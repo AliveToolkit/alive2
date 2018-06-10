@@ -266,7 +266,7 @@ expr expr::binop_commutative(const expr &rhs,
 bool expr::binop_sfold(const expr &rhs,
                        int64_t(*native)(int64_t, int64_t), expr &result) const {
   int64_t a, b;
-  if (bits() <= 64 && isInt(a) && isInt(b)) {
+  if (bits() <= 64 && isInt(a) && rhs.isInt(b)) {
     result = mkInt(native(a, b), sort());
     return true;
   }
@@ -277,7 +277,7 @@ bool expr::binop_ufold(const expr &rhs,
                        uint64_t(*native)(uint64_t, uint64_t),
                        expr &result) const {
   uint64_t a, b;
-  if (bits() <= 64 && isUInt(a) && isUInt(b)) {
+  if (bits() <= 64 && isUInt(a) && rhs.isUInt(b)) {
     result = mkUInt(native(a, b), sort());
     return true;
   }
