@@ -17,8 +17,8 @@ struct StateValue {
   StateValue(smt::expr &&value, smt::expr &&non_poison)
       : value(std::move(value)), non_poison(std::move(non_poison)) {}
 
-  static StateValue mkIf(const smt::expr &cond, StateValue &&then,
-                         StateValue &&els);
+  static StateValue mkIf(const smt::expr &cond, const StateValue &then,
+                         const StateValue &els);
 
   friend std::ostream& operator<<(std::ostream &os, const StateValue &val);
 };
@@ -47,14 +47,17 @@ public:
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &bb);
-  void addReturn(StateValue &&val);
+  void addReturn(const StateValue &val);
   void addUB(smt::expr &&ub)      { domain &= std::move(ub); }
   void addUB(const smt::expr &ub) { domain &= ub; }
   void addQuantVar(const smt::expr &var);
 
   auto& getFn() const { return f; }
   const auto& getValues() const { return values; }
+
   bool fnReturned() const { return returned; }
+  const smt::expr& returnDomain() const { return return_domain; }
+  const StateValue& returnVal() const { return return_val; }
 };
 
 }

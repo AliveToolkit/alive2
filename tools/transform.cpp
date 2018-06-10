@@ -15,9 +15,27 @@ using namespace smt;
 using namespace util;
 using namespace std;
 
+static void check_refinement(Solver &s, Errors &errs,
+                             const expr &dom_a, const StateValue &a,
+                             const expr &dom_b, const StateValue &b) {
+  // TODO: handle quantified vars
+  // TODO: improve error messages
+  s.check({
+    { dom_a.notImplies(dom_b), [&](const Model &m) {
+      errs.add("Source is more defined than target"); } },
+
+    { dom_a && a.non_poison.notImplies(b.non_poison), [&](const Model &m) {
+      errs.add("Target is more poisonous than source"); } },
+
+    { dom_a && a.non_poison && a.value != b.value, [&](const Model &m) {
+      errs.add("value mismatch");
+     } }
+  });
+}
+
 namespace tools {
 
-Errors Transform::verify() const {
+Errors Transform::verify(const TransformVerifyOpts &opts) const {
   Errors errs;
 
   unordered_map<string, const Value*> tgt_vals;
@@ -30,26 +48,16 @@ Errors Transform::verify() const {
   sym_exec(tgt_state);
 
   Solver s;
-  for (auto &[var, val] : src_state.getValues()) {
-    auto &name = var->getName();
-    if (name.empty() || name[0] != '%')
-      continue;
 
-    auto &[srcv, srcp] = val;
-    auto &[tgtv, tgtp] = tgt_state[*tgt_vals.at(name)];
+  if (opts.check_each_var) {
+    for (auto &[var, val] : src_state.getValues()) {
+      auto &name = var->getName();
+      if (name[0] != '%')
+        continue;
 
-    // TODO
-    // add data-flow domain tracking for Alive, but not for TV?
-    // finish these proof obligations
-    // handle quantified vars
-    s.check({
-//              { srcd.notImplies(tgtd), "Source is more defined than target" },
- //             { srcd && srcp.notImplies(tgtd), "foo" },
-              { srcp && srcv != tgtv, [&](const Model &m) {
-      errs.add("value mismatch");
-    }}
-            }
-    );
+      // TODO: add data-flow domain tracking for Alive, but not for TV
+      check_refinement(s, errs, true, val, true, tgt_state[*tgt_vals.at(name)]);
+    }
   }
 
   if (src_state.fnReturned() != tgt_state.fnReturned()) {
@@ -59,7 +67,9 @@ Errors Transform::verify() const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    // FIXME
+    check_refinement(s, errs,
+                     src_state.returnDomain(), src_state.returnVal(),
+                     tgt_state.returnDomain(), tgt_state.returnVal());
   }
 
   return errs;

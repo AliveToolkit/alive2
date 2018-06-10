@@ -16,9 +16,12 @@ static string fresh_id() {
 
 namespace IR {
 
-Value::Value(unique_ptr<Type> &&type, string &&name)
+Value::Value(unique_ptr<Type> &&type, string &&name, bool mk_unique_name)
   : type(move(type)), name(move(name)) {
-  this->type->setName(getName());
+  if (mk_unique_name)
+    this->type->setName(getName() + '_' + fresh_id());
+  else
+    this->type->setName(getName());
 }
 
 void Value::fixupTypes(const Model &m) {
@@ -36,8 +39,7 @@ ostream& operator<<(ostream &os, const Value &val) {
 
 
 IntConst::IntConst(unique_ptr<Type> &&type, uint64_t val)
-  : Value(move(type), to_string(val)), val(val) {
-  getWType().setName(getName() + '_' + fresh_id());
+  : Value(move(type), to_string(val), true), val(val) {
   getWType().enforceIntType();
 }
 

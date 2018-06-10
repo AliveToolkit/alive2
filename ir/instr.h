@@ -9,8 +9,10 @@ namespace IR {
 
 class Instr : public Value {
 protected:
-  Instr(std::unique_ptr<Type> &&type, std::string &&name)
-    : Value(std::move(type), std::move(name)) {}
+  Instr(std::unique_ptr<Type> &&type, std::string &&name,
+        bool mk_unique_name = false)
+    : Value(std::move(type), std::move(name), mk_unique_name) {}
+  void printType(std::ostream &os) const;
 };
 
 
@@ -32,6 +34,19 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
   ~BinOp();
+};
+
+
+class Return final : public Instr {
+  Value &val;
+public:
+  Return(std::unique_ptr<Type> &&type, Value &val) :
+    Instr(std::move(type), "return", true), val(val) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+  ~Return();
 };
 
 

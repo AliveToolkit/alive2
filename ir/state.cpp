@@ -11,8 +11,8 @@ using namespace std;
 
 namespace IR {
 
-StateValue StateValue::mkIf(const expr &cond, StateValue &&then,
-                            StateValue &&els) {
+StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
+                            const StateValue &els) {
   return { expr::mkIf(cond, then.value, els.value),
            expr::mkIf(cond, then.non_poison, els.non_poison) };
 }
@@ -49,15 +49,14 @@ void State::addJump(const BasicBlock &bb) {
     p.first->second |= domain;
 }
 
-void State::addReturn(StateValue &&val) {
+void State::addReturn(const StateValue &val) {
   if (returned) {
     return_domain |= domain;
-    return_val =
-        StateValue::mkIf(domain, move(val), move(return_val));
+    return_val = StateValue::mkIf(domain, val, return_val);
   } else {
     returned = true;
     return_domain = domain;
-    return_val = move(val);
+    return_val = val;
   }
 }
 

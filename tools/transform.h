@@ -30,11 +30,15 @@ public:
 };
 
 
+struct TransformVerifyOpts {
+  bool check_each_var = true;
+};
+
 struct Transform {
   std::string name;
   IR::Function src, tgt;
 
-  util::Errors verify() const;
+  util::Errors verify(const TransformVerifyOpts &opts) const;
   TypingAssignments getTypings() const;
   void fixupTypes(const TypingAssignments &t);
 

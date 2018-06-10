@@ -33,6 +33,7 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
   for (auto &i : bb.instrs()) {
     os << "  ";
     i.print(os);
+    os << '\n';
   }
   return os;
 }

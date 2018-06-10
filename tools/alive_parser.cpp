@@ -227,20 +227,31 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   UNREACHABLE();
 }
 
+static unique_ptr<Instr> parse_return() {
+  auto type = parse_type(/*optional=*/true);
+  auto &val = parse_operand(type.get());
+  return make_unique<Return>(move(type), val);
+}
+
 static void parse_fn(Function &f) {
   fn = &f;
+  identifiers.clear();
   BasicBlock *bb = &f.getBB("");
 
   while (true) {
     switch (auto t = *tokenizer) {
     case IDENTIFIER: {
-      auto i = parse_instr(yylval.str);
-      identifiers.emplace(yylval.str, i.get());
+      string name(yylval.str);
+      auto i = parse_instr(name);
+      identifiers.emplace(move(name), i.get());
       bb->addIntr(move(i));
       break;
     }
     case LABEL:
       bb = &f.getBB(yylval.str);
+      break;
+    case RETURN:
+      bb->addIntr(parse_return());
       break;
     case UNREACH:
       bb->addIntr(make_unique<Unreachable>());
@@ -270,6 +281,7 @@ vector<Transform> parse(string_view buf) {
     parse_fn(t.tgt);
   }
 
+  identifiers.clear();
   return ret;
 }
 

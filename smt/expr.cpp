@@ -302,13 +302,21 @@ expr expr::operator*(const expr &rhs) const {
 
 expr expr::sdiv(const expr &rhs) const {
   C(rhs);
-  // TODO: optimize
+
+  expr r;
+  if (binop_sfold(rhs, [](auto a, auto b) { return a / b; }, r))
+    return r;
+
   return Z3_mk_bvsdiv(ctx(), ast(), rhs());
 }
 
 expr expr::udiv(const expr &rhs) const {
   C(rhs);
-  // TODO: optimize
+
+  expr r;
+  if (binop_ufold(rhs, [](auto a, auto b) { return a / b; }, r))
+    return r;
+
   return Z3_mk_bvudiv(ctx(), ast(), rhs());
 }
 

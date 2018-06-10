@@ -10,6 +10,13 @@ using namespace std;
 
 namespace IR {
 
+void Instr::printType(ostream &os) const {
+  auto t = getType().toString();
+  if (!t.empty())
+    os << t << ' ';
+}
+
+
 BinOp::BinOp(unique_ptr<Type> &&type, string &&name, Value &lhs, Value &rhs,
              Op op, Flags flags)
   : Instr(move(type), move(name)), lhs(lhs), rhs(rhs), op(op), flags(flags) {
@@ -50,10 +57,8 @@ void BinOp::print(ostream &os) const {
   }
 
   os << getName() << " = " << str << flag;
-  auto t = getType().toString();
-  if (!t.empty())
-    os << t << ' ';
-  os << lhs.getName() << ", " << rhs.getName() << '\n';
+  printType(os);
+  os << lhs.getName() << ", " << rhs.getName();
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -152,6 +157,26 @@ expr BinOp::getTypeConstraints() const {
 }
 
 BinOp::~BinOp() {}
+
+
+void Return::print(ostream &os) const {
+  os << "return ";
+  printType(os);
+  os << val.getName();
+}
+
+StateValue Return::toSMT(State &s) const {
+  s.addReturn(s[val]);
+  return {};
+}
+
+expr Return::getTypeConstraints() const {
+  return getType().getTypeConstraints() &&
+         getType() == val.getType();
+}
+
+Return::~Return() {}
+
 
 void Unreachable::print(ostream &os) const {
   os << "unreachable";

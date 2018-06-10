@@ -31,9 +31,11 @@ void sym_exec(State &s) {
 
     for (auto &i : bb->instrs()) {
       auto val = i.toSMT(s);
-      if (!i.getName().empty()) {
+      auto &name = i.getName();
+
+      if (name[0] == '%') {
         if (config::symexec_print_each_value)
-          cout << i.getName() << " = " << val << '\n';
+          cout << name << " = " << val << '\n';
         s.add(i, move(val));
       }
     }

@@ -20,6 +20,7 @@ static void show_help() {
   cerr <<
     "Usage: alive2 <options> <files.opt>\n"
     "Options:\n"
+    " -root-only:\tCheck the expression's root only\n"
     " -v:\t\tverbose mode\n"
     " -smt-stats:\tshow SMT statistics\n"
     " -skip-smt:\tassume all SMT queries are UNSAT\n"
@@ -31,13 +32,18 @@ int main(int argc, char **argv) {
   bool verbose = false;
   bool show_smt_stats = false;
 
+  TransformVerifyOpts transform_opts;
+
   int argc_i = 1;
   for (; argc_i < argc; ++argc_i) {
     if (argv[argc_i][0] != '-')
       break;
 
     string_view arg(argv[argc_i]);
-    if (arg == "-v")
+    if (arg == "-root-only")
+      // FIXME: add a return instruction to each transform as needed
+      transform_opts.check_each_var = false;
+    else if (arg == "-v")
       verbose = true;
     else if (arg == "-smt-stats")
       show_smt_stats = true;
@@ -87,7 +93,7 @@ int main(int argc, char **argv) {
         unsigned i = 0;
         for (; types; ++types) {
           t.fixupTypes(types);
-          if (auto errs = t.verify()) {
+          if (auto errs = t.verify(transform_opts)) {
             cerr << errs;
             ++num_errors;
             break;

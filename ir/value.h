@@ -19,7 +19,8 @@ class Value {
   std::string name;
 
 protected:
-  Value(std::unique_ptr<Type> &&type, std::string &&name);
+  Value(std::unique_ptr<Type> &&type, std::string &&name,
+        bool mk_unique_name = false);
   Type& getWType() { return *type.get(); }
 
 public:

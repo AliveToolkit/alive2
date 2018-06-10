@@ -135,6 +135,7 @@ re2c:yyfill:check = 0;
 "nsw" { return NSW; }
 "nuw" { return NUW; }
 "exact" { return EXACT; }
+"return" { return RETURN; }
 "unreachable" { return UNREACH; }
 
 * { error("couldn't parse: '" + string((char*)YYTEXT, 16) + '\''); }
