@@ -41,5 +41,6 @@ struct const_strip_unique_ptr {
 };
 
 unsigned ilog2(uint64_t n);
+unsigned num_sign_bits(uint64_t n);
 
 }

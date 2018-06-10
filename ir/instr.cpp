@@ -160,7 +160,7 @@ BinOp::~BinOp() {}
 
 
 void Return::print(ostream &os) const {
-  os << "return ";
+  os << "ret ";
   printType(os);
   os << val.getName();
 }

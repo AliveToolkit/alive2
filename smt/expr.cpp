@@ -213,6 +213,16 @@ bool expr::isAllOnes() const {
   return isInt(n) && n == -1;
 }
 
+bool expr::isSMin() const {
+  uint64_t n = 0;
+  return isUInt(n) && n == (1ull << (bits() - 1));
+}
+
+bool expr::isSMax() const {
+  uint64_t n = 0;
+  return isUInt(n) && n == ((uint64_t)INT64_MAX >> (64 - bits()));
+}
+
 unsigned expr::bits() const {
   return Z3_get_bv_sort_size(ctx(), sort());
 }
@@ -224,7 +234,13 @@ bool expr::isUInt(uint64_t &n) const {
 
 bool expr::isInt(int64_t &n) const {
   C();
-  return Z3_get_numeral_int64(ctx(), ast(), &n) == Z3_TRUE;
+  if (Z3_get_numeral_int64(ctx(), ast(), &n) == Z3_FALSE)
+    return false;
+
+  auto bw = bits();
+  if (bw < 64)
+    n = (int64_t)((uint64_t)n << (64 - bw)) >> (64 - bw);
+  return true;
 }
 
 bool expr::isNot(expr &neg) const {
@@ -293,6 +309,8 @@ expr expr::operator+(const expr &rhs) const {
 }
 
 expr expr::operator-(const expr &rhs) const {
+  if (eq(rhs))
+    return mkUInt(0, sort());
   return *this + mkInt(-1, sort()) * rhs;
 }
 
@@ -303,6 +321,15 @@ expr expr::operator*(const expr &rhs) const {
 expr expr::sdiv(const expr &rhs) const {
   C(rhs);
 
+  if (eq(rhs))
+    return mkUInt(1, sort());
+
+  if (rhs.isZero())
+    return rhs;
+
+  if (isSMin() && rhs.isAllOnes())
+    return mkUInt(0, sort());
+
   expr r;
   if (binop_sfold(rhs, [](auto a, auto b) { return a / b; }, r))
     return r;
@@ -312,6 +339,12 @@ expr expr::sdiv(const expr &rhs) const {
 
 expr expr::udiv(const expr &rhs) const {
   C(rhs);
+
+  if (eq(rhs))
+    return mkUInt(1, sort());
+
+  if (rhs.isZero())
+    return rhs;
 
   expr r;
   if (binop_ufold(rhs, [](auto a, auto b) { return a / b; }, r))

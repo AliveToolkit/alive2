@@ -84,6 +84,8 @@ public:
   bool isZero() const;
   bool isOne() const;
   bool isAllOnes() const;
+  bool isSMin() const;
+  bool isSMax() const;
 
   unsigned bits() const;
   bool isUInt(uint64_t &n) const;

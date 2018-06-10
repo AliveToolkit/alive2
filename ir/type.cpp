@@ -114,11 +114,12 @@ expr IntType::getTypeConstraints() const {
   auto bw = var("bw", var_bw_bits);
   if (defined) {
     c &= bw == expr::mkUInt(bitwidth, var_bw_bits);
-  } else {
-    // limit ints to be between 1 and 64 bits
-    c &= bw.uge(expr::mkUInt(1, var_bw_bits));
-    c &= bw.ule(expr::mkUInt(64, var_bw_bits));
   }
+
+  // limit ints to be between 1 and 64 bits
+  // TODO: lift 64-bit restriction
+  c &= bw.uge(expr::mkUInt(1, var_bw_bits));
+  c &= bw.ule(expr::mkUInt(64, var_bw_bits));
   return c;
 }
 

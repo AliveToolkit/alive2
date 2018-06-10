@@ -38,7 +38,7 @@ ostream& operator<<(ostream &os, const Value &val) {
 }
 
 
-IntConst::IntConst(unique_ptr<Type> &&type, uint64_t val)
+IntConst::IntConst(unique_ptr<Type> &&type, int64_t val)
   : Value(move(type), to_string(val), true), val(val) {
   getWType().enforceIntType();
 }
@@ -48,12 +48,13 @@ void IntConst::print(ostream &os) const {
 }
 
 StateValue IntConst::toSMT(State &s) const {
-  return { expr::mkUInt(val, bits()), true };
+  return { expr::mkInt(val, bits()), true };
 }
 
 expr IntConst::getTypeConstraints() const {
+  unsigned min_bits = (val >= 0 ? 63 : 64) - num_sign_bits(val);
   return getType().getTypeConstraints() &&
-         getType().atLeastBits(ilog2(val));
+         getType().atLeastBits(min_bits);
 }
 
 IntConst::~IntConst() {}

@@ -90,6 +90,8 @@ void TypingAssignments::operator++(void) {
 }
 
 TypingAssignments Transform::getTypings() const {
+  // TODO: missing cross-program type constraints
+  // e.g. for inputs and return values
   return { src.getTypeConstraints() && tgt.getTypeConstraints() };
 }
 

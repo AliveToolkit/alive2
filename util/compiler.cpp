@@ -22,4 +22,12 @@ unsigned ilog2(uint64_t n) {
 #endif
 }
 
+unsigned num_sign_bits(uint64_t n) {
+#ifdef __GNUC__
+  return __builtin_clrsbll(n);
+#else
+# error Unknown compiler
+#endif
+}
+
 }

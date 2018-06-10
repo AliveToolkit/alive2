@@ -39,10 +39,10 @@ public:
 
 
 class IntConst final : public Value {
-  uint64_t val;
+  int64_t val;
 
 public:
-  IntConst(std::unique_ptr<Type> &&type, uint64_t val);
+  IntConst(std::unique_ptr<Type> &&type, int64_t val);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;

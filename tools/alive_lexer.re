@@ -97,7 +97,7 @@ re2c:yyfill:check = 0;
   return INT_TYPE;
 }
 
-[0-9]+ {
+"-"?[0-9]+ {
   yylval.num = strtoull((char*)YYTEXT, nullptr, 10);
   return NUM;
 }
@@ -135,7 +135,7 @@ re2c:yyfill:check = 0;
 "nsw" { return NSW; }
 "nuw" { return NUW; }
 "exact" { return EXACT; }
-"return" { return RETURN; }
+"ret" { return RETURN; }
 "unreachable" { return UNREACH; }
 
 * { error("couldn't parse: '" + string((char*)YYTEXT, 16) + '\''); }
