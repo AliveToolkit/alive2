@@ -7,6 +7,7 @@
 #include <ostream>
 #include <utility>
 
+typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_app* Z3_app;
 typedef struct _Z3_ast* Z3_ast;
 typedef struct _Z3_sort* Z3_sort;
@@ -26,6 +27,23 @@ class expr {
 
   Z3_sort sort() const;
   Z3_app isApp() const;
+
+  expr binop_commutative(const expr &rhs,
+                         uint64_t(*native)(uint64_t, uint64_t),
+                         Z3_ast(*z3)(Z3_context, Z3_ast, Z3_ast),
+                         bool (expr::*identity)() const,
+                         bool (expr::*absorvent)() const) const;
+  expr binop_commutative(const expr &rhs,
+                         Z3_ast(*z3)(Z3_context, Z3_ast, Z3_ast)) const;
+
+  bool binop_sfold(const expr &rhs,
+                   int64_t(*native)(int64_t, int64_t),
+                   expr &result) const;
+  bool binop_ufold(const expr &rhs,
+                   uint64_t(*native)(uint64_t, uint64_t),
+                   expr &result) const;
+
+  bool alwaysFalse() const { return false; }
 
   static Z3_ast mkTrue();
   static Z3_ast mkFalse();
@@ -64,6 +82,7 @@ public:
   bool isTrue() const;
   bool isFalse() const;
   bool isZero() const;
+  bool isOne() const;
   bool isAllOnes() const;
 
   unsigned bits() const;

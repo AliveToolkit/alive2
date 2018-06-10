@@ -199,13 +199,16 @@ bool expr::isFalse() const {
 }
 
 bool expr::isZero() const {
-  C();
   uint64_t n = 0;
   return isUInt(n) && n == 0;
 }
 
+bool expr::isOne() const {
+  uint64_t n = 0;
+  return isUInt(n) && n == 1;
+}
+
 bool expr::isAllOnes() const {
-  C();
   int64_t n = 0;
   return isInt(n) && n == -1;
 }
@@ -234,10 +237,59 @@ bool expr::isNot(expr &neg) const {
   return Z3_get_decl_kind(ctx(), decl) == Z3_OP_NOT;
 }
 
-expr expr::operator+(const expr &rhs) const {
+expr expr::binop_commutative(const expr &rhs,
+                             uint64_t (*native)(uint64_t, uint64_t),
+                             Z3_ast (*z3)(Z3_context, Z3_ast, Z3_ast),
+                             bool (expr::*identity)() const,
+                             bool (expr::*absorvent)() const) const {
   C(rhs);
-  // TODO: optimize
-  return Z3_mk_bvadd(ctx(), ast(), rhs());
+  expr r;
+  if (binop_ufold(rhs, native, r))
+    return r;
+
+  if ((this->*absorvent)() || (rhs.*identity)())
+    return *this;
+
+  if ((rhs.*absorvent)() || (this->*identity)())
+    return rhs;
+
+  return binop_commutative(rhs, z3);
+}
+
+expr expr::binop_commutative(const expr &rhs,
+                             Z3_ast(*z3)(Z3_context, Z3_ast, Z3_ast)) const {
+  auto cmp = *this < rhs;
+  auto a = ast(), b = rhs();
+  return z3(ctx(), cmp ? a : b, cmp ? b : a);
+}
+
+bool expr::binop_sfold(const expr &rhs,
+                       int64_t(*native)(int64_t, int64_t), expr &result) const {
+  int64_t a, b;
+  if (bits() <= 64 && isInt(a) && isInt(b)) {
+    result = mkInt(native(a, b), sort());
+    return true;
+  }
+  return false;
+}
+
+bool expr::binop_ufold(const expr &rhs,
+                       uint64_t(*native)(uint64_t, uint64_t),
+                       expr &result) const {
+  uint64_t a, b;
+  if (bits() <= 64 && isUInt(a) && isUInt(b)) {
+    result = mkUInt(native(a, b), sort());
+    return true;
+  }
+  return false;
+}
+
+#define binopc(native_op, z3, identity, absorvent)                             \
+  binop_commutative(rhs, [](uint64_t a, uint64_t b) { return a native_op b; }, \
+                    z3, &expr::identity, &expr::absorvent)
+
+expr expr::operator+(const expr &rhs) const {
+  return binopc(+, Z3_mk_bvadd, isZero, alwaysFalse);
 }
 
 expr expr::operator-(const expr &rhs) const {
@@ -245,9 +297,7 @@ expr expr::operator-(const expr &rhs) const {
 }
 
 expr expr::operator*(const expr &rhs) const {
-  C(rhs);
-  // TODO: optimize
-  return Z3_mk_bvmul(ctx(), ast(), rhs());
+  return binopc(*, Z3_mk_bvmul, isOne, isZero);
 }
 
 expr expr::sdiv(const expr &rhs) const {
@@ -300,22 +350,37 @@ expr expr::udiv_exact(const expr &rhs) const {
 
 expr expr::operator<<(const expr &rhs) const {
   C(rhs);
-  if (rhs.isZero())
+  if (isZero() || rhs.isZero())
     return *this;
+
+  expr r;
+  if (binop_ufold(rhs, [](auto a, auto b) { return a << b; }, r))
+    return r;
+
   return Z3_mk_bvshl(ctx(), ast(), rhs());
 }
 
 expr expr::ashr(const expr &rhs) const {
   C(rhs);
-  if (rhs.isZero())
+  if (isZero() || rhs.isZero())
     return *this;
+
+  expr r;
+  if (binop_sfold(rhs, [](auto a, auto b) { return a >> b; }, r))
+    return r;
+
   return Z3_mk_bvashr(ctx(), ast(), rhs());
 }
 
 expr expr::lshr(const expr &rhs) const {
   C(rhs);
-  if (rhs.isZero())
+  if (isZero() || rhs.isZero())
     return *this;
+
+  expr r;
+  if (binop_ufold(rhs, [](auto a, auto b) { return a >> b; }, r))
+    return r;
+
   return Z3_mk_bvlshr(ctx(), ast(), rhs());
 }
 
@@ -336,32 +401,21 @@ expr expr::lshr_exact(const expr &rhs) const {
 }
 
 expr expr::operator&(const expr &rhs) const {
-  C(rhs);
-  if (eq(rhs) || isZero() || rhs.isAllOnes())
+  if (eq(rhs))
     return *this;
-
-  if (rhs.isZero() || isAllOnes())
-    return rhs;
-
-  return Z3_mk_bvand(ctx(), ast(), rhs());
+  return binopc(&, Z3_mk_bvand, isAllOnes, isZero);
 }
 
 expr expr::operator|(const expr &rhs) const {
-  C(rhs);
-  if (eq(rhs) || rhs.isZero() || isAllOnes())
+  if (eq(rhs))
     return *this;
-
-  if (isZero() || rhs.isAllOnes())
-    return rhs;
-
-  return Z3_mk_bvor(ctx(), ast(), rhs());
+  return binopc(|, Z3_mk_bvor, isZero, isAllOnes);
 }
 
 expr expr::operator^(const expr &rhs) const {
-  C(rhs);
   if (eq(rhs))
-    return mkUInt(0, bits());
-  return Z3_mk_bvxor(ctx(), ast(), rhs());
+    return mkUInt(0, sort());
+  return binopc(^, Z3_mk_bvxor, isZero, alwaysFalse);
 }
 
 expr expr::operator!() const {
@@ -379,8 +433,8 @@ expr expr::operator!() const {
 
 expr expr::operator~() const {
   C();
-  uint64_t n;
-  if (isUInt(n))
+  int64_t n;
+  if (isInt(n))
     return mkUInt(~n, sort());
   return mkInt(-1, sort()) - *this;
 }
@@ -391,7 +445,7 @@ expr expr::operator==(const expr &rhs) const {
     return true;
   if (isConst() && rhs.isConst())
     return false;
-  return Z3_mk_eq(ctx(), ast(), rhs());
+  return binop_commutative(rhs, Z3_mk_eq);
 }
 
 expr expr::operator!=(const expr &rhs) const {
@@ -467,7 +521,7 @@ expr expr::ule(const expr &rhs) const {
 expr expr::ult(const expr &rhs) const {
   uint64_t n;
   if (rhs.isUInt(n))
-    return rhs.isZero() ? false : ule(mkUInt(n - 1, bits()));
+    return rhs.isZero() ? false : ule(mkUInt(n - 1, sort()));
 
   return !rhs.ule(*this);
 }
@@ -549,18 +603,8 @@ ostream& operator<<(ostream &os, const expr &e) {
 
 bool expr::operator<(const expr &rhs) const {
   C(rhs);
-#ifndef NDEBUG
-  auto id_a = id();
-  auto id_b = rhs.id();
-  if (id_a < id_b)
-    return true;
-  if (id_a > id_b)
-    return false;
-  assert(eq(rhs));
-  return false;
-#else
+  assert((id() == rhs.id()) == eq(rhs));
   return id() < rhs.id();
-#endif
 }
 
 unsigned expr::id() const {
