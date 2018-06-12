@@ -32,7 +32,7 @@ public:
   virtual StateValue toSMT(State &s) const = 0;
   virtual smt::expr getTypeConstraints() const = 0;
   void fixupTypes(const smt::Model &m);
-  virtual ~Value() = 0;
+  virtual ~Value();
 
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
 };
@@ -46,7 +46,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
-  ~IntConst() override;
 };
 
 
@@ -57,7 +56,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
-  ~Input() override;
 };
 
 }

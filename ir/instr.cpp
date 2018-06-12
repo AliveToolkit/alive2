@@ -156,8 +156,6 @@ expr BinOp::getTypeConstraints() const {
          getType() == rhs.getType();
 }
 
-BinOp::~BinOp() {}
-
 
 void Return::print(ostream &os) const {
   os << "ret ";
@@ -175,8 +173,6 @@ expr Return::getTypeConstraints() const {
          getType() == val.getType();
 }
 
-Return::~Return() {}
-
 
 void Unreachable::print(ostream &os) const {
   os << "unreachable";
@@ -190,7 +186,5 @@ StateValue Unreachable::toSMT(State &s) const {
 expr Unreachable::getTypeConstraints() const {
   return true;
 }
-
-Unreachable::~Unreachable() {}
 
 }

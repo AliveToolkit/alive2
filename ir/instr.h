@@ -33,7 +33,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
-  ~BinOp();
 };
 
 
@@ -46,7 +45,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
-  ~Return();
 };
 
 
@@ -57,7 +55,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
-  ~Unreachable();
 };
 
 }

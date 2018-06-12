@@ -43,6 +43,7 @@ void Type::setName(const string &name) {
 unsigned Type::bits() const {
   UNREACHABLE();
 }
+
 expr Type::operator==(const Type &b) const {
 #define CMP(Ty)                                                                \
   if (auto lhs = dynamic_cast<const Ty*>(this)) {                              \
@@ -81,6 +82,8 @@ string Type::toString() const {
   print(s);
   return s.str();
 }
+
+Type::~Type() {}
 
 
 expr VoidType::getTypeConstraints() const {

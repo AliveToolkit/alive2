@@ -57,8 +57,6 @@ expr IntConst::getTypeConstraints() const {
          getType().atLeastBits(min_bits);
 }
 
-IntConst::~IntConst() {}
-
 
 void Input::print(std::ostream &os) const {
   os << getName();
@@ -76,7 +74,5 @@ StateValue Input::toSMT(State &s) const {
 expr Input::getTypeConstraints() const {
   return getType().getTypeConstraints();
 }
-
-Input::~Input() {}
 
 }
