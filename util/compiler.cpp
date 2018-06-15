@@ -23,7 +23,13 @@ unsigned ilog2(uint64_t n) {
 }
 
 unsigned num_sign_bits(uint64_t n) {
-#ifdef __GNUC__
+#ifdef __clang__
+  if (n == 0 || n == -1)
+    return 63;
+  int zeros = __builtin_clzll(n) - 1;
+  int ones = __builtin_clzll(~n) - 1;
+  return zeros > ones ? zeros : ones;
+#elif defined __GNUC__
   return __builtin_clrsbll(n);
 #else
 # error Unknown compiler
