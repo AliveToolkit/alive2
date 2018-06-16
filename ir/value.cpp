@@ -54,7 +54,7 @@ StateValue IntConst::toSMT(State &s) const {
 expr IntConst::getTypeConstraints() const {
   unsigned min_bits = (val >= 0 ? 63 : 64) - num_sign_bits(val);
   return getType().getTypeConstraints() &&
-         getType().atLeastBits(min_bits);
+         getType().sizeVar().uge(min_bits);
 }
 
 

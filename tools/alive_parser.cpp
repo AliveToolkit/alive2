@@ -113,7 +113,7 @@ static void parse_comma() {
   tokenizer.ensure(COMMA);
 }
 
-static unique_ptr<Type> parse_type(bool optional) {
+static unique_ptr<Type> parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
   case INT_TYPE:
     return make_unique<IntType>(yylval.num);
@@ -131,7 +131,13 @@ static unique_ptr<Type> parse_type(bool optional) {
 static Value& parse_operand(Type *type) {
   switch (auto t = *tokenizer) {
   case NUM:
+    // FIXME: constraint type to int
     return get_constant(yylval.num, type);
+  case TRUE:
+    // FIXME: constrain types below to boolean
+    return get_constant(1, type);
+  case FALSE:
+    return get_constant(0, type);
   case IDENTIFIER: {
     string id(yylval.str);
     if (auto I = identifiers.find(id); 
@@ -172,14 +178,22 @@ static BinOp::Flags parse_exact() {
 
 static BinOp::Flags parse_binop_flags(token op_token) {
   switch (op_token) {
-  case ADD:  return parse_nsw_nuw();
-  case SUB:  return parse_nsw_nuw();
-  case MUL:  return parse_nsw_nuw();
-  case SDIV: return parse_exact();
-  case UDIV: return parse_exact();
-  case SHL:  return parse_nsw_nuw();
-  case LSHR: return parse_exact();
-  case ASHR: return parse_exact();
+  case ADD:
+  case SUB:
+  case MUL:
+  case SHL:
+    return parse_nsw_nuw();
+  case SDIV:
+  case UDIV:
+  case LSHR:
+  case ASHR:
+    return parse_exact();
+  case SREM:
+  case UREM:
+  case AND:
+  case OR:
+  case XOR:
+    return BinOp::None;
   default:
     UNREACHABLE();
   }
@@ -187,7 +201,7 @@ static BinOp::Flags parse_binop_flags(token op_token) {
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   BinOp::Flags flags = parse_binop_flags(op_token);
-  auto type = parse_type(/*optional=*/true);
+  auto type = parse_type();
   auto &a = parse_operand(type.get());
   parse_comma();
   auto &b = parse_operand(type.get());
@@ -199,13 +213,51 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case MUL:  op = BinOp::Mul; break;
   case SDIV: op = BinOp::SDiv; break;
   case UDIV: op = BinOp::UDiv; break;
+  case SREM: op = BinOp::SRem; break;
+  case UREM: op = BinOp::URem; break;
   case SHL:  op = BinOp::Shl; break;
   case LSHR: op = BinOp::LShr; break;
   case ASHR: op = BinOp::AShr; break;
+  case AND:  op = BinOp::And; break;
+  case OR:   op = BinOp::Or; break;
+  case XOR:  op = BinOp::Xor; break;
   default:
     UNREACHABLE();
   }
   return make_unique<BinOp>(move(type), string(name), a, b, op, flags);
+}
+
+static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
+  // op ty %op to ty2
+  auto opty = parse_type();
+  auto &val = parse_operand(opty.get());
+  unique_ptr<Type> ty2;
+  if (tokenizer.consumeIf(TO)) {
+    ty2 = parse_type(/*optional=*/false);
+  }
+
+  ConversionOp::Op op;
+  switch (op_token) {
+  case SEXT:  op = ConversionOp::SExt; break;
+  case ZEXT:  op = ConversionOp::ZExt; break;
+  case TRUNC: op = ConversionOp::Trunc; break;
+  default:
+    UNREACHABLE();
+  }
+  return make_unique<ConversionOp>(move(ty2), string(name), val, op);
+}
+
+static unique_ptr<Instr> parse_select(string_view name) {
+  // select condty %cond, ty %a, ty %b
+  auto condty = parse_type();
+  auto &cond = parse_operand(condty.get());
+  parse_comma();
+  auto aty = parse_type();
+  auto &a = parse_operand(aty.get());
+  parse_comma();
+  auto bty = parse_type();
+  auto &b = parse_operand(bty.get());
+  return make_unique<Select>(move(aty), string(name), cond, a, b);
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {
@@ -217,10 +269,21 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case MUL:
   case SDIV:
   case UDIV:
+  case SREM:
+  case UREM:
   case SHL:
   case ASHR:
   case LSHR:
+  case AND:
+  case OR:
+  case XOR:
     return parse_binop(name, t);
+  case SEXT:
+  case ZEXT:
+  case TRUNC:
+    return parse_conversionop(name, t);
+  case SELECT:
+    return parse_select(name);
   default:
     error(string("Expected instruction name; got: ") + token_name[t]);
   }
@@ -228,7 +291,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
 }
 
 static unique_ptr<Instr> parse_return() {
-  auto type = parse_type(/*optional=*/true);
+  auto type = parse_type();
   auto &val = parse_operand(type.get());
   return make_unique<Return>(move(type), val);
 }

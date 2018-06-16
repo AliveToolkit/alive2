@@ -250,7 +250,11 @@ bool expr::isNot(expr &neg) const {
     return false;
 
   auto decl = Z3_get_app_decl(ctx(), app);
-  return Z3_get_decl_kind(ctx(), decl) == Z3_OP_NOT;
+  if (Z3_get_decl_kind(ctx(), decl) != Z3_OP_NOT)
+    return false;
+
+  neg = Z3_get_app_arg(ctx(), app, 0);
+  return true;
 }
 
 expr expr::binop_commutative(const expr &rhs,
@@ -351,6 +355,41 @@ expr expr::udiv(const expr &rhs) const {
     return r;
 
   return Z3_mk_bvudiv(ctx(), ast(), rhs());
+}
+
+expr expr::srem(const expr &rhs) const {
+  C(rhs);
+
+  if (eq(rhs))
+    return mkUInt(1, sort());
+
+  if (rhs.isZero())
+    return rhs;
+
+  if (isSMin() && rhs.isAllOnes())
+    return mkUInt(0, sort());
+
+  expr r;
+  if (binop_sfold(rhs, [](auto a, auto b) { return a % b; }, r))
+    return r;
+
+  return Z3_mk_bvsrem(ctx(), ast(), rhs());
+}
+
+expr expr::urem(const expr &rhs) const {
+  C(rhs);
+
+  if (eq(rhs))
+    return mkUInt(1, sort());
+
+  if (rhs.isZero())
+    return rhs;
+
+  expr r;
+  if (binop_ufold(rhs, [](auto a, auto b) { return a % b; }, r))
+    return r;
+
+  return Z3_mk_bvurem(ctx(), ast(), rhs());
 }
 
 expr expr::add_no_soverflow(const expr &rhs) const {
@@ -616,6 +655,10 @@ expr expr::zext(unsigned amount) const {
   return mkUInt(0, amount).concat(*this);
 }
 
+expr expr::trunc(unsigned tobw) const {
+  return extract(tobw-1, 0);
+}
+
 expr expr::concat(const expr &rhs) const {
   C(rhs);
   return Z3_mk_concat(ctx(), ast(), rhs());
@@ -633,7 +676,16 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
     return then;
   if (cond.isFalse())
     return els;
-  return Z3_mk_ite(ctx(), cond(), then(), els());
+
+  expr notcond;
+  Z3_ast c, t = then(), e = els();
+  if (cond.isNot(notcond)) {
+    c = notcond();
+    swap(t, e);
+  } else {
+    c = cond();
+  }
+  return Z3_mk_ite(ctx(), c, t, e);
 }
 
 ostream& operator<<(ostream &os, const expr &e) {

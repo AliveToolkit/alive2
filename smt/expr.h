@@ -98,6 +98,8 @@ public:
   expr operator*(const expr &rhs) const;
   expr sdiv(const expr &rhs) const;
   expr udiv(const expr &rhs) const;
+  expr srem(const expr &rhs) const;
+  expr urem(const expr &rhs) const;
 
   expr add_no_soverflow(const expr &rhs) const;
   expr add_no_uoverflow(const expr &rhs) const;
@@ -145,8 +147,15 @@ public:
   expr sge(const expr &rhs) const;
   expr sgt(const expr &rhs) const;
 
+  expr ule(uint64_t rhs) const { return ule(mkUInt(rhs, bits())); }
+  expr ult(uint64_t rhs) const { return ult(mkUInt(rhs, bits())); }
+  expr uge(uint64_t rhs) const { return uge(mkUInt(rhs, bits())); }
+  expr ugt(uint64_t rhs) const { return ugt(mkUInt(rhs, bits())); }
+  expr operator==(uint64_t rhs) const { return *this == mkUInt(rhs, bits()); }
+
   expr sext(unsigned amount) const;
   expr zext(unsigned amount) const;
+  expr trunc(unsigned tobw) const;
 
   expr concat(const expr &rhs) const;
   expr extract(unsigned high, unsigned low) const;

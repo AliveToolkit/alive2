@@ -21,12 +21,12 @@ class Value {
 protected:
   Value(std::unique_ptr<Type> &&type, std::string &&name,
         bool mk_unique_name = false);
-  Type& getWType() { return *type.get(); }
 
 public:
   unsigned bits() const { return type->bits(); }
   const std::string& getName() const { return name; }
   const Type& getType() const { return *type.get(); }
+  Type& getWType() { return *type.get(); }
 
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;

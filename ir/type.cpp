@@ -26,6 +26,10 @@ expr Type::typeVar() const {
   return var("type", var_type_bits);
 }
 
+expr Type::sizeVar() const {
+  return var("bw", var_bw_bits);
+}
+
 expr Type::is(unsigned t) const {
   return typeVar() == expr::mkUInt(t, var_type_bits);
 }
@@ -90,10 +94,6 @@ expr VoidType::getTypeConstraints() const {
   return true;
 }
 
-expr VoidType::atLeastBits(unsigned bits) const {
-  UNREACHABLE();
-}
-
 void VoidType::fixup(const Model &m) {
   // do nothing
 }
@@ -114,7 +114,7 @@ unsigned IntType::bits() const {
 
 expr IntType::getTypeConstraints() const {
   auto c = isInt();
-  auto bw = var("bw", var_bw_bits);
+  auto bw = sizeVar();
   if (defined) {
     c &= bw == expr::mkUInt(bitwidth, var_bw_bits);
   }
@@ -126,17 +126,13 @@ expr IntType::getTypeConstraints() const {
   return c;
 }
 
-expr IntType::atLeastBits(unsigned bits) const {
-  return var("bw", var_bw_bits).uge(expr::mkUInt(bits, var_bw_bits));
-}
-
 expr IntType::operator==(const IntType &rhs) const {
-  return var("bw", var_bw_bits) == rhs.var("bw", var_bw_bits);
+  return sizeVar() == rhs.sizeVar();
 }
 
 void IntType::fixup(const Model &m) {
   assert(m.getUInt(typeVar()) == SymbolicType::Int);
-  bitwidth = m.getUInt(var("bw", var_bw_bits));
+  bitwidth = m.getUInt(sizeVar());
   defined = true;
 }
 
@@ -163,11 +159,6 @@ expr FloatType::getTypeConstraints() const {
   return isFloat() && false;
 }
 
-expr FloatType::atLeastBits(unsigned bits) const {
-  // TODO
-  return true;
-}
-
 expr FloatType::operator==(const FloatType &rhs) const {
   // TODO
   return true;
@@ -192,13 +183,9 @@ expr PtrType::getTypeConstraints() const {
   return isPtr() && false;
 }
 
-expr PtrType::atLeastBits(unsigned bits) const {
-  return var("bw", var_bw_bits).uge(expr::mkUInt(bits, var_bw_bits));
-}
-
 expr PtrType::operator==(const PtrType &rhs) const {
   // TODO
-  return var("bw", var_bw_bits) == rhs.var("bw", var_bw_bits);
+  return sizeVar() == rhs.sizeVar();
 }
 
 void PtrType::fixup(const Model &m) {
@@ -224,11 +211,6 @@ expr ArrayType::getTypeConstraints() const {
   return isArray() && false;
 }
 
-expr ArrayType::atLeastBits(unsigned bits) const {
-  // FIXME
-  return true;
-}
-
 expr ArrayType::operator==(const ArrayType &rhs) const {
   // TODO
   return true;
@@ -251,11 +233,6 @@ void ArrayType::print(ostream &os) const {
 expr VectorType::getTypeConstraints() const {
   // TODO
   return isVector() && false;
-}
-
-expr VectorType::atLeastBits(unsigned bits) const {
-  // FIXME
-  return true;
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
@@ -331,16 +308,6 @@ expr SymbolicType::getTypeConstraints() const {
   c |= isPtr()    && p.getTypeConstraints();
   c |= isArray()  && a.getTypeConstraints();
   c |= isVector() && v.getTypeConstraints();
-  return c;
-}
-
-expr SymbolicType::atLeastBits(unsigned bits) const {
-  expr c(false);
-  c |= isInt()    && i.atLeastBits(bits);
-  c |= isFloat()  && f.atLeastBits(bits);
-  c |= isPtr()    && p.atLeastBits(bits);
-  c |= isArray()  && a.atLeastBits(bits);
-  c |= isVector() && v.atLeastBits(bits);
   return c;
 }
 

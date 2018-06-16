@@ -31,7 +31,7 @@ public:
   virtual unsigned bits() const;
 
   virtual smt::expr getTypeConstraints() const = 0;
-  virtual smt::expr atLeastBits(unsigned bits) const = 0;
+  smt::expr sizeVar() const;
   smt::expr operator==(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
@@ -50,7 +50,6 @@ class VoidType final : public Type {
 public:
   VoidType() {}
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   void fixup(const smt::Model &m) override;
   std::unique_ptr<Type> dup() const override;
   void print(std::ostream &os) const override;
@@ -66,7 +65,6 @@ public:
   IntType(unsigned bitwidth) : bitwidth(bitwidth), defined(true) {}
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
   void enforceIntType() override;
@@ -80,7 +78,6 @@ class FloatType final : public Type {
 public:
   FloatType() {}
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
   std::unique_ptr<Type> dup() const override;
@@ -92,7 +89,6 @@ class PtrType final : public Type {
 public:
   PtrType() {}
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
   void enforceIntOrPtrOrVectorType() override;
@@ -105,7 +101,6 @@ class ArrayType final : public Type {
 public:
   ArrayType() {}
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
   std::unique_ptr<Type> dup() const override;
@@ -117,7 +112,6 @@ class VectorType final : public Type {
 public:
   VectorType() {}
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
   void enforceIntOrPtrOrVectorType() override;
@@ -153,7 +147,6 @@ public:
   void setName(const std::string &name) override;
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr atLeastBits(unsigned bits) const override;
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
   void enforceIntType() override;

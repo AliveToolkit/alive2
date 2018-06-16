@@ -124,17 +124,29 @@ re2c:yyfill:check = 0;
   return LABEL;
 }
 
+"true" { return TRUE; }
+"false" { return FALSE; }
 "add" { return ADD; }
 "mul" { return MUL; }
 "sub" { return SUB; }
 "sdiv" { return SDIV; }
 "udiv" { return UDIV; }
+"srem" { return SREM; }
+"urem" { return UREM; }
 "shl" { return SHL; }
 "ashr" { return ASHR; }
 "lshr" { return LSHR; }
+"and" { return AND; }
+"or" { return OR; }
+"xor" { return XOR; }
 "nsw" { return NSW; }
 "nuw" { return NUW; }
 "exact" { return EXACT; }
+"sext" { return SEXT; }
+"zext" { return ZEXT; }
+"trunc" { return TRUNC; }
+"to" { return TO; }
+"select" { return SELECT; }
 "ret" { return RETURN; }
 "unreachable" { return UNREACH; }
 
