@@ -360,14 +360,11 @@ expr expr::udiv(const expr &rhs) const {
 expr expr::srem(const expr &rhs) const {
   C(rhs);
 
-  if (eq(rhs))
-    return mkUInt(1, sort());
+  if (eq(rhs) || (isSMin() && rhs.isAllOnes()))
+    return mkUInt(0, sort());
 
   if (rhs.isZero())
     return rhs;
-
-  if (isSMin() && rhs.isAllOnes())
-    return mkUInt(0, sort());
 
   expr r;
   if (binop_sfold(rhs, [](auto a, auto b) { return a % b; }, r))
@@ -380,7 +377,7 @@ expr expr::urem(const expr &rhs) const {
   C(rhs);
 
   if (eq(rhs))
-    return mkUInt(1, sort());
+    return mkUInt(0, sort());
 
   if (rhs.isZero())
     return rhs;
