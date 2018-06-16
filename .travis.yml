@@ -1,0 +1,94 @@
+language: cpp
+os: linux
+dist: trusty
+sudo: required
+
+cache:
+  directories:
+    - /tmp/z3cache
+    - /tmp/re2ccache
+
+addons:
+  apt:
+    sources: &default_sources
+      - ubuntu-toolchain-r-test
+    packages: &default_packages
+      - ninja-build
+
+env:
+  global:
+    - Z3_VERSION=4.7.1
+
+before_script:
+  - |
+    if [ ! -d /tmp/z3cache/z3-$Z3_VERSION-x64-ubuntu-14.04 ] ; then
+      rm -fr /tmp/z3cache
+      mkdir /tmp/z3cache
+      wget https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/z3-$Z3_VERSION-x64-ubuntu-14.04.zip -O /tmp/z3.zip
+      pushd /tmp
+      unzip z3.zip
+      mv z3-* z3cache
+      popd
+    fi
+  - sudo cp /tmp/z3cache/z3-$Z3_VERSION-*/bin/libz3.so /usr/lib
+  - sudo cp /tmp/z3cache/z3-$Z3_VERSION-*/include/* /usr/include
+  - |
+    if [ ! -f /tmp/re2ccache/re2c ] ; then
+      mkdir /tmp/re2ccache
+      wget https://github.com/skvadrik/re2c/releases/download/1.0.3/re2c-1.0.3.tar.gz -O /tmp/re2c.tar.gz
+      pushd /tmp
+        tar xfz re2c.tar.gz
+        pushd re2c-*
+          ./configure && make
+          cp re2c /tmp/re2ccache
+        popd
+      popd
+    fi
+  - sudo cp /tmp/re2ccache/re2c /usr/bin
+
+script:
+  - mkdir build
+  - cd build
+  - cmake -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
+          -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER
+          -GNinja
+          ..
+  - ninja
+
+matrix:
+  include:
+    - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Debug
+      addons: &gcc7
+        apt:
+          sources: *default_sources
+          packages:
+            - *default_packages
+            - g++-7
+
+    - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Release
+      addons: *gcc7
+
+    - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug
+      addons: &gcc8
+        apt:
+          sources: *default_sources
+          packages:
+            - *default_packages
+            - g++-8
+
+    - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Release
+      addons: *gcc8
+
+    - env: CMAKE_CXX_COMPILER=clang++-6.0 CMAKE_BUILD_TYPE=Debug
+      addons: &clang6
+        apt:
+          sources:
+            - *default_sources
+            - llvm-toolchain-trusty-6.0
+          packages:
+            - *default_packages
+            - clang-6.0
+            - g++-8
+
+    - env: CMAKE_CXX_COMPILER=clang++-6.0 CMAKE_BUILD_TYPE=Release
+      addons: *clang6
