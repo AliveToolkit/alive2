@@ -252,7 +252,6 @@ bool expr::isInt(int64_t &n) const {
 }
 
 bool expr::isNot(expr &neg) const {
-  C();
   if (auto app = isAppOf(Z3_OP_NOT)) {
     neg = Z3_get_app_arg(ctx(), app, 0);
     return true;

@@ -231,10 +231,7 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   // op ty %op to ty2
   auto opty = parse_type();
   auto &val = parse_operand(opty.get());
-  unique_ptr<Type> ty2;
-  if (tokenizer.consumeIf(TO)) {
-    ty2 = parse_type(/*optional=*/false);
-  }
+  unique_ptr<Type> ty2 = parse_type(/*optional=*/!tokenizer.consumeIf(TO));
 
   ConversionOp::Op op;
   switch (op_token) {

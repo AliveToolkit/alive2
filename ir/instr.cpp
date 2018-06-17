@@ -329,13 +329,15 @@ StateValue ICmp::toSMT(State &s) const {
 }
 
 expr ICmp::getTypeConstraints() const {
-  return a.getTypeConstraints() &&
+  return getType().getTypeConstraints() &&
+         a.getTypeConstraints() &&
          a.getType() == b.getType() &&
          (cond == Any ? cond_var.ule(expr::mkUInt(9, 4))
                       : cond_var == expr::mkUInt(cond, 4));
 }
 
 void ICmp::fixupTypes(const Model &m) {
+  Value::fixupTypes(m);
   cond = (Cond)m.getUInt(cond_var);
 }
 
