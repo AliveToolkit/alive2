@@ -64,6 +64,24 @@ public:
 };
 
 
+class ICmp final : public Instr {
+public:
+  enum Cond { EQ, NE, SLE, SLT, SGE, SGT, ULE, ULT, UGE, UGT, Any };
+
+private:
+  Value &a, &b;
+  smt::expr cond_var;
+  Cond cond;
+
+public:
+  ICmp(std::string &&name, Cond cond, Value &a, Value &b);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+  void fixupTypes(const smt::Model &m) override;
+};
+
+
 class Return final : public Instr {
   Value &val;
 public:

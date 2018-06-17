@@ -3,6 +3,7 @@
 
 #include "ir/instr.h"
 #include "smt/expr.h"
+#include "smt/solver.h"
 #include "util/compiler.h"
 
 using namespace smt;
@@ -276,6 +277,66 @@ expr Select::getTypeConstraints() const {
          getType().getTypeConstraints() &&
          getType() == a.getType() &&
          getType() == b.getType();
+}
+
+
+ICmp::ICmp(std::string &&name, Cond cond, Value &a, Value &b) :
+  Instr(make_unique<IntType>(1), move(name)), a(a), b(b), cond(cond) {
+  a.getWType().enforceIntOrPtrOrVectorType();
+  b.getWType().enforceIntOrPtrOrVectorType();
+
+  auto str = getName() + "_cond";
+  cond_var = expr::mkVar(str.c_str(), 4);
+}
+
+void ICmp::print(ostream &os) const {
+  const char *condtxt = nullptr;
+  switch (cond) {
+  case EQ:  condtxt = "eq "; break;
+  case NE:  condtxt = "ne "; break;
+  case SLE: condtxt = "sle "; break;
+  case SLT: condtxt = "slt "; break;
+  case SGE: condtxt = "sge "; break;
+  case SGT: condtxt = "sgt "; break;
+  case ULE: condtxt = "ule "; break;
+  case ULT: condtxt = "ult "; break;
+  case UGE: condtxt = "uge "; break;
+  case UGT: condtxt = "ugt "; break;
+  case Any: condtxt = " "; break;
+  }
+  os << getName() << " = icmp " << condtxt << a << ", " << b.getName();
+}
+
+StateValue ICmp::toSMT(State &s) const {
+  auto &[av, ap] = s[a];
+  auto &[bv, bp] = s[b];
+  expr val;
+  switch (cond) {
+  case EQ:  val = av == bv; break;
+  case NE:  val = av != bv; break;
+  case SLE: val = av.sle(bv); break;
+  case SLT: val = av.slt(bv); break;
+  case SGE: val = av.sge(bv); break;
+  case SGT: val = av.sgt(bv); break;
+  case ULE: val = av.ule(bv); break;
+  case ULT: val = av.ult(bv); break;
+  case UGE: val = av.uge(bv); break;
+  case UGT: val = av.ugt(bv); break;
+  case Any:
+    UNREACHABLE();
+  }
+  return { expr::mkIf(val, expr::mkUInt(1,1), expr::mkUInt(0,1)), ap && bp };
+}
+
+expr ICmp::getTypeConstraints() const {
+  return a.getTypeConstraints() &&
+         a.getType() == b.getType() &&
+         (cond == Any ? cond_var.ule(expr::mkUInt(9, 4))
+                      : cond_var == expr::mkUInt(cond, 4));
+}
+
+void ICmp::fixupTypes(const Model &m) {
+  cond = (Cond)m.getUInt(cond_var);
 }
 
 

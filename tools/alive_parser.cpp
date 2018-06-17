@@ -260,6 +260,34 @@ static unique_ptr<Instr> parse_select(string_view name) {
   return make_unique<Select>(move(aty), string(name), cond, a, b);
 }
 
+static ICmp::Cond parse_icmp_cond() {
+  switch (auto t = *tokenizer) {
+  case EQ:  return ICmp::EQ;
+  case NE:  return ICmp::NE;
+  case SLE: return ICmp::SLE;
+  case SLT: return ICmp::SLT;
+  case SGE: return ICmp::SGE;
+  case SGT: return ICmp::SGT;
+  case ULE: return ICmp::ULE;
+  case ULT: return ICmp::ULT;
+  case UGE: return ICmp::UGE;
+  case UGT: return ICmp::UGT;
+  default:
+    tokenizer.unget(t);
+    return ICmp::Any;
+  }
+}
+
+static unique_ptr<Instr> parse_icmp(string_view name) {
+  // icmp cond ty %a, &b
+  auto cond = parse_icmp_cond();
+  auto ty = parse_type();
+  auto &a = parse_operand(ty.get());
+  parse_comma();
+  auto &b = parse_operand(ty.get());
+  return make_unique<ICmp>(string(name), cond, a, b);
+}
+
 static unique_ptr<Instr> parse_instr(string_view name) {
   // %name = instr arg1, arg2, ...
   tokenizer.ensure(EQUALS);
@@ -284,6 +312,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_conversionop(name, t);
   case SELECT:
     return parse_select(name);
+  case ICMP:
+    return parse_icmp(name);
   default:
     error(string("Expected instruction name; got: ") + token_name[t]);
   }

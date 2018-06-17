@@ -27,6 +27,7 @@ class expr {
 
   Z3_sort sort() const;
   Z3_app isApp() const;
+  Z3_app isAppOf(int app) const;
 
   expr binop_commutative(const expr &rhs,
                          uint64_t(*native)(uint64_t, uint64_t),

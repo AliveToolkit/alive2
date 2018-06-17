@@ -126,6 +126,14 @@ Z3_app expr::isApp() const {
   return nullptr;
 }
 
+Z3_app expr::isAppOf(int app_type) const {
+  auto app = isApp();
+  if (!app)
+    return nullptr;
+  auto decl = Z3_get_app_decl(ctx(), app);
+  return Z3_get_decl_kind(ctx(), decl) == app_type ? app : nullptr;
+}
+
 Z3_ast expr::mkTrue() {
   return Z3_mk_true(ctx());
 }
@@ -245,16 +253,11 @@ bool expr::isInt(int64_t &n) const {
 
 bool expr::isNot(expr &neg) const {
   C();
-  auto app = isApp();
-  if (!app)
-    return false;
-
-  auto decl = Z3_get_app_decl(ctx(), app);
-  if (Z3_get_decl_kind(ctx(), decl) != Z3_OP_NOT)
-    return false;
-
-  neg = Z3_get_app_arg(ctx(), app, 0);
-  return true;
+  if (auto app = isAppOf(Z3_OP_NOT)) {
+    neg = Z3_get_app_arg(ctx(), app, 0);
+    return true;
+  }
+  return false;
 }
 
 expr expr::binop_commutative(const expr &rhs,
@@ -522,6 +525,28 @@ expr expr::operator==(const expr &rhs) const {
     return true;
   if (isConst() && rhs.isConst())
     return false;
+
+  if (auto app = isAppOf(Z3_OP_ITE)) {
+    expr c = Z3_get_app_arg(ctx(), app, 0);
+    expr t = Z3_get_app_arg(ctx(), app, 1);
+    expr e = Z3_get_app_arg(ctx(), app, 2);
+
+#if 0
+    // TODO: benchmark
+    // (= (ite c t e) (ite c x y)) -> (ite c (= t x) (= e y))
+    if (auto rhs_app = rhs.isAppOf(Z3_OP_ITE)) {
+      expr c2 = Z3_get_app_arg(ctx(), rhs_app, 0);
+      if (c.eq(c2))
+        return mkIf(c,
+                    t == Z3_get_app_arg(ctx(), rhs_app, 1),
+                    e == Z3_get_app_arg(ctx(), rhs_app, 2));
+    }
+#endif
+
+    // (= (ite c t e) x) -> (ite c (= t x) (= e x))
+    if (rhs.isConst() || (t.isConst() && e.isConst()))
+      return mkIf(c, t == rhs, e == rhs);
+  }
   return binop_commutative(rhs, Z3_mk_eq);
 }
 
@@ -673,6 +698,11 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
     return then;
   if (cond.isFalse())
     return els;
+
+  if (then.isTrue() && els.isFalse())
+    return cond;
+  if (then.isFalse() && els.isTrue())
+    return !cond;
 
   expr notcond;
   Z3_ast c, t = then(), e = els();

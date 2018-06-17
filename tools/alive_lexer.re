@@ -147,6 +147,17 @@ re2c:yyfill:check = 0;
 "trunc" { return TRUNC; }
 "to" { return TO; }
 "select" { return SELECT; }
+"icmp" { return ICMP; }
+"eq" { return EQ; }
+"ne" { return NE; }
+"sle" { return SLE; }
+"slt" { return SLT; }
+"sge" { return SGE; }
+"sgt" { return SGT; }
+"ule" { return ULE; }
+"ult" { return ULT; }
+"uge" { return UGE; }
+"ugt" { return UGT; }
 "ret" { return RETURN; }
 "unreachable" { return UNREACH; }
 

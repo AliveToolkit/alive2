@@ -31,7 +31,7 @@ public:
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;
   virtual smt::expr getTypeConstraints() const = 0;
-  void fixupTypes(const smt::Model &m);
+  virtual void fixupTypes(const smt::Model &m);
   virtual ~Value();
 
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
