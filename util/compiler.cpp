@@ -29,7 +29,7 @@ unsigned num_sign_bits(uint64_t n) {
   int zeros = __builtin_clzll(n) - 1;
   int ones = __builtin_clzll(~n) - 1;
   return zeros > ones ? zeros : ones;
-#elif defined __GNUC__
+#elif defined(__GNUC__)
   return __builtin_clrsbll(n);
 #else
 # error Unknown compiler
