@@ -5,7 +5,9 @@
 
 #include <cstdint>
 #include <ostream>
+#include <set>
 #include <utility>
+#include <vector>
 
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_app* Z3_app;
@@ -162,6 +164,10 @@ public:
   expr extract(unsigned high, unsigned low) const;
 
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
+  static expr mkForAll(const std::set<expr> &vars, expr &&val);
+
+  // replace v1 -> v2
+  expr replace(std::vector<std::pair<expr, expr>> &repls) const;
 
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 

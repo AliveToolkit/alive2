@@ -22,6 +22,8 @@ protected:
   Value(std::unique_ptr<Type> &&type, std::string &&name,
         bool mk_unique_name = false);
 
+  static std::string fresh_id();
+
 public:
   unsigned bits() const { return type->bits(); }
   const std::string& getName() const { return name; }
@@ -34,6 +36,8 @@ public:
   virtual void fixupTypes(const smt::Model &m);
   virtual ~Value();
 
+  static void reset_gbl_id();
+
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
 };
 
@@ -43,6 +47,26 @@ class IntConst final : public Value {
 
 public:
   IntConst(std::unique_ptr<Type> &&type, int64_t val);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+};
+
+
+class UndefValue final : public Value {
+public:
+  UndefValue(std::unique_ptr<Type> &&type);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+
+  static std::string getFreshName();
+};
+
+
+class PoisonValue final : public Value {
+public:
+  PoisonValue(std::unique_ptr<Type> &&type);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;

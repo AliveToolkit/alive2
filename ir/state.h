@@ -4,9 +4,11 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include <array>
 #include <ostream>
 #include <set>
 #include <unordered_map>
+#include <utility>
 
 namespace IR {
 
@@ -29,21 +31,33 @@ class BasicBlock;
 class Function;
 
 class State {
+public:
+  using ValTy = std::pair<StateValue, std::set<smt::expr>>;
+
+private:
   const Function &f;
   std::set<smt::expr> quantified_vars;
-  // var -> ((value, not_poison), domain)
-  std::unordered_map<const Value*, StateValue> values;
+  // var -> ((value, not_poison), undef_vars)
+  std::unordered_map<const Value*, ValTy> values;
   std::unordered_map<const BasicBlock*, smt::expr> domain_bbs;
+
+  // temp state
   smt::expr domain;
+  std::set<smt::expr> undef_vars;
+  std::array<StateValue, 4> tmp_values;
+  unsigned i_tmp_values = 0; // next available position in tmp_values
+
   smt::expr return_domain;
   // FIXME: replace with disjoint expr builder
-  StateValue return_val;
+  ValTy return_val;
   bool returned = false;
 
 public:
   State(const Function &f);
-  void add(const Value &val, StateValue &&e);
-  const StateValue& operator[](const Value &val) const;
+
+  const StateValue& exec(const Value &v);
+  const StateValue& operator[](const Value &val);
+  const ValTy& at(const Value &val) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &bb);
@@ -51,13 +65,16 @@ public:
   void addUB(smt::expr &&ub)      { domain &= std::move(ub); }
   void addUB(const smt::expr &ub) { domain &= ub; }
   void addQuantVar(const smt::expr &var);
+  void addUndefVar(const smt::expr &var);
+  void resetUndefVars();
 
   auto& getFn() const { return f; }
   const auto& getValues() const { return values; }
+  const auto& getQuantVars() const { return quantified_vars; }
 
   bool fnReturned() const { return returned; }
-  const smt::expr& returnDomain() const { return return_domain; }
-  const StateValue& returnVal() const { return return_val; }
+  auto& returnDomain() const { return return_domain; }
+  auto& returnVal() const { return return_val; }
 };
 
 }

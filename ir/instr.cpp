@@ -342,6 +342,47 @@ void ICmp::fixupTypes(const Model &m) {
 }
 
 
+void Freeze::print(ostream &os) const {
+  os << getName() << " = freeze " << val;
+}
+
+StateValue Freeze::toSMT(State &s) const {
+  auto &[v, p] = s[val];
+  s.resetUndefVars();
+
+  if (p.isTrue())
+    return { expr(v), expr(p) };
+
+  auto name = "undet_" + fresh_id();
+  expr undet = expr::mkVar(name.c_str(), bits());
+  s.addQuantVar(undet);
+
+  return { p.isFalse() ?
+             move(undet) :
+             expr::mkIf(p, v, undet),
+           true };
+}
+
+expr Freeze::getTypeConstraints() const {
+  return getType().getTypeConstraints() &&
+         getType() == val.getType();
+}
+
+
+void CopyOp::print(ostream &os) const {
+  os << getName() << " = " << val;
+}
+
+StateValue CopyOp::toSMT(State &s) const {
+  return s[val];
+}
+
+expr CopyOp::getTypeConstraints() const {
+  return getType().getTypeConstraints() &&
+         getType() == val.getType();
+}
+
+
 void Return::print(ostream &os) const {
   os << "ret " << val;
 }

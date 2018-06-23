@@ -82,6 +82,30 @@ public:
 };
 
 
+class Freeze final : public Instr {
+  Value &val;
+public:
+  Freeze(std::unique_ptr<Type> &&type, std::string &&name, Value &val) :
+    Instr(std::move(type), std::move(name)), val(val) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+};
+
+
+class CopyOp final : public Instr {
+  Value &val;
+public:
+  CopyOp(std::unique_ptr<Type> &&type, std::string &&name, Value &val) :
+    Instr(std::move(type), std::move(name)), val(val) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
+};
+
+
 class Return final : public Instr {
   Value &val;
 public:

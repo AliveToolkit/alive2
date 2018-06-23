@@ -25,12 +25,62 @@ State::State(const Function &f) : f(f) {
   domain_bbs.emplace(&f.getBB(""), true);
 }
 
-void State::add(const Value &val, StateValue &&e) {
-  auto p = values.emplace(&val, move(e));
+const StateValue& State::exec(const Value &v) {
+  assert(undef_vars.empty());
+  auto val = v.toSMT(*this);
+  auto p = values.try_emplace(&v, move(val), move(undef_vars));
   assert(p.second);
+
+  // cleanup potentailly used temporary values due to undef rewriting
+  while (i_tmp_values > 0) {
+    tmp_values[--i_tmp_values] = StateValue();
+  }
+
+  return p.first->second.first;
 }
 
-const StateValue& State::operator[](const Value &val) const {
+const StateValue& State::operator[](const Value &val) {
+  auto &[sval, uvars] = values.at(&val);
+  if (uvars.empty())
+    return sval;
+
+  if (undef_vars.empty()) {
+    undef_vars = uvars;
+    return sval;
+  }
+
+  // if evaluated expr shares undef vars with previously evaluated expr, rename
+  // those undef vars
+  vector<pair<expr, expr>> repls;
+  auto VI = uvars.begin(), VE = uvars.end();
+  for (auto I = undef_vars.begin(), E = undef_vars.end(); I != E && VI != VE;) {
+    if (I->eq(*VI)) {
+      auto name = UndefValue::getFreshName();
+      repls.emplace_back(*I, expr::mkVar(name.c_str(), I->bits()));
+      ++I, ++VI;
+
+    } else if (*I < *VI) {
+      ++I;
+
+    } else {
+      undef_vars.emplace_hint(I, *VI);
+      ++VI;
+    }
+  }
+
+  if (repls.empty())
+    return sval;
+
+  for (auto &p : repls) {
+    undef_vars.emplace(p.second);
+  }
+
+  tmp_values[i_tmp_values] =
+      { sval.value.replace(repls), sval.non_poison.replace(repls) };
+  return tmp_values[i_tmp_values++];
+}
+
+const State::ValTy& State::at(const Value &val) const {
   return values.at(&val);
 }
 
@@ -52,16 +102,26 @@ void State::addJump(const BasicBlock &bb) {
 void State::addReturn(const StateValue &val) {
   if (returned) {
     return_domain |= domain;
-    return_val = StateValue::mkIf(domain, val, return_val);
+    // TODO: combine undef_vars
+    return_val = { StateValue::mkIf(domain, val, return_val.first),
+                   move(undef_vars) };
   } else {
     returned = true;
     return_domain = domain;
-    return_val = val;
+    return_val = { val, move(undef_vars) };
   }
 }
 
 void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
+}
+
+void State::addUndefVar(const expr &var) {
+  undef_vars.emplace(var);
+}
+
+void State::resetUndefVars() {
+  undef_vars.clear();
 }
 
 }

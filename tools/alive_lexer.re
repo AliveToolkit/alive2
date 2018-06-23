@@ -126,6 +126,8 @@ re2c:yyfill:check = 0;
 
 "true" { return TRUE; }
 "false" { return FALSE; }
+"undef" { return UNDEF; }
+"poison" { return POISON; }
 "add" { return ADD; }
 "mul" { return MUL; }
 "sub" { return SUB; }
@@ -158,6 +160,7 @@ re2c:yyfill:check = 0;
 "ult" { return ULT; }
 "uge" { return UGE; }
 "ugt" { return UGT; }
+"freeze" { return FREEZE; }
 "ret" { return RETURN; }
 "unreachable" { return UNREACH; }
 

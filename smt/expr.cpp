@@ -4,6 +4,7 @@
 #include "smt/ctx.h"
 #include "smt/expr.h"
 #include <cassert>
+#include <memory>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -714,10 +715,34 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   return Z3_mk_ite(ctx(), c, t, e);
 }
 
+expr expr::mkForAll(const set<expr> &vars, expr &&val) {
+  if (vars.empty() || val.isTrue() || val.isFalse())
+    return move(val);
+
+  unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
+  unsigned i = 0;
+  for (auto &v : vars) {
+    vars_ast[i++] = (Z3_app)v();
+  }
+  return Z3_mk_forall_const(ctx(), 0, vars.size(), vars_ast.get(), 0, nullptr,
+                            val());
+}
+
+expr expr::replace(vector<pair<expr, expr>> &repls) const {
+  unique_ptr<Z3_ast[]> from(new Z3_ast[repls.size()]);
+  unique_ptr<Z3_ast[]> to(new Z3_ast[repls.size()]);
+
+  unsigned i = 0;
+  for (auto &p : repls) {
+    from[i] = p.first();
+    to[i] = p.second();
+    ++i;
+  }
+  return Z3_substitute(ctx(), ast(), repls.size(), from.get(), to.get());
+}
+
 ostream& operator<<(ostream &os, const expr &e) {
-  if (!e.isValid())
-    return os << "(null)";
-  return os << Z3_ast_to_string(ctx(), e());
+  return os << (e.isValid() ? Z3_ast_to_string(ctx(), e()) : "(null)");
 }
 
 bool expr::operator<(const expr &rhs) const {

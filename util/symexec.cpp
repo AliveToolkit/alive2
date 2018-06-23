@@ -17,12 +17,10 @@ void sym_exec(State &s) {
   Function &f = const_cast<Function&>(s.getFn());
 
   // add constants & inputs to State table first of all
-  for (auto &c : f.getConstants()) {
-    s.add(c, c.toSMT(s));
-  }
-
-  for (auto &i : f.getInputs()) {
-    s.add(i, i.toSMT(s));
+  for (auto &l : { f.getConstants(), f.getInputs(), f.getUndefs() }) {
+    for (const auto &v : l) {
+      s.exec(v);
+    }
   }
 
   for (auto &bb : f.getBBs()) {
@@ -30,14 +28,11 @@ void sym_exec(State &s) {
       continue;
 
     for (auto &i : bb->instrs()) {
-      auto val = i.toSMT(s);
+      auto val = s.exec(i);
       auto &name = i.getName();
 
-      if (name[0] == '%') {
-        if (config::symexec_print_each_value)
-          cout << name << " = " << val << '\n';
-        s.add(i, move(val));
-      }
+      if (config::symexec_print_each_value && name[0] == '%')
+        cout << name << " = " << val << '\n';
     }
   }
 }

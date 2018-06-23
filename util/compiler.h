@@ -36,8 +36,8 @@ struct const_strip_unique_ptr {
     bool operator!=(const const_iterator &other) const { return I != other.I; }
   };
 
-  const_iterator begin() { return container.begin(); }
-  const_iterator end()   { return container.end(); }
+  const_iterator begin() const { return container.begin(); }
+  const_iterator end() const   { return container.end(); }
 };
 
 unsigned ilog2(uint64_t n);

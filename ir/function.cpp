@@ -44,11 +44,10 @@ expr Function::getTypeConstraints() const {
   for (auto bb : getBBs()) {
     t &= bb->getTypeConstraints();
   }
-  for (auto &c : constants) {
-    t &= c->getTypeConstraints();
-  }
-  for (auto &i : inputs) {
-    t &= i->getTypeConstraints();
+  for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
+    for (auto &v : l) {
+      t &= v.getTypeConstraints();
+    }
   }
   return t;
 }
@@ -57,11 +56,10 @@ void Function::fixupTypes(const Model &m) {
   for (auto bb : getBBs()) {
     bb->fixupTypes(m);
   }
-  for (auto &c : constants) {
-    c->fixupTypes(m);
-  }
-  for (auto &i : inputs) {
-    i->fixupTypes(m);
+  for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
+    for (auto &v : l) {
+      const_cast<Value&>(v).fixupTypes(m);
+    }
   }
 }
 
@@ -80,8 +78,12 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(move(c));
 }
 
-void Function::addInput(unique_ptr<Input> &&c) {
-  inputs.emplace_back(move(c));
+void Function::addUndef(unique_ptr<UndefValue> &&u) {
+  undefs.emplace_back(move(u));
+}
+
+void Function::addInput(unique_ptr<Input> &&i) {
+  inputs.emplace_back(move(i));
 }
 
 Function::instr_iterator::

@@ -138,6 +138,18 @@ static Value& parse_operand(Type *type) {
     return get_constant(1, type);
   case FALSE:
     return get_constant(0, type);
+  case UNDEF: {
+    auto val = make_unique<UndefValue>(type->dup());
+    auto ret = val.get();
+    fn->addUndef(move(val));
+    return *ret;
+  }
+  case POISON: {
+    auto val = make_unique<PoisonValue>(type->dup());
+    auto ret = val.get();
+    fn->addConstant(move(val));
+    return *ret;
+  }
   case IDENTIFIER: {
     string id(yylval.str);
     if (auto I = identifiers.find(id); 
@@ -285,6 +297,20 @@ static unique_ptr<Instr> parse_icmp(string_view name) {
   return make_unique<ICmp>(string(name), cond, a, b);
 }
 
+static unique_ptr<Instr> parse_freeze(string_view name) {
+  // freeze ty %op
+  auto ty = parse_type();
+  auto &op = parse_operand(ty.get());
+  return make_unique<Freeze>(move(ty), string(name), op);
+}
+
+static unique_ptr<Instr> parse_copyop(string_view name, token t) {
+  tokenizer.unget(t);
+  auto ty = parse_type();
+  auto &op = parse_operand(ty.get());
+  return make_unique<CopyOp>(move(ty), string(name), op);
+}
+
 static unique_ptr<Instr> parse_instr(string_view name) {
   // %name = instr arg1, arg2, ...
   tokenizer.ensure(EQUALS);
@@ -311,6 +337,16 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_select(name);
   case ICMP:
     return parse_icmp(name);
+  case FREEZE:
+    return parse_freeze(name);
+  case INT_TYPE:
+  case NUM:
+  case TRUE:
+  case FALSE:
+  case UNDEF:
+  case POISON:
+  case IDENTIFIER:
+    return parse_copyop(name, t);
   default:
     error(string("Expected instruction name; got: ") + token_name[t]);
   }

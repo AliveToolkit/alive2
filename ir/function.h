@@ -45,6 +45,7 @@ class Function {
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
+  std::vector<std::unique_ptr<Value>> undefs;
   std::vector<std::unique_ptr<Value>> inputs;
 
 public:
@@ -60,6 +61,11 @@ public:
   void addConstant(std::unique_ptr<Value> &&c);
   util::const_strip_unique_ptr<decltype(constants)> getConstants() const {
     return constants;
+  }
+
+  void addUndef(std::unique_ptr<UndefValue> &&c);
+  util::const_strip_unique_ptr<decltype(undefs)> getUndefs() const {
+    return undefs;
   }
 
   void addInput(std::unique_ptr<Input> &&c);

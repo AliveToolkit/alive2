@@ -16,47 +16,53 @@ using namespace util;
 using namespace std;
 
 static void check_refinement(Solver &s, Errors &errs,
-                             const expr &dom_a, const StateValue &a,
-                             const expr &dom_b, const StateValue &b) {
-  // TODO: handle quantified vars
+                             const set<expr> &global_qvars,
+                             const expr &dom_a, const State::ValTy &ap,
+                             const expr &dom_b, const State::ValTy &bp) {
+  auto &a = ap.first;
+  auto &b = bp.first;
+
+  auto qvars = global_qvars;
+  qvars.insert(ap.second.begin(), ap.second.end());
+
   // TODO: improve error messages
   s.check({
-    { dom_a.notImplies(dom_b), [&](const Model &m) {
-      errs.add("Source is more defined than target"); } },
+    { expr::mkForAll(qvars, dom_a.notImplies(dom_b)),
+      [&](const Model &m) { errs.add("Source is more defined than target"); } },
 
-    { dom_a && a.non_poison.notImplies(b.non_poison), [&](const Model &m) {
-      errs.add("Target is more poisonous than source"); } },
+    { expr::mkForAll(qvars, dom_a && a.non_poison.notImplies(b.non_poison)),
+      [&](const Model &m) {errs.add("Target is more poisonous than source"); }},
 
-    { dom_a && a.non_poison && a.value != b.value, [&](const Model &m) {
-      errs.add("value mismatch");
-     } }
+    { expr::mkForAll(qvars, dom_a && a.non_poison && a.value != b.value),
+      [&](const Model &m) { errs.add("value mismatch"); } }
   });
 }
 
 namespace tools {
 
 Errors Transform::verify(const TransformVerifyOpts &opts) const {
-  Errors errs;
-
   unordered_map<string, const Value*> tgt_vals;
   for (auto &i : tgt.instrs()) {
     tgt_vals.emplace(i.getName(), &i);
   }
 
+  Value::reset_gbl_id();
   State src_state(src), tgt_state(tgt);
   sym_exec(src_state);
   sym_exec(tgt_state);
 
+  Errors errs;
   Solver s;
 
   if (opts.check_each_var) {
     for (auto &[var, val] : src_state.getValues()) {
       auto &name = var->getName();
-      if (name[0] != '%')
+      if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
         continue;
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(s, errs, true, val, true, tgt_state[*tgt_vals.at(name)]);
+      check_refinement(s, errs, tgt_state.getQuantVars(),
+                       true, val, true, tgt_state.at(*tgt_vals.at(name)));
     }
   }
 
@@ -67,7 +73,7 @@ Errors Transform::verify(const TransformVerifyOpts &opts) const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    check_refinement(s, errs,
+    check_refinement(s, errs, tgt_state.getQuantVars(),
                      src_state.returnDomain(), src_state.returnVal(),
                      tgt_state.returnDomain(), tgt_state.returnVal());
   }
