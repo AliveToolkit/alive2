@@ -31,7 +31,7 @@ const StateValue& State::exec(const Value &v) {
   auto p = values.try_emplace(&v, move(val), move(undef_vars));
   assert(p.second);
 
-  // cleanup potentailly used temporary values due to undef rewriting
+  // cleanup potentially used temporary values due to undef rewriting
   while (i_tmp_values > 0) {
     tmp_values[--i_tmp_values] = StateValue();
   }
