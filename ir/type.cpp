@@ -333,6 +333,7 @@ expr SymbolicType::operator==(const Type &b) const {
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
+  UNREACHABLE();
 }
 
 void SymbolicType::fixup(const Model &m) {
