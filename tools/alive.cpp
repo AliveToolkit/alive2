@@ -3,6 +3,7 @@
 
 #include "ir/function.h"
 #include "smt/smt.h"
+#include "smt/solver.h"
 #include "tools/alive_parser.h"
 #include "util/config.h"
 #include "util/file.h"
@@ -112,9 +113,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (show_smt_stats) {
-    // TODO
-  }
+  if (show_smt_stats)
+    smt::solver_print_stats(cout);
 
   return num_errors;
 }

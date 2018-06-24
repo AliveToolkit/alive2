@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <ostream>
 #include <utility>
 
 typedef struct _Z3_model* Z3_model;
@@ -107,6 +108,9 @@ public:
 
   friend class SolverPop;
 };
+
+
+void solver_print_stats(std::ostream &os);
 
 
 struct EnableSMTQueriesTMP {

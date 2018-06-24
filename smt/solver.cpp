@@ -5,6 +5,7 @@
 #include "smt/ctx.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <iomanip>
 #include <z3.h>
 
 using namespace smt;
@@ -162,6 +163,25 @@ void Solver::check(initializer_list<E> queries) {
       return;
     }
   }
+}
+
+void solver_print_stats(ostream &os) {
+  float total = num_queries / 100.0;
+  float trivial_pc = num_queries == 0 ? 0 :
+                       (num_trivial * 100.0) / (num_trivial + num_queries);
+  float unknown_pc = num_queries == 0 ? 0 : num_unknown / total;
+  float sat_pc     = num_queries == 0 ? 0 : num_sats / total;
+  float unsat_pc   = num_queries == 0 ? 0 : num_unsats / total;
+
+  os << fixed << setprecision(1);
+  os << "\n------------------- SMT STATS -------------------\n"
+        "Num queries: " << num_queries << "\n"
+        "Num invalid: " << num_invalid << "\n"
+        "Num skips:   " << num_skips << "\n"
+        "Num trivial  " << num_trivial << " (" << trivial_pc << "%)\n"
+        "Num unknown  " << num_unknown << " (" << unknown_pc << "%)\n"
+        "Num SAT:     " << num_sats << " (" << sat_pc << "%)\n"
+        "Num UNSAT:   " << num_unsats << " (" << unsat_pc << "%)\n";
 }
 
 
