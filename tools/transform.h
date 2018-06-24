@@ -29,11 +29,13 @@ struct Transform {
 class TypingAssignments {
   smt::Solver s;
   smt::Result r;
+  bool has_only_one_solution = false;
+  bool is_unsat = false;
   TypingAssignments(const smt::expr &e);
 
 public:
-  bool operator!() const { return !r.isSat(); }
-  operator bool() const { return r.isSat(); }
+  bool operator!() const { return !(bool)*this; }
+  operator bool() const;
   void operator++(void);
 
   friend class TransformVerify;

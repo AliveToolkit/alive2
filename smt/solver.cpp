@@ -178,8 +178,8 @@ void solver_print_stats(ostream &os) {
         "Num queries: " << num_queries << "\n"
         "Num invalid: " << num_invalid << "\n"
         "Num skips:   " << num_skips << "\n"
-        "Num trivial  " << num_trivial << " (" << trivial_pc << "%)\n"
-        "Num unknown  " << num_unknown << " (" << unknown_pc << "%)\n"
+        "Num trivial: " << num_trivial << " (" << trivial_pc << "%)\n"
+        "Num unknown: " << num_unknown << " (" << unknown_pc << "%)\n"
         "Num SAT:     " << num_sats << " (" << sat_pc << "%)\n"
         "Num UNSAT:   " << num_unsats << " (" << unsat_pc << "%)\n";
 }

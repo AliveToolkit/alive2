@@ -85,16 +85,28 @@ Errors TransformVerify::verify() const {
 
 
 TypingAssignments::TypingAssignments(const expr &e) {
-  EnableSMTQueriesTMP tmp;
-  s.add(e);
-  r = s.check();
+  if (e.isTrue()) {
+    has_only_one_solution = true;
+  } else {
+    EnableSMTQueriesTMP tmp;
+    s.add(e);
+    r = s.check();
+  }
+}
+
+TypingAssignments::operator bool() const {
+  return !is_unsat && (has_only_one_solution || r.isSat());
 }
 
 void TypingAssignments::operator++(void) {
-  EnableSMTQueriesTMP tmp;
-  s.block(r.getModel());
-  r = s.check();
-  assert(!r.isUnknown());
+  if (has_only_one_solution) {
+    is_unsat = true;
+  } else {
+    EnableSMTQueriesTMP tmp;
+    s.block(r.getModel());
+    r = s.check();
+    assert(!r.isUnknown());
+  }
 }
 
 TypingAssignments TransformVerify::getTypings() const {
@@ -111,6 +123,8 @@ TypingAssignments TransformVerify::getTypings() const {
 }
 
 void TransformVerify::fixupTypes(const TypingAssignments &ty) {
+  if (ty.has_only_one_solution)
+    return;
   t.src.fixupTypes(ty.r.getModel());
   t.tgt.fixupTypes(ty.r.getModel());
 }
