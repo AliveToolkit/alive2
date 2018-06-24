@@ -36,7 +36,7 @@ public:
   operator bool() const { return r.isSat(); }
   void operator++(void);
 
-  friend struct TransformVerify;
+  friend class TransformVerify;
 };
 
 
