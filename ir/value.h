@@ -36,6 +36,8 @@ public:
   static void reset_gbl_id();
 
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
+
+  virtual ~Value() {}
 };
 
 
