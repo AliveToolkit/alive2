@@ -49,6 +49,9 @@ unsigned Type::bits() const {
 }
 
 expr Type::operator==(const Type &b) const {
+  if (this == &b)
+    return true;
+
 #define CMP(Ty)                                                                \
   if (auto lhs = dynamic_cast<const Ty*>(this)) {                              \
     if (auto rhs = dynamic_cast<const Ty*>(&b))                                \
@@ -108,22 +111,19 @@ void VoidType::print(ostream &os) const {
 
 
 unsigned IntType::bits() const {
-  assert(defined);
   return bitwidth;
 }
 
 expr IntType::getTypeConstraints() const {
-  auto c = isInt();
-  auto bw = sizeVar();
-  if (defined) {
-    c &= bw == expr::mkUInt(bitwidth, var_bw_bits);
-  }
-
   // limit ints to be between 1 and 64 bits
   // TODO: lift 64-bit restriction
-  c &= bw.uge(expr::mkUInt(1, var_bw_bits));
-  c &= bw.ule(expr::mkUInt(64, var_bw_bits));
-  return c;
+  auto bw = sizeVar();
+  return bw != expr::mkUInt(0, var_bw_bits) &&
+         bw.ule(expr::mkUInt(64, var_bw_bits));
+}
+
+expr IntType::sizeVar() const {
+  return defined ? expr::mkUInt(bits(), var_bw_bits) : Type::sizeVar();
 }
 
 expr IntType::operator==(const IntType &rhs) const {
@@ -131,9 +131,8 @@ expr IntType::operator==(const IntType &rhs) const {
 }
 
 void IntType::fixup(const Model &m) {
-  assert(m.getUInt(typeVar()) == SymbolicType::Int);
-  bitwidth = m.getUInt(sizeVar());
-  defined = true;
+  if (!defined)
+    bitwidth = m.getUInt(sizeVar());
 }
 
 void IntType::enforceIntType() {
@@ -156,16 +155,15 @@ void IntType::print(ostream &os) const {
 
 expr FloatType::getTypeConstraints() const {
   // TODO
-  return isFloat() && false;
+  return false;
 }
 
 expr FloatType::operator==(const FloatType &rhs) const {
   // TODO
-  return true;
+  return false;
 }
 
 void FloatType::fixup(const Model &m) {
-  assert(m.getUInt(typeVar()) == SymbolicType::Float);
   // TODO
 }
 
@@ -180,7 +178,7 @@ void FloatType::print(ostream &os) const {
 
 expr PtrType::getTypeConstraints() const {
   // TODO
-  return isPtr() && false;
+  return false;
 }
 
 expr PtrType::operator==(const PtrType &rhs) const {
@@ -189,7 +187,6 @@ expr PtrType::operator==(const PtrType &rhs) const {
 }
 
 void PtrType::fixup(const Model &m) {
-  assert(m.getUInt(typeVar()) == SymbolicType::Ptr);
   // TODO
 }
 
@@ -208,16 +205,15 @@ void PtrType::print(ostream &os) const {
 
 expr ArrayType::getTypeConstraints() const {
   // TODO
-  return isArray() && false;
+  return false;
 }
 
 expr ArrayType::operator==(const ArrayType &rhs) const {
   // TODO
-  return true;
+  return false;
 }
 
 void ArrayType::fixup(const Model &m) {
-  assert(m.getUInt(typeVar()) == SymbolicType::Array);
   // TODO
 }
 
@@ -232,16 +228,15 @@ void ArrayType::print(ostream &os) const {
 
 expr VectorType::getTypeConstraints() const {
   // TODO
-  return isVector() && false;
+  return false;
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
   // TODO
-  return true;
+  return false;
 }
 
 void VectorType::fixup(const Model &m) {
-  assert(m.getUInt(typeVar()) == SymbolicType::Vector);
   // TODO
 }
 

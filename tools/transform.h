@@ -8,11 +8,21 @@
 #include "util/errors.h"
 #include <string>
 #include <ostream>
+#include <unordered_map>
 
 namespace tools {
 
 struct TransformPrintOpts {
   bool print_fn_header = true;
+};
+
+
+struct Transform {
+  std::string name;
+  IR::Function src, tgt;
+
+  void print(std::ostream &os, const TransformPrintOpts &opt) const;
+  friend std::ostream& operator<<(std::ostream &os, const Transform &t);
 };
 
 
@@ -26,24 +36,20 @@ public:
   operator bool() const { return r.isSat(); }
   void operator++(void);
 
-  friend struct Transform;
+  friend struct TransformVerify;
 };
 
 
-struct TransformVerifyOpts {
-  bool check_each_var = true;
-};
+class TransformVerify {
+  Transform &t;
+  std::unordered_map<std::string, const IR::Value*> tgt_vals;
+  bool check_each_var;
 
-struct Transform {
-  std::string name;
-  IR::Function src, tgt;
-
-  util::Errors verify(const TransformVerifyOpts &opts) const;
+public:
+  TransformVerify(Transform &t, bool check_each_var);
+  util::Errors verify() const;
   TypingAssignments getTypings() const;
-  void fixupTypes(const TypingAssignments &t);
-
-  void print(std::ostream &os, const TransformPrintOpts &opt) const;
-  friend std::ostream& operator<<(std::ostream &os, const Transform &t);
+  void fixupTypes(const TypingAssignments &ty);
 };
 
 }

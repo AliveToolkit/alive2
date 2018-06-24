@@ -31,7 +31,7 @@ public:
   virtual unsigned bits() const;
 
   virtual smt::expr getTypeConstraints() const = 0;
-  smt::expr sizeVar() const;
+  virtual smt::expr sizeVar() const;
   smt::expr operator==(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
@@ -57,7 +57,7 @@ public:
 
 
 class IntType final : public Type {
-  unsigned bitwidth = 0;
+  unsigned bitwidth;
   bool defined = false;
 
 public:
@@ -65,6 +65,7 @@ public:
   IntType(unsigned bitwidth) : bitwidth(bitwidth), defined(true) {}
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
   void enforceIntType() override;

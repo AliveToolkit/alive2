@@ -31,8 +31,7 @@ static void show_help() {
 int main(int argc, char **argv) {
   bool verbose = false;
   bool show_smt_stats = false;
-
-  TransformVerifyOpts transform_opts;
+  bool check_each_var = true;
 
   int argc_i = 1;
   for (; argc_i < argc; ++argc_i) {
@@ -42,7 +41,7 @@ int main(int argc, char **argv) {
     string_view arg(argv[argc_i]);
     if (arg == "-root-only")
       // FIXME: add a return instruction to each transform as needed
-      transform_opts.check_each_var = false;
+      check_each_var = false;
     else if (arg == "-v")
       verbose = true;
     else if (arg == "-smt-stats")
@@ -83,7 +82,8 @@ int main(int argc, char **argv) {
         t.print(cout, print_opts);
         cout << '\n';
 
-        auto types = t.getTypings();
+        TransformVerify tv(t, check_each_var);
+        auto types = tv.getTypings();
         if (!types) {
           cerr << "Doesn't type check!\n";
           ++num_errors;
@@ -92,8 +92,8 @@ int main(int argc, char **argv) {
 
         unsigned i = 0;
         for (; types; ++types) {
-          t.fixupTypes(types);
-          if (auto errs = t.verify(transform_opts)) {
+          tv.fixupTypes(types);
+          if (auto errs = tv.verify()) {
             cerr << errs;
             ++num_errors;
             break;

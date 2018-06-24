@@ -7,8 +7,6 @@
 #include "smt/solver.h"
 #include "util/errors.h"
 #include "util/symexec.h"
-#include <string>
-#include <unordered_map>
 
 using namespace IR;
 using namespace smt;
@@ -40,21 +38,25 @@ static void check_refinement(Solver &s, Errors &errs,
 
 namespace tools {
 
-Errors Transform::verify(const TransformVerifyOpts &opts) const {
-  unordered_map<string, const Value*> tgt_vals;
-  for (auto &i : tgt.instrs()) {
-    tgt_vals.emplace(i.getName(), &i);
+TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
+  t(t), check_each_var(check_each_var) {
+  if (check_each_var) {
+    for (auto &i : t.tgt.instrs()) {
+      tgt_vals.emplace(i.getName(), &i);
+    }
   }
+}
 
+Errors TransformVerify::verify() const {
   Value::reset_gbl_id();
-  State src_state(src), tgt_state(tgt);
+  State src_state(t.src), tgt_state(t.tgt);
   sym_exec(src_state);
   sym_exec(tgt_state);
 
   Errors errs;
   Solver s;
 
-  if (opts.check_each_var) {
+  if (check_each_var) {
     for (auto &[var, val] : src_state.getValues()) {
       auto &name = var->getName();
       if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
@@ -95,15 +97,22 @@ void TypingAssignments::operator++(void) {
   assert(!r.isUnknown());
 }
 
-TypingAssignments Transform::getTypings() const {
+TypingAssignments TransformVerify::getTypings() const {
   // TODO: missing cross-program type constraints
   // e.g. for inputs and return values
-  return { src.getTypeConstraints() && tgt.getTypeConstraints() };
+  auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
+
+  if (check_each_var) {
+    for (auto &i : t.src.instrs()) {
+      c &= i.getType() == tgt_vals.at(i.getName())->getType();
+    }
+  }
+  return { move(c) };
 }
 
-void Transform::fixupTypes(const TypingAssignments &t) {
-  src.fixupTypes(t.r.getModel());
-  tgt.fixupTypes(t.r.getModel());
+void TransformVerify::fixupTypes(const TypingAssignments &ty) {
+  t.src.fixupTypes(ty.r.getModel());
+  t.tgt.fixupTypes(ty.r.getModel());
 }
 
 void Transform::print(ostream &os, const TransformPrintOpts &opt) const {
