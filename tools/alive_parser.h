@@ -11,6 +11,7 @@
 namespace tools {
 
 std::vector<tools::Transform> parse(std::string_view buf);
+void init_parser();
 
 struct ParseException {
   std::string str;

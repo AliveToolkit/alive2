@@ -13,10 +13,8 @@ namespace smt { class Model; }
 namespace IR {
 
 class Type {
-  // name of associated operand
-  std::string opname;
-
 protected:
+  std::string name;
   smt::expr var(const char *var, unsigned bits) const;
   smt::expr typeVar() const;
   smt::expr is(unsigned t) const;
@@ -27,7 +25,7 @@ protected:
   smt::expr isVector() const;
 
 public:
-  virtual void setName(const std::string &name);
+  Type(std::string &&name) : name(std::move(name)) {}
   virtual unsigned bits() const;
 
   virtual smt::expr getTypeConstraints() const = 0;
@@ -35,10 +33,9 @@ public:
   smt::expr operator==(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
-  virtual void enforceIntType();
-  virtual void enforceIntOrPtrOrVectorType();
+  virtual smt::expr enforceIntType() const;
+  virtual smt::expr enforceIntOrPtrOrVectorType() const;
 
-  virtual std::unique_ptr<Type> dup() const = 0;
   virtual void print(std::ostream &os) const = 0;
   std::string toString() const;
 
@@ -48,10 +45,9 @@ public:
 
 class VoidType final : public Type {
 public:
-  VoidType() {}
+  VoidType(std::string &&name) : Type(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
-  std::unique_ptr<Type> dup() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -61,62 +57,59 @@ class IntType final : public Type {
   bool defined = false;
 
 public:
-  IntType() {}
-  IntType(unsigned bitwidth) : bitwidth(bitwidth), defined(true) {}
+  IntType(std::string &&name) : Type(std::move(name)) {}
+  IntType(std::string &&name, unsigned bitwidth)
+    : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
+
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
-  void enforceIntType() override;
-  void enforceIntOrPtrOrVectorType() override;
-  std::unique_ptr<Type> dup() const override;
+  smt::expr enforceIntType() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
 
 
 class FloatType final : public Type {
 public:
-  FloatType() {}
+  FloatType(std::string &&name) : Type(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
-  std::unique_ptr<Type> dup() const override;
   void print(std::ostream &os) const override;
 };
 
 
 class PtrType final : public Type {
 public:
-  PtrType() {}
+  PtrType(std::string &&name) : Type(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
-  void enforceIntOrPtrOrVectorType() override;
-  std::unique_ptr<Type> dup() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
 
 
 class ArrayType final : public Type {
 public:
-  ArrayType() {}
+  ArrayType(std::string &&name) : Type(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
-  std::unique_ptr<Type> dup() const override;
   void print(std::ostream &os) const override;
 };
 
 
 class VectorType final : public Type {
 public:
-  VectorType() {}
+  VectorType(std::string &&name) : Type(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
-  void enforceIntOrPtrOrVectorType() override;
-  std::unique_ptr<Type> dup() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -126,33 +119,21 @@ public:
   enum TypeNum { Int, Float, Ptr, Array, Vector, Undefined };
 
 private:
-  std::string name;
   TypeNum typ = Undefined;
-  unsigned enabled = (1 << Int) | (1 << Float) | (1 << Ptr) | (1 << Array) |
-                     (1 << Vector);
   IntType i;
   FloatType f;
   PtrType p;
   ArrayType a;
   VectorType v;
 
-  smt::expr isInt() const;
-  smt::expr isFloat() const;
-  smt::expr isPtr() const;
-  smt::expr isArray() const;
-  smt::expr isVector() const;
-
 public:
-  SymbolicType() {}
-  SymbolicType(std::string &&name) : name(std::move(name)) {}
-  void setName(const std::string &name) override;
+  SymbolicType(std::string &&name);
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
-  void enforceIntType() override;
-  void enforceIntOrPtrOrVectorType() override;
-  std::unique_ptr<Type> dup() const override;
+  smt::expr enforceIntType() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
 

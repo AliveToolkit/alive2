@@ -17,8 +17,7 @@ static constexpr unsigned var_bw_bits = 10;
 namespace IR {
 
 expr Type::var(const char *var, unsigned bits) const {
-  assert(!opname.empty());
-  auto str = opname + '_' + var;
+  auto str = name + '_' + var;
   return expr::mkVar(str.c_str(), bits);
 }
 
@@ -39,10 +38,6 @@ expr Type::isFloat() const  { return is(SymbolicType::Float); }
 expr Type::isPtr() const    { return is(SymbolicType::Ptr); }
 expr Type::isArray() const  { return is(SymbolicType::Array); }
 expr Type::isVector() const { return is(SymbolicType::Vector); }
-
-void Type::setName(const string &name) {
-  opname = name;
-}
 
 unsigned Type::bits() const {
   UNREACHABLE();
@@ -76,12 +71,12 @@ expr Type::operator==(const Type &b) const {
   return false;
 }
 
-void Type::enforceIntType() {
-  UNREACHABLE();
+expr Type::enforceIntType() const {
+  return false;
 }
 
-void Type::enforceIntOrPtrOrVectorType() {
-  UNREACHABLE();
+expr Type::enforceIntOrPtrOrVectorType() const {
+  return false;
 }
 
 string Type::toString() const {
@@ -99,10 +94,6 @@ expr VoidType::getTypeConstraints() const {
 
 void VoidType::fixup(const Model &m) {
   // do nothing
-}
-
-unique_ptr<Type> VoidType::dup() const {
-  return make_unique<VoidType>();
 }
 
 void VoidType::print(ostream &os) const {
@@ -135,16 +126,12 @@ void IntType::fixup(const Model &m) {
     bitwidth = m.getUInt(sizeVar());
 }
 
-void IntType::enforceIntType() {
-  // do nothing
+expr IntType::enforceIntType() const {
+  return true;
 }
 
-void IntType::enforceIntOrPtrOrVectorType() {
-  // do nothing
-}
-
-unique_ptr<Type> IntType::dup() const {
-  return make_unique<IntType>(*this);
+expr IntType::enforceIntOrPtrOrVectorType() const {
+  return true;
 }
 
 void IntType::print(ostream &os) const {
@@ -167,10 +154,6 @@ void FloatType::fixup(const Model &m) {
   // TODO
 }
 
-unique_ptr<Type> FloatType::dup() const {
-  return make_unique<FloatType>(*this);
-}
-
 void FloatType::print(ostream &os) const {
   os << "TODO";
 }
@@ -190,12 +173,8 @@ void PtrType::fixup(const Model &m) {
   // TODO
 }
 
-void PtrType::enforceIntOrPtrOrVectorType() {
-  // do nothing
-}
-
-unique_ptr<Type> PtrType::dup() const {
-  return make_unique<PtrType>(*this);
+expr PtrType::enforceIntOrPtrOrVectorType() const {
+  return true;
 }
 
 void PtrType::print(ostream &os) const {
@@ -217,10 +196,6 @@ void ArrayType::fixup(const Model &m) {
   // TODO
 }
 
-unique_ptr<Type> ArrayType::dup() const {
-  return make_unique<ArrayType>(*this);
-}
-
 void ArrayType::print(ostream &os) const {
   os << "TODO";
 }
@@ -240,12 +215,8 @@ void VectorType::fixup(const Model &m) {
   // TODO
 }
 
-void VectorType::enforceIntOrPtrOrVectorType() {
-  // do nothing
-}
-
-unique_ptr<Type> VectorType::dup() const {
-  return make_unique<VectorType>(*this);
+expr VectorType::enforceIntOrPtrOrVectorType() const {
+  return true;
 }
 
 void VectorType::print(ostream &os) const {
@@ -253,35 +224,9 @@ void VectorType::print(ostream &os) const {
 }
 
 
-expr SymbolicType::isInt() const {
-  return expr(enabled & (1 << Int)) && Type::isInt();
-}
-
-expr SymbolicType::isFloat() const {
-  return expr(enabled & (1 << Float)) && Type::isFloat();
-}
-
-expr SymbolicType::isPtr() const {
-  return expr(enabled & (1 << Ptr)) && Type::isPtr();
-}
-
-expr SymbolicType::isVector() const {
-  return expr(enabled & (1 << Vector)) && Type::isVector();
-}
-
-expr SymbolicType::isArray() const {
-  return expr(enabled & (1 << Array)) && Type::isArray();
-}
-
-void SymbolicType::setName(const string &opname) {
-  auto &str = name.empty() ? opname : name;
-  i.setName(str);
-  f.setName(str);
-  p.setName(str);
-  a.setName(str);
-  v.setName(str);
-  Type::setName(str);
-}
+SymbolicType::SymbolicType(string &&name)
+  : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
+    a(string(name)), v(string(name)) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -307,6 +252,9 @@ expr SymbolicType::getTypeConstraints() const {
 }
 
 expr SymbolicType::operator==(const Type &b) const {
+  if (this == &b)
+    return true;
+
   if (auto rhs = dynamic_cast<const IntType*>(&b))
     return isInt() && i == *rhs;
   if (auto rhs = dynamic_cast<const FloatType*>(&b))
@@ -334,7 +282,6 @@ expr SymbolicType::operator==(const Type &b) const {
 void SymbolicType::fixup(const Model &m) {
   unsigned smt_typ = m.getUInt(typeVar());
   assert(smt_typ >= Int && smt_typ <= Vector);
-  assert((1 << smt_typ) & enabled);
   typ = TypeNum(smt_typ);
 
   switch (typ) {
@@ -348,16 +295,12 @@ void SymbolicType::fixup(const Model &m) {
   }
 }
 
-void SymbolicType::enforceIntType() {
-  enabled &= (1 << Int);
+expr SymbolicType::enforceIntType() const {
+  return isInt();
 }
 
-void SymbolicType::enforceIntOrPtrOrVectorType() {
-  enabled &= (1 << Int) | (1 << Ptr) | (1 << Vector);
-}
-
-unique_ptr<Type> SymbolicType::dup() const {
-  return make_unique<SymbolicType>(*this);
+expr SymbolicType::enforceIntOrPtrOrVectorType() const {
+  return isInt() || isPtr() || isVector();
 }
 
 void SymbolicType::print(ostream &os) const {

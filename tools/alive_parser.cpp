@@ -6,11 +6,14 @@
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
 #include <cassert>
-#include <iostream>
-#include <string>
-#include <string_view>
+#include <memory>
+#include <unordered_map>
 
 #define YYDEBUG 0
+
+#if YYDEBUG
+#include <iostream>
+#endif
 
 using namespace IR;
 using namespace tools;
@@ -27,8 +30,8 @@ static void error(string &&s) {
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
-static Value& get_constant(uint64_t n, Type *t) {
-  auto c = make_unique<IntConst>(t->dup(), n);
+static Value& get_constant(uint64_t n, Type &t) {
+  auto c = make_unique<IntConst>(t, n);
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;
@@ -113,14 +116,23 @@ static void parse_comma() {
   tokenizer.ensure(COMMA);
 }
 
-static unique_ptr<Type> parse_type(bool optional = true) {
+
+static vector<unique_ptr<IntType>> int_types;
+static vector<unique_ptr<SymbolicType>> sym_types;
+static unsigned sym_num;
+
+static Type& parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
   case INT_TYPE:
-    return make_unique<IntType>(yylval.num);
+    if (yylval.num <= 64)
+      return *int_types[yylval.num].get();
+    error("Int type too long: " + to_string(yylval.num));
+    break;
   default:
     if (optional) {
       tokenizer.unget(t);
-      return make_unique<SymbolicType>();
+      auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
+      return *sym_types.emplace_back(move(t)).get();
     } else {
       error(string("Expecting a type, got: ") + token_name[t]);
     }
@@ -128,7 +140,7 @@ static unique_ptr<Type> parse_type(bool optional = true) {
   UNREACHABLE();
 }
 
-static Value& parse_operand(Type *type) {
+static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
     // FIXME: constraint type to int
@@ -139,13 +151,13 @@ static Value& parse_operand(Type *type) {
   case FALSE:
     return get_constant(0, type);
   case UNDEF: {
-    auto val = make_unique<UndefValue>(type->dup());
+    auto val = make_unique<UndefValue>(type);
     auto ret = val.get();
     fn->addUndef(move(val));
     return *ret;
   }
   case POISON: {
-    auto val = make_unique<PoisonValue>(type->dup());
+    auto val = make_unique<PoisonValue>(type);
     auto ret = val.get();
     fn->addConstant(move(val));
     return *ret;
@@ -156,7 +168,7 @@ static Value& parse_operand(Type *type) {
         I != identifiers.end())
       return *I->second;
 
-    auto input = make_unique<Input>(type->dup(), string(id));
+    auto input = make_unique<Input>(type, string(id));
     auto ret = input.get();
     fn->addInput(move(input));
     identifiers.emplace(move(id), ret);
@@ -213,10 +225,10 @@ static BinOp::Flags parse_binop_flags(token op_token) {
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   BinOp::Flags flags = parse_binop_flags(op_token);
-  auto type = parse_type();
-  auto &a = parse_operand(type.get());
+  auto &type = parse_type();
+  auto &a = parse_operand(type);
   parse_comma();
-  auto &b = parse_operand(type.get());
+  auto &b = parse_operand(type);
 
   BinOp::Op op;
   switch (op_token) {
@@ -236,14 +248,14 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(move(type), string(name), a, b, op, flags);
+  return make_unique<BinOp>(type, string(name), a, b, op, flags);
 }
 
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   // op ty %op to ty2
-  auto opty = parse_type();
-  auto &val = parse_operand(opty.get());
-  unique_ptr<Type> ty2 = parse_type(/*optional=*/!tokenizer.consumeIf(TO));
+  auto &opty = parse_type();
+  auto &val = parse_operand(opty);
+  auto &ty2 = parse_type(/*optional=*/!tokenizer.consumeIf(TO));
 
   ConversionOp::Op op;
   switch (op_token) {
@@ -253,20 +265,20 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<ConversionOp>(move(ty2), string(name), val, op);
+  return make_unique<ConversionOp>(ty2, string(name), val, op);
 }
 
 static unique_ptr<Instr> parse_select(string_view name) {
   // select condty %cond, ty %a, ty %b
-  auto condty = parse_type();
-  auto &cond = parse_operand(condty.get());
+  auto &condty = parse_type();
+  auto &cond = parse_operand(condty);
   parse_comma();
-  auto aty = parse_type();
-  auto &a = parse_operand(aty.get());
+  auto &aty = parse_type();
+  auto &a = parse_operand(aty);
   parse_comma();
-  auto bty = parse_type();
-  auto &b = parse_operand(bty.get());
-  return make_unique<Select>(move(aty), string(name), cond, a, b);
+  auto &bty = parse_type();
+  auto &b = parse_operand(bty);
+  return make_unique<Select>(aty, string(name), cond, a, b);
 }
 
 static ICmp::Cond parse_icmp_cond() {
@@ -290,25 +302,25 @@ static ICmp::Cond parse_icmp_cond() {
 static unique_ptr<Instr> parse_icmp(string_view name) {
   // icmp cond ty %a, &b
   auto cond = parse_icmp_cond();
-  auto ty = parse_type();
-  auto &a = parse_operand(ty.get());
+  auto &ty = parse_type();
+  auto &a = parse_operand(ty);
   parse_comma();
-  auto &b = parse_operand(ty.get());
-  return make_unique<ICmp>(string(name), cond, a, b);
+  auto &b = parse_operand(ty);
+  return make_unique<ICmp>(*int_types[1].get(), string(name), cond, a, b);
 }
 
 static unique_ptr<Instr> parse_freeze(string_view name) {
   // freeze ty %op
-  auto ty = parse_type();
-  auto &op = parse_operand(ty.get());
-  return make_unique<Freeze>(move(ty), string(name), op);
+  auto &ty = parse_type();
+  auto &op = parse_operand(ty);
+  return make_unique<Freeze>(ty, string(name), op);
 }
 
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
-  auto ty = parse_type();
-  auto &op = parse_operand(ty.get());
-  return make_unique<CopyOp>(move(ty), string(name), op);
+  auto &ty = parse_type();
+  auto &op = parse_operand(ty);
+  return make_unique<CopyOp>(ty, string(name), op);
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {
@@ -354,9 +366,9 @@ static unique_ptr<Instr> parse_instr(string_view name) {
 }
 
 static unique_ptr<Instr> parse_return() {
-  auto type = parse_type();
-  auto &val = parse_operand(type.get());
-  return make_unique<Return>(move(type), val);
+  auto &type = parse_type();
+  auto &val = parse_operand(type);
+  return make_unique<Return>(type, val);
 }
 
 static void parse_fn(Function &f) {
@@ -397,6 +409,7 @@ vector<Transform> parse(string_view buf) {
   vector<Transform> ret;
 
   yylex_init(buf);
+  sym_num = 0;
 
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
@@ -409,6 +422,14 @@ vector<Transform> parse(string_view buf) {
 
   identifiers.clear();
   return ret;
+}
+
+void init_parser() {
+  int_types.emplace_back(nullptr);
+
+  for (unsigned i = 1; i <= 64; ++i) {
+    int_types.emplace_back(make_unique<IntType>("i" + to_string(i), i));
+  }
 }
 
 }

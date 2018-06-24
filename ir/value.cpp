@@ -21,19 +21,13 @@ string Value::fresh_id() {
   return to_string(++gbl_fresh_id);
 }
 
-Value::Value(unique_ptr<Type> &&type, string &&name, bool mk_unique_name)
-  : type(move(type)), name(move(name)) {
-  if (mk_unique_name)
-    this->type->setName(getName() + '_' + fresh_id());
-  else
-    this->type->setName(getName());
+expr Value::getTypeConstraints() const {
+  return getType().getTypeConstraints();
 }
 
 void Value::fixupTypes(const Model &m) {
-  type->fixup(m);
+  type.fixup(m);
 }
-
-Value::~Value() {}
 
 ostream& operator<<(ostream &os, const Value &val) {
   auto t = val.getType().toString();
@@ -43,10 +37,8 @@ ostream& operator<<(ostream &os, const Value &val) {
 }
 
 
-IntConst::IntConst(unique_ptr<Type> &&type, int64_t val)
-  : Value(move(type), to_string(val), true), val(val) {
-  getWType().enforceIntType();
-}
+IntConst::IntConst(Type &type, int64_t val)
+  : Value(type, to_string(val)), val(val) {}
 
 void IntConst::print(ostream &os) const {
   UNREACHABLE();
@@ -58,16 +50,14 @@ StateValue IntConst::toSMT(State &s) const {
 
 expr IntConst::getTypeConstraints() const {
   unsigned min_bits = (val >= 0 ? 63 : 64) - num_sign_bits(val);
-  return getType().getTypeConstraints() &&
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType() &&
          getType().sizeVar().uge(min_bits);
 }
 
 
-UndefValue::UndefValue(unique_ptr<Type> &&type)
-  : Value(std::move(type), "undef", true) {}
-
 void UndefValue::print(ostream &os) const {
-  os << "undef";
+  UNREACHABLE();
 }
 
 StateValue UndefValue::toSMT(State &s) const {
@@ -77,33 +67,22 @@ StateValue UndefValue::toSMT(State &s) const {
   return { move(var), true };
 }
 
-expr UndefValue::getTypeConstraints() const {
-  return getType().getTypeConstraints();
-}
-
 string UndefValue::getFreshName() {
   return "undef_" + fresh_id();
 }
 
 
-PoisonValue::PoisonValue(unique_ptr<Type> &&type)
-  : Value(std::move(type), "poison", true) {}
-
 void PoisonValue::print(ostream &os) const {
-  os << "poison";
+  UNREACHABLE();
 }
 
 StateValue PoisonValue::toSMT(State &s) const {
   return { {}, false };
 }
 
-expr PoisonValue::getTypeConstraints() const {
-  return getType().getTypeConstraints();
-}
-
 
 void Input::print(std::ostream &os) const {
-  os << getName();
+  UNREACHABLE();
 }
 
 StateValue Input::toSMT(State &s) const {
@@ -120,10 +99,6 @@ StateValue Input::toSMT(State &s) const {
                       expr::mkVar(getName().c_str(), bw),
                       move(undef)),
            type.extract(1,1) == expr::mkUInt(0, 1) };
-}
-
-expr Input::getTypeConstraints() const {
-  return getType().getTypeConstraints();
 }
 
 }

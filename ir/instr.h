@@ -9,9 +9,8 @@ namespace IR {
 
 class Instr : public Value {
 protected:
-  Instr(std::unique_ptr<Type> &&type, std::string &&name,
-        bool mk_unique_name = false)
-    : Value(std::move(type), std::move(name), mk_unique_name) {}
+  static VoidType voidTy;
+  Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
 };
 
 
@@ -27,8 +26,8 @@ private:
   Flags flags;
 
 public:
-  BinOp(std::unique_ptr<Type> &&type, std::string &&name, Value &lhs,
-        Value &rhs, Op op, Flags flags = None);
+  BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
+        Flags flags = None);
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -45,8 +44,8 @@ private:
   Op op;
 
 public:
-  ConversionOp(std::unique_ptr<Type> &&type, std::string &&name, Value &val,
-               Op op);
+  ConversionOp(Type &type, std::string &&name, Value &val, Op op)
+    : Instr(type, std::move(name)), val(val), op(op) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
@@ -56,8 +55,8 @@ public:
 class Select final : public Instr {
   Value &cond, &a, &b;
 public:
-  Select(std::unique_ptr<Type> &&type, std::string &&name, Value &cond,
-         Value &a, Value &b);
+  Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
+    : Instr(type, move(name)), cond(cond), a(a), b(b) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
@@ -74,7 +73,7 @@ private:
   Cond cond;
 
 public:
-  ICmp(std::string &&name, Cond cond, Value &a, Value &b);
+  ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
@@ -85,8 +84,8 @@ public:
 class Freeze final : public Instr {
   Value &val;
 public:
-  Freeze(std::unique_ptr<Type> &&type, std::string &&name, Value &val) :
-    Instr(std::move(type), std::move(name)), val(val) {}
+  Freeze(Type &type, std::string &&name, Value &val)
+    : Instr(type, std::move(name)), val(val) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -97,8 +96,8 @@ public:
 class CopyOp final : public Instr {
   Value &val;
 public:
-  CopyOp(std::unique_ptr<Type> &&type, std::string &&name, Value &val) :
-    Instr(std::move(type), std::move(name)), val(val) {}
+  CopyOp(Type &type, std::string &&name, Value &val)
+    : Instr(type, std::move(name)), val(val) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -109,8 +108,7 @@ public:
 class Return final : public Instr {
   Value &val;
 public:
-  Return(std::unique_ptr<Type> &&type, Value &val) :
-    Instr(std::move(type), "return", true), val(val) {}
+  Return(Type &type, Value &val) : Instr(type, "return"), val(val) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -120,7 +118,7 @@ public:
 
 class Unreachable final : public Instr {
 public:
-  Unreachable() : Instr(std::make_unique<VoidType>(), "") {}
+  Unreachable() : Instr(Instr::voidTy, "") {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
