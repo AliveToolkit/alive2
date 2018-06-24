@@ -29,10 +29,7 @@ foreach ($m as $opt) {
   $o = $orig[$opt[1]];
   $nargs = count(explode(',', $opt[2]));
   $opt[3] = rename_fn($opt[3], $nargs);
-  $o = "Name: $opt[1]$o=>$opt[3]\n";
-  if (strstr($o, 'undef'))
-    continue;
-  $output .= $o;
+  $output .= "Name: $opt[1]$o=>$opt[3]\n";
 }
 
 file_put_contents("$ll.alive.opt", $output);
