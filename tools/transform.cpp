@@ -63,8 +63,10 @@ Errors TransformVerify::verify() const {
         continue;
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(s, errs, tgt_state.getQuantVars(),
+      check_refinement(s, errs, src_state.getQuantVars(),
                        true, val, true, tgt_state.at(*tgt_vals.at(name)));
+      if (errs)
+        return errs;
     }
   }
 
@@ -75,7 +77,7 @@ Errors TransformVerify::verify() const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    check_refinement(s, errs, tgt_state.getQuantVars(),
+    check_refinement(s, errs, src_state.getQuantVars(),
                      src_state.returnDomain(), src_state.returnVal(),
                      tgt_state.returnDomain(), tgt_state.returnVal());
   }

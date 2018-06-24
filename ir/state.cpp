@@ -67,6 +67,7 @@ const StateValue& State::operator[](const Value &val) {
       ++VI;
     }
   }
+  undef_vars.insert(VI, VE);
 
   if (repls.empty())
     return sval;
@@ -121,6 +122,7 @@ void State::addUndefVar(const expr &var) {
 }
 
 void State::resetUndefVars() {
+  quantified_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
 }
 

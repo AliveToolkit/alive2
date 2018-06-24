@@ -11,7 +11,7 @@ using namespace smt;
 using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
-static constexpr unsigned var_bw_bits = 10;
+static constexpr unsigned var_bw_bits = 8;
 
 
 namespace IR {
