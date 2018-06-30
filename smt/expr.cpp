@@ -716,7 +716,7 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
 }
 
 expr expr::mkForAll(const set<expr> &vars, expr &&val) {
-  if (vars.empty() || val.isTrue() || val.isFalse())
+  if (vars.empty() || val.isTrue() || val.isFalse() || !val.isValid())
     return move(val);
 
   unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
@@ -728,17 +728,31 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
                             val());
 }
 
-expr expr::replace(vector<pair<expr, expr>> &repls) const {
+expr expr::simplify() const {
+  C();
+  return Z3_simplify(ctx(), ast());
+}
+
+expr expr::subst(vector<pair<expr, expr>> &repls) const {
+  C();
   unique_ptr<Z3_ast[]> from(new Z3_ast[repls.size()]);
   unique_ptr<Z3_ast[]> to(new Z3_ast[repls.size()]);
 
   unsigned i = 0;
   for (auto &p : repls) {
+    C2(p.first, p.second);
     from[i] = p.first();
     to[i] = p.second();
     ++i;
   }
   return Z3_substitute(ctx(), ast(), repls.size(), from.get(), to.get());
+}
+
+expr expr::subst(const expr &from, const expr &to) const {
+  C(from, to);
+  auto f = from();
+  auto t = to();
+  return Z3_substitute(ctx(), ast(), 1, &f, &t);
 }
 
 ostream& operator<<(ostream &os, const expr &e) {

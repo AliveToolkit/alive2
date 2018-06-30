@@ -77,7 +77,7 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   tmp_values[i_tmp_values] =
-      { sval.value.replace(repls), sval.non_poison.replace(repls) };
+      { sval.value.subst(repls), sval.non_poison.subst(repls) };
   return tmp_values[i_tmp_values++];
 }
 

@@ -76,6 +76,7 @@ public:
     Value(type, std::move(name)) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
+  smt::expr getTyVar() const;
 };
 
 }

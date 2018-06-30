@@ -25,7 +25,8 @@ static void show_help() {
     " -v\t\tVerbose mode\n"
     " -smt-stats\tShow SMT statistics\n"
     " -smt-to:x\tTimeout for SMT queries in ms\n"
-    " -skip-smt\tAssume all SMT queries are UNSAT\n"
+    " -smt-verbose\tPrint all SMT queries\n"
+    " -skip-smt\tSkip all SMT queries\n"
     " -h / --help\tShow this help\n";
 }
 
@@ -50,6 +51,8 @@ int main(int argc, char **argv) {
       show_smt_stats = true;
     else if (arg.compare(0, 8, "-smt-to:") == 0 && arg.size() > 8)
       smt::set_query_timeout(arg.substr(8).data());
+    else if (arg == "-smt-verbose")
+      smt::solver_print_queries(true);
     else if (arg == "-skip-smt")
       config::skip_smt = true;
     else if (arg == "-h" || arg == "--help") {

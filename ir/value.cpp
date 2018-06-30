@@ -87,8 +87,7 @@ void Input::print(std::ostream &os) const {
 
 StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
-  string tyname = "ty_" + getName();
-  expr type = expr::mkVar(tyname.c_str(), 2);
+  expr type = getTyVar();
 
   auto bw = bits();
   string uname = UndefValue::getFreshName();
@@ -99,6 +98,11 @@ StateValue Input::toSMT(State &s) const {
                       expr::mkVar(getName().c_str(), bw),
                       move(undef)),
            type.extract(1,1) == expr::mkUInt(0, 1) };
+}
+
+expr Input::getTyVar() const {
+  string tyname = "ty_" + getName();
+  return expr::mkVar(tyname.c_str(), 2);
 }
 
 }

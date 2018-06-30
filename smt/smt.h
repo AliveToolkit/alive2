@@ -14,4 +14,7 @@ struct smt_initializer {
 void set_query_timeout(const char *ms);
 const char* get_query_timeout();
 
+bool hit_memory_limit();
+bool hit_half_memory_limit();
+
 }

@@ -4,16 +4,63 @@
 #include "tools/transform.h"
 #include "ir/state.h"
 #include "smt/expr.h"
+#include "smt/smt.h"
 #include "smt/solver.h"
 #include "util/errors.h"
 #include "util/symexec.h"
 
 using namespace IR;
 using namespace smt;
+using namespace tools;
 using namespace util;
 using namespace std;
 
-static void check_refinement(Solver &s, Errors &errs,
+
+static expr preprocess(Transform &t, const set<expr> &qvars,
+                       const set<expr> &undef_qvars, expr && e) {
+  if (qvars.empty() || e.isFalse())
+    return move(e);
+
+  // TODO: maybe try to instantiate undet_xx vars?
+  if (undef_qvars.empty() || hit_half_memory_limit())
+    return expr::mkForAll(qvars, move(e));
+
+  // manually instantiate all ty_%v vars
+  set<expr> instances({ move(e) });
+  set<expr> instances2;
+
+  expr nums[3] = { expr::mkUInt(0, 2), expr::mkUInt(1, 2), expr::mkUInt(2, 2) };
+
+  for (auto &i : t.src.getInputs()) {
+    auto var = static_cast<const Input&>(i).getTyVar();
+
+    for (auto &e : instances) {
+      for (unsigned i = 0; i <= 2; ++i) {
+        expr newexpr = e.subst(var, nums[i]);
+        if (newexpr.eq(e))
+          break;
+
+        newexpr = newexpr.simplify();
+        if (newexpr.isFalse())
+          continue;
+        instances2.emplace(move(newexpr));
+      }
+    }
+    instances = move(instances2);
+  }
+
+  expr insts(false);
+  for (auto &e : instances) {
+    insts |= e;
+  }
+
+  // TODO: try out instantiating the undefs in forall quantifier
+
+  return expr::mkForAll(qvars, move(insts));
+}
+
+
+static void check_refinement(Errors &errs, Transform &t,
                              const set<expr> &global_qvars,
                              const expr &dom_a, const State::ValTy &ap,
                              const expr &dom_b, const State::ValTy &bp) {
@@ -24,15 +71,16 @@ static void check_refinement(Solver &s, Errors &errs,
   qvars.insert(ap.second.begin(), ap.second.end());
 
   // TODO: improve error messages
-  s.check({
-    { expr::mkForAll(qvars, dom_a.notImplies(dom_b)),
-      [&](const Model &m) { errs.add("Source is more defined than target"); } },
+  Solver::check({
+    { preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
+      [&](const Result &r) { errs.add("Source is more defined than target"); }},
 
-    { expr::mkForAll(qvars, dom_a && a.non_poison.notImplies(b.non_poison)),
-      [&](const Model &m) {errs.add("Target is more poisonous than source"); }},
+    { preprocess(t, qvars, ap.second,
+                 dom_a && a.non_poison.notImplies(b.non_poison)),
+      [&](const Result &r) {errs.add("Target is more poisonous than source");}},
 
-    { expr::mkForAll(qvars, dom_a && a.non_poison && a.value != b.value),
-      [&](const Model &m) { errs.add("value mismatch"); } }
+    { preprocess(t, qvars, ap.second, dom_a && a.non_poison && a.value != b.value),
+      [&](const Result &r) { errs.add("value mismatch"); } }
   });
 }
 
@@ -54,7 +102,6 @@ Errors TransformVerify::verify() const {
   sym_exec(tgt_state);
 
   Errors errs;
-  Solver s;
 
   if (check_each_var) {
     for (auto &[var, val] : src_state.getValues()) {
@@ -63,7 +110,7 @@ Errors TransformVerify::verify() const {
         continue;
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(s, errs, src_state.getQuantVars(),
+      check_refinement(errs, t, src_state.getQuantVars(),
                        true, val, true, tgt_state.at(*tgt_vals.at(name)));
       if (errs)
         return errs;
@@ -77,7 +124,7 @@ Errors TransformVerify::verify() const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    check_refinement(s, errs, src_state.getQuantVars(),
+    check_refinement(errs, t, src_state.getQuantVars(),
                      src_state.returnDomain(), src_state.returnVal(),
                      tgt_state.returnDomain(), tgt_state.returnVal());
   }

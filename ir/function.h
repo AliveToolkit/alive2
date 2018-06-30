@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/instr.h"
+#include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include <memory>

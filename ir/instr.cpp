@@ -348,7 +348,7 @@ StateValue Freeze::toSMT(State &s) const {
 
   return { p.isFalse() ?
              move(undet) :
-             expr::mkIf(p, v, undet),
+             expr::mkIf(p, v, std::move(undet)),
            true };
 }
 

@@ -54,12 +54,13 @@ public:
 
 class Result {
 public:
-  enum answer { UNSAT, SAT, UNKNOWN };
+  enum answer { UNSAT, SAT, INVALID, UNKNOWN };
 
   Result() : a(UNKNOWN) {}
 
   bool isSat() const { return a == SAT; }
   bool isUnsat() const { return a == UNSAT; }
+  bool isInvalid() const { return a == INVALID; }
   bool isUnknown() const { return a == UNKNOWN; }
 
   const Model& getModel() const {
@@ -72,7 +73,7 @@ private:
   answer a;
 
   Result(answer a) : a(a) {}
-  Result(Z3_model m, answer a) : m(m), a(a) {}
+  Result(Z3_model m) : m(m), a(SAT) {}
 
   friend class Solver;
 };
@@ -92,7 +93,7 @@ public:
 class Solver {
   Z3_solver s;
   bool valid = true;
-  using E = std::pair<expr, std::function<void(const Model &m)>>;
+  using E = std::pair<expr, std::function<void(const Result &r)>>;
 public:
   Solver();
   ~Solver();
@@ -103,13 +104,13 @@ public:
   void reset();
 
   Result check() const;
-  Result check(const expr &e);
-  void check(std::initializer_list<E> queries);
+  static void check(std::initializer_list<E> queries);
 
   friend class SolverPop;
 };
 
 
+void solver_print_queries(bool yes);
 void solver_print_stats(std::ostream &os);
 
 

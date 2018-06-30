@@ -166,8 +166,11 @@ public:
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
 
+  expr simplify() const;
+
   // replace v1 -> v2
-  expr replace(std::vector<std::pair<expr, expr>> &repls) const;
+  expr subst(std::vector<std::pair<expr, expr>> &repls) const;
+  expr subst(const expr &from, const expr &to) const;
 
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 

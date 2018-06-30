@@ -6,6 +6,7 @@
 #include "util/compiler.h"
 #include "util/config.h"
 #include <iomanip>
+#include <iostream>
 #include <z3.h>
 
 using namespace smt;
@@ -75,6 +76,11 @@ SolverPop::~SolverPop() {
 }
 
 
+static bool print_queries = false;
+void solver_print_queries(bool yes) {
+  print_queries = yes;
+}
+
 Solver::Solver() {
   // FIXME: implement a tactic
   s = Z3_mk_simple_solver(ctx());
@@ -118,10 +124,12 @@ Result Solver::check() const {
 
   if (!valid) {
     ++num_invalid;
-    return Result::UNKNOWN;
+    return Result::INVALID;
   }
 
   ++num_queries;
+  if (print_queries)
+    cout << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s);
 
   switch (Z3_solver_check(ctx(), s)) {
   case Z3_L_FALSE:
@@ -129,7 +137,7 @@ Result Solver::check() const {
     return Result::UNSAT;
   case Z3_L_TRUE:
     ++num_sats;
-    return { Z3_solver_get_model(ctx(), s), Result::SAT };
+    return Z3_solver_get_model(ctx(), s);
   case Z3_L_UNDEF:
     ++num_unknown;
     return Result::UNKNOWN;
@@ -138,28 +146,25 @@ Result Solver::check() const {
   }
 }
 
-Result Solver::check(const expr &e) {
-  if (!e.isValid()) {
-    ++num_invalid;
-    return Result::UNKNOWN;
-  }
-
-  if (e.isFalse()) {
-    ++num_trivial;
-    return Result::UNSAT;
-  }
-
-  // FIXME: benchmark: is push/pop the best?
-  auto pop = push();
-  add(e);
-  return check();
-}
-
 void Solver::check(initializer_list<E> queries) {
   for (auto &[q, error] : queries) {
-    auto res = check(q);
-    if (res.isSat()) {
-      error(res.m);
+    if (!q.isValid()) {
+      ++num_invalid;
+      error(Result::INVALID);
+      return;
+    }
+
+    if (q.isFalse()) {
+      ++num_trivial;
+      continue;
+    }
+
+    // TODO: benchmark: reset() or new solver every time?
+    Solver s;
+    s.add(q);
+    auto res = s.check();
+    if (!res.isUnsat()) {
+      error(res);
       return;
     }
   }
