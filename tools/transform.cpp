@@ -51,12 +51,12 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
 
   expr insts(false);
   for (auto &e : instances) {
-    insts |= e;
+    insts |= expr::mkForAll(qvars, move(const_cast<expr&>(e)));
   }
 
   // TODO: try out instantiating the undefs in forall quantifier
 
-  return expr::mkForAll(qvars, move(insts));
+  return move(insts);
 }
 
 
