@@ -56,7 +56,7 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
 
   // TODO: try out instantiating the undefs in forall quantifier
 
-  return move(insts);
+  return insts;
 }
 
 
