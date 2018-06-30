@@ -10,4 +10,8 @@ struct smt_initializer {
   ~smt_initializer();
 };
 
+
+void set_query_timeout(const char *ms);
+const char* get_query_timeout();
+
 }

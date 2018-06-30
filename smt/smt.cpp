@@ -16,4 +16,15 @@ smt_initializer::~smt_initializer() {
   Z3_finalize_memory();
 }
 
+
+static const char *query_timeout = "10000";
+
+void set_query_timeout(const char *ms) {
+  query_timeout = ms;
+}
+
+const char* get_query_timeout() {
+  return query_timeout;
+}
+
 }

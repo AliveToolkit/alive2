@@ -21,11 +21,12 @@ static void show_help() {
   cerr <<
     "Usage: alive2 <options> <files.opt>\n"
     "Options:\n"
-    " -root-only:\tCheck the expression's root only\n"
-    " -v:\t\tverbose mode\n"
-    " -smt-stats:\tshow SMT statistics\n"
-    " -skip-smt:\tassume all SMT queries are UNSAT\n"
-    " -h / --help:\tshow this help\n";
+    " -root-only\tCheck the expression's root only\n"
+    " -v\t\tVerbose mode\n"
+    " -smt-stats\tShow SMT statistics\n"
+    " -smt-to:x\tTimeout for SMT queries in ms\n"
+    " -skip-smt\tAssume all SMT queries are UNSAT\n"
+    " -h / --help\tShow this help\n";
 }
 
 
@@ -47,6 +48,8 @@ int main(int argc, char **argv) {
       verbose = true;
     else if (arg == "-smt-stats")
       show_smt_stats = true;
+    else if (arg.compare(0, 8, "-smt-to:") == 0 && arg.size() > 8)
+      smt::set_query_timeout(arg.substr(8).data());
     else if (arg == "-skip-smt")
       config::skip_smt = true;
     else if (arg == "-h" || arg == "--help") {
