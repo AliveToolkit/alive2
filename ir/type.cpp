@@ -266,7 +266,7 @@ expr SymbolicType::operator==(const Type &b) const {
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
     return isVector() && v == *rhs;
 
-  if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {  
+  if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
     c |= isInt()    && i == rhs->i;
     c |= isFloat()  && f == rhs->f;

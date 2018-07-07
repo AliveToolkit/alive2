@@ -301,7 +301,7 @@ void ICmp::print(ostream &os) const {
   case ULT: condtxt = "ult "; break;
   case UGE: condtxt = "uge "; break;
   case UGT: condtxt = "ugt "; break;
-  case Any: condtxt = " "; break;
+  case Any: condtxt = ""; break;
   }
   os << getName() << " = icmp " << condtxt << a << ", " << b.getName();
 }

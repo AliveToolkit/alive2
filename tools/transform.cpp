@@ -160,7 +160,21 @@ void TypingAssignments::operator++(void) {
 
 TypingAssignments TransformVerify::getTypings() const {
   auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
+
+  // return type
   c &= t.src.getType() == t.tgt.getType();
+
+  // input types
+  {
+    unordered_map<string, const Value*> tgt_inputs;
+    for (auto &i : t.tgt.getInputs()) {
+      tgt_inputs.emplace(i.getName(), &i);
+    }
+
+    for (auto &i : t.src.getInputs()) {
+      c &= i.getType() == tgt_inputs.at(i.getName())->getType();
+    }
+  }
 
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
