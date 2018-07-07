@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/instr.h"
+#include "ir/function.h"
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
@@ -12,6 +13,16 @@ using namespace std;
 namespace IR {
 
 VoidType Instr::voidTy("void");
+
+expr Instr::eqType(const Instr &i) const {
+  return getType() == i.getType();
+}
+
+expr Instr::getTypeConstraints() const {
+  UNREACHABLE();
+  return {};
+}
+
 
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
              Flags flags)
@@ -183,7 +194,7 @@ StateValue BinOp::toSMT(State &s) const {
   return { move(val), move(not_poison) };
 }
 
-expr BinOp::getTypeConstraints() const {
+expr BinOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
          getType() == lhs.getType() &&
@@ -225,7 +236,7 @@ StateValue ConversionOp::toSMT(State &s) const {
   return { move(newval), expr(vp) };
 }
 
-expr ConversionOp::getTypeConstraints() const {
+expr ConversionOp::getTypeConstraints(const Function &f) const {
   expr sizeconstr;
   switch (op) {
   case SExt:
@@ -239,7 +250,6 @@ expr ConversionOp::getTypeConstraints() const {
   // TODO: missing constraint comparing ty and to_ty (e.g. both ints)
   return Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
-         val.getTypeConstraints() &&
          val.getType().enforceIntOrPtrOrVectorType() &&  // FIXME: remove
          move(sizeconstr);
 }
@@ -258,9 +268,8 @@ StateValue Select::toSMT(State &s) const {
            cp && expr::mkIf(cond, ap, bp) };
 }
 
-expr Select::getTypeConstraints() const {
-  return cond.getTypeConstraints() &&
-         cond.getType().enforceIntType() &&
+expr Select::getTypeConstraints(const Function &f) const {
+  return cond.getType().enforceIntType() &&
          cond.getType().sizeVar() == 1u &&
          Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
@@ -270,9 +279,13 @@ expr Select::getTypeConstraints() const {
 
 
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
-  : Instr(type, move(name)), a(a), b(b), cond(cond) {
-  auto str = getName() + "_cond";
-  cond_var = expr::mkVar(str.c_str(), 4);
+  : Instr(type, move(name)), a(a), b(b), cond(cond), defined(cond != Any) {
+  if (!defined) {
+    auto str = getName() + "_cond" + fresh_id();
+    cond_var = expr::mkVar(str.c_str(), 4);
+  } else {
+    cond_var = expr::mkUInt(cond, 4);
+  }
 }
 
 void ICmp::print(ostream &os) const {
@@ -314,20 +327,31 @@ StateValue ICmp::toSMT(State &s) const {
   return { expr::mkIf(val, expr::mkUInt(1,1), expr::mkUInt(0,1)), ap && bp };
 }
 
-expr ICmp::getTypeConstraints() const {
-  return Value::getTypeConstraints() &&
-         getType().enforceIntType() &&
-         getType().sizeVar() == 1u &&
-         a.getTypeConstraints() &&
-         a.getType().enforceIntOrPtrOrVectorType() &&
-         a.getType() == b.getType() &&
-         (cond == Any ? cond_var.ule(expr::mkUInt(9, 4))
-                      : cond_var == expr::mkUInt(cond, 4));
+expr ICmp::getTypeConstraints(const Function &f) const {
+  expr e = Value::getTypeConstraints() &&
+           getType().enforceIntType() &&
+           getType().sizeVar() == 1u &&
+           a.getType().enforceIntOrPtrOrVectorType() &&
+           a.getType() == b.getType();
+  if (!defined)
+    e &= cond_var.ule(expr::mkUInt(9, 4));
+  return e;
 }
 
 void ICmp::fixupTypes(const Model &m) {
   Value::fixupTypes(m);
-  cond = (Cond)m.getUInt(cond_var);
+  if (!defined)
+    cond = (Cond)m.getUInt(cond_var);
+}
+
+expr ICmp::eqType(const Instr &i) const {
+  expr eq = Instr::eqType(i);
+  if (auto rhs = dynamic_cast<const ICmp*>(&i)) {
+    if (!defined || !rhs->defined) {
+      eq &= cond_var == rhs->cond_var;
+    }
+  }
+  return eq;
 }
 
 
@@ -352,7 +376,7 @@ StateValue Freeze::toSMT(State &s) const {
            true };
 }
 
-expr Freeze::getTypeConstraints() const {
+expr Freeze::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType() == val.getType();
 }
@@ -366,7 +390,7 @@ StateValue CopyOp::toSMT(State &s) const {
   return s[val];
 }
 
-expr CopyOp::getTypeConstraints() const {
+expr CopyOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType() == val.getType();
 }
@@ -381,9 +405,10 @@ StateValue Return::toSMT(State &s) const {
   return {};
 }
 
-expr Return::getTypeConstraints() const {
+expr Return::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType() == val.getType();
+         getType() == val.getType() &&
+         f.getType() == getType();
 }
 
 
@@ -396,7 +421,7 @@ StateValue Unreachable::toSMT(State &s) const {
   return {};
 }
 
-expr Unreachable::getTypeConstraints() const {
+expr Unreachable::getTypeConstraints(const Function &f) const {
   return true;
 }
 

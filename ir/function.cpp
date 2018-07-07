@@ -9,10 +9,10 @@ using namespace std;
 
 namespace IR {
 
-expr BasicBlock::getTypeConstraints() const {
+expr BasicBlock::getTypeConstraints(const Function &f) const {
   expr t(true);
   for (auto &i : instrs()) {
-    t &= i.getTypeConstraints();
+    t &= i.getTypeConstraints(f);
   }
   return t;
 }
@@ -42,7 +42,7 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
 expr Function::getTypeConstraints() const {
   expr t(true);
   for (auto bb : getBBs()) {
-    t &= bb->getTypeConstraints();
+    t &= bb->getTypeConstraints(*this);
   }
   for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
     for (auto &v : l) {

@@ -44,7 +44,7 @@ public:
 
 class TransformVerify {
   Transform &t;
-  std::unordered_map<std::string, const IR::Value*> tgt_vals;
+  std::unordered_map<std::string, const IR::Instr*> tgt_instrs;
   bool check_each_var;
 
 public:

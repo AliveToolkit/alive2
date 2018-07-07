@@ -233,6 +233,7 @@ bool expr::isSMax() const {
 }
 
 unsigned expr::bits() const {
+  C();
   return Z3_get_bv_sort_size(ctx(), sort());
 }
 

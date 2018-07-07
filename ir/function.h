@@ -18,6 +18,8 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class Function;
+
 class BasicBlock {
   std::string name;
   std::vector<std::unique_ptr<Instr>> m_instrs;
@@ -26,7 +28,7 @@ public:
   BasicBlock(std::string &&name) : name(std::move(name)) {}
   BasicBlock(std::string_view name) : name(name) {}
 
-  smt::expr getTypeConstraints() const;
+  smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 
   void addIntr(std::unique_ptr<Instr> &&i);
@@ -34,12 +36,14 @@ public:
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;
   }
+  Instr& back() { return *m_instrs.back(); }
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
 };
 
 
 class Function {
+  IR::Type *type = nullptr;
   std::string name;
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
@@ -51,7 +55,11 @@ class Function {
 
 public:
   Function() {}
-  Function(std::string &&name) : name(std::move(name)) {}
+  Function(Type &type, std::string &&name)
+    : type(&type), name(std::move(name)) {}
+
+  const IR::Type& getType() const { return *type; }
+  void setType(IR::Type &t) { type = &t; }
 
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);

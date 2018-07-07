@@ -375,6 +375,7 @@ static void parse_fn(Function &f) {
   fn = &f;
   identifiers.clear();
   BasicBlock *bb = &f.getBB("");
+  bool has_return = false;
 
   while (true) {
     switch (auto t = *tokenizer) {
@@ -388,9 +389,13 @@ static void parse_fn(Function &f) {
     case LABEL:
       bb = &f.getBB(yylval.str);
       break;
-    case RETURN:
-      bb->addIntr(parse_return());
+    case RETURN: {
+      auto instr = parse_return();
+      f.setType(instr->getType());
+      bb->addIntr(move(instr));
+      has_return = true;
       break;
+    }
     case UNREACH:
       bb->addIntr(make_unique<Unreachable>());
       break;
@@ -398,6 +403,13 @@ static void parse_fn(Function &f) {
       tokenizer.unget(t);
       return;
     }
+  }
+
+  // FIXME: if target: copy relevant src instructions
+  // FIXME: add error checking
+  if (!has_return) {
+    auto &last = bb->back();
+    f.setType(last.getType());
   }
 }
 

@@ -90,7 +90,7 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
   t(t), check_each_var(check_each_var) {
   if (check_each_var) {
     for (auto &i : t.tgt.instrs()) {
-      tgt_vals.emplace(i.getName(), &i);
+      tgt_instrs.emplace(i.getName(), &i);
     }
   }
 }
@@ -111,7 +111,7 @@ Errors TransformVerify::verify() const {
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
       check_refinement(errs, t, src_state.getQuantVars(),
-                       true, val, true, tgt_state.at(*tgt_vals.at(name)));
+                       true, val, true, tgt_state.at(*tgt_instrs.at(name)));
       if (errs)
         return errs;
     }
@@ -159,13 +159,12 @@ void TypingAssignments::operator++(void) {
 }
 
 TypingAssignments TransformVerify::getTypings() const {
-  // TODO: missing cross-program type constraints
-  // e.g. for inputs and return values
   auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
+  c &= t.src.getType() == t.tgt.getType();
 
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
-      c &= i.getType() == tgt_vals.at(i.getName())->getType();
+      c &= i.eqType(*tgt_instrs.at(i.getName()));
     }
   }
   return { move(c) };

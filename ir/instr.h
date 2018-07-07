@@ -7,10 +7,18 @@
 
 namespace IR {
 
+class Function;
+
+
 class Instr : public Value {
 protected:
   static VoidType voidTy;
   Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
+
+public:
+  virtual smt::expr eqType(const Instr &i) const;
+  smt::expr getTypeConstraints() const override;
+  virtual smt::expr getTypeConstraints(const Function &f) const = 0;
 };
 
 
@@ -31,7 +39,7 @@ public:
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -48,7 +56,7 @@ public:
     : Instr(type, std::move(name)), val(val), op(op) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -59,7 +67,7 @@ public:
     : Instr(type, move(name)), cond(cond), a(a), b(b) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -71,13 +79,15 @@ private:
   Value &a, &b;
   smt::expr cond_var;
   Cond cond;
+  bool defined;
 
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   void fixupTypes(const smt::Model &m) override;
+  smt::expr eqType(const Instr &i) const override;
 };
 
 
@@ -89,7 +99,7 @@ public:
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -101,7 +111,7 @@ public:
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -112,7 +122,7 @@ public:
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -122,7 +132,7 @@ public:
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 }
