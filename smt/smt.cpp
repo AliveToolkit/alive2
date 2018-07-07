@@ -3,6 +3,7 @@
 
 #include "smt/smt.h"
 #include "smt/ctx.h"
+#include "smt/solver.h"
 #include <cstdint>
 #include <z3.h>
 
@@ -10,9 +11,11 @@ namespace smt {
 
 smt_initializer::smt_initializer() {
   ctx.init();
+  solver_init();
 }
 
 smt_initializer::~smt_initializer() {
+  solver_destroy();
   ctx.destroy();
   Z3_finalize_memory();
 }

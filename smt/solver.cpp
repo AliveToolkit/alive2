@@ -5,8 +5,10 @@
 #include "smt/ctx.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <utility>
 #include <z3.h>
 
 using namespace smt;
@@ -20,6 +22,56 @@ static unsigned num_trivial = 0;
 static unsigned num_sats = 0;
 static unsigned num_unsats = 0;
 static unsigned num_unknown = 0;
+
+namespace {
+class Tactic {
+  Z3_tactic t;
+
+  Tactic(Z3_tactic t) : t(t) {
+    Z3_tactic_inc_ref(ctx(), t);
+  }
+
+  void destroy() {
+    if (t)
+      Z3_tactic_dec_ref(ctx(), t);
+  }
+
+public:
+  Tactic() : t(nullptr) {}
+  Tactic(const char *name) : Tactic(Z3_mk_tactic(ctx(), name)) {}
+
+  Tactic(Tactic &&other) : t(nullptr) {
+    swap(t, other.t);
+  }
+
+  void operator=(Tactic &&other) {
+    destroy();
+    t = nullptr;
+    swap(t, other.t);
+  }
+
+  Tactic(initializer_list<Tactic> ts) : t(nullptr) {
+    assert(ts.size() != 0);
+    Tactic tmp = move(const_cast<Tactic&>(*ts.begin()));
+
+    for (auto I = next(ts.begin()), E = ts.end(); I != E; ++I) {
+      tmp = Tactic::mkThen(tmp, *I);
+    }
+    *this = move(tmp);
+  }
+
+  static Tactic mkThen(const Tactic &a, const Tactic &b) {
+    return Z3_tactic_and_then(ctx(), a.t, b.t);
+  }
+
+  ~Tactic() { destroy(); }
+
+  friend class smt::Solver;
+};
+}
+
+static Tactic tactic;
+
 
 namespace smt {
 
@@ -82,8 +134,7 @@ void solver_print_queries(bool yes) {
 }
 
 Solver::Solver() {
-  // FIXME: implement a tactic
-  s = Z3_mk_simple_solver(ctx());
+  s = Z3_mk_solver_from_tactic(ctx(), tactic.t);
   Z3_solver_inc_ref(ctx(), s);
 }
 
@@ -196,6 +247,20 @@ EnableSMTQueriesTMP::EnableSMTQueriesTMP() : old(config::skip_smt) {
 
 EnableSMTQueriesTMP::~EnableSMTQueriesTMP() {
   config::skip_smt = old;
+}
+
+
+void solver_init() {
+  tactic = {
+    "simplify",
+    "propagate-values",
+    "simplify",
+    "smt"
+  };
+}
+
+void solver_destroy() {
+  tactic = Tactic();
 }
 
 }

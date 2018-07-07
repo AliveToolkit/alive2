@@ -120,4 +120,8 @@ struct EnableSMTQueriesTMP {
   ~EnableSMTQueriesTMP();
 };
 
+
+void solver_init();
+void solver_destroy();
+
 }
