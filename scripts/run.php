@@ -27,8 +27,6 @@ $output = '';
 preg_match_all($regex, $txt, $m, PREG_SET_ORDER);
 foreach ($m as $opt) {
   $o = $orig[$opt[1]];
-  $nargs = count(explode(',', $opt[2]));
-  $opt[3] = rename_fn($opt[3], $nargs);
   $output .= "Name: $opt[1]$o=>$opt[3]\n";
 }
 
@@ -38,10 +36,3 @@ echo `$alive -root-only $ll.alive.opt 2>&1`;
 
 unlink($ll);
 unlink("$ll.alive.opt");
-
-
-function rename_fn($fn, $skip) {
-  return preg_replace_callback('/%(\d+)/', function($m) use($skip) {
-   return $m[1] > $skip ? "%_$m[1]" : $m[0];
-  }, $fn);
-}
