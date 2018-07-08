@@ -547,6 +547,9 @@ expr expr::operator==(const expr &rhs) const {
     // (= (ite c t e) x) -> (ite c (= t x) (= e x))
     if (rhs.isConst() || (t.isConst() && e.isConst()))
       return mkIf(c, t == rhs, e == rhs);
+
+  } else if (rhs.isAppOf(Z3_OP_ITE)) {
+    return rhs == *this;
   }
   return binop_commutative(rhs, Z3_mk_eq);
 }
