@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   }
 
   smt::smt_initializer smt_init;
-  init_parser();
+  parser_initializer parser_init;
 
   TransformPrintOpts print_opts;
   print_opts.print_fn_header = false;

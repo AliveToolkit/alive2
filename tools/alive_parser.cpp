@@ -131,6 +131,9 @@ static Type& parse_type(bool optional = true) {
   default:
     if (optional) {
       tokenizer.unget(t);
+      if (sym_num < sym_types.size())
+        return *sym_types[sym_num++].get();
+
       auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
       return *sym_types.emplace_back(move(t)).get();
     } else {
@@ -421,10 +424,10 @@ vector<Transform> parse(string_view buf) {
   vector<Transform> ret;
 
   yylex_init(buf);
-  sym_num = 0;
 
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
+    sym_num = 0;
     parse_name(t);
     parse_pre(t);
     parse_fn(t.src);
@@ -436,12 +439,18 @@ vector<Transform> parse(string_view buf) {
   return ret;
 }
 
-void init_parser() {
+
+parser_initializer::parser_initializer() {
   int_types.emplace_back(nullptr);
 
   for (unsigned i = 1; i <= 64; ++i) {
     int_types.emplace_back(make_unique<IntType>("i" + to_string(i), i));
   }
+}
+
+parser_initializer::~parser_initializer() {
+  int_types.clear();
+  sym_types.clear();
 }
 
 }

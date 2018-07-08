@@ -172,7 +172,9 @@ TypingAssignments TransformVerify::getTypings() const {
     }
 
     for (auto &i : t.src.getInputs()) {
-      c &= i.getType() == tgt_inputs.at(i.getName())->getType();
+      auto tgt_i = tgt_inputs.find(i.getName());
+      if (tgt_i != tgt_inputs.end())
+        c &= i.getType() == tgt_i->second->getType();
     }
   }
 
