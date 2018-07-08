@@ -22,6 +22,7 @@ static const YYCTYPE *YYCURSOR;
 static const YYCTYPE *YYLIMIT;
 static const YYCTYPE *YYTEXT;
 static const YYCTYPE *YYMARKER;
+static const YYCTYPE *tag1, *yyt1;
 
 #if 0
 # define YYRESTART() cout << "restart line: " << yylineno << '\n'; goto restart
@@ -83,8 +84,8 @@ re2c:yyfill:check = 0;
   YYRESTART();
 }
 
-"Name: " [^\r\n]+ {
-  COPY_STR(sizeof("Name: ")-1);
+"Name:" [ \t]* @tag1 [^\r\n]+ {
+  COPY_STR(tag1 - YYTEXT);
   return NAME;
 }
 
