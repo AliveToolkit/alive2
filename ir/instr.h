@@ -77,9 +77,10 @@ public:
 
 private:
   Value &a, &b;
-  smt::expr cond_var;
+  std::string cond_name;
   Cond cond;
   bool defined;
+  smt::expr cond_var() const;
 
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);

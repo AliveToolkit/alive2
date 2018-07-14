@@ -280,12 +280,12 @@ expr Select::getTypeConstraints(const Function &f) const {
 
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
   : Instr(type, move(name)), a(a), b(b), cond(cond), defined(cond != Any) {
-  if (!defined) {
-    auto str = getName() + "_cond" + fresh_id();
-    cond_var = expr::mkVar(str.c_str(), 4);
-  } else {
-    cond_var = expr::mkUInt(cond, 4);
-  }
+  if (!defined)
+    cond_name = getName() + "_cond" + fresh_id();
+}
+
+expr ICmp::cond_var() const {
+  return defined ? expr::mkUInt(cond, 4) : expr::mkVar(cond_name.c_str(), 4);
 }
 
 void ICmp::print(ostream &os) const {
@@ -334,21 +334,21 @@ expr ICmp::getTypeConstraints(const Function &f) const {
            a.getType().enforceIntOrPtrOrVectorType() &&
            a.getType() == b.getType();
   if (!defined)
-    e &= cond_var.ule(expr::mkUInt(9, 4));
+    e &= cond_var().ule(expr::mkUInt(9, 4));
   return e;
 }
 
 void ICmp::fixupTypes(const Model &m) {
   Value::fixupTypes(m);
   if (!defined)
-    cond = (Cond)m.getUInt(cond_var);
+    cond = (Cond)m.getUInt(cond_var());
 }
 
 expr ICmp::eqType(const Instr &i) const {
   expr eq = Instr::eqType(i);
   if (auto rhs = dynamic_cast<const ICmp*>(&i)) {
     if (!defined || !rhs->defined) {
-      eq &= cond_var == rhs->cond_var;
+      eq &= cond_var() == rhs->cond_var();
     }
   }
   return eq;

@@ -10,14 +10,28 @@
 namespace smt {
 
 smt_initializer::smt_initializer() {
+  init();
+}
+
+void smt_initializer::reset() {
+  destroy();
+  Z3_reset_memory();
+  init();
+}
+
+smt_initializer::~smt_initializer() {
+  destroy();
+  Z3_finalize_memory();
+}
+
+void smt_initializer::init() {
   ctx.init();
   solver_init();
 }
 
-smt_initializer::~smt_initializer() {
+void smt_initializer::destroy() {
   solver_destroy();
   ctx.destroy();
-  Z3_finalize_memory();
 }
 
 

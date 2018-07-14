@@ -8,6 +8,11 @@ namespace smt {
 struct smt_initializer {
   smt_initializer();
   ~smt_initializer();
+  void reset();
+
+private:
+  void init();
+  void destroy();
 };
 
 

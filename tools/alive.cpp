@@ -85,8 +85,8 @@ int main(int argc, char **argv) {
   for (; argc_i < argc; ++argc_i) {
     cout << "Processing " << argv[argc_i] << "..\n";
     try {
-      file_reader f(argv[argc_i], PARSER_READ_AHEAD);
-      for (auto &t : parse(*f)) {
+      for (auto &t : parse(*file_reader(argv[argc_i], PARSER_READ_AHEAD))) {
+        smt_init.reset();
         t.print(cout, print_opts);
         cout << '\n';
 
