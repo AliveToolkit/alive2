@@ -125,9 +125,10 @@ private:
   PtrType p;
   ArrayType a;
   VectorType v;
+  bool named;
 
 public:
-  SymbolicType(std::string &&name);
+  SymbolicType(std::string &&name, bool named = false);
   unsigned bits() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;

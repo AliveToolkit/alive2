@@ -224,9 +224,9 @@ void VectorType::print(ostream &os) const {
 }
 
 
-SymbolicType::SymbolicType(string &&name)
+SymbolicType::SymbolicType(string &&name, bool named)
   : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)) {}
+    a(string(name)), v(string(name)), named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -304,7 +304,7 @@ expr SymbolicType::enforceIntOrPtrOrVectorType() const {
 }
 
 void SymbolicType::print(ostream &os) const {
-  if (!name.empty()) {
+  if (named) {
     os << name;
     return;
   }
