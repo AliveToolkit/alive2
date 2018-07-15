@@ -28,8 +28,7 @@ State::State(const Function &f) : f(f) {
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
-  auto p = values_map.try_emplace(&v, (unsigned)values.size());
-  assert(p.second);
+  ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
   values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
 
   // cleanup potentially used temporary values due to undef rewriting
