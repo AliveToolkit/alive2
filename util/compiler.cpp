@@ -36,4 +36,12 @@ unsigned num_sign_bits(uint64_t n) {
 #endif
 }
 
+unsigned num_leading_zeros(uint64_t n) {
+#if defined(__GNUC__)
+  return __builtin_clzll(n);
+#else
+# error Unknown compiler
+#endif
+}
+
 }

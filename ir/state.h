@@ -9,6 +9,7 @@
 #include <set>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace IR {
 
@@ -37,8 +38,11 @@ public:
 private:
   const Function &f;
   std::set<smt::expr> quantified_vars;
+
   // var -> ((value, not_poison), undef_vars)
-  std::unordered_map<const Value*, ValTy> values;
+  std::unordered_map<const Value*, unsigned> values_map;
+  std::vector<std::pair<const Value*, ValTy>> values;
+
   std::unordered_map<const BasicBlock*, smt::expr> domain_bbs;
 
   // temp state

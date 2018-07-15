@@ -13,7 +13,7 @@ class Errors {
   std::vector<std::string> errs;
 
 public:
-  void add(const char *str);
+  void add(std::string &&str);
   explicit operator bool() const { return !errs.empty(); }
 
   friend std::ostream& operator<<(std::ostream &os, const Errors &e);

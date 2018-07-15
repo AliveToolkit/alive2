@@ -28,19 +28,20 @@ State::State(const Function &f) : f(f) {
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
-  auto p = values.try_emplace(&v, move(val), move(undef_vars));
+  auto p = values_map.try_emplace(&v, (unsigned)values.size());
   assert(p.second);
+  values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
 
   // cleanup potentially used temporary values due to undef rewriting
   while (i_tmp_values > 0) {
     tmp_values[--i_tmp_values] = StateValue();
   }
 
-  return p.first->second.first;
+  return values.back().second.first;
 }
 
 const StateValue& State::operator[](const Value &val) {
-  auto &[sval, uvars] = values.at(&val);
+  auto &[sval, uvars] = values[values_map.at(&val)].second;
   if (uvars.empty())
     return sval;
 
@@ -82,7 +83,7 @@ const StateValue& State::operator[](const Value &val) {
 }
 
 const State::ValTy& State::at(const Value &val) const {
-  return values.at(&val);
+  return values[values_map.at(&val)].second;
 }
 
 bool State::startBB(const BasicBlock &bb) {

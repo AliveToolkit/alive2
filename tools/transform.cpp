@@ -8,12 +8,85 @@
 #include "smt/solver.h"
 #include "util/errors.h"
 #include "util/symexec.h"
+#include <set>
+#include <sstream>
 
 using namespace IR;
 using namespace smt;
 using namespace tools;
 using namespace util;
 using namespace std;
+
+
+static void print_varval(ostream &s, const Model &m, const StateValue &val) {
+  if (m[val.non_poison].isFalse()) {
+    s << "poison";
+    return;
+  }
+
+  expr e = m[val.value];
+  uint64_t n;
+  ENSURE(e.isUInt(n));
+  auto bw = e.bits();
+  s << "0x" << hex << n << dec;
+  s << " (" << n;
+  if (n != 0 && num_leading_zeros(n) == (64 - bw)) {
+    s << ", " << ((int64_t)(n << (64 - bw)) >> (64 - bw));
+  }
+  s << ')';
+}
+
+
+static void error(Errors &errs, State &src_state, State &tgt_state,
+                  const Result &r, bool print_var, const Value *var,
+                  const StateValue &src, const StateValue &tgt,
+                  const char *msg) {
+
+  if (r.isInvalid()) {
+    errs.add("Invalid expr");
+    return;
+  }
+
+  if (r.isUnknown()) {
+    errs.add("Timeout");
+    return;
+  }
+
+  stringstream s;
+  string empty;
+  auto &var_name = var ? var->getName() : empty;
+  auto &m = r.getModel();
+
+  s << msg;
+  if (!var_name.empty())
+    s << " for " << *var;
+  s << "\n\nExample:\n";
+
+  set<string> seen_vars;
+  for (auto &vs : { src_state.getValues(), tgt_state.getValues() }) {
+    for (auto &[var, val] : vs) {
+      auto &name = var->getName();
+      if (name == var_name)
+        break;
+
+      if (name[0] != '%' || !seen_vars.insert(name).second)
+        continue;
+
+      s << *var << " = ";
+      print_varval(s, m, val.first);
+      s << '\n';
+    }
+  }
+
+  if (print_var) {
+    s << "Source value: ";
+    print_varval(s, m, src);
+    s << "\nTarget value: ";
+    print_varval(s, m, tgt);
+  }
+
+  errs.add(s.str());
+}
 
 
 static expr preprocess(Transform &t, const set<expr> &qvars,
@@ -43,6 +116,8 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
         newexpr = newexpr.simplify();
         if (newexpr.isFalse())
           continue;
+
+        newexpr &= var == nums[i]; // keep for counterexample printing
         instances2.emplace(move(newexpr));
       }
     }
@@ -61,28 +136,38 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
 
 
 static void check_refinement(Errors &errs, Transform &t,
-                             const set<expr> &global_qvars,
+                             State &src_state, State &tgt_state,
+                             const Value *var,
                              const expr &dom_a, const State::ValTy &ap,
                              const expr &dom_b, const State::ValTy &bp) {
   auto &a = ap.first;
   auto &b = bp.first;
 
-  auto qvars = global_qvars;
+  auto qvars = src_state.getQuantVars();
   qvars.insert(ap.second.begin(), ap.second.end());
 
-  // TODO: improve error messages
+  auto err = [&](const Result &r, bool print_var, const char *msg) {
+    error(errs, src_state, tgt_state, r, print_var, var, a, b, msg);
+  };
+
   Solver::check({
     { preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
-      [&](const Result &r) { errs.add("Source is more defined than target"); }},
-
+      [&](const Result &r) {
+        err(r, false, "Source is more defined than target");
+      }},
     { preprocess(t, qvars, ap.second,
                  dom_a && a.non_poison.notImplies(b.non_poison)),
-      [&](const Result &r) {errs.add("Target is more poisonous than source");}},
-
-    { preprocess(t, qvars, ap.second, dom_a && a.non_poison && a.value != b.value),
-      [&](const Result &r) { errs.add("value mismatch"); } }
+      [&](const Result &r) {
+        err(r, true, "Target is more poisonous than source");
+      }},
+    { preprocess(t, qvars, ap.second,
+                 dom_a && a.non_poison && a.value != b.value),
+      [&](const Result &r) {
+        err(r, true, "Value mismatch");
+      }}
   });
 }
+
 
 namespace tools {
 
@@ -110,7 +195,7 @@ Errors TransformVerify::verify() const {
         continue;
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(errs, t, src_state.getQuantVars(),
+      check_refinement(errs, t, src_state, tgt_state, var,
                        true, val, true, tgt_state.at(*tgt_instrs.at(name)));
       if (errs)
         return errs;
@@ -124,7 +209,7 @@ Errors TransformVerify::verify() const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    check_refinement(errs, t, src_state.getQuantVars(),
+    check_refinement(errs, t, src_state, tgt_state, nullptr,
                      src_state.returnDomain(), src_state.returnVal(),
                      tgt_state.returnDomain(), tgt_state.returnVal());
   }

@@ -7,13 +7,13 @@ using namespace std;
 
 namespace util {
 
-void Errors::add(const char *str) {
+void Errors::add(string &&str) {
   errs.emplace_back(str);
 }
 
 ostream& operator<<(ostream &os, const Errors &errs) {
   for (auto &err : errs.errs) {
-    os << "Error: " << err << '\n';
+    os << "ERROR: " << err << '\n';
   }
   return os;
 }
