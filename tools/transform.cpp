@@ -18,10 +18,21 @@ using namespace util;
 using namespace std;
 
 
-static void print_varval(ostream &s, const Model &m, const StateValue &val) {
+static void print_varval(ostream &s, const Model &m, const Value *var,
+                         const StateValue &val) {
   if (m[val.non_poison].isFalse()) {
     s << "poison";
     return;
+  }
+
+  if (auto *in = dynamic_cast<const Input*>(var)) {
+    uint64_t n;
+    ENSURE(m[in->getTyVar()].isUInt(n));
+    if (n == 1) {
+      s << "undef";
+      return;
+    }
+    assert(n == 0);
   }
 
   expr e = m[val.value];
@@ -73,16 +84,16 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
         continue;
 
       s << *var << " = ";
-      print_varval(s, m, val.first);
+      print_varval(s, m, var, val.first);
       s << '\n';
     }
   }
 
   if (print_var) {
     s << "Source value: ";
-    print_varval(s, m, src);
+    print_varval(s, m, var, src);
     s << "\nTarget value: ";
-    print_varval(s, m, tgt);
+    print_varval(s, m, var, tgt);
   }
 
   errs.add(s.str());
