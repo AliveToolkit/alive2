@@ -54,6 +54,7 @@ script:
           -GNinja
           ..
   - ninja
+  - ninja check
 
 matrix:
   include:
