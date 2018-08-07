@@ -84,6 +84,10 @@ re2c:yyfill:check = 0;
   YYRESTART();
 }
 
+";" [^\r\n]* {
+  YYRESTART();
+}
+
 "Name:" [ \t]* @tag1 [^\r\n]+ {
   COPY_STR(tag1 - YYTEXT);
   return NAME;

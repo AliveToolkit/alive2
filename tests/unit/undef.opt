@@ -1,7 +1,14 @@
+; a comment
 Name: add undef1
-%r = add undef, 0
+%r = add undef, 1
   =>
-%r = undef
+%r = undef  ; undef + 1 -> undef
+
+
+Name: add undef2
+%r = add undef, %in
+  =>
+%r = undef  ; undef + x -> undef
 
 
 Name: add2
