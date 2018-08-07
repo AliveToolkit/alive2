@@ -1,0 +1,5 @@
+Name: add
+%x = shl %i, 1
+  =>
+%y = freeze %i
+%x = add %y, %y

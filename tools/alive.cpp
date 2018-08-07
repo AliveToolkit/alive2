@@ -99,16 +99,20 @@ int main(int argc, char **argv) {
         }
 
         unsigned i = 0;
+        bool correct = true;
         for (; types; ++types) {
           tv.fixupTypes(types);
           if (auto errs = tv.verify()) {
             cerr << errs;
             ++num_errors;
+            correct = false;
             break;
           }
           cout << "\rDone: " << ++i << flush;
         }
         cout << '\n';
+        if (correct)
+          cout << "Optimization is correct!\n";
       }
     } catch (const FileIOException &e) {
       cerr << "Couldn't read the file" << endl;

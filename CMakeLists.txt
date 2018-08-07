@@ -86,3 +86,12 @@ if (CYGWIN)
 else()
   target_link_libraries(alive ${Z3_LIBRARIES})
 endif()
+
+
+add_custom_target("check"
+                  COMMAND "python"
+                          "${PROJECT_SOURCE_DIR}/tests/lit/lit.py"
+                          "-s"
+                          "${PROJECT_SOURCE_DIR}/tests"
+                  DEPENDS "alive"
+                 )

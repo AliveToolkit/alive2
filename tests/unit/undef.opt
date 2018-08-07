@@ -1,0 +1,16 @@
+Name: add undef1
+%r = add undef, 0
+  =>
+%r = undef
+
+
+Name: add2
+%x = add i4 %i, %i
+  =>
+%x = shl i4 %i, 1
+
+
+Name: undef2
+%r = undef
+  =>
+%r = 0
