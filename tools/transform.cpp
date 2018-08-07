@@ -121,8 +121,10 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
     for (auto &e : instances) {
       for (unsigned i = 0; i <= 2; ++i) {
         expr newexpr = e.subst(var, nums[i]);
-        if (newexpr.eq(e))
+        if (newexpr.eq(e)) {
+          instances2.emplace(move(newexpr));
           break;
+        }
 
         newexpr = newexpr.simplify();
         if (newexpr.isFalse())
