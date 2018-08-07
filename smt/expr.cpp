@@ -109,7 +109,7 @@ void expr::operator=(const expr &other) {
     ptr = 0;
   } else if (other.isZ3Ast()) {
     ptr = other.ptr;
-    Z3_inc_ref(ctx(), ast());
+    incRef();
   } else {
     assert(0 && "TODO");
   }

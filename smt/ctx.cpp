@@ -10,11 +10,9 @@ namespace smt {
 context ctx;
 
 void context::init() {
-  auto config = Z3_mk_config();
-  Z3_set_param_value(config, "timeout", get_query_timeout());
   Z3_global_param_set("smt.ematching", "false");
-  ctx = Z3_mk_context_rc(config);
-  Z3_del_config(config);
+  Z3_global_param_set("timeout", get_query_timeout());
+  ctx = Z3_mk_context_rc(nullptr);
 }
 
 void context::destroy() {
