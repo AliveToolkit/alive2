@@ -3,3 +3,8 @@ Name: add
   =>
 %y = freeze %i
 %x = add %y, %y
+
+Name: poison
+%x = poison
+  =>
+%x = freeze poison
