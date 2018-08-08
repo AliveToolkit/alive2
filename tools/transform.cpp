@@ -51,7 +51,7 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
 static void error(Errors &errs, State &src_state, State &tgt_state,
                   const Result &r, bool print_var, const Value *var,
                   const StateValue &src, const StateValue &tgt,
-                  const char *msg) {
+                  const char *msg, bool check_each_var) {
 
   if (r.isInvalid()) {
     errs.add("Invalid expr");
@@ -73,14 +73,34 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     s << " for " << *var;
   s << "\n\nExample:\n";
 
+  for (auto &[var, val] : src_state.getValues()) {
+    if (!dynamic_cast<const Input*>(var))
+      continue;
+    s << *var << " = ";
+    print_varval(s, m, var, val.first);
+    s << '\n';
+  }
+
   set<string> seen_vars;
+  bool source = true;
   for (auto &vs : { src_state.getValues(), tgt_state.getValues() }) {
+    if (!check_each_var) {
+      if (source) {
+        s << "\nSource:\n";
+        source = false;
+      } else {
+        s << "\nTarget:\n";
+      }
+    }
+
     for (auto &[var, val] : vs) {
       auto &name = var->getName();
       if (name == var_name)
         break;
 
-      if (name[0] != '%' || !seen_vars.insert(name).second)
+      if (name[0] != '%' ||
+          dynamic_cast<const Input*>(var) ||
+          (check_each_var && !seen_vars.insert(name).second))
         continue;
 
       s << *var << " = ";
@@ -152,7 +172,8 @@ static void check_refinement(Errors &errs, Transform &t,
                              State &src_state, State &tgt_state,
                              const Value *var,
                              const expr &dom_a, const State::ValTy &ap,
-                             const expr &dom_b, const State::ValTy &bp) {
+                             const expr &dom_b, const State::ValTy &bp,
+                             bool check_each_var) {
   auto &a = ap.first;
   auto &b = bp.first;
 
@@ -160,7 +181,8 @@ static void check_refinement(Errors &errs, Transform &t,
   qvars.insert(ap.second.begin(), ap.second.end());
 
   auto err = [&](const Result &r, bool print_var, const char *msg) {
-    error(errs, src_state, tgt_state, r, print_var, var, a, b, msg);
+    error(errs, src_state, tgt_state, r, print_var, var, a, b, msg,
+          check_each_var);
   };
 
   Solver::check({
@@ -209,7 +231,8 @@ Errors TransformVerify::verify() const {
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
       check_refinement(errs, t, src_state, tgt_state, var,
-                       true, val, true, tgt_state.at(*tgt_instrs.at(name)));
+                       true, val, true, tgt_state.at(*tgt_instrs.at(name)),
+                       check_each_var);
       if (errs)
         return errs;
     }
@@ -224,7 +247,8 @@ Errors TransformVerify::verify() const {
   } else if (src_state.fnReturned()) {
     check_refinement(errs, t, src_state, tgt_state, nullptr,
                      src_state.returnDomain(), src_state.returnVal(),
-                     tgt_state.returnDomain(), tgt_state.returnVal());
+                     tgt_state.returnDomain(), tgt_state.returnVal(),
+                     check_each_var);
   }
 
   return errs;
