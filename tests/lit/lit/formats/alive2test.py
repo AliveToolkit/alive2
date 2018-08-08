@@ -59,6 +59,6 @@ class Alive2Test(FileBasedTest):
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
-    if exitCode != 0 and string.find(out, m.group(1)) != -1:
+    if exitCode != 0 and string.find(err, m.group(1)) != -1:
       return lit.Test.PASS, ''
     return lit.Test.FAIL, out + err

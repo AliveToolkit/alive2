@@ -1,0 +1,4 @@
+; ERROR: Value mismatch
+%r = 0
+  =>
+%r = undef

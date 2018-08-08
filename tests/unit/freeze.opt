@@ -8,3 +8,8 @@ Name: poison
 %x = poison
   =>
 %x = freeze poison
+
+Name: undef
+%r = undef
+  =>
+%r = freeze undef
