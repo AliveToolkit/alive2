@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/constant.h"
 #include "ir/instr.h"
 #include "ir/value.h"
 #include "smt/expr.h"
@@ -47,9 +48,11 @@ class Function {
   std::string name;
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
+  Predicate *precondition = nullptr;
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
+  std::vector<std::unique_ptr<Predicate>> predicates;
   std::vector<std::unique_ptr<Value>> undefs;
   std::vector<std::unique_ptr<Value>> inputs;
 
@@ -71,6 +74,8 @@ public:
   util::const_strip_unique_ptr<decltype(constants)> getConstants() const {
     return constants;
   }
+
+  void addPredicate(std::unique_ptr<Predicate> &&p);
 
   void addUndef(std::unique_ptr<UndefValue> &&c);
   util::const_strip_unique_ptr<decltype(undefs)> getUndefs() const {

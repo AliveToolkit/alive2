@@ -21,6 +21,7 @@ protected:
   Value(Type &type, std::string &&name)
     : type(type), name(std::move(name)) {}
 
+  void setName(std::string &&str) { name = std::move(str); }
   static std::string fresh_id();
 
 public:

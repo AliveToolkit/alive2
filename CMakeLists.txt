@@ -46,6 +46,7 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
 include_directories(${PROJECT_SOURCE_DIR})
 
 set(IR_SRC
+    ir/constant.cpp
     ir/function.cpp
     ir/instr.cpp
     ir/state.cpp

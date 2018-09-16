@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "tools/alive_parser.h"
+#include "ir/constant.h"
 #include "ir/value.h"
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
@@ -27,6 +28,11 @@ static void error(string &&s) {
   throw ParseException(move(s), yylineno);
 }
 
+static void error(const char *s, token t) {
+  throw ParseException(string(s) + "; got: " + token_name[t], yylineno);
+}
+
+static vector<unique_ptr<IntType>> int_types;
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
@@ -34,6 +40,19 @@ static Value& get_constant(uint64_t n, Type &t) {
   auto c = make_unique<IntConst>(t, n);
   auto ret = c.get();
   fn->addConstant(move(c));
+  return *ret;
+}
+
+static Value& get_constant(string_view name, Type &type) {
+  string id(name);
+  if (auto I = identifiers.find(id);
+      I != identifiers.end())
+    return *I->second;
+
+  auto c = make_unique<Constant>(type, string(id));
+  auto ret = c.get();
+  fn->addConstant(move(c));
+  identifiers.emplace(move(id), ret);
   return *ret;
 }
 
@@ -106,10 +125,82 @@ static void parse_name(Transform &t) {
     t.name = yylval.str;
 }
 
+static Value& parse_const_expr(Type &type);
+
+static Predicate* parse_predicate(Predicate *last = nullptr,
+                                  token last_t = END) {
+  switch (auto t = *tokenizer) {
+  case LPAREN: {
+    auto newpred = parse_predicate();
+    tokenizer.ensure(RPAREN);
+    if (last == nullptr) {
+parse_more:
+      switch (auto t = *tokenizer) {
+      case BAND:
+      case BOR:
+        return parse_predicate(newpred, t);
+      default:
+        tokenizer.unget(t);
+        return newpred;
+      }
+    }
+
+    if (last_t == BAND) {
+      auto p = make_unique<BoolPred>(*last, *newpred, BoolPred::AND);
+      newpred = p.get();
+      fn->addPredicate(move(p));
+      goto parse_more;
+    }
+
+    assert(last_t == BOR);
+
+    switch (auto t = *tokenizer) {
+    case BAND: {
+      newpred = parse_predicate(newpred, BAND);
+      auto p = make_unique<BoolPred>(*last, *newpred, BoolPred::OR);
+      auto ret = p.get();
+      fn->addPredicate(move(p));
+      return ret;
+    }
+
+    case BOR: {
+      auto p = make_unique<BoolPred>(*last, *newpred, BoolPred::OR);
+      auto ret = p.get();
+      fn->addPredicate(move(p));
+      return parse_predicate(ret, BOR);
+    }
+
+    default: {
+      tokenizer.unget(t);
+      auto p = make_unique<BoolPred>(*last, *newpred,
+                                     last_t == BAND ? BoolPred::AND :
+                                                      BoolPred::OR);
+      auto ret = p.get();
+      fn->addPredicate(move(p));
+      return ret;
+    }
+    }
+    break;
+  }
+  case IDENTIFIER:
+    //TODO
+    break;
+
+  case CONSTANT:
+    //TODO
+    parse_const_expr(*int_types[64].get());
+    break;
+
+  default:
+    error("Expected predicate", t);
+  }
+  UNREACHABLE();
+}
+
 static void parse_pre(Transform &t) {
   if (!tokenizer.consumeIf(PRE))
     return;
-  // TODO
+  parse_predicate();
 }
 
 static void parse_comma() {
@@ -117,7 +208,6 @@ static void parse_comma() {
 }
 
 
-static vector<unique_ptr<IntType>> int_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
 
@@ -137,8 +227,44 @@ static Type& parse_type(bool optional = true) {
       auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
       return *sym_types.emplace_back(move(t)).get();
     } else {
-      error(string("Expecting a type, got: ") + token_name[t]);
+      error("Expecting a type", t);
     }
+  }
+  UNREACHABLE();
+}
+
+static Value& parse_operand(Type &type);
+
+static Value& parse_const_expr(Type &type) {
+  switch (auto t = *tokenizer) {
+  case LPAREN: {
+    auto &ret = parse_const_expr(type);
+    tokenizer.ensure(RPAREN);
+    return ret;
+  }
+  case CONSTANT:
+    return get_constant(yylval.str, type);
+  case IDENTIFIER: {
+    string_view name = yylval.str;
+    std::vector<Value*> args;
+    tokenizer.ensure(LPAREN);
+    if (!tokenizer.consumeIf(RPAREN)) {
+      do {
+        args.push_back(&parse_operand(parse_type()));
+      } while (tokenizer.consumeIf(COMMA));
+      tokenizer.ensure(RPAREN);
+    }
+    try {
+      auto f = make_unique<ConstantFn>(type, name, move(args));
+      auto ret = f.get();
+      fn->addConstant(move(f));
+      return *ret;
+    } catch (ConstantFnException &e) {
+      error(move(e.str));
+    }
+  }
+  default:
+    error("Expected constant expression", t);
   }
   UNREACHABLE();
 }
@@ -146,10 +272,8 @@ static Type& parse_type(bool optional = true) {
 static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
-    // FIXME: constraint type to int
     return get_constant(yylval.num, type);
   case TRUE:
-    // FIXME: constrain types below to boolean
     return get_constant(1, type);
   case FALSE:
     return get_constant(0, type);
@@ -165,7 +289,7 @@ static Value& parse_operand(Type &type) {
     fn->addConstant(move(val));
     return *ret;
   }
-  case IDENTIFIER: {
+  case REGISTER: {
     string id(yylval.str);
     if (auto I = identifiers.find(id); 
         I != identifiers.end())
@@ -177,8 +301,13 @@ static Value& parse_operand(Type &type) {
     identifiers.emplace(move(id), ret);
     return *ret;
   }
+  case CONSTANT:
+  case IDENTIFIER:
+  case LPAREN:
+    tokenizer.unget(t);
+    return parse_const_expr(type);
   default:
-    error(string("Expected an operand, got: ") + token_name[t]);
+    error("Expected an operand", t);
   }
   UNREACHABLE();
 }
@@ -360,10 +489,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FALSE:
   case UNDEF:
   case POISON:
-  case IDENTIFIER:
+  case REGISTER:
     return parse_copyop(name, t);
   default:
-    error(string("Expected instruction name; got: ") + token_name[t]);
+    error("Expected instruction name", t);
   }
   UNREACHABLE();
 }
@@ -382,7 +511,7 @@ static void parse_fn(Function &f) {
 
   while (true) {
     switch (auto t = *tokenizer) {
-    case IDENTIFIER: {
+    case REGISTER: {
       string name(yylval.str);
       auto i = parse_instr(name);
       identifiers.emplace(move(name), i.get());

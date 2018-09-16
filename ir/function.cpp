@@ -78,6 +78,10 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(move(c));
 }
 
+void Function::addPredicate(unique_ptr<Predicate> &&p) {
+  predicates.emplace_back(move(p));
+}
+
 void Function::addUndef(unique_ptr<UndefValue> &&u) {
   undefs.emplace_back(move(u));
 }

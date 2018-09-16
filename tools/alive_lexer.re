@@ -21,7 +21,7 @@ using namespace std;
 static const YYCTYPE *YYCURSOR;
 static const YYCTYPE *YYLIMIT;
 static const YYCTYPE *YYTEXT;
-static const YYCTYPE *YYMARKER;
+//static const YYCTYPE *YYMARKER;
 static const YYCTYPE *tag1, *yyt1;
 
 #if 0
@@ -93,7 +93,7 @@ re2c:yyfill:check = 0;
   return NAME;
 }
 
-"Pre: " {
+"Pre:" {
   return PRE;
 }
 
@@ -109,7 +109,12 @@ re2c:yyfill:check = 0;
 
 "%" [a-zA-Z0-9_.]+ {
   COPY_STR();
-  return IDENTIFIER;
+  return REGISTER;
+}
+
+"C" [0-9]+ {
+  COPY_STR();
+  return CONSTANT;
 }
 
 "=" {
@@ -128,6 +133,19 @@ re2c:yyfill:check = 0;
   COPY_STR_RTRIM(1);
   return LABEL;
 }
+
+"("  { return LPAREN; }
+")"  { return RPAREN; }
+"+"  { return PLUS; }
+"*"  { return STAR; }
+"&&" { return BAND; }
+"||" { return BOR; }
+"=="  { return CEQ; }
+"!="  { return CNE; }
+">"  { return CSGT; }
+"<"  { return CSLT; }
+">u" { return CUGT; }
+"<u" { return CULT; }
 
 "true" { return TRUE; }
 "false" { return FALSE; }
@@ -168,6 +186,11 @@ re2c:yyfill:check = 0;
 "freeze" { return FREEZE; }
 "ret" { return RETURN; }
 "unreachable" { return UNREACH; }
+
+[a-zA-Z][a-zA-Z0-9]* {
+  COPY_STR();
+  return IDENTIFIER;
+}
 
 * { error("couldn't parse: '" + string((char*)YYTEXT, 16) + '\''); }
 
