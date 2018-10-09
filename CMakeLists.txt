@@ -15,7 +15,7 @@ if (MSVC)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2 /Oi /Zi")
   set(CMAKE_EXE_LINKER_FLAGS         "/LTCG:INCREMENTAL ${CMAKE_EXE_LINKER_FLAGS}")
 else()
-  set(CMAKE_CXX_FLAGS                "-std=c++17 -Wall -march=native")
+  set(CMAKE_CXX_FLAGS                "-std=c++17 -Wall -march=native -fPIC")
   set(CMAKE_CXX_FLAGS_DEBUG          "-Werror -g -Og")
   set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} -g")
@@ -45,49 +45,63 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-set(IR_SRC
-    ir/constant.cpp
-    ir/function.cpp
-    ir/instr.cpp
-    ir/state.cpp
-    ir/type.cpp
-    ir/value.cpp
-  )
+add_library(ir STATIC
+  ir/constant.cpp
+  ir/function.cpp
+  ir/instr.cpp
+  ir/state.cpp
+  ir/type.cpp
+  ir/value.cpp
+)
 
-set(SMT_SRC
-    smt/ctx.cpp
-    smt/expr.cpp
-    smt/smt.cpp
-    smt/solver.cpp
-  )
+add_library(smt STATIC
+  smt/ctx.cpp
+  smt/expr.cpp
+  smt/smt.cpp
+  smt/solver.cpp
+)
 
-set(UTIL_SRC
-    util/compiler.cpp
-    util/config.cpp
-    util/errors.cpp
-    util/file.cpp
-    util/symexec.cpp
-  )
+add_library(tools STATIC
+  tools/transform.cpp
+)
+
+add_library(util STATIC
+  util/compiler.cpp
+  util/config.cpp
+  util/errors.cpp
+  util/file.cpp
+  util/symexec.cpp
+)
+
+set(ALIVE_LIBS ir smt tools util)
 
 add_executable(alive
-               ${IR_SRC}
-               ${SMT_SRC}
-               ${UTIL_SRC}
                "tools/alive.cpp"
                "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                "tools/alive_parser.cpp"
-               "tools/transform.cpp"
               )
+target_link_libraries(alive ${ALIVE_LIBS})
+
+add_library(alive2 SHARED)
+target_link_libraries(alive2 ${ALIVE_LIBS})
 
 if (CYGWIN)
   # cmake on cygwin doesn't seem to know about dlls..
   get_filename_component(Z3_LIB_DIR "${Z3_LIBRARIES}" DIRECTORY)
   set(CMAKE_EXE_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
+  set(CMAKE_SHARED_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
   file(COPY "${Z3_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
 else()
   target_link_libraries(alive ${Z3_LIBRARIES})
+  target_link_libraries(alive2 ${Z3_LIBRARIES})
 endif()
 
+if (BUILD_TV)
+  message(STATUS "Compiling translation validation plugin")
+  add_subdirectory(tv)
+else()
+  message(STATUS "Skiping translation validation plugin")
+endif()
 
 add_custom_target("check"
                   COMMAND "python"
