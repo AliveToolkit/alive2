@@ -82,7 +82,7 @@ add_executable(alive
               )
 target_link_libraries(alive ${ALIVE_LIBS})
 
-add_library(alive2 SHARED)
+add_library(alive2 SHARED ${ALIVE_LIBS})
 target_link_libraries(alive2 ${ALIVE_LIBS})
 
 if (CYGWIN)
