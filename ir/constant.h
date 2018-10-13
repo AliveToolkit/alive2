@@ -55,6 +55,7 @@ class Predicate {
 public:
   virtual void print(std::ostream &os) const = 0;
   virtual smt::expr toSMT() const = 0;
+  virtual ~Predicate() {}
 };
 
 
