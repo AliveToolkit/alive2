@@ -113,6 +113,11 @@ void Function::instr_iterator::operator++(void) {
 }
 
 void Function::print(ostream &os, bool print_header) const {
+  if (precondition) {
+    os << "Pre: ";
+    precondition->print(os);
+  }
+
   if (print_header) {
     os << "declare @" << name << '(';
     bool first = true;

@@ -135,7 +135,21 @@ expr BoolPred::toSMT() const {
 
 
 void CmpPred::print(ostream &os) const {
-  // TODO
+  const char *p = nullptr;
+  switch (pred) {
+  case EQ:  p = " == ";  break;
+  case NE:  p = " != ";  break;
+  case SLE: p = " <= ";  break;
+  case SLT: p = " < ";   break;
+  case SGE: p = " >= ";  break;
+  case SGT: p = " > ";   break;
+  case ULE: p = " u<= "; break;
+  case ULT: p = " u< ";  break;
+  case UGE: p = " u>= "; break;
+  case UGT: p = " u> ";  break;
+  }
+  lhs.print(os);
+  rhs.print(os << p);
 }
 
 expr CmpPred::toSMT() const {

@@ -21,7 +21,7 @@ namespace IR {
 
 class Function;
 
-class BasicBlock {
+class BasicBlock final {
   std::string name;
   std::vector<std::unique_ptr<Instr>> m_instrs;
 
@@ -43,7 +43,7 @@ public:
 };
 
 
-class Function {
+class Function final {
   IR::Type *type = nullptr;
   std::string name;
   std::unordered_map<std::string, BasicBlock> BBs;
