@@ -80,16 +80,16 @@ matrix:
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Release
       addons: *gcc8
 
-    - env: CMAKE_CXX_COMPILER=clang++-6.0 CMAKE_BUILD_TYPE=Debug
-      addons: &clang6
+    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Debug
+      addons: &clang7
         apt:
           sources:
             - *default_sources
-            - llvm-toolchain-trusty-6.0
+            - llvm-toolchain-trusty-7
           packages:
             - *default_packages
-            - clang-6.0
+            - clang-7
             - g++-8
 
-    - env: CMAKE_CXX_COMPILER=clang++-6.0 CMAKE_BUILD_TYPE=Release
-      addons: *clang6
+    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Release
+      addons: *clang7
