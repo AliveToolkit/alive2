@@ -16,6 +16,8 @@ static constexpr unsigned var_bw_bits = 8;
 
 namespace IR {
 
+VoidType Type::voidTy("void");
+
 expr Type::var(const char *var, unsigned bits) const {
   auto str = name + '_' + var;
   return expr::mkVar(str.c_str(), bits);
@@ -77,6 +79,11 @@ expr Type::enforceIntType() const {
 
 expr Type::enforceIntOrPtrOrVectorType() const {
   return false;
+}
+
+ostream& operator<<(ostream &os, const Type &t) {
+  t.print(os);
+  return os;
 }
 
 string Type::toString() const {

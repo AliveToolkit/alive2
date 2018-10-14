@@ -12,6 +12,8 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class VoidType;
+
 class Type {
 protected:
   std::string name;
@@ -37,7 +39,10 @@ public:
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
 
   virtual void print(std::ostream &os) const = 0;
+  friend std::ostream& operator<<(std::ostream &os, const Type &t);
   std::string toString() const;
+
+  static VoidType voidTy;
 
   virtual ~Type();
 };

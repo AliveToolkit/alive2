@@ -12,7 +12,6 @@ class Function;
 
 class Instr : public Value {
 protected:
-  static VoidType voidTy;
   Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
 
 public:
@@ -129,7 +128,7 @@ public:
 
 class Unreachable final : public Instr {
 public:
-  Unreachable() : Instr(Instr::voidTy, "") {}
+  Unreachable() : Instr(Type::voidTy, "") {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

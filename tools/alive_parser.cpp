@@ -6,6 +6,7 @@
 #include "ir/value.h"
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
+#include <array>
 #include <cassert>
 #include <memory>
 #include <unordered_map>
@@ -32,7 +33,7 @@ static void error(const char *s, token t) {
   throw ParseException(string(s) + "; got: " + token_name[t], yylineno);
 }
 
-static vector<unique_ptr<IntType>> int_types;
+static array<unique_ptr<IntType>, 65> int_types;
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
@@ -570,15 +571,15 @@ vector<Transform> parse(string_view buf) {
 
 
 parser_initializer::parser_initializer() {
-  int_types.emplace_back(nullptr);
+  int_types[0] = nullptr;
 
   for (unsigned i = 1; i <= 64; ++i) {
-    int_types.emplace_back(make_unique<IntType>("i" + to_string(i), i));
+    int_types[i] = make_unique<IntType>("i" + to_string(i), i);
   }
 }
 
 parser_initializer::~parser_initializer() {
-  int_types.clear();
+  for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
   sym_types.clear();
 }
 

@@ -12,8 +12,6 @@ using namespace std;
 
 namespace IR {
 
-VoidType Instr::voidTy("void");
-
 expr Instr::eqType(const Instr &i) const {
   return getType() == i.getType();
 }
