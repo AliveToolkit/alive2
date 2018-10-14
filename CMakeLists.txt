@@ -45,7 +45,7 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-add_library(ir STATIC
+set(IR_SRCS
   ir/constant.cpp
   ir/function.cpp
   ir/instr.cpp
@@ -54,24 +54,32 @@ add_library(ir STATIC
   ir/value.cpp
 )
 
-add_library(smt STATIC
+add_library(ir STATIC ${IR_SRCS})
+
+set(SMT_SRCS
   smt/ctx.cpp
   smt/expr.cpp
   smt/smt.cpp
   smt/solver.cpp
 )
 
-add_library(tools STATIC
+add_library(smt STATIC ${SMT_SRCS})
+
+set(TOOLS_SRCS
   tools/transform.cpp
 )
 
-add_library(util STATIC
+add_library(tools STATIC ${TOOLS_SRCS})
+
+set(UTIL_SRCS
   util/compiler.cpp
   util/config.cpp
   util/errors.cpp
   util/file.cpp
   util/symexec.cpp
 )
+
+add_library(util STATIC ${UTIL_SRCS})
 
 set(ALIVE_LIBS ir smt tools util)
 
@@ -82,7 +90,7 @@ add_executable(alive
               )
 target_link_libraries(alive ${ALIVE_LIBS})
 
-add_library(alive2 SHARED ${ALIVE_LIBS})
+add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS})
 target_link_libraries(alive2 ${ALIVE_LIBS})
 
 if (CYGWIN)
