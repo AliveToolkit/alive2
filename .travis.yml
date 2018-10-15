@@ -69,7 +69,7 @@ matrix:
     - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Release
       addons: *gcc7
 
-    - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug
+    - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       addons: &gcc8
         apt:
           sources: *default_sources
@@ -91,5 +91,5 @@ matrix:
             - clang-7
             - g++-8
 
-    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Release CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Release
       addons: *clang7
