@@ -64,9 +64,12 @@ public:
   const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
 
+  const std::string& getName() const { return name; }
+
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);
 
+  const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name);
   const BasicBlock& getBB(std::string_view name) const;
 

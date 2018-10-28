@@ -22,7 +22,7 @@ ostream& operator<<(ostream &os, const StateValue &val) {
 }
 
 State::State(const Function &f) : f(f) {
-  domain_bbs.emplace(&f.getBB(""), true);
+  domain_bbs.emplace(&f.getFirstBB(), true);
 }
 
 const StateValue& State::exec(const Value &v) {
