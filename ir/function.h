@@ -61,7 +61,7 @@ public:
   Function(Type &type, std::string &&name)
     : type(&type), name(std::move(name)) {}
 
-  const IR::Type& getType() const { return *type; }
+  const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
 
   smt::expr getTypeConstraints() const;
