@@ -7,6 +7,7 @@
 #include "tools/transform.h"
 #include "util/config.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -124,9 +125,9 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
 #undef LLVM_BINOP
   {
     auto ty = llvm_type2alive(i.getType());
-    auto op1 = get_operand(i.getOperand(0));
-    auto op2 = get_operand(i.getOperand(1));
-    if (!ty || !op1 || !op2)
+    auto a = get_operand(i.getOperand(0));
+    auto b = get_operand(i.getOperand(1));
+    if (!ty || !a || !b)
       goto err;
 
     auto alive_op = llvm_binop2alive.at(i.getOpcode());
@@ -139,9 +140,71 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
 
-    auto op = make_unique<BinOp>(*ty, value_name(i), *op1, *op2, alive_op,
+    auto op = make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
                                  (BinOp::Flags)flags);
 
+    identifiers.emplace(&i, op.get());
+    return op;
+  }
+  case llvm::Instruction::SExt:
+  case llvm::Instruction::ZExt:
+  case llvm::Instruction::Trunc:
+  {
+    auto ty = llvm_type2alive(i.getType());
+    auto val = get_operand(i.getOperand(0));
+    if (!ty || !val)
+      goto err;
+
+    ConversionOp::Op op;
+    switch (i.getOpcode()) {
+    case llvm::Instruction::SExt:  op = ConversionOp::SExt; break;
+    case llvm::Instruction::ZExt:  op = ConversionOp::ZExt; break;
+    case llvm::Instruction::Trunc: op = ConversionOp::Trunc; break;
+    default:
+      UNREACHABLE();
+    }
+    auto conv = make_unique<ConversionOp>(*ty, value_name(i), *val, op);
+    identifiers.emplace(&i, conv.get());
+    return conv;
+  }
+  case llvm::Instruction::ICmp:
+  {
+    auto a = get_operand(i.getOperand(0));
+    auto b = get_operand(i.getOperand(1));
+    if (!a || !b)
+      goto err;
+
+    ICmp::Cond cond;
+    switch (cast<llvm::CmpInst>(i).getPredicate()) {
+    case llvm::CmpInst::ICMP_EQ:  cond = ICmp::EQ; break;
+    case llvm::CmpInst::ICMP_NE:  cond = ICmp::NE; break;
+    case llvm::CmpInst::ICMP_UGT: cond = ICmp::UGT; break;
+    case llvm::CmpInst::ICMP_UGE: cond = ICmp::UGE; break;
+    case llvm::CmpInst::ICMP_ULT: cond = ICmp::ULT; break;
+    case llvm::CmpInst::ICMP_ULE: cond = ICmp::ULE; break;
+    case llvm::CmpInst::ICMP_SGT: cond = ICmp::SGT; break;
+    case llvm::CmpInst::ICMP_SGE: cond = ICmp::SGE; break;
+    case llvm::CmpInst::ICMP_SLT: cond = ICmp::SLT; break;
+    case llvm::CmpInst::ICMP_SLE: cond = ICmp::SLE; break;
+    default:
+      UNREACHABLE();
+    }
+
+    auto op = make_unique<ICmp>(*int_types[1].get(), value_name(i), cond, *a,
+                                *b);
+    identifiers.emplace(&i, op.get());
+    return op;
+  }
+  case llvm::Instruction::Select:
+  {
+    auto ty = llvm_type2alive(i.getType());
+    auto cond = get_operand(i.getOperand(0));
+    auto a = get_operand(i.getOperand(1));
+    auto b = get_operand(i.getOperand(2));
+    if (!ty || !cond || !a || !b)
+      goto err;
+
+    auto op = make_unique<Select>(*ty, value_name(i), *cond, *a, *b);
     identifiers.emplace(&i, op.get());
     return op;
   }
@@ -153,6 +216,8 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
       goto err;
     return make_unique<Return>(*ty, *op);
   }
+  case llvm::Instruction::Unreachable:
+    return make_unique<Unreachable>();
   default:
     break;
   }
@@ -198,7 +263,7 @@ optional<Function> llvm2alive(const llvm::Function &f) {
 struct TVPass : public llvm::FunctionPass {
   static char ID;
 
-  bool FatalErrors = true;
+  bool FatalErrors = false;
 
   TVPass() : FunctionPass(ID) {}
 
@@ -213,6 +278,7 @@ struct TVPass : public llvm::FunctionPass {
     if (inserted)
       return false;
 
+    smt_init.reset();
     Transform t;
     t.src = move(old_fn->second);
     t.tgt = move(*fn);
@@ -220,15 +286,19 @@ struct TVPass : public llvm::FunctionPass {
     t.print(cout, print_opts);
 
     if (Errors errs = verifier.verify()) {
+      cout << "Transformation doesn't verify!\n" << errs << endl;
       if (FatalErrors)
-        llvm::report_fatal_error("[Alive2] Transform doesn't verify!");
-      else
-        cout << "Transformation doesn't verify!\n\n";
+        llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     } else {
       cout << "Transformation seems to be correct!\n\n";
     }
 
     old_fn->second = move(t.tgt);
+    return false;
+  }
+
+  bool doFinalization(llvm::Module&) override {
+    smt::solver_print_stats(cout);
     return false;
   }
 
