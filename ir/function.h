@@ -29,6 +29,8 @@ public:
   BasicBlock(std::string &&name) : name(std::move(name)) {}
   BasicBlock(std::string_view name) : name(name) {}
 
+  const std::string& getName() const { return name; }
+
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 

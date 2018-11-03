@@ -64,7 +64,9 @@ public:
   const ValTy& at(const Value &val) const;
 
   bool startBB(const BasicBlock &bb);
-  void addJump(const BasicBlock &bb);
+  void addJump(const BasicBlock &dst);
+  void addCondJump(const StateValue &cond, const BasicBlock &dst_true,
+                   const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
   void addUB(smt::expr &&ub)      { domain &= std::move(ub); }
   void addUB(const smt::expr &ub) { domain &= ub; }
@@ -79,6 +81,9 @@ public:
   bool fnReturned() const { return returned; }
   auto& returnDomain() const { return return_domain; }
   auto& returnVal() const { return return_val; }
+
+private:
+  void addJump(const BasicBlock &dst, smt::expr &&domain);
 };
 
 }

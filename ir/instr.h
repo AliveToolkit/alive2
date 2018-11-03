@@ -115,6 +115,22 @@ public:
 };
 
 
+class Branch final : public Instr {
+  Value *cond = nullptr;
+  const BasicBlock &dst_true, *dst_false = nullptr;
+public:
+  Branch(const BasicBlock &dst) : Instr(Type::voidTy, "br"), dst_true(dst) {}
+
+  Branch(Value &cond, const BasicBlock &dst_true, const BasicBlock &dst_false)
+    : Instr(Type::voidTy, "br"), cond(&cond), dst_true(dst_true),
+    dst_false(&dst_false) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
+
+
 class Return final : public Instr {
   Value &val;
 public:

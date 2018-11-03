@@ -94,10 +94,22 @@ bool State::startBB(const BasicBlock &bb) {
   return !domain.isFalse();
 }
 
-void State::addJump(const BasicBlock &bb) {
-  auto p = domain_bbs.try_emplace(&bb, domain);
+void State::addJump(const BasicBlock &dst, expr &&domain) {
+  auto p = domain_bbs.try_emplace(&dst, move(domain));
   if (!p.second)
-    p.first->second |= domain;
+    p.first->second |= move(domain);
+}
+
+void State::addJump(const BasicBlock &dst) {
+  addJump(dst, expr(domain));
+  domain = false;
+}
+
+void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
+                        const BasicBlock &dst_false) {
+  addJump(dst_true, cond.value && cond.non_poison);
+  addJump(dst_false, !cond.value && cond.non_poison);
+  domain = false;
 }
 
 void State::addReturn(const StateValue &val) {
@@ -111,6 +123,7 @@ void State::addReturn(const StateValue &val) {
     return_domain = domain;
     return_val = { val, move(undef_vars) };
   }
+  domain = false;
 }
 
 void State::addQuantVar(const expr &var) {

@@ -394,6 +394,30 @@ expr CopyOp::getTypeConstraints(const Function &f) const {
 }
 
 
+void Branch::print(ostream &os) const {
+  os << "br ";
+  if (cond)
+    os << *cond << ", ";
+  os << "label " << dst_true.getName();
+  if (dst_false)
+    os << ", label " << dst_false->getName();
+}
+
+StateValue Branch::toSMT(State &s) const {
+  if (cond) {
+    s.addCondJump(s[*cond], dst_true, *dst_false);
+  } else {
+    s.addJump(dst_true);
+  }
+  return {};
+}
+
+expr Branch::getTypeConstraints(const Function &f) const {
+  return cond->getType().enforceIntType() &&
+         cond->getType().sizeVar() == 1u;
+}
+
+
 void Return::print(ostream &os) const {
   os << "ret " << val;
 }
