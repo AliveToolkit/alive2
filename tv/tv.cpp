@@ -7,6 +7,7 @@
 #include "tools/transform.h"
 #include "util/config.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
@@ -207,6 +208,19 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
     auto op = make_unique<Select>(*ty, value_name(i), *cond, *a, *b);
     identifiers.emplace(&i, op.get());
     return op;
+  }
+  case llvm::Instruction::Br:
+  {
+    auto &br = cast<llvm::BranchInst>(i);
+    auto &dst_true = current_fn->getBB(value_name(*br.getSuccessor(0)));
+    if (br.isUnconditional())
+      return make_unique<Branch>(dst_true);
+
+    auto &dst_false = current_fn->getBB(value_name(*br.getSuccessor(1)));
+    auto cond = get_operand(br.getCondition());
+    if (!cond)
+      return nullptr;
+    return make_unique<Branch>(*cond, dst_true, dst_false);
   }
   case llvm::Instruction::Ret:
   {

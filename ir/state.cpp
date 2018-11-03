@@ -107,8 +107,8 @@ void State::addJump(const BasicBlock &dst) {
 
 void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
-  addJump(dst_true, cond.value && cond.non_poison);
-  addJump(dst_false, !cond.value && cond.non_poison);
+  addJump(dst_true, cond.value == 1 && cond.non_poison);
+  addJump(dst_false, cond.value == 0 && cond.non_poison);
   domain = false;
 }
 
