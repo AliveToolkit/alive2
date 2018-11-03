@@ -43,7 +43,8 @@ private:
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::pair<const Value*, ValTy>> values;
 
-  std::unordered_map<const BasicBlock*, smt::expr> domain_bbs;
+  std::unordered_map<const BasicBlock*,
+                     std::pair<smt::expr, std::set<smt::expr>>> domain_bbs;
 
   // temp state
   smt::expr domain;

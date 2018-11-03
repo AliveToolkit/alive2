@@ -22,7 +22,7 @@ ostream& operator<<(ostream &os, const StateValue &val) {
 }
 
 State::State(const Function &f) : f(f) {
-  domain_bbs.emplace(&f.getFirstBB(), true);
+  domain_bbs.try_emplace(&f.getFirstBB(), true, set<expr>());
 }
 
 const StateValue& State::exec(const Value &v) {
@@ -90,14 +90,18 @@ bool State::startBB(const BasicBlock &bb) {
   if (I == domain_bbs.end())
     return false;
 
-  domain = move(I->second);
+  domain = move(I->second.first);
+  undef_vars = move(I->second.second);
   return !domain.isFalse();
 }
 
 void State::addJump(const BasicBlock &dst, expr &&domain) {
-  auto p = domain_bbs.try_emplace(&dst, move(domain));
-  if (!p.second)
-    p.first->second |= move(domain);
+  auto p = domain_bbs.try_emplace(&dst, move(domain), undef_vars);
+  if (!p.second) {
+    // FIXME: rename undef vars?
+    p.first->second.first |= move(domain);
+    p.first->second.second.insert(undef_vars.begin(), undef_vars.end());
+  }
 }
 
 void State::addJump(const BasicBlock &dst) {
