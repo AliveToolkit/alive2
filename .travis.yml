@@ -17,7 +17,7 @@ addons:
 
 env:
   global:
-    - Z3_VERSION=4.7.1
+    - Z3_VERSION=4.8.1.016872a5e0f6
 
 before_script:
   - |
