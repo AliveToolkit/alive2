@@ -31,8 +31,8 @@ before_script:
       mv z3-* z3cache
       popd
     fi
-  - sudo cp /tmp/z3cache/z3-$Z3_VERSION-*/bin/libz3.so /usr/lib
-  - sudo cp /tmp/z3cache/z3-$Z3_VERSION-*/include/* /usr/include
+  - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/bin/libz3.so /usr/lib
+  - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/include/* /usr/include
   - |
     if [ ! -f /tmp/re2ccache/re2c ] ; then
       mkdir /tmp/re2ccache
