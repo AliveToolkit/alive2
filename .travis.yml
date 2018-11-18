@@ -17,6 +17,7 @@ addons:
 
 env:
   global:
+    - RE2C_VERSION=1.1.1
     - Z3_VERSION=4.8.1
     - Z3_HASH=016872a5e0f6
 
@@ -34,18 +35,19 @@ before_script:
   - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/bin/libz3.so /usr/lib
   - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/include/* /usr/include
   - |
-    if [ ! -f /tmp/re2ccache/re2c ] ; then
-      mkdir /tmp/re2ccache
-      wget https://github.com/skvadrik/re2c/releases/download/1.0.3/re2c-1.0.3.tar.gz -O /tmp/re2c.tar.gz
+    if [ ! -f /tmp/re2ccache/$RE2C_VERSION/re2c ] ; then
+      rm -fr /tmp/re2ccache
+      mkdir -p /tmp/re2ccache/$RE2C_VERSION
+      wget https://github.com/skvadrik/re2c/releases/download/$RE2C_VERSION/re2c-$RE2C_VERSION.tar.gz -O /tmp/re2c.tar.gz
       pushd /tmp
         tar xfz re2c.tar.gz
         pushd re2c-*
-          ./configure && make
-          cp re2c /tmp/re2ccache
+          ./configure && make -j2
+          cp re2c /tmp/re2ccache/$RE2C_VERSION
         popd
       popd
     fi
-  - sudo cp /tmp/re2ccache/re2c /usr/bin
+  - sudo cp /tmp/re2ccache/$RE2C_VERSION/re2c /usr/bin
 
 script:
   - mkdir build
