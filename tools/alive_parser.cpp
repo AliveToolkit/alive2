@@ -347,6 +347,10 @@ static BinOp::Flags parse_binop_flags(token op_token) {
     return parse_exact();
   case SREM:
   case UREM:
+  case UADD_SAT:
+  case SADD_SAT:
+  case USUB_SAT:
+  case SSUB_SAT:
   case AND:
   case OR:
   case XOR:
@@ -378,6 +382,10 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case AND:  op = BinOp::And; break;
   case OR:   op = BinOp::Or; break;
   case XOR:  op = BinOp::Xor; break;
+  case SADD_SAT: op = BinOp::SAdd_Sat; break;
+  case UADD_SAT: op = BinOp::UAdd_Sat; break;
+  case SSUB_SAT: op = BinOp::SSub_Sat; break;
+  case USUB_SAT: op = BinOp::USub_Sat; break;
   default:
     UNREACHABLE();
   }
@@ -470,6 +478,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SHL:
   case ASHR:
   case LSHR:
+  case SADD_SAT:
+  case UADD_SAT:
+  case SSUB_SAT:
+  case USUB_SAT:
   case AND:
   case OR:
   case XOR:

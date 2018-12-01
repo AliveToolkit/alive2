@@ -47,7 +47,7 @@ static void div_ub(const expr &a, const expr &b, expr &ub, bool sign) {
   auto bits = b.bits();
   ub &= b != expr::mkUInt(0, bits);
   if (sign)
-    ub &= (a != expr::IntMin(bits) || b != expr::mkInt(-1, bits));
+    ub &= (a != expr::IntSMin(bits) || b != expr::mkInt(-1, bits));
 }
 
 pair<expr, expr> ConstantBinOp::toSMT_cnst() const {

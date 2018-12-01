@@ -40,6 +40,10 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
     break;
   case SRem:
   case URem:
+  case SAdd_Sat:
+  case UAdd_Sat:
+  case SSub_Sat:
+  case USub_Sat:
   case And:
   case Or:
   case Xor:
@@ -61,6 +65,10 @@ void BinOp::print(ostream &os) const {
   case Shl:  str = "shl"; break;
   case AShr: str = "ashr"; break;
   case LShr: str = "lshr"; break;
+  case SAdd_Sat: str = "sadd_sat"; break;
+  case UAdd_Sat: str = "uadd_sat"; break;
+  case SSub_Sat: str = "ssub_sat"; break;
+  case USub_Sat: str = "usub_sat"; break;
   case And:  str = "and"; break;
   case Or:   str = "or"; break;
   case Xor:  str = "xor"; break;
@@ -84,7 +92,7 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
   s.addUB(bp);
   s.addUB(b != expr::mkUInt(0, bits));
   if (sign)
-    s.addUB((ap && a != expr::IntMin(bits)) || b != expr::mkInt(-1, bits));
+    s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -177,6 +185,22 @@ StateValue BinOp::toSMT(State &s) const {
       not_poison &= a.lshr_exact(b);
     break;
   }
+  case SAdd_Sat:
+    val = a.sadd_sat(b);
+    break;
+
+  case UAdd_Sat:
+    val = a.uadd_sat(b);
+    break;
+
+  case SSub_Sat:
+    val = a.ssub_sat(b);
+    break;
+
+  case USub_Sat:
+    val = a.usub_sat(b);
+    break;
+
   case And:
     val = a & b;
     break;

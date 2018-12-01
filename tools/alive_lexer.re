@@ -21,7 +21,7 @@ using namespace std;
 static const YYCTYPE *YYCURSOR;
 static const YYCTYPE *YYLIMIT;
 static const YYCTYPE *YYTEXT;
-//static const YYCTYPE *YYMARKER;
+static const YYCTYPE *YYMARKER;
 static const YYCTYPE *tag1, *yyt1;
 
 #if 0
@@ -40,7 +40,7 @@ namespace tools {
 unsigned yylineno;
 yylval_t yylval;
 
-const char *token_name[] = {
+const char *const token_name[] = {
 #define TOKEN(x) #x,
 #include "tools/tokens.h"
 #undef TOKEN
@@ -161,6 +161,10 @@ re2c:yyfill:check = 0;
 "shl" { return SHL; }
 "ashr" { return ASHR; }
 "lshr" { return LSHR; }
+"sadd_sat" { return SADD_SAT; }
+"uadd_sat" { return UADD_SAT; }
+"ssub_sat" { return SSUB_SAT; }
+"usub_sat" { return USUB_SAT; }
 "and" { return AND; }
 "or" { return OR; }
 "xor" { return XOR; }

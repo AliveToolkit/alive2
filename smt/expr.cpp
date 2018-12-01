@@ -171,7 +171,7 @@ expr expr::mkBoolVar(const char *name) {
   return ::mkVar(name, Z3_mk_bool_sort(ctx()));
 }
 
-expr expr::IntMin(unsigned bits) {
+expr expr::IntSMin(unsigned bits) {
   assert(bits > 0);
   static_assert(sizeof(unsigned long long) == 8);
   if (bits <= 64)
@@ -179,12 +179,16 @@ expr expr::IntMin(unsigned bits) {
   return mkUInt(1, bits) << mkUInt(bits - 1, bits);
 }
 
-expr expr::IntMax(unsigned bits) {
+expr expr::IntSMax(unsigned bits) {
   assert(bits > 0);
   static_assert(sizeof(unsigned long long) == 8);
   if (bits <= 64)
     return mkUInt(-1ull >> (65u - bits), bits);
   return mkInt(-1, bits).lshr(mkUInt(1, bits));
+}
+
+expr expr::IntUMax(unsigned bits) {
+  return mkInt(-1, bits);
 }
 
 bool expr::eq(const expr &rhs) const {
@@ -239,15 +243,15 @@ unsigned expr::bits() const {
 
 bool expr::isUInt(uint64_t &n) const {
   C();
-  return Z3_get_numeral_uint64(ctx(), ast(), &n) == Z3_TRUE;
+  return bits() <= 64 && Z3_get_numeral_uint64(ctx(), ast(), &n);
 }
 
 bool expr::isInt(int64_t &n) const {
   C();
-  if (Z3_get_numeral_int64(ctx(), ast(), &n) == Z3_FALSE)
+  auto bw = bits();
+  if (bw > 64 || !Z3_get_numeral_int64(ctx(), ast(), &n))
     return false;
 
-  auto bw = bits();
   if (bw < 64)
     n = (int64_t)((uint64_t)n << (64 - bw)) >> (64 - bw);
   return true;
@@ -391,6 +395,24 @@ expr expr::urem(const expr &rhs) const {
     return r;
 
   return Z3_mk_bvurem(ctx(), ast(), rhs());
+}
+
+expr expr::sadd_sat(const expr &rhs) const {
+  return mkIf(add_no_soverflow(rhs),
+              *this + rhs,
+              IntSMax(bits()));
+}
+
+expr expr::uadd_sat(const expr &rhs) const {
+  return mkIf(add_no_uoverflow(rhs),
+              *this + rhs,
+              IntUMax(bits()));
+}
+
+expr expr::ssub_sat(const expr &rhs) const {
+}
+
+expr expr::usub_sat(const expr &rhs) const {
 }
 
 expr expr::add_no_soverflow(const expr &rhs) const {

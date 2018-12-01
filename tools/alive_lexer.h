@@ -27,7 +27,7 @@ token yylex();
 
 extern yylval_t yylval;
 extern unsigned yylineno;
-extern const char *token_name[];
+extern const char *const token_name[];
 
 struct LexException {
   std::string str;

@@ -1,0 +1,27 @@
+Name: add max
+%r = uadd_sat %x, -1
+  =>
+%r = -1
+
+Name: uadd undef
+%r = uadd_sat %x, undef
+  =>
+%r = %x
+
+Name: sadd undef
+%r = sadd_sat %x, undef
+  =>
+%r = %x
+
+Name: sadd 0
+%r = sadd_sat %x, 0
+  =>
+%r = %x
+
+Name: uadd combine
+%a = uadd_sat i3 %x, %val2
+%r = uadd_sat %a, %val
+  =>
+%a = uadd_sat %x, %val2
+%b = uadd_sat %val, %val2
+%r = uadd_sat %x, %b

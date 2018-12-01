@@ -73,8 +73,9 @@ public:
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
 
-  static expr IntMin(unsigned bits);
-  static expr IntMax(unsigned bits);
+  static expr IntSMin(unsigned bits);
+  static expr IntSMax(unsigned bits);
+  static expr IntUMax(unsigned bits);
 
   // structural equivalence
   bool eq(const expr &rhs) const;
@@ -103,6 +104,12 @@ public:
   expr udiv(const expr &rhs) const;
   expr srem(const expr &rhs) const;
   expr urem(const expr &rhs) const;
+
+  // saturating arithmetic
+  expr sadd_sat(const expr &rhs) const;
+  expr uadd_sat(const expr &rhs) const;
+  expr ssub_sat(const expr &rhs) const;
+  expr usub_sat(const expr &rhs) const;
 
   expr add_no_soverflow(const expr &rhs) const;
   expr add_no_uoverflow(const expr &rhs) const;
