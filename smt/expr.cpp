@@ -410,9 +410,21 @@ expr expr::uadd_sat(const expr &rhs) const {
 }
 
 expr expr::ssub_sat(const expr &rhs) const {
+  expr sub_ext = sext(1) - rhs.sext(1);
+  auto bw = bits();
+  auto min = IntSMin(bw);
+  auto max = IntSMax(bw);
+  return mkIf(sub_ext.sle(min),
+              min,
+              mkIf(sub_ext.sge(max),
+                   max,
+                   *this - rhs));
 }
 
 expr expr::usub_sat(const expr &rhs) const {
+  return mkIf(rhs.uge(*this),
+              mkUInt(0, bits()),
+              *this - rhs);
 }
 
 expr expr::add_no_soverflow(const expr &rhs) const {
@@ -420,7 +432,8 @@ expr expr::add_no_soverflow(const expr &rhs) const {
 }
 
 expr expr::add_no_uoverflow(const expr &rhs) const {
-  return zext(1) + rhs.zext(1) == (*this + rhs).zext(1);
+  auto bw = bits();
+  return (zext(1) + rhs.zext(1)).extract(bw, bw) == mkUInt(0, 1);
 }
 
 expr expr::sub_no_soverflow(const expr &rhs) const {
@@ -428,7 +441,8 @@ expr expr::sub_no_soverflow(const expr &rhs) const {
 }
 
 expr expr::sub_no_uoverflow(const expr &rhs) const {
-  return zext(1) - rhs.zext(1) == (*this - rhs).zext(1);
+  auto bw = bits();
+  return (zext(1) - rhs.zext(1)).extract(bw, bw) == mkUInt(0, 1);
 }
 
 expr expr::mul_no_soverflow(const expr &rhs) const {

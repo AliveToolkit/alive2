@@ -25,3 +25,23 @@ Name: uadd combine
 %a = uadd_sat %x, %val2
 %b = uadd_sat %val, %val2
 %r = uadd_sat %x, %b
+
+Name: ssub overflow
+%r = ssub_sat i4 4, -5
+  =>
+%r = 7
+
+Name: ssub underflow
+%r = ssub_sat i4 -4, 6
+  =>
+%r = -8
+
+Name: usub overflow
+%r = usub_sat i8 5, 7
+  =>
+%r = 0
+
+Name: usub undef
+%r = usub_sat %x, undef
+  =>
+%r = %x
