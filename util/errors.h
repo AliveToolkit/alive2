@@ -15,6 +15,7 @@ class Errors {
 public:
   void add(std::string &&str);
   explicit operator bool() const { return !errs.empty(); }
+  bool isTimeout() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Errors &e);
 };

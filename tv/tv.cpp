@@ -344,7 +344,7 @@ struct TVPass : public llvm::FunctionPass {
 
     if (Errors errs = verifier.verify()) {
       cerr << "Transformation doesn't verify!\n" << errs << endl;
-      if (FatalErrors)
+      if (FatalErrors && !errs.isTimeout())
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     } else {
       cerr << "Transformation seems to be correct!\n\n";
