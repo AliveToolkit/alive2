@@ -1,0 +1,2 @@
+tests/lit/* linguist-vendored
+tests/lit/lit/formats/alive2test.py linguist-vendored=false
