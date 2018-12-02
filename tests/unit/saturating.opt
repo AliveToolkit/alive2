@@ -9,12 +9,12 @@ Name: uadd undef
 %r = %x
 
 Name: sadd undef
-%r = sadd_sat %x, undef
+%r = sadd_sat i7 %x, undef
   =>
 %r = %x
 
 Name: sadd 0
-%r = sadd_sat %x, 0
+%r = sadd_sat i7 %x, 0
   =>
 %r = %x
 
