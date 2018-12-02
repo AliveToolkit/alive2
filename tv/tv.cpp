@@ -320,7 +320,7 @@ public:
 struct TVPass : public llvm::FunctionPass {
   static char ID;
 
-  bool FatalErrors = false;
+  bool FatalErrors = true;
 
   TVPass() : FunctionPass(ID) {}
 
@@ -355,7 +355,7 @@ struct TVPass : public llvm::FunctionPass {
   }
 
   bool doFinalization(llvm::Module&) override {
-    smt::solver_print_stats(cout);
+    smt::solver_print_stats(cerr);
     return false;
   }
 
