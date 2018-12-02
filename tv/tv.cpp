@@ -6,9 +6,7 @@
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -119,19 +117,45 @@ const unordered_map<unsigned, BinOp::Op> llvm_binop2alive = {
 #undef LLVM_BINOP
 };
 
-unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
-  switch (i.getOpcode()) {
-#define LLVM_BINOP(x, y) case x:
-#include "tv/tv.h"
-#undef LLVM_BINOP
-  {
-    auto ty = llvm_type2alive(i.getType());
-    auto a = get_operand(i.getOperand(0));
-    auto b = get_operand(i.getOperand(1));
-    if (!ty || !a || !b)
-      goto err;
+#define PARSE_UNOP()                       \
+  auto ty = llvm_type2alive(i.getType());  \
+  auto val = get_operand(i.getOperand(0)); \
+  if (!ty || !val)                         \
+    return error(i)
 
-    auto alive_op = llvm_binop2alive.at(i.getOpcode());
+#define PARSE_BINOP()                     \
+  auto ty = llvm_type2alive(i.getType()); \
+  auto a = get_operand(i.getOperand(0));  \
+  auto b = get_operand(i.getOperand(1));  \
+  if (!ty || !a || !b)                    \
+    return error(i)
+
+#define PARSE_TRIOP()                     \
+  auto ty = llvm_type2alive(i.getType()); \
+  auto a = get_operand(i.getOperand(0));  \
+  auto b = get_operand(i.getOperand(1));  \
+  auto c = get_operand(i.getOperand(2));  \
+  if (!ty || !a || !b || !c)              \
+    return error(i)
+
+#define RETURN_IDENTIFIER(op)         \
+  auto ret = op;                      \
+  identifiers.emplace(&i, ret.get()); \
+  return ret
+
+class llvm2alive : public llvm::InstVisitor<llvm2alive, unique_ptr<Instr>> {
+  llvm::Function &f;
+  using RetTy = unique_ptr<Instr>;
+
+public:
+  llvm2alive(llvm::Function &f) : f(f) {}
+
+  RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
+    PARSE_BINOP();
+    auto op_I = llvm_binop2alive.find(i.getOpcode());
+    if (op_I == llvm_binop2alive.end())
+      return error(i);
+    auto alive_op = op_I->second;
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
@@ -141,42 +165,32 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
 
-    auto op = make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
-                                 (BinOp::Flags)flags);
-
-    identifiers.emplace(&i, op.get());
-    return op;
+    RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
+                                         (BinOp::Flags)flags));
   }
-  case llvm::Instruction::SExt:
-  case llvm::Instruction::ZExt:
-  case llvm::Instruction::Trunc:
-  {
-    auto ty = llvm_type2alive(i.getType());
-    auto val = get_operand(i.getOperand(0));
-    if (!ty || !val)
-      goto err;
 
-    ConversionOp::Op op;
-    switch (i.getOpcode()) {
-    case llvm::Instruction::SExt:  op = ConversionOp::SExt; break;
-    case llvm::Instruction::ZExt:  op = ConversionOp::ZExt; break;
-    case llvm::Instruction::Trunc: op = ConversionOp::Trunc; break;
-    default:
-      UNREACHABLE();
-    }
-    auto conv = make_unique<ConversionOp>(*ty, value_name(i), *val, op);
-    identifiers.emplace(&i, conv.get());
-    return conv;
+  RetTy visitSExtInst(llvm::SExtInst &i) {
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
+                                                ConversionOp::SExt));
   }
-  case llvm::Instruction::ICmp:
-  {
-    auto a = get_operand(i.getOperand(0));
-    auto b = get_operand(i.getOperand(1));
-    if (!a || !b)
-      goto err;
 
+  RetTy visitZExtInst(llvm::ZExtInst &i) {
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
+                                                ConversionOp::ZExt));
+  }
+
+  RetTy visitTruncInst(llvm::TruncInst &i) {
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
+                                                ConversionOp::Trunc));
+  }
+
+  RetTy visitICmpInst(llvm::ICmpInst &i) {
+    PARSE_BINOP();
     ICmp::Cond cond;
-    switch (cast<llvm::CmpInst>(i).getPredicate()) {
+    switch (i.getPredicate()) {
     case llvm::CmpInst::ICMP_EQ:  cond = ICmp::EQ; break;
     case llvm::CmpInst::ICMP_NE:  cond = ICmp::NE; break;
     case llvm::CmpInst::ICMP_UGT: cond = ICmp::UGT; break;
@@ -190,88 +204,76 @@ unique_ptr<Instr> llvm_instr2alive(const llvm::Instruction &i) {
     default:
       UNREACHABLE();
     }
-
-    auto op = make_unique<ICmp>(*int_types[1].get(), value_name(i), cond, *a,
-                                *b);
-    identifiers.emplace(&i, op.get());
-    return op;
+    RETURN_IDENTIFIER(make_unique<ICmp>(*int_types[1].get(), value_name(i),
+                                        cond, *a, *b));
   }
-  case llvm::Instruction::Select:
-  {
-    auto ty = llvm_type2alive(i.getType());
-    auto cond = get_operand(i.getOperand(0));
-    auto a = get_operand(i.getOperand(1));
-    auto b = get_operand(i.getOperand(2));
-    if (!ty || !cond || !a || !b)
-      goto err;
 
-    auto op = make_unique<Select>(*ty, value_name(i), *cond, *a, *b);
-    identifiers.emplace(&i, op.get());
-    return op;
+  RetTy visitSelectInst(llvm::SelectInst &i) {
+    PARSE_TRIOP();
+    RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
   }
-  case llvm::Instruction::Br:
-  {
-    auto &br = cast<llvm::BranchInst>(i);
-    auto &dst_true = current_fn->getBB(value_name(*br.getSuccessor(0)));
-    if (br.isUnconditional())
+
+  RetTy visitBranchInst(llvm::BranchInst &i) {
+    auto &dst_true = current_fn->getBB(value_name(*i.getSuccessor(0)));
+    if (i.isUnconditional())
       return make_unique<Branch>(dst_true);
 
-    auto &dst_false = current_fn->getBB(value_name(*br.getSuccessor(1)));
-    auto cond = get_operand(br.getCondition());
+    auto &dst_false = current_fn->getBB(value_name(*i.getSuccessor(1)));
+    auto cond = get_operand(i.getCondition());
     if (!cond)
       return nullptr;
     return make_unique<Branch>(*cond, dst_true, dst_false);
   }
-  case llvm::Instruction::Ret:
-  {
-    auto ty = llvm_type2alive(i.getType());
-    auto op = get_operand(i.getOperand(0));
-    if (!ty || !op)
-      goto err;
-    return make_unique<Return>(*ty, *op);
+
+  RetTy visitReturnInst(llvm::ReturnInst &i) {
+    PARSE_UNOP();
+    return make_unique<Return>(*ty, *val);
   }
-  case llvm::Instruction::Unreachable:
+
+  RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
     return make_unique<Unreachable>();
-  default:
-    break;
   }
-err:
-  errs() << "Unsupported instruction: " << i << '\n';
-  return {};
-}
 
+  RetTy visitDbgInfoIntrinsic(llvm::DbgInfoIntrinsic&) { return {}; }
+  RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
-optional<Function> llvm2alive(const llvm::Function &f) {
-  reset_state();
-
-  auto type = llvm_type2alive(f.getReturnType());
-  if (!type)
+  RetTy error(llvm::Instruction &i) {
+    errs() << "Unsupported instruction: " << i << '\n';
     return {};
+  }
 
-  Function Fn(*type, f.getName());
-  current_fn = &Fn;
+  optional<Function> run() {
+    reset_state();
 
-  for (auto &arg : f.args()) {
-    auto ty = llvm_type2alive(arg.getType());
-    if (!ty)
+    auto type = llvm_type2alive(f.getReturnType());
+    if (!type)
       return {};
-    auto val = make_unique<Input>(*ty, value_name(arg));
-    identifiers.emplace(&arg, val.get());
-    Fn.addInput(move(val));
-  }
 
-  for (auto &bb : f) {
-    auto &BB = Fn.getBB(value_name(bb));
-    for (auto &i : bb) {
-      if (auto I = llvm_instr2alive(i))
-        BB.addIntr(move(I));
-      else
+    Function Fn(*type, f.getName());
+    current_fn = &Fn;
+
+    for (auto &arg : f.args()) {
+      auto ty = llvm_type2alive(arg.getType());
+      if (!ty)
         return {};
+      auto val = make_unique<Input>(*ty, value_name(arg));
+      identifiers.emplace(&arg, val.get());
+      Fn.addInput(move(val));
     }
-  }
 
-  return move(Fn);
-}
+    for (auto &bb : f) {
+      auto &BB = Fn.getBB(value_name(bb));
+      for (auto &i : bb) {
+        if (auto I = visit(i))
+          BB.addIntr(move(I));
+        else
+          return {};
+      }
+    }
+
+    return move(Fn);
+  }
+};
 
 
 struct TVPass : public llvm::FunctionPass {
@@ -282,7 +284,7 @@ struct TVPass : public llvm::FunctionPass {
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
-    auto fn = llvm2alive(F);
+    auto fn = llvm2alive(F).run();
     if (!fn) {
       fns.erase(F.getName());
       return false;
