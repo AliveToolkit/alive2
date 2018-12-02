@@ -398,9 +398,15 @@ expr expr::urem(const expr &rhs) const {
 }
 
 expr expr::sadd_sat(const expr &rhs) const {
-  return mkIf(add_no_soverflow(rhs),
-              *this + rhs,
-              IntSMax(bits()));
+  expr add_ext = sext(1) + rhs.sext(1);
+  auto bw = bits();
+  auto min = IntSMin(bw);
+  auto max = IntSMax(bw);
+  return mkIf(add_ext.sle(min.sext(1)),
+              min,
+              mkIf(add_ext.sge(max.sext(1)),
+                   max,
+                   *this + rhs));
 }
 
 expr expr::uadd_sat(const expr &rhs) const {
@@ -414,9 +420,9 @@ expr expr::ssub_sat(const expr &rhs) const {
   auto bw = bits();
   auto min = IntSMin(bw);
   auto max = IntSMax(bw);
-  return mkIf(sub_ext.sle(min),
+  return mkIf(sub_ext.sle(min.sext(1)),
               min,
-              mkIf(sub_ext.sge(max),
+              mkIf(sub_ext.sge(max.sext(1)),
                    max,
                    *this - rhs));
 }

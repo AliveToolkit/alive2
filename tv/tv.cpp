@@ -267,7 +267,6 @@ public:
     case llvm::Intrinsic::dbg_addr:
     case llvm::Intrinsic::dbg_label:
     case llvm::Intrinsic::donothing:
-    case llvm::Intrinsic::expect:
       return {};
 
     default:
