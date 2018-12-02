@@ -234,6 +234,48 @@ public:
     return make_unique<Unreachable>();
   }
 
+  RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
+    switch (i.getIntrinsicID()) {
+    case llvm::Intrinsic::sadd_sat:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           BinOp::SAdd_Sat));
+    }
+    case llvm::Intrinsic::uadd_sat:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           BinOp::UAdd_Sat));
+    }
+    case llvm::Intrinsic::ssub_sat:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           BinOp::SSub_Sat));
+    }
+    case llvm::Intrinsic::usub_sat:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           BinOp::USub_Sat));
+    }
+
+    // do nothing intrinsics
+    case llvm::Intrinsic::dbg_declare:
+    case llvm::Intrinsic::dbg_value:
+    case llvm::Intrinsic::dbg_addr:
+    case llvm::Intrinsic::dbg_label:
+    case llvm::Intrinsic::donothing:
+    case llvm::Intrinsic::expect:
+      return {};
+
+    default:
+      break;
+    }
+    return error(i);
+  }
+
   RetTy visitDbgInfoIntrinsic(llvm::DbgInfoIntrinsic&) { return {}; }
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
