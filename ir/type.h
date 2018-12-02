@@ -58,7 +58,7 @@ public:
 
 
 class IntType final : public Type {
-  unsigned bitwidth;
+  unsigned bitwidth = 0;
   bool defined = false;
 
 public:

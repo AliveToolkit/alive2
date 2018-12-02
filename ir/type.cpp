@@ -142,7 +142,7 @@ expr IntType::enforceIntOrPtrOrVectorType() const {
 }
 
 void IntType::print(ostream &os) const {
-  if (defined)
+  if (bits())
     os << 'i' << bits();
 }
 
