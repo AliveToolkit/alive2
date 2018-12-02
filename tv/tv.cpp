@@ -340,14 +340,14 @@ struct TVPass : public llvm::FunctionPass {
     t.src = move(old_fn->second);
     t.tgt = move(*fn);
     TransformVerify verifier(t, false);
-    t.print(cout, print_opts);
+    t.print(cerr, print_opts);
 
     if (Errors errs = verifier.verify()) {
-      cout << "Transformation doesn't verify!\n" << errs << endl;
+      cerr << "Transformation doesn't verify!\n" << errs << endl;
       if (FatalErrors)
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     } else {
-      cout << "Transformation seems to be correct!\n\n";
+      cerr << "Transformation seems to be correct!\n\n";
     }
 
     old_fn->second = move(t.tgt);
