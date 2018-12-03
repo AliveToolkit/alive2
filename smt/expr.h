@@ -10,6 +10,14 @@
 #include <vector>
 #include <z3.h> // for __int64, __uint64
 
+// FIXME: drop this once z3-4.7.1 is *REQUIRED*.
+#ifndef __uint64
+#define __uint64 uint64_t
+#endif
+#ifndef __int64
+#define __int64 int64_t
+#endif
+
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_app* Z3_app;
 typedef struct _Z3_ast* Z3_ast;
