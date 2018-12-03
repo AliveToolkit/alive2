@@ -6,7 +6,7 @@ $file   = @$argv[1];
 $optarg = @$argv[2];
 $alive  = @$argv[3];
 if (!$file || !$optarg || !$alive)
-  die("usage: php run.php file.ll.bz2 llvm-opt alive <opt>\n");
+  die("usage: php run.php file.ll.bz2 llvm-opt-pass-name build/alive <llvm/build/opt>\n");
 
 $optbin = empty($argv[4]) ? 'opt' : $argv[4];
 
