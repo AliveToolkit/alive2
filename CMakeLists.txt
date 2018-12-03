@@ -33,6 +33,7 @@ endif()
 
 find_package(Z3 REQUIRED)
 include_directories(${Z3_INCLUDE_DIRS})
+add_definitions(${Z3_HAVE_GET_ESTIMATED_ALLOC_SIZE})
 
 find_program(RE2C re2c)
 message(STATUS "RE2C: ${RE2C}")

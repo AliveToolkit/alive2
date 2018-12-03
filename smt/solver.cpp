@@ -98,13 +98,13 @@ expr Model::operator[](const expr &var) const {
 }
 
 uint64_t Model::getUInt(const expr &var) const {
-  uint64_t n;
+  __uint64 n;
   ENSURE((*this)[var].isUInt(n));
   return n;
 }
 
 int64_t Model::getInt(const expr &var) const {
-  int64_t n;
+  __int64 n;
   ENSURE((*this)[var].isInt(n));
   return n;
 }

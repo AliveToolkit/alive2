@@ -1,3 +1,4 @@
 .vs
 *.pyc
 CMakeSettings.json
+build*/

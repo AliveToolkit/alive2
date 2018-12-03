@@ -212,27 +212,27 @@ bool expr::isFalse() const {
 }
 
 bool expr::isZero() const {
-  uint64_t n = 0;
+  __uint64 n = 0;
   return isUInt(n) && n == 0;
 }
 
 bool expr::isOne() const {
-  uint64_t n = 0;
+  __uint64 n = 0;
   return isUInt(n) && n == 1;
 }
 
 bool expr::isAllOnes() const {
-  int64_t n = 0;
+  __int64 n = 0;
   return isInt(n) && n == -1;
 }
 
 bool expr::isSMin() const {
-  uint64_t n = 0;
+  __uint64 n = 0;
   return isUInt(n) && n == (1ull << (bits() - 1));
 }
 
 bool expr::isSMax() const {
-  uint64_t n = 0;
+  __uint64 n = 0;
   return isUInt(n) && n == ((uint64_t)INT64_MAX >> (64 - bits()));
 }
 
@@ -241,12 +241,12 @@ unsigned expr::bits() const {
   return Z3_get_bv_sort_size(ctx(), sort());
 }
 
-bool expr::isUInt(uint64_t &n) const {
+bool expr::isUInt(__uint64 &n) const {
   C();
   return bits() <= 64 && Z3_get_numeral_uint64(ctx(), ast(), &n);
 }
 
-bool expr::isInt(int64_t &n) const {
+bool expr::isInt(__int64& n) const {
   C();
   auto bw = bits();
   if (bw > 64 || !Z3_get_numeral_int64(ctx(), ast(), &n))
@@ -293,7 +293,7 @@ expr expr::binop_commutative(const expr &rhs,
 
 bool expr::binop_sfold(const expr &rhs,
                        int64_t(*native)(int64_t, int64_t), expr &result) const {
-  int64_t a, b;
+  __int64 a, b;
   if (bits() <= 64 && isInt(a) && rhs.isInt(b)) {
     result = mkInt(native(a, b), sort());
     return true;
@@ -304,7 +304,7 @@ bool expr::binop_sfold(const expr &rhs,
 bool expr::binop_ufold(const expr &rhs,
                        uint64_t(*native)(uint64_t, uint64_t),
                        expr &result) const {
-  uint64_t a, b;
+  __uint64 a, b;
   if (bits() <= 64 && isUInt(a) && rhs.isUInt(b)) {
     result = mkUInt(native(a, b), sort());
     return true;
@@ -556,7 +556,7 @@ expr expr::operator!() const {
 
 expr expr::operator~() const {
   C();
-  int64_t n;
+  __int64 n;
   if (isInt(n))
     return mkUInt(~n, sort());
   return mkInt(-1, sort()) - *this;
@@ -659,7 +659,7 @@ expr expr::ule(const expr &rhs) const {
   if (eq(rhs) || isZero())
     return true;
 
-  uint64_t a, b;
+  __uint64 a, b;
   if (isUInt(a) && rhs.isUInt(b))
     return a <= b;
 
@@ -667,7 +667,7 @@ expr expr::ule(const expr &rhs) const {
 }
 
 expr expr::ult(const expr &rhs) const {
-  uint64_t n;
+  __uint64 n;
   if (rhs.isUInt(n))
     return rhs.isZero() ? false : ule(mkUInt(n - 1, sort()));
 
@@ -687,7 +687,7 @@ expr expr::sle(const expr &rhs) const {
   if (eq(rhs))
     return true;
 
-  int64_t a, b;
+  __int64 a, b;
   if (isInt(a) && rhs.isInt(b))
     return a <= b;
 
@@ -709,7 +709,7 @@ expr expr::sgt(const expr &rhs) const {
 expr expr::sext(unsigned amount) const {
   assert(amount > 0);
   C();
-  int64_t n;
+  __int64 n;
   if (isInt(n))
     return mkInt(n, bits() + amount);
   return Z3_mk_sign_ext(ctx(), amount, ast());
@@ -717,7 +717,7 @@ expr expr::sext(unsigned amount) const {
 
 expr expr::zext(unsigned amount) const {
   assert(amount > 0);
-  uint64_t n;
+  __uint64 n;
   if (isUInt(n))
     return mkUInt(n, bits() + amount);
   return mkUInt(0, amount).concat(*this);

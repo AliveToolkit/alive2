@@ -8,6 +8,7 @@
 #include <set>
 #include <utility>
 #include <vector>
+#include <z3.h> // for __int64, __uint64
 
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_app* Z3_app;
@@ -92,8 +93,8 @@ public:
   bool isSMax() const;
 
   unsigned bits() const;
-  bool isUInt(uint64_t &n) const;
-  bool isInt(int64_t &n) const;
+  bool isUInt(__uint64 &n) const;
+  bool isInt(__int64 &n) const;
 
   bool isNot(expr &neg) const;
 

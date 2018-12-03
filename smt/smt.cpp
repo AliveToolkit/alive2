@@ -45,6 +45,7 @@ const char* get_query_timeout() {
   return query_timeout;
 }
 
+#ifdef Z3_HAVE_GET_ESTIMATED_ALLOC_SIZE
 
 // FIXME make this configurable
 static uint64_t z3_memory_limit = 1ull << 30; // 1 GB
@@ -56,5 +57,17 @@ bool hit_memory_limit() {
 bool hit_half_memory_limit() {
   return Z3_get_estimated_alloc_size() >= (z3_memory_limit / 2);
 }
+
+#else
+
+bool hit_memory_limit() {
+  return false; // might suffer OOM's?
+}
+
+bool hit_half_memory_limit() {
+  return false; // might suffer OOM's?
+}
+
+#endif
 
 }

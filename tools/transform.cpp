@@ -26,7 +26,7 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
   }
 
   if (auto *in = dynamic_cast<const Input*>(var)) {
-    uint64_t n;
+    __uint64 n;
     ENSURE(m[in->getTyVar()].isUInt(n));
     if (n == 1) {
       s << "undef";
@@ -36,7 +36,7 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
   }
 
   expr e = m[val.value];
-  uint64_t n;
+  __uint64 n;
   ENSURE(e.isUInt(n));
   auto bw = e.bits();
   s << "0x" << hex << n << dec;
