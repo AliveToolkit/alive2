@@ -132,6 +132,24 @@ public:
 };
 
 
+class Switch final : public Instr {
+  Value &value;
+  const BasicBlock &default_target;
+  std::vector<std::pair<Value&, const BasicBlock&>> targets;
+
+public:
+  Switch(Value &value, const BasicBlock &default_target)
+    : Instr(Type::voidTy, "switch"), value(value),
+      default_target(default_target) {}
+
+  void addTarget(Value &val, const BasicBlock &target);
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
+
+
 class Return final : public Instr {
   Value &val;
 public:

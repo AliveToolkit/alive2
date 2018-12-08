@@ -442,6 +442,43 @@ expr Branch::getTypeConstraints(const Function &f) const {
 }
 
 
+void Switch::addTarget(Value &val, const BasicBlock &target) {
+  targets.emplace_back(val, target);
+}
+
+void Switch::print(ostream &os) const {
+  os << "switch " << value << ", label " << default_target.getName() << " [\n";
+  for (auto &[val, target] : targets) {
+    os << "  " << val << ", label " << target.getName() << '\n';
+  }
+  os << "]";
+}
+
+StateValue Switch::toSMT(State &s) const {
+  auto val = s[value];
+  expr default_cond(true);
+
+  for (auto &p : targets) {
+    auto target = s[p.first];
+    assert(target.non_poison.isTrue());
+    s.addJump({ val.value == target.value, expr(val.non_poison) }, p.second);
+    default_cond &= val.value != target.value;
+  }
+
+  s.addJump({ move(default_cond), move(val.non_poison) }, default_target);
+  s.addUB(false);
+  return {};
+}
+
+expr Switch::getTypeConstraints(const Function &f) const {
+  expr typ = value.getType().enforceIntType();
+  for (auto &p : targets) {
+    typ &= p.first.getType().enforceIntType();
+  }
+  return typ;
+}
+
+
 void Return::print(ostream &os) const {
   os << "ret " << val;
 }

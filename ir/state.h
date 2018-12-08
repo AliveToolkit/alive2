@@ -66,6 +66,9 @@ public:
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);
+  // boolean cond
+  void addJump(StateValue &&cond, const BasicBlock &dst);
+  // i1 cond
   void addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
