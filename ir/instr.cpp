@@ -449,9 +449,9 @@ void Switch::addTarget(Value &val, const BasicBlock &target) {
 void Switch::print(ostream &os) const {
   os << "switch " << value << ", label " << default_target.getName() << " [\n";
   for (auto &[val, target] : targets) {
-    os << "  " << val << ", label " << target.getName() << '\n';
+    os << "    " << val << ", label " << target.getName() << '\n';
   }
-  os << "]";
+  os << "  ]";
 }
 
 StateValue Switch::toSMT(State &s) const {

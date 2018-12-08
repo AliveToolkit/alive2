@@ -110,6 +110,10 @@ Value* get_operand(llvm::Value *v) {
   return nullptr;
 }
 
+BasicBlock& getBB(const llvm::BasicBlock *bb) {
+  return current_fn->getBB(value_name(*bb));
+}
+
 
 const unordered_map<unsigned, BinOp::Op> llvm_binop2alive = {
 #define LLVM_BINOP(x, y) { x, y },
@@ -214,15 +218,28 @@ public:
   }
 
   RetTy visitBranchInst(llvm::BranchInst &i) {
-    auto &dst_true = current_fn->getBB(value_name(*i.getSuccessor(0)));
+    auto &dst_true = getBB(i.getSuccessor(0));
     if (i.isUnconditional())
       return make_unique<Branch>(dst_true);
 
-    auto &dst_false = current_fn->getBB(value_name(*i.getSuccessor(1)));
+    auto &dst_false = getBB(i.getSuccessor(1));
     auto cond = get_operand(i.getCondition());
     if (!cond)
-      return nullptr;
+      return error(i);
     return make_unique<Branch>(*cond, dst_true, dst_false);
+  }
+
+  RetTy visitSwitchInst(llvm::SwitchInst &i) {
+    auto cond = get_operand(i.getCondition());
+    if (!cond)
+      return error(i);
+    auto op = make_unique<Switch>(*cond, getBB(i.getDefaultDest()));
+
+    for (auto &Case : i.cases()) {
+      op->addTarget(*get_operand(Case.getCaseValue()),
+                    getBB(Case.getCaseSuccessor()));
+    }
+    return op;
   }
 
   RetTy visitReturnInst(llvm::ReturnInst &i) {
