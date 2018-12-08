@@ -3,8 +3,12 @@ find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-if (NOT LLVM_ENABLE_RTTI OR NOT LLVM_ENABLE_EH)
-  message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_RTTI=ON'")
+if (NOT LLVM_ENABLE_RTTI)
+  message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_RTTI=ON'")
+endif()
+
+if (NOT LLVM_ENABLE_EH)
+  message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_EH=ON'")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
