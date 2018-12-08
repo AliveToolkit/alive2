@@ -260,6 +260,11 @@ public:
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
                                            BinOp::USub_Sat));
     }
+    case llvm::Intrinsic::expect:
+    {
+      PARSE_UNOP();
+      RETURN_IDENTIFIER(make_unique<CopyOp>(*ty, value_name(i), *val));
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_declare:
