@@ -30,7 +30,7 @@ if (CYGWIN)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
 endif()
 
-find_package(Z3 REQUIRED)
+find_package(Z3 4.8.1 REQUIRED)
 include_directories(${Z3_INCLUDE_DIRS})
 
 find_program(RE2C re2c)
