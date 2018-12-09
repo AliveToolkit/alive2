@@ -7,6 +7,18 @@ using namespace std;
 
 namespace util {
 
+Errors::Errors(const char *str) {
+  add(str);
+}
+
+Errors::Errors(string &&str) {
+  add(move(str));
+}
+
+void Errors::add(const char *str) {
+  errs.emplace_back(str);
+}
+
 void Errors::add(string &&str) {
   errs.emplace_back(str);
 }

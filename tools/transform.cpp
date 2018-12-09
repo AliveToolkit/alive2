@@ -218,8 +218,13 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 Errors TransformVerify::verify() const {
   Value::reset_gbl_id();
   State src_state(t.src), tgt_state(t.tgt);
-  sym_exec(src_state);
-  sym_exec(tgt_state);
+
+  try {
+    sym_exec(src_state);
+    sym_exec(tgt_state);
+  } catch (LoopInCFGDetected &e) {
+    return "WARNING: Loops not supported yet! Skipping function.";
+  }
 
   Errors errs;
 

@@ -8,10 +8,14 @@
 #include <ostream>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace IR {
+
+struct LoopInCFGDetected : public std::exception {};
+
 
 struct StateValue {
   smt::expr value, non_poison;
@@ -54,6 +58,7 @@ private:
 
   std::unordered_map<const BasicBlock*,
                      std::pair<smt::expr, std::set<smt::expr>>> domain_bbs;
+  std::unordered_set<const BasicBlock*> seen_bbs;
 
   // temp state
   smt::expr domain;

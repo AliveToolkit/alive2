@@ -13,6 +13,10 @@ class Errors {
   std::vector<std::string> errs;
 
 public:
+  Errors() = default;
+  Errors(const char *str);
+  Errors(std::string &&str);
+  void add(const char *str);
   void add(std::string &&str);
   explicit operator bool() const { return !errs.empty(); }
   bool isTimeout() const;

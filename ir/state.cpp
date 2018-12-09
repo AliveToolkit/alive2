@@ -66,6 +66,7 @@ const State::ValTy& State::at(const Value &val) const {
 }
 
 bool State::startBB(const BasicBlock &bb) {
+  seen_bbs.emplace(&bb);
   auto I = domain_bbs.find(&bb);
   if (I == domain_bbs.end())
     return false;
@@ -76,6 +77,9 @@ bool State::startBB(const BasicBlock &bb) {
 }
 
 void State::addJump(const BasicBlock &dst, expr &&domain) {
+  if (seen_bbs.count(&dst))
+    throw LoopInCFGDetected();
+
   auto p = domain_bbs.try_emplace(&dst, move(domain), undef_vars);
   if (!p.second) {
     p.first->second.first |= move(domain);
