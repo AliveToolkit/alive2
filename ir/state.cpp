@@ -111,15 +111,14 @@ void State::addReturn(const StateValue &val) {
     return_domain |= domain.first;
     return_val.first = StateValue::mkIf(domain.first, val, return_val.first);
     return_val.second.insert(undef_vars.begin(), undef_vars.end());
-    return_val.second.insert(domain.second.begin(), domain.second.end());
+    undef_vars.clear();
   } else {
     returned = true;
     return_domain = move(domain.first);
     return_val = { val, move(undef_vars) };
-    return_val.second.insert(domain.second.begin(), domain.second.end());
   }
+  return_val.second.insert(domain.second.begin(), domain.second.end());
   domain.first = false;
-  undef_vars.clear();
 }
 
 void State::addUB(expr &&ub) {
