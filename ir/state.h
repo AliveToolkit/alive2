@@ -47,6 +47,7 @@ class Function;
 class State {
 public:
   using ValTy = std::pair<StateValue, std::set<smt::expr>>;
+  using DomainTy = std::pair<smt::expr, std::set<smt::expr>>;
 
 private:
   const Function &f;
@@ -56,12 +57,11 @@ private:
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::pair<const Value*, ValTy>> values;
 
-  std::unordered_map<const BasicBlock*,
-                     std::pair<smt::expr, std::set<smt::expr>>> domain_bbs;
+  std::unordered_map<const BasicBlock*, DomainTy> domain_bbs;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
   // temp state
-  smt::expr domain;
+  DomainTy domain;
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 4> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
@@ -86,8 +86,8 @@ public:
   void addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
-  void addUB(smt::expr &&ub)      { domain &= std::move(ub); }
-  void addUB(const smt::expr &ub) { domain &= ub; }
+  void addUB(smt::expr &&ub);
+  void addUB(const smt::expr &ub);
   void addQuantVar(const smt::expr &var);
   void addUndefVar(const smt::expr &var);
   void resetUndefVars();

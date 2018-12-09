@@ -51,8 +51,10 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   auto sval_new = sval.subst(repls);
-  if (sval_new.eq(sval))
+  if (sval_new.eq(sval)) {
+    uvars.clear();
     return sval;
+  }
 
   for (auto &p : repls) {
     undef_vars.emplace(move(p.second));
@@ -66,54 +68,68 @@ const State::ValTy& State::at(const Value &val) const {
 }
 
 bool State::startBB(const BasicBlock &bb) {
+  assert(undef_vars.empty());
   seen_bbs.emplace(&bb);
   auto I = domain_bbs.find(&bb);
   if (I == domain_bbs.end())
     return false;
 
-  domain = move(I->second.first);
-  undef_vars = move(I->second.second);
-  return !domain.isFalse();
+  domain = move(I->second);
+  return !domain.first.isFalse();
 }
 
-void State::addJump(const BasicBlock &dst, expr &&domain) {
+void State::addJump(const BasicBlock &dst, expr &&cond) {
   if (seen_bbs.count(&dst))
     throw LoopInCFGDetected();
 
-  auto p = domain_bbs.try_emplace(&dst, move(domain), undef_vars);
+  auto p = domain_bbs.try_emplace(&dst, domain.first && move(cond), undef_vars);
   if (!p.second) {
-    p.first->second.first |= move(domain);
+    p.first->second.first |= move(cond);
     p.first->second.second.insert(undef_vars.begin(), undef_vars.end());
   }
+  p.first->second.second.insert(domain.second.begin(), domain.second.end());
 }
 
 void State::addJump(const BasicBlock &dst) {
-  addJump(dst, move(domain));
-  domain = false;
+  addJump(dst, true);
+  domain.first = false;
 }
 
 void State::addJump(StateValue &&cond, const BasicBlock &dst) {
-  addJump(dst, domain && move(cond.value) && move(cond.non_poison));
+  addJump(dst, move(cond.value) && move(cond.non_poison));
 }
 
 void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
-  addJump(dst_true,  domain && cond.value == 1 && cond.non_poison);
-  addJump(dst_false, domain && cond.value == 0 && cond.non_poison);
-  domain = false;
+  addJump(dst_true,  cond.value == 1 && cond.non_poison);
+  addJump(dst_false, cond.value == 0 && cond.non_poison);
+  domain.first = false;
 }
 
 void State::addReturn(const StateValue &val) {
   if (returned) {
-    return_domain |= domain;
-    return_val.first = StateValue::mkIf(domain, val, return_val.first);
+    return_domain |= domain.first;
+    return_val.first = StateValue::mkIf(domain.first, val, return_val.first);
     return_val.second.insert(undef_vars.begin(), undef_vars.end());
+    return_val.second.insert(domain.second.begin(), domain.second.end());
   } else {
     returned = true;
-    return_domain = move(domain);
+    return_domain = move(domain.first);
     return_val = { val, move(undef_vars) };
+    return_val.second.insert(domain.second.begin(), domain.second.end());
   }
-  domain = false;
+  domain.first = false;
+  undef_vars.clear();
+}
+
+void State::addUB(expr &&ub) {
+  domain.first &= move(ub);
+  domain.second.insert(undef_vars.begin(), undef_vars.end());
+}
+
+void State::addUB(const expr &ub) {
+  domain.first &= ub;
+  domain.second.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addQuantVar(const expr &var) {
