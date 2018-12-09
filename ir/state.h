@@ -23,6 +23,15 @@ struct StateValue {
   static StateValue mkIf(const smt::expr &cond, const StateValue &then,
                          const StateValue &els);
 
+  bool eq(const StateValue &other) const {
+    return value.eq(other.value) && non_poison.eq(other.non_poison);
+  }
+
+  StateValue
+    subst(const std::vector<std::pair<smt::expr, smt::expr>> &repls) const {
+    return { value.subst(repls), non_poison.subst(repls) };
+  }
+
   friend std::ostream& operator<<(std::ostream &os, const StateValue &val);
 };
 

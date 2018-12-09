@@ -44,41 +44,21 @@ const StateValue& State::operator[](const Value &val) {
   if (uvars.empty())
     return sval;
 
-  if (undef_vars.empty()) {
-    undef_vars = uvars;
-    return sval;
-  }
-
-  // if evaluated expr shares undef vars with previously evaluated expr, rename
-  // those undef vars
   vector<pair<expr, expr>> repls;
-  auto VI = uvars.begin(), VE = uvars.end();
-  for (auto I = undef_vars.begin(), E = undef_vars.end(); I != E && VI != VE;) {
-    if (I->eq(*VI)) {
-      auto name = UndefValue::getFreshName();
-      repls.emplace_back(*I, expr::mkVar(name.c_str(), I->bits()));
-      ++I, ++VI;
-
-    } else if (*I < *VI) {
-      ++I;
-
-    } else {
-      undef_vars.emplace_hint(I, *VI);
-      ++VI;
-    }
+  for (auto &u : uvars) {
+    auto name = UndefValue::getFreshName();
+    repls.emplace_back(u, expr::mkVar(name.c_str(), u.bits()));
   }
-  undef_vars.insert(VI, VE);
 
-  if (repls.empty())
+  auto sval_new = sval.subst(repls);
+  if (sval_new.eq(sval))
     return sval;
 
   for (auto &p : repls) {
-    undef_vars.emplace(p.second);
+    undef_vars.emplace(move(p.second));
   }
 
-  tmp_values[i_tmp_values] =
-      { sval.value.subst(repls), sval.non_poison.subst(repls) };
-  return tmp_values[i_tmp_values++];
+  return tmp_values[i_tmp_values++] = move(sval_new);
 }
 
 const State::ValTy& State::at(const Value &val) const {
@@ -98,37 +78,35 @@ bool State::startBB(const BasicBlock &bb) {
 void State::addJump(const BasicBlock &dst, expr &&domain) {
   auto p = domain_bbs.try_emplace(&dst, move(domain), undef_vars);
   if (!p.second) {
-    // FIXME: rename undef vars?
     p.first->second.first |= move(domain);
     p.first->second.second.insert(undef_vars.begin(), undef_vars.end());
   }
 }
 
 void State::addJump(const BasicBlock &dst) {
-  addJump(dst, expr(domain));
+  addJump(dst, move(domain));
   domain = false;
 }
 
 void State::addJump(StateValue &&cond, const BasicBlock &dst) {
-  addJump(dst, move(cond.value) && move(cond.non_poison));
+  addJump(dst, domain && move(cond.value) && move(cond.non_poison));
 }
 
 void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
-  addJump(dst_true, cond.value == 1 && cond.non_poison);
-  addJump(dst_false, cond.value == 0 && cond.non_poison);
+  addJump(dst_true,  domain && cond.value == 1 && cond.non_poison);
+  addJump(dst_false, domain && cond.value == 0 && cond.non_poison);
   domain = false;
 }
 
 void State::addReturn(const StateValue &val) {
   if (returned) {
     return_domain |= domain;
-    // TODO: combine undef_vars
-    return_val = { StateValue::mkIf(domain, val, return_val.first),
-                   move(undef_vars) };
+    return_val.first = StateValue::mkIf(domain, val, return_val.first);
+    return_val.second.insert(undef_vars.begin(), undef_vars.end());
   } else {
     returned = true;
-    return_domain = domain;
+    return_domain = move(domain);
     return_val = { val, move(undef_vars) };
   }
   domain = false;

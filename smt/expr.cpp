@@ -779,7 +779,7 @@ expr expr::simplify() const {
   return Z3_simplify(ctx(), ast());
 }
 
-expr expr::subst(vector<pair<expr, expr>> &repls) const {
+expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   C();
   unique_ptr<Z3_ast[]> from(new Z3_ast[repls.size()]);
   unique_ptr<Z3_ast[]> to(new Z3_ast[repls.size()]);

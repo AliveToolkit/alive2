@@ -176,7 +176,7 @@ public:
   expr simplify() const;
 
   // replace v1 -> v2
-  expr subst(std::vector<std::pair<expr, expr>> &repls) const;
+  expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
 
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
