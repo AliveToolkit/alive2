@@ -31,7 +31,7 @@ if (CYGWIN)
 endif()
 
 find_package(Z3 4.8.1 REQUIRED)
-include_directories(${Z3_INCLUDE_DIRS})
+include_directories(${Z3_INCLUDE_DIR})
 
 find_program(RE2C re2c)
 message(STATUS "RE2C: ${RE2C}")
