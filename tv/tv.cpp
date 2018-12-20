@@ -277,6 +277,12 @@ public:
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
                                            BinOp::USub_Sat));
     }
+    case llvm::Intrinsic::cttz:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           BinOp::Cttz));
+    }
     case llvm::Intrinsic::expect:
     {
       PARSE_UNOP();

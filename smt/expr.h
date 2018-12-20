@@ -129,6 +129,8 @@ public:
   expr ashr_exact(const expr &rhs) const;
   expr lshr_exact(const expr &rhs) const;
 
+  expr cttz() const;
+
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;
   expr operator^(const expr &rhs) const;

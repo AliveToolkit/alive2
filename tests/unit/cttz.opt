@@ -1,0 +1,51 @@
+Name: cttz constant
+%r = cttz i8 32, i1 0
+  =>
+%r = 5
+
+Name: cttz undef
+%r = cttz i8 0, i1 1
+  =>
+%r = undef
+
+Name: cttz def
+%r = cttz i8 0, i1 0
+  =>
+%r = 8
+
+Name: cttz variable
+%k = shl i8 1, 3
+%r = cttz i8 %k, i1 0
+  =>
+%k = 8
+%r = 3
+
+Name: cttz variable2
+%k = lshr i8 64, 2
+%r = cttz %k, i1 1
+  =>
+%k = 16
+%r = 4
+
+Name: cttz zero
+%k = cttz i4 1, i1 1
+  =>
+%k = 0
+
+Name: cttz sge
+%a = shl i4 %x, 1
+%b = cttz i4 %a, i1 1
+%c = icmp sge %b, 1
+  =>
+%a = shl i4 %x, 1
+%b = cttz i4 %a, i1 1
+%c = 1
+
+Name: cttz eq
+%a = shl i8 %x, 3
+%b = cttz i8 %a, i1 1
+%c = icmp slt %b, 3
+  =>
+%a = shl i8 %x, 3
+%b = cttz i8 %a, i1 1
+%c = 0

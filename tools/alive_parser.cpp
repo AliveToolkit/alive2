@@ -104,6 +104,10 @@ struct tokenizer_t {
     return peek() == END;
   }
 
+  bool isType() {
+    return peek() == INT_TYPE;
+  }
+
 private:
   token get_new_token() const {
     try {
@@ -234,6 +238,12 @@ static Type& parse_type(bool optional = true) {
   UNREACHABLE();
 }
 
+static Type& try_parse_type(Type &default_type) {
+  if (tokenizer.isType())
+    return parse_type();
+  return default_type;
+}
+
 static Value& parse_operand(Type &type);
 
 static Value& parse_const_expr(Type &type) {
@@ -354,6 +364,7 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case AND:
   case OR:
   case XOR:
+  case CTTZ:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -365,7 +376,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
-  auto &b = parse_operand(type);
+  auto &type2 = try_parse_type(type);
+  auto &b = parse_operand(type2);
 
   BinOp::Op op;
   switch (op_token) {
@@ -382,6 +394,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case AND:  op = BinOp::And; break;
   case OR:   op = BinOp::Or; break;
   case XOR:  op = BinOp::Xor; break;
+  case CTTZ: op = BinOp::Cttz; break;
   case SADD_SAT: op = BinOp::SAdd_Sat; break;
   case UADD_SAT: op = BinOp::UAdd_Sat; break;
   case SSUB_SAT: op = BinOp::SSub_Sat; break;
@@ -485,6 +498,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case AND:
   case OR:
   case XOR:
+  case CTTZ:
     return parse_binop(name, t);
   case SEXT:
   case ZEXT:
