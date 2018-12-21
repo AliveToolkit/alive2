@@ -53,6 +53,8 @@ int main(int argc, char **argv) {
       smt::set_query_timeout(arg.substr(8).data());
     else if (arg == "-smt-verbose")
       smt::solver_print_queries(true);
+    else if (arg == "-tactic-verbose")
+      smt::solver_tactic_verbose(true);
     else if (arg == "-skip-smt")
       config::skip_smt = true;
     else if (arg == "-h" || arg == "--help") {

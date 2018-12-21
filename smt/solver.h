@@ -111,6 +111,7 @@ public:
 
 
 void solver_print_queries(bool yes);
+void solver_tactic_verbose(bool yes);
 void solver_print_stats(std::ostream &os);
 
 
