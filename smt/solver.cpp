@@ -92,9 +92,7 @@ void Model::operator=(Model &&other) {
 
 expr Model::operator[](const expr &var) const {
   Z3_ast val;
-  if (Z3_model_eval(ctx(), m, var(), Z3_TRUE, &val) == Z3_FALSE)
-    return {};
-  return val;
+  return Z3_model_eval(ctx(), m, var(), true, &val) ? val : expr();
 }
 
 uint64_t Model::getUInt(const expr &var) const {
