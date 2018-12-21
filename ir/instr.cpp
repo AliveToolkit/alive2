@@ -495,6 +495,21 @@ expr Return::getTypeConstraints(const Function &f) const {
 }
 
 
+void Assume::print(ostream &os) const {
+  os << "assume " << cond;
+}
+
+StateValue Assume::toSMT(State &s) const {
+  auto &[v, p] = s[cond];
+  s.addUB(v != 0 && p);
+  return {};
+}
+
+expr Assume::getTypeConstraints(const Function &f) const {
+  return cond.getType().enforceIntType();
+}
+
+
 void Unreachable::print(ostream &os) const {
   os << "unreachable";
 }

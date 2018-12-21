@@ -162,6 +162,7 @@ public:
   expr uge(uint64_t rhs) const { return uge(mkUInt(rhs, bits())); }
   expr ugt(uint64_t rhs) const { return ugt(mkUInt(rhs, bits())); }
   expr operator==(uint64_t rhs) const { return *this == mkUInt(rhs, bits()); }
+  expr operator!=(uint64_t rhs) const { return *this != mkUInt(rhs, bits()); }
 
   expr sext(unsigned amount) const;
   expr zext(unsigned amount) const;
