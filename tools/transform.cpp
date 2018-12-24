@@ -8,6 +8,7 @@
 #include "smt/solver.h"
 #include "util/errors.h"
 #include "util/symexec.h"
+#include <map>
 #include <set>
 #include <sstream>
 
@@ -130,19 +131,19 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
     return expr::mkForAll(qvars, move(e));
 
   // manually instantiate all ty_%v vars
-  set<expr> instances({ move(e) });
-  set<expr> instances2;
+  map<expr, expr> instances({ { move(e), true } });
+  map<expr, expr> instances2;
 
   expr nums[3] = { expr::mkUInt(0, 2), expr::mkUInt(1, 2), expr::mkUInt(2, 2) };
 
   for (auto &i : t.src.getInputs()) {
     auto var = static_cast<const Input&>(i).getTyVar();
 
-    for (auto &e : instances) {
+    for (auto &[e, v] : instances) {
       for (unsigned i = 0; i <= 2; ++i) {
         expr newexpr = e.subst(var, nums[i]);
         if (newexpr.eq(e)) {
-          instances2.emplace(move(newexpr));
+          instances2[move(newexpr)] = v;
           break;
         }
 
@@ -150,16 +151,16 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
         if (newexpr.isFalse())
           continue;
 
-        newexpr &= var == nums[i]; // keep for counterexample printing
-        instances2.emplace(move(newexpr));
+        // keep 'var' variables for counterexample printing
+        instances2[move(newexpr)] = v && var == nums[i];
       }
     }
     instances = move(instances2);
   }
 
   expr insts(false);
-  for (auto &e : instances) {
-    insts |= expr::mkForAll(qvars, move(const_cast<expr&>(e)));
+  for (auto &[e, v] : instances) {
+    insts |= expr::mkForAll(qvars, move(const_cast<expr&>(e))) && v;
   }
 
   // TODO: try out instantiating the undefs in forall quantifier
