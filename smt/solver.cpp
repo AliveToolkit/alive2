@@ -344,7 +344,10 @@ void solver_init() {
     "propagate-values",
     "simplify",
     "elim-uncnstr",
-//    "qe2",
+    "qe-light",
+    "simplify",
+    "elim-uncnstr",
+    "qe-light",
     "simplify",
     "smt"
   };
