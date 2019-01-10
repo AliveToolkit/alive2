@@ -48,6 +48,7 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case Or:
   case Xor:
   case Cttz:
+  case Ctlz:
     assert(flags == 0);
     break;
   }
@@ -74,6 +75,7 @@ void BinOp::print(ostream &os) const {
   case Or:   str = "or"; break;
   case Xor:  str = "xor"; break;
   case Cttz: str = "cttz"; break;
+  case Ctlz: str = "ctlz"; break;
   }
 
   const char *flag = nullptr;
@@ -220,20 +222,31 @@ StateValue BinOp::toSMT(State &s) const {
     not_poison &= (b == 0u || a != 0u);
     break;
 
+  case Ctlz:
+    val = a.ctlz();
+    not_poison &= (b == 0u || a != 0u);
+    break;
+
   }
   return { move(val), move(not_poison) };
 }
 
 expr BinOp::getTypeConstraints(const Function &f) const {
-  auto instrConstraints = (getType() == rhs.getType());
-  if (op == Cttz)
-    instrConstraints = (rhs.getType().enforceIntType() &&
-                        rhs.getType().sizeVar() == 1u);
+  expr instrconstr;
+  switch (op) {
+  case Cttz:
+  case Ctlz:
+    instrconstr = (rhs.getType().enforceIntType() &&
+                   rhs.getType().sizeVar() == 1u);
+    break;
+  default:
+    instrconstr = (getType() == rhs.getType());
+  }
 
   return Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
          getType() == lhs.getType() &&
-         instrConstraints;
+         move(instrconstr);
 }
 
 

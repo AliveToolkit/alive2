@@ -535,6 +535,18 @@ expr expr::cttz() const {
   return cond;
 }
 
+expr expr::ctlz() const {
+  C();
+  auto nbits = bits();
+
+  auto cond = mkUInt(nbits, nbits);
+  for (unsigned i = 0; i < nbits; ++i) {
+    cond = mkIf(extract(i, i) == 1u, mkUInt(nbits - 1 - i, nbits), cond);
+  }
+
+  return cond;
+}
+
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
