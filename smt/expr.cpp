@@ -523,6 +523,17 @@ expr expr::lshr_exact(const expr &rhs) const {
   return (lshr(rhs) << rhs) == *this;
 }
 
+expr expr::cttz() const {
+  auto nbits = bits();
+
+  auto cond = mkUInt(nbits, nbits);
+  for (int i = nbits - 1; i >= 0; --i) {
+    cond = mkIf(extract(i, i) == 1u, mkUInt(i, nbits), cond);
+  }
+
+  return cond;
+}
+
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
