@@ -130,6 +130,7 @@ public:
   expr lshr_exact(const expr &rhs) const;
 
   expr cttz() const;
+  expr ctlz() const;
 
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;

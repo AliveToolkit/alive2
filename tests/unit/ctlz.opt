@@ -1,0 +1,51 @@
+Name: ctlz constant
+%r = ctlz i8 32, i1 0
+  =>
+%r = 2
+
+Name: ctlz undef
+%r = ctlz i8 0, i1 1
+  =>
+%r = undef
+
+Name: ctlz def
+%r = ctlz i8 0, i1 0
+  =>
+%r = 8
+
+Name: ctlz variable
+%k = shl i8 1, 3
+%r = ctlz i8 %k, i1 0
+  =>
+%k = 8
+%r = 4
+
+Name: ctlz variable2
+%k = lshr i8 64, 2
+%r = ctlz %k, i1 1
+  =>
+%k = 16
+%r = 3
+
+Name: ctlz zero
+%k = ctlz i4 8, i1 1
+  =>
+%k = 0
+
+Name: ctlz sge
+%a = lshr i4 %x, 1
+%b = ctlz i4 %a, i1 1
+%c = icmp sge %b, 1
+  =>
+%a = lshr i4 %x, 1
+%b = ctlz i4 %a, i1 1
+%c = 1
+
+Name: ctlz negtest
+%a = lshr i8 %x, 3
+%b = ctlz i8 %a, i1 1
+%c = icmp slt %b, 3
+  =>
+%a = lshr i8 %x, 3
+%b = ctlz i8 %a, i1 1
+%c = 0

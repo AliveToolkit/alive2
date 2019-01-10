@@ -365,6 +365,7 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case OR:
   case XOR:
   case CTTZ:
+  case CTLZ:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -395,6 +396,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case OR:   op = BinOp::Or; break;
   case XOR:  op = BinOp::Xor; break;
   case CTTZ: op = BinOp::Cttz; break;
+  case CTLZ: op = BinOp::Ctlz; break;
   case SADD_SAT: op = BinOp::SAdd_Sat; break;
   case UADD_SAT: op = BinOp::UAdd_Sat; break;
   case SSUB_SAT: op = BinOp::SSub_Sat; break;
@@ -499,6 +501,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case OR:
   case XOR:
   case CTTZ:
+  case CTLZ:
     return parse_binop(name, t);
   case SEXT:
   case ZEXT:

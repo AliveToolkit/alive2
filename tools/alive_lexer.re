@@ -190,6 +190,7 @@ re2c:yyfill:check = 0;
 "freeze" { return FREEZE; }
 "ret" { return RETURN; }
 "cttz" { return CTTZ; }
+"ctlz" { return CTLZ; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {
