@@ -191,6 +191,7 @@ re2c:yyfill:check = 0;
 "ret" { return RETURN; }
 "cttz" { return CTTZ; }
 "ctlz" { return CTLZ; }
+"ctpop" { return CTPOP; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

@@ -250,6 +250,34 @@ expr BinOp::getTypeConstraints(const Function &f) const {
 }
 
 
+void UnaryOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case Ctpop:  str = "ctpop "; break;
+  }
+
+  os << getName() << " = " << str << val;
+}
+
+StateValue UnaryOp::toSMT(State &s) const {
+  auto &[v, vp] = s[val];
+  expr newval;
+
+  switch (op) {
+  case Ctpop:
+    newval = v.ctpop();
+    break;
+  }
+  return { move(newval), expr(vp) };
+}
+
+expr UnaryOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforceIntOrPtrOrVectorType() &&
+         getType() == val.getType();
+}
+
+
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {

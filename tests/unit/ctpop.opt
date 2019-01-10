@@ -1,0 +1,39 @@
+Name: ctpop constant
+%a = ctpop i8 32
+  =>
+%a = 1
+
+Name: ctpop variable
+%a = shl i8 255, 3
+%b = ctpop i8 %a
+  =>
+%a = shl i8 255, 3
+%b = 5
+
+Name: ctpop zero
+%a = ctpop i8 0
+  =>
+%a = 0
+
+Name: ctpop all
+%a = ctpop i8 255
+  =>
+%a = 8
+
+Name: ctpop icmp
+%a = shl i8 %x, 2
+%b = ctpop i8 %a
+%c = icmp sle %b, 6
+  =>
+%a = shl i8 %x, 2
+%b = ctpop i8 %a
+%c = 1
+
+Name: ctpop negtest
+%a = shl i8 %x, 3
+%b = ctpop i8 %a
+%c = icmp sgt %b, 5
+  =>
+%a = shl i8 %x, 3
+%b = ctpop i8 %a
+%c = 0

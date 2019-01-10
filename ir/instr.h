@@ -42,6 +42,21 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
 };
 
+class UnaryOp final : public Instr {
+public:
+  enum Op { Ctpop };
+
+private:
+  Value &val;
+  Op op;
+
+public:
+  UnaryOp(Type &type, std::string &&name, Value &val, Op op)
+    : Instr(type, std::move(name)), val(val), op(op) {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
 
 class ConversionOp final : public Instr {
 public:
