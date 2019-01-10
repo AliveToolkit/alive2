@@ -292,7 +292,7 @@ static Value& parse_operand(Type &type) {
   }
   case REGISTER: {
     string id(yylval.str);
-    if (auto I = identifiers.find(id); 
+    if (auto I = identifiers.find(id);
         I != identifiers.end())
       return *I->second;
 
