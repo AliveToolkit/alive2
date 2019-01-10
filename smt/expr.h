@@ -131,6 +131,7 @@ public:
 
   expr cttz() const;
   expr ctlz() const;
+  expr ctpop() const;
 
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;
