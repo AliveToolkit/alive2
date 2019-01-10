@@ -407,6 +407,19 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   return make_unique<BinOp>(type, string(name), a, b, op, flags);
 }
 
+static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
+  UnaryOp::Op op;
+  switch (op_token) {
+  case CTPOP: op = UnaryOp::Ctpop; break;
+  default:
+    UNREACHABLE();
+  }
+
+  auto &ty = parse_type();
+  auto &a = parse_operand(ty);
+  return make_unique<UnaryOp>(ty, string(name), a, op);
+}
+
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   // op ty %op to ty2
   auto &opty = parse_type();
@@ -503,6 +516,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case CTTZ:
   case CTLZ:
     return parse_binop(name, t);
+  case CTPOP:
+    return parse_unaryop(name, t);
   case SEXT:
   case ZEXT:
   case TRUNC:

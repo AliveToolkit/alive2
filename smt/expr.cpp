@@ -547,6 +547,18 @@ expr expr::ctlz() const {
   return cond;
 }
 
+expr expr::ctpop() const {
+  C();
+  auto nbits = bits();
+
+  auto res = mkUInt(0, nbits);
+  for (unsigned i = 0; i < nbits; ++i) {
+    res = res + extract(i, i).zext(nbits - 1);
+  }
+
+  return res;
+}
+
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;

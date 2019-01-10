@@ -289,6 +289,11 @@ public:
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
                                            BinOp::Ctlz));
     }
+    case llvm::Intrinsic::ctpop:
+    {
+      PARSE_UNOP();
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::Ctpop));
+    }
     case llvm::Intrinsic::expect:
     {
       PARSE_UNOP();
