@@ -524,6 +524,7 @@ expr expr::lshr_exact(const expr &rhs) const {
 }
 
 expr expr::cttz() const {
+  C();
   auto nbits = bits();
 
   auto cond = mkUInt(nbits, nbits);
