@@ -410,7 +410,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   UnaryOp::Op op;
   switch (op_token) {
-  case CTPOP: op = UnaryOp::Ctpop; break;
+  case BITREVERSE: op = UnaryOp::BitReverse; break;
+  case CTPOP:      op = UnaryOp::Ctpop; break;
   default:
     UNREACHABLE();
   }
@@ -516,6 +517,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case CTTZ:
   case CTLZ:
     return parse_binop(name, t);
+  case BITREVERSE:
   case CTPOP:
     return parse_unaryop(name, t);
   case SEXT:

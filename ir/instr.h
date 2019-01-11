@@ -44,7 +44,7 @@ public:
 
 class UnaryOp final : public Instr {
 public:
-  enum Op { Ctpop };
+  enum Op { BitReverse, Ctpop };
 
 private:
   Value &val;
