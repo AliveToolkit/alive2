@@ -1,0 +1,19 @@
+Name: bitreverse constant
+%a = bitreverse i8 32
+  =>
+%a = 4
+
+Name: bitreverse constant1
+%a = bitreverse i16 4352
+  =>
+%a = 136
+
+Name: bitreverse constant2
+%a = bitreverse i8 1
+  =>
+%a = 128
+
+Name: bitreverse constant3
+%a = bitreverse i8 129
+  =>
+%a = 129

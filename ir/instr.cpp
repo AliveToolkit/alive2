@@ -253,7 +253,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
 void UnaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case Ctpop:  str = "ctpop "; break;
+  case BitReverse:  str = "bitreverse "; break;
+  case Ctpop:       str = "ctpop "; break;
   }
 
   os << getName() << " = " << str << val;
@@ -264,6 +265,9 @@ StateValue UnaryOp::toSMT(State &s) const {
   expr newval;
 
   switch (op) {
+  case BitReverse:
+    newval = v.bitreverse();
+    break;
   case Ctpop:
     newval = v.ctpop();
     break;

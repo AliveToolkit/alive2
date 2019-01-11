@@ -129,6 +129,7 @@ public:
   expr ashr_exact(const expr &rhs) const;
   expr lshr_exact(const expr &rhs) const;
 
+  expr bitreverse() const;
   expr cttz() const;
   expr ctlz() const;
   expr ctpop() const;
