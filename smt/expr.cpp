@@ -523,6 +523,20 @@ expr expr::lshr_exact(const expr &rhs) const {
   return (lshr(rhs) << rhs) == *this;
 }
 
+expr expr::bswap() const {
+  C();
+  auto nbits = bits();
+  constexpr unsigned bytelen = 8;
+
+  assert(nbits > 0 && nbits % (bytelen * 2) == 0);
+  expr res = extract(bytelen - 1, 0);
+  for (unsigned i = 1; i < nbits / bytelen; i++) {
+    res = res.concat(extract((i + 1) * bytelen - 1, i * bytelen));
+  }
+
+  return res;
+}
+
 expr expr::bitreverse() const {
   C();
   auto nbits = bits();

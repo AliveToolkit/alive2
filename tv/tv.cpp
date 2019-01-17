@@ -294,6 +294,11 @@ public:
       PARSE_UNOP();
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::BitReverse));
     }
+    case llvm::Intrinsic::bswap:
+    {
+      PARSE_UNOP();
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::BSwap));
+    }
     case llvm::Intrinsic::ctpop:
     {
       PARSE_UNOP();

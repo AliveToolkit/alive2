@@ -189,6 +189,7 @@ re2c:yyfill:check = 0;
 "ugt" { return UGT; }
 "freeze" { return FREEZE; }
 "ret" { return RETURN; }
+"bswap" { return BSWAP; }
 "bitreverse" { return BITREVERSE; }
 "cttz" { return CTTZ; }
 "ctlz" { return CTLZ; }

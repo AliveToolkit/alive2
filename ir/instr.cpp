@@ -254,6 +254,7 @@ void UnaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
   case BitReverse:  str = "bitreverse "; break;
+  case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
   }
 
@@ -268,6 +269,9 @@ StateValue UnaryOp::toSMT(State &s) const {
   case BitReverse:
     newval = v.bitreverse();
     break;
+  case BSwap:
+    newval = v.bswap();;
+    break;
   case Ctpop:
     newval = v.ctpop();
     break;
@@ -276,9 +280,19 @@ StateValue UnaryOp::toSMT(State &s) const {
 }
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
+  expr instrconstr;
+  switch(op) {
+  case BSwap:
+    instrconstr = val.getType().sizeVar().urem(expr::mkUInt(16, 8)) == 0;
+    break;
+  default:
+    instrconstr = true;
+  }
+
   return Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
-         getType() == val.getType();
+         getType() == val.getType() &&
+         move(instrconstr);
 }
 
 
