@@ -1,0 +1,9 @@
+Name: bswap constant16
+%a = bswap i16 52275
+  =>
+%a = 13260
+
+Name: bswap constant32
+%a = bswap i32 32896
+  =>
+%a = 2155872256
