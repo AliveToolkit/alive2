@@ -21,6 +21,7 @@ using namespace tools;
 using namespace util;
 using namespace std;
 using llvm::cast, llvm::dyn_cast, llvm::isa, llvm::errs;
+using llvm::LLVMContext;
 
 namespace {
 
@@ -94,6 +95,7 @@ Value* get_operand(llvm::Value *v) {
     return nullptr;
 
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
+    // TODO: support > 64 bits
     auto c = make_unique<IntConst>(*ty, cnst->getZExtValue());
     auto ret = c.get();
     current_fn->addConstant(move(c));
@@ -292,17 +294,20 @@ public:
     case llvm::Intrinsic::bitreverse:
     {
       PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::BitReverse));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
+                                             UnaryOp::BitReverse));
     }
     case llvm::Intrinsic::bswap:
     {
       PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::BSwap));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
+                                             UnaryOp::BSwap));
     }
     case llvm::Intrinsic::ctpop:
     {
       PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::Ctpop));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
+                                             UnaryOp::Ctpop));
     }
     case llvm::Intrinsic::expect:
     {
@@ -332,6 +337,63 @@ public:
     return {};
   }
 
+  bool handleMetadata(llvm::Instruction &llvm_i, Instr &i, BasicBlock &BB) {
+    llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
+    llvm_i.getAllMetadataOtherThanDebugLoc(MDs);
+
+    for (auto &[ID, Node] : MDs) {
+      switch (ID) {
+      case LLVMContext::MD_range:
+      {
+        Value *range = nullptr;
+        for (unsigned op = 0, e = Node->getNumOperands(); op < e; ++op) {
+          auto *low =
+            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(op));
+          auto *high =
+            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op));
+
+          auto op_name = to_string(op / 2);
+          auto l = make_unique<ICmp>(*int_types[1].get(),
+                                     "$range_l$" + op_name + value_name(llvm_i),
+                                     ICmp::SGE, i, *get_operand(low));
+
+          auto h = make_unique<ICmp>(*int_types[1].get(),
+                                     "$range_h$" + op_name + value_name(llvm_i),
+                                     ICmp::SLT, i, *get_operand(high));
+
+          auto r = make_unique<BinOp>(*int_types[1].get(),
+                                      "$range$" + op_name + value_name(llvm_i),
+                                      *l.get(), *h.get(), BinOp::And);
+
+          auto r_ptr = r.get();
+          BB.addInstr(move(l));
+          BB.addInstr(move(h));
+          BB.addInstr(move(r));
+
+          if (range) {
+            auto range_or = make_unique<BinOp>(*int_types[1].get(),
+                                               "$rangeOR$" + op_name +
+                                                 value_name(llvm_i),
+                                               *range, *r_ptr, BinOp::Or);
+            range = range_or.get();
+            BB.addInstr(move(range_or));
+          } else {
+            range = r_ptr;
+          }
+        }
+
+        if (range)
+          BB.addInstr(make_unique<Assume>(*range));
+        break;
+      }
+      default:
+        errs() << "Unsupported metadata: " << ID << '\n';
+        return false;
+      }
+    }
+    return true;
+  }
+
   optional<Function> run() {
     reset_state();
 
@@ -354,9 +416,14 @@ public:
     for (auto &bb : f) {
       auto &BB = Fn.getBB(value_name(bb));
       for (auto &i : bb) {
-        if (auto I = visit(i))
-          BB.addIntr(move(I));
-        else
+        if (auto I = visit(i)) {
+          auto alive_i = I.get();
+          BB.addInstr(move(I));
+
+          if (i.hasMetadataOtherThanDebugLoc() &&
+              !handleMetadata(i, *alive_i, BB))
+            return {};
+        } else
           return {};
       }
     }

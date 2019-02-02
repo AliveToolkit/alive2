@@ -42,6 +42,7 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
 };
 
+
 class UnaryOp final : public Instr {
 public:
   enum Op { BitReverse, BSwap, Ctpop };
@@ -57,6 +58,7 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
 };
+
 
 class ConversionOp final : public Instr {
 public:

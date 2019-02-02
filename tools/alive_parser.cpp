@@ -564,7 +564,7 @@ static void parse_fn(Function &f) {
       string name(yylval.str);
       auto i = parse_instr(name);
       identifiers.emplace(move(name), i.get());
-      bb->addIntr(move(i));
+      bb->addInstr(move(i));
       break;
     }
     case LABEL:
@@ -573,12 +573,12 @@ static void parse_fn(Function &f) {
     case RETURN: {
       auto instr = parse_return();
       f.setType(instr->getType());
-      bb->addIntr(move(instr));
+      bb->addInstr(move(instr));
       has_return = true;
       break;
     }
     case UNREACH:
-      bb->addIntr(make_unique<Unreachable>());
+      bb->addInstr(make_unique<Unreachable>());
       break;
     default:
       tokenizer.unget(t);

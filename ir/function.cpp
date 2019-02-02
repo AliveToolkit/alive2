@@ -23,7 +23,7 @@ void BasicBlock::fixupTypes(const Model &m) {
   }
 }
 
-void BasicBlock::addIntr(unique_ptr<Instr> &&i) {
+void BasicBlock::addInstr(unique_ptr<Instr> &&i) {
   m_instrs.push_back(move(i));
 }
 

@@ -34,7 +34,7 @@ public:
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 
-  void addIntr(std::unique_ptr<Instr> &&i);
+  void addInstr(std::unique_ptr<Instr> &&i);
 
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;

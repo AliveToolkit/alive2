@@ -528,7 +528,7 @@ expr expr::bswap() const {
   auto nbits = bits();
   constexpr unsigned bytelen = 8;
 
-  assert(nbits > 0 && nbits % (bytelen * 2) == 0);
+  assert(nbits % (bytelen * 2) == 0);
   expr res = extract(bytelen - 1, 0);
   for (unsigned i = 1; i < nbits / bytelen; i++) {
     res = res.concat(extract((i + 1) * bytelen - 1, i * bytelen));
