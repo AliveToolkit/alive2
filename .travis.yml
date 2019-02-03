@@ -18,8 +18,8 @@ addons:
 env:
   global:
     - RE2C_VERSION=1.1.1
-    - Z3_VERSION=4.8.3
-    - Z3_HASH=7f5d66c3c299
+    - Z3_VERSION=4.8.4
+    - Z3_HASH=d6df51951f4c
 
 before_script:
   - |
