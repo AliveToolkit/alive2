@@ -6,10 +6,10 @@
 #include "ir/value.h"
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
-#include <array>
 #include <cassert>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #define YYDEBUG 0
 
@@ -33,12 +33,19 @@ static void error(const char *s, token t) {
   throw ParseException(string(s) + "; got: " + token_name[t], yylineno);
 }
 
-static array<unique_ptr<IntType>, 65> int_types;
+static vector<unique_ptr<IntType>> int_types;
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
 static Value& get_constant(uint64_t n, Type &t) {
   auto c = make_unique<IntConst>(t, n);
+  auto ret = c.get();
+  fn->addConstant(move(c));
+  return *ret;
+}
+
+static Value& get_num_constant(string_view n, Type &t) {
+  auto c = make_unique<IntConst>(t, string(n));
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;
@@ -219,10 +226,18 @@ static unsigned sym_num;
 static Type& parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
   case INT_TYPE:
-    if (yylval.num <= 64)
-      return *int_types[yylval.num].get();
-    error("Int type too long: " + to_string(yylval.num));
-    break;
+    if (yylval.num > 4 * 1024)
+      error("Int type too long: " + to_string(yylval.num));
+
+    if (yylval.num >= int_types.size())
+      int_types.resize(yylval.num + 1);
+
+    if (!int_types[yylval.num])
+      int_types[yylval.num] =
+        make_unique<IntType>("i" + to_string(yylval.num), yylval.num);
+
+    return *int_types[yylval.num].get();
+
   default:
     if (optional) {
       tokenizer.unget(t);
@@ -284,6 +299,8 @@ static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
     return get_constant(yylval.num, type);
+  case NUM_STR:
+    return get_num_constant(yylval.str, type);
   case TRUE:
     return get_constant(1, type);
   case FALSE:
@@ -619,11 +636,8 @@ vector<Transform> parse(string_view buf) {
 
 
 parser_initializer::parser_initializer() {
-  int_types[0] = nullptr;
-
-  for (unsigned i = 1; i <= 64; ++i) {
-    int_types[i] = make_unique<IntType>("i" + to_string(i), i);
-  }
+  int_types.resize(65);
+  int_types[1] = make_unique<IntType>("i1", 1);
 }
 
 parser_initializer::~parser_initializer() {

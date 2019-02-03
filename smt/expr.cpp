@@ -159,6 +159,10 @@ expr expr::mkInt(int64_t n, unsigned bits) {
   return mkInt(n, mkBVSort(bits));
 }
 
+expr expr::mkInt(const char *n, unsigned bits) {
+  return Z3_mk_numeral(ctx(), n, mkBVSort(bits));
+}
+
 expr expr::mkConst(Z3_func_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }

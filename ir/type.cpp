@@ -113,11 +113,12 @@ unsigned IntType::bits() const {
 }
 
 expr IntType::getTypeConstraints() const {
-  // limit ints to be between 1 and 64 bits
-  // TODO: lift 64-bit restriction
+  // since size cannot be unbounded, limit it between 1 and 64 bits if undefined
   auto bw = sizeVar();
-  return bw != expr::mkUInt(0, var_bw_bits) &&
-         bw.ule(expr::mkUInt(64, var_bw_bits));
+  auto r = bw != expr::mkUInt(0, var_bw_bits);
+  if (!defined)
+    r &= bw.ule(expr::mkUInt(64, var_bw_bits));
+  return r;
 }
 
 expr IntType::sizeVar() const {

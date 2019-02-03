@@ -10,11 +10,11 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
-#include <array>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using namespace IR;
 using namespace tools;
@@ -33,7 +33,7 @@ string_view s(llvm::StringRef str) {
 
 smt::smt_initializer smt_init;
 TransformPrintOpts print_opts;
-array<unique_ptr<IntType>, 65> int_types;
+vector<unique_ptr<IntType>> int_types;
 unordered_map<string, Function> fns;
 unordered_map<const llvm::Value*, Value*> identifiers;
 Function *current_fn;
@@ -45,11 +45,8 @@ unsigned value_id_counter; // for %0, %1, etc..
 
 struct alive_init {
   alive_init() {
-    int_types[0] = nullptr;
-
-    for (unsigned i = 1; i <= 64; ++i) {
-      int_types[i] = make_unique<IntType>("i" + to_string(i), i);
-    }
+    int_types.resize(65);
+    int_types[1] = make_unique<IntType>("i1", 1);
   }
 } alive_init;
 
@@ -77,7 +74,11 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return &Type::voidTy;
   case llvm::Type::IntegerTyID: {
     auto bits = cast<llvm::IntegerType>(ty)->getBitWidth();
-    return bits <= 64 ? int_types[bits].get() : nullptr;
+    if (bits >= int_types.size())
+      int_types.resize(bits + 1);
+    if (!int_types[bits])
+      int_types[bits] = make_unique<IntType>("i" + to_string(bits), bits);
+    return int_types[bits].get();
   }
   default:
     errs() << "Unsupported type: " << *ty << '\n';
@@ -95,8 +96,11 @@ Value* get_operand(llvm::Value *v) {
     return nullptr;
 
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
-    // TODO: support > 64 bits
-    auto c = make_unique<IntConst>(*ty, cnst->getZExtValue());
+    unique_ptr<IntConst> c;
+    if (cnst->getBitWidth() <= 64)
+      c = make_unique<IntConst>(*ty, cnst->getZExtValue());
+    else
+      c = make_unique<IntConst>(*ty, cnst->getValue().toString(10, false));
     auto ret = c.get();
     current_fn->addConstant(move(c));
     return ret;

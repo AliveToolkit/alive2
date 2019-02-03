@@ -4,6 +4,8 @@
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
 #include <cassert>
+#include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <iostream>
 
@@ -104,6 +106,10 @@ re2c:yyfill:check = 0;
 
 "-"?[0-9]+ {
   yylval.num = strtoull((char*)YYTEXT, nullptr, 10);
+  if (yylval.num == ULLONG_MAX && errno == ERANGE) {
+    COPY_STR();
+    return NUM_STR;
+  }
   return NUM;
 }
 

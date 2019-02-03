@@ -70,6 +70,7 @@ public:
 
   static expr mkUInt(uint64_t n, unsigned bits);
   static expr mkInt(int64_t n, unsigned bits);
+  static expr mkInt(const char *n, unsigned bits);
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
 

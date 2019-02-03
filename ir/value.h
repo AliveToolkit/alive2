@@ -8,6 +8,7 @@
 #include "smt/expr.h"
 #include <ostream>
 #include <string>
+#include <variant>
 
 namespace smt { class Model; }
 
@@ -43,10 +44,11 @@ public:
 
 
 class IntConst final : public Value {
-  int64_t val;
+  std::variant<int64_t, std::string> val;
 
 public:
   IntConst(Type &type, int64_t val);
+  IntConst(Type &type, std::string &&val);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;
