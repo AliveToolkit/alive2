@@ -15,9 +15,28 @@ class Constant : public Value {
 public:
   Constant(Type &type, std::string &&name) : Value(type, std::move(name)) {}
   void print(std::ostream &os) const override;
-  // <value, UB>
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const;
   StateValue toSMT(State &s) const override;
+  // <value, UB>
+  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const = 0;
+};
+
+
+class IntConst final : public Constant {
+  std::variant<int64_t, std::string> val;
+
+public:
+  IntConst(Type &type, int64_t val);
+  IntConst(Type &type, std::string &&val);
+  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  smt::expr getTypeConstraints() const override;
+};
+
+
+class ConstantInput final : public Constant {
+public:
+  ConstantInput(Type &type, std::string &&name)
+    : Constant(type, std::move(name)) {}
+  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const;
 };
 
 

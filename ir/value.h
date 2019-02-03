@@ -43,18 +43,6 @@ public:
 };
 
 
-class IntConst final : public Value {
-  std::variant<int64_t, std::string> val;
-
-public:
-  IntConst(Type &type, int64_t val);
-  IntConst(Type &type, std::string &&val);
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
-};
-
-
 class UndefValue final : public Value {
 public:
   UndefValue(Type &type) : Value(type, "undef") {}

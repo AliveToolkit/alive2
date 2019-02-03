@@ -6,7 +6,6 @@
 #include "util/compiler.h"
 
 using namespace smt;
-using namespace util;
 using namespace std;
 
 static unsigned gbl_fresh_id = 0;
@@ -34,33 +33,6 @@ ostream& operator<<(ostream &os, const Value &val) {
   if (!t.empty())
     os << t << ' ';
   return os << val.getName();
-}
-
-
-IntConst::IntConst(Type &type, int64_t val)
-  : Value(type, to_string(val)), val(val) {}
-
-IntConst::IntConst(Type &type, string &&val)
-  : Value(type, string(val)), val(move(val)) {}
-
-void IntConst::print(ostream &os) const {
-  UNREACHABLE();
-}
-
-StateValue IntConst::toSMT(State &s) const {
-  if (auto v = get_if<int64_t>(&val))
-    return { expr::mkInt(*v, bits()), true };
-  return { expr::mkInt(get<string>(val).c_str(), bits()), true };
-}
-
-expr IntConst::getTypeConstraints() const {
-  unsigned min_bits = 0;
-  if (auto v = get_if<int64_t>(&val))
-    min_bits = (*v >= 0 ? 63 : 64) - num_sign_bits(*v);
-
-  return Value::getTypeConstraints() &&
-         getType().enforceIntType() &&
-         getType().sizeVar().uge(min_bits);
 }
 
 

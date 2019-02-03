@@ -57,7 +57,7 @@ static Value& get_constant(string_view name, Type &type) {
       I != identifiers.end())
     return *I->second;
 
-  auto c = make_unique<Constant>(type, string(id));
+  auto c = make_unique<ConstantInput>(type, string(id));
   auto ret = c.get();
   fn->addConstant(move(c));
   identifiers.emplace(move(id), ret);

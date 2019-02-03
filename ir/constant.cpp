@@ -8,6 +8,7 @@
 
 using namespace smt;
 using namespace std;
+using namespace util;
 
 namespace IR {
 
@@ -15,14 +16,37 @@ void Constant::print(ostream &os) const {
   UNREACHABLE();
 }
 
-pair<expr, expr> Constant::toSMT_cnst() const {
-  return { expr::mkVar(getName().c_str(), bits()), true };
-}
-
 StateValue Constant::toSMT(State &s) const {
   auto ret = toSMT_cnst();
   s.addUB(move(ret.second));
   return { move(ret.first), true };
+}
+
+
+IntConst::IntConst(Type &type, int64_t val)
+  : Constant(type, to_string(val)), val(val) {}
+
+IntConst::IntConst(Type &type, string &&val)
+  : Constant(type, string(val)), val(move(val)) {}
+
+pair<expr, expr> IntConst::toSMT_cnst() const {
+  if (auto v = get_if<int64_t>(&val))
+    return { expr::mkInt(*v, bits()), true };
+  return { expr::mkInt(get<string>(val).c_str(), bits()), true };
+}
+
+expr IntConst::getTypeConstraints() const {
+  unsigned min_bits = 0;
+  if (auto v = get_if<int64_t>(&val))
+    min_bits = (*v >= 0 ? 63 : 64) - num_sign_bits(*v);
+
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType() &&
+         getType().sizeVar().uge(min_bits);
+}
+
+pair<expr, expr> ConstantInput::toSMT_cnst() const {
+  return { expr::mkVar(getName().c_str(), bits()), true };
 }
 
 
