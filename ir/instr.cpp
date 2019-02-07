@@ -49,6 +49,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case Xor:
   case Cttz:
   case Ctlz:
+  case SAdd_Overflow:
+  case ExtractValue:
     assert(flags == 0);
     break;
   }
@@ -76,6 +78,8 @@ void BinOp::print(ostream &os) const {
   case Xor:  str = "xor"; break;
   case Cttz: str = "cttz"; break;
   case Ctlz: str = "ctlz"; break;
+  case SAdd_Overflow: str = "sadd_overflow"; break;
+  case ExtractValue: str = "extractvalue"; break;
   }
 
   const char *flag = nullptr;
@@ -226,6 +230,15 @@ StateValue BinOp::toSMT(State &s) const {
     val = a.ctlz();
     not_poison &= (b == 0u || a != 0u);
     break;
+  
+  case SAdd_Overflow:
+    val = a + b;
+    val = val.concat(expr::mkIf(a.add_no_soverflow(b), expr::mkUInt(0, 1), expr::mkUInt(1, 1)));
+    break;
+
+  case ExtractValue:
+    val = expr::mkIf(b == 1u, a.extract(0, 0), a.extract(1, a.bits() - 1));
+    break;
   }
   return { move(val), move(not_poison) };
 }
@@ -235,8 +248,10 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   switch (op) {
   case Cttz:
   case Ctlz:
-    instrconstr = (rhs.getType().enforceIntType() &&
-                   rhs.getType().sizeVar() == 1u);
+  case ExtractValue:
+    instrconstr = lhs.getType().enforceAggregateType() &&
+                  rhs.getType().enforceIntType() &&
+                  rhs.getType().sizeVar() == 1u;
     break;
   default:
     instrconstr = (getType() == rhs.getType());

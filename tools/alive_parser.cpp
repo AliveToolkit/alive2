@@ -220,8 +220,28 @@ static void parse_comma() {
 }
 
 
+static unordered_map<unsigned, unique_ptr<AggregateType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
+
+static Type& get_overflow_type(unsigned bitwidth) {
+  if (overflow_aggregate_types.find(bitwidth) != overflow_aggregate_types.end()) {
+    return *overflow_aggregate_types[bitwidth];
+  }
+
+  auto t = make_unique<AggregateType>("oaggty_" + to_string(bitwidth), bitwidth, 1);
+  overflow_aggregate_types.emplace(bitwidth, std::move(t));
+
+  return *overflow_aggregate_types[bitwidth];
+}
+
+static Type& get_sym_type() {
+  if (sym_num < sym_types.size())
+    return *sym_types[sym_num++].get();
+
+  auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
+  return *sym_types.emplace_back(move(t)).get();
+}
 
 static Type& parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
@@ -241,11 +261,7 @@ static Type& parse_type(bool optional = true) {
   default:
     if (optional) {
       tokenizer.unget(t);
-      if (sym_num < sym_types.size())
-        return *sym_types[sym_num++].get();
-
-      auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
-      return *sym_types.emplace_back(move(t)).get();
+      return get_sym_type();
     } else {
       error("Expecting a type", t);
     }
@@ -396,6 +412,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   parse_comma();
   auto &type2 = try_parse_type(type);
   auto &b = parse_operand(type2);
+  auto rettype = std::ref(type);
 
   BinOp::Op op;
   switch (op_token) {
@@ -418,10 +435,18 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case UADD_SAT: op = BinOp::UAdd_Sat; break;
   case SSUB_SAT: op = BinOp::SSub_Sat; break;
   case USUB_SAT: op = BinOp::USub_Sat; break;
+  case SADD_OVERFLOW:
+    op = BinOp::SAdd_Overflow;
+    rettype = std::ref(get_overflow_type(type.bits()));
+    break;
+  case EXTRACTVALUE:
+    op = BinOp::ExtractValue;
+    rettype = std::ref(get_sym_type());
+    break;
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(type, string(name), a, b, op, flags);
+  return make_unique<BinOp>(rettype.get(), string(name), a, b, op, flags);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -671,6 +696,7 @@ parser_initializer::parser_initializer() {
 parser_initializer::~parser_initializer() {
   for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
   sym_types.clear();
+  overflow_aggregate_types.clear();
 }
 
 }

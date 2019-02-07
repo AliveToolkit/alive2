@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <ostream>
@@ -38,6 +39,7 @@ public:
   virtual smt::expr enforceIntType() const;
   virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
+  virtual smt::expr enforceAggregateType() const;
 
   virtual void print(std::ostream &os) const = 0;
   friend std::ostream& operator<<(std::ostream &os, const Type &t);
@@ -118,6 +120,25 @@ public:
   smt::expr operator==(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
+  void print(std::ostream &os) const override;
+};
+
+
+// Currently only supports aggregate type with two children
+// of int type.
+// Eg: {i32, i1}. Enforced in getTypeConstraints()
+class AggregateType final : public Type {
+  std::vector<unsigned> childrenSize;
+
+public:
+  AggregateType(std::string &&name, unsigned first, unsigned second)
+    : Type(std::move(name)) {
+    childrenSize = {first, second};
+  }
+  smt::expr enforceAggregateType() const override;
+  smt::expr getTypeConstraints() const override;
+  void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };

@@ -85,6 +85,10 @@ expr Type::enforceIntOrPtrOrVectorType() const {
   return false;
 }
 
+expr Type::enforceAggregateType() const {
+  return false;
+}
+
 ostream& operator<<(ostream &os, const Type &t) {
   t.print(os);
   return os;
@@ -245,6 +249,34 @@ expr VectorType::enforceIntOrPtrOrVectorType() const {
 
 void VectorType::print(ostream &os) const {
   os << "TODO";
+}
+
+expr AggregateType::getTypeConstraints() const {
+  // Only allow aggregates of type {ix, i1} for overflow instrs
+  return childrenSize.size() == 2 &&
+         childrenSize[0] <= 64 &&
+         childrenSize[1] == 1;
+}
+
+expr AggregateType::enforceAggregateType() const {
+  return true;
+}
+
+void AggregateType::fixup(const Model &m) {
+  // TODO
+}
+
+expr AggregateType::enforceIntOrPtrOrVectorType() const {
+  return false;
+}
+
+void AggregateType::print(ostream &os) const {
+  os << "{";
+  for (auto &isize : childrenSize) {
+    // FIXME: Don't print this extra comma in the end
+    os << "i" << isize << ", ";
+  }
+  os << "}";
 }
 
 
