@@ -119,4 +119,5 @@ add_custom_target("check"
                           "-s"
                           "${PROJECT_SOURCE_DIR}/tests"
                   DEPENDS "alive"
+                  USES_TERMINAL
                  )
