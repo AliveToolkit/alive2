@@ -237,7 +237,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case ExtractValue:
-    val = expr::mkIf(b == 1u, a.extract(0, 0), a.extract(1, a.bits() - 1));
+    val = expr::mkIf(b == 1u, a.extract(0, 0), a.extract(a.bits() - 1, 1));
     break;
   }
   return { move(val), move(not_poison) };
