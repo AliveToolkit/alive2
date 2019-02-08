@@ -194,6 +194,8 @@ re2c:yyfill:check = 0;
 "uge" { return UGE; }
 "ugt" { return UGT; }
 "freeze" { return FREEZE; }
+"fshl" { return FSHL; }
+"fshr" { return FSHR; }
 "ret" { return RETURN; }
 "bswap" { return BSWAP; }
 "bitreverse" { return BITREVERSE; }

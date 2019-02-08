@@ -1,0 +1,5 @@
+%t = fshl i8 %a, i8 %b, i8 %c
+  =>
+%t = poison
+
+; ERROR: Target is more poisonous than source for i8 %t
