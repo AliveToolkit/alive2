@@ -1,0 +1,7 @@
+Name: check that an intermediate variable that only exists on RHS does not cause an exception
+%c = shl %a, %b
+  =>
+%f = udiv %d, %e
+%c = add %f, %g
+
+; ERROR: Target is more poisonous than source for i1 %c

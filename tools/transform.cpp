@@ -235,10 +235,13 @@ Errors TransformVerify::verify() const {
       if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
         continue;
 
+      auto tgt_i = tgt_instrs.find(name);
+      if (tgt_i == tgt_instrs.end())
+        continue;
+
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(errs, t, src_state, tgt_state, var,
-                       true, val, true, tgt_state.at(*tgt_instrs.at(name)),
-                       check_each_var);
+      check_refinement(errs, t, src_state, tgt_state, var, true, val, true,
+                       tgt_state.at(*tgt_i->second), check_each_var);
       if (errs)
         return errs;
     }
@@ -308,7 +311,9 @@ TypingAssignments TransformVerify::getTypings() const {
 
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
-      c &= i.eqType(*tgt_instrs.at(i.getName()));
+      auto tgt_i = tgt_instrs.find(i.getName());
+      if (tgt_i != tgt_instrs.end())
+        c &= i.eqType(*tgt_i->second);
     }
   }
   return { move(c) };
