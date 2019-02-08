@@ -1,0 +1,127 @@
+Name: passthrough
+%t = %a
+  =>
+%t = fshl i4 %a, i4 0, i4 0
+
+Name: single shift by constant
+%t = shl i4 %a, i4 2
+  =>
+%t = fshl i4 %a, i4 0, i4 2
+
+
+Name: single shift by masked value
+%c_mod_width = urem i4 %c, i4 4
+%t = shl i4 %a, i4 %c_mod_width
+  =>
+%c_mod_width = urem i4 %c, i4 4
+%t = fshl i4 %a, i4 0, i4 %c
+
+Name: single shift by value
+%t = shl i4 %a, i4 %c
+  =>
+%t = fshl i4 %a, i4 0, i4 %c
+
+
+Name: rotate by constant
+%highpart = shl i4 %a, 3
+%lowpart = lshr i4 %a, 1
+%t = or i4 %highpart, %lowpart
+  =>
+%highpart = shl i4 %a, 3
+%lowpart = lshr i4 %a, 1
+%t = fshl i4 %a, i4 %a, i4 3
+
+Name: rotate by masked value
+%c_mod_width = urem i4 %c, 4
+%neg_c_mod_width = sub i4 4, %c_mod_width
+%highpart = shl i4 %a, %c_mod_width
+%lowpart = lshr i4 %a, %neg_c_mod_width
+%t = or i4 %highpart, %lowpart
+  =>
+%c_mod_width = urem i4 %c, 4
+%neg_c_mod_width = sub i4 4, %c_mod_width
+%highpart = shl i4 %a, %c_mod_width
+%lowpart = lshr i4 %a, %neg_c_mod_width
+%t = fshl i4 %a, i4 %a, i4 %c
+
+Name: rotate by value
+%neg_c = sub i4 4, %c
+%highpart = shl i4 %a, %c
+%lowpart = lshr i4 %a, %neg_c
+%t = or i4 %highpart, %lowpart
+  =>
+%neg_c = sub i4 4, %c
+%highpart = shl i4 %a, %c
+%lowpart = lshr i4 %a, %neg_c
+%t = fshl i4 %a, i4 %a, i4 %c
+
+
+Name: funnel shift by constant
+%highpart = shl i4 %a, 3
+%lowpart = lshr i4 %b, 1
+%t = or i4 %highpart, %lowpart
+  =>
+%highpart = shl i4 %a, 3
+%lowpart = lshr i4 %b, 1
+%t = fshl i4 %a, i4 %b, i4 3
+
+Name: funnel shift by masked value
+%c_mod_width = urem i4 %c, 4
+%neg_c_mod_width = sub i4 4, %c_mod_width
+%highpart = shl i4 %a, %c_mod_width
+%lowpart = lshr i4 %b, %neg_c_mod_width
+%t = or i4 %highpart, %lowpart
+  =>
+%c_mod_width = urem i4 %c, 4
+%neg_c_mod_width = sub i4 4, %c_mod_width
+%highpart = shl i4 %a, %c_mod_width
+%lowpart = lshr i4 %b, %neg_c_mod_width
+%t = fshl i4 %a, i4 %b, i4 %c
+
+Name: funnel shift by value
+%neg_c = sub i4 4, %c
+%highpart = shl i4 %a, %c
+%lowpart = lshr i4 %b, %neg_c
+%t = or i4 %highpart, %lowpart
+  =>
+%neg_c = sub i4 4, %c
+%highpart = shl i4 %a, %c
+%lowpart = lshr i4 %b, %neg_c
+%t = fshl i4 %a, i4 %b, i4 %c
+
+
+Name: widening funnel shift by constant
+%widea = zext i4 %a to i8
+%wideb = zext i4 %b to i8
+%high = shl i8 %widea, 4
+%wide = or i8 %high, %wideb
+%skiplowhalf = lshr i8 %wide, 1
+%t = trunc i8 %skiplowhalf to i4
+  =>
+%widea = zext i4 %a to i8
+%wideb = zext i4 %b to i8
+%high = shl i8 %widea, 4
+%wide = or i8 %high, %wideb
+%skiplowhalf = lshr i8 %wide, 1
+%t = fshl i4 %a, i4 %b, i4 3
+
+Name: widening funnel shift by masked value
+%widea = zext i4 %a to i8
+%wideb = zext i4 %b to i8
+%high = shl i8 %widea, 4
+%wide = or i8 %high, %wideb
+%cmodwidth = urem i4 %c, 4
+%cmodwidthwide = zext i4 %cmodwidth to i8
+%shifted = shl i8 %wide, %cmodwidthwide
+%skiplowhalf = lshr i8 %shifted, 4
+%t = trunc i8 %skiplowhalf to i4
+  =>
+%widea = zext i4 %a to i8
+%wideb = zext i4 %b to i8
+%high = shl i8 %widea, 4
+%wide = or i8 %high, %wideb
+%cmodwidth = urem i4 %c, 4
+%cmodwidthwide = zext i4 %cmodwidth to i8
+%shifted = shl i8 %wide, %cmodwidthwide
+%skiplowhalf = lshr i8 %shifted, 4
+%t = fshl i4 %a, i4 %b, i4 %c

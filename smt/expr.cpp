@@ -1,9 +1,10 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "smt/ctx.h"
 #include "smt/expr.h"
+#include "smt/ctx.h"
 #include <cassert>
+#include <limits>
 #include <memory>
 #include <z3.h>
 
@@ -509,6 +510,59 @@ expr expr::lshr(const expr &rhs) const {
     return r;
 
   return Z3_mk_bvlshr(ctx(), ast(), rhs());
+}
+
+expr expr::rotate(const expr &rhs, bool shift_left) const {
+  C(rhs);
+  if (isZero() || isAllOnes() || rhs.isZero())
+    return *this;
+
+  auto nbits = bits();
+  expr rhs_mod_width = rhs.urem(mkUInt(nbits, nbits));
+  if (rhs_mod_width.isZero())
+    return *this;
+
+  // FIXME: could do constant-folding, but *only* for i8/i16/i32/i64.
+
+  uint64_t rhs_mod_width_const;
+  if (rhs_mod_width.isUInt(rhs_mod_width_const))
+    return shift_left ? Z3_mk_rotate_left(ctx(), rhs_mod_width_const, ast())
+                      : Z3_mk_rotate_right(ctx(), rhs_mod_width_const, ast());
+
+  return shift_left ? Z3_mk_ext_rotate_left(ctx(), ast(), rhs_mod_width.ast())
+                    : Z3_mk_ext_rotate_right(ctx(), ast(), rhs_mod_width.ast());
+}
+
+expr expr::funnelShift(const expr &a, const expr &b, const expr &c,
+                       bool is_left_shift) {
+  C2(a, b, c);
+
+  if (c.isZero())
+    return is_left_shift ? a : b;
+
+  auto nbits = a.bits();
+  expr c_mod_width = c.urem(mkUInt(nbits, nbits));
+  if (c_mod_width.isZero())
+    return is_left_shift ? a : b;
+
+  if (a.eq(b))
+    return a.rotate(c_mod_width, is_left_shift);
+
+  // FIXME: could do constant-folding, but *only* for i8/i16/i32/i64.
+
+  expr res = a.concat(b);
+  expr c_mod_width_zext = c_mod_width.zext(res.bits() - c_mod_width.bits());
+  res = is_left_shift ? res << c_mod_width_zext : res.lshr(c_mod_width_zext);
+
+  unsigned high = nbits - 1;
+  unsigned low = 0;
+  if (is_left_shift) {
+    high += nbits;
+    low += nbits;
+  }
+  res = res.extract(high, low); // FIXME: would be nicer to pass {offset, len}
+
+  return res;
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {

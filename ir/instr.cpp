@@ -295,6 +295,71 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
          move(instrconstr);
 }
 
+void TernaryOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case FShl:
+    str = "fshl ";
+    break;
+  case FShr:
+    str = "fshr ";
+    break;
+  }
+
+  os << getName() << " = " << str << A << ", " << B << ", " << C;
+}
+
+expr TernaryOp::funnelShiftNotPoison(const expr &a, const expr &ap,
+                                     const expr &b, const expr &bp,
+                                     const expr &c, const expr &cp) const {
+  assert(op == FShl || op == FShr && "Only for funnel shift operations.");
+
+  expr input_not_poison;
+  if (a.eq(b)) {
+    assert(ap.eq(bp) && "structurally equivalent expressions have structurally "
+                        "inequivalent poisonness statuses");
+    // If both of the values-to-be-funnel-shifted are identical, then regardless
+    // of the shift amt, we'll only propagate the poison status of said value.
+    input_not_poison = ap;
+  } else {
+    // Else, if the values participating in the funnel shift aren't identical,
+    // then we need to pay attention to the shift amount.
+    auto nbits = c.bits();
+    expr c_mod_width = c.urem(expr::mkUInt(nbits, nbits));
+    // If the shift amount is zero, then we will only use one of the values,
+    // (If it's shift-left, then only 'a', else if shift-right then only 'b')
+    // But if shift amount is *not* zero, then we will use both of the values.
+    input_not_poison =
+        expr::mkIf(c_mod_width == 0u, (op == FShl ? ap : bp), ap && bp);
+  }
+
+  // But the shift amount must not be poison regardless.
+  return input_not_poison && cp;
+}
+
+StateValue TernaryOp::toSMT(State &s) const {
+  auto &[a, ap] = s[A];
+  auto &[b, bp] = s[B];
+  auto &[c, cp] = s[C];
+  expr newval;
+  expr not_poison;
+
+  switch (op) {
+  case FShl:
+  case FShr:
+    newval = expr::funnelShift(a, b, c, /*is_left_shift=*/op == FShl);
+    not_poison = funnelShiftNotPoison(a, ap, b, bp, c, cp);
+    break;
+  }
+
+  return {move(newval), move(not_poison)};
+}
+
+expr TernaryOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() && getType().enforceIntOrVectorType() &&
+         getType() == A.getType() && getType() == B.getType() &&
+         getType() == C.getType();
+}
 
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;

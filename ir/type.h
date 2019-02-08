@@ -36,6 +36,7 @@ public:
   virtual void fixup(const smt::Model &m) = 0;
 
   virtual smt::expr enforceIntType() const;
+  virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
 
   virtual void print(std::ostream &os) const = 0;
@@ -72,6 +73,7 @@ public:
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntType() const override;
+  smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
@@ -93,6 +95,7 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
+  smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
@@ -114,6 +117,7 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
+  smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };
@@ -139,6 +143,7 @@ public:
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntType() const override;
+  smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 };

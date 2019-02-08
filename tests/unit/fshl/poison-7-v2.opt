@@ -1,0 +1,5 @@
+%b = poison
+%t = fshl i8 %a, i8 %b, i8 7
+  =>
+%b = poison
+%t = poison
