@@ -583,6 +583,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case XOR:
   case CTTZ:
   case CTLZ:
+  case SADD_OVERFLOW:
+  case EXTRACTVALUE:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:

@@ -246,20 +246,32 @@ StateValue BinOp::toSMT(State &s) const {
 expr BinOp::getTypeConstraints(const Function &f) const {
   expr instrconstr;
   switch (op) {
-  case Cttz:
-  case Ctlz:
   case ExtractValue:
     instrconstr = lhs.getType().enforceAggregateType() &&
                   rhs.getType().enforceIntType() &&
-                  rhs.getType().sizeVar() == 1u;
+                  rhs.getType().sizeVar() == 1u &&
+                  dynamic_cast<AggregateType&>(lhs.getType()).getChildrenConstraints(getType());
+    // TODO: Avoid above dynamic_cast
+    break;
+  case SAdd_Overflow:
+    instrconstr = lhs.getType() == rhs.getType() &&
+                  getType().enforceAggregateType();
+    break;
+  case Cttz:
+  case Ctlz:
+    instrconstr = rhs.getType().enforceIntType() &&
+                  rhs.getType().sizeVar() == 1u &&
+                  getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType();
     break;
   default:
-    instrconstr = (getType() == rhs.getType());
+    instrconstr = getType() == rhs.getType() &&
+                  getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType();
+    break;
   }
 
   return Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrOrVectorType() &&
-         getType() == lhs.getType() &&
          move(instrconstr);
 }
 

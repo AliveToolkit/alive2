@@ -26,6 +26,7 @@ protected:
   smt::expr isPtr() const;
   smt::expr isArray() const;
   smt::expr isVector() const;
+  smt::expr isAggregate() const;
 
 public:
   Type(std::string &&name) : name(std::move(name)) {}
@@ -132,21 +133,25 @@ class AggregateType final : public Type {
   std::vector<unsigned> childrenSize;
 
 public:
+  AggregateType(std::string &&name) : Type(std::move(name)) {}
   AggregateType(std::string &&name, unsigned first, unsigned second)
     : Type(std::move(name)) {
     childrenSize = {first, second};
   }
+
+  unsigned bits() const override;
   smt::expr enforceAggregateType() const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
+  smt::expr getChildrenConstraints(Type &type) const;
 };
 
 
 class SymbolicType final : public Type {
 public:
-  enum TypeNum { Int, Float, Ptr, Array, Vector, Undefined };
+  enum TypeNum { Int, Float, Ptr, Array, Vector, Aggregate, Undefined };
 
 private:
   TypeNum typ = Undefined;
@@ -155,6 +160,7 @@ private:
   PtrType p;
   ArrayType a;
   VectorType v;
+  AggregateType ag;
   bool named;
 
 public:

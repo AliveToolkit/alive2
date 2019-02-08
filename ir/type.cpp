@@ -40,6 +40,7 @@ expr Type::isFloat() const  { return is(SymbolicType::Float); }
 expr Type::isPtr() const    { return is(SymbolicType::Ptr); }
 expr Type::isArray() const  { return is(SymbolicType::Array); }
 expr Type::isVector() const { return is(SymbolicType::Vector); }
+expr Type::isAggregate() const { return is(SymbolicType::Aggregate); }
 
 unsigned Type::bits() const {
   UNREACHABLE();
@@ -270,6 +271,10 @@ expr AggregateType::enforceIntOrPtrOrVectorType() const {
   return false;
 }
 
+unsigned AggregateType::bits() const {
+  return childrenSize[0] + childrenSize[1];
+}
+
 void AggregateType::print(ostream &os) const {
   os << "{";
   for (auto &isize : childrenSize) {
@@ -279,10 +284,15 @@ void AggregateType::print(ostream &os) const {
   os << "}";
 }
 
+expr AggregateType::getChildrenConstraints(Type &type) const {
+  return (type.enforceIntType() && type.sizeVar() == childrenSize[0]) ||
+         (type.enforceIntType() && type.sizeVar() == childrenSize[1]);
+}
+
 
 SymbolicType::SymbolicType(string &&name, bool named)
   : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)), named(named) {}
+    a(string(name)), v(string(name)), ag(string(name)), named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -291,6 +301,7 @@ unsigned SymbolicType::bits() const {
   case Ptr:    return p.bits();
   case Array:  return a.bits();
   case Vector: return v.bits();
+  case Aggregate: return ag.bits();
   case Undefined:
     assert(0 && "undefined at SymbolicType::bits()");
   }
@@ -321,6 +332,8 @@ expr SymbolicType::operator==(const Type &b) const {
     return isArray() && a == *rhs;
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
     return isVector() && v == *rhs;
+  if (auto rhs = dynamic_cast<const AggregateType*>(&b))
+    return isAggregate() && ag == *rhs;
 
   if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
@@ -346,6 +359,7 @@ void SymbolicType::fixup(const Model &m) {
   case Ptr:    p.fixup(m); break;
   case Array:  a.fixup(m); break;
   case Vector: v.fixup(m); break;
+  case Aggregate: ag.fixup(m); break;
   case Undefined:
     UNREACHABLE();
   }
@@ -375,6 +389,7 @@ void SymbolicType::print(ostream &os) const {
   case Ptr:       p.print(os); break;
   case Array:     a.print(os); break;
   case Vector:    v.print(os); break;
+  case Aggregate: ag.print(os); break;
   case Undefined: break;
   }
 }
