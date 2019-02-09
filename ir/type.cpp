@@ -255,7 +255,6 @@ void VectorType::print(ostream &os) const {
 expr AggregateType::getTypeConstraints() const {
   // Only allow aggregates of type {ix, i1} for overflow instrs
   return childrenSize.size() == 2 &&
-         childrenSize[0] <= 64 &&
          childrenSize[1] == 1;
 }
 
