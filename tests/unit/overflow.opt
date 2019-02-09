@@ -1,0 +1,13 @@
+Name: overflow test
+%a = sadd_overflow i8 20, 120
+%b = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 20, 120
+%b = i1 1
+
+Name: overflow test2
+%a = sadd_overflow i8 20, 10
+%b = extractvalue %a, 0
+  =>
+%a = sadd_overflow i8 20, 10
+%b = i8 30
