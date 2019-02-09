@@ -312,7 +312,7 @@ void TernaryOp::print(ostream &os) const {
 expr TernaryOp::funnelShiftNotPoison(const expr &a, const expr &ap,
                                      const expr &b, const expr &bp,
                                      const expr &c, const expr &cp) const {
-  assert(op == FShl || op == FShr && "Only for funnel shift operations.");
+  assert((op == FShl || op == FShr) && "Only for funnel shift operations.");
 
   expr input_not_poison;
   if (a.eq(b)) {
