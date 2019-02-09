@@ -28,7 +28,7 @@ class BinOp final : public Instr {
 public:
   enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
             SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat,
-	    SAdd_Overflow, ExtractValue,
+            SAdd_Overflow, ExtractValue,
             And, Or, Xor, Cttz, Ctlz };
   enum Flags { None = 0, NSW = 1, NUW = 2, NSWNUW = 3, Exact = 4 };
 

@@ -4,7 +4,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
-#include <initializer_list>
 #include <memory>
 #include <string>
 #include <ostream>
