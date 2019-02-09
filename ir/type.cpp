@@ -275,10 +275,11 @@ unsigned AggregateType::bits() const {
 }
 
 void AggregateType::print(ostream &os) const {
+  assert(childrenSize.size() > 0);
   os << "{";
-  for (auto &isize : childrenSize) {
-    // FIXME: Don't print this extra comma in the end
-    os << "i" << isize << ", ";
+  os << "i" << childrenSize[0];
+  for (unsigned i = 1; i < childrenSize.size(); i++) {
+    os << ", i" << childrenSize[i];
   }
   os << "}";
 }
