@@ -399,6 +399,8 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case XOR:
   case CTTZ:
   case CTLZ:
+  case SADD_OVERFLOW:
+  case EXTRACTVALUE:
     return BinOp::None;
   default:
     UNREACHABLE();
