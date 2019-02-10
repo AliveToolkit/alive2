@@ -95,6 +95,7 @@ Value* get_operand(llvm::Value *v) {
   if (!ty)
     return nullptr;
 
+  // TODO: cache these?
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
     unique_ptr<IntConst> c;
     if (cnst->getBitWidth() <= 64)
@@ -249,6 +250,10 @@ public:
   }
 
   RetTy visitReturnInst(llvm::ReturnInst &i) {
+    if (i.getNumOperands() == 0) {
+      assert(i.getType().isVoidTy());
+      return make_unique<Return>(Type::voidTy, Value::voidVal);
+    }
     PARSE_UNOP();
     return make_unique<Return>(*ty, *val);
   }

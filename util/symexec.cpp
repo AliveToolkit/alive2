@@ -23,6 +23,8 @@ void sym_exec(State &s) {
     }
   }
 
+  s.exec(Value::voidVal);
+
   for (auto &bb : f.getBBs()) {
     if (!s.startBB(*bb))
       continue;

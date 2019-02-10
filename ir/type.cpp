@@ -16,7 +16,7 @@ static constexpr unsigned var_bw_bits = 8;
 
 namespace IR {
 
-VoidType Type::voidTy("void");
+VoidType Type::voidTy;
 
 expr Type::var(const char *var, unsigned bits) const {
   auto str = name + '_' + var;

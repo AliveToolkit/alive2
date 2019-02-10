@@ -12,6 +12,8 @@ static unsigned gbl_fresh_id = 0;
 
 namespace IR {
 
+VoidValue Value::voidVal(Type::voidTy);
+
 void Value::reset_gbl_id() {
   gbl_fresh_id = 0;
 }
@@ -58,6 +60,15 @@ void PoisonValue::print(ostream &os) const {
 
 StateValue PoisonValue::toSMT(State &s) const {
   return { expr::mkUInt(0, bits()), false };
+}
+
+
+void VoidValue::print(ostream &os) const {
+  UNREACHABLE();
+}
+
+StateValue VoidValue::toSMT(State &s) const {
+  return { false, false };
 }
 
 
