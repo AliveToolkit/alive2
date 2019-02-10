@@ -82,7 +82,8 @@ void State::addJump(const BasicBlock &dst, expr &&cond) {
   if (seen_bbs.count(&dst))
     throw LoopInCFGDetected();
 
-  auto p = domain_bbs.try_emplace(&dst, domain.first && move(cond), undef_vars);
+  cond &= domain.first;
+  auto p = domain_bbs.try_emplace(&dst, move(cond), undef_vars);
   if (!p.second) {
     p.first->second.first |= move(cond);
     p.first->second.second.insert(undef_vars.begin(), undef_vars.end());
