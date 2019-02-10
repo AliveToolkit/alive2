@@ -568,12 +568,15 @@ expr Return::getTypeConstraints(const Function &f) const {
 
 
 void Assume::print(ostream &os) const {
-  os << "assume " << cond;
+  os << (if_non_poison ? "assume_non_poison " : "assume ") << cond;
 }
 
 StateValue Assume::toSMT(State &s) const {
-  auto &[v, p] = s[cond];
-  s.addUB(v != 0 && p);
+  auto &[v, np] = s[cond];
+  if (if_non_poison)
+    s.addUB(np.implies(v != 0));
+  else
+    s.addUB(np && v != 0);
   return {};
 }
 

@@ -387,7 +387,7 @@ public:
         }
 
         if (range)
-          BB.addInstr(make_unique<Assume>(*range));
+          BB.addInstr(make_unique<Assume>(*range, true));
         break;
       }
       default:
