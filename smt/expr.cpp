@@ -773,8 +773,10 @@ expr expr::sgt(const expr &rhs) const {
 }
 
 expr expr::sext(unsigned amount) const {
-  assert(amount > 0);
   C();
+  if (amount == 0)
+    return *this;
+
   int64_t n;
   if (isInt(n))
     return mkInt(n, bits() + amount);
@@ -782,7 +784,9 @@ expr expr::sext(unsigned amount) const {
 }
 
 expr expr::zext(unsigned amount) const {
-  assert(amount > 0);
+  if (amount == 0)
+    return *this;
+
   uint64_t n;
   if (isUInt(n))
     return mkUInt(n, bits() + amount);
