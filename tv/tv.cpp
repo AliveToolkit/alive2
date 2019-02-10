@@ -251,7 +251,7 @@ public:
 
   RetTy visitReturnInst(llvm::ReturnInst &i) {
     if (i.getNumOperands() == 0) {
-      assert(i.getType().isVoidTy());
+      assert(i.getType()->isVoidTy());
       return make_unique<Return>(Type::voidTy, Value::voidVal);
     }
     PARSE_UNOP();
