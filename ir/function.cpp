@@ -119,7 +119,7 @@ void Function::print(ostream &os, bool print_header) const {
   }
 
   if (print_header) {
-    os << "declare " << getType() << " @" << name << '(';
+    os << "define " << getType() << " @" << name << '(';
     bool first = true;
     for (auto &input : getInputs()) {
       if (!first)
