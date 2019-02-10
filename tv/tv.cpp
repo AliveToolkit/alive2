@@ -259,6 +259,11 @@ public:
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
     switch (i.getIntrinsicID()) {
+    case llvm::Intrinsic::assume:
+    {
+      PARSE_UNOP();
+      return make_unique<Assume>(*val, false);
+    }
     case llvm::Intrinsic::sadd_sat:
     {
       PARSE_BINOP();
