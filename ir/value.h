@@ -68,7 +68,7 @@ public:
 
 class VoidValue final : public Value {
 public:
-  VoidValue(Type &type) : Value(type, "void") {}
+  VoidValue() : Value(Type::voidTy, "void") {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

@@ -12,7 +12,7 @@ static unsigned gbl_fresh_id = 0;
 
 namespace IR {
 
-VoidValue Value::voidVal(Type::voidTy);
+VoidValue Value::voidVal;
 
 void Value::reset_gbl_id() {
   gbl_fresh_id = 0;
