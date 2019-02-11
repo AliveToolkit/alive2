@@ -296,13 +296,13 @@ unsigned AggregateType::bits() const {
 
 void AggregateType::print(ostream &os) const {
   assert(childrenType.size() > 0);
-  os << "{";
+  os << '{';
   childrenType[0]->print(os);
   for (unsigned i = 1; i < childrenType.size(); i++) {
     os << ", ";
     childrenType[i]->print(os);
   }
-  os << "}";
+  os << '}';
 }
 
 expr AggregateType::getChildrenConstraints(Type &type) const {
