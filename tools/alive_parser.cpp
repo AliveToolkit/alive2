@@ -229,8 +229,9 @@ static Type& get_overflow_type(unsigned bitwidth) {
     return *overflow_aggregate_types[bitwidth];
   }
 
-  auto t = make_unique<AggregateType>("oaggty_" + to_string(bitwidth), bitwidth, 1);
-  overflow_aggregate_types.emplace(bitwidth, std::move(t));
+  initializer_list<Type*> children = { int_types[bitwidth].get(), int_types[1].get() };
+  auto t = make_unique<AggregateType>("oaggty_" + to_string(bitwidth), move(children));
+  overflow_aggregate_types.emplace(bitwidth, move(t));
 
   return *overflow_aggregate_types[bitwidth];
 }

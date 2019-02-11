@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <ostream>
@@ -127,23 +128,24 @@ public:
 
 // Currently only supports aggregate type with two children
 // of int type.
-// Eg: {i32, i1}. Enforced in getTypeConstraints()
+// Eg: {ix, i1}. Enforced in getTypeConstraints()
 class AggregateType final : public Type {
-  std::vector<unsigned> childrenSize;
+  std::vector<Type*> childrenType;
 
 public:
   AggregateType(std::string &&name) : Type(std::move(name)) {}
-  AggregateType(std::string &&name, unsigned first, unsigned second)
-    : Type(std::move(name)) {
-    childrenSize = {first, second};
-  }
+  AggregateType(std::string &&name, std::initializer_list<Type*> types)
+    : Type(std::move(name)), childrenType(types) {}
 
   unsigned bits() const override;
   smt::expr enforceAggregateType() const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr operator==(const AggregateType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
+
+  // constraint enforcing type to be one of the aggregate's children
   smt::expr getChildrenConstraints(Type &type) const;
 };
 

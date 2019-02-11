@@ -247,12 +247,15 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   expr instrconstr;
   switch (op) {
   case ExtractValue:
+  {
     instrconstr = lhs.getType().enforceAggregateType() &&
                   rhs.getType().enforceIntType() &&
-                  rhs.getType().sizeVar() == 1u &&
-                  dynamic_cast<AggregateType&>(lhs.getType()).getChildrenConstraints(getType());
-    // TODO: Avoid above dynamic_cast
+                  rhs.getType().sizeVar() == 1u;
+    auto aggregateType = dynamic_cast<AggregateType&>(lhs.getType());
+    instrconstr = instrconstr &&
+                  aggregateType.getChildrenConstraints(getType());
     break;
+  }
   case SAdd_Overflow:
     instrconstr = lhs.getType() == rhs.getType() &&
                   getType().enforceAggregateType();

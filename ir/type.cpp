@@ -253,9 +253,24 @@ void VectorType::print(ostream &os) const {
 }
 
 expr AggregateType::getTypeConstraints() const {
-  // Only allow aggregates of type {ix, i1} for overflow instrs
-  return childrenSize.size() == 2 &&
-         childrenSize[1] == 1;
+  if (childrenType.size() != 2)
+    return false;
+
+  return childrenType[0]->enforceIntType() &&
+         childrenType[1]->enforceIntType() &&
+         childrenType[1]->sizeVar() == 1u;
+}
+
+expr AggregateType::operator==(const AggregateType &rhs) const {
+  if (childrenType.size() != rhs.childrenType.size())
+    return false;
+
+  expr res(false);
+  for (unsigned i = 0; i < childrenType.size(); i++) {
+    res = res || *childrenType[i] == *rhs.childrenType[i];
+  }
+
+  return res;
 }
 
 expr AggregateType::enforceAggregateType() const {
@@ -271,22 +286,32 @@ expr AggregateType::enforceIntOrPtrOrVectorType() const {
 }
 
 unsigned AggregateType::bits() const {
-  return childrenSize[0] + childrenSize[1];
+  unsigned res = 0;
+  for (unsigned i = 0; i < childrenType.size(); i++) {
+    res += childrenType[i]->bits();
+  }
+
+  return res;
 }
 
 void AggregateType::print(ostream &os) const {
-  assert(childrenSize.size() > 0);
+  assert(childrenType.size() > 0);
   os << "{";
-  os << "i" << childrenSize[0];
-  for (unsigned i = 1; i < childrenSize.size(); i++) {
-    os << ", i" << childrenSize[i];
+  childrenType[0]->print(os);
+  for (unsigned i = 1; i < childrenType.size(); i++) {
+    os << ", ";
+    childrenType[i]->print(os);
   }
   os << "}";
 }
 
 expr AggregateType::getChildrenConstraints(Type &type) const {
-  return (type.enforceIntType() && type.sizeVar() == childrenSize[0]) ||
-         (type.enforceIntType() && type.sizeVar() == childrenSize[1]);
+  expr constr(false);
+  for (auto &childType : childrenType) {
+    constr = constr || *childType == type;
+  }
+
+  return constr;
 }
 
 
