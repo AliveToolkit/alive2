@@ -10,7 +10,7 @@ Name: overflow test2
 %b = extractvalue %a, 0
   =>
 %a = sadd_overflow i8 20, 10
-%b = i8 30
+%b = 30
 
 Name: overflow simple add
 %a = sadd_overflow i8 120, 5

@@ -253,12 +253,15 @@ void VectorType::print(ostream &os) const {
 }
 
 expr AggregateType::getTypeConstraints() const {
-  if (childrenType.size() != 2)
+  if (childrenType.size() < 2)
     return false;
 
-  return childrenType[0]->enforceIntType() &&
-         childrenType[1]->enforceIntType() &&
-         childrenType[1]->sizeVar() == 1u;
+  expr res(true);
+  for (auto &type : childrenType) {
+    res &= type->enforceIntType();
+  }
+
+  return res;
 }
 
 expr AggregateType::operator==(const AggregateType &rhs) const {
@@ -312,6 +315,21 @@ expr AggregateType::getChildrenConstraints(Type &type) const {
   }
 
   return constr;
+}
+
+expr AggregateType::extract(const expr &a, const expr &b) const {
+  unsigned curBW = childrenType[0]->bits();
+  unsigned last = a.bits();
+  unsigned low = last - curBW;
+  expr res = a.extract(last - 1, low);
+  last = low;
+  for (unsigned i = 1; i < childrenType.size(); i++) {
+    curBW = childrenType[i]->bits();
+    res = expr::mkIf(b == i, a.extract(last - 1, last - curBW), res);
+    last = last - curBW;
+  }
+
+  return res;
 }
 
 

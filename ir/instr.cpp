@@ -6,6 +6,7 @@
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "ir/type.h"
 
 using namespace smt;
 using namespace std;
@@ -237,9 +238,17 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case ExtractValue:
-    val = expr::mkIf(b == 1u, a.extract(0, 0), a.extract(a.bits() - 1, 1));
+  {
+    auto &aggType = static_cast<AggregateType&>(lhs.getType());
+    val = aggType.extract(a, b);
+
+    uint64_t n;
+    not_poison &= b.isUInt(n);
+    not_poison &= n < aggType.getChildrenSize();
     break;
   }
+  }
+
   return { move(val), move(not_poison) };
 }
 
@@ -249,8 +258,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case ExtractValue:
   {
     instrconstr = lhs.getType().enforceAggregateType() &&
-                  rhs.getType().enforceIntType() &&
-                  rhs.getType().sizeVar() == 1u;
+                  rhs.getType().enforceIntType();
     auto aggregateType = dynamic_cast<AggregateType&>(lhs.getType());
     instrconstr = instrconstr &&
                   aggregateType.getChildrenConstraints(getType());
