@@ -91,6 +91,8 @@ target_link_libraries(alive ${ALIVE_LIBS})
 
 add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS})
 target_link_libraries(alive2 ${ALIVE_LIBS})
+target_link_libraries(alive pthread)
+target_link_libraries(alive2 pthread)
 
 if (CYGWIN)
   # cmake on cygwin doesn't seem to know about dlls..
