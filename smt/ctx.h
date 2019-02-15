@@ -13,7 +13,7 @@ class context {
 public:
   Z3_context operator()() const { return ctx; }
 
-  void init();
+  void initialize();
   void destroy();
 };
 
