@@ -9,7 +9,7 @@ namespace smt {
 
 context ctx;
 
-void context::init() {
+void context::initialize() {
   Z3_global_param_set("smt.ematching", "false");
   Z3_global_param_set("smt.mbqi.max_iterations", "1000000");
   Z3_global_param_set("timeout", get_query_timeout());
