@@ -244,6 +244,14 @@ static Type& get_sym_type() {
   return *sym_types.emplace_back(move(t)).get();
 }
 
+static Type& get_int_type(unsigned size) {
+  if (!int_types[size])
+    int_types[size] =
+      make_unique<IntType>("i" + to_string(yylval.num), yylval.num);
+
+  return *int_types[size].get();
+}
+
 static Type& parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
   case INT_TYPE:
@@ -253,11 +261,7 @@ static Type& parse_type(bool optional = true) {
     if (yylval.num >= int_types.size())
       int_types.resize(yylval.num + 1);
 
-    if (!int_types[yylval.num])
-      int_types[yylval.num] =
-        make_unique<IntType>("i" + to_string(yylval.num), yylval.num);
-
-    return *int_types[yylval.num].get();
+    return get_int_type(yylval.num);
 
   default:
     if (optional) {
@@ -413,7 +417,11 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
-  auto &type2 = try_parse_type(type);
+
+  // 2nd binop argument handling
+  auto type2 = std::ref(try_parse_type(type));
+  if (op_token == EXTRACTVALUE)
+    type2 = std::ref(get_int_type(64));
   auto &b = parse_operand(type2);
   auto rettype = std::ref(type);
 

@@ -4,11 +4,12 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
-#include <cassert>
+#include "util/compiler.h"
+
 #include <initializer_list>
 #include <memory>
-#include <string>
 #include <ostream>
+#include <string>
 
 namespace smt { class Model; }
 
@@ -137,7 +138,7 @@ public:
   AggregateType(std::string &&name) : Type(std::move(name)) {}
   AggregateType(std::string &&name, std::initializer_list<Type*> types)
     : Type(std::move(name)), childrenType(types) {
-    assert(childrenType.size() > 0);
+    ENSURE(!childrenType.empty());
   }
 
   unsigned bits() const override;
@@ -149,8 +150,8 @@ public:
   void print(std::ostream &os) const override;
 
   unsigned getChildrenSize() const { return childrenType.size(); }
-  // constraint enforcing type to be one of the aggregate's children
-  smt::expr getChildrenConstraints(Type &type) const;
+  // constraint enforcing type to be aggregate's type at index
+  smt::expr getChildConstraints(Type &type, unsigned index) const;
   // Extracts the type located at `b` from `a`.
   smt::expr extract(const smt::expr &a, const smt::expr &b) const;
 };

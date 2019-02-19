@@ -3,10 +3,10 @@
 
 #include "ir/instr.h"
 #include "ir/function.h"
+#include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
-#include "ir/type.h"
 
 using namespace smt;
 using namespace std;
@@ -241,10 +241,6 @@ StateValue BinOp::toSMT(State &s) const {
   {
     auto &aggType = static_cast<AggregateType&>(lhs.getType());
     val = aggType.extract(a, b);
-
-    uint64_t n;
-    not_poison &= b.isUInt(n);
-    not_poison &= n < aggType.getChildrenSize();
     break;
   }
   }
@@ -257,11 +253,12 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   switch (op) {
   case ExtractValue:
   {
+    int64_t n;
     instrconstr = lhs.getType().enforceAggregateType() &&
-                  rhs.getType().enforceIntType();
+                  rhs.isIntConst(n);
     auto aggregateType = dynamic_cast<AggregateType&>(lhs.getType());
     instrconstr = instrconstr &&
-                  aggregateType.getChildrenConstraints(getType());
+                  aggregateType.getChildConstraints(getType(), n);
     break;
   }
   case SAdd_Overflow:

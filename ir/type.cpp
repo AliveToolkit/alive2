@@ -277,7 +277,7 @@ expr AggregateType::operator==(const AggregateType &rhs) const {
 }
 
 expr AggregateType::enforceAggregateType() const {
-  return true;
+  return !childrenType.empty();
 }
 
 void AggregateType::fixup(const Model &m) {
@@ -308,13 +308,10 @@ void AggregateType::print(ostream &os) const {
   os << '}';
 }
 
-expr AggregateType::getChildrenConstraints(Type &type) const {
-  expr constr(false);
-  for (auto &childType : childrenType) {
-    constr = constr || *childType == type;
-  }
-
-  return constr;
+expr AggregateType::getChildConstraints(Type &type, unsigned index) const {
+  if (index < childrenType.size())
+    return *childrenType[index] == type;
+  return false;
 }
 
 expr AggregateType::extract(const expr &a, const expr &b) const {
