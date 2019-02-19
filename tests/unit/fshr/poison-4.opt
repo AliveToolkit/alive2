@@ -7,9 +7,3 @@
 %a = poison
 %t = poison
 %r = select i8 %c_is_seven, i8 poison, i8 %z
-
-; ERROR: Target is more poisonous than source for i8 %t
-
-; FIXME: XFAIL. this is a false-negative.
-; We used both %b (which is poison) and %a, so the result should be poison.
-; poison-4-v2.opt agrees.

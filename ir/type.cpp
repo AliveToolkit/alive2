@@ -77,7 +77,9 @@ expr Type::enforceIntType() const {
   return false;
 }
 
-expr Type::enforceIntOrVectorType() const { return false; }
+expr Type::enforceIntOrVectorType() const {
+  return false;
+}
 
 expr Type::enforceIntOrPtrOrVectorType() const {
   return false;
@@ -140,7 +142,9 @@ expr IntType::enforceIntType() const {
   return true;
 }
 
-expr IntType::enforceIntOrVectorType() const { return true; }
+expr IntType::enforceIntOrVectorType() const {
+  return true;
+}
 
 expr IntType::enforceIntOrPtrOrVectorType() const {
   return true;
@@ -185,7 +189,9 @@ void PtrType::fixup(const Model &m) {
   // TODO
 }
 
-expr PtrType::enforceIntOrVectorType() const { return false; }
+expr PtrType::enforceIntOrVectorType() const {
+  return false;
+}
 
 expr PtrType::enforceIntOrPtrOrVectorType() const {
   return true;
@@ -229,7 +235,9 @@ void VectorType::fixup(const Model &m) {
   // TODO
 }
 
-expr VectorType::enforceIntOrVectorType() const { return true; }
+expr VectorType::enforceIntOrVectorType() const {
+  return true;
+}
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
   return true;

@@ -67,10 +67,6 @@ private:
   Value &A, &B, &C;
   Op op;
 
-  smt::expr funnelShiftNotPoison(const smt::expr &a, const smt::expr &ap,
-                                 const smt::expr &b, const smt::expr &bp,
-                                 const smt::expr &c, const smt::expr &cp) const;
-
 public:
   TernaryOp(Type &type, std::string &&name, Value &A, Value &B, Value &C, Op op)
       : Instr(type, std::move(name)), A(A), B(B), C(C), op(op) {}

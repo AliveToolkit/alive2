@@ -7,5 +7,3 @@
 %b = poison
 %t = poison
 %r = select i8 %c_is_zero, i8 poison, i8 %z
-
-; ERROR: Target is more poisonous than source for i8 %t
