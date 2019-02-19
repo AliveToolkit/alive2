@@ -125,10 +125,8 @@ public:
   expr ashr(const expr &rhs) const;
   expr lshr(const expr &rhs) const;
 
-  expr rotate(const expr &rhs, bool shift_left) const;
-
-  static expr funnelShift(const expr &a, const expr &b, const expr &c,
-                          bool is_left_shift);
+  static expr fshl(const expr &a, const expr &b, const expr &c);
+  static expr fshr(const expr &a, const expr &b, const expr &c);
 
   expr shl_no_soverflow(const expr &rhs) const;
   expr shl_no_uoverflow(const expr &rhs) const;
