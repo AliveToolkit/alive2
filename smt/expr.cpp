@@ -8,7 +8,6 @@
 #include <cassert>
 #include <memory>
 #include <string>
-#include <iostream>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -236,12 +235,13 @@ bool expr::isAllOnes() const {
 
 bool expr::isSMin() const {
   uint64_t n = 0;
-  return isUInt(n) && n == (1ull << (bits() - 1));
+  return bits() <= 64 && isUInt(n) && n == (1ull << (bits() - 1));
 }
 
 bool expr::isSMax() const {
   uint64_t n = 0;
-  return isUInt(n) && n == ((uint64_t)INT64_MAX >> (64 - bits()));
+  return bits() <= 64 && isUInt(n) &&
+         n == ((uint64_t)INT64_MAX >> (64 - bits()));
 }
 
 bool expr::isSigned() const {
@@ -306,7 +306,7 @@ expr expr::binop_commutative(const expr &rhs,
 bool expr::binop_sfold(const expr &rhs,
                        int64_t(*native)(int64_t, int64_t), expr &result) const {
   int64_t a, b;
-  if (bits() <= 64 && isInt(a) && rhs.isInt(b)) {
+  if (/*bits() <= 64 &&*/ isInt(a) && rhs.isInt(b)) {
     result = mkInt(native(a, b), sort());
     return true;
   }
@@ -743,7 +743,7 @@ expr expr::ule(const expr &rhs) const {
 expr expr::ult(const expr &rhs) const {
   uint64_t n;
   if (rhs.isUInt(n))
-    return rhs.isZero() ? false : ule(mkUInt(n - 1, sort()));
+    return n == 0 ? false : ule(mkUInt(n - 1, sort()));
 
   return !rhs.ule(*this);
 }
