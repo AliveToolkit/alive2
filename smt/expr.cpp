@@ -3,8 +3,12 @@
 
 #include "smt/ctx.h"
 #include "smt/expr.h"
+#include "util/compiler.h"
+#include <algorithm>
 #include <cassert>
 #include <memory>
+#include <string>
+#include <iostream>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -240,6 +244,10 @@ bool expr::isSMax() const {
   return isUInt(n) && n == ((uint64_t)INT64_MAX >> (64 - bits()));
 }
 
+bool expr::isSigned() const {
+  return (extract(0, 0) == mkUInt(1, 1)).simplify().isTrue();
+}
+
 unsigned expr::bits() const {
   C();
   return Z3_get_bv_sort_size(ctx(), sort());
@@ -247,7 +255,7 @@ unsigned expr::bits() const {
 
 bool expr::isUInt(uint64_t &n) const {
   C();
-  return bits() <= 64 && Z3_get_numeral_uint64(ctx(), ast(), &n);
+  return Z3_get_numeral_uint64(ctx(), ast(), &n);
 }
 
 bool expr::isInt(int64_t &n) const {
@@ -869,6 +877,39 @@ expr expr::subst(const expr &from, const expr &to) const {
   auto f = from();
   auto t = to();
   return Z3_substitute(ctx(), ast(), 1, &f, &t);
+}
+
+void expr::printUnsigned(std::ostream &os) const {
+  expr zero = mkUInt(0, sort());
+  expr ten  = mkUInt(10, sort());
+  expr n    = *this;
+
+  string str;
+  uint64_t d;
+
+  do {
+    expr digit = n.urem(ten).simplify();
+    ENSURE(digit.isUInt(d));
+    str.push_back('0' + d);
+    n = n.udiv(ten).simplify();
+  } while (!n.eq(zero));
+
+  reverse(str.begin(), str.end());
+  os << str;
+}
+
+void expr::printSigned(std::ostream &os) const {
+  if (isSigned()) {
+    os << '-';
+    (~*this + mkUInt(1, sort())).simplify().printUnsigned(os);
+  } else {
+    printUnsigned(os);
+  }
+}
+
+void expr::printHexadecimal(std::ostream &os) const {
+  auto rem = bits() % 4;
+  os << (rem == 0 ? *this : zext(4 - rem)).simplify();
 }
 
 ostream& operator<<(ostream &os, const expr &e) {
