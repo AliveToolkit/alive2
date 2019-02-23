@@ -224,6 +224,22 @@ public:
     RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
   }
 
+  RetTy visitPHINode(llvm::PHINode &i) {
+    Phi::ValTy values;
+    auto ty = llvm_type2alive(i.getType());
+    if (!ty)
+      return error(i);
+
+    for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
+      auto op = get_operand(i.getIncomingValue(idx));
+      if (!op)
+        return error(i);
+      values.emplace_back(*op, value_name(*i.getIncomingBlock(idx)));
+    }
+
+    RETURN_IDENTIFIER(make_unique<Phi>(*ty, value_name(i), move(values)));
+  }
+
   RetTy visitBranchInst(llvm::BranchInst &i) {
     auto &dst_true = getBB(i.getSuccessor(0));
     if (i.isUnconditional())
@@ -331,10 +347,7 @@ public:
     }
 
     // do nothing intrinsics
-    case llvm::Intrinsic::dbg_declare:
-    case llvm::Intrinsic::dbg_value:
     case llvm::Intrinsic::dbg_addr:
-    case llvm::Intrinsic::dbg_label:
     case llvm::Intrinsic::donothing:
       return {};
 
