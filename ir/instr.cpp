@@ -460,14 +460,11 @@ StateValue Freeze::toSMT(State &s) const {
   if (p.isTrue())
     return { expr(v), expr(p) };
 
-  auto name = "undet_" + fresh_id();
-  expr undet = expr::mkVar(name.c_str(), bits());
-  s.addQuantVar(undet);
+  auto name = "nondet_" + fresh_id();
+  expr nondet = expr::mkVar(name.c_str(), bits());
+  s.addQuantVar(nondet);
 
-  return { p.isFalse() ?
-             move(undet) :
-             expr::mkIf(p, v, std::move(undet)),
-           true };
+  return { expr::mkIf(p, v, std::move(nondet)), true };
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {
