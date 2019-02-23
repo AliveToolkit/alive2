@@ -595,7 +595,8 @@ static void parse_fn(Function &f) {
       break;
     }
     case UNREACH:
-      bb->addInstr(make_unique<Unreachable>());
+      bb->addInstr(make_unique<Assume>(get_constant(0, *int_types[1].get()),
+                                       /*if_non_poison=*/false));
       break;
     default:
       tokenizer.unget(t);

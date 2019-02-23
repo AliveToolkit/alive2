@@ -584,18 +584,4 @@ expr Assume::getTypeConstraints(const Function &f) const {
   return cond.getType().enforceIntType();
 }
 
-
-void Unreachable::print(ostream &os) const {
-  os << "unreachable";
-}
-
-StateValue Unreachable::toSMT(State &s) const {
-  s.addUB(false);
-  return {};
-}
-
-expr Unreachable::getTypeConstraints(const Function &f) const {
-  return true;
-}
-
 }

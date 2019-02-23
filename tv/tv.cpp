@@ -259,7 +259,8 @@ public:
   }
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
-    return make_unique<Unreachable>();
+    return make_unique<Assume>(get_operand(llvm::ConstantInt::getFalse()),
+                               /*if_non_poison=*/false);
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {

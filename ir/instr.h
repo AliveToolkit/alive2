@@ -190,14 +190,4 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
 };
 
-
-class Unreachable final : public Instr {
-public:
-  Unreachable() : Instr(Type::voidTy, "") {}
-
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-};
-
 }
