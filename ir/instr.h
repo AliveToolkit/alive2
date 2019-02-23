@@ -4,6 +4,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/value.h"
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace IR {
 
@@ -126,6 +129,21 @@ class CopyOp final : public Instr {
 public:
   CopyOp(Type &type, std::string &&name, Value &val)
     : Instr(type, std::move(name)), val(val) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
+
+
+class Phi final : public Instr {
+public:
+  typedef std::vector<std::pair<Value&, std::string>> ValTy;
+private:
+  ValTy values;
+public:
+  Phi(Type &type, std::string &&name, ValTy &&values)
+    : Instr(type, std::move(name)), values(std::move(values)) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

@@ -879,7 +879,7 @@ expr expr::subst(const expr &from, const expr &to) const {
   return Z3_substitute(ctx(), ast(), 1, &f, &t);
 }
 
-void expr::printUnsigned(std::ostream &os) const {
+void expr::printUnsigned(ostream &os) const {
   expr zero = mkUInt(0, sort());
   expr ten  = mkUInt(10, sort());
   expr n    = *this;
@@ -898,7 +898,7 @@ void expr::printUnsigned(std::ostream &os) const {
   os << str;
 }
 
-void expr::printSigned(std::ostream &os) const {
+void expr::printSigned(ostream &os) const {
   if (isSigned()) {
     os << '-';
     (~*this + mkUInt(1, sort())).simplify().printUnsigned(os);
@@ -907,7 +907,7 @@ void expr::printSigned(std::ostream &os) const {
   }
 }
 
-void expr::printHexadecimal(std::ostream &os) const {
+void expr::printHexadecimal(ostream &os) const {
   auto rem = bits() % 4;
   os << (rem == 0 ? *this : zext(4 - rem)).simplify();
 }

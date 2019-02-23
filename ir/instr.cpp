@@ -487,6 +487,36 @@ expr CopyOp::getTypeConstraints(const Function &f) const {
 }
 
 
+void Phi::print(ostream &os) const {
+  os << getName() << " = phi ";
+  auto t = getType().toString();
+  if (!t.empty())
+    os << t << ' ';
+
+  bool first = true;
+  for (auto &[val, bb] : values) {
+    if (!first)
+      os << ", ";
+    os << "[ " << val.getName() << ", " << bb << " ]";
+    first = false;
+  }
+}
+
+StateValue Phi::toSMT(State &s) const {
+  // TODO
+  return {};
+}
+
+expr Phi::getTypeConstraints(const Function &f) const {
+  auto c = Value::getTypeConstraints();
+  for (auto &[val, bb] : values) {
+    (void)bb;
+    c &= val.getType() == getType();
+  }
+  return c;
+}
+
+
 void Branch::print(ostream &os) const {
   os << "br ";
   if (cond)
