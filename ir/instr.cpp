@@ -226,7 +226,6 @@ StateValue BinOp::toSMT(State &s) const {
     val = a.ctlz();
     not_poison &= (b == 0u || a != 0u);
     break;
-
   }
   return { move(val), move(not_poison) };
 }
@@ -503,8 +502,20 @@ void Phi::print(ostream &os) const {
 }
 
 StateValue Phi::toSMT(State &s) const {
-  // TODO
-  return {};
+  StateValue ret;
+  bool first = true;
+
+  for (auto &[val, bb] : values) {
+    auto v = s[val];
+    if (first) {
+      ret = v;
+      first = false;
+    } else {
+      expr pre = s.jumpCondFrom(s.getFn().getBB(bb));
+      ret = StateValue::mkIf(pre, v, ret);
+    }
+  }
+  return ret;
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {
