@@ -51,7 +51,7 @@ public:
 
 class VoidType final : public Type {
 public:
-  VoidType(std::string &&name) : Type(std::move(name)) {}
+  VoidType() : Type("void") {}
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   void print(std::ostream &os) const override;

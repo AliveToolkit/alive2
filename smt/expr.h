@@ -91,6 +91,7 @@ public:
   bool isAllOnes() const;
   bool isSMin() const;
   bool isSMax() const;
+  bool isSigned() const;
 
   unsigned bits() const;
   bool isUInt(uint64_t &n) const;
@@ -190,6 +191,9 @@ public:
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
 
+  void printUnsigned(std::ostream &os) const;
+  void printSigned(std::ostream &os) const;
+  void printHexadecimal(std::ostream &os) const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only

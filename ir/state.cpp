@@ -22,7 +22,7 @@ ostream& operator<<(ostream &os, const StateValue &val) {
 }
 
 State::State(const Function &f) : f(f) {
-  domain_bbs.try_emplace(&f.getFirstBB(), true, set<expr>());
+  predecessor_domain[&f.getFirstBB()].try_emplace(nullptr, true, set<expr>());
 }
 
 const StateValue& State::exec(const Value &v) {
@@ -67,14 +67,28 @@ const State::ValTy& State::at(const Value &val) const {
   return values[values_map.at(&val)].second;
 }
 
+const expr& State::jumpCondFrom(const BasicBlock &bb) const {
+  return predecessor_domain.at(current_bb).at(&bb).first;
+}
+
 bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
-  seen_bbs.emplace(&bb);
-  auto I = domain_bbs.find(&bb);
-  if (I == domain_bbs.end())
+  ENSURE(seen_bbs.emplace(&bb).second);
+  current_bb = &bb;
+
+  auto I = predecessor_domain.find(&bb);
+  if (I == predecessor_domain.end())
     return false;
 
-  domain = move(I->second);
+  domain.first = false;
+  domain.second.clear();
+
+  for (auto &[src, data] : I->second) {
+    (void)src;
+    auto &[d, vars] = data;
+    domain.first |= d;
+    domain.second.insert(vars.begin(), vars.end());
+  }
   return !domain.first.isFalse();
 }
 
@@ -82,7 +96,9 @@ void State::addJump(const BasicBlock &dst, expr &&cond) {
   if (seen_bbs.count(&dst))
     throw LoopInCFGDetected();
 
-  auto p = domain_bbs.try_emplace(&dst, domain.first && move(cond), undef_vars);
+  cond &= domain.first;
+  auto p = predecessor_domain[&dst].try_emplace(current_bb, move(cond),
+                                                undef_vars);
   if (!p.second) {
     p.first->second.first |= move(cond);
     p.first->second.second.insert(undef_vars.begin(), undef_vars.end());

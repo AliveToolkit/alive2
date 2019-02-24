@@ -14,6 +14,9 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class VoidValue;
+
+
 class Value {
   Type &type;
   std::string name;
@@ -34,6 +37,8 @@ public:
   virtual StateValue toSMT(State &s) const = 0;
   virtual smt::expr getTypeConstraints() const;
   virtual void fixupTypes(const smt::Model &m);
+
+  static VoidValue voidVal;
 
   static void reset_gbl_id();
 
@@ -56,6 +61,14 @@ public:
 class PoisonValue final : public Value {
 public:
   PoisonValue(Type &type) : Value(type, "poison") {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+};
+
+
+class VoidValue final : public Value {
+public:
+  VoidValue() : Value(Type::voidTy, "void") {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

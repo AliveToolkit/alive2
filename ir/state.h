@@ -51,19 +51,23 @@ public:
 
 private:
   const Function &f;
+  const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
 
   // var -> ((value, not_poison), undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::pair<const Value*, ValTy>> values;
 
-  std::unordered_map<const BasicBlock*, DomainTy> domain_bbs;
+  // dst BB -> src BB -> domain data
+  std::unordered_map<const BasicBlock*,
+                     std::unordered_map<const BasicBlock*, DomainTy>>
+    predecessor_domain;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
   // temp state
   DomainTy domain;
   std::set<smt::expr> undef_vars;
-  std::array<StateValue, 4> tmp_values;
+  std::array<StateValue, 8> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   smt::expr return_domain;
@@ -77,6 +81,7 @@ public:
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const ValTy& at(const Value &val) const;
+  const smt::expr& jumpCondFrom(const BasicBlock &bb) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);

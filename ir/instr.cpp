@@ -226,7 +226,6 @@ StateValue BinOp::toSMT(State &s) const {
     val = a.ctlz();
     not_poison &= (b == 0u || a != 0u);
     break;
-
   }
   return { move(val), move(not_poison) };
 }
@@ -500,14 +499,11 @@ StateValue Freeze::toSMT(State &s) const {
   if (p.isTrue())
     return { expr(v), expr(p) };
 
-  auto name = "undet_" + fresh_id();
-  expr undet = expr::mkVar(name.c_str(), bits());
-  s.addQuantVar(undet);
+  auto name = "nondet_" + fresh_id();
+  expr nondet = expr::mkVar(name.c_str(), bits());
+  s.addQuantVar(nondet);
 
-  return { p.isFalse() ?
-             move(undet) :
-             expr::mkIf(p, v, std::move(undet)),
-           true };
+  return { expr::mkIf(p, v, std::move(nondet)), true };
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {
@@ -527,6 +523,48 @@ StateValue CopyOp::toSMT(State &s) const {
 expr CopyOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType() == val.getType();
+}
+
+
+void Phi::print(ostream &os) const {
+  os << getName() << " = phi ";
+  auto t = getType().toString();
+  if (!t.empty())
+    os << t << ' ';
+
+  bool first = true;
+  for (auto &[val, bb] : values) {
+    if (!first)
+      os << ", ";
+    os << "[ " << val.getName() << ", " << bb << " ]";
+    first = false;
+  }
+}
+
+StateValue Phi::toSMT(State &s) const {
+  StateValue ret;
+  bool first = true;
+
+  for (auto &[val, bb] : values) {
+    auto v = s[val];
+    if (first) {
+      ret = v;
+      first = false;
+    } else {
+      expr pre = s.jumpCondFrom(s.getFn().getBB(bb));
+      ret = StateValue::mkIf(pre, v, ret);
+    }
+  }
+  return ret;
+}
+
+expr Phi::getTypeConstraints(const Function &f) const {
+  auto c = Value::getTypeConstraints();
+  for (auto &[val, bb] : values) {
+    (void)bb;
+    c &= val.getType() == getType();
+  }
+  return c;
 }
 
 
@@ -608,31 +646,20 @@ expr Return::getTypeConstraints(const Function &f) const {
 
 
 void Assume::print(ostream &os) const {
-  os << "assume " << cond;
+  os << (if_non_poison ? "assume_non_poison " : "assume ") << cond;
 }
 
 StateValue Assume::toSMT(State &s) const {
-  auto &[v, p] = s[cond];
-  s.addUB(v != 0 && p);
+  auto &[v, np] = s[cond];
+  if (if_non_poison)
+    s.addUB(np.implies(v != 0));
+  else
+    s.addUB(np && v != 0);
   return {};
 }
 
 expr Assume::getTypeConstraints(const Function &f) const {
   return cond.getType().enforceIntType();
-}
-
-
-void Unreachable::print(ostream &os) const {
-  os << "unreachable";
-}
-
-StateValue Unreachable::toSMT(State &s) const {
-  s.addUB(false);
-  return {};
-}
-
-expr Unreachable::getTypeConstraints(const Function &f) const {
-  return true;
 }
 
 }
