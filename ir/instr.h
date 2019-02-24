@@ -4,6 +4,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/value.h"
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace IR {
 
@@ -149,6 +152,21 @@ public:
 };
 
 
+class Phi final : public Instr {
+public:
+  typedef std::vector<std::pair<Value&, std::string>> ValTy;
+private:
+  ValTy values;
+public:
+  Phi(Type &type, std::string &&name, ValTy &&values)
+    : Instr(type, std::move(name)), values(std::move(values)) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
+
+
 class Branch final : public Instr {
   Value *cond = nullptr;
   const BasicBlock &dst_true, *dst_false = nullptr;
@@ -200,16 +218,6 @@ class Assume final : public Instr {
 public:
   Assume(Value &cond, bool if_non_poison)
     : Instr(Type::voidTy, ""), cond(cond), if_non_poison(if_non_poison) {}
-
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-};
-
-
-class Unreachable final : public Instr {
-public:
-  Unreachable() : Instr(Type::voidTy, "") {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

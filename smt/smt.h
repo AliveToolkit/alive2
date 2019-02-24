@@ -3,6 +3,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include <string>
+
 namespace smt {
 
 struct smt_initializer {
@@ -16,7 +18,7 @@ private:
 };
 
 
-void set_query_timeout(const char *ms);
+void set_query_timeout(std::string ms);
 const char* get_query_timeout();
 
 bool hit_memory_limit();

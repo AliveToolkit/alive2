@@ -9,6 +9,7 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include <iostream>
 #include <optional>
@@ -25,13 +26,37 @@ using llvm::LLVMContext;
 
 namespace {
 
+llvm::cl::opt<unsigned> opt_smt_to(
+  "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
+  llvm::cl::init(1000), llvm::cl::value_desc("ms"));
+
+llvm::cl::opt<bool> opt_se_verbose(
+  "tv-se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_smt_stats(
+  "tv-smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_smt_skip(
+  "tv-smt-skip", llvm::cl::desc("Alive: skip SMT queries"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_smt_verbose(
+  "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_tactic_verbose(
+  "tv-tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
+  llvm::cl::init(false));
+
 #if 0
 string_view s(llvm::StringRef str) {
   return { str.data(), str.size() };
 }
 #endif
 
-smt::smt_initializer smt_init;
+optional<smt::smt_initializer> smt_init;
 TransformPrintOpts print_opts;
 vector<unique_ptr<IntType>> int_types;
 unordered_map<string, Function> fns;
@@ -224,6 +249,22 @@ public:
     RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
   }
 
+  RetTy visitPHINode(llvm::PHINode &i) {
+    Phi::ValTy values;
+    auto ty = llvm_type2alive(i.getType());
+    if (!ty)
+      return error(i);
+
+    for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
+      auto op = get_operand(i.getIncomingValue(idx));
+      if (!op)
+        return error(i);
+      values.emplace_back(*op, value_name(*i.getIncomingBlock(idx)));
+    }
+
+    RETURN_IDENTIFIER(make_unique<Phi>(*ty, value_name(i), move(values)));
+  }
+
   RetTy visitBranchInst(llvm::BranchInst &i) {
     auto &dst_true = getBB(i.getSuccessor(0));
     if (i.isUnconditional())
@@ -259,7 +300,8 @@ public:
   }
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
-    return make_unique<Unreachable>();
+    auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
+    return make_unique<Assume>(*fals, /*if_non_poison=*/false);
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
@@ -330,10 +372,7 @@ public:
     }
 
     // do nothing intrinsics
-    case llvm::Intrinsic::dbg_declare:
-    case llvm::Intrinsic::dbg_value:
     case llvm::Intrinsic::dbg_addr:
-    case llvm::Intrinsic::dbg_label:
     case llvm::Intrinsic::donothing:
       return {};
 
@@ -427,6 +466,12 @@ public:
       Fn.addInput(move(val));
     }
 
+	// create all BBs upfront to keep LLVM's order
+	// FIXME: this can go away once we have CFG analysis
+	for (auto &bb : f) {
+	  Fn.getBB(value_name(bb));
+	}
+
     for (auto &bb : f) {
       auto &BB = Fn.getBB(value_name(bb));
       for (auto &i : bb) {
@@ -465,7 +510,7 @@ struct TVPass : public llvm::FunctionPass {
     if (inserted)
       return false;
 
-    smt_init.reset();
+    smt_init->reset();
     Transform t;
     t.src = move(old_fn->second);
     t.tgt = move(*fn);
@@ -484,8 +529,29 @@ struct TVPass : public llvm::FunctionPass {
     return false;
   }
 
+  bool doInitialization(llvm::Module&) override {
+    static bool done = false;
+    if (done)
+      return false;
+    done = true;
+
+    smt::solver_print_queries(opt_smt_verbose);
+    smt::solver_tactic_verbose(opt_tactic_verbose);
+    smt::set_query_timeout(to_string(opt_smt_to));
+    config::skip_smt = opt_smt_skip;
+    config::symexec_print_each_value = opt_se_verbose;
+
+    smt_init.emplace();
+    return false;
+  }
+
   bool doFinalization(llvm::Module&) override {
-    smt::solver_print_stats(cerr);
+    static bool showed_stats = false;
+    if (opt_smt_stats && !showed_stats) {
+      smt::solver_print_stats(cerr);
+      showed_stats = true;
+    }
+    smt_init.reset();
     return false;
   }
 

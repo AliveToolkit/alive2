@@ -3,8 +3,11 @@
 
 #include "smt/expr.h"
 #include "smt/ctx.h"
+#include "util/compiler.h"
+#include <algorithm>
 #include <cassert>
 #include <memory>
+#include <string>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -232,12 +235,17 @@ bool expr::isAllOnes() const {
 
 bool expr::isSMin() const {
   uint64_t n = 0;
-  return isUInt(n) && n == (1ull << (bits() - 1));
+  return bits() <= 64 && isUInt(n) && n == (1ull << (bits() - 1));
 }
 
 bool expr::isSMax() const {
   uint64_t n = 0;
-  return isUInt(n) && n == ((uint64_t)INT64_MAX >> (64 - bits()));
+  return bits() <= 64 && isUInt(n) &&
+         n == ((uint64_t)INT64_MAX >> (64 - bits()));
+}
+
+bool expr::isSigned() const {
+  return (extract(0, 0) == mkUInt(1, 1)).simplify().isTrue();
 }
 
 unsigned expr::bits() const {
@@ -247,7 +255,7 @@ unsigned expr::bits() const {
 
 bool expr::isUInt(uint64_t &n) const {
   C();
-  return bits() <= 64 && Z3_get_numeral_uint64(ctx(), ast(), &n);
+  return Z3_get_numeral_uint64(ctx(), ast(), &n);
 }
 
 bool expr::isInt(int64_t &n) const {
@@ -298,7 +306,7 @@ expr expr::binop_commutative(const expr &rhs,
 bool expr::binop_sfold(const expr &rhs,
                        int64_t(*native)(int64_t, int64_t), expr &result) const {
   int64_t a, b;
-  if (bits() <= 64 && isInt(a) && rhs.isInt(b)) {
+  if (/*bits() <= 64 &&*/ isInt(a) && rhs.isInt(b)) {
     result = mkInt(native(a, b), sort());
     return true;
   }
@@ -777,7 +785,7 @@ expr expr::ule(const expr &rhs) const {
 expr expr::ult(const expr &rhs) const {
   uint64_t n;
   if (rhs.isUInt(n))
-    return rhs.isZero() ? false : ule(mkUInt(n - 1, sort()));
+    return n == 0 ? false : ule(mkUInt(n - 1, sort()));
 
   return !rhs.ule(*this);
 }
@@ -911,6 +919,39 @@ expr expr::subst(const expr &from, const expr &to) const {
   auto f = from();
   auto t = to();
   return Z3_substitute(ctx(), ast(), 1, &f, &t);
+}
+
+void expr::printUnsigned(ostream &os) const {
+  expr zero = mkUInt(0, sort());
+  expr ten  = mkUInt(10, sort());
+  expr n    = *this;
+
+  string str;
+  uint64_t d;
+
+  do {
+    expr digit = n.urem(ten).simplify();
+    ENSURE(digit.isUInt(d));
+    str.push_back('0' + d);
+    n = n.udiv(ten).simplify();
+  } while (!n.eq(zero));
+
+  reverse(str.begin(), str.end());
+  os << str;
+}
+
+void expr::printSigned(ostream &os) const {
+  if (isSigned()) {
+    os << '-';
+    (~*this + mkUInt(1, sort())).simplify().printUnsigned(os);
+  } else {
+    printUnsigned(os);
+  }
+}
+
+void expr::printHexadecimal(ostream &os) const {
+  auto rem = bits() % 4;
+  os << (rem == 0 ? *this : zext(4 - rem)).simplify();
 }
 
 ostream& operator<<(ostream &os, const expr &e) {

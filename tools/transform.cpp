@@ -37,13 +37,12 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
   }
 
   expr e = m[val.value];
-  uint64_t n;
-  ENSURE(e.isUInt(n));
-  auto bw = e.bits();
-  s << "0x" << hex << n << dec;
-  s << " (" << n;
-  if (n != 0 && num_leading_zeros(n) == (64 - bw)) {
-    s << ", " << ((int64_t)(n << (64 - bw)) >> (64 - bw));
+  e.printHexadecimal(s);
+  s << " (";
+  e.printUnsigned(s);
+  if (e.bits() > 1 && e.isSigned()) {
+    s << ", ";
+    e.printSigned(s);
   }
   s << ')';
 }
