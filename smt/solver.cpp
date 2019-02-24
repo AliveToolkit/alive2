@@ -8,6 +8,7 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <utility>
 #include <vector>
 #include <z3.h>
@@ -42,7 +43,6 @@ protected:
   }
 
 public:
-  Tactic() = default;
   Tactic(const char *name) : Tactic(Z3_mk_tactic(ctx(), name)) {
     this->name = name;
   }
@@ -72,30 +72,23 @@ class MultiTactic final : public Tactic {
   Z3_goal goal = nullptr;
 
 public:
-  MultiTactic() : Tactic() {}
-
-  MultiTactic(initializer_list<Tactic> ts) : Tactic("skip") {
+  MultiTactic(initializer_list<const char*> ts) : Tactic("skip") {
     if (tactic_verbose) {
       goal = Z3_mk_goal(ctx(), true, false, false);
       Z3_goal_inc_ref(ctx(), goal);
     }
 
     for (auto I = ts.begin(), E = ts.end(); I != E; ++I) {
-      *this = mkThen(*this, *I);
+      Tactic t(*I);
+      *this = mkThen(*this, t);
       if (tactic_verbose)
-        tactics.emplace_back(move(const_cast<Tactic&>(*I)));
+        tactics.emplace_back(move(t));
     }
   }
 
   ~MultiTactic() {
     if (goal)
       Z3_goal_dec_ref(ctx(), goal);
-  }
-
-  void operator=(MultiTactic &&other) {
-    *this = move(static_cast<Tactic&&>(other));
-    tactics = move(other.tactics);
-    swap(goal, other.goal);
   }
 
   void operator=(Tactic &&other) {
@@ -123,7 +116,7 @@ public:
       Tactic to(Z3_tactic_try_for(ctx(), t.t, 5000));
       auto r = Z3_tactic_apply(ctx(), to.t, goal);
       Z3_apply_result_inc_ref(ctx(), r);
-      reset();
+      reset_solver();
 
       for (unsigned i = 0, e = Z3_apply_result_get_num_subgoals(ctx(), r);
            i != e; ++i) {
@@ -144,14 +137,14 @@ public:
     }
   }
 
-  void reset() {
+  void reset_solver() {
     if (tactic_verbose)
       Z3_goal_reset(ctx(), goal);
   }
 };
 }
 
-static MultiTactic tactic;
+static optional<MultiTactic> tactic;
 
 
 namespace smt {
@@ -217,7 +210,7 @@ void solver_tactic_verbose(bool yes) {
 }
 
 Solver::Solver() {
-  s = Z3_mk_solver_from_tactic(ctx(), tactic.t);
+  s = Z3_mk_solver_from_tactic(ctx(), tactic->t);
   Z3_solver_inc_ref(ctx(), s);
 }
 
@@ -229,7 +222,7 @@ void Solver::add(const expr &e) {
   if (e.isValid()) {
     auto ast = e();
     Z3_solver_assert(ctx(), s, ast);
-    tactic.add(ast);
+    tactic->add(ast);
   } else {
     valid = false;
   }
@@ -250,7 +243,7 @@ SolverPop Solver::push() {
 
 void Solver::reset() {
   Z3_solver_reset(ctx(), s);
-  tactic.reset();
+  tactic->reset_solver();
 }
 
 Result Solver::check() const {
@@ -268,7 +261,7 @@ Result Solver::check() const {
   if (print_queries)
     cout << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s);
 
-  tactic.check();
+  tactic->check();
 
   switch (Z3_solver_check(ctx(), s)) {
   case Z3_L_FALSE:
@@ -339,7 +332,7 @@ EnableSMTQueriesTMP::~EnableSMTQueriesTMP() {
 
 
 void solver_init() {
-  tactic = {
+  tactic.emplace({
     "simplify",
     "propagate-values",
     "simplify",
@@ -350,11 +343,11 @@ void solver_init() {
     "qe-light",
     "simplify",
     "smt"
-  };
+  });
 }
 
 void solver_destroy() {
-  tactic = MultiTactic();
+  tactic.reset();
 }
 
 }

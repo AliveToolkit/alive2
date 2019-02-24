@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <z3.h>
 
+using namespace std;
+
 namespace smt {
 
 smt_initializer::smt_initializer() {
@@ -35,14 +37,14 @@ void smt_initializer::destroy() {
 }
 
 
-static const char *query_timeout = "10000";
+static string query_timeout = "10000";
 
-void set_query_timeout(const char *ms) {
-  query_timeout = ms;
+void set_query_timeout(string ms) {
+  query_timeout = move(ms);
 }
 
 const char* get_query_timeout() {
-  return query_timeout;
+  return query_timeout.c_str();
 }
 
 
