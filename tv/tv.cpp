@@ -441,6 +441,12 @@ public:
       Fn.addInput(move(val));
     }
 
+	// create all BBs upfront to keep LLVM's order
+	// FIXME: this can go away once we have CFG analysis
+	for (auto &bb : f) {
+	  Fn.getBB(value_name(bb));
+	}
+
     for (auto &bb : f) {
       auto &BB = Fn.getBB(value_name(bb));
       for (auto &i : bb) {
