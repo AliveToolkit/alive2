@@ -345,6 +345,19 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
     }
+    case llvm::Intrinsic::fshl:
+    case llvm::Intrinsic::fshr:
+    {
+      PARSE_TRIOP();
+      TernaryOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
+      case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
+                                               op));
+    }
     case llvm::Intrinsic::expect:
     {
       PARSE_UNOP();
