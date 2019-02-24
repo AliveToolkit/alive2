@@ -62,6 +62,22 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
 };
 
+class TernaryOp final : public Instr {
+public:
+  enum Op { FShl, FShr };
+
+private:
+  Value &A, &B, &C;
+  Op op;
+
+public:
+  TernaryOp(Type &type, std::string &&name, Value &A, Value &B, Value &C, Op op)
+      : Instr(type, std::move(name)), A(A), B(B), C(C), op(op) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+};
 
 class ConversionOp final : public Instr {
 public:

@@ -1,0 +1,9 @@
+%c_is_zero = icmp eq i8 %c, 0
+%a = poison
+%t = fshr i8 %a, i8 %b, i8 %c
+%r = select i8 %c_is_zero, i8 %t, i8 %z
+  =>
+%c_is_zero = icmp eq i8 %c, 0
+%a = poison
+%t = poison
+%r = select i8 %c_is_zero, i8 poison, i8 %z

@@ -1,8 +1,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "smt/ctx.h"
 #include "smt/expr.h"
+#include "smt/ctx.h"
 #include "util/compiler.h"
 #include <algorithm>
 #include <cassert>
@@ -517,6 +517,48 @@ expr expr::lshr(const expr &rhs) const {
     return r;
 
   return Z3_mk_bvlshr(ctx(), ast(), rhs());
+}
+
+expr expr::fshl(const expr &a, const expr &b, const expr &c) {
+  C2(a, b, c);
+
+  if (c.isZero())
+    return a;
+
+  auto nbits = a.bits();
+  expr c_mod_width = c.urem(mkUInt(nbits, nbits));
+  if (c_mod_width.isZero())
+    return a;
+
+  // FIXME: could do constant-folding
+
+  expr res = a.concat(b);
+  expr c_mod_width_zext = c_mod_width.zext(nbits);
+  res = res << c_mod_width_zext;
+  res = res.extract(2 * nbits - 1, nbits); // upper half (MSB)
+
+  return res;
+}
+
+expr expr::fshr(const expr &a, const expr &b, const expr &c) {
+  C2(a, b, c);
+
+  if (c.isZero())
+    return b;
+
+  auto nbits = a.bits();
+  expr c_mod_width = c.urem(mkUInt(nbits, nbits));
+  if (c_mod_width.isZero())
+    return b;
+
+  // FIXME: could do constant-folding
+
+  expr res = a.concat(b);
+  expr c_mod_width_zext = c_mod_width.zext(nbits);
+  res = res.lshr(c_mod_width_zext);
+  res = res.extract(nbits - 1, 0); // lower half (LSB)
+
+  return res;
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {

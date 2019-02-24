@@ -294,6 +294,46 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
          move(instrconstr);
 }
 
+void TernaryOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case FShl:
+    str = "fshl ";
+    break;
+  case FShr:
+    str = "fshr ";
+    break;
+  }
+
+  os << getName() << " = " << str << A << ", " << B << ", " << C;
+}
+
+StateValue TernaryOp::toSMT(State &s) const {
+  auto &[a, ap] = s[A];
+  auto &[b, bp] = s[B];
+  auto &[c, cp] = s[C];
+  expr newval;
+  expr not_poison;
+
+  switch (op) {
+  case FShl:
+    newval = expr::fshl(a, b, c);
+    not_poison = ap && bp && cp;
+    break;
+  case FShr:
+    newval = expr::fshr(a, b, c);
+    not_poison = ap && bp && cp;
+    break;
+  }
+
+  return {move(newval), move(not_poison)};
+}
+
+expr TernaryOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() && getType().enforceIntOrVectorType() &&
+         getType() == A.getType() && getType() == B.getType() &&
+         getType() == C.getType();
+}
 
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;

@@ -126,6 +126,9 @@ public:
   expr ashr(const expr &rhs) const;
   expr lshr(const expr &rhs) const;
 
+  static expr fshl(const expr &a, const expr &b, const expr &c);
+  static expr fshr(const expr &a, const expr &b, const expr &c);
+
   expr shl_no_soverflow(const expr &rhs) const;
   expr shl_no_uoverflow(const expr &rhs) const;
   expr ashr_exact(const expr &rhs) const;

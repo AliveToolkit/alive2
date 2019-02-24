@@ -1,0 +1,34 @@
+Name: passthrough
+%t = fshl i4 0, i4 0, i4 0
+  =>
+%t = 0
+
+Name: single shift by constant 0
+%t = fshl i4 5, i4 0, i4 2
+  =>
+%t = i4 4
+
+Name: single shift by constant 1
+%t = fshl i4 0, i4 5, i4 2
+  =>
+%t = i4 1
+
+Name: rotate by constant 0
+%t = fshl i8 171, i8 171, i8 4
+  =>
+%t = i8 186
+
+Name: rotate by constant 1
+%t = fshl i48 1193046, i48 1193046, i48 32
+  =>
+%t = i48 57543971831826
+
+Name: funnel shift by constant 0
+%t = fshl i8 170, i8 85, i8 4
+  =>
+%t = i8 165
+
+Name: funnel shift by constant 1
+%t = fshl i32 11259375, i32 305419896, i32 12
+  =>
+%t = i32 3168727331

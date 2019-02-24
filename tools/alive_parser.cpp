@@ -439,6 +439,30 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   return make_unique<UnaryOp>(ty, string(name), a, op);
 }
 
+static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
+  TernaryOp::Op op;
+  switch (op_token) {
+  case FSHL:
+    op = TernaryOp::FShl;
+    break;
+  case FSHR:
+    op = TernaryOp::FShr;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  auto &aty = parse_type();
+  auto &a = parse_operand(aty);
+  parse_comma();
+  auto &bty = parse_type();
+  auto &b = parse_operand(bty);
+  parse_comma();
+  auto &cty = parse_type();
+  auto &c = parse_operand(cty);
+  return make_unique<TernaryOp>(aty, string(name), a, b, c, op);
+}
+
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   // op ty %op to ty2
   auto &opty = parse_type();
@@ -539,6 +563,9 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case BSWAP:
   case CTPOP:
     return parse_unaryop(name, t);
+  case FSHL:
+  case FSHR:
+    return parse_ternary(name, t);
   case SEXT:
   case ZEXT:
   case TRUNC:
