@@ -520,45 +520,19 @@ expr expr::lshr(const expr &rhs) const {
 }
 
 expr expr::fshl(const expr &a, const expr &b, const expr &c) {
-  C2(a, b, c);
-
-  if (c.isZero())
-    return a;
-
+  C2(a);
   auto nbits = a.bits();
-  expr c_mod_width = c.urem(mkUInt(nbits, nbits));
-  if (c_mod_width.isZero())
-    return a;
-
-  // FIXME: could do constant-folding
-
-  expr res = a.concat(b);
-  expr c_mod_width_zext = c_mod_width.zext(nbits);
-  res = res << c_mod_width_zext;
-  res = res.extract(2 * nbits - 1, nbits); // upper half (MSB)
-
-  return res;
+  expr c_mod_width = c.urem(mkUInt(nbits, nbits)).zext(nbits);
+  expr res = a.concat(b) << c_mod_width;
+  return res.extract(2 * nbits - 1, nbits); // upper half (MSB)
 }
 
 expr expr::fshr(const expr &a, const expr &b, const expr &c) {
-  C2(a, b, c);
-
-  if (c.isZero())
-    return b;
-
+  C2(a);
   auto nbits = a.bits();
-  expr c_mod_width = c.urem(mkUInt(nbits, nbits));
-  if (c_mod_width.isZero())
-    return b;
-
-  // FIXME: could do constant-folding
-
-  expr res = a.concat(b);
-  expr c_mod_width_zext = c_mod_width.zext(nbits);
-  res = res.lshr(c_mod_width_zext);
-  res = res.extract(nbits - 1, 0); // lower half (LSB)
-
-  return res;
+  expr c_mod_width = c.urem(mkUInt(nbits, nbits)).zext(nbits);
+  expr res = a.concat(b).lshr(c_mod_width);
+  return res.extract(nbits - 1, 0); // lower half (LSB)
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {

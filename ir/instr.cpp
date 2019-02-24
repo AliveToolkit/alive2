@@ -294,6 +294,7 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
          move(instrconstr);
 }
 
+
 void TernaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
@@ -330,10 +331,13 @@ StateValue TernaryOp::toSMT(State &s) const {
 }
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() && getType().enforceIntOrVectorType() &&
-         getType() == A.getType() && getType() == B.getType() &&
+  return Value::getTypeConstraints() &&
+         getType().enforceIntOrVectorType() &&
+         getType() == A.getType() &&
+         getType() == B.getType() &&
          getType() == C.getType();
 }
+
 
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;
