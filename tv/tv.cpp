@@ -312,58 +312,38 @@ public:
       return make_unique<Assume>(*val, false);
     }
     case llvm::Intrinsic::sadd_sat:
-    {
-      PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::SAdd_Sat));
-    }
     case llvm::Intrinsic::uadd_sat:
-    {
-      PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::UAdd_Sat));
-    }
     case llvm::Intrinsic::ssub_sat:
-    {
-      PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::SSub_Sat));
-    }
     case llvm::Intrinsic::usub_sat:
-    {
-      PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::USub_Sat));
-    }
     case llvm::Intrinsic::cttz:
-    {
-      PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::Cttz));
-    }
     case llvm::Intrinsic::ctlz:
     {
       PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           BinOp::Ctlz));
+      BinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::sadd_sat: op = BinOp::SAdd_Sat; break;
+      case llvm::Intrinsic::uadd_sat: op = BinOp::UAdd_Sat; break;
+      case llvm::Intrinsic::ssub_sat: op = BinOp::SSub_Sat; break;
+      case llvm::Intrinsic::usub_sat: op = BinOp::USub_Sat; break;
+      case llvm::Intrinsic::cttz:     op = BinOp::Cttz; break;
+      case llvm::Intrinsic::ctlz:     op = BinOp::Ctlz; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op));
     }
     case llvm::Intrinsic::bitreverse:
-    {
-      PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
-                                             UnaryOp::BitReverse));
-    }
     case llvm::Intrinsic::bswap:
-    {
-      PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
-                                             UnaryOp::BSwap));
-    }
     case llvm::Intrinsic::ctpop:
     {
       PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val,
-                                             UnaryOp::Ctpop));
+      UnaryOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::bitreverse: op = UnaryOp::BitReverse; break;
+      case llvm::Intrinsic::bswap:      op = UnaryOp::BSwap; break;
+      case llvm::Intrinsic::ctpop:      op = UnaryOp::Ctpop; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
     }
     case llvm::Intrinsic::expect:
     {
