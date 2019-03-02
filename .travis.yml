@@ -1,7 +1,4 @@
 language: cpp
-os: linux
-dist: xenial
-sudo: required
 
 cache:
   directories:
@@ -23,31 +20,32 @@ env:
 
 before_script:
   - |
-    if [ ! -d /tmp/z3cache/z3-$Z3_VERSION-x64-ubuntu-14.04 ] ; then
-      rm -fr /tmp/z3cache
-      mkdir /tmp/z3cache
-      wget https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/z3-$Z3_VERSION.$Z3_HASH-x64-ubuntu-16.04.zip -O /tmp/z3.zip
-      pushd /tmp
-      unzip z3.zip
-      mv z3-* z3cache
-      popd
-    fi
-  - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/bin/libz3.so /usr/lib
-  - sudo cp /tmp/z3cache/z3-$Z3_VERSION*/include/* /usr/include
-  - |
-    if [ ! -f /tmp/re2ccache/$RE2C_VERSION/re2c ] ; then
-      rm -fr /tmp/re2ccache
-      mkdir -p /tmp/re2ccache/$RE2C_VERSION
-      wget https://github.com/skvadrik/re2c/releases/download/$RE2C_VERSION/re2c-$RE2C_VERSION.tar.gz -O /tmp/re2c.tar.gz
-      pushd /tmp
-        tar xfz re2c.tar.gz
-        pushd re2c-*
-          ./configure && make -j2
-          cp re2c /tmp/re2ccache/$RE2C_VERSION
+    if [ $TRAVIS_OS_NAME = linux ]; then
+      if [ ! -d /tmp/z3cache/z3-$Z3_VERSION-x64-ubuntu-14.04 ] ; then
+        rm -fr /tmp/z3cache
+        mkdir /tmp/z3cache
+        wget https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/z3-$Z3_VERSION.$Z3_HASH-x64-ubuntu-16.04.zip -O /tmp/z3.zip
+        pushd /tmp
+        unzip z3.zip
+        mv z3-* z3cache
         popd
-      popd
+      fi
+      sudo cp /tmp/z3cache/z3-$Z3_VERSION*/bin/libz3.so /usr/lib
+      sudo cp /tmp/z3cache/z3-$Z3_VERSION*/include/* /usr/include
+      if [ ! -f /tmp/re2ccache/$RE2C_VERSION/re2c ] ; then
+        rm -fr /tmp/re2ccache
+        mkdir -p /tmp/re2ccache/$RE2C_VERSION
+        wget https://github.com/skvadrik/re2c/releases/download/$RE2C_VERSION/re2c-$RE2C_VERSION.tar.gz -O /tmp/re2c.tar.gz
+        pushd /tmp
+          tar xfz re2c.tar.gz
+          pushd re2c-*
+            ./configure && make -j2
+            cp re2c /tmp/re2ccache/$RE2C_VERSION
+          popd
+        popd
+      fi
+      sudo cp /tmp/re2ccache/$RE2C_VERSION/re2c /usr/bin
     fi
-  - sudo cp /tmp/re2ccache/$RE2C_VERSION/re2c /usr/bin
 
 script:
   - mkdir build
@@ -63,6 +61,8 @@ script:
 matrix:
   include:
     - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Debug
+      os: linux
+      dist: xenial
       addons: &gcc7
         apt:
           sources: *default_sources
@@ -71,9 +71,13 @@ matrix:
             - g++-7
 
     - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: xenial
       addons: *gcc7
 
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug
+      os: linux
+      dist: xenial
       addons: &gcc8
         apt:
           sources: *default_sources
@@ -82,9 +86,13 @@ matrix:
             - g++-8
 
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: xenial
       addons: *gcc8
 
     - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+      os: linux
+      dist: xenial
       addons: &clang7
         apt:
           sources:
@@ -96,9 +104,13 @@ matrix:
             - g++-8
 
     - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: xenial
       addons: *clang7
 
     - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+      os: linux
+      dist: xenial
       addons: &clang8
         apt:
           sources:
@@ -110,4 +122,21 @@ matrix:
             - g++-8
 
     - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: xenial
       addons: *clang8
+
+    - env: CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+      os: osx
+      osx_image: xcode10.1
+      addons: &mac
+        homebrew:
+          packages:
+            - ninja
+            - re2c
+            - z3
+
+    - env: CMAKE_BUILD_TYPE=Release
+      os: osx
+      osx_image: xcode10.1
+      addons: *mac
