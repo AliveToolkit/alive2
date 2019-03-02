@@ -21,7 +21,11 @@ using namespace std;
 
 static void print_varval(ostream &s, const Model &m, const Value *var,
                          const StateValue &val) {
-  if (m[val.non_poison].isFalse()) {
+  // if the model is partial, we don't know for sure if it's poison or not
+  // this happens if the poison constraint depends on an undef
+  // however, cexs are usually triggered by the worst case, which is poison
+  if (auto v = m.eval(val.non_poison);
+      (!v.isConst() || v.isFalse())) {
     s << "poison";
     return;
   }
@@ -36,7 +40,13 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
     assert(n == 0);
   }
 
-  expr e = m[val.value];
+  expr e = m.eval(val.value);
+  // undef variables may not have a model since each read uses a copy
+  if (!e.isConst()) {
+    s << "undef";
+    return;
+  }
+
   e.printHexadecimal(s);
   s << " (";
   e.printUnsigned(s);

@@ -164,9 +164,10 @@ void Model::operator=(Model &&other) {
   swap(other.m, m);
 }
 
-expr Model::operator[](const expr &var) const {
+expr Model::eval(const expr &var, bool complete) const {
   Z3_ast val;
-  return Z3_model_eval(ctx(), m, var(), true, &val) ? val : expr();
+  ENSURE(Z3_model_eval(ctx(), m, var(), complete, &val));
+  return val;
 }
 
 uint64_t Model::getUInt(const expr &var) const {

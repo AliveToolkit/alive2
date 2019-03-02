@@ -31,7 +31,8 @@ public:
 
   void operator=(Model &&other);
 
-  expr operator[](const expr &var) const;
+  expr operator[](const expr &var) const { return eval(var, true); }
+  expr eval(const expr &var, bool complete = false) const;
   uint64_t getUInt(const expr &var) const;
   int64_t getInt(const expr &var) const;
 
