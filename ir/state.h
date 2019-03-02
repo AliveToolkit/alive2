@@ -81,7 +81,7 @@ public:
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const ValTy& at(const Value &val) const;
-  const smt::expr& jumpCondFrom(const BasicBlock &bb) const;
+  const smt::expr* jumpCondFrom(const BasicBlock &bb) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);

@@ -550,13 +550,16 @@ StateValue Phi::toSMT(State &s) const {
   bool first = true;
 
   for (auto &[val, bb] : values) {
+    auto pre = s.jumpCondFrom(s.getFn().getBB(bb));
+    if (!pre) // jump from unreachable BB
+      continue;
+
     auto v = s[val];
     if (first) {
       ret = v;
       first = false;
     } else {
-      expr pre = s.jumpCondFrom(s.getFn().getBB(bb));
-      ret = StateValue::mkIf(pre, v, ret);
+      ret = StateValue::mkIf(*pre, v, ret);
     }
   }
   return ret;
