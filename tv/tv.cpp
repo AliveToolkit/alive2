@@ -28,6 +28,10 @@ using llvm::LLVMContext;
 
 namespace {
 
+llvm::cl::opt<bool> opt_error_fatal(
+  "tv-exit-on-error", llvm::cl::desc("Alive: exit on error"),
+  llvm::cl::init(false));
+
 llvm::cl::opt<unsigned> opt_smt_to(
   "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
   llvm::cl::init(1000), llvm::cl::value_desc("ms"));
@@ -494,8 +498,6 @@ public:
 struct TVPass : public llvm::FunctionPass {
   static char ID;
 
-  bool FatalErrors = true;
-
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
@@ -526,7 +528,7 @@ struct TVPass : public llvm::FunctionPass {
 
     if (Errors errs = verifier.verify()) {
       cerr << "Transformation doesn't verify!\n" << errs << endl;
-      if (FatalErrors && !errs.isTimeout())
+      if (opt_error_fatal && !errs.isTimeout())
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     } else {
       cerr << "Transformation seems to be correct!\n\n";

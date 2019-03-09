@@ -119,8 +119,6 @@ public:
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
 
-  bool empty() const { return BB_order.empty(); }
-
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
 };
