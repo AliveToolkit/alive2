@@ -91,9 +91,9 @@ void Function::addInput(unique_ptr<Input> &&i) {
 }
 
 Function::instr_iterator::
-instr_iterator(vector<BasicBlock*>::const_iterator BBI,
-               vector<BasicBlock*>::const_iterator BBE)
-  : BBI(BBI), BBE(BBE) {
+instr_iterator(vector<BasicBlock*>::const_iterator &&BBI,
+               vector<BasicBlock*>::const_iterator &&BBE)
+  : BBI(move(BBI)), BBE(move(BBE)) {
   next_bb();
 }
 
@@ -145,6 +145,73 @@ void Function::print(ostream &os, bool print_header) const {
 ostream& operator<<(ostream &os, const Function &f) {
   f.print(os);
   return os;
+}
+
+
+void CFG::edge_iterator::next() {
+  // jump to next BB with a terminator that is not a return instruction
+  while (it != end && dynamic_cast<Return*>(&(*it)->back())) {
+    ++it;
+  }
+}
+
+CFG::edge_iterator::edge_iterator(vector<BasicBlock*>::iterator &&it,
+                                  vector<BasicBlock*>::iterator &&end)
+  : it(move(it)), end(move(end)) {
+  next();
+}
+
+tuple<const BasicBlock&, const BasicBlock&, const Instr&>
+  CFG::edge_iterator::operator*() const {
+  const BasicBlock *dst;
+  auto instr = &(*it)->back();
+  if (auto br = dynamic_cast<Branch*>(instr)) {
+    dst = idx == 0 ? &br->getTrue() : br->getFalse();
+  } else if (auto sw = dynamic_cast<Switch*>(instr)) {
+    dst = idx == 0 ? &sw->getDefault() : &sw->getTarget(idx-1).second;
+  } else {
+    UNREACHABLE();
+  }
+  return { **it, *dst, *instr };
+}
+
+void CFG::edge_iterator::operator++(void) {
+  auto instr = &(*it)->back();
+  auto inc = [&](bool next_bb) {
+    if (next_bb) {
+      idx = 0;
+      ++it;
+      next();
+    } else {
+      ++idx;
+    }
+  };
+
+  if (auto br = dynamic_cast<Branch*>(instr)) {
+    inc(idx > 0 || !br->getFalse());
+  } else if (auto sw = dynamic_cast<Switch*>(instr)) {
+    inc(idx == sw->getNumTargets());
+  } else {
+    UNREACHABLE();
+  }
+}
+
+static string_view bb_dot_name(const string &name) {
+  if (name[0] == '%')
+    return string_view(name).substr(1);
+  return name;
+}
+
+void CFG::printDot(ostream &os) const {
+  os << "digraph {\n"
+        "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
+
+  for (const auto &[src, dst, instr] : *this) {
+    (void)instr;
+    os << '"' << bb_dot_name(src.getName()) << "\" -> \""
+       << bb_dot_name(dst.getName()) << "\";\n";
+  }
+  os << "}\n";
 }
 
 }

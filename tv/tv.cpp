@@ -11,10 +11,12 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 using namespace IR;
@@ -50,6 +52,10 @@ llvm::cl::opt<bool> opt_tactic_verbose(
   "tv-tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
   llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_print_dot(
+  "tv-dot", llvm::cl::desc("Alive: print .dot file with CFG of each function"),
+  llvm::cl::init(false));
+
 #if 0
 string_view s(llvm::StringRef str) {
   return { str.data(), str.size() };
@@ -59,7 +65,7 @@ string_view s(llvm::StringRef str) {
 optional<smt::smt_initializer> smt_init;
 TransformPrintOpts print_opts;
 vector<unique_ptr<IntType>> int_types;
-unordered_map<string, Function> fns;
+unordered_map<string, pair<Function, unsigned>> fns;
 unordered_map<const llvm::Value*, Value*> identifiers;
 Function *current_fn;
 
@@ -459,11 +465,11 @@ public:
       Fn.addInput(move(val));
     }
 
-	// create all BBs upfront to keep LLVM's order
-	// FIXME: this can go away once we have CFG analysis
-	for (auto &bb : f) {
-	  Fn.getBB(value_name(bb));
-	}
+    // create all BBs upfront to keep LLVM's order
+    // FIXME: this can go away once we have CFG analysis
+    for (auto &bb : f) {
+      Fn.getBB(value_name(bb));
+    }
 
     for (auto &bb : f) {
       auto &BB = Fn.getBB(value_name(bb));
@@ -499,13 +505,21 @@ struct TVPass : public llvm::FunctionPass {
       return false;
     }
 
-    auto [old_fn, inserted] = fns.try_emplace(fn->getName(), move(*fn));
+    auto [old_fn, inserted] = fns.try_emplace(fn->getName(), move(*fn), 0);
+
+    if (opt_print_dot) {
+      auto &f = inserted ? old_fn->second.first : *fn;
+      ofstream file(f.getName() + '.' + to_string(old_fn->second.second++)
+                      + ".dot");
+      CFG(f).printDot(file);
+    }
+
     if (inserted)
       return false;
 
     smt_init->reset();
     Transform t;
-    t.src = move(old_fn->second);
+    t.src = move(old_fn->second.first);
     t.tgt = move(*fn);
     TransformVerify verifier(t, false);
     t.print(cerr, print_opts);
@@ -518,7 +532,7 @@ struct TVPass : public llvm::FunctionPass {
       cerr << "Transformation seems to be correct!\n\n";
     }
 
-    old_fn->second = move(t.tgt);
+    old_fn->second.first = move(t.tgt);
     return false;
   }
 

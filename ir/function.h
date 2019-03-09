@@ -12,6 +12,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -101,8 +102,8 @@ public:
       const_iterator II, IE;
     void next_bb();
   public:
-    instr_iterator(std::vector<BasicBlock*>::const_iterator BBI,
-                   std::vector<BasicBlock*>::const_iterator BBE);
+    instr_iterator(std::vector<BasicBlock*>::const_iterator &&BBI,
+                   std::vector<BasicBlock*>::const_iterator &&BBE);
     const IR::Instr& operator*() const { return *II; }
     void operator++(void);
     bool operator!=(instr_iterator &rhs) const { return BBI != rhs.BBI; }
@@ -115,11 +116,41 @@ public:
     instr_iterator begin() { return { f.BB_order.begin(), f.BB_order.end() }; }
     instr_iterator end()   { return { f.BB_order.end(), f.BB_order.end() }; }
   };
-  instr_helper instrs() { return { *this }; }
-  instr_helper instrs() const { return { *this }; }
+  instr_helper instrs() { return *this; }
+  instr_helper instrs() const { return *this; }
+
+  bool empty() const { return BB_order.empty(); }
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
+};
+
+
+class CFG final {
+  Function &f;
+
+public:
+  CFG(Function &f) : f(f) {}
+
+  class edge_iterator {
+    std::vector<BasicBlock*>::iterator it, end;
+    unsigned idx = 0;
+    void next();
+  public:
+    edge_iterator(std::vector<BasicBlock*>::iterator &&it,
+                  std::vector<BasicBlock*>::iterator &&end);
+    std::tuple<const BasicBlock&, const BasicBlock&, const Instr&>
+      operator*() const;
+    void operator++(void);
+    bool operator!=(edge_iterator &rhs) const { return it != rhs.it; }
+  };
+
+  edge_iterator begin() const {
+    return { f.getBBs().begin(), f.getBBs().end() };
+  }
+  edge_iterator end() const { return { f.getBBs().end(), f.getBBs().end() }; }
+
+  void printDot(std::ostream &os) const;
 };
 
 }

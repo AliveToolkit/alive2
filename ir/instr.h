@@ -177,6 +177,8 @@ public:
     : Instr(Type::voidTy, "br"), cond(&cond), dst_true(dst_true),
     dst_false(&dst_false) {}
 
+  auto& getTrue() const { return dst_true; }
+  auto getFalse() const { return dst_false; }
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -194,6 +196,10 @@ public:
       default_target(default_target) {}
 
   void addTarget(Value &val, const BasicBlock &target);
+
+  auto getNumTargets() const { return targets.size(); }
+  auto& getTarget(unsigned i) const { return targets[i]; }
+  auto& getDefault() const { return default_target; }
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
