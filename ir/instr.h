@@ -21,6 +21,7 @@ public:
   virtual smt::expr eqType(const Instr &i) const;
   smt::expr getTypeConstraints() const override;
   virtual smt::expr getTypeConstraints(const Function &f) const = 0;
+  virtual std::unique_ptr<Instr> dup(const std::string &suffix) const = 0;
 };
 
 
@@ -43,12 +44,13 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class UnaryOp final : public Instr {
 public:
-  enum Op { BitReverse, BSwap, Ctpop };
+  enum Op { Copy, BitReverse, BSwap, Ctpop };
 
 private:
   Value &val;
@@ -60,6 +62,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 class TernaryOp final : public Instr {
@@ -77,6 +80,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 class ConversionOp final : public Instr {
@@ -93,6 +97,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -104,6 +109,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -125,6 +131,7 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
   void fixupTypes(const smt::Model &m) override;
   smt::expr eqType(const Instr &i) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -137,18 +144,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-};
-
-
-class CopyOp final : public Instr {
-  Value &val;
-public:
-  CopyOp(Type &type, std::string &&name, Value &val)
-    : Instr(type, std::move(name)), val(val) {}
-
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -164,6 +160,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -182,6 +179,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -204,6 +202,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -215,6 +214,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -228,6 +228,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 }

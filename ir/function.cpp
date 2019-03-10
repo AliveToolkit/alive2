@@ -27,6 +27,14 @@ void BasicBlock::addInstr(unique_ptr<Instr> &&i) {
   m_instrs.push_back(move(i));
 }
 
+unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
+  auto newbb = make_unique<BasicBlock>(name + suffix);
+  for (auto &i : instrs()) {
+    newbb->addInstr(i.dup(suffix));
+  }
+  return newbb;
+}
+
 ostream& operator<<(ostream &os, const BasicBlock &bb) {
   if (!bb.name.empty())
     os << bb.name << ":\n";

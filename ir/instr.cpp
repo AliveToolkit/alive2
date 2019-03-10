@@ -248,10 +248,15 @@ expr BinOp::getTypeConstraints(const Function &f) const {
          move(instrconstr);
 }
 
+unique_ptr<Instr> BinOp::dup(const string &suffix) const {
+  return make_unique<BinOp>(getType(), getName()+suffix, lhs, rhs, op, flags);
+}
+
 
 void UnaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
+  case Copy:        str = ""; break;
   case BitReverse:  str = "bitreverse "; break;
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
@@ -265,6 +270,9 @@ StateValue UnaryOp::toSMT(State &s) const {
   expr newval;
 
   switch (op) {
+  case Copy:
+    newval = v;
+    break;
   case BitReverse:
     newval = v.bitreverse();
     break;
@@ -279,19 +287,25 @@ StateValue UnaryOp::toSMT(State &s) const {
 }
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
-  expr instrconstr;
+  expr instrconstr = true;
   switch(op) {
   case BSwap:
     instrconstr = val.getType().sizeVar().urem(expr::mkUInt(16, 8)) == 0;
+    [[fallthrough]];
+  case BitReverse:
+  case Ctpop:
+    instrconstr &= getType().enforceIntOrPtrOrVectorType();
+  case Copy:
     break;
-  default:
-    instrconstr = true;
   }
 
   return Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrOrVectorType() &&
          getType() == val.getType() &&
          move(instrconstr);
+}
+
+unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
+  return make_unique<UnaryOp>(getType(), getName() + suffix, val, op);
 }
 
 
@@ -327,7 +341,7 @@ StateValue TernaryOp::toSMT(State &s) const {
     break;
   }
 
-  return {move(newval), move(not_poison)};
+  return { move(newval), move(not_poison) };
 }
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
@@ -336,6 +350,10 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
          getType() == A.getType() &&
          getType() == B.getType() &&
          getType() == C.getType();
+}
+
+unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {
+  return make_unique<TernaryOp>(getType(), getName() + suffix, A, B, C, op);
 }
 
 
@@ -391,6 +409,10 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
          move(sizeconstr);
 }
 
+unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {
+  return make_unique<ConversionOp>(getType(), getName() + suffix, val, op);
+}
+
 
 void Select::print(ostream &os) const {
   os << getName() << " = select " << cond << ", " << a << ", " << b;
@@ -412,6 +434,10 @@ expr Select::getTypeConstraints(const Function &f) const {
          getType().enforceIntOrPtrOrVectorType() &&
          getType() == a.getType() &&
          getType() == b.getType();
+}
+
+unique_ptr<Instr> Select::dup(const string &suffix) const {
+  return make_unique<Select>(getType(), getName() + suffix, cond, a, b);
 }
 
 
@@ -491,6 +517,10 @@ expr ICmp::eqType(const Instr &i) const {
   return eq;
 }
 
+unique_ptr<Instr> ICmp::dup(const string &suffix) const {
+  return make_unique<ICmp>(getType(), getName() + suffix, cond, a, b);
+}
+
 
 void Freeze::print(ostream &os) const {
   os << getName() << " = freeze " << val;
@@ -507,7 +537,7 @@ StateValue Freeze::toSMT(State &s) const {
   expr nondet = expr::mkVar(name.c_str(), bits());
   s.addQuantVar(nondet);
 
-  return { expr::mkIf(p, v, std::move(nondet)), true };
+  return { expr::mkIf(p, v, move(nondet)), true };
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {
@@ -515,18 +545,8 @@ expr Freeze::getTypeConstraints(const Function &f) const {
          getType() == val.getType();
 }
 
-
-void CopyOp::print(ostream &os) const {
-  os << getName() << " = " << val;
-}
-
-StateValue CopyOp::toSMT(State &s) const {
-  return s[val];
-}
-
-expr CopyOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType() == val.getType();
+unique_ptr<Instr> Freeze::dup(const string &suffix) const {
+  return make_unique<Freeze>(getType(), getName() + suffix, val);
 }
 
 
@@ -574,6 +594,10 @@ expr Phi::getTypeConstraints(const Function &f) const {
   return c;
 }
 
+unique_ptr<Instr> Phi::dup(const string &suffix) const {
+  return make_unique<Phi>(getType(), getName() + suffix, ValTy(values));
+}
+
 
 void Branch::print(ostream &os) const {
   os << "br ";
@@ -598,6 +622,12 @@ expr Branch::getTypeConstraints(const Function &f) const {
          cond->getType().sizeVar() == 1u;
 }
 
+unique_ptr<Instr> Branch::dup(const string &suffix) const {
+  if (dst_false)
+    return make_unique<Branch>(*cond, dst_true, *dst_false);
+  return make_unique<Branch>(dst_true);
+}
+
 
 void Switch::addTarget(Value &val, const BasicBlock &target) {
   targets.emplace_back(val, target);
@@ -615,10 +645,10 @@ StateValue Switch::toSMT(State &s) const {
   auto val = s[value];
   expr default_cond(true);
 
-  for (auto &p : targets) {
-    auto target = s[p.first];
+  for (auto &[value_cond, bb] : targets) {
+    auto target = s[value_cond];
     assert(target.non_poison.isTrue());
-    s.addJump({ val.value == target.value, expr(val.non_poison) }, p.second);
+    s.addJump({ val.value == target.value, expr(val.non_poison) }, bb);
     default_cond &= val.value != target.value;
   }
 
@@ -633,6 +663,14 @@ expr Switch::getTypeConstraints(const Function &f) const {
     typ &= p.first.getType().enforceIntType();
   }
   return typ;
+}
+
+unique_ptr<Instr> Switch::dup(const string &suffix) const {
+  auto sw = make_unique<Switch>(value, default_target);
+  for (auto &[value_cond, bb] : targets) {
+    sw->addTarget(value_cond, bb);
+  }
+  return sw;
 }
 
 
@@ -651,6 +689,10 @@ expr Return::getTypeConstraints(const Function &f) const {
          f.getType() == getType();
 }
 
+unique_ptr<Instr> Return::dup(const string &suffix) const {
+  return make_unique<Return>(getType(), val);
+}
+
 
 void Assume::print(ostream &os) const {
   os << (if_non_poison ? "assume_non_poison " : "assume ") << cond;
@@ -667,6 +709,10 @@ StateValue Assume::toSMT(State &s) const {
 
 expr Assume::getTypeConstraints(const Function &f) const {
   return cond.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Assume::dup(const string &suffix) const {
+  return make_unique<Assume>(cond, if_non_poison);
 }
 
 }

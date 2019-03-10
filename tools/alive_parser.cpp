@@ -532,7 +532,7 @@ static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
   auto &ty = parse_type();
   auto &op = parse_operand(ty);
-  return make_unique<CopyOp>(ty, string(name), op);
+  return make_unique<UnaryOp>(ty, string(name), op, UnaryOp::Copy);
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {

@@ -344,6 +344,7 @@ public:
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
     case llvm::Intrinsic::ctpop:
+    case llvm::Intrinsic::expect:
     {
       PARSE_UNOP();
       UnaryOp::Op op;
@@ -351,6 +352,7 @@ public:
       case llvm::Intrinsic::bitreverse: op = UnaryOp::BitReverse; break;
       case llvm::Intrinsic::bswap:      op = UnaryOp::BSwap; break;
       case llvm::Intrinsic::ctpop:      op = UnaryOp::Ctpop; break;
+      case llvm::Intrinsic::expect:     op = UnaryOp::Copy; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
@@ -367,11 +369,6 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
                                                op));
-    }
-    case llvm::Intrinsic::expect:
-    {
-      PARSE_UNOP();
-      RETURN_IDENTIFIER(make_unique<CopyOp>(*ty, value_name(i), *val));
     }
 
     // do nothing intrinsics

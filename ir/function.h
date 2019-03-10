@@ -42,6 +42,8 @@ public:
   }
   Instr& back() { return *m_instrs.back(); }
 
+  std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
+
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
 };
 
