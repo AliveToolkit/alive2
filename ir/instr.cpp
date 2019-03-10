@@ -550,6 +550,10 @@ unique_ptr<Instr> Freeze::dup(const string &suffix) const {
 }
 
 
+void Phi::addValue(Value &val, string &&BB_name) {
+  values.emplace_back(val, move(BB_name));
+}
+
 void Phi::print(ostream &os) const {
   os << getName() << " = phi ";
   auto t = getType().toString();
@@ -595,7 +599,11 @@ expr Phi::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Phi::dup(const string &suffix) const {
-  return make_unique<Phi>(getType(), getName() + suffix, ValTy(values));
+  auto phi = make_unique<Phi>(getType(), getName() + suffix);
+  for (auto &[val, bb] : values) {
+    phi->addValue(val, string(bb));
+  }
+  return phi;
 }
 
 

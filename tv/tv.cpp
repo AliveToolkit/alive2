@@ -260,19 +260,19 @@ public:
   }
 
   RetTy visitPHINode(llvm::PHINode &i) {
-    Phi::ValTy values;
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
       return error(i);
 
+    auto phi = make_unique<Phi>(*ty, value_name(i));
     for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
       auto op = get_operand(i.getIncomingValue(idx));
       if (!op)
         return error(i);
-      values.emplace_back(*op, value_name(*i.getIncomingBlock(idx)));
+      phi->addValue(*op, value_name(*i.getIncomingBlock(idx)));
     }
 
-    RETURN_IDENTIFIER(make_unique<Phi>(*ty, value_name(i), move(values)));
+    RETURN_IDENTIFIER(move(phi));
   }
 
   RetTy visitBranchInst(llvm::BranchInst &i) {

@@ -149,13 +149,11 @@ public:
 
 
 class Phi final : public Instr {
+  std::vector<std::pair<Value&, std::string>> values;
 public:
-  typedef std::vector<std::pair<Value&, std::string>> ValTy;
-private:
-  ValTy values;
-public:
-  Phi(Type &type, std::string &&name, ValTy &&values)
-    : Instr(type, std::move(name)), values(std::move(values)) {}
+  Phi(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
+
+  void addValue(Value &val, std::string &&BB_name);
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
