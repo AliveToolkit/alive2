@@ -607,6 +607,29 @@ unique_ptr<Instr> Phi::dup(const string &suffix) const {
 }
 
 
+const BasicBlock& JumpInstr::target_iterator::operator*() const {
+  if (auto br = dynamic_cast<Branch*>(instr))
+    return idx == 0 ? br->getTrue() : *br->getFalse();
+
+  if (auto sw = dynamic_cast<Switch*>(instr))
+    return idx == 0 ? sw->getDefault() : sw->getTarget(idx-1).second;
+
+  UNREACHABLE();
+}
+
+JumpInstr::target_iterator JumpInstr::it_helper::end() const {
+  unsigned idx;
+  if (auto br = dynamic_cast<Branch*>(instr)) {
+    idx = br->getFalse() ? 2 : 1;
+  } else if (auto sw = dynamic_cast<Switch*>(instr)) {
+    idx = sw->getNumTargets() + 1;
+  } else {
+    UNREACHABLE();
+  }
+  return { instr, idx };
+}
+
+
 void Branch::print(ostream &os) const {
   os << "br ";
   if (cond)

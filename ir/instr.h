@@ -162,14 +162,41 @@ public:
 };
 
 
-class Branch final : public Instr {
+class JumpInstr : public Instr {
+public:
+  JumpInstr(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
+
+  class target_iterator {
+    JumpInstr *instr;
+    unsigned idx;
+  public:
+    target_iterator() {}
+    target_iterator(JumpInstr *instr, unsigned idx) : instr(instr), idx(idx) {}
+    const BasicBlock& operator*() const;
+    target_iterator& operator++(void) { ++idx; return *this; }
+    bool operator!=(target_iterator &rhs) const { return idx != rhs.idx; }
+    bool operator==(target_iterator &rhs) const { return !(*this != rhs); }
+  };
+
+  class it_helper {
+    JumpInstr *instr;
+  public:
+    it_helper(JumpInstr *instr) : instr(instr) {}
+    target_iterator begin() const { return { instr, 0 }; }
+    target_iterator end() const;
+  };
+  it_helper targets() { return this; }
+};
+
+
+class Branch final : public JumpInstr {
   Value *cond = nullptr;
   const BasicBlock &dst_true, *dst_false = nullptr;
 public:
-  Branch(const BasicBlock &dst) : Instr(Type::voidTy, "br"), dst_true(dst) {}
+  Branch(const BasicBlock &dst) : JumpInstr(Type::voidTy, "br"), dst_true(dst) {}
 
   Branch(Value &cond, const BasicBlock &dst_true, const BasicBlock &dst_false)
-    : Instr(Type::voidTy, "br"), cond(&cond), dst_true(dst_true),
+    : JumpInstr(Type::voidTy, "br"), cond(&cond), dst_true(dst_true),
     dst_false(&dst_false) {}
 
   auto& getTrue() const { return dst_true; }
@@ -181,14 +208,14 @@ public:
 };
 
 
-class Switch final : public Instr {
+class Switch final : public JumpInstr {
   Value &value;
   const BasicBlock &default_target;
   std::vector<std::pair<Value&, const BasicBlock&>> targets;
 
 public:
   Switch(Value &value, const BasicBlock &default_target)
-    : Instr(Type::voidTy, "switch"), value(value),
+    : JumpInstr(Type::voidTy, "switch"), value(value),
       default_target(default_target) {}
 
   void addTarget(Value &val, const BasicBlock &target);

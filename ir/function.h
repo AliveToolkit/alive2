@@ -133,8 +133,8 @@ public:
   CFG(Function &f) : f(f) {}
 
   class edge_iterator {
-    std::vector<BasicBlock*>::iterator it, end;
-    unsigned idx = 0;
+    std::vector<BasicBlock*>::iterator bbi, bbe;
+    JumpInstr::target_iterator ti, te;
     void next();
   public:
     edge_iterator(std::vector<BasicBlock*>::iterator &&it,
@@ -142,7 +142,7 @@ public:
     std::tuple<const BasicBlock&, const BasicBlock&, const Instr&>
       operator*() const;
     void operator++(void);
-    bool operator!=(edge_iterator &rhs) const { return it != rhs.it; }
+    bool operator!=(edge_iterator &rhs) const;
   };
 
   edge_iterator begin() const {

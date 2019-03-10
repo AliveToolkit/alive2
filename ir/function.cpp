@@ -157,51 +157,41 @@ ostream& operator<<(ostream &os, const Function &f) {
 
 
 void CFG::edge_iterator::next() {
-  // jump to next BB with a terminator that is not a return instruction
-  while (it != end && dynamic_cast<Return*>(&(*it)->back())) {
-    ++it;
+  // jump to next BB with a terminator that is a jump
+  while (true) {
+    if (bbi == bbe)
+      return;
+
+    if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
+      ti = instr->targets().begin();
+      te = instr->targets().end();
+      return;
+    }
+
+    ++bbi;
   }
 }
 
 CFG::edge_iterator::edge_iterator(vector<BasicBlock*>::iterator &&it,
                                   vector<BasicBlock*>::iterator &&end)
-  : it(move(it)), end(move(end)) {
+  : bbi(move(it)), bbe(move(end)) {
   next();
 }
 
 tuple<const BasicBlock&, const BasicBlock&, const Instr&>
   CFG::edge_iterator::operator*() const {
-  const BasicBlock *dst;
-  auto instr = &(*it)->back();
-  if (auto br = dynamic_cast<Branch*>(instr)) {
-    dst = idx == 0 ? &br->getTrue() : br->getFalse();
-  } else if (auto sw = dynamic_cast<Switch*>(instr)) {
-    dst = idx == 0 ? &sw->getDefault() : &sw->getTarget(idx-1).second;
-  } else {
-    UNREACHABLE();
-  }
-  return { **it, *dst, *instr };
+  return { **bbi, *ti, (*bbi)->back() };
 }
 
 void CFG::edge_iterator::operator++(void) {
-  auto instr = &(*it)->back();
-  auto inc = [&](bool next_bb) {
-    if (next_bb) {
-      idx = 0;
-      ++it;
-      next();
-    } else {
-      ++idx;
-    }
-  };
-
-  if (auto br = dynamic_cast<Branch*>(instr)) {
-    inc(idx > 0 || !br->getFalse());
-  } else if (auto sw = dynamic_cast<Switch*>(instr)) {
-    inc(idx == sw->getNumTargets());
-  } else {
-    UNREACHABLE();
+  if (++ti == te) {
+    ++bbi;
+    next();
   }
+}
+
+bool CFG::edge_iterator::operator!=(edge_iterator &rhs) const {
+  return bbi != rhs.bbi && (bbi == bbe || rhs.bbi == rhs.bbe || ti != rhs.ti);
 }
 
 static string_view bb_dot_name(const string &name) {
