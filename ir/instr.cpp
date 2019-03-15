@@ -231,16 +231,20 @@ StateValue BinOp::toSMT(State &s) const {
     val = a.ctlz();
     not_poison &= (b == 0u || a != 0u);
     break;
-  
+
   case SAdd_Overflow:
     val = a + b;
-    val = val.concat(expr::mkIf(a.add_no_soverflow(b), expr::mkUInt(0, 1), expr::mkUInt(1, 1)));
+    val = val.concat(expr::mkIf(a.add_no_soverflow(b),
+				expr::mkUInt(0, 1),
+				expr::mkUInt(1, 1)));
     break;
 
   case ExtractValue:
   {
-    auto &aggType = static_cast<AggregateType&>(lhs.getType());
-    val = aggType.extract(a, b);
+    auto &aggType = static_cast<StructureType&>(lhs.getType());
+    uint64_t index;
+    ENSURE(b.isUInt(index));
+    val = aggType.extract(a, index);
     break;
   }
   }
@@ -254,16 +258,17 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case ExtractValue:
   {
     int64_t n;
-    instrconstr = lhs.getType().enforceAggregateType() &&
+    instrconstr = lhs.getType().enforceStructureType() &&
                   rhs.isIntConst(n);
-    auto aggregateType = dynamic_cast<AggregateType&>(lhs.getType());
+    auto aggregateType = dynamic_cast<StructureType&>(lhs.getType());
     instrconstr = instrconstr &&
-                  aggregateType.getChildConstraints(getType(), n);
+                  aggregateType.getChildType(n) == getType();
     break;
   }
   case SAdd_Overflow:
     instrconstr = lhs.getType() == rhs.getType() &&
-                  getType().enforceAggregateType();
+                  lhs.getType().enforceIntType() &&
+                  getType().enforceStructureType();
     break;
   case Cttz:
   case Ctlz:

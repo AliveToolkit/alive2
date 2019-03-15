@@ -28,7 +28,7 @@ protected:
   smt::expr isPtr() const;
   smt::expr isArray() const;
   smt::expr isVector() const;
-  smt::expr isAggregate() const;
+  smt::expr isStructure() const;
 
 public:
   Type(std::string &&name) : name(std::move(name)) {}
@@ -42,7 +42,7 @@ public:
   virtual smt::expr enforceIntType() const;
   virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
-  virtual smt::expr enforceAggregateType() const;
+  virtual smt::expr enforceStructureType() const;
 
   virtual void print(std::ostream &os) const = 0;
   friend std::ostream& operator<<(std::ostream &os, const Type &t);
@@ -128,38 +128,31 @@ public:
 };
 
 
-// Currently only supports aggregate type with two children
-// of int type.
-// Eg: {ix, i1}. Enforced in getTypeConstraints()
-class AggregateType final : public Type {
-  std::vector<Type*> childrenType;
+class StructureType final : public Type {
+  const std::vector<Type*> children;
 
 public:
-  AggregateType(std::string &&name) : Type(std::move(name)) {}
-  AggregateType(std::string &&name, std::initializer_list<Type*> types)
-    : Type(std::move(name)), childrenType(types) {
-    ENSURE(!childrenType.empty());
-  }
+  StructureType(std::string &&name) : Type(std::move(name)) {}
+  StructureType(std::string &&name, std::vector<Type*> &&children)
+    : Type(std::move(name)), children(children) { }
 
   unsigned bits() const override;
-  smt::expr enforceAggregateType() const override;
+  smt::expr enforceStructureType() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr operator==(const AggregateType &rhs) const;
+  smt::expr operator==(const StructureType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 
-  unsigned getChildrenSize() const { return childrenType.size(); }
-  // constraint enforcing type to be aggregate's type at index
-  smt::expr getChildConstraints(Type &type, unsigned index) const;
-  // Extracts the type located at `b` from `a`.
-  smt::expr extract(const smt::expr &a, const smt::expr &b) const;
+  Type& getChildType(unsigned index) const;
+  // Extracts the type located at `index` from `aggType`.
+  smt::expr extract(const smt::expr &aggregate, unsigned index) const;
 };
 
 
 class SymbolicType final : public Type {
 public:
-  enum TypeNum { Int, Float, Ptr, Array, Vector, Aggregate, Undefined };
+  enum TypeNum { Int, Float, Ptr, Array, Vector, Structure, Undefined };
 
 private:
   TypeNum typ = Undefined;
@@ -168,7 +161,7 @@ private:
   PtrType p;
   ArrayType a;
   VectorType v;
-  AggregateType ag;
+  StructureType st;
   bool named;
 
 public:
@@ -180,6 +173,7 @@ public:
   smt::expr enforceIntType() const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr enforceStructureType() const override;
   void print(std::ostream &os) const override;
 };
 

@@ -220,20 +220,20 @@ static void parse_comma() {
 }
 
 
-static unordered_map<unsigned, unique_ptr<AggregateType>> overflow_aggregate_types;
+static vector<unique_ptr<StructureType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
+static unsigned ov_num;
 
-static Type& get_overflow_type(unsigned bitwidth) {
-  if (overflow_aggregate_types.find(bitwidth) != overflow_aggregate_types.end()) {
-    return *overflow_aggregate_types[bitwidth];
-  }
+static Type& get_overflow_type(Type &type) {
+  if (ov_num < overflow_aggregate_types.size())
+    return *overflow_aggregate_types[ov_num++].get();
 
-  initializer_list<Type*> children = { int_types[bitwidth].get(), int_types[1].get() };
-  auto t = make_unique<AggregateType>("oaggty_" + to_string(bitwidth), move(children));
-  overflow_aggregate_types.emplace(bitwidth, move(t));
-
-  return *overflow_aggregate_types[bitwidth];
+  auto t = make_unique<StructureType>("oaggty_" + std::to_string(ov_num++),
+				      std::initializer_list<Type*>(
+					{ &type,
+					  int_types[1].get()}));
+  return *overflow_aggregate_types.emplace_back(move(t)).get();
 }
 
 static Type& get_sym_type() {
@@ -274,7 +274,7 @@ static Type& parse_type(bool optional = true) {
   UNREACHABLE();
 }
 
-static Type& try_parse_type(Type &default_type) {
+static Type& try_parse_type(Type &default_type = get_int_type(64)) {
   if (tokenizer.isType())
     return parse_type();
   return default_type;
@@ -419,11 +419,11 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   parse_comma();
 
   // 2nd binop argument handling
-  auto type2 = std::ref(try_parse_type(type));
+  Type *type2 = &try_parse_type(type);
   if (op_token == EXTRACTVALUE)
-    type2 = std::ref(get_int_type(64));
-  auto &b = parse_operand(type2);
-  auto rettype = std::ref(type);
+    type2 = &get_int_type(64);
+  auto &b = parse_operand(*type2);
+  Type *rettype = &type;
 
   BinOp::Op op;
   switch (op_token) {
@@ -448,16 +448,16 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case USUB_SAT: op = BinOp::USub_Sat; break;
   case SADD_OVERFLOW:
     op = BinOp::SAdd_Overflow;
-    rettype = std::ref(get_overflow_type(type.bits()));
+    rettype = &get_overflow_type(type);
     break;
   case EXTRACTVALUE:
     op = BinOp::ExtractValue;
-    rettype = std::ref(get_sym_type());
+    rettype = &get_sym_type();
     break;
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(rettype.get(), string(name), a, b, op, flags);
+  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -689,6 +689,7 @@ vector<Transform> parse(string_view buf) {
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
     sym_num = 0;
+    ov_num = 0;
     parse_name(t);
     parse_pre(t);
     parse_fn(t.src);
