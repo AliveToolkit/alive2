@@ -220,20 +220,17 @@ static void parse_comma() {
 }
 
 
-static vector<unique_ptr<StructureType>> overflow_aggregate_types;
+static unordered_map<Type*, unique_ptr<StructureType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
-static unsigned ov_num;
 
 static Type& get_overflow_type(Type &type) {
-  if (ov_num < overflow_aggregate_types.size())
-    return *overflow_aggregate_types[ov_num++].get();
-
-  auto t = make_unique<StructureType>("oaggty_" + std::to_string(ov_num++),
+  auto t = make_unique<StructureType>("oaggty",
 				      std::initializer_list<Type*>(
 					{ &type,
 					  int_types[1].get()}));
-  return *overflow_aggregate_types.emplace_back(move(t)).get();
+  auto res = overflow_aggregate_types.emplace(&type, move(t));
+  return *res.first->second.get();
 }
 
 static Type& get_sym_type() {
@@ -689,7 +686,6 @@ vector<Transform> parse(string_view buf) {
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
     sym_num = 0;
-    ov_num = 0;
     parse_name(t);
     parse_pre(t);
     parse_fn(t.src);
