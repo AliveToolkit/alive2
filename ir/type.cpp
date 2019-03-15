@@ -310,14 +310,14 @@ Type& StructureType::getChildType(unsigned index) const {
   return *children[index];
 }
 
-expr StructureType::extract(const expr &aggregate, unsigned index) const {
+expr StructureType::extract(const expr &struct_val, unsigned index) const {
   unsigned total_till_now = 0;
   assert(index < children.size());
   for (unsigned i = 0; i <= index; i++) {
     total_till_now += children[i]->bits();
   }
-  unsigned low = aggregate.bits() - total_till_now;
-  return aggregate.extract(low + children[index]->bits() - 1, low);
+  unsigned low = struct_val.bits() - total_till_now;
+  return struct_val.extract(low + children[index]->bits() - 1, low);
 }
 
 

@@ -241,10 +241,10 @@ StateValue BinOp::toSMT(State &s) const {
 
   case ExtractValue:
   {
-    auto &aggType = static_cast<StructureType&>(lhs.getType());
+    auto &structType = static_cast<StructureType&>(lhs.getType());
     uint64_t index;
     ENSURE(b.isUInt(index));
-    val = aggType.extract(a, index);
+    val = structType.extract(a, index);
     break;
   }
   }
@@ -260,10 +260,11 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     int64_t n;
     instrconstr = lhs.getType().enforceStructureType() &&
                   rhs.isIntConst(n);
-    auto aggregateType = dynamic_cast<StructureType&>(lhs.getType());
-    if (n >= 0 && n < static_cast<int64_t>(aggregateType.numElements())) {
+    auto structType = dynamic_cast<StructureType*>(&lhs.getType());
+    if (structType &&
+	n >= 0 && n < static_cast<int64_t>(structType->numElements())) {
       instrconstr = instrconstr &&
-	            aggregateType.getChildType(n) == getType();
+	            structType->getChildType(n) == getType();
     } else {
       instrconstr = false;
     }

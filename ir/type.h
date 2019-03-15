@@ -4,9 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
-#include "util/compiler.h"
 
-#include <initializer_list>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -143,11 +141,10 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
-
   auto numElements() const { return children.size(); }
   Type& getChildType(unsigned index) const;
-  // Extracts the type located at `index` from `aggType`.
-  smt::expr extract(const smt::expr &aggregate, unsigned index) const;
+  // Extracts the type located at \p index from \p struct_val
+  smt::expr extract(const smt::expr &struct_val, unsigned index) const;
 };
 
 
