@@ -261,8 +261,12 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     instrconstr = lhs.getType().enforceStructureType() &&
                   rhs.isIntConst(n);
     auto aggregateType = dynamic_cast<StructureType&>(lhs.getType());
-    instrconstr = instrconstr &&
-                  aggregateType.getChildType(n) == getType();
+    if (n >= 0 && n < static_cast<int64_t>(aggregateType.numElements())) {
+      instrconstr = instrconstr &&
+	            aggregateType.getChildType(n) == getType();
+    } else {
+      instrconstr = false;
+    }
     break;
   }
   case SAdd_Overflow:

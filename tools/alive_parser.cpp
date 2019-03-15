@@ -244,7 +244,7 @@ static Type& get_sym_type() {
 static Type& get_int_type(unsigned size) {
   if (!int_types[size])
     int_types[size] =
-      make_unique<IntType>("i" + to_string(yylval.num), yylval.num);
+      make_unique<IntType>("i" + to_string(size), size);
 
   return *int_types[size].get();
 }
@@ -271,7 +271,7 @@ static Type& parse_type(bool optional = true) {
   UNREACHABLE();
 }
 
-static Type& try_parse_type(Type &default_type = get_int_type(64)) {
+static Type& try_parse_type(Type &default_type) {
   if (tokenizer.isType())
     return parse_type();
   return default_type;

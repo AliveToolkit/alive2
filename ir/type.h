@@ -144,6 +144,7 @@ public:
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
 
+  auto numElements() const { return children.size(); }
   Type& getChildType(unsigned index) const;
   // Extracts the type located at `index` from `aggType`.
   smt::expr extract(const smt::expr &aggregate, unsigned index) const;
