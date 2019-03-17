@@ -157,12 +157,6 @@ BasicBlock& getBB(const llvm::BasicBlock *bb) {
 }
 
 
-const unordered_map<unsigned, BinOp::Op> llvm_binop2alive = {
-#define LLVM_BINOP(x, y) { x, y },
-#include "tv/tv.h"
-#undef LLVM_BINOP
-};
-
 #define PARSE_UNOP()                       \
   auto ty = llvm_type2alive(i.getType());  \
   auto val = get_operand(i.getOperand(0)); \
@@ -198,10 +192,24 @@ public:
 
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
     PARSE_BINOP();
-    auto op_I = llvm_binop2alive.find(i.getOpcode());
-    if (op_I == llvm_binop2alive.end())
+    BinOp::Op alive_op;
+    switch (i.getOpcode()) {
+    case llvm::Instruction::Add:  alive_op = BinOp::Add; break;
+    case llvm::Instruction::Sub:  alive_op = BinOp::Sub; break;
+    case llvm::Instruction::Mul:  alive_op = BinOp::Mul; break;
+    case llvm::Instruction::SDiv: alive_op = BinOp::SDiv; break;
+    case llvm::Instruction::UDiv: alive_op = BinOp::UDiv; break;
+    case llvm::Instruction::SRem: alive_op = BinOp::SRem; break;
+    case llvm::Instruction::URem: alive_op = BinOp::URem; break;
+    case llvm::Instruction::Shl:  alive_op = BinOp::Shl; break;
+    case llvm::Instruction::AShr: alive_op = BinOp::AShr; break;
+    case llvm::Instruction::LShr: alive_op = BinOp::LShr; break;
+    case llvm::Instruction::And:  alive_op = BinOp::And; break;
+    case llvm::Instruction::Or:   alive_op = BinOp::Or; break;
+    case llvm::Instruction::Xor:  alive_op = BinOp::Xor; break;
+    default:
       return error(i);
-    auto alive_op = op_I->second;
+    }
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
