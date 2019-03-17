@@ -449,6 +449,9 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case EXTRACTVALUE:
     op = BinOp::ExtractValue;
     rettype = &get_sym_type();
+
+    if (!dynamic_cast<IntConst*>(&b))
+      error("Only int const accepted for RHS of extractvalue");
     break;
   default:
     UNREACHABLE();
