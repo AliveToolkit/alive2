@@ -220,17 +220,17 @@ static void parse_comma() {
 }
 
 
-static unordered_map<Type*, unique_ptr<StructureType>> overflow_aggregate_types;
+static unordered_map<Type*, unique_ptr<StructType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
 
 static Type& get_overflow_type(Type &type) {
-  auto t = make_unique<StructureType>("oaggty",
-				      std::initializer_list<Type*>(
-					{ &type,
-					  int_types[1].get()}));
-  auto res = overflow_aggregate_types.emplace(&type, move(t));
-  return *res.first->second.get();
+  auto p = overflow_aggregate_types.try_emplace(&type);
+  auto &st = p.first->second;
+  if (p.second)
+    st = make_unique<StructType>("structty",
+           initializer_list<Type*>({ &type, int_types[1].get() }));
+  return *st.get();
 }
 
 static Type& get_sym_type() {
@@ -242,9 +242,11 @@ static Type& get_sym_type() {
 }
 
 static Type& get_int_type(unsigned size) {
+  if (size >= int_types.size())
+    int_types.resize(size + 1);
+
   if (!int_types[size])
-    int_types[size] =
-      make_unique<IntType>("i" + to_string(size), size);
+    int_types[size] = make_unique<IntType>("i" + to_string(size), size);
 
   return *int_types[size].get();
 }
@@ -254,10 +256,6 @@ static Type& parse_type(bool optional = true) {
   case INT_TYPE:
     if (yylval.num > 4 * 1024)
       error("Int type too long: " + to_string(yylval.num));
-
-    if (yylval.num >= int_types.size())
-      int_types.resize(yylval.num + 1);
-
     return get_int_type(yylval.num);
 
   default:
@@ -415,11 +413,12 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto &a = parse_operand(type);
   parse_comma();
 
-  // 2nd binop argument handling
-  Type *type2 = &try_parse_type(type);
-  if (op_token == EXTRACTVALUE)
-    type2 = &get_int_type(64);
-  auto &b = parse_operand(*type2);
+  // RHS handling
+  // for extractvalue it isn't important to try multiple types
+  // so we use a default of i8
+  Type &default_rhs_type = op_token == EXTRACTVALUE ? get_int_type(8) : type;
+  Type &type_rhs = try_parse_type(default_rhs_type);
+  auto &b = parse_operand(type_rhs);
   Type *rettype = &type;
 
   BinOp::Op op;

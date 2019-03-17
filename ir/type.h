@@ -13,6 +13,7 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class StructType;
 class VoidType;
 
 class Type {
@@ -26,7 +27,7 @@ protected:
   smt::expr isPtr() const;
   smt::expr isArray() const;
   smt::expr isVector() const;
-  smt::expr isStructure() const;
+  smt::expr isStruct() const;
 
 public:
   Type(std::string &&name) : name(std::move(name)) {}
@@ -37,10 +38,13 @@ public:
   smt::expr operator==(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
-  virtual smt::expr enforceIntType() const;
+  virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
-  virtual smt::expr enforceStructureType() const;
+  virtual smt::expr enforceStructType() const;
+  virtual smt::expr enforceAggregateType() const;
+
+  virtual const StructType* getAsStructType() const;
 
   virtual void print(std::ostream &os) const = 0;
   friend std::ostream& operator<<(std::ostream &os, const Type &t);
@@ -75,7 +79,7 @@ public:
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
-  smt::expr enforceIntType() const override;
+  smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
@@ -110,6 +114,7 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
+  smt::expr enforceAggregateType() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -126,23 +131,25 @@ public:
 };
 
 
-class StructureType final : public Type {
+class StructType final : public Type {
   const std::vector<Type*> children;
 
 public:
-  StructureType(std::string &&name) : Type(std::move(name)) {}
-  StructureType(std::string &&name, std::vector<Type*> &&children)
-    : Type(std::move(name)), children(children) { }
+  StructType(std::string &&name) : Type(std::move(name)) {}
+  StructType(std::string &&name, std::vector<Type*> &&children)
+    : Type(std::move(name)), children(std::move(children)) {}
 
   unsigned bits() const override;
-  smt::expr enforceStructureType() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr operator==(const StructureType &rhs) const;
+  smt::expr operator==(const StructType &rhs) const;
   void fixup(const smt::Model &m) override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr enforceStructType() const override;
+  smt::expr enforceAggregateType() const override;
+  const StructType* getAsStructType() const override;
   void print(std::ostream &os) const override;
-  auto numElements() const { return children.size(); }
-  Type& getChildType(unsigned index) const;
+
+  smt::expr numElements() const;
+  Type& getChild(unsigned index) const;
   // Extracts the type located at \p index from \p struct_val
   smt::expr extract(const smt::expr &struct_val, unsigned index) const;
 };
@@ -150,7 +157,7 @@ public:
 
 class SymbolicType final : public Type {
 public:
-  enum TypeNum { Int, Float, Ptr, Array, Vector, Structure, Undefined };
+  enum TypeNum { Int, Float, Ptr, Array, Vector, Struct, Undefined };
 
 private:
   TypeNum typ = Undefined;
@@ -159,7 +166,7 @@ private:
   PtrType p;
   ArrayType a;
   VectorType v;
-  StructureType st;
+  StructType s;
   bool named;
 
 public:
@@ -168,10 +175,12 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
-  smt::expr enforceIntType() const override;
+  smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
-  smt::expr enforceStructureType() const override;
+  smt::expr enforceStructType() const override;
+  smt::expr enforceAggregateType() const override;
+  const StructType* getAsStructType() const override;
   void print(std::ostream &os) const override;
 };
 

@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace IR {
@@ -29,7 +30,7 @@ public:
   IntConst(Type &type, std::string &&val);
   virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
   smt::expr getTypeConstraints() const override;
-  bool isIntConst(int64_t &n) const override;
+  auto getInt() const { return std::get_if<int64_t>(&val); }
 };
 
 

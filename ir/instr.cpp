@@ -39,6 +39,10 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case LShr:
     assert((flags & Exact) == flags);
     break;
+  case ExtractValue:
+    assert(dynamic_cast<IntConst*>(&rhs));
+    assert(dynamic_cast<IntConst&>(rhs).getInt());
+    [[fallthrough]];
   case SRem:
   case URem:
   case SAdd_Sat:
@@ -51,7 +55,6 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case Cttz:
   case Ctlz:
   case SAdd_Overflow:
-  case ExtractValue:
     assert(flags == 0);
     break;
   }
@@ -234,17 +237,14 @@ StateValue BinOp::toSMT(State &s) const {
 
   case SAdd_Overflow:
     val = a + b;
-    val = val.concat(expr::mkIf(a.add_no_soverflow(b),
-				expr::mkUInt(0, 1),
-				expr::mkUInt(1, 1)));
+    val = val.concat(expr::toBVBool(!a.add_no_soverflow(b)));
     break;
 
   case ExtractValue:
   {
-    auto &structType = static_cast<StructureType&>(lhs.getType());
-    uint64_t index;
-    ENSURE(b.isUInt(index));
-    val = structType.extract(a, index);
+    auto structType = lhs.getType().getAsStructType();
+    auto idx = *static_cast<IntConst&>(rhs).getInt();
+    val = structType->extract(a, idx);
     break;
   }
   }
@@ -257,40 +257,42 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   switch (op) {
   case ExtractValue:
   {
-    int64_t n;
-    instrconstr = lhs.getType().enforceStructureType() &&
-                  rhs.isIntConst(n);
-    auto structType = dynamic_cast<StructureType*>(&lhs.getType());
-    if (structType &&
-	n >= 0 && n < static_cast<int64_t>(structType->numElements())) {
-      instrconstr = instrconstr &&
-	            structType->getChildType(n) == getType();
-    } else {
-      instrconstr = false;
+    instrconstr = lhs.getType().enforceAggregateType() &&
+                  rhs.getType().enforceIntType();
+
+    // TODO: add support for arrays
+    if (auto ty = lhs.getType().getAsStructType()) {
+      auto idx = *static_cast<IntConst&>(rhs).getInt();
+      instrconstr &= ty->numElements().ugt(idx) &&
+                     ty->getChild(idx) == getType();
     }
     break;
   }
   case SAdd_Overflow:
-    instrconstr = lhs.getType() == rhs.getType() &&
+    instrconstr = getType().enforceStructType() &&
                   lhs.getType().enforceIntType() &&
-                  getType().enforceStructureType();
+                  lhs.getType() == rhs.getType();
+
+    if (auto ty = getType().getAsStructType()) {
+      instrconstr &= ty->numElements() == 2 &&
+                     ty->getChild(0) == lhs.getType() &&
+                     ty->getChild(1).enforceIntType(1);
+    }
     break;
   case Cttz:
   case Ctlz:
-    instrconstr = rhs.getType().enforceIntType() &&
-                  rhs.getType().sizeVar() == 1u &&
-                  getType().enforceIntOrPtrOrVectorType() &&
-                  getType() == lhs.getType();
+    instrconstr = getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType() &&
+                  rhs.getType().enforceIntType() &&
+                  rhs.getType().sizeVar() == 1u;
     break;
   default:
-    instrconstr = getType() == rhs.getType() &&
-                  getType().enforceIntOrPtrOrVectorType() &&
-                  getType() == lhs.getType();
+    instrconstr = getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType() &&
+                  getType() == rhs.getType();
     break;
   }
-
-  return Value::getTypeConstraints() &&
-         move(instrconstr);
+  return Value::getTypeConstraints() && move(instrconstr);
 }
 
 unique_ptr<Instr> BinOp::dup(const string &suffix) const {

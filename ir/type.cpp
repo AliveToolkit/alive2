@@ -40,7 +40,7 @@ expr Type::isFloat() const  { return is(SymbolicType::Float); }
 expr Type::isPtr() const    { return is(SymbolicType::Ptr); }
 expr Type::isArray() const  { return is(SymbolicType::Array); }
 expr Type::isVector() const { return is(SymbolicType::Vector); }
-expr Type::isStructure() const { return is(SymbolicType::Structure); }
+expr Type::isStruct() const { return is(SymbolicType::Struct); }
 
 unsigned Type::bits() const {
   UNREACHABLE();
@@ -64,6 +64,7 @@ expr Type::operator==(const Type &b) const {
   CMP(PtrType)
   CMP(ArrayType)
   CMP(VectorType)
+  CMP(StructType)
 
 #undef CMP
 
@@ -74,7 +75,7 @@ expr Type::operator==(const Type &b) const {
   return false;
 }
 
-expr Type::enforceIntType() const {
+expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
 
@@ -86,8 +87,16 @@ expr Type::enforceIntOrPtrOrVectorType() const {
   return false;
 }
 
-expr Type::enforceStructureType() const {
+expr Type::enforceStructType() const {
   return false;
+}
+
+expr Type::enforceAggregateType() const {
+  return false;
+}
+
+const StructType* Type::getAsStructType() const {
+  UNREACHABLE();
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -143,8 +152,8 @@ void IntType::fixup(const Model &m) {
     bitwidth = m.getUInt(sizeVar());
 }
 
-expr IntType::enforceIntType() const {
-  return true;
+expr IntType::enforceIntType(unsigned bits) const {
+  return bits ? sizeVar() == bits : true;
 }
 
 expr IntType::enforceIntOrVectorType() const {
@@ -221,6 +230,10 @@ void ArrayType::fixup(const Model &m) {
   // TODO
 }
 
+expr ArrayType::enforceAggregateType() const {
+  return true;
+}
+
 void ArrayType::print(ostream &os) const {
   os << "TODO";
 }
@@ -252,68 +265,77 @@ void VectorType::print(ostream &os) const {
   os << "TODO";
 }
 
-expr StructureType::getTypeConstraints() const {
+expr StructType::getTypeConstraints() const {
   expr res(true);
-  for (auto type : children) {
-    res &= type->enforceIntType();
+  for (auto c : children) {
+    res &= c->getTypeConstraints();
   }
-
   return res;
 }
 
-expr StructureType::operator==(const StructureType &rhs) const {
+expr StructType::operator==(const StructType &rhs) const {
   if (children.size() != rhs.children.size())
     return false;
 
-  expr res(false);
-  for (unsigned i = 0; i < children.size(); i++) {
-    res = res || *children[i] == *rhs.children[i];
+  expr res(true);
+  for (unsigned i = 0, e = children.size(); i != e; ++i) {
+    res &= *children[i] == *rhs.children[i];
   }
-
   return res;
 }
 
-expr StructureType::enforceStructureType() const {
-  return !children.empty();
+expr StructType::enforceStructType() const {
+  return true;
 }
 
-void StructureType::fixup(const Model &m) {
-  // TODO
+expr StructType::enforceAggregateType() const {
+  return true;
 }
 
-expr StructureType::enforceIntOrPtrOrVectorType() const {
-  return false;
+const StructType* StructType::getAsStructType() const {
+  return this;
 }
 
-unsigned StructureType::bits() const {
+void StructType::fixup(const Model &m) {
+  for (auto c : children) {
+    c->fixup(m);
+  }
+}
+
+unsigned StructType::bits() const {
   unsigned res = 0;
-  for (unsigned i = 0; i < children.size(); i++) {
-    res += children[i]->bits();
+  for (auto c : children) {
+    res += c->bits();
   }
-
   return res;
 }
 
-void StructureType::print(ostream &os) const {
-  assert(children.size() > 0);
+void StructType::print(ostream &os) const {
   os << '{';
-  children[0]->print(os);
-  for (unsigned i = 1; i < children.size(); i++) {
-    os << ", ";
-    children[i]->print(os);
+  bool first = true;
+  for (auto c : children) {
+    if (!first)
+      os << ", ";
+    first = false;
+    c->print(os);
   }
   os << '}';
 }
 
-Type& StructureType::getChildType(unsigned index) const {
-  assert(index < children.size());
+smt::expr StructType::numElements() const {
+  // TODO: fix symbolic struct type
+  return expr::mkUInt(children.size(), 8);
+}
+
+Type& StructType::getChild(unsigned index) const {
+  // TODO: fix symbolic struct type
   return *children[index];
 }
 
-expr StructureType::extract(const expr &struct_val, unsigned index) const {
+expr StructType::extract(const expr &struct_val, unsigned index) const {
   unsigned total_till_now = 0;
   assert(index < children.size());
-  for (unsigned i = 0; i <= index; i++) {
+  for (unsigned i = 0; i <= index; ++i) {
     total_till_now += children[i]->bits();
   }
   unsigned low = struct_val.bits() - total_till_now;
@@ -323,7 +345,7 @@ expr StructureType::extract(const expr &struct_val, unsigned index) const {
 
 SymbolicType::SymbolicType(string &&name, bool named)
   : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)), st(string(name)), named(named) {}
+    a(string(name)), v(string(name)), s(string(name)), named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -332,7 +354,7 @@ unsigned SymbolicType::bits() const {
   case Ptr:    return p.bits();
   case Array:  return a.bits();
   case Vector: return v.bits();
-  case Structure: return st.bits();
+  case Struct: return s.bits();
   case Undefined:
     assert(0 && "undefined at SymbolicType::bits()");
   }
@@ -346,6 +368,7 @@ expr SymbolicType::getTypeConstraints() const {
   c |= isPtr()    && p.getTypeConstraints();
   c |= isArray()  && a.getTypeConstraints();
   c |= isVector() && v.getTypeConstraints();
+  c |= isStruct() && s.getTypeConstraints();
   return c;
 }
 
@@ -363,8 +386,8 @@ expr SymbolicType::operator==(const Type &b) const {
     return isArray() && a == *rhs;
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
     return isVector() && v == *rhs;
-  if (auto rhs = dynamic_cast<const StructureType*>(&b))
-    return isStructure() && st == *rhs;
+  if (auto rhs = dynamic_cast<const StructType*>(&b))
+    return isStruct() && s == *rhs;
 
   if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
@@ -373,7 +396,7 @@ expr SymbolicType::operator==(const Type &b) const {
     c |= isPtr()    && p == rhs->p;
     c |= isArray()  && a == rhs->a;
     c |= isVector() && v == rhs->v;
-    c |= isStructure() && st == rhs->st;
+    // FIXME: add support for this: c |= isStruct() && s == rhs->s;
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
@@ -382,7 +405,7 @@ expr SymbolicType::operator==(const Type &b) const {
 
 void SymbolicType::fixup(const Model &m) {
   unsigned smt_typ = m.getUInt(typeVar());
-  assert(smt_typ >= Int && smt_typ <= Vector);
+  assert(smt_typ >= Int && smt_typ <= Struct);
   typ = TypeNum(smt_typ);
 
   switch (typ) {
@@ -391,14 +414,14 @@ void SymbolicType::fixup(const Model &m) {
   case Ptr:    p.fixup(m); break;
   case Array:  a.fixup(m); break;
   case Vector: v.fixup(m); break;
-  case Structure: st.fixup(m); break;
+  case Struct: s.fixup(m); break;
   case Undefined:
     UNREACHABLE();
   }
 }
 
-expr SymbolicType::enforceIntType() const {
-  return isInt();
+expr SymbolicType::enforceIntType(unsigned bits) const {
+  return isInt() && i.enforceIntType(bits);
 }
 
 expr SymbolicType::enforceIntOrVectorType() const {
@@ -409,8 +432,16 @@ expr SymbolicType::enforceIntOrPtrOrVectorType() const {
   return isInt() || isPtr() || isVector();
 }
 
-expr SymbolicType::enforceStructureType() const {
-  return isStructure();
+expr SymbolicType::enforceStructType() const {
+  return isStruct();
+}
+
+expr SymbolicType::enforceAggregateType() const {
+  return isArray() || isStruct();
+}
+
+const StructType* SymbolicType::getAsStructType() const {
+  return &s;
 }
 
 void SymbolicType::print(ostream &os) const {
@@ -425,7 +456,7 @@ void SymbolicType::print(ostream &os) const {
   case Ptr:       p.print(os); break;
   case Array:     a.print(os); break;
   case Vector:    v.print(os); break;
-  case Structure: st.print(os); break;
+  case Struct:    s.print(os); break;
   case Undefined: break;
   }
 }

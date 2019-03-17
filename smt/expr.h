@@ -73,6 +73,7 @@ public:
   static expr mkInt(const char *n, unsigned bits);
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
+  static expr toBVBool(const expr &e);
 
   static expr IntSMin(unsigned bits);
   static expr IntSMax(unsigned bits);

@@ -42,8 +42,6 @@ public:
 
   static void reset_gbl_id();
 
-  virtual bool isIntConst(int64_t &n) const { return false; }
-
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
 
   virtual ~Value() {}

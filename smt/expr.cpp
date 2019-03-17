@@ -178,6 +178,11 @@ expr expr::mkBoolVar(const char *name) {
   return ::mkVar(name, Z3_mk_bool_sort(ctx()));
 }
 
+expr expr::toBVBool(const expr &e) {
+  auto sort = mkBVSort(1);
+  return mkIf(e, mkUInt(1, sort), mkUInt(0, sort));
+}
+
 expr expr::IntSMin(unsigned bits) {
   assert(bits > 0);
   static_assert(sizeof(unsigned long long) == 8);
