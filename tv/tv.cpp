@@ -259,6 +259,12 @@ public:
     RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
   }
 
+  RetTy visitExtractElementInst(llvm::ExtractElementInst &i) {
+    PARSE_BINOP();
+    RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                         BinOp::ExtractValue));
+  }
+
   RetTy visitPHINode(llvm::PHINode &i) {
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
@@ -321,6 +327,7 @@ public:
       PARSE_UNOP();
       return make_unique<Assume>(*val, false);
     }
+    case llvm::Intrinsic::sadd_with_overflow:
     case llvm::Intrinsic::sadd_sat:
     case llvm::Intrinsic::uadd_sat:
     case llvm::Intrinsic::ssub_sat:
@@ -331,6 +338,7 @@ public:
       PARSE_BINOP();
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::sadd_with_overflow: op=BinOp::SAdd_Overflow; break;
       case llvm::Intrinsic::sadd_sat: op = BinOp::SAdd_Sat; break;
       case llvm::Intrinsic::uadd_sat: op = BinOp::UAdd_Sat; break;
       case llvm::Intrinsic::ssub_sat: op = BinOp::SSub_Sat; break;
