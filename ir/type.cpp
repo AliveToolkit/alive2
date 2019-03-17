@@ -265,6 +265,15 @@ void VectorType::print(ostream &os) const {
   os << "TODO";
 }
 
+
+unsigned StructType::bits() const {
+  unsigned res = 0;
+  for (auto c : children) {
+    res += c->bits();
+  }
+  return res;
+}
+
 expr StructType::getTypeConstraints() const {
   expr res(true);
   for (auto c : children) {
@@ -284,6 +293,12 @@ expr StructType::operator==(const StructType &rhs) const {
   return res;
 }
 
+void StructType::fixup(const Model &m) {
+  for (auto c : children) {
+    c->fixup(m);
+  }
+}
+
 expr StructType::enforceStructType() const {
   return true;
 }
@@ -294,20 +309,6 @@ expr StructType::enforceAggregateType() const {
 
 const StructType* StructType::getAsStructType() const {
   return this;
-}
-
-void StructType::fixup(const Model &m) {
-  for (auto c : children) {
-    c->fixup(m);
-  }
-}
-
-unsigned StructType::bits() const {
-  unsigned res = 0;
-  for (auto c : children) {
-    res += c->bits();
-  }
-  return res;
 }
 
 void StructType::print(ostream &os) const {
