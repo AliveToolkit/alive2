@@ -40,6 +40,7 @@ expr Type::isFloat() const  { return is(SymbolicType::Float); }
 expr Type::isPtr() const    { return is(SymbolicType::Ptr); }
 expr Type::isArray() const  { return is(SymbolicType::Array); }
 expr Type::isVector() const { return is(SymbolicType::Vector); }
+expr Type::isStructure() const { return is(SymbolicType::Structure); }
 
 unsigned Type::bits() const {
   UNREACHABLE();
@@ -82,6 +83,10 @@ expr Type::enforceIntOrVectorType() const {
 }
 
 expr Type::enforceIntOrPtrOrVectorType() const {
+  return false;
+}
+
+expr Type::enforceStructureType() const {
   return false;
 }
 
@@ -247,10 +252,78 @@ void VectorType::print(ostream &os) const {
   os << "TODO";
 }
 
+expr StructureType::getTypeConstraints() const {
+  expr res(true);
+  for (auto type : children) {
+    res &= type->enforceIntType();
+  }
+
+  return res;
+}
+
+expr StructureType::operator==(const StructureType &rhs) const {
+  if (children.size() != rhs.children.size())
+    return false;
+
+  expr res(false);
+  for (unsigned i = 0; i < children.size(); i++) {
+    res = res || *children[i] == *rhs.children[i];
+  }
+
+  return res;
+}
+
+expr StructureType::enforceStructureType() const {
+  return !children.empty();
+}
+
+void StructureType::fixup(const Model &m) {
+  // TODO
+}
+
+expr StructureType::enforceIntOrPtrOrVectorType() const {
+  return false;
+}
+
+unsigned StructureType::bits() const {
+  unsigned res = 0;
+  for (unsigned i = 0; i < children.size(); i++) {
+    res += children[i]->bits();
+  }
+
+  return res;
+}
+
+void StructureType::print(ostream &os) const {
+  assert(children.size() > 0);
+  os << '{';
+  children[0]->print(os);
+  for (unsigned i = 1; i < children.size(); i++) {
+    os << ", ";
+    children[i]->print(os);
+  }
+  os << '}';
+}
+
+Type& StructureType::getChildType(unsigned index) const {
+  assert(index < children.size());
+  return *children[index];
+}
+
+expr StructureType::extract(const expr &struct_val, unsigned index) const {
+  unsigned total_till_now = 0;
+  assert(index < children.size());
+  for (unsigned i = 0; i <= index; i++) {
+    total_till_now += children[i]->bits();
+  }
+  unsigned low = struct_val.bits() - total_till_now;
+  return struct_val.extract(low + children[index]->bits() - 1, low);
+}
+
 
 SymbolicType::SymbolicType(string &&name, bool named)
   : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)), named(named) {}
+    a(string(name)), v(string(name)), st(string(name)), named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -259,6 +332,7 @@ unsigned SymbolicType::bits() const {
   case Ptr:    return p.bits();
   case Array:  return a.bits();
   case Vector: return v.bits();
+  case Structure: return st.bits();
   case Undefined:
     assert(0 && "undefined at SymbolicType::bits()");
   }
@@ -289,6 +363,8 @@ expr SymbolicType::operator==(const Type &b) const {
     return isArray() && a == *rhs;
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
     return isVector() && v == *rhs;
+  if (auto rhs = dynamic_cast<const StructureType*>(&b))
+    return isStructure() && st == *rhs;
 
   if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
@@ -297,6 +373,7 @@ expr SymbolicType::operator==(const Type &b) const {
     c |= isPtr()    && p == rhs->p;
     c |= isArray()  && a == rhs->a;
     c |= isVector() && v == rhs->v;
+    c |= isStructure() && st == rhs->st;
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
@@ -314,6 +391,7 @@ void SymbolicType::fixup(const Model &m) {
   case Ptr:    p.fixup(m); break;
   case Array:  a.fixup(m); break;
   case Vector: v.fixup(m); break;
+  case Structure: st.fixup(m); break;
   case Undefined:
     UNREACHABLE();
   }
@@ -331,6 +409,10 @@ expr SymbolicType::enforceIntOrPtrOrVectorType() const {
   return isInt() || isPtr() || isVector();
 }
 
+expr SymbolicType::enforceStructureType() const {
+  return isStructure();
+}
+
 void SymbolicType::print(ostream &os) const {
   if (named) {
     os << name;
@@ -343,6 +425,7 @@ void SymbolicType::print(ostream &os) const {
   case Ptr:       p.print(os); break;
   case Array:     a.print(os); break;
   case Vector:    v.print(os); break;
+  case Structure: st.print(os); break;
   case Undefined: break;
   }
 }

@@ -45,6 +45,15 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
+bool IntConst::isIntConst(int64_t &n) const {
+  if (auto v = get_if<int64_t>(&val))
+    n = *v;
+  else if (auto v = get_if<string>(&val))
+    n = std::stoll(*v);
+
+  return true;
+}
+
 pair<expr, expr> ConstantInput::toSMT_cnst() const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }

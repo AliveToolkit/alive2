@@ -202,6 +202,8 @@ re2c:yyfill:check = 0;
 "cttz" { return CTTZ; }
 "ctlz" { return CTLZ; }
 "ctpop" { return CTPOP; }
+"extractvalue" { return EXTRACTVALUE; }
+"sadd_overflow" { return SADD_OVERFLOW; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

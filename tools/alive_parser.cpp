@@ -220,8 +220,34 @@ static void parse_comma() {
 }
 
 
+static unordered_map<Type*, unique_ptr<StructureType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
+
+static Type& get_overflow_type(Type &type) {
+  auto t = make_unique<StructureType>("oaggty",
+				      std::initializer_list<Type*>(
+					{ &type,
+					  int_types[1].get()}));
+  auto res = overflow_aggregate_types.emplace(&type, move(t));
+  return *res.first->second.get();
+}
+
+static Type& get_sym_type() {
+  if (sym_num < sym_types.size())
+    return *sym_types[sym_num++].get();
+
+  auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
+  return *sym_types.emplace_back(move(t)).get();
+}
+
+static Type& get_int_type(unsigned size) {
+  if (!int_types[size])
+    int_types[size] =
+      make_unique<IntType>("i" + to_string(size), size);
+
+  return *int_types[size].get();
+}
 
 static Type& parse_type(bool optional = true) {
   switch (auto t = *tokenizer) {
@@ -232,20 +258,12 @@ static Type& parse_type(bool optional = true) {
     if (yylval.num >= int_types.size())
       int_types.resize(yylval.num + 1);
 
-    if (!int_types[yylval.num])
-      int_types[yylval.num] =
-        make_unique<IntType>("i" + to_string(yylval.num), yylval.num);
-
-    return *int_types[yylval.num].get();
+    return get_int_type(yylval.num);
 
   default:
     if (optional) {
       tokenizer.unget(t);
-      if (sym_num < sym_types.size())
-        return *sym_types[sym_num++].get();
-
-      auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
-      return *sym_types.emplace_back(move(t)).get();
+      return get_sym_type();
     } else {
       error("Expecting a type", t);
     }
@@ -383,6 +401,8 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case XOR:
   case CTTZ:
   case CTLZ:
+  case SADD_OVERFLOW:
+  case EXTRACTVALUE:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -394,8 +414,13 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
-  auto &type2 = try_parse_type(type);
-  auto &b = parse_operand(type2);
+
+  // 2nd binop argument handling
+  Type *type2 = &try_parse_type(type);
+  if (op_token == EXTRACTVALUE)
+    type2 = &get_int_type(64);
+  auto &b = parse_operand(*type2);
+  Type *rettype = &type;
 
   BinOp::Op op;
   switch (op_token) {
@@ -418,10 +443,18 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case UADD_SAT: op = BinOp::UAdd_Sat; break;
   case SSUB_SAT: op = BinOp::SSub_Sat; break;
   case USUB_SAT: op = BinOp::USub_Sat; break;
+  case SADD_OVERFLOW:
+    op = BinOp::SAdd_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case EXTRACTVALUE:
+    op = BinOp::ExtractValue;
+    rettype = &get_sym_type();
+    break;
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(type, string(name), a, b, op, flags);
+  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -558,6 +591,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case XOR:
   case CTTZ:
   case CTLZ:
+  case SADD_OVERFLOW:
+  case EXTRACTVALUE:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:
@@ -671,6 +706,7 @@ parser_initializer::parser_initializer() {
 parser_initializer::~parser_initializer() {
   for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
   sym_types.clear();
+  overflow_aggregate_types.clear();
 }
 
 }

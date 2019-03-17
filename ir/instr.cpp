@@ -3,6 +3,7 @@
 
 #include "ir/instr.h"
 #include "ir/function.h"
+#include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
@@ -49,6 +50,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case Xor:
   case Cttz:
   case Ctlz:
+  case SAdd_Overflow:
+  case ExtractValue:
     assert(flags == 0);
     break;
   }
@@ -76,6 +79,8 @@ void BinOp::print(ostream &os) const {
   case Xor:  str = "xor"; break;
   case Cttz: str = "cttz"; break;
   case Ctlz: str = "ctlz"; break;
+  case SAdd_Overflow: str = "sadd_overflow"; break;
+  case ExtractValue: str = "extractvalue"; break;
   }
 
   const char *flag = nullptr;
@@ -226,25 +231,65 @@ StateValue BinOp::toSMT(State &s) const {
     val = a.ctlz();
     not_poison &= (b == 0u || a != 0u);
     break;
+
+  case SAdd_Overflow:
+    val = a + b;
+    val = val.concat(expr::mkIf(a.add_no_soverflow(b),
+				expr::mkUInt(0, 1),
+				expr::mkUInt(1, 1)));
+    break;
+
+  case ExtractValue:
+  {
+    auto &structType = static_cast<StructureType&>(lhs.getType());
+    uint64_t index;
+    ENSURE(b.isUInt(index));
+    val = structType.extract(a, index);
+    break;
   }
+  }
+
   return { move(val), move(not_poison) };
 }
 
 expr BinOp::getTypeConstraints(const Function &f) const {
   expr instrconstr;
   switch (op) {
+  case ExtractValue:
+  {
+    int64_t n;
+    instrconstr = lhs.getType().enforceStructureType() &&
+                  rhs.isIntConst(n);
+    auto structType = dynamic_cast<StructureType*>(&lhs.getType());
+    if (structType &&
+	n >= 0 && n < static_cast<int64_t>(structType->numElements())) {
+      instrconstr = instrconstr &&
+	            structType->getChildType(n) == getType();
+    } else {
+      instrconstr = false;
+    }
+    break;
+  }
+  case SAdd_Overflow:
+    instrconstr = lhs.getType() == rhs.getType() &&
+                  lhs.getType().enforceIntType() &&
+                  getType().enforceStructureType();
+    break;
   case Cttz:
   case Ctlz:
-    instrconstr = (rhs.getType().enforceIntType() &&
-                   rhs.getType().sizeVar() == 1u);
+    instrconstr = rhs.getType().enforceIntType() &&
+                  rhs.getType().sizeVar() == 1u &&
+                  getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType();
     break;
   default:
-    instrconstr = (getType() == rhs.getType());
+    instrconstr = getType() == rhs.getType() &&
+                  getType().enforceIntOrPtrOrVectorType() &&
+                  getType() == lhs.getType();
+    break;
   }
 
   return Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrOrVectorType() &&
-         getType() == lhs.getType() &&
          move(instrconstr);
 }
 
