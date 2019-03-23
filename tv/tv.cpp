@@ -568,6 +568,7 @@ struct TVPass : public llvm::FunctionPass {
       return false;
     done = true;
 
+    type_id_counter = 0;
     int_types.resize(65);
     int_types[1] = make_unique<IntType>("i1", 1);
 
@@ -588,8 +589,8 @@ struct TVPass : public llvm::FunctionPass {
       showed_stats = true;
     }
     smt_init.reset();
+    int_types.clear();
     type_cache.clear();
-    type_id_counter = 0;
     return false;
   }
 
