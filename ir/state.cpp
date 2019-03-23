@@ -68,7 +68,7 @@ const State::ValTy& State::at(const Value &val) const {
 }
 
 const expr* State::jumpCondFrom(const BasicBlock &bb) const {
-  auto pres = predecessor_domain.at(current_bb);
+  auto &pres = predecessor_domain.at(current_bb);
   auto I = pres.find(&bb);
   return I == pres.end() ? nullptr : &I->second.first;
 }
