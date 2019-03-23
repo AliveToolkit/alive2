@@ -223,12 +223,13 @@ static void parse_comma() {
 static unordered_map<Type*, unique_ptr<StructType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
+static unsigned struct_num;
 
 static Type& get_overflow_type(Type &type) {
   auto p = overflow_aggregate_types.try_emplace(&type);
   auto &st = p.first->second;
   if (p.second)
-    st = make_unique<StructType>("structty",
+    st = make_unique<StructType>("structty_" + to_string(struct_num++),
            initializer_list<Type*>({ &type, int_types[1].get() }));
   return *st.get();
 }
@@ -687,7 +688,7 @@ vector<Transform> parse(string_view buf) {
 
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
-    sym_num = 0;
+    sym_num = struct_num = 0;
     parse_name(t);
     parse_pre(t);
     parse_fn(t.src);
