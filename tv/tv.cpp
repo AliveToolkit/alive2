@@ -74,16 +74,13 @@ unordered_map<const llvm::Value*, Value*> identifiers;
 Function *current_fn;
 
 // cache Value*'s names
-unordered_map<const llvm::Value*, std::string> value_names;
+unordered_map<const llvm::Value*, string> value_names;
 unsigned value_id_counter; // for %0, %1, etc..
 
+// cache complex types
+unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
+unsigned type_id_counter; // for unamed types
 
-struct alive_init {
-  alive_init() {
-    int_types.resize(65);
-    int_types[1] = make_unique<IntType>("i1", 1);
-  }
-} alive_init;
 
 void reset_state() {
   identifiers.clear();
@@ -91,7 +88,6 @@ void reset_state() {
   value_names.clear();
   value_id_counter = 0;
 }
-
 
 string value_name(const llvm::Value &v) {
   auto &name = value_names[&v];
@@ -114,6 +110,21 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (!int_types[bits])
       int_types[bits] = make_unique<IntType>("i" + to_string(bits), bits);
     return int_types[bits].get();
+  }
+  case llvm::Type::StructTyID: {
+    auto &cache = type_cache[ty];
+    if (!cache) {
+      vector<Type*> elems;
+      for (auto e : cast<llvm::StructType>(ty)->elements()) {
+        if (auto ty = llvm_type2alive(e))
+          elems.push_back(ty);
+        else
+          return nullptr;
+      }
+      cache = make_unique<StructType>("ty_" + to_string(type_id_counter++),
+                                      move(elems));
+    }
+    return cache.get();
   }
   default:
     errs() << "Unsupported type: " << *ty << '\n';
@@ -557,6 +568,9 @@ struct TVPass : public llvm::FunctionPass {
       return false;
     done = true;
 
+    int_types.resize(65);
+    int_types[1] = make_unique<IntType>("i1", 1);
+
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
     smt::set_query_timeout(to_string(opt_smt_to));
@@ -574,6 +588,8 @@ struct TVPass : public llvm::FunctionPass {
       showed_stats = true;
     }
     smt_init.reset();
+    type_cache.clear();
+    type_id_counter = 0;
     return false;
   }
 
