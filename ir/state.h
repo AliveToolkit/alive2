@@ -15,6 +15,7 @@
 namespace IR {
 
 struct LoopInCFGDetected : public std::exception {};
+struct OutOfMemory : public std::exception {};
 
 
 struct StateValue {

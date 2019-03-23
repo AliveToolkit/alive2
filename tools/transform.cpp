@@ -232,8 +232,10 @@ Errors TransformVerify::verify() const {
   try {
     sym_exec(src_state);
     sym_exec(tgt_state);
-  } catch (LoopInCFGDetected &e) {
-    return "WARNING: Loops not supported yet! Skipping function.";
+  } catch (LoopInCFGDetected&) {
+    return "Loops are not supported yet! Skipping function.";
+  } catch (OutOfMemory&) {
+    return "Out of memory; skipping function.";
   }
 
   Errors errs;

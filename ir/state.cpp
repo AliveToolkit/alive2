@@ -4,6 +4,7 @@
 #include "ir/state.h"
 #include "ir/function.h"
 #include "smt/expr.h"
+#include "smt/smt.h"
 #include <cassert>
 
 using namespace smt;
@@ -49,6 +50,9 @@ const StateValue& State::operator[](const Value &val) {
     auto name = UndefValue::getFreshName();
     repls.emplace_back(u, expr::mkVar(name.c_str(), u.bits()));
   }
+
+  if (hit_half_memory_limit())
+    throw OutOfMemory();
 
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
