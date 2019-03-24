@@ -7,6 +7,7 @@
 #include "tools/alive_parser.h"
 #include "util/config.h"
 #include "util/file.h"
+#include <cstdlib>
 #include <iostream>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,7 @@ static void show_help() {
     " -v\t\tVerbose mode\n"
     " -smt-stats\tShow SMT statistics\n"
     " -smt-to:x\tTimeout for SMT queries in ms\n"
+    " -max-mem:x\tMax memory consumption in MB (aprox)\n"
     " -smt-verbose\tPrint all SMT queries\n"
     " -skip-smt\tSkip all SMT queries\n"
     " -h / --help\tShow this help\n";
@@ -51,6 +53,9 @@ int main(int argc, char **argv) {
       show_smt_stats = true;
     else if (arg.compare(0, 8, "-smt-to:") == 0 && arg.size() > 8)
       smt::set_query_timeout(arg.substr(8).data());
+    else if (arg.compare(0, 9, "-max-mem:") == 0 && arg.size() > 9)
+      smt::set_memory_limit(strtoul(arg.substr(9).data(), nullptr, 10) *
+                            1024 * 1024);
     else if (arg == "-smt-verbose")
       smt::solver_print_queries(true);
     else if (arg == "-tactic-verbose")

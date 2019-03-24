@@ -48,8 +48,11 @@ const char* get_query_timeout() {
 }
 
 
-// FIXME make this configurable
 static uint64_t z3_memory_limit = 1ull << 30; // 1 GB
+
+void set_memory_limit(uint64_t limit) {
+  z3_memory_limit = limit;
+}
 
 bool hit_memory_limit() {
   return Z3_get_estimated_alloc_size() >= z3_memory_limit;
