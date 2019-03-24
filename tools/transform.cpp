@@ -165,6 +165,10 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
       }
     }
     instances = move(instances2);
+
+    // Bail out if it gets too big. It's very likely we can't solve it anyway.
+    if (instances.size() >= 128 || hit_half_memory_limit())
+      break;
   }
 
   expr insts(false);
