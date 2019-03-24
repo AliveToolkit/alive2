@@ -19,6 +19,14 @@
 #include <utility>
 #include <vector>
 
+#if __GNUC__ < 8
+# include <experimental/filesystem>
+  namespace fs = std::experimental::filesystem;
+#else
+# include <filesystem>
+  namespace fs = std::filesystem;
+#endif
+
 using namespace IR;
 using namespace tools;
 using namespace util;
@@ -52,6 +60,10 @@ llvm::cl::opt<bool> opt_smt_skip(
   "tv-smt-skip", llvm::cl::desc("Alive: skip SMT queries"),
   llvm::cl::init(false));
 
+llvm::cl::opt<string> opt_report_dir(
+  "tv-report-dir", llvm::cl::desc("Alive: save report to disk"),
+  llvm::cl::value_desc("directory"));
+
 llvm::cl::opt<bool> opt_smt_verbose(
   "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
   llvm::cl::init(false));
@@ -69,6 +81,21 @@ string_view s(llvm::StringRef str) {
   return { str.data(), str.size() };
 }
 #endif
+
+#define PRINT(T)                                \
+ostream& operator<<(ostream &os, const T &x) {  \
+  string str;                                   \
+  llvm::raw_string_ostream ss(str);             \
+  ss << x;                                      \
+  return os << ss.str();                        \
+}
+PRINT(llvm::Type)
+PRINT(llvm::Value)
+#undef PRINT
+
+
+ostream *out;
+ofstream out_file;
 
 optional<smt::smt_initializer> smt_init;
 TransformPrintOpts print_opts;
@@ -131,7 +158,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return cache.get();
   }
   default:
-    errs() << "Unsupported type: " << *ty << '\n';
+    *out << "Unsupported type: " << *ty << '\n';
     return nullptr;
   }
 }
@@ -417,7 +444,7 @@ public:
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
   RetTy error(llvm::Instruction &i) {
-    errs() << "Unsupported instruction: " << i << '\n';
+    *out << "Unsupported instruction: " << i << '\n';
     return {};
   }
 
@@ -471,7 +498,7 @@ public:
         break;
       }
       default:
-        errs() << "Unsupported metadata: " << ID << '\n';
+        *out << "Unsupported metadata: " << ID << '\n';
         return false;
       }
     }
@@ -552,25 +579,47 @@ struct TVPass : public llvm::FunctionPass {
     t.src = move(old_fn->second.first);
     t.tgt = move(*fn);
     TransformVerify verifier(t, false);
-    t.print(cerr, print_opts);
+    t.print(*out, print_opts);
 
     if (Errors errs = verifier.verify()) {
-      cerr << "Transformation doesn't verify!\n" << errs << endl;
+      *out << "Transformation doesn't verify!\n" << errs << endl;
       if (opt_error_fatal && !errs.isTimeout())
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     } else {
-      cerr << "Transformation seems to be correct!\n\n";
+      *out << "Transformation seems to be correct!\n\n";
     }
 
     old_fn->second.first = move(t.tgt);
     return false;
   }
 
-  bool doInitialization(llvm::Module&) override {
+  bool doInitialization(llvm::Module &module) override {
     static bool done = false;
     if (done)
       return false;
     done = true;
+
+    if (!opt_report_dir.empty()) {
+      auto &source_file = module.getSourceFileName();
+      fs::path fname = source_file.empty() ? "alive.txt" : source_file;
+      fname.replace_extension(".txt");
+      fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
+
+      unsigned n = 0;
+      while (fs::exists(path)) {
+        auto newname = fname.stem();
+        newname += "_" + to_string(++n) + ".txt";
+        path.replace_filename(newname);
+      }
+
+      out_file = ofstream(path);
+      out = &out_file;
+      if (!out_file.is_open())
+        llvm::report_fatal_error("Alive2: Couldn't open report file!");
+
+      *out << "Source: " << source_file << endl;
+    } else
+      out = &cerr;
 
     type_id_counter = 0;
     int_types.resize(65);
@@ -590,7 +639,7 @@ struct TVPass : public llvm::FunctionPass {
   bool doFinalization(llvm::Module&) override {
     static bool showed_stats = false;
     if (opt_smt_stats && !showed_stats) {
-      smt::solver_print_stats(cerr);
+      smt::solver_print_stats(*out);
       showed_stats = true;
     }
     smt_init.reset();

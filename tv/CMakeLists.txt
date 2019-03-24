@@ -24,4 +24,5 @@ else()
   add_llvm_library(tv MODULE tv.cpp)
 endif()
 
-target_link_libraries(tv ${ALIVE_LIBS} ${Z3_LIBRARIES})
+target_link_libraries(tv ${ALIVE_LIBS} ${Z3_LIBRARIES}
+  $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
