@@ -204,6 +204,11 @@ re2c:yyfill:check = 0;
 "ctpop" { return CTPOP; }
 "extractvalue" { return EXTRACTVALUE; }
 "sadd_overflow" { return SADD_OVERFLOW; }
+"uadd_overflow" { return UADD_OVERFLOW; }
+"ssub_overflow" { return SSUB_OVERFLOW; }
+"usub_overflow" { return USUB_OVERFLOW; }
+"smul_overflow" { return SMUL_OVERFLOW; }
+"umul_overflow" { return UMUL_OVERFLOW; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

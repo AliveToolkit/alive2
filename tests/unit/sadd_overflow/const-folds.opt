@@ -1,0 +1,71 @@
+Name: no overflow, simple add
+%a = sadd_overflow i8 120, 6
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 120, 6
+%v0 = add nuw nsw i8 120, 6
+%v1 = 0
+
+Name: no overflow
+%a = sadd_overflow i8 7, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 7, 120
+%v0 = 127
+%v1 = 0
+
+Name: no overflow
+%a = sadd_overflow i8 7, -7
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 7, -7
+%v0 = 0
+%v1 = 0
+
+Name: no overflow
+%a = sadd_overflow i8 7, -8
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 7, -8
+%v0 = -1
+%v1 = 0
+
+Name: no overflow
+%a = sadd_overflow i8 -1, -126
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 -1, -126
+%v0 = -127
+%v1 = 0
+
+Name: no overflow
+%a = sadd_overflow i8 -1, -127
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 -1, -127
+%v0 = -128
+%v1 = 0
+
+Name: overflow
+%a = sadd_overflow i8 8, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 8, 120
+%v0 = 128
+%v1 = 1
+
+Name: overflow
+%a = sadd_overflow i8 -1, -128
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = sadd_overflow i8 -1, -128
+%v0 = 127
+%v1 = 1

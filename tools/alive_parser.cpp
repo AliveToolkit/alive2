@@ -401,6 +401,11 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case CTTZ:
   case CTLZ:
   case SADD_OVERFLOW:
+  case UADD_OVERFLOW:
+  case SSUB_OVERFLOW:
+  case USUB_OVERFLOW:
+  case SMUL_OVERFLOW:
+  case UMUL_OVERFLOW:
   case EXTRACTVALUE:
     return BinOp::None;
   default:
@@ -445,6 +450,26 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case USUB_SAT: op = BinOp::USub_Sat; break;
   case SADD_OVERFLOW:
     op = BinOp::SAdd_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case UADD_OVERFLOW:
+    op = BinOp::UAdd_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case SSUB_OVERFLOW:
+    op = BinOp::SSub_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case USUB_OVERFLOW:
+    op = BinOp::USub_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case SMUL_OVERFLOW:
+    op = BinOp::SMul_Overflow;
+    rettype = &get_overflow_type(type);
+    break;
+  case UMUL_OVERFLOW:
+    op = BinOp::UMul_Overflow;
     rettype = &get_overflow_type(type);
     break;
   case EXTRACTVALUE:
@@ -595,6 +620,11 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case CTTZ:
   case CTLZ:
   case SADD_OVERFLOW:
+  case UADD_OVERFLOW:
+  case SSUB_OVERFLOW:
+  case USUB_OVERFLOW:
+  case SMUL_OVERFLOW:
+  case UMUL_OVERFLOW:
   case EXTRACTVALUE:
     return parse_binop(name, t);
   case BITREVERSE:

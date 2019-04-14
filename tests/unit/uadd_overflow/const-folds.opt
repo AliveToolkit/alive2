@@ -1,0 +1,44 @@
+Name: no overflow, simple add
+%a = uadd_overflow i8 120, 6
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = uadd_overflow i8 120, 6
+%v0 = add nuw nsw i8 120, 6
+%v1 = 0
+
+Name: no overflow
+%a = uadd_overflow i8 7, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = uadd_overflow i8 7, 120
+%v0 = 127
+%v1 = 0
+
+Name: no overflow
+%a = uadd_overflow i8 8, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = uadd_overflow i8 8, 120
+%v0 = 128
+%v1 = 0
+
+Name: no overflow
+%a = uadd_overflow i8 135, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = uadd_overflow i8 135, 120
+%v0 = 255
+%v1 = 0
+
+Name: overflow
+%a = uadd_overflow i8 136, 120
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = uadd_overflow i8 136, 120
+%v0 = 0
+%v1 = 1

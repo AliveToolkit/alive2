@@ -55,6 +55,11 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case Cttz:
   case Ctlz:
   case SAdd_Overflow:
+  case UAdd_Overflow:
+  case SSub_Overflow:
+  case USub_Overflow:
+  case SMul_Overflow:
+  case UMul_Overflow:
     assert(flags == 0);
     break;
   }
@@ -83,6 +88,11 @@ void BinOp::print(ostream &os) const {
   case Cttz: str = "cttz"; break;
   case Ctlz: str = "ctlz"; break;
   case SAdd_Overflow: str = "sadd_overflow"; break;
+  case UAdd_Overflow: str = "uadd_overflow"; break;
+  case SSub_Overflow: str = "ssub_overflow"; break;
+  case USub_Overflow: str = "usub_overflow"; break;
+  case SMul_Overflow: str = "smul_overflow"; break;
+  case UMul_Overflow: str = "umul_overflow"; break;
   case ExtractValue: str = "extractvalue"; break;
   }
 
@@ -240,6 +250,31 @@ StateValue BinOp::toSMT(State &s) const {
     val = val.concat(expr::toBVBool(!a.add_no_soverflow(b)));
     break;
 
+  case UAdd_Overflow:
+    val = a + b;
+    val = val.concat(expr::toBVBool(!a.add_no_uoverflow(b)));
+    break;
+
+  case SSub_Overflow:
+    val = a - b;
+    val = val.concat(expr::toBVBool(!a.sub_no_soverflow(b)));
+    break;
+
+  case USub_Overflow:
+    val = a - b;
+    val = val.concat(expr::toBVBool(!a.sub_no_uoverflow(b)));
+    break;
+
+  case SMul_Overflow:
+    val = a * b;
+    val = val.concat(expr::toBVBool(!a.mul_no_soverflow(b)));
+    break;
+
+  case UMul_Overflow:
+    val = a * b;
+    val = val.concat(expr::toBVBool(!a.mul_no_uoverflow(b)));
+    break;
+
   case ExtractValue:
   {
     auto structType = lhs.getType().getAsStructType();
@@ -269,6 +304,11 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     break;
   }
   case SAdd_Overflow:
+  case UAdd_Overflow:
+  case SSub_Overflow:
+  case USub_Overflow:
+  case SMul_Overflow:
+  case UMul_Overflow:
     instrconstr = getType().enforceStructType() &&
                   lhs.getType().enforceIntType() &&
                   lhs.getType() == rhs.getType();
