@@ -378,6 +378,11 @@ public:
       return make_unique<Assume>(*val, false);
     }
     case llvm::Intrinsic::sadd_with_overflow:
+    case llvm::Intrinsic::uadd_with_overflow:
+    case llvm::Intrinsic::ssub_with_overflow:
+    case llvm::Intrinsic::usub_with_overflow:
+    case llvm::Intrinsic::smul_with_overflow:
+    case llvm::Intrinsic::umul_with_overflow:
     case llvm::Intrinsic::sadd_sat:
     case llvm::Intrinsic::uadd_sat:
     case llvm::Intrinsic::ssub_sat:
@@ -389,6 +394,11 @@ public:
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::sadd_with_overflow: op=BinOp::SAdd_Overflow; break;
+      case llvm::Intrinsic::uadd_with_overflow: op=BinOp::UAdd_Overflow; break;
+      case llvm::Intrinsic::ssub_with_overflow: op=BinOp::SSub_Overflow; break;
+      case llvm::Intrinsic::usub_with_overflow: op=BinOp::USub_Overflow; break;
+      case llvm::Intrinsic::smul_with_overflow: op=BinOp::SMul_Overflow; break;
+      case llvm::Intrinsic::umul_with_overflow: op=BinOp::UMul_Overflow; break;
       case llvm::Intrinsic::sadd_sat: op = BinOp::SAdd_Sat; break;
       case llvm::Intrinsic::uadd_sat: op = BinOp::UAdd_Sat; break;
       case llvm::Intrinsic::ssub_sat: op = BinOp::SSub_Sat; break;

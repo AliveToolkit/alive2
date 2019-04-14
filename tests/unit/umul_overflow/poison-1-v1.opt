@@ -1,0 +1,5 @@
+%t = umul_overflow i4 poison, i4 %b
+%v1 = extractvalue %t, 1
+  =>
+%t = umul_overflow i4 poison, i4 %b
+%v1 = poison

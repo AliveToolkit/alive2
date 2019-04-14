@@ -1,0 +1,7 @@
+%t = usub_overflow i4 %a, i4 %b
+%v0 = extractvalue %t, 0
+  =>
+%t = usub_overflow i4 %a, i4 %b
+%v0 = poison
+
+; ERROR: Target is more poisonous than source for i4 %v0

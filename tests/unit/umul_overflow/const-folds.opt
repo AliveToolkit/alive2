@@ -1,0 +1,44 @@
+Name: no overflow, simple mul
+%a = umul_overflow i8 40, 3
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = umul_overflow i8 40, 3
+%v0 = mul nuw nsw i8 40, 3
+%v1 = 0
+
+Name: no overflow
+%a = umul_overflow i8 12, 10
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = umul_overflow i8 12, 10
+%v0 = 120
+%v1 = 0
+
+Name: overflow
+%a = umul_overflow i8 12, 11
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = umul_overflow i8 12, 11
+%v0 = 132
+%v1 = 0
+
+Name: overflow
+%a = umul_overflow i8 12, -11
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = umul_overflow i8 12, -11
+%v0 = 124
+%v1 = 1
+
+Name: overflow
+%a = umul_overflow i8 12, -10
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+  =>
+%a = umul_overflow i8 12, -10
+%v0 = 136
+%v1 = 1

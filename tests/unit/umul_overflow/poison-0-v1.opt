@@ -1,0 +1,7 @@
+%t = umul_overflow i4 %a, i4 %b
+%v1 = extractvalue %t, 1
+  =>
+%t = umul_overflow i4 %a, i4 %b
+%v1 = poison
+
+; ERROR: Target is more poisonous than source for i1 %v1
