@@ -76,7 +76,8 @@ private:
   Op op;
 
 public:
-  TernaryOp(Type &type, std::string &&name, Value &A, Value &B, Value &C, Op op)
+  TernaryOp(Type &type, std::string &&name, Value &A, Value &B, Value &C,
+            Op op)
       : Instr(type, std::move(name)), A(A), B(B), C(C), op(op) {}
 
   void print(std::ostream &os) const override;
@@ -107,7 +108,21 @@ class Select final : public Instr {
   Value &cond, &a, &b;
 public:
   Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
-    : Instr(type, move(name)), cond(cond), a(a), b(b) {}
+    : Instr(type, std::move(name)), cond(cond), a(a), b(b) {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FnCall final : public Instr {
+  std::string fnName;
+  std::vector<Value*> args;
+public:
+  FnCall(Type &type, std::string &&name, std::string &&fnName)
+    : Instr(type, std::move(name)) , fnName(std::move(fnName)) {}
+  void addArg(Value &arg);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;

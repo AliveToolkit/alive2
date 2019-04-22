@@ -33,6 +33,9 @@ public:
   Type(std::string &&name) : name(std::move(name)) {}
   virtual unsigned bits() const;
 
+  // to use when one needs the corresponding SMT type
+  virtual smt::expr getDummyValue() const = 0;
+
   virtual smt::expr getTypeConstraints() const = 0;
   virtual smt::expr sizeVar() const;
   smt::expr operator==(const Type &rhs) const;
@@ -59,6 +62,7 @@ public:
 class VoidType final : public Type {
 public:
   VoidType() : Type("void") {}
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   void print(std::ostream &os) const override;
@@ -75,6 +79,7 @@ public:
     : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
 
   unsigned bits() const override;
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
@@ -89,6 +94,7 @@ public:
 class FloatType final : public Type {
 public:
   FloatType(std::string &&name) : Type(std::move(name)) {}
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -99,6 +105,7 @@ public:
 class PtrType final : public Type {
 public:
   PtrType(std::string &&name) : Type(std::move(name)) {}
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -111,6 +118,7 @@ public:
 class ArrayType final : public Type {
 public:
   ArrayType(std::string &&name) : Type(std::move(name)) {}
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -122,6 +130,7 @@ public:
 class VectorType final : public Type {
 public:
   VectorType(std::string &&name) : Type(std::move(name)) {}
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -140,6 +149,7 @@ public:
     : Type(std::move(name)), children(std::move(children)) {}
 
   unsigned bits() const override;
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const StructType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -172,6 +182,7 @@ private:
 public:
   SymbolicType(std::string &&name, bool named = false);
   unsigned bits() const override;
+  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;

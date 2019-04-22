@@ -183,6 +183,11 @@ public:
   expr concat(const expr &rhs) const;
   expr extract(unsigned high, unsigned low) const;
 
+  // we don't expose SMT expr types, so range must be passed as a dummy value
+  // of the desired type
+  static expr mkUF(const char *name, const std::vector<expr> &args,
+                   const expr &range);
+
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
 

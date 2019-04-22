@@ -283,6 +283,27 @@ public:
                                                 ConversionOp::Trunc));
   }
 
+  RetTy visitCallInst(llvm::CallInst &i) {
+    // TODO: support attributes
+    auto fn = i.getCalledFunction();
+    if (!fn) // TODO: support indirect calls
+      return error(i);
+
+    auto ty = llvm_type2alive(i.getType());
+    if (!ty)
+      return error(i);
+
+    string fn_name = '@' + fn->getName().str();
+    auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name));
+    for (auto &arg : i.args()) {
+      auto a = get_operand(arg);
+      if (!a)
+        error(i);
+      call->addArg(*a);
+    }
+    RETURN_IDENTIFIER(move(call));
+  }
+
   RetTy visitICmpInst(llvm::ICmpInst &i) {
     PARSE_BINOP();
     ICmp::Cond cond;
@@ -610,6 +631,7 @@ struct TVPass : public llvm::FunctionPass {
     done = true;
 
     if (!opt_report_dir.empty()) {
+      // TODO: make dir if it doesn't exit
       auto &source_file = module.getSourceFileName();
       fs::path fname = source_file.empty() ? "alive.txt" : source_file;
       fname.replace_extension(".txt");

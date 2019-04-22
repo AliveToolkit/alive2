@@ -528,6 +528,65 @@ unique_ptr<Instr> Select::dup(const string &suffix) const {
 }
 
 
+void FnCall::addArg(Value &arg) {
+  args.emplace_back(&arg);
+}
+
+void FnCall::print(ostream &os) const {
+  auto printType = [](auto &t) {
+    auto type = t.toString();
+    return type.empty() ? type : type + ' ';
+  };
+
+  os << getName() << " = call " << printType(getType()) << fnName << '(';
+
+  bool first = true;
+  for (auto arg : args) {
+    if (!first)
+      os << ", ";
+    os << *arg;
+    first = false;
+  }
+  os << ')';
+}
+
+StateValue FnCall::toSMT(State &s) const {
+  // TODO: add support for memory
+  // TODO: add support for global variables
+  vector<expr> args_eval;
+
+  for (auto arg : args) {
+    auto &[v, p] = s[*arg];
+    // if the value is poison, mask out the arithmetic result
+    args_eval.emplace_back(expr::mkIf(p, v, expr::mkUInt(0, v.bits())));
+    args_eval.emplace_back(p);
+  }
+
+  // impact of the function on the domain of the program
+  // TODO: constraint when certain attributes are on
+  auto ub_name = fnName + "_ub";
+  s.addUB(expr::mkUF(ub_name.c_str(), args_eval, true));
+
+  if (dynamic_cast<VoidType*>(&getType()))
+    return {};
+
+  auto poison_name = fnName + "_poison";
+  return { expr::mkUF(fnName.c_str(), args_eval, getType().getDummyValue()),
+           expr::mkUF(poison_name.c_str(), args_eval, true) };
+}
+
+expr FnCall::getTypeConstraints(const Function &f) const {
+  // TODO : also need to name each arg type smt var uniquely
+  return Value::getTypeConstraints();
+}
+
+unique_ptr<Instr> FnCall::dup(const string &suffix) const {
+  auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName));
+  r->args = args;
+  return r;
+}
+
+
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
   : Instr(type, move(name)), a(a), b(b), cond(cond), defined(cond != Any) {
   if (!defined)

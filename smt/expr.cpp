@@ -837,6 +837,25 @@ expr expr::extract(unsigned high, unsigned low) const {
   return Z3_mk_extract(ctx(), high, low, ast());
 }
 
+expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range){
+  auto num_args = args.size();
+  vector<Z3_ast> z3_args;
+  vector<Z3_sort> z3_sorts;
+  z3_args.reserve(num_args);
+  z3_sorts.reserve(num_args);
+
+  for (auto &arg : args) {
+    if (!arg.isValid())
+      return {};
+    z3_args.emplace_back(arg());
+    z3_sorts.emplace_back(arg.sort());
+  }
+
+  auto decl = Z3_mk_func_decl(ctx(), Z3_mk_string_symbol(ctx(), name),
+                              num_args, z3_sorts.data(), range.sort());
+  return Z3_mk_app(ctx(), decl, num_args, z3_args.data());
+}
+
 expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   C2(cond, then, els);
   if (cond.isTrue() || then.eq(els))

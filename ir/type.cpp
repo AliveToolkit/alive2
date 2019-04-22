@@ -113,6 +113,10 @@ string Type::toString() const {
 Type::~Type() {}
 
 
+expr VoidType::getDummyValue() const {
+  UNREACHABLE();
+}
+
 expr VoidType::getTypeConstraints() const {
   return true;
 }
@@ -128,6 +132,10 @@ void VoidType::print(ostream &os) const {
 
 unsigned IntType::bits() const {
   return bitwidth;
+}
+
+expr IntType::getDummyValue() const {
+  return expr::mkUInt(0, bits());
 }
 
 expr IntType::getTypeConstraints() const {
@@ -170,6 +178,11 @@ void IntType::print(ostream &os) const {
 }
 
 
+expr FloatType::getDummyValue() const {
+  // TODO
+  return {};
+}
+
 expr FloatType::getTypeConstraints() const {
   // TODO
   return false;
@@ -188,6 +201,11 @@ void FloatType::print(ostream &os) const {
   os << "TODO";
 }
 
+
+expr PtrType::getDummyValue() const {
+  // TODO
+  return {};
+}
 
 expr PtrType::getTypeConstraints() const {
   // TODO
@@ -216,6 +234,11 @@ void PtrType::print(ostream &os) const {
 }
 
 
+expr ArrayType::getDummyValue() const {
+  // TODO
+  return {};
+}
+
 expr ArrayType::getTypeConstraints() const {
   // TODO
   return false;
@@ -238,6 +261,11 @@ void ArrayType::print(ostream &os) const {
   os << "TODO";
 }
 
+
+expr VectorType::getDummyValue() const {
+  // TODO
+  return {};
+}
 
 expr VectorType::getTypeConstraints() const {
   // TODO
@@ -272,6 +300,11 @@ unsigned StructType::bits() const {
     res += c->bits();
   }
   return res;
+}
+
+expr StructType::getDummyValue() const {
+  // TODO
+  return {};
 }
 
 expr StructType::getTypeConstraints() const {
@@ -358,6 +391,20 @@ unsigned SymbolicType::bits() const {
   case Struct: return s.bits();
   case Undefined:
     assert(0 && "undefined at SymbolicType::bits()");
+  }
+  UNREACHABLE();
+}
+
+expr SymbolicType::getDummyValue() const {
+  switch (typ) {
+  case Int:    return i.getDummyValue();
+  case Float:  return f.getDummyValue();
+  case Ptr:    return p.getDummyValue();
+  case Array:  return a.getDummyValue();
+  case Vector: return v.getDummyValue();
+  case Struct: return s.getDummyValue();
+  case Undefined:
+    break;
   }
   UNREACHABLE();
 }
