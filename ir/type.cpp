@@ -303,8 +303,18 @@ unsigned StructType::bits() const {
 }
 
 expr StructType::getDummyValue() const {
-  // TODO
-  return {};
+  expr res;
+  bool first = true;
+  // TODO: what if a function returns a struct with no children?
+  for (auto c : children) {
+    if (first) {
+      res = c->getDummyValue();
+      first = false;
+    } else {
+      res = res.concat(c->getDummyValue());
+    }
+  }
+  return res;
 }
 
 expr StructType::getTypeConstraints() const {

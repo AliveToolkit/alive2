@@ -533,12 +533,10 @@ void FnCall::addArg(Value &arg) {
 }
 
 void FnCall::print(ostream &os) const {
-  auto printType = [](auto &t) {
-    auto type = t.toString();
-    return type.empty() ? type : type + ' ';
-  };
-
-  os << getName() << " = call " << printType(getType()) << fnName << '(';
+  auto type = getType().toString();
+  if (!type.empty())
+    type += ' ';
+  os << getName() << " = call " << type << fnName << '(';
 
   bool first = true;
   for (auto arg : args) {
