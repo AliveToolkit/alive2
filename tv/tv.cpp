@@ -298,7 +298,7 @@ public:
     for (auto &arg : i.args()) {
       auto a = get_operand(arg);
       if (!a)
-        error(i);
+        return error(i);
       call->addArg(*a);
     }
     RETURN_IDENTIFIER(move(call));
