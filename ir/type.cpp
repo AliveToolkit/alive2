@@ -303,6 +303,9 @@ unsigned StructType::bits() const {
 }
 
 expr StructType::getDummyValue() const {
+  if (children.empty())
+    return expr::mkUInt(0, 1);
+
   expr res;
   bool first = true;
   // TODO: what if a function returns a struct with no children?
