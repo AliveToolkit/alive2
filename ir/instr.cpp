@@ -536,7 +536,11 @@ void FnCall::print(ostream &os) const {
   auto type = getType().toString();
   if (!type.empty())
     type += ' ';
-  os << getName() << " = call " << type << fnName << '(';
+
+  if (!dynamic_cast<VoidType*>(&getType()))
+    os << getName() << " = ";
+
+  os << "call " << type << fnName << '(';
 
   bool first = true;
   for (auto arg : args) {

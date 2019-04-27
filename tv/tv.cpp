@@ -127,7 +127,8 @@ string value_name(const llvm::Value &v) {
 
   if (!v.getName().empty())
     return name = '%' + v.getName().str();
-  return name = '%' + to_string(value_id_counter++);
+  return name = v.getType()->isVoidTy() ? "<void>"
+                                        : '%' + to_string(value_id_counter++);
 }
 
 Type* llvm_type2alive(const llvm::Type *ty) {
