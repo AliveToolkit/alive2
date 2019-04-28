@@ -22,6 +22,15 @@ unsigned ilog2(uint64_t n) {
 #endif
 }
 
+bool is_power2(uint64_t n, uint64_t *log) {
+  if (n == 0 || (n & (n - 1)) != 0)
+    return false;
+
+  if (log)
+    *log = ilog2(n);
+  return true;
+}
+
 unsigned num_sign_bits(uint64_t n) {
 #ifdef __clang__
   if (n == 0 || n == -1)
@@ -39,6 +48,14 @@ unsigned num_sign_bits(uint64_t n) {
 unsigned num_leading_zeros(uint64_t n) {
 #if defined(__GNUC__)
   return __builtin_clzll(n);
+#else
+# error Unknown compiler
+#endif
+}
+
+unsigned num_trailing_zeros(uint64_t n) {
+#if defined(__GNUC__)
+  return __builtin_ctzll(n);
 #else
 # error Unknown compiler
 #endif

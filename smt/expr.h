@@ -10,6 +10,7 @@
 #include <vector>
 
 typedef struct _Z3_context* Z3_context;
+typedef struct _Z3_func_decl* Z3_decl;
 typedef struct _Z3_app* Z3_app;
 typedef struct _Z3_ast* Z3_ast;
 typedef struct _Z3_sort* Z3_sort;
@@ -28,6 +29,7 @@ class expr {
   void decRef();
 
   Z3_sort sort() const;
+  Z3_decl decl() const;
   Z3_app isApp() const;
   Z3_app isAppOf(int app_type) const;
 
@@ -98,6 +100,8 @@ public:
   bool isUInt(uint64_t &n) const;
   bool isInt(int64_t &n) const;
 
+  bool isConcat(expr &a, expr &b) const;
+  bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isNot(expr &neg) const;
 
   expr operator+(const expr &rhs) const;

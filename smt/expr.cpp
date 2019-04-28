@@ -17,6 +17,7 @@
 #endif
 
 using namespace std;
+using namespace util;
 
 // helpers to check if all input arguments are non-null
 #define C(...)                                                                 \
@@ -120,6 +121,12 @@ void expr::operator=(const expr &other) {
 
 Z3_sort expr::sort() const {
   return Z3_get_sort(ctx(), ast());
+}
+
+Z3_decl expr::decl() const {
+  auto app = isApp();
+  assert(app);
+  return Z3_get_app_decl(ctx(), app);
 }
 
 Z3_app expr::isApp() const {
@@ -272,6 +279,27 @@ bool expr::isInt(int64_t &n) const {
   if (bw < 64)
     n = (int64_t)((uint64_t)n << (64 - bw)) >> (64 - bw);
   return true;
+}
+
+bool expr::isConcat(expr &a, expr &b) const {
+  if (auto app = isAppOf(Z3_OP_CONCAT)) {
+    assert(Z3_get_domain_size(ctx(), decl()) == 2);
+    a = Z3_get_app_arg(ctx(), app, 0);
+    b = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
+bool expr::isExtract(expr &e, unsigned &high, unsigned &low) const {
+  if (auto app = isAppOf(Z3_OP_EXTRACT)) {
+    e = Z3_get_app_arg(ctx(), app, 0);
+    auto d = decl();
+    high = Z3_get_decl_int_parameter(ctx(), d, 0);
+    low = Z3_get_decl_int_parameter(ctx(), d, 1);
+    return true;
+  }
+  return false;
 }
 
 bool expr::isNot(expr &neg) const {
@@ -446,7 +474,7 @@ expr expr::ssub_sat(const expr &rhs) const {
 
 expr expr::usub_sat(const expr &rhs) const {
   return mkIf(rhs.uge(*this),
-              mkUInt(0, bits()),
+              mkUInt(0, sort()),
               *this - rhs);
 }
 
@@ -497,6 +525,14 @@ expr expr::operator<<(const expr &rhs) const {
   if (binop_ufold(rhs, [](auto a, auto b) { return a << b; }, r))
     return r;
 
+  uint64_t shift;
+  if (rhs.isUInt(shift)) {
+    auto bw = bits();
+    if (shift >= bw)
+      return mkUInt(0, sort());
+    return extract(bw-shift-1, 0).concat(mkUInt(0, shift));
+  }
+
   return Z3_mk_bvshl(ctx(), ast(), rhs());
 }
 
@@ -520,6 +556,14 @@ expr expr::lshr(const expr &rhs) const {
   expr r;
   if (binop_ufold(rhs, [](auto a, auto b) { return a >> b; }, r))
     return r;
+
+  uint64_t shift;
+  if (rhs.isUInt(shift)) {
+    auto bw = bits();
+    if (shift >= bw)
+      return mkUInt(0, sort());
+    return mkUInt(0, shift).concat(extract(bw-1, shift));
+  }
 
   return Z3_mk_bvlshr(ctx(), ast(), rhs());
 }
@@ -621,6 +665,35 @@ expr expr::ctpop() const {
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
+
+  auto fold_extract = [](auto &a, auto &b) {
+    uint64_t n;
+    if (!a.isUInt(n) || n == 0 || n == -1ULL)
+      return expr();
+
+    auto lead  = num_leading_zeros(n);
+    auto trail = num_trailing_zeros(n);
+
+    if (!is_power2((n >> trail) + 1))
+      return expr();
+
+    auto r = b.extract(63 - lead, trail);
+    lead -= 64 - a.bits();
+    if (lead > 0)
+      r = mkUInt(0, lead).concat(r);
+    if (trail > 0)
+      r = r.concat(mkUInt(0, trail));
+    return r;
+  };
+
+  if (bits() <= 64) {
+    if (auto f = fold_extract(*this, rhs);
+        f.isValid())
+      return f;
+    if (auto f = fold_extract(rhs, *this);
+        f.isValid())
+      return f;
+  }
   return binopc(&, Z3_mk_bvand, isAllOnes, isZero);
 }
 
@@ -834,6 +907,23 @@ expr expr::concat(const expr &rhs) const {
 expr expr::extract(unsigned high, unsigned low) const {
   C();
   assert(high >= low && high < bits());
+
+  {
+    expr sub;
+    unsigned high_2, low_2;
+    if (isExtract(sub, high_2, low_2))
+      return sub.extract(high + low_2, low + low_2);
+  }
+  {
+    expr a, b;
+    if (isConcat(a, b)) {
+      auto b_bw = b.bits();
+      if (high < b_bw)
+        return b.extract(high, low);
+      if (low >= b_bw)
+        return a.extract(high - b_bw, low - b_bw);
+    }
+  }
   return Z3_mk_extract(ctx(), high, low, ast());
 }
 
