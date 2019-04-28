@@ -310,6 +310,17 @@ bool expr::isNot(expr &neg) const {
   return false;
 }
 
+unsigned expr::min_leading_zeros() const {
+  expr a, b;
+  uint64_t n;
+  if (isConcat(a, b)) {
+    return a.min_leading_zeros();
+  } else if (isUInt(n)) {
+    return num_leading_zeros(n) - (64 - bits());
+  }
+  return 0;
+}
+
 expr expr::binop_commutative(const expr &rhs,
                              uint64_t (*native)(uint64_t, uint64_t),
                              Z3_ast (*z3)(Z3_context, Z3_ast, Z3_ast),
@@ -479,15 +490,22 @@ expr expr::usub_sat(const expr &rhs) const {
 }
 
 expr expr::add_no_soverflow(const expr &rhs) const {
+  if (min_leading_zeros() >= 2 && rhs.min_leading_zeros() >= 2)
+    return true;
   return sext(1) + rhs.sext(1) == (*this + rhs).sext(1);
 }
 
 expr expr::add_no_uoverflow(const expr &rhs) const {
+  if (min_leading_zeros() >= 1 && rhs.min_leading_zeros() >= 1)
+    return true;
+
   auto bw = bits();
   return (zext(1) + rhs.zext(1)).extract(bw, bw) == mkUInt(0, 1);
 }
 
 expr expr::sub_no_soverflow(const expr &rhs) const {
+  if (min_leading_zeros() >= 1 && rhs.min_leading_zeros() >= 1)
+    return true;
   return sext(1) - rhs.sext(1) == (*this - rhs).sext(1);
 }
 

@@ -104,6 +104,9 @@ public:
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isNot(expr &neg) const;
 
+  // best effort; returns number of statically known bits
+  unsigned min_leading_zeros() const;
+
   expr operator+(const expr &rhs) const;
   expr operator-(const expr &rhs) const;
   expr operator*(const expr &rhs) const;
