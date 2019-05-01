@@ -19,9 +19,9 @@ add_definitions(${LLVM_DEFINITIONS})
 
 # add_llvm_loadable_module was removed in https://reviews.llvm.org/D51748
 if (COMMAND add_llvm_loadable_module)
-  add_llvm_loadable_module(tv tv.cpp)
+  add_llvm_loadable_module(tv tv.cpp llvm-utils.cpp)
 else()
-  add_llvm_library(tv MODULE tv.cpp)
+  add_llvm_library(tv MODULE tv.cpp llvm-utils.cpp)
 endif()
 
 target_link_libraries(tv ${ALIVE_LIBS} ${Z3_LIBRARIES}
