@@ -31,7 +31,7 @@ protected:
 
 public:
   Type(std::string &&name) : name(std::move(name)) {}
-  virtual unsigned bits() const;
+  virtual unsigned bits() const = 0;
 
   // to use when one needs the corresponding SMT type
   virtual smt::expr getDummyValue() const = 0;
@@ -63,6 +63,7 @@ public:
 class VoidType final : public Type {
 public:
   VoidType() : Type("void") {}
+  unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
@@ -95,6 +96,7 @@ public:
 class FloatType final : public Type {
 public:
   FloatType(std::string &&name) : Type(std::move(name)) {}
+  unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const FloatType &rhs) const;
@@ -112,6 +114,7 @@ public:
   PtrType(std::string &&name) : Type(std::move(name)) {}
 
   PtrType(unsigned addr_space);
+  unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
@@ -126,6 +129,7 @@ public:
 class ArrayType final : public Type {
 public:
   ArrayType(std::string &&name) : Type(std::move(name)) {}
+  unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const ArrayType &rhs) const;
@@ -138,6 +142,7 @@ public:
 class VectorType final : public Type {
 public:
   VectorType(std::string &&name) : Type(std::move(name)) {}
+  unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;

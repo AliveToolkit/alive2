@@ -12,7 +12,6 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
-static constexpr unsigned sizeof_ptr = 64; // TODO: make this configurable
 
 
 namespace IR {
@@ -42,10 +41,6 @@ expr Type::isPtr() const    { return is(SymbolicType::Ptr); }
 expr Type::isArray() const  { return is(SymbolicType::Array); }
 expr Type::isVector() const { return is(SymbolicType::Vector); }
 expr Type::isStruct() const { return is(SymbolicType::Struct); }
-
-unsigned Type::bits() const {
-  UNREACHABLE();
-}
 
 expr Type::operator==(const Type &b) const {
   if (this == &b)
@@ -118,6 +113,10 @@ string Type::toString() const {
 Type::~Type() {}
 
 
+unsigned VoidType::bits() const {
+  UNREACHABLE();
+}
+
 expr VoidType::getDummyValue() const {
   UNREACHABLE();
 }
@@ -183,6 +182,11 @@ void IntType::print(ostream &os) const {
 }
 
 
+unsigned FloatType::bits() const {
+  // TODO
+  return 0;
+}
+
 expr FloatType::getDummyValue() const {
   // TODO
   return {};
@@ -212,15 +216,20 @@ PtrType::PtrType(unsigned addr_space)
     addr_space(addr_space), defined(true) {}
 
 expr PtrType::ASVar() const {
-  return defined ? expr::mkUInt(addr_space, 8) : var("as", 8);
+  return defined ? expr::mkUInt(addr_space, 2) : var("as", 2);
+}
+
+unsigned PtrType::bits() const {
+  // TODO: make this configurable
+  return 64;
 }
 
 expr PtrType::getDummyValue() const {
-  return expr::mkUInt(0, sizeof_ptr);
+  return expr::mkUInt(0, bits());
 }
 
 expr PtrType::getTypeConstraints() const {
-  return sizeVar() == sizeof_ptr;
+  return sizeVar() == bits();
 }
 
 expr PtrType::operator==(const PtrType &rhs) const {
@@ -253,6 +262,11 @@ void PtrType::print(ostream &os) const {
 }
 
 
+unsigned ArrayType::bits() const {
+  // TODO
+  return 0;
+}
+
 expr ArrayType::getDummyValue() const {
   // TODO
   return {};
@@ -280,6 +294,11 @@ void ArrayType::print(ostream &os) const {
   os << "TODO";
 }
 
+
+unsigned VectorType::bits() const {
+  // TODO
+  return 0;
+}
 
 expr VectorType::getDummyValue() const {
   // TODO
@@ -410,9 +429,8 @@ expr StructType::extract(const expr &struct_val, unsigned index) const {
 
 
 SymbolicType::SymbolicType(string &&name, bool named)
-  : Type(string(name)), i(name + "_int"), f(name + "_fp"), p(name + "_ptr"),
-    a(name + "_array"), v(name + "_vector"), s(name + "_struct"),
-    named(named) {}
+  : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
+    a(string(name)), v(string(name)), s(string(name)), named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
