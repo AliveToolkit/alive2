@@ -894,4 +894,44 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
   return make_unique<Assume>(cond, if_non_poison);
 }
 
+
+void Load::print(std::ostream &os) const {
+  os << getName() << " = load " << getType() << ", " << ptr;
+}
+
+StateValue Load::toSMT(State &s) const {
+  // TODO
+  s.addUB({});
+  return {};
+}
+
+expr Load::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr.getType().enforcePtrType();
+}
+
+unique_ptr<Instr> Load::dup(const string &suffix) const {
+  return make_unique<Load>(getType(), getName() + suffix, ptr);
+}
+
+
+void Store::print(std::ostream &os) const {
+  os << "store " << getType() << ", " << ptr << ", " << val;
+}
+
+StateValue Store::toSMT(State &s) const {
+  // TODO
+  s.addUB({});
+  return {};
+}
+
+expr Store::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr.getType().enforcePtrType();
+}
+
+unique_ptr<Instr> Store::dup(const string &suffix) const {
+  return make_unique<Store>(getType(), getName() + suffix, ptr, val);
+}
+
 }

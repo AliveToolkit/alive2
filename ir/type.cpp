@@ -12,6 +12,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
+static constexpr unsigned sizeof_ptr = 64; // TODO: make this configurable
 
 
 namespace IR {
@@ -84,6 +85,10 @@ expr Type::enforceIntOrVectorType() const {
 }
 
 expr Type::enforceIntOrPtrOrVectorType() const {
+  return false;
+}
+
+expr Type::enforcePtrType() const {
   return false;
 }
 
@@ -202,23 +207,30 @@ void FloatType::print(ostream &os) const {
 }
 
 
+PtrType::PtrType(unsigned addr_space)
+  : Type(addr_space == 0 ? "*" : "as(" + to_string(addr_space) + ")*"),
+    addr_space(addr_space), defined(true) {}
+
+expr PtrType::ASVar() const {
+  return defined ? expr::mkUInt(addr_space, 8) : var("as", 8);
+}
+
 expr PtrType::getDummyValue() const {
-  // TODO
-  return {};
+  return expr::mkUInt(0, sizeof_ptr);
 }
 
 expr PtrType::getTypeConstraints() const {
-  // TODO
-  return false;
+  return sizeVar() == sizeof_ptr;
 }
 
 expr PtrType::operator==(const PtrType &rhs) const {
-  // TODO
-  return sizeVar() == rhs.sizeVar();
+  return sizeVar() == rhs.sizeVar() &&
+         ASVar() == rhs.ASVar();
 }
 
 void PtrType::fixup(const Model &m) {
-  // TODO
+  if (!defined)
+    addr_space = m.getUInt(ASVar());
 }
 
 expr PtrType::enforceIntOrVectorType() const {
@@ -229,8 +241,15 @@ expr PtrType::enforceIntOrPtrOrVectorType() const {
   return true;
 }
 
+expr PtrType::enforcePtrType() const {
+  return true;
+}
+
 void PtrType::print(ostream &os) const {
-  os << "TODO";
+  if (addr_space != 0)
+    os << "as(" << addr_space << ")*";
+  else
+    os << '*';
 }
 
 
@@ -391,8 +410,9 @@ expr StructType::extract(const expr &struct_val, unsigned index) const {
 
 
 SymbolicType::SymbolicType(string &&name, bool named)
-  : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)), s(string(name)), named(named) {}
+  : Type(string(name)), i(name + "_int"), f(name + "_fp"), p(name + "_ptr"),
+    a(name + "_array"), v(name + "_vector"), s(name + "_struct"),
+    named(named) {}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
@@ -491,6 +511,10 @@ expr SymbolicType::enforceIntOrVectorType() const {
 
 expr SymbolicType::enforceIntOrPtrOrVectorType() const {
   return isInt() || isPtr() || isVector();
+}
+
+expr SymbolicType::enforcePtrType() const {
+  return isPtr();
 }
 
 expr SymbolicType::enforceStructType() const {

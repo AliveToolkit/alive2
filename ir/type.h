@@ -44,6 +44,7 @@ public:
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
+  virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
   virtual smt::expr enforceAggregateType() const;
 
@@ -103,14 +104,21 @@ public:
 
 
 class PtrType final : public Type {
+  unsigned addr_space = 0;
+  bool defined = false;
+  smt::expr ASVar() const;
 public:
+  // symbolic addr space ptr
   PtrType(std::string &&name) : Type(std::move(name)) {}
+
+  PtrType(unsigned addr_space);
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr enforcePtrType() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -189,6 +197,7 @@ public:
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr enforcePtrType() const override;
   smt::expr enforceStructType() const override;
   smt::expr enforceAggregateType() const override;
   const StructType* getAsStructType() const override;

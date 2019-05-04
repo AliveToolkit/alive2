@@ -273,4 +273,30 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
+class Load final : public Instr {
+  Value &ptr;
+public:
+  Load(Type &type, std::string &&name, Value &ptr)
+    : Instr(type, std::move(name)), ptr(ptr) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class Store final : public Instr {
+  Value &ptr, &val;
+public:
+  Store(Type &type, std::string &&name, Value &ptr, Value &val)
+    : Instr(type, std::move(name)), ptr(ptr), val(val) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
 }
