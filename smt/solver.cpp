@@ -195,6 +195,10 @@ Model::iterator Model::end() const {
   return { nullptr, Z3_model_get_num_consts(ctx(), m) };
 }
 
+ostream& operator<<(ostream &os, const Model &m) {
+  return os << Z3_model_to_string(ctx(), m.m);
+}
+
 
 SolverPop::~SolverPop() {
   Z3_solver_pop(ctx(), s.s, 1);

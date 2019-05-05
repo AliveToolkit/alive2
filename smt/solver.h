@@ -50,6 +50,8 @@ public:
   // WARNING: the parent Model class has to be alive while iterators are in use.
   iterator begin() const;
   iterator end() const;
+
+  friend std::ostream& operator<<(std::ostream &os, const Model &m);
 };
 
 
