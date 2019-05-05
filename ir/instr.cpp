@@ -321,13 +321,13 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     break;
   case Cttz:
   case Ctlz:
-    instrconstr = getType().enforceIntOrPtrOrVectorType() &&
+    instrconstr = getType().enforceIntOrVectorType() &&
                   getType() == lhs.getType() &&
                   rhs.getType().enforceIntType() &&
                   rhs.getType().sizeVar() == 1u;
     break;
   default:
-    instrconstr = getType().enforceIntOrPtrOrVectorType() &&
+    instrconstr = getType().enforceIntOrVectorType() &&
                   getType() == lhs.getType() &&
                   getType() == rhs.getType();
     break;
@@ -381,7 +381,7 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     [[fallthrough]];
   case BitReverse:
   case Ctpop:
-    instrconstr &= getType().enforceIntOrPtrOrVectorType();
+    instrconstr &= getType().enforceIntOrVectorType();
   case Copy:
     break;
   }
@@ -489,10 +489,9 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
     sizeconstr = getType().sizeVar().ult(val.getType().sizeVar());
     break;
   }
-  // TODO: missing constraint comparing ty and to_ty (e.g. both ints)
   return Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrOrVectorType() &&
-         val.getType().enforceIntOrPtrOrVectorType() &&  // FIXME: remove
+         getType().enforceIntOrVectorType() &&
+         getType().sameType(val.getType()) &&
          move(sizeconstr);
 }
 

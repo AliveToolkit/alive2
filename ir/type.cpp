@@ -50,9 +50,6 @@ expr Type::operator==(const Type &b) const {
   if (auto lhs = dynamic_cast<const Ty*>(this)) {                              \
     if (auto rhs = dynamic_cast<const Ty*>(&b))                                \
       return *lhs == *rhs;                                                     \
-    if (auto rhs = dynamic_cast<const SymbolicType*>(&b))                      \
-      return *rhs == *lhs;                                                     \
-    return false;                                                              \
   }
 
   CMP(IntType)
@@ -61,12 +58,40 @@ expr Type::operator==(const Type &b) const {
   CMP(ArrayType)
   CMP(VectorType)
   CMP(StructType)
-
 #undef CMP
 
-  if (auto lhs = dynamic_cast<const SymbolicType*>(this)) {
+  if (auto lhs = dynamic_cast<const SymbolicType*>(this))
     return *lhs == b;
+
+  if (auto rhs = dynamic_cast<const SymbolicType*>(&b))
+    return *rhs == *this;
+
+  return false;
+}
+
+expr Type::sameType(const Type &b) const {
+  if (this == &b)
+    return true;
+
+#define CMP(Ty)                                                                \
+  if (auto lhs = dynamic_cast<const Ty*>(this)) {                              \
+    if (auto rhs = dynamic_cast<const Ty*>(&b))                                \
+      return lhs->sameType(*rhs);                                              \
   }
+
+  CMP(IntType)
+  CMP(FloatType)
+  CMP(PtrType)
+  CMP(ArrayType)
+  CMP(VectorType)
+  CMP(StructType)
+#undef CMP
+
+  if (auto lhs = dynamic_cast<const SymbolicType*>(this))
+    return lhs->sameType(b);
+
+  if (auto rhs = dynamic_cast<const SymbolicType*>(&b))
+    return rhs->sameType(*this);
 
   return false;
 }
@@ -159,6 +184,10 @@ expr IntType::operator==(const IntType &rhs) const {
   return sizeVar() == rhs.sizeVar();
 }
 
+expr IntType::sameType(const IntType &rhs) const {
+  return true;
+}
+
 void IntType::fixup(const Model &m) {
   if (!defined)
     bitwidth = m.getUInt(sizeVar());
@@ -202,6 +231,10 @@ expr FloatType::operator==(const FloatType &rhs) const {
   return false;
 }
 
+expr FloatType::sameType(const FloatType &rhs) const {
+  return true;
+}
+
 void FloatType::fixup(const Model &m) {
   // TODO
 }
@@ -235,6 +268,10 @@ expr PtrType::getTypeConstraints() const {
 expr PtrType::operator==(const PtrType &rhs) const {
   return sizeVar() == rhs.sizeVar() &&
          ASVar() == rhs.ASVar();
+}
+
+expr PtrType::sameType(const PtrType &rhs) const {
+  return *this == rhs;
 }
 
 void PtrType::fixup(const Model &m) {
@@ -282,6 +319,11 @@ expr ArrayType::operator==(const ArrayType &rhs) const {
   return false;
 }
 
+expr ArrayType::sameType(const ArrayType &rhs) const {
+  // TODO
+  return false;
+}
+
 void ArrayType::fixup(const Model &m) {
   // TODO
 }
@@ -315,16 +357,23 @@ expr VectorType::operator==(const VectorType &rhs) const {
   return false;
 }
 
+expr VectorType::sameType(const VectorType &rhs) const {
+  // TODO
+  return false;
+}
+
 void VectorType::fixup(const Model &m) {
   // TODO
 }
 
 expr VectorType::enforceIntOrVectorType() const {
-  return true;
+  // TODO: check if elements are int
+  return false;
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
-  return true;
+  // TODO: check if elements are int/ptr
+  return false;
 }
 
 void VectorType::print(ostream &os) const {
@@ -373,6 +422,17 @@ expr StructType::operator==(const StructType &rhs) const {
   expr res(true);
   for (unsigned i = 0, e = children.size(); i != e; ++i) {
     res &= *children[i] == *rhs.children[i];
+  }
+  return res;
+}
+
+expr StructType::sameType(const StructType &rhs) const {
+  if (children.size() != rhs.children.size())
+    return false;
+
+  expr res(true);
+  for (unsigned i = 0, e = children.size(); i != e; ++i) {
+    res &= children[i]->sameType(*rhs.children[i]);
   }
   return res;
 }
@@ -499,6 +559,37 @@ expr SymbolicType::operator==(const Type &b) const {
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
+  UNREACHABLE();
+}
+
+expr SymbolicType::sameType(const Type &b) const {
+  if (this == &b)
+    return true;
+
+  if (auto rhs = dynamic_cast<const IntType*>(&b))
+    return isInt() && i.sameType(*rhs);
+  if (auto rhs = dynamic_cast<const FloatType*>(&b))
+    return isFloat() && f.sameType(*rhs);
+  if (auto rhs = dynamic_cast<const PtrType*>(&b))
+    return isPtr() && p.sameType(*rhs);
+  if (auto rhs = dynamic_cast<const ArrayType*>(&b))
+    return isArray() && a.sameType(*rhs);
+  if (auto rhs = dynamic_cast<const VectorType*>(&b))
+    return isVector() && v.sameType(*rhs);
+  if (auto rhs = dynamic_cast<const StructType*>(&b))
+    return isStruct() && s.sameType(*rhs);
+
+  if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
+    expr c(false);
+    c |= isInt()    && i.sameType(rhs->i);
+    c |= isFloat()  && f.sameType(rhs->f);
+    c |= isPtr()    && p.sameType(rhs->p);
+    c |= isArray()  && a.sameType(rhs->a);
+    c |= isVector() && v.sameType(rhs->v);
+    // FIXME: add support for this: c |= isStruct() && s.sameType(rhs->s);
+    return move(c) && typeVar() == rhs->typeVar();
+  }
+  assert(0 && "unhandled case in SymbolicType::sameType");
   UNREACHABLE();
 }
 

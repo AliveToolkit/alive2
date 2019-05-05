@@ -39,6 +39,7 @@ public:
   virtual smt::expr getTypeConstraints() const = 0;
   virtual smt::expr sizeVar() const;
   smt::expr operator==(const Type &rhs) const;
+  smt::expr sameType(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
@@ -85,6 +86,7 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
+  smt::expr sameType(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
@@ -100,6 +102,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const FloatType &rhs) const;
+  smt::expr sameType(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
   void print(std::ostream &os) const override;
 };
@@ -118,6 +121,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
+  smt::expr sameType(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
@@ -133,6 +137,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const ArrayType &rhs) const;
+  smt::expr sameType(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType() const override;
   void print(std::ostream &os) const override;
@@ -146,6 +151,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;
+  smt::expr sameType(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
@@ -165,6 +171,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const StructType &rhs) const;
+  smt::expr sameType(const StructType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceStructType() const override;
   smt::expr enforceAggregateType() const override;
@@ -198,6 +205,7 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
+  smt::expr sameType(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
