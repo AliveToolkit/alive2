@@ -68,7 +68,7 @@ private:
   // temp state
   DomainTy domain;
   std::set<smt::expr> undef_vars;
-  std::array<StateValue, 8> tmp_values;
+  std::array<StateValue, 32> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   smt::expr return_domain;
