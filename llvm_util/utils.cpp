@@ -21,6 +21,7 @@ unordered_map<const llvm::Value*, string> value_names;
 unsigned value_id_counter; // for %0, %1, etc..
 
 vector<unique_ptr<IntType>> int_types;
+vector<unique_ptr<PtrType>> ptr_types;
 
 // cache complex types
 unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
@@ -77,6 +78,15 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (!int_types[bits])
       int_types[bits] = make_unique<IntType>("i" + to_string(bits), bits);
     return int_types[bits].get();
+  }
+  case llvm::Type::PointerTyID: {
+    // TODO: support for non-64 bits pointers
+    unsigned as = cast<llvm::PointerType>(ty)->getAddressSpace();
+    if (as < ptr_types.size())
+      ptr_types.resize(as + 1);
+    if (!ptr_types[as])
+      ptr_types[as] = make_unique<PtrType>(as);
+    return ptr_types[as].get();
   }
   case llvm::Type::StructTyID: {
     auto &cache = type_cache[ty];
@@ -270,6 +280,21 @@ public:
     PARSE_BINOP();
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
                                          BinOp::ExtractValue));
+  }
+
+  RetTy visitLoadInst(llvm::LoadInst &i) {
+    // TODO: Add support for isVolatile(), getAlignment(), getOrdering()
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val));
+  }
+
+  RetTy visitStoreInst(llvm::StoreInst &i) {
+    // TODO: Add support for isVolatile(), getAlignment(), getOrdering()
+    auto val = get_operand(i.getValueOperand());
+    auto ptr = get_operand(i.getPointerOperand());
+    if (!val || !ptr)
+      return error(i);
+    RETURN_IDENTIFIER(make_unique<Store>(value_name(i), *ptr, *val));
   }
 
   RetTy visitPHINode(llvm::PHINode &i) {
@@ -524,10 +549,12 @@ initializer::initializer(ostream &os) {
   type_id_counter = 0;
   int_types.resize(65);
   int_types[1] = make_unique<IntType>("i1", 1);
+  ptr_types.emplace_back(make_unique<PtrType>(0));
 }
 
 initializer::~initializer() {
   int_types.clear();
+  ptr_types.clear();
   type_cache.clear();
 }
 

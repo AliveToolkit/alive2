@@ -290,8 +290,8 @@ public:
 class Store final : public Instr {
   Value &ptr, &val;
 public:
-  Store(Type &type, std::string &&name, Value &ptr, Value &val)
-    : Instr(type, std::move(name)), ptr(ptr), val(val) {}
+  Store(std::string &&name, Value &ptr, Value &val)
+    : Instr(Type::voidTy, std::move(name)), ptr(ptr), val(val) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

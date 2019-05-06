@@ -915,7 +915,7 @@ unique_ptr<Instr> Load::dup(const string &suffix) const {
 
 
 void Store::print(std::ostream &os) const {
-  os << "store " << getType() << ", " << ptr << ", " << val;
+  os << "store " << val << ", " << ptr;
 }
 
 StateValue Store::toSMT(State &s) const {
@@ -930,7 +930,7 @@ expr Store::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Store::dup(const string &suffix) const {
-  return make_unique<Store>(getType(), getName() + suffix, ptr, val);
+  return make_unique<Store>(getName() + suffix, ptr, val);
 }
 
 }
