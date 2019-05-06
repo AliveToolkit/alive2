@@ -1,19 +1,19 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "llvm_util/utils.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
-#include "tv/llvm-utils.h"
 #include "util/config.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <iostream>
-#include <optional>
+#include <unordered_map>
 #include <utility>
-#include <vector>
 
 #if __GNUC__ < 8
 # include <experimental/filesystem>
@@ -24,11 +24,10 @@
 #endif
 
 using namespace IR;
+using namespace llvm_util;
 using namespace tools;
 using namespace util;
 using namespace std;
-using llvm::cast, llvm::dyn_cast, llvm::isa, llvm::errs;
-using llvm::LLVMContext;
 
 namespace {
 
@@ -72,17 +71,14 @@ llvm::cl::opt<bool> opt_print_dot(
   "tv-dot", llvm::cl::desc("Alive: print .dot file with CFG of each function"),
   llvm::cl::init(false));
 
-#if 0
-string_view s(llvm::StringRef str) {
-  return { str.data(), str.size() };
-}
-#endif
 
 ostream *out;
 ofstream out_file;
 optional<smt::smt_initializer> smt_init;
+optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, pair<Function, unsigned>> fns;
+
 
 struct TVPass : public llvm::FunctionPass {
   static char ID;
@@ -90,7 +86,7 @@ struct TVPass : public llvm::FunctionPass {
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
-    auto fn = llvm2alive(F, out).run();
+    auto fn = llvm2alive(F);
     if (!fn) {
       fns.erase(F.getName());
       return false;
@@ -155,8 +151,6 @@ struct TVPass : public llvm::FunctionPass {
       *out << "Source: " << source_file << endl;
     } else
       out = &cerr;
-
-    initLLVMUtils();
     
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
@@ -165,6 +159,7 @@ struct TVPass : public llvm::FunctionPass {
     config::skip_smt = opt_smt_skip;
     config::symexec_print_each_value = opt_se_verbose;
 
+    llvm_util_init.emplace(*out);
     smt_init.emplace();
     return false;
   }
@@ -175,8 +170,8 @@ struct TVPass : public llvm::FunctionPass {
       smt::solver_print_stats(*out);
       showed_stats = true;
     }
+    llvm_util_init.reset();
     smt_init.reset();
-    finalizeLLVMUtils();
     return false;
   }
 

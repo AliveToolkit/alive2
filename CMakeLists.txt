@@ -82,6 +82,37 @@ add_library(util STATIC ${UTIL_SRCS})
 
 set(ALIVE_LIBS ir smt tools util)
 
+
+if (BUILD_LLVM_UTILS OR BUILD_TV)
+  find_package(LLVM REQUIRED CONFIG)
+
+  message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+  if (NOT LLVM_ENABLE_RTTI)
+    message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_RTTI=ON'")
+  endif()
+
+  if (NOT LLVM_ENABLE_EH)
+    message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_EH=ON'")
+  endif()
+
+  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+  include(AddLLVM)
+
+  include_directories(${LLVM_INCLUDE_DIRS})
+  add_definitions(${LLVM_DEFINITIONS})
+
+  set(LLVM_UTIL_SRCS
+    "llvm_util/utils.cpp"
+  )
+
+  add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
+  set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
+else()
+  set(LLVM_UTIL_SRCS "")
+endif()
+
 add_executable(alive
                "tools/alive.cpp"
                "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
@@ -89,8 +120,7 @@ add_executable(alive
               )
 target_link_libraries(alive ${ALIVE_LIBS})
 
-add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS})
-target_link_libraries(alive2 ${ALIVE_LIBS})
+add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (CYGWIN)
   # cmake on cygwin doesn't seem to know about dlls..
