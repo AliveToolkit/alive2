@@ -892,6 +892,36 @@ expr expr::sgt(const expr &rhs) const {
   return !sle(rhs);
 }
 
+expr expr::ule(uint64_t rhs) const {
+  C();
+  return ule(mkUInt(rhs, bits()));
+}
+
+expr expr::ult(uint64_t rhs) const {
+  C();
+  return ult(mkUInt(rhs, bits()));
+}
+
+expr expr::uge(uint64_t rhs) const {
+  C();
+  return uge(mkUInt(rhs, bits()));
+}
+
+expr expr::ugt(uint64_t rhs) const {
+  C();
+  return ugt(mkUInt(rhs, bits()));
+}
+
+expr expr::operator==(uint64_t rhs) const {
+  C();
+  return *this == mkUInt(rhs, bits());
+}
+
+expr expr::operator!=(uint64_t rhs) const {
+  C();
+  return *this != mkUInt(rhs, bits());
+}
+
 expr expr::sext(unsigned amount) const {
   C();
   if (amount == 0)

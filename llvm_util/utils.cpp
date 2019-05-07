@@ -82,7 +82,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   case llvm::Type::PointerTyID: {
     // TODO: support for non-64 bits pointers
     unsigned as = cast<llvm::PointerType>(ty)->getAddressSpace();
-    if (as < ptr_types.size())
+    if (as >= ptr_types.size())
       ptr_types.resize(as + 1);
     if (!ptr_types[as])
       ptr_types[as] = make_unique<PtrType>(as);
