@@ -109,6 +109,11 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
 
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
+
+  add_executable(alive-tv
+    "tools/alive-tv.cpp"
+    )
+
 else()
   set(LLVM_UTIL_SRCS "")
 endif()
@@ -125,6 +130,7 @@ add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LL
 if (BUILD_LLVM_UTILS OR BUILD_TV)
    llvm_map_components_to_libnames(llvm_libs support core irreader)
    target_link_libraries(alive2 PRIVATE ${llvm_libs})
+   target_link_libraries(alive-tv PRIVATE llvm_util ${ALIVE_LIBS} ${llvm_libs})
 endif()
 
 if (CYGWIN)
