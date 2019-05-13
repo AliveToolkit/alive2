@@ -60,6 +60,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case USub_Overflow:
   case SMul_Overflow:
   case UMul_Overflow:
+  case FAdd:
+  case FSub:
     assert(flags == 0);
     break;
   }
@@ -94,6 +96,8 @@ void BinOp::print(ostream &os) const {
   case SMul_Overflow: str = "smul_overflow"; break;
   case UMul_Overflow: str = "umul_overflow"; break;
   case ExtractValue: str = "extractvalue"; break;
+  case FAdd: str = "fadd"; break;
+  case FSub: str = "fsub"; break;
   }
 
   const char *flag = nullptr;
@@ -282,6 +286,14 @@ StateValue BinOp::toSMT(State &s) const {
     val = structType->extract(a, idx);
     break;
   }
+
+  case FAdd:
+    val = a.fadd(b);
+    break;
+
+  case FSub:
+    val = a.fsub(b);
+    break;
   }
 
   return { move(val), move(not_poison) };
@@ -325,6 +337,12 @@ expr BinOp::getTypeConstraints(const Function &f) const {
                   getType() == lhs.getType() &&
                   rhs.getType().enforceIntType() &&
                   rhs.getType().sizeVar() == 1u;
+    break;
+  case FAdd:
+  case FSub:
+    instrconstr = getType().enforceFloatType() &&
+                  getType() == lhs.getType() &&
+                  getType() == rhs.getType();
     break;
   default:
     instrconstr = getType().enforceIntOrVectorType() &&

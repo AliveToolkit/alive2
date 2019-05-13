@@ -33,6 +33,14 @@ public:
   auto getInt() const { return std::get_if<int64_t>(&val); }
 };
 
+class FloatConst final : public Constant {
+  double val;
+public:
+  FloatConst(Type &type, double val);
+
+  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  smt::expr getTypeConstraints() const override;
+};
 
 class ConstantInput final : public Constant {
 public:

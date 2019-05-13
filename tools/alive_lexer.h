@@ -17,6 +17,7 @@ enum token {
 struct yylval_t {
   union {
     uint64_t num;
+    double fp_num;
     std::string_view str;
   };
   yylval_t() {}

@@ -73,8 +73,12 @@ public:
   static expr mkUInt(uint64_t n, unsigned bits);
   static expr mkInt(int64_t n, unsigned bits);
   static expr mkInt(const char *n, unsigned bits);
+  static expr mkDouble(double n);
+  static expr mkFloat(float n);
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
+  static expr mkFloatVar(const char *name);
+  static expr mkDoubleVar(const char *name);
 
   static expr IntSMin(unsigned bits);
   static expr IntSMax(unsigned bits);
@@ -192,6 +196,8 @@ public:
   expr extract(unsigned high, unsigned low) const;
 
   expr toBVBool() const;
+  expr fadd(const expr &rhs) const;
+  expr fsub(const expr &rhs) const;
 
   // we don't expose SMT expr types, so range must be passed as a dummy value
   // of the desired type

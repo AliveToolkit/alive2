@@ -34,6 +34,8 @@ static void error(const char *s, token t) {
 }
 
 static vector<unique_ptr<IntType>> int_types;
+static unique_ptr<FloatType> float_type;
+static unique_ptr<FloatType> double_type;
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
@@ -64,6 +66,12 @@ static Value& get_constant(string_view name, Type &type) {
   return *ret;
 }
 
+static Value& get_fp_constant(double n, Type &t) {
+  auto c = make_unique<FloatConst>(t, n);
+  auto ret = c.get();
+  fn->addConstant(move(c));
+  return *ret;
+}
 
 struct tokenizer_t {
   token last;
@@ -259,6 +267,12 @@ static Type& parse_type(bool optional = true) {
       error("Int type too long: " + to_string(yylval.num));
     return get_int_type(yylval.num);
 
+  case DOUBLE_TYPE:
+    return *double_type.get();
+
+  case FLOAT_TYPE:
+    return *float_type.get();
+
   default:
     if (optional) {
       tokenizer.unget(t);
@@ -351,6 +365,9 @@ static Value& parse_operand(Type &type) {
   case LPAREN:
     tokenizer.unget(t);
     return parse_const_expr(type);
+  case FP_NUM:
+    return get_fp_constant(yylval.fp_num, type);
+
   default:
     error("Expected an operand", t);
   }
@@ -407,6 +424,8 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
   case EXTRACTVALUE:
+  case FADD:
+  case FSUB:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -479,6 +498,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
     if (!dynamic_cast<IntConst*>(&b))
       error("Only int const accepted for RHS of extractvalue");
     break;
+  case FADD: op = BinOp::FAdd; break;
+  case FSUB: op = BinOp::FSub; break;
   default:
     UNREACHABLE();
   }
@@ -626,6 +647,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
   case EXTRACTVALUE:
+  case FADD:
+  case FSUB:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:
@@ -734,10 +757,15 @@ vector<Transform> parse(string_view buf) {
 parser_initializer::parser_initializer() {
   int_types.resize(65);
   int_types[1] = make_unique<IntType>("i1", 1);
+
+  float_type = make_unique<FloatType>("float", FloatType::Float);
+  double_type = make_unique<FloatType>("double", FloatType::Double);
 }
 
 parser_initializer::~parser_initializer() {
   for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
+  float_type.reset();
+  double_type.reset();
   sym_types.clear();
   overflow_aggregate_types.clear();
 }
