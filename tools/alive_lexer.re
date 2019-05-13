@@ -104,6 +104,11 @@ re2c:yyfill:check = 0;
   return INT_TYPE;
 }
 
+[-+]? [0-9]* "." [0-9]+ ([eE] [-+]? [0-9]+)? {
+  yylval.fp_num = strtof((char*)YYTEXT, nullptr);
+  return FP_NUM;
+}
+
 "-"?[0-9]+ {
   yylval.num = strtoull((char*)YYTEXT, nullptr, 10);
   if (yylval.num == ULLONG_MAX && errno == ERANGE) {
@@ -209,6 +214,10 @@ re2c:yyfill:check = 0;
 "usub_overflow" { return USUB_OVERFLOW; }
 "smul_overflow" { return SMUL_OVERFLOW; }
 "umul_overflow" { return UMUL_OVERFLOW; }
+"fadd" { return FADD; }
+"fsub" { return FSUB; }
+"float" { return FLOAT_TYPE;}
+"double" { return DOUBLE_TYPE;}
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

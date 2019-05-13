@@ -79,6 +79,19 @@ void Input::print(std::ostream &os) const {
 }
 
 StateValue Input::toSMT(State &s) const {
+  if (auto fpType = getType().getAsFloatType()) {
+    FloatType::FpType fpTy = fpType->getFpType();
+    switch (fpTy) {
+    case FloatType::Float:
+      return {expr::mkFloatVar(getName().c_str()), true};
+    case FloatType::Double:
+      return {expr::mkDoubleVar(getName().c_str()), true};
+    default:
+      // TODO: support more fp types
+      UNREACHABLE();
+    }
+  }
+
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 

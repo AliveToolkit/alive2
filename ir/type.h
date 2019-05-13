@@ -13,6 +13,7 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class FloatType;
 class StructType;
 class VoidType;
 
@@ -48,8 +49,10 @@ public:
   virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
   virtual smt::expr enforceAggregateType() const;
+  virtual smt::expr enforceFloatType() const;
 
   virtual const StructType* getAsStructType() const;
+  virtual const FloatType* getAsFloatType() const;
 
   virtual void print(std::ostream &os) const = 0;
   friend std::ostream& operator<<(std::ostream &os, const Type &t);
@@ -97,13 +100,28 @@ public:
 
 class FloatType final : public Type {
 public:
+  enum FpType {
+    Quarter, Half, BFloat16, Float, Double, IEEE80, FP128
+  };
+
+private:
+  FpType fpType;
+  bool defined = false;
+
+public:
   FloatType(std::string &&name) : Type(std::move(name)) {}
+  FloatType(std::string &&name, FpType fpType)
+    : Type(std::move(name)), fpType(fpType), defined(true) {}
   unsigned bits() const override;
+  FpType getFpType() const { return fpType; };
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   smt::expr operator==(const FloatType &rhs) const;
   smt::expr sameType(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
+  smt::expr enforceFloatType() const override;
+  const FloatType* getAsFloatType() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -213,7 +231,9 @@ public:
   smt::expr enforcePtrType() const override;
   smt::expr enforceStructType() const override;
   smt::expr enforceAggregateType() const override;
+  smt::expr enforceFloatType() const override;
   const StructType* getAsStructType() const override;
+  const FloatType* getAsFloatType() const override;
   void print(std::ostream &os) const override;
 };
 

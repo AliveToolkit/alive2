@@ -120,8 +120,16 @@ expr Type::enforceAggregateType() const {
   return false;
 }
 
+expr Type::enforceFloatType() const {
+  return false;
+}
+
 const StructType* Type::getAsStructType() const {
   UNREACHABLE();
+}
+
+const FloatType* Type::getAsFloatType() const {
+  return nullptr;
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -212,8 +220,31 @@ void IntType::print(ostream &os) const {
 
 
 unsigned FloatType::bits() const {
-  // TODO
-  return 0;
+  switch (fpType) {
+  case FpType::Quarter:
+    return 8;
+  case FpType::Half:
+    return 16;
+  case FpType::BFloat16:
+    return 16;
+  case FpType::Float:
+    return 32;
+  case FpType::Double:
+    return 64;
+  case FpType::IEEE80:
+    return 80;
+  case FpType::FP128:
+    return 128;
+  }
+  UNREACHABLE();
+}
+
+const FloatType* FloatType::getAsFloatType() const {
+  return this;
+}
+
+expr FloatType::sizeVar() const {
+  return defined ? expr::mkUInt(getFpType(), var_bw_bits) : Type::sizeVar();
 }
 
 expr FloatType::getDummyValue() const {
@@ -222,13 +253,18 @@ expr FloatType::getDummyValue() const {
 }
 
 expr FloatType::getTypeConstraints() const {
-  // TODO
-  return false;
+  if (defined)
+    return true;
+
+  auto bw = sizeVar();
+  // TODO: support more fp types
+  auto isFloat = bw == expr::mkUInt(Float, var_bw_bits);
+  auto isDouble = bw == expr::mkUInt(Double, var_bw_bits);
+  return (isFloat || isDouble);
 }
 
 expr FloatType::operator==(const FloatType &rhs) const {
-  // TODO
-  return false;
+  return sizeVar() == rhs.sizeVar();
 }
 
 expr FloatType::sameType(const FloatType &rhs) const {
@@ -236,13 +272,41 @@ expr FloatType::sameType(const FloatType &rhs) const {
 }
 
 void FloatType::fixup(const Model &m) {
-  // TODO
+  unsigned fp_typ = m.getUInt(sizeVar());
+  assert(fp_typ >= Quarter && fp_typ <= FP128);
+  if (!defined)
+    fpType = FpType(fp_typ);
 }
 
 void FloatType::print(ostream &os) const {
-  os << "TODO";
+  switch (fpType) {
+  case FpType::Quarter:
+    os << "quarter";
+    break;
+  case FpType::Half:
+    os << "half";
+    break;
+  case FpType::BFloat16:
+    os << "bfloat16";
+    break;
+  case FpType::Float:
+    os << "float";
+    break;
+  case FpType::Double:
+    os << "double";
+    break;
+  case FpType::IEEE80:
+    os << "ieee80";
+    break;
+  case FpType::FP128:
+    os << "fp128";
+    break;
+  }
 }
 
+expr FloatType::enforceFloatType() const {
+  return true;
+}
 
 PtrType::PtrType(unsigned addr_space)
   : Type(addr_space == 0 ? "*" : "as(" + to_string(addr_space) + ")*"),
@@ -635,8 +699,19 @@ expr SymbolicType::enforceAggregateType() const {
   return isArray() || isStruct();
 }
 
+expr SymbolicType::enforceFloatType() const {
+  return isFloat();
+}
+
 const StructType* SymbolicType::getAsStructType() const {
   return &s;
+}
+
+const FloatType* SymbolicType::getAsFloatType() const {
+  if (typ == Float)
+    return &f;
+  else
+    return nullptr;
 }
 
 void SymbolicType::print(ostream &os) const {

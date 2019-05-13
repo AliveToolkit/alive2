@@ -45,6 +45,29 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
+FloatConst::FloatConst(Type &type, double val)
+  : Constant(type, to_string(val)), val(val) {}
+
+expr FloatConst::getTypeConstraints() const {
+  return Value::getTypeConstraints() &&
+         getType().enforceFloatType();
+}
+
+pair<expr, expr> FloatConst::toSMT_cnst() const {
+  const FloatType *ft = getType().getAsFloatType();
+  switch (ft->getFpType()) {
+  case FloatType::Double: {
+    return { expr::mkDouble(val), true };
+  }
+  case FloatType::Float: {
+    return { expr::mkFloat((float) val), true };
+  }
+  default:
+    // TODO: support other fp types
+    UNREACHABLE();
+  }
+}
+
 pair<expr, expr> ConstantInput::toSMT_cnst() const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }

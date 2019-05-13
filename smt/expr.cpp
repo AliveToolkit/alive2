@@ -173,6 +173,14 @@ expr expr::mkInt(const char *n, unsigned bits) {
   return bits ? Z3_mk_numeral(ctx(), n, mkBVSort(bits)) : expr();
 }
 
+expr expr::mkFloat(float n) {
+  return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_single(ctx()));
+}
+
+expr expr::mkDouble(double n) {
+  return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx()));
+}
+
 expr expr::mkConst(Z3_func_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
@@ -183,6 +191,14 @@ expr expr::mkVar(const char *name, unsigned bits) {
 
 expr expr::mkBoolVar(const char *name) {
   return ::mkVar(name, Z3_mk_bool_sort(ctx()));
+}
+
+expr expr::mkFloatVar(const char *name) {
+  return ::mkVar(name, Z3_mk_fpa_sort_single(ctx()));
+}
+
+expr expr::mkDoubleVar(const char *name) {
+  return ::mkVar(name, Z3_mk_fpa_sort_double(ctx()));
 }
 
 expr expr::IntSMin(unsigned bits) {
@@ -673,6 +689,17 @@ expr expr::ctpop() const {
   }
 
   return res;
+}
+
+// TODO: make rounding mode customizable
+expr expr::fadd(const expr &rhs) const {
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return Z3_mk_fpa_add(ctx(), rm, ast(), rhs());
+}
+
+expr expr::fsub(const expr &rhs) const {
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return Z3_mk_fpa_sub(ctx(), rm, ast(), rhs());
 }
 
 expr expr::operator&(const expr &rhs) const {
