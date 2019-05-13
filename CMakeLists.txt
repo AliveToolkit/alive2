@@ -118,9 +118,14 @@ add_executable(alive
                "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                "tools/alive_parser.cpp"
               )
-target_link_libraries(alive ${ALIVE_LIBS})
+target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
 
 add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
+
+if (BUILD_LLVM_UTILS OR BUILD_TV)
+   llvm_map_components_to_libnames(llvm_libs support core irreader)
+   target_link_libraries(alive2 PRIVATE ${llvm_libs})
+endif()
 
 if (CYGWIN)
   # cmake on cygwin doesn't seem to know about dlls..
@@ -129,8 +134,8 @@ if (CYGWIN)
   set(CMAKE_SHARED_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
   file(COPY "${Z3_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
 else()
-  target_link_libraries(alive ${Z3_LIBRARIES})
-  target_link_libraries(alive2 ${Z3_LIBRARIES})
+  target_link_libraries(alive PRIVATE ${Z3_LIBRARIES})
+  target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
 endif()
 
 if (BUILD_TV)
