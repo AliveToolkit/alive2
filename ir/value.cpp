@@ -4,9 +4,11 @@
 #include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
+#include "util/config.h"
 
 using namespace smt;
 using namespace std;
+using namespace util;
 
 static unsigned gbl_fresh_id = 0;
 
@@ -83,7 +85,8 @@ StateValue Input::toSMT(State &s) const {
   auto bw = bits();
   string uname = UndefValue::getFreshName();
   expr undef = expr::mkVar(uname.c_str(), bw);
-  s.addUndefVar(undef);
+  if (!config::disable_undef_input)
+    s.addUndefVar(undef);
 
   return { expr::mkIf(type == expr::mkUInt(0, 2),
                       expr::mkVar(getName().c_str(), bw),

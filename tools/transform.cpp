@@ -6,6 +6,7 @@
 #include "smt/expr.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
+#include "util/config.h"
 #include "util/errors.h"
 #include "util/symexec.h"
 #include <map>
@@ -132,6 +133,17 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
 static expr preprocess(Transform &t, const set<expr> &qvars,
                        const set<expr> &undef_qvars, expr && e) {
+
+  // restrict type variable from taking disabled values
+  for (auto &i : t.src.getInputs()) {
+    auto var = static_cast<const Input &>(i).getTyVar();
+
+    if (config::disable_undef_input)
+      e &= var != expr::mkUInt(1, 2);
+    if (config::disable_poison_input)
+      e &= var.extract(1, 1) == expr::mkUInt(0, 1);
+  }
+
   if (qvars.empty() || e.isFalse())
     return move(e);
 
