@@ -22,14 +22,16 @@ static void show_help() {
   cerr <<
     "Usage: alive2 <options> <files.opt>\n"
     "Options:\n"
-    " -root-only\tCheck the expression's root only\n"
-    " -v\t\tVerbose mode\n"
-    " -smt-stats\tShow SMT statistics\n"
-    " -smt-to:x\tTimeout for SMT queries in ms\n"
-    " -max-mem:x\tMax memory consumption in MB (aprox)\n"
-    " -smt-verbose\tPrint all SMT queries\n"
-    " -skip-smt\tSkip all SMT queries\n"
-    " -h / --help\tShow this help\n";
+    " -root-only\t\tCheck the expression's root only\n"
+    " -v\t\t\tVerbose mode\n"
+    " -smt-stats\t\tShow SMT statistics\n"
+    " -smt-to:x\t\tTimeout for SMT queries in ms\n"
+    " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
+    " -smt-verbose\t\tPrint all SMT queries\n"
+    " -skip-smt\t\tSkip all SMT queries\n"
+    " -disable-poison-input\tAssume input variables can never be poison\n"
+    " -disable-undef-input\tAssume input variables can never be undef\n"
+    " -h / --help\t\tShow this help\n";
 }
 
 
@@ -62,6 +64,10 @@ int main(int argc, char **argv) {
       smt::solver_tactic_verbose(true);
     else if (arg == "-skip-smt")
       config::skip_smt = true;
+    else if (arg == "-disable-undef-input")
+      config::disable_undef_input = true;
+    else if (arg == "-disable-poison-input")
+      config::disable_poison_input = true;
     else if (arg == "-h" || arg == "--help") {
       show_help();
       return 0;
