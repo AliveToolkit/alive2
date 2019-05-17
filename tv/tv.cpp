@@ -71,6 +71,15 @@ llvm::cl::opt<bool> opt_print_dot(
   "tv-dot", llvm::cl::desc("Alive: print .dot file with CFG of each function"),
   llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_disable_poison_input(
+  "tv-disable-poison-input",
+  llvm::cl::desc("Alive: Assume function input cannot be poison"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_disable_undef_input(
+  "tv-disable-undef-input",
+  llvm::cl::desc("Alive: Assume function input cannot be undef"),
+  llvm::cl::init(false));
 
 ostream *out;
 ofstream out_file;
@@ -158,6 +167,8 @@ struct TVPass : public llvm::FunctionPass {
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
     config::symexec_print_each_value = opt_se_verbose;
+    config::disable_undef_input = opt_disable_undef_input;
+    config::disable_poison_input = opt_disable_poison_input;
 
     llvm_util_init.emplace(*out);
     smt_init.emplace();
