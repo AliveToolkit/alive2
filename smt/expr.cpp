@@ -158,7 +158,7 @@ expr expr::mkUInt(uint64_t n, Z3_sort sort) {
 }
 
 expr expr::mkUInt(uint64_t n, unsigned bits) {
-  return mkUInt(n, mkBVSort(bits));
+  return bits ? mkUInt(n, mkBVSort(bits)) : expr();
 }
 
 expr expr::mkInt(int64_t n, Z3_sort sort) {
@@ -166,11 +166,11 @@ expr expr::mkInt(int64_t n, Z3_sort sort) {
 }
 
 expr expr::mkInt(int64_t n, unsigned bits) {
-  return mkInt(n, mkBVSort(bits));
+  return bits ? mkInt(n, mkBVSort(bits)) : expr();
 }
 
 expr expr::mkInt(const char *n, unsigned bits) {
-  return Z3_mk_numeral(ctx(), n, mkBVSort(bits));
+  return bits ? Z3_mk_numeral(ctx(), n, mkBVSort(bits)) : expr();
 }
 
 expr expr::mkConst(Z3_func_decl decl) {
@@ -890,36 +890,6 @@ expr expr::sge(const expr &rhs) const {
 
 expr expr::sgt(const expr &rhs) const {
   return !sle(rhs);
-}
-
-expr expr::ule(uint64_t rhs) const {
-  C();
-  return ule(mkUInt(rhs, bits()));
-}
-
-expr expr::ult(uint64_t rhs) const {
-  C();
-  return ult(mkUInt(rhs, bits()));
-}
-
-expr expr::uge(uint64_t rhs) const {
-  C();
-  return uge(mkUInt(rhs, bits()));
-}
-
-expr expr::ugt(uint64_t rhs) const {
-  C();
-  return ugt(mkUInt(rhs, bits()));
-}
-
-expr expr::operator==(uint64_t rhs) const {
-  C();
-  return *this == mkUInt(rhs, bits());
-}
-
-expr expr::operator!=(uint64_t rhs) const {
-  C();
-  return *this != mkUInt(rhs, bits());
 }
 
 expr expr::sext(unsigned amount) const {
