@@ -83,15 +83,22 @@ StateValue Input::toSMT(State &s) const {
   expr type = getTyVar();
 
   auto bw = bits();
-  string uname = UndefValue::getFreshName();
-  expr undef = expr::mkVar(uname.c_str(), bw);
-  if (!config::disable_undef_input)
+  expr val;
+  if (config::disable_undef_input) {
+    val = expr::mkVar(getName().c_str(), bw);
+  } else {
+    string uname = UndefValue::getFreshName();
+    expr undef = expr::mkVar(uname.c_str(), bw);
     s.addUndefVar(undef);
+    val = expr::mkIf(type == expr::mkUInt(0, 2),
+                     expr::mkVar(getName().c_str(), bw),
+                     move(undef));
+  }
 
-  return { expr::mkIf(type == expr::mkUInt(0, 2),
-                      expr::mkVar(getName().c_str(), bw),
-                      move(undef)),
-           type.extract(1,1) == expr::mkUInt(0, 1) };
+  return { move(val),
+           config::disable_poison_input
+             ? true
+             : type.extract(1,1) == expr::mkUInt(0, 1) };
 }
 
 expr Input::getTyVar() const {
