@@ -176,12 +176,12 @@ public:
   expr sge(const expr &rhs) const;
   expr sgt(const expr &rhs) const;
 
-  expr ule(uint64_t rhs) const { return ule(mkUInt(rhs, bits())); }
-  expr ult(uint64_t rhs) const { return ult(mkUInt(rhs, bits())); }
-  expr uge(uint64_t rhs) const { return uge(mkUInt(rhs, bits())); }
-  expr ugt(uint64_t rhs) const { return ugt(mkUInt(rhs, bits())); }
-  expr operator==(uint64_t rhs) const { return *this == mkUInt(rhs, bits()); }
-  expr operator!=(uint64_t rhs) const { return *this != mkUInt(rhs, bits()); }
+  expr ule(uint64_t rhs) const;
+  expr ult(uint64_t rhs) const;
+  expr uge(uint64_t rhs) const;
+  expr ugt(uint64_t rhs) const;
+  expr operator==(uint64_t rhs) const;
+  expr operator!=(uint64_t rhs) const;
 
   expr sext(unsigned amount) const;
   expr zext(unsigned amount) const;

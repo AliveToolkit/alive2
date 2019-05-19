@@ -523,7 +523,7 @@ expr expr::mul_no_soverflow(const expr &rhs) const {
 expr expr::mul_no_uoverflow(const expr &rhs) const {
   C(rhs);
   auto bw = bits();
-  return (zext(bw) * rhs.zext(bw)).extract(2 * bw - 1, bw) == mkUInt(0, bw);
+  return (zext(bw) * rhs.zext(bw)).extract(2*bw - 1, bw) == mkUInt(0, sort());
 }
 
 expr expr::sdiv_exact(const expr &rhs) const {
@@ -890,6 +890,36 @@ expr expr::sge(const expr &rhs) const {
 
 expr expr::sgt(const expr &rhs) const {
   return !sle(rhs);
+}
+
+expr expr::ule(uint64_t rhs) const {
+  C();
+  return ule(mkUInt(rhs, sort()));
+}
+
+expr expr::ult(uint64_t rhs) const {
+  C();
+  return ult(mkUInt(rhs, sort()));
+}
+
+expr expr::uge(uint64_t rhs) const {
+  C();
+  return uge(mkUInt(rhs, sort()));
+}
+
+expr expr::ugt(uint64_t rhs) const {
+  C();
+  return ugt(mkUInt(rhs, sort()));
+}
+
+expr expr::operator==(uint64_t rhs) const {
+  C();
+  return *this == mkUInt(rhs, sort());
+}
+
+expr expr::operator!=(uint64_t rhs) const {
+  C();
+  return *this != mkUInt(rhs, sort());
 }
 
 expr expr::sext(unsigned amount) const {
