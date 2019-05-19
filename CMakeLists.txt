@@ -110,12 +110,22 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
 
-  add_executable(alive-tv
+  add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
-    )
+  )
 
 else()
   set(LLVM_UTIL_SRCS "")
+endif()
+
+if (BUILD_TV)
+  if (CYGWIN)
+    message(FATAL_ERROR "LLVM plugins not supported on cygwin")
+  endif()
+  message(STATUS "Compiling translation validation plugin")
+  add_subdirectory(tv)
+else()
+  message(STATUS "Skiping translation validation plugin")
 endif()
 
 add_executable(alive
@@ -128,9 +138,9 @@ target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
 add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
-   llvm_map_components_to_libnames(llvm_libs support core irreader)
-   target_link_libraries(alive2 PRIVATE ${llvm_libs})
-   target_link_libraries(alive-tv PRIVATE llvm_util ${ALIVE_LIBS} ${llvm_libs})
+  llvm_map_components_to_libnames(llvm_libs support core irreader)
+  target_link_libraries(alive2 PRIVATE ${llvm_libs})
+  target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
 endif()
 
 if (CYGWIN)
@@ -142,16 +152,6 @@ if (CYGWIN)
 else()
   target_link_libraries(alive PRIVATE ${Z3_LIBRARIES})
   target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
-endif()
-
-if (BUILD_TV)
-  if (CYGWIN)
-    message(FATAL_ERROR "LLVM plugins not supported on cygwin")
-  endif()
-  message(STATUS "Compiling translation validation plugin")
-  add_subdirectory(tv)
-else()
-  message(STATUS "Skiping translation validation plugin")
 endif()
 
 add_custom_target("check"
