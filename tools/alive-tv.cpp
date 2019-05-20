@@ -7,6 +7,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -65,9 +66,13 @@ static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
                                                    std::string InputFilename) {
   std::unique_ptr<llvm::MemoryBuffer> MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
-  std::unique_ptr<llvm::Module> M =
-    ExitOnErr(getOwningLazyBitcodeModule(std::move(MB), Context,
-                                         /*ShouldLazyLoadMetadata=*/true));
+  llvm::SMDiagnostic Diag;
+  std::unique_ptr<llvm::Module> M = getLazyIRModule(std::move(MB), Diag, Context,
+    /*ShouldLazyLoadMetadata=*/true);
+  if (!M) {
+    Diag.print("", llvm::errs(), false);
+    return 0;
+  }
   ExitOnErr(M->materializeAll());
   return M;
 }
@@ -97,19 +102,9 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Alive2 stand-alone translation validator\n");
 
-  auto M1 = openInputFile(Context, opt_file1);
-  if (!M1.get())
-    llvm::report_fatal_error("Could not read bitcode from '" + opt_file1 + "'");
-  auto F1 = getSingleFunction(M1.get());
-  auto Func1 = llvm2alive(*F1);
-
-  auto M2 = openInputFile(Context, opt_file2);
-  if (!M2.get())
-    llvm::report_fatal_error("Could not read bitcode from '" + opt_file2 + "'");
-  auto F2 = getSingleFunction(M2.get());
-  auto Func2 = llvm2alive(*F2);
-
-  // TODO check that function signatures match before proceeding?
+  llvm_util::initializer llvm_util_init(cerr);
+  smt::smt_initializer smt_init;
+  TransformPrintOpts print_opts;
 
   smt::solver_print_queries(false);
   smt::solver_tactic_verbose(false);
@@ -119,16 +114,30 @@ int main(int argc, char **argv) {
   config::symexec_print_each_value = true;
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
-  
-  llvm_util::initializer llvm_util_init(cerr);
-  smt::smt_initializer smt_init;
-  TransformPrintOpts print_opts;
+
+  auto M1 = openInputFile(Context, opt_file1);
+  if (!M1.get())
+    llvm::report_fatal_error("Could not read bitcode from '" + opt_file1 + "'");
+  auto F1 = getSingleFunction(M1.get());
+  auto Func1 = llvm2alive(*F1);
+  if (!Func1)
+    llvm::report_fatal_error("Could not translate '" + opt_file1 + "' to Alive IR");
+
+  auto M2 = openInputFile(Context, opt_file2);
+  if (!M2.get())
+    llvm::report_fatal_error("Could not read bitcode from '" + opt_file2 + "'");
+  auto F2 = getSingleFunction(M2.get());
+  auto Func2 = llvm2alive(*F2);
+  if (!Func2)
+    llvm::report_fatal_error("Could not translate '" + opt_file2 + "' to Alive IR");
+
+  // TODO check that function signatures match before proceeding?
 
   Transform t;
   t.src = move(*Func1);
   t.tgt = move(*Func2);
   TransformVerify verifier(t, false);
-  t.print(std::cout, print_opts);
+  t.print(cout, print_opts);
 
   if (Errors errs = verifier.verify()) {
     cerr << "Transformation doesn't verify!\n" << errs << endl;
