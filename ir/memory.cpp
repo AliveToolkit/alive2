@@ -12,13 +12,13 @@ using namespace util;
 namespace IR {
 
 Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
-  expr bid;
+  expr bid_expr;
   if (local)
-    bid = expr::mkUInt((uint64_t)bid << m.bits_for_nonlocal_bid,
-                       bits_for_bids());
+    bid_expr = expr::mkUInt((uint64_t)bid << m.bits_for_nonlocal_bid,
+                            bits_for_bids());
   else
-    bid = expr::mkUInt(bid, bits_for_bids());
-  p = expr::mkUInt(0, m.bits_for_offset).concat(bid);
+    bid_expr = expr::mkUInt(bid, bits_for_bids());
+  p = expr::mkUInt(0, m.bits_for_offset).concat(bid_expr);
 }
 
 unsigned Pointer::bits_for_bids() const {
