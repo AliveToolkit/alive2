@@ -274,11 +274,39 @@ public:
 };
 
 
-class Load final : public Instr {
+// TODO: only supports alloca for now
+class Alloc final : public Instr {
+  Value &size;
+  unsigned align;
+public:
+  Alloc(Type &type, std::string &&name, Value &size, unsigned align)
+    : Instr(type, std::move(name)), size(size), align(align) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class Free final : public Instr {
   Value &ptr;
 public:
-  Load(Type &type, std::string &&name, Value &ptr)
-    : Instr(type, std::move(name)), ptr(ptr) {}
+  Free(Value &ptr) : Instr(Type::voidTy, "free"), ptr(ptr) {}
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class Load final : public Instr {
+  Value &ptr;
+  unsigned align;
+public:
+  Load(Type &type, std::string &&name, Value &ptr, unsigned align)
+    : Instr(type, std::move(name)), ptr(ptr), align(align) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -289,9 +317,10 @@ public:
 
 class Store final : public Instr {
   Value &ptr, &val;
+  unsigned align;
 public:
-  Store(std::string &&name, Value &ptr, Value &val)
-    : Instr(Type::voidTy, std::move(name)), ptr(ptr), val(val) {}
+  Store(Value &ptr, Value &val, unsigned align)
+    : Instr(Type::voidTy, "store"), ptr(ptr), val(val), align(align) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

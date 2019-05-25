@@ -894,8 +894,50 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
 }
 
 
+void Alloc::print(std::ostream &os) const {
+  os << getName() << " = alloca " << size << ", align " << align;
+}
+
+StateValue Alloc::toSMT(State &s) const {
+  auto &[sz, np] = s[size];
+  s.addUB(np);
+  return { s.getMemory().alloc(sz, align, true), true };
+}
+
+expr Alloc::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforcePtrType() &&
+         size.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Alloc::dup(const string &suffix) const {
+  return make_unique<Alloc>(getType(), getName() + suffix, size, align);
+}
+
+
+void Free::print(std::ostream &os) const {
+  os << "free " << ptr;
+}
+
+StateValue Free::toSMT(State &s) const {
+  auto &[p, np] = s[ptr];
+  s.addUB(np);
+  s.getMemory().free(p);
+  return {};
+}
+
+expr Free::getTypeConstraints(const Function &f) const {
+  return ptr.getType().enforcePtrType();
+}
+
+unique_ptr<Instr> Free::dup(const string &suffix) const {
+  return make_unique<Free>(ptr);
+}
+
+
 void Load::print(std::ostream &os) const {
-  os << getName() << " = load " << getType() << ", " << ptr;
+  os << getName() << " = load " << getType() << ", " << ptr
+     << ", align " << align;
 }
 
 StateValue Load::toSMT(State &s) const {
@@ -910,12 +952,12 @@ expr Load::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Load::dup(const string &suffix) const {
-  return make_unique<Load>(getType(), getName() + suffix, ptr);
+  return make_unique<Load>(getType(), getName() + suffix, ptr, align);
 }
 
 
 void Store::print(std::ostream &os) const {
-  os << "store " << val << ", " << ptr;
+  os << "store " << val << ", " << ptr << ", align " << align;
 }
 
 StateValue Store::toSMT(State &s) const {
@@ -926,12 +968,11 @@ StateValue Store::toSMT(State &s) const {
 }
 
 expr Store::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         ptr.getType().enforcePtrType();
+  return ptr.getType().enforcePtrType();
 }
 
 unique_ptr<Instr> Store::dup(const string &suffix) const {
-  return make_unique<Store>(getName() + suffix, ptr, val);
+  return make_unique<Store>(ptr, val, align);
 }
 
 }

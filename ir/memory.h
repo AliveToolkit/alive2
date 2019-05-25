@@ -50,7 +50,9 @@ class Memory {
 public:
   Memory(State &state);
 
-  smt::expr alloc(const smt::expr &bytes, bool local);
+  smt::expr alloc(const smt::expr &bytes, unsigned align, bool local);
+  void free(const smt::expr &ptr);
+
   void store(const smt::expr &ptr, const StateValue &val);
   StateValue load(const smt::expr &ptr, unsigned bits);
 

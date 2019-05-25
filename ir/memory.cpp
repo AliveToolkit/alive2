@@ -43,7 +43,7 @@ void Pointer::is_dereferenceable(unsigned bytes) {
   expr length = expr::mkUInt(bytes, m.bits_for_offset);
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state.addUB((offset + length).ult(block_sz));
+  m.state.addUB((offset + length).zextOrTrunc(m.bits_size_t).ult(block_sz));
   m.state.addUB(offset.add_no_uoverflow(length));
 
   // 2) check block is alive
@@ -62,11 +62,16 @@ Memory::Memory(State &state) : state(state) {
                              expr::mkUInt(0, byte_size + 1)); // val+poison bit
 }
 
-expr Memory::alloc(const expr &bytes, bool local) {
+expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
   Pointer p(*this, last_bid++, local);
+  // TODO: handle alignment
   blocks_size = blocks_size.store(p(), bytes.zextOrTrunc(bits_size_t));
   memset(p(), { expr::mkUInt(0, byte_size), false }, bytes);
   return p();
+}
+
+void Memory::free(const expr &ptr) {
+  // TODO
 }
 
 void Memory::store(const expr &p, const StateValue &v) {

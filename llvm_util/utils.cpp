@@ -283,18 +283,19 @@ public:
   }
 
   RetTy visitLoadInst(llvm::LoadInst &i) {
-    // TODO: Add support for isVolatile(), getAlignment(), getOrdering()
+    // TODO: Add support for isVolatile(), getOrdering()
     PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val));
+    RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val,
+                                        i.getAlignment()));
   }
 
   RetTy visitStoreInst(llvm::StoreInst &i) {
-    // TODO: Add support for isVolatile(), getAlignment(), getOrdering()
+    // TODO: Add support for isVolatile(), getOrdering()
     auto val = get_operand(i.getValueOperand());
     auto ptr = get_operand(i.getPointerOperand());
     if (!val || !ptr)
       return error(i);
-    RETURN_IDENTIFIER(make_unique<Store>(value_name(i), *ptr, *val));
+    RETURN_IDENTIFIER(make_unique<Store>(*ptr, *val, i.getAlignment()));
   }
 
   RetTy visitPHINode(llvm::PHINode &i) {

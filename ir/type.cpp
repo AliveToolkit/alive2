@@ -254,7 +254,7 @@ expr PtrType::ASVar() const {
 
 unsigned PtrType::bits() const {
   // TODO: make this configurable
-  return 64;
+  return 48;
 }
 
 expr PtrType::getDummyValue() const {
