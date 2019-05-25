@@ -185,6 +185,7 @@ public:
   expr sext(unsigned amount) const;
   expr zext(unsigned amount) const;
   expr trunc(unsigned tobw) const;
+  expr zextOrTrunc(unsigned tobw) const;
 
   expr concat(const expr &rhs) const;
   expr extract(unsigned high, unsigned low) const;
