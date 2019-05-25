@@ -185,11 +185,6 @@ expr expr::mkBoolVar(const char *name) {
   return ::mkVar(name, Z3_mk_bool_sort(ctx()));
 }
 
-expr expr::toBVBool(const expr &e) {
-  auto sort = mkBVSort(1);
-  return mkIf(e, mkUInt(1, sort), mkUInt(0, sort));
-}
-
 expr expr::IntSMin(unsigned bits) {
   assert(bits > 0);
   static_assert(sizeof(unsigned long long) == 8);
@@ -956,6 +951,9 @@ expr expr::extract(unsigned high, unsigned low) const {
   C();
   assert(high >= low && high < bits());
 
+  if (low == 0 && high == bits()-1)
+    return *this;
+
   {
     expr sub;
     unsigned high_2, low_2;
@@ -975,7 +973,13 @@ expr expr::extract(unsigned high, unsigned low) const {
   return Z3_mk_extract(ctx(), high, low, ast());
 }
 
-expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range){
+expr expr::toBVBool() const {
+  auto sort = mkBVSort(1);
+  return mkIf(*this, mkUInt(1, sort), mkUInt(0, sort));
+}
+
+expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
+  C2(range);
   auto num_args = args.size();
   vector<Z3_ast> z3_args;
   vector<Z3_sort> z3_sorts;
@@ -992,6 +996,21 @@ expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range){
   auto decl = Z3_mk_func_decl(ctx(), Z3_mk_string_symbol(ctx(), name),
                               num_args, z3_sorts.data(), range.sort());
   return Z3_mk_app(ctx(), decl, num_args, z3_args.data());
+}
+
+expr expr::mkArray(const char *name, const expr &domain, const expr &range) {
+  C2(domain, range);
+  return ::mkVar(name, Z3_mk_array_sort(ctx(), domain.sort(), range.sort()));
+}
+
+expr expr::store(const expr &idx, const expr &val) const {
+  C(idx, val);
+  return Z3_mk_store(ctx(), ast(), idx(), val());
+}
+
+expr expr::load(const expr &idx) const {
+  C(idx);
+  return Z3_mk_select(ctx(), ast(), idx());
 }
 
 expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {

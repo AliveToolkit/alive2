@@ -3,7 +3,6 @@
 
 #include "ir/state.h"
 #include "ir/function.h"
-#include "smt/expr.h"
 #include "smt/smt.h"
 #include <cassert>
 
@@ -12,17 +11,7 @@ using namespace std;
 
 namespace IR {
 
-StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
-                            const StateValue &els) {
-  return { expr::mkIf(cond, then.value, els.value),
-           expr::mkIf(cond, then.non_poison, els.non_poison) };
-}
-
-ostream& operator<<(ostream &os, const StateValue &val) {
-  return os << val.value << " / " << val.non_poison;
-}
-
-State::State(const Function &f) : f(f) {
+State::State(const Function &f) : f(f), memory(*this) {
   predecessor_domain[&f.getFirstBB()].try_emplace(nullptr, true, set<expr>());
 }
 

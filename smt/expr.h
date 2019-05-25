@@ -75,7 +75,6 @@ public:
   static expr mkInt(const char *n, unsigned bits);
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
-  static expr toBVBool(const expr &e);
 
   static expr IntSMin(unsigned bits);
   static expr IntSMax(unsigned bits);
@@ -190,10 +189,16 @@ public:
   expr concat(const expr &rhs) const;
   expr extract(unsigned high, unsigned low) const;
 
+  expr toBVBool() const;
+
   // we don't expose SMT expr types, so range must be passed as a dummy value
   // of the desired type
   static expr mkUF(const char *name, const std::vector<expr> &args,
                    const expr &range);
+
+  static expr mkArray(const char *name, const expr &domain, const expr &range);
+  expr store(const expr &idx, const expr &val) const;
+  expr load(const expr &idx) const;
 
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);

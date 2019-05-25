@@ -61,4 +61,8 @@ unsigned num_trailing_zeros(uint64_t n) {
 #endif
 }
 
+uint64_t divide_up(uint64_t n, uint64_t amount) {
+  return (n + amount - 1) / amount;
+}
+
 }

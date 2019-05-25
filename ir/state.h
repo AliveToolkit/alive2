@@ -3,6 +3,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/memory.h"
+#include "ir/state_value.h"
 #include "smt/expr.h"
 #include <array>
 #include <ostream>
@@ -16,30 +18,6 @@ namespace IR {
 
 struct LoopInCFGDetected : public std::exception {};
 struct OutOfMemory : public std::exception {};
-
-
-struct StateValue {
-  smt::expr value, non_poison;
-
-  StateValue() {}
-  StateValue(smt::expr &&value, smt::expr &&non_poison)
-      : value(std::move(value)), non_poison(std::move(non_poison)) {}
-
-  static StateValue mkIf(const smt::expr &cond, const StateValue &then,
-                         const StateValue &els);
-
-  bool eq(const StateValue &other) const {
-    return value.eq(other.value) && non_poison.eq(other.non_poison);
-  }
-
-  StateValue
-    subst(const std::vector<std::pair<smt::expr, smt::expr>> &repls) const {
-    return { value.subst(repls), non_poison.subst(repls) };
-  }
-
-  friend std::ostream& operator<<(std::ostream &os, const StateValue &val);
-};
-
 
 class Value;
 class BasicBlock;
@@ -67,6 +45,7 @@ private:
 
   // temp state
   DomainTy domain;
+  Memory memory;
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 32> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
@@ -98,6 +77,7 @@ public:
   void addUndefVar(const smt::expr &var);
   void resetUndefVars();
 
+  auto& getMemory() { return memory; }
   auto& getFn() const { return f; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }

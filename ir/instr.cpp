@@ -247,32 +247,32 @@ StateValue BinOp::toSMT(State &s) const {
 
   case SAdd_Overflow:
     val = a + b;
-    val = val.concat(expr::toBVBool(!a.add_no_soverflow(b)));
+    val = val.concat((!a.add_no_soverflow(b)).toBVBool());
     break;
 
   case UAdd_Overflow:
     val = a + b;
-    val = val.concat(expr::toBVBool(!a.add_no_uoverflow(b)));
+    val = val.concat((!a.add_no_uoverflow(b)).toBVBool());
     break;
 
   case SSub_Overflow:
     val = a - b;
-    val = val.concat(expr::toBVBool(!a.sub_no_soverflow(b)));
+    val = val.concat((!a.sub_no_soverflow(b)).toBVBool());
     break;
 
   case USub_Overflow:
     val = a - b;
-    val = val.concat(expr::toBVBool(!a.sub_no_uoverflow(b)));
+    val = val.concat((!a.sub_no_uoverflow(b)).toBVBool());
     break;
 
   case SMul_Overflow:
     val = a * b;
-    val = val.concat(expr::toBVBool(!a.mul_no_soverflow(b)));
+    val = val.concat((!a.mul_no_soverflow(b)).toBVBool());
     break;
 
   case UMul_Overflow:
     val = a * b;
-    val = val.concat(expr::toBVBool(!a.mul_no_uoverflow(b)));
+    val = val.concat((!a.mul_no_uoverflow(b)).toBVBool());
     break;
 
   case ExtractValue:
@@ -899,9 +899,9 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  // TODO
-  s.addUB({});
-  return {};
+  auto &[p, np] = s[ptr];
+  s.addUB(np);
+  return s.getMemory().load(p, getType().bits());
 }
 
 expr Load::getTypeConstraints(const Function &f) const {
@@ -919,8 +919,9 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  // TODO
-  s.addUB({});
+  auto &[p, np] = s[ptr];
+  s.addUB(np);
+  s.getMemory().store(p, s[val]);
   return {};
 }
 
