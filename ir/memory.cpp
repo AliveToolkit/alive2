@@ -43,15 +43,15 @@ void Pointer::is_dereferenceable(unsigned bytes) {
   expr length = expr::mkUInt(bytes, m.bits_for_offset);
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state.addUB((offset + length).zextOrTrunc(m.bits_size_t).ult(block_sz));
-  m.state.addUB(offset.add_no_uoverflow(length));
+  m.state->addUB((offset + length).zextOrTrunc(m.bits_size_t).ult(block_sz));
+  m.state->addUB(offset.add_no_uoverflow(length));
 
   // 2) check block is alive
   // TODO
 }
 
 
-Memory::Memory(State &state) : state(state) {
+Memory::Memory(State &state) : state(&state) {
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
   blocks_size = expr::mkArray("blks_size",
                               expr::mkUInt(0, bits_bids),
@@ -60,6 +60,8 @@ Memory::Memory(State &state) : state(state) {
   blocks_val = expr::mkArray("blks_val",
                              expr::mkUInt(0, bits_bids + bits_for_offset),
                              expr::mkUInt(0, byte_size + 1)); // val+poison bit
+
+  assert(bits_for_offset <= bits_size_t);
 }
 
 expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
@@ -74,11 +76,12 @@ void Memory::free(const expr &ptr) {
   // TODO
 }
 
-void Memory::store(const expr &p, const StateValue &v) {
+void Memory::store(const expr &p, const StateValue &v, unsigned align) {
   unsigned bits = v.value.bits();
   unsigned bytes = divide_up(bits, byte_size);
 
   Pointer ptr(*this, p);
+  // TODO: handle alignment
   ptr.is_dereferenceable(bytes);
 
   expr poison = v.non_poison.toBVBool();
@@ -92,9 +95,10 @@ void Memory::store(const expr &p, const StateValue &v) {
   }
 }
 
-StateValue Memory::load(const expr &p, unsigned bits) {
+StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
   unsigned bytes = divide_up(bits, byte_size);
   Pointer ptr(*this, p);
+  // TODO: handle alignment
   ptr.is_dereferenceable(bytes);
 
   expr val, non_poison;
@@ -127,15 +131,9 @@ void Memory::memcpy(const expr &dst, const expr &src, const expr &bytes) {
   // TODO
 }
 
-Memory Memory::ite(const expr &cond, const Memory &then, const Memory &els) {
-  assert(&then.state == &els.state);
-  Memory ret(then.state);
-  ret.bits_for_offset       = then.bits_for_offset;
-  ret.bits_for_local_bid    = then.bits_for_local_bid;
-  ret.bits_for_nonlocal_bid = then.bits_for_nonlocal_bid;
-  ret.bits_size_t           = then.bits_size_t;
-  ret.byte_size             = then.byte_size;
-
+Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
+  assert(then.state == els.state);
+  Memory ret(then);
   ret.blocks_size = expr::mkIf(cond, then.blocks_size, els.blocks_size);
   ret.blocks_val  = expr::mkIf(cond, then.blocks_val, els.blocks_val);
   ret.last_bid    = max(then.last_bid, els.last_bid);

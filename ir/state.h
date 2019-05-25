@@ -37,10 +37,11 @@ private:
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::pair<const Value*, ValTy>> values;
 
-  // dst BB -> src BB -> domain data
+  // dst BB -> src BB -> (domain data, memory)
   std::unordered_map<const BasicBlock*,
-                     std::unordered_map<const BasicBlock*, DomainTy>>
-    predecessor_domain;
+                     std::unordered_map<const BasicBlock*,
+                                        std::pair<DomainTy, Memory>>>
+    predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
   // temp state

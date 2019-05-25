@@ -34,7 +34,7 @@ public:
 
 
 class Memory {
-  State &state;
+  State *state;
 
   // FIXME: these should be tuned per function
   unsigned bits_for_offset = 32;
@@ -53,16 +53,16 @@ public:
   smt::expr alloc(const smt::expr &bytes, unsigned align, bool local);
   void free(const smt::expr &ptr);
 
-  void store(const smt::expr &ptr, const StateValue &val);
-  StateValue load(const smt::expr &ptr, unsigned bits);
+  void store(const smt::expr &ptr, const StateValue &val, unsigned align);
+  StateValue load(const smt::expr &ptr, unsigned bits, unsigned align);
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytes);
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytes);
 
-  static Memory ite(const smt::expr &cond, const Memory &then,
-                    const Memory &els);
+  static Memory mkIf(const smt::expr &cond, const Memory &then,
+                     const Memory &els);
 
   friend class Pointer;
 };

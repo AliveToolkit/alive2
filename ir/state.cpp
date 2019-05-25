@@ -12,7 +12,9 @@ using namespace std;
 namespace IR {
 
 State::State(const Function &f) : f(f), memory(*this) {
-  predecessor_domain[&f.getFirstBB()].try_emplace(nullptr, true, set<expr>());
+  predecessor_data[&f.getFirstBB()].try_emplace(nullptr,
+                                                DomainTy(true, set<expr>()),
+                                                *this);
 }
 
 const StateValue& State::exec(const Value &v) {
@@ -61,9 +63,9 @@ const State::ValTy& State::at(const Value &val) const {
 }
 
 const expr* State::jumpCondFrom(const BasicBlock &bb) const {
-  auto &pres = predecessor_domain.at(current_bb);
+  auto &pres = predecessor_data.at(current_bb);
   auto I = pres.find(&bb);
-  return I == pres.end() ? nullptr : &I->second.first;
+  return I == pres.end() ? nullptr : &I->second.first.first;
 }
 
 bool State::startBB(const BasicBlock &bb) {
@@ -71,18 +73,27 @@ bool State::startBB(const BasicBlock &bb) {
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
 
-  auto I = predecessor_domain.find(&bb);
-  if (I == predecessor_domain.end())
+  auto I = predecessor_data.find(&bb);
+  if (I == predecessor_data.end())
     return false;
 
   domain.first = false;
   domain.second.clear();
+  bool first = true;
 
   for (auto &[src, data] : I->second) {
     (void)src;
-    auto &[d, vars] = data;
-    domain.first |= d;
+    auto &[dom, mem] = data;
+    auto &[cond, vars] = dom;
+    domain.first |= cond;
     domain.second.insert(vars.begin(), vars.end());
+
+    if (first) {
+      memory = mem;
+      first = false;
+    } else {
+      memory = Memory::mkIf(cond, mem, memory);
+    }
   }
   return !domain.first.isFalse();
 }
@@ -92,13 +103,17 @@ void State::addJump(const BasicBlock &dst, expr &&cond) {
     throw LoopInCFGDetected();
 
   cond &= domain.first;
-  auto p = predecessor_domain[&dst].try_emplace(current_bb, move(cond),
-                                                undef_vars);
+  auto p = predecessor_data[&dst].try_emplace(current_bb, DomainTy({}, {}),
+                                              memory);
   if (!p.second) {
-    p.first->second.first |= move(cond);
-    p.first->second.second.insert(undef_vars.begin(), undef_vars.end());
+    p.first->second.second = Memory::mkIf(cond, memory, p.first->second.second);
+    p.first->second.first.first |= move(cond);
+    p.first->second.first.second.insert(undef_vars.begin(), undef_vars.end());
+  } else {
+    p.first->second.first.first  = move(cond);
+    p.first->second.first.second = undef_vars;
   }
-  p.first->second.second.insert(domain.second.begin(), domain.second.end());
+  p.first->second.first.second.insert(domain.second.begin(), domain.second.end());
 }
 
 void State::addJump(const BasicBlock &dst) {
