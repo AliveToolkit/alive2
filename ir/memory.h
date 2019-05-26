@@ -26,10 +26,16 @@ public:
   smt::expr get_offset() const;
 
   const smt::expr& operator()() const { return p; }
+  unsigned bits() const { return p.bits(); }
 
   void operator++(void);
+  Pointer operator+(const smt::expr &bytes) const;
+
+  smt::expr ult(const Pointer &rhs) const;
+  smt::expr uge(const Pointer &rhs) const;
 
   void is_dereferenceable(unsigned bytes);
+  void is_dereferenceable(const smt::expr &bytes);
 };
 
 
@@ -41,11 +47,11 @@ class Memory {
   unsigned bits_for_local_bid = 8;
   unsigned bits_for_nonlocal_bid = 8;
   unsigned bits_size_t = 64;
-  unsigned byte_size = 8;
 
   smt::expr blocks_size; // array: bid -> size in bytes
   smt::expr blocks_val;  // array: (bid, offset) -> StateValue
   unsigned last_bid = 0;
+  unsigned last_idx_ptr = 0;
 
 public:
   Memory(State &state);
@@ -57,9 +63,9 @@ public:
   StateValue load(const smt::expr &ptr, unsigned bits, unsigned align);
 
   void memset(const smt::expr &ptr, const StateValue &val,
-              const smt::expr &bytes);
+              const smt::expr &bytes, unsigned align);
   void memcpy(const smt::expr &dst, const smt::expr &src,
-              const smt::expr &bytes);
+              const smt::expr &bytes, unsigned align_dst, unsigned align_src);
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

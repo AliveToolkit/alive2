@@ -1054,6 +1054,18 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
                             val());
 }
 
+expr expr::mkLambda(const set<expr> &vars, expr &&val) {
+  if (vars.empty() || val.isTrue() || val.isFalse() || !val.isValid())
+    return move(val);
+
+  unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
+  unsigned i = 0;
+  for (auto &v : vars) {
+    vars_ast[i++] = (Z3_app)v();
+  }
+  return Z3_mk_lambda_const(ctx(), vars.size(), vars_ast.get(), val());
+}
+
 expr expr::simplify() const {
   C();
   return Z3_simplify(ctx(), ast());
