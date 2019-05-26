@@ -2,7 +2,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/utils.h"
-#include "util/compiler.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
@@ -13,7 +12,6 @@
 
 using namespace IR;
 using namespace std;
-using namespace util;
 using llvm::cast, llvm::dyn_cast, llvm::isa;
 using llvm::LLVMContext;
 
@@ -188,6 +186,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   llvm::Function &f;
   using RetTy = unique_ptr<Instr>;
 
+  auto DL() const { return f.getParent()->getDataLayout(); }
+
 public:
   llvm2alive_(llvm::Function &f) : f(f) {}
 
@@ -304,10 +304,8 @@ public:
     if (!ty)
       return error(i);
 
-    // FIXME: bring in DL data
-    unsigned sz = divide_up(i.getAllocatedType()->getPrimitiveSizeInBits(), 8);
     // FIXME: size bits shouldn't be a constant
-    auto size = make_intconst(sz, 64);
+    auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
     RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
                                          i.getAlignment()));
   }
@@ -331,9 +329,7 @@ public:
       if (I.getStructTypeOrNull())
         return error(i);
 
-      // FIXME: bring in DL data
-      unsigned sz = divide_up(I.getIndexedType()->getPrimitiveSizeInBits(), 8);
-      gep->addIdx(sz, *op);
+      gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()), *op);
     }
     RETURN_IDENTIFIER(move(gep));
   }

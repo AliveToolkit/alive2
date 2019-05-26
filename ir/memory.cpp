@@ -34,11 +34,15 @@ expr Pointer::get_offset() const {
 }
 
 void Pointer::operator++(void) {
-  p = (get_offset() + expr::mkUInt(1, m.bits_for_offset)).concat(get_bid());
+  *this += expr::mkUInt(1, m.bits_for_offset);
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
   return { m, (get_offset() + bytes).concat(get_bid()) };
+}
+
+void Pointer::operator+=(const expr &bytes) {
+  p = (get_offset() + bytes).concat(get_bid());
 }
 
 expr Pointer::ult(const Pointer &rhs) const {

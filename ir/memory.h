@@ -26,10 +26,12 @@ public:
   smt::expr get_offset() const;
 
   const smt::expr& operator()() const { return p; }
+  smt::expr&& release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
   void operator++(void);
   Pointer operator+(const smt::expr &bytes) const;
+  void operator+=(const smt::expr &bytes);
 
   smt::expr ult(const Pointer &rhs) const;
   smt::expr uge(const Pointer &rhs) const;

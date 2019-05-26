@@ -954,18 +954,19 @@ StateValue GEP::toSMT(State &s) const {
   auto [val, non_poison] = s[ptr];
   unsigned bits_offset = s.getMemory().bitsOffset();
 
+  Pointer ptr(s.getMemory(), move(val));
   if (inbounds)
-    non_poison &= Pointer(s.getMemory(), val).inbounds();
+    non_poison &= ptr.inbounds();
 
   for (auto &[sz, idx] : idxs) {
     auto &[v, np] = s[idx];
-    val = val + expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
+    ptr += expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
     non_poison &= np;
 
     if (inbounds)
-      non_poison &= Pointer(s.getMemory(), val).inbounds();
+      non_poison &= ptr.inbounds();
   }
-  return { move(val), move(non_poison) };
+  return { ptr.release(), move(non_poison) };
 }
 
 expr GEP::getTypeConstraints(const Function &f) const {
