@@ -88,8 +88,9 @@ Memory::Memory(State &state) : state(&state) {
 expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
   Pointer p(*this, last_bid++, local);
   // TODO: handle alignment
-  blocks_size = blocks_size.store(p(), bytes);
-  memset(p(), { expr::mkUInt(0, 8), false }, bytes, align);
+  expr size = bytes.zextOrTrunc(bits_size_t);
+  blocks_size = blocks_size.store(p.get_bid(), size);
+  memset(p(), { expr::mkUInt(0, 8), false }, size, align);
   return p();
 }
 

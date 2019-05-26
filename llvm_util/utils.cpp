@@ -2,6 +2,8 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/utils.h"
+#include "util/compiler.h"
+#include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include <string>
@@ -11,6 +13,7 @@
 
 using namespace IR;
 using namespace std;
+using namespace util;
 using llvm::cast, llvm::dyn_cast, llvm::isa;
 using llvm::LLVMContext;
 
@@ -67,18 +70,28 @@ string value_name(const llvm::Value &v) {
                                         : '%' + to_string(value_id_counter++);
 }
 
+Type* make_int_type(unsigned bits) {
+  if (bits >= int_types.size())
+    int_types.resize(bits + 1);
+  if (!int_types[bits])
+    int_types[bits] = make_unique<IntType>("i" + to_string(bits), bits);
+  return int_types[bits].get();
+}
+
+Value* make_intconst(uint64_t val, int bits) {
+  auto c = make_unique<IntConst>(*make_int_type(bits), val);
+  auto ret = c.get();
+  current_fn->addConstant(move(c));
+  return ret;
+}
+
 Type* llvm_type2alive(const llvm::Type *ty) {
   switch (ty->getTypeID()) {
   case llvm::Type::VoidTyID:
     return &Type::voidTy;
-  case llvm::Type::IntegerTyID: {
-    auto bits = cast<llvm::IntegerType>(ty)->getBitWidth();
-    if (bits >= int_types.size())
-      int_types.resize(bits + 1);
-    if (!int_types[bits])
-      int_types[bits] = make_unique<IntType>("i" + to_string(bits), bits);
-    return int_types[bits].get();
-  }
+  case llvm::Type::IntegerTyID:
+    return make_int_type(cast<llvm::IntegerType>(ty)->getBitWidth());
+
   case llvm::Type::PointerTyID: {
     // TODO: support for non-64 bits pointers
     unsigned as = cast<llvm::PointerType>(ty)->getAddressSpace();
@@ -280,6 +293,49 @@ public:
     PARSE_BINOP();
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
                                          BinOp::ExtractValue));
+  }
+
+  RetTy visitAllocaInst(llvm::AllocaInst &i) {
+    // TODO
+    if (i.isArrayAllocation() || !i.isStaticAlloca())
+      return error(i);
+
+    auto ty = llvm_type2alive(i.getType());
+    if (!ty)
+      return error(i);
+
+    // FIXME: bring in DL data
+    unsigned sz = divide_up(i.getAllocatedType()->getPrimitiveSizeInBits(), 8);
+    // FIXME: size bits shouldn't be a constant
+    auto size = make_intconst(sz, 64);
+    RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
+                                         i.getAlignment()));
+  }
+
+  RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
+    auto ty = llvm_type2alive(i.getType());
+    auto ptr = get_operand(i.getPointerOperand());
+    if (!ty || !ptr)
+      return error(i);
+
+    auto gep = make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds());
+
+    // reference: GEPOperator::accumulateConstantOffset()
+    for (auto I = llvm::gep_type_begin(i), E = llvm::gep_type_end(i);
+         I != E; ++I) {
+      auto op = get_operand(I.getOperand());
+      if (!op)
+        return error(i);
+
+      // TODO: support for struct indexing
+      if (I.getStructTypeOrNull())
+        return error(i);
+
+      // FIXME: bring in DL data
+      unsigned sz = divide_up(I.getIndexedType()->getPrimitiveSizeInBits(), 8);
+      gep->addIdx(sz, *op);
+    }
+    RETURN_IDENTIFIER(move(gep));
   }
 
   RetTy visitLoadInst(llvm::LoadInst &i) {
@@ -546,17 +602,15 @@ public:
 namespace llvm_util {
 
 initializer::initializer(ostream &os) {
+  int_types.clear();
+  ptr_types.clear();
+  type_cache.clear();
+
   out = &os;
   type_id_counter = 0;
   int_types.resize(65);
   int_types[1] = make_unique<IntType>("i1", 1);
   ptr_types.emplace_back(make_unique<PtrType>(0));
-}
-
-initializer::~initializer() {
-  int_types.clear();
-  ptr_types.clear();
-  type_cache.clear();
 }
 
 optional<IR::Function> llvm2alive(llvm::Function &F) {
