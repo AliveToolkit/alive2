@@ -34,6 +34,7 @@ public:
   smt::expr ult(const Pointer &rhs) const;
   smt::expr uge(const Pointer &rhs) const;
 
+  smt::expr inbounds() const;
   void is_dereferenceable(unsigned bytes);
   void is_dereferenceable(const smt::expr &bytes);
 };
@@ -69,6 +70,8 @@ public:
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
+
+  unsigned bitsOffset() const { return bits_for_offset; }
 
   friend class Pointer;
 };

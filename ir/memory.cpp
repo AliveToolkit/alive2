@@ -49,12 +49,18 @@ expr Pointer::uge(const Pointer &rhs) const {
   return get_bid() == rhs.get_bid() && get_offset().uge(rhs.get_offset());
 }
 
+expr Pointer::inbounds() const {
+  expr block_sz = m.blocks_size.load(get_bid());
+  expr offset = get_offset();
+  return offset.zextOrTrunc(m.bits_size_t).ule(block_sz);
+}
+
 void Pointer::is_dereferenceable(const expr &bytes) {
   expr block_sz = m.blocks_size.load(get_bid());
   expr offset = get_offset();
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ult(block_sz));
+  m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));
   m.state->addUB(offset.add_no_uoverflow(bytes));
 
   // 2) check block is alive

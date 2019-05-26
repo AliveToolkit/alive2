@@ -942,6 +942,11 @@ expr expr::trunc(unsigned tobw) const {
   return extract(tobw-1, 0);
 }
 
+expr expr::sextOrTrunc(unsigned tobw) const {
+  auto bw = bits();
+  return bw < tobw ? sext(tobw - bw) : trunc(tobw);
+}
+
 expr expr::zextOrTrunc(unsigned tobw) const {
   auto bw = bits();
   return bw < tobw ? zext(tobw - bw) : trunc(tobw);

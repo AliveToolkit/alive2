@@ -935,6 +935,58 @@ unique_ptr<Instr> Free::dup(const string &suffix) const {
 }
 
 
+void GEP::addIdx(unsigned obj_size, Value &idx) {
+  idxs.emplace_back(obj_size, idx);
+}
+
+void GEP::print(std::ostream &os) const {
+  os << getName() << " = gep ";
+  if (inbounds)
+    os << "inbounds ";
+  os << ptr;
+
+  for (auto &[sz, idx] : idxs) {
+    os << ", " << sz << " x " << idx;
+  }
+}
+
+StateValue GEP::toSMT(State &s) const {
+  auto [val, non_poison] = s[ptr];
+  unsigned bits_offset = s.getMemory().bitsOffset();
+
+  if (inbounds)
+    non_poison &= Pointer(s.getMemory(), val).inbounds();
+
+  for (auto &[sz, idx] : idxs) {
+    auto &[v, np] = s[idx];
+    val = val + expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
+    non_poison &= np;
+
+    if (inbounds)
+      non_poison &= Pointer(s.getMemory(), val).inbounds();
+  }
+  return { move(val), move(non_poison) };
+}
+
+expr GEP::getTypeConstraints(const Function &f) const {
+  auto c = getType() == ptr.getType() &&
+           ptr.getType().enforcePtrType();
+  for (auto &[sz, idx] : idxs) {
+    (void)sz;
+    c &= idx.getType().enforceIntType();
+  }
+  return c;
+}
+
+unique_ptr<Instr> GEP::dup(const string &suffix) const {
+  auto dup = make_unique<GEP>(getType(), getName() + suffix, ptr, inbounds);
+  for (auto &[sz, idx] : idxs) {
+    dup->addIdx(sz, idx);
+  }
+  return dup;
+}
+
+
 void Load::print(std::ostream &os) const {
   os << getName() << " = load " << getType() << ", " << ptr
      << ", align " << align;

@@ -301,6 +301,23 @@ public:
 };
 
 
+class GEP final : public Instr {
+  Value &ptr;
+  std::vector<std::pair<unsigned, Value&>> idxs;
+  bool inbounds;
+public:
+  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds)
+    : Instr(type, std::move(name)), ptr(ptr), inbounds(inbounds) {}
+
+  void addIdx(unsigned obj_size, Value &idx);
+
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class Load final : public Instr {
   Value &ptr;
   unsigned align;
