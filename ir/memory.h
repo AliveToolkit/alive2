@@ -30,6 +30,7 @@ public:
   unsigned bits() const { return p.bits(); }
 
   void operator++(void);
+  Pointer operator+(unsigned) const;
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);
 

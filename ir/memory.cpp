@@ -41,6 +41,10 @@ Pointer Pointer::operator+(const expr &bytes) const {
   return { m, (get_offset() + bytes).concat(get_bid()) };
 }
 
+Pointer Pointer::operator+(unsigned bytes) const {
+  return *this + expr::mkUInt(bytes, m.bits_for_offset);
+}
+
 void Pointer::operator+=(const expr &bytes) {
   p = (get_offset() + bytes).concat(get_bid());
 }
@@ -116,8 +120,7 @@ void Memory::store(const expr &p, const StateValue &v, unsigned align) {
   for (unsigned i = 0; i < bytes; ++i) {
     // FIXME: right now we store in little-endian; consider others?
     expr data = val.extract((i + 1) * 8 - 1, i * 8);
-    blocks_val = blocks_val.store(ptr(), poison.concat(data));
-    ++ptr;
+    blocks_val = blocks_val.store((ptr + i)(), poison.concat(data));
   }
 }
 
@@ -131,7 +134,7 @@ StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
   bool first = true;
 
   for (unsigned i = 0; i < bytes; ++i) {
-    expr pair = blocks_val.load(ptr());
+    expr pair = blocks_val.load((ptr + i)());
     expr v = pair.extract(8-1, 0);
     expr p = pair.extract(8, 8) == expr::mkUInt(1, 1);
 
@@ -143,7 +146,6 @@ StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
       non_poison &= p;
     }
     first = false;
-    ++ptr;
   }
 
   return { val.trunc(bits), move(non_poison) };
