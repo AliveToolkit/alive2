@@ -141,6 +141,11 @@ Value* get_operand(llvm::Value *v) {
     return ret;
   }
 
+  if (auto ptr = dyn_cast<llvm::GlobalVariable>(v)) {
+    *out << "Global variables are not yet supported\n";
+    return nullptr;
+  }
+
   if (isa<llvm::UndefValue>(v)) {
     auto val = make_unique<UndefValue>(*ty);
     auto ret = val.get();
