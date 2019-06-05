@@ -272,10 +272,12 @@ expr FloatType::sameType(const FloatType &rhs) const {
 }
 
 void FloatType::fixup(const Model &m) {
+  if (defined)
+    return;
+
   unsigned fp_typ = m.getUInt(sizeVar());
   assert(fp_typ >= Quarter && fp_typ <= FP128);
-  if (!defined)
-    fpType = FpType(fp_typ);
+  fpType = FpType(fp_typ);
 }
 
 void FloatType::print(ostream &os) const {

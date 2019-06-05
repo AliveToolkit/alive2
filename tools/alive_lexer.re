@@ -105,7 +105,7 @@ re2c:yyfill:check = 0;
 }
 
 [-+]? [0-9]* "." [0-9]+ ([eE] [-+]? [0-9]+)? {
-  yylval.fp_num = strtof((char*)YYTEXT, nullptr);
+  yylval.fp_num = strtod((char*)YYTEXT, nullptr);
   return FP_NUM;
 }
 
