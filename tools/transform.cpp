@@ -21,7 +21,7 @@ using namespace std;
 
 
 static void print_varval(ostream &s, const Model &m, const Value *var,
-                         const StateValue &val) {
+                         const Type &type, const StateValue &val) {
   // if the model is partial, we don't know for sure if it's poison or not
   // this happens if the poison constraint depends on an undef
   // however, cexs are usually triggered by the worst case, which is poison
@@ -48,12 +48,13 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
     return;
   }
 
-  var->getType().printVal(s, e);
+  type.printVal(s, e);
 }
 
 
 static void error(Errors &errs, State &src_state, State &tgt_state,
                   const Result &r, bool print_var, const Value *var,
+                  const Type &type,
                   const StateValue &src, const StateValue &tgt,
                   const char *msg, bool check_each_var) {
 
@@ -81,7 +82,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     if (!dynamic_cast<const Input*>(var))
       continue;
     s << *var << " = ";
-    print_varval(s, m, var, val.first);
+    print_varval(s, m, var, var->getType(), val.first);
     s << '\n';
   }
 
@@ -108,16 +109,16 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
         continue;
 
       s << *var << " = ";
-      print_varval(s, m, var, val.first);
+      print_varval(s, m, var, var->getType(), val.first);
       s << '\n';
     }
   }
 
   if (print_var) {
     s << "Source value: ";
-    print_varval(s, m, var, src);
+    print_varval(s, m, var, type, src);
     s << "\nTarget value: ";
-    print_varval(s, m, var, tgt);
+    print_varval(s, m, var, type, tgt);
   }
 
   errs.add(s.str());
@@ -189,7 +190,7 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
 
 static void check_refinement(Errors &errs, Transform &t,
                              State &src_state, State &tgt_state,
-                             const Value *var,
+                             const Value *var, const Type &type,
                              const expr &dom_a, const State::ValTy &ap,
                              const expr &dom_b, const State::ValTy &bp,
                              bool check_each_var) {
@@ -200,7 +201,7 @@ static void check_refinement(Errors &errs, Transform &t,
   qvars.insert(ap.second.begin(), ap.second.end());
 
   auto err = [&](const Result &r, bool print_var, const char *msg) {
-    error(errs, src_state, tgt_state, r, print_var, var, a, b, msg,
+    error(errs, src_state, tgt_state, r, print_var, var, type, a, b, msg,
           check_each_var);
   };
 
@@ -258,7 +259,7 @@ Errors TransformVerify::verify() const {
         continue;
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(errs, t, src_state, tgt_state, var,
+      check_refinement(errs, t, src_state, tgt_state, var, var->getType(),
                        true, val, true, tgt_state.at(*tgt_instrs.at(name)),
                        check_each_var);
       if (errs)
@@ -273,7 +274,7 @@ Errors TransformVerify::verify() const {
       errs.add("Target returns but source doesn't");
 
   } else if (src_state.fnReturned()) {
-    check_refinement(errs, t, src_state, tgt_state, nullptr,
+    check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
                      src_state.returnDomain(), src_state.returnVal(),
                      tgt_state.returnDomain(), tgt_state.returnVal(),
                      check_each_var);
