@@ -167,6 +167,10 @@ pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
   UNREACHABLE();
 }
 
+void VoidType::printVal(ostream &os, const expr &e) const {
+  UNREACHABLE();
+}
+
 void VoidType::print(ostream &os) const {
   os << "void";
 }
@@ -221,6 +225,17 @@ expr IntType::enforceIntOrPtrOrVectorType() const {
 pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
   auto var = expr::mkVar(name, bits());
   return { var, { var } };
+}
+
+void IntType::printVal(ostream &os, const expr &e) const {
+  e.printHexadecimal(os);
+  os << " (";
+  e.printUnsigned(os);
+  if (e.bits() > 1 && e.isSigned()) {
+    os << ", ";
+    e.printSigned(os);
+  }
+  os << ')';
 }
 
 void IntType::print(ostream &os) const {
@@ -320,6 +335,10 @@ pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
   return { var, { var } };
 }
 
+void FloatType::printVal(ostream &os, const expr &e) const {
+  os << e;
+}
+
 void FloatType::print(ostream &os) const {
   switch (fpType) {
   case Quarter:
@@ -400,6 +419,10 @@ pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
   return s.getMemory().mkInput(name);
 }
 
+void PtrType::printVal(ostream &os, const expr &e) const {
+  // TODO
+}
+
 void PtrType::print(ostream &os) const {
   if (addr_space != 0)
     os << "as(" << addr_space << ")*";
@@ -444,6 +467,10 @@ expr ArrayType::enforceAggregateType() const {
 pair<expr, vector<expr>> ArrayType::mkInput(State &s, const char *name) const {
   // TODO
   return {};
+}
+
+void ArrayType::printVal(ostream &os, const expr &e) const {
+  // TODO
 }
 
 void ArrayType::print(ostream &os) const {
@@ -493,6 +520,10 @@ expr VectorType::enforceIntOrPtrOrVectorType() const {
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
   // TODO
   return {};
+}
+
+void VectorType::printVal(ostream &os, const expr &e) const {
+  // TODO
 }
 
 void VectorType::print(ostream &os) const {
@@ -587,6 +618,10 @@ pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
     ++num;
   }
   return { move(val), move(vars) };
+}
+
+void StructType::printVal(ostream &os, const expr &e) const {
+  // TODO
 }
 
 void StructType::print(ostream &os) const {
@@ -793,6 +828,18 @@ pair<expr, vector<expr>>
   case Undefined: UNREACHABLE();
   }
   UNREACHABLE();
+}
+
+void SymbolicType::printVal(ostream &os, const expr &e) const {
+  switch (typ) {
+  case Int:       i.printVal(os, e); break;
+  case Float:     f.printVal(os, e); break;
+  case Ptr:       p.printVal(os, e); break;
+  case Array:     a.printVal(os, e); break;
+  case Vector:    v.printVal(os, e); break;
+  case Struct:    s.printVal(os, e); break;
+  case Undefined: UNREACHABLE();
+  }
 }
 
 void SymbolicType::print(ostream &os) const {

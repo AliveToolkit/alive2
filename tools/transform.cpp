@@ -47,19 +47,8 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
     s << "undef";
     return;
   }
-  // print floating point
-  if (var->getType().getAsFloatType()) {
-    s << e;
-  } else {
-    e.printHexadecimal(s);
-    s << " (";
-    e.printUnsigned(s);
-    if (e.bits() > 1 && e.isSigned()) {
-      s << ", ";
-      e.printSigned(s);
-    }
-    s << ')';
-  }
+
+  var->getType().printVal(s, e);
 }
 
 
