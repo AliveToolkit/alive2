@@ -215,18 +215,20 @@ static void check_refinement(Errors &errs, Transform &t,
           check_each_var);
   };
 
+  expr pre = src_state.getPre() && tgt_state.getPre();
+
   Solver::check({
-    { preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
+    { preprocess(t, qvars, ap.second, pre && dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
     { preprocess(t, qvars, ap.second,
-                 dom_a && a.non_poison.notImplies(b.non_poison)),
+                 pre && dom_a && a.non_poison.notImplies(b.non_poison)),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
     { preprocess(t, qvars, ap.second,
-                 dom_a && a.non_poison && a.value != b.value),
+                 pre && dom_a && a.non_poison && a.value != b.value),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}
@@ -247,7 +249,7 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 
 Errors TransformVerify::verify() const {
   Value::reset_gbl_id();
-  State src_state(t.src), tgt_state(t.tgt);
+  State src_state(t.src, true), tgt_state(t.tgt, false);
 
   try {
     sym_exec(src_state);

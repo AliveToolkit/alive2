@@ -5,6 +5,7 @@
 
 #include "ir/state_value.h"
 #include "smt/expr.h"
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -26,6 +27,7 @@ public:
 
   smt::expr get_bid() const;
   smt::expr get_offset() const;
+  smt::expr get_address() const;
 
   const smt::expr& operator()() const { return p; }
   smt::expr&& release() { return std::move(p); }
@@ -40,8 +42,9 @@ public:
   smt::expr uge(const Pointer &rhs) const;
 
   smt::expr inbounds() const;
-  void is_dereferenceable(unsigned bytes);
-  void is_dereferenceable(const smt::expr &bytes);
+  smt::expr is_aligned(unsigned align) const;
+  void is_dereferenceable(unsigned bytes, unsigned align);
+  void is_dereferenceable(const smt::expr &bytes, unsigned align);
 };
 
 
@@ -58,6 +61,9 @@ class Memory {
   smt::expr blocks_val;  // array: (bid, offset) -> StateValue
   unsigned last_bid = 0;
   unsigned last_idx_ptr = 0;
+
+  std::string mkName(const char *str) const;
+  smt::expr block_addr(const smt::expr &bid) const;
 
 public:
   Memory(State &state);

@@ -30,6 +30,9 @@ public:
 
 private:
   const Function &f;
+  bool source;
+  smt::expr precondition;
+
   const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
 
@@ -57,7 +60,7 @@ private:
   bool returned = false;
 
 public:
-  State(const Function &f);
+  State(const Function &f, bool source);
 
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
@@ -72,20 +75,27 @@ public:
   void addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
+
+  void addPre(smt::expr &&cond) { precondition &= std::move(cond); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
+
   void addQuantVar(const smt::expr &var);
   void addUndefVar(const smt::expr &var);
   void resetUndefVars();
 
-  auto& getMemory() { return memory; }
   auto& getFn() const { return f; }
+  auto& getMemory() { return memory; }
+  auto& getPre() const { return precondition; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
 
   bool fnReturned() const { return returned; }
   auto& returnDomain() const { return return_domain; }
   auto& returnVal() const { return return_val; }
+
+  // whether this is source or target program
+  bool isSource() const { return source; }
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

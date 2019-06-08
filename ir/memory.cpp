@@ -33,6 +33,10 @@ expr Pointer::get_offset() const {
   return p.extract(bits_for_bids() + m.bits_for_offset - 1, bits_for_bids());
 }
 
+expr Pointer::get_address() const {
+  return m.block_addr(get_bid());
+}
+
 void Pointer::operator++(void) {
   *this += expr::mkUInt(1, m.bits_for_offset);
 }
@@ -63,7 +67,13 @@ expr Pointer::inbounds() const {
   return offset.zextOrTrunc(m.bits_size_t).ule(block_sz);
 }
 
-void Pointer::is_dereferenceable(const expr &bytes) {
+expr Pointer::is_aligned(unsigned align) const {
+  if (auto bits = ilog2(align))
+    return get_address().extract(bits-1, 0) == 0;
+  return true;
+}
+
+void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
   expr block_sz = m.blocks_size.load(get_bid());
   expr offset = get_offset();
 
@@ -71,22 +81,37 @@ void Pointer::is_dereferenceable(const expr &bytes) {
   m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));
   m.state->addUB(offset.add_no_uoverflow(bytes));
 
-  // 2) check block is alive
+  // 2) check block's address is aligned
+  m.state->addUB(is_aligned(align));
+
+  // 3) check block is alive
   // TODO
 }
 
-void Pointer::is_dereferenceable(unsigned bytes) {
-  is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset));
+void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
+  is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
 }
 
 
+string Memory::mkName(const char *str) const {
+  return string(str) + (state->isSource() ? "_src" : "_tgt");
+}
+
+expr Memory::block_addr(const expr &bid) const {
+  auto name = mkName("blks_addr");
+  return expr::mkUF(name.c_str(), { bid }, expr::mkUInt(0, bits_size_t));
+}
+
 Memory::Memory(State &state) : state(&state) {
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  blocks_size = expr::mkArray("blks_size",
+
+  auto size_name = mkName("blks_size");
+  blocks_size = expr::mkArray(size_name.c_str(),
                               expr::mkUInt(0, bits_bids),
                               expr::mkUInt(0, bits_size_t));
 
-  blocks_val = expr::mkArray("blks_val",
+  auto val_name = mkName("blks_val");
+  blocks_val = expr::mkArray(val_name.c_str(),
                              expr::mkUInt(0, bits_bids + bits_for_offset),
                              expr::mkUInt(0, 8 + 1)); // val+poison bit
 
@@ -105,7 +130,8 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 
 expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
   Pointer p(*this, last_bid++, local);
-  // TODO: handle alignment
+  state->addPre(p.is_aligned(align));
+
   expr size = bytes.zextOrTrunc(bits_size_t);
   blocks_size = blocks_size.store(p.get_bid(), size);
   memset(p(), { expr::mkUInt(0, 8), false }, size, align);
@@ -121,8 +147,7 @@ void Memory::store(const expr &p, const StateValue &v, unsigned align) {
   unsigned bytes = divide_up(bits, 8);
 
   Pointer ptr(*this, p);
-  // TODO: handle alignment
-  ptr.is_dereferenceable(bytes);
+  ptr.is_dereferenceable(bytes, align);
 
   expr poison = v.non_poison.toBVBool();
   expr val = v.value.zext(bytes * 8 - bits);
@@ -137,8 +162,7 @@ void Memory::store(const expr &p, const StateValue &v, unsigned align) {
 StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
   unsigned bytes = divide_up(bits, 8);
   Pointer ptr(*this, p);
-  // TODO: handle alignment
-  ptr.is_dereferenceable(bytes);
+  ptr.is_dereferenceable(bytes, align);
 
   expr val, non_poison;
   bool first = true;
@@ -164,8 +188,7 @@ StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
                     unsigned align) {
   Pointer ptr(*this, p);
-  // TODO: handle alignment
-  ptr.is_dereferenceable(bytes);
+  ptr.is_dereferenceable(bytes, align);
   expr store_val = val.non_poison.toBVBool().concat(val.value);
 
   uint64_t n;
@@ -187,9 +210,8 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
                     unsigned align_dst, unsigned align_src) {
   Pointer dst(*this, d), src(*this, s);
-  // TODO: handle alignment
-  dst.is_dereferenceable(bytes);
-  src.is_dereferenceable(bytes);
+  dst.is_dereferenceable(bytes, align_dst);
+  src.is_dereferenceable(bytes, align_src);
   // TODO
 }
 
