@@ -1131,6 +1131,12 @@ expr expr::subst(const expr &from, const expr &to) const {
 }
 
 void expr::printUnsigned(ostream &os) const {
+  uint64_t num;
+  if (isUInt(num)) {
+    os << num;
+    return;
+  }
+
   expr zero = mkUInt(0, sort());
   expr ten  = mkUInt(10, sort());
   expr n    = *this;
