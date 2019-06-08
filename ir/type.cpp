@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/type.h"
+#include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <cassert>
@@ -162,6 +163,10 @@ void VoidType::fixup(const Model &m) {
   // do nothing
 }
 
+pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
+  UNREACHABLE();
+}
+
 void VoidType::print(ostream &os) const {
   os << "void";
 }
@@ -213,6 +218,11 @@ expr IntType::enforceIntOrPtrOrVectorType() const {
   return true;
 }
 
+pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
+  auto var = expr::mkVar(name, bits());
+  return { var, { var } };
+}
+
 void IntType::print(ostream &os) const {
   if (bits())
     os << 'i' << bits();
@@ -221,20 +231,22 @@ void IntType::print(ostream &os) const {
 
 unsigned FloatType::bits() const {
   switch (fpType) {
-  case FpType::Quarter:
+  case Quarter:
     return 8;
-  case FpType::Half:
+  case Half:
     return 16;
-  case FpType::BFloat16:
+  case BFloat16:
     return 16;
-  case FpType::Float:
+  case Float:
     return 32;
-  case FpType::Double:
+  case Double:
     return 64;
-  case FpType::IEEE80:
+  case IEEE80:
     return 80;
-  case FpType::FP128:
+  case FP128:
     return 128;
+  case Unknown:
+    UNREACHABLE();
   }
   UNREACHABLE();
 }
@@ -248,8 +260,18 @@ expr FloatType::sizeVar() const {
 }
 
 expr FloatType::getDummyValue() const {
-  // TODO
-  return {};
+  switch (fpType) {
+  case Float:
+    return expr::mkFloat(0);
+  case Double:
+    return expr::mkDouble(0);
+  case Unknown:
+    UNREACHABLE();
+  default:
+    // TODO
+    return {};
+  }
+  UNREACHABLE();
 }
 
 expr FloatType::getTypeConstraints() const {
@@ -280,35 +302,52 @@ void FloatType::fixup(const Model &m) {
   fpType = FpType(fp_typ);
 }
 
+expr FloatType::enforceFloatType() const {
+  return true;
+}
+
+pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
+  expr var;
+  switch (fpType) {
+  case Float:   var = expr::mkFloatVar(name); break;
+  case Double:  var = expr::mkDoubleVar(name); break;
+  case Unknown: UNREACHABLE();
+  default:
+    // TODO
+    UNREACHABLE();
+  }
+
+  return { var, { var } };
+}
+
 void FloatType::print(ostream &os) const {
   switch (fpType) {
-  case FpType::Quarter:
+  case Quarter:
     os << "quarter";
     break;
-  case FpType::Half:
+  case Half:
     os << "half";
     break;
-  case FpType::BFloat16:
+  case BFloat16:
     os << "bfloat16";
     break;
-  case FpType::Float:
+  case Float:
     os << "float";
     break;
-  case FpType::Double:
+  case Double:
     os << "double";
     break;
-  case FpType::IEEE80:
+  case IEEE80:
     os << "ieee80";
     break;
-  case FpType::FP128:
+  case FP128:
     os << "fp128";
+    break;
+  case Unknown:
     break;
   }
 }
 
-expr FloatType::enforceFloatType() const {
-  return true;
-}
 
 PtrType::PtrType(unsigned addr_space)
   : Type(addr_space == 0 ? "*" : "as(" + to_string(addr_space) + ")*"),
@@ -357,6 +396,11 @@ expr PtrType::enforcePtrType() const {
   return true;
 }
 
+pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
+  // TODO
+  return {};
+}
+
 void PtrType::print(ostream &os) const {
   if (addr_space != 0)
     os << "as(" << addr_space << ")*";
@@ -396,6 +440,11 @@ void ArrayType::fixup(const Model &m) {
 
 expr ArrayType::enforceAggregateType() const {
   return true;
+}
+
+pair<expr, vector<expr>> ArrayType::mkInput(State &s, const char *name) const {
+  // TODO
+  return {};
 }
 
 void ArrayType::print(ostream &os) const {
@@ -440,6 +489,11 @@ expr VectorType::enforceIntOrVectorType() const {
 expr VectorType::enforceIntOrPtrOrVectorType() const {
   // TODO: check if elements are int/ptr
   return false;
+}
+
+pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
+  // TODO
+  return {};
 }
 
 void VectorType::print(ostream &os) const {
@@ -519,6 +573,11 @@ expr StructType::enforceAggregateType() const {
 
 const StructType* StructType::getAsStructType() const {
   return this;
+}
+
+pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
+  // TODO
+  return {};
 }
 
 void StructType::print(ostream &os) const {
@@ -710,10 +769,21 @@ const StructType* SymbolicType::getAsStructType() const {
 }
 
 const FloatType* SymbolicType::getAsFloatType() const {
-  if (typ == Float)
-    return &f;
-  else
-    return nullptr;
+  return &f;
+}
+
+pair<expr, vector<expr>>
+  SymbolicType::mkInput(State &st, const char *name) const {
+  switch (typ) {
+  case Int:       return i.mkInput(st, name);
+  case Float:     return f.mkInput(st, name);
+  case Ptr:       return p.mkInput(st, name);
+  case Array:     return a.mkInput(st, name);
+  case Vector:    return v.mkInput(st, name);
+  case Struct:    return s.mkInput(st, name);
+  case Undefined: UNREACHABLE();
+  }
+  UNREACHABLE();
 }
 
 void SymbolicType::print(ostream &os) const {

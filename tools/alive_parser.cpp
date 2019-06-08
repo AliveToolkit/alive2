@@ -243,11 +243,8 @@ static Type& get_overflow_type(Type &type) {
 }
 
 static Type& get_sym_type() {
-  if (sym_num < sym_types.size())
-    return *sym_types[sym_num++].get();
-
-  auto t = make_unique<SymbolicType>("symty_" + to_string(sym_num++));
-  return *sym_types.emplace_back(move(t)).get();
+  return *sym_types.emplace_back(
+    make_unique<SymbolicType>("symty_" + to_string(sym_num++))).get();
 }
 
 static Type& get_int_type(unsigned size) {

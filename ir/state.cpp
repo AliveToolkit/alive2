@@ -39,7 +39,7 @@ const StateValue& State::operator[](const Value &val) {
   vector<pair<expr, expr>> repls;
   for (auto &u : uvars) {
     auto name = UndefValue::getFreshName();
-    repls.emplace_back(u, expr::mkVar(name.c_str(), u.bits()));
+    repls.emplace_back(u, expr::mkVar(name.c_str(), u));
   }
 
   if (hit_half_memory_limit())

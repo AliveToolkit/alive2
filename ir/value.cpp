@@ -36,8 +36,10 @@ ostream& operator<<(ostream &os, const Value &val) {
   auto t = val.getType().toString();
   if (!t.empty())
     os << t;
-  if (!dynamic_cast<VoidType*>(&val.getType()))
-    os << ' ' << val.getName();
+  if (!dynamic_cast<VoidType*>(&val.getType())) {
+    if (!t.empty()) os << ' ';
+    os << val.getName();
+  }
   return os;
 }
 
@@ -81,39 +83,26 @@ void Input::print(std::ostream &os) const {
 }
 
 StateValue Input::toSMT(State &s) const {
-  if (auto fpType = getType().getAsFloatType()) {
-    FloatType::FpType fpTy = fpType->getFpType();
-    switch (fpTy) {
-    case FloatType::Float:
-      return {expr::mkFloatVar(getName().c_str()), true};
-    case FloatType::Double:
-      return {expr::mkDoubleVar(getName().c_str()), true};
-    default:
-      // TODO: support more fp types
-      UNREACHABLE();
-    }
-  }
-
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
-  auto bw = bits();
-  expr val;
-  if (config::disable_undef_input) {
-    val = expr::mkVar(getName().c_str(), bw);
-  } else {
-    string uname = UndefValue::getFreshName();
-    expr undef = expr::mkVar(uname.c_str(), bw);
-    s.addUndefVar(undef);
-    val = expr::mkIf(type == expr::mkUInt(0, 2),
-                     expr::mkVar(getName().c_str(), bw),
-                     move(undef));
+  auto [val, vars] = getType().mkInput(s, getName().c_str());
+
+  if (!config::disable_undef_input) {
+    vector<pair<expr, expr>> repls;
+
+    for (auto &v : vars) {
+      string uname = UndefValue::getFreshName();
+      expr undef = expr::mkVar(uname.c_str(), v);
+      s.addUndefVar(undef);
+      repls.emplace_back(v, move(undef));
+    }
+
+    val = expr::mkIf(type.extract(0, 0) == 0, val, val.subst(repls));
   }
 
   return { move(val),
-           config::disable_poison_input
-             ? true
-             : type.extract(1,1) == expr::mkUInt(0, 1) };
+           config::disable_poison_input ? true : type.extract(1, 1) == 0 };
 }
 
 expr Input::getTyVar() const {

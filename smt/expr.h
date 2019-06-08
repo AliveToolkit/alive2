@@ -75,6 +75,7 @@ public:
   static expr mkInt(const char *n, unsigned bits);
   static expr mkDouble(double n);
   static expr mkFloat(float n);
+  static expr mkVar(const char *name, const expr &type);
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
   static expr mkFloatVar(const char *name);

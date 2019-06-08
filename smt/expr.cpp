@@ -185,6 +185,11 @@ expr expr::mkConst(Z3_func_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
 
+expr expr::mkVar(const char *name, const expr &type) {
+  C2(type);
+  return ::mkVar(name, type.sort());
+}
+
 expr expr::mkVar(const char *name, unsigned bits) {
   return ::mkVar(name, mkBVSort(bits));
 }

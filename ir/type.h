@@ -8,6 +8,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <vector>
 
 namespace smt { class Model; }
 
@@ -16,6 +17,7 @@ namespace IR {
 class FloatType;
 class StructType;
 class VoidType;
+class State;
 
 class Type {
 protected:
@@ -54,6 +56,9 @@ public:
   virtual const StructType* getAsStructType() const;
   virtual const FloatType* getAsFloatType() const;
 
+  virtual std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const = 0;
+
   virtual void print(std::ostream &os) const = 0;
   friend std::ostream& operator<<(std::ostream &os, const Type &t);
   std::string toString() const;
@@ -71,6 +76,8 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -94,6 +101,8 @@ public:
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -101,11 +110,11 @@ public:
 class FloatType final : public Type {
 public:
   enum FpType {
-    Quarter, Half, BFloat16, Float, Double, IEEE80, FP128
+    Quarter, Half, BFloat16, Float, Double, IEEE80, FP128, Unknown
   };
 
 private:
-  FpType fpType;
+  FpType fpType = Unknown;
   bool defined = false;
 
 public:
@@ -122,6 +131,8 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -144,6 +155,8 @@ public:
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -158,6 +171,8 @@ public:
   smt::expr sameType(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -173,6 +188,8 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -194,6 +211,8 @@ public:
   smt::expr enforceStructType() const override;
   smt::expr enforceAggregateType() const override;
   const StructType* getAsStructType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 
   smt::expr numElements() const;
@@ -234,6 +253,8 @@ public:
   smt::expr enforceFloatType() const override;
   const StructType* getAsStructType() const override;
   const FloatType* getAsFloatType() const override;
+  std::pair<smt::expr, std::vector<smt::expr>>
+    mkInput(State &s, const char *name) const override;
   void print(std::ostream &os) const override;
 };
 
