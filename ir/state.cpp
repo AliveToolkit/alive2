@@ -12,7 +12,7 @@ using namespace std;
 namespace IR {
 
 State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this) {
+  : f(f), source(source), precondition(true), memory(*this) {
   predecessor_data[&f.getFirstBB()].try_emplace(nullptr,
                                                 DomainTy(true, set<expr>()),
                                                 *this);
