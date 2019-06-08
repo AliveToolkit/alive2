@@ -397,8 +397,7 @@ expr PtrType::enforcePtrType() const {
 }
 
 pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
+  return s.getMemory().mkInput(name);
 }
 
 void PtrType::print(ostream &os) const {
@@ -576,8 +575,18 @@ const StructType* StructType::getAsStructType() const {
 }
 
 pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
+  expr val;
+  vector<expr> vars;
+  unsigned num = 0;
+
+  for (auto c : children) {
+    string c_name = string(name) + "#" + to_string(num);
+    auto [v, vs] = c->mkInput(s, c_name.c_str());
+    val = num == 0 ? v : val.concat(v);
+    vars.insert(vars.end(), vs.begin(), vs.end());
+    ++num;
+  }
+  return { move(val), move(vars) };
 }
 
 void StructType::print(ostream &os) const {

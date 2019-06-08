@@ -5,6 +5,8 @@
 
 #include "ir/state_value.h"
 #include "smt/expr.h"
+#include <utility>
+#include <vector>
 
 namespace IR {
 
@@ -59,6 +61,8 @@ class Memory {
 
 public:
   Memory(State &state);
+
+  std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 
   smt::expr alloc(const smt::expr &bytes, unsigned align, bool local);
   void free(const smt::expr &ptr);

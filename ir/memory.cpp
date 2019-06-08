@@ -93,6 +93,16 @@ Memory::Memory(State &state) : state(&state) {
   assert(bits_for_offset <= bits_size_t);
 }
 
+pair<expr, vector<expr>> Memory::mkInput(const char *name) {
+  unsigned bits = bits_for_nonlocal_bid + bits_for_offset;
+  expr var = expr::mkVar(name, bits);
+  // [offset, local_bid, nonlocal_bid]
+  expr offset = var.extract(bits - 1, bits_for_nonlocal_bid);
+  expr bid = var.extract(bits_for_nonlocal_bid - 1, 0);
+  expr val = offset.concat(expr::mkUInt(0, bits_for_local_bid).concat(bid));
+  return { move(val), { var } };
+}
+
 expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
   Pointer p(*this, last_bid++, local);
   // TODO: handle alignment
