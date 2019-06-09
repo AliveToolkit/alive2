@@ -224,22 +224,20 @@ public:
                                          (BinOp::Flags)flags));
   }
 
-  RetTy visitSExtInst(llvm::SExtInst &i) {
+  RetTy visitCastInst(llvm::CastInst &i) {
     PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
-                                                ConversionOp::SExt));
-  }
-
-  RetTy visitZExtInst(llvm::ZExtInst &i) {
-    PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
-                                                ConversionOp::ZExt));
-  }
-
-  RetTy visitTruncInst(llvm::TruncInst &i) {
-    PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val,
-                                                ConversionOp::Trunc));
+    ConversionOp::Op op;
+    switch (i.getOpcode()) {
+    case llvm::Instruction::SExt:     op = ConversionOp::SExt; break;
+    case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
+    case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
+    case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
+    case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
+    case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
+    default:
+      return error(i);
+    }
+    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val, op));
   }
 
   RetTy visitCallInst(llvm::CallInst &i) {
