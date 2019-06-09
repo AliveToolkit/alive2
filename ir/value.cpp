@@ -50,7 +50,7 @@ void UndefValue::print(ostream &os) const {
 
 StateValue UndefValue::toSMT(State &s) const {
   auto name = getFreshName();
-  expr var = expr::mkVar(name.c_str(), bits());
+  expr var = expr::mkVar(name.c_str(), getType().getDummyValue());
   s.addUndefVar(var);
   return { move(var), true };
 }
