@@ -620,8 +620,16 @@ pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
   return { move(val), move(vars) };
 }
 
-void StructType::printVal(ostream &os, const expr &e) const {
-  // TODO
+void StructType::printVal(ostream &os, const expr &val) const {
+  os << "{ ";
+  bool first = true;
+  for (size_t i = 0, e = children.size(); i != e; ++i) {
+    if (!first)
+      os << ", ";
+    getChild(i).printVal(os, extract(val, i));
+    first = false;
+  }
+  os << " }";
 }
 
 void StructType::print(ostream &os) const {

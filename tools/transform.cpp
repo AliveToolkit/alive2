@@ -44,7 +44,8 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
   expr e = m.eval(val.value);
   // undef variables may not have a model since each read uses a copy
   if (!e.isConst()) {
-    s << "undef";
+    // FIXME
+    s << "?";
     return;
   }
 
