@@ -295,11 +295,8 @@ public:
 
     auto inst = make_unique<ExtractValue>(*ty, value_name(i), *val);
 
-    for (auto &idx : i.indices) {
-      auto op = get_operand(idx);
-      if (!op)
-        return error(i);
-      inst->addIdx(*op);
+    for (auto idx : i.indices()) {
+      inst->addIdx(idx);
     }
 
     RETURN_IDENTIFIER(move(inst));
