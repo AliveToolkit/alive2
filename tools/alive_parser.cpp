@@ -227,6 +227,11 @@ static void parse_comma() {
   tokenizer.ensure(COMMA);
 }
 
+static uint64_t parse_number() {
+  tokenizer.ensure(NUM);
+  return yylval.num;
+}
+
 
 static unordered_map<Type*, unique_ptr<StructType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
@@ -327,6 +332,8 @@ static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
     return get_constant(yylval.num, type);
+  case FP_NUM:
+    return get_fp_constant(yylval.fp_num, type);
   case NUM_STR:
     return get_num_constant(yylval.str, type);
   case TRUE:
@@ -362,9 +369,6 @@ static Value& parse_operand(Type &type) {
   case LPAREN:
     tokenizer.unget(t);
     return parse_const_expr(type);
-  case FP_NUM:
-    return get_fp_constant(yylval.fp_num, type);
-
   default:
     error("Expected an operand", t);
   }
@@ -420,7 +424,6 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case USUB_OVERFLOW:
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
-  case EXTRACTVALUE:
   case FADD:
   case FSUB:
     return BinOp::None;
@@ -434,12 +437,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
-
-  // RHS handling
-  // for extractvalue it isn't important to try multiple types
-  // so we use a default of i8
-  Type &default_rhs_type = op_token == EXTRACTVALUE ? get_int_type(8) : type;
-  Type &type_rhs = try_parse_type(default_rhs_type);
+  Type &type_rhs = try_parse_type(type);
   auto &b = parse_operand(type_rhs);
   Type *rettype = &type;
 
@@ -487,13 +485,6 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case UMUL_OVERFLOW:
     op = BinOp::UMul_Overflow;
     rettype = &get_overflow_type(type);
-    break;
-  case EXTRACTVALUE:
-    op = BinOp::ExtractValue;
-    rettype = &get_sym_type();
-
-    if (!dynamic_cast<IntConst*>(&b))
-      error("Only int const accepted for RHS of extractvalue");
     break;
   case FADD: op = BinOp::FAdd; break;
   case FSUB: op = BinOp::FSub; break;
@@ -572,6 +563,20 @@ static unique_ptr<Instr> parse_select(string_view name) {
   return make_unique<Select>(aty, string(name), cond, a, b);
 }
 
+static unique_ptr<Instr> parse_extractvalue(string_view name) {
+  auto &type = parse_type();
+  auto &val = parse_operand(type);
+  auto instr = make_unique<ExtractValue>(get_sym_type(), string(name), val);
+
+  while (true) {
+    if (!tokenizer.consumeIf(COMMA))
+      break;
+    instr->addIdx((unsigned)parse_number());
+  }
+
+  return instr;
+}
+
 static ICmp::Cond parse_icmp_cond() {
   switch (auto t = *tokenizer) {
   case EQ:  return ICmp::EQ;
@@ -643,7 +648,6 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case USUB_OVERFLOW:
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
-  case EXTRACTVALUE:
   case FADD:
   case FSUB:
     return parse_binop(name, t);
@@ -660,6 +664,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_conversionop(name, t);
   case SELECT:
     return parse_select(name);
+  case EXTRACTVALUE:
+    return parse_extractvalue(name);
   case ICMP:
     return parse_icmp(name);
   case FREEZE:

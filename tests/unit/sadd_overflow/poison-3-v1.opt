@@ -1,5 +1,0 @@
-%t = sadd_overflow i4 poison, i4 poison
-%v1 = extractvalue %t, 1
-  =>
-%t = sadd_overflow i4 poison, i4 poison
-%v1 = poison

@@ -30,7 +30,7 @@ public:
   enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
             SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat,
             SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
-            SMul_Overflow, UMul_Overflow, ExtractValue,
+            SMul_Overflow, UMul_Overflow,
             FAdd, FSub,
             And, Or, Xor, Cttz, Ctlz  };
   enum Flags { None = 0, NSW = 1, NUW = 2, NSWNUW = 3, Exact = 4 };
@@ -112,6 +112,20 @@ class Select final : public Instr {
 public:
   Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
     : Instr(type, std::move(name)), cond(cond), a(a), b(b) {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class ExtractValue final : public Instr {
+  Value &val;
+  std::vector<unsigned> idxs;
+public:
+  ExtractValue(Type &type, std::string &&name, Value &val)
+    : Instr(type, std::move(name)), val(val) {}
+  void addIdx(unsigned idx);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;

@@ -39,10 +39,6 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case LShr:
     assert((flags & Exact) == flags);
     break;
-  case ExtractValue:
-    assert(dynamic_cast<IntConst*>(&rhs));
-    assert(dynamic_cast<IntConst&>(rhs).getInt());
-    [[fallthrough]];
   case SRem:
   case URem:
   case SAdd_Sat:
@@ -95,7 +91,6 @@ void BinOp::print(ostream &os) const {
   case USub_Overflow: str = "usub_overflow"; break;
   case SMul_Overflow: str = "smul_overflow"; break;
   case UMul_Overflow: str = "umul_overflow"; break;
-  case ExtractValue: str = "extractvalue"; break;
   case FAdd: str = "fadd"; break;
   case FSub: str = "fsub"; break;
   }
@@ -279,14 +274,6 @@ StateValue BinOp::toSMT(State &s) const {
     val = val.concat((!a.mul_no_uoverflow(b)).toBVBool());
     break;
 
-  case ExtractValue:
-  {
-    auto structType = lhs.getType().getAsStructType();
-    auto idx = *static_cast<IntConst&>(rhs).getInt();
-    val = structType->extract(a, idx);
-    break;
-  }
-
   case FAdd:
     val = a.fadd(b);
     break;
@@ -302,19 +289,6 @@ StateValue BinOp::toSMT(State &s) const {
 expr BinOp::getTypeConstraints(const Function &f) const {
   expr instrconstr;
   switch (op) {
-  case ExtractValue:
-  {
-    instrconstr = lhs.getType().enforceAggregateType() &&
-                  rhs.getType().enforceIntType();
-
-    // TODO: add support for arrays
-    if (auto ty = lhs.getType().getAsStructType()) {
-      auto idx = *static_cast<IntConst&>(rhs).getInt();
-      instrconstr &= ty->numElements().ugt(idx) &&
-                     ty->getChild(idx) == getType();
-    }
-    break;
-  }
   case SAdd_Overflow:
   case UAdd_Overflow:
   case SSub_Overflow:
@@ -568,6 +542,62 @@ expr Select::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Select::dup(const string &suffix) const {
   return make_unique<Select>(getType(), getName() + suffix, cond, a, b);
+}
+
+
+void ExtractValue::addIdx(unsigned idx) {
+  idxs.emplace_back(idx);
+}
+
+void ExtractValue::print(ostream &os) const {
+  os << getName() << " = extractvalue " << val;
+  for (auto idx : idxs) {
+    os << ", " << idx;
+  }
+}
+
+StateValue ExtractValue::toSMT(State &s) const {
+  auto [v, p] = s[val];
+
+  // TODO: add support for array type
+  Type *type = &val.getType();
+  for (auto idx : idxs) {
+    auto st = type->getAsStructType();
+    v = st->extract(v, idx);
+    type = &st->getChild(idx);
+  }
+
+  return { move(v), move(p) };
+}
+
+expr ExtractValue::getTypeConstraints(const Function &f) const {
+  auto c = Value::getTypeConstraints() &&
+           val.getType().enforceAggregateType();
+
+  // TODO: add support for arrays
+  Type *type = &val.getType();
+  unsigned i = 0;
+  for (auto idx : idxs) {
+    auto st = type->getAsStructType();
+    if (!st) {
+      c = false;
+      break;
+    }
+    type = &st->getChild(idx);
+
+    c &= st->numElements().ugt(idx);
+    if (++i == idxs.size())
+      c &= st->getChild(idx) == getType();
+  }
+  return c;
+}
+
+unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
+  auto ret = make_unique<ExtractValue>(getType(), getName() + suffix, val);
+  for (auto idx : idxs) {
+    ret->addIdx(idx);
+  }
+  return ret;
 }
 
 

@@ -1,0 +1,41 @@
+Name: poison 1
+%t = usub_overflow i4 %a, poison
+%v0 = extractvalue %t, 0
+  =>
+%t = usub_overflow i4 %a, poison
+%v0 = poison
+
+Name: poison 2
+%t = usub_overflow i4 %a, poison
+%v1 = extractvalue %t, 1
+  =>
+%t = usub_overflow i4 %a, poison
+%v1 = poison
+
+Name: poison 3
+%t = usub_overflow i4 poison, %b
+%v0 = extractvalue %t, 0
+  =>
+%t = usub_overflow i4 poison, %b
+%v0 = poison
+
+Name: poison 4
+%t = usub_overflow i4 poison, %b
+%v1 = extractvalue %t, 1
+  =>
+%t = usub_overflow i4 poison, %b
+%v1 = poison
+
+Name: poison 5
+%t = usub_overflow i4 poison, poison
+%v0 = extractvalue %t, 0
+  =>
+%t = usub_overflow i4 poison, poison
+%v0 = poison
+
+Name: poison 6
+%t = usub_overflow i4 poison, poison
+%v1 = extractvalue %t, 1
+  =>
+%t = usub_overflow i4 poison, poison
+%v1 = poison

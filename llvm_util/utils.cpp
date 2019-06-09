@@ -287,10 +287,22 @@ public:
     RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
   }
 
-  RetTy visitExtractElementInst(llvm::ExtractElementInst &i) {
-    PARSE_BINOP();
-    RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                         BinOp::ExtractValue));
+  RetTy visitExtractValueInst(llvm::ExtractValueInst &i) {
+    auto ty = llvm_type2alive(i.getType());
+    auto val = get_operand(i.getAggregateOperand());
+    if (!ty || !val)
+      return error(i);
+
+    auto inst = make_unique<ExtractValue>(*ty, value_name(i), *val);
+
+    for (auto &idx : i.indices) {
+      auto op = get_operand(idx);
+      if (!op)
+        return error(i);
+      inst->addIdx(*op);
+    }
+
+    RETURN_IDENTIFIER(move(inst));
   }
 
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
