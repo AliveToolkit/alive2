@@ -215,6 +215,15 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
   // TODO
 }
 
+expr Memory::ptr2int(const expr &ptr) {
+  return Pointer(*this, ptr).get_address();
+}
+
+expr Memory::int2ptr(const expr &val) {
+  // TODO
+  return {};
+}
+
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);

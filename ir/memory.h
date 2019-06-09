@@ -81,6 +81,9 @@ public:
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytes, unsigned align_dst, unsigned align_src);
 
+  smt::expr ptr2int(const smt::expr &ptr);
+  smt::expr int2ptr(const smt::expr &val);
+
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 

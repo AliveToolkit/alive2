@@ -68,6 +68,7 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
 class TernaryOp final : public Instr {
 public:
   enum Op { FShl, FShr };
@@ -87,9 +88,10 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
 class ConversionOp final : public Instr {
 public:
-  enum Op { SExt, ZExt, Trunc };
+  enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
 
 private:
   Value &val;

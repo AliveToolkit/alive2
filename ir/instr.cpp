@@ -465,9 +465,12 @@ unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case SExt:  str = "sext "; break;
-  case ZExt:  str = "zext "; break;
-  case Trunc: str = "trunc "; break;
+  case SExt:    str = "sext "; break;
+  case ZExt:    str = "zext "; break;
+  case Trunc:   str = "trunc "; break;
+  case BitCast: str = "bitcast "; break;
+  case Ptr2Int: str = "ptrtoint "; break;
+  case Int2Ptr: str = "int2ptr "; break;
   }
 
   os << getName() << " = " << str << val;
@@ -492,25 +495,48 @@ StateValue ConversionOp::toSMT(State &s) const {
   case Trunc:
     newval = v.trunc(to_bw);
     break;
+  case BitCast:
+    newval = v;
+    break;
+  case Ptr2Int:
+    newval = s.getMemory().ptr2int(v);
+    break;
+  case Int2Ptr:
+    newval = s.getMemory().int2ptr(v);
+    break;
   }
   return { move(newval), expr(vp) };
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
-  expr sizeconstr;
+  expr c;
   switch (op) {
   case SExt:
   case ZExt:
-    sizeconstr = val.getType().sizeVar().ult(getType().sizeVar());
+    c = getType().enforceIntOrVectorType() &&
+        getType().sameType(val.getType()) &&
+        val.getType().sizeVar().ult(getType().sizeVar());
     break;
   case Trunc:
-    sizeconstr = getType().sizeVar().ult(val.getType().sizeVar());
+    c = getType().enforceIntOrVectorType() &&
+        getType().sameType(val.getType()) &&
+        getType().sizeVar().ult(val.getType().sizeVar());
+    break;
+  case BitCast:
+    // FIXME: input can only be ptr if result is a ptr as well
+    c = getType().enforceIntOrPtrOrVectorType() &&
+        getType().sizeVar() == val.getType().sizeVar();
+    break;
+  case Ptr2Int:
+    c = getType().enforceIntType() &&
+        val.getType().enforcePtrType();
+    break;
+  case Int2Ptr:
+    c = getType().enforcePtrType() &&
+        val.getType().enforceIntType();
     break;
   }
-  return Value::getTypeConstraints() &&
-         getType().enforceIntOrVectorType() &&
-         getType().sameType(val.getType()) &&
-         move(sizeconstr);
+  return Value::getTypeConstraints() && move(c);
 }
 
 unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {
