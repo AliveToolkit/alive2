@@ -12,6 +12,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <unordered_map>
 #include <utility>
 
@@ -139,18 +140,27 @@ struct TVPass : public llvm::FunctionPass {
     done = true;
 
     if (!opt_report_dir.empty()) {
-      // TODO: make dir if it doesn't exist
+      static default_random_engine re;
+      static uniform_int_distribution<unsigned> rand;
+      static bool seeded = false;
+
+      if (!seeded) {
+        random_device rd;
+        re.seed(rd());
+        seeded = true;
+      }
+
+      fs::create_directories(opt_report_dir.getValue());
       auto &source_file = module.getSourceFileName();
       fs::path fname = source_file.empty() ? "alive.txt" : source_file;
       fname.replace_extension(".txt");
       fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
 
-      unsigned n = 0;
-      while (fs::exists(path)) {
+      do {
         auto newname = fname.stem();
-        newname += "_" + to_string(++n) + ".txt";
+        newname += "_" + to_string(rand(re)) + ".txt";
         path.replace_filename(newname);
-      }
+      } while (fs::exists(path));
 
       out_file = ofstream(path);
       out = &out_file;
