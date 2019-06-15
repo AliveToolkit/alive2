@@ -10,13 +10,9 @@ namespace util {
 
 unsigned ilog2(uint64_t n) {
 #ifdef __GNUC__
-  return n == 0 ? 0 : (64 - __builtin_clzll(n));
-#elif defined(_MSC_VER)
-# ifdef _M_X64
-  return 64 - (unsigned)__lzcnt64(n);
-# else
-# error Unknown compiler
-# endif
+  return n == 0 ? 0 : (63 - __builtin_clzll(n));
+#elif defined(_MSC_VER) && defined(_M_X64)
+  return 63 - (unsigned)__lzcnt64(n);
 #else
 # error Unknown compiler
 #endif
