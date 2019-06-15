@@ -126,7 +126,7 @@ expr Type::enforceFloatType() const {
 }
 
 const StructType* Type::getAsStructType() const {
-  UNREACHABLE();
+  return nullptr;
 }
 
 const FloatType* Type::getAsFloatType() const {
