@@ -24,16 +24,23 @@ class Pointer {
 public:
   Pointer(Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(Memory &m, unsigned bid, bool local);
+  Pointer(Memory &m, const smt::expr &offset, const smt::expr &local_bid,
+          const smt::expr &nonlocal_bid);
+
+  smt::expr is_local() const;
 
   smt::expr get_bid() const;
+  smt::expr get_local_bid() const;
+  smt::expr get_nonlocal_bid() const;
   smt::expr get_offset() const;
   smt::expr get_address() const;
+
+  smt::expr block_size() const;
 
   const smt::expr& operator()() const { return p; }
   smt::expr&& release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
-  void operator++(void);
   Pointer operator+(unsigned) const;
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);
@@ -57,16 +64,19 @@ class Memory {
   unsigned bits_for_nonlocal_bid = 8;
   unsigned bits_size_t = 64;
 
-  smt::expr blocks_size; // array: bid -> size in bytes
   smt::expr blocks_val;  // array: (bid, offset) -> StateValue
   unsigned last_bid = 0;
   unsigned last_idx_ptr = 0;
 
+  std::string mkName(const char *str, bool src) const;
   std::string mkName(const char *str) const;
-  smt::expr block_addr(const smt::expr &bid) const;
+
+  smt::expr mk_val_array(const char *name) const;
 
 public:
   Memory(State &state);
+
+  smt::expr mk_axioms();
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 

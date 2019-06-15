@@ -21,12 +21,29 @@ Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
   p = expr::mkUInt(0, m.bits_for_offset).concat(bid_expr);
 }
 
+Pointer::Pointer(Memory &m, const expr &offset, const expr &local_bid,
+                 const expr &nonlocal_bid)
+  : m(m), p(offset.concat(local_bid).concat(nonlocal_bid)) {}
+
 unsigned Pointer::bits_for_bids() const {
   return m.bits_for_local_bid + m.bits_for_nonlocal_bid;
 }
 
+expr Pointer::is_local() const {
+  // we need to check both because of undef pointers
+  return get_local_bid() != 0 && get_nonlocal_bid() == 0;
+}
+
 expr Pointer::get_bid() const {
   return p.extract(bits_for_bids() - 1, 0);
+}
+
+expr Pointer::get_local_bid() const {
+  return p.extract(bits_for_bids() - 1, m.bits_for_nonlocal_bid);
+}
+
+expr Pointer::get_nonlocal_bid() const {
+  return p.extract(m.bits_for_nonlocal_bid - 1, 0);
 }
 
 expr Pointer::get_offset() const {
@@ -34,11 +51,21 @@ expr Pointer::get_offset() const {
 }
 
 expr Pointer::get_address() const {
-  return m.block_addr(get_bid());
+  expr range = expr::mkUInt(0, m.bits_size_t);
+  auto local_name = m.mkName("blks_addr");
+  return
+    expr::mkIf(is_local(),
+               expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
+               expr::mkUF("blks_addr", { get_nonlocal_bid() }, range));
 }
 
-void Pointer::operator++(void) {
-  *this += expr::mkUInt(1, m.bits_for_offset);
+expr Pointer::block_size() const {
+  expr range = expr::mkUInt(0, m.bits_size_t);
+  auto local_name = m.mkName("blks_size");
+  return
+    expr::mkIf(is_local(),
+               expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
+               expr::mkUF("blks_size", { get_nonlocal_bid() }, range));
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -62,9 +89,7 @@ expr Pointer::uge(const Pointer &rhs) const {
 }
 
 expr Pointer::inbounds() const {
-  expr block_sz = m.blocks_size.load(get_bid());
-  expr offset = get_offset();
-  return offset.zextOrTrunc(m.bits_size_t).ule(block_sz);
+  return get_offset().zextOrTrunc(m.bits_size_t).ule(block_size());
 }
 
 expr Pointer::is_aligned(unsigned align) const {
@@ -74,7 +99,7 @@ expr Pointer::is_aligned(unsigned align) const {
 }
 
 void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
-  expr block_sz = m.blocks_size.load(get_bid());
+  expr block_sz = block_size();
   expr offset = get_offset();
 
   // 1) check that offset is within bounds and that arith doesn't overflow
@@ -93,47 +118,54 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 }
 
 
-string Memory::mkName(const char *str) const {
-  return string(str) + (state->isSource() ? "_src" : "_tgt");
+string Memory::mkName(const char *str, bool src) const {
+  return string(str) + (src ? "_src" : "_tgt");
 }
 
-expr Memory::block_addr(const expr &bid) const {
-  auto name = mkName("blks_addr");
-  return expr::mkUF(name.c_str(), { bid }, expr::mkUInt(0, bits_size_t));
+string Memory::mkName(const char *str) const {
+  return mkName(str, state->isSource());
+}
+
+expr Memory::mk_val_array(const char *name) const {
+  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
+  return expr::mkArray(name, expr::mkUInt(0, bits_bids + bits_for_offset),
+                             expr::mkUInt(0, 8 + 1)); // val+poison bit
 }
 
 Memory::Memory(State &state) : state(&state) {
-  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-
-  auto size_name = mkName("blks_size");
-  blocks_size = expr::mkArray(size_name.c_str(),
-                              expr::mkUInt(0, bits_bids),
-                              expr::mkUInt(0, bits_size_t));
-
   auto val_name = mkName("blks_val");
-  blocks_val = expr::mkArray(val_name.c_str(),
-                             expr::mkUInt(0, bits_bids + bits_for_offset),
-                             expr::mkUInt(0, 8 + 1)); // val+poison bit
+  blocks_val = mk_val_array(val_name.c_str());
 
   assert(bits_for_offset <= bits_size_t);
+}
+
+expr Memory::mk_axioms() {
+  expr offset = expr::mkVar("offset", bits_for_offset);
+  expr bid = expr::mkVar("bid", bits_for_nonlocal_bid);
+  Pointer ptr(*this, offset, expr::mkUInt(0, bits_for_local_bid), bid);
+
+  auto val_src_name = mkName("blks_val", true);
+  auto val_tgt_name = mkName("blks_val", false);
+  auto val_src = mk_val_array(val_src_name.c_str()).load(ptr());
+  auto val_tgt = mk_val_array(val_tgt_name.c_str()).load(ptr());
+  return expr::mkForAll({ offset, bid }, val_src == val_tgt);
 }
 
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   unsigned bits = bits_for_nonlocal_bid + bits_for_offset;
   expr var = expr::mkVar(name, bits);
-  // [offset, local_bid, nonlocal_bid]
   expr offset = var.extract(bits - 1, bits_for_nonlocal_bid);
   expr bid = var.extract(bits_for_nonlocal_bid - 1, 0);
-  expr val = offset.concat(expr::mkUInt(0, bits_for_local_bid).concat(bid));
-  return { move(val), { var } };
+  expr local_bid = expr::mkUInt(0, bits_for_local_bid);
+  return { Pointer(*this, offset, local_bid, bid).release(), { var } };
 }
 
 expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
-  Pointer p(*this, last_bid++, local);
+  Pointer p(*this, ++last_bid, local);
   state->addPre(p.is_aligned(align));
 
   expr size = bytes.zextOrTrunc(bits_size_t);
-  blocks_size = blocks_size.store(p.get_bid(), size);
+  state->addPre(p.block_size() == size);
   memset(p(), { expr::mkUInt(0, 8), false }, size, align);
   return p();
 }
@@ -155,7 +187,8 @@ void Memory::store(const expr &p, const StateValue &v, unsigned align) {
   for (unsigned i = 0; i < bytes; ++i) {
     // FIXME: right now we store in little-endian; consider others?
     expr data = val.extract((i + 1) * 8 - 1, i * 8);
-    blocks_val = blocks_val.store((ptr + i)(), poison.concat(data));
+    auto p = (ptr + i).release();
+    blocks_val = blocks_val.store(p, poison.concat(data));
   }
 }
 
@@ -168,9 +201,10 @@ StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
   bool first = true;
 
   for (unsigned i = 0; i < bytes; ++i) {
-    expr pair = blocks_val.load((ptr + i)());
+    auto ptr_i = (ptr + i).release();
+    expr pair = blocks_val.load(ptr_i);
     expr v = pair.extract(8-1, 0);
-    expr p = pair.extract(8, 8) == expr::mkUInt(1, 1);
+    expr p = pair.extract(8, 8) == 1;
 
     if (first) {
       val = move(v);
@@ -194,8 +228,8 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
   uint64_t n;
   if (bytes.isUInt(n) && n <= 4) {
     for (unsigned i = 0; i < n; ++i) {
-      blocks_val = blocks_val.store(ptr(), store_val);
-      ++ptr;
+      auto p = (ptr + i).release();
+      blocks_val = blocks_val.store(p, store_val);
     }
   } else {
     string name = "#idx_" + to_string(last_idx_ptr++);
@@ -227,8 +261,8 @@ expr Memory::int2ptr(const expr &val) {
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
-  ret.blocks_size  = expr::mkIf(cond, then.blocks_size, els.blocks_size);
   ret.blocks_val   = expr::mkIf(cond, then.blocks_val, els.blocks_val);
+  // FIXME: this isn't correct; should be a per function counter
   ret.last_bid     = max(then.last_bid, els.last_bid);
   ret.last_idx_ptr = max(then.last_idx_ptr, els.last_idx_ptr);
   return ret;
