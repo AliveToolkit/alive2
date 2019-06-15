@@ -188,6 +188,18 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
   auto DL() const { return f.getParent()->getDataLayout(); }
 
+  template <typename T>
+  unsigned alignment(T &i, llvm::Type *ty) const {
+    auto a = i.getAlignment();
+    return a != 0 ? a : DL().getABITypeAlignment(ty);
+  }
+
+  template <typename T>
+  unsigned pref_alignment(T &i, llvm::Type *ty) const {
+    auto a = i.getAlignment();
+    return a != 0 ? a : DL().getPrefTypeAlignment(ty);
+  }
+
 public:
   llvm2alive_(llvm::Function &f) : f(f) {}
 
@@ -314,7 +326,7 @@ public:
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
     RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
-                                         i.getAlignment()));
+                        pref_alignment(i, i.getAllocatedType())));
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
@@ -345,7 +357,7 @@ public:
     // TODO: Add support for isVolatile(), getOrdering()
     PARSE_UNOP();
     RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val,
-                                        i.getAlignment()));
+                                        alignment(i, i.getType())));
   }
 
   RetTy visitStoreInst(llvm::StoreInst &i) {
@@ -354,7 +366,8 @@ public:
     auto ptr = get_operand(i.getPointerOperand());
     if (!val || !ptr)
       return error(i);
-    RETURN_IDENTIFIER(make_unique<Store>(*ptr, *val, i.getAlignment()));
+    RETURN_IDENTIFIER(make_unique<Store>(*ptr, *val,
+                        alignment(i, i.getValueOperand()->getType())));
   }
 
   RetTy visitPHINode(llvm::PHINode &i) {
