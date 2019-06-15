@@ -47,7 +47,7 @@ unsigned num_sign_bits(uint64_t n) {
 
 unsigned num_leading_zeros(uint64_t n) {
 #if defined(__GNUC__)
-  return __builtin_clzll(n);
+  return n == 0 ? 64 : __builtin_clzll(n);
 #else
 # error Unknown compiler
 #endif
@@ -55,7 +55,7 @@ unsigned num_leading_zeros(uint64_t n) {
 
 unsigned num_trailing_zeros(uint64_t n) {
 #if defined(__GNUC__)
-  return __builtin_ctzll(n);
+  return n == 0 ? 64 : __builtin_ctzll(n);
 #else
 # error Unknown compiler
 #endif
