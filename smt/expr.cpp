@@ -6,6 +6,7 @@
 #include "util/compiler.h"
 #include <algorithm>
 #include <cassert>
+#include <limits>
 #include <memory>
 #include <string>
 #include <z3.h>
@@ -211,15 +212,15 @@ expr expr::IntSMin(unsigned bits) {
   static_assert(sizeof(unsigned long long) == 8);
   if (bits <= 64)
     return mkUInt(1ull << (bits - 1), bits);
-  return mkUInt(1, bits) << mkUInt(bits - 1, bits);
+  return mkUInt(1, 1).concat(mkUInt(0, bits-1));
 }
 
 expr expr::IntSMax(unsigned bits) {
   assert(bits > 0);
   static_assert(sizeof(unsigned long long) == 8);
   if (bits <= 64)
-    return mkUInt(-1ull >> (65u - bits), bits);
-  return mkInt(-1, bits).lshr(mkUInt(1, bits));
+    return mkUInt(numeric_limits<uint64_t>::max() >> (65u - bits), bits);
+  return mkUInt(0, 1).concat(mkInt(-1, bits-1));
 }
 
 expr expr::IntUMax(unsigned bits) {
@@ -273,7 +274,8 @@ bool expr::isSMax() const {
 }
 
 bool expr::isSigned() const {
-  return (extract(0, 0) == mkUInt(1, 1)).simplify().isTrue();
+  auto bit = bits() - 1;
+  return (extract(bit, bit) == 1).simplify().isTrue();
 }
 
 unsigned expr::bits() const {
@@ -516,7 +518,7 @@ expr expr::add_no_uoverflow(const expr &rhs) const {
     return true;
 
   auto bw = bits();
-  return (zext(1) + rhs.zext(1)).extract(bw, bw) == mkUInt(0, 1);
+  return (zext(1) + rhs.zext(1)).extract(bw, bw) == 0;
 }
 
 expr expr::sub_no_soverflow(const expr &rhs) const {
@@ -527,7 +529,7 @@ expr expr::sub_no_soverflow(const expr &rhs) const {
 
 expr expr::sub_no_uoverflow(const expr &rhs) const {
   auto bw = bits();
-  return (zext(1) - rhs.zext(1)).extract(bw, bw) == mkUInt(0, 1);
+  return (zext(1) - rhs.zext(1)).extract(bw, bw) == 0;
 }
 
 expr expr::mul_no_soverflow(const expr &rhs) const {
@@ -539,7 +541,7 @@ expr expr::mul_no_soverflow(const expr &rhs) const {
 expr expr::mul_no_uoverflow(const expr &rhs) const {
   C(rhs);
   auto bw = bits();
-  return (zext(bw) * rhs.zext(bw)).extract(2*bw - 1, bw) == mkUInt(0, sort());
+  return (zext(bw) * rhs.zext(bw)).extract(2*bw - 1, bw) == 0;
 }
 
 expr expr::sdiv_exact(const expr &rhs) const {
@@ -713,7 +715,7 @@ expr expr::operator&(const expr &rhs) const {
 
   auto fold_extract = [](auto &a, auto &b) {
     uint64_t n;
-    if (!a.isUInt(n) || n == 0 || n == -1ULL)
+    if (!a.isUInt(n) || n == 0 || n == numeric_limits<uint64_t>::max())
       return expr();
 
     auto lead  = num_leading_zeros(n);
