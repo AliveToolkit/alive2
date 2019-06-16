@@ -626,7 +626,7 @@ void StructType::printVal(ostream &os, const expr &val) const {
   for (size_t i = 0, e = children.size(); i != e; ++i) {
     if (!first)
       os << ", ";
-    getChild(i).printVal(os, extract(val, i));
+    getChild(i).printVal(os, extract(val, i).simplify());
     first = false;
   }
   os << " }";

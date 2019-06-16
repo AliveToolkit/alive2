@@ -996,6 +996,10 @@ expr expr::extract(unsigned high, unsigned low) const {
   if (low == 0 && high == bits()-1)
     return *this;
 
+  uint64_t n;
+  if (low < 64 && isUInt(n))
+    return mkUInt(n >> low, high - low + 1);
+
   {
     expr sub;
     unsigned high_2, low_2;
@@ -1132,7 +1136,7 @@ expr expr::subst(const expr &from, const expr &to) const {
 
 void expr::printUnsigned(ostream &os) const {
   uint64_t num;
-  if (isUInt(num)) {
+  if (simplify().isUInt(num)) {
     os << num;
     return;
   }
