@@ -637,7 +637,8 @@ StateValue FnCall::toSMT(State &s) const {
     args_eval.emplace_back(p);
   }
 
-  auto add_axiom = [&](string fn, const expr &type) {
+  auto add_axiom = [&](string fn, const expr &type,
+                       expr (expr::*implies)(const expr &) const) {
     if (!s.isSource())
       return;
 
@@ -650,20 +651,44 @@ StateValue FnCall::toSMT(State &s) const {
       vars_tgt.emplace_back(expr::mkVar(name.c_str(), arg));
     }
 
-    expr cond(true);
-    for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-      // src is poison or values are non-poison and equal
-      cond &= !vars_src[i+1] || (vars_tgt[i+1] && vars_src[i] == vars_tgt[i]);
-    }
-
-    set<expr> vars_set(vars_src.begin(), vars_src.end());
-    vars_set.insert(vars_tgt.begin(), vars_tgt.end());
-
     auto name_src = fn + "#src";
     auto name_tgt = fn + "#tgt";
-    auto fn_src = expr::mkUF(name_src.c_str(), vars_src, type);
-    auto fn_tgt = expr::mkUF(name_tgt.c_str(), vars_tgt, type);
-    s.addPre(expr::mkForAll(vars_set, cond.implies(fn_src == fn_tgt)));
+
+    {
+      // fns are equal if args are non-poison and equal
+      set<expr> vars_set;
+      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
+        vars_set.insert(vars_src[i]);
+      }
+
+      vector<expr> v_src, v_tgt;
+      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
+        v_src.emplace_back(vars_src[i]);
+        v_src.emplace_back(true);
+        v_tgt.emplace_back(vars_src[i]);
+        v_tgt.emplace_back(true);
+      }
+
+      auto fn_src = expr::mkUF(name_src.c_str(), v_src, type);
+      auto fn_tgt = expr::mkUF(name_tgt.c_str(), v_tgt, type);
+      s.addPre(expr::mkForAll(vars_set, fn_src == fn_tgt));
+    }
+
+    {
+      // fn src implies fn tgt if source value is poison
+      set<expr> vars_set(vars_src.begin(), vars_src.end());
+      vars_set.insert(vars_tgt.begin(), vars_tgt.end());
+
+      expr cond(false);
+      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
+        cond |= !vars_src[i + 1];
+      }
+
+      auto fn_src = expr::mkUF(name_src.c_str(), vars_src, type);
+      auto fn_tgt = expr::mkUF(name_tgt.c_str(), vars_tgt, type);
+      s.addPre(expr::mkForAll(vars_set,
+                              cond.implies((fn_src.*implies)(fn_tgt))));
+    }
   };
 
 
@@ -672,14 +697,14 @@ StateValue FnCall::toSMT(State &s) const {
   auto ub_name = fnName + "_ub" + suffix;
   s.addUB(expr::mkUF(ub_name.c_str(), args_eval, false));
 
-  add_axiom(fnName + "_ub", false);
+  add_axiom(fnName + "_ub", false, &expr::implies);
 
   if (dynamic_cast<VoidType*>(&getType()))
     return {};
 
   expr ret_type = getType().getDummyValue();
-  add_axiom(fnName, ret_type);
-  add_axiom(fnName + "_poison", false);
+  add_axiom(fnName, ret_type, &expr::operator==);
+  add_axiom(fnName + "_poison", false, &expr::implies);
 
   auto val_name = fnName + suffix;
   auto poison_name = fnName + "_poison" + suffix;
