@@ -55,9 +55,17 @@ static llvm::cl::opt<bool> opt_disable_poison("disable-poison-input",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Alive: Assume inputs are not poison (default=false)"));
 
+static llvm::cl::opt<bool> opt_se_verbose(
+    "tv-se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<unsigned> opt_smt_to(
   "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries (default=1000)"),
   llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
+
+static llvm::cl::opt<bool> opt_smt_verbose(
+    "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_bidirectional("bidirectional",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
@@ -203,12 +211,12 @@ int main(int argc, char **argv) {
   smt::smt_initializer smt_init;
   TransformPrintOpts print_opts;
 
-  smt::solver_print_queries(false);
+  smt::solver_print_queries(opt_smt_verbose);
   smt::solver_tactic_verbose(false);
   smt::set_query_timeout(to_string(opt_smt_to));
   smt::set_memory_limit(1024 * 1024 * 1024);
   //config::skip_smt = opt_smt_skip;
-  config::symexec_print_each_value = false;
+  config::symexec_print_each_value = opt_se_verbose;
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
 
