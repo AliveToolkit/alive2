@@ -652,8 +652,8 @@ StateValue FnCall::toSMT(State &s) const {
 
     expr cond(true);
     for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-      // src is poison or values are equal
-      cond &= vars_src[i + 1] || vars_src[i] == vars_tgt[i];
+      // src is poison or values are non-poison and equal
+      cond &= !vars_src[i+1] || (vars_tgt[i+1] && vars_src[i] == vars_tgt[i]);
     }
 
     set<expr> vars_set(vars_src.begin(), vars_src.end());
