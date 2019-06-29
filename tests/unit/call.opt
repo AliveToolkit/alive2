@@ -1,0 +1,19 @@
+Name: poison->poison
+%call = call i32 @f(i32 poison)
+  =>
+%call = call i32 @f(i32 poison)
+
+Name: poison->val
+%call = call i32 @f(i32 poison)
+  =>
+%call = call i32 @f(i32 42)
+
+Name: val->val
+%call = call i32 @f(i32 42)
+  =>
+%call = call i32 @f(i32 42)
+
+Name: 2 vals
+%call = call i32 @g(i32 42, i32 3)
+  =>
+%call = call i32 @g(i32 42, i32 3)

@@ -138,7 +138,7 @@ class FnCall final : public Instr {
   std::vector<Value*> args;
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName)
-    : Instr(type, std::move(name)) , fnName(std::move(fnName)) {}
+    : Instr(type, std::move(name)), fnName(std::move(fnName)) {}
   void addArg(Value &arg);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

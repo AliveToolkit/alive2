@@ -1,0 +1,4 @@
+; ERROR: Target is more poisonous
+%call = call i32 @f(i32 32)
+  =>
+%call = call i32 @f(i32 poison)

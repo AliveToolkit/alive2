@@ -145,6 +145,11 @@ static void parse_name(Transform &t) {
     t.name = yylval.str;
 }
 
+static string parse_global_name() {
+  tokenizer.ensure(GLOBAL_NAME);
+  return string(yylval.str);
+}
+
 static Value& parse_const_expr(Type &type);
 
 static Predicate* parse_predicate(Predicate *last = nullptr,
@@ -612,6 +617,26 @@ static unique_ptr<Instr> parse_freeze(string_view name) {
   return make_unique<Freeze>(ty, string(name), op);
 }
 
+static unique_ptr<Instr> parse_call(string_view name) {
+  // call ty name(ty_1 %op_1, ..., ty_n %op_n)
+  auto &ret_ty = parse_type();
+  auto fn_name = parse_global_name();
+  tokenizer.ensure(LPAREN);
+
+  auto call = make_unique<FnCall>(ret_ty, string(name), move(fn_name));
+  bool first = true;
+
+  while (tokenizer.peek() != RPAREN) {
+    if (!first)
+      tokenizer.ensure(COMMA);
+    first = false;
+    auto &ty = parse_type();
+    call->addArg(parse_operand(ty));
+  }
+  tokenizer.ensure(RPAREN);
+  return call;
+}
+
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
   auto &ty = parse_type();
@@ -670,6 +695,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_icmp(name);
   case FREEZE:
     return parse_freeze(name);
+  case CALL:
+    return parse_call(name);
   case INT_TYPE:
   case NUM:
   case TRUE:

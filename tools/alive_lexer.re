@@ -123,6 +123,11 @@ re2c:yyfill:check = 0;
   return REGISTER;
 }
 
+"@" [a-zA-Z0-9_.]+ {
+  COPY_STR();
+  return GLOBAL_NAME;
+}
+
 "C" [0-9]+ {
   COPY_STR();
   return CONSTANT;
@@ -198,6 +203,7 @@ re2c:yyfill:check = 0;
 "ult" { return ULT; }
 "uge" { return UGE; }
 "ugt" { return UGT; }
+"call" { return CALL; }
 "freeze" { return FREEZE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
