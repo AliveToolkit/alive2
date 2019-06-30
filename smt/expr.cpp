@@ -1053,6 +1053,16 @@ expr expr::toBVBool() const {
   return mkIf(*this, mkUInt(1, sort), mkUInt(0, sort));
 }
 
+expr expr::float2BV() const {
+  C();
+  return Z3_mk_fpa_to_ieee_bv(ctx(), ast());
+}
+
+expr expr::BV2float(const expr &type) const {
+  C(type);
+  return Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort());
+}
+
 expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
   C2(range);
   auto num_args = args.size();

@@ -45,6 +45,9 @@ public:
   smt::expr sameType(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
+  virtual bool isIntType() const;
+  virtual bool isFloatType() const;
+
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
@@ -100,6 +103,7 @@ public:
   smt::expr operator==(const IntType &rhs) const;
   smt::expr sameType(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
+  bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
@@ -132,6 +136,7 @@ public:
   smt::expr operator==(const FloatType &rhs) const;
   smt::expr sameType(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
+  bool isFloatType() const override;
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
   std::pair<smt::expr, std::vector<smt::expr>>
@@ -252,6 +257,8 @@ public:
   smt::expr operator==(const Type &rhs) const;
   smt::expr sameType(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
+  bool isIntType() const override;
+  bool isFloatType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;

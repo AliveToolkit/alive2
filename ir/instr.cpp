@@ -492,7 +492,15 @@ StateValue ConversionOp::toSMT(State &s) const {
     newval = v.trunc(to_bw);
     break;
   case BitCast:
-    newval = v;
+    if ((getType().isIntType() && val.getType().isIntType()) ||
+        (getType().isFloatType() && val.getType().isFloatType()))
+      newval = v;
+    else if (getType().isIntType() && val.getType().isFloatType())
+      newval = v.float2BV();
+    else if (getType().isFloatType() && val.getType().isIntType())
+      newval = v.BV2float(getType().getDummyValue());
+    else
+      UNREACHABLE();
     break;
   case Ptr2Int:
     newval = s.getMemory().ptr2int(v);

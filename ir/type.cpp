@@ -97,6 +97,14 @@ expr Type::sameType(const Type &b) const {
   return false;
 }
 
+bool Type::isIntType() const {
+  return false;
+}
+
+bool Type::isFloatType() const {
+  return false;
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
@@ -210,6 +218,10 @@ void IntType::fixup(const Model &m) {
     bitwidth = m.getUInt(sizeVar());
 }
 
+bool IntType::isIntType() const {
+  return true;
+}
+
 expr IntType::enforceIntType(unsigned bits) const {
   return bits ? sizeVar() == bits : true;
 }
@@ -302,6 +314,10 @@ void FloatType::fixup(const Model &m) {
   unsigned fp_typ = m.getUInt(sizeVar());
   assert(fp_typ < (unsigned)Unknown);
   fpType = FpType(fp_typ);
+}
+
+bool FloatType::isFloatType() const {
+  return true;
 }
 
 expr FloatType::enforceFloatType() const {
@@ -758,6 +774,14 @@ void SymbolicType::fixup(const Model &m) {
   case Undefined:
     UNREACHABLE();
   }
+}
+
+bool SymbolicType::isIntType() const {
+  return typ == Int;
+}
+
+bool SymbolicType::isFloatType() const {
+  return typ == Float;
 }
 
 expr SymbolicType::enforceIntType(unsigned bits) const {
