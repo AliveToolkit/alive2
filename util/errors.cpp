@@ -24,11 +24,16 @@ void Errors::add(string &&str) {
 }
 
 bool Errors::isTimeout() const {
-  for (auto &err : errs) {
-    if (err != "Timeout")
-      return false;
-  }
-  return !errs.empty();
+  return errs.size() == 1 && errs[0] == "Timeout";
+}
+
+bool Errors::isOOM() const {
+  return errs.size() == 1 && errs[0] == "Out of memory; skipping function.";
+}
+
+bool Errors::isLoopyCFG() const {
+  return errs.size() == 1 &&
+         errs[0] == "Loops are not supported yet! Skipping function.";
 }
 
 ostream& operator<<(ostream &os, const Errors &errs) {
