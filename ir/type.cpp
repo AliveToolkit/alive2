@@ -246,20 +246,12 @@ void IntType::print(ostream &os) const {
 
 unsigned FloatType::bits() const {
   switch (fpType) {
-  case Quarter:
-    return 8;
   case Half:
-    return 16;
-  case BFloat16:
     return 16;
   case Float:
     return 32;
   case Double:
     return 64;
-  case IEEE80:
-    return 80;
-  case FP128:
-    return 128;
   case Unknown:
     UNREACHABLE();
   }
@@ -276,15 +268,10 @@ expr FloatType::sizeVar() const {
 
 expr FloatType::getDummyValue() const {
   switch (fpType) {
-  case Float:
-    return expr::mkFloat(0);
-  case Double:
-    return expr::mkDouble(0);
-  case Unknown:
-    UNREACHABLE();
-  default:
-    // TODO
-    return {};
+  case Half:    return expr::mkHalf(0);
+  case Float:   return expr::mkFloat(0);
+  case Double:  return expr::mkDouble(0);
+  case Unknown: UNREACHABLE();
   }
   UNREACHABLE();
 }
@@ -313,7 +300,7 @@ void FloatType::fixup(const Model &m) {
     return;
 
   unsigned fp_typ = m.getUInt(sizeVar());
-  assert(fp_typ >= Quarter && fp_typ <= FP128);
+  assert(fp_typ < (unsigned)Unknown);
   fpType = FpType(fp_typ);
 }
 
@@ -324,14 +311,11 @@ expr FloatType::enforceFloatType() const {
 pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
   expr var;
   switch (fpType) {
+  case Half:    var = expr::mkHalfVar(name); break;
   case Float:   var = expr::mkFloatVar(name); break;
   case Double:  var = expr::mkDoubleVar(name); break;
   case Unknown: UNREACHABLE();
-  default:
-    // TODO
-    UNREACHABLE();
   }
-
   return { var, { var } };
 }
 
@@ -341,26 +325,14 @@ void FloatType::printVal(ostream &os, const expr &e) const {
 
 void FloatType::print(ostream &os) const {
   switch (fpType) {
-  case Quarter:
-    os << "quarter";
-    break;
   case Half:
     os << "half";
-    break;
-  case BFloat16:
-    os << "bfloat16";
     break;
   case Float:
     os << "float";
     break;
   case Double:
     os << "double";
-    break;
-  case IEEE80:
-    os << "ieee80";
-    break;
-  case FP128:
-    os << "fp128";
     break;
   case Unknown:
     break;

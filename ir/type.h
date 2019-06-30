@@ -113,7 +113,7 @@ public:
 class FloatType final : public Type {
 public:
   enum FpType {
-    Quarter, Half, BFloat16, Float, Double, IEEE80, FP128, Unknown
+    Half, Float, Double, Unknown
   };
 
 private:

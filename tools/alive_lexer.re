@@ -222,8 +222,12 @@ re2c:yyfill:check = 0;
 "umul_overflow" { return UMUL_OVERFLOW; }
 "fadd" { return FADD; }
 "fsub" { return FSUB; }
-"float" { return FLOAT_TYPE;}
-"double" { return DOUBLE_TYPE;}
+"fmul" { return FMUL; }
+"fdiv" { return FDIV; }
+"frem" { return FREM; }
+"half" { return HALF;}
+"float" { return FLOAT;}
+"double" { return DOUBLE;}
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

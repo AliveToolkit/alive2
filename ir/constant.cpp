@@ -55,17 +55,14 @@ expr FloatConst::getTypeConstraints() const {
 }
 
 pair<expr, expr> FloatConst::toSMT_cnst() const {
+  expr e;
   switch (getType().getAsFloatType()->getFpType()) {
-  case FloatType::Double: {
-    return { expr::mkDouble(val), true };
+  case FloatType::Half:    e = expr::mkHalf((float)val); break;
+  case FloatType::Float:   e = expr::mkFloat((float)val); break;
+  case FloatType::Double:  e = expr::mkDouble(val); break;
+  case FloatType::Unknown: UNREACHABLE();
   }
-  case FloatType::Float: {
-    return { expr::mkFloat((float) val), true };
-  }
-  default:
-    // TODO: support other fp types
-    UNREACHABLE();
-  }
+  return { move(e), true };
 }
 
 

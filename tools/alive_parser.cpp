@@ -34,8 +34,9 @@ static void error(const char *s, token t) {
 }
 
 static vector<unique_ptr<IntType>> int_types;
-static unique_ptr<FloatType> float_type;
-static unique_ptr<FloatType> double_type;
+static FloatType half_type("half", FloatType::Half);
+static FloatType float_type("float", FloatType::Float);
+static FloatType double_type("double", FloatType::Double);
 static unordered_map<string, Value*> identifiers;
 static Function *fn;
 
@@ -274,11 +275,14 @@ static Type& parse_type(bool optional = true) {
       error("Int type too long: " + to_string(yylval.num));
     return get_int_type(yylval.num);
 
-  case DOUBLE_TYPE:
-    return *double_type.get();
+  case HALF:
+    return half_type;
 
-  case FLOAT_TYPE:
-    return *float_type.get();
+  case FLOAT:
+    return float_type;
+
+  case DOUBLE:
+    return double_type;
 
   default:
     if (optional) {
@@ -787,15 +791,10 @@ vector<Transform> parse(string_view buf) {
 parser_initializer::parser_initializer() {
   int_types.resize(65);
   int_types[1] = make_unique<IntType>("i1", 1);
-
-  float_type = make_unique<FloatType>("float", FloatType::Float);
-  double_type = make_unique<FloatType>("double", FloatType::Double);
 }
 
 parser_initializer::~parser_initializer() {
   for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
-  float_type.reset();
-  double_type.reset();
   sym_types.clear();
   overflow_aggregate_types.clear();
 }

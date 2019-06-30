@@ -23,6 +23,9 @@ unsigned value_id_counter; // for %0, %1, etc..
 
 vector<unique_ptr<IntType>> int_types;
 vector<unique_ptr<PtrType>> ptr_types;
+FloatType half_type("half", FloatType::Half);
+FloatType float_type("float", FloatType::Float);
+FloatType double_type("double", FloatType::Double);
 
 // cache complex types
 unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
@@ -89,6 +92,12 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return &Type::voidTy;
   case llvm::Type::IntegerTyID:
     return make_int_type(cast<llvm::IntegerType>(ty)->getBitWidth());
+  case llvm::Type::HalfTyID:
+    return &half_type;
+  case llvm::Type::FloatTyID:
+    return &float_type;
+  case llvm::Type::DoubleTyID:
+    return &double_type;
 
   case llvm::Type::PointerTyID: {
     // TODO: support for non-64 bits pointers
@@ -136,6 +145,23 @@ Value* get_operand(llvm::Value *v) {
       c = make_unique<IntConst>(*ty, cnst->getZExtValue());
     else
       c = make_unique<IntConst>(*ty, cnst->getValue().toString(10, false));
+    auto ret = c.get();
+    current_fn->addConstant(move(c));
+    return ret;
+  }
+
+  if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
+    auto &apfloat = cnst->getValueAPF();
+    auto apint = apfloat.bitcastToAPInt();
+    double val;
+    if (apint.getBitWidth() == 32) {
+      val = apfloat.convertToFloat();
+    } else if (apint.getBitWidth() == 64) {
+      val = apfloat.convertToDouble();
+    } else // TODO
+      return nullptr;
+
+    auto c = make_unique<FloatConst>(*ty, val);
     auto ret = c.get();
     current_fn->addConstant(move(c));
     return ret;
@@ -220,6 +246,11 @@ public:
     case llvm::Instruction::And:  alive_op = BinOp::And; break;
     case llvm::Instruction::Or:   alive_op = BinOp::Or; break;
     case llvm::Instruction::Xor:  alive_op = BinOp::Xor; break;
+    case llvm::Instruction::FAdd: alive_op = BinOp::FAdd; break;
+    case llvm::Instruction::FSub: alive_op = BinOp::FSub; break;
+    case llvm::Instruction::FMul: alive_op = BinOp::FMul; break;
+    case llvm::Instruction::FDiv: alive_op = BinOp::FDiv; break;
+    case llvm::Instruction::FRem: alive_op = BinOp::FRem; break;
     default:
       return error(i);
     }
@@ -231,6 +262,10 @@ public:
       flags |= BinOp::NUW;
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
+
+    // TODO: support FP fast-math stuff
+    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any())
+      return error(i);
 
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
                                          (BinOp::Flags)flags));
