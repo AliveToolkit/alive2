@@ -731,11 +731,6 @@ expr expr::fdiv(const expr &rhs) const {
   return Z3_mk_fpa_div(ctx(), rm, ast(), rhs());
 }
 
-expr expr::frem(const expr &rhs) const {
-  C(rhs);
-  return Z3_mk_fpa_rem(ctx(), ast(), rhs());
-}
-
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;

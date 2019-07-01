@@ -298,7 +298,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FRem:
-    val = a.frem(b);
+    // TODO; Z3 has no support for LLVM's frem which is actually an fmod
     break;
   }
 
