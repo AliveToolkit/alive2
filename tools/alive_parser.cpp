@@ -435,6 +435,9 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case UMUL_OVERFLOW:
   case FADD:
   case FSUB:
+  case FMUL:
+  case FDIV:
+  case FREM:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -497,6 +500,9 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
     break;
   case FADD: op = BinOp::FAdd; break;
   case FSUB: op = BinOp::FSub; break;
+  case FMUL: op = BinOp::FMul; break;
+  case FDIV: op = BinOp::FDiv; break;
+  case FREM: op = BinOp::FRem; break;
   default:
     UNREACHABLE();
   }
@@ -679,6 +685,9 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case UMUL_OVERFLOW:
   case FADD:
   case FSUB:
+  case FMUL:
+  case FDIV:
+  case FREM:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:

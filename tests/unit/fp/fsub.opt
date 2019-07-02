@@ -1,0 +1,15 @@
+Name: -a + 3.0 => 3.0 - a
+%t1 = fsub half -0.0, %a
+%t = fadd half %t1, 3.0
+  =>
+%t1 = fsub half -0.0, %a
+%t = fsub half 3.0, %a
+
+
+; TODO: fix timeout
+;Name: -a + b => b - a
+;%t1 = fsub half -0.0, %a
+;%t = fadd half %t1, %b
+;  =>
+;%t1 = fsub half -0.0, %a
+;%t = fsub half %b, %a
