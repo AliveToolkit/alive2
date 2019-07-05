@@ -178,6 +178,7 @@ public:
   expr fule(const expr &rhs) const;
   expr fune(const expr &rhs) const;
   expr funo(const expr &rhs) const;
+  expr fneg() const;
 
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;

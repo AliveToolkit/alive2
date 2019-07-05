@@ -814,6 +814,11 @@ expr expr::funo(const expr &rhs) const {
   return !ford(rhs());
 }
 
+expr expr::fneg() const {
+  C();
+  return Z3_mk_fpa_neg(ctx(), ast());
+}
+
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
