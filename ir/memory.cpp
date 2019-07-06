@@ -143,7 +143,7 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 
 ostream& operator<<(ostream &os, const Pointer &p) {
   // TODO
-  return os << p;
+  return os << p.p;
 }
 
 
