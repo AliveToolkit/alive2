@@ -503,7 +503,7 @@ StateValue ConversionOp::toSMT(State &s) const {
       UNREACHABLE();
     break;
   case Ptr2Int:
-    newval = s.getMemory().ptr2int(v);
+    newval = s.getMemory().ptr2int(v).zextOrTrunc(getType().bits());
     break;
   case Int2Ptr:
     newval = s.getMemory().int2ptr(v);
