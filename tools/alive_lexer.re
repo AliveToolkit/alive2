@@ -225,6 +225,17 @@ re2c:yyfill:check = 0;
 "fmul" { return FMUL; }
 "fdiv" { return FDIV; }
 "frem" { return FREM; }
+"fcmp" { return FCMP; }
+"oeq" { return OEQ; }
+"ogt" { return OGT; }
+"oge" { return OGE; }
+"olt" { return OLT; }
+"ole" { return OLE; }
+"one" { return ONE; }
+"ord" { return ORD; }
+"ueq" { return UEQ; }
+"une" { return UNE; }
+"uno" { return UNO; }
 "half" { return HALF;}
 "float" { return FLOAT;}
 "double" { return DOUBLE;}

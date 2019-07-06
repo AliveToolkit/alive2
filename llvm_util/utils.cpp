@@ -329,6 +329,42 @@ public:
                                         cond, *a, *b));
   }
 
+  RetTy visitFCmpInst(llvm::FCmpInst &i) {
+    PARSE_BINOP();
+    FCmp::Cond cond;
+    switch (i.getPredicate()) {
+    case llvm::CmpInst::FCMP_OEQ:   cond = FCmp::OEQ; break;
+    case llvm::CmpInst::FCMP_OGT:   cond = FCmp::OGT; break;
+    case llvm::CmpInst::FCMP_OGE:   cond = FCmp::UGE; break;
+    case llvm::CmpInst::FCMP_OLT:   cond = FCmp::OLT; break;
+    case llvm::CmpInst::FCMP_OLE:   cond = FCmp::OLE; break;
+    case llvm::CmpInst::FCMP_ONE:   cond = FCmp::ONE; break;
+    case llvm::CmpInst::FCMP_ORD:   cond = FCmp::ORD; break;
+    case llvm::CmpInst::FCMP_UEQ:   cond = FCmp::UEQ; break;
+    case llvm::CmpInst::FCMP_UGT:   cond = FCmp::UGT; break;
+    case llvm::CmpInst::FCMP_UGE:   cond = FCmp::UGE; break;
+    case llvm::CmpInst::FCMP_ULT:   cond = FCmp::ULT; break;
+    case llvm::CmpInst::FCMP_ULE:   cond = FCmp::ULE; break;
+    case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
+    case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
+    case llvm::CmpInst::FCMP_TRUE: {
+      auto tru = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*int_types[1].get(),
+                                             value_name(i), *tru, UnaryOp::Copy));
+    }
+    case llvm::CmpInst::FCMP_FALSE: {
+      auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*int_types[1].get(),
+                                             value_name(i), *fals, UnaryOp::Copy));
+    }
+    default:
+      UNREACHABLE();
+    }
+    RETURN_IDENTIFIER(make_unique<FCmp>(*int_types[1].get(), value_name(i),
+                                        cond, *a, *b));
+  }
+
+
   RetTy visitSelectInst(llvm::SelectInst &i) {
     PARSE_TRIOP();
     RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
