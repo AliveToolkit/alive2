@@ -27,6 +27,10 @@ bool Errors::isTimeout() const {
   return errs.size() == 1 && errs[0] == "Timeout";
 }
 
+bool Errors::isInvalidExpr() const {
+  return errs.size() == 1 && errs[0] == "Invalid expr";
+}
+
 bool Errors::isOOM() const {
   return errs.size() == 1 && errs[0] == "Out of memory; skipping function.";
 }

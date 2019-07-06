@@ -125,6 +125,7 @@ struct TVPass : public llvm::FunctionPass {
       *out << "Transformation doesn't verify!\n" << errs << endl;
       if (opt_error_fatal &&
           !errs.isTimeout() &&
+          !errs.isInvalidExpr() &&
           !errs.isOOM() &&
           !errs.isLoopyCFG())
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");

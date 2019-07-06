@@ -20,6 +20,7 @@ public:
   void add(std::string &&str);
   explicit operator bool() const { return !errs.empty(); }
   bool isTimeout() const;
+  bool isInvalidExpr() const;
   bool isOOM() const;
   bool isLoopyCFG() const; // FIXME
 
