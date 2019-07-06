@@ -614,6 +614,51 @@ static unique_ptr<Instr> parse_icmp(string_view name) {
   return make_unique<ICmp>(*int_types[1].get(), string(name), cond, a, b);
 }
 
+static unique_ptr<Instr> parse_fcmp(string_view name) {
+  // fcmp cond ty %a, &b
+  FCmp::Cond cond;
+  auto cond_t = *tokenizer;
+  switch (cond_t) {
+  case OEQ:   cond = FCmp::OEQ; break;
+  case OGT:   cond = FCmp::OGT; break;
+  case OGE:   cond = FCmp::OGE; break;
+  case OLT:   cond = FCmp::OLT; break;
+  case OLE:   cond = FCmp::OLE; break;
+  case ONE:   cond = FCmp::ONE; break;
+  case ORD:   cond = FCmp::ORD; break;
+  case UEQ:   cond = FCmp::UEQ; break;
+  case UGT:   cond = FCmp::UGT; break;
+  case UGE:   cond = FCmp::UGE; break;
+  case ULT:   cond = FCmp::ULT; break;
+  case ULE:   cond = FCmp::ULE; break;
+  case UNE:   cond = FCmp::UNE; break;
+  case UNO:   cond = FCmp::UNO; break;
+  case TRUE:                    break;
+  case FALSE:                   break;
+  default:
+    error("Expected fcmp cond", cond_t);
+  }
+
+  auto &ty = parse_type();
+  auto &a = parse_operand(ty);
+  parse_comma();
+  auto &b = parse_operand(ty);
+
+  switch (cond_t) {
+  case TRUE:
+    return make_unique<UnaryOp>(*int_types[1].get(), string(name),
+                                get_constant(1, *int_types[1].get()),
+                                UnaryOp::Copy);
+  case FALSE:
+    return make_unique<UnaryOp>(*int_types[1].get(), string(name),
+                                get_constant(0, *int_types[1].get()),
+                                UnaryOp::Copy);
+  default:
+    return make_unique<FCmp>(*int_types[1].get(), string(name), cond, a, b);
+  }
+  UNREACHABLE();
+}
+
 static unique_ptr<Instr> parse_freeze(string_view name) {
   // freeze ty %op
   auto &ty = parse_type();
@@ -697,6 +742,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_extractvalue(name);
   case ICMP:
     return parse_icmp(name);
+  case FCMP:
+    return parse_fcmp(name);
   case FREEZE:
     return parse_freeze(name);
   case CALL:

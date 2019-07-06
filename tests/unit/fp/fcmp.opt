@@ -1,0 +1,39 @@
+Name: T1
+%t = fcmp oeq float 4.0, 5.0
+  =>
+%t = false
+
+Name: T2
+%t = fcmp one float 4.0, 5.0
+  =>
+%t = true
+
+Name: T3
+%t = fcmp olt float 4.0, 5.0
+  =>
+%t = true
+
+Name: T4
+%t = fcmp ueq float 1.0, 2.0
+  =>
+%t = false
+
+Name: T5
+%t = fcmp true float 1.0, 2.0
+  =>
+%t = true
+
+Name: T6
+%t = fcmp false float 4.0, 5.0
+  =>
+%t = false
+
+Name: T7
+%t = true
+  =>
+%t = fcmp true float 1.0, 2.0
+
+Name: T8
+%t = false
+  =>
+%t = fcmp false float 4.0, 5.0

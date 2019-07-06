@@ -854,6 +854,65 @@ unique_ptr<Instr> ICmp::dup(const string &suffix) const {
   return make_unique<ICmp>(getType(), getName() + suffix, cond, a, b);
 }
 
+FCmp::FCmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
+  : Instr(type, move(name)), a(a), b(b), cond(cond) {}
+
+void FCmp::print(ostream &os) const {
+  const char *condtxt = nullptr;
+  switch (cond) {
+  case OEQ:   condtxt = "oeq "; break;
+  case OGT:   condtxt = "ogt "; break;
+  case OGE:   condtxt = "oge "; break;
+  case OLT:   condtxt = "olt "; break;
+  case OLE:   condtxt = "ole "; break;
+  case ONE:   condtxt = "one "; break;
+  case ORD:   condtxt = "ord "; break;
+  case UEQ:   condtxt = "ueq "; break;
+  case UGT:   condtxt = "ugt "; break;
+  case UGE:   condtxt = "uge "; break;
+  case ULT:   condtxt = "ult "; break;
+  case ULE:   condtxt = "ule "; break;
+  case UNE:   condtxt = "une "; break;
+  case UNO:   condtxt = "uno "; break;
+  }
+  os << getName() << " = fcmp " << condtxt << a << ", " << b.getName();
+}
+
+StateValue FCmp::toSMT(State &s) const {
+  auto &[av, ap] = s[a];
+  auto &[bv, bp] = s[b];
+  expr val;
+  switch (cond) {
+  case OEQ:   val = av.foeq(bv); break;
+  case OGT:   val = av.fogt(bv); break;
+  case OGE:   val = av.foge(bv); break;
+  case OLT:   val = av.folt(bv); break;
+  case OLE:   val = av.fole(bv); break;
+  case ONE:   val = av.fone(bv); break;
+  case ORD:   val = av.ford(bv); break;
+  case UEQ:   val = av.fueq(bv); break;
+  case UGT:   val = av.fugt(bv); break;
+  case UGE:   val = av.fuge(bv); break;
+  case ULT:   val = av.fult(bv); break;
+  case ULE:   val = av.fule(bv); break;
+  case UNE:   val = av.fune(bv); break;
+  case UNO:   val = av.funo(bv); break;
+  }
+  return { val.toBVBool(), ap && bp };
+}
+
+expr FCmp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType() &&
+         getType().sizeVar() == 1u &&
+         a.getType().enforceFloatType() &&
+         a.getType() == b.getType();
+}
+
+unique_ptr<Instr> FCmp::dup(const string &suffix) const {
+  return make_unique<FCmp>(getType(), getName() + suffix, cond, a, b);
+}
+
 
 void Freeze::print(ostream &os) const {
   os << getName() << " = freeze " << val;

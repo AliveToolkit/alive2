@@ -154,10 +154,27 @@ public:
   expr ctlz() const;
   expr ctpop() const;
 
+  expr isNaN() const;
   expr fadd(const expr &rhs) const;
   expr fsub(const expr &rhs) const;
   expr fmul(const expr &rhs) const;
   expr fdiv(const expr &rhs) const;
+
+  expr foeq(const expr &rhs) const;
+  expr fogt(const expr &rhs) const;
+  expr foge(const expr &rhs) const;
+  expr folt(const expr &rhs) const;
+  expr fole(const expr &rhs) const;
+  expr fone(const expr &rhs) const;
+  expr ford(const expr &rhs) const;
+  expr fueq(const expr &rhs) const;
+  expr fugt(const expr &rhs) const;
+  expr fuge(const expr &rhs) const;
+  expr fult(const expr &rhs) const;
+  expr fule(const expr &rhs) const;
+  expr fune(const expr &rhs) const;
+  expr funo(const expr &rhs) const;
+
 
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;

@@ -168,6 +168,23 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+class FCmp final : public Instr {
+public:
+  enum Cond { OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
+              UEQ, UGT, UGE, ULT, ULE, UNE, UNO };
+
+private:
+  Value &a, &b;
+  Cond cond;
+
+public:
+  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
 
 class Freeze final : public Instr {
   Value &val;

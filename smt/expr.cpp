@@ -706,6 +706,11 @@ expr expr::ctpop() const {
   return res;
 }
 
+expr expr::isNaN() const {
+  C();
+  return Z3_mk_fpa_is_nan(ctx(), ast());
+}
+
 // TODO: make rounding mode customizable
 expr expr::fadd(const expr &rhs) const {
   C(rhs);
@@ -729,6 +734,74 @@ expr expr::fdiv(const expr &rhs) const {
   C(rhs);
   auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
   return Z3_mk_fpa_div(ctx(), rm, ast(), rhs());
+}
+
+expr expr::foeq(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && Z3_mk_fpa_eq(ctx(), ast(), rhs());
+}
+
+expr expr::fogt(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && Z3_mk_fpa_gt(ctx(), ast(), rhs());
+}
+
+expr expr::foge(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && Z3_mk_fpa_geq(ctx(), ast(), rhs());
+}
+
+expr expr::folt(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && Z3_mk_fpa_lt(ctx(), ast(), rhs());
+}
+
+expr expr::fole(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && Z3_mk_fpa_leq(ctx(), ast(), rhs());
+}
+
+expr expr::fone(const expr &rhs) const {
+  C(rhs);
+  return ford(rhs) && !expr(Z3_mk_fpa_eq(ctx(), ast(), rhs()));
+}
+
+expr expr::ford(const expr &rhs) const {
+  return !isNaN() && !rhs.isNaN();
+}
+
+expr expr::fueq(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || Z3_mk_fpa_eq(ctx(), ast(), rhs());
+}
+
+expr expr::fugt(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || Z3_mk_fpa_gt(ctx(), ast(), rhs());
+}
+
+expr expr::fuge(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || Z3_mk_fpa_geq(ctx(), ast(), rhs());
+}
+
+expr expr::fult(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || Z3_mk_fpa_lt(ctx(), ast(), rhs());
+}
+
+expr expr::fule(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || Z3_mk_fpa_leq(ctx(), ast(), rhs());
+}
+
+expr expr::fune(const expr &rhs) const {
+  C(rhs);
+  return funo(rhs) || !expr(Z3_mk_fpa_eq(ctx(), ast(), rhs()));
+}
+
+expr expr::funo(const expr &rhs) const {
+  return !ford(rhs());
 }
 
 expr expr::operator&(const expr &rhs) const {
