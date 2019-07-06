@@ -118,7 +118,7 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
   auto bits = b.bits();
   s.addUB(bp);
-  s.addUB(b != expr::mkUInt(0, bits));
+  s.addUB(b != 0);
   if (sign)
     s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
 }
@@ -183,9 +183,7 @@ StateValue BinOp::toSMT(State &s) const {
   case Shl:
   {
     val = a << b;
-
-    auto bits = b.bits();
-    not_poison &= b.ult(expr::mkUInt(bits, bits));
+    not_poison &= b.ult(b.bits());
 
     if (flags & NSW)
       not_poison &= a.shl_no_soverflow(b);
@@ -195,9 +193,7 @@ StateValue BinOp::toSMT(State &s) const {
   }
   case AShr: {
     val = a.ashr(b);
-
-    auto bits = b.bits();
-    not_poison &= b.ult(expr::mkUInt(bits, bits));
+    not_poison &= b.ult(b.bits());
 
     if (flags & Exact)
       not_poison &= a.ashr_exact(b);
@@ -205,9 +201,7 @@ StateValue BinOp::toSMT(State &s) const {
   }
   case LShr: {
     val = a.lshr(b);
-
-    auto bits = b.bits();
-    not_poison &= b.ult(expr::mkUInt(bits, bits));
+    not_poison &= b.ult(b.bits());
 
     if (flags & Exact)
       not_poison &= a.lshr_exact(b);
@@ -493,7 +487,8 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case BitCast:
     if ((getType().isIntType() && val.getType().isIntType()) ||
-        (getType().isFloatType() && val.getType().isFloatType()))
+        (getType().isFloatType() && val.getType().isFloatType()) ||
+        (getType().isPtrType() && val.getType().isPtrType()))
       newval = v;
     else if (getType().isIntType() && val.getType().isFloatType())
       newval = v.float2BV();
@@ -785,22 +780,47 @@ void ICmp::print(ostream &os) const {
 StateValue ICmp::toSMT(State &s) const {
   auto &[av, ap] = s[a];
   auto &[bv, bp] = s[b];
-  expr val;
-  switch (cond) {
-  case EQ:  val = av == bv; break;
-  case NE:  val = av != bv; break;
-  case SLE: val = av.sle(bv); break;
-  case SLT: val = av.slt(bv); break;
-  case SGE: val = av.sge(bv); break;
-  case SGT: val = av.sgt(bv); break;
-  case ULE: val = av.ule(bv); break;
-  case ULT: val = av.ult(bv); break;
-  case UGE: val = av.uge(bv); break;
-  case UGT: val = av.ugt(bv); break;
-  case Any:
-    UNREACHABLE();
+  expr val, non_poison = ap && bp;
+
+  if (a.getType().isPtrType()) {
+    Pointer lhs(s.getMemory(), av);
+    Pointer rhs(s.getMemory(), bv);
+    StateValue cmp;
+
+    switch (cond) {
+    case EQ:  cmp = { lhs == rhs, true }; break;
+    case NE:  cmp = { lhs != rhs, true }; break;
+    case SLE: cmp = lhs.sle(rhs); break;
+    case SLT: cmp = lhs.slt(rhs); break;
+    case SGE: cmp = lhs.sge(rhs); break;
+    case SGT: cmp = lhs.sgt(rhs); break;
+    case ULE: cmp = lhs.ule(rhs); break;
+    case ULT: cmp = lhs.ult(rhs); break;
+    case UGE: cmp = lhs.uge(rhs); break;
+    case UGT: cmp = lhs.ugt(rhs); break;
+    case Any:
+      UNREACHABLE();
+    }
+    val = move(cmp.value);
+    non_poison &= move(cmp.non_poison);
+
+  } else {  // integer comparison
+    switch (cond) {
+    case EQ:  val = av == bv; break;
+    case NE:  val = av != bv; break;
+    case SLE: val = av.sle(bv); break;
+    case SLT: val = av.slt(bv); break;
+    case SGE: val = av.sge(bv); break;
+    case SGT: val = av.sgt(bv); break;
+    case ULE: val = av.ule(bv); break;
+    case ULT: val = av.ult(bv); break;
+    case UGE: val = av.uge(bv); break;
+    case UGT: val = av.ugt(bv); break;
+    case Any:
+      UNREACHABLE();
+    }
   }
-  return { expr::mkIf(val, expr::mkUInt(1,1), expr::mkUInt(0,1)), ap && bp };
+  return { val.toBVBool(), move(non_poison) };
 }
 
 expr ICmp::getTypeConstraints(const Function &f) const {
@@ -810,7 +830,7 @@ expr ICmp::getTypeConstraints(const Function &f) const {
            a.getType().enforceIntOrPtrOrVectorType() &&
            a.getType() == b.getType();
   if (!defined)
-    e &= cond_var().ule(expr::mkUInt(9, 4));
+    e &= cond_var().ule(9);
   return e;
 }
 
@@ -1126,7 +1146,12 @@ StateValue GEP::toSMT(State &s) const {
 
   for (auto &[sz, idx] : idxs) {
     auto &[v, np] = s[idx];
-    ptr += expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
+    auto inc = expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
+
+    if (inbounds)
+      non_poison &= ptr.add_no_overflow(inc);
+
+    ptr += inc;
     non_poison &= np;
 
     if (inbounds)

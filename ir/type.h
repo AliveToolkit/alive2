@@ -47,6 +47,7 @@ public:
 
   virtual bool isIntType() const;
   virtual bool isFloatType() const;
+  virtual bool isPtrType() const;
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
@@ -161,6 +162,7 @@ public:
   smt::expr operator==(const PtrType &rhs) const;
   smt::expr sameType(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
+  bool isPtrType() const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
@@ -259,6 +261,7 @@ public:
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;
   bool isFloatType() const override;
+  bool isPtrType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;

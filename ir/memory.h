@@ -5,6 +5,7 @@
 
 #include "ir/state_value.h"
 #include "smt/expr.h"
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,6 +18,7 @@ class State;
 class Pointer {
   Memory &m;
   // [offset, local_bid, nonlocal_bid]
+  // TODO: missing support for address space
   smt::expr p;
 
   unsigned bits_for_bids() const;
@@ -45,13 +47,26 @@ public:
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);
 
-  smt::expr ult(const Pointer &rhs) const;
-  smt::expr uge(const Pointer &rhs) const;
+  smt::expr add_no_overflow(const smt::expr &offset) const;
+
+  smt::expr operator==(const Pointer &rhs) const;
+  smt::expr operator!=(const Pointer &rhs) const;
+
+  StateValue sle(const Pointer &rhs) const;
+  StateValue slt(const Pointer &rhs) const;
+  StateValue sge(const Pointer &rhs) const;
+  StateValue sgt(const Pointer &rhs) const;
+  StateValue ule(const Pointer &rhs) const;
+  StateValue ult(const Pointer &rhs) const;
+  StateValue uge(const Pointer &rhs) const;
+  StateValue ugt(const Pointer &rhs) const;
 
   smt::expr inbounds() const;
   smt::expr is_aligned(unsigned align) const;
   void is_dereferenceable(unsigned bytes, unsigned align);
   void is_dereferenceable(const smt::expr &bytes, unsigned align);
+
+  friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
 
 

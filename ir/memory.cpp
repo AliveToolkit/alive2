@@ -60,12 +60,16 @@ expr Pointer::get_address() const {
 }
 
 expr Pointer::block_size() const {
-  expr range = expr::mkUInt(0, m.bits_size_t);
+  // ASSUMPTION: programs can only allocate up to half of address space
+  // so the first bit of size is always zero.
+  // We need this assumption to support negative offsets.
+  expr range = expr::mkUInt(0, m.bits_size_t - 1);
   auto local_name = m.mkName("blks_size");
   return
-    expr::mkIf(is_local(),
-               expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
-               expr::mkUF("blks_size", { get_nonlocal_bid() }, range));
+    expr::mkUInt(0, 1).concat(
+      expr::mkIf(is_local(),
+                 expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
+                 expr::mkUF("blks_size", { get_nonlocal_bid() }, range)));
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -80,16 +84,36 @@ void Pointer::operator+=(const expr &bytes) {
   p = (get_offset() + bytes).concat(get_bid());
 }
 
-expr Pointer::ult(const Pointer &rhs) const {
-  return get_bid() == rhs.get_bid() && get_offset().ult(rhs.get_offset());
+expr Pointer::add_no_overflow(const expr &offset) const {
+  return get_offset().add_no_soverflow(offset);
 }
 
-expr Pointer::uge(const Pointer &rhs) const {
-  return get_bid() == rhs.get_bid() && get_offset().uge(rhs.get_offset());
+expr Pointer::operator==(const Pointer &rhs) const {
+  return get_bid() == rhs.get_bid() && get_offset() == rhs.get_offset();
 }
+
+expr Pointer::operator!=(const Pointer &rhs) const {
+  return !operator==(rhs);
+}
+
+#define DEFINE_CMP(op)                                                      \
+StateValue Pointer::op(const Pointer &rhs) const {                          \
+  return { get_offset().op(rhs.get_offset()), get_bid() == rhs.get_bid() }; \
+}
+
+DEFINE_CMP(sle)
+DEFINE_CMP(slt)
+DEFINE_CMP(sge)
+DEFINE_CMP(sgt)
+DEFINE_CMP(ule)
+DEFINE_CMP(ult)
+DEFINE_CMP(uge)
+DEFINE_CMP(ugt)
 
 expr Pointer::inbounds() const {
-  return get_offset().zextOrTrunc(m.bits_size_t).ule(block_size());
+  // equivalent to offset >= 0 && offset <= block_size
+  // because block_size u<= 0x7FFF..
+  return get_offset().sextOrTrunc(m.bits_size_t).ule(block_size());
 }
 
 expr Pointer::is_aligned(unsigned align) const {
@@ -115,6 +139,11 @@ void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
   is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
+}
+
+ostream& operator<<(ostream &os, const Pointer &p) {
+  // TODO
+  return os << p;
 }
 
 
@@ -235,7 +264,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
     string name = "#idx_" + to_string(last_idx_ptr++);
     Pointer idx(*this, expr::mkVar(name.c_str(), ptr.bits()));
 
-    expr cond = idx.uge(ptr) && idx.ult(ptr + bytes);
+    expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytes).both();
     expr val = expr::mkIf(cond, blocks_val.store(idx(), store_val), blocks_val);
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }

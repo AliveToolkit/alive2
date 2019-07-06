@@ -19,6 +19,8 @@ struct StateValue {
   static StateValue mkIf(const smt::expr &cond, const StateValue &then,
                          const StateValue &els);
 
+  smt::expr both() const { return value && non_poison; }
+
   bool eq(const StateValue &other) const;
 
   StateValue

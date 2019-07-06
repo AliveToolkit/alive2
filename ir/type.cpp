@@ -105,6 +105,10 @@ bool Type::isFloatType() const {
   return false;
 }
 
+bool Type::isPtrType() const {
+  return false;
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
@@ -391,6 +395,10 @@ void PtrType::fixup(const Model &m) {
     addr_space = m.getUInt(ASVar());
 }
 
+bool PtrType::isPtrType() const {
+  return true;
+}
+
 expr PtrType::enforceIntOrVectorType() const {
   return false;
 }
@@ -409,6 +417,7 @@ pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
 
 void PtrType::printVal(ostream &os, const expr &e) const {
   // TODO
+  os << e;
 }
 
 void PtrType::print(ostream &os) const {
@@ -782,6 +791,10 @@ bool SymbolicType::isIntType() const {
 
 bool SymbolicType::isFloatType() const {
   return typ == Float;
+}
+
+bool SymbolicType::isPtrType() const {
+  return typ == Ptr;
 }
 
 expr SymbolicType::enforceIntType(unsigned bits) const {
