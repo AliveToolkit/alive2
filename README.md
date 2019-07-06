@@ -13,6 +13,13 @@ Alive2 includes the following libraries:
 Included tools:
 * Alive drop-in replacement
 * Translation validation plugin for LLVM's `opt`
+* Standalone translation validation tool: `llvm-tv`
+
+
+WARNING
+-------
+Alive2 does not support inter-procedural transformations. Alive2 may crash
+or produce spurious counterexamples if run with such passes.
 
 
 Prerequisites
@@ -75,3 +82,32 @@ Translation validation of the LLVM unit tests:
 ```
 ~/llvm/build/bin/llvm-lit -vv -Dopt=/home/user/alive2/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
+
+
+Running Standalone Translation Validation Tool (alive-tv)
+--------
+
+This tool takes two arguments: source and target (optimized) bitcode.
+For example, let's prove that removing `nsw` is correct for addition:
+
+```
+$ ./alive-tv src.ll tgt.ll
+
+----------------------------------------
+define i32 @f(i32 %a, i32 %b) {
+  %add = add nsw i32 %b, %a
+  ret i32 %add
+}
+=>
+define i32 @f(i32 %a, i32 %b) {
+  %add = add i32 %b, %a
+  ret i32 %add
+}
+
+Transformation seems to be correct!
+```
+
+Flipping the inputs yields a counterexample, since it's not correct to
+add `nsw` without further information.
+If you are not interested in counterexamples using `undef`, you can use the
+command-line argument `-disable-undef-input`.
