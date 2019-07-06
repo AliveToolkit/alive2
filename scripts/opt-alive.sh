@@ -3,7 +3,7 @@
 set -e
 
 # IPO passes aren't supported ATM
-PASSES="argpromotion deadargelim inline ipsccp mergefunc partial-inliner"
+PASSES="argpromotion deadargelim hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner -Os -O2 -O3"
 
 TV="-tv"
 for p in $PASSES; do
