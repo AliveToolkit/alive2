@@ -750,6 +750,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_call(name);
   case INT_TYPE:
   case NUM:
+  case FP_NUM:
   case TRUE:
   case FALSE:
   case UNDEF:
