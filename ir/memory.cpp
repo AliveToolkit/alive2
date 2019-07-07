@@ -203,15 +203,29 @@ void Memory::free(const expr &ptr) {
   // TODO
 }
 
-void Memory::store(const expr &p, const StateValue &v, unsigned align) {
-  unsigned bits = v.value.bits();
+void Memory::store(const expr &p, const StateValue &v, Type &type,
+                   unsigned align) {
+  expr val = v.value;
+  expr poison = v.non_poison.toBVBool();
+
+  if (type.isIntType()) {
+    // do nothing
+  } else if (type.isFloatType()) {
+    val = val.float2BV();
+  } else if (type.isPtrType()) {
+    // TODO
+    val = expr();
+  } else {
+    UNREACHABLE();
+  }
+
+  unsigned bits = val.bits();
   unsigned bytes = divide_up(bits, 8);
+
+  val = val.zext(bytes * 8 - bits);
 
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
-
-  expr poison = v.non_poison.toBVBool();
-  expr val = v.value.zext(bytes * 8 - bits);
 
   for (unsigned i = 0; i < bytes; ++i) {
     // FIXME: right now we store in little-endian; consider others?
@@ -221,7 +235,8 @@ void Memory::store(const expr &p, const StateValue &v, unsigned align) {
   }
 }
 
-StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
+StateValue Memory::load(const expr &p, Type &type, unsigned align) {
+  auto bits = type.bits();
   unsigned bytes = divide_up(bits, 8);
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
@@ -245,7 +260,19 @@ StateValue Memory::load(const expr &p, unsigned bits, unsigned align) {
     first = false;
   }
 
-  return { val.trunc(bits), move(non_poison) };
+  val = val.trunc(bits);
+  if (type.isIntType()) {
+    // do nothing
+  } else if (type.isFloatType()) {
+    val = val.BV2float(type.getDummyValue());
+  } else if (type.isPtrType()) {
+    // TODO
+    val = expr();
+  } else {
+    UNREACHABLE();
+  }
+
+  return { move(val), move(non_poison) };
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,

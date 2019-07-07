@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/state_value.h"
+#include "ir/type.h"
 #include "smt/expr.h"
 #include <ostream>
 #include <string>
@@ -98,8 +99,9 @@ public:
   smt::expr alloc(const smt::expr &bytes, unsigned align, bool local);
   void free(const smt::expr &ptr);
 
-  void store(const smt::expr &ptr, const StateValue &val, unsigned align);
-  StateValue load(const smt::expr &ptr, unsigned bits, unsigned align);
+  void store(const smt::expr &ptr, const StateValue &val, Type &type,
+             unsigned align);
+  StateValue load(const smt::expr &ptr, Type &type, unsigned align);
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytes, unsigned align);

@@ -1247,7 +1247,7 @@ void Load::print(std::ostream &os) const {
 StateValue Load::toSMT(State &s) const {
   auto &[p, np] = s[ptr];
   s.addUB(np);
-  return s.getMemory().load(p, getType().bits(), align);
+  return s.getMemory().load(p, getType(), align);
 }
 
 expr Load::getTypeConstraints(const Function &f) const {
@@ -1267,7 +1267,7 @@ void Store::print(std::ostream &os) const {
 StateValue Store::toSMT(State &s) const {
   auto &[p, np] = s[ptr];
   s.addUB(np);
-  s.getMemory().store(p, s[val], align);
+  s.getMemory().store(p, s[val], val.getType(), align);
   return {};
 }
 
