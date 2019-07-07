@@ -292,7 +292,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
     Pointer idx(*this, expr::mkVar(name.c_str(), ptr.bits()));
 
     expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytes).both();
-    expr val = expr::mkIf(cond, blocks_val.store(idx(), store_val), blocks_val);
+    expr val = expr::mkIf(cond, store_val, blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
 }
