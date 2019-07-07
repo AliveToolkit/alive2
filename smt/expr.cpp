@@ -1093,6 +1093,13 @@ expr expr::zextOrTrunc(unsigned tobw) const {
 
 expr expr::concat(const expr &rhs) const {
   C(rhs);
+
+  auto rhs_bits = rhs.bits();
+  auto bw = bits() + rhs_bits;
+  uint64_t a, b;
+  if (bw <= 64 && isUInt(a) && rhs.isUInt(b))
+    return mkUInt((a << rhs_bits) | b, bw);
+
   return Z3_mk_concat(ctx(), ast(), rhs());
 }
 
