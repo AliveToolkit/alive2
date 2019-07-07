@@ -175,7 +175,6 @@ public:
   expr fune(const expr &rhs) const;
   expr funo(const expr &rhs) const;
 
-
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;
   expr operator^(const expr &rhs) const;

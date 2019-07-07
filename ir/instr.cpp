@@ -854,6 +854,7 @@ unique_ptr<Instr> ICmp::dup(const string &suffix) const {
   return make_unique<ICmp>(getType(), getName() + suffix, cond, a, b);
 }
 
+
 FCmp::FCmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
   : Instr(type, move(name)), a(a), b(b), cond(cond) {}
 

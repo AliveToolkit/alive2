@@ -350,12 +350,14 @@ public:
     case llvm::CmpInst::FCMP_TRUE: {
       auto tru = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*int_types[1].get(),
-                                             value_name(i), *tru, UnaryOp::Copy));
+                                             value_name(i), *tru,
+                                             UnaryOp::Copy));
     }
     case llvm::CmpInst::FCMP_FALSE: {
       auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*int_types[1].get(),
-                                             value_name(i), *fals, UnaryOp::Copy));
+                                             value_name(i), *fals,
+                                             UnaryOp::Copy));
     }
     default:
       UNREACHABLE();

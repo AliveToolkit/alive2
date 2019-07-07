@@ -168,6 +168,7 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
 class FCmp final : public Instr {
 public:
   enum Cond { OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
