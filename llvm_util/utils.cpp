@@ -362,10 +362,14 @@ public:
     default:
       UNREACHABLE();
     }
+
+    // TODO: support FP fast-math stuff
+    if (i.getFastMathFlags().any())
+      return error(i);
+
     RETURN_IDENTIFIER(make_unique<FCmp>(*int_types[1].get(), value_name(i),
                                         cond, *a, *b));
   }
-
 
   RetTy visitSelectInst(llvm::SelectInst &i) {
     PARSE_TRIOP();
