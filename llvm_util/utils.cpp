@@ -335,7 +335,7 @@ public:
     switch (i.getPredicate()) {
     case llvm::CmpInst::FCMP_OEQ:   cond = FCmp::OEQ; break;
     case llvm::CmpInst::FCMP_OGT:   cond = FCmp::OGT; break;
-    case llvm::CmpInst::FCMP_OGE:   cond = FCmp::UGE; break;
+    case llvm::CmpInst::FCMP_OGE:   cond = FCmp::OGE; break;
     case llvm::CmpInst::FCMP_OLT:   cond = FCmp::OLT; break;
     case llvm::CmpInst::FCMP_OLE:   cond = FCmp::OLE; break;
     case llvm::CmpInst::FCMP_ONE:   cond = FCmp::ONE; break;
