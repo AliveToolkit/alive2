@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <ostream>
 #include <set>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -155,6 +156,9 @@ public:
   expr ctpop() const;
 
   expr isNaN() const;
+  expr isInf() const;
+  expr isFPNeg() const;
+
   expr fadd(const expr &rhs) const;
   expr fsub(const expr &rhs) const;
   expr fmul(const expr &rhs) const;
@@ -221,6 +225,7 @@ public:
 
   expr toBVBool() const;
   expr float2BV() const;
+  expr float2Real() const;
   expr BV2float(const expr &type) const;
 
   // we don't expose SMT expr types, so range must be passed as a dummy value
@@ -245,6 +250,7 @@ public:
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
+  std::string numeral_string() const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only

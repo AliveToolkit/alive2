@@ -711,6 +711,16 @@ expr expr::isNaN() const {
   return Z3_mk_fpa_is_nan(ctx(), ast());
 }
 
+expr expr::isInf() const {
+  C();
+  return Z3_mk_fpa_is_infinite(ctx(), ast());
+}
+
+expr expr::isFPNeg() const {
+  C();
+  return Z3_mk_fpa_is_negative(ctx(), ast());
+}
+
 // TODO: make rounding mode customizable
 expr expr::fadd(const expr &rhs) const {
   C(rhs);
@@ -1126,6 +1136,11 @@ expr expr::float2BV() const {
   return Z3_mk_fpa_to_ieee_bv(ctx(), ast());
 }
 
+expr expr::float2Real() const {
+  C();
+  return Z3_mk_fpa_to_real(ctx(), ast());
+}
+
 expr expr::BV2float(const expr &type) const {
   C(type);
   return Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort());
@@ -1242,28 +1257,7 @@ expr expr::subst(const expr &from, const expr &to) const {
 }
 
 void expr::printUnsigned(ostream &os) const {
-  uint64_t num;
-  if (simplify().isUInt(num)) {
-    os << num;
-    return;
-  }
-
-  expr zero = mkUInt(0, sort());
-  expr ten  = mkUInt(10, sort());
-  expr n    = *this;
-
-  string str;
-  uint64_t d;
-
-  do {
-    expr digit = n.urem(ten).simplify();
-    ENSURE(digit.isUInt(d));
-    str.push_back('0' + d);
-    n = n.udiv(ten).simplify();
-  } while (!n.eq(zero));
-
-  reverse(str.begin(), str.end());
-  os << str;
+  os << numeral_string();
 }
 
 void expr::printSigned(ostream &os) const {
@@ -1278,6 +1272,11 @@ void expr::printSigned(ostream &os) const {
 void expr::printHexadecimal(ostream &os) const {
   auto rem = bits() % 4;
   os << (rem == 0 ? *this : zext(4 - rem)).simplify();
+}
+
+string expr::numeral_string() const {
+  C();
+  return Z3_get_numeral_decimal_string(ctx(), ast(), 12);
 }
 
 ostream& operator<<(ostream &os, const expr &e) {

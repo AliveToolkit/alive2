@@ -340,7 +340,14 @@ pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
 }
 
 void FloatType::printVal(ostream &os, const expr &e) const {
-  os << e;
+  if (e.isNaN().simplify().isTrue()) {
+    os << "NaN";
+  } else if (e.isInf().simplify().isTrue()) {
+    os << (e.isFPNeg().simplify().isTrue() ? "-oo" : "+oo");
+  } else {
+    e.float2BV().printHexadecimal(os);
+    os << " (" << e.float2Real().simplify().numeral_string() << ')';
+  }
 }
 
 void FloatType::print(ostream &os) const {
