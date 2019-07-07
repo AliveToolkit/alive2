@@ -134,6 +134,7 @@ matrix:
             - ninja
             - re2c
             - z3
+          update: true
 
     - env: CMAKE_BUILD_TYPE=Release
       os: osx
