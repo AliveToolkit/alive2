@@ -5,6 +5,6 @@ Name: x/2 => × * 0.5
 
 
 Name: x/4 => × * 0.25
-%t = fdiv float %a, 4.0
+%t = fdiv half %a, 4.0
   =>
-%t = fmul float %a, 0.25
+%t = fmul half %a, 0.25
