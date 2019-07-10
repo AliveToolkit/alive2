@@ -1,0 +1,10 @@
+Name: x/2 => × * 0.5
+%t = fdiv half %a, 2.0
+  =>
+%t = fmul half %a, 0.5
+
+
+Name: x/4 => × * 0.25
+%t = fdiv half %a, 4.0
+  =>
+%t = fmul half %a, 0.25

@@ -1,0 +1,8 @@
+; TODO: reassoc
+Name: (a / 2.0) * 8.0 => × * 4.0
+; ERROR: Value mismatch for half %t
+%t1 = fdiv half %a, 2.0
+%t = fmul half %t1, 8.0
+  =>
+%t1 = fdiv half %a, 2.0
+%t = fmul half %a, 4.0
