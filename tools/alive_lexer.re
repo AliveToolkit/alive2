@@ -236,6 +236,7 @@ re2c:yyfill:check = 0;
 "ueq" { return UEQ; }
 "une" { return UNE; }
 "uno" { return UNO; }
+"fneg" { return FNEG; }
 "half" { return HALF;}
 "float" { return FLOAT;}
 "double" { return DOUBLE;}

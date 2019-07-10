@@ -355,6 +355,7 @@ void UnaryOp::print(ostream &os) const {
   case BitReverse:  str = "bitreverse "; break;
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
+  case FNeg:        str = "fneg "; break;
   }
 
   os << getName() << " = " << str << val;
@@ -377,6 +378,9 @@ StateValue UnaryOp::toSMT(State &s) const {
   case Ctpop:
     newval = v.ctpop();
     break;
+  case FNeg:
+    newval = v.fneg();
+    break;
   }
   return { move(newval), expr(vp) };
 }
@@ -391,6 +395,9 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
   case Ctpop:
     instrconstr &= getType().enforceIntOrVectorType();
   case Copy:
+    break;
+  case FNeg:
+    instrconstr = getType().enforceFloatType();
     break;
   }
 

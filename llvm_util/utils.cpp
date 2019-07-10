@@ -229,6 +229,17 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 public:
   llvm2alive_(llvm::Function &f) : f(f) {}
 
+  RetTy visitUnaryOperator(llvm::UnaryOperator &i) {
+    PARSE_UNOP();
+    UnaryOp::Op op;
+    switch (i.getOpcode()) {
+    case llvm::Instruction::FNeg: op = UnaryOp::FNeg; break;
+    default:
+      return error(i);
+    }
+    RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+  }
+
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
     PARSE_BINOP();
     BinOp::Op alive_op;
