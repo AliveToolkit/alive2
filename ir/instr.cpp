@@ -108,6 +108,9 @@ void BinOp::print(ostream &os) const {
   case NSW:    flag = " nsw "; break;
   case NUW:    flag = " nuw "; break;
   case NSWNUW: flag = " nsw nuw "; break;
+  case NNAN:   flag = " nnan "; break;
+  case NINF:   flag = " ninf "; break;
+  case NNANNINF: flag = " nnan ninf "; break;
   case Exact:  flag = " exact "; break;
   }
 
@@ -121,6 +124,17 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
   s.addUB(b != 0);
   if (sign)
     s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
+}
+
+static expr fm_poison(const expr &a, const expr &b, const expr &val,
+                      BinOp::Flags flags) {
+  expr ret = false;
+  if (flags & BinOp::NINF)
+    ret |= a.isInf() || b.isInf() || val.isInf();
+  if (flags & BinOp::NNAN)
+    ret |= a.isNaN() || b.isNaN() || val.isNaN();
+
+  return ret;
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -277,18 +291,22 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     val = a.fadd(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FSub:
     val = a.fsub(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FMul:
     val = a.fmul(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FDiv:
     val = a.fdiv(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FRem:

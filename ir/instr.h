@@ -33,7 +33,8 @@ public:
             SMul_Overflow, UMul_Overflow,
             FAdd, FSub, FMul, FDiv, FRem,
             And, Or, Xor, Cttz, Ctlz  };
-  enum Flags { None = 0, NSW = 1, NUW = 2, NSWNUW = 3, Exact = 4 };
+  enum Flags { None = 0, NSW = 1, NUW = 2, NSWNUW = 3, Exact = 4,
+               NNAN = 8, NINF = 16, NNANNINF = 24};
 
 private:
   Value &lhs, &rhs;
