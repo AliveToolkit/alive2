@@ -9,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -1266,6 +1267,56 @@ expr expr::subst(const expr &from, const expr &to) const {
   auto f = from();
   auto t = to();
   return Z3_substitute(ctx(), ast(), 1, &f, &t);
+}
+
+set<expr> expr::vars() const {
+  C();
+  set<expr> result;
+  unordered_set<Z3_ast> todo{ ast() };
+  unordered_set<Z3_ast> seen = todo;
+
+  do {
+    auto I = todo.begin();
+    auto ast = *I;
+    todo.erase(I);
+
+    switch (Z3_get_ast_kind(ctx(), ast)) {
+    case Z3_VAR_AST:
+    case Z3_NUMERAL_AST:
+      break;
+
+    case Z3_QUANTIFIER_AST: {
+      auto body = Z3_get_quantifier_body(ctx(), ast);
+      if (seen.emplace(body).second)
+        todo.emplace(body);
+      break;
+    }
+
+    case Z3_APP_AST: {
+      // Z3_NUMERAL_AST above only catches real numbers
+      if (Z3_is_numeral_ast(ctx(), ast))
+        continue;
+
+      auto app = Z3_to_app(ctx(), ast);
+      auto num_args = Z3_get_app_num_args(ctx(), app);
+      if (num_args == 0) { // it's a variable
+        result.emplace(expr(ast));
+        continue;
+      }
+
+      for (unsigned i = 0; i < num_args; ++i) {
+        auto arg = Z3_get_app_arg(ctx(), app, i);
+        if (seen.emplace(arg).second)
+          todo.emplace(arg);
+      }
+      break;
+    }
+    default:
+      UNREACHABLE();
+    }
+  } while (!todo.empty());
+
+  return result;
 }
 
 void expr::printUnsigned(ostream &os) const {

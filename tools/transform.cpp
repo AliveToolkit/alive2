@@ -20,6 +20,12 @@ using namespace util;
 using namespace std;
 
 
+static bool is_undef(const expr &e) {
+  Solver s;
+  s.add(expr::mkForAll(e.vars(), expr::mkVar("#undef", e) != e));
+  return s.check().isUnsat();
+}
+
 static void print_varval(ostream &s, const Model &m, const Value *var,
                          const Type &type, const StateValue &val) {
   // if the model is partial, we don't know for sure if it's poison or not
@@ -41,15 +47,19 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
     assert(n == 0);
   }
 
-  expr e = m.eval(val.value);
-  // undef variables may not have a model since each read uses a copy
-  if (!e.isConst()) {
-    // FIXME
-    s << "?";
+  expr partial = m.eval(val.value);
+  if (is_undef(partial)) {
+    s << "undef";
     return;
   }
 
-  type.printVal(s, e);
+  type.printVal(s, m.eval(val.value, true));
+
+  // undef variables may not have a model since each read uses a copy
+  // TODO: add intervals of possible values for ints at least?
+  if (!partial.isConst()) {
+    s << "\t[based on undef value]";
+  }
 }
 
 
