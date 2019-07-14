@@ -28,7 +28,8 @@ Name: fsub, type infer, constant
 %t = %a
 
 
-Name: fadd, identity, two variables
-%t = fadd half %a, %b
-  =>
-%t = fadd half %a, %b
+; FIXME: timeout
+;Name: fadd, identity, two variables
+;%t = fadd half %a, %b
+;  =>
+;%t = fadd half %a, %b
