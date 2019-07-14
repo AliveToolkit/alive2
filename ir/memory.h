@@ -22,9 +22,11 @@ class Pointer {
   // TODO: missing support for address space
   smt::expr p;
 
+  unsigned total_bits() const;
   unsigned bits_for_bids() const;
 
 public:
+  Pointer(Memory &m, const char *var_name);
   Pointer(Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(Memory &m, unsigned bid, bool local);
   Pointer(Memory &m, const smt::expr &offset, const smt::expr &local_bid,
@@ -91,8 +93,6 @@ class Memory {
 
 public:
   Memory(State &state);
-
-  smt::expr mk_axioms();
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 

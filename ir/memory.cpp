@@ -11,6 +11,9 @@ using namespace util;
 
 namespace IR {
 
+Pointer::Pointer(Memory &m, const char *var_name)
+  : m(m), p(expr::mkVar(var_name, total_bits())) {}
+
 Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
   expr bid_expr;
   if (local)
@@ -24,6 +27,10 @@ Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
 Pointer::Pointer(Memory &m, const expr &offset, const expr &local_bid,
                  const expr &nonlocal_bid)
   : m(m), p(offset.concat(local_bid).concat(nonlocal_bid)) {}
+
+unsigned Pointer::total_bits() const {
+  return bits_for_bids() + m.bits_for_offset;
+}
 
 unsigned Pointer::bits_for_bids() const {
   return m.bits_for_local_bid + m.bits_for_nonlocal_bid;
@@ -162,22 +169,16 @@ expr Memory::mk_val_array(const char *name) const {
 }
 
 Memory::Memory(State &state) : state(&state) {
-  auto val_name = mkName("blks_val");
-  blocks_val = mk_val_array(val_name.c_str());
+  blocks_val = mk_val_array("blks_val");
+  {
+    // initialize all local blocks as poison
+    Pointer idx(*this, "#idx0");
+    expr poison = expr::mkUInt(0, 9);
+    expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
+    blocks_val = expr::mkLambda({ idx() }, move(val));
+  }
 
   assert(bits_for_offset <= bits_size_t);
-}
-
-expr Memory::mk_axioms() {
-  expr offset = expr::mkVar("offset", bits_for_offset);
-  expr bid = expr::mkVar("bid", bits_for_nonlocal_bid);
-  Pointer ptr(*this, offset, expr::mkUInt(0, bits_for_local_bid), bid);
-
-  auto val_src_name = mkName("blks_val", true);
-  auto val_tgt_name = mkName("blks_val", false);
-  auto val_src = mk_val_array(val_src_name.c_str()).load(ptr());
-  auto val_tgt = mk_val_array(val_tgt_name.c_str()).load(ptr());
-  return expr::mkForAll({ offset, bid }, val_src == val_tgt);
 }
 
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
@@ -195,7 +196,6 @@ expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
 
   expr size = bytes.zextOrTrunc(bits_size_t);
   state->addPre(p.block_size() == size);
-  memset(p(), { expr::mkUInt(0, 8), false }, size, align);
   return p();
 }
 
@@ -289,7 +289,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
     }
   } else {
     string name = "#idx_" + to_string(last_idx_ptr++);
-    Pointer idx(*this, expr::mkVar(name.c_str(), ptr.bits()));
+    Pointer idx(*this, name.c_str());
 
     expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytes).both();
     expr val = expr::mkIf(cond, store_val, blocks_val.load(idx()));

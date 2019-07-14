@@ -16,9 +16,6 @@ State::State(const Function &f, bool source)
   predecessor_data[&f.getFirstBB()].try_emplace(nullptr,
                                                 DomainTy(true, set<expr>()),
                                                 *this);
-
-  if (source)
-    addPre(getMemory().mk_axioms());
 }
 
 const StateValue& State::exec(const Value &v) {
