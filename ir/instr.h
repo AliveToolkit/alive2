@@ -300,7 +300,7 @@ class Assume final : public Instr {
   bool if_non_poison; /// cond only needs to hold if non-poison
 public:
   Assume(Value &cond, bool if_non_poison)
-    : Instr(Type::voidTy, ""), cond(cond), if_non_poison(if_non_poison) {}
+    : Instr(Type::voidTy, "assume"), cond(cond), if_non_poison(if_non_poison) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

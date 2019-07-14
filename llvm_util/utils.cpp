@@ -618,15 +618,15 @@ public:
 
           auto op_name = to_string(op / 2);
           auto l = make_unique<ICmp>(*int_types[1].get(),
-                                     "$range_l$" + op_name + value_name(llvm_i),
+                                     "%range_l#" + op_name + value_name(llvm_i),
                                      ICmp::SGE, i, *get_operand(low));
 
           auto h = make_unique<ICmp>(*int_types[1].get(),
-                                     "$range_h$" + op_name + value_name(llvm_i),
+                                     "%range_h#" + op_name + value_name(llvm_i),
                                      ICmp::SLT, i, *get_operand(high));
 
           auto r = make_unique<BinOp>(*int_types[1].get(),
-                                      "$range$" + op_name + value_name(llvm_i),
+                                      "%range#" + op_name + value_name(llvm_i),
                                       *l.get(), *h.get(), BinOp::And);
 
           auto r_ptr = r.get();
