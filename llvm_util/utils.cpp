@@ -274,9 +274,20 @@ public:
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
 
+    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().noNaNs())
+      flags |= BinOp::NNAN;
+    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().noInfs())
+      flags |= BinOp::NINF;
+
     // TODO: support FP fast-math stuff
-    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any())
+    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any()) {
+      auto FMFlag = i.getFastMathFlags();
+      if (FMFlag.allowReassoc() || FMFlag.allowReciprocal() ||
+          FMFlag.allowContract() || FMFlag.approxFunc() ||
+          FMFlag.noSignedZeros () || FMFlag.isFast())
       return error(i);
+    }
+
 
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
                                          (BinOp::Flags)flags));

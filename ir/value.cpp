@@ -65,7 +65,7 @@ void PoisonValue::print(ostream &os) const {
 }
 
 StateValue PoisonValue::toSMT(State &s) const {
-  return { expr::mkUInt(0, bits()), false };
+  return { getType().getDummyValue(), false };
 }
 
 

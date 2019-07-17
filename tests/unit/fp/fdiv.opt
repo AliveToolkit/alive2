@@ -8,3 +8,9 @@ Name: x/4 => × * 0.25
 %t = fdiv half %a, 4.0
   =>
 %t = fmul half %a, 0.25
+
+
+Name: constant poison
+%t = fdiv ninf double 3.0, 0.0
+  =>
+%t = poison

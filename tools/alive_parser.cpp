@@ -404,6 +404,21 @@ static BinOp::Flags parse_exact() {
   return BinOp::None;
 }
 
+static BinOp::Flags parse_fast_math() {
+  BinOp::Flags flags = BinOp::None;
+  while (true) {
+    if (tokenizer.consumeIf(NINF)) {
+      flags = (BinOp::Flags)(flags | BinOp::NINF);
+    } else if (tokenizer.consumeIf(NNAN)) {
+      flags = (BinOp::Flags)(flags | BinOp::NNAN);
+    } else {
+      break;
+    }
+  }
+  return flags;
+}
+
+
 static BinOp::Flags parse_binop_flags(token op_token) {
   switch (op_token) {
   case ADD:
@@ -416,6 +431,12 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case LSHR:
   case ASHR:
     return parse_exact();
+  case FADD:
+  case FSUB:
+  case FMUL:
+  case FDIV:
+  case FREM:
+    return parse_fast_math();
   case SREM:
   case UREM:
   case UADD_SAT:
@@ -433,11 +454,6 @@ static BinOp::Flags parse_binop_flags(token op_token) {
   case USUB_OVERFLOW:
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
-  case FADD:
-  case FSUB:
-  case FMUL:
-  case FDIV:
-  case FREM:
     return BinOp::None;
   default:
     UNREACHABLE();

@@ -39,6 +39,13 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case LShr:
     assert((flags & Exact) == flags);
     break;
+  case FAdd:
+  case FSub:
+  case FMul:
+  case FDiv:
+  case FRem:
+    assert((flags & NNANNINF) == flags);
+    break;
   case SRem:
   case URem:
   case SAdd_Sat:
@@ -56,12 +63,6 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case USub_Overflow:
   case SMul_Overflow:
   case UMul_Overflow:
-    // TODO: add support for fast-math flags
-  case FAdd:
-  case FSub:
-  case FMul:
-  case FDiv:
-  case FRem:
     assert(flags == 0);
     break;
   }
@@ -108,6 +109,9 @@ void BinOp::print(ostream &os) const {
   case NSW:    flag = " nsw "; break;
   case NUW:    flag = " nuw "; break;
   case NSWNUW: flag = " nsw nuw "; break;
+  case NNAN:   flag = " nnan "; break;
+  case NINF:   flag = " ninf "; break;
+  case NNANNINF: flag = " nnan ninf "; break;
   case Exact:  flag = " exact "; break;
   }
 
@@ -121,6 +125,17 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
   s.addUB(b != 0);
   if (sign)
     s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
+}
+
+static expr fm_poison(const expr &a, const expr &b, const expr &val,
+                      BinOp::Flags flags) {
+  expr ret = false;
+  if (flags & BinOp::NINF)
+    ret |= a.isInf() || b.isInf() || val.isInf();
+  if (flags & BinOp::NNAN)
+    ret |= a.isNaN() || b.isNaN() || val.isNaN();
+
+  return ret;
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -277,18 +292,22 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     val = a.fadd(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FSub:
     val = a.fsub(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FMul:
     val = a.fmul(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FDiv:
     val = a.fdiv(b);
+    not_poison &= !fm_poison(a, b, val, flags);
     break;
 
   case FRem:
@@ -934,7 +953,7 @@ StateValue Freeze::toSMT(State &s) const {
     return { expr(v), expr(p) };
 
   auto name = "nondet_" + fresh_id();
-  expr nondet = expr::mkVar(name.c_str(), bits());
+  expr nondet = expr::mkVar(name.c_str(), getType().getDummyValue());
   s.addQuantVar(nondet);
 
   return { expr::mkIf(p, v, move(nondet)), true };
