@@ -952,7 +952,7 @@ StateValue Freeze::toSMT(State &s) const {
     return { expr(v), expr(p) };
 
   auto name = "nondet_" + fresh_id();
-  expr nondet = expr::mkVar(name.c_str(), bits());
+  expr nondet = expr::mkVar(name.c_str(), getType().getDummyValue());
   s.addQuantVar(nondet);
 
   return { expr::mkIf(p, v, move(nondet)), true };
