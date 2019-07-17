@@ -39,6 +39,13 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case LShr:
     assert((flags & Exact) == flags);
     break;
+  case FAdd:
+  case FSub:
+  case FMul:
+  case FDiv:
+  case FRem:
+    assert((flags & NNANNINF) == flags);
+    break;
   case SRem:
   case URem:
   case SAdd_Sat:
@@ -56,12 +63,6 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case USub_Overflow:
   case SMul_Overflow:
   case UMul_Overflow:
-    // TODO: add support for fast-math flags
-  case FAdd:
-  case FSub:
-  case FMul:
-  case FDiv:
-  case FRem:
     assert(flags == 0);
     break;
   }
