@@ -149,8 +149,12 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
-  // TODO
-  return os << p.p;
+  os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
+     << ", block_id=";
+  p.get_bid().simplify().printUnsigned(os);
+  os << ", offset=";
+  p.get_offset().simplify().printSigned(os);
+  return os << ')';
 }
 
 

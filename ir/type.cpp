@@ -179,7 +179,7 @@ pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
   UNREACHABLE();
 }
 
-void VoidType::printVal(ostream &os, const expr &e) const {
+void VoidType::printVal(ostream &os, State &s, const expr &e) const {
   UNREACHABLE();
 }
 
@@ -243,7 +243,7 @@ pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
   return { var, { var } };
 }
 
-void IntType::printVal(ostream &os, const expr &e) const {
+void IntType::printVal(ostream &os, State &s, const expr &e) const {
   e.printHexadecimal(os);
   os << " (";
   e.printUnsigned(os);
@@ -339,7 +339,7 @@ pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
   return { var, { var } };
 }
 
-void FloatType::printVal(ostream &os, const expr &e) const {
+void FloatType::printVal(ostream &os, State &s, const expr &e) const {
   if (e.isNaN().simplify().isTrue()) {
     os << "NaN";
   } else if (e.isInf().simplify().isTrue()) {
@@ -422,9 +422,8 @@ pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
   return s.getMemory().mkInput(name);
 }
 
-void PtrType::printVal(ostream &os, const expr &e) const {
-  // TODO
-  os << e;
+void PtrType::printVal(ostream &os, State &s, const expr &e) const {
+  os << Pointer(s.getMemory(), e);
 }
 
 void PtrType::print(ostream &os) const {
@@ -473,7 +472,7 @@ pair<expr, vector<expr>> ArrayType::mkInput(State &s, const char *name) const {
   return {};
 }
 
-void ArrayType::printVal(ostream &os, const expr &e) const {
+void ArrayType::printVal(ostream &os, State &s, const expr &e) const {
   // TODO
 }
 
@@ -526,7 +525,7 @@ pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
   return {};
 }
 
-void VectorType::printVal(ostream &os, const expr &e) const {
+void VectorType::printVal(ostream &os, State &s, const expr &e) const {
   // TODO
 }
 
@@ -624,13 +623,13 @@ pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
   return { move(val), move(vars) };
 }
 
-void StructType::printVal(ostream &os, const expr &val) const {
+void StructType::printVal(ostream &os, State &s, const expr &val) const {
   os << "{ ";
   bool first = true;
   for (size_t i = 0, e = children.size(); i != e; ++i) {
     if (!first)
       os << ", ";
-    getChild(i).printVal(os, extract(val, i).simplify());
+    getChild(i).printVal(os, s, extract(val, i).simplify());
     first = false;
   }
   os << " }";
@@ -854,14 +853,14 @@ pair<expr, vector<expr>>
   UNREACHABLE();
 }
 
-void SymbolicType::printVal(ostream &os, const expr &e) const {
+void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
   switch (typ) {
-  case Int:       i.printVal(os, e); break;
-  case Float:     f.printVal(os, e); break;
-  case Ptr:       p.printVal(os, e); break;
-  case Array:     a.printVal(os, e); break;
-  case Vector:    v.printVal(os, e); break;
-  case Struct:    s.printVal(os, e); break;
+  case Int:       i.printVal(os, st, e); break;
+  case Float:     f.printVal(os, st, e); break;
+  case Ptr:       p.printVal(os, st, e); break;
+  case Array:     a.printVal(os, st, e); break;
+  case Vector:    v.printVal(os, st, e); break;
+  case Struct:    s.printVal(os, st, e); break;
   case Undefined: UNREACHABLE();
   }
 }

@@ -26,8 +26,9 @@ static bool is_undef(const expr &e) {
   return s.check().isUnsat();
 }
 
-static void print_varval(ostream &s, const Model &m, const Value *var,
-                         const Type &type, const StateValue &val) {
+static void print_varval(ostream &s, State &st, const Model &m,
+                         const Value *var, const Type &type,
+                         const StateValue &val) {
   // if the model is partial, we don't know for sure if it's poison or not
   // this happens if the poison constraint depends on an undef
   // however, cexs are usually triggered by the worst case, which is poison
@@ -53,7 +54,7 @@ static void print_varval(ostream &s, const Model &m, const Value *var,
     return;
   }
 
-  type.printVal(s, m.eval(val.value, true));
+  type.printVal(s, st, m.eval(val.value, true));
 
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
@@ -93,23 +94,21 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     if (!dynamic_cast<const Input*>(var))
       continue;
     s << *var << " = ";
-    print_varval(s, m, var, var->getType(), val.first);
+    print_varval(s, src_state, m, var, var->getType(), val.first);
     s << '\n';
   }
 
   set<string> seen_vars;
-  bool source = true;
-  for (auto &vs : { src_state.getValues(), tgt_state.getValues() }) {
+  for (auto &st : { src_state, tgt_state }) {
     if (!check_each_var) {
-      if (source) {
+      if (st.isSource()) {
         s << "\nSource:\n";
-        source = false;
       } else {
         s << "\nTarget:\n";
       }
     }
 
-    for (auto &[var, val] : vs) {
+    for (auto &[var, val] : st.getValues()) {
       auto &name = var->getName();
       if (name == var_name)
         break;
@@ -120,16 +119,17 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
         continue;
 
       s << *var << " = ";
-      print_varval(s, m, var, var->getType(), val.first);
+      print_varval(s, const_cast<State&>(st), m, var, var->getType(),
+                   val.first);
       s << '\n';
     }
   }
 
   if (print_var) {
     s << "Source value: ";
-    print_varval(s, m, var, type, src);
+    print_varval(s, src_state, m, var, type, src);
     s << "\nTarget value: ";
-    print_varval(s, m, var, type, tgt);
+    print_varval(s, tgt_state, m, var, type, tgt);
   }
 
   errs.add(s.str());
