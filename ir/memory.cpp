@@ -58,12 +58,13 @@ expr Pointer::get_offset() const {
 }
 
 expr Pointer::get_address() const {
-  expr range = expr::mkUInt(0, m.bits_size_t);
+  expr offset = get_offset().sextOrTrunc(m.bits_size_t);
   auto local_name = m.mkName("blks_addr");
   return
-    expr::mkIf(is_local(),
-               expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
-               expr::mkUF("blks_addr", { get_nonlocal_bid() }, range));
+    offset +
+      expr::mkIf(is_local(),
+                 expr::mkUF(local_name.c_str(), { get_local_bid() }, offset),
+                 expr::mkUF("blks_addr", { get_nonlocal_bid() }, offset));
 }
 
 expr Pointer::block_size() const {
