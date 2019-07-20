@@ -77,7 +77,7 @@ class Memory {
   State *state;
 
   // FIXME: these should be tuned per function
-  unsigned bits_for_offset = 32;
+  unsigned bits_for_offset = 64;
   unsigned bits_for_local_bid = 8;
   unsigned bits_for_nonlocal_bid = 8;
   unsigned bits_size_t = 64;
