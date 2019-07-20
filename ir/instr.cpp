@@ -1232,10 +1232,14 @@ StateValue GEP::toSMT(State &s) const {
 
   for (auto &[sz, idx] : idxs) {
     auto &[v, np] = s[idx];
-    auto inc = expr::mkUInt(sz, bits_offset) * v.sextOrTrunc(bits_offset);
+    auto multiplier = expr::mkUInt(sz, bits_offset);
+    auto val = v.sextOrTrunc(bits_offset);
+    auto inc = multiplier * val;
 
-    if (inbounds)
+    if (inbounds) {
+      non_poison &= multiplier.mul_no_soverflow(val);
       non_poison &= ptr.add_no_overflow(inc);
+    }
 
     ptr += inc;
     non_poison &= np;
