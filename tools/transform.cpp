@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <string_view>
 
 using namespace IR;
 using namespace smt;
@@ -59,7 +60,17 @@ static void print_varval(ostream &s, State &st, const Model &m,
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
   if (!partial.isConst()) {
-    s << "\t[based on undef value]";
+    // some functions / vars may not have an interpretation because it's not
+    // needed, not because it's undef
+    bool found_undef = false;
+    for (auto &var : partial.vars()) {
+      ostringstream ss;
+      ss << var;
+      auto name = ss.str();
+      found_undef |= string_view(name).substr(0, 6) == "undef_";
+    }
+    if (found_undef)
+      s << "\t[based on undef value]";
   }
 }
 
