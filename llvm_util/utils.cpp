@@ -237,6 +237,11 @@ public:
     default:
       return error(i);
     }
+
+    // TODO: support FP fast-math stuff
+    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any())
+      return error(i);
+
     RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
   }
 
