@@ -18,6 +18,12 @@ State::State(const Function &f, bool source)
                                                 *this);
 }
 
+void State::syncWithSrc(const State &src) {
+  assert(src.isSource());
+  assert(!isSource());
+  next_fn_call_id = src.next_fn_call_id;
+}
+
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);

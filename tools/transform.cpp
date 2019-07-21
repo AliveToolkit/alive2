@@ -22,6 +22,8 @@ using namespace std;
 
 
 static bool is_undef(const expr &e) {
+  if (e.isConst())
+    return false;
   Solver s;
   s.add(expr::mkForAll(e.vars(), expr::mkVar("#undef", e) != e));
   return s.check().isUnsat();
@@ -230,17 +232,17 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre = src_state.getPre() && tgt_state.getPre();
 
   Solver::check({
-    { preprocess(t, qvars, ap.second, pre && dom_a.notImplies(dom_b)),
+    { pre && preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { preprocess(t, qvars, ap.second,
-                 pre && dom_a && a.non_poison.notImplies(b.non_poison)),
+    { pre && preprocess(t, qvars, ap.second,
+                        dom_a && a.non_poison.notImplies(b.non_poison)),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { preprocess(t, qvars, ap.second,
-                 pre && dom_a && a.non_poison && a.value != b.value),
+    { pre && preprocess(t, qvars, ap.second,
+                        dom_a && a.non_poison && a.value != b.value),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}
@@ -265,6 +267,7 @@ Errors TransformVerify::verify() const {
 
   try {
     sym_exec(src_state);
+    tgt_state.syncWithSrc(src_state);
     sym_exec(tgt_state);
   } catch (LoopInCFGDetected&) {
     return "Loops are not supported yet! Skipping function.";

@@ -679,88 +679,64 @@ void FnCall::print(ostream &os) const {
 StateValue FnCall::toSMT(State &s) const {
   // TODO: add support for memory
   // TODO: add support for global variables
-  vector<expr> args_eval;
-  const char *suffix = s.isSource() ? "#src" : "#tgt";
+  vector<expr> all_args, value_args;
+  expr all_args_np(true);
 
   for (auto arg : args) {
-    auto &[v, p] = s[*arg];
-    args_eval.emplace_back(v);
-    args_eval.emplace_back(p);
+    auto &[v, np] = s[*arg];
+    all_args.emplace_back(v);
+    all_args.emplace_back(np);
+    value_args.emplace_back(v);
+    all_args_np &= np;
   }
 
-  auto add_axiom = [&](string fn, const expr &type,
-                       expr (expr::*implies)(const expr &) const) {
-    if (!s.isSource())
-      return;
-
+  auto add_implies_axiom = [&](const string &fn) {
     vector<expr> vars_src, vars_tgt;
     unsigned i = 0;
-    for (auto &arg : args_eval) {
+    for (auto &arg : all_args) {
       auto name = "v" + to_string(i++);
       vars_src.emplace_back(expr::mkVar(name.c_str(), arg));
       name = "v" + to_string(i++);
       vars_tgt.emplace_back(expr::mkVar(name.c_str(), arg));
     }
 
-    auto name_src = fn + "#src";
-    auto name_tgt = fn + "#tgt";
+    // fn src implies fn tgt if each src arg is poison or it's equal to tgt
+    set<expr> vars_set(vars_src.begin(), vars_src.end());
+    vars_set.insert(vars_tgt.begin(), vars_tgt.end());
 
-    {
-      // fns are equal if args are non-poison and equal
-      set<expr> vars_set;
-      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-        vars_set.insert(vars_src[i]);
-      }
-
-      vector<expr> v_src, v_tgt;
-      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-        v_src.emplace_back(vars_src[i]);
-        v_src.emplace_back(true);
-        v_tgt.emplace_back(vars_src[i]);
-        v_tgt.emplace_back(true);
-      }
-
-      auto fn_src = expr::mkUF(name_src.c_str(), v_src, type);
-      auto fn_tgt = expr::mkUF(name_tgt.c_str(), v_tgt, type);
-      s.addPre(expr::mkForAll(vars_set, fn_src == fn_tgt));
+    expr cond(true);
+    for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
+      cond &= !vars_src[i + 1] ||
+              (vars_src[i] == vars_tgt[i] && vars_tgt[i+1]);
     }
 
-    {
-      // fn src implies fn tgt if source value is poison
-      set<expr> vars_set(vars_src.begin(), vars_src.end());
-      vars_set.insert(vars_tgt.begin(), vars_tgt.end());
-
-      expr cond(false);
-      for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-        cond |= !vars_src[i + 1];
-      }
-
-      auto fn_src = expr::mkUF(name_src.c_str(), vars_src, type);
-      auto fn_tgt = expr::mkUF(name_tgt.c_str(), vars_tgt, type);
-      s.addPre(expr::mkForAll(vars_set,
-                              cond.implies((fn_src.*implies)(fn_tgt))));
-    }
+    auto fn_src = expr::mkUF(fn.c_str(), vars_src, false);
+    auto fn_tgt = expr::mkUF(fn.c_str(), vars_tgt, false);
+    s.addPre(expr::mkForAll(vars_set, cond.implies(fn_src.implies(fn_tgt))));
   };
-
 
   // impact of the function on the domain of the program
   // TODO: constraint when certain attributes are on
-  auto ub_name = fnName + "_ub" + suffix;
-  s.addUB(expr::mkUF(ub_name.c_str(), args_eval, false));
-
-  add_axiom(fnName + "_ub", false, &expr::implies);
+  auto ub_name = fnName + "#ub";
+  s.addUB(expr::mkUF(ub_name.c_str(), all_args, false));
+  add_implies_axiom(ub_name);
 
   if (dynamic_cast<VoidType*>(&getType()))
     return {};
 
-  expr ret_type = getType().getDummyValue();
-  add_axiom(fnName, ret_type, &expr::operator==);
-  add_axiom(fnName + "_poison", false, &expr::implies);
+  // create a new variable that can take any value if function is poison
+  expr val = expr::mkUF(fnName.c_str(), value_args, getType().getDummyValue());
+  if (!all_args_np.isTrue()) {
+    auto var_name = fnName + '#' + to_string(s.nextFnCallId());
+    auto var = expr::mkVar(var_name.c_str(), getType().getDummyValue());
+    s.addQuantVar(var);
+    val = expr::mkIf(all_args_np, val, var);
+  }
 
-  auto val_name = fnName + suffix;
-  auto poison_name = fnName + "_poison" + suffix;
-  return { expr::mkUF(val_name.c_str(), args_eval, ret_type),
-           expr::mkUF(poison_name.c_str(), args_eval, false) };
+  auto poison_name = fnName + "#poison";
+  add_implies_axiom(poison_name);
+
+  return { move(val), expr::mkUF(poison_name.c_str(), all_args, false) };
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {

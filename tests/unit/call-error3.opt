@@ -1,0 +1,13 @@
+; ERROR: Value mismatch
+
+%c = call i32 @f(i32 3)
+%d = call i32 @f(i32 poison)
+%e = call i32 @f(i32 4)
+%f = add %c, %e
+ret %f
+  =>
+%c = call i32 @f(i32 3)
+%d = call i32 @f(i32 3)
+%e = call i32 @f(i32 4)
+%f = add %c, %d
+ret %f
