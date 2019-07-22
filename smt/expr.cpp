@@ -717,6 +717,11 @@ expr expr::isInf() const {
   return Z3_mk_fpa_is_infinite(ctx(), ast());
 }
 
+expr expr::isFPZero() const {
+  C();
+  return Z3_mk_fpa_is_zero(ctx(), ast());
+}
+
 expr expr::isFPNeg() const {
   C();
   return Z3_mk_fpa_is_negative(ctx(), ast());

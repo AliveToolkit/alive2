@@ -157,6 +157,7 @@ public:
 
   expr isNaN() const;
   expr isInf() const;
+  expr isFPZero() const;
   expr isFPNeg() const;
 
   expr fadd(const expr &rhs) const;
