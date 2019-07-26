@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 using namespace IR;
 using namespace std;
@@ -123,6 +124,18 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
+  case llvm::Type::VectorTyID: {
+    auto &cache = type_cache[ty];
+    if (!cache) {
+      std::cout<<"HellO";
+      auto vT = cast<llvm::VectorType>(ty);
+      std::cout<<(*vT);
+      cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
+                                      llvm_type2alive(vT->getElementType()),
+                                      vT->getNumElements());
+    }
+    return cache.get();
+  }
   default:
     *out << "Unsupported type: " << *ty << '\n';
     return nullptr;
@@ -135,6 +148,7 @@ Value* get_operand(llvm::Value *v) {
     return identifiers[v];
 
   auto ty = llvm_type2alive(v->getType());
+  std::cout<<ty;
   if (!ty)
     return nullptr;
 
@@ -678,6 +692,7 @@ public:
     reset_state();
 
     auto type = llvm_type2alive(f.getReturnType());
+    //    std::cout<<*type;
     if (!type)
       return {};
 

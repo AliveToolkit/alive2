@@ -532,7 +532,7 @@ void VectorType::printVal(ostream &os, State &s, const expr &e) const {
 }
 
 void VectorType::print(ostream &os) const {
-  os << "TODO";
+  os << "<" << length << " x " <<  *elementTy << ">";
 }
 
 

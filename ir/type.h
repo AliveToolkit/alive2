@@ -192,8 +192,13 @@ public:
 
 
 class VectorType final : public Type {
+  Type *elementTy;
+  unsigned length = 0;
 public:
   VectorType(std::string &&name) : Type(std::move(name)) {}
+  VectorType(std::string &&name, Type* elementTy, unsigned length)
+    : Type(std::move(name)), elementTy(elementTy), length(length) {}
+
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
