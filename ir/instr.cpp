@@ -7,6 +7,7 @@
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include <iostream>
 
 using namespace smt;
 using namespace std;
@@ -143,6 +144,31 @@ StateValue BinOp::toSMT(State &s) const {
   auto &[b, bp] = s[rhs];
   expr val;
   auto not_poison = ap && bp;
+
+  if (getType().isVectorType()) {
+    expr val;
+
+    auto VT = getType().getAsVectorType();
+    for (unsigned idx = VT->getLength() - 1; idx >= 0; idx --) {
+      auto a_i = VT->extract(a, idx);
+      auto b_i = VT->extract(b, idx);
+
+      expr r_i;
+
+      switch (op) {
+      case Add:
+        r_i = a_i + b_i;
+      case Sub:
+        r_i = a_i - b_i;
+      case Mul:
+        r_i = a_i * b_i;
+      default:
+        UNREACHABLE();
+      }
+      val = idx == 0 ? r_i : val.concat(r_i);
+    }
+    return { move(val), move(not_poison) };
+  }
 
   switch (op) {
   case Add:

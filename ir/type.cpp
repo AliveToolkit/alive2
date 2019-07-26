@@ -7,6 +7,7 @@
 #include "util/compiler.h"
 #include <cassert>
 #include <sstream>
+#include <iostream>
 
 using namespace smt;
 using namespace std;
@@ -109,6 +110,10 @@ bool Type::isPtrType() const {
   return false;
 }
 
+bool Type::isVectorType() const {
+  return false;
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
@@ -142,6 +147,10 @@ const StructType* Type::getAsStructType() const {
 }
 
 const FloatType* Type::getAsFloatType() const {
+  return nullptr;
+}
+
+const VectorType* Type::getAsVectorType() const {
   return nullptr;
 }
 
@@ -512,6 +521,14 @@ void VectorType::fixup(const Model &m) {
   // TODO
 }
 
+bool VectorType::isVectorType() const {
+  return true;
+}
+
+const VectorType* VectorType::getAsVectorType() const {
+  return this;
+}
+
 expr VectorType::enforceIntOrVectorType() const {
   // TODO: check if elements are int
   return false;
@@ -523,16 +540,41 @@ expr VectorType::enforceIntOrPtrOrVectorType() const {
 }
 
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
+  expr val;
+  vector<expr> vars;
+
+  for (unsigned idx = 0; idx < length; idx ++) {
+    string c_name = string(name) + "#" + to_string(idx);
+    auto [v, vs] = elementTy->mkInput(s, c_name.c_str());
+    val = idx == 0 ? v : val.concat(v);
+    vars.insert(vars.end(), vs.begin(), vs.end());
+  }
+  return { move(val), move(vars) };
 }
 
 void VectorType::printVal(ostream &os, State &s, const expr &e) const {
+  e.printHexadecimal(os);
+  os << " (<";
+  for (unsigned idx = 0; idx < length; idx ++) {
+  }
+  os << ">)";
   // TODO
 }
 
 void VectorType::print(ostream &os) const {
   os << "<" << length << " x " <<  *elementTy << ">";
+}
+
+expr VectorType::extract(const expr &vector_val, unsigned index) const {
+  assert(index < length);
+  unsigned offset = (index + 1) * elementTy->bits();
+  unsigned low = vector_val.bits() - offset;
+  std::cout<<(low+elementTy->bits()-1)<<std::endl;
+  std::cout<<low<<std::endl;
+  std::cout<<vector_val<<std::endl;
+  auto a =  vector_val.extract(7, 0);
+  std::cout<<a;
+  return a;
 }
 
 
