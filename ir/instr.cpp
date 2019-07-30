@@ -148,20 +148,23 @@ StateValue BinOp::toSMT(State &s) const {
   if (getType().isVectorType()) {
     expr val;
 
-    auto VT = getType().getAsVectorType();
-    for (unsigned idx = VT->getLength() - 1; idx >= 0; idx --) {
-      auto a_i = VT->extract(a, idx);
-      auto b_i = VT->extract(b, idx);
+    auto vt = getType().getAsVectorType();
+    for (unsigned idx = 0; idx < vt->getLength(); idx ++) {
+      auto a_i = vt->extract(a, idx);
+      auto b_i = vt->extract(b, idx);
 
       expr r_i;
 
       switch (op) {
       case Add:
         r_i = a_i + b_i;
+        break;
       case Sub:
         r_i = a_i - b_i;
+        break;
       case Mul:
         r_i = a_i * b_i;
+        break;
       default:
         UNREACHABLE();
       }

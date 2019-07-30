@@ -569,11 +569,14 @@ expr VectorType::extract(const expr &vector_val, unsigned index) const {
   assert(index < length);
   unsigned offset = (index + 1) * elementTy->bits();
   unsigned low = vector_val.bits() - offset;
+  std::cout<<"START"<<std::endl;
+  std::cout<<index<<std::endl;
   std::cout<<(low+elementTy->bits()-1)<<std::endl;
   std::cout<<low<<std::endl;
   std::cout<<vector_val<<std::endl;
-  auto a =  vector_val.extract(7, 0);
-  std::cout<<a;
+  auto  a = vector_val.extract(low+elementTy->bits()-1, low);
+  std::cout<<a<<std::endl;
+  std::cout<<"END"<<std::endl;
   return a;
 }
 
