@@ -139,211 +139,218 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
   return ret;
 }
 
+  /*
+static expr v_binop (const expr &a, const expr &b, BinOp::Op op,
+                     const VectorType *vty) {
+  for (unsigned idx = 0; idx < vty->len(); idx ++) {
+    auto ai = vty->extract(a, idx);
+    auto bi = vty->extract(b, idx);
+    expr ri;
+
+    switch (op) {
+    case BinOp::Add:
+      ri = ai + bi;
+      break;
+    case BinOp::Sub:
+      ri = ai - bi;
+      break;
+    case BinOp::Mul:
+      ri = ai * bi;
+      break;
+    default:
+      UNREACHABLE();
+    }
+    val = idx == 0 ? ri : val.concat(ri);
+  }
+  return val;
+  }*/
+
 StateValue BinOp::toSMT(State &s) const {
   auto &[a, ap] = s[lhs];
   auto &[b, bp] = s[rhs];
   expr val;
   auto not_poison = ap && bp;
 
-  if (getType().isVectorType()) {
-    expr val;
+  auto vty = getType().getAsVectorType();
+  unsigned num_elements = getType().isVectorType() ? vty->len() : 1;
 
-    auto vt = getType().getAsVectorType();
-    for (unsigned idx = 0; idx < vt->getLength(); idx ++) {
-      auto a_i = vt->extract(a, idx);
-      auto b_i = vt->extract(b, idx);
+  for (unsigned idx = 0; idx < num_elements; idx ++) {
+    auto a_i = getType().isVectorType() ? vty->extract(a, idx) : a;
+    auto b_i = getType().isVectorType() ? vty->extract(b, idx) : b;
+    expr val_i;
 
-      expr r_i;
+    switch (op) {
+    case Add:
+      val_i = a_i + b_i;
+      if (flags & NSW)
+        not_poison &= a_i.add_no_soverflow(b_i);
+      if (flags & NUW)
+        not_poison &= a_i.add_no_uoverflow(b_i);
+      break;
 
-      switch (op) {
-      case Add:
-        r_i = a_i + b_i;
+    case Sub:
+      val_i = a_i - b_i;
+      if (flags & NSW)
+        not_poison &= a_i.sub_no_soverflow(b_i);
+      if (flags & NUW)
+        not_poison &= a_i.sub_no_uoverflow(b_i);
+      break;
+
+    case Mul:
+      val_i = a_i * b_i;
+      if (flags & NSW)
+        not_poison &= a_i.mul_no_soverflow(b_i);
+      if (flags & NUW)
+        not_poison &= a_i.mul_no_uoverflow(b_i);
+      break;
+
+    case SDiv:
+      val_i = a_i.sdiv(b_i);
+      div_ub(s, a_i, b_i, ap, bp, true);
+
+      if (flags & Exact)
+        not_poison &= a_i.sdiv_exact(b_i);
+      break;
+
+    case UDiv:
+      val_i = a_i.udiv(b_i);
+      div_ub(s, a_i, b_i, ap, bp, false);
+
+      if (flags & Exact)
+        not_poison &= a_i.udiv_exact(b_i);
+      break;
+
+    case SRem:
+      val_i = a_i.srem(b_i);
+      div_ub(s, a_i, b_i, ap, bp, true);
+      break;
+
+    case URem:
+      val_i = a_i.urem(b_i);
+      div_ub(s, a_i, b_i, ap, bp, false);
+      break;
+
+    case Shl:
+      {
+        val_i = a_i << b_i;
+        not_poison &= b_i.ult(b.bits());
+
+        if (flags & NSW)
+          not_poison &= a_i.shl_no_soverflow(b_i);
+        if (flags & NUW)
+          not_poison &= a_i.shl_no_uoverflow(b_i);
         break;
-      case Sub:
-        r_i = a_i - b_i;
-        break;
-      case Mul:
-        r_i = a_i * b_i;
-        break;
-      default:
-        UNREACHABLE();
       }
-      val = idx == 0 ? r_i : val.concat(r_i);
+    case AShr: {
+      val_i = a_i.ashr(b_i);
+      not_poison &= b_i.ult(b_i.bits());
+
+      if (flags & Exact)
+        not_poison &= a_i.ashr_exact(b_i);
+      break;
     }
-    return { move(val), move(not_poison) };
+    case LShr: {
+      val_i = a_i.lshr(b_i);
+      not_poison &= b_i.ult(b_i.bits());
+
+      if (flags & Exact)
+        not_poison &= a_i.lshr_exact(b_i);
+      break;
+    }
+    case SAdd_Sat:
+      val_i = a_i.sadd_sat(b_i);
+      break;
+
+    case UAdd_Sat:
+      val_i = a_i.uadd_sat(b_i);
+      break;
+
+    case SSub_Sat:
+      val_i = a_i.ssub_sat(b_i);
+      break;
+
+    case USub_Sat:
+      val_i = a.usub_sat(b_i);
+      break;
+
+    case And:
+      val_i = a_i & b_i;
+      break;
+
+    case Or:
+      val_i = a_i | b_i;
+      break;
+
+    case Xor:
+      val_i = a_i ^ b_i;
+      break;
+
+    case Cttz:
+      val_i = a_i.cttz();
+      not_poison &= (b_i == 0u || a_i != 0u);
+      break;
+
+    case Ctlz:
+      val_i = a_i.ctlz();
+      not_poison &= (b_i == 0u || a_i != 0u);
+      break;
+
+    case SAdd_Overflow:
+      val_i = a_i + b_i;
+      val_i = val_i.concat((!a_i.add_no_soverflow(b_i)).toBVBool());
+      break;
+
+    case UAdd_Overflow:
+      val_i = a_i + b_i;
+      val_i = val_i.concat((!a_i.add_no_uoverflow(b_i)).toBVBool());
+      break;
+
+    case SSub_Overflow:
+      val_i = a_i - b_i;
+      val_i = val_i.concat((!a_i.sub_no_soverflow(b_i)).toBVBool());
+      break;
+
+    case USub_Overflow:
+      val_i = a_i - b_i;
+      val_i = val_i.concat((!a_i.sub_no_uoverflow(b_i)).toBVBool());
+      break;
+
+    case SMul_Overflow:
+      val_i = a_i * b_i;
+      val_i = val_i.concat((!a_i.mul_no_soverflow(b_i)).toBVBool());
+      break;
+
+    case UMul_Overflow:
+      val_i = a_i * b_i;
+      val_i = val_i.concat((!a_i.mul_no_uoverflow(b_i)).toBVBool());
+      break;
+
+    case FAdd:
+      val_i = a_i.fadd(b_i);
+      not_poison &= !fm_poison(a_i, b_i, val_i, flags);
+      break;
+
+    case FSub:
+      val_i = a_i.fsub(b_i);
+      not_poison &= !fm_poison(a_i, b_i, val_i, flags);
+      break;
+
+    case FMul:
+      val_i = a_i.fmul(b_i);
+      not_poison &= !fm_poison(a_i, b_i, val_i, flags);
+      break;
+
+    case FDiv:
+      val_i = a_i.fdiv(b_i);
+      not_poison &= !fm_poison(a_i, b_i, val_i, flags);
+      break;
+
+    case FRem:
+      // TODO; Z3 has no support for LLVM's frem which is actually an fmod
+      break;
+    }
+    val = idx == 0 ? val_i : val.concat(val_i);
   }
-
-  switch (op) {
-  case Add:
-    val = a + b;
-    if (flags & NSW)
-      not_poison &= a.add_no_soverflow(b);
-    if (flags & NUW)
-      not_poison &= a.add_no_uoverflow(b);
-    break;
-
-  case Sub:
-    val = a - b;
-    if (flags & NSW)
-      not_poison &= a.sub_no_soverflow(b);
-    if (flags & NUW)
-      not_poison &= a.sub_no_uoverflow(b);
-    break;
-
-  case Mul:
-    val = a * b;
-    if (flags & NSW)
-      not_poison &= a.mul_no_soverflow(b);
-    if (flags & NUW)
-      not_poison &= a.mul_no_uoverflow(b);
-    break;
-
-  case SDiv:
-    val = a.sdiv(b);
-    div_ub(s, a, b, ap, bp, true);
-
-    if (flags & Exact)
-      not_poison &= a.sdiv_exact(b);
-    break;
-
-  case UDiv:
-    val = a.udiv(b);
-    div_ub(s, a, b, ap, bp, false);
-
-    if (flags & Exact)
-      not_poison &= a.udiv_exact(b);
-    break;
-
-  case SRem:
-    val = a.srem(b);
-    div_ub(s, a, b, ap, bp, true);
-    break;
-
-  case URem:
-    val = a.urem(b);
-    div_ub(s, a, b, ap, bp, false);
-    break;
-
-  case Shl:
-  {
-    val = a << b;
-    not_poison &= b.ult(b.bits());
-
-    if (flags & NSW)
-      not_poison &= a.shl_no_soverflow(b);
-    if (flags & NUW)
-      not_poison &= a.shl_no_uoverflow(b);
-    break;
-  }
-  case AShr: {
-    val = a.ashr(b);
-    not_poison &= b.ult(b.bits());
-
-    if (flags & Exact)
-      not_poison &= a.ashr_exact(b);
-    break;
-  }
-  case LShr: {
-    val = a.lshr(b);
-    not_poison &= b.ult(b.bits());
-
-    if (flags & Exact)
-      not_poison &= a.lshr_exact(b);
-    break;
-  }
-  case SAdd_Sat:
-    val = a.sadd_sat(b);
-    break;
-
-  case UAdd_Sat:
-    val = a.uadd_sat(b);
-    break;
-
-  case SSub_Sat:
-    val = a.ssub_sat(b);
-    break;
-
-  case USub_Sat:
-    val = a.usub_sat(b);
-    break;
-
-  case And:
-    val = a & b;
-    break;
-
-  case Or:
-    val = a | b;
-    break;
-
-  case Xor:
-    val = a ^ b;
-    break;
-
-  case Cttz:
-    val = a.cttz();
-    not_poison &= (b == 0u || a != 0u);
-    break;
-
-  case Ctlz:
-    val = a.ctlz();
-    not_poison &= (b == 0u || a != 0u);
-    break;
-
-  case SAdd_Overflow:
-    val = a + b;
-    val = val.concat((!a.add_no_soverflow(b)).toBVBool());
-    break;
-
-  case UAdd_Overflow:
-    val = a + b;
-    val = val.concat((!a.add_no_uoverflow(b)).toBVBool());
-    break;
-
-  case SSub_Overflow:
-    val = a - b;
-    val = val.concat((!a.sub_no_soverflow(b)).toBVBool());
-    break;
-
-  case USub_Overflow:
-    val = a - b;
-    val = val.concat((!a.sub_no_uoverflow(b)).toBVBool());
-    break;
-
-  case SMul_Overflow:
-    val = a * b;
-    val = val.concat((!a.mul_no_soverflow(b)).toBVBool());
-    break;
-
-  case UMul_Overflow:
-    val = a * b;
-    val = val.concat((!a.mul_no_uoverflow(b)).toBVBool());
-    break;
-
-  case FAdd:
-    val = a.fadd(b);
-    not_poison &= !fm_poison(a, b, val, flags);
-    break;
-
-  case FSub:
-    val = a.fsub(b);
-    not_poison &= !fm_poison(a, b, val, flags);
-    break;
-
-  case FMul:
-    val = a.fmul(b);
-    not_poison &= !fm_poison(a, b, val, flags);
-    break;
-
-  case FDiv:
-    val = a.fdiv(b);
-    not_poison &= !fm_poison(a, b, val, flags);
-    break;
-
-  case FRem:
-    // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-    break;
-  }
-
   return { move(val), move(not_poison) };
 }
 

@@ -205,7 +205,7 @@ public:
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
   Type *getElementTy() const {return elementTy;};
-  unsigned getLength() const {return length;};
+  unsigned len() const {return length;};
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const VectorType &rhs) const;
   smt::expr sameType(const VectorType &rhs) const;
