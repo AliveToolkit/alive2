@@ -10,6 +10,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <iostream>
 
 #define YYDEBUG 0
 
@@ -121,7 +122,16 @@ struct tokenizer_t {
   }
 
   bool isType() {
-    return peek() == INT_TYPE;
+    return isScalarType() || isVectorType();
+  }
+
+  bool isScalarType() {
+    return peek() == INT_TYPE || peek() == HALF ||
+           peek() == FLOAT || peek() == DOUBLE;
+  }
+
+  bool isVectorType() {
+    return peek() == CSLT;
   }
 
 private:
@@ -241,8 +251,10 @@ static uint64_t parse_number() {
 
 static unordered_map<Type*, unique_ptr<StructType>> overflow_aggregate_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
+static vector<unique_ptr<VectorType>> vector_types;
 static unsigned sym_num;
 static unsigned struct_num;
+static unsigned vector_num;
 
 static Type& get_overflow_type(Type &type) {
   auto p = overflow_aggregate_types.try_emplace(&type);
@@ -268,8 +280,8 @@ static Type& get_int_type(unsigned size) {
   return *int_types[size].get();
 }
 
-static Type& parse_type(bool optional = true) {
-  switch (auto t = *tokenizer) {
+static Type& parse_scalar_type() {
+  switch (*tokenizer) {
   case INT_TYPE:
     if (yylval.num > 4 * 1024)
       error("Int type too long: " + to_string(yylval.num));
@@ -285,12 +297,37 @@ static Type& parse_type(bool optional = true) {
     return double_type;
 
   default:
-    if (optional) {
-      tokenizer.unget(t);
+    UNREACHABLE();
+  }
+}
+
+static Type& parse_vector_type() {
+  tokenizer.ensure(CSLT);
+  tokenizer.ensure(NUM);
+  unsigned len = yylval.num;
+
+  auto t = *tokenizer;
+  if (t != IDENTIFIER || yylval.str != "x")
+    error ("Expect x");
+
+  Type &elemTy = parse_scalar_type();
+
+  tokenizer.ensure(CSGT);
+  return *vector_types.emplace_back(
+    make_unique<VectorType>("vectorty_" + to_string(vector_num++),
+                            &elemTy, len)).get();
+}
+
+static Type& parse_type(bool optional = true) {
+  if (tokenizer.isScalarType()) {
+    return parse_scalar_type();
+  } else if (tokenizer.isVectorType()) {
+    return parse_vector_type();
+  } else {
+    if (optional)
       return get_sym_type();
-    } else {
-      error("Expecting a type", t);
-    }
+    else
+      error("Expecting a type", tokenizer.peek());
   }
   UNREACHABLE();
 }
