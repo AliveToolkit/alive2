@@ -1,0 +1,12 @@
+
+
+Name: identity
+%r = add <2 x i8> %x, %y
+  =>
+%r = add <2 x i8> %x, %y
+
+
+Name: sub
+%r = sub <2 x i8> %x, %y
+  =>
+%r = sub <2 x i8> %x, %y
