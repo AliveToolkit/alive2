@@ -493,32 +493,38 @@ void ArrayType::print(ostream &os) const {
 
 
 unsigned VectorType::bits() const {
-  // TODO
-  return 0;
+  return len() * getElementTy()->bits();
 }
 
 expr VectorType::getDummyValue() const {
-  // TODO
-  return {};
+  expr res;
+  for (unsigned idx = 0; idx < len() ; idx++) {
+    auto elementDummy = getElementTy()->getDummyValue();
+    res = idx == 0 ? elementDummy : res.concat(elementDummy);
+  }
+  return res;
 }
 
 expr VectorType::getTypeConstraints() const {
-  // TODO
-  return false;
+  return getElementTy()->getTypeConstraints();
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
-  // TODO
-  return false;
+  if (len() != rhs.len())
+    return false;
+
+  return *getElementTy() == *rhs.getElementTy();
 }
 
 expr VectorType::sameType(const VectorType &rhs) const {
-  // TODO
-  return false;
+  if (len() != rhs.len())
+    return false;
+
+  return getElementTy()->sameType(*rhs.getElementTy());
 }
 
 void VectorType::fixup(const Model &m) {
-  // TODO
+  getElementTy()->fixup(m);
 }
 
 bool VectorType::isVectorType() const {
