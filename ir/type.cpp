@@ -537,12 +537,12 @@ const VectorType* VectorType::getAsVectorType() const {
 
 expr VectorType::enforceIntOrVectorType() const {
   // TODO: check if elements are int
-  return false;
+  return true;
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
   // TODO: check if elements are int/ptr
-  return false;
+  return true;
 }
 
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
