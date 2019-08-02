@@ -7,7 +7,6 @@
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
-#include <iostream>
 
 using namespace smt;
 using namespace std;

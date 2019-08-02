@@ -1117,6 +1117,7 @@ expr expr::concat(const expr &rhs) const {
 expr expr::extract(unsigned high, unsigned low) const {
   C();
   assert(high >= low && high < bits());
+
   if (low == 0 && high == bits()-1)
     return *this;
 

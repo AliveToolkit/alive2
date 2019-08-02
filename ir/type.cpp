@@ -7,7 +7,6 @@
 #include "util/compiler.h"
 #include <cassert>
 #include <sstream>
-#include <iostream>
 
 using namespace smt;
 using namespace std;
