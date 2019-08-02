@@ -139,32 +139,6 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
   return ret;
 }
 
-  /*
-static expr v_binop (const expr &a, const expr &b, BinOp::Op op,
-                     const VectorType *vty) {
-  for (unsigned idx = 0; idx < vty->len(); idx ++) {
-    auto ai = vty->extract(a, idx);
-    auto bi = vty->extract(b, idx);
-    expr ri;
-
-    switch (op) {
-    case BinOp::Add:
-      ri = ai + bi;
-      break;
-    case BinOp::Sub:
-      ri = ai - bi;
-      break;
-    case BinOp::Mul:
-      ri = ai * bi;
-      break;
-    default:
-      UNREACHABLE();
-    }
-    val = idx == 0 ? ri : val.concat(ri);
-  }
-  return val;
-  }*/
-
 StateValue BinOp::toSMT(State &s) const {
   auto &[a, ap] = s[lhs];
   auto &[b, bp] = s[rhs];
