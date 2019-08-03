@@ -561,9 +561,11 @@ void VectorType::printVal(ostream &os, State &s, const expr &e) const {
   e.printHexadecimal(os);
   os << " (<";
   for (unsigned idx = 0; idx < length; idx ++) {
+    if (idx != 0)
+      os << ", ";
+    elementTy->printVal(os, s, extract(e, idx));
   }
   os << ">)";
-  // TODO
 }
 
 void VectorType::print(ostream &os) const {
