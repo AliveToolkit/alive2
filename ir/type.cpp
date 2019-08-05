@@ -505,10 +505,11 @@ expr VectorType::getDummyValue() const {
 }
 
 expr VectorType::getTypeConstraints() const {
-  if (length)
-    return getElementTy()->getTypeConstraints();
-  else
-    return true;
+  auto bw = sizeVar();
+  auto r = bw != expr::mkUInt(0, var_bw_bits);
+  if (!defined)
+    r &= bw.ule(expr::mkUInt(8, var_bw_bits));
+  return (r && elementTy->getTypeConstraints());
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
