@@ -505,10 +505,10 @@ expr VectorType::getDummyValue() const {
 }
 
 expr VectorType::getTypeConstraints() const {
-  // TODO: Fixme
-  if (getElementTy())
+  if (length)
     return getElementTy()->getTypeConstraints();
-  else return true;
+  else
+    return true;
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
