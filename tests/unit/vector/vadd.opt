@@ -1,12 +1,18 @@
 
 
-Name: identity
+Name: add identity
 %r = add <2 x i8> %x, %y
   =>
 %r = add <2 x i8> %x, %y
 
 
-Name: sub
+Name: sub identity
 %r = sub <2 x i8> %x, %y
   =>
 %r = sub <2 x i8> %x, %y
+
+
+Name: sub identity
+%r = add <4 x i8> %x, %y
+  =>
+%r = add <4 x i8> %x, %y
