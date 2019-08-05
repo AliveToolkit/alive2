@@ -513,6 +513,14 @@ expr VectorType::getTypeConstraints() const {
   return (r && elementTy->getTypeConstraints());
 }
 
+static std::vector<std::unique_ptr<SymbolicType>> child_sym_types;
+static unsigned child_sym_num;
+
+VectorType::VectorType(std::string &&name) : Type(std::move(name)) {
+  elementTy = child_sym_types.emplace_back(
+    std::make_unique<SymbolicType>("child_symty_" + std::to_string(child_sym_num++))).get();
+}
+
 expr VectorType::operator==(const VectorType &rhs) const {
   if (len() != rhs.len())
     return false;

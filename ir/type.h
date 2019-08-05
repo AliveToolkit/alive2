@@ -193,15 +193,14 @@ public:
   void print(std::ostream &os) const override;
 };
 
-
 class VectorType final : public Type {
   Type *elementTy;
   unsigned length = 0;
   bool defined = false;
 public:
-  VectorType(std::string &&name) : Type(std::move(name)) {}
   VectorType(std::string &&name, Type* elementTy, unsigned length)
     : Type(std::move(name)), elementTy(elementTy), length(length), defined(true) {}
+  VectorType(std::string &&name);
 
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
