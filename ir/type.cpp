@@ -13,6 +13,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
+static constexpr unsigned MAX_VECTOR_LENGTH = 4;
 
 
 namespace IR {
@@ -508,7 +509,7 @@ expr VectorType::getTypeConstraints() const {
   auto bw = sizeVar();
   auto r = bw != expr::mkUInt(0, var_bw_bits);
   if (!defined)
-    r &= bw.ule(expr::mkUInt(8, var_bw_bits));
+    r &= bw.ule(expr::mkUInt(MAX_VECTOR_LENGTH, var_bw_bits));
   return (r && elementTy->getTypeConstraints());
 }
 
@@ -527,6 +528,9 @@ expr VectorType::sameType(const VectorType &rhs) const {
 }
 
 void VectorType::fixup(const Model &m) {
+  length = m.getUInt(sizeVar());
+  assert(length < MAX_VECTOR_LENGTH);
+
   getElementTy()->fixup(m);
 }
 
