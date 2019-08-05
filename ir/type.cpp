@@ -513,12 +513,13 @@ expr VectorType::getTypeConstraints() const {
   return (r && elementTy->getTypeConstraints());
 }
 
-static std::vector<std::unique_ptr<SymbolicType>> child_sym_types;
-static unsigned child_sym_num;
+static std::vector<std::unique_ptr<IntType>> child_types;
+static unsigned child_ty_num;
 
+// TODO: Supoort floating point types
 VectorType::VectorType(std::string &&name) : Type(std::move(name)) {
-  elementTy = child_sym_types.emplace_back(
-    std::make_unique<SymbolicType>("child_symty_" + std::to_string(child_sym_num++))).get();
+  elementTy = child_types.emplace_back(
+    std::make_unique<IntType>("child_" + std::to_string(child_ty_num++))).get();
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
