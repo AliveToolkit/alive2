@@ -13,7 +13,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
-static constexpr unsigned MAX_VECTOR_LENGTH = 4;
+static constexpr unsigned MAX_VECTOR_LENGTH = 2;
 
 
 namespace IR {
@@ -763,12 +763,12 @@ expr SymbolicType::getDummyValue() const {
 
 expr SymbolicType::getTypeConstraints() const {
   expr c(false);
-  c |= isInt()    && i.getTypeConstraints();
-  c |= isFloat()  && f.getTypeConstraints();
-  c |= isPtr()    && p.getTypeConstraints();
-  c |= isArray()  && a.getTypeConstraints();
+  c |= isInt()    && i.getTypeConstraints() && (v.getElementTy()->sizeVar() == 0);
+  c |= isFloat()  && f.getTypeConstraints() && (v.getElementTy()->sizeVar() == 0);
+  c |= isPtr()    && p.getTypeConstraints() && (v.getElementTy()->sizeVar() == 0);
+  c |= isArray()  && a.getTypeConstraints() && (v.getElementTy()->sizeVar() == 0);
   c |= isVector() && v.getTypeConstraints();
-  c |= isStruct() && s.getTypeConstraints();
+  c |= isStruct() && s.getTypeConstraints() && (v.getElementTy()->sizeVar() == 0);
   return c;
 }
 
