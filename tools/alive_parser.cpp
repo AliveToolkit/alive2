@@ -376,7 +376,8 @@ static Value& parse_const_expr(Type &type) {
 static Value& parse_vector_constant(Type &type) {
   Type &firstTy = parse_scalar_type();
   Value &firstElem = parse_operand(type);
-  auto c = make_unique<VectorConst>(firstTy);
+  auto c = make_unique<VectorConst>(type);
+  auto ret = c.get();
   c->addElement(firstElem);
 
   while(tokenizer.consumeIf(COMMA)) {
@@ -385,9 +386,11 @@ static Value& parse_vector_constant(Type &type) {
     Value &elem = parse_operand(type);
     c->addElement(elem);
   }
-  fn->addConstant(move(c));
+
   tokenizer.ensure(CSGT);
-  return *c;
+  fn->addConstant(move(c));
+
+  return *ret;
 }
 
 static Value& parse_operand(Type &type) {

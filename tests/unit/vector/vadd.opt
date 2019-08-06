@@ -12,7 +12,7 @@ Name: sub identity
 %r = sub <2 x i8> %x, %y
 
 
-Name: sub identity
-%r = add <4 x i8> %x, %y
+Name: add identity, with constant
+%r = add <2 x i8> <i8 3, i8 5>, %y
   =>
-%r = add <4 x i8> %x, %y
+%r = add <2 x i8> <i8 3, i8 5>, %y
