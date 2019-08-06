@@ -522,18 +522,16 @@ VectorType::VectorType(std::string &&name) : Type(std::move(name)) {
     std::make_unique<IntType>("child_" + std::to_string(child_ty_num++))).get();
 }
 
-expr VectorType::operator==(const VectorType &rhs) const {
-  if (len() != rhs.len())
-    return false;
+expr VectorType::sizeVar() const {
+  return defined ? expr::mkUInt(len(), var_bw_bits) : Type::sizeVar();
+}
 
-  return *getElementTy() == *rhs.getElementTy();
+expr VectorType::operator==(const VectorType &rhs) const {
+  return (sizeVar() == rhs.sizeVar()) && (*getElementTy() == *rhs.getElementTy());
 }
 
 expr VectorType::sameType(const VectorType &rhs) const {
-  if (len() != rhs.len())
-    return false;
-
-  return getElementTy()->sameType(*rhs.getElementTy());
+  return (sizeVar() == rhs.sizeVar()) && getElementTy()->sameType(*rhs.getElementTy());
 }
 
 void VectorType::fixup(const Model &m) {

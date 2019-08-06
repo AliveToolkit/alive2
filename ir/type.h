@@ -219,6 +219,7 @@ public:
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
   smt::expr extract(const smt::expr &vector_val, unsigned index) const;
+  smt::expr sizeVar() const override;
 };
 
 
