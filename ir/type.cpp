@@ -539,7 +539,7 @@ expr VectorType::sameType(const VectorType &rhs) const {
 
 void VectorType::fixup(const Model &m) {
   length = m.getUInt(sizeVar());
-  assert(length < MAX_VECTOR_LENGTH);
+  assert(length <= MAX_VECTOR_LENGTH);
 
   getElementTy()->fixup(m);
 }
