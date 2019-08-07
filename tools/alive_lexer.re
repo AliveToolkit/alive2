@@ -104,6 +104,11 @@ re2c:yyfill:check = 0;
   return INT_TYPE;
 }
 
+"<" [1-9][0-9]* {
+  yylval.num = strtoull((char*)YYTEXT+1, nullptr, 10);
+  return VECTOR_TYPE;
+}
+
 [-+]? [0-9]* "." [0-9]+ ([eE] [-+]? [0-9]+)? {
   yylval.fp_num = strtod((char*)YYTEXT, nullptr);
   return FP_NUM;

@@ -130,7 +130,7 @@ struct tokenizer_t {
   }
 
   bool isVectorType() {
-    return peek() == CSLT;
+    return peek() == VECTOR_TYPE;
   }
 
 private:
@@ -301,8 +301,7 @@ static Type& parse_scalar_type() {
 }
 
 static Type& parse_vector_type() {
-  tokenizer.ensure(CSLT);
-  tokenizer.ensure(NUM);
+  tokenizer.ensure(VECTOR_TYPE);
   unsigned len = yylval.num;
 
   auto t = *tokenizer;
@@ -325,16 +324,6 @@ static Type& parse_type(bool optional = true) {
   if (tokenizer.isVectorType()) {
     return parse_vector_type();
   }
-  // vector type
-  /*
-  if (tokenizer.consumeIf(CSLT)) {
-    auto t = tokenizer.peek();
-    std::cout<<t;
-    tokenizer.unget(CSLT);
-    std::cout<<t;
-    if (t == NUM)
-      return parse_vector_type();
-      }*/
 
   if (optional)
     return get_sym_type();

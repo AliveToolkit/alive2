@@ -31,12 +31,12 @@ Name: add zero
 
 
 Name: add constants
-%r = add <2 x i8> <i8 0, i8 0>, <2 x i8> <i8 0, i8 1>
+%r = add <2 x i8> <i8 0, i8 0>, <i8 0, i8 1>
   =>
-%r = add <2 x i8> <i8 0, i8 1>, <2 x i8> <i8 0, i8 0>
+%r = add <2 x i8> <i8 0, i8 1>, <i8 0, i8 0>
 
 
 Name: add undef
-%r = add <2 x i8> <i8 0, i8 0>, <2 x i8> <i8 0, i8 undef>
+%r = add <2 x i8> <i8 0, i8 0>, <i8 0, i8 undef>
   =>
-%r = add <2 x i8> <i8 0, i8 1>, <2 x i8> <i8 0, i8 42>
+%r = add <2 x i8> <i8 0, i8 1>, <i8 0, i8 42>
