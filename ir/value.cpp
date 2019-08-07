@@ -126,11 +126,18 @@ VectorValue::VectorValue(Type &type, std::vector<Value *> vals)
   : Value(type, genVectorName(vals)), vals(std::move(vals)) {}
 
 void VectorValue::print(ostream &os) const {
-  os << "TODO";
+  UNREACHABLE();
 }
 
 StateValue VectorValue::toSMT(State &s) const {
-  return { expr() , true };
+  expr val;
+
+  for (unsigned idx = 0; idx < vals.size() ; idx ++) {
+    auto [v, vs] = vals[idx]->toSMT(s);
+    val = idx == 0 ? v : val.concat(v);
+  }
+  // TODO
+  return { move(val), true };
 }
 
 }

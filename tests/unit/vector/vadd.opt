@@ -6,6 +6,12 @@ Name: add identity
 %r = add <2 x i8> %x, %y
 
 
+Name: add associvity
+%r = add <2 x i8> %x, %y
+  =>
+%r = add <2 x i8> %y, %x
+
+
 Name: sub identity
 %r = sub <2 x i8> %x, %y
   =>
@@ -16,3 +22,21 @@ Name: add identity, with constant
 %r = add <2 x i8> <i8 3, i8 5>, %y
   =>
 %r = add <2 x i8> <i8 3, i8 5>, %y
+
+
+Name: add zero
+%r = add <2 x i8> <i8 0, i8 0>, %y
+  =>
+%r = %y
+
+
+Name: add constants
+%r = add <2 x i8> <i8 0, i8 0>, <2 x i8> <i8 0, i8 1>
+  =>
+%r = add <2 x i8> <i8 0, i8 1>, <2 x i8> <i8 0, i8 0>
+
+
+Name: add undef
+%r = add <2 x i8> <i8 0, i8 0>, <2 x i8> <i8 0, i8 undef>
+  =>
+%r = add <2 x i8> <i8 0, i8 1>, <2 x i8> <i8 0, i8 42>
