@@ -43,15 +43,6 @@ public:
   smt::expr getTypeConstraints() const override;
 };
 
-class VectorConst final : public Constant {
-  std::vector<Value *> vals;
-public:
-  VectorConst(Type &type, std::vector<Value *> vals);
-
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
-  smt::expr getTypeConstraints() const override;
-};
-
 class ConstantInput final : public Constant {
 public:
   ConstantInput(Type &type, std::string &&name)

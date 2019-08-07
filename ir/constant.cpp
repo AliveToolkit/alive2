@@ -65,19 +65,6 @@ pair<expr, expr> FloatConst::toSMT_cnst() const {
   return { move(e), true };
 }
 
-VectorConst::VectorConst(Type &type, std::vector<Value *> vals)
- : Constant(type, "abc"), vals(std::move(vals)) {}
-
-expr VectorConst::getTypeConstraints() const {
-  // TODO
-  return true;
-}
-
-pair<expr, expr> VectorConst::toSMT_cnst() const {
-  // TODO
-  return { expr() , true };
-}
-
 pair<expr, expr> ConstantInput::toSMT_cnst() const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }

@@ -110,4 +110,15 @@ expr Input::getTyVar() const {
   return expr::mkVar(tyname.c_str(), 2);
 }
 
+VectorValue::VectorValue(Type &type, std::vector<Value *> vals)
+ : Value(type, "def"), vals(std::move(vals)) {}
+
+void VectorValue::print(ostream &os) const {
+  os << "TODO";
+}
+
+StateValue VectorValue::toSMT(State &s) const {
+  return { expr() , true };
+}
+
 }

@@ -388,7 +388,7 @@ static Value& parse_vector_constant(Type &type) {
 
   tokenizer.ensure(CSGT);
 
-  auto c = make_unique<VectorConst>(type, vals);
+  auto c = make_unique<VectorValue>(type, vals);
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;

@@ -83,4 +83,12 @@ public:
   smt::expr getTyVar() const;
 };
 
+class VectorValue final : public Value {
+  std::vector<Value *> vals;
+public:
+  VectorValue(Type &type, std::vector<Value *> vals);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+};
+
 }
