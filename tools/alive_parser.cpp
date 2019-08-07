@@ -320,14 +320,27 @@ static Type& parse_vector_type() {
 static Type& parse_type(bool optional = true) {
   if (tokenizer.isScalarType()) {
     return parse_scalar_type();
-  } else if (tokenizer.isVectorType()) {
-    return parse_vector_type();
-  } else {
-    if (optional)
-      return get_sym_type();
-    else
-      error("Expecting a type", tokenizer.peek());
   }
+
+  if (tokenizer.isVectorType()) {
+    return parse_vector_type();
+  }
+  // vector type
+  /*
+  if (tokenizer.consumeIf(CSLT)) {
+    auto t = tokenizer.peek();
+    std::cout<<t;
+    tokenizer.unget(CSLT);
+    std::cout<<t;
+    if (t == NUM)
+      return parse_vector_type();
+      }*/
+
+  if (optional)
+    return get_sym_type();
+  else
+    error("Expecting a type", tokenizer.peek());
+
   UNREACHABLE();
 }
 
@@ -375,16 +388,12 @@ static Value& parse_const_expr(Type &type) {
 
 static Value& parse_vector_constant(Type &type) {
   std::vector<Value*> vals;
-  Type &elemTy = parse_scalar_type();
-  Value *elem = &parse_operand(elemTy);
-  vals.emplace_back(elem);
-
-  while(tokenizer.consumeIf(COMMA)) {
+  do {
     //    auto t = tokenizer.peek();
-    parse_scalar_type();
-    elem = &parse_operand(elemTy);
+    Type &elemTy = parse_scalar_type();
+    Value *elem = &parse_operand(elemTy);
     vals.emplace_back(elem);
-  }
+  } while (tokenizer.consumeIf(COMMA));
 
   tokenizer.ensure(CSGT);
 
