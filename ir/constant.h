@@ -44,10 +44,9 @@ public:
 };
 
 class VectorConst final : public Constant {
-  std::vector<Value*> vals;
+  std::vector<Value *> vals;
 public:
-  VectorConst(Type &type);
-  void addElement(Value &c) {vals.emplace_back(&c);}
+  VectorConst(Type &type, std::vector<Value *> vals);
 
   virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
   smt::expr getTypeConstraints() const override;

@@ -374,22 +374,23 @@ static Value& parse_const_expr(Type &type) {
 }
 
 static Value& parse_vector_constant(Type &type) {
+  std::vector<Value*> vals;
   Type &firstTy = parse_scalar_type();
-  Value &firstElem = parse_operand(type);
-  auto c = make_unique<VectorConst>(type);
-  auto ret = c.get();
-  c->addElement(firstElem);
+  Value *elem = &parse_operand(type);
+  vals.emplace_back(elem);
 
   while(tokenizer.consumeIf(COMMA)) {
     //    auto t = tokenizer.peek();
     parse_scalar_type();
-    Value &elem = parse_operand(type);
-    c->addElement(elem);
+    elem = &parse_operand(type);
+    vals.emplace_back(elem);
   }
 
   tokenizer.ensure(CSGT);
-  fn->addConstant(move(c));
 
+  auto c = make_unique<VectorConst>(type, vals);
+  fn->addConstant(move(c));
+  auto ret = c.get();
   return *ret;
 }
 
