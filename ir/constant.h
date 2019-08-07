@@ -43,6 +43,7 @@ public:
   smt::expr getTypeConstraints() const override;
 };
 
+
 class ConstantInput final : public Constant {
 public:
   ConstantInput(Type &type, std::string &&name)

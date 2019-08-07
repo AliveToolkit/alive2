@@ -6,7 +6,7 @@ Name: add identity
 %r = add <2 x i4> %x, %y
 
 
-Name: add associvity
+Name: add commutativity
 %r = add <2 x i4> %x, %y
   =>
 %r = add <2 x i4> %y, %x

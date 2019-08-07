@@ -65,6 +65,7 @@ pair<expr, expr> FloatConst::toSMT_cnst() const {
   return { move(e), true };
 }
 
+
 pair<expr, expr> ConstantInput::toSMT_cnst() const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }
