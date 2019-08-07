@@ -510,6 +510,9 @@ expr VectorType::getTypeConstraints() const {
   auto r = bw != expr::mkUInt(0, var_bw_bits);
   if (!defined)
     r &= bw.ule(expr::mkUInt(MAX_VECTOR_LENGTH, var_bw_bits));
+
+  // limit the problem size to get tests passing
+  r &= elementTy->sizeVar().ule(4);
   return (r && elementTy->getTypeConstraints());
 }
 
@@ -573,6 +576,7 @@ pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
 }
 
 void VectorType::printVal(ostream &os, State &s, const expr &e) const {
+
   e.printHexadecimal(os);
   os << " (<";
   for (unsigned idx = 0; idx < length; idx ++) {

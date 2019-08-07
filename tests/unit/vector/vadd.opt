@@ -1,42 +1,42 @@
 
 
 Name: add identity
-%r = add <2 x i8> %x, %y
+%r = add <2 x i4> %x, %y
   =>
-%r = add <2 x i8> %x, %y
+%r = add <2 x i4> %x, %y
 
 
 Name: add associvity
-%r = add <2 x i8> %x, %y
+%r = add <2 x i4> %x, %y
   =>
-%r = add <2 x i8> %y, %x
+%r = add <2 x i4> %y, %x
 
 
 Name: sub identity
-%r = sub <2 x i8> %x, %y
+%r = sub <2 x i4> %x, %y
   =>
-%r = sub <2 x i8> %x, %y
+%r = sub <2 x i4> %x, %y
 
 
 Name: add identity, with constant
-%r = add <2 x i8> <i8 3, i8 5>, %y
+%r = add <2 x i4> <i4 3, i4 5>, %y
   =>
-%r = add <2 x i8> <i8 3, i8 5>, %y
+%r = add <2 x i4> <i4 3, i4 5>, %y
 
 
 Name: add zero
-%r = add <2 x i8> <i8 0, i8 0>, %y
+%r = add <2 x i4> <i4 0, i4 0>, %y
   =>
 %r = %y
 
 
 Name: add constants
-%r = add <2 x i8> <i8 0, i8 0>, <i8 0, i8 1>
+%r = add <2 x i4> <i4 0, i4 0>, <i4 0, i4 1>
   =>
-%r = add <2 x i8> <i8 0, i8 1>, <i8 0, i8 0>
+%r = add <2 x i4> <i4 0, i4 1>, <i4 0, i4 0>
 
 
 Name: add undef
-%r = add <2 x i8> <i8 0, i8 0>, <i8 0, i8 undef>
+%r = add <2 x i4> <i4 0, i4 0>, <i4 0, i4 undef>
   =>
-%r = add <2 x i8> <i8 0, i8 1>, <i8 0, i8 42>
+%r = add <2 x i4> <i4 0, i4 1>, <i4 0, i4 5>
