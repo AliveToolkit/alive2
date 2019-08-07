@@ -5,6 +5,7 @@
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <sstream>
 
 using namespace smt;
 using namespace std;
@@ -110,8 +111,19 @@ expr Input::getTyVar() const {
   return expr::mkVar(tyname.c_str(), 2);
 }
 
+static string genVectorName (std::vector<Value *> vals) {
+  ostringstream ss;
+  ss << "<";
+  for (unsigned idx = 0 ; idx < vals.size(); idx++) {
+    ss << *vals[idx];
+    if (idx != vals.size() -1)
+      ss << ", ";
+  }
+  ss << ">";
+  return ss.str();
+}
 VectorValue::VectorValue(Type &type, std::vector<Value *> vals)
- : Value(type, "def"), vals(std::move(vals)) {}
+  : Value(type, genVectorName(vals)), vals(std::move(vals)) {}
 
 void VectorValue::print(ostream &os) const {
   os << "TODO";

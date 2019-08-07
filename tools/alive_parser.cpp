@@ -375,14 +375,14 @@ static Value& parse_const_expr(Type &type) {
 
 static Value& parse_vector_constant(Type &type) {
   std::vector<Value*> vals;
-  Type &firstTy = parse_scalar_type();
-  Value *elem = &parse_operand(type);
+  Type &elemTy = parse_scalar_type();
+  Value *elem = &parse_operand(elemTy);
   vals.emplace_back(elem);
 
   while(tokenizer.consumeIf(COMMA)) {
     //    auto t = tokenizer.peek();
     parse_scalar_type();
-    elem = &parse_operand(type);
+    elem = &parse_operand(elemTy);
     vals.emplace_back(elem);
   }
 
