@@ -1153,7 +1153,7 @@ expr expr::seq_append(const expr &rhs) const {
 expr expr::seq_at(unsigned idx) const {
   C();
   auto sort = Z3_mk_int_sort(ctx());
-  return Z3_mk_seq_at(ctx(), ast(), mkUInt(idx, sort)());
+  return Z3_mk_seq_nth(ctx(), ast(), mkUInt(idx, sort)());
 }
 
 expr expr::toBVBool() const {
