@@ -678,7 +678,7 @@ pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
   for (auto c : children) {
     string c_name = string(name) + "#" + to_string(num);
     auto [v, vs] = c->mkInput(s, c_name.c_str());
-    val = num == 0 ? v : val.concat(v);
+    val = num == 0 ? v.toUnitSeq() : val.seq_append(v);
     vars.insert(vars.end(), vs.begin(), vs.end());
     ++num;
   }
