@@ -119,6 +119,18 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+class ExtractElement final : public Instr {
+  Value &vec;
+  Value &idx;
+public:
+  ExtractElement(Type &type, std::string &&name, Value &vec, Value &idx)
+    : Instr(type, std::move(name)), vec(vec), idx(idx){}
+  void addIdx(unsigned idx);
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
 
 class ExtractValue final : public Instr {
   Value &val;

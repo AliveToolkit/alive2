@@ -1144,6 +1144,18 @@ expr expr::extract(unsigned high, unsigned low) const {
   return Z3_mk_extract(ctx(), high, low, ast());
 }
 
+expr expr::seq_append(const expr &rhs) const {
+  C();
+  Z3_ast _args[2] = { ast(), rhs.toUnitSeq()() };
+  return Z3_mk_seq_concat(ctx(), 2, _args);
+}
+
+expr expr::seq_at(unsigned idx) const {
+  C();
+  auto sort = Z3_mk_int_sort(ctx());
+  return Z3_mk_seq_at(ctx(), ast(), mkUInt(idx, sort)());
+}
+
 expr expr::toBVBool() const {
   auto sort = mkBVSort(1);
   return mkIf(*this, mkUInt(1, sort), mkUInt(0, sort));
@@ -1162,6 +1174,11 @@ expr expr::float2Real() const {
 expr expr::BV2float(const expr &type) const {
   C(type);
   return Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort());
+}
+
+expr expr::toUnitSeq() const {
+  C();
+  return Z3_mk_seq_unit(ctx(), ast());
 }
 
 expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {

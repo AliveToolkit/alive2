@@ -134,7 +134,7 @@ StateValue VectorValue::toSMT(State &s) const {
 
   for (unsigned idx = 0; idx < vals.size() ; idx ++) {
     auto [v, vs] = vals[idx]->toSMT(s);
-    val = idx == 0 ? v : val.concat(v);
+    val = idx == 0 ? v.toUnitSeq() : val.seq_append(v);
   }
   // TODO
   return { move(val), true };

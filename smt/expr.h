@@ -224,11 +224,14 @@ public:
 
   expr concat(const expr &rhs) const;
   expr extract(unsigned high, unsigned low) const;
+  expr seq_append(const expr &rhs) const;
+  expr seq_at(unsigned idx) const;
 
   expr toBVBool() const;
   expr float2BV() const;
   expr float2Real() const;
   expr BV2float(const expr &type) const;
+  expr toUnitSeq() const;
 
   // we don't expose SMT expr types, so range must be passed as a dummy value
   // of the desired type

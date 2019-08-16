@@ -219,6 +219,7 @@ re2c:yyfill:check = 0;
 "ctlz" { return CTLZ; }
 "ctpop" { return CTPOP; }
 "extractvalue" { return EXTRACTVALUE; }
+"extractelement" { return EXTRACTELEMENT; }
 "sadd_overflow" { return SADD_OVERFLOW; }
 "uadd_overflow" { return UADD_OVERFLOW; }
 "ssub_overflow" { return SSUB_OVERFLOW; }

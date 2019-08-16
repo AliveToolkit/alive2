@@ -652,6 +652,16 @@ static unique_ptr<Instr> parse_select(string_view name) {
   return make_unique<Select>(aty, string(name), cond, a, b);
 }
 
+static unique_ptr<Instr> parse_extractelement(string_view name) {
+  auto &vty= parse_vector_type();
+  auto &vec = parse_operand(vty);
+  parse_comma();
+  auto &ity = parse_scalar_type();
+  auto &idx = parse_operand(ity);
+  auto elemty = vty.getAsVectorType()->getElementTy();
+  return make_unique<ExtractElement>(*elemty, string(name), vec, idx);
+}
+
 static unique_ptr<Instr> parse_extractvalue(string_view name) {
   auto &type = parse_type();
   auto &val = parse_operand(type);
@@ -822,6 +832,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_conversionop(name, t);
   case SELECT:
     return parse_select(name);
+  case EXTRACTELEMENT:
+    return parse_extractelement(name);
   case EXTRACTVALUE:
     return parse_extractvalue(name);
   case ICMP:

@@ -148,8 +148,8 @@ StateValue BinOp::toSMT(State &s) const {
   unsigned num_elements = getType().isVectorType() ? vty->len() : 1;
 
   for (unsigned idx = 0; idx < num_elements; idx ++) {
-    auto a_i = getType().isVectorType() ? vty->extract(a, idx) : a;
-    auto b_i = getType().isVectorType() ? vty->extract(b, idx) : b;
+    auto a_i = getType().isVectorType() ? vty->at(a, idx) : a;
+    auto b_i = getType().isVectorType() ? vty->at(b, idx) : b;
     expr val_i;
 
     switch (op) {
@@ -322,7 +322,7 @@ StateValue BinOp::toSMT(State &s) const {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       break;
     }
-    val = idx == 0 ? val_i : val.concat(val_i);
+    val = idx == 0 ? val_i.toUnitSeq() : val.seq_append(val_i);
   }
   return { move(val), move(not_poison) };
 }
@@ -617,7 +617,7 @@ void ExtractValue::print(ostream &os) const {
 }
 
 StateValue ExtractValue::toSMT(State &s) const {
-  auto [v, p] = s[val];
+  /*  auto [v, p] = s[val];
 
   // TODO: add support for array type
   Type *type = &val.getType();
@@ -625,9 +625,10 @@ StateValue ExtractValue::toSMT(State &s) const {
     auto st = type->getAsStructType();
     v = st->extract(v, idx);
     type = &st->getChild(idx);
-  }
+    }*/
+  //TODO
 
-  return { move(v), move(p) };
+  return { true, true };
 }
 
 expr ExtractValue::getTypeConstraints(const Function &f) const {
@@ -657,6 +658,32 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
   for (auto idx : idxs) {
     ret->addIdx(idx);
   }
+  return ret;
+}
+
+
+void ExtractElement::print(ostream &os) const {
+  os << "TODO";
+  return;
+}
+
+StateValue ExtractElement::toSMT(State &s) const {
+  /*  auto [v, p1] = s[vec];
+  auto [i, p2] = s[idx];
+
+  auto vty = vec.getType().getAsVectorType();
+  v = v.extract(i, vty->getElementTy()->bits());*/
+  // TODO
+  return { true, true };
+}
+
+expr ExtractElement::getTypeConstraints(const Function &f) const {
+  // TODO
+  return true;
+}
+
+unique_ptr<Instr> ExtractElement::dup(const string &suffix) const {
+  auto ret = make_unique<ExtractElement>(getType(), getName() + suffix, vec, idx);
   return ret;
 }
 

@@ -13,7 +13,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
-static constexpr unsigned MAX_VECTOR_LENGTH = 2;
+static constexpr unsigned MAX_VECTOR_LENGTH = 3;
 
 
 namespace IR {
@@ -569,7 +569,7 @@ pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
   for (unsigned idx = 0; idx < length; idx ++) {
     string c_name = string(name) + "#" + to_string(idx);
     auto [v, vs] = elementTy->mkInput(s, c_name.c_str());
-    val = idx == 0 ? v : val.concat(v);
+    val = idx == 0 ? v.toUnitSeq() : val.seq_append(v);
     vars.insert(vars.end(), vs.begin(), vs.end());
   }
   return { move(val), move(vars) };
@@ -582,7 +582,7 @@ void VectorType::printVal(ostream &os, State &s, const expr &e) const {
   for (unsigned idx = 0; idx < length; idx ++) {
     if (idx != 0)
       os << ", ";
-    elementTy->printVal(os, s, extract(e, idx));
+    elementTy->printVal(os, s, at(e, idx));
   }
   os << ">)";
 }
@@ -591,13 +591,10 @@ void VectorType::print(ostream &os) const {
   os << "<" << length << " x " <<  *elementTy << ">";
 }
 
-expr VectorType::extract(const expr &vector_val, unsigned index) const {
+expr VectorType::at(const expr &vector_val, unsigned index) const {
   assert(index < length);
-  unsigned offset = (index + 1) * elementTy->bits();
-  unsigned low = vector_val.bits() - offset;
-  return vector_val.extract(low+elementTy->bits()-1, low);
+  return vector_val.seq_at(index);
 }
-
 
 unsigned StructType::bits() const {
   unsigned res = 0;
