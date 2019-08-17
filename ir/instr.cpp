@@ -726,7 +726,7 @@ StateValue FnCall::toSMT(State &s) const {
   // create a new variable that can take any value if function is poison
   expr val = expr::mkUF(fnName.c_str(), value_args, getType().getDummyValue());
   if (!all_args_np.isTrue()) {
-    auto var_name = fnName + '#' + to_string(s.nextFnCallId());
+    auto var_name = fnName + '#' + fresh_id();
     auto var = expr::mkVar(var_name.c_str(), getType().getDummyValue());
     s.addQuantVar(var);
     val = expr::mkIf(all_args_np, val, var);

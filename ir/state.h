@@ -47,9 +47,6 @@ private:
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
-  // fn call id to be used when an argument is poison
-  unsigned next_fn_call_id = 0;
-
   // temp state
   DomainTy domain;
   Memory memory;
@@ -64,8 +61,6 @@ private:
 
 public:
   State(const Function &f, bool source);
-
-  void syncWithSrc(const State &src);
 
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
@@ -84,8 +79,6 @@ public:
   void addPre(smt::expr &&cond) { precondition &= std::move(cond); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
-
-  unsigned nextFnCallId() { return next_fn_call_id++; }
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(const smt::expr &var);
