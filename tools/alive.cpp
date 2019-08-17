@@ -18,6 +18,29 @@ using namespace util;
 using namespace std;
 
 
+static bool add_return(Function &f) {
+  if (f.hasReturn())
+    return true;
+
+  auto &bbs = f.getBBs();
+  if (bbs.size() != 1) {
+    cerr << "-root-only only supports single BB transforms\n";
+    return false;
+  }
+
+  auto bb = bbs[0];
+  if (bb->empty()) {
+    cerr << "-root-only doesn't support empty BBs\n";
+    return false;
+  }
+
+  auto &type = get_sym_type();
+  bb->addInstr(make_unique<Return>(type, bb->back()));
+  f.setType(type);
+  return true;
+}
+
+
 static void show_help() {
   cerr <<
     "Usage: alive2 <options> <files.opt>\n"
@@ -38,7 +61,7 @@ static void show_help() {
 int main(int argc, char **argv) {
   bool verbose = false;
   bool show_smt_stats = false;
-  bool check_each_var = true;
+  bool root_only = false;
 
   int argc_i = 1;
   for (; argc_i < argc; ++argc_i) {
@@ -47,8 +70,7 @@ int main(int argc, char **argv) {
 
     string_view arg(argv[argc_i]);
     if (arg == "-root-only")
-      // FIXME: add a return instruction to each transform as needed
-      check_each_var = false;
+      root_only = true;
     else if (arg == "-v")
       verbose = true;
     else if (arg == "-smt-stats")
@@ -100,10 +122,16 @@ int main(int argc, char **argv) {
     try {
       for (auto &t : parse(*file_reader(argv[argc_i], PARSER_READ_AHEAD))) {
         smt_init.reset();
+
+        if (root_only && (!add_return(t.src) || !add_return(t.tgt))) {
+          ++num_errors;
+          continue;
+        }
+
         t.print(cout, print_opts);
         cout << '\n';
 
-        TransformVerify tv(t, check_each_var);
+        TransformVerify tv(t, !root_only);
         auto types = tv.getTypings();
         if (!types) {
           cerr << "Doesn't type check!\n";

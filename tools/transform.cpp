@@ -259,6 +259,11 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
       tgt_instrs.emplace(i.getName(), &i);
     }
   }
+
+  if (!check_each_var) {
+    assert(t.src.hasReturn());
+    assert(t.tgt.hasReturn());
+  }
 }
 
 Errors TransformVerify::verify() const {

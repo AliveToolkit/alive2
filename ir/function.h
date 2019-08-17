@@ -42,6 +42,8 @@ public:
   }
   Instr& back() { return *m_instrs.back(); }
 
+  bool empty() const { return m_instrs.empty(); }
+
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
@@ -94,6 +96,8 @@ public:
   util::const_strip_unique_ptr<decltype(inputs)> getInputs() const {
     return inputs;
   }
+
+  bool hasReturn() const;
 
   auto& getBBs() { return BB_order; }
   const auto& getBBs() const { return BB_order; }

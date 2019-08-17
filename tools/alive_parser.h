@@ -8,9 +8,12 @@
 #include <string_view>
 #include <vector>
 
+namespace IR { class Type; }
+
 namespace tools {
 
 std::vector<Transform> parse(std::string_view buf);
+IR::Type& get_sym_type();
 
 struct parser_initializer {
   parser_initializer();

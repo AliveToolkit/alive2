@@ -98,6 +98,14 @@ void Function::addInput(unique_ptr<Input> &&i) {
   inputs.emplace_back(move(i));
 }
 
+bool Function::hasReturn() const {
+  for (auto &i : instrs()) {
+    if (dynamic_cast<const Return *>(&i))
+      return true;
+  }
+  return false;
+}
+
 Function::instr_iterator::
 instr_iterator(vector<BasicBlock*>::const_iterator &&BBI,
                vector<BasicBlock*>::const_iterator &&BBE)
