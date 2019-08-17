@@ -793,10 +793,11 @@ static StateValue build_icmp_chain(const expr &var,
 }
 
 StateValue ICmp::toSMT(State &s) const {
-  auto &[av, ap] = s[a];
-  auto &[bv, bp] = s[b];
+  auto &a_eval = s[a];
+  auto &b_eval = s[b];
+  auto &av = a_eval.value, &bv = b_eval.value;
   function<StateValue(Cond)> fn;
-  expr val, non_poison = ap && bp;
+  expr val, non_poison = a_eval.non_poison && b_eval.non_poison;
 
   if (a.getType().isPtrType()) {
     Pointer lhs(s.getMemory(), av);
