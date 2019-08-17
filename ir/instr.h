@@ -164,8 +164,6 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  void fixupTypes(const smt::Model &m) override;
-  smt::expr eqType(const Instr &i) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 

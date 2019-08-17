@@ -7,6 +7,7 @@
 #include "smt/expr.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include <functional>
 
 using namespace smt;
 using namespace std;
@@ -341,8 +342,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case Ctlz:
     instrconstr = getType().enforceIntOrVectorType() &&
                   getType() == lhs.getType() &&
-                  rhs.getType().enforceIntType() &&
-                  rhs.getType().sizeVar() == 1u;
+                  rhs.getType().enforceIntType(1);
     break;
   case FAdd:
   case FSub:
@@ -583,8 +583,7 @@ StateValue Select::toSMT(State &s) const {
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
-  return cond.getType().enforceIntType() &&
-         cond.getType().sizeVar() == 1u &&
+  return cond.getType().enforceIntType(1) &&
          Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
          getType() == a.getType() &&
@@ -754,7 +753,7 @@ unique_ptr<Instr> FnCall::dup(const string &suffix) const {
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
   : Instr(type, move(name)), a(a), b(b), cond(cond), defined(cond != Any) {
   if (!defined)
-    cond_name = getName() + "_cond" + fresh_id();
+    cond_name = getName() + "_cond";
 }
 
 expr ICmp::cond_var() const {
@@ -779,77 +778,77 @@ void ICmp::print(ostream &os) const {
   os << getName() << " = icmp " << condtxt << a << ", " << b.getName();
 }
 
+static StateValue build_icmp_chain(const expr &var,
+                                   function<StateValue(ICmp::Cond)> &fn,
+                                   ICmp::Cond cond = ICmp::Any,
+                                   StateValue last = StateValue()) {
+  auto old_cond = cond;
+  cond = ICmp::Cond(cond - 1);
+
+  if (old_cond == ICmp::Any)
+    return build_icmp_chain(var, fn, cond, fn(cond));
+
+  auto e = StateValue::mkIf(var == cond, fn(cond), last);
+  return cond == 0 ? e : build_icmp_chain(var, fn, cond, move(e));
+}
+
 StateValue ICmp::toSMT(State &s) const {
   auto &[av, ap] = s[a];
   auto &[bv, bp] = s[b];
+  function<StateValue(Cond)> fn;
   expr val, non_poison = ap && bp;
 
   if (a.getType().isPtrType()) {
     Pointer lhs(s.getMemory(), av);
     Pointer rhs(s.getMemory(), bv);
-    StateValue cmp;
 
-    switch (cond) {
-    case EQ:  cmp = { lhs == rhs, true }; break;
-    case NE:  cmp = { lhs != rhs, true }; break;
-    case SLE: cmp = lhs.sle(rhs); break;
-    case SLT: cmp = lhs.slt(rhs); break;
-    case SGE: cmp = lhs.sge(rhs); break;
-    case SGT: cmp = lhs.sgt(rhs); break;
-    case ULE: cmp = lhs.ule(rhs); break;
-    case ULT: cmp = lhs.ult(rhs); break;
-    case UGE: cmp = lhs.uge(rhs); break;
-    case UGT: cmp = lhs.ugt(rhs); break;
-    case Any:
+    fn = [&](Cond cond) {
+      switch (cond) {
+      case EQ:  return StateValue(lhs == rhs, true);
+      case NE:  return StateValue(lhs != rhs, true);
+      case SLE: return lhs.sle(rhs);
+      case SLT: return lhs.slt(rhs);
+      case SGE: return lhs.sge(rhs);
+      case SGT: return lhs.sgt(rhs);
+      case ULE: return lhs.ule(rhs);
+      case ULT: return lhs.ult(rhs);
+      case UGE: return lhs.uge(rhs);
+      case UGT: return lhs.ugt(rhs);
+      case Any:
+        UNREACHABLE();
+      }
       UNREACHABLE();
-    }
-    val = move(cmp.value);
-    non_poison &= move(cmp.non_poison);
+    };
 
   } else {  // integer comparison
-    switch (cond) {
-    case EQ:  val = av == bv; break;
-    case NE:  val = av != bv; break;
-    case SLE: val = av.sle(bv); break;
-    case SLT: val = av.slt(bv); break;
-    case SGE: val = av.sge(bv); break;
-    case SGT: val = av.sgt(bv); break;
-    case ULE: val = av.ule(bv); break;
-    case ULT: val = av.ult(bv); break;
-    case UGE: val = av.uge(bv); break;
-    case UGT: val = av.ugt(bv); break;
-    case Any:
+    fn = [&](Cond cond) {
+      switch (cond) {
+      case EQ:  return StateValue(av == bv, true);
+      case NE:  return StateValue(av != bv, true);
+      case SLE: return StateValue(av.sle(bv), true);
+      case SLT: return StateValue(av.slt(bv), true);
+      case SGE: return StateValue(av.sge(bv), true);
+      case SGT: return StateValue(av.sgt(bv), true);
+      case ULE: return StateValue(av.ule(bv), true);
+      case ULT: return StateValue(av.ult(bv), true);
+      case UGE: return StateValue(av.uge(bv), true);
+      case UGT: return StateValue(av.ugt(bv), true);
+      case Any:
+        UNREACHABLE();
+      }
       UNREACHABLE();
-    }
+    };
   }
-  return { val.toBVBool(), move(non_poison) };
+
+  StateValue cmp = cond != Any ? fn(cond) : build_icmp_chain(cond_var(), fn);
+  return { cmp.value.toBVBool(), move(non_poison) && move(cmp.non_poison) };
 }
 
 expr ICmp::getTypeConstraints(const Function &f) const {
-  expr e = Value::getTypeConstraints() &&
-           getType().enforceIntType() &&
-           getType().sizeVar() == 1u &&
-           a.getType().enforceIntOrPtrOrVectorType() &&
-           a.getType() == b.getType();
-  if (!defined)
-    e &= cond_var().ule(9);
-  return e;
-}
-
-void ICmp::fixupTypes(const Model &m) {
-  Value::fixupTypes(m);
-  if (!defined)
-    cond = (Cond)m.getUInt(cond_var());
-}
-
-expr ICmp::eqType(const Instr &i) const {
-  expr eq = Instr::eqType(i);
-  if (auto rhs = dynamic_cast<const ICmp*>(&i)) {
-    if (!defined || !rhs->defined) {
-      eq &= cond_var() == rhs->cond_var();
-    }
-  }
-  return eq;
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType(1) &&
+         a.getType().enforceIntOrPtrOrVectorType() &&
+         a.getType() == b.getType();
 }
 
 unique_ptr<Instr> ICmp::dup(const string &suffix) const {
@@ -906,8 +905,7 @@ StateValue FCmp::toSMT(State &s) const {
 
 expr FCmp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType().enforceIntType() &&
-         getType().sizeVar() == 1u &&
+         getType().enforceIntType(1) &&
          a.getType().enforceFloatType() &&
          a.getType() == b.getType();
 }
@@ -1044,8 +1042,7 @@ StateValue Branch::toSMT(State &s) const {
 }
 
 expr Branch::getTypeConstraints(const Function &f) const {
-  return cond->getType().enforceIntType() &&
-         cond->getType().sizeVar() == 1u;
+  return cond->getType().enforceIntType(1);
 }
 
 unique_ptr<Instr> Branch::dup(const string &suffix) const {
