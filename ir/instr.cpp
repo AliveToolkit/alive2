@@ -857,9 +857,6 @@ unique_ptr<Instr> ICmp::dup(const string &suffix) const {
 }
 
 
-FCmp::FCmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
-  : Instr(type, move(name)), a(a), b(b), cond(cond) {}
-
 void FCmp::print(ostream &os) const {
   const char *condtxt = nullptr;
   switch (cond) {

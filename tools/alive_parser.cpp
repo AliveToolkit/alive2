@@ -639,7 +639,7 @@ static unique_ptr<Instr> parse_icmp(string_view name) {
 
 static unique_ptr<Instr> parse_fcmp(string_view name) {
   // fcmp cond ty %a, &b
-  FCmp::Cond cond;
+  FCmp::Cond cond = FCmp::OEQ;
   auto cond_t = *tokenizer;
   switch (cond_t) {
   case OEQ:   cond = FCmp::OEQ; break;
@@ -666,18 +666,16 @@ static unique_ptr<Instr> parse_fcmp(string_view name) {
   auto &a = parse_operand(ty);
   parse_comma();
   auto &b = parse_operand(ty);
+  auto &bool_ty = *int_types[1].get();
 
   switch (cond_t) {
   case TRUE:
-    return make_unique<UnaryOp>(*int_types[1].get(), string(name),
-                                get_constant(1, *int_types[1].get()),
-                                UnaryOp::Copy);
   case FALSE:
-    return make_unique<UnaryOp>(*int_types[1].get(), string(name),
-                                get_constant(0, *int_types[1].get()),
+    return make_unique<UnaryOp>(bool_ty, string(name),
+                                get_constant(cond_t == TRUE, bool_ty),
                                 UnaryOp::Copy);
   default:
-    return make_unique<FCmp>(*int_types[1].get(), string(name), cond, a, b);
+    return make_unique<FCmp>(bool_ty, string(name), cond, a, b);
   }
   UNREACHABLE();
 }

@@ -178,7 +178,9 @@ private:
   Cond cond;
 
 public:
-  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
+  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b)
+    : Instr(type, move(name)), a(a), b(b), cond(cond) {}
+
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
