@@ -37,8 +37,10 @@ static vector<unique_ptr<IntType>> int_types;
 static FloatType half_type("half", FloatType::Half);
 static FloatType float_type("float", FloatType::Float);
 static FloatType double_type("double", FloatType::Double);
-static unordered_map<string, Value*> identifiers;
+static unordered_map<string, Value*> identifiers, identifiers_src;
 static Function *fn;
+static BasicBlock *bb;
+static bool parse_src;
 
 static Value& get_constant(uint64_t n, Type &t) {
   auto c = make_unique<IntConst>(t, n);
@@ -367,10 +369,31 @@ static Value& parse_operand(Type &type) {
         I != identifiers.end())
       return *I->second;
 
-    auto input = make_unique<Input>(type, string(id));
-    auto ret = input.get();
-    fn->addInput(move(input));
+    if (parse_src) {
+      auto input = make_unique<Input>(type, string(id));
+      auto ret = input.get();
+      fn->addInput(move(input));
+      identifiers.emplace(move(id), ret);
+      return *ret;
+    }
+
+    // in tgt, we need to either copy instruction(s) from src, or it's an error
+    auto I_src = identifiers_src.find(id);
+    if (I_src == identifiers_src.end())
+      error("Cannot declare an input variable in the target: " + id);
+
+    auto val_src = I_src->second;
+    assert(!dynamic_cast<Input*>(val_src));
+
+    auto instr_src = dynamic_cast<Instr*>(val_src);
+    assert(instr_src);
+
+    // TODO: add support for recursive copy
+    auto tgt_instr = instr_src->dup("");
+    // TODO: rauw operands with this fn own values
+    auto ret = tgt_instr.get();
     identifiers.emplace(move(id), ret);
+    bb->addInstr(move(tgt_instr));
     return *ret;
   }
   case CONSTANT:
@@ -796,13 +819,13 @@ static unique_ptr<Instr> parse_return() {
 
 static void parse_fn(Function &f) {
   fn = &f;
-  identifiers.clear();
-  BasicBlock *bb = &f.getBB("");
+  bb = &f.getBB("");
   bool has_return = false;
 
   while (true) {
     switch (auto t = *tokenizer) {
     case REGISTER: {
+      // FIXME: add error checking for repeated names
       string name(yylval.str);
       auto i = parse_instr(name);
       identifiers.emplace(move(name), i.get());
@@ -829,7 +852,6 @@ static void parse_fn(Function &f) {
     }
   }
 
-  // FIXME: if target: copy relevant src instructions
   // FIXME: add error checking
   if (!has_return) {
     auto &last = bb->back();
@@ -851,12 +873,31 @@ vector<Transform> parse(string_view buf) {
     sym_num = struct_num = 0;
     parse_name(t);
     parse_pre(t);
+    parse_src = true;
     parse_fn(t.src);
     parse_arrow();
+
+    // copy inputs from src to target
+    decltype(identifiers) identifiers_tgt;
+    for (auto &[name, val] : identifiers) {
+      if (dynamic_cast<Input *>(val)) {
+        auto input = make_unique<Input>(val->getType(), string(name));
+        identifiers_tgt.emplace(name, input.get());
+        t.tgt.addInput(move(input));
+      }
+    }
+    identifiers_src = move(identifiers);
+    identifiers = move(identifiers_tgt);
+
+    parse_src = false;
     parse_fn(t.tgt);
+
+    // FIXME: need to copy missing BBs and missing instructions
+
+    identifiers.clear();
+    identifiers_src.clear();
   }
 
-  identifiers.clear();
   return ret;
 }
 
@@ -867,7 +908,7 @@ parser_initializer::parser_initializer() {
 }
 
 parser_initializer::~parser_initializer() {
-  for_each(int_types.begin(), int_types.end(), [](auto &e) { e.reset(); });
+  int_types.clear();
   sym_types.clear();
   overflow_aggregate_types.clear();
 }
