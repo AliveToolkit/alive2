@@ -16,6 +16,7 @@ namespace IR {
 
 class FloatType;
 class StructType;
+class VectorType;
 class VoidType;
 class State;
 
@@ -48,6 +49,7 @@ public:
   virtual bool isIntType() const;
   virtual bool isFloatType() const;
   virtual bool isPtrType() const;
+  virtual bool isVectorType() const;
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
@@ -59,6 +61,7 @@ public:
 
   virtual const StructType* getAsStructType() const;
   virtual const FloatType* getAsFloatType() const;
+  virtual const VectorType* getAsVectorType() const;
 
   virtual std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const = 0;
@@ -192,16 +195,25 @@ public:
 
 
 class VectorType final : public Type {
+  Type *elementTy;
+  unsigned length = 0;
+  bool defined = false;
 public:
-  VectorType(std::string &&name) : Type(std::move(name)) {}
+  VectorType(std::string &&name, Type* elementTy, unsigned length)
+    : Type(std::move(name)), elementTy(elementTy), length(length), defined(true) {}
+  VectorType(std::string &&name);
   unsigned bits() const override;
+  Type& getElementTy() const { return *elementTy; };
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   smt::expr operator==(const VectorType &rhs) const;
   smt::expr sameType(const VectorType &rhs) const;
   void fixup(const smt::Model &m) override;
+  bool isVectorType() const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  const VectorType* getAsVectorType() const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -263,6 +275,7 @@ public:
   bool isIntType() const override;
   bool isFloatType() const override;
   bool isPtrType() const override;
+  bool isVectorType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
@@ -272,6 +285,7 @@ public:
   smt::expr enforceFloatType() const override;
   const StructType* getAsStructType() const override;
   const FloatType* getAsFloatType() const override;
+  const VectorType* getAsVectorType() const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;

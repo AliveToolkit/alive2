@@ -13,6 +13,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
+static constexpr unsigned var_vec_length_bits = 4;
 
 
 namespace IR {
@@ -109,6 +110,10 @@ bool Type::isPtrType() const {
   return false;
 }
 
+bool Type::isVectorType() const {
+  return false;
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
@@ -142,6 +147,10 @@ const StructType* Type::getAsStructType() const {
 }
 
 const FloatType* Type::getAsFloatType() const {
+  return nullptr;
+}
+
+const VectorType* Type::getAsVectorType() const {
   return nullptr;
 }
 
@@ -482,6 +491,14 @@ void ArrayType::print(ostream &os) const {
   os << "TODO";
 }
 
+static std::vector<std::unique_ptr<IntType>> child_types;
+static unsigned child_ty_num;
+
+ // TODO: Support symbolic vector on floating point types
+VectorType::VectorType(std::string &&name) : Type(std::move(name)) {
+  elementTy = child_types.emplace_back(
+    std::make_unique<IntType>("child_" + std::to_string(child_ty_num++))).get();
+}
 
 unsigned VectorType::bits() const {
   // TODO
@@ -489,42 +506,68 @@ unsigned VectorType::bits() const {
 }
 
 expr VectorType::getDummyValue() const {
-  // TODO
-  return {};
+  expr res;
+  for (unsigned idx = 0; idx < length ; idx++) {
+    auto ed = getElementTy().getDummyValue();
+    res = idx == 0 ? ed : res.concat(ed);
+  }
+  return res;
 }
 
 expr VectorType::getTypeConstraints() const {
-  // TODO
-  return false;
+  auto bw = sizeVar();
+  auto r = bw != expr::mkUInt(0, var_bw_bits);
+  if (!defined)
+    r &= bw.ule(expr::mkUInt(var_vec_length_bits, var_bw_bits));
+
+  return (r && elementTy->getTypeConstraints());
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
-  // TODO
-  return false;
+  return (sizeVar() == rhs.sizeVar()) && (getElementTy() == rhs.getElementTy());
 }
 
 expr VectorType::sameType(const VectorType &rhs) const {
-  // TODO
-  return false;
+  return (sizeVar() == rhs.sizeVar()) && (getElementTy().sameType(rhs.getElementTy()));
 }
 
 void VectorType::fixup(const Model &m) {
-  // TODO
+  length = m.getUInt(sizeVar());
+  assert(length <= var_vec_length_bits);
+
+  getElementTy().fixup(m);
+}
+
+bool VectorType::isVectorType() const {
+  return true;
 }
 
 expr VectorType::enforceIntOrVectorType() const {
   // TODO: check if elements are int
-  return false;
+  return true;
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
   // TODO: check if elements are int/ptr
-  return false;
+  return true;
+}
+
+const VectorType* VectorType::getAsVectorType() const {
+  return this;
 }
 
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
+  expr val;
+  vector<expr> vars;
+
+  for (unsigned idx = 0; idx < length; idx ++) {
+    string c_name = string(name) + "#" + to_string(idx);
+    auto [v, vs] = elementTy->mkInput(s, c_name.c_str());
+    val = idx == 0 ? v : val.concat(v);
+    vars.insert(vars.end(), vs.begin(), vs.end());
+  }
+
+  return { move(val), move(vars) };
 }
 
 void VectorType::printVal(ostream &os, State &s, const expr &e) const {
@@ -532,7 +575,11 @@ void VectorType::printVal(ostream &os, State &s, const expr &e) const {
 }
 
 void VectorType::print(ostream &os) const {
-  os << "TODO";
+  os << "<" << length << " x " <<  *elementTy << ">";
+}
+
+expr VectorType::sizeVar() const {
+  return defined ? expr::mkUInt(length, var_bw_bits) : Type::sizeVar();
 }
 
 
@@ -704,12 +751,12 @@ expr SymbolicType::getDummyValue() const {
 
 expr SymbolicType::getTypeConstraints() const {
   expr c(false);
-  c |= isInt()    && i.getTypeConstraints();
-  c |= isFloat()  && f.getTypeConstraints();
-  c |= isPtr()    && p.getTypeConstraints();
-  c |= isArray()  && a.getTypeConstraints();
+  c |= isInt()    && i.getTypeConstraints() && (v.getElementTy().sizeVar() == 0);
+  c |= isFloat()  && f.getTypeConstraints() && (v.getElementTy().sizeVar() == 0);
+  c |= isPtr()    && p.getTypeConstraints() && (v.getElementTy().sizeVar() == 0);
+  c |= isArray()  && a.getTypeConstraints() && (v.getElementTy().sizeVar() == 0);
   c |= isVector() && v.getTypeConstraints();
-  c |= isStruct() && s.getTypeConstraints();
+  c |= isStruct() && s.getTypeConstraints() && (v.getElementTy().sizeVar() == 0);
   return c;
 }
 
@@ -805,6 +852,10 @@ bool SymbolicType::isPtrType() const {
   return typ == Ptr;
 }
 
+bool SymbolicType::isVectorType() const {
+  return typ == Vector;
+}
+
 expr SymbolicType::enforceIntType(unsigned bits) const {
   return isInt() && i.enforceIntType(bits);
 }
@@ -839,6 +890,10 @@ const StructType* SymbolicType::getAsStructType() const {
 
 const FloatType* SymbolicType::getAsFloatType() const {
   return &f;
+}
+
+const VectorType* SymbolicType::getAsVectorType() const {
+  return &v;
 }
 
 pair<expr, vector<expr>>
