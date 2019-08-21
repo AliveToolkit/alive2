@@ -651,6 +651,60 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 }
 
 
+
+
+/*
+void Memset::print(std::ostream &os) const {
+  os << "memset " << ptr << ", " << val << ", " << bytes << ", align " << align;
+}
+
+StateValue Memset::toSMT(State &s) const {
+  // TODO: check following lines are correct
+  auto &[p, np] = s[ptr];
+  auto &[vbytes, np2] = s[bytes];
+  s.addUB(np);
+  s.addUB(np2);
+  s.getMemory().memset(p, s[val], vbytes, align);
+  return {};
+}
+
+expr Memset::getTypeConstraints(const Function &f) const {
+  // TODO: add bytes is an integer?
+  return ptr.getType().enforcePtrType() && bytes.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memset::dup(const string &suffix) const {
+  return make_unique<Memset>(ptr, val, bytes, align);
+}
+
+
+void Memcpy::print(std::ostream &os) const {
+  os << "memcpy " << dst << ", " << src << ", " << bytes << ", align " << align;
+}
+
+StateValue Memcpy::toSMT(State &s) const {
+  // TODO: check following lines are correct
+  auto &[vdst, np] = s[dst];
+  s.addUB(np);
+  auto &[vsrc, np2] = s[src];
+  s.addUB(np2);
+  auto &[vbytes, np3] = s[bytes];
+  s.addUB(np3);
+  s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src);
+  return {};
+}
+
+expr Memcpy::getTypeConstraints(const Function &f) const {
+  // TODO: add bytes is an integer?
+  return dst.getType().enforcePtrType() && dst.getType().enforcePtrType() && bytes.getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
+  return make_unique<Memcpy>(dst, src, bytes, align_dst, align_src);
+}
+*/
+
+
 void FnCall::addArg(Value &arg) {
   args.emplace_back(&arg);
 }
@@ -680,6 +734,31 @@ StateValue FnCall::toSMT(State &s) const {
   // TODO: add support for global variables
   vector<expr> all_args, value_args;
   expr all_args_np(true);
+
+  // TODO: make fnName matching real llvm memset(memcpy)
+  // TODO: make align
+  // TODO: check isvolatile?
+  if(fnName.compare("@memset") == 0 && args.size() == 3) {
+    auto &[p, np] = s[*args.at(0)];
+    auto &[vbytes, np2] = s[*args.at(2)];
+    s.addUB(np);
+    s.addUB(np2);
+    s.getMemory().memset(p, s[*args.at(1)], vbytes, 1);
+    return {};
+  }
+
+  // TODO: make fnName matching real llvm memset(memcpy)
+  // TODO: make align
+  if(fnName.compare("@memcpy") == 0 && args.size() == 3) {
+    auto &[vdst, np] = s[*args.at(0)];
+    s.addUB(np);
+    auto &[vsrc, np2] = s[*args.at(1)];
+    s.addUB(np2);
+    auto &[vbytes, np3] = s[*args.at(2)];
+    s.addUB(np3);
+    s.getMemory().memcpy(vdst, vsrc, vbytes, 1, 1);
+    return {};
+  }
 
   for (auto arg : args) {
     auto &[v, np] = s[*arg];
