@@ -507,7 +507,7 @@ unsigned VectorType::bits() const {
 
 expr VectorType::getDummyValue() const {
   expr res;
-  for (unsigned idx = 0; idx < length ; idx++) {
+  for (unsigned idx = 0; idx < length ; ++idx) {
     auto ed = getElementTy().getDummyValue();
     res = idx == 0 ? ed : res.concat(ed);
   }
@@ -524,11 +524,11 @@ expr VectorType::getTypeConstraints() const {
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
-  return (sizeVar() == rhs.sizeVar()) && (getElementTy() == rhs.getElementTy());
+  return sizeVar() == rhs.sizeVar() && getElementTy() == rhs.getElementTy();
 }
 
 expr VectorType::sameType(const VectorType &rhs) const {
-  return (sizeVar() == rhs.sizeVar()) && (getElementTy().sameType(rhs.getElementTy()));
+  return sizeVar() == rhs.sizeVar() && getElementTy().sameType(rhs.getElementTy());
 }
 
 void VectorType::fixup(const Model &m) {
@@ -543,13 +543,11 @@ bool VectorType::isVectorType() const {
 }
 
 expr VectorType::enforceIntOrVectorType() const {
-  // TODO: check if elements are int
-  return true;
+  return elementTy->isIntType();
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
-  // TODO: check if elements are int/ptr
-  return true;
+  return elementTy->isIntType() || elementTy->isPtrType();
 }
 
 const VectorType* VectorType::getAsVectorType() const {
@@ -560,7 +558,7 @@ pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
   expr val;
   vector<expr> vars;
 
-  for (unsigned idx = 0; idx < length; idx ++) {
+  for (unsigned idx = 0; idx < length; ++idx) {
     string c_name = string(name) + "#" + to_string(idx);
     auto [v, vs] = elementTy->mkInput(s, c_name.c_str());
     val = idx == 0 ? v : val.concat(v);
