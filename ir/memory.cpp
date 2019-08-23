@@ -149,6 +149,14 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
   is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
 }
 
+expr disjoint(expr offset1, const expr &len1, expr offset2, const expr &len2) {
+  return ((offset1+len1).ule(offset2) || (offset2+len2).ule(offset1));
+}
+
+void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2, const expr &len2) const {
+  m.state->addUB(get_bid() != ptr2.get_bid() || disjoint(get_offset(), len1, ptr2.get_offset(), len2));
+}
+
 ostream& operator<<(ostream &os, const Pointer &p) {
   os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
      << ", block_id=";
@@ -304,10 +312,27 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
 
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
                     unsigned align_dst, unsigned align_src) {
+  // TODO: Add ub condition - bytes == 0
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytes, align_dst);
   src.is_dereferenceable(bytes, align_src);
-  // TODO
+  src.is_disjoint(bytes, dst, bytes);
+
+  uint64_t n;
+  if (bytes.isUInt(n) && n <= 4) {
+    for (unsigned i = 0; i < n; ++i) {
+      auto src_i = (src + i).release();
+      auto dst_i = (dst + i).release();
+      blocks_val = blocks_val.store(dst_i, blocks_val.load(src_i));
+    }
+  } else {
+    string name = "#idx_" + to_string(last_idx_ptr++);
+    Pointer idx(*this, expr::mkVar(name.c_str(), dst.bits()));
+
+    expr cond = idx.uge(dst).both() && idx.ult(dst + bytes).both();
+    expr val = expr::mkIf(cond, blocks_val.load((src + idx.get_offset()).release()), blocks_val.load(idx()));
+    blocks_val = expr::mkLambda({ idx() }, move(val));
+  }
 }
 
 expr Memory::ptr2int(const expr &ptr) {
