@@ -6,6 +6,7 @@
 #include "smt/expr.h"
 
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -51,6 +52,7 @@ public:
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
+  smt::expr enforceIntOrPtrType() const;
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
   virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
@@ -191,9 +193,20 @@ public:
 };
 
 
+class SymbolicType;
+
 class VectorType final : public Type {
+  std::unique_ptr<SymbolicType> sym;
+  Type &elementTy;
+  unsigned elements;
+  bool defined = false;
 public:
-  VectorType(std::string &&name) : Type(std::move(name)) {}
+  VectorType(std::string &&name, unsigned elements, Type &elementTy);
+  VectorType(std::string &&name);
+
+  smt::expr numElements() const;
+  smt::expr extract(const smt::expr &val, const smt::expr &index) const;
+
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
@@ -244,16 +257,18 @@ public:
 
 private:
   TypeNum typ = Undefined;
-  IntType i;
-  FloatType f;
-  PtrType p;
-  ArrayType a;
-  VectorType v;
-  StructType s;
-  bool named;
+  std::optional<IntType> i;
+  std::optional<FloatType> f;
+  std::optional<PtrType> p;
+  std::optional<ArrayType> a;
+  std::optional<VectorType> v;
+  std::optional<StructType> s;
 
 public:
-  SymbolicType(std::string &&name, bool named = false);
+  SymbolicType(std::string &&name);
+  // use mask of (1 << TypeNum)
+  SymbolicType(std::string &&name, unsigned type_mask);
+
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;

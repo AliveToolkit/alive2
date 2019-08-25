@@ -13,6 +13,7 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 8;
+static constexpr unsigned var_vector_elements = 10;
 
 
 namespace IR {
@@ -117,6 +118,10 @@ expr Type::enforceIntOrVectorType() const {
   return false;
 }
 
+expr Type::enforceIntOrPtrType() const {
+  return enforceIntType() || enforcePtrType();
+}
+
 expr Type::enforceIntOrPtrOrVectorType() const {
   return false;
 }
@@ -199,9 +204,9 @@ expr IntType::getDummyValue() const {
 expr IntType::getTypeConstraints() const {
   // since size cannot be unbounded, limit it between 1 and 64 bits if undefined
   auto bw = sizeVar();
-  auto r = bw != expr::mkUInt(0, var_bw_bits);
+  auto r = bw != 0;
   if (!defined)
-    r &= bw.ule(expr::mkUInt(64, var_bw_bits));
+    r &= bw.ule(64);
   return r;
 }
 
@@ -483,56 +488,111 @@ void ArrayType::print(ostream &os) const {
 }
 
 
+VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
+  : Type(move(name)), elementTy(elementTy), elements(elements), defined(true) {
+  assert(elements != 0);
+}
+
+VectorType::VectorType(string &&name)
+  : Type(string(name)),
+    sym(make_unique<SymbolicType>("v_" + name, (1 << SymbolicType::Int) |
+                                               (1 << SymbolicType::Float) |
+                                               (1 << SymbolicType::Ptr))),
+    elementTy(*sym.get()), elements(0) {}
+
+expr VectorType::numElements() const {
+  return defined ? expr::mkUInt(elements, var_vector_elements) :
+                   var("elements", var_vector_elements);
+}
+
+expr VectorType::extract(const expr &val, const expr &index) const {
+  unsigned bw_elem = elementTy.bits();
+  unsigned bw_val = val.bits();
+  expr v = val << (index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val));
+  v = v.extract(elements * bw_elem - 1, (elements - 1) * bw_elem);
+  return elementTy.isFloatType() ? v.BV2float(elementTy.getDummyValue()) : v;
+}
+
 unsigned VectorType::bits() const {
-  // TODO
-  return 0;
+  return elements * elementTy.bits();
 }
 
 expr VectorType::getDummyValue() const {
-  // TODO
-  return {};
+  expr element = elementTy.getDummyValue();
+  if (elementTy.isFloatType())
+    element = element.float2BV();
+
+  expr ret = element;
+  for (unsigned i = 1; i < elements; ++i) {
+    ret = ret.concat(element);
+  }
+  return ret;
 }
 
 expr VectorType::getTypeConstraints() const {
-  // TODO
-  return false;
+  expr elems = numElements();
+  expr r = elementTy.getTypeConstraints() &&
+           (elementTy.enforceIntType() ||
+            elementTy.enforceFloatType() ||
+            elementTy.enforcePtrType()) &&
+           elems != 0;
+  if (!defined)
+    r &= elems.ule(4);
+  return r;
 }
 
 expr VectorType::operator==(const VectorType &rhs) const {
-  // TODO
-  return false;
+  return numElements() == rhs.numElements() && elementTy == rhs.elementTy;
 }
 
 expr VectorType::sameType(const VectorType &rhs) const {
-  // TODO
-  return false;
+  return numElements() == rhs.numElements() &&
+         elementTy.sameType(rhs.elementTy);
 }
 
 void VectorType::fixup(const Model &m) {
-  // TODO
+  elementTy.fixup(m);
+  if (!defined)
+    elements = m.getUInt(numElements());
 }
 
 expr VectorType::enforceIntOrVectorType() const {
-  // TODO: check if elements are int
-  return false;
+  return elementTy.enforceIntType();
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
-  // TODO: check if elements are int/ptr
-  return false;
+  return elementTy.enforceIntOrPtrType();
 }
 
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
+  expr val;
+  vector<expr> vect;
+
+  for (unsigned i = 0; i < elements; ++i) {
+    auto name_i = string(name) + '#' + to_string(i);
+    auto [val_i, vect_i] = elementTy.mkInput(s, name_i.c_str());
+    vect.insert(vect.end(), vect_i.begin(), vect_i.end());
+
+    if (elementTy.isFloatType())
+      val_i = val_i.float2BV();
+    val = i == 0 ? move(val_i) : val.concat(val_i);
+  }
+  return { move(val), move(vect) };
 }
 
 void VectorType::printVal(ostream &os, State &s, const expr &e) const {
-  // TODO
+  os << '<';
+  for (unsigned i = 0; i < elements; ++i) {
+    if (i != 0)
+      os << ", ";
+    elementTy.printVal(os, s, extract(e, expr::mkUInt(i, 8)).simplify());
+  }
+  os << '>';
 }
 
 void VectorType::print(ostream &os) const {
-  os << "TODO";
+  if (elements)
+    os << '<' << elements << " x " << elementTy << '>';
 }
 
 
@@ -670,18 +730,34 @@ expr StructType::extract(const expr &struct_val, unsigned index) const {
 }
 
 
-SymbolicType::SymbolicType(string &&name, bool named)
+SymbolicType::SymbolicType(string &&name)
   : Type(string(name)), i(string(name)), f(string(name)), p(string(name)),
-    a(string(name)), v(string(name)), s(string(name)), named(named) {}
+    a(string(name)), v(string(name)), s(string(name)) {}
+
+SymbolicType::SymbolicType(string &&name, unsigned type_mask)
+  : Type(string(name)) {
+  if (type_mask & (1 << Int))
+    i.emplace(string(name));
+  if (type_mask & (1 << Float))
+    f.emplace(string(name));
+  if (type_mask & (1 << Ptr))
+    p.emplace(string(name));
+  if (type_mask & (1 << Array))
+    a.emplace(string(name));
+  if (type_mask & (1 << Vector))
+    v.emplace(string(name));
+  if (type_mask & (1 << Struct))
+    s.emplace(string(name));
+}
 
 unsigned SymbolicType::bits() const {
   switch (typ) {
-  case Int:    return i.bits();
-  case Float:  return f.bits();
-  case Ptr:    return p.bits();
-  case Array:  return a.bits();
-  case Vector: return v.bits();
-  case Struct: return s.bits();
+  case Int:    return i->bits();
+  case Float:  return f->bits();
+  case Ptr:    return p->bits();
+  case Array:  return a->bits();
+  case Vector: return v->bits();
+  case Struct: return s->bits();
   case Undefined:
     assert(0 && "undefined at SymbolicType::bits()");
   }
@@ -690,12 +766,12 @@ unsigned SymbolicType::bits() const {
 
 expr SymbolicType::getDummyValue() const {
   switch (typ) {
-  case Int:    return i.getDummyValue();
-  case Float:  return f.getDummyValue();
-  case Ptr:    return p.getDummyValue();
-  case Array:  return a.getDummyValue();
-  case Vector: return v.getDummyValue();
-  case Struct: return s.getDummyValue();
+  case Int:    return i->getDummyValue();
+  case Float:  return f->getDummyValue();
+  case Ptr:    return p->getDummyValue();
+  case Array:  return a->getDummyValue();
+  case Vector: return v->getDummyValue();
+  case Struct: return s->getDummyValue();
   case Undefined:
     break;
   }
@@ -704,12 +780,13 @@ expr SymbolicType::getDummyValue() const {
 
 expr SymbolicType::getTypeConstraints() const {
   expr c(false);
-  c |= isInt()    && i.getTypeConstraints();
-  c |= isFloat()  && f.getTypeConstraints();
-  c |= isPtr()    && p.getTypeConstraints();
-  c |= isArray()  && a.getTypeConstraints();
-  c |= isVector() && v.getTypeConstraints();
-  c |= isStruct() && s.getTypeConstraints();
+  if (i) c |= isInt()    && i->getTypeConstraints();
+  if (f) c |= isFloat()  && f->getTypeConstraints();
+  if (p) c |= isPtr()    && p->getTypeConstraints();
+  if (a) c |= isArray()  && a->getTypeConstraints();
+  // FIXME: disabled temporarily until BinOps/etc support vectors
+  //if (v) c |= isVector() && v->getTypeConstraints();
+  if (s) c |= isStruct() && s->getTypeConstraints();
   return c;
 }
 
@@ -718,25 +795,25 @@ expr SymbolicType::operator==(const Type &b) const {
     return true;
 
   if (auto rhs = dynamic_cast<const IntType*>(&b))
-    return isInt() && i == *rhs;
+    return isInt() && (i ? *i == *rhs : false);
   if (auto rhs = dynamic_cast<const FloatType*>(&b))
-    return isFloat() && f == *rhs;
+    return isFloat() && (f ? *f == *rhs : false);
   if (auto rhs = dynamic_cast<const PtrType*>(&b))
-    return isPtr() && p == *rhs;
+    return isPtr() && (p ? *p == *rhs : false);
   if (auto rhs = dynamic_cast<const ArrayType*>(&b))
-    return isArray() && a == *rhs;
+    return isArray() && (a ? *a == *rhs : false);
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
-    return isVector() && v == *rhs;
+    return isVector() && (v ? *v == *rhs : false);
   if (auto rhs = dynamic_cast<const StructType*>(&b))
-    return isStruct() && s == *rhs;
+    return isStruct() && (s ? *s == *rhs : false);
 
   if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
-    c |= isInt()    && i == rhs->i;
-    c |= isFloat()  && f == rhs->f;
-    c |= isPtr()    && p == rhs->p;
-    c |= isArray()  && a == rhs->a;
-    c |= isVector() && v == rhs->v;
+    if (i && rhs->i) c |= isInt()    && *i == *rhs->i;
+    if (f && rhs->f) c |= isFloat()  && *f == *rhs->f;
+    if (p && rhs->p) c |= isPtr()    && *p == *rhs->p;
+    if (a && rhs->a) c |= isArray()  && *a == *rhs->a;
+    if (v && rhs->v) c |= isVector() && *v == *rhs->v;
     // FIXME: add support for this: c |= isStruct() && s == rhs->s;
     return move(c) && typeVar() == rhs->typeVar();
   }
@@ -749,25 +826,25 @@ expr SymbolicType::sameType(const Type &b) const {
     return true;
 
   if (auto rhs = dynamic_cast<const IntType*>(&b))
-    return isInt() && i.sameType(*rhs);
+    return isInt() && (i ? i->sameType(*rhs) : false);
   if (auto rhs = dynamic_cast<const FloatType*>(&b))
-    return isFloat() && f.sameType(*rhs);
+    return isFloat() && (f ? f->sameType(*rhs) : false);
   if (auto rhs = dynamic_cast<const PtrType*>(&b))
-    return isPtr() && p.sameType(*rhs);
+    return isPtr() && (p ? p->sameType(*rhs) : false);
   if (auto rhs = dynamic_cast<const ArrayType*>(&b))
-    return isArray() && a.sameType(*rhs);
+    return isArray() && (a ? a->sameType(*rhs) : false);
   if (auto rhs = dynamic_cast<const VectorType*>(&b))
-    return isVector() && v.sameType(*rhs);
+    return isVector() && (v ? v->sameType(*rhs) : false);
   if (auto rhs = dynamic_cast<const StructType*>(&b))
-    return isStruct() && s.sameType(*rhs);
+    return isStruct() && (s ? s->sameType(*rhs) : false);
 
   if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
     expr c(false);
-    c |= isInt()    && i.sameType(rhs->i);
-    c |= isFloat()  && f.sameType(rhs->f);
-    c |= isPtr()    && p.sameType(rhs->p);
-    c |= isArray()  && a.sameType(rhs->a);
-    c |= isVector() && v.sameType(rhs->v);
+    if (i && rhs->i) c |= isInt()    && i->sameType(*rhs->i);
+    if (f && rhs->f) c |= isFloat()  && f->sameType(*rhs->f);
+    if (p && rhs->p) c |= isPtr()    && p->sameType(*rhs->p);
+    if (a && rhs->a) c |= isArray()  && a->sameType(*rhs->a);
+    if (v && rhs->v) c |= isVector() && v->sameType(*rhs->v);
     // FIXME: add support for this: c |= isStruct() && s.sameType(rhs->s);
     return move(c) && typeVar() == rhs->typeVar();
   }
@@ -781,12 +858,12 @@ void SymbolicType::fixup(const Model &m) {
   typ = TypeNum(smt_typ);
 
   switch (typ) {
-  case Int:    i.fixup(m); break;
-  case Float:  f.fixup(m); break;
-  case Ptr:    p.fixup(m); break;
-  case Array:  a.fixup(m); break;
-  case Vector: v.fixup(m); break;
-  case Struct: s.fixup(m); break;
+  case Int:    i->fixup(m); break;
+  case Float:  f->fixup(m); break;
+  case Ptr:    p->fixup(m); break;
+  case Array:  a->fixup(m); break;
+  case Vector: v->fixup(m); break;
+  case Struct: s->fixup(m); break;
   case Undefined:
     UNREACHABLE();
   }
@@ -805,15 +882,17 @@ bool SymbolicType::isPtrType() const {
 }
 
 expr SymbolicType::enforceIntType(unsigned bits) const {
-  return isInt() && i.enforceIntType(bits);
+  return isInt() && (i ? i->enforceIntType(bits) : false);
 }
 
 expr SymbolicType::enforceIntOrVectorType() const {
-  return isInt() || isVector();
+  return isInt() ||
+         (isVector() && (v ? v->enforceIntOrPtrOrVectorType() : false));
 }
 
 expr SymbolicType::enforceIntOrPtrOrVectorType() const {
-  return isInt() || isPtr() || isVector();
+  return isInt() || isPtr() ||
+         (isVector() && (v ? v->enforceIntOrPtrOrVectorType() : false));
 }
 
 expr SymbolicType::enforcePtrType() const {
@@ -833,22 +912,22 @@ expr SymbolicType::enforceFloatType() const {
 }
 
 const StructType* SymbolicType::getAsStructType() const {
-  return &s;
+  return &*s;
 }
 
 const FloatType* SymbolicType::getAsFloatType() const {
-  return &f;
+  return &*f;
 }
 
 pair<expr, vector<expr>>
   SymbolicType::mkInput(State &st, const char *name) const {
   switch (typ) {
-  case Int:       return i.mkInput(st, name);
-  case Float:     return f.mkInput(st, name);
-  case Ptr:       return p.mkInput(st, name);
-  case Array:     return a.mkInput(st, name);
-  case Vector:    return v.mkInput(st, name);
-  case Struct:    return s.mkInput(st, name);
+  case Int:       return i->mkInput(st, name);
+  case Float:     return f->mkInput(st, name);
+  case Ptr:       return p->mkInput(st, name);
+  case Array:     return a->mkInput(st, name);
+  case Vector:    return v->mkInput(st, name);
+  case Struct:    return s->mkInput(st, name);
   case Undefined: UNREACHABLE();
   }
   UNREACHABLE();
@@ -856,29 +935,24 @@ pair<expr, vector<expr>>
 
 void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
   switch (typ) {
-  case Int:       i.printVal(os, st, e); break;
-  case Float:     f.printVal(os, st, e); break;
-  case Ptr:       p.printVal(os, st, e); break;
-  case Array:     a.printVal(os, st, e); break;
-  case Vector:    v.printVal(os, st, e); break;
-  case Struct:    s.printVal(os, st, e); break;
+  case Int:       i->printVal(os, st, e); break;
+  case Float:     f->printVal(os, st, e); break;
+  case Ptr:       p->printVal(os, st, e); break;
+  case Array:     a->printVal(os, st, e); break;
+  case Vector:    v->printVal(os, st, e); break;
+  case Struct:    s->printVal(os, st, e); break;
   case Undefined: UNREACHABLE();
   }
 }
 
 void SymbolicType::print(ostream &os) const {
-  if (named) {
-    os << name;
-    return;
-  }
-
   switch (typ) {
-  case Int:       i.print(os); break;
-  case Float:     f.print(os); break;
-  case Ptr:       p.print(os); break;
-  case Array:     a.print(os); break;
-  case Vector:    v.print(os); break;
-  case Struct:    s.print(os); break;
+  case Int:       i->print(os); break;
+  case Float:     f->print(os); break;
+  case Ptr:       p->print(os); break;
+  case Array:     a->print(os); break;
+  case Vector:    v->print(os); break;
+  case Struct:    s->print(os); break;
   case Undefined: break;
   }
 }
