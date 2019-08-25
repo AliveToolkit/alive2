@@ -37,7 +37,6 @@ Name: cttz sge
 %b = cttz i4 %a, i1 1
 %c = icmp sge %b, 1
   =>
-%a = shl i4 %x, 1
 %b = cttz i4 %a, i1 1
 %c = 1
 
@@ -46,6 +45,5 @@ Name: cttz eq
 %b = cttz i8 %a, i1 1
 %c = icmp slt %b, 3
   =>
-%a = shl i8 %x, 3
 %b = cttz i8 %a, i1 1
 %c = 0

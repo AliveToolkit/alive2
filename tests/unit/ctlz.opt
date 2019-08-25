@@ -37,7 +37,6 @@ Name: ctlz sge
 %b = ctlz i4 %a, i1 1
 %c = icmp sge %b, 1
   =>
-%a = lshr i4 %x, 1
 %b = ctlz i4 %a, i1 1
 %c = 1
 
@@ -46,6 +45,5 @@ Name: ctlz negtest
 %b = ctlz i8 %a, i1 1
 %c = icmp slt %b, 3
   =>
-%a = lshr i8 %x, 3
 %b = ctlz i8 %a, i1 1
 %c = 0

@@ -12,6 +12,11 @@
 using namespace smt;
 using namespace std;
 
+#define RAUW(val)    \
+  if (val == &what)  \
+    val = &with
+
+
 namespace IR {
 
 expr Instr::eqType(const Instr &i) const {
@@ -26,7 +31,7 @@ expr Instr::getTypeConstraints() const {
 
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
              Flags flags)
-  : Instr(type, move(name)), lhs(lhs), rhs(rhs), op(op), flags(flags) {
+  : Instr(type, move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags) {
   switch (op) {
   case Add:
   case Sub:
@@ -67,6 +72,15 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
     assert(flags == 0);
     break;
   }
+}
+
+vector<Value*> BinOp::operands() const {
+  return { lhs, rhs };
+}
+
+void BinOp::rauw(const Value &what, Value &with) {
+  RAUW(lhs);
+  RAUW(rhs);
 }
 
 void BinOp::print(ostream &os) const {
@@ -116,7 +130,7 @@ void BinOp::print(ostream &os) const {
   case Exact:  flag = " exact "; break;
   }
 
-  os << getName() << " = " << str << flag << lhs << ", " << rhs.getName();
+  os << getName() << " = " << str << flag << *lhs << ", " << rhs->getName();
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -140,8 +154,8 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
 }
 
 StateValue BinOp::toSMT(State &s) const {
-  auto &[a, ap] = s[lhs];
-  auto &[b, bp] = s[rhs];
+  auto &[a, ap] = s[*lhs];
+  auto &[b, bp] = s[*rhs];
   expr val;
   auto not_poison = ap && bp;
 
@@ -313,6 +327,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FRem:
     // TODO; Z3 has no support for LLVM's frem which is actually an fmod
+    not_poison = expr();
     break;
   }
 
@@ -329,20 +344,20 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case SMul_Overflow:
   case UMul_Overflow:
     instrconstr = getType().enforceStructType() &&
-                  lhs.getType().enforceIntType() &&
-                  lhs.getType() == rhs.getType();
+                  lhs->getType().enforceIntType() &&
+                  lhs->getType() == rhs->getType();
 
     if (auto ty = getType().getAsStructType()) {
       instrconstr &= ty->numElements() == 2 &&
-                     ty->getChild(0) == lhs.getType() &&
+                     ty->getChild(0) == lhs->getType() &&
                      ty->getChild(1).enforceIntType(1);
     }
     break;
   case Cttz:
   case Ctlz:
     instrconstr = getType().enforceIntOrVectorType() &&
-                  getType() == lhs.getType() &&
-                  rhs.getType().enforceIntType(1);
+                  getType() == lhs->getType() &&
+                  rhs->getType().enforceIntType(1);
     break;
   case FAdd:
   case FSub:
@@ -350,22 +365,30 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case FDiv:
   case FRem:
     instrconstr = getType().enforceFloatType() &&
-                  getType() == lhs.getType() &&
-                  getType() == rhs.getType();
+                  getType() == lhs->getType() &&
+                  getType() == rhs->getType();
     break;
   default:
     instrconstr = getType().enforceIntOrVectorType() &&
-                  getType() == lhs.getType() &&
-                  getType() == rhs.getType();
+                  getType() == lhs->getType() &&
+                  getType() == rhs->getType();
     break;
   }
   return Value::getTypeConstraints() && move(instrconstr);
 }
 
 unique_ptr<Instr> BinOp::dup(const string &suffix) const {
-  return make_unique<BinOp>(getType(), getName()+suffix, lhs, rhs, op, flags);
+  return make_unique<BinOp>(getType(), getName()+suffix, *lhs, *rhs, op, flags);
 }
 
+
+vector<Value*> UnaryOp::operands() const {
+  return { val };
+}
+
+void UnaryOp::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
 
 void UnaryOp::print(ostream &os) const {
   const char *str = nullptr;
@@ -377,11 +400,11 @@ void UnaryOp::print(ostream &os) const {
   case FNeg:        str = "fneg "; break;
   }
 
-  os << getName() << " = " << str << val;
+  os << getName() << " = " << str << *val;
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
-  auto &[v, vp] = s[val];
+  auto &[v, vp] = s[*val];
   expr newval;
 
   switch (op) {
@@ -408,7 +431,7 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
   expr instrconstr = true;
   switch(op) {
   case BSwap:
-    instrconstr = val.getType().sizeVar().urem(expr::mkUInt(16, 8)) == 0;
+    instrconstr = val->getType().sizeVar().urem(expr::mkUInt(16, 8)) == 0;
     [[fallthrough]];
   case BitReverse:
   case Ctpop:
@@ -421,14 +444,24 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
   }
 
   return Value::getTypeConstraints() &&
-         getType() == val.getType() &&
+         getType() == val->getType() &&
          move(instrconstr);
 }
 
 unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
-  return make_unique<UnaryOp>(getType(), getName() + suffix, val, op);
+  return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op);
 }
 
+
+vector<Value*> TernaryOp::operands() const {
+  return { a, b, c };
+}
+
+void TernaryOp::rauw(const Value &what, Value &with) {
+  RAUW(a);
+  RAUW(b);
+  RAUW(c);
+}
 
 void TernaryOp::print(ostream &os) const {
   const char *str = nullptr;
@@ -441,24 +474,22 @@ void TernaryOp::print(ostream &os) const {
     break;
   }
 
-  os << getName() << " = " << str << A << ", " << B << ", " << C;
+  os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
 }
 
 StateValue TernaryOp::toSMT(State &s) const {
-  auto &[a, ap] = s[A];
-  auto &[b, bp] = s[B];
-  auto &[c, cp] = s[C];
+  auto &[av, ap] = s[*a];
+  auto &[bv, bp] = s[*b];
+  auto &[cv, cp] = s[*c];
   expr newval;
-  expr not_poison;
+  expr not_poison = ap && bp && cp;
 
   switch (op) {
   case FShl:
-    newval = expr::fshl(a, b, c);
-    not_poison = ap && bp && cp;
+    newval = expr::fshl(av, bv, cv);
     break;
   case FShr:
-    newval = expr::fshr(a, b, c);
-    not_poison = ap && bp && cp;
+    newval = expr::fshr(av, bv, cv);
     break;
   }
 
@@ -468,15 +499,23 @@ StateValue TernaryOp::toSMT(State &s) const {
 expr TernaryOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceIntOrVectorType() &&
-         getType() == A.getType() &&
-         getType() == B.getType() &&
-         getType() == C.getType();
+         getType() == a->getType() &&
+         getType() == b->getType() &&
+         getType() == c->getType();
 }
 
 unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {
-  return make_unique<TernaryOp>(getType(), getName() + suffix, A, B, C, op);
+  return make_unique<TernaryOp>(getType(), getName() + suffix, *a, *b, *c, op);
 }
 
+
+vector<Value*> ConversionOp::operands() const {
+  return { val };
+}
+
+void ConversionOp::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
 
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;
@@ -489,7 +528,7 @@ void ConversionOp::print(ostream &os) const {
   case Int2Ptr: str = "int2ptr "; break;
   }
 
-  os << getName() << " = " << str << val;
+  os << getName() << " = " << str << *val;
 
   if (auto ty = getType().toString();
       !ty.empty())
@@ -497,28 +536,28 @@ void ConversionOp::print(ostream &os) const {
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
-  auto &[v, vp] = s[val];
+  auto &[v, vp] = s[*val];
   expr newval;
   auto to_bw = getType().bits();
 
   switch (op) {
   case SExt:
-    newval = v.sext(to_bw - val.bits());
+    newval = v.sext(to_bw - val->bits());
     break;
   case ZExt:
-    newval = v.zext(to_bw - val.bits());
+    newval = v.zext(to_bw - val->bits());
     break;
   case Trunc:
     newval = v.trunc(to_bw);
     break;
   case BitCast:
-    if ((getType().isIntType() && val.getType().isIntType()) ||
-        (getType().isFloatType() && val.getType().isFloatType()) ||
-        (getType().isPtrType() && val.getType().isPtrType()))
+    if ((getType().isIntType() && val->getType().isIntType()) ||
+        (getType().isFloatType() && val->getType().isFloatType()) ||
+        (getType().isPtrType() && val->getType().isPtrType()))
       newval = v;
-    else if (getType().isIntType() && val.getType().isFloatType())
+    else if (getType().isIntType() && val->getType().isFloatType())
       newval = v.float2BV();
-    else if (getType().isFloatType() && val.getType().isIntType())
+    else if (getType().isFloatType() && val->getType().isIntType())
       newval = v.BV2float(getType().getDummyValue());
     else
       UNREACHABLE();
@@ -539,59 +578,69 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
   case SExt:
   case ZExt:
     c = getType().enforceIntOrVectorType() &&
-        getType().sameType(val.getType()) &&
-        val.getType().sizeVar().ult(getType().sizeVar());
+        getType().sameType(val->getType()) &&
+        val->getType().sizeVar().ult(getType().sizeVar());
     break;
   case Trunc:
     c = getType().enforceIntOrVectorType() &&
-        getType().sameType(val.getType()) &&
-        getType().sizeVar().ult(val.getType().sizeVar());
+        getType().sameType(val->getType()) &&
+        getType().sizeVar().ult(val->getType().sizeVar());
     break;
   case BitCast:
     // FIXME: input can only be ptr if result is a ptr as well
     c = getType().enforceIntOrPtrOrVectorType() &&
-        getType().sizeVar() == val.getType().sizeVar();
+        getType().sizeVar() == val->getType().sizeVar();
     break;
   case Ptr2Int:
     c = getType().enforceIntType() &&
-        val.getType().enforcePtrType();
+        val->getType().enforcePtrType();
     break;
   case Int2Ptr:
     c = getType().enforcePtrType() &&
-        val.getType().enforceIntType();
+        val->getType().enforceIntType();
     break;
   }
   return Value::getTypeConstraints() && move(c);
 }
 
 unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {
-  return make_unique<ConversionOp>(getType(), getName() + suffix, val, op);
+  return make_unique<ConversionOp>(getType(), getName() + suffix, *val, op);
 }
 
 
+vector<Value*> Select::operands() const {
+  return { cond, a, b };
+}
+
+void Select::rauw(const Value &what, Value &with) {
+  RAUW(cond);
+  RAUW(a);
+  RAUW(b);
+}
+
 void Select::print(ostream &os) const {
-  os << getName() << " = select " << cond << ", " << a << ", " << b;
+  os << getName() << " = select " << *cond << ", " << *a << ", " << *b;
 }
 
 StateValue Select::toSMT(State &s) const {
-  auto &[c, cp] = s[cond];
-  auto &[av, ap] = s[a];
-  auto &[bv, bp] = s[b];
+  auto &[c, cp] = s[*cond];
+  auto &[av, ap] = s[*a];
+  auto &[bv, bp] = s[*b];
   auto cond = c == 1u;
   return { expr::mkIf(cond, av, bv),
            cp && expr::mkIf(cond, ap, bp) };
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
-  return cond.getType().enforceIntType(1) &&
+  return cond->getType().enforceIntType(1) &&
          Value::getTypeConstraints() &&
          getType().enforceIntOrPtrOrVectorType() &&
-         getType() == a.getType() &&
-         getType() == b.getType();
+         getType() == a->getType() &&
+         getType() == b->getType();
 }
 
 unique_ptr<Instr> Select::dup(const string &suffix) const {
-  return make_unique<Select>(getType(), getName() + suffix, cond, a, b);
+  return make_unique<Select>(getType(), getName() + suffix, *cond, *a, *b);
 }
 
 
@@ -599,18 +648,26 @@ void ExtractValue::addIdx(unsigned idx) {
   idxs.emplace_back(idx);
 }
 
+vector<Value*> ExtractValue::operands() const {
+  return { val };
+}
+
+void ExtractValue::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
+
 void ExtractValue::print(ostream &os) const {
-  os << getName() << " = extractvalue " << val;
+  os << getName() << " = extractvalue " << *val;
   for (auto idx : idxs) {
     os << ", " << idx;
   }
 }
 
 StateValue ExtractValue::toSMT(State &s) const {
-  auto [v, p] = s[val];
+  auto [v, p] = s[*val];
 
   // TODO: add support for array type
-  Type *type = &val.getType();
+  Type *type = &val->getType();
   for (auto idx : idxs) {
     auto st = type->getAsStructType();
     v = st->extract(v, idx);
@@ -622,10 +679,10 @@ StateValue ExtractValue::toSMT(State &s) const {
 
 expr ExtractValue::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints() &&
-           val.getType().enforceAggregateType();
+           val->getType().enforceAggregateType();
 
   // TODO: add support for arrays
-  Type *type = &val.getType();
+  Type *type = &val->getType();
   unsigned i = 0;
   for (auto idx : idxs) {
     auto st = type->getAsStructType();
@@ -643,7 +700,7 @@ expr ExtractValue::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
-  auto ret = make_unique<ExtractValue>(getType(), getName() + suffix, val);
+  auto ret = make_unique<ExtractValue>(getType(), getName() + suffix, *val);
   for (auto idx : idxs) {
     ret->addIdx(idx);
   }
@@ -653,6 +710,16 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 
 void FnCall::addArg(Value &arg) {
   args.emplace_back(&arg);
+}
+
+vector<Value*> FnCall::operands() const {
+  return args;
+}
+
+void FnCall::rauw(const Value &what, Value &with) {
+  for (auto &arg : args) {
+    RAUW(arg);
+  }
 }
 
 void FnCall::print(ostream &os) const {
@@ -751,13 +818,22 @@ unique_ptr<Instr> FnCall::dup(const string &suffix) const {
 
 
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
-  : Instr(type, move(name)), a(a), b(b), cond(cond), defined(cond != Any) {
+  : Instr(type, move(name)), a(&a), b(&b), cond(cond), defined(cond != Any) {
   if (!defined)
     cond_name = getName() + "_cond";
 }
 
 expr ICmp::cond_var() const {
   return defined ? expr::mkUInt(cond, 4) : expr::mkVar(cond_name.c_str(), 4);
+}
+
+vector<Value*> ICmp::operands() const {
+  return { a, b };
+}
+
+void ICmp::rauw(const Value &what, Value &with) {
+  RAUW(a);
+  RAUW(b);
 }
 
 void ICmp::print(ostream &os) const {
@@ -775,7 +851,7 @@ void ICmp::print(ostream &os) const {
   case UGT: condtxt = "ugt "; break;
   case Any: condtxt = ""; break;
   }
-  os << getName() << " = icmp " << condtxt << a << ", " << b.getName();
+  os << getName() << " = icmp " << condtxt << *a << ", " << b->getName();
 }
 
 static StateValue build_icmp_chain(const expr &var,
@@ -793,13 +869,13 @@ static StateValue build_icmp_chain(const expr &var,
 }
 
 StateValue ICmp::toSMT(State &s) const {
-  auto &a_eval = s[a];
-  auto &b_eval = s[b];
+  auto &a_eval = s[*a];
+  auto &b_eval = s[*b];
   auto &av = a_eval.value, &bv = b_eval.value;
   function<StateValue(Cond)> fn;
   expr val, non_poison = a_eval.non_poison && b_eval.non_poison;
 
-  if (a.getType().isPtrType()) {
+  if (a->getType().isPtrType()) {
     Pointer lhs(s.getMemory(), av);
     Pointer rhs(s.getMemory(), bv);
 
@@ -848,14 +924,23 @@ StateValue ICmp::toSMT(State &s) const {
 expr ICmp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceIntType(1) &&
-         a.getType().enforceIntOrPtrOrVectorType() &&
-         a.getType() == b.getType();
+         a->getType().enforceIntOrPtrOrVectorType() &&
+         a->getType() == b->getType();
 }
 
 unique_ptr<Instr> ICmp::dup(const string &suffix) const {
-  return make_unique<ICmp>(getType(), getName() + suffix, cond, a, b);
+  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b);
 }
 
+
+vector<Value*> FCmp::operands() const {
+  return { a, b };
+}
+
+void FCmp::rauw(const Value &what, Value &with) {
+  RAUW(a);
+  RAUW(b);
+}
 
 void FCmp::print(ostream &os) const {
   const char *condtxt = nullptr;
@@ -875,12 +960,12 @@ void FCmp::print(ostream &os) const {
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
   }
-  os << getName() << " = fcmp " << condtxt << a << ", " << b.getName();
+  os << getName() << " = fcmp " << condtxt << *a << ", " << b->getName();
 }
 
 StateValue FCmp::toSMT(State &s) const {
-  auto &[av, ap] = s[a];
-  auto &[bv, bp] = s[b];
+  auto &[av, ap] = s[*a];
+  auto &[bv, bp] = s[*b];
   expr val;
   switch (cond) {
   case OEQ:   val = av.foeq(bv); break;
@@ -904,21 +989,29 @@ StateValue FCmp::toSMT(State &s) const {
 expr FCmp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceIntType(1) &&
-         a.getType().enforceFloatType() &&
-         a.getType() == b.getType();
+         a->getType().enforceFloatType() &&
+         a->getType() == b->getType();
 }
 
 unique_ptr<Instr> FCmp::dup(const string &suffix) const {
-  return make_unique<FCmp>(getType(), getName() + suffix, cond, a, b);
+  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b);
 }
 
 
+vector<Value*> Freeze::operands() const {
+  return { val };
+}
+
+void Freeze::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
+
 void Freeze::print(ostream &os) const {
-  os << getName() << " = freeze " << val;
+  os << getName() << " = freeze " << *val;
 }
 
 StateValue Freeze::toSMT(State &s) const {
-  auto &[v, p] = s[val];
+  auto &[v, p] = s[*val];
   s.resetUndefVars();
 
   if (p.isTrue())
@@ -933,16 +1026,32 @@ StateValue Freeze::toSMT(State &s) const {
 
 expr Freeze::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType() == val.getType();
+         getType() == val->getType();
 }
 
 unique_ptr<Instr> Freeze::dup(const string &suffix) const {
-  return make_unique<Freeze>(getType(), getName() + suffix, val);
+  return make_unique<Freeze>(getType(), getName() + suffix, *val);
 }
 
 
 void Phi::addValue(Value &val, string &&BB_name) {
-  values.emplace_back(val, move(BB_name));
+  values.emplace_back(&val, move(BB_name));
+}
+
+vector<Value*> Phi::operands() const {
+  vector<Value*> v;
+  for (auto &[val, bb] : values) {
+    (void)bb;
+    v.emplace_back(val);
+  }
+  return v;
+}
+
+void Phi::rauw(const Value &what, Value &with) {
+  for (auto &[val, bb] : values) {
+    (void)bb;
+    RAUW(val);
+  }
 }
 
 void Phi::print(ostream &os) const {
@@ -955,7 +1064,7 @@ void Phi::print(ostream &os) const {
   for (auto &[val, bb] : values) {
     if (!first)
       os << ", ";
-    os << "[ " << val.getName() << ", " << bb << " ]";
+    os << "[ " << val->getName() << ", " << bb << " ]";
     first = false;
   }
 }
@@ -969,7 +1078,7 @@ StateValue Phi::toSMT(State &s) const {
     if (!pre) // jump from unreachable BB
       continue;
 
-    auto v = s[val];
+    auto v = s[*val];
     if (first) {
       ret = v;
       first = false;
@@ -984,7 +1093,7 @@ expr Phi::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints();
   for (auto &[val, bb] : values) {
     (void)bb;
-    c &= val.getType() == getType();
+    c &= val->getType() == getType();
   }
   return c;
 }
@@ -992,7 +1101,7 @@ expr Phi::getTypeConstraints(const Function &f) const {
 unique_ptr<Instr> Phi::dup(const string &suffix) const {
   auto phi = make_unique<Phi>(getType(), getName() + suffix);
   for (auto &[val, bb] : values) {
-    phi->addValue(val, string(bb));
+    phi->addValue(*val, string(bb));
   }
   return phi;
 }
@@ -1020,6 +1129,16 @@ JumpInstr::target_iterator JumpInstr::it_helper::end() const {
   return { instr, idx };
 }
 
+
+vector<Value*> Branch::operands() const {
+  if (cond)
+    return { cond };
+  return {};
+}
+
+void Branch::rauw(const Value &what, Value &with) {
+  RAUW(cond);
+}
 
 void Branch::print(ostream &os) const {
   os << "br ";
@@ -1051,23 +1170,40 @@ unique_ptr<Instr> Branch::dup(const string &suffix) const {
 
 
 void Switch::addTarget(Value &val, const BasicBlock &target) {
-  targets.emplace_back(val, target);
+  targets.emplace_back(&val, target);
+}
+
+vector<Value*> Switch::operands() const {
+  vector<Value*> ret = { value };
+  for (auto &[val, target] : targets) {
+    (void)target;
+    ret.emplace_back(val);
+  }
+  return ret;
+}
+
+void Switch::rauw(const Value &what, Value &with) {
+  RAUW(value);
+  for (auto &[val, target] : targets) {
+    (void)target;
+    RAUW(val);
+  }
 }
 
 void Switch::print(ostream &os) const {
-  os << "switch " << value << ", label " << default_target.getName() << " [\n";
+  os << "switch " << *value << ", label " << default_target.getName() << " [\n";
   for (auto &[val, target] : targets) {
-    os << "    " << val << ", label " << target.getName() << '\n';
+    os << "    " << *val << ", label " << target.getName() << '\n';
   }
   os << "  ]";
 }
 
 StateValue Switch::toSMT(State &s) const {
-  auto val = s[value];
+  auto val = s[*value];
   expr default_cond(true);
 
   for (auto &[value_cond, bb] : targets) {
-    auto target = s[value_cond];
+    auto target = s[*value_cond];
     assert(target.non_poison.isTrue());
     s.addJump({ val.value == target.value, expr(val.non_poison) }, bb);
     default_cond &= val.value != target.value;
@@ -1079,48 +1215,64 @@ StateValue Switch::toSMT(State &s) const {
 }
 
 expr Switch::getTypeConstraints(const Function &f) const {
-  expr typ = value.getType().enforceIntType();
+  expr typ = value->getType().enforceIntType();
   for (auto &p : targets) {
-    typ &= p.first.getType().enforceIntType();
+    typ &= p.first->getType().enforceIntType();
   }
   return typ;
 }
 
 unique_ptr<Instr> Switch::dup(const string &suffix) const {
-  auto sw = make_unique<Switch>(value, default_target);
+  auto sw = make_unique<Switch>(*value, default_target);
   for (auto &[value_cond, bb] : targets) {
-    sw->addTarget(value_cond, bb);
+    sw->addTarget(*value_cond, bb);
   }
   return sw;
 }
 
 
+vector<Value*> Return::operands() const {
+  return { val };
+}
+
+void Return::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
+
 void Return::print(ostream &os) const {
-  os << "ret " << val;
+  os << "ret " << *val;
 }
 
 StateValue Return::toSMT(State &s) const {
-  s.addReturn(s[val]);
+  s.addReturn(s[*val]);
   return {};
 }
 
 expr Return::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType() == val.getType() &&
+         getType() == val->getType() &&
          f.getType() == getType();
 }
 
 unique_ptr<Instr> Return::dup(const string &suffix) const {
-  return make_unique<Return>(getType(), val);
+  return make_unique<Return>(getType(), *val);
 }
 
 
+vector<Value*> Assume::operands() const {
+  return { cond };
+}
+
+void Assume::rauw(const Value &what, Value &with) {
+  RAUW(cond);
+}
+
 void Assume::print(ostream &os) const {
-  os << (if_non_poison ? "assume_non_poison " : "assume ") << cond;
+  os << (if_non_poison ? "assume_non_poison " : "assume ") << *cond;
 }
 
 StateValue Assume::toSMT(State &s) const {
-  auto &[v, np] = s[cond];
+  auto &[v, np] = s[*cond];
   if (if_non_poison)
     s.addUB(np.implies(v != 0));
   else
@@ -1129,20 +1281,28 @@ StateValue Assume::toSMT(State &s) const {
 }
 
 expr Assume::getTypeConstraints(const Function &f) const {
-  return cond.getType().enforceIntType();
+  return cond->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Assume::dup(const string &suffix) const {
-  return make_unique<Assume>(cond, if_non_poison);
+  return make_unique<Assume>(*cond, if_non_poison);
 }
 
 
+vector<Value*> Alloc::operands() const {
+  return { size };
+}
+
+void Alloc::rauw(const Value &what, Value &with) {
+  RAUW(size);
+}
+
 void Alloc::print(std::ostream &os) const {
-  os << getName() << " = alloca " << size << ", align " << align;
+  os << getName() << " = alloca " << *size << ", align " << align;
 }
 
 StateValue Alloc::toSMT(State &s) const {
-  auto &[sz, np] = s[size];
+  auto &[sz, np] = s[*size];
   s.addUB(np);
   return { s.getMemory().alloc(sz, align, true), true };
 }
@@ -1150,51 +1310,76 @@ StateValue Alloc::toSMT(State &s) const {
 expr Alloc::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforcePtrType() &&
-         size.getType().enforceIntType();
+         size->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
-  return make_unique<Alloc>(getType(), getName() + suffix, size, align);
+  return make_unique<Alloc>(getType(), getName() + suffix, *size, align);
 }
 
 
+vector<Value*> Free::operands() const {
+  return { ptr };
+}
+
+void Free::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
 void Free::print(std::ostream &os) const {
-  os << "free " << ptr;
+  os << "free " << *ptr;
 }
 
 StateValue Free::toSMT(State &s) const {
-  auto &[p, np] = s[ptr];
+  auto &[p, np] = s[*ptr];
   s.addUB(np);
   s.getMemory().free(p);
   return {};
 }
 
 expr Free::getTypeConstraints(const Function &f) const {
-  return ptr.getType().enforcePtrType();
+  return ptr->getType().enforcePtrType();
 }
 
 unique_ptr<Instr> Free::dup(const string &suffix) const {
-  return make_unique<Free>(ptr);
+  return make_unique<Free>(*ptr);
 }
 
 
 void GEP::addIdx(unsigned obj_size, Value &idx) {
-  idxs.emplace_back(obj_size, idx);
+  idxs.emplace_back(obj_size, &idx);
+}
+
+vector<Value*> GEP::operands() const {
+  vector<Value*> v = { ptr };
+  for (auto &[sz, idx] : idxs) {
+    (void)sz;
+    v.emplace_back(idx);
+  }
+  return v;
+}
+
+void GEP::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  for (auto &[sz, idx] : idxs) {
+    (void)sz;
+    RAUW(idx);
+  }
 }
 
 void GEP::print(std::ostream &os) const {
   os << getName() << " = gep ";
   if (inbounds)
     os << "inbounds ";
-  os << ptr;
+  os << *ptr;
 
   for (auto &[sz, idx] : idxs) {
-    os << ", " << sz << " x " << idx;
+    os << ", " << sz << " x " << *idx;
   }
 }
 
 StateValue GEP::toSMT(State &s) const {
-  auto [val, non_poison] = s[ptr];
+  auto [val, non_poison] = s[*ptr];
   unsigned bits_offset = s.getMemory().bitsOffset();
 
   Pointer ptr(s.getMemory(), move(val));
@@ -1202,7 +1387,7 @@ StateValue GEP::toSMT(State &s) const {
     non_poison &= ptr.inbounds();
 
   for (auto &[sz, idx] : idxs) {
-    auto &[v, np] = s[idx];
+    auto &[v, np] = s[*idx];
     auto multiplier = expr::mkUInt(sz, bits_offset);
     auto val = v.sextOrTrunc(bits_offset);
     auto inc = multiplier * val;
@@ -1222,62 +1407,79 @@ StateValue GEP::toSMT(State &s) const {
 }
 
 expr GEP::getTypeConstraints(const Function &f) const {
-  auto c = getType() == ptr.getType() &&
-           ptr.getType().enforcePtrType();
+  auto c = getType() == ptr->getType() &&
+           getType().enforcePtrType();
   for (auto &[sz, idx] : idxs) {
     (void)sz;
-    c &= idx.getType().enforceIntType();
+    c &= idx->getType().enforceIntType();
   }
   return c;
 }
 
 unique_ptr<Instr> GEP::dup(const string &suffix) const {
-  auto dup = make_unique<GEP>(getType(), getName() + suffix, ptr, inbounds);
+  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds);
   for (auto &[sz, idx] : idxs) {
-    dup->addIdx(sz, idx);
+    dup->addIdx(sz, *idx);
   }
   return dup;
 }
 
 
+vector<Value*> Load::operands() const {
+  return { ptr };
+}
+
+void Load::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
 void Load::print(std::ostream &os) const {
-  os << getName() << " = load " << getType() << ", " << ptr
+  os << getName() << " = load " << getType() << ", " << *ptr
      << ", align " << align;
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto &[p, np] = s[ptr];
+  auto &[p, np] = s[*ptr];
   s.addUB(np);
   return s.getMemory().load(p, getType(), align);
 }
 
 expr Load::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         ptr.getType().enforcePtrType();
+         ptr->getType().enforcePtrType();
 }
 
 unique_ptr<Instr> Load::dup(const string &suffix) const {
-  return make_unique<Load>(getType(), getName() + suffix, ptr, align);
+  return make_unique<Load>(getType(), getName() + suffix, *ptr, align);
 }
 
 
+vector<Value*> Store::operands() const {
+  return { val, ptr };
+}
+
+void Store::rauw(const Value &what, Value &with) {
+  RAUW(val);
+  RAUW(ptr);
+}
+
 void Store::print(std::ostream &os) const {
-  os << "store " << val << ", " << ptr << ", align " << align;
+  os << "store " << *val << ", " << *ptr << ", align " << align;
 }
 
 StateValue Store::toSMT(State &s) const {
-  auto &[p, np] = s[ptr];
+  auto &[p, np] = s[*ptr];
   s.addUB(np);
-  s.getMemory().store(p, s[val], val.getType(), align);
+  s.getMemory().store(p, s[*val], val->getType(), align);
   return {};
 }
 
 expr Store::getTypeConstraints(const Function &f) const {
-  return ptr.getType().enforcePtrType();
+  return ptr->getType().enforcePtrType();
 }
 
 unique_ptr<Instr> Store::dup(const string &suffix) const {
-  return make_unique<Store>(ptr, val, align);
+  return make_unique<Store>(*ptr, *val, align);
 }
 
 }

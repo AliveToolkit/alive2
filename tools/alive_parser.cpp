@@ -387,10 +387,40 @@ static Value& parse_operand(Type &type) {
 
     auto instr_src = dynamic_cast<Instr*>(val_src);
     assert(instr_src);
-
-    // TODO: add support for recursive copy
     auto tgt_instr = instr_src->dup("");
-    // TODO: rauw operands with this fn own values
+
+    for (auto &op : instr_src->operands()) {
+      if (dynamic_cast<Input*>(op)) {
+        tgt_instr->rauw(*op, *identifiers.at(op->getName()));
+      } else if (dynamic_cast<UndefValue*>(op)) {
+        auto newop = make_unique<UndefValue>(type);
+        tgt_instr->rauw(*op, *newop.get());
+        fn->addUndef(move(newop));
+      } else if (dynamic_cast<PoisonValue*>(op)) {
+        auto newop = make_unique<PoisonValue>(type);
+        tgt_instr->rauw(*op, *newop.get());
+        fn->addConstant(move(newop));
+      } else if (auto c = dynamic_cast<IntConst*>(op)) {
+        auto newop = make_unique<IntConst>(*c);
+        tgt_instr->rauw(*op, *newop.get());
+        fn->addConstant(move(newop));
+      } else if (auto c = dynamic_cast<FloatConst*>(op)) {
+        auto newop = make_unique<FloatConst>(*c);
+        tgt_instr->rauw(*op, *newop.get());
+        fn->addConstant(move(newop));
+      } else if (dynamic_cast<ConstantInput*>(op)) {
+        assert(0 && "TODO");
+      } else if (dynamic_cast<ConstantBinOp*>(op)) {
+        assert(0 && "TODO");
+      } else if (dynamic_cast<ConstantFn*>(op)) {
+        assert(0 && "TODO");
+      } else if (dynamic_cast<Instr*>(op)) {
+        error("TODO: unsupported recursive instr copy from src to tgt");
+      } else {
+        UNREACHABLE();
+      }
+    }
+
     auto ret = tgt_instr.get();
     identifiers.emplace(move(id), ret);
     bb->addInstr(move(tgt_instr));

@@ -1,0 +1,4 @@
+%a = add i7 %x, %y
+%r = add %a, %a
+  =>
+%r = shl %a, 1

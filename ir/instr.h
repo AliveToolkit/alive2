@@ -18,6 +18,8 @@ protected:
   Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
 
 public:
+  virtual std::vector<Value*> operands() const = 0;
+  virtual void rauw(const Value &what, Value &with) = 0;
   virtual smt::expr eqType(const Instr &i) const;
   smt::expr getTypeConstraints() const override;
   virtual smt::expr getTypeConstraints(const Function &f) const = 0;
@@ -37,7 +39,7 @@ public:
                NNAN = 8, NINF = 16, NNANNINF = 24};
 
 private:
-  Value &lhs, &rhs;
+  Value *lhs, *rhs;
   Op op;
   Flags flags;
 
@@ -45,6 +47,8 @@ public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
         Flags flags = None);
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -57,12 +61,15 @@ public:
   enum Op { Copy, BitReverse, BSwap, Ctpop, FNeg };
 
 private:
-  Value &val;
+  Value *val;
   Op op;
 
 public:
   UnaryOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(val), op(op) {}
+    : Instr(type, std::move(name)), val(&val), op(op) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -75,14 +82,15 @@ public:
   enum Op { FShl, FShr };
 
 private:
-  Value &A, &B, &C;
+  Value *a, *b, *c;
   Op op;
 
 public:
-  TernaryOp(Type &type, std::string &&name, Value &A, Value &B, Value &C,
-            Op op)
-      : Instr(type, std::move(name)), A(A), B(B), C(C), op(op) {}
+  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c, Op op)
+      : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -95,12 +103,15 @@ public:
   enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
 
 private:
-  Value &val;
+  Value *val;
   Op op;
 
 public:
   ConversionOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(val), op(op) {}
+    : Instr(type, std::move(name)), val(&val), op(op) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -109,10 +120,13 @@ public:
 
 
 class Select final : public Instr {
-  Value &cond, &a, &b;
+  Value *cond, *a, *b;
 public:
   Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
-    : Instr(type, std::move(name)), cond(cond), a(a), b(b) {}
+    : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -121,12 +135,15 @@ public:
 
 
 class ExtractValue final : public Instr {
-  Value &val;
+  Value *val;
   std::vector<unsigned> idxs;
 public:
   ExtractValue(Type &type, std::string &&name, Value &val)
-    : Instr(type, std::move(name)), val(val) {}
+    : Instr(type, std::move(name)), val(&val) {}
   void addIdx(unsigned idx);
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -141,6 +158,9 @@ public:
   FnCall(Type &type, std::string &&name, std::string &&fnName)
     : Instr(type, std::move(name)), fnName(std::move(fnName)) {}
   void addArg(Value &arg);
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -153,7 +173,7 @@ public:
   enum Cond { EQ, NE, SLE, SLT, SGE, SGT, ULE, ULT, UGE, UGT, Any };
 
 private:
-  Value &a, &b;
+  Value *a, *b;
   std::string cond_name;
   Cond cond;
   bool defined;
@@ -161,6 +181,9 @@ private:
 
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -174,13 +197,15 @@ public:
               UEQ, UGT, UGE, ULT, ULE, UNE, UNO };
 
 private:
-  Value &a, &b;
+  Value *a, *b;
   Cond cond;
 
 public:
   FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b)
-    : Instr(type, move(name)), a(a), b(b), cond(cond) {}
+    : Instr(type, move(name)), a(&a), b(&b), cond(cond) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -189,11 +214,13 @@ public:
 
 
 class Freeze final : public Instr {
-  Value &val;
+  Value *val;
 public:
   Freeze(Type &type, std::string &&name, Value &val)
-    : Instr(type, std::move(name)), val(val) {}
+    : Instr(type, std::move(name)), val(&val) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -202,12 +229,14 @@ public:
 
 
 class Phi final : public Instr {
-  std::vector<std::pair<Value&, std::string>> values;
+  std::vector<std::pair<Value*, std::string>> values;
 public:
   Phi(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
 
   void addValue(Value &val, std::string &&BB_name);
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -254,6 +283,8 @@ public:
 
   auto& getTrue() const { return dst_true; }
   auto getFalse() const { return dst_false; }
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -262,13 +293,13 @@ public:
 
 
 class Switch final : public JumpInstr {
-  Value &value;
+  Value *value;
   const BasicBlock &default_target;
-  std::vector<std::pair<Value&, const BasicBlock&>> targets;
+  std::vector<std::pair<Value*, const BasicBlock&>> targets;
 
 public:
   Switch(Value &value, const BasicBlock &default_target)
-    : JumpInstr(Type::voidTy, "switch"), value(value),
+    : JumpInstr(Type::voidTy, "switch"), value(&value),
       default_target(default_target) {}
 
   void addTarget(Value &val, const BasicBlock &target);
@@ -277,6 +308,8 @@ public:
   auto& getTarget(unsigned i) const { return targets[i]; }
   auto& getDefault() const { return default_target; }
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -285,10 +318,12 @@ public:
 
 
 class Return final : public Instr {
-  Value &val;
+  Value *val;
 public:
-  Return(Type &type, Value &val) : Instr(type, "return"), val(val) {}
+  Return(Type &type, Value &val) : Instr(type, "return"), val(&val) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -297,12 +332,15 @@ public:
 
 
 class Assume final : public Instr {
-  Value &cond;
+  Value *cond;
   bool if_non_poison; /// cond only needs to hold if non-poison
 public:
   Assume(Value &cond, bool if_non_poison)
-    : Instr(Type::voidTy, "assume"), cond(cond), if_non_poison(if_non_poison) {}
+    : Instr(Type::voidTy, "assume"), cond(&cond),
+      if_non_poison(if_non_poison) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -312,12 +350,14 @@ public:
 
 // TODO: only supports alloca for now
 class Alloc final : public Instr {
-  Value &size;
+  Value *size;
   unsigned align;
 public:
   Alloc(Type &type, std::string &&name, Value &size, unsigned align)
-    : Instr(type, std::move(name)), size(size), align(align) {}
+    : Instr(type, std::move(name)), size(&size), align(align) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -326,10 +366,12 @@ public:
 
 
 class Free final : public Instr {
-  Value &ptr;
+  Value *ptr;
 public:
-  Free(Value &ptr) : Instr(Type::voidTy, "free"), ptr(ptr) {}
+  Free(Value &ptr) : Instr(Type::voidTy, "free"), ptr(&ptr) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -338,15 +380,17 @@ public:
 
 
 class GEP final : public Instr {
-  Value &ptr;
-  std::vector<std::pair<unsigned, Value&>> idxs;
+  Value *ptr;
+  std::vector<std::pair<unsigned, Value*>> idxs;
   bool inbounds;
 public:
   GEP(Type &type, std::string &&name, Value &ptr, bool inbounds)
-    : Instr(type, std::move(name)), ptr(ptr), inbounds(inbounds) {}
+    : Instr(type, std::move(name)), ptr(&ptr), inbounds(inbounds) {}
 
   void addIdx(unsigned obj_size, Value &idx);
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -355,12 +399,14 @@ public:
 
 
 class Load final : public Instr {
-  Value &ptr;
+  Value *ptr;
   unsigned align;
 public:
   Load(Type &type, std::string &&name, Value &ptr, unsigned align)
-    : Instr(type, std::move(name)), ptr(ptr), align(align) {}
+    : Instr(type, std::move(name)), ptr(&ptr), align(align) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
@@ -369,12 +415,14 @@ public:
 
 
 class Store final : public Instr {
-  Value &ptr, &val;
+  Value *ptr, *val;
   unsigned align;
 public:
   Store(Value &ptr, Value &val, unsigned align)
-    : Instr(Type::voidTy, "store"), ptr(ptr), val(val), align(align) {}
+    : Instr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
 
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
