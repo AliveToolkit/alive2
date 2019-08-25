@@ -734,8 +734,7 @@ expr SymbolicType::operator==(const Type &b) const {
     expr c(false);
     c |= isInt()    && i == rhs->i;
     c |= isFloat()  && f == rhs->f;
-    // TODO: to reenable this, we need partial models and/or a shrinker
-    //c |= isPtr()    && p == rhs->p;
+    c |= isPtr()    && p == rhs->p;
     c |= isArray()  && a == rhs->a;
     c |= isVector() && v == rhs->v;
     // FIXME: add support for this: c |= isStruct() && s == rhs->s;

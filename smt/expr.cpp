@@ -973,6 +973,22 @@ void expr::operator|=(const expr &rhs) {
   }
 }
 
+expr expr::mk_and(const set<expr> &vals) {
+  expr ret(true);
+  for (auto &e : vals) {
+    ret &= e;
+  }
+  return ret;
+}
+
+expr expr::mk_or(const set<expr> &vals) {
+  expr ret(false);
+  for (auto &e : vals) {
+    ret |= e;
+  }
+  return ret;
+}
+
 expr expr::implies(const expr &rhs) const {
   if (eq(rhs))
     return true;

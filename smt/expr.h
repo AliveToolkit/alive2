@@ -197,6 +197,9 @@ public:
   void operator&=(const expr &rhs);
   void operator|=(const expr &rhs);
 
+  static expr mk_and(const std::set<expr> &vals);
+  static expr mk_or(const std::set<expr> &vals);
+
   expr implies(const expr &rhs) const;
   expr notImplies(const expr &rhs) const;
 

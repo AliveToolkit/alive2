@@ -84,12 +84,11 @@ private:
 
 class Solver;
 
-class SolverPop {
+class SolverPush {
   Solver &s;
-  SolverPop(Solver &s) : s(s) {}
 public:
-  ~SolverPop();
-  friend class Solver;
+  SolverPush(Solver &s);
+  ~SolverPush();
 };
 
 
@@ -102,14 +101,15 @@ public:
   ~Solver();
 
   void add(const expr &e);
-  void block(const Model &m);
-  SolverPop push();
+  void block(const Model &m, bool minimize = false);
   void reset();
+
+  expr assertions() const;
 
   Result check() const;
   static void check(std::initializer_list<E> queries);
 
-  friend class SolverPop;
+  friend class SolverPush;
 };
 
 

@@ -332,7 +332,7 @@ void TypingAssignments::operator++(void) {
     is_unsat = true;
   } else {
     EnableSMTQueriesTMP tmp;
-    s.block(r.getModel());
+    s.block(r.getModel(), /*minimize=*/true);
     r = s.check();
     assert(!r.isUnknown());
   }

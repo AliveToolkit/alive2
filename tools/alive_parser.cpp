@@ -626,9 +626,10 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
 
   ConversionOp::Op op;
   switch (op_token) {
-  case SEXT:  op = ConversionOp::SExt; break;
-  case ZEXT:  op = ConversionOp::ZExt; break;
-  case TRUNC: op = ConversionOp::Trunc; break;
+  case BITCAST: op = ConversionOp::BitCast; break;
+  case SEXT:    op = ConversionOp::SExt; break;
+  case ZEXT:    op = ConversionOp::ZExt; break;
+  case TRUNC:   op = ConversionOp::Trunc; break;
   default:
     UNREACHABLE();
   }
@@ -810,6 +811,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FSHL:
   case FSHR:
     return parse_ternary(name, t);
+  case BITCAST:
   case SEXT:
   case ZEXT:
   case TRUNC:

@@ -200,7 +200,11 @@ ostream& operator<<(ostream &os, const Model &m) {
 }
 
 
-SolverPop::~SolverPop() {
+SolverPush::SolverPush(Solver &s) : s(s) {
+  Z3_solver_push(ctx(), s.s);
+}
+
+SolverPush::~SolverPush() {
   Z3_solver_pop(ctx(), s.s, 1);
 }
 
@@ -233,22 +237,47 @@ void Solver::add(const expr &e) {
   }
 }
 
-void Solver::block(const Model &m) {
-  expr c(false);
+void Solver::block(const Model &m, bool minimize) {
+  set<expr> assignments;
   for (const auto &[var, val] : m) {
-    c |= var != val;
+    assignments.insert(var == val);
   }
-  add(c);
-}
 
-SolverPop Solver::push() {
-  Z3_solver_push(ctx(), s);
-  return *this;
+  if (minimize) {
+    // simple left-to-right variable discard algorithm
+    Solver s;
+    s.add(!assertions());
+
+    for (auto I = assignments.begin(); I != assignments.end(); ) {
+      SolverPush push(s);
+      expr val = *I;
+      I = assignments.erase(I);
+
+      s.add(expr::mk_and(assignments));
+      if (!s.check().isUnsat())
+        assignments.insert(val);
+    }
+  }
+
+  add(!expr::mk_and(assignments));
 }
 
 void Solver::reset() {
   Z3_solver_reset(ctx(), s);
   tactic->reset_solver();
+}
+
+expr Solver::assertions() const {
+  auto vect = Z3_solver_get_assertions(ctx(), s);
+  Z3_ast_vector_inc_ref(ctx(), vect);
+  expr ret(true);
+
+  for (unsigned i = 0, e = Z3_ast_vector_size(ctx(), vect); i != e; ++i) {
+    ret &= Z3_ast_vector_get(ctx(), vect, i);
+  }
+
+  Z3_ast_vector_dec_ref(ctx(), vect);
+  return ret;
 }
 
 Result Solver::check() const {

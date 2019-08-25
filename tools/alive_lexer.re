@@ -187,6 +187,7 @@ re2c:yyfill:check = 0;
 "nsw" { return NSW; }
 "nuw" { return NUW; }
 "exact" { return EXACT; }
+"bitcast" { return BITCAST; }
 "sext" { return SEXT; }
 "zext" { return ZEXT; }
 "trunc" { return TRUNC; }
