@@ -135,6 +135,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   )
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   target_link_libraries(llvm_util PRIVATE ALIVELLVM)
+  target_link_libraries(llvm_util PRIVATE ir)
   target_link_libraries(alive2 PUBLIC llvm_util)
 
   add_llvm_executable(alive-tv
