@@ -48,9 +48,13 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
 
 # cmake <3.11 requires some source to be specified for add_library()
 file(TOUCH "${PROJECT_BINARY_DIR}/dummy.h")
-add_library(alive2 "${PROJECT_BINARY_DIR}/dummy.h")
-# Do *NOT* clarify whether it should be STATIC or SHARED, defer to CMake's BUILD_SHARED_LIBS.
-# All sub-libs, however, can either do the same or be explicitly specified as STATIC.
+if(BUILD_SHARED_LIBS)
+  add_library(alive2 SHARED "${PROJECT_BINARY_DIR}/dummy.h")
+  set(VISIBILITY PUBLIC)
+else()
+  add_library(alive2 INTERFACE)
+  set(VISIBILITY INTERFACE)
+endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -65,7 +69,7 @@ set(IR_SRCS
   ir/value.cpp
 )
 add_library(ir STATIC ${IR_SRCS})
-target_link_libraries(alive2 PUBLIC ir)
+target_link_libraries(alive2 ${VISIBILITY} ir)
 
 set(SMT_SRCS
   smt/ctx.cpp
@@ -75,14 +79,14 @@ set(SMT_SRCS
 )
 add_library(smt STATIC ${SMT_SRCS})
 target_link_libraries(smt PRIVATE Z3::Z3)
-target_link_libraries(alive2 PUBLIC smt)
+target_link_libraries(alive2 ${VISIBILITY} smt)
 
 set(TOOLS_SRCS
   tools/transform.cpp
 )
 add_library(tools STATIC ${TOOLS_SRCS})
 target_link_libraries(tools PRIVATE ir)
-target_link_libraries(alive2 PUBLIC tools)
+target_link_libraries(alive2 ${VISIBILITY} tools)
 
 set(UTIL_SRCS
   util/compiler.cpp
@@ -92,7 +96,7 @@ set(UTIL_SRCS
   util/symexec.cpp
 )
 add_library(util STATIC ${UTIL_SRCS})
-target_link_libraries(alive2 PUBLIC util)
+target_link_libraries(alive2 ${VISIBILITY} util)
 
 add_executable(alive
                "tools/alive.cpp"
@@ -137,7 +141,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   target_link_libraries(llvm_util PRIVATE ALIVELLVM)
   target_link_libraries(llvm_util PRIVATE ir)
-  target_link_libraries(alive2 PUBLIC llvm_util)
+  target_link_libraries(alive2 ${VISIBILITY} llvm_util)
 
   add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
