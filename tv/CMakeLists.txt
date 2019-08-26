@@ -5,7 +5,7 @@ else()
   add_llvm_library(tv MODULE tv.cpp)
 endif()
 
-target_link_libraries(tv PRIVATE ALIVELLVM $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
+target_link_libraries(tv PRIVATE alive2 ALIVELLVM $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
 
 if(APPLE)
     set_target_properties(tv PROPERTIES
