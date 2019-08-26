@@ -80,6 +80,7 @@ set(TOOLS_SRCS
   tools/transform.cpp
 )
 add_library(tools STATIC ${TOOLS_SRCS})
+target_link_libraries(tools PRIVATE ir)
 target_link_libraries(alive2 PUBLIC tools)
 
 set(UTIL_SRCS
