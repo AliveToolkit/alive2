@@ -6,6 +6,10 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
+if (NOT DEFINED BUILD_SHARED_LIBS)
+  set(BUILD_SHARED_LIBS ON)
+endif()
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if (MSVC)
@@ -31,7 +35,6 @@ if (CYGWIN)
 endif()
 
 find_package(Z3 4.8.4 REQUIRED)
-include_directories(${Z3_INCLUDE_DIR})
 
 find_program(RE2C re2c)
 message(STATUS "RE2C: ${RE2C}")
@@ -41,6 +44,12 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                    "-o" "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                    "${PROJECT_SOURCE_DIR}/tools/alive_lexer.re"
                    DEPENDS "tools/alive_lexer.re")
+
+# cmake <3.11 requires some source to be specified for add_library()
+file(TOUCH "${PROJECT_BINARY_DIR}/dummy.h")
+add_library(alive2 "${PROJECT_BINARY_DIR}/dummy.h")
+# Do *NOT* clarify whether it should be STATIC or SHARED, defer to CMake's BUILD_SHARED_LIBS.
+# All sub-libs, however, can either do the same or be explicitly specified as STATIC.
 
 include_directories(${PROJECT_SOURCE_DIR})
 
@@ -54,8 +63,8 @@ set(IR_SRCS
   ir/type.cpp
   ir/value.cpp
 )
-
 add_library(ir STATIC ${IR_SRCS})
+target_link_libraries(alive2 PUBLIC ir)
 
 set(SMT_SRCS
   smt/ctx.cpp
@@ -63,14 +72,15 @@ set(SMT_SRCS
   smt/smt.cpp
   smt/solver.cpp
 )
-
 add_library(smt STATIC ${SMT_SRCS})
+target_link_libraries(smt PRIVATE Z3::Z3)
+target_link_libraries(alive2 PUBLIC smt)
 
 set(TOOLS_SRCS
   tools/transform.cpp
 )
-
 add_library(tools STATIC ${TOOLS_SRCS})
+target_link_libraries(alive2 PUBLIC tools)
 
 set(UTIL_SRCS
   util/compiler.cpp
@@ -79,11 +89,19 @@ set(UTIL_SRCS
   util/file.cpp
   util/symexec.cpp
 )
-
 add_library(util STATIC ${UTIL_SRCS})
+target_link_libraries(alive2 PUBLIC util)
 
-set(ALIVE_LIBS ir smt tools util)
+add_executable(alive
+               "tools/alive.cpp"
+               "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
+               "tools/alive_parser.cpp"
+              )
+target_link_libraries(alive PRIVATE alive2)
 
+if (BUILD_TV AND CYGWIN)
+  message(FATAL_ERROR "LLVM plugins not supported on cygwin")
+endif()
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
   find_package(LLVM REQUIRED CONFIG)
@@ -102,58 +120,34 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   include(AddLLVM)
 
-  include_directories(${LLVM_INCLUDE_DIRS})
-  add_definitions(${LLVM_DEFINITIONS})
+  llvm_map_components_to_libnames(llvm_libs support core irreader)
+
+  add_library(ALIVELLVM INTERFACE IMPORTED)
+  # We must use INTERFACE_COMPILE_OPTIONS, not INTERFACE_COMPILE_DEFINITIONS,
+  # because ${LLVM_DEFINITIONS} already have -D prefixes.
+  set_target_properties(ALIVELLVM PROPERTIES INTERFACE_COMPILE_OPTIONS "${LLVM_DEFINITIONS}")
+  set_target_properties(ALIVELLVM PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
+  set_target_properties(ALIVELLVM PROPERTIES INTERFACE_LINK_LIBRARIES "${llvm_libs}")
 
   set(LLVM_UTIL_SRCS
     "llvm_util/utils.cpp"
   )
-
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
-  set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
+  target_link_libraries(llvm_util PRIVATE ALIVELLVM)
+  target_link_libraries(alive2 PUBLIC llvm_util)
 
   add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
   )
-
-else()
-  set(LLVM_UTIL_SRCS "")
+  target_link_libraries(alive-tv PRIVATE ALIVELLVM)
+  target_link_libraries(alive-tv PRIVATE alive2)
 endif()
 
 if (BUILD_TV)
-  if (CYGWIN)
-    message(FATAL_ERROR "LLVM plugins not supported on cygwin")
-  endif()
   message(STATUS "Compiling translation validation plugin")
   add_subdirectory(tv)
 else()
   message(STATUS "Skiping translation validation plugin")
-endif()
-
-add_executable(alive
-               "tools/alive.cpp"
-               "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
-               "tools/alive_parser.cpp"
-              )
-target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
-
-add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
-
-if (BUILD_LLVM_UTILS OR BUILD_TV)
-  llvm_map_components_to_libnames(llvm_libs support core irreader)
-  target_link_libraries(alive2 PRIVATE ${llvm_libs})
-  target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
-endif()
-
-if (CYGWIN)
-  # cmake on cygwin doesn't seem to know about dlls..
-  get_filename_component(Z3_LIB_DIR "${Z3_LIBRARIES}" DIRECTORY)
-  set(CMAKE_EXE_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
-  set(CMAKE_SHARED_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
-  file(COPY "${Z3_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
-else()
-  target_link_libraries(alive PRIVATE ${Z3_LIBRARIES})
-  target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
 endif()
 
 add_custom_target("check"

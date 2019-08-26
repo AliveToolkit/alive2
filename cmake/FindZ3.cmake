@@ -24,3 +24,17 @@ if (${Z3_INSTALLED_VERSION} VERSION_LESS ${Z3_REQUIRED_VERSION})
 else()
   message(STATUS "Z3 installed version: ${Z3_INSTALLED_VERSION}")
 endif()
+
+add_library(Z3::Z3 INTERFACE IMPORTED)
+set_target_properties(Z3::Z3 PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${Z3_INCLUDE_DIR}")
+
+if (CYGWIN)
+  # cmake on cygwin doesn't seem to know about dlls..
+  get_filename_component(Z3_LIB_DIR "${Z3_LIBRARIES}" DIRECTORY)
+  set_target_properties(Z3::Z3 PROPERTIES LINK_FLAGS "-L${Z3_LIB_DIR}")
+  set_target_properties(Z3::Z3 PROPERTIES INTERFACE_LINK_LIBRARIES "z3")
+
+  file(COPY "${Z3_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
+else()
+  set_target_properties(Z3::Z3 PROPERTIES INTERFACE_LINK_LIBRARIES "${Z3_LIBRARIES}")
+endif()
