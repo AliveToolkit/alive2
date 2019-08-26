@@ -6,8 +6,9 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif()
 
+# Static linking is nice, lets default to it.
 if (NOT DEFINED BUILD_SHARED_LIBS)
-  set(BUILD_SHARED_LIBS ON)
+  set(BUILD_SHARED_LIBS OFF)
 endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
