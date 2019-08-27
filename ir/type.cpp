@@ -637,6 +637,17 @@ expr AggregateType::map_reduce(expr(*map)(const StateValue&, const StateValue&),
   return reduce(r);
 }
 
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
+  assert(vals.size() == elements);
+
+  StateValue v;
+  for (unsigned idx = 0; idx < elements; ++idx) {
+    auto vv = children[idx]->toBV(vals[idx]);
+    v = idx == 0 ? move(vv) : v.concat(vv);
+  }
+  return v;
+}
+
 
 expr ArrayType::getTypeConstraints() const {
   // TODO
