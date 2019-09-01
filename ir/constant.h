@@ -28,7 +28,7 @@ class IntConst final : public Constant {
 public:
   IntConst(Type &type, int64_t val);
   IntConst(Type &type, std::string &&val);
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
   smt::expr getTypeConstraints() const override;
   auto getInt() const { return std::get_if<int64_t>(&val); }
 };
@@ -39,17 +39,18 @@ class FloatConst final : public Constant {
 public:
   FloatConst(Type &type, double val);
 
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
   smt::expr getTypeConstraints() const override;
 };
 
 
 class AggregateConst final : public Constant {
-  std::vector<Constant*> vals;
+  std::vector<Value*> vals;
 public:
-  AggregateConst(Type &type, std::vector<Constant*> &&vals);
+  AggregateConst(Type &type, std::vector<Value*> &&vals);
 
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  StateValue toSMT(State &s) const override;
+  std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
   smt::expr getTypeConstraints() const override;
 };
 
@@ -58,7 +59,7 @@ class ConstantInput final : public Constant {
 public:
   ConstantInput(Type &type, std::string &&name)
     : Constant(type, std::move(name)) {}
-  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const;
+  std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
 };
 
 

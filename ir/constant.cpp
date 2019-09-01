@@ -66,7 +66,7 @@ pair<expr, expr> FloatConst::toSMT_cnst() const {
 }
 
 
-static string agg_const_str(vector<Constant*> &vals) {
+static string agg_const_str(vector<Value*> &vals) {
   string r = "{ ";
   bool first = true;
   for (auto val : vals) {
@@ -78,20 +78,24 @@ static string agg_const_str(vector<Constant*> &vals) {
   return r + " }";
 }
 
-AggregateConst::AggregateConst(Type &type, vector<Constant*> &&vals)
+AggregateConst::AggregateConst(Type &type, vector<Value*> &&vals)
   : Constant(type, agg_const_str(vals)), vals(move(vals)) {}
 
-pair<expr, expr> AggregateConst::toSMT_cnst() const {
+StateValue AggregateConst::toSMT(State &s) const {
   expr v;
   bool first = true;
   for (auto val : vals) {
-    auto [vv, vnp] = val->toSMT_cnst();
+    auto [vv, vnp] = val->toSMT(s);
     assert(vnp.isTrue());
     vv = val->getType().toBV(vv);
     v = first ? vv : v.concat(vv);
     first = false;
   }
   return { move(v), true };
+}
+
+pair<expr, expr> AggregateConst::toSMT_cnst() const {
+  UNREACHABLE();
 }
 
 expr AggregateConst::getTypeConstraints() const {
