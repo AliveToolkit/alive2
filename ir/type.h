@@ -56,11 +56,14 @@ public:
   virtual smt::expr enforceIntOrPtrOrVectorType() const;
   virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
-  virtual smt::expr enforceAggregateType() const;
+  virtual smt::expr enforceAggregateType(
+    std::vector<Type*> *element_types = nullptr) const;
   virtual smt::expr enforceFloatType() const;
 
   virtual const StructType* getAsStructType() const;
   virtual const FloatType* getAsFloatType() const;
+
+  virtual smt::expr toBV(smt::expr e) const;
 
   virtual std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const = 0;
@@ -143,6 +146,7 @@ public:
   bool isFloatType() const override;
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
+  smt::expr toBV(smt::expr e) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -185,7 +189,8 @@ public:
   smt::expr operator==(const ArrayType &rhs) const;
   smt::expr sameType(const ArrayType &rhs) const;
   void fixup(const smt::Model &m) override;
-  smt::expr enforceAggregateType() const override;
+  smt::expr enforceAggregateType(
+    std::vector<Type*> *element_types) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -215,6 +220,8 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr enforceAggregateType(
+    std::vector<Type*> *element_types) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -237,7 +244,8 @@ public:
   smt::expr sameType(const StructType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceStructType() const override;
-  smt::expr enforceAggregateType() const override;
+  smt::expr enforceAggregateType(
+    std::vector<Type*> *element_types) const override;
   const StructType* getAsStructType() const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
@@ -283,7 +291,8 @@ public:
   smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
   smt::expr enforceStructType() const override;
-  smt::expr enforceAggregateType() const override;
+  smt::expr enforceAggregateType(
+    std::vector<Type*> *element_types) const override;
   smt::expr enforceFloatType() const override;
   const StructType* getAsStructType() const override;
   const FloatType* getAsFloatType() const override;

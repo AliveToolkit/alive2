@@ -174,6 +174,17 @@ Value* get_operand(llvm::Value *v) {
     return ret;
   }
 
+  if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
+    vector<Constant*> vals;
+    for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
+      vals.emplace_back(static_cast<Constant*>(get_operand(*I)));
+    }
+    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto ret = val.get();
+    current_fn->addConstant(move(val));
+    return ret;
+  }
+
   return nullptr;
 }
 

@@ -76,6 +76,7 @@ static Value& get_fp_constant(double n, Type &t) {
   return *ret;
 }
 
+namespace {
 struct tokenizer_t {
   token last;
   // true if token last was 'unget' and should be returned next
@@ -139,6 +140,7 @@ private:
     }
   }
 };
+}
 
 static tokenizer_t tokenizer;
 

@@ -134,7 +134,7 @@ expr Type::enforceStructType() const {
   return false;
 }
 
-expr Type::enforceAggregateType() const {
+expr Type::enforceAggregateType(vector<Type*> *element_types) const {
   return false;
 }
 
@@ -148,6 +148,10 @@ const StructType* Type::getAsStructType() const {
 
 const FloatType* Type::getAsFloatType() const {
   return nullptr;
+}
+
+expr Type::toBV(expr e) const {
+  return e;
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -281,6 +285,10 @@ unsigned FloatType::bits() const {
 
 const FloatType* FloatType::getAsFloatType() const {
   return this;
+}
+
+expr FloatType::toBV(expr e) const {
+  return e.float2BV();
 }
 
 expr FloatType::sizeVar() const {
@@ -470,7 +478,8 @@ void ArrayType::fixup(const Model &m) {
   // TODO
 }
 
-expr ArrayType::enforceAggregateType() const {
+expr ArrayType::enforceAggregateType(vector<Type*> *element_types) const {
+  // TODO
   return true;
 }
 
@@ -518,9 +527,7 @@ unsigned VectorType::bits() const {
 }
 
 expr VectorType::getDummyValue() const {
-  expr element = elementTy.getDummyValue();
-  if (elementTy.isFloatType())
-    element = element.float2BV();
+  expr element = elementTy.toBV(elementTy.getDummyValue());
 
   expr ret = element;
   for (unsigned i = 1; i < elements; ++i) {
@@ -564,6 +571,17 @@ expr VectorType::enforceIntOrPtrOrVectorType() const {
   return elementTy.enforceIntOrPtrType();
 }
 
+expr VectorType::enforceAggregateType(vector<Type*> *element_types) const {
+  if (!element_types)
+    return true;
+
+  expr r = numElements() == element_types->size();
+  for (auto ty : *element_types) {
+    r &= *ty == elementTy;
+  }
+  return r;
+}
+
 pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
   expr val;
   vector<expr> vect;
@@ -573,8 +591,7 @@ pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
     auto [val_i, vect_i] = elementTy.mkInput(s, name_i.c_str());
     vect.insert(vect.end(), vect_i.begin(), vect_i.end());
 
-    if (elementTy.isFloatType())
-      val_i = val_i.float2BV();
+    val_i = elementTy.toBV(val_i);
     val = i == 0 ? move(val_i) : val.concat(val_i);
   }
   return { move(val), move(vect) };
@@ -610,7 +627,6 @@ expr StructType::getDummyValue() const {
 
   expr res;
   bool first = true;
-  // TODO: what if a function returns a struct with no children?
   for (auto c : children) {
     if (first) {
       res = c->getDummyValue();
@@ -662,8 +678,19 @@ expr StructType::enforceStructType() const {
   return true;
 }
 
-expr StructType::enforceAggregateType() const {
-  return true;
+expr StructType::enforceAggregateType(vector<Type*> *element_types) const {
+  if (!element_types)
+    return true;
+
+  // TODO: support symbolic structs
+  if (children.size() != element_types->size())
+    return false;
+
+  expr r(true);
+  for (unsigned i = 0, e = children.size(); i != e; ++i) {
+    r &= *children[i] == *(*element_types)[i];
+  }
+  return r;
 }
 
 const StructType* StructType::getAsStructType() const {
@@ -903,8 +930,10 @@ expr SymbolicType::enforceStructType() const {
   return isStruct();
 }
 
-expr SymbolicType::enforceAggregateType() const {
-  return isArray() || isStruct();
+expr SymbolicType::enforceAggregateType(vector<Type*> *element_types) const {
+  return (isArray() && a->enforceAggregateType (element_types)) ||
+         (isVector() && v->enforceAggregateType(element_types)) ||
+         (isStruct() && s->enforceAggregateType(element_types));
 }
 
 expr SymbolicType::enforceFloatType() const {

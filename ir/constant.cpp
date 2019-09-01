@@ -66,6 +66,45 @@ pair<expr, expr> FloatConst::toSMT_cnst() const {
 }
 
 
+static string agg_const_str(vector<Constant*> &vals) {
+  string r = "{ ";
+  bool first = true;
+  for (auto val : vals) {
+    if (!first)
+      r += ", ";
+    r += val->getName();
+    first = false;
+  }
+  return r + " }";
+}
+
+AggregateConst::AggregateConst(Type &type, vector<Constant*> &&vals)
+  : Constant(type, agg_const_str(vals)), vals(move(vals)) {}
+
+pair<expr, expr> AggregateConst::toSMT_cnst() const {
+  expr v;
+  bool first = true;
+  for (auto val : vals) {
+    auto [vv, vnp] = val->toSMT_cnst();
+    assert(vnp.isTrue());
+    vv = val->getType().toBV(vv);
+    v = first ? vv : v.concat(vv);
+    first = false;
+  }
+  return { move(v), true };
+}
+
+expr AggregateConst::getTypeConstraints() const {
+  expr r = Value::getTypeConstraints();
+  vector<Type*> types;
+  for (auto val : vals) {
+    types.emplace_back(&val->getType());
+    r &= val->getTypeConstraints();
+  }
+  return r && getType().enforceAggregateType(&types);
+}
+
+
 pair<expr, expr> ConstantInput::toSMT_cnst() const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }

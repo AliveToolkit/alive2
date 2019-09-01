@@ -44,6 +44,16 @@ public:
 };
 
 
+class AggregateConst final : public Constant {
+  std::vector<Constant*> vals;
+public:
+  AggregateConst(Type &type, std::vector<Constant*> &&vals);
+
+  virtual std::pair<smt::expr, smt::expr> toSMT_cnst() const override;
+  smt::expr getTypeConstraints() const override;
+};
+
+
 class ConstantInput final : public Constant {
 public:
   ConstantInput(Type &type, std::string &&name)
