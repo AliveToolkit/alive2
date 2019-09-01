@@ -7,7 +7,6 @@ Name: ctpop variable
 %a = shl i8 255, 3
 %b = ctpop i8 %a
   =>
-%a = shl i8 255, 3
 %b = 5
 
 Name: ctpop zero
@@ -25,7 +24,6 @@ Name: ctpop icmp
 %b = ctpop i8 %a
 %c = icmp sle %b, 6
   =>
-%b = ctpop i8 %a
 %c = 1
 
 Name: ctpop negtest
@@ -33,5 +31,4 @@ Name: ctpop negtest
 %b = ctpop i8 %a
 %c = icmp sgt %b, 5
   =>
-%b = ctpop i8 %a
 %c = 0

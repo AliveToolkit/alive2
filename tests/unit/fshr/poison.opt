@@ -1,0 +1,68 @@
+%t = fshr i8 %a, i8 %b, i8 poison
+  =>
+%t = poison
+
+Name: test 2
+%t = fshr i8 poison, i8 poison, i8 %c
+  =>
+%t = poison
+
+
+Name: test 3
+%c_is_zero = icmp eq i8 %c, 0
+%t = fshr i8 poison, i8 %b, i8 %c
+%r = select i8 %c_is_zero, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_zero, i8 poison, i8 %z
+
+
+Name: test 4
+%c_is_seven = icmp eq i8 %c, 7
+%t = fshr i8 poison, i8 %b, i8 %c
+%r = select i8 %c_is_seven, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_seven, i8 poison, i8 %z
+
+
+Name: test 4v2
+%t = fshr i8 %a, poison, i8 7
+  =>
+%t = poison
+
+
+Name: test 5
+%c_is_eight = icmp eq i8 %c, 8
+%t = fshr i8 poison, i8 %b, i8 %c
+%r = select i8 %c_is_eight, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_eight, i8 poison, i8 %z
+
+
+Name: test 6
+%c_is_zero = icmp eq i8 %c, 0
+%t = fshr i8 %a, i8 poison, i8 %c
+%r = select i8 %c_is_zero, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_zero, i8 poison, i8 %z
+
+
+Name: test 7
+%c_is_seven = icmp eq i8 %c, 7
+%t = fshr i8 %a, i8 poison, i8 %c
+%r = select i8 %c_is_seven, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_seven, i8 %t, i8 %z
+
+
+Name: test 8
+%c_is_eight = icmp eq i8 %c, 8
+%t = fshr i8 %a, poison, i8 %c
+%r = select i8 %c_is_eight, i8 %t, i8 %z
+  =>
+%t = poison
+%r = select i8 %c_is_eight, i8 poison, i8 %z

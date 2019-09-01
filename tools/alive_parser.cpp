@@ -339,6 +339,64 @@ static Value& parse_const_expr(Type &type) {
   UNREACHABLE();
 }
 
+static Value& get_or_copy_instr(const string &name) {
+  assert(!parse_src);
+
+  if (auto I = identifiers.find(name);
+      I != identifiers.end())
+    return *I->second;
+
+  // we need to either copy instruction(s) from src, or it's an error
+  auto I_src = identifiers_src.find(name);
+  if (I_src == identifiers_src.end())
+    error("Cannot declare an input variable in the target: " + name);
+
+  auto val_src = I_src->second;
+  assert(!dynamic_cast<Input*>(val_src));
+
+  auto instr_src = dynamic_cast<Instr*>(val_src);
+  assert(instr_src);
+  auto tgt_instr = instr_src->dup("");
+
+  for (auto &op : instr_src->operands()) {
+    if (dynamic_cast<Input*>(op)) {
+      tgt_instr->rauw(*op, *identifiers.at(op->getName()));
+    } else if (dynamic_cast<UndefValue*>(op)) {
+      auto newop = make_unique<UndefValue>(op->getType());
+      tgt_instr->rauw(*op, *newop.get());
+      fn->addUndef(move(newop));
+    } else if (dynamic_cast<PoisonValue*>(op)) {
+      auto newop = make_unique<PoisonValue>(op->getType());
+      tgt_instr->rauw(*op, *newop.get());
+      fn->addConstant(move(newop));
+    } else if (auto c = dynamic_cast<IntConst*>(op)) {
+      auto newop = make_unique<IntConst>(*c);
+      tgt_instr->rauw(*op, *newop.get());
+      fn->addConstant(move(newop));
+    } else if (auto c = dynamic_cast<FloatConst*>(op)) {
+      auto newop = make_unique<FloatConst>(*c);
+      tgt_instr->rauw(*op, *newop.get());
+      fn->addConstant(move(newop));
+    } else if (dynamic_cast<ConstantInput*>(op)) {
+      assert(0 && "TODO");
+    } else if (dynamic_cast<ConstantBinOp*>(op)) {
+      assert(0 && "TODO");
+    } else if (dynamic_cast<ConstantFn*>(op)) {
+      assert(0 && "TODO");
+    } else if (dynamic_cast<Instr*>(op)) {
+      // FIXME: support for PHI nodes (cyclic graph)
+      tgt_instr->rauw(*op, get_or_copy_instr(op->getName()));
+    } else {
+      UNREACHABLE();
+    }
+  }
+
+  auto ret = tgt_instr.get();
+  identifiers.emplace(name, ret);
+  bb->addInstr(move(tgt_instr));
+  return *ret;
+}
+
 static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
@@ -376,55 +434,7 @@ static Value& parse_operand(Type &type) {
       identifiers.emplace(move(id), ret);
       return *ret;
     }
-
-    // in tgt, we need to either copy instruction(s) from src, or it's an error
-    auto I_src = identifiers_src.find(id);
-    if (I_src == identifiers_src.end())
-      error("Cannot declare an input variable in the target: " + id);
-
-    auto val_src = I_src->second;
-    assert(!dynamic_cast<Input*>(val_src));
-
-    auto instr_src = dynamic_cast<Instr*>(val_src);
-    assert(instr_src);
-    auto tgt_instr = instr_src->dup("");
-
-    for (auto &op : instr_src->operands()) {
-      if (dynamic_cast<Input*>(op)) {
-        tgt_instr->rauw(*op, *identifiers.at(op->getName()));
-      } else if (dynamic_cast<UndefValue*>(op)) {
-        auto newop = make_unique<UndefValue>(type);
-        tgt_instr->rauw(*op, *newop.get());
-        fn->addUndef(move(newop));
-      } else if (dynamic_cast<PoisonValue*>(op)) {
-        auto newop = make_unique<PoisonValue>(type);
-        tgt_instr->rauw(*op, *newop.get());
-        fn->addConstant(move(newop));
-      } else if (auto c = dynamic_cast<IntConst*>(op)) {
-        auto newop = make_unique<IntConst>(*c);
-        tgt_instr->rauw(*op, *newop.get());
-        fn->addConstant(move(newop));
-      } else if (auto c = dynamic_cast<FloatConst*>(op)) {
-        auto newop = make_unique<FloatConst>(*c);
-        tgt_instr->rauw(*op, *newop.get());
-        fn->addConstant(move(newop));
-      } else if (dynamic_cast<ConstantInput*>(op)) {
-        assert(0 && "TODO");
-      } else if (dynamic_cast<ConstantBinOp*>(op)) {
-        assert(0 && "TODO");
-      } else if (dynamic_cast<ConstantFn*>(op)) {
-        assert(0 && "TODO");
-      } else if (dynamic_cast<Instr*>(op)) {
-        error("TODO: unsupported recursive instr copy from src to tgt");
-      } else {
-        UNREACHABLE();
-      }
-    }
-
-    auto ret = tgt_instr.get();
-    identifiers.emplace(move(id), ret);
-    bb->addInstr(move(tgt_instr));
-    return *ret;
+    return get_or_copy_instr(id);
   }
   case CONSTANT:
   case IDENTIFIER:
@@ -924,7 +934,11 @@ vector<Transform> parse(string_view buf) {
     parse_src = false;
     parse_fn(t.tgt);
 
-    // FIXME: need to copy missing BBs and missing instructions
+    // copy any missing instruction in tgt from src
+    for (auto &[name, val] : identifiers_src) {
+      (void)val;
+      get_or_copy_instr(name);
+    }
 
     identifiers.clear();
     identifiers_src.clear();

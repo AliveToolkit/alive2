@@ -2,3 +2,11 @@
 %r = add %a, %a
   =>
 %r = shl %a, 1
+
+
+Name: recursive copy
+%a = add i3 %x, %y
+%b = mul %a, 2
+%c = mul %b, 2
+  =>
+%c = shl %b, 1

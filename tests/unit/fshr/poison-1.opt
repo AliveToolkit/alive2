@@ -1,3 +1,0 @@
-%t = fshr i8 %a, i8 %b, i8 poison
-  =>
-%t = poison

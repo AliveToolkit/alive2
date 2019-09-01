@@ -1,9 +1,0 @@
-%c_is_eight = icmp eq i8 %c, 8
-%a = poison
-%t = fshr i8 %a, i8 %b, i8 %c
-%r = select i8 %c_is_eight, i8 %t, i8 %z
-  =>
-%c_is_eight = icmp eq i8 %c, 8
-%a = poison
-%t = poison
-%r = select i8 %c_is_eight, i8 poison, i8 %z
