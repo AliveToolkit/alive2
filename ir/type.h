@@ -21,7 +21,7 @@ class StructType;
 class SymbolicType;
 class VoidType;
 class State;
-class StateValue;
+struct StateValue;
 
 class Type {
 protected:
