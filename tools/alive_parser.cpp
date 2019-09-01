@@ -857,10 +857,10 @@ static void parse_fn(Function &f) {
   while (true) {
     switch (auto t = *tokenizer) {
     case REGISTER: {
-      // FIXME: add error checking for repeated names
       string name(yylval.str);
       auto i = parse_instr(name);
-      identifiers.emplace(move(name), i.get());
+      if (!identifiers.emplace(move(name), i.get()).second)
+        error("Duplicated assignment to " + string(yylval.str));
       bb->addInstr(move(i));
       break;
     }
