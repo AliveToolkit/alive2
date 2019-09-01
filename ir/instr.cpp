@@ -153,6 +153,16 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
   return ret;
 }
 
+static expr mk_poison_agg(expr &poison, unsigned agg_size) {
+  assert(agg_size > 0);
+  expr p = poison.toBVBool();
+  expr r = p;
+  for (unsigned i = 1; i != agg_size; ++i) {
+    r = r.concat(p);
+  }
+  return r;
+}
+
 StateValue BinOp::toSMT(State &s) const {
   auto &[a, ap] = s[*lhs];
   auto &[b, bp] = s[*rhs];
@@ -278,31 +288,37 @@ StateValue BinOp::toSMT(State &s) const {
   case SAdd_Overflow:
     val = a + b;
     val = val.concat((!a.add_no_soverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case UAdd_Overflow:
     val = a + b;
     val = val.concat((!a.add_no_uoverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case SSub_Overflow:
     val = a - b;
     val = val.concat((!a.sub_no_soverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case USub_Overflow:
     val = a - b;
     val = val.concat((!a.sub_no_uoverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case SMul_Overflow:
     val = a * b;
     val = val.concat((!a.mul_no_soverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case UMul_Overflow:
     val = a * b;
     val = val.concat((!a.mul_no_uoverflow(b)).toBVBool());
+    not_poison = mk_poison_agg(not_poison, 2);
     break;
 
   case FAdd:
@@ -664,37 +680,34 @@ void ExtractValue::print(ostream &os) const {
 }
 
 StateValue ExtractValue::toSMT(State &s) const {
-  auto [v, p] = s[*val];
+  auto v = s[*val];
 
-  // TODO: add support for array type
   Type *type = &val->getType();
   for (auto idx : idxs) {
-    auto st = type->getAsStructType();
-    v = st->extract(v, idx);
-    type = &st->getChild(idx);
+    auto ty = type->getAsAggregateType();
+    v = ty->extract(v, idx);
+    type = &ty->getChild(idx);
   }
-
-  return { move(v), move(p) };
+  return v;
 }
 
 expr ExtractValue::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints() &&
            val->getType().enforceAggregateType();
 
-  // TODO: add support for arrays
   Type *type = &val->getType();
   unsigned i = 0;
   for (auto idx : idxs) {
-    auto st = type->getAsStructType();
-    if (!st) {
+    auto ty = type->getAsAggregateType();
+    if (!ty) {
       c = false;
       break;
     }
-    type = &st->getChild(idx);
+    type = &ty->getChild(idx);
 
-    c &= st->numElements().ugt(idx);
+    c &= ty->numElements().ugt(idx);
     if (++i == idxs.size())
-      c &= st->getChild(idx) == getType();
+      c &= ty->getChild(idx) == getType();
   }
   return c;
 }

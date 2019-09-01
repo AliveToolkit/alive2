@@ -82,16 +82,14 @@ AggregateConst::AggregateConst(Type &type, vector<Value*> &&vals)
   : Constant(type, agg_const_str(vals)), vals(move(vals)) {}
 
 StateValue AggregateConst::toSMT(State &s) const {
-  expr v;
+  StateValue v;
   bool first = true;
   for (auto val : vals) {
-    auto [vv, vnp] = val->toSMT(s);
-    assert(vnp.isTrue());
-    vv = val->getType().toBV(vv);
-    v = first ? vv : v.concat(vv);
+    auto vv = val->getType().toBV(val->toSMT(s));
+    v = first ? move(vv) : v.concat(vv);
     first = false;
   }
-  return { move(v), true };
+  return v;
 }
 
 pair<expr, expr> AggregateConst::toSMT_cnst() const {

@@ -142,16 +142,38 @@ expr Type::enforceFloatType() const {
   return false;
 }
 
-const StructType* Type::getAsStructType() const {
-  return nullptr;
-}
-
 const FloatType* Type::getAsFloatType() const {
   return nullptr;
 }
 
+const AggregateType* Type::getAsAggregateType() const {
+  return nullptr;
+}
+
+const StructType* Type::getAsStructType() const {
+  return nullptr;
+}
+
+expr Type::map_reduce(expr(*map)(const StateValue&, const StateValue&),
+                      expr(*reduce)(const set<expr> &),
+                      const StateValue &a, const StateValue &b) const {
+  return map(a, b);
+}
+
 expr Type::toBV(expr e) const {
   return e;
+}
+
+StateValue Type::toBV(StateValue v) const {
+  return { toBV(v.value), v.non_poison.toBVBool() };
+}
+
+expr Type::fromBV(expr e) const {
+  return e;
+}
+
+StateValue Type::fromBV(StateValue v) const {
+  return { fromBV(v.value), v.non_poison == 1 };
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -289,6 +311,10 @@ const FloatType* FloatType::getAsFloatType() const {
 
 expr FloatType::toBV(expr e) const {
   return e.float2BV();
+}
+
+expr FloatType::fromBV(expr e) const {
+  return e.BV2float(getDummyValue());
 }
 
 expr FloatType::sizeVar() const {
@@ -449,47 +475,177 @@ void PtrType::print(ostream &os) const {
 }
 
 
-unsigned ArrayType::bits() const {
-  // TODO
-  return 0;
+AggregateType::AggregateType(string &&name, bool symbolic)
+  : Type(string(name)) {
+  if (!symbolic)
+    return;
+
+  // create symbolic type with a finite number of children
+  unsigned num = 4;
+  sym.resize(num);
+  children.resize(num);
+
+  // FIXME: limitation below is for vectors; what about structs and arrays?
+  for (unsigned i = 0; i < num; ++i) {
+    sym[i] = make_unique<SymbolicType>("v_" + name,
+                                        (1 << SymbolicType::Int) |
+                                        (1 << SymbolicType::Float) |
+                                        (1 << SymbolicType::Ptr));
+    children[i] = sym[i].get();
+  }
 }
 
-expr ArrayType::getDummyValue() const {
-  // TODO
-  return {};
+expr AggregateType::numElements() const {
+  return defined ? expr::mkUInt(elements, var_vector_elements) :
+                   var("elements", var_vector_elements);
 }
+
+StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
+  unsigned total_till_now = 0;
+  for (unsigned i = 0; i < index; ++i) {
+    total_till_now += children[i]->bits();
+  }
+  unsigned high = val.value.bits() - total_till_now;
+  unsigned poison_idx = children.size() - index - 1;
+
+  return children[index]->fromBV({
+           val.value.extract(high - 1, high - children[index]->bits()),
+           val.non_poison.extract(poison_idx, poison_idx) });
+}
+
+StateValue AggregateType::extract(const StateValue &val,
+                                  const expr &index) const {
+  auto &elementTy = *children[0];
+  for (unsigned i = 1; i < elements; ++i) {
+    assert(elementTy.bits() == children[i]->bits());
+  }
+  unsigned bw_elem = elementTy.bits();
+  unsigned bw_val = val.value.bits();
+  expr idx = index.zextOrTrunc(bw_val);
+  expr v = val.value << (idx * expr::mkUInt(bw_elem, bw_val));
+  return elementTy.fromBV({
+           v.extract(elements * bw_elem - 1, (elements - 1) * bw_elem),
+           (val.non_poison << idx).extract(elements-1, elements-1) });
+}
+
+unsigned AggregateType::bits() const {
+  unsigned bw = 0;
+  for (unsigned i = 0; i < elements; ++i) {
+    bw += children[i]->bits();
+  }
+  return bw;
+}
+
+expr AggregateType::getDummyValue() const {
+  if (elements == 0)
+    return expr::mkUInt(0, 1);
+
+  expr ret;
+  for (unsigned i = 0; i < elements; ++i) {
+    auto v = children[i]->toBV(children[i]->getDummyValue());
+    ret = i == 0 ? move(v) : ret.concat(v);
+  }
+  return ret;
+}
+
+expr AggregateType::getTypeConstraints() const {
+  expr r(true), elems = numElements();
+  for (unsigned i = 0, e = children.size(); i != e; ++i) {
+    r &= elems.ugt(i).implies(children[i]->getTypeConstraints());
+  }
+  if (!defined)
+    r &= elems.ule(4);
+  return r;
+}
+
+expr AggregateType::operator==(const AggregateType &rhs) const {
+  expr elems = numElements();
+  expr res = elems == rhs.numElements();
+  for (unsigned i = 0, e = min(children.size(), rhs.children.size());
+       i != e; ++i) {
+    res &= elems.ugt(i).implies(*children[i] == *rhs.children[i]);
+  }
+  return res;
+}
+
+expr AggregateType::sameType(const AggregateType &rhs) const {
+  expr elems = numElements();
+  expr res = elems == rhs.numElements();
+  for (unsigned i = 0, e = min(children.size(), rhs.children.size());
+       i != e; ++i) {
+    res &= elems.ugt(i).implies(children[i]->sameType(*rhs.children[i]));
+  }
+  return res;
+}
+
+void AggregateType::fixup(const Model &m) {
+  if (!defined)
+    elements = m.getUInt(numElements());
+
+  for (unsigned i = 0; i < elements; ++i) {
+    children[i]->fixup(m);
+  }
+}
+
+expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
+  if (!element_types)
+    return true;
+
+  if (children.size() < element_types->size())
+    return false;
+
+  expr r = numElements() == element_types->size();
+  for (unsigned i = 0, e = element_types->size(); i != e; ++i) {
+    r &= *children[i] == *(*element_types)[i];
+  }
+  return r;
+}
+
+pair<expr, vector<expr>>
+  AggregateType::mkInput(State &s, const char *name) const {
+  expr val;
+  vector<expr> vars;
+
+  for (unsigned i = 0; i < elements; ++i) {
+    string c_name = string(name) + "#" + to_string(i);
+    auto [v, vs] = children[i]->mkInput(s, c_name.c_str());
+    v = children[i]->toBV(v);
+    val = i == 0 ? move(v) : val.concat(v);
+    vars.insert(vars.end(), vs.begin(), vs.end());
+  }
+  return { move(val), move(vars) };
+}
+
+void AggregateType::printVal(ostream &os, State &s, const expr &e) const {
+  os << (dynamic_cast<const StructType*>(this) ? "{ " : "< ");
+  // FIXME: poison
+  auto tmp_e = StateValue(expr(e), expr::mkUInt(0, elements));
+  for (unsigned i = 0; i < elements; ++i) {
+    if (i != 0)
+      os << ", ";
+    children[i]->printVal(os, s, extract(tmp_e, i).value.simplify());
+  }
+  os << (dynamic_cast<const StructType*>(this) ? " }" : " >");
+}
+
+const AggregateType* AggregateType::getAsAggregateType() const {
+  return this;
+}
+
+expr AggregateType::map_reduce(expr(*map)(const StateValue&, const StateValue&),
+                               expr(*reduce)(const set<expr>&),
+                               const StateValue &a, const StateValue &b) const {
+  set<expr> r;
+  for (unsigned i = 0; i < elements; ++i) {
+    r.insert(map(extract(a, i), extract(b, i)));
+  }
+  return reduce(r);
+}
+
 
 expr ArrayType::getTypeConstraints() const {
   // TODO
   return false;
-}
-
-expr ArrayType::operator==(const ArrayType &rhs) const {
-  // TODO
-  return false;
-}
-
-expr ArrayType::sameType(const ArrayType &rhs) const {
-  // TODO
-  return false;
-}
-
-void ArrayType::fixup(const Model &m) {
-  // TODO
-}
-
-expr ArrayType::enforceAggregateType(vector<Type*> *element_types) const {
-  // TODO
-  return true;
-}
-
-pair<expr, vector<expr>> ArrayType::mkInput(State &s, const char *name) const {
-  // TODO
-  return {};
-}
-
-void ArrayType::printVal(ostream &os, State &s, const expr &e) const {
-  // TODO
 }
 
 void ArrayType::print(ostream &os) const {
@@ -498,262 +654,71 @@ void ArrayType::print(ostream &os) const {
 
 
 VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : Type(move(name)), elementTy(elementTy), elements(elements), defined(true) {
+  : AggregateType(move(name), false) {
   assert(elements != 0);
-}
+  this->elements = elements;
+  defined = true;
 
-VectorType::VectorType(string &&name)
-  : Type(string(name)),
-    sym(make_unique<SymbolicType>("v_" + name, (1 << SymbolicType::Int) |
-                                               (1 << SymbolicType::Float) |
-                                               (1 << SymbolicType::Ptr))),
-    elementTy(*sym.get()), elements(0) {}
-
-expr VectorType::numElements() const {
-  return defined ? expr::mkUInt(elements, var_vector_elements) :
-                   var("elements", var_vector_elements);
-}
-
-expr VectorType::extract(const expr &val, const expr &index) const {
-  unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = val.bits();
-  expr v = val << (index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val));
-  v = v.extract(elements * bw_elem - 1, (elements - 1) * bw_elem);
-  return elementTy.isFloatType() ? v.BV2float(elementTy.getDummyValue()) : v;
-}
-
-unsigned VectorType::bits() const {
-  return elements * elementTy.bits();
-}
-
-expr VectorType::getDummyValue() const {
-  expr element = elementTy.toBV(elementTy.getDummyValue());
-
-  expr ret = element;
-  for (unsigned i = 1; i < elements; ++i) {
-    ret = ret.concat(element);
+  for (unsigned i = 0; i < elements; ++i) {
+    children.emplace_back(&elementTy);
   }
-  return ret;
 }
 
 expr VectorType::getTypeConstraints() const {
-  expr elems = numElements();
-  expr r = elementTy.getTypeConstraints() &&
+  auto &elementTy = *children[0];
+  expr r = AggregateType::getTypeConstraints() &&
            (elementTy.enforceIntType() ||
             elementTy.enforceFloatType() ||
             elementTy.enforcePtrType()) &&
-           elems != 0;
-  if (!defined)
-    r &= elems.ule(4);
+           numElements() != 0;
+
+  // all elements have the same type
+  for (unsigned i = 1, e = children.size(); i != e; ++i) {
+    r &= numElements().ugt(i).implies(elementTy == *children[i]);
+  }
+
   return r;
-}
-
-expr VectorType::operator==(const VectorType &rhs) const {
-  return numElements() == rhs.numElements() && elementTy == rhs.elementTy;
-}
-
-expr VectorType::sameType(const VectorType &rhs) const {
-  return numElements() == rhs.numElements() &&
-         elementTy.sameType(rhs.elementTy);
-}
-
-void VectorType::fixup(const Model &m) {
-  elementTy.fixup(m);
-  if (!defined)
-    elements = m.getUInt(numElements());
 }
 
 expr VectorType::enforceIntOrVectorType() const {
-  return elementTy.enforceIntType();
+  return children[0]->enforceIntType();
 }
 
 expr VectorType::enforceIntOrPtrOrVectorType() const {
-  return elementTy.enforceIntOrPtrType();
-}
-
-expr VectorType::enforceAggregateType(vector<Type*> *element_types) const {
-  if (!element_types)
-    return true;
-
-  expr r = numElements() == element_types->size();
-  for (auto ty : *element_types) {
-    r &= *ty == elementTy;
-  }
-  return r;
-}
-
-pair<expr, vector<expr>> VectorType::mkInput(State &s, const char *name) const {
-  expr val;
-  vector<expr> vect;
-
-  for (unsigned i = 0; i < elements; ++i) {
-    auto name_i = string(name) + '#' + to_string(i);
-    auto [val_i, vect_i] = elementTy.mkInput(s, name_i.c_str());
-    vect.insert(vect.end(), vect_i.begin(), vect_i.end());
-
-    val_i = elementTy.toBV(val_i);
-    val = i == 0 ? move(val_i) : val.concat(val_i);
-  }
-  return { move(val), move(vect) };
-}
-
-void VectorType::printVal(ostream &os, State &s, const expr &e) const {
-  os << '<';
-  for (unsigned i = 0; i < elements; ++i) {
-    if (i != 0)
-      os << ", ";
-    elementTy.printVal(os, s, extract(e, expr::mkUInt(i, 8)).simplify());
-  }
-  os << '>';
+  return children[0]->enforceIntOrPtrType();
 }
 
 void VectorType::print(ostream &os) const {
   if (elements)
-    os << '<' << elements << " x " << elementTy << '>';
+    os << '<' << elements << " x " << *children[0] << '>';
 }
 
 
-unsigned StructType::bits() const {
-  unsigned res = 0;
-  for (auto c : children) {
-    res += c->bits();
-  }
-  return res;
-}
-
-expr StructType::getDummyValue() const {
-  if (children.empty())
-    return expr::mkUInt(0, 1);
-
-  expr res;
-  bool first = true;
-  for (auto c : children) {
-    if (first) {
-      res = c->getDummyValue();
-      first = false;
-    } else {
-      res = res.concat(c->getDummyValue());
-    }
-  }
-  return res;
-}
-
-expr StructType::getTypeConstraints() const {
-  expr res(true);
-  for (auto c : children) {
-    res &= c->getTypeConstraints();
-  }
-  return res;
-}
-
-expr StructType::operator==(const StructType &rhs) const {
-  if (children.size() != rhs.children.size())
-    return false;
-
-  expr res(true);
-  for (unsigned i = 0, e = children.size(); i != e; ++i) {
-    res &= *children[i] == *rhs.children[i];
-  }
-  return res;
-}
-
-expr StructType::sameType(const StructType &rhs) const {
-  if (children.size() != rhs.children.size())
-    return false;
-
-  expr res(true);
-  for (unsigned i = 0, e = children.size(); i != e; ++i) {
-    res &= children[i]->sameType(*rhs.children[i]);
-  }
-  return res;
-}
-
-void StructType::fixup(const Model &m) {
-  for (auto c : children) {
-    c->fixup(m);
-  }
+StructType::StructType(string &&name, vector<Type*> &&children)
+  : AggregateType(move(name), move(children)) {
+  elements = this->children.size();
+  defined = true;
 }
 
 expr StructType::enforceStructType() const {
   return true;
 }
 
-expr StructType::enforceAggregateType(vector<Type*> *element_types) const {
-  if (!element_types)
-    return true;
-
-  // TODO: support symbolic structs
-  if (children.size() != element_types->size())
-    return false;
-
-  expr r(true);
-  for (unsigned i = 0, e = children.size(); i != e; ++i) {
-    r &= *children[i] == *(*element_types)[i];
-  }
-  return r;
-}
-
 const StructType* StructType::getAsStructType() const {
   return this;
 }
 
-pair<expr, vector<expr>> StructType::mkInput(State &s, const char *name) const {
-  expr val;
-  vector<expr> vars;
-  unsigned num = 0;
-
-  for (auto c : children) {
-    string c_name = string(name) + "#" + to_string(num);
-    auto [v, vs] = c->mkInput(s, c_name.c_str());
-    val = num == 0 ? v : val.concat(v);
-    vars.insert(vars.end(), vs.begin(), vs.end());
-    ++num;
-  }
-  return { move(val), move(vars) };
-}
-
-void StructType::printVal(ostream &os, State &s, const expr &val) const {
-  os << "{ ";
-  bool first = true;
-  for (size_t i = 0, e = children.size(); i != e; ++i) {
-    if (!first)
-      os << ", ";
-    getChild(i).printVal(os, s, extract(val, i).simplify());
-    first = false;
-  }
-  os << " }";
-}
-
 void StructType::print(ostream &os) const {
+  if (!elements)
+    return;
+
   os << '{';
-  bool first = true;
-  for (auto c : children) {
-    if (!first)
+  for (unsigned i = 0; i < elements; ++i) {
+    if (i != 0)
       os << ", ";
-    first = false;
-    c->print(os);
+    children[i]->print(os);
   }
   os << '}';
-}
-
-smt::expr StructType::numElements() const {
-  // TODO: fix symbolic struct type
-  return expr::mkUInt(children.size(), 8);
-}
-
-Type& StructType::getChild(unsigned index) const {
-  // TODO: fix symbolic struct type
-  return *children[index];
-}
-
-expr StructType::extract(const expr &struct_val, unsigned index) const {
-  unsigned total_till_now = 0;
-  assert(index < children.size());
-  for (unsigned i = 0; i <= index; ++i) {
-    total_till_now += children[i]->bits();
-  }
-  unsigned low = struct_val.bits() - total_till_now;
-  return struct_val.extract(low + children[index]->bits() - 1, low);
 }
 
 
@@ -931,7 +896,7 @@ expr SymbolicType::enforceStructType() const {
 }
 
 expr SymbolicType::enforceAggregateType(vector<Type*> *element_types) const {
-  return (isArray() && a->enforceAggregateType (element_types)) ||
+  return (isArray()  && a->enforceAggregateType(element_types)) ||
          (isVector() && v->enforceAggregateType(element_types)) ||
          (isStruct() && s->enforceAggregateType(element_types));
 }
@@ -940,12 +905,17 @@ expr SymbolicType::enforceFloatType() const {
   return isFloat();
 }
 
-const StructType* SymbolicType::getAsStructType() const {
+const FloatType* SymbolicType::getAsFloatType() const {
+  return &*f;
+}
+
+const AggregateType* SymbolicType::getAsAggregateType() const {
+  // TODO: needs a proxy or something
   return &*s;
 }
 
-const FloatType* SymbolicType::getAsFloatType() const {
-  return &*f;
+const StructType* SymbolicType::getAsStructType() const {
+  return &*s;
 }
 
 pair<expr, vector<expr>>

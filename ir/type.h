@@ -15,10 +15,13 @@ namespace smt { class Model; }
 
 namespace IR {
 
+class AggregateType;
 class FloatType;
 class StructType;
+class SymbolicType;
 class VoidType;
 class State;
+class StateValue;
 
 class Type {
 protected:
@@ -60,10 +63,19 @@ public:
     std::vector<Type*> *element_types = nullptr) const;
   virtual smt::expr enforceFloatType() const;
 
-  virtual const StructType* getAsStructType() const;
   virtual const FloatType* getAsFloatType() const;
+  virtual const AggregateType* getAsAggregateType() const;
+  virtual const StructType* getAsStructType() const;
+
+  virtual smt::expr map_reduce(
+    smt::expr(*map)(const IR::StateValue&, const IR::StateValue&),
+    smt::expr(*reduce)(const std::set<smt::expr>&),
+    const IR::StateValue &a, const IR::StateValue &b) const;
 
   virtual smt::expr toBV(smt::expr e) const;
+  IR::StateValue toBV(IR::StateValue v) const;
+  virtual smt::expr fromBV(smt::expr e) const;
+  IR::StateValue fromBV(IR::StateValue v) const;
 
   virtual std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const = 0;
@@ -147,6 +159,7 @@ public:
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
   smt::expr toBV(smt::expr e) const override;
+  smt::expr fromBV(smt::expr e) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -180,82 +193,73 @@ public:
 };
 
 
-class ArrayType final : public Type {
-public:
-  ArrayType(std::string &&name) : Type(std::move(name)) {}
-  unsigned bits() const override;
-  smt::expr getDummyValue() const override;
-  smt::expr getTypeConstraints() const override;
-  smt::expr operator==(const ArrayType &rhs) const;
-  smt::expr sameType(const ArrayType &rhs) const;
-  void fixup(const smt::Model &m) override;
-  smt::expr enforceAggregateType(
-    std::vector<Type*> *element_types) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
-  void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
-  void print(std::ostream &os) const override;
-};
-
-
-class SymbolicType;
-
-class VectorType final : public Type {
-  std::unique_ptr<SymbolicType> sym;
-  Type &elementTy;
+// don't create these directly; use vectors, arrays, or structs
+class AggregateType : public Type {
+protected:
+  std::vector<Type*> children;
+  std::vector<std::unique_ptr<SymbolicType>> sym;
   unsigned elements;
   bool defined = false;
-public:
-  VectorType(std::string &&name, unsigned elements, Type &elementTy);
-  VectorType(std::string &&name);
 
+  AggregateType(std::string &&name, bool symbolic = true);
+  AggregateType(std::string &&name, std::vector<Type*> &&children)
+    : Type(std::move(name)), children(std::move(children)) {}
+
+public:
   smt::expr numElements() const;
-  smt::expr extract(const smt::expr &val, const smt::expr &index) const;
+  IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
+  IR::StateValue extract(const IR::StateValue &val,
+                         const smt::expr &index) const;
+  Type& getChild(unsigned index) const { return *children[index]; }
 
   unsigned bits() const override;
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr operator==(const VectorType &rhs) const;
-  smt::expr sameType(const VectorType &rhs) const;
+  smt::expr operator==(const AggregateType &rhs) const;
+  smt::expr sameType(const AggregateType &rhs) const;
   void fixup(const smt::Model &m) override;
-  smt::expr enforceIntOrVectorType() const override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforceAggregateType(
-    std::vector<Type*> *element_types) const override;
+    std::vector<Type *> *element_types) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
+  const AggregateType* getAsAggregateType() const override;
+
+  smt::expr map_reduce(
+    smt::expr(*map)(const IR::StateValue&, const IR::StateValue&),
+    smt::expr(*reduce)(const std::set<smt::expr>&),
+    const IR::StateValue &a, const IR::StateValue &b) const override;
+};
+
+
+class ArrayType final : public AggregateType {
+public:
+  ArrayType(std::string &&name) : AggregateType(std::move(name)) {}
+  smt::expr getTypeConstraints() const override;
   void print(std::ostream &os) const override;
 };
 
 
-class StructType final : public Type {
-  const std::vector<Type*> children;
-
+class VectorType final : public AggregateType {
 public:
-  StructType(std::string &&name) : Type(std::move(name)) {}
-  StructType(std::string &&name, std::vector<Type*> &&children)
-    : Type(std::move(name)), children(std::move(children)) {}
+  VectorType(std::string &&name) : AggregateType(std::move(name)) {}
+  VectorType(std::string &&name, unsigned elements, Type &elementTy);
 
-  unsigned bits() const override;
-  smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
-  smt::expr operator==(const StructType &rhs) const;
-  smt::expr sameType(const StructType &rhs) const;
-  void fixup(const smt::Model &m) override;
-  smt::expr enforceStructType() const override;
-  smt::expr enforceAggregateType(
-    std::vector<Type*> *element_types) const override;
-  const StructType* getAsStructType() const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
-  void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
+  smt::expr enforceIntOrVectorType() const override;
+  smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
+};
 
-  smt::expr numElements() const;
-  Type& getChild(unsigned index) const;
-  // Extracts the type located at \p index from \p struct_val
-  smt::expr extract(const smt::expr &struct_val, unsigned index) const;
+
+class StructType final : public AggregateType {
+public:
+  StructType(std::string &&name) : AggregateType(std::move(name)) {}
+  StructType(std::string &&name, std::vector<Type*> &&children);
+
+  smt::expr enforceStructType() const override;
+  const StructType* getAsStructType() const override;
+  void print(std::ostream &os) const override;
 };
 
 
@@ -294,8 +298,9 @@ public:
   smt::expr enforceAggregateType(
     std::vector<Type*> *element_types) const override;
   smt::expr enforceFloatType() const override;
-  const StructType* getAsStructType() const override;
   const FloatType* getAsFloatType() const override;
+  const AggregateType* getAsAggregateType() const override;
+  const StructType* getAsStructType() const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;

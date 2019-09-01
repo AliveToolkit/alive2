@@ -14,6 +14,10 @@ StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
            expr::mkIf(cond, then.non_poison, els.non_poison) };
 }
 
+StateValue StateValue::concat(const StateValue &other) const {
+  return { value.concat(other.value), non_poison.concat(other.non_poison) };
+}
+
 bool StateValue::eq(const StateValue &other) const {
   return value.eq(other.value) && non_poison.eq(other.non_poison);
 }

@@ -157,9 +157,9 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
     auto var = static_cast<const Input &>(i).getTyVar();
 
     if (config::disable_undef_input)
-      e &= var != expr::mkUInt(1, 2);
+      e &= var != 1;
     if (config::disable_poison_input)
-      e &= var.extract(1, 1) == expr::mkUInt(0, 1);
+      e &= var.extract(1, 1) == 0;
   }
 
   if (qvars.empty() || e.isFalse())
@@ -231,18 +231,26 @@ static void check_refinement(Errors &errs, Transform &t,
 
   expr pre = src_state.getPre() && tgt_state.getPre();
 
+  expr poison_cnstr = type.map_reduce(
+                        [](const StateValue &a, const StateValue &b) {
+                          return a.non_poison.notImplies(b.non_poison);
+                        }, &expr::mk_or, a, b);
+
+  expr value_cnstr = type.map_reduce(
+                       [](const StateValue &a, const StateValue &b) {
+                         return a.non_poison && a.value != b.value;
+                       }, &expr::mk_or, a, b);
+
   Solver::check({
     { pre && preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { pre && preprocess(t, qvars, ap.second,
-                        dom_a && a.non_poison.notImplies(b.non_poison)),
+    { pre && preprocess(t, qvars, ap.second, dom_a && poison_cnstr),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { pre && preprocess(t, qvars, ap.second,
-                        dom_a && a.non_poison && a.value != b.value),
+    { pre && preprocess(t, qvars, ap.second, dom_a && value_cnstr),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}

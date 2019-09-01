@@ -20,6 +20,7 @@ struct StateValue {
   static StateValue mkIf(const smt::expr &cond, const StateValue &then,
                          const StateValue &els);
 
+  StateValue concat(const StateValue &other) const;
   smt::expr both() const { return value && non_poison; }
 
   bool eq(const StateValue &other) const;
