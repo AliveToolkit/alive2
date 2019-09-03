@@ -435,7 +435,8 @@ class Memset final : public Instr {
   unsigned align;
 public:
   Memset(Value &ptr, Value &val, Value &bytes, unsigned align)
-    : Instr(Type::voidTy, "memset"), ptr(ptr), val(val), bytes(bytes), align(align) {}
+    : Instr(Type::voidTy, "memset"), ptr(ptr), val(val), bytes(bytes),
+            align(align) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -448,8 +449,10 @@ class Memcpy final : public Instr {
   Value &dst, &src, &bytes;
   unsigned align_dst, align_src;
 public:
-  Memcpy(Value &dst, Value &src, Value &bytes, unsigned align_dst, unsigned align_src)
-    : Instr(Type::voidTy, "memcpy"), dst(dst), src(src), bytes(bytes), align_dst(align_dst), align_src(align_src) {}
+  Memcpy(Value &dst, Value &src, Value &bytes,
+        unsigned align_dst, unsigned align_src)
+    : Instr(Type::voidTy, "memcpy"), dst(dst), src(src), bytes(bytes),
+            align_dst(align_dst), align_src(align_src) {}
 
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

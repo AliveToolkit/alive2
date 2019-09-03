@@ -348,10 +348,6 @@ public:
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
-    auto fn = i.getCalledFunction();
-    if (!fn) // TODO: check real memset
-      return error(i);
-
     auto ty = llvm_type2alive(i.getType());
     if (ty != &Type::voidTy)
       return error(i);
@@ -367,10 +363,6 @@ public:
   }
 
   RetTy visitMemCpyInst(llvm::MemCpyInst &i) {
-    auto fn = i.getCalledFunction();
-    if (!fn) // TODO: check real memcpy
-      return error(i);
-
     auto ty = llvm_type2alive(i.getType());
     if (ty != &Type::voidTy)
       return error(i);

@@ -149,12 +149,16 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
   is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
 }
 
-expr disjoint(expr offset1, const expr &len1, expr offset2, const expr &len2) {
-  return ((offset1+len1).ule(offset2) || (offset2+len2).ule(offset1));
+// general disjoint check for unsigned integer
+static expr disjoint(expr begin1, const expr &len1, expr begin2,
+                      const expr &len2) {
+  return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
+// offset + len's overflow is checked by 'is_dereferenceable' at line 139.
 void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2, const expr &len2) const {
-  m.state->addUB(get_bid() != ptr2.get_bid() || disjoint(get_offset(), len1, ptr2.get_offset(), len2));
+  m.state->addUB(get_bid() != ptr2.get_bid() ||
+                  disjoint(get_offset(), len1, ptr2.get_offset(), len2));
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
