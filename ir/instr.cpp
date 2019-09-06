@@ -1502,51 +1502,72 @@ unique_ptr<Instr> Store::dup(const string &suffix) const {
 }
 
 
-void Memset::print(std::ostream &os) const {
-  os << "memset " << ptr << " align " << align << ", " << val << ", " << bytes;
+vector<Value*> Memset::operands() const {
+  return { ptr, val, bytes };
+}
+
+void Memset::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  RAUW(val);
+  RAUW(bytes);
+}
+
+void Memset::print(ostream &os) const {
+  os << "memset " << *ptr << " align " << align << ", " << *val
+     << ", " << *bytes;
 }
 
 StateValue Memset::toSMT(State &s) const {
-  // TODO: check following lines are correct
-  auto &[vptr, np] = s[ptr];
-  auto &[vbytes, np2] = s[bytes];
-  s.addUB(np);
-  s.addUB(np2);
-  s.getMemory().memset(vptr, s[val], vbytes, align);
+  auto &[vptr, np] = s[*ptr];
+  auto &[vbytes, np2] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np));
+  s.addUB(vbytes.ugt(0).implies(np2));
+  s.getMemory().memset(vptr, s[*val], vbytes, align);
   return {};
 }
 
 expr Memset::getTypeConstraints(const Function &f) const {
-  return ptr.getType().enforcePtrType() && bytes.getType().enforceIntType();
+  return ptr->getType().enforcePtrType() && bytes->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Memset::dup(const string &suffix) const {
-  return make_unique<Memset>(ptr, val, bytes, align);
+  return make_unique<Memset>(*ptr, *val, *bytes, align);
 }
 
 
-void Memcpy::print(std::ostream &os) const {
-  os << "memcpy " << dst  << " align " << align_dst << ", " << src  << " align " << align_src << ", " << bytes;
+vector<Value*> Memcpy::operands() const {
+  return { dst, src, bytes };
+}
+
+void Memcpy::rauw(const Value &what, Value &with) {
+  RAUW(dst);
+  RAUW(src);
+  RAUW(bytes);
+}
+
+void Memcpy::print(ostream &os) const {
+  os << "memcpy " << *dst  << " align " << align_dst << ", " << *src
+     << " align " << align_src << ", " << *bytes;
 }
 
 StateValue Memcpy::toSMT(State &s) const {
-  // TODO: check following lines are correct
-  auto &[vdst, np] = s[dst];
-  s.addUB(np);
-  auto &[vsrc, np2] = s[src];
-  s.addUB(np2);
-  auto &[vbytes, np3] = s[bytes];
-  s.addUB(np3);
+  auto &[vdst, np] = s[*dst];
+  auto &[vsrc, np2] = s[*src];
+  auto &[vbytes, np3] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np));
+  s.addUB(vbytes.ugt(0).implies(np2));
+  s.addUB(vbytes.ugt(0).implies(np3));
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src);
   return {};
 }
 
 expr Memcpy::getTypeConstraints(const Function &f) const {
-  return dst.getType().enforcePtrType() && dst.getType().enforcePtrType() && bytes.getType().enforceIntType();
+  return dst->getType().enforcePtrType() && dst->getType().enforcePtrType()
+         && bytes->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
-  return make_unique<Memcpy>(dst, src, bytes, align_dst, align_src);
+  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src);
 }
 
 }

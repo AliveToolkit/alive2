@@ -348,10 +348,6 @@ public:
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
-    auto ty = llvm_type2alive(i.getType());
-    if (ty != &Type::voidTy)
-      return error(i);
-
     auto ptr = get_operand(i.getOperand(0));
     auto val = get_operand(i.getOperand(1));
     auto bytes = get_operand(i.getOperand(2));
@@ -363,10 +359,6 @@ public:
   }
 
   RetTy visitMemCpyInst(llvm::MemCpyInst &i) {
-    auto ty = llvm_type2alive(i.getType());
-    if (ty != &Type::voidTy)
-      return error(i);
-
     auto dst = get_operand(i.getOperand(0));
     auto src = get_operand(i.getOperand(1));
     auto bytes = get_operand(i.getOperand(2));

@@ -130,16 +130,18 @@ expr Pointer::is_aligned(unsigned align) const {
   return true;
 }
 
+// When bytes is 0, pointer is always derefenceable
 void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
   expr block_sz = block_size();
   expr offset = get_offset();
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));
-  m.state->addUB(offset.add_no_uoverflow(bytes));
+  m.state->addUB(bytes.ugt(0).implies(
+                (offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz)));
+  m.state->addUB(bytes.ugt(0).implies(offset.add_no_uoverflow(bytes)));
 
   // 2) check block's address is aligned
-  m.state->addUB(is_aligned(align));
+  m.state->addUB(bytes.ugt(0).implies(is_aligned(align)));
 
   // 3) check block is alive
   // TODO
@@ -156,7 +158,9 @@ static expr disjoint(expr begin1, const expr &len1, expr begin2,
 }
 
 // offset + len's overflow is checked by 'is_dereferenceable' at line 139.
-void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2, const expr &len2) const {
+// When bytes is zero, this is already no ub.
+void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
+                           const expr &len2) const {
   m.state->addUB(get_bid() != ptr2.get_bid() ||
                   disjoint(get_offset(), len1, ptr2.get_offset(), len2));
 }
@@ -316,7 +320,6 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
 
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
                     unsigned align_dst, unsigned align_src) {
-  // TODO: Add ub condition - bytes == 0
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytes, align_dst);
   src.is_dereferenceable(bytes, align_src);
@@ -334,7 +337,8 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     Pointer idx(*this, expr::mkVar(name.c_str(), dst.bits()));
 
     expr cond = idx.uge(dst).both() && idx.ult(dst + bytes).both();
-    expr val = expr::mkIf(cond, blocks_val.load((src + idx.get_offset()).release()), blocks_val.load(idx()));
+    expr val = expr::mkIf(cond, blocks_val.load((src + idx.get_offset()).release()),
+                          blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
 }
