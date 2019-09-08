@@ -334,12 +334,7 @@ expr FloatType::getDummyValue() const {
 expr FloatType::getTypeConstraints() const {
   if (defined)
     return true;
-
-  auto bw = sizeVar();
-  // TODO: support more fp types
-  auto isFloat = bw == expr::mkUInt(Float, var_bw_bits);
-  auto isDouble = bw == expr::mkUInt(Double, var_bw_bits);
-  return (isFloat || isDouble);
+  return sizeVar().ult(Unknown);
 }
 
 expr FloatType::operator==(const FloatType &rhs) const {

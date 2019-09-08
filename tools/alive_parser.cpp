@@ -257,7 +257,7 @@ static Type& get_overflow_type(Type &type) {
   return *st.get();
 }
 
-Type& get_sym_type() {
+static Type& get_sym_type() {
   return *sym_types.emplace_back(
     make_unique<SymbolicType>("symty_" + to_string(sym_num++))).get();
 }
