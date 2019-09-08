@@ -16,6 +16,21 @@ using namespace std;
   if (val == &what)  \
     val = &with
 
+namespace {
+struct print_type {
+  IR::Type &ty;
+  const char *pre, *post;
+
+  print_type(IR::Type &ty, const char *pre = "", const char *post = " ")
+    : ty(ty), pre(pre), post(post) {}
+
+  friend ostream& operator<<(ostream &os, const print_type &s) {
+    auto str = s.ty.toString();
+    return str.empty() ? os : (os << s.pre << str << s.post);
+  }
+};
+}
+
 
 namespace IR {
 
@@ -130,7 +145,8 @@ void BinOp::print(ostream &os) const {
   case Exact:  flag = " exact "; break;
   }
 
-  os << getName() << " = " << str << flag << *lhs << ", " << rhs->getName();
+  os << getName() << " = " << str << flag << print_type(getType())
+     << lhs->getName() << ", " << rhs->getName();
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -416,7 +432,7 @@ void UnaryOp::print(ostream &os) const {
   case FNeg:        str = "fneg "; break;
   }
 
-  os << getName() << " = " << str << *val;
+  os << getName() << " = " << str << print_type(getType()) << val->getName();
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
@@ -544,11 +560,7 @@ void ConversionOp::print(ostream &os) const {
   case Int2Ptr: str = "int2ptr "; break;
   }
 
-  os << getName() << " = " << str << *val;
-
-  if (auto ty = getType().toString();
-      !ty.empty())
-    os << " to " << ty;
+  os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
@@ -736,14 +748,10 @@ void FnCall::rauw(const Value &what, Value &with) {
 }
 
 void FnCall::print(ostream &os) const {
-  auto type = getType().toString();
-  if (!type.empty())
-    type += ' ';
-
   if (!dynamic_cast<VoidType*>(&getType()))
     os << getName() << " = ";
 
-  os << "call " << type << fnName << '(';
+  os << "call " << print_type(getType()) << fnName << '(';
 
   bool first = true;
   for (auto arg : args) {
@@ -973,7 +981,8 @@ void FCmp::print(ostream &os) const {
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
   }
-  os << getName() << " = fcmp " << condtxt << *a << ", " << b->getName();
+  os << getName() << " = fcmp " << condtxt << print_type(getType())
+     << a->getName() << ", " << b->getName();
 }
 
 StateValue FCmp::toSMT(State &s) const {
@@ -1020,7 +1029,7 @@ void Freeze::rauw(const Value &what, Value &with) {
 }
 
 void Freeze::print(ostream &os) const {
-  os << getName() << " = freeze " << *val;
+  os << getName() << " = freeze " << print_type(getType()) << val->getName();
 }
 
 StateValue Freeze::toSMT(State &s) const {
@@ -1068,10 +1077,7 @@ void Phi::rauw(const Value &what, Value &with) {
 }
 
 void Phi::print(ostream &os) const {
-  os << getName() << " = phi ";
-  auto t = getType().toString();
-  if (!t.empty())
-    os << t << ' ';
+  os << getName() << " = phi " << print_type(getType());
 
   bool first = true;
   for (auto &[val, bb] : values) {
@@ -1253,7 +1259,7 @@ void Return::rauw(const Value &what, Value &with) {
 }
 
 void Return::print(ostream &os) const {
-  os << "ret " << *val;
+  os << "ret " << print_type(getType()) << val->getName();
 }
 
 StateValue Return::toSMT(State &s) const {
