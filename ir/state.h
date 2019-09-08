@@ -31,7 +31,8 @@ public:
 private:
   const Function &f;
   bool source;
-  smt::expr precondition;
+  smt::expr precondition = true;
+  smt::expr axioms = true;
 
   const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
@@ -76,6 +77,7 @@ public:
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
 
+  void addAxiom(smt::expr &&axiom) { axioms &= std::move(axiom); }
   void addPre(smt::expr &&cond) { precondition &= std::move(cond); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
@@ -86,6 +88,7 @@ public:
 
   auto& getFn() const { return f; }
   auto& getMemory() { return memory; }
+  auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }

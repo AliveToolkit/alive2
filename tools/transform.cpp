@@ -221,6 +221,7 @@ static void check_refinement(Errors &errs, Transform &t,
   auto &a = ap.first;
   auto &b = bp.first;
 
+  auto &uvars = ap.second;
   auto qvars = src_state.getQuantVars();
   qvars.insert(ap.second.begin(), ap.second.end());
 
@@ -229,7 +230,16 @@ static void check_refinement(Errors &errs, Transform &t,
           check_each_var);
   };
 
-  expr pre = src_state.getPre() && tgt_state.getPre();
+  expr axioms = src_state.getAxioms() && tgt_state.getAxioms();
+  // note that precondition->toSMT() may add stuff to getPre,
+  // so order here matters
+  expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
+  pre &= src_state.getPre() && tgt_state.getPre();
+
+  if (check_expr(axioms && preprocess(t, qvars, uvars, expr(pre))).isUnsat()) {
+    errs.add("Precondition is always false");
+    return;
+  }
 
   expr poison_cnstr = type.map_reduce(
                         [](const StateValue &a, const StateValue &b) {
@@ -242,15 +252,15 @@ static void check_refinement(Errors &errs, Transform &t,
                        }, &expr::mk_or, a, b);
 
   Solver::check({
-    { pre && preprocess(t, qvars, ap.second, dom_a.notImplies(dom_b)),
+    { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { pre && preprocess(t, qvars, ap.second, dom_a && poison_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && dom_a && poison_cnstr),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { pre && preprocess(t, qvars, ap.second, dom_a && value_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && dom_a && value_cnstr),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}
@@ -349,6 +359,9 @@ void TypingAssignments::operator++(void) {
 TypingAssignments TransformVerify::getTypings() const {
   auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
 
+  if (t.precondition)
+    c &= t.precondition->getTypeConstraints();
+
   // return type
   c &= t.src.getType() == t.tgt.getType();
 
@@ -377,6 +390,8 @@ TypingAssignments TransformVerify::getTypings() const {
 void TransformVerify::fixupTypes(const TypingAssignments &ty) {
   if (ty.has_only_one_solution)
     return;
+  if (t.precondition)
+    t.precondition->fixupTypes(ty.r.getModel());
   t.src.fixupTypes(ty.r.getModel());
   t.tgt.fixupTypes(ty.r.getModel());
 }
@@ -385,6 +400,10 @@ void Transform::print(ostream &os, const TransformPrintOpts &opt) const {
   os << "\n----------------------------------------\n";
   if (!name.empty())
     os << "Name: " << name << '\n';
+  if (precondition) {
+    precondition->print(os << "Pre: ");
+    os << '\n';
+  }
   src.print(os, opt.print_fn_header);
   os << "=>\n";
   tgt.print(os, opt.print_fn_header);

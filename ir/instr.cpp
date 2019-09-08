@@ -799,7 +799,7 @@ StateValue FnCall::toSMT(State &s) const {
 
     auto fn_src = expr::mkUF(fn.c_str(), vars_src, false);
     auto fn_tgt = expr::mkUF(fn.c_str(), vars_tgt, false);
-    s.addPre(expr::mkForAll(vars_set, cond.implies(fn_src.implies(fn_tgt))));
+    s.addAxiom(expr::mkForAll(vars_set, cond.implies(fn_src.implies(fn_tgt))));
   };
 
   // impact of the function on the domain of the program

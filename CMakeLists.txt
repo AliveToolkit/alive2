@@ -49,6 +49,7 @@ set(IR_SRCS
   ir/function.cpp
   ir/instr.cpp
   ir/memory.cpp
+  ir/precondition.cpp
   ir/state.cpp
   ir/state_value.cpp
   ir/type.cpp

@@ -336,6 +336,12 @@ void Solver::check(initializer_list<E> queries) {
   }
 }
 
+Result check_expr(const expr &e) {
+  Solver s;
+  s.add(e);
+  return s.check();
+}
+
 void solver_print_stats(ostream &os) {
   float total = num_queries / 100.0;
   float trivial_pc = num_queries == 0 ? 0 :

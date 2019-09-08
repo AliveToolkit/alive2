@@ -645,6 +645,20 @@ expr expr::lshr_exact(const expr &rhs) const {
   return (lshr(rhs) << rhs) == *this;
 }
 
+static expr log2_rec(const expr &e, unsigned idx, unsigned bw) {
+  if (idx == 0)
+    return expr::mkUInt(0, bw);
+
+  return expr::mkIf(e.extract(idx, idx) == 1,
+                    expr::mkUInt(idx, bw),
+                    log2_rec(e, idx - 1, bw));
+}
+
+expr expr::log2(unsigned bw_output) const {
+  C();
+  return log2_rec(*this, bits() - 1, bw_output);
+}
+
 expr expr::bswap() const {
   C();
   auto nbits = bits();

@@ -20,6 +20,8 @@
 # define ENSURE(x) (void)(x)
 #endif
 
+#define sizeof_array(a) (sizeof(a)/sizeof(*a))
+
 namespace util {
 
 template <typename T>

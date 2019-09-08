@@ -112,6 +112,8 @@ public:
   friend class SolverPush;
 };
 
+Result check_expr(const expr &e);
+
 
 void solver_print_queries(bool yes);
 void solver_tactic_verbose(bool yes);

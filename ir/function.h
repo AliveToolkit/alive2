@@ -3,8 +3,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "ir/constant.h"
 #include "ir/instr.h"
+#include "ir/precondition.h"
 #include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
@@ -55,7 +55,6 @@ class Function final {
   std::string name;
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
-  Predicate *precondition = nullptr;
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;

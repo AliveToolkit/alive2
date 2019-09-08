@@ -3,6 +3,7 @@
 
 #include "tools/alive_parser.h"
 #include "ir/constant.h"
+#include "ir/precondition.h"
 #include "ir/value.h"
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
@@ -41,6 +42,9 @@ static unordered_map<string, Value*> identifiers, identifiers_src;
 static Function *fn;
 static BasicBlock *bb;
 static bool parse_src;
+
+static Type& get_sym_type();
+static Value& parse_operand(Type &type);
 
 static Value& get_constant(uint64_t n, Type &t) {
   auto c = make_unique<IntConst>(t, n);
@@ -212,10 +216,24 @@ parse_more:
     }
     break;
   }
-  case IDENTIFIER:
-    //TODO
-    break;
+  case IDENTIFIER: {
+    // function: identifier '(' arg0, ... argn ')'
+    vector<Value*> args;
+    auto name = yylval.str;
+    tokenizer.ensure(LPAREN);
+    while (true) {
+      args.emplace_back(&parse_operand(get_sym_type()));
 
+      if (!tokenizer.consumeIf(COMMA))
+        break;
+    }
+    tokenizer.ensure(RPAREN);
+
+    auto p = make_unique<FnPred>(name, move(args));
+    auto ret = p.get();
+    fn->addPredicate(move(p));
+    return ret;
+  }
   case CONSTANT:
     //TODO
     parse_const_expr(*int_types[64].get());
@@ -230,7 +248,8 @@ parse_more:
 static void parse_pre(Transform &t) {
   if (!tokenizer.consumeIf(PRE))
     return;
-  parse_predicate();
+  fn = &t.src;
+  t.precondition = parse_predicate();
 }
 
 static void parse_comma() {
@@ -258,6 +277,9 @@ static Type& get_overflow_type(Type &type) {
 }
 
 static Type& get_sym_type() {
+  if (sym_num < sym_types.size())
+    return *sym_types[sym_num++].get();
+
   return *sym_types.emplace_back(
     make_unique<SymbolicType>("symty_" + to_string(sym_num++))).get();
 }
@@ -304,8 +326,6 @@ static Type& try_parse_type(Type &default_type) {
     return parse_type();
   return default_type;
 }
-
-static Value& parse_operand(Type &type);
 
 static Value& parse_const_expr(Type &type) {
   switch (auto t = *tokenizer) {
@@ -919,9 +939,10 @@ vector<Transform> parse(string_view buf) {
   while (!tokenizer.empty()) {
     auto &t = ret.emplace_back();
     sym_num = struct_num = 0;
+    parse_src = true;
+
     parse_name(t);
     parse_pre(t);
-    parse_src = true;
     parse_fn(t.src);
     parse_arrow();
 

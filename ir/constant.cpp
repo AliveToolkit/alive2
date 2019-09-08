@@ -16,12 +16,6 @@ void Constant::print(ostream &os) const {
   UNREACHABLE();
 }
 
-StateValue Constant::toSMT(State &s) const {
-  auto ret = toSMT_cnst();
-  s.addUB(move(ret.second));
-  return { move(ret.first), true };
-}
-
 
 IntConst::IntConst(Type &type, int64_t val)
   : Constant(type, to_string(val)), val(val) {}
@@ -29,7 +23,7 @@ IntConst::IntConst(Type &type, int64_t val)
 IntConst::IntConst(Type &type, string &&val)
   : Constant(type, string(val)), val(move(val)) {}
 
-pair<expr, expr> IntConst::toSMT_cnst() const {
+StateValue IntConst::toSMT(State &s) const {
   if (auto v = get_if<int64_t>(&val))
     return { expr::mkInt(*v, bits()), true };
   return { expr::mkInt(get<string>(val).c_str(), bits()), true };
@@ -54,7 +48,7 @@ expr FloatConst::getTypeConstraints() const {
          getType().enforceFloatType();
 }
 
-pair<expr, expr> FloatConst::toSMT_cnst() const {
+StateValue FloatConst::toSMT(State &s) const {
   expr e;
   switch (getType().getAsFloatType()->getFpType()) {
   case FloatType::Half:    e = expr::mkHalf((float)val); break;
@@ -92,10 +86,6 @@ StateValue AggregateConst::toSMT(State &s) const {
   return v;
 }
 
-pair<expr, expr> AggregateConst::toSMT_cnst() const {
-  UNREACHABLE();
-}
-
 expr AggregateConst::getTypeConstraints() const {
   expr r = Value::getTypeConstraints();
   vector<Type*> types;
@@ -107,7 +97,7 @@ expr AggregateConst::getTypeConstraints() const {
 }
 
 
-pair<expr, expr> ConstantInput::toSMT_cnst() const {
+StateValue ConstantInput::toSMT(State &s) const {
   return { expr::mkVar(getName().c_str(), bits()), true };
 }
 
@@ -129,32 +119,30 @@ ConstantBinOp::ConstantBinOp(Type &type, Constant &lhs, Constant &rhs, Op op)
   this->setName(move(str));
 }
 
-static void div_ub(const expr &a, const expr &b, expr &ub, bool sign) {
-  auto bits = b.bits();
-  ub &= b != expr::mkUInt(0, bits);
+static void div_ub(const expr &a, const expr &b, State &s, bool sign) {
+  s.addPre(b != 0);
   if (sign)
-    ub &= (a != expr::IntSMin(bits) || b != expr::mkInt(-1, bits));
+    s.addPre(a != expr::IntSMin(b.bits()) || b != -1);
 }
 
-pair<expr, expr> ConstantBinOp::toSMT_cnst() const {
-  auto a = lhs.toSMT_cnst();
-  auto b = rhs.toSMT_cnst();
-  auto ub = move(a.second) && move(b.second);
+StateValue ConstantBinOp::toSMT(State &s) const {
+  auto &[a, ap] = s[lhs];
+  auto &[b, bp] = s[rhs];
   expr val;
 
   switch (op) {
-  case ADD: val = a.first + b.first; break;
-  case SUB: val = a.first - b.first; break;
+  case ADD: val = a + b; break;
+  case SUB: val = a - b; break;
   case SDIV:
-    val = a.first.sdiv(b.first);
-    div_ub(a.first, b.first, ub, true);
+    val = a.sdiv(b);
+    div_ub(a, b, s, true);
     break;
   case UDIV:
-    val = a.first.udiv(b.first);
-    div_ub(a.first, b.first, ub, false);
+    val = a.udiv(b);
+    div_ub(a, b, s, false);
     break;
   }
-  return { move(val), move(ub) };
+  return { move(val), ap && bp };
 }
 
 expr ConstantBinOp::getTypeConstraints() const {
@@ -165,8 +153,8 @@ expr ConstantBinOp::getTypeConstraints() const {
 }
 
 
-ConstantFn::ConstantFn(Type &type, string_view name, vector<Value*> &&args) :
-  Constant(type, ""), args(move(args)) {
+ConstantFn::ConstantFn(Type &type, string_view name, vector<Value*> &&args)
+  : Constant(type, ""), args(move(args)) {
   unsigned num_args;
   if (name == "log2") {
     fn = LOG2;
@@ -181,7 +169,7 @@ ConstantFn::ConstantFn(Type &type, string_view name, vector<Value*> &&args) :
   auto actual_args = this->args.size();
   if (actual_args != num_args)
     throw ConstantFnException("Expected " + to_string(num_args) +
-                              " parameter for " + string(name) + ", but got " +
+                              " parameters for " + string(name) + ", but got " +
                               to_string(actual_args));
 
   string str = string(name) + '(';
@@ -196,50 +184,34 @@ ConstantFn::ConstantFn(Type &type, string_view name, vector<Value*> &&args) :
   this->setName(move(str));
 }
 
-pair<expr, expr> ConstantFn::toSMT_cnst() const {
-  return { expr() /* TODO */, true };
-}
-
-
-void BoolPred::print(ostream &os) const {
-  os << '(';
-  lhs.print(os);
-  os << ") " << (pred == AND ? "&&" : "||") << " (";
-  rhs.print(os);
-  os << ')';
-}
-
-expr BoolPred::toSMT() const {
-  auto a = lhs.toSMT();
-  auto b = rhs.toSMT();
-  switch (pred) {
-  case AND: return a && b;
-  case OR:  return a || b;
+StateValue ConstantFn::toSMT(State &s) const {
+  expr r;
+  switch (fn) {
+  case LOG2: {
+    auto &[v, vp] = s[*args[0]];
+    return { v.log2(bits()), expr(vp) };
   }
-  UNREACHABLE();
-}
-
-
-void CmpPred::print(ostream &os) const {
-  const char *p = nullptr;
-  switch (pred) {
-  case EQ:  p = " == ";  break;
-  case NE:  p = " != ";  break;
-  case SLE: p = " <= ";  break;
-  case SLT: p = " < ";   break;
-  case SGE: p = " >= ";  break;
-  case SGT: p = " > ";   break;
-  case ULE: p = " u<= "; break;
-  case ULT: p = " u< ";  break;
-  case UGE: p = " u>= "; break;
-  case UGT: p = " u> ";  break;
+  case WIDTH:
+    r = args[0]->bits();
+    break;
   }
-  lhs.print(os);
-  rhs.print(os << p);
+  return { move(r), true };
 }
 
-expr CmpPred::toSMT() const {
-  return expr() /* TODO */;
+expr ConstantFn::getTypeConstraints() const {
+  expr r = Value::getTypeConstraints();
+  for (auto a : args) {
+    r &= a->getTypeConstraints();
+  }
+
+  Type &ty = getType();
+  switch (fn) {
+  case LOG2:
+  case WIDTH:
+    r &= ty.enforceIntType();
+    break;
+  }
+  return r;
 }
 
 }
