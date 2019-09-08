@@ -892,14 +892,18 @@ static void parse_fn(Function &f) {
       break;
     default:
       tokenizer.unget(t);
-      return;
+      goto exit;
     }
   }
 
-  // FIXME: add error checking
+exit:
   if (!has_return) {
-    auto &last = bb->back();
-    f.setType(last.getType());
+    if (bb->empty())
+      error("Block cannot be empty");
+
+    auto &type = get_sym_type();
+    bb->addInstr(make_unique<Return>(type, bb->back()));
+    f.setType(type);
   }
 }
 

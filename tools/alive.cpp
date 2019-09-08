@@ -18,29 +18,6 @@ using namespace util;
 using namespace std;
 
 
-static bool add_return(Function &f) {
-  if (f.hasReturn())
-    return true;
-
-  auto &bbs = f.getBBs();
-  if (bbs.size() != 1) {
-    cerr << "-root-only only supports single BB transforms\n";
-    return false;
-  }
-
-  auto bb = bbs[0];
-  if (bb->empty()) {
-    cerr << "-root-only doesn't support empty BBs\n";
-    return false;
-  }
-
-  auto &type = get_sym_type();
-  bb->addInstr(make_unique<Return>(type, bb->back()));
-  f.setType(type);
-  return true;
-}
-
-
 static void show_help() {
   cerr <<
     "Usage: alive2 <options> <files.opt>\n"
@@ -123,7 +100,8 @@ int main(int argc, char **argv) {
       for (auto &t : parse(*file_reader(argv[argc_i], PARSER_READ_AHEAD))) {
         smt_init.reset();
 
-        if (root_only && (!add_return(t.src) || !add_return(t.tgt))) {
+        if (root_only && (!t.src.hasReturn() || !t.tgt.hasReturn())) {
+          cerr << "Return instruction required with -root-only.\n";
           ++num_errors;
           continue;
         }
