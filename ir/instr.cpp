@@ -1518,16 +1518,17 @@ void Memset::print(ostream &os) const {
 }
 
 StateValue Memset::toSMT(State &s) const {
-  auto &[vptr, np] = s[*ptr];
-  auto &[vbytes, np2] = s[*bytes];
-  s.addUB(vbytes.ugt(0).implies(np));
-  s.addUB(vbytes.ugt(0).implies(np2));
+  auto &[vptr, np_ptr] = s[*ptr];
+  auto &[vbytes, np_bytes] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np_ptr));
+  s.addUB(np_bytes);
   s.getMemory().memset(vptr, s[*val], vbytes, align);
   return {};
 }
 
 expr Memset::getTypeConstraints(const Function &f) const {
-  return ptr->getType().enforcePtrType() && bytes->getType().enforceIntType();
+  return ptr->getType().enforcePtrType() &&
+         bytes->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Memset::dup(const string &suffix) const {
@@ -1551,19 +1552,19 @@ void Memcpy::print(ostream &os) const {
 }
 
 StateValue Memcpy::toSMT(State &s) const {
-  auto &[vdst, np] = s[*dst];
-  auto &[vsrc, np2] = s[*src];
-  auto &[vbytes, np3] = s[*bytes];
-  s.addUB(vbytes.ugt(0).implies(np));
-  s.addUB(vbytes.ugt(0).implies(np2));
-  s.addUB(vbytes.ugt(0).implies(np3));
+  auto &[vdst, np_dst] = s[*dst];
+  auto &[vsrc, np_src] = s[*src];
+  auto &[vbytes, np_bytes] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np_dst && np_src));
+  s.addUB(np_bytes);
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src);
   return {};
 }
 
 expr Memcpy::getTypeConstraints(const Function &f) const {
-  return dst->getType().enforcePtrType() && dst->getType().enforcePtrType()
-         && bytes->getType().enforceIntType();
+  return dst->getType().enforcePtrType() &&
+         dst->getType().enforcePtrType() &&
+         bytes->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
