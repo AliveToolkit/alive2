@@ -153,7 +153,7 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 
 // general disjoint check for unsigned integer
 // This function assumes that both begin + len don't overflow
-static expr disjoint(const expr begin1, const expr &len1, const expr begin2,
+static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
                      const expr &len2) {
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
