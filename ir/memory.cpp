@@ -81,7 +81,9 @@ expr Pointer::block_size() const {
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
-  return { m, (get_offset() + bytes).concat(get_bid()) };
+  expr off = (get_offset().sextOrTrunc(m.bits_size_t) +
+              bytes.zextOrTrunc(m.bits_size_t)).trunc(m.bits_for_offset);
+  return { m, off.concat(get_bid()) };
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
@@ -89,7 +91,7 @@ Pointer Pointer::operator+(unsigned bytes) const {
 }
 
 void Pointer::operator+=(const expr &bytes) {
-  p = (get_offset() + bytes).concat(get_bid());
+  p = (*this + bytes).p;
 }
 
 expr Pointer::add_no_overflow(const expr &offset) const {
@@ -131,14 +133,14 @@ expr Pointer::is_aligned(unsigned align) const {
 }
 
 // When bytes is 0, pointer is always derefenceable
-void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
+void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
   expr block_sz = block_size();
-  expr offset = get_offset();
+  expr offset = get_offset().sextOrTrunc(m.bits_size_t);
+  expr bytes = bytes0.zextOrTrunc(m.bits_size_t);
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state->addUB(bytes.ugt(0).implies(
-                (offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz)));
-  m.state->addUB(bytes.ugt(0).implies(offset.add_no_uoverflow(bytes)));
+  m.state->addUB(bytes.ugt(0).implies((offset + bytes).ule(block_sz) &&
+                                      offset.add_no_uoverflow(bytes)));
 
   // 2) check block's address is aligned
   m.state->addUB(bytes.ugt(0).implies(is_aligned(align)));
@@ -158,12 +160,14 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
-// offset + len's overflow is checked by 'is_dereferenceable' at line 139.
-// When bytes is zero, this is already no ub.
+// This function assumes that both begin + len don't overflow
 void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
                            const expr &len2) const {
   m.state->addUB(get_bid() != ptr2.get_bid() ||
-                  disjoint(get_offset(), len1, ptr2.get_offset(), len2));
+                  disjoint(get_offset().sextOrTrunc(m.bits_size_t),
+                           len1.zextOrTrunc(m.bits_size_t),
+                           ptr2.get_offset().sextOrTrunc(m.bits_size_t),
+                           len2.zextOrTrunc(m.bits_size_t)));
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
