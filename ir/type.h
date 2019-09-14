@@ -207,6 +207,7 @@ protected:
 
 public:
   smt::expr numElements() const;
+  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
   IR::StateValue extract(const IR::StateValue &val,
                          const smt::expr &index) const;
@@ -229,7 +230,6 @@ public:
     smt::expr(*map)(const IR::StateValue&, const IR::StateValue&),
     smt::expr(*reduce)(const std::set<smt::expr>&),
     const IR::StateValue &a, const IR::StateValue &b) const override;
-  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
 };
 
 

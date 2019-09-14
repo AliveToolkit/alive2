@@ -495,6 +495,15 @@ expr AggregateType::numElements() const {
                    var("elements", var_vector_elements);
 }
 
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
+  StateValue v;
+  for (unsigned idx = 0; idx < elements; ++idx) {
+    auto vv = children[idx]->toBV(vals[idx]);
+    v = idx == 0 ? move(vv) : v.concat(vv);
+  }
+  return v;
+}
+
 StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
   unsigned total_till_now = 0;
   for (unsigned i = 0; i < index; ++i) {
@@ -635,17 +644,6 @@ expr AggregateType::map_reduce(expr(*map)(const StateValue&, const StateValue&),
     r.insert(map(extract(a, i), extract(b, i)));
   }
   return reduce(r);
-}
-
-StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
-  assert(vals.size() == elements);
-
-  StateValue v;
-  for (unsigned idx = 0; idx < elements; ++idx) {
-    auto vv = children[idx]->toBV(vals[idx]);
-    v = idx == 0 ? move(vv) : v.concat(vv);
-  }
-  return v;
 }
 
 

@@ -210,33 +210,20 @@ void Memory::free(const expr &ptr) {
 
 void Memory::store(const expr &p, const StateValue &v, Type &type,
                    unsigned align) {
-  expr val = v.value;
-  expr poison = v.non_poison.toBVBool();
-
-  if (type.isIntType()) {
-    // do nothing
-  } else if (type.isFloatType()) {
-    val = val.float2BV();
-  } else if (type.isPtrType()) {
-    // TODO
-    val = expr();
-  } else {
-    UNREACHABLE();
-  }
-
-  unsigned bits = val.bits();
+  StateValue val = type.toBV(v);
+  unsigned bits = val.value.bits();
   unsigned bytes = divide_up(bits, 8);
 
-  val = val.zext(bytes * 8 - bits);
+  val.value = val.value.zext(bytes * 8 - bits);
 
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
 
   for (unsigned i = 0; i < bytes; ++i) {
     // FIXME: right now we store in little-endian; consider others?
-    expr data = val.extract((i + 1) * 8 - 1, i * 8);
+    expr data = val.value.extract((i + 1) * 8 - 1, i * 8);
     auto p = (ptr + i).release();
-    blocks_val = blocks_val.store(p, poison.concat(data));
+    blocks_val = blocks_val.store(p, val.non_poison.concat(data));
   }
 }
 
@@ -246,38 +233,27 @@ StateValue Memory::load(const expr &p, Type &type, unsigned align) {
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
 
-  expr val, non_poison;
+  StateValue val;
   bool first = true;
 
   for (unsigned i = 0; i < bytes; ++i) {
     auto ptr_i = (ptr + i).release();
     expr pair = blocks_val.load(ptr_i);
     expr v = pair.extract(8-1, 0);
-    expr p = pair.extract(8, 8) == 1;
+    expr p = pair.extract(8, 8);
 
     if (first) {
-      val = move(v);
-      non_poison = move(p);
+      val.value      = move(v);
+      val.non_poison = move(p);
     } else {
-      val = v.concat(val);
-      non_poison &= p;
+      val.value      = v.concat(val.value);
+      val.non_poison = p | val.non_poison;
     }
     first = false;
   }
 
-  val = val.trunc(bits);
-  if (type.isIntType()) {
-    // do nothing
-  } else if (type.isFloatType()) {
-    val = val.BV2float(type.getDummyValue());
-  } else if (type.isPtrType()) {
-    // TODO
-    val = expr();
-  } else {
-    UNREACHABLE();
-  }
-
-  return { move(val), move(non_poison) };
+  val.value = val.value.trunc(bits);
+  return type.fromBV(move(val));
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,

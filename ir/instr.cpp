@@ -169,16 +169,6 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
   return ret;
 }
 
-static expr mk_poison_agg(expr &poison, unsigned agg_size) {
-  assert(agg_size > 0);
-  expr p = poison.toBVBool();
-  expr r = p;
-  for (unsigned i = 1; i != agg_size; ++i) {
-    r = r.concat(p);
-  }
-  return r;
-}
-
 StateValue BinOp::toSMT(State &s) const {
   auto &[a, ap] = s[*lhs];
   auto &[b, bp] = s[*rhs];
@@ -301,42 +291,36 @@ StateValue BinOp::toSMT(State &s) const {
     not_poison &= (b == 0u || a != 0u);
     break;
 
-  case SAdd_Overflow:
-    val = a + b;
-    val = val.concat((!a.add_no_soverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
-  case UAdd_Overflow:
-    val = a + b;
-    val = val.concat((!a.add_no_uoverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
-  case SSub_Overflow:
-    val = a - b;
-    val = val.concat((!a.sub_no_soverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
-  case USub_Overflow:
-    val = a - b;
-    val = val.concat((!a.sub_no_uoverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
-  case SMul_Overflow:
-    val = a * b;
-    val = val.concat((!a.mul_no_soverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
-  case UMul_Overflow:
-    val = a * b;
-    val = val.concat((!a.mul_no_uoverflow(b)).toBVBool());
-    not_poison = mk_poison_agg(not_poison, 2);
-    break;
-
+  case SAdd_Overflow: {
+    vector<StateValue> vals = { { a + b, expr(not_poison) } };
+    vals.emplace_back((!a.add_no_soverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  case UAdd_Overflow: {
+    vector<StateValue> vals = { { a + b, expr(not_poison) } };
+    vals.emplace_back((!a.add_no_uoverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  case SSub_Overflow: {
+    vector<StateValue> vals = { { a - b, expr(not_poison) } };
+    vals.emplace_back((!a.sub_no_soverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  case USub_Overflow: {
+    vector<StateValue> vals = { { a - b, expr(not_poison) } };
+    vals.emplace_back((!a.sub_no_uoverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  case SMul_Overflow: {
+    vector<StateValue> vals = { { a * b, expr(not_poison) } };
+    vals.emplace_back((!a.mul_no_soverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  case UMul_Overflow: {
+    vector<StateValue> vals = { { a * b, expr(not_poison) } };
+    vals.emplace_back((!a.mul_no_uoverflow(b)).toBVBool(), move(not_poison));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
   case FAdd:
     val = a.fadd(b);
     not_poison &= !fm_poison(a, b, val, flags);
@@ -359,7 +343,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FRem:
     // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-    not_poison = expr();
+    not_poison = !fm_poison(a, b, val, flags);
     break;
   }
 

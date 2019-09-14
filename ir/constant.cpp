@@ -80,9 +80,7 @@ StateValue AggregateConst::toSMT(State &s) const {
   for (auto val : vals) {
     state_vals.emplace_back(val->toSMT(s));
   }
-  auto aty = getType().getAsAggregateType();
-  assert(aty);
-  return aty->aggregateVals(state_vals);
+  return getType().getAsAggregateType()->aggregateVals(state_vals);
 }
 
 expr AggregateConst::getTypeConstraints() const {
