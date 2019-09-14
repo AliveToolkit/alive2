@@ -1020,6 +1020,9 @@ expr expr::ule(const expr &rhs) const {
   if (eq(rhs) || isZero())
     return true;
 
+  if (rhs.isZero())
+    return *this == rhs;
+
   uint64_t a, b;
   if (isUInt(a) && rhs.isUInt(b))
     return a <= b;
