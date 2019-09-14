@@ -152,8 +152,9 @@ void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
 }
 
 // general disjoint check for unsigned integer
-static expr disjoint(expr begin1, const expr &len1, expr begin2,
-                      const expr &len2) {
+// This function assumes that both begin + len don't overflow
+static expr disjoint(const expr begin1, const expr &len1, const expr begin2,
+                     const expr &len2) {
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
@@ -334,12 +335,13 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     }
   } else {
     string name = "#idx_" + to_string(last_idx_ptr++);
-    Pointer idx(*this, expr::mkVar(name.c_str(), dst.bits()));
+    Pointer dst_idx(*this, expr::mkVar(name.c_str(), dst.bits()));
+    Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
 
-    expr cond = idx.uge(dst).both() && idx.ult(dst + bytes).both();
-    expr val = expr::mkIf(cond, blocks_val.load((src + idx.get_offset()).release()),
-                          blocks_val.load(idx()));
-    blocks_val = expr::mkLambda({ idx() }, move(val));
+    expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytes).both();
+    expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
+                          blocks_val.load(dst_idx()));
+    blocks_val = expr::mkLambda({ dst_idx() }, move(val));
   }
 }
 
