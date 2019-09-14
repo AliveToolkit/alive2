@@ -139,14 +139,16 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
   expr bytes = bytes0.zextOrTrunc(m.bits_size_t);
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state->addUB(bytes.ugt(0).implies((offset + bytes).ule(block_sz) &&
-                                      offset.add_no_uoverflow(bytes)));
+  expr cond = (offset + bytes).ule(block_sz);
+  cond &= offset.add_no_uoverflow(bytes);
 
   // 2) check block's address is aligned
-  m.state->addUB(bytes.ugt(0).implies(is_aligned(align)));
+  cond &= is_aligned(align);
 
   // 3) check block is alive
   // TODO
+
+  m.state->addUB(bytes.ugt(0).implies(cond));
 }
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
