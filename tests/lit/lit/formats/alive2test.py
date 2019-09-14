@@ -3,8 +3,8 @@
 
 import lit.TestRunner
 import lit.util
-from .base import FileBasedTest
-import re, signal, string, subprocess
+from .base import TestFormat
+import os, re, signal, string, subprocess
 
 
 def executeCommand(command):
@@ -35,14 +35,35 @@ def readFile(path):
   return fd.read()
 
 
-class Alive2Test(FileBasedTest):
+class Alive2Test(TestFormat):
   def __init__(self):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
 
+  def getTestsInDirectory(self, testSuite, path_in_suite,
+                          litConfig, localConfig):
+    source_path = testSuite.getSourcePath(path_in_suite)
+    for filename in os.listdir(source_path):
+      filepath = os.path.join(source_path, filename)
+      if not filename.startswith('.') and \
+          not os.path.isdir(filepath) and \
+          (filename.endswith('.opt') or filename.endswith('.src.ll')):
+        yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
+
+
   def execute(self, test, litConfig):
     test = test.getSourcePath()
-    cmd = ['./alive']
+
+    alive_tv = test.endswith('.src.ll')
+    if alive_tv:
+      cmd = ['./alive-tv']
+      ok_string = 'Transformation seems to be correct!'
+      if not os.path.isfile('alive-tv'):
+        return lit.Test.UNSUPPORTED, ''
+    else:
+      cmd = ['./alive']
+      ok_string = 'Optimization is correct!'
+
     input = readFile(test)
 
     # add test-specific args
@@ -51,11 +72,13 @@ class Alive2Test(FileBasedTest):
       cmd += m.group(1).split()
 
     cmd.append(test)
+    if alive_tv:
+      cmd.append(test.replace('.src.ll', '.tgt.ll'))
     out, err, exitCode = executeCommand(cmd)
 
     m = self.regex_errs.search(input)
     if m == None:
-      if exitCode == 0 and string.find(out, 'Optimization is correct!') != -1:
+      if exitCode == 0 and string.find(out + err, ok_string) != -1:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 

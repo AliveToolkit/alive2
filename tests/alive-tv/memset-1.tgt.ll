@@ -1,3 +1,3 @@
 define i8 @f() {
-  ret i8 1
+  ret i8 3
 }
