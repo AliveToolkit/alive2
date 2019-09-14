@@ -347,6 +347,28 @@ public:
     RETURN_IDENTIFIER(move(call));
   }
 
+  RetTy visitMemSetInst(llvm::MemSetInst &i) {
+    auto ptr = get_operand(i.getOperand(0));
+    auto val = get_operand(i.getOperand(1));
+    auto bytes = get_operand(i.getOperand(2));
+    // TODO: add isvolatile, alignment
+    if (!ptr || !val || !bytes)
+      return error(i);
+
+    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes, 1));
+  }
+
+  RetTy visitMemCpyInst(llvm::MemCpyInst &i) {
+    auto dst = get_operand(i.getOperand(0));
+    auto src = get_operand(i.getOperand(1));
+    auto bytes = get_operand(i.getOperand(2));
+    // TODO: add isvolatile, alignment
+    if (!dst || !src || !bytes)
+      return error(i);
+
+    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes, 1, 1));
+  }
+
   RetTy visitICmpInst(llvm::ICmpInst &i) {
     PARSE_BINOP();
     ICmp::Cond cond;

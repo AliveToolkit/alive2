@@ -1485,4 +1485,74 @@ unique_ptr<Instr> Store::dup(const string &suffix) const {
   return make_unique<Store>(*ptr, *val, align);
 }
 
+
+vector<Value*> Memset::operands() const {
+  return { ptr, val, bytes };
+}
+
+void Memset::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  RAUW(val);
+  RAUW(bytes);
+}
+
+void Memset::print(ostream &os) const {
+  os << "memset " << *ptr << " align " << align << ", " << *val
+     << ", " << *bytes;
+}
+
+StateValue Memset::toSMT(State &s) const {
+  auto &[vptr, np_ptr] = s[*ptr];
+  auto &[vbytes, np_bytes] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np_ptr));
+  s.addUB(np_bytes);
+  s.getMemory().memset(vptr, s[*val], vbytes, align);
+  return {};
+}
+
+expr Memset::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType() &&
+         bytes->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memset::dup(const string &suffix) const {
+  return make_unique<Memset>(*ptr, *val, *bytes, align);
+}
+
+
+vector<Value*> Memcpy::operands() const {
+  return { dst, src, bytes };
+}
+
+void Memcpy::rauw(const Value &what, Value &with) {
+  RAUW(dst);
+  RAUW(src);
+  RAUW(bytes);
+}
+
+void Memcpy::print(ostream &os) const {
+  os << "memcpy " << *dst  << " align " << align_dst << ", " << *src
+     << " align " << align_src << ", " << *bytes;
+}
+
+StateValue Memcpy::toSMT(State &s) const {
+  auto &[vdst, np_dst] = s[*dst];
+  auto &[vsrc, np_src] = s[*src];
+  auto &[vbytes, np_bytes] = s[*bytes];
+  s.addUB(vbytes.ugt(0).implies(np_dst && np_src));
+  s.addUB(np_bytes);
+  s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src);
+  return {};
+}
+
+expr Memcpy::getTypeConstraints(const Function &f) const {
+  return dst->getType().enforcePtrType() &&
+         dst->getType().enforcePtrType() &&
+         bytes->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
+  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src);
+}
+
 }

@@ -130,16 +130,18 @@ expr Pointer::is_aligned(unsigned align) const {
   return true;
 }
 
+// When bytes is 0, pointer is always derefenceable
 void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
   expr block_sz = block_size();
   expr offset = get_offset();
 
   // 1) check that offset is within bounds and that arith doesn't overflow
-  m.state->addUB((offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz));
-  m.state->addUB(offset.add_no_uoverflow(bytes));
+  m.state->addUB(bytes.ugt(0).implies(
+                (offset + bytes).zextOrTrunc(m.bits_size_t).ule(block_sz)));
+  m.state->addUB(bytes.ugt(0).implies(offset.add_no_uoverflow(bytes)));
 
   // 2) check block's address is aligned
-  m.state->addUB(is_aligned(align));
+  m.state->addUB(bytes.ugt(0).implies(is_aligned(align)));
 
   // 3) check block is alive
   // TODO
@@ -147,6 +149,21 @@ void Pointer::is_dereferenceable(const expr &bytes, unsigned align) {
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
   is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
+}
+
+// general disjoint check for unsigned integer
+// This function assumes that both begin + len don't overflow
+static expr disjoint(const expr begin1, const expr &len1, const expr begin2,
+                     const expr &len2) {
+  return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
+}
+
+// offset + len's overflow is checked by 'is_dereferenceable' at line 139.
+// When bytes is zero, this is already no ub.
+void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
+                           const expr &len2) const {
+  m.state->addUB(get_bid() != ptr2.get_bid() ||
+                  disjoint(get_offset(), len1, ptr2.get_offset(), len2));
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
@@ -283,7 +300,25 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytes, align_dst);
   src.is_dereferenceable(bytes, align_src);
-  // TODO
+  src.is_disjoint(bytes, dst, bytes);
+
+  uint64_t n;
+  if (bytes.isUInt(n) && n <= 4) {
+    for (unsigned i = 0; i < n; ++i) {
+      auto src_i = (src + i).release();
+      auto dst_i = (dst + i).release();
+      blocks_val = blocks_val.store(dst_i, blocks_val.load(src_i));
+    }
+  } else {
+    string name = "#idx_" + to_string(last_idx_ptr++);
+    Pointer dst_idx(*this, expr::mkVar(name.c_str(), dst.bits()));
+    Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
+
+    expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytes).both();
+    expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
+                          blocks_val.load(dst_idx()));
+    blocks_val = expr::mkLambda({ dst_idx() }, move(val));
+  }
 }
 
 expr Memory::ptr2int(const expr &ptr) {

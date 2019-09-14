@@ -68,6 +68,8 @@ public:
   smt::expr is_aligned(unsigned align) const;
   void is_dereferenceable(unsigned bytes, unsigned align);
   void is_dereferenceable(const smt::expr &bytes, unsigned align);
+  void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
+                   const smt::expr &len2) const;
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
