@@ -206,6 +206,11 @@ void VoidType::fixup(const Model &m) {
   // do nothing
 }
 
+pair<expr, expr>
+VoidType::refines(const StateValue &src, const StateValue &tgt) const {
+  UNREACHABLE();
+}
+
 pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
   UNREACHABLE();
 }
@@ -267,6 +272,13 @@ expr IntType::enforceIntOrVectorType() const {
 
 expr IntType::enforceIntOrPtrOrVectorType() const {
   return true;
+}
+
+pair<expr, expr>
+IntType::refines(const StateValue &src, const StateValue &tgt) const {
+  return { src.non_poison.implies(tgt.non_poison),
+           // TODO: test if perf improves with && tgt.non_poison below
+           src.non_poison.implies(src.value == tgt.value) };
 }
 
 pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
@@ -362,6 +374,14 @@ expr FloatType::enforceFloatType() const {
   return true;
 }
 
+pair<expr, expr>
+FloatType::refines(const StateValue &src, const StateValue &tgt) const {
+  return
+    { src.non_poison.implies(tgt.non_poison),
+      // TODO: test if perf improves with && tgt.non_poison below
+      (src.non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
+}
+
 pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
   expr var;
   switch (fpType) {
@@ -374,6 +394,8 @@ pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
 }
 
 void FloatType::printVal(ostream &os, State &s, const expr &e) const {
+  e.float2BV().printHexadecimal(os);
+  os << " (";
   if (e.isNaN().simplify().isTrue()) {
     os << "NaN";
   } else if (e.isFPZero().simplify().isTrue()) {
@@ -381,9 +403,9 @@ void FloatType::printVal(ostream &os, State &s, const expr &e) const {
   } else if (e.isInf().simplify().isTrue()) {
     os << (e.isFPNeg().simplify().isTrue() ? "-oo" : "+oo");
   } else {
-    e.float2BV().printHexadecimal(os);
-    os << " (" << e.float2Real().simplify().numeral_string() << ')';
+    os << e.float2Real().simplify().numeral_string();
   }
+  os << ')';
 }
 
 void FloatType::print(ostream &os) const {
@@ -452,6 +474,13 @@ expr PtrType::enforceIntOrPtrOrVectorType() const {
 
 expr PtrType::enforcePtrType() const {
   return true;
+}
+
+pair<expr, expr>
+PtrType::refines(const StateValue &src, const StateValue &tgt) const {
+  return { src.non_poison.implies(tgt.non_poison),
+           // TODO: test if perf improves with && tgt.non_poison below
+           src.non_poison.implies(src.value == tgt.value) };
 }
 
 pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
@@ -605,8 +634,19 @@ expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
   return r;
 }
 
+pair<expr, expr>
+AggregateType::refines(const StateValue &src, const StateValue &tgt) const {
+  set<expr> poison, value;
+  for (unsigned i = 0; i < elements; ++i) {
+    auto [p, v] = children[i]->refines(extract(src, i), extract(tgt, i));
+    poison.insert(p);
+    value.insert(v);
+  }
+  return { expr::mk_and(poison), expr::mk_and(value) };
+}
+
 pair<expr, vector<expr>>
-  AggregateType::mkInput(State &s, const char *name) const {
+AggregateType::mkInput(State &s, const char *name) const {
   expr val;
   vector<expr> vars;
 
@@ -922,8 +962,22 @@ const StructType* SymbolicType::getAsStructType() const {
   return &*s;
 }
 
+pair<expr, expr>
+SymbolicType::refines(const StateValue &src, const StateValue &tgt) const {
+  switch (typ) {
+  case Int:       return i->refines(src, tgt);
+  case Float:     return f->refines(src, tgt);
+  case Ptr:       return p->refines(src, tgt);
+  case Array:     return a->refines(src, tgt);
+  case Vector:    return v->refines(src, tgt);
+  case Struct:    return s->refines(src, tgt);
+  case Undefined: UNREACHABLE();
+  }
+  UNREACHABLE();
+}
+
 pair<expr, vector<expr>>
-  SymbolicType::mkInput(State &st, const char *name) const {
+SymbolicType::mkInput(State &st, const char *name) const {
   switch (typ) {
   case Int:       return i->mkInput(st, name);
   case Float:     return f->mkInput(st, name);

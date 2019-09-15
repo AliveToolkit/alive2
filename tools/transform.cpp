@@ -244,26 +244,18 @@ static void check_refinement(Errors &errs, Transform &t,
     return;
   }
 
-  expr poison_cnstr = type.map_reduce(
-                        [](const StateValue &a, const StateValue &b) {
-                          return a.non_poison.notImplies(b.non_poison);
-                        }, &expr::mk_or, a, b);
-
-  expr value_cnstr = type.map_reduce(
-                       [](const StateValue &a, const StateValue &b) {
-                         return a.non_poison && a.value != b.value;
-                       }, &expr::mk_or, a, b);
+  auto [poison_cnstr, value_cnstr] = type.refines(a, b);
 
   Solver::check({
     { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a && poison_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && dom_a && !poison_cnstr),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a && value_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && dom_a && !value_cnstr),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}

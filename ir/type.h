@@ -9,6 +9,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace smt { class Model; }
@@ -77,6 +78,10 @@ public:
   virtual smt::expr fromBV(smt::expr e) const;
   IR::StateValue fromBV(IR::StateValue v) const;
 
+  // returns pair of refinement constraints for <poison, !poison && value>
+  virtual std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src, const IR::StateValue &tgt) const = 0;
+
   virtual std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const = 0;
   virtual void printVal(std::ostream &os, State &s,
@@ -99,6 +104,8 @@ public:
   smt::expr getDummyValue() const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -126,6 +133,8 @@ public:
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -160,6 +169,8 @@ public:
   const FloatType* getAsFloatType() const override;
   smt::expr toBV(smt::expr e) const override;
   smt::expr fromBV(smt::expr e) const override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -186,6 +197,8 @@ public:
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -221,6 +234,8 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType(
     std::vector<Type *> *element_types) const override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -302,6 +317,8 @@ public:
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;
+  std::pair<smt::expr, smt::expr>
+    refines(const IR::StateValue &a, const IR::StateValue &b) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
