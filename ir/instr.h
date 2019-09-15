@@ -450,11 +450,12 @@ public:
 class Memcpy final : public Instr {
   Value *dst, *src, *bytes;
   unsigned align_dst, align_src;
+  bool move;
 public:
   Memcpy(Value &dst, Value &src, Value &bytes,
-        unsigned align_dst, unsigned align_src)
+         unsigned align_dst, unsigned align_src, bool move)
     : Instr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
-            align_dst(align_dst), align_src(align_src) {}
+            align_dst(align_dst), align_src(align_src), move(move) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

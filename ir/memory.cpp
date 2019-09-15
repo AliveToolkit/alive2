@@ -302,18 +302,20 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
 }
 
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
-                    unsigned align_dst, unsigned align_src) {
+                    unsigned align_dst, unsigned align_src, bool move) {
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytes, align_dst);
   src.is_dereferenceable(bytes, align_src);
-  src.is_disjoint(bytes, dst, bytes);
+  if (!move)
+    src.is_disjoint(bytes, dst, bytes);
 
   uint64_t n;
   if (bytes.isUInt(n) && n <= 4) {
+    auto old_val = blocks_val;
     for (unsigned i = 0; i < n; ++i) {
       auto src_i = (src + i).release();
       auto dst_i = (dst + i).release();
-      blocks_val = blocks_val.store(dst_i, blocks_val.load(src_i));
+      blocks_val = blocks_val.store(dst_i, old_val.load(src_i));
     }
   } else {
     string name = "#idx_" + to_string(last_idx_ptr++);
@@ -323,7 +325,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytes).both();
     expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
                           blocks_val.load(dst_idx()));
-    blocks_val = expr::mkLambda({ dst_idx() }, move(val));
+    blocks_val = expr::mkLambda({ dst_idx() }, std::move(val));
   }
 }
 

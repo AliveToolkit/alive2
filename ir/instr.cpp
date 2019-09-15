@@ -1531,8 +1531,8 @@ void Memcpy::rauw(const Value &what, Value &with) {
 }
 
 void Memcpy::print(ostream &os) const {
-  os << "memcpy " << *dst  << " align " << align_dst << ", " << *src
-     << " align " << align_src << ", " << *bytes;
+  os << (move ? "memmove " : "memcpy ") << *dst  << " align " << align_dst
+     << ", " << *src << " align " << align_src << ", " << *bytes;
 }
 
 StateValue Memcpy::toSMT(State &s) const {
@@ -1541,7 +1541,7 @@ StateValue Memcpy::toSMT(State &s) const {
   auto &[vbytes, np_bytes] = s[*bytes];
   s.addUB(vbytes.ugt(0).implies(np_dst && np_src));
   s.addUB(np_bytes);
-  s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src);
+  s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
 }
 
@@ -1552,7 +1552,7 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
-  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src);
+  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
 }
 
 }

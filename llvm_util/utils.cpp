@@ -358,7 +358,7 @@ public:
     RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes, 1));
   }
 
-  RetTy visitMemCpyInst(llvm::MemCpyInst &i) {
+  RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
     auto dst = get_operand(i.getOperand(0));
     auto src = get_operand(i.getOperand(1));
     auto bytes = get_operand(i.getOperand(2));
@@ -366,7 +366,8 @@ public:
     if (!dst || !src || !bytes)
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes, 1, 1));
+    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes, 1, 1,
+                                          isa<llvm::MemMoveInst>(&i)));
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {

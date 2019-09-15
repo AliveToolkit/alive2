@@ -108,7 +108,8 @@ public:
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytes, unsigned align);
   void memcpy(const smt::expr &dst, const smt::expr &src,
-              const smt::expr &bytes, unsigned align_dst, unsigned align_src);
+              const smt::expr &bytes, unsigned align_dst, unsigned align_src,
+              bool move);
 
   smt::expr ptr2int(const smt::expr &ptr);
   smt::expr int2ptr(const smt::expr &val);
