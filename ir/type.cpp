@@ -208,7 +208,7 @@ void VoidType::fixup(const Model &m) {
 
 pair<expr, expr>
 VoidType::refines(const StateValue &src, const StateValue &tgt) const {
-  UNREACHABLE();
+  return { true, true };
 }
 
 pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
