@@ -35,6 +35,8 @@ const StateValue& State::exec(const Value &v) {
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars, used] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
+  (void)var;
+
   if (uvars.empty() || !used || disable_undef_rewrite) {
     used = true;
     undef_vars.insert(uvars.begin(), uvars.end());
