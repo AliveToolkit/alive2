@@ -277,8 +277,7 @@ expr IntType::enforceIntOrPtrOrVectorType() const {
 pair<expr, expr>
 IntType::refines(const StateValue &src, const StateValue &tgt) const {
   return { src.non_poison.implies(tgt.non_poison),
-           // TODO: test if perf improves with && tgt.non_poison below
-           src.non_poison.implies(src.value == tgt.value) };
+           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
 pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
@@ -376,10 +375,9 @@ expr FloatType::enforceFloatType() const {
 
 pair<expr, expr>
 FloatType::refines(const StateValue &src, const StateValue &tgt) const {
-  return
-    { src.non_poison.implies(tgt.non_poison),
-      // TODO: test if perf improves with && tgt.non_poison below
-      (src.non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
+  expr non_poison = src.non_poison && tgt.non_poison;
+  return { src.non_poison.implies(tgt.non_poison),
+           (non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
 }
 
 pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
@@ -479,8 +477,7 @@ expr PtrType::enforcePtrType() const {
 pair<expr, expr>
 PtrType::refines(const StateValue &src, const StateValue &tgt) const {
   return { src.non_poison.implies(tgt.non_poison),
-           // TODO: test if perf improves with && tgt.non_poison below
-           src.non_poison.implies(src.value == tgt.value) };
+           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
 pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {

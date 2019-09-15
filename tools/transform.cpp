@@ -246,6 +246,8 @@ static void check_refinement(Errors &errs, Transform &t,
 
   auto [poison_cnstr, value_cnstr] = type.refines(a, b);
 
+  // TODO: these checks continue continue if prev queries timesout
+  // requires && dom_b on 2nd & 3rd fmls. could be good for perf as well?
   Solver::check({
     { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
       [&](const Result &r) {
