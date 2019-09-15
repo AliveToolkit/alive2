@@ -22,20 +22,24 @@ const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
+  values.emplace_back(&v, ValTy(move(val), move(undef_vars)), false);
 
   // cleanup potentially used temporary values due to undef rewriting
   while (i_tmp_values > 0) {
     tmp_values[--i_tmp_values] = StateValue();
   }
 
-  return values.back().second.first;
+  return get<1>(values.back()).first;
 }
 
 const StateValue& State::operator[](const Value &val) {
-  auto &[sval, uvars] = values[values_map.at(&val)].second;
-  if (uvars.empty())
+  auto &[var, val_uvars, used] = values[values_map.at(&val)];
+  auto &[sval, uvars] = val_uvars;
+  if (uvars.empty() || !used || disable_undef_rewrite) {
+    used = true;
+    undef_vars.insert(uvars.begin(), uvars.end());
     return sval;
+  }
 
   vector<pair<expr, expr>> repls;
   for (auto &u : uvars) {
@@ -60,7 +64,7 @@ const StateValue& State::operator[](const Value &val) {
 }
 
 const State::ValTy& State::at(const Value &val) const {
-  return values[values_map.at(&val)].second;
+  return get<1>(values[values_map.at(&val)]);
 }
 
 const expr* State::jumpCondFrom(const BasicBlock &bb) const {

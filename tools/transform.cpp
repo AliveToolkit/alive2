@@ -103,7 +103,8 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     s << " for " << *var;
   s << "\n\nExample:\n";
 
-  for (auto &[var, val] : src_state.getValues()) {
+  for (auto &[var, val, used] : src_state.getValues()) {
+    (void)used;
     if (!dynamic_cast<const Input*>(var))
       continue;
     s << *var << " = ";
@@ -121,7 +122,8 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
       }
     }
 
-    for (auto &[var, val] : st.getValues()) {
+    for (auto &[var, val, used] : st.getValues()) {
+      (void)used;
       auto &name = var->getName();
       if (name == var_name)
         break;
@@ -233,6 +235,7 @@ static void check_refinement(Errors &errs, Transform &t,
   expr axioms = src_state.getAxioms() && tgt_state.getAxioms();
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
+  src_state.startParsingPre();
   expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
   pre &= src_state.getPre() && tgt_state.getPre();
 
@@ -300,7 +303,8 @@ Errors TransformVerify::verify() const {
   Errors errs;
 
   if (check_each_var) {
-    for (auto &[var, val] : src_state.getValues()) {
+    for (auto &[var, val, used] : src_state.getValues()) {
+      (void)used;
       auto &name = var->getName();
       if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
         continue;

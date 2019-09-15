@@ -9,6 +9,7 @@
 #include <array>
 #include <ostream>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -31,15 +32,16 @@ public:
 private:
   const Function &f;
   bool source;
+  bool disable_undef_rewrite = false;
   smt::expr precondition = true;
   smt::expr axioms = true;
 
   const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
 
-  // var -> ((value, not_poison), undef_vars)
+  // var -> ((value, not_poison), undef_vars, already_used?)
   std::unordered_map<const Value*, unsigned> values_map;
-  std::vector<std::pair<const Value*, ValTy>> values;
+  std::vector<std::tuple<const Value*, ValTy, bool>> values;
 
   // dst BB -> src BB -> (domain data, memory)
   std::unordered_map<const BasicBlock*,
@@ -96,6 +98,8 @@ public:
   bool fnReturned() const { return returned; }
   auto& returnDomain() const { return return_domain; }
   auto& returnVal() const { return return_val; }
+
+  void startParsingPre() { disable_undef_rewrite = true; }
 
   // whether this is source or target program
   bool isSource() const { return source; }
