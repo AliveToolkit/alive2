@@ -555,7 +555,12 @@ public:
       assert(i.getType()->isVoidTy());
       return make_unique<Return>(Type::voidTy, Value::voidVal);
     }
-    PARSE_UNOP();
+
+    auto ty = llvm_type2alive(i.getOperand(0)->getType());
+    auto val = get_operand(i.getOperand(0));
+    if (!ty || !val)
+      return error(i);
+
     return make_unique<Return>(*ty, *val);
   }
 
