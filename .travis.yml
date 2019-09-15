@@ -127,7 +127,7 @@ matrix:
 
     - env: CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: osx
-      osx_image: xcode10.2
+      osx_image: xcode11
       addons: &mac
         homebrew:
           packages:
@@ -138,5 +138,5 @@ matrix:
 
     - env: CMAKE_BUILD_TYPE=Release
       os: osx
-      osx_image: xcode10.2
+      osx_image: xcode11
       addons: *mac
