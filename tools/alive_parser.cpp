@@ -277,9 +277,7 @@ static Type& get_overflow_type(Type &type) {
 }
 
 static Type& get_sym_type() {
-  if (sym_num < sym_types.size())
-    return *sym_types[sym_num++].get();
-
+  // NOTE: don't reuse sym_types across transforms or printing is messed up
   return *sym_types.emplace_back(
     make_unique<SymbolicType>("symty_" + to_string(sym_num++))).get();
 }
