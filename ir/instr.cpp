@@ -1243,7 +1243,10 @@ void Return::rauw(const Value &what, Value &with) {
 }
 
 void Return::print(ostream &os) const {
-  os << "ret " << print_type(getType()) << val->getName();
+  os << "ret ";
+  if (&getType() != &Type::voidTy)
+    os << print_type(getType());
+  os << val->getName();
 }
 
 StateValue Return::toSMT(State &s) const {

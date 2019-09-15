@@ -34,9 +34,8 @@ void Value::fixupTypes(const Model &m) {
 
 ostream& operator<<(ostream &os, const Value &val) {
   auto t = val.getType().toString();
-  if (!t.empty())
-    os << t;
-  if (!dynamic_cast<VoidType*>(&val.getType())) {
+  os << t;
+  if (&val.getType() != &Type::voidTy) {
     if (!t.empty()) os << ' ';
     os << val.getName();
   }
