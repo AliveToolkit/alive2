@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/function.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include <optional>
 #include <ostream>
 
@@ -15,6 +16,6 @@ struct initializer {
   initializer(std::ostream &os);
 };
 
-std::optional<IR::Function> llvm2alive(llvm::Function &F);
-
+std::optional<IR::Function> llvm2alive(llvm::Function &F,
+    const llvm::TargetLibraryInfo &TLI);
 }

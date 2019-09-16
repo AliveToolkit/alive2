@@ -32,6 +32,11 @@ const StateValue& State::exec(const Value &v) {
   return get<1>(values.back()).first;
 }
 
+const Memory &State::getMemoryAtEntry() const {
+  return *memoryAtEntry;
+}
+
+
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars, used] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
@@ -79,6 +84,10 @@ bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
+
+  if (bb.getName() == f.getFirstBB().getName()) {
+    memoryAtEntry = memory;
+  }
 
   auto I = predecessor_data.find(&bb);
   if (I == predecessor_data.end())

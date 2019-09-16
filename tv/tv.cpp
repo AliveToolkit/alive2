@@ -96,7 +96,10 @@ struct TVPass : public llvm::FunctionPass {
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
-    auto fn = llvm2alive(F);
+    const llvm::TargetLibraryInfo &TLI =
+        getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI();
+
+    auto fn = llvm2alive(F, TLI);
     if (!fn) {
       fns.erase(F.getName());
       return false;
@@ -174,7 +177,7 @@ struct TVPass : public llvm::FunctionPass {
       *out << "Source: " << source_file << endl;
     } else
       out = &cerr;
-    
+
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
     smt::set_query_timeout(to_string(opt_smt_to));
@@ -201,6 +204,7 @@ struct TVPass : public llvm::FunctionPass {
   }
 
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<llvm::TargetLibraryInfoWrapperPass>();
     AU.setPreservesAll();
   }
 };

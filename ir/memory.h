@@ -19,6 +19,10 @@ class State;
 class Pointer {
   Memory &m;
   // [offset, local_bid, nonlocal_bid]
+  // A pointer is pointing to a memory block that is allocated at the current
+  // stackframe if local_bid is non-zero and nonlocal_bid is zero.
+  // Otherwise, it is either pointing to a global variable, heap, or a
+  // stackframe that is not one of this function call.
   // TODO: missing support for address space
   smt::expr p;
 
@@ -70,6 +74,8 @@ public:
   void is_dereferenceable(const smt::expr &bytes, unsigned align);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
+  smt::expr is_block_alive();
+  smt::expr is_at_heap();
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
@@ -84,7 +90,10 @@ class Memory {
   unsigned bits_for_nonlocal_bid = 8;
   unsigned bits_size_t = 64;
 
-  smt::expr blocks_val;  // array: (bid, offset) -> StateValue
+public:
+  smt::expr blocks_val; // array: (bid, offset) -> StateValue
+  smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
+  smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
   unsigned last_bid = 0;
   unsigned last_idx_ptr = 0;
 
@@ -93,12 +102,11 @@ class Memory {
 
   smt::expr mk_val_array(const char *name) const;
 
-public:
   Memory(State &state);
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 
-  smt::expr alloc(const smt::expr &bytes, unsigned align, bool local);
+  smt::expr alloc(const smt::expr &bytes, unsigned align, bool heap);
   void free(const smt::expr &ptr);
 
   void store(const smt::expr &ptr, const StateValue &val, Type &type,

@@ -1310,7 +1310,7 @@ void Alloc::print(std::ostream &os) const {
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   s.addUB(np);
-  return { s.getMemory().alloc(sz, align, true), true };
+  return { s.getMemory().alloc(sz, align, false), true };
 }
 
 expr Alloc::getTypeConstraints(const Function &f) const {
@@ -1321,6 +1321,36 @@ expr Alloc::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
   return make_unique<Alloc>(getType(), getName() + suffix, *size, align);
+}
+
+
+vector<Value*> Malloc::operands() const {
+  return { size };
+}
+
+void Malloc::rauw(const Value &what, Value &with) {
+  RAUW(size);
+}
+
+void Malloc::print(std::ostream &os) const {
+  os << getName() << " = malloc " << *size;
+}
+
+StateValue Malloc::toSMT(State &s) const {
+  auto &[sz, np] = s[*size];
+  s.addUB(np);
+  // TODO: malloc's alignment is implementation defined.
+  return { s.getMemory().alloc(sz, 8, true), true };
+}
+
+expr Malloc::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforcePtrType() &&
+         size->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Malloc::dup(const string &suffix) const {
+  return make_unique<Malloc>(getType(), getName() + suffix, *size);
 }
 
 

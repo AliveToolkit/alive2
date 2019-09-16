@@ -2,6 +2,8 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Function.h"
@@ -233,11 +235,17 @@ int main(int argc, char **argv) {
   if (cmpTypes(F1->getFunctionType(), F2->getFunctionType(), F1, F2))
     llvm::report_fatal_error("Only functions with identical signatures can be checked");
 
-  auto Func1 = llvm2alive(*F1);
+  if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
+    llvm::report_fatal_error("Modules have different target triple");
+
+  auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
+  auto TLI = llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI();
+
+  auto Func1 = llvm2alive(*F1, TLI);
   if (!Func1)
     llvm::report_fatal_error("Could not translate '" + opt_file1 + "' to Alive IR");
 
-  auto Func2 = llvm2alive(*F2);
+  auto Func2 = llvm2alive(*F2, TLI);
   if (!Func2)
     llvm::report_fatal_error("Could not translate '" + opt_file2 + "' to Alive IR");
 

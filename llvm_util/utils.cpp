@@ -3,6 +3,8 @@
 
 #include "llvm_util/utils.h"
 #include "ir/constant.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
@@ -222,6 +224,7 @@ BasicBlock& getBB(const llvm::BasicBlock *bb) {
 
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   llvm::Function &f;
+  const llvm::TargetLibraryInfo &TLI;
   using RetTy = unique_ptr<Instr>;
 
   auto DL() const { return f.getParent()->getDataLayout(); }
@@ -239,7 +242,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   }
 
 public:
-  llvm2alive_(llvm::Function &f) : f(f) {}
+  llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI)
+      : f(f), TLI(TLI) {}
 
   RetTy visitUnaryOperator(llvm::UnaryOperator &i) {
     PARSE_UNOP();
@@ -331,6 +335,23 @@ public:
     auto fn = i.getCalledFunction();
     if (!fn) // TODO: support indirect calls
       return error(i);
+
+    if (llvm::isMallocLikeFn(&i, &TLI, false) && fn->getName() == "malloc") {
+      // This is a call to C/C++'s malloc() function.
+      auto ptr = get_operand(i.getArgOperand(0));
+      auto ty = llvm_type2alive(i.getType());
+      if (!ptr || !ty)
+        return error(i);
+
+      RETURN_IDENTIFIER(make_unique<Malloc>(*ty, value_name(i), *ptr));
+    } else if (llvm::isFreeCall(&i, &TLI) && fn->getName() == "free") {
+      // This is a call to C/C++'s free() function.
+      auto ptr = get_operand(i.getArgOperand(0));
+      if (!ptr)
+        return error(i);
+
+      RETURN_IDENTIFIER(make_unique<Free>(*ptr));
+    }
 
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
@@ -780,8 +801,9 @@ initializer::initializer(ostream &os) {
   ptr_types.emplace_back(make_unique<PtrType>(0));
 }
 
-optional<IR::Function> llvm2alive(llvm::Function &F) {
-  return llvm2alive_(F).run();
+optional<IR::Function> llvm2alive(llvm::Function &F,
+                                  const llvm::TargetLibraryInfo &TLI) {
+  return llvm2alive_(F, TLI).run();
 }
 
 }

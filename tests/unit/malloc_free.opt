@@ -1,0 +1,32 @@
+Name: free_id
+free * %p
+ret 0
+  =>
+free * %p
+ret 0
+
+Name: free_double_ub
+free * %p
+free * %p
+ret 0
+  =>
+free * %p
+ret 1
+
+Name: malloc_id
+%p = malloc i16 8
+ret 0
+  =>
+%p = malloc i16 8
+ret 0
+
+Name: malloc_doublefree_ub
+%p = malloc i16 8
+free * %p
+free * %p
+ret 1
+  =>
+%p = malloc i16 8
+free * %p
+ret 2
+

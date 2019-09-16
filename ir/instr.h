@@ -364,6 +364,19 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+class Malloc final : public Instr {
+  Value *size;
+public:
+  Malloc(Type &type, std::string &&name, Value &size)
+    : Instr(type, std::move(name)), size(&size) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
 
 class Free final : public Instr {
   Value *ptr;
