@@ -128,7 +128,17 @@ struct tokenizer_t {
   }
 
   bool isType() {
-    return peek() == INT_TYPE;
+    // TODO: support other aggregate types
+    return isScalarType() || isVectorType();
+  }
+
+  bool isScalarType() {
+    return peek() == INT_TYPE || peek() == HALF ||
+           peek() == FLOAT || peek() == DOUBLE;
+  }
+
+  bool isVectorType() {
+    return peek() == VECTOR_TYPE_PREFIX;
   }
 
 private:
@@ -292,8 +302,11 @@ static Type& get_int_type(unsigned size) {
   return *int_types[size].get();
 }
 
-static Type& parse_type(bool optional = true) {
-  switch (auto t = *tokenizer) {
+static unsigned vector_num;
+static vector<unique_ptr<VectorType>> vector_types;
+
+static Type& parse_scalar_type() {
+  switch (*tokenizer) {
   case INT_TYPE:
     if (yylval.num > 4 * 1024)
       error("Int type too long: " + to_string(yylval.num));
@@ -309,13 +322,40 @@ static Type& parse_type(bool optional = true) {
     return double_type;
 
   default:
-    if (optional) {
-      tokenizer.unget(t);
-      return get_sym_type();
-    } else {
-      error("Expecting a type", t);
-    }
+    UNREACHABLE();
   }
+}
+
+static Type& parse_vector_type() {
+  tokenizer.ensure(VECTOR_TYPE_PREFIX);
+  unsigned elements = yylval.num;
+
+  auto t = *tokenizer;
+  if (t != IDENTIFIER || yylval.str != "x")
+    error ("Expect x");
+
+  Type &elemTy = parse_scalar_type();
+
+  tokenizer.ensure(CSGT);
+  return *vector_types.emplace_back(
+    make_unique<VectorType>("vty_" + to_string(vector_num++),
+                            elements, elemTy)).get();
+}
+
+static Type& parse_type(bool optional = true) {
+  if (tokenizer.isScalarType()) {
+    return parse_scalar_type();
+  }
+
+  if (tokenizer.isVectorType()) {
+    return parse_vector_type();
+  }
+
+  if (optional)
+    return get_sym_type();
+  else
+    error("Expecting a type", tokenizer.peek());
+
   UNREACHABLE();
 }
 
@@ -417,6 +457,22 @@ static Value& get_or_copy_instr(const string &name) {
   return *ret;
 }
 
+static Value& parse_vector_constant(Type &type) {
+  std::vector<Value*> vals;
+  do {
+    Type &elemTy = parse_scalar_type();
+    Value *elem = &parse_operand(elemTy);
+    vals.emplace_back(elem);
+  } while (tokenizer.consumeIf(COMMA));
+
+  tokenizer.ensure(CSGT);
+
+  auto c = make_unique<AggregateConst>(type, move(vals));
+  auto ret = c.get();
+  fn->addConstant(move(c));
+  return *ret;
+}
+
 static Value& parse_operand(Type &type) {
   switch (auto t = *tokenizer) {
   case NUM:
@@ -425,6 +481,8 @@ static Value& parse_operand(Type &type) {
     return get_fp_constant(yylval.fp_num, type);
   case NUM_STR:
     return get_num_constant(yylval.str, type);
+  case CSLT:
+    return parse_vector_constant(type);
   case TRUE:
     return get_constant(1, type);
   case FALSE:
