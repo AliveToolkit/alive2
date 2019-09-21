@@ -75,6 +75,7 @@ restart:
   YYTEXT = YYCURSOR;
 
 /*!re2c
+space = [ \t];
 re2c:yyfill:check = 0;
 
 "\r"? "\n" {
@@ -82,7 +83,7 @@ re2c:yyfill:check = 0;
   YYRESTART();
 }
 
-[ \t]+ {
+space+ {
   YYRESTART();
 }
 
@@ -104,8 +105,8 @@ re2c:yyfill:check = 0;
   return INT_TYPE;
 }
 
-"<" [1-9][0-9]* {
-  yylval.num = strtoull((char*)YYTEXT+1, nullptr, 10);
+"<" space* @tag1 [1-9][0-9]* space* "x" {
+  yylval.num = strtoull((char*)tag1, nullptr, 10);
   return VECTOR_TYPE_PREFIX;
 }
 

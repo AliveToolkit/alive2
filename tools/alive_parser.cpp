@@ -330,10 +330,6 @@ static Type& parse_vector_type() {
   tokenizer.ensure(VECTOR_TYPE_PREFIX);
   unsigned elements = yylval.num;
 
-  auto t = *tokenizer;
-  if (t != IDENTIFIER || yylval.str != "x")
-    error ("Expect x");
-
   Type &elemTy = parse_scalar_type();
 
   tokenizer.ensure(CSGT);
