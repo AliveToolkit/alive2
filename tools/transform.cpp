@@ -29,15 +29,15 @@ static bool is_undef(const expr &e) {
   return s.check().isUnsat();
 }
 
-static void print_varval(ostream &s, State &st, const Model &m,
-                         const Value *var, const Type &type,
-                         const StateValue &val) {
+static void print_single_varval(ostream &os, State &st, const Model &m,
+                                const Value *var, const Type &type,
+                                const StateValue &val) {
   // if the model is partial, we don't know for sure if it's poison or not
   // this happens if the poison constraint depends on an undef
   // however, cexs are usually triggered by the worst case, which is poison
   if (auto v = m.eval(val.non_poison);
       (!v.isConst() || v.isFalse())) {
-    s << "poison";
+    os << "poison";
     return;
   }
 
@@ -45,7 +45,7 @@ static void print_varval(ostream &s, State &st, const Model &m,
     uint64_t n;
     ENSURE(m[in->getTyVar()].isUInt(n));
     if (n == 1) {
-      s << "undef";
+      os << "undef";
       return;
     }
     assert(n == 0);
@@ -53,11 +53,11 @@ static void print_varval(ostream &s, State &st, const Model &m,
 
   expr partial = m.eval(val.value);
   if (is_undef(partial)) {
-    s << "undef";
+    os << "undef";
     return;
   }
 
-  type.printVal(s, st, m.eval(val.value, true));
+  type.printVal(os, st, m.eval(val.value, true));
 
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
@@ -72,8 +72,26 @@ static void print_varval(ostream &s, State &st, const Model &m,
       found_undef |= string_view(name).substr(0, 6) == "undef_";
     }
     if (found_undef)
-      s << "\t[based on undef value]";
+      os << "\t[based on undef value]";
   }
+}
+
+static void print_varval(ostream &os, State &st, const Model &m,
+                         const Value *var, const Type &type,
+                         const StateValue &val) {
+  if (!type.isAggregateType()) {
+    print_single_varval(os, st, m, var, type, val);
+    return;
+  }
+
+  os << (type.isStructType() ? "{ " : "< ");
+  auto agg = type.getAsAggregateType();
+  for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
+    if (i != 0)
+      os << ", ";
+    print_varval(os, st, m, var, agg->getChild(i), agg->extract(val, i));
+  }
+  os << (type.isStructType() ? " }" : " >");
 }
 
 

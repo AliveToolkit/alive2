@@ -53,6 +53,10 @@ public:
   virtual bool isIntType() const;
   virtual bool isFloatType() const;
   virtual bool isPtrType() const;
+  virtual bool isArrayType() const;
+  virtual bool isStructType() const;
+  virtual bool isVectorType() const;
+  bool isAggregateType() const;
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   virtual smt::expr enforceIntOrVectorType() const;
@@ -67,11 +71,6 @@ public:
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
   virtual const StructType* getAsStructType() const;
-
-  virtual smt::expr map_reduce(
-    smt::expr(*map)(const IR::StateValue&, const IR::StateValue&),
-    smt::expr(*reduce)(const std::set<smt::expr>&),
-    const IR::StateValue &a, const IR::StateValue &b) const;
 
   virtual smt::expr toBV(smt::expr e) const;
   IR::StateValue toBV(IR::StateValue v) const;
@@ -220,6 +219,8 @@ protected:
 
 public:
   smt::expr numElements() const;
+  unsigned numElementsConst() const { return elements; }
+
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
   IR::StateValue extract(const IR::StateValue &val,
@@ -240,11 +241,6 @@ public:
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   const AggregateType* getAsAggregateType() const override;
-
-  smt::expr map_reduce(
-    smt::expr(*map)(const IR::StateValue&, const IR::StateValue&),
-    smt::expr(*reduce)(const std::set<smt::expr>&),
-    const IR::StateValue &a, const IR::StateValue &b) const override;
 };
 
 
@@ -252,6 +248,7 @@ class ArrayType final : public AggregateType {
 public:
   ArrayType(std::string &&name) : AggregateType(std::move(name)) {}
   smt::expr getTypeConstraints() const override;
+  bool isArrayType() const override;
   void print(std::ostream &os) const override;
 };
 
@@ -262,6 +259,7 @@ public:
   VectorType(std::string &&name, unsigned elements, Type &elementTy);
 
   smt::expr getTypeConstraints() const override;
+  bool isVectorType() const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;
   void print(std::ostream &os) const override;
@@ -273,6 +271,7 @@ public:
   StructType(std::string &&name) : AggregateType(std::move(name)) {}
   StructType(std::string &&name, std::vector<Type*> &&children);
 
+  bool isStructType() const override;
   smt::expr enforceStructType() const override;
   const StructType* getAsStructType() const override;
   void print(std::ostream &os) const override;
@@ -306,6 +305,9 @@ public:
   bool isIntType() const override;
   bool isFloatType() const override;
   bool isPtrType() const override;
+  bool isArrayType() const override;
+  bool isStructType() const override;
+  bool isVectorType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   smt::expr enforceIntOrVectorType() const override;
   smt::expr enforceIntOrPtrOrVectorType() const override;

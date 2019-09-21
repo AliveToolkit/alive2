@@ -110,6 +110,22 @@ bool Type::isPtrType() const {
   return false;
 }
 
+bool Type::isArrayType() const {
+  return false;
+}
+
+bool Type::isStructType() const {
+  return false;
+}
+
+bool Type::isVectorType() const {
+  return false;
+}
+
+bool Type::isAggregateType() const {
+  return isArrayType() || isStructType() || isVectorType();
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
@@ -152,12 +168,6 @@ const AggregateType* Type::getAsAggregateType() const {
 
 const StructType* Type::getAsStructType() const {
   return nullptr;
-}
-
-expr Type::map_reduce(expr(*map)(const StateValue&, const StateValue&),
-                      expr(*reduce)(const set<expr> &),
-                      const StateValue &a, const StateValue &b) const {
-  return map(a, b);
 }
 
 expr Type::toBV(expr e) const {
@@ -664,35 +674,21 @@ AggregateType::mkInput(State &s, const char *name) const {
 }
 
 void AggregateType::printVal(ostream &os, State &s, const expr &e) const {
-  os << (dynamic_cast<const StructType*>(this) ? "{ " : "< ");
-  // FIXME: poison
-  auto tmp_e = StateValue(expr(e), expr::mkUInt(0, elements));
-  for (unsigned i = 0; i < elements; ++i) {
-    if (i != 0)
-      os << ", ";
-    children[i]->printVal(os, s, extract(tmp_e, i).value.simplify());
-  }
-  os << (dynamic_cast<const StructType*>(this) ? " }" : " >");
+  UNREACHABLE();
 }
 
 const AggregateType* AggregateType::getAsAggregateType() const {
   return this;
 }
 
-expr AggregateType::map_reduce(expr(*map)(const StateValue&, const StateValue&),
-                               expr(*reduce)(const set<expr>&),
-                               const StateValue &a, const StateValue &b) const {
-  set<expr> r;
-  for (unsigned i = 0; i < elements; ++i) {
-    r.insert(map(extract(a, i), extract(b, i)));
-  }
-  return reduce(r);
-}
-
 
 expr ArrayType::getTypeConstraints() const {
   // TODO
   return false;
+}
+
+bool ArrayType::isArrayType() const {
+  return true;
 }
 
 void ArrayType::print(ostream &os) const {
@@ -727,6 +723,10 @@ expr VectorType::getTypeConstraints() const {
   return r;
 }
 
+bool VectorType::isVectorType() const {
+  return true;
+}
+
 expr VectorType::enforceIntOrVectorType() const {
   return children[0]->enforceIntType();
 }
@@ -745,6 +745,10 @@ StructType::StructType(string &&name, vector<Type*> &&children)
   : AggregateType(move(name), move(children)) {
   elements = this->children.size();
   defined = true;
+}
+
+bool StructType::isStructType() const {
+  return true;
 }
 
 expr StructType::enforceStructType() const {
@@ -918,6 +922,18 @@ bool SymbolicType::isFloatType() const {
 
 bool SymbolicType::isPtrType() const {
   return typ == Ptr;
+}
+
+bool SymbolicType::isArrayType() const {
+  return typ == Array;
+}
+
+bool SymbolicType::isVectorType() const {
+  return typ == Vector;
+}
+
+bool SymbolicType::isStructType() const {
+  return typ == Struct;
 }
 
 expr SymbolicType::enforceIntType(unsigned bits) const {
