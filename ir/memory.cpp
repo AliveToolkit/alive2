@@ -173,7 +173,7 @@ void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
 }
 
 expr Pointer::is_block_alive() {
-  return m.blocks_liveness.load(get_bid()) == 1;
+  return m.blocks_liveness.load(get_bid());
 }
 
 expr Pointer::is_at_heap() {
@@ -206,8 +206,7 @@ expr Memory::mk_val_array(const char *name) const {
 
 expr Memory::mk_liveness_uf() const {
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  return expr::mkArray("blks_liveness", expr::mkUInt(0, bits_bids),
-                       expr::mkUInt(0, 1));
+  return expr::mkArray("blks_liveness", expr::mkUInt(0, bits_bids), true);
 }
 
 Memory::Memory(State &state) : state(&state) {
@@ -245,8 +244,8 @@ expr Memory::alloc(const expr &bytes, unsigned align, bool heap) {
   expr size = bytes.zextOrTrunc(bits_size_t);
   state->addPre(p.block_size() == size);
 
-  state->addPre(mk_liveness_uf().load(p.get_bid()) == 0);
-  blocks_liveness = blocks_liveness.store(p.get_bid(), expr::mkUInt(1, 1));
+  state->addPre(!mk_liveness_uf().load(p.get_bid()));
+  blocks_liveness = blocks_liveness.store(p.get_bid(), true);
   blocks_kind = blocks_kind.store(p.get_bid(), expr::mkUInt(heap, 1));
 
   return p();
@@ -258,7 +257,7 @@ void Memory::free(const expr &ptr) {
   state->addUB(p.get_offset() == 0);
   state->addUB(p.is_block_alive());
   state->addUB(p.is_at_heap());
-  blocks_liveness = blocks_liveness.store(p.get_bid(), expr::mkUInt(0, 1));
+  blocks_liveness = blocks_liveness.store(p.get_bid(), false);
 }
 
 void Memory::store(const expr &p, const StateValue &v, Type &type,

@@ -35,19 +35,24 @@ class expr {
   Z3_app isAppOf(int app_type) const;
 
   expr binop_commutative(const expr &rhs,
-                         uint64_t(*native)(uint64_t, uint64_t),
-                         Z3_ast(*z3)(Z3_context, Z3_ast, Z3_ast),
+                         Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast),
                          bool (expr::*identity)() const,
                          bool (expr::*absorvent)() const) const;
   expr binop_commutative(const expr &rhs,
-                         Z3_ast(*z3)(Z3_context, Z3_ast, Z3_ast)) const;
+                         Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast)) const;
 
-  bool binop_sfold(const expr &rhs,
-                   int64_t(*native)(int64_t, int64_t),
-                   expr &result) const;
-  bool binop_ufold(const expr &rhs,
-                   uint64_t(*native)(uint64_t, uint64_t),
-                   expr &result) const;
+  expr unop_fold(Z3_ast(*op)(Z3_context, Z3_ast)) const;
+  expr binop_fold(const expr &rhs,
+                  Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast)) const;
+
+  template <typename... Exprs>
+  static expr simplify_const(expr &&e, const expr &input,
+                             const Exprs &... inputs) {
+    if (input.isConst())
+      return simplify_const(std::move(e), inputs...);
+    return std::move(e);
+  }
+  static expr simplify_const(expr &&e) { return e.simplify(); }
 
   bool alwaysFalse() const { return false; }
 
