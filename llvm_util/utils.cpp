@@ -336,20 +336,18 @@ public:
     if (!fn) // TODO: support indirect calls
       return error(i);
 
-    if (llvm::isMallocLikeFn(&i, &TLI, false) && fn->getName() == "malloc") {
-      // This is a call to C/C++'s malloc() function.
+    // TODO: add support for checking mismatch of C vs C++ alloc fns
+    if (llvm::isMallocLikeFn(&i, &TLI, false)) {
       auto ptr = get_operand(i.getArgOperand(0));
       auto ty = llvm_type2alive(i.getType());
       if (!ptr || !ty)
         return error(i);
-
       RETURN_IDENTIFIER(make_unique<Malloc>(*ty, value_name(i), *ptr));
-    } else if (llvm::isFreeCall(&i, &TLI) && fn->getName() == "free") {
-      // This is a call to C/C++'s free() function.
+
+    } else if (llvm::isFreeCall(&i, &TLI)) {
       auto ptr = get_operand(i.getArgOperand(0));
       if (!ptr)
         return error(i);
-
       RETURN_IDENTIFIER(make_unique<Free>(*ptr));
     }
 

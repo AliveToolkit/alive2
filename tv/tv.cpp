@@ -96,8 +96,7 @@ struct TVPass : public llvm::FunctionPass {
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
-    const llvm::TargetLibraryInfo &TLI =
-        getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI();
+    auto &TLI = getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
 
     auto fn = llvm2alive(F, TLI);
     if (!fn) {

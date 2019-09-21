@@ -885,8 +885,7 @@ static unique_ptr<Instr> parse_copyop(string_view name, token t) {
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {
-  auto t = *tokenizer;
-  switch (t) {
+  switch (auto t = *tokenizer) {
   case ADD:
   case SUB:
   case MUL:
@@ -990,7 +989,7 @@ static void parse_fn(Function &f) {
                                        /*if_non_poison=*/false));
       break;
     default:
-      string_view name = "";
+      string_view name;
       if (t == REGISTER) {
         name = yylval.str;
         tokenizer.ensure(EQUALS);
@@ -1002,7 +1001,8 @@ static void parse_fn(Function &f) {
         tokenizer.unget(t);
         goto exit;
       }
-      if (name.length() != 0) {
+
+      if (!name.empty()) {
         if (!identifiers.emplace(name, i.get()).second)
           error("Duplicated assignment to " + string(name));
       }

@@ -71,18 +71,18 @@ static llvm::cl::opt<bool> opt_smt_verbose(
 
 static llvm::cl::opt<bool> opt_bidirectional("bidirectional",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
-    llvm::cl::desc("Alive: Run refinement check in both directions (default=false)"));
+    llvm::cl::desc("Alive: Run refinement check in both directions"));
 
 static llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
 static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
                                                    std::string InputFilename) {
-  std::unique_ptr<llvm::MemoryBuffer> MB =
+  auto MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
   llvm::SMDiagnostic Diag;
-  std::unique_ptr<llvm::Module> M = getLazyIRModule(std::move(MB), Diag, Context,
-    /*ShouldLazyLoadMetadata=*/true);
+  auto M = getLazyIRModule(move(MB), Diag, Context,
+                           /*ShouldLazyLoadMetadata=*/true);
   if (!M) {
     Diag.print("", llvm::errs(), false);
     return 0;
@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
   llvm::LLVMContext Context;
 
   llvm::cl::ParseCommandLineOptions(argc, argv,
-                                    "Alive2 stand-alone translation validator\n");
+                                  "Alive2 stand-alone translation validator\n");
 
   llvm_util::initializer llvm_util_init(cerr);
   smt::smt_initializer smt_init;
@@ -229,25 +229,29 @@ int main(int argc, char **argv) {
 
   auto M2 = openInputFile(Context, opt_file2);
   if (!M2.get())
-    llvm::report_fatal_error("Could not read bitcode from '" + opt_file2 + "'");
+    llvm::report_fatal_error(
+      "Could not read bitcode from '" + opt_file2 + "'");
   auto F2 = getSingleFunction(M2.get());
 
   if (cmpTypes(F1->getFunctionType(), F2->getFunctionType(), F1, F2))
-    llvm::report_fatal_error("Only functions with identical signatures can be checked");
+    llvm::report_fatal_error(
+      "Only functions with identical signatures can be checked");
 
   if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
     llvm::report_fatal_error("Modules have different target triple");
 
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
-  auto TLI = llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI();
+  auto TLI = llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(*F1);
 
   auto Func1 = llvm2alive(*F1, TLI);
   if (!Func1)
-    llvm::report_fatal_error("Could not translate '" + opt_file1 + "' to Alive IR");
+    llvm::report_fatal_error(
+      "Could not translate '" + opt_file1 + "' to Alive IR");
 
   auto Func2 = llvm2alive(*F2, TLI);
   if (!Func2)
-    llvm::report_fatal_error("Could not translate '" + opt_file2 + "' to Alive IR");
+    llvm::report_fatal_error(
+      "Could not translate '" + opt_file2 + "' to Alive IR");
 
   Transform t;
   t.src = move(*Func1);

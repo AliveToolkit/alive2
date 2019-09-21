@@ -204,6 +204,12 @@ expr Memory::mk_val_array(const char *name) const {
                              expr::mkUInt(0, 8 + 1)); // val+poison bit
 }
 
+expr Memory::mk_liveness_uf() const {
+  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
+  return expr::mkArray("blks_liveness", expr::mkUInt(0, bits_bids),
+                       expr::mkUInt(0, 1));
+}
+
 Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
   {
@@ -213,11 +219,12 @@ Memory::Memory(State &state) : state(&state) {
     expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
+
+  blocks_liveness = mk_liveness_uf();
+
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  auto bidDomain = expr::mkUInt(0, bits_bids);
-  blocks_liveness = expr::mkArray("blks_liveness", bidDomain,
-                                  expr::mkUInt(0, 1));
-  blocks_kind = expr::mkArray("blks_kind", bidDomain, expr::mkUInt(0, 1));
+  blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bits_bids),
+                              expr::mkUInt(0, 1));
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -232,17 +239,15 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 }
 
 expr Memory::alloc(const expr &bytes, unsigned align, bool heap) {
-  Pointer p(*this, ++last_bid, heap);
+  Pointer p(*this, ++last_bid, !heap);
   state->addPre(p.is_aligned(align));
 
   expr size = bytes.zextOrTrunc(bits_size_t);
   state->addPre(p.block_size() == size);
 
-  const expr &blocks_liveness_at_start =
-      state->getMemoryAtEntry().blocks_liveness;
-  state->addPre(blocks_liveness_at_start.load(p.get_bid()) == 0);
+  state->addPre(mk_liveness_uf().load(p.get_bid()) == 0);
   blocks_liveness = blocks_liveness.store(p.get_bid(), expr::mkUInt(1, 1));
-  blocks_kind = blocks_kind.store(p.get_bid(), expr::mkUInt(heap ? 1 : 0, 1));
+  blocks_kind = blocks_kind.store(p.get_bid(), expr::mkUInt(heap, 1));
 
   return p();
 }

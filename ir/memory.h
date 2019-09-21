@@ -90,7 +90,6 @@ class Memory {
   unsigned bits_for_nonlocal_bid = 8;
   unsigned bits_size_t = 64;
 
-public:
   smt::expr blocks_val; // array: (bid, offset) -> StateValue
   smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
@@ -101,7 +100,9 @@ public:
   std::string mkName(const char *str) const;
 
   smt::expr mk_val_array(const char *name) const;
+  smt::expr mk_liveness_uf() const;
 
+public:
   Memory(State &state);
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);

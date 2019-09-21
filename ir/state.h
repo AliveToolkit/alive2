@@ -7,7 +7,6 @@
 #include "ir/state_value.h"
 #include "smt/expr.h"
 #include <array>
-#include <optional>
 #include <ostream>
 #include <set>
 #include <tuple>
@@ -51,10 +50,6 @@ private:
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
-  // The initial memory at the first basic block.
-  // startBB() initializes this variable when starting entry.
-  std::optional<Memory> memoryAtEntry;
-
   // temp state
   DomainTy domain;
   Memory memory;
@@ -74,9 +69,6 @@ public:
   const StateValue& operator[](const Value &val);
   const ValTy& at(const Value &val) const;
   const smt::expr* jumpCondFrom(const BasicBlock &bb) const;
-
-  // Returns the initial memory at the first basic block.
-  const Memory &getMemoryAtEntry() const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);
