@@ -83,5 +83,5 @@ class Alive2Test(TestFormat):
       return lit.Test.FAIL, out + err
 
     if exitCode != 0 and string.find(err, m.group(1)) != -1:
-      return lit.Test.PASS, ''
-    return lit.Test.FAIL, out + err
+      return lit.Test.XFAIL, ''
+    return lit.Test.XPASS, out + err
