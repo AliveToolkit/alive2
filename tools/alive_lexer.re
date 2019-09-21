@@ -212,6 +212,8 @@ space+ {
 "ugt" { return UGT; }
 "call" { return CALL; }
 "freeze" { return FREEZE; }
+"malloc" { return MALLOC; }
+"free" { return FREE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
 "ret" { return RETURN; }

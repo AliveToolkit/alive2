@@ -35,6 +35,7 @@ static void error(const char *s, token t) {
 }
 
 static vector<unique_ptr<IntType>> int_types;
+static vector<unique_ptr<PtrType>> pointer_types;
 static FloatType half_type("half", FloatType::Half);
 static FloatType float_type("float", FloatType::Float);
 static FloatType double_type("double", FloatType::Double);
@@ -134,7 +135,7 @@ struct tokenizer_t {
 
   bool isScalarType() {
     return peek() == INT_TYPE || peek() == HALF ||
-           peek() == FLOAT || peek() == DOUBLE;
+           peek() == FLOAT || peek() == DOUBLE || peek() == STAR;
   }
 
   bool isVectorType() {
@@ -302,6 +303,17 @@ static Type& get_int_type(unsigned size) {
   return *int_types[size].get();
 }
 
+static Type& get_pointer_type(unsigned address_space_number) {
+  if (address_space_number >= pointer_types.size())
+    pointer_types.resize(address_space_number + 1);
+
+  if (!pointer_types[address_space_number])
+    pointer_types[address_space_number] = make_unique<PtrType>(
+        address_space_number);
+
+  return *pointer_types[address_space_number].get();
+}
+
 static unsigned vector_num;
 static vector<unique_ptr<VectorType>> vector_types;
 
@@ -320,6 +332,10 @@ static Type& parse_scalar_type() {
 
   case DOUBLE:
     return double_type;
+
+  case STAR:
+    // TODO: Pointer type of non-zero address space
+    return get_pointer_type(0);
 
   default:
     UNREACHABLE();
@@ -825,6 +841,13 @@ static unique_ptr<Instr> parse_freeze(string_view name) {
   return make_unique<Freeze>(ty, string(name), op);
 }
 
+static unique_ptr<Instr> parse_free() {
+  // free * %op
+  auto &ty = parse_type();
+  auto &op = parse_operand(ty);
+  return make_unique<Free>(op);
+}
+
 static unique_ptr<Instr> parse_call(string_view name) {
   // call ty name(ty_1 %op_1, ..., ty_n %op_n)
   auto &ret_ty = parse_type();
@@ -845,6 +868,15 @@ static unique_ptr<Instr> parse_call(string_view name) {
   return call;
 }
 
+static unique_ptr<Instr> parse_malloc(string_view name) {
+  // %p = malloc ty %sz
+  auto &ty = parse_type();
+  auto &op = parse_operand(ty);
+  // Malloc returns a pointer at address space 0
+  Type &pointer_type = get_pointer_type(0);
+  return make_unique<Malloc>(pointer_type, string(name), op);
+}
+
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
   auto &ty = parse_type();
@@ -853,9 +885,8 @@ static unique_ptr<Instr> parse_copyop(string_view name, token t) {
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {
-  // %name = instr arg1, arg2, ...
-  tokenizer.ensure(EQUALS);
-  switch (auto t = *tokenizer) {
+  auto t = *tokenizer;
+  switch (t) {
   case ADD:
   case SUB:
   case MUL:
@@ -908,10 +939,14 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_icmp(name);
   case FCMP:
     return parse_fcmp(name);
+  case FREE:
+    return parse_free();
   case FREEZE:
     return parse_freeze(name);
   case CALL:
     return parse_call(name);
+  case MALLOC:
+    return parse_malloc(name);
   case INT_TYPE:
   case NUM:
   case FP_NUM:
@@ -922,7 +957,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case REGISTER:
     return parse_copyop(name, t);
   default:
-    error("Expected instruction name", t);
+    return nullptr;
   }
   UNREACHABLE();
 }
@@ -940,14 +975,6 @@ static void parse_fn(Function &f) {
 
   while (true) {
     switch (auto t = *tokenizer) {
-    case REGISTER: {
-      string name(yylval.str);
-      auto i = parse_instr(name);
-      if (!identifiers.emplace(move(name), i.get()).second)
-        error("Duplicated assignment to " + string(yylval.str));
-      bb->addInstr(move(i));
-      break;
-    }
     case LABEL:
       bb = &f.getBB(yylval.str);
       break;
@@ -963,8 +990,24 @@ static void parse_fn(Function &f) {
                                        /*if_non_poison=*/false));
       break;
     default:
-      tokenizer.unget(t);
-      goto exit;
+      string_view name = "";
+      if (t == REGISTER) {
+        name = yylval.str;
+        tokenizer.ensure(EQUALS);
+      } else
+        tokenizer.unget(t);
+
+      auto i = parse_instr(name);
+      if (!i) {
+        tokenizer.unget(t);
+        goto exit;
+      }
+      if (name.length() != 0) {
+        if (!identifiers.emplace(name, i.get()).second)
+          error("Duplicated assignment to " + string(name));
+      }
+      bb->addInstr(move(i));
+      break;
     }
   }
 

@@ -146,7 +146,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
   cond &= is_aligned(align);
 
   // 3) check block is alive
-  // TODO
+  cond &= is_block_alive();
 
   m.state->addUB(bytes.ugt(0).implies(cond));
 }
@@ -170,6 +170,14 @@ void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
                            len1.zextOrTrunc(m.bits_size_t),
                            ptr2.get_offset().sextOrTrunc(m.bits_size_t),
                            len2.zextOrTrunc(m.bits_size_t)));
+}
+
+expr Pointer::is_block_alive() {
+  return m.blocks_liveness.load(get_bid()) == 1;
+}
+
+expr Pointer::is_at_heap() {
+  return m.blocks_kind.load(get_bid()) == 1;
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
@@ -205,6 +213,11 @@ Memory::Memory(State &state) : state(&state) {
     expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
+  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
+  auto bidDomain = expr::mkUInt(0, bits_bids);
+  blocks_liveness = expr::mkArray("blks_liveness", bidDomain,
+                                  expr::mkUInt(0, 1));
+  blocks_kind = expr::mkArray("blks_kind", bidDomain, expr::mkUInt(0, 1));
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -218,17 +231,29 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   return { Pointer(*this, offset, local_bid, bid).release(), { var } };
 }
 
-expr Memory::alloc(const expr &bytes, unsigned align, bool local) {
-  Pointer p(*this, ++last_bid, local);
+expr Memory::alloc(const expr &bytes, unsigned align, bool heap) {
+  Pointer p(*this, ++last_bid, heap);
   state->addPre(p.is_aligned(align));
 
   expr size = bytes.zextOrTrunc(bits_size_t);
   state->addPre(p.block_size() == size);
+
+  const expr &blocks_liveness_at_start =
+      state->getMemoryAtEntry().blocks_liveness;
+  state->addPre(blocks_liveness_at_start.load(p.get_bid()) == 0);
+  blocks_liveness = blocks_liveness.store(p.get_bid(), expr::mkUInt(1, 1));
+  blocks_kind = blocks_kind.store(p.get_bid(), expr::mkUInt(heap ? 1 : 0, 1));
+
   return p();
 }
 
+
 void Memory::free(const expr &ptr) {
-  // TODO
+  Pointer p(*this, ptr);
+  state->addUB(p.get_offset() == 0);
+  state->addUB(p.is_block_alive());
+  state->addUB(p.is_at_heap());
+  blocks_liveness = blocks_liveness.store(p.get_bid(), expr::mkUInt(0, 1));
 }
 
 void Memory::store(const expr &p, const StateValue &v, Type &type,
@@ -342,6 +367,9 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
   ret.blocks_val   = expr::mkIf(cond, then.blocks_val, els.blocks_val);
+  ret.blocks_liveness = expr::mkIf(cond, then.blocks_liveness,
+                                   els.blocks_liveness);
+  ret.blocks_kind = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
   // FIXME: this isn't correct; should be a per function counter
   ret.last_bid     = max(then.last_bid, els.last_bid);
   ret.last_idx_ptr = max(then.last_idx_ptr, els.last_idx_ptr);
