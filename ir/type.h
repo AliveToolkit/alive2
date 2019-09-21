@@ -42,7 +42,7 @@ public:
   virtual unsigned bits() const = 0;
 
   // to use when one needs the corresponding SMT type
-  virtual smt::expr getDummyValue() const = 0;
+  virtual IR::StateValue getDummyValue(bool non_poison) const = 0;
 
   virtual smt::expr getTypeConstraints() const = 0;
   virtual smt::expr sizeVar() const;
@@ -100,7 +100,7 @@ class VoidType final : public Type {
 public:
   VoidType() : Type("void") {}
   unsigned bits() const override;
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   std::pair<smt::expr, smt::expr>
@@ -122,7 +122,7 @@ public:
     : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
 
   unsigned bits() const override;
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
@@ -157,7 +157,7 @@ public:
     : Type(std::move(name)), fpType(fpType), defined(true) {}
   unsigned bits() const override;
   FpType getFpType() const { return fpType; };
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const FloatType &rhs) const;
@@ -187,7 +187,7 @@ public:
 
   PtrType(unsigned addr_space);
   unsigned bits() const override;
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const PtrType &rhs) const;
   smt::expr sameType(const PtrType &rhs) const;
@@ -228,7 +228,7 @@ public:
   Type& getChild(unsigned index) const { return *children[index]; }
 
   unsigned bits() const override;
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const AggregateType &rhs) const;
   smt::expr sameType(const AggregateType &rhs) const;
@@ -297,7 +297,7 @@ public:
   SymbolicType(std::string &&name, unsigned type_mask);
 
   unsigned bits() const override;
-  smt::expr getDummyValue() const override;
+  IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
   smt::expr sameType(const Type &rhs) const;

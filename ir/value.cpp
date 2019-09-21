@@ -49,9 +49,10 @@ void UndefValue::print(ostream &os) const {
 
 StateValue UndefValue::toSMT(State &s) const {
   auto name = getFreshName();
-  expr var = expr::mkVar(name.c_str(), getType().getDummyValue());
+  auto val = getType().getDummyValue(true);
+  expr var = expr::mkVar(name.c_str(), val.value);
   s.addUndefVar(var);
-  return { move(var), true };
+  return { move(var), move(val.non_poison) };
 }
 
 string UndefValue::getFreshName() {
@@ -64,7 +65,7 @@ void PoisonValue::print(ostream &os) const {
 }
 
 StateValue PoisonValue::toSMT(State &s) const {
-  return { getType().getDummyValue(), false };
+  return getType().getDummyValue(false);
 }
 
 

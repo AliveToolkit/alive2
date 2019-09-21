@@ -570,7 +570,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     else if (getType().isIntType() && val->getType().isFloatType())
       newval = v.float2BV();
     else if (getType().isFloatType() && val->getType().isIntType())
-      newval = v.BV2float(getType().getDummyValue());
+      newval = v.BV2float(getType().getDummyValue(true).value);
     else
       UNREACHABLE();
     break;
@@ -796,14 +796,16 @@ StateValue FnCall::toSMT(State &s) const {
     return {};
 
   // create a new variable that can take any value if function is poison
-  expr val = expr::mkUF(fnName.c_str(), value_args, getType().getDummyValue());
+  StateValue ret_type = getType().getDummyValue(true);
+  expr val = expr::mkUF(fnName.c_str(), value_args, ret_type.value);
   if (!all_args_np.isTrue()) {
     auto var_name = fnName + '#' + fresh_id();
-    auto var = expr::mkVar(var_name.c_str(), getType().getDummyValue());
+    auto var = expr::mkVar(var_name.c_str(), ret_type.value);
     s.addQuantVar(var);
     val = expr::mkIf(all_args_np, val, var);
   }
 
+  // FIXME: broken for functions that return aggregate types
   auto poison_name = fnName + "#poison";
   add_implies_axiom(poison_name);
 
@@ -1024,10 +1026,11 @@ StateValue Freeze::toSMT(State &s) const {
     return { expr(v), expr(p) };
 
   auto name = "nondet_" + fresh_id();
-  expr nondet = expr::mkVar(name.c_str(), getType().getDummyValue());
+  StateValue ret_type = getType().getDummyValue(true);
+  expr nondet = expr::mkVar(name.c_str(), ret_type.value);
   s.addQuantVar(nondet);
 
-  return { expr::mkIf(p, v, move(nondet)), true };
+  return { expr::mkIf(p, v, move(nondet)), move(ret_type.non_poison) };
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {

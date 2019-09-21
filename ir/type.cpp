@@ -207,7 +207,7 @@ unsigned VoidType::bits() const {
   UNREACHABLE();
 }
 
-expr VoidType::getDummyValue() const {
+StateValue VoidType::getDummyValue(bool non_poison) const {
   UNREACHABLE();
 }
 
@@ -241,8 +241,8 @@ unsigned IntType::bits() const {
   return bitwidth;
 }
 
-expr IntType::getDummyValue() const {
-  return expr::mkUInt(0, bits());
+StateValue IntType::getDummyValue(bool non_poison) const {
+  return { expr::mkUInt(0, bits()), non_poison };
 }
 
 expr IntType::getTypeConstraints() const {
@@ -338,21 +338,22 @@ expr FloatType::toBV(expr e) const {
 }
 
 expr FloatType::fromBV(expr e) const {
-  return e.BV2float(getDummyValue());
+  return e.BV2float(getDummyValue(true).value);
 }
 
 expr FloatType::sizeVar() const {
   return defined ? expr::mkUInt(getFpType(), var_bw_bits) : Type::sizeVar();
 }
 
-expr FloatType::getDummyValue() const {
+StateValue FloatType::getDummyValue(bool non_poison) const {
+  expr e;
   switch (fpType) {
-  case Half:    return expr::mkHalf(0);
-  case Float:   return expr::mkFloat(0);
-  case Double:  return expr::mkDouble(0);
+  case Half:    e = expr::mkHalf(0); break;
+  case Float:   e = expr::mkFloat(0); break;
+  case Double:  e = expr::mkDouble(0); break;
   case Unknown: UNREACHABLE();
   }
-  UNREACHABLE();
+  return { move(e), non_poison };
 }
 
 expr FloatType::getTypeConstraints() const {
@@ -449,8 +450,8 @@ unsigned PtrType::bits() const {
   return 64+8+8;
 }
 
-expr PtrType::getDummyValue() const {
-  return expr::mkUInt(0, bits());
+StateValue PtrType::getDummyValue(bool non_poison) const {
+  return { expr::mkUInt(0, bits()), non_poison };
 }
 
 expr PtrType::getTypeConstraints() const {
@@ -535,6 +536,11 @@ expr AggregateType::numElements() const {
 }
 
 StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
+  assert(vals.size() == elements);
+  // structs can be empty
+  if (vals.empty())
+    return { expr::mkUInt(0, 1), true };
+
   StateValue v;
   for (unsigned idx = 0; idx < elements; ++idx) {
     auto vv = children[idx]->toBV(vals[idx]);
@@ -582,16 +588,12 @@ unsigned AggregateType::bits() const {
   return bw;
 }
 
-expr AggregateType::getDummyValue() const {
-  if (elements == 0)
-    return expr::mkUInt(0, 1);
-
-  expr ret;
+StateValue AggregateType::getDummyValue(bool non_poison) const {
+  vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
-    auto v = children[i]->toBV(children[i]->getDummyValue());
-    ret = i == 0 ? move(v) : ret.concat(v);
+    vals.emplace_back(children[i]->getDummyValue(non_poison));
   }
-  return ret;
+  return aggregateVals(vals);
 }
 
 expr AggregateType::getTypeConstraints() const {
@@ -807,14 +809,14 @@ unsigned SymbolicType::bits() const {
   UNREACHABLE();
 }
 
-expr SymbolicType::getDummyValue() const {
+StateValue SymbolicType::getDummyValue(bool non_poison) const {
   switch (typ) {
-  case Int:    return i->getDummyValue();
-  case Float:  return f->getDummyValue();
-  case Ptr:    return p->getDummyValue();
-  case Array:  return a->getDummyValue();
-  case Vector: return v->getDummyValue();
-  case Struct: return s->getDummyValue();
+  case Int:    return i->getDummyValue(non_poison);
+  case Float:  return f->getDummyValue(non_poison);
+  case Ptr:    return p->getDummyValue(non_poison);
+  case Array:  return a->getDummyValue(non_poison);
+  case Vector: return v->getDummyValue(non_poison);
+  case Struct: return s->getDummyValue(non_poison);
   case Undefined:
     break;
   }
