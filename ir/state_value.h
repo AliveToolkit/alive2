@@ -20,6 +20,8 @@ struct StateValue {
   static StateValue mkIf(const smt::expr &cond, const StateValue &then,
                          const StateValue &els);
 
+  auto bits() const { return value.bits(); }
+
   StateValue concat(const StateValue &other) const;
   smt::expr both() const { return value && non_poison; }
 

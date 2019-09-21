@@ -165,7 +165,10 @@ expr Type::toBV(expr e) const {
 }
 
 StateValue Type::toBV(StateValue v) const {
-  return { toBV(v.value), v.non_poison.toBVBool() };
+  expr val = toBV(v.value);
+  auto bw = val.bits();
+  return { move(val),
+           expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
 
 expr Type::fromBV(expr e) const {
@@ -173,7 +176,7 @@ expr Type::fromBV(expr e) const {
 }
 
 StateValue Type::fromBV(StateValue v) const {
-  return { fromBV(v.value), v.non_poison == 1 };
+  return { fromBV(v.value), v.non_poison == 0 };
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -536,11 +539,11 @@ StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
     total_till_now += children[i]->bits();
   }
   unsigned high = val.value.bits() - total_till_now;
-  unsigned poison_idx = children.size() - index - 1;
+  unsigned h = high - 1;
+  unsigned l = high - children[index]->bits();
 
-  return children[index]->fromBV({
-           val.value.extract(high - 1, high - children[index]->bits()),
-           val.non_poison.extract(poison_idx, poison_idx) });
+  return children[index]->fromBV({ val.value.extract(h, l),
+                                   val.non_poison.extract(h, l) });
 }
 
 StateValue AggregateType::extract(const StateValue &val,
@@ -551,11 +554,14 @@ StateValue AggregateType::extract(const StateValue &val,
   }
   unsigned bw_elem = elementTy.bits();
   unsigned bw_val = val.value.bits();
-  expr idx = index.zextOrTrunc(bw_val);
-  expr v = val.value << (idx * expr::mkUInt(bw_elem, bw_val));
-  return elementTy.fromBV({
-           v.extract(elements * bw_elem - 1, (elements - 1) * bw_elem),
-           (val.non_poison << idx).extract(elements-1, elements-1) });
+  assert(bw_val == val.non_poison.bits());
+  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+
+  unsigned h = elements * bw_elem - 1;
+  unsigned l = (elements - 1) * bw_elem;
+
+  return elementTy.fromBV({ (val.value << idx).extract(h, l),
+                            (val.non_poison << idx).extract(h, l) });
 }
 
 unsigned AggregateType::bits() const {

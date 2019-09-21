@@ -1545,6 +1545,7 @@ StateValue Memset::toSMT(State &s) const {
 
 expr Memset::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType() &&
+         val->getType().enforceIntType(8) &&
          bytes->getType().enforceIntType();
 }
 

@@ -201,7 +201,7 @@ string Memory::mkName(const char *str) const {
 expr Memory::mk_val_array(const char *name) const {
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
   return expr::mkArray(name, expr::mkUInt(0, bits_bids + bits_for_offset),
-                             expr::mkUInt(0, 8 + 1)); // val+poison bit
+                             expr::mkUInt(0, 2 * 8)); // val + poison bits
 }
 
 expr Memory::mk_liveness_uf() const {
@@ -215,7 +215,7 @@ Memory::Memory(State &state) : state(&state) {
   {
     // initialize all local blocks as poison
     Pointer idx(*this, "#idx0");
-    expr poison = expr::mkUInt(0, 9);
+    expr poison = expr::mkUInt(0, 16);
     expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
@@ -264,7 +264,7 @@ void Memory::free(const expr &ptr) {
 void Memory::store(const expr &p, const StateValue &v, Type &type,
                    unsigned align) {
   StateValue val = type.toBV(v);
-  unsigned bits = val.value.bits();
+  unsigned bits = val.bits();
   unsigned bytes = divide_up(bits, 8);
 
   val.value = val.value.zext(bytes * 8 - bits);
@@ -274,9 +274,9 @@ void Memory::store(const expr &p, const StateValue &v, Type &type,
 
   for (unsigned i = 0; i < bytes; ++i) {
     // FIXME: right now we store in little-endian; consider others?
-    expr data = val.value.extract((i + 1) * 8 - 1, i * 8);
-    auto p = (ptr + i).release();
-    blocks_val = blocks_val.store(p, val.non_poison.concat(data));
+    expr data  = val.value.extract((i + 1) * 8 - 1, i * 8);
+    expr np    = val.non_poison.extract((i + 1) * 8 - 1, i * 8);
+    blocks_val = blocks_val.store((ptr + i).release(), np.concat(data));
   }
 }
 
@@ -292,16 +292,11 @@ StateValue Memory::load(const expr &p, Type &type, unsigned align) {
   for (unsigned i = 0; i < bytes; ++i) {
     auto ptr_i = (ptr + i).release();
     expr pair = blocks_val.load(ptr_i);
-    expr v = pair.extract(8-1, 0);
-    expr p = pair.extract(8, 8);
+    expr v = pair.extract(7, 0);
+    expr p = pair.extract(15, 8);
 
-    if (first) {
-      val.value      = move(v);
-      val.non_poison = move(p);
-    } else {
-      val.value      = v.concat(val.value);
-      val.non_poison = p | val.non_poison;
-    }
+    val.value      = first ? move(v) : v.concat(val.value);
+    val.non_poison = first ? move(p) : p.concat(val.non_poison);
     first = false;
   }
 
@@ -311,9 +306,11 @@ StateValue Memory::load(const expr &p, Type &type, unsigned align) {
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
                     unsigned align) {
+  assert(val.bits() == 8);
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
-  expr store_val = val.non_poison.toBVBool().concat(val.value);
+  auto valbv = IntType("", 8).toBV(val);
+  expr store_val = valbv.non_poison.concat(valbv.value);
 
   uint64_t n;
   if (bytes.isUInt(n) && n <= 4) {
