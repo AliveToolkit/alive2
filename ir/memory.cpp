@@ -266,7 +266,7 @@ void Memory::store(const expr &p, const StateValue &v, Type &type,
   unsigned bits = val.bits();
   unsigned bytes = divide_up(bits, 8);
 
-  val.value = val.value.zext(bytes * 8 - bits);
+  val = val.zext(bytes * 8 - bits);
 
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes, align);
@@ -291,11 +291,8 @@ StateValue Memory::load(const expr &p, Type &type, unsigned align) {
   for (unsigned i = 0; i < bytes; ++i) {
     auto ptr_i = (ptr + i).release();
     expr pair = blocks_val.load(ptr_i);
-    expr v = pair.extract(7, 0);
-    expr p = pair.extract(15, 8);
-
-    val.value      = first ? move(v) : v.concat(val.value);
-    val.non_poison = first ? move(p) : p.concat(val.non_poison);
+    StateValue v(pair.extract(7, 0),  pair.extract(15, 8));
+    val = first ? move(v) : v.concat(val);
     first = false;
   }
 

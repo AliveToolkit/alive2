@@ -22,7 +22,9 @@ struct StateValue {
 
   auto bits() const { return value.bits(); }
 
+  StateValue zext(unsigned amount) const;
   StateValue concat(const StateValue &other) const;
+
   smt::expr both() const { return value && non_poison; }
 
   bool eq(const StateValue &other) const;
