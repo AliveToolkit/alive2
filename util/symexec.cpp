@@ -37,6 +37,11 @@ void sym_exec(State &s) {
         cout << name << " = " << val << '\n';
     }
   }
+
+  if (config::symexec_print_each_value) {
+    cout << "domain = " << s.returnDomain() << '\n';
+    cout << "return = " << s.returnVal().first << "\n\n";
+  }
 }
 
 }
