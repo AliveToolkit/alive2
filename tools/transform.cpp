@@ -32,6 +32,11 @@ static bool is_undef(const expr &e) {
 static void print_single_varval(ostream &os, State &st, const Model &m,
                                 const Value *var, const Type &type,
                                 const StateValue &val) {
+  if (!val.isValid()) {
+    os << "(invalid expr)";
+    return;
+  }
+
   // if the model is partial, we don't know for sure if it's poison or not
   // this happens if the poison constraint depends on an undef
   // however, cexs are usually triggered by the worst case, which is poison
