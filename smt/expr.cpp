@@ -253,29 +253,29 @@ bool expr::isFalse() const {
 }
 
 bool expr::isZero() const {
-  return (*this == 0).isTrue();
+  return eq(mkUInt(0, sort()));
 }
 
 bool expr::isOne() const {
-  return (*this == 1).isTrue();
+  return eq(mkUInt(1, sort()));
 }
 
 bool expr::isAllOnes() const {
-  return (*this == mkInt(-1, sort())).isTrue();
+  return eq(mkInt(-1, sort()));
 }
 
 bool expr::isSMin() const {
-  return (*this == IntSMin(bits())).isTrue();
+  return eq(IntSMin(bits()));
 }
 
 bool expr::isSMax() const {
-  return (*this == IntSMax(bits())).isTrue();
+  return eq(IntSMax(bits()));
 }
 
 bool expr::isSigned() const {
   C();
   auto bit = bits() - 1;
-  return (extract(bit, bit) == 1).isTrue();
+  return extract(bit, bit).eq(mkUInt(1, 1));
 }
 
 unsigned expr::bits() const {
