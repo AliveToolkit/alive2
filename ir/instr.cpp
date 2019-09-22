@@ -745,9 +745,15 @@ void FnCall::print(ostream &os) const {
     first = false;
   }
   os << ')';
+
+  if (!valid)
+    os << "\t; WARNING: unknown known function";
 }
 
 StateValue FnCall::toSMT(State &s) const {
+  if (!valid)
+    return {};
+
   // TODO: add support for memory
   // TODO: add support for global variables
   vector<expr> all_args, value_args;
@@ -818,7 +824,8 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
-  auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName));
+  auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
+                               valid);
   r->args = args;
   return r;
 }
@@ -1542,13 +1549,13 @@ StateValue Memset::toSMT(State &s) const {
   auto &[vbytes, np_bytes] = s[*bytes];
   s.addUB(vbytes.ugt(0).implies(np_ptr));
   s.addUB(np_bytes);
-  s.getMemory().memset(vptr, s[*val], vbytes, align);
+  s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align);
   return {};
 }
 
 expr Memset::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType() &&
-         val->getType().enforceIntType(8) &&
+         val->getType().enforceIntType() &&
          bytes->getType().enforceIntType();
 }
 

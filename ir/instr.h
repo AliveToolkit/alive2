@@ -154,9 +154,11 @@ public:
 class FnCall final : public Instr {
   std::string fnName;
   std::vector<Value*> args;
+  bool valid;
 public:
-  FnCall(Type &type, std::string &&name, std::string &&fnName)
-    : Instr(type, std::move(name)), fnName(std::move(fnName)) {}
+  FnCall(Type &type, std::string &&name, std::string &&fnName,
+         bool valid = true)
+    : Instr(type, std::move(name)), fnName(std::move(fnName)), valid(valid) {}
   void addArg(Value &arg);
 
   std::vector<Value*> operands() const override;

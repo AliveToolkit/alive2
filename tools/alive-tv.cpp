@@ -1,6 +1,11 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "llvm_util/llvm2alive.h"
+#include "smt/smt.h"
+#include "tools/transform.h"
+#include "util/config.h"
+
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -11,27 +16,12 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
 
-#include "ir/function.h"
-#include "llvm_util/utils.h"
-#include "smt/smt.h"
-#include "smt/solver.h"
-#include "tools/alive_parser.h"
-#include "util/config.h"
-#include "util/file.h"
-#include <cstdlib>
 #include <iostream>
-#include <optional>
-#include <string_view>
-#include <vector>
 
-using namespace IR;
 using namespace tools;
 using namespace util;
 using namespace std;

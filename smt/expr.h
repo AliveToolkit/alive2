@@ -99,6 +99,7 @@ public:
   bool isValid() const { return ptr != 0; }
 
   bool isConst() const;
+  bool isBool() const;
   bool isTrue() const;
   bool isFalse() const;
   bool isZero() const;

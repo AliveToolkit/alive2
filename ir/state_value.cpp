@@ -15,7 +15,14 @@ StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
 }
 
 StateValue StateValue::zext(unsigned amount) const {
-  return { value.zext(amount), non_poison.zext(amount) };
+  return { value.zext(amount),
+           non_poison.isBool() ? expr(non_poison) : non_poison.zext(amount) };
+}
+
+StateValue StateValue::zextOrTrunc(unsigned tobw) const {
+  return
+    { value.zextOrTrunc(tobw),
+      non_poison.isBool() ? expr(non_poison) : non_poison.zextOrTrunc(tobw) };
 }
 
 StateValue StateValue::concat(const StateValue &other) const {

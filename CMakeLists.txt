@@ -107,6 +107,8 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_definitions(${LLVM_DEFINITIONS})
 
   set(LLVM_UTIL_SRCS
+    "llvm_util/known_fns.cpp"
+    "llvm_util/llvm2alive.cpp"
     "llvm_util/utils.cpp"
   )
 
