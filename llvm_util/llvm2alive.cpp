@@ -189,25 +189,28 @@ public:
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
-    auto ptr = get_operand(i.getOperand(0));
-    auto val = get_operand(i.getOperand(1));
-    auto bytes = get_operand(i.getOperand(2));
-    // TODO: add isvolatile, alignment
+    auto ptr = get_operand(i.getRawDest());
+    auto val = get_operand(i.getValue());
+    auto bytes = get_operand(i.getLength());
+    // TODO: add isvolatile
     if (!ptr || !val || !bytes)
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes, 1));
+    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes,
+                                          i.getDestAlignment()));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
-    auto dst = get_operand(i.getOperand(0));
-    auto src = get_operand(i.getOperand(1));
-    auto bytes = get_operand(i.getOperand(2));
-    // TODO: add isvolatile, alignment
+    auto dst = get_operand(i.getRawDest());
+    auto src = get_operand(i.getRawSource());
+    auto bytes = get_operand(i.getLength());
+    // TODO: add isvolatile
     if (!dst || !src || !bytes)
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes, 1, 1,
+    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes,
+                                          i.getDestAlignment(),
+                                          i.getSourceAlignment(),
                                           isa<llvm::MemMoveInst>(&i)));
   }
 
