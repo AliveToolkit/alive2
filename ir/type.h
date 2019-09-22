@@ -73,9 +73,9 @@ public:
   virtual const StructType* getAsStructType() const;
 
   virtual smt::expr toBV(smt::expr e) const;
-  IR::StateValue toBV(IR::StateValue v) const;
+  virtual IR::StateValue toBV(IR::StateValue v) const;
   virtual smt::expr fromBV(smt::expr e) const;
-  IR::StateValue fromBV(IR::StateValue v) const;
+  virtual IR::StateValue fromBV(IR::StateValue v) const;
 
   // returns pair of refinement constraints for <poison, !poison && value>
   virtual std::pair<smt::expr, smt::expr>
@@ -235,6 +235,8 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType(
     std::vector<Type *> *element_types) const override;
+  IR::StateValue toBV(IR::StateValue v) const override;
+  IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>

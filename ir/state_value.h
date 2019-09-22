@@ -23,6 +23,7 @@ struct StateValue {
   auto bits() const { return value.bits(); }
 
   StateValue zext(unsigned amount) const;
+  StateValue trunc(unsigned amount) const;
   StateValue zextOrTrunc(unsigned tobw) const;
   StateValue concat(const StateValue &other) const;
 

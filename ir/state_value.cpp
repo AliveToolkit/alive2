@@ -19,6 +19,11 @@ StateValue StateValue::zext(unsigned amount) const {
            non_poison.isBool() ? expr(non_poison) : non_poison.zext(amount) };
 }
 
+StateValue StateValue::trunc(unsigned amount) const {
+  return { value.trunc(amount),
+           non_poison.isBool() ? expr(non_poison) : non_poison.trunc(amount) };
+}
+
 StateValue StateValue::zextOrTrunc(unsigned tobw) const {
   return
     { value.zextOrTrunc(tobw),

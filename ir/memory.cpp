@@ -296,8 +296,7 @@ StateValue Memory::load(const expr &p, Type &type, unsigned align) {
     first = false;
   }
 
-  val.value = val.value.trunc(bits);
-  return type.fromBV(move(val));
+  return type.fromBV(val.trunc(bits));
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,

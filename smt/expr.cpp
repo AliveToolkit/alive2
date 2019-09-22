@@ -258,14 +258,17 @@ bool expr::isFalse() const {
 }
 
 bool expr::isZero() const {
+  C();
   return eq(mkUInt(0, sort()));
 }
 
 bool expr::isOne() const {
+  C();
   return eq(mkUInt(1, sort()));
 }
 
 bool expr::isAllOnes() const {
+  C();
   return eq(mkInt(-1, sort()));
 }
 

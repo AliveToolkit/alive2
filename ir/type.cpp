@@ -649,6 +649,14 @@ expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
   return r;
 }
 
+StateValue AggregateType::toBV(StateValue v) const {
+  return v;
+}
+
+StateValue AggregateType::fromBV(StateValue v) const {
+  return v;
+}
+
 pair<expr, expr>
 AggregateType::refines(const StateValue &src, const StateValue &tgt) const {
   set<expr> poison, value;
