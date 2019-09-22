@@ -158,6 +158,13 @@ Value* get_operand(llvm::Value *v) {
     return ret;
   }
 
+  if (isa<llvm::ConstantPointerNull>(v)) {
+    auto val = make_unique<NullPointerValue>(*ty);
+    auto ret = val.get();
+    current_fn->addConstant(move(val));
+    return ret;
+  }
+
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
     vector<Value*> vals;
     for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {

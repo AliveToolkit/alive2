@@ -441,6 +441,10 @@ static Value& get_or_copy_instr(const string &name) {
       auto newop = make_unique<PoisonValue>(op->getType());
       tgt_instr->rauw(*op, *newop.get());
       fn->addConstant(move(newop));
+    } else if (dynamic_cast<NullPointerValue*>(op)) {
+      auto newop = make_unique<NullPointerValue>(op->getType());
+      tgt_instr->rauw(*op, *newop.get());
+      fn->addConstant(move(newop));
     } else if (auto c = dynamic_cast<IntConst*>(op)) {
       auto newop = make_unique<IntConst>(*c);
       tgt_instr->rauw(*op, *newop.get());
@@ -507,6 +511,12 @@ static Value& parse_operand(Type &type) {
   }
   case POISON: {
     auto val = make_unique<PoisonValue>(type);
+    auto ret = val.get();
+    fn->addConstant(move(val));
+    return *ret;
+  }
+  case NULLTOKEN: {
+    auto val = make_unique<NullPointerValue>(type);
     auto ret = val.get();
     fn->addConstant(move(val));
     return *ret;

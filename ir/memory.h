@@ -77,6 +77,12 @@ public:
   smt::expr is_block_alive();
   smt::expr is_at_heap();
 
+  // Makes a null pointer.
+  // TODO: add a bool flag that says whether the twin memory model is used.
+  // In the twin memory model, a null pointer is a physical pointer with
+  // absolute address 0.
+  static Pointer mkNullPointer(Memory &m);
+
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
 
@@ -93,7 +99,10 @@ class Memory {
   smt::expr blocks_val; // array: (bid, offset) -> StateValue
   smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
-  unsigned last_bid = 0;
+  // Block id 0 is reserved for a null block.
+  // TODO: In the twin memory, there is no null block, so the initial last_bid
+  // should depend on whether the twin memory is used or not.
+  unsigned last_bid = 1;
   unsigned last_idx_ptr = 0;
 
   std::string mkName(const char *str, bool src) const;

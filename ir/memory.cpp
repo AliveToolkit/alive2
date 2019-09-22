@@ -180,6 +180,11 @@ expr Pointer::is_at_heap() {
   return m.blocks_kind.load(get_bid()) == 1;
 }
 
+Pointer Pointer::mkNullPointer(Memory &m) {
+  // A null pointer points to block 0.
+  return Pointer(m, 0, false);
+}
+
 ostream& operator<<(ostream &os, const Pointer &p) {
   os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
      << ", block_id=";
@@ -225,6 +230,12 @@ Memory::Memory(State &state) : state(&state) {
   blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bits_bids),
                               expr::mkUInt(0, 1));
 
+  // Initialize a memory block for null pointer.
+  // TODO: in twin memory model, this is not needed.
+  auto nullPtr = Pointer::mkNullPointer(*this);
+  state.addPre(nullPtr.get_address() == 0);
+  state.addPre(nullPtr.block_size() == 0);
+
   assert(bits_for_offset <= bits_size_t);
 }
 
@@ -254,9 +265,11 @@ expr Memory::alloc(const expr &bytes, unsigned align, bool heap) {
 
 void Memory::free(const expr &ptr) {
   Pointer p(*this, ptr);
-  state->addUB(p.get_offset() == 0);
-  state->addUB(p.is_block_alive());
-  state->addUB(p.is_at_heap());
+  auto isNullPointer = p == Pointer::mkNullPointer(*this);
+
+  state->addUB(isNullPointer || ((p.get_offset() == 0) &&
+                                 (p.is_block_alive()) &&
+                                 (p.is_at_heap())));
   blocks_liveness = blocks_liveness.store(p.get_bid(), false);
 }
 
