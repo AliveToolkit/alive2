@@ -751,8 +751,10 @@ void FnCall::print(ostream &os) const {
 }
 
 StateValue FnCall::toSMT(State &s) const {
-  if (!valid)
+  if (!valid) {
+    s.addUB({});
     return {};
+  }
 
   // TODO: add support for memory
   // TODO: add support for global variables
