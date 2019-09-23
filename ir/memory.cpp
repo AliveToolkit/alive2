@@ -172,11 +172,11 @@ void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
                            len2.zextOrTrunc(m.bits_size_t)));
 }
 
-expr Pointer::is_block_alive() {
+expr Pointer::is_block_alive() const {
   return m.blocks_liveness.load(get_bid());
 }
 
-expr Pointer::is_at_heap() {
+expr Pointer::is_at_heap() const {
   return m.blocks_kind.load(get_bid()) == 1;
 }
 
@@ -237,12 +237,12 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   return { Pointer(*this, offset, local_bid, bid).release(), { var } };
 }
 
-expr Memory::alloc(const expr &bytes, unsigned align, bool heap) {
-  Pointer p(*this, ++last_bid, !heap);
+expr Memory::alloc(const expr &size, unsigned align, bool heap) {
+  Pointer p(*this, ++last_bid, true);
   state->addPre(p.is_aligned(align));
 
-  expr size = bytes.zextOrTrunc(bits_size_t);
-  state->addPre(p.block_size() == size);
+  expr size_zextOrTrunced = size.zextOrTrunc(bits_size_t);
+  state->addPre(p.block_size() == size_zextOrTrunced);
 
   state->addPre(!mk_liveness_uf().load(p.get_bid()));
   blocks_liveness = blocks_liveness.store(p.get_bid(), true);
