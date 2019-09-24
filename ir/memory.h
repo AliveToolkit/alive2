@@ -19,10 +19,13 @@ class State;
 class Pointer {
   Memory &m;
   // [offset, local_bid, nonlocal_bid]
-  // A pointer is pointing to a memory block that is allocated at the current
-  // stackframe if local_bid is non-zero and nonlocal_bid is zero.
-  // Otherwise, it is either pointing to a global variable, heap, or a
-  // stackframe that is not one of this function call.
+  // A pointer is pointing to a local memory block if local_bid is non-zero and
+  // nonlocal_bid is zero. A local memory block is a memory block that is
+  // allocated by an instruction during the current function call. This does
+  // not include allocated blocks from a nested function call. A heap-allocated
+  // block can also be a local memory block.
+  // Otherwise, a pointer is pointing to a non-local block, which can be either
+  // of global variable, heap, or a stackframe that is not this function call.
   // TODO: missing support for address space
   smt::expr p;
 
@@ -74,8 +77,8 @@ public:
   void is_dereferenceable(const smt::expr &bytes, unsigned align);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
-  smt::expr is_block_alive();
-  smt::expr is_at_heap();
+  smt::expr is_block_alive() const;
+  smt::expr is_at_heap() const;
 
   // Makes a null pointer.
   // TODO: add a bool flag that says whether the twin memory model is used.
@@ -116,7 +119,8 @@ public:
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 
-  smt::expr alloc(const smt::expr &bytes, unsigned align, bool heap);
+  // Allocates a new local memory block.
+  smt::expr alloc(const smt::expr &size, unsigned align, bool heap);
   void free(const smt::expr &ptr);
 
   void store(const smt::expr &ptr, const StateValue &val, Type &type,
