@@ -5,14 +5,6 @@ ret 0
 free * %p
 ret 0
 
-Name: free_double_ub
-free * %p
-free * %p
-ret 0
-  =>
-free * %p
-ret 1
-
 Name: malloc_id
 %p = malloc i16 8
 ret 0
@@ -30,3 +22,8 @@ ret 1
 free * %p
 ret 2
 
+Name: free_null
+ret 1
+  =>
+free * null
+ret 1

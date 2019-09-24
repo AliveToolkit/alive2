@@ -78,6 +78,16 @@ StateValue VoidValue::toSMT(State &s) const {
 }
 
 
+void NullPointerValue::print(ostream &os) const {
+  UNREACHABLE();
+}
+
+StateValue NullPointerValue::toSMT(State &s) const {
+  auto nullp = Pointer::mkNullPointer(s.getMemory());
+  return { nullp.release(), true };
+}
+
+
 void Input::print(std::ostream &os) const {
   UNREACHABLE();
 }

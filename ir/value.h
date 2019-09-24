@@ -74,6 +74,14 @@ public:
 };
 
 
+class NullPointerValue final : public Value {
+public:
+  NullPointerValue(Type &type) : Value(type, "null") {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+};
+
+
 class Input final : public Value {
 public:
   Input(Type &type, std::string &&name) :

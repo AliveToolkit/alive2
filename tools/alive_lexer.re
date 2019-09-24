@@ -173,6 +173,7 @@ space+ {
 "false" { return FALSE; }
 "undef" { return UNDEF; }
 "poison" { return POISON; }
+"null" { return NULLTOKEN; }
 "add" { return ADD; }
 "mul" { return MUL; }
 "sub" { return SUB; }
