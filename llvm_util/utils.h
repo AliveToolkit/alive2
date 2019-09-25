@@ -8,6 +8,7 @@
 
 namespace llvm {
 class BasicBlock;
+class DataLayout;
 class Type;
 class Value;
 }
@@ -38,6 +39,6 @@ PRINT(llvm::Type)
 PRINT(llvm::Value)
 #undef PRINT
 
-void init_llvm_utils(std::ostream &os);
+void init_llvm_utils(std::ostream &os, const llvm::DataLayout &DL);
 void reset_state(IR::Function &f);
 }

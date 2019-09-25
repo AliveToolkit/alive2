@@ -13,9 +13,6 @@ namespace IR {
 
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this) {
-  predecessor_data[&f.getFirstBB()].try_emplace(nullptr,
-                                                DomainTy(true, set<expr>()),
-                                                *this);
   return_domain = false;
   return_val.first = f.getType().getDummyValue(false);
 }
@@ -81,6 +78,11 @@ bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
+
+  if (f.getFirstBB().getName() == bb.getName()) {
+    domain.first = true;
+    return true;
+  }
 
   auto I = predecessor_data.find(&bb);
   if (I == predecessor_data.end())
@@ -175,6 +177,35 @@ void State::addUndefVar(const expr &var) {
 void State::resetUndefVars() {
   quantified_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
+}
+
+void State::addGlobalVarBid(const string &glbvar, unsigned bid) {
+  assert(glbvar_bids.count(glbvar) == 0);
+  glbvar_bids.emplace(glbvar, bid);
+}
+
+bool State::hasGlobalVarBid(const string &glbvar,
+    unsigned &bid) const {
+  auto itr = glbvar_bids.find(glbvar);
+  bool found = itr != glbvar_bids.end();
+  if (found) {
+    bid = itr->second;
+  }
+  return found;
+}
+
+void State::copyGlobalVarBidsFromSrc(const State &src) {
+  assert(glbvar_bids.empty());
+  assert(src.isSource());
+  // Copy glbvar_bids.
+  glbvar_bids = src.glbvar_bids;
+  // Bump memory's last_bid so Memory::alloc()'s newly assigned bids never
+  // collide with this
+  unsigned maxid = 0;
+  for (const auto &itm: glbvar_bids) {
+    maxid = max(maxid, itm.second);
+  }
+  getMemory().bumpLastBid(maxid);
 }
 
 }

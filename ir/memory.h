@@ -6,6 +6,7 @@
 #include "ir/state_value.h"
 #include "ir/type.h"
 #include "smt/expr.h"
+#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -102,9 +103,13 @@ class Memory {
   smt::expr blocks_val; // array: (bid, offset) -> StateValue
   smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
+  // last_bid stores 1 + the last memory block id.
   // Block id 0 is reserved for a null block.
   // TODO: In the twin memory, there is no null block, so the initial last_bid
   // should depend on whether the twin memory is used or not.
+  // When setting last_bid to 0 to support twin memory, be careful with local
+  // id because last_bid is also used to set local bid but local bid cannot be
+  // 0.
   unsigned last_bid = 1;
   unsigned last_idx_ptr = 0;
 
@@ -115,12 +120,25 @@ class Memory {
   smt::expr mk_liveness_uf() const;
 
 public:
+  enum BlockKind {
+    HEAP, STACK, GLOBAL
+  };
+
   Memory(State &state);
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 
-  // Allocates a new local memory block.
-  smt::expr alloc(const smt::expr &size, unsigned align, bool heap);
+  // Allocates a new memory block.
+  // If bid is not specified, it creates a fresh block id by increasing
+  // last_bid.
+  // If bid is specified, the bid is used, and last_bid is not increased.
+  // In this case, it is caller's responsibility to give a unique bid, and
+  // bumpLastBid() should be called in advance to correctly do this.
+  // The newly assigned bid is stored to bid_out if bid_out != nullptr.
+  smt::expr alloc(const smt::expr &size, unsigned align, BlockKind blockKind,
+                  std::optional<unsigned> bid = std::nullopt,
+                  unsigned *bid_out = nullptr);
+
   void free(const smt::expr &ptr);
 
   void store(const smt::expr &ptr, const StateValue &val, Type &type,
@@ -140,6 +158,7 @@ public:
                      const Memory &els);
 
   unsigned bitsOffset() const { return bits_for_offset; }
+  void bumpLastBid(unsigned bid);
 
   friend class Pointer;
 };

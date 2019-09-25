@@ -8,6 +8,7 @@
 #include <ostream>
 
 namespace llvm {
+class DataLayout;
 class Function;
 class TargetLibraryInfo;
 }
@@ -15,7 +16,7 @@ class TargetLibraryInfo;
 namespace llvm_util {
 
 struct initializer {
-  initializer(std::ostream &os);
+  initializer(std::ostream &os, const llvm::DataLayout &DL);
 };
 
 std::optional<IR::Function> llvm2alive(llvm::Function &F,

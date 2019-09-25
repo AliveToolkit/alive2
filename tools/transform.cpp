@@ -305,6 +305,7 @@ Errors TransformVerify::verify() const {
 
   try {
     sym_exec(src_state);
+    tgt_state.copyGlobalVarBidsFromSrc(src_state);
     sym_exec(tgt_state);
   } catch (LoopInCFGDetected&) {
     return "Loops are not supported yet! Skipping function.";
