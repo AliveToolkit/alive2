@@ -205,14 +205,6 @@ void init_llvm_utils(ostream &os) {
   ptr_types.emplace_back(make_unique<PtrType>(0));
 }
 
-void destroy_llvm_utils() {
-  int_types.clear();
-  ptr_types.clear();
-  type_cache.clear();
-  value_names.clear();
-  identifiers.clear();
-}
-
 void reset_state(Function &f) {
   current_fn = &f;
   identifiers.clear();

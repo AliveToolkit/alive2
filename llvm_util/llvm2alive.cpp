@@ -608,10 +608,6 @@ initializer::initializer(ostream &os) {
   init_llvm_utils(os);
 }
 
-initializer::~initializer() {
-  destroy_llvm_utils();
-}
-
 optional<IR::Function> llvm2alive(llvm::Function &F,
                                   const llvm::TargetLibraryInfo &TLI) {
   return llvm2alive_(F, TLI).run();

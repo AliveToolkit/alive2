@@ -39,6 +39,5 @@ PRINT(llvm::Value)
 #undef PRINT
 
 void init_llvm_utils(std::ostream &os);
-void destroy_llvm_utils();
 void reset_state(IR::Function &f);
 }
