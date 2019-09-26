@@ -1,0 +1,5 @@
+%3 = sext i1 %1 to i65
+%4 = shl i65 %0, %3
+  =>
+%3n = zext i1 %1 to i65
+%4 = shl i65 %0, %3n
