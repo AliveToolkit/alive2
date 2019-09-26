@@ -142,8 +142,12 @@ void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
+  if (return_domain.isFalse()) {
+    return_val.first = val;
+  } else {
+    return_val.first = StateValue::mkIf(domain.first, val, return_val.first);
+  }
   return_domain |= domain.first;
-  return_val.first = StateValue::mkIf(domain.first, val, return_val.first);
   return_val.second.insert(undef_vars.begin(), undef_vars.end());
   return_val.second.insert(domain.second.begin(), domain.second.end());
   undef_vars.clear();
