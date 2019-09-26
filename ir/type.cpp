@@ -208,7 +208,7 @@ unsigned VoidType::bits() const {
 }
 
 StateValue VoidType::getDummyValue(bool non_poison) const {
-  UNREACHABLE();
+  return { false, non_poison };
 }
 
 expr VoidType::getTypeConstraints() const {

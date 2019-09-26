@@ -27,6 +27,7 @@ class Function;
 class State {
 public:
   using ValTy = std::pair<StateValue, std::set<smt::expr>>;
+  // DomainTy: (reachability from entry to this basic block, undef vars)
   using DomainTy = std::pair<smt::expr, std::set<smt::expr>>;
 
 private:
@@ -57,10 +58,10 @@ private:
   std::array<StateValue, 32> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
+  // return_domain: a boolean expression describing return condition
   smt::expr return_domain;
   // FIXME: replace with disjoint expr builder
   ValTy return_val;
-  bool returned = false;
 
 public:
   State(const Function &f, bool source);
@@ -95,7 +96,6 @@ public:
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
 
-  bool fnReturned() const { return returned; }
   auto& returnDomain() const { return return_domain; }
   auto& returnVal() const { return return_val; }
 

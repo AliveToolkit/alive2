@@ -297,11 +297,6 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
       tgt_instrs.emplace(i.getName(), &i);
     }
   }
-
-  if (!check_each_var) {
-    assert(t.src.hasReturn());
-    assert(t.tgt.hasReturn());
-  }
 }
 
 Errors TransformVerify::verify() const {
@@ -335,18 +330,10 @@ Errors TransformVerify::verify() const {
     }
   }
 
-  if (src_state.fnReturned() != tgt_state.fnReturned()) {
-    if (src_state.fnReturned())
-      errs.add("Source returns but target doesn't");
-    else
-      errs.add("Target returns but source doesn't");
-
-  } else if (src_state.fnReturned()) {
-    check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-                     src_state.returnDomain(), src_state.returnVal(),
-                     tgt_state.returnDomain(), tgt_state.returnVal(),
-                     check_each_var);
-  }
+  check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
+                   src_state.returnDomain(), src_state.returnVal(),
+                   tgt_state.returnDomain(), tgt_state.returnVal(),
+                   check_each_var);
 
   return errs;
 }

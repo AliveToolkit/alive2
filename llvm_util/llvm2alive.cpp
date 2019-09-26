@@ -596,13 +596,6 @@ public:
       }
     }
 
-    // infinite void functions may not have a return stmt in LLVM
-    if (!Fn.hasReturn()) {
-      assert(f.getReturnType()->isVoidTy());
-      Fn.getBBs().back()->addInstr(
-        make_unique<Return>(Type::voidTy, Value::voidVal));
-    }
-
     return move(Fn);
   }
 };
