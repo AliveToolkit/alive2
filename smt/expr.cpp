@@ -1084,6 +1084,32 @@ expr expr::BV2float(const expr &type) const {
   return simplify_const(Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort()), *this);
 }
 
+expr expr::fp2sint(unsigned bits) const {
+  C();
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return simplify_const(Z3_mk_fpa_to_sbv(ctx(), rm, ast(), bits), *this);
+}
+
+expr expr::fp2uint(unsigned bits) const {
+  C();
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return simplify_const(Z3_mk_fpa_to_ubv(ctx(), rm, ast(), bits), *this);
+}
+
+expr expr::sint2fp(const expr &type) const {
+  C(type);
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return simplify_const(Z3_mk_fpa_to_fp_signed(ctx(), rm, ast(), type.sort()),
+                        *this);
+}
+
+expr expr::uint2fp(const expr &type) const {
+  C(type);
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return simplify_const(Z3_mk_fpa_to_fp_unsigned(ctx(), rm, ast(), type.sort()),
+                        *this);
+}
+
 expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
   C2(range);
   auto num_args = args.size();

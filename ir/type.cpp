@@ -130,16 +130,12 @@ expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
 
-expr Type::enforceIntOrVectorType() const {
-  return false;
+expr Type::enforceIntType() const {
+  return enforceIntType(0);
 }
 
 expr Type::enforceIntOrPtrType() const {
   return enforceIntType() || enforcePtrType();
-}
-
-expr Type::enforceIntOrPtrOrVectorType() const {
-  return false;
 }
 
 expr Type::enforcePtrType() const {
@@ -156,6 +152,26 @@ expr Type::enforceAggregateType(vector<Type*> *element_types) const {
 
 expr Type::enforceFloatType() const {
   return false;
+}
+
+expr Type::enforceVectorType(expr(Type::*elementTy)() const) const {
+  return false;
+}
+
+expr Type::enforceScalarOrVectorType(expr(Type::*elementTy)() const) const {
+  return (this->*elementTy)() || enforceVectorType(elementTy);
+}
+
+expr Type::enforceIntOrVectorType() const {
+  return enforceScalarOrVectorType(&Type::enforceIntType);
+}
+
+expr Type::enforceIntOrPtrOrVectorType() const {
+  return enforceScalarOrVectorType(&Type::enforceIntOrPtrType);
+}
+
+expr Type::enforceFloatOrVectorType() const {
+  return enforceScalarOrVectorType(&Type::enforceFloatType);
 }
 
 const FloatType* Type::getAsFloatType() const {
@@ -277,14 +293,6 @@ bool IntType::isIntType() const {
 
 expr IntType::enforceIntType(unsigned bits) const {
   return bits ? sizeVar() == bits : true;
-}
-
-expr IntType::enforceIntOrVectorType() const {
-  return true;
-}
-
-expr IntType::enforceIntOrPtrOrVectorType() const {
-  return true;
 }
 
 pair<expr, expr>
@@ -473,14 +481,6 @@ void PtrType::fixup(const Model &m) {
 }
 
 bool PtrType::isPtrType() const {
-  return true;
-}
-
-expr PtrType::enforceIntOrVectorType() const {
-  return false;
-}
-
-expr PtrType::enforceIntOrPtrOrVectorType() const {
   return true;
 }
 
@@ -737,12 +737,8 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
-expr VectorType::enforceIntOrVectorType() const {
-  return children[0]->enforceIntType();
-}
-
-expr VectorType::enforceIntOrPtrOrVectorType() const {
-  return children[0]->enforceIntOrPtrType();
+expr VectorType::enforceVectorType(expr(Type::*elementTy)() const) const {
+  return (children[0]->*elementTy)();
 }
 
 void VectorType::print(ostream &os) const {
@@ -950,16 +946,6 @@ expr SymbolicType::enforceIntType(unsigned bits) const {
   return isInt() && (i ? i->enforceIntType(bits) : false);
 }
 
-expr SymbolicType::enforceIntOrVectorType() const {
-  return isInt() ||
-         (isVector() && (v ? v->enforceIntOrPtrOrVectorType() : false));
-}
-
-expr SymbolicType::enforceIntOrPtrOrVectorType() const {
-  return isInt() || isPtr() ||
-         (isVector() && (v ? v->enforceIntOrPtrOrVectorType() : false));
-}
-
 expr SymbolicType::enforcePtrType() const {
   return isPtr();
 }
@@ -976,6 +962,10 @@ expr SymbolicType::enforceAggregateType(vector<Type*> *element_types) const {
 
 expr SymbolicType::enforceFloatType() const {
   return isFloat();
+}
+
+expr SymbolicType::enforceVectorType(expr(Type::*elementTy)() const) const {
+  return v ? (isVector() && v->enforceVectorType(elementTy)) : false;
 }
 
 const FloatType* SymbolicType::getAsFloatType() const {

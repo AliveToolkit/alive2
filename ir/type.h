@@ -58,15 +58,23 @@ public:
   virtual bool isVectorType() const;
   bool isAggregateType() const;
 
-  virtual smt::expr enforceIntType(unsigned bits = 0) const;
-  virtual smt::expr enforceIntOrVectorType() const;
+  virtual smt::expr enforceIntType(unsigned bits) const;
+  smt::expr enforceIntType() const;
   smt::expr enforceIntOrPtrType() const;
-  virtual smt::expr enforceIntOrPtrOrVectorType() const;
   virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
   virtual smt::expr enforceAggregateType(
     std::vector<Type*> *element_types = nullptr) const;
   virtual smt::expr enforceFloatType() const;
+
+  virtual smt::expr enforceVectorType(
+    smt::expr (Type::*elementTy)() const) const;
+  smt::expr enforceScalarOrVectorType(
+    smt::expr(Type::*elementTy)() const) const;
+
+  smt::expr enforceIntOrVectorType() const;
+  smt::expr enforceIntOrPtrOrVectorType() const;
+  smt::expr enforceFloatOrVectorType() const;
 
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
@@ -130,8 +138,6 @@ public:
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
-  smt::expr enforceIntOrVectorType() const override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
@@ -193,8 +199,6 @@ public:
   smt::expr sameType(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isPtrType() const override;
-  smt::expr enforceIntOrVectorType() const override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
@@ -262,8 +266,8 @@ public:
 
   smt::expr getTypeConstraints() const override;
   bool isVectorType() const override;
-  smt::expr enforceIntOrVectorType() const override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
+  smt::expr
+    enforceVectorType(smt::expr(Type::*elementTy)() const) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -311,13 +315,13 @@ public:
   bool isStructType() const override;
   bool isVectorType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
-  smt::expr enforceIntOrVectorType() const override;
-  smt::expr enforceIntOrPtrOrVectorType() const override;
   smt::expr enforcePtrType() const override;
   smt::expr enforceStructType() const override;
   smt::expr enforceAggregateType(
     std::vector<Type*> *element_types) const override;
   smt::expr enforceFloatType() const override;
+  smt::expr
+    enforceVectorType(smt::expr(Type:: *elementTy)() const) const override;
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;

@@ -236,6 +236,7 @@ space+ {
 "fdiv" { return FDIV; }
 "frem" { return FREM; }
 "fcmp" { return FCMP; }
+"fneg" { return FNEG; }
 "oeq" { return OEQ; }
 "ogt" { return OGT; }
 "oge" { return OGE; }
@@ -246,7 +247,10 @@ space+ {
 "ueq" { return UEQ; }
 "une" { return UNE; }
 "uno" { return UNO; }
-"fneg" { return FNEG; }
+"fptosi" { return FPTOSI; }
+"fptoui" { return FPTOUI; }
+"sitofp" { return SITOFP; }
+"uitofp" { return UITOFP; }
 "half" { return HALF;}
 "float" { return FLOAT;}
 "double" { return DOUBLE;}

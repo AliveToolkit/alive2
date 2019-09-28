@@ -155,6 +155,10 @@ public:
     case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
     case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
     case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
+    case llvm::Instruction::SIToFP:   op = ConversionOp::SIntToFP; break;
+    case llvm::Instruction::UIToFP:   op = ConversionOp::UIntToFP; break;
+    case llvm::Instruction::FPToSI:   op = ConversionOp::FPToSInt; break;
+    case llvm::Instruction::FPToUI:   op = ConversionOp::FPToUInt; break;
     case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
     case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
     default:

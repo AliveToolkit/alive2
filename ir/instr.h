@@ -100,7 +100,8 @@ public:
 
 class ConversionOp final : public Instr {
 public:
-  enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
+  enum Op { SExt, ZExt, Trunc, BitCast, SIntToFP, UIntToFP, FPToSInt, FPToUInt,
+            Ptr2Int, Int2Ptr };
 
 private:
   Value *val;
@@ -350,7 +351,6 @@ public:
 };
 
 
-// TODO: only supports alloca for now
 class Alloc final : public Instr {
   Value *size;
   unsigned align;
@@ -365,6 +365,7 @@ public:
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
+
 
 class Malloc final : public Instr {
   Value *size;

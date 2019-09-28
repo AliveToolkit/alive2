@@ -740,6 +740,10 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   case SEXT:    op = ConversionOp::SExt; break;
   case ZEXT:    op = ConversionOp::ZExt; break;
   case TRUNC:   op = ConversionOp::Trunc; break;
+  case SITOFP:  op = ConversionOp::SIntToFP; break;
+  case UITOFP:  op = ConversionOp::UIntToFP; break;
+  case FPTOSI:  op = ConversionOp::FPToSInt; break;
+  case FPTOUI:  op = ConversionOp::FPToUInt; break;
   default:
     UNREACHABLE();
   }
@@ -939,6 +943,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SEXT:
   case ZEXT:
   case TRUNC:
+  case SITOFP:
+  case UITOFP:
+  case FPTOSI:
+  case FPTOUI:
     return parse_conversionop(name, t);
   case SELECT:
     return parse_select(name);
@@ -966,6 +974,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case REGISTER:
     return parse_copyop(name, t);
   default:
+    tokenizer.unget(t);
     return nullptr;
   }
   UNREACHABLE();
@@ -1008,8 +1017,9 @@ static void parse_fn(Function &f) {
 
       auto i = parse_instr(name);
       if (!i) {
-        tokenizer.unget(t);
-        goto exit;
+        if (name.empty())
+          goto exit;
+        error("Instruction expected", *tokenizer);
       }
 
       if (!name.empty()) {

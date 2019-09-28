@@ -536,12 +536,16 @@ void ConversionOp::rauw(const Value &what, Value &with) {
 void ConversionOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case SExt:    str = "sext "; break;
-  case ZExt:    str = "zext "; break;
-  case Trunc:   str = "trunc "; break;
-  case BitCast: str = "bitcast "; break;
-  case Ptr2Int: str = "ptrtoint "; break;
-  case Int2Ptr: str = "int2ptr "; break;
+  case SExt:     str = "sext "; break;
+  case ZExt:     str = "zext "; break;
+  case Trunc:    str = "trunc "; break;
+  case BitCast:  str = "bitcast "; break;
+  case SIntToFP: str = "sitofp "; break;
+  case UIntToFP: str = "uitofp "; break;
+  case FPToSInt: str = "fptosi "; break;
+  case FPToUInt: str = "fptoui "; break;
+  case Ptr2Int:  str = "ptrtoint "; break;
+  case Int2Ptr:  str = "int2ptr "; break;
   }
 
   os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
@@ -574,6 +578,18 @@ StateValue ConversionOp::toSMT(State &s) const {
     else
       UNREACHABLE();
     break;
+  case SIntToFP:
+    newval = v.sint2fp(getType().getDummyValue(false).value);
+    break;
+  case UIntToFP:
+    newval = v.uint2fp(getType().getDummyValue(false).value);
+    break;
+  case FPToSInt:
+    newval = v.fp2sint(to_bw);
+    break;
+  case FPToUInt:
+    newval = v.fp2uint(to_bw);
+    break;
   case Ptr2Int:
     newval = s.getMemory().ptr2int(v).zextOrTrunc(getType().bits());
     break;
@@ -602,6 +618,17 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
     // FIXME: input can only be ptr if result is a ptr as well
     c = getType().enforceIntOrPtrOrVectorType() &&
         getType().sizeVar() == val->getType().sizeVar();
+    break;
+  case SIntToFP:
+  case UIntToFP:
+    // FIXME: output is vector iff input is vector
+    c = getType().enforceFloatOrVectorType() &&
+        val->getType().enforceIntOrVectorType();
+    break;
+  case FPToSInt:
+  case FPToUInt:
+    c = getType().enforceIntOrVectorType() &&
+        val->getType().enforceFloatOrVectorType();
     break;
   case Ptr2Int:
     c = getType().enforceIntType() &&

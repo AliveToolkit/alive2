@@ -1,0 +1,19 @@
+Name: sitofp
+%r = sitofp -1
+  =>
+%r = -1.0
+
+Name: uitofp
+%r = uitofp i8 -1
+  =>
+%r = 255.0
+
+Name: sitofp
+%r = fptosi -1.0
+  =>
+%r = -1
+
+Name: sitofp
+%r = fptoui 255.0 to i8
+  =>
+%r = -1
