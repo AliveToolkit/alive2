@@ -171,6 +171,7 @@ public:
   expr fsub(const expr &rhs) const;
   expr fmul(const expr &rhs) const;
   expr fdiv(const expr &rhs) const;
+  expr fneg() const;
 
   expr foeq(const expr &rhs) const;
   expr fogt(const expr &rhs) const;
@@ -186,7 +187,6 @@ public:
   expr fule(const expr &rhs) const;
   expr fune(const expr &rhs) const;
   expr funo(const expr &rhs) const;
-  expr fneg() const;
 
   expr operator&(const expr &rhs) const;
   expr operator|(const expr &rhs) const;

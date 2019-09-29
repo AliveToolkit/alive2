@@ -702,6 +702,10 @@ expr expr::fdiv(const expr &rhs) const {
   return Z3_mk_fpa_div(ctx(), rm, ast(), rhs());
 }
 
+expr expr::fneg() const {
+  return unop_fold(Z3_mk_fpa_neg);
+}
+
 expr expr::foeq(const expr &rhs) const {
   return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_eq);
 }
@@ -758,10 +762,6 @@ expr expr::funo(const expr &rhs) const {
   return !ford(rhs());
 }
 
-expr expr::fneg() const {
-  return unop_fold(Z3_mk_fpa_neg);
-}
-
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
@@ -806,6 +806,10 @@ expr expr::operator|(const expr &rhs) const {
 expr expr::operator^(const expr &rhs) const {
   if (eq(rhs))
     return mkUInt(0, sort());
+  if (isAllOnes())
+    return ~rhs;
+  if (rhs.isAllOnes())
+    return ~*this;
   return binopc(Z3_mk_bvxor, isZero, alwaysFalse);
 }
 
@@ -823,8 +827,7 @@ expr expr::operator!() const {
 }
 
 expr expr::operator~() const {
-  C();
-  return mkInt(-1, sort()) - *this;
+  return unop_fold(Z3_mk_bvnot);
 }
 
 expr expr::operator==(const expr &rhs) const {
