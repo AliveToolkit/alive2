@@ -97,11 +97,12 @@ class Solver {
   bool valid = true;
   using E = std::pair<expr, std::function<void(const Result &r)>>;
 public:
-  Solver();
+  Solver(bool simple = false);
   ~Solver();
 
   void add(const expr &e);
-  void block(const Model &m, bool minimize = false);
+  // use a negated solver for minimization
+  void block(const Model &m, Solver *sneg = nullptr);
   void reset();
 
   expr assertions() const;

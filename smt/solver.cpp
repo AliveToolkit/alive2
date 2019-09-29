@@ -218,8 +218,9 @@ void solver_tactic_verbose(bool yes) {
   tactic_verbose = yes;
 }
 
-Solver::Solver() {
-  s = Z3_mk_solver_from_tactic(ctx(), tactic->t);
+Solver::Solver(bool simple) {
+  s = simple ? Z3_mk_simple_solver(ctx())
+             : Z3_mk_solver_from_tactic(ctx(), tactic->t);
   Z3_solver_inc_ref(ctx(), s);
 }
 
@@ -237,25 +238,22 @@ void Solver::add(const expr &e) {
   }
 }
 
-void Solver::block(const Model &m, bool minimize) {
+void Solver::block(const Model &m, Solver *sneg) {
   set<expr> assignments;
   for (const auto &[var, val] : m) {
     assignments.insert(var == val);
   }
 
-  if (minimize) {
+  if (sneg) {
     // simple left-to-right variable discard algorithm
-    Solver s;
-    s.add(!assertions());
-
     for (auto I = assignments.begin(); I != assignments.end(); ) {
-      SolverPush push(s);
+      SolverPush push(*sneg);
       expr val = *I;
       I = assignments.erase(I);
 
-      s.add(expr::mk_and(assignments));
-      if (!s.check().isUnsat())
-        assignments.insert(val);
+      sneg->add(expr::mk_and(assignments));
+      if (!sneg->check().isUnsat())
+        assignments.insert(move(val));
     }
   }
 

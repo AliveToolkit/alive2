@@ -339,12 +339,13 @@ Errors TransformVerify::verify() const {
 }
 
 
-TypingAssignments::TypingAssignments(const expr &e) {
+TypingAssignments::TypingAssignments(const expr &e) : s(true), sneg(true) {
   if (e.isTrue()) {
     has_only_one_solution = true;
   } else {
     EnableSMTQueriesTMP tmp;
     s.add(e);
+    sneg.add(!e);
     r = s.check();
   }
 }
@@ -358,7 +359,7 @@ void TypingAssignments::operator++(void) {
     is_unsat = true;
   } else {
     EnableSMTQueriesTMP tmp;
-    s.block(r.getModel(), /*minimize=*/true);
+    s.block(r.getModel(), &sneg);
     r = s.check();
     assert(!r.isUnknown());
   }

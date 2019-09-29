@@ -28,7 +28,7 @@ struct Transform {
 
 
 class TypingAssignments {
-  smt::Solver s;
+  smt::Solver s, sneg;
   smt::Result r;
   bool has_only_one_solution = false;
   bool is_unsat = false;
