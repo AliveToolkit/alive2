@@ -12,8 +12,7 @@ using namespace std;
 namespace IR {
 
 State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this) {
-  return_domain = false;
+  : f(f), source(source), memory(*this), return_domain(false) {
   return_val.first = f.getType().getDummyValue(false);
 }
 
@@ -124,7 +123,8 @@ void State::addJump(const BasicBlock &dst, expr &&cond) {
     p.first->second.first.first  = move(cond);
     p.first->second.first.second = undef_vars;
   }
-  p.first->second.first.second.insert(domain.second.begin(), domain.second.end());
+  p.first->second.first.second.insert(domain.second.begin(),
+                                      domain.second.end());
 }
 
 void State::addJump(const BasicBlock &dst) {
@@ -180,12 +180,10 @@ void State::resetUndefVars() {
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {
-  assert(glbvar_bids.count(glbvar) == 0);
-  glbvar_bids.emplace(glbvar, bid);
+  ENSURE(glbvar_bids.emplace(glbvar, bid).second);
 }
 
-bool State::hasGlobalVarBid(const string &glbvar,
-    unsigned &bid) const {
+bool State::hasGlobalVarBid(const string &glbvar, unsigned &bid) const {
   auto itr = glbvar_bids.find(glbvar);
   bool found = itr != glbvar_bids.end();
   if (found) {

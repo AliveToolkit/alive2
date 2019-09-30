@@ -268,6 +268,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   state->addPre(p.block_size() == size_zextOrTrunced);
   // TODO: If its address space is not 0, its address can be 0.
   state->addPre(p.get_address() != 0);
+  // TODO: address of new blocks should be disjoint from other live blocks
 
   if (is_local) {
     // Initially there was no such block, now it is allocated.
@@ -279,7 +280,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     state->addPre(mk_liveness_uf().load(p.get_bid()));
   }
   blocks_kind = blocks_kind.store(p.get_bid(),
-      expr::mkUInt(blockKind == HEAP, 1));
+                                  expr::mkUInt(blockKind == HEAP, 1));
 
   return p();
 }

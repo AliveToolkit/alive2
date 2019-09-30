@@ -171,9 +171,9 @@ Value* get_operand(llvm::Value *v) {
   }
 
   if (auto gv = dyn_cast<llvm::GlobalVariable>(v)) {
-    auto itr = globalvars.find(gv);
-    if (itr != globalvars.end())
-      return itr->second;
+    auto &gvar = globalvars[gv];
+    if (gvar)
+      return gvar;
 
     if (gv->getValueType()->isArrayTy()) {
       // TODO: Array type of a global variable is not supported.
@@ -191,9 +191,9 @@ Value* get_operand(llvm::Value *v) {
     int align = gv->getAlignment();
     auto name = "@" + gv->getName().str();
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
-        initval);
+                                           initval);
     auto ret = val.get();
-    globalvars[gv] = ret;
+    gvar = ret;
     current_fn->addConstant(move(val));
     return ret;
   }
