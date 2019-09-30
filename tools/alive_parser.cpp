@@ -736,14 +736,15 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
 
   ConversionOp::Op op;
   switch (op_token) {
-  case BITCAST: op = ConversionOp::BitCast; break;
-  case SEXT:    op = ConversionOp::SExt; break;
-  case ZEXT:    op = ConversionOp::ZExt; break;
-  case TRUNC:   op = ConversionOp::Trunc; break;
-  case SITOFP:  op = ConversionOp::SIntToFP; break;
-  case UITOFP:  op = ConversionOp::UIntToFP; break;
-  case FPTOSI:  op = ConversionOp::FPToSInt; break;
-  case FPTOUI:  op = ConversionOp::FPToUInt; break;
+  case BITCAST:  op = ConversionOp::BitCast; break;
+  case SEXT:     op = ConversionOp::SExt; break;
+  case ZEXT:     op = ConversionOp::ZExt; break;
+  case TRUNC:    op = ConversionOp::Trunc; break;
+  case SITOFP:   op = ConversionOp::SIntToFP; break;
+  case UITOFP:   op = ConversionOp::UIntToFP; break;
+  case FPTOSI:   op = ConversionOp::FPToSInt; break;
+  case FPTOUI:   op = ConversionOp::FPToUInt; break;
+  case PTRTOINT: op = ConversionOp::Ptr2Int; break;
   default:
     UNREACHABLE();
   }
@@ -888,7 +889,7 @@ static unique_ptr<Instr> parse_malloc(string_view name) {
   auto &op = parse_operand(ty);
   // Malloc returns a pointer at address space 0
   Type &pointer_type = get_pointer_type(0);
-  return make_unique<Malloc>(pointer_type, string(name), op);
+  return make_unique<Malloc>(pointer_type, string(name), op, false);
 }
 
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {
@@ -947,6 +948,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case UITOFP:
   case FPTOSI:
   case FPTOUI:
+  case PTRTOINT:
     return parse_conversionop(name, t);
   case SELECT:
     return parse_select(name);

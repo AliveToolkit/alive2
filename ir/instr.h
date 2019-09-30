@@ -369,9 +369,12 @@ public:
 
 class Malloc final : public Instr {
   Value *size;
+  // Is this malloc (or equivalent operation, like new()) never returning
+  // null?
+  bool isNonNull;
 public:
-  Malloc(Type &type, std::string &&name, Value &size)
-    : Instr(type, std::move(name)), size(&size) {}
+  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
+    : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

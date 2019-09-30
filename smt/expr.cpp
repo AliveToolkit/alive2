@@ -216,6 +216,10 @@ expr expr::mkDoubleVar(const char *name) {
   return ::mkVar(name, Z3_mk_fpa_sort_double(ctx()));
 }
 
+expr expr::mkFreshVar(const char *prefix, const expr &type) {
+  return Z3_mk_fresh_const(ctx(), prefix, type.sort());
+}
+
 expr expr::IntSMin(unsigned bits) {
   if (bits == 0)
     return {};
