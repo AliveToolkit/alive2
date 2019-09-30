@@ -82,6 +82,25 @@ public:
 };
 
 
+class GlobalVariable final : public Value {
+  // The size of this global variable (in bytes)
+  int allocsize;
+  // Alignment of this global variable
+  int align;
+  // Initial value stored at this global variable.
+  // This is initialized only if the global is constant.
+  // If it has no initial value, this is nullptr.
+  Value *initval;
+public:
+  GlobalVariable(Type &type, std::string &&name, int allocsize, int align,
+                 Value *initval) :
+    Value(type, std::move(name)), allocsize(allocsize), align(align),
+    initval(initval) {}
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+};
+
+
 class Input final : public Value {
 public:
   Input(Type &type, std::string &&name) :

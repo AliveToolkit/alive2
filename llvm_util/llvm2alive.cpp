@@ -607,9 +607,9 @@ public:
 
 namespace llvm_util {
 
-initializer::initializer(ostream &os) {
+initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
   out = &os;
-  init_llvm_utils(os);
+  init_llvm_utils(os, DL);
 }
 
 optional<IR::Function> llvm2alive(llvm::Function &F,

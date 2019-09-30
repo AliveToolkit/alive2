@@ -1349,7 +1349,7 @@ void Alloc::print(std::ostream &os) const {
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   s.addUB(np);
-  return { s.getMemory().alloc(sz, align, false), true };
+  return { s.getMemory().alloc(sz, align, Memory::STACK), true };
 }
 
 expr Alloc::getTypeConstraints(const Function &f) const {
@@ -1379,7 +1379,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   s.addUB(np);
   // TODO: malloc's alignment is implementation defined.
-  return { s.getMemory().alloc(sz, 8, true), true };
+  return { s.getMemory().alloc(sz, 8, Memory::HEAP), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {

@@ -88,7 +88,31 @@ StateValue NullPointerValue::toSMT(State &s) const {
 }
 
 
-void Input::print(std::ostream &os) const {
+void GlobalVariable::print(ostream &os) const {
+  UNREACHABLE();
+}
+
+StateValue GlobalVariable::toSMT(State &s) const {
+  auto sizeexpr = expr::mkInt(allocsize, 64);
+  expr ptrval;
+  unsigned glbvar_bid;
+  if (s.hasGlobalVarBid(getName(), glbvar_bid)) {
+    // Use the same block id that is used by src
+    assert(!s.isSource());
+    ptrval = s.getMemory().alloc(sizeexpr, align, Memory::GLOBAL, glbvar_bid);
+  } else {
+    ptrval = s.getMemory().alloc(sizeexpr, align, Memory::GLOBAL, nullopt,
+                                 &glbvar_bid);
+    s.addGlobalVarBid(getName(), glbvar_bid);
+  }
+  if (initval) {
+    s.getMemory().store(ptrval, s[*initval], getType(), align);
+  }
+  return { move(ptrval), true };
+}
+
+
+void Input::print(ostream &os) const {
   UNREACHABLE();
 }
 

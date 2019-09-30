@@ -186,7 +186,7 @@ struct TVPass : public llvm::FunctionPass {
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
 
-    llvm_util_init.emplace(*out);
+    llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();
     return false;
   }

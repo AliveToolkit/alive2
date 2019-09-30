@@ -5,7 +5,9 @@
 #include "ir/constant.h"
 #include "ir/function.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,8 +34,11 @@ unsigned type_id_counter; // for unamed types
 
 Function *current_fn;
 unordered_map<const llvm::Value*, Value*> identifiers;
+unordered_map<const llvm::GlobalVariable*, GlobalVariable*> globalvars;
 
 ostream *out;
+
+const llvm::DataLayout *DL;
 
 }
 
@@ -165,6 +170,34 @@ Value* get_operand(llvm::Value *v) {
     return ret;
   }
 
+  if (auto gv = dyn_cast<llvm::GlobalVariable>(v)) {
+    auto itr = globalvars.find(gv);
+    if (itr != globalvars.end())
+      return itr->second;
+
+    if (gv->getValueType()->isArrayTy()) {
+      // TODO: Array type of a global variable is not supported.
+      return nullptr;
+    } else if (auto st = dyn_cast<llvm::StructType>(gv->getValueType())) {
+      if (st->isOpaque())
+        // TODO: Global variable of opaque type is not supported.
+        return nullptr;
+    }
+    Value *initval = nullptr;
+    if (gv->hasInitializer() && gv->isConstant()) {
+      initval = get_operand(gv->getInitializer());
+    }
+    int size = DL->getTypeAllocSize(gv->getValueType());
+    int align = gv->getAlignment();
+    auto name = "@" + gv->getName().str();
+    auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
+        initval);
+    auto ret = val.get();
+    globalvars[gv] = ret;
+    current_fn->addConstant(move(val));
+    return ret;
+  }
+
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
     vector<Value*> vals;
     for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
@@ -197,18 +230,20 @@ PRINT(llvm::Value)
 #undef PRINT
 
 
-void init_llvm_utils(ostream &os) {
+void init_llvm_utils(ostream &os, const llvm::DataLayout &dataLayout) {
   out = &os;
   type_id_counter = 0;
   int_types.resize(65);
   int_types[1] = make_unique<IntType>("i1", 1);
   ptr_types.emplace_back(make_unique<PtrType>(0));
+  DL = &dataLayout;
 }
 
 void reset_state(Function &f) {
   current_fn = &f;
   identifiers.clear();
   value_names.clear();
+  globalvars.clear();
   value_id_counter = 0;
 }
 

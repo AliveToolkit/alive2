@@ -51,6 +51,9 @@ private:
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
+  // Global variables' memory block ids
+  std::unordered_map<std::string, unsigned> glbvar_bids;
+
   // temp state
   DomainTy domain;
   Memory memory;
@@ -103,6 +106,12 @@ public:
 
   // whether this is source or target program
   bool isSource() const { return source; }
+
+  void addGlobalVarBid(const std::string &glbvar, unsigned bid);
+  // Checks whether glbvar has block id assigned.
+  // If it has, bid is updated with the block id.
+  bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid) const;
+  void copyGlobalVarBidsFromSrc(const State &src);
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

@@ -199,7 +199,6 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                   "Alive2 stand-alone translation validator\n");
 
-  llvm_util::initializer llvm_util_init(cerr);
   smt::smt_initializer smt_init;
   TransformPrintOpts print_opts;
 
@@ -232,6 +231,9 @@ int main(int argc, char **argv) {
 
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
   auto TLI = llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(*F1);
+  auto &DL = M1->getDataLayout();
+
+  llvm_util::initializer llvm_util_init(cerr, DL);
 
   auto Func1 = llvm2alive(*F1, TLI);
   if (!Func1)

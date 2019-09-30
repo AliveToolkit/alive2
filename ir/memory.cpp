@@ -248,16 +248,38 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   return { Pointer(*this, offset, local_bid, bid).release(), { var } };
 }
 
-expr Memory::alloc(const expr &size, unsigned align, bool heap) {
-  Pointer p(*this, ++last_bid, true);
+expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
+                   optional<unsigned> bidopt, unsigned *bid_out) {
+  unsigned bid = bidopt ? *bidopt : last_bid;
+  if (!bidopt)
+    last_bid++;
+  assert(bid < last_bid);
+
+  if (bid_out)
+    *bid_out = bid;
+
+  // It is allocated as a local block if blockKind is heap or stack.
+  bool is_local = blockKind != GLOBAL;
+
+  Pointer p(*this, bid, is_local);
   state->addPre(p.is_aligned(align));
 
   expr size_zextOrTrunced = size.zextOrTrunc(bits_size_t);
   state->addPre(p.block_size() == size_zextOrTrunced);
+  // TODO: If its address space is not 0, its address can be 0.
+  state->addPre(p.get_address() != 0);
 
-  state->addPre(!mk_liveness_uf().load(p.get_bid()));
-  blocks_liveness = blocks_liveness.store(p.get_bid(), true);
-  blocks_kind = blocks_kind.store(p.get_bid(), expr::mkUInt(heap, 1));
+  if (is_local) {
+    // Initially there was no such block, now it is allocated.
+    state->addPre(!mk_liveness_uf().load(p.get_bid()));
+    blocks_liveness = blocks_liveness.store(p.get_bid(), true);
+  } else {
+    // The memory block was initially alive.
+    // TODO: const global variables should be read-only
+    state->addPre(mk_liveness_uf().load(p.get_bid()));
+  }
+  blocks_kind = blocks_kind.store(p.get_bid(),
+      expr::mkUInt(blockKind == HEAP, 1));
 
   return p();
 }
@@ -384,6 +406,11 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.last_bid     = max(then.last_bid, els.last_bid);
   ret.last_idx_ptr = max(then.last_idx_ptr, els.last_idx_ptr);
   return ret;
+}
+
+void Memory::bumpLastBid(unsigned bid) {
+  assert(last_bid <= bid + 1);
+  last_bid = bid + 1;
 }
 
 }
