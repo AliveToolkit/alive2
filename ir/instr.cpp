@@ -396,40 +396,35 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fadd(b.value), flags);
+      auto non_poison = !fm_poison(a.value, b.value, a.value.fadd(b.value), flags);
       return { a.value.fadd(b.value), move(non_poison) };
     };
     break;
 
   case FSub:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fsub(b.value), flags);
+      auto non_poison = !fm_poison(a.value, b.value, a.value.fsub(b.value), flags);
       return { a.value.fsub(b.value), move(non_poison) };
     };
     break;
 
   case FMul:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fmul(b.value), flags);
+      auto non_poison = !fm_poison(a.value, b.value, a.value.fmul(b.value), flags);
       return { a.value.fmul(b.value), move(non_poison) };
     };
     break;
 
   case FDiv:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fdiv(b.value), flags);
+      auto non_poison = !fm_poison(a.value, b.value, a.value.fdiv(b.value), flags);
       return { a.value.fdiv(b.value), move(non_poison) };
     };
     break;
 
   case FRem:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, expr(), flags);
+      auto non_poison = !fm_poison(a.value, b.value, expr(), flags);
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       return { expr(), move(non_poison) };
     };
