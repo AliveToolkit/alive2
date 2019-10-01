@@ -170,13 +170,14 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
 }
 
 StateValue BinOp::toSMT(State &s) const {
+  bool use_default_poison = true;
   std::function<StateValue(const StateValue&,
-                           const StateValue&, Type&)> scalar_op;
+                           const StateValue&, Type&)> scalar_partial, scalar_op;
 
   switch (op) {
   case Add:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.value.add_no_soverflow(b.value);
       if (flags & NUW)
@@ -186,8 +187,8 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case Sub:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.value.sub_no_soverflow(b.value);
       if (flags & NUW)
@@ -197,8 +198,8 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case Mul:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.value.sub_no_soverflow(b.value);
       if (flags & NUW)
@@ -208,18 +209,18 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SDiv:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      expr non_poison = true;
       div_ub(s, a.value, b.value, a.non_poison, b.non_poison, true);
       if (flags & Exact)
-        non_poison &= a.value.sdiv_exact(b.value);
+        non_poison = a.value.sdiv_exact(b.value);
       return { a.value.sdiv(b.value), move(non_poison) };
     };
     break;
 
   case UDiv:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      expr non_poison = true;
       div_ub(s, a.value, b.value, a.non_poison, b.non_poison, false);
       if (flags & Exact)
         non_poison &= a.value.udiv_exact(b.value);
@@ -228,25 +229,22 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SRem:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       div_ub(s, a.value, b.value, a.non_poison, b.non_poison, true);
-      return { a.value.srem(b.value), move(non_poison) };
+      return { a.value.srem(b.value), true };
     };
     break;
 
   case URem:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       div_ub(s, a.value, b.value, a.non_poison, b.non_poison, false);
-      return { a.value.urem(b.value), move(non_poison) };
+      return { a.value.urem(b.value), true };
     };
     break;
 
   case Shl:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= b.value.ult(b.value.bits());
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      auto non_poison = b.value.ult(b.value.bits());
       if (flags & NSW)
         non_poison &= a.value.shl_no_soverflow(b.value);
       if (flags & NUW)
@@ -257,9 +255,8 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case AShr:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= b.value.ult(b.value.bits());
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      auto non_poison = b.value.ult(b.value.bits());
       if (flags & Exact)
         non_poison &= a.value.ashr_exact(b.value);
       return { a.value.ashr(b.value), move(non_poison) };
@@ -267,9 +264,8 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case LShr:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= b.value.ult(b.value.bits());
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      auto non_poison = b.value.ult(b.value.bits());
       if (flags & Exact)
         non_poison &= a.value.lshr_exact(b.value);
       return { a.value.lshr(b.value), move(non_poison) };
@@ -277,119 +273,129 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SAdd_Sat:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value.sadd_sat(b.value),  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value.sadd_sat(b.value), true };
     };
     break;
 
   case UAdd_Sat:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value.uadd_sat(b.value),  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value.uadd_sat(b.value), true };
     };
     break;
 
   case SSub_Sat:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value.ssub_sat(b.value),  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value.ssub_sat(b.value), true };
     };
     break;
 
   case USub_Sat:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value.usub_sat(b.value),  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value.usub_sat(b.value), true };
     };
     break;
 
   case And:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value & b.value,  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value & b.value, true };
     };
     break;
 
   case Or:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value | b.value,  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value | b.value, true };
     };
     break;
 
   case Xor:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      return { a.value ^ b.value,  a.non_poison && b.non_poison };
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      return { a.value ^ b.value, true };
     };
     break;
 
   case Cttz:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= (b.value == 0u || a.value != 0u);
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      auto non_poison = (b.value == 0u || a.value != 0u);
       return { a.value.cttz(), move(non_poison) };
     };
     break;
 
   case Ctlz:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= (b.value == 0u || a.value != 0u);
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
+      auto non_poison = (b.value == 0u || a.value != 0u);
       return { a.value.ctlz(), move(non_poison) };
     };
     break;
 
   case SAdd_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value + b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.add_no_soverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.add_no_soverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case UAdd_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value + b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.add_no_uoverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.add_no_uoverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case SSub_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value - b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.sub_no_soverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.sub_no_soverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case USub_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value - b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.sub_no_uoverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.sub_no_uoverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case SMul_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value * b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.mul_no_soverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.mul_no_soverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case UMul_Overflow:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    use_default_poison = false;
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       vector<StateValue> vals = { { a.value * b.value, expr(non_poison) } };
-      vals.emplace_back((!a.value.mul_no_uoverflow(b.value)).toBVBool(), move(non_poison));
+      vals.emplace_back((!a.value.mul_no_uoverflow(b.value)).toBVBool(),
+                        move(non_poison));
       return t.getAsAggregateType()->aggregateVals(vals);
     };
     break;
 
   case FAdd:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       non_poison &= !fm_poison(a.value, b.value, a.value.fadd(b.value), flags);
       return { a.value.fadd(b.value), move(non_poison) };
@@ -397,7 +403,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FSub:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       non_poison &= !fm_poison(a.value, b.value, a.value.fsub(b.value), flags);
       return { a.value.fsub(b.value), move(non_poison) };
@@ -405,7 +411,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FMul:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       non_poison &= !fm_poison(a.value, b.value, a.value.fmul(b.value), flags);
       return { a.value.fmul(b.value), move(non_poison) };
@@ -413,7 +419,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FDiv:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       non_poison &= !fm_poison(a.value, b.value, a.value.fdiv(b.value), flags);
       return { a.value.fdiv(b.value), move(non_poison) };
@@ -421,7 +427,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FRem:
-    scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       auto non_poison = a.non_poison && b.non_poison;
       non_poison &= !fm_poison(a.value, b.value, expr(), flags);
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
@@ -429,6 +435,12 @@ StateValue BinOp::toSMT(State &s) const {
     };
     break;
   }
+
+  scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
+    auto [v, p] = scalar_partial(a, b, t);
+    auto dp = a.non_poison && b.non_poison;
+    return { move(v), use_default_poison ? dp && p : p };
+  };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
