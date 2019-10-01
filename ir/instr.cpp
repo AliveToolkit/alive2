@@ -316,15 +316,15 @@ StateValue BinOp::toSMT(State &s) const {
 
   case Cttz:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = (b.value == 0u || a.value != 0u);
-      return { a.value.cttz(), move(non_poison) };
+      return { a.value.cttz(),
+               b.value == 0u || a.value != 0u };
     };
     break;
 
   case Ctlz:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = (b.value == 0u || a.value != 0u);
-      return { a.value.ctlz(), move(non_poison) };
+      return { a.value.ctlz(),
+               b.value == 0u || a.value != 0u };
     };
     break;
 
@@ -396,60 +396,59 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fadd(b.value), flags);
-      return { a.value.fadd(b.value), move(non_poison) };
+      auto val = a.value.fadd(b.value);
+      auto non_poison = !fm_poison(a.value, b.value, val, flags);
+      return { move(val), move(non_poison) };
     };
     break;
 
   case FSub:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fsub(b.value), flags);
-      return { a.value.fsub(b.value), move(non_poison) };
+      auto val = a.value.fsub(b.value);
+      auto non_poison = !fm_poison(a.value, b.value, val, flags);
+      return { move(val), move(non_poison) };
     };
     break;
 
   case FMul:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fmul(b.value), flags);
-      return { a.value.fmul(b.value), move(non_poison) };
+      auto val = a.value.fmul(b.value);
+      auto non_poison = !fm_poison(a.value, b.value, val, flags);
+      return { move(val), move(non_poison) };
     };
     break;
 
   case FDiv:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, a.value.fdiv(b.value), flags);
-      return { a.value.fdiv(b.value), move(non_poison) };
+      auto val = a.value.fdiv(b.value);
+      auto non_poison = !fm_poison(a.value, b.value, val, flags);
+      return { move(val), move(non_poison) };
     };
     break;
 
   case FRem:
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
-      auto non_poison = a.non_poison && b.non_poison;
-      non_poison &= !fm_poison(a.value, b.value, expr(), flags);
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      return { expr(), move(non_poison) };
+      auto val = expr();
+      auto non_poison = !fm_poison(a.value, b.value, val, flags);
+      return { move(val), move(non_poison) };
     };
     break;
   }
 
   scalar_op = [&](auto a, auto b, auto &t) -> StateValue {
     auto [v, p] = scalar_partial(a, b, t);
-    auto dp = a.non_poison && b.non_poison;
-    return { move(v), use_default_poison ? dp && p : p };
+    return { move(v),
+             use_default_poison ? a.non_poison && b.non_poison && p : move(p) };
   };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto aty = getType().getAsAggregateType();
-    for (unsigned i = 0 ; i < aty->numElementsConst(); ++i) {
+    for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
       auto a_i = aty->extract(s[*lhs], i);
       auto b_i = aty->extract(s[*rhs], i);
-      auto &cty = aty->getChild(i);
-      vals.emplace_back(scalar_op(a_i, b_i, cty));
+      vals.emplace_back(scalar_op(a_i, b_i, aty->getChild(i)));
     }
     return aty->aggregateVals(vals);
   }
