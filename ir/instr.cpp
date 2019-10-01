@@ -437,12 +437,12 @@ StateValue BinOp::toSMT(State &s) const {
       auto a_i = aty->extract(s[*lhs], i);
       auto b_i = aty->extract(s[*rhs], i);
       auto &cty = aty->getChild(i);
-      vals.emplace_back(scalar_op(move(a_i), move(b_i), cty));
+      vals.emplace_back(scalar_op(a_i, b_i, cty));
     }
     return aty->aggregateVals(vals);
   }
 
-  return scalar_op(move(s[*lhs]), move(s[*rhs]), getType());
+  return scalar_op(s[*lhs], s[*rhs], getType());
 }
 
 expr BinOp::getTypeConstraints(const Function &f) const {
