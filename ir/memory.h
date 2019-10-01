@@ -18,8 +18,8 @@ class Memory;
 class State;
 
 class Pointer {
-  Memory &m;
-  // [offset, local_bid, nonlocal_bid]
+  const Memory &m;
+// [offset, local_bid, nonlocal_bid]
   // A pointer is pointing to a local memory block if local_bid is non-zero and
   // nonlocal_bid is zero. A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -34,10 +34,10 @@ class Pointer {
   unsigned bits_for_bids() const;
 
 public:
-  Pointer(Memory &m, const char *var_name);
-  Pointer(Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
-  Pointer(Memory &m, unsigned bid, bool local);
-  Pointer(Memory &m, const smt::expr &offset, const smt::expr &local_bid,
+  Pointer(const Memory &m, const char *var_name);
+  Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
+  Pointer(const Memory &m, unsigned bid, bool local);
+  Pointer(const Memory &m, const smt::expr &offset, const smt::expr &local_bid,
           const smt::expr &nonlocal_bid);
 
   smt::expr is_local() const;
@@ -81,6 +81,8 @@ public:
   smt::expr is_block_alive() const;
   smt::expr is_at_heap() const;
 
+  const Memory &getMemory() const { return m; }
+
   // Makes a null pointer.
   // TODO: add a bool flag that says whether the twin memory model is used.
   // In the twin memory model, a null pointer is a physical pointer with
@@ -98,9 +100,10 @@ class Memory {
   unsigned bits_for_offset = 64;
   unsigned bits_for_local_bid = 8;
   unsigned bits_for_nonlocal_bid = 8;
+  // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
 
-  smt::expr blocks_val; // array: (bid, offset) -> StateValue
+  smt::expr blocks_val; // array: (bid, offset) -> Byte
   smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
   // last_bid stores 1 + the last memory block id.
@@ -141,14 +144,14 @@ public:
 
   void free(const smt::expr &ptr);
 
-  void store(const smt::expr &ptr, const StateValue &val, Type &type,
+  void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align);
-  StateValue load(const smt::expr &ptr, Type &type, unsigned align);
+  StateValue load(const smt::expr &ptr, const Type &type, unsigned align);
 
   void memset(const smt::expr &ptr, const StateValue &val,
-              const smt::expr &bytes, unsigned align);
+              const smt::expr &bytesize, unsigned align);
   void memcpy(const smt::expr &dst, const smt::expr &src,
-              const smt::expr &bytes, unsigned align_dst, unsigned align_src,
+              const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);
 
   smt::expr ptr2int(const smt::expr &ptr);
@@ -157,7 +160,15 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
+  // Returns the number of bits needed to represent a pointer offset.
   unsigned bitsOffset() const { return bits_for_offset; }
+  // Returns the number of bits needed to represent a block id.
+  unsigned bitsBid() const { return bits_for_local_bid +
+                                    bits_for_nonlocal_bid; }
+  // Returns the number of bits needed to represent a byte.
+  unsigned bitsByte() const { return 1 + 1 + bitsBid() + bitsOffset() + 3; }
+  // Returns the number of bits needed to represent a pointer.
+  unsigned bitsPtrSize() const { return bits_size_t; }
   void bumpLastBid(unsigned bid);
 
   friend class Pointer;
