@@ -1,0 +1,10 @@
+Name: add constant
+%r = add <2 x i4> <i4 3, i4 11>, <i4 3, i4 6>
+  =>
+%r = add <2 x i4> <i4 0, i4 0>, <i4 6, i4 1>
+
+
+Name: add constant
+%r = add <2 x i8> <i8 3, i8 11>, <i8 3, i8 6>
+  =>
+%r = add <2 x i8> <i8 0, i8 0>, <i8 6, i8 17>
