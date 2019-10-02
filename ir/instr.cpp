@@ -1484,8 +1484,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   s.addUB(np);
   // TODO: malloc's alignment is implementation defined.
-  unsigned new_bid;
-  auto p = s.getMemory().alloc(sz, 8, Memory::HEAP, nullopt, &new_bid);
+  auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
   if (isNonNull)
     return { move(p), true };
@@ -1493,7 +1492,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto nullp = Pointer::mkNullPointer(s.getMemory());
   auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
   s.addQuantVar(flag);
-  return { expr::mkIf(move(flag), move(p), nullp.release()), true };
+  return { expr::mkIf(move(flag), nullp.release(), move(p)), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
