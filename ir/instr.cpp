@@ -1167,9 +1167,8 @@ StateValue Freeze::toSMT(State &s) const {
   if (p.isTrue())
     return { expr(v), expr(p) };
 
-  auto name = "nondet_" + fresh_id();
   StateValue ret_type = getType().getDummyValue(true);
-  expr nondet = expr::mkVar(name.c_str(), ret_type.value);
+  expr nondet = expr::mkFreshVar("nondet", ret_type.value);
   s.addQuantVar(nondet);
 
   return { expr::mkIf(p, v, move(nondet)), move(ret_type.non_poison) };
@@ -1485,7 +1484,16 @@ StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   s.addUB(np);
   // TODO: malloc's alignment is implementation defined.
-  return { s.getMemory().alloc(sz, 8, Memory::HEAP), true };
+  unsigned new_bid;
+  auto p = s.getMemory().alloc(sz, 8, Memory::HEAP, nullopt, &new_bid);
+
+  if (isNonNull)
+    return { move(p), true };
+
+  auto nullp = Pointer::mkNullPointer(s.getMemory());
+  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
+  s.addQuantVar(flag);
+  return { expr::mkIf(move(flag), move(p), nullp.release()), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -1495,7 +1503,7 @@ expr Malloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
-  return make_unique<Malloc>(getType(), getName() + suffix, *size);
+  return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
 }
 
 

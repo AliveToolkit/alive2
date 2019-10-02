@@ -13,6 +13,8 @@ ret 0
 ret 0
 
 Name: malloc_doublefree_ub
+; This optimization is correct because src's malloc nondeterministically
+; returns a non-null ptr, raising double free
 %p = malloc i16 8
 free * %p
 free * %p

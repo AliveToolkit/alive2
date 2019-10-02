@@ -251,6 +251,7 @@ space+ {
 "fptoui" { return FPTOUI; }
 "sitofp" { return SITOFP; }
 "uitofp" { return UITOFP; }
+"ptrtoint" { return PTRTOINT; }
 "half" { return HALF;}
 "float" { return FLOAT;}
 "double" { return DOUBLE;}

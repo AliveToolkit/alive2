@@ -360,11 +360,11 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
 }
 
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
-                    unsigned align_dst, unsigned align_src, bool move) {
+                    unsigned align_dst, unsigned align_src, bool is_move) {
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytes, align_dst);
   src.is_dereferenceable(bytes, align_src);
-  if (!move)
+  if (!is_move)
     src.is_disjoint(bytes, dst, bytes);
 
   uint64_t n;
@@ -383,7 +383,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytes).both();
     expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
                           blocks_val.load(dst_idx()));
-    blocks_val = expr::mkLambda({ dst_idx() }, std::move(val));
+    blocks_val = expr::mkLambda({ dst_idx() }, move(val));
   }
 }
 

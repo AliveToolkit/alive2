@@ -29,12 +29,12 @@ using namespace llvm_util;
 
 static llvm::cl::OptionCategory opt_alive("Alive options");
 
-static llvm::cl::opt<std::string>
+static llvm::cl::opt<string>
 opt_file1(llvm::cl::Positional, llvm::cl::desc("first_bitcode_file"),
     llvm::cl::Required, llvm::cl::value_desc("filename"),
     llvm::cl::cat(opt_alive));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::opt<string>
 opt_file2(llvm::cl::Positional, llvm::cl::desc("second_bitcode_file"),
     llvm::cl::Required, llvm::cl::value_desc("filename"),
     llvm::cl::cat(opt_alive));
@@ -67,7 +67,7 @@ static llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
 static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
-                                                   std::string InputFilename) {
+                                                   string InputFilename) {
   auto MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
   llvm::SMDiagnostic Diag;

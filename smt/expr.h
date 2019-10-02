@@ -88,6 +88,7 @@ public:
   static expr mkHalfVar(const char *name);
   static expr mkFloatVar(const char *name);
   static expr mkDoubleVar(const char *name);
+  static expr mkFreshVar(const char *prefix, const expr &type);
 
   static expr IntSMin(unsigned bits);
   static expr IntSMax(unsigned bits);

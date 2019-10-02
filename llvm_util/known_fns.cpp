@@ -34,7 +34,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocLikeFn(&i, &TLI, false)) {
-    RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0]));
+    bool isNonNull = i.getCalledFunction()->getName() != "malloc";
+    RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull));
   } else if (llvm::isFreeCall(&i, &TLI)) {
     RETURN_KNOWN(make_unique<Free>(*args[0]));
   }
