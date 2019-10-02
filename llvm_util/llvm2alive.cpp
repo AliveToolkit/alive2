@@ -200,11 +200,8 @@ public:
     if (!ptr || !val || !bytes)
       return error(i);
 
-    auto destAlign = i.getDestAlignment();
-    if(destAlign == 0)
-      destAlign = 1;
-
-    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes, destAlign));
+    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes,
+                                          min(1, i.getDestAlignment())));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -215,15 +212,9 @@ public:
     if (!dst || !src || !bytes)
       return error(i);
 
-    auto destAlign = i.getDestAlignment();
-    if(destAlign == 0)
-      destAlign = 1;
-    auto sourceAlign = i.getSourceAlignment();
-    if(sourceAlign == 0)
-      sourceAlign = 1;
-
-    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes, destAlign,
-                                          sourceAlign,
+    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes,
+                                          min(1, i.getDestAlignment()),
+                                          min(1, i.getSourceAlignment()),
                                           isa<llvm::MemMoveInst>(&i)));
   }
 
