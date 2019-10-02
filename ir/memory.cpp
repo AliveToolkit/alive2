@@ -143,7 +143,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
   cond &= offset.add_no_uoverflow(bytes);
 
   // 2) check block's address is aligned
-  cond &= is_aligned(align);
+  m.state->addUB(is_aligned(align));
 
   // 3) check block is alive
   cond &= is_block_alive();

@@ -201,7 +201,7 @@ public:
       return error(i);
 
     RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes,
-                                          i.getDestAlignment()));
+                                          min(1, i.getDestAlignment())));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -213,8 +213,8 @@ public:
       return error(i);
 
     RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes,
-                                          i.getDestAlignment(),
-                                          i.getSourceAlignment(),
+                                          min(1, i.getDestAlignment()),
+                                          min(1, i.getSourceAlignment()),
                                           isa<llvm::MemMoveInst>(&i)));
   }
 
