@@ -201,9 +201,9 @@ StateValue BinOp::toSMT(State &s) const {
     scalar_partial = [&](auto a, auto b, auto &t) -> StateValue {
       expr non_poison = true;
       if (flags & NSW)
-        non_poison &= a.value.sub_no_soverflow(b.value);
+        non_poison &= a.value.mul_no_soverflow(b.value);
       if (flags & NUW)
-        non_poison &= a.value.sub_no_uoverflow(b.value);
+        non_poison &= a.value.mul_no_uoverflow(b.value);
       return { a.value * b.value, move(non_poison) };
     };
     break;
