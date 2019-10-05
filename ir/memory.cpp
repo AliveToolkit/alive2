@@ -281,8 +281,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   }
   blocks_kind = blocks_kind.store(p.get_bid(),
                                   expr::mkUInt(blockKind == HEAP, 1));
-
-  return p();
+  return p.release();
 }
 
 
