@@ -169,9 +169,9 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
   expr bid_expr;
   if (local)
     bid_expr = expr::mkUInt((uint64_t)bid << m.bits_for_nonlocal_bid,
-                            bits_for_bids());
+                            m.bitsBid());
   else
-    bid_expr = expr::mkUInt(bid, bits_for_bids());
+    bid_expr = expr::mkUInt(bid, m.bitsBid());
   p = expr::mkUInt(0, m.bits_for_offset).concat(bid_expr);
 }
 
@@ -180,11 +180,7 @@ Pointer::Pointer(const Memory &m, const expr &offset, const expr &local_bid,
   : m(m), p(offset.concat(local_bid).concat(nonlocal_bid)) {}
 
 unsigned Pointer::total_bits() const {
-  return bits_for_bids() + m.bits_for_offset;
-}
-
-unsigned Pointer::bits_for_bids() const {
-  return m.bits_for_local_bid + m.bits_for_nonlocal_bid;
+  return m.bitsBid() + m.bits_for_offset;
 }
 
 expr Pointer::is_local() const {
@@ -193,11 +189,11 @@ expr Pointer::is_local() const {
 }
 
 expr Pointer::get_bid() const {
-  return p.extract(bits_for_bids() - 1, 0);
+  return p.extract(m.bitsBid() - 1, 0);
 }
 
 expr Pointer::get_local_bid() const {
-  return p.extract(bits_for_bids() - 1, m.bits_for_nonlocal_bid);
+  return p.extract(m.bitsBid() - 1, m.bits_for_nonlocal_bid);
 }
 
 expr Pointer::get_nonlocal_bid() const {
@@ -205,7 +201,7 @@ expr Pointer::get_nonlocal_bid() const {
 }
 
 expr Pointer::get_offset() const {
-  return p.extract(bits_for_bids() + m.bits_for_offset - 1, bits_for_bids());
+  return p.extract(m.bitsBid() + m.bits_for_offset - 1, m.bitsBid());
 }
 
 expr Pointer::get_address() const {
@@ -355,14 +351,12 @@ string Memory::mkName(const char *str) const {
 }
 
 expr Memory::mk_val_array(const char *name) const {
-  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  return expr::mkArray(name, expr::mkUInt(0, bits_bids + bits_for_offset),
+  return expr::mkArray(name, expr::mkUInt(0, bitsBid() + bits_for_offset),
                              expr::mkUInt(0, bitsByte()));
 }
 
 expr Memory::mk_liveness_uf() const {
-  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  return expr::mkArray("blks_liveness", expr::mkUInt(0, bits_bids), true);
+  return expr::mkArray("blks_liveness", expr::mkUInt(0, bitsBid()), true);
 }
 
 // last_bid stores 1 + the last memory block id.
@@ -392,8 +386,7 @@ Memory::Memory(State &state) : state(&state) {
     blocks_liveness = expr::mkLambda({ bid }, move(val));
   }
 
-  unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
-  blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bits_bids),
+  blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bitsBid()),
                               expr::mkUInt(0, 1));
 
   // Initialize a memory block for null pointer.
@@ -448,7 +441,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   // TODO: address of new blocks should be disjoint from other live blocks
 
   if (is_local) {
-    // Initially there was no such block, now it is allocated.
     blocks_liveness = blocks_liveness.store(p.get_bid(), true);
   } else {
     // The memory block was initially alive.
@@ -567,11 +559,6 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
                                    els.blocks_liveness);
   ret.blocks_kind = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
   return ret;
-}
-
-void Memory::bumpLastBid(unsigned bid) {
-  assert(last_nonlocal_bid <= bid + 1);
-  last_nonlocal_bid = bid + 1;
 }
 
 }

@@ -31,7 +31,6 @@ class Pointer {
   smt::expr p;
 
   unsigned total_bits() const;
-  unsigned bits_for_bids() const;
 
 public:
   Pointer(const Memory &m, const char *var_name);
@@ -154,16 +153,11 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
-  // Returns the number of bits needed to represent a pointer offset.
   unsigned bitsOffset() const { return bits_for_offset; }
-  // Returns the number of bits needed to represent a block id.
   unsigned bitsBid() const { return bits_for_local_bid +
                                     bits_for_nonlocal_bid; }
-  // Returns the number of bits needed to represent a byte.
   unsigned bitsByte() const { return 1 + 1 + bitsBid() + bitsOffset() + 3; }
-  // Returns the number of bits needed to represent a pointer.
   unsigned bitsPtrSize() const { return bits_size_t; }
-  void bumpLastBid(unsigned bid);
 
   friend class Pointer;
 };
