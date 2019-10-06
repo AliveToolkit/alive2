@@ -11,10 +11,60 @@ using namespace util;
 
 namespace IR {
 
-Pointer::Pointer(Memory &m, const char *var_name)
+// A data structure that represents a byte.
+// A byte is either a pointer byte or a non-pointer byte.
+// Pointer byte's representation:
+//   +-+------------------+-------------------+----------------+-------------+
+//   |1| non-poison byte? | ptr offset        | block id       | byte offset |
+//   | | (1 bit)          | (bits_for_offset) | (bits_for_bid) | (3 bits)    |
+//   +-+------------------+-------------------+----------------+-------------+
+// Non-pointer byte's representation:
+//   +-+--------------------------+--------------------+---------------------+
+//   |0| padding(000000000)       | non-poison bits?   | data                |
+//   | |                          | (8 bits)           | (8 bits)            |
+//   +-+--------------------------+--------------------+---------------------+
+class Byte {
+  // Memory, which is needed to get the size of offset and block id.
+  const Memory &m;
+  // The underlying representation.
+  smt::expr p;
+
+public:
+  Byte(Byte &&b): m(b.m), p(std::move(b.p)) {}
+  // Creates a byte with its raw representation.
+  Byte(const Memory &m, smt::expr &&byterepr);
+  // Creates a pointer byte that represents i'th byte of p.
+  // non_poison should be an one-bit vector or boolean.
+  Byte(const Pointer &p, unsigned i, const smt::expr &non_poison);
+  // Creates a non-pointer byte that has data and non_poison.
+  // data and non_poison should have 8 bits.
+  Byte(const Memory &m, const smt::expr &data, const smt::expr &non_poison);
+
+  // Returns a bit that represents whether this byte is a pointer byte.
+  smt::expr is_ptrbyte() const { return p.extract(p.bits() - 1, p.bits() - 1); }
+  // Assuming that this is a pointer byte, returns a single bit that represents
+  // whether the byte is poison.
+  smt::expr ptr_nonpoison() const {
+    return p.extract(p.bits() - 2, p.bits() - 2);
+  }
+  // Returns its value assuming that this is a pointer byte.
+  smt::expr ptr_value() const { return p.extract(p.bits() - 3, 3); }
+  // Assuming that this is a pointer byte, returns its byte offset.
+  smt::expr ptr_byteoffset() const { return p.extract(2, 0); }
+  // Assuming that this is a non-pointer byte, returns 8-bit bitvector.
+  smt::expr nonptr_nonpoison() const { return p.extract(15, 8); };
+  // Assuming that this is a non-pointer byte, returns its value.
+  smt::expr nonptr_value() const { return p.extract(7, 0); }
+
+  const smt::expr& operator()() const { return p; }
+  smt::expr release() const { return std::move(p); }
+};
+
+
+Pointer::Pointer(const Memory &m, const char *var_name)
   : m(m), p(expr::mkVar(var_name, total_bits())) {}
 
-Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
+Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
   expr bid_expr;
   if (local)
     bid_expr = expr::mkUInt((uint64_t)bid << m.bits_for_nonlocal_bid,
@@ -24,7 +74,7 @@ Pointer::Pointer(Memory &m, unsigned bid, bool local) : m(m) {
   p = expr::mkUInt(0, m.bits_for_offset).concat(bid_expr);
 }
 
-Pointer::Pointer(Memory &m, const expr &offset, const expr &local_bid,
+Pointer::Pointer(const Memory &m, const expr &offset, const expr &local_bid,
                  const expr &nonlocal_bid)
   : m(m), p(offset.concat(local_bid).concat(nonlocal_bid)) {}
 
@@ -195,6 +245,115 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
+Byte::Byte(const Memory &m, expr &&byterepr): m(m), p(move(byterepr)) {
+  assert(p.bits() == m.bitsByte());
+}
+
+Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
+    : m(ptr.getMemory()) {
+  // TODO: support pointers larger than 64 bits.
+  assert(m.bitsPtrSize() <= 64 && m.bitsPtrSize() % 8 == 0);
+
+  expr byteofs = expr::mkUInt(i, 3);
+  p = expr::mkUInt(1, 1).concat(non_poison.isBool() ? non_poison.toBVBool() :
+                                non_poison).concat(ptr()).concat(byteofs);
+  assert(p.bits() == m.bitsByte());
+}
+
+Byte::Byte(const Memory &m, const expr &data, const expr &non_poison): m(m) {
+  assert(m.bitsByte() >= 1 + 8 + 8);
+  assert(data.bits() == 8);
+  assert(non_poison.bits() == 8);
+
+  unsigned padding = m.bitsByte() - 1 - 8 - 8;
+  p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
+                        .concat(data);
+}
+
+
+// Converts StateValue to Byte array.
+vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
+                          const Memory &mem) {
+  vector<Byte> bytes;
+  if (fromType.isPtrType()) {
+    Pointer p(mem, val.value);
+    unsigned bytesize = mem.bitsPtrSize() / 8;
+
+    for (unsigned i = 0; i < bytesize; ++i)
+      bytes.emplace_back(p, i, val.non_poison);
+  } else {
+    StateValue bvval = fromType.toBV(val);
+    unsigned bitsize = bvval.bits();
+    unsigned bytesize = divide_up(bitsize, 8);
+
+    bvval = bvval.zext(bytesize * 8 - bitsize);
+
+    for (unsigned i = 0; i < bytesize; ++i) {
+      expr data  = bvval.value.extract((i + 1) * 8 - 1, i * 8);
+      expr np    = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
+      bytes.emplace_back(mem, data, np);
+    }
+  }
+  return bytes;
+}
+
+// Converts bytes to StateValue.
+StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
+  assert(!bytes.empty());
+
+  if (toType.isPtrType()) {
+    bool first = true;
+
+    expr loaded_ptr;
+    // The result is not poison if all of these hold:
+    // (1) There's no poison byte, and they are all pointer bytes
+    // (2) All of the bytes have the same information
+    // (3) Byte offsets should be correct
+    expr non_poison = true;
+
+    for (unsigned i = 0; i < bytes.size(); ++i) {
+      auto &b = bytes[i];
+      expr is_ptrbyte = b.is_ptrbyte();
+      expr byte_ofs = b.ptr_byteoffset();
+      expr ptr_value = b.ptr_value();
+      expr is_nonpoisonb = b.ptr_nonpoison();
+
+      if (first) {
+        loaded_ptr = move(ptr_value);
+      } else {
+        non_poison &= ptr_value == loaded_ptr;
+      }
+      non_poison &= is_ptrbyte == 1;
+      non_poison &= is_nonpoisonb == 1;
+      non_poison &= byte_ofs == i;
+    }
+    return { move(loaded_ptr), move(non_poison) };
+
+  } else {
+    auto bitsize = toType.bits();
+    unsigned bytesize = divide_up(bitsize, 8);
+    assert(bytesize == bytes.size());
+
+    StateValue val;
+    bool first = true;
+    // The result is poison if any byte is a pointer byte.
+    expr non_poison = true;
+
+    for (auto &b: bytes) {
+      StateValue v(b.nonptr_value(), b.nonptr_nonpoison());
+
+      val = first ? move(v) : v.concat(val);
+      first = false;
+      non_poison &= b.is_ptrbyte() == 0;
+    }
+
+    val = toType.fromBV(val.trunc(bitsize));
+    val.non_poison &= non_poison;
+    return val;
+  }
+}
+
+
 string Memory::mkName(const char *str, bool src) const {
   return string(str) + (src ? "_src" : "_tgt");
 }
@@ -206,7 +365,7 @@ string Memory::mkName(const char *str) const {
 expr Memory::mk_val_array(const char *name) const {
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
   return expr::mkArray(name, expr::mkUInt(0, bits_bids + bits_for_offset),
-                             expr::mkUInt(0, 2 * 8)); // val + poison bits
+                             expr::mkUInt(0, bitsByte()));
 }
 
 expr Memory::mk_liveness_uf() const {
@@ -217,9 +376,10 @@ expr Memory::mk_liveness_uf() const {
 Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
   {
-    // initialize all local blocks as poison
+    // initialize all local blocks as non-pointer, poison value
+    // This is okay because loading a pointer as non-pointer is also poison.
     Pointer idx(*this, "#idx0");
-    expr poison = expr::mkUInt(0, 16);
+    expr poison = expr::mkUInt(0, bitsByte());
     expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
@@ -295,79 +455,67 @@ void Memory::free(const expr &ptr) {
   blocks_liveness = blocks_liveness.store(p.get_bid(), false);
 }
 
-void Memory::store(const expr &p, const StateValue &v, Type &type,
+void Memory::store(const expr &p, const StateValue &v, const Type &type,
                    unsigned align) {
-  StateValue val = type.toBV(v);
-  unsigned bits = val.bits();
-  unsigned bytes = divide_up(bits, 8);
-
-  val = val.zext(bytes * 8 - bits);
+  vector<Byte> bytes = valueToBytes(v, type, *this);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes, align);
-
-  for (unsigned i = 0; i < bytes; ++i) {
-    // FIXME: right now we store in little-endian; consider others?
-    expr data  = val.value.extract((i + 1) * 8 - 1, i * 8);
-    expr np    = val.non_poison.extract((i + 1) * 8 - 1, i * 8);
-    blocks_val = blocks_val.store((ptr + i).release(), np.concat(data));
+  ptr.is_dereferenceable(bytes.size(), align);
+  for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
+    // FIXME: support big-endian
+    blocks_val = blocks_val.store((ptr + i).release(), bytes[i]());
   }
 }
 
-StateValue Memory::load(const expr &p, Type &type, unsigned align) {
-  auto bits = type.bits();
-  unsigned bytes = divide_up(bits, 8);
+StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
+  auto bitsize = type.isPtrType() ? bitsPtrSize() : type.bits();
+  unsigned bytesize = divide_up(bitsize, 8);
+
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes, align);
+  ptr.is_dereferenceable(bytesize, align);
 
-  StateValue val;
-  bool first = true;
-
-  for (unsigned i = 0; i < bytes; ++i) {
-    auto ptr_i = (ptr + i).release();
-    expr pair = blocks_val.load(ptr_i);
-    StateValue v(pair.extract(7, 0),  pair.extract(15, 8));
-    val = first ? move(v) : v.concat(val);
-    first = false;
+  vector<Byte> loadedBytes;
+  for (unsigned i = 0; i < bytesize; ++i) {
+    loadedBytes.emplace_back(*this, blocks_val.load((ptr + i).release()));
   }
-
-  return type.fromBV(val.trunc(bits));
+  return bytesToValue(loadedBytes, type);
 }
 
-void Memory::memset(const expr &p, const StateValue &val, const expr &bytes,
+void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
   assert(val.bits() == 8);
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes, align);
-  auto valbv = IntType("", 8).toBV(val);
-  expr store_val = valbv.non_poison.concat(valbv.value);
+  ptr.is_dereferenceable(bytesize, align);
+
+  vector<Byte> bytes = valueToBytes(val, IntType("", 8), *this);
+  assert(bytes.size() == 1);
 
   uint64_t n;
-  if (bytes.isUInt(n) && n <= 4) {
+  if (bytesize.isUInt(n) && n <= 4) {
     for (unsigned i = 0; i < n; ++i) {
       auto p = (ptr + i).release();
-      blocks_val = blocks_val.store(p, store_val);
+      blocks_val = blocks_val.store(p, bytes[0]());
     }
   } else {
     string name = "#idx_" + to_string(last_idx_ptr++);
     Pointer idx(*this, name.c_str());
 
-    expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytes).both();
-    expr val = expr::mkIf(cond, store_val, blocks_val.load(idx()));
+    expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytesize).both();
+    expr val = expr::mkIf(cond, bytes[0](), blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
 }
 
-void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
+void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
                     unsigned align_dst, unsigned align_src, bool is_move) {
   Pointer dst(*this, d), src(*this, s);
-  dst.is_dereferenceable(bytes, align_dst);
-  src.is_dereferenceable(bytes, align_src);
+  dst.is_dereferenceable(bytesize, align_dst);
+  src.is_dereferenceable(bytesize, align_src);
   if (!is_move)
-    src.is_disjoint(bytes, dst, bytes);
+    src.is_disjoint(bytesize, dst, bytesize);
 
   uint64_t n;
-  if (bytes.isUInt(n) && n <= 4) {
+  if (bytesize.isUInt(n) && n <= 4) {
     auto old_val = blocks_val;
     for (unsigned i = 0; i < n; ++i) {
       auto src_i = (src + i).release();
@@ -379,7 +527,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytes,
     Pointer dst_idx(*this, expr::mkVar(name.c_str(), dst.bits()));
     Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
 
-    expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytes).both();
+    expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytesize).both();
     expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
                           blocks_val.load(dst_idx()));
     blocks_val = expr::mkLambda({ dst_idx() }, move(val));
