@@ -15,7 +15,7 @@ addons:
 env:
   global:
     - RE2C_VERSION=1.1.1
-    - Z3_VERSION=4.8.5
+    - Z3_VERSION=4.8.6
 
 before_script:
   - |
@@ -23,7 +23,7 @@ before_script:
       if [ ! -d /tmp/z3cache/z3-$Z3_VERSION-x64-ubuntu-16.04 ] ; then
         rm -fr /tmp/z3cache
         mkdir /tmp/z3cache
-        wget https://github.com/Z3Prover/z3/releases/download/Z3-$Z3_VERSION/z3-$Z3_VERSION-x64-ubuntu-16.04.zip -O /tmp/z3.zip
+        wget https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/z3-$Z3_VERSION-x64-ubuntu-16.04.zip -O /tmp/z3.zip
         pushd /tmp
         unzip z3.zip
         mv z3-* z3cache
