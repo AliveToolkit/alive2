@@ -8,13 +8,13 @@ cache:
 addons:
   apt:
     sources: &default_sources
-      - ubuntu-toolchain-r-test
+      - sourceline: "ppa:ubuntu-toolchain-r/test"
     packages: &default_packages
       - ninja-build
+      - re2c
 
 env:
   global:
-    - RE2C_VERSION=1.1.1
     - Z3_VERSION=4.8.6
 
 before_script:
@@ -31,19 +31,6 @@ before_script:
       fi
       sudo cp /tmp/z3cache/z3-$Z3_VERSION*/bin/libz3.so /usr/lib
       sudo cp /tmp/z3cache/z3-$Z3_VERSION*/include/* /usr/include
-      if [ ! -f /tmp/re2ccache/$RE2C_VERSION/re2c ] ; then
-        rm -fr /tmp/re2ccache
-        mkdir -p /tmp/re2ccache/$RE2C_VERSION
-        wget https://github.com/skvadrik/re2c/releases/download/$RE2C_VERSION/re2c-$RE2C_VERSION.tar.gz -O /tmp/re2c.tar.gz
-        pushd /tmp
-          tar xfz re2c.tar.gz
-          pushd re2c-*
-            ./configure && make -j2
-            cp re2c /tmp/re2ccache/$RE2C_VERSION
-          popd
-        popd
-      fi
-      sudo cp /tmp/re2ccache/$RE2C_VERSION/re2c /usr/bin
     fi
 
 script:
@@ -59,71 +46,78 @@ script:
 
 matrix:
   include:
-    - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Debug
+    - env: CMAKE_CXX_COMPILER=g++ CMAKE_BUILD_TYPE=Debug
       os: linux
-      dist: xenial
+      dist: bionic
       addons: &gcc7
         apt:
-          sources: *default_sources
           packages:
             - *default_packages
-            - g++-7
 
-    - env: CMAKE_CXX_COMPILER=g++-7 CMAKE_BUILD_TYPE=Release
+    - env: CMAKE_CXX_COMPILER=g++ CMAKE_BUILD_TYPE=Release
       os: linux
-      dist: xenial
+      dist: bionic
       addons: *gcc7
 
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug
       os: linux
-      dist: xenial
+      dist: bionic
       addons: &gcc8
         apt:
-          sources: *default_sources
           packages:
             - *default_packages
             - g++-8
 
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Release
       os: linux
-      dist: xenial
+      dist: bionic
       addons: *gcc8
 
-    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+    - env: CMAKE_CXX_COMPILER=g++-9 CMAKE_BUILD_TYPE=Debug
       os: linux
-      dist: xenial
-      addons: &clang7
+      dist: bionic
+      addons: &gcc9
         apt:
-          sources:
-            - *default_sources
-            - llvm-toolchain-xenial-7
+          sources: *default_sources
           packages:
             - *default_packages
-            - clang-7
-            - g++-8
+            - g++-9
 
-    - env: CMAKE_CXX_COMPILER=clang++-7 CMAKE_BUILD_TYPE=Release
+    - env: CMAKE_CXX_COMPILER=g++-9 CMAKE_BUILD_TYPE=Release
       os: linux
-      dist: xenial
-      addons: *clang7
+      dist: bionic
+      addons: *gcc9
 
     - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: linux
-      dist: xenial
+      dist: bionic
       addons: &clang8
         apt:
-          sources:
-            - *default_sources
-            - llvm-toolchain-xenial-8
           packages:
             - *default_packages
             - clang-8
-            - g++-8
 
     - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Release
       os: linux
-      dist: xenial
+      dist: bionic
       addons: *clang8
+
+    - env: CMAKE_CXX_COMPILER=clang++-9 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+      os: linux
+      dist: bionic
+      addons: &clang9
+        apt:
+          sources:
+            - sourceline: "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main"
+              key_url: "https://apt.llvm.org/llvm-snapshot.gpg.key"
+          packages:
+            - *default_packages
+            - clang-9
+
+    - env: CMAKE_CXX_COMPILER=clang++-9 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: bionic
+      addons: *clang9
 
     - env: CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: osx
