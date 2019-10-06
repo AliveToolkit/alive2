@@ -16,6 +16,11 @@ State::State(const Function &f, bool source)
   return_val.first = f.getType().getDummyValue(false);
 }
 
+void State::resetGlobals() {
+  Value::reset_gbl_id();
+  Memory::resetGlobalData();
+}
+
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
@@ -78,7 +83,7 @@ bool State::startBB(const BasicBlock &bb) {
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
 
-  if (f.getFirstBB().getName() == bb.getName()) {
+  if (&f.getFirstBB() == &bb) {
     domain.first = true;
     return true;
   }
@@ -195,15 +200,9 @@ bool State::hasGlobalVarBid(const string &glbvar, unsigned &bid) const {
 void State::copyGlobalVarBidsFromSrc(const State &src) {
   assert(glbvar_bids.empty());
   assert(src.isSource());
-  // Copy glbvar_bids.
   glbvar_bids = src.glbvar_bids;
-  // Bump memory's last_bid so Memory::alloc()'s newly assigned bids never
-  // collide with this
-  unsigned maxid = 0;
-  for (const auto &itm: glbvar_bids) {
-    maxid = max(maxid, itm.second);
-  }
-  getMemory().bumpLastBid(maxid);
+
+  Memory::resetLocalBids();
 }
 
 }

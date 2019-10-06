@@ -106,15 +106,6 @@ class Memory {
   smt::expr blocks_val; // array: (bid, offset) -> Byte
   smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
-  // last_bid stores 1 + the last memory block id.
-  // Block id 0 is reserved for a null block.
-  // TODO: In the twin memory, there is no null block, so the initial last_bid
-  // should depend on whether the twin memory is used or not.
-  // When setting last_bid to 0 to support twin memory, be careful with local
-  // id because last_bid is also used to set local bid but local bid cannot be
-  // 0.
-  unsigned last_bid = 1;
-  unsigned last_idx_ptr = 0;
 
   std::string mkName(const char *str, bool src) const;
   std::string mkName(const char *str) const;
@@ -128,6 +119,9 @@ public:
   };
 
   Memory(State &state);
+
+  static void resetGlobalData();
+  static void resetLocalBids();
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 

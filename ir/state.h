@@ -69,6 +69,8 @@ private:
 public:
   State(const Function &f, bool source);
 
+  static void resetGlobals();
+
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const ValTy& at(const Value &val) const;

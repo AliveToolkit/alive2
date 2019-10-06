@@ -188,8 +188,8 @@ unsigned Pointer::bits_for_bids() const {
 }
 
 expr Pointer::is_local() const {
-  // we need to check both because of undef pointers
-  return get_local_bid() != 0 && get_nonlocal_bid() == 0;
+  // bid == 0 is the global null block
+  return get_local_bid() != 0;
 }
 
 expr Pointer::get_bid() const {
@@ -365,6 +365,15 @@ expr Memory::mk_liveness_uf() const {
   return expr::mkArray("blks_liveness", expr::mkUInt(0, bits_bids), true);
 }
 
+// last_bid stores 1 + the last memory block id.
+// Global block id 0 is reserved for a null block.
+// TODO: In the twin memory, there is no null block, so the initial last_bid
+// should depend on whether the twin memory is used or not.
+// Local bid > 0 since bids == 0 is the global block 0
+static unsigned last_local_bid;
+static unsigned last_nonlocal_bid;
+static unsigned last_idx_ptr;
+
 Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
   {
@@ -391,6 +400,16 @@ Memory::Memory(State &state) : state(&state) {
   assert(bits_for_offset <= bits_size_t);
 }
 
+void Memory::resetGlobalData() {
+  last_local_bid = 1;
+  last_nonlocal_bid = 1;
+  last_idx_ptr = 1;
+}
+
+void Memory::resetLocalBids() {
+  last_local_bid = 1;
+}
+
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   unsigned bits = bits_for_nonlocal_bid + bits_for_offset;
   expr var = expr::mkVar(name, bits);
@@ -402,16 +421,17 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out) {
+  // Produce a local block if blockKind is heap or stack.
+  bool is_local = blockKind != GLOBAL;
+
+  auto &last_bid = is_local ? last_local_bid : last_nonlocal_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
   if (!bidopt)
-    last_bid++;
+    ++last_bid;
   assert(bid < last_bid);
 
   if (bid_out)
     *bid_out = bid;
-
-  // It is allocated as a local block if blockKind is heap or stack.
-  bool is_local = blockKind != GLOBAL;
 
   Pointer p(*this, bid, is_local);
   state->addPre(p.is_aligned(align));
@@ -542,15 +562,12 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.blocks_liveness = expr::mkIf(cond, then.blocks_liveness,
                                    els.blocks_liveness);
   ret.blocks_kind = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
-  // FIXME: this isn't correct; should be a per function counter
-  ret.last_bid     = max(then.last_bid, els.last_bid);
-  ret.last_idx_ptr = max(then.last_idx_ptr, els.last_idx_ptr);
   return ret;
 }
 
 void Memory::bumpLastBid(unsigned bid) {
-  assert(last_bid <= bid + 1);
-  last_bid = bid + 1;
+  assert(last_nonlocal_bid <= bid + 1);
+  last_nonlocal_bid = bid + 1;
 }
 
 }

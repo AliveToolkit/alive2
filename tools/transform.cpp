@@ -300,7 +300,7 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 }
 
 Errors TransformVerify::verify() const {
-  Value::reset_gbl_id();
+  State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
 
   try {
