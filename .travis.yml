@@ -3,7 +3,6 @@ language: cpp
 cache:
   directories:
     - /tmp/z3cache
-    - /tmp/re2ccache
 
 addons:
   apt:
