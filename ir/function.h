@@ -91,7 +91,7 @@ public:
     return undefs;
   }
 
-  void addInput(std::unique_ptr<Input> &&c);
+  void addInput(std::unique_ptr<Value> &&c);
   util::const_strip_unique_ptr<decltype(inputs)> getInputs() const {
     return inputs;
   }

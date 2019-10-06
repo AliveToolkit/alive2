@@ -128,7 +128,8 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
   for (auto &[var, val, used] : src_state.getValues()) {
     (void)used;
-    if (!dynamic_cast<const Input*>(var))
+    if (!dynamic_cast<const Input*>(var) &&
+        !dynamic_cast<const ConstantInput*>(var))
       continue;
     s << *var << " = ";
     print_varval(s, src_state, m, var, var->getType(), val.first);

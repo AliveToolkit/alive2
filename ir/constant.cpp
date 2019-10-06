@@ -95,7 +95,13 @@ expr AggregateConst::getTypeConstraints() const {
 
 
 StateValue ConstantInput::toSMT(State &s) const {
-  return { expr::mkVar(getName().c_str(), bits()), true };
+  auto type = getType().getDummyValue(false).value;
+  return { expr::mkVar(getName().c_str(), type), true };
+}
+
+expr ConstantInput::getTypeConstraints() const {
+  return Value::getTypeConstraints() &&
+         (getType().enforceIntType() || getType().enforceFloatType());
 }
 
 

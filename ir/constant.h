@@ -56,6 +56,7 @@ public:
   ConstantInput(Type &type, std::string &&name)
     : Constant(type, std::move(name)) {}
   StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints() const override;
 };
 
 
