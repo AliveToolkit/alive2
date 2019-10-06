@@ -5,11 +5,12 @@
 #include "ir/state.h"
 #include "util/compiler.h"
 
+using namespace IR;
 using namespace smt;
 using namespace std;
 using namespace util;
 
-namespace IR {
+namespace {
 
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
@@ -24,42 +25,142 @@ namespace IR {
 //   | |                          | (8 bits)           | (8 bits)            |
 //   +-+--------------------------+--------------------+---------------------+
 class Byte {
-  // Memory, which is needed to get the size of offset and block id.
   const Memory &m;
-  // The underlying representation.
-  smt::expr p;
+  expr p;
 
 public:
-  Byte(Byte &&b): m(b.m), p(std::move(b.p)) {}
   // Creates a byte with its raw representation.
-  Byte(const Memory &m, smt::expr &&byterepr);
+  Byte(const Memory &m, expr &&byterepr) : m(m), p(move(byterepr)) {
+    assert(p.bits() == m.bitsByte());
+  }
+
   // Creates a pointer byte that represents i'th byte of p.
   // non_poison should be an one-bit vector or boolean.
-  Byte(const Pointer &p, unsigned i, const smt::expr &non_poison);
+  Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
+    : m(ptr.getMemory()) {
+    // TODO: support pointers larger than 64 bits.
+    assert(m.bitsPtrSize() <= 64 && m.bitsPtrSize() % 8 == 0);
+
+    expr byteofs = expr::mkUInt(i, 3);
+    expr np = non_poison.toBVBool();
+    p = expr::mkUInt(1, 1).concat(np).concat(ptr()).concat(byteofs);
+    assert(p.bits() == m.bitsByte());
+  }
+
   // Creates a non-pointer byte that has data and non_poison.
   // data and non_poison should have 8 bits.
-  Byte(const Memory &m, const smt::expr &data, const smt::expr &non_poison);
+  Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
+    assert(m.bitsByte() > 1 + 8 + 8);
+    assert(data.bits() == 8);
+    assert(non_poison.bits() == 8);
 
-  // Returns a bit that represents whether this byte is a pointer byte.
-  smt::expr is_ptrbyte() const { return p.extract(p.bits() - 1, p.bits() - 1); }
-  // Assuming that this is a pointer byte, returns a single bit that represents
-  // whether the byte is poison.
-  smt::expr ptr_nonpoison() const {
-    return p.extract(p.bits() - 2, p.bits() - 2);
+    unsigned padding = m.bitsByte() - 1 - 8 - 8;
+    p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
+                          .concat(data);
   }
-  // Returns its value assuming that this is a pointer byte.
-  smt::expr ptr_value() const { return p.extract(p.bits() - 3, 3); }
-  // Assuming that this is a pointer byte, returns its byte offset.
-  smt::expr ptr_byteoffset() const { return p.extract(2, 0); }
-  // Assuming that this is a non-pointer byte, returns 8-bit bitvector.
-  smt::expr nonptr_nonpoison() const { return p.extract(15, 8); };
-  // Assuming that this is a non-pointer byte, returns its value.
-  smt::expr nonptr_value() const { return p.extract(7, 0); }
 
-  const smt::expr& operator()() const { return p; }
-  smt::expr release() const { return std::move(p); }
+  expr is_ptr() const {
+    auto bit = p.bits() - 1;
+    return p.extract(bit, bit);
+  }
+
+  // Assuming that this is a pointer byte
+  expr ptr_nonpoison() const {
+    auto bit = p.bits() - 2;
+    return p.extract(bit, bit);
+  }
+
+  expr ptr_value() const { return p.extract(p.bits() - 3, 3); }
+  expr ptr_byteoffset() const { return p.extract(2, 0); }
+
+  // Assuming that this is a non-pointer byte
+  expr nonptr_nonpoison() const { return p.extract(15, 8); };
+  expr nonptr_value() const { return p.extract(7, 0); }
+
+  const expr& operator()() const { return p; }
 };
 
+
+vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
+                          const Memory &mem) {
+  vector<Byte> bytes;
+  if (fromType.isPtrType()) {
+    Pointer p(mem, val.value);
+    unsigned bytesize = mem.bitsPtrSize() / 8;
+
+    for (unsigned i = 0; i < bytesize; ++i)
+      bytes.emplace_back(p, i, val.non_poison);
+  } else {
+    StateValue bvval = fromType.toBV(val);
+    unsigned bitsize = bvval.bits();
+    unsigned bytesize = divide_up(bitsize, 8);
+
+    bvval = bvval.zext(bytesize * 8 - bitsize);
+
+    for (unsigned i = 0; i < bytesize; ++i) {
+      expr data  = bvval.value.extract((i + 1) * 8 - 1, i * 8);
+      expr np    = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
+      bytes.emplace_back(mem, data, np);
+    }
+  }
+  return bytes;
+}
+
+StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
+  assert(!bytes.empty());
+
+  if (toType.isPtrType()) {
+    bool first = true;
+
+    expr loaded_ptr;
+    // The result is not poison if all of these hold:
+    // (1) There's no poison byte, and they are all pointer bytes
+    // (2) All of the bytes have the same information
+    // (3) Byte offsets should be correct
+    expr non_poison = true;
+
+    for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
+      auto &b = bytes[i];
+      expr ptr_value = b.ptr_value();
+
+      if (first) {
+        loaded_ptr = move(ptr_value);
+      } else {
+        non_poison &= ptr_value == loaded_ptr;
+      }
+      non_poison &= b.is_ptr() == 1;
+      non_poison &= b.ptr_nonpoison() == 1;
+      non_poison &= b.ptr_byteoffset() == i;
+      first = false;
+    }
+    return { move(loaded_ptr), move(non_poison) };
+
+  } else {
+    auto bitsize = toType.bits();
+    assert(divide_up(bitsize, 8) == bytes.size());
+
+    StateValue val;
+    bool first = true;
+    // The result is poison if any byte is a pointer byte.
+    expr non_poison = true;
+
+    for (auto &b: bytes) {
+      StateValue v(b.nonptr_value(), b.nonptr_nonpoison());
+
+      val = first ? move(v) : v.concat(val);
+      first = false;
+      non_poison &= b.is_ptr() == 0;
+    }
+
+    val = toType.fromBV(val.trunc(bitsize));
+    val.non_poison &= non_poison;
+    return val;
+  }
+}
+}
+
+
+namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name)
   : m(m), p(expr::mkVar(var_name, total_bits())) {}
@@ -242,115 +343,6 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   os << ", offset=";
   p.get_offset().simplify().printSigned(os);
   return os << ')';
-}
-
-
-Byte::Byte(const Memory &m, expr &&byterepr): m(m), p(move(byterepr)) {
-  assert(p.bits() == m.bitsByte());
-}
-
-Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
-    : m(ptr.getMemory()) {
-  // TODO: support pointers larger than 64 bits.
-  assert(m.bitsPtrSize() <= 64 && m.bitsPtrSize() % 8 == 0);
-
-  expr byteofs = expr::mkUInt(i, 3);
-  p = expr::mkUInt(1, 1).concat(non_poison.isBool() ? non_poison.toBVBool() :
-                                non_poison).concat(ptr()).concat(byteofs);
-  assert(p.bits() == m.bitsByte());
-}
-
-Byte::Byte(const Memory &m, const expr &data, const expr &non_poison): m(m) {
-  assert(m.bitsByte() >= 1 + 8 + 8);
-  assert(data.bits() == 8);
-  assert(non_poison.bits() == 8);
-
-  unsigned padding = m.bitsByte() - 1 - 8 - 8;
-  p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
-                        .concat(data);
-}
-
-
-// Converts StateValue to Byte array.
-vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
-                          const Memory &mem) {
-  vector<Byte> bytes;
-  if (fromType.isPtrType()) {
-    Pointer p(mem, val.value);
-    unsigned bytesize = mem.bitsPtrSize() / 8;
-
-    for (unsigned i = 0; i < bytesize; ++i)
-      bytes.emplace_back(p, i, val.non_poison);
-  } else {
-    StateValue bvval = fromType.toBV(val);
-    unsigned bitsize = bvval.bits();
-    unsigned bytesize = divide_up(bitsize, 8);
-
-    bvval = bvval.zext(bytesize * 8 - bitsize);
-
-    for (unsigned i = 0; i < bytesize; ++i) {
-      expr data  = bvval.value.extract((i + 1) * 8 - 1, i * 8);
-      expr np    = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
-      bytes.emplace_back(mem, data, np);
-    }
-  }
-  return bytes;
-}
-
-// Converts bytes to StateValue.
-StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
-  assert(!bytes.empty());
-
-  if (toType.isPtrType()) {
-    bool first = true;
-
-    expr loaded_ptr;
-    // The result is not poison if all of these hold:
-    // (1) There's no poison byte, and they are all pointer bytes
-    // (2) All of the bytes have the same information
-    // (3) Byte offsets should be correct
-    expr non_poison = true;
-
-    for (unsigned i = 0; i < bytes.size(); ++i) {
-      auto &b = bytes[i];
-      expr is_ptrbyte = b.is_ptrbyte();
-      expr byte_ofs = b.ptr_byteoffset();
-      expr ptr_value = b.ptr_value();
-      expr is_nonpoisonb = b.ptr_nonpoison();
-
-      if (first) {
-        loaded_ptr = move(ptr_value);
-      } else {
-        non_poison &= ptr_value == loaded_ptr;
-      }
-      non_poison &= is_ptrbyte == 1;
-      non_poison &= is_nonpoisonb == 1;
-      non_poison &= byte_ofs == i;
-    }
-    return { move(loaded_ptr), move(non_poison) };
-
-  } else {
-    auto bitsize = toType.bits();
-    unsigned bytesize = divide_up(bitsize, 8);
-    assert(bytesize == bytes.size());
-
-    StateValue val;
-    bool first = true;
-    // The result is poison if any byte is a pointer byte.
-    expr non_poison = true;
-
-    for (auto &b: bytes) {
-      StateValue v(b.nonptr_value(), b.nonptr_nonpoison());
-
-      val = first ? move(v) : v.concat(val);
-      first = false;
-      non_poison &= b.is_ptrbyte() == 0;
-    }
-
-    val = toType.fromBV(val.trunc(bitsize));
-    val.non_poison &= non_poison;
-    return val;
-  }
 }
 
 

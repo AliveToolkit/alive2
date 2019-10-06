@@ -81,7 +81,7 @@ public:
   smt::expr is_block_alive() const;
   smt::expr is_at_heap() const;
 
-  const Memory &getMemory() const { return m; }
+  const Memory& getMemory() const { return m; }
 
   // Makes a null pointer.
   // TODO: add a bool flag that says whether the twin memory model is used.
