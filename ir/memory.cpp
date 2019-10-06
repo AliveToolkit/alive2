@@ -372,9 +372,17 @@ Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
   blocks_liveness = mk_liveness_uf();
   {
+    Pointer idx(*this, "#idx0");
+
+    // All non-local blocks cannot initially contain pointers to local blocks.
+    auto byte = Byte(*this, blocks_val.load(idx()));
+    Pointer loadedptr(*this, byte.ptr_value());
+    expr cond = byte.is_ptr() == 0 || byte.ptr_nonpoison() == 0 ||
+                !loadedptr.is_local();
+    state.addPre(expr::mkForAll({ idx() }, move(cond)));
+
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    Pointer idx(*this, "#idx0");
     expr is_local = idx.is_local();
     expr val = expr::mkIf(is_local, expr::mkUInt(0, bitsByte()),
                           blocks_val.load(idx()));
