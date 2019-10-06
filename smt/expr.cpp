@@ -243,7 +243,8 @@ bool expr::eq(const expr &rhs) const {
 
 bool expr::isConst() const {
   C();
-  return Z3_is_numeral_ast(ctx(), ast());
+  return Z3_is_numeral_ast(ctx(), ast()) ||
+         Z3_get_bool_value(ctx(), ast()) != Z3_L_UNDEF;
 }
 
 bool expr::isBool() const {
@@ -1176,7 +1177,7 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
 }
 
 expr expr::mkForAll(const set<expr> &vars, expr &&val) {
-  if (vars.empty() || val.isTrue() || val.isFalse() || !val.isValid())
+  if (vars.empty() || val.isConst() || !val.isValid())
     return move(val);
 
   unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
@@ -1189,7 +1190,7 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
 }
 
 expr expr::mkLambda(const set<expr> &vars, expr &&val) {
-  if (vars.empty() || val.isTrue() || val.isFalse() || !val.isValid())
+  if (vars.empty() || val.isConst() || !val.isValid())
     return move(val);
 
   unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);

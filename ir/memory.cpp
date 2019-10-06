@@ -376,16 +376,21 @@ static unsigned last_idx_ptr;
 
 Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
+  blocks_liveness = mk_liveness_uf();
   {
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
     Pointer idx(*this, "#idx0");
-    expr poison = expr::mkUInt(0, bitsByte());
-    expr val = expr::mkIf(idx.is_local(), poison, blocks_val.load(idx()));
+    expr is_local = idx.is_local();
+    expr val = expr::mkIf(is_local, expr::mkUInt(0, bitsByte()),
+                          blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
-  }
 
-  blocks_liveness = mk_liveness_uf();
+    // all local blocks are dead in the beginning
+    expr bid = idx.get_bid();
+    val = !is_local && blocks_liveness.load(bid);
+    blocks_liveness = expr::mkLambda({ bid }, move(val));
+  }
 
   unsigned bits_bids = bits_for_local_bid + bits_for_nonlocal_bid;
   blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bits_bids),
@@ -444,7 +449,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   if (is_local) {
     // Initially there was no such block, now it is allocated.
-    state->addPre(!mk_liveness_uf().load(p.get_bid()));
     blocks_liveness = blocks_liveness.store(p.get_bid(), true);
   } else {
     // The memory block was initially alive.
