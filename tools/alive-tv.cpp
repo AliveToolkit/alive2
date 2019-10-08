@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
   cerr << "  " << goodCount << " correct transformations\n";
   cerr << "  " << badCount << " incorrect transformations\n";
   cerr << "  " << errorCount << " errors\n";
-  
+
   smt_init.reset();
 
   return result;

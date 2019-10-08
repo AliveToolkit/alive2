@@ -32,6 +32,7 @@ private:
   bool source;
   bool disable_undef_rewrite = false;
   smt::expr precondition = true;
+  smt::expr precondition_quant = true; // preconditions on quantifiers
   smt::expr axioms = true;
 
   const BasicBlock *current_bb;
@@ -83,7 +84,7 @@ public:
   void addReturn(const StateValue &val);
 
   void addAxiom(smt::expr &&axiom) { axioms &= std::move(axiom); }
-  void addPre(smt::expr &&cond) { precondition &= std::move(cond); }
+  void addPre(smt::expr &&cond, bool quant = false);
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
 
@@ -95,6 +96,7 @@ public:
   auto& getMemory() { return memory; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
+  auto& getPreForQuantVars() const { return precondition_quant; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
 

@@ -107,13 +107,18 @@ class Memory {
   smt::expr blocks_liveness; // array: bid -> bool
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
   smt::expr blocks_readonly; // array: bid -> bool, true if readonly
+  smt::expr blocks_addr; // array: bid -> uint
+  smt::expr blocks_size_local; // array: local_bid -> uint
 
   std::string mkName(const char *str, bool src) const;
   std::string mkName(const char *str) const;
 
-  smt::expr mk_val_array(const char *name) const;
+  smt::expr mk_val_array() const;
   smt::expr mk_liveness_uf() const;
-  smt::expr mk_readonly_array(const char *name) const;
+  smt::expr mk_readonly_array() const;
+  smt::expr mk_addr_array() const;
+  smt::expr mk_size_array(bool local) const;
+  smt::expr mk_kind_array() const;
 
 public:
   enum BlockKind {

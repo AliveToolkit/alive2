@@ -266,21 +266,22 @@ static void check_refinement(Errors &errs, Transform &t,
   // so order here matters
   src_state.startParsingPre();
   expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  pre &= src_state.getPre() && tgt_state.getPre();
+  pre &= tgt_state.getPre() && src_state.getPre() && tgt_state.getPreForQuantVars();
+  expr srcpre_quant = src_state.getPreForQuantVars();
 
   auto [poison_cnstr, value_cnstr] = type.refines(a, b);
-  expr pre_dom = pre && (dom_a && dom_b);
+  expr dom_a_b = dom_a && dom_b;
 
   Solver::check({
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
+    { axioms && preprocess(t, qvars, uvars, pre && (!srcpre_quant || dom_a.notImplies(dom_b))),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre_dom && !poison_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && (!srcpre_quant || (dom_a_b && !poison_cnstr))),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre_dom && !value_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre && (!srcpre_quant || (dom_a_b && !value_cnstr))),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}

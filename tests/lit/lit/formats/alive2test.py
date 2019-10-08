@@ -71,6 +71,23 @@ class Alive2Test(TestFormat):
     if m != None:
       cmd += m.group(1).split()
 
+    if alive_tv:
+      # Run identity check first
+      srcpath = test
+      looperr_string = 'Loops are not supported yet! Skipping function'
+      resultchk = lambda msg, exitCode: \
+          (exitCode == 0 and msg.find(ok_string) != -1) or \
+          (exitCode != 0 and msg.find(looperr_string) != -1)
+
+      out, err, exitCode = executeCommand(cmd + [srcpath, srcpath])
+      if not resultchk(out + err, exitCode):
+        return lit.Test.FAIL, 'src identity check fail: ' + out + err
+
+      tgtpath = test.replace('.src.ll', '.tgt.ll')
+      out, err, exitCode = executeCommand(cmd + [tgtpath, tgtpath])
+      if not resultchk(out + err, exitCode):
+        return lit.Test.FAIL, 'tgt identity check fail: ' + out + err
+
     cmd.append(test)
     if alive_tv:
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
@@ -78,10 +95,10 @@ class Alive2Test(TestFormat):
 
     m = self.regex_errs.search(input)
     if m == None:
-      if exitCode == 0 and string.find(out + err, ok_string) != -1:
+      if exitCode == 0 and (out + err).find(ok_string) != -1:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
-    if exitCode != 0 and string.find(err, m.group(1)) != -1:
+    if exitCode != 0 and err.find(m.group(1)) != -1:
       return lit.Test.PASS, ''
     return lit.Test.FAIL, out + err

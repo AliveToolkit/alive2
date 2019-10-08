@@ -201,25 +201,15 @@ expr Pointer::get_offset() const {
 
 expr Pointer::get_address() const {
   expr offset = get_offset().sextOrTrunc(m.bits_size_t);
-  auto local_name = m.mkName("blks_addr");
-  return
-    offset +
-      expr::mkIf(is_local(),
-                 expr::mkUF(local_name.c_str(), { get_local_bid() }, offset),
-                 expr::mkUF("blks_addr", { get_nonlocal_bid() }, offset));
+  return offset + m.blocks_addr.load(get_bid());
 }
 
 expr Pointer::block_size() const {
-  // ASSUMPTION: programs can only allocate up to half of address space
-  // so the first bit of size is always zero.
-  // We need this assumption to support negative offsets.
-  expr range = expr::mkUInt(0, m.bits_size_t - 1);
-  auto local_name = m.mkName("blks_size");
   return
     expr::mkUInt(0, 1).concat(
       expr::mkIf(is_local(),
-                 expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
-                 expr::mkUF("blks_size", { get_nonlocal_bid() }, range)));
+                 m.blocks_size_local.load(get_local_bid()),
+                 m.mk_size_array(false).load(get_nonlocal_bid())));
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -357,17 +347,38 @@ string Memory::mkName(const char *str) const {
   return mkName(str, state->isSource());
 }
 
-expr Memory::mk_val_array(const char *name) const {
-  return expr::mkArray(name, expr::mkUInt(0, bitsBid() + bits_for_offset),
-                             expr::mkUInt(0, bitsByte()));
+expr Memory::mk_val_array() const {
+  return expr::mkArray("blks_val", expr::mkUInt(0, bitsBid() + bits_for_offset),
+                                   expr::mkUInt(0, bitsByte()));
 }
 
 expr Memory::mk_liveness_uf() const {
-  return expr::mkArray("blks_liveness", expr::mkUInt(0, bitsBid()), true);
+  auto range = expr::mkUInt(0, bitsBid());
+  return expr::mkArray("blks_liveness", range, true);
 }
 
-expr Memory::mk_readonly_array(const char *name) const {
+expr Memory::mk_readonly_array() const {
   return expr::mkArray("blks_readonly", expr::mkUInt(0, bitsBid()), false);
+}
+
+expr Memory::mk_addr_array() const {
+  return expr::mkArray("blks_addr", expr::mkUInt(0, bitsBid()),
+                       expr::mkUInt(0, bitsPtrSize()));
+}
+
+expr Memory::mk_kind_array() const {
+  return expr::mkArray("blks_kind", expr::mkUInt(0, bitsBid()),
+                       expr::mkUInt(0, 1));
+}
+
+expr Memory::mk_size_array(bool local) const {
+  // ASSUMPTION: programs can only allocate up to half of address space
+  // so the first bit of size is always zero.
+  // We need this assumption to support negative offsets.
+  auto range = expr::mkUInt(0,
+                            local ? bits_for_local_bid : bits_for_nonlocal_bid);
+  auto name = local ? mkName("blks_size") : string("blks_size");
+  return expr::mkArray(name.c_str(), range, expr::mkUInt(0, bitsPtrSize() - 1));
 }
 
 // last_bid stores 1 + the last memory block id.
@@ -380,9 +391,13 @@ static unsigned last_nonlocal_bid;
 static unsigned last_idx_ptr;
 
 Memory::Memory(State &state) : state(&state) {
-  blocks_val = mk_val_array("blks_val");
-  blocks_readonly = mk_readonly_array("blks_readonly");
+  blocks_val = mk_val_array();
+  blocks_readonly = mk_readonly_array();
   blocks_liveness = mk_liveness_uf();
+  blocks_addr = mk_addr_array();
+  blocks_size_local = mk_size_array(true);
+  blocks_kind = mk_kind_array();
+
   {
     Pointer idx(*this, "#idx0");
 
@@ -392,22 +407,7 @@ Memory::Memory(State &state) : state(&state) {
     expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
                 !loadedptr.is_local();
     state.addAxiom(expr::mkForAll({ idx() }, move(cond)));
-
-    // initialize all local blocks as non-pointer, poison value
-    // This is okay because loading a pointer as non-pointer is also poison.
-    expr is_local = idx.is_local();
-    expr val = expr::mkIf(is_local, expr::mkUInt(0, bitsByte()),
-                          blocks_val.load(idx()));
-    blocks_val = expr::mkLambda({ idx() }, move(val));
-
-    // all local blocks are dead in the beginning
-    expr bid = idx.get_bid();
-    val = !is_local && blocks_liveness.load(bid);
-    blocks_liveness = expr::mkLambda({ bid }, move(val));
   }
-
-  blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bitsBid()),
-                              expr::mkUInt(0, 1));
 
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
@@ -452,19 +452,34 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     *bid_out = bid;
 
   Pointer p(*this, bid, is_local);
-  state->addPre(p.is_aligned(align));
 
-  expr size_zextOrTrunced = size.zextOrTrunc(bits_size_t);
-  state->addPre(p.block_size() == size_zextOrTrunced);
+  if (is_local) {
+    expr newaddr = expr::mkFreshVar("addr", expr::mkUInt(0, bitsPtrSize()));
+    // A local block's address is quantified because a memory block's address
+    // is nondeterminstically chosen, as the result of a freeze instruction.
+    // Note that determining whether this can be null or not is a different
+    // question, and it is addressed at Malloc::toSMT().
+    state->addQuantVar(newaddr);
+    blocks_addr = blocks_addr.store(p.get_bid(), newaddr);
+  }
+
+  state->addPre(p.block_size() == size.zextOrTrunc(bits_size_t));
+  state->addPre(p.is_aligned(align), is_local);
   // TODO: If its address space is not 0, its address can be 0.
-  state->addPre(p.get_address() != 0);
+  state->addPre(p.get_address() != 0, is_local);
   // TODO: address of new blocks should be disjoint from other live blocks
 
   if (is_local) {
+    // The memory block was initially not allocated.
+    state->addPre(!mk_liveness_uf().load(p.get_bid()));
     blocks_liveness = blocks_liveness.store(p.get_bid(), true);
+
+    // initialize its value as non-pointer, poison value
+    // This is okay because loading a pointer as non-pointer is also poison.
+    expr ofs = expr::mkFreshVar("ofs", expr::mkUInt(0, bitsOffset()));
+    state->addPre(expr::mkForAll({ ofs }, mk_val_array().load(ofs.concat(p.get_bid())) == 0));
   } else {
     // The memory block was initially alive.
-    // TODO: const global variables should be read-only
     state->addAxiom(mk_liveness_uf().load(p.get_bid()));
   }
   blocks_kind = blocks_kind.store(p.get_bid(),

@@ -1,4 +1,5 @@
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
+; TEST-ARGS: -disable-undef-input
 
 define i16 @f(i16** %pptr) {
   %ptr0 = call i8* @malloc(i64 2)
