@@ -191,7 +191,7 @@ Value* get_operand(llvm::Value *v) {
     int align = gv->getAlignment();
     auto name = "@" + gv->getName().str();
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
-                                           initval);
+                                           initval, gv->isConstant());
     auto ret = val.get();
     gvar = ret;
     current_fn->addConstant(move(val));

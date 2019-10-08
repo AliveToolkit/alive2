@@ -280,7 +280,8 @@ expr Pointer::is_aligned(unsigned align) const {
 }
 
 // When bytes is 0, pointer is always derefenceable
-void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
+void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
+                                 bool iswrite) {
   expr block_sz = block_size();
   expr offset = get_offset().sextOrTrunc(m.bits_size_t);
   expr bytes = bytes0.zextOrTrunc(m.bits_size_t);
@@ -295,11 +296,15 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align) {
   // 3) check block is alive
   cond &= is_block_alive();
 
+  // 4) If it is write, it should not be readonly
+  if (iswrite)
+    cond &= !is_readonly();
+
   m.state->addUB(bytes.ugt(0).implies(cond));
 }
 
-void Pointer::is_dereferenceable(unsigned bytes, unsigned align) {
-  is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align);
+void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
+  is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align, iswrite);
 }
 
 // general disjoint check for unsigned integer
@@ -325,6 +330,10 @@ expr Pointer::is_block_alive() const {
 
 expr Pointer::is_at_heap() const {
   return m.blocks_kind.load(get_bid()) == 1;
+}
+
+expr Pointer::is_readonly() const {
+  return m.blocks_readonly.load(get_bid());
 }
 
 Pointer Pointer::mkNullPointer(Memory &m) {
@@ -359,6 +368,10 @@ expr Memory::mk_liveness_uf() const {
   return expr::mkArray("blks_liveness", expr::mkUInt(0, bitsBid()), true);
 }
 
+expr Memory::mk_readonly_array(const char *name) const {
+  return expr::mkArray("blks_readonly", expr::mkUInt(0, bitsBid()), false);
+}
+
 // last_bid stores 1 + the last memory block id.
 // Global block id 0 is reserved for a null block.
 // TODO: In the twin memory, there is no null block, so the initial last_bid
@@ -370,6 +383,7 @@ static unsigned last_idx_ptr;
 
 Memory::Memory(State &state) : state(&state) {
   blocks_val = mk_val_array("blks_val");
+  blocks_readonly = mk_readonly_array("blks_readonly");
   blocks_liveness = mk_liveness_uf();
   {
     Pointer idx(*this, "#idx0");
@@ -428,7 +442,7 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out) {
   // Produce a local block if blockKind is heap or stack.
-  bool is_local = blockKind != GLOBAL;
+  bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 
   auto &last_bid = is_local ? last_local_bid : last_nonlocal_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
@@ -457,6 +471,9 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   }
   blocks_kind = blocks_kind.store(p.get_bid(),
                                   expr::mkUInt(blockKind == HEAP, 1));
+  blocks_readonly = blocks_readonly.store(p.get_bid(),
+                                          blockKind == CONSTGLOBAL);
+
   return p.release();
 }
 
@@ -476,7 +493,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   vector<Byte> bytes = valueToBytes(v, type, *this);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes.size(), align);
+  ptr.is_dereferenceable(bytes.size(), align, true);
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
     // FIXME: support big-endian
     blocks_val = blocks_val.store((ptr + i).release(), bytes[i]());
@@ -488,7 +505,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
   unsigned bytesize = divide_up(bitsize, 8);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytesize, align);
+  ptr.is_dereferenceable(bytesize, align, false);
 
   vector<Byte> loadedBytes;
   for (unsigned i = 0; i < bytesize; ++i) {
@@ -501,7 +518,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
   assert(val.bits() == 8);
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytesize, align);
+  ptr.is_dereferenceable(bytesize, align, true);
 
   vector<Byte> bytes = valueToBytes(val, IntType("", 8), *this);
   assert(bytes.size() == 1);
@@ -525,8 +542,8 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
                     unsigned align_dst, unsigned align_src, bool is_move) {
   Pointer dst(*this, d), src(*this, s);
-  dst.is_dereferenceable(bytesize, align_dst);
-  src.is_dereferenceable(bytesize, align_src);
+  dst.is_dereferenceable(bytesize, align_dst, true);
+  src.is_dereferenceable(bytesize, align_src, false);
   if (!is_move)
     src.is_disjoint(bytesize, dst, bytesize);
 

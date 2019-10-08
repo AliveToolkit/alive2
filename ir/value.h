@@ -91,11 +91,14 @@ class GlobalVariable final : public Value {
   // This is initialized only if the global is constant.
   // If it has no initial value, this is nullptr.
   Value *initval;
+  // Is this global variable constant?
+  // initval can be null even if isconst is true if this is an external const.
+  bool isconst;
 public:
   GlobalVariable(Type &type, std::string &&name, int allocsize, int align,
-                 Value *initval) :
+                 Value *initval, bool isconst) :
     Value(type, std::move(name)), allocsize(allocsize), align(align),
-    initval(initval) {}
+    initval(initval), isconst(isconst) {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };
