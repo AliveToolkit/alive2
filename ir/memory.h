@@ -73,12 +73,13 @@ public:
 
   smt::expr inbounds() const;
   smt::expr is_aligned(unsigned align) const;
-  void is_dereferenceable(unsigned bytes, unsigned align);
-  void is_dereferenceable(const smt::expr &bytes, unsigned align);
+  void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
+  void is_dereferenceable(const smt::expr &bytes, unsigned align, bool iswrite);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
   smt::expr is_block_alive() const;
   smt::expr is_at_heap() const;
+  smt::expr is_readonly() const;
 
   const Memory& getMemory() const { return m; }
 
@@ -103,18 +104,20 @@ class Memory {
   unsigned bits_size_t = 64;
 
   smt::expr blocks_val; // array: (bid, offset) -> Byte
-  smt::expr blocks_liveness; // array: bid -> uint(1bit), 1 if alive, 0 if freed
+  smt::expr blocks_liveness; // array: bid -> bool
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
+  smt::expr blocks_readonly; // array: bid -> bool, true if readonly
 
   std::string mkName(const char *str, bool src) const;
   std::string mkName(const char *str) const;
 
   smt::expr mk_val_array(const char *name) const;
   smt::expr mk_liveness_uf() const;
+  smt::expr mk_readonly_array(const char *name) const;
 
 public:
   enum BlockKind {
-    HEAP, STACK, GLOBAL
+    HEAP, STACK, GLOBAL, CONSTGLOBAL
   };
 
   Memory(State &state);

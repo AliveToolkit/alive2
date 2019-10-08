@@ -96,16 +96,19 @@ StateValue GlobalVariable::toSMT(State &s) const {
   auto sizeexpr = expr::mkInt(allocsize, 64);
   expr ptrval;
   unsigned glbvar_bid;
+  auto blkkind = isconst ? Memory::CONSTGLOBAL : Memory::GLOBAL;
+
   if (s.hasGlobalVarBid(getName(), glbvar_bid)) {
     // Use the same block id that is used by src
     assert(!s.isSource());
-    ptrval = s.getMemory().alloc(sizeexpr, align, Memory::GLOBAL, glbvar_bid);
+    ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, glbvar_bid);
   } else {
-    ptrval = s.getMemory().alloc(sizeexpr, align, Memory::GLOBAL, nullopt,
+    ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, nullopt,
                                  &glbvar_bid);
     s.addGlobalVarBid(getName(), glbvar_bid);
   }
   if (initval) {
+    assert(isconst);
     s.getMemory().store(ptrval, s[*initval], initval->getType(), align);
   }
   return { move(ptrval), true };
