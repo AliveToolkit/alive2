@@ -157,7 +157,9 @@ if (CYGWIN)
 else()
   target_link_libraries(alive PRIVATE ${Z3_LIBRARIES})
   target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
-  target_link_libraries(alive-tv PRIVATE ${Z3_LIBRARIES})
+  if (BUILD_LLVM_UTILS OR BUILD_TV)
+    target_link_libraries(alive-tv PRIVATE ${Z3_LIBRARIES})
+  endif()
 endif()
 
 add_custom_target("check"
