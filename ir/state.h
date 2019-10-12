@@ -17,9 +17,6 @@
 
 namespace IR {
 
-struct LoopInCFGDetected : public std::exception {};
-struct OutOfMemory : public std::exception {};
-
 class Value;
 class BasicBlock;
 class Function;

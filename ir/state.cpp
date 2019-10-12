@@ -4,9 +4,11 @@
 #include "ir/state.h"
 #include "ir/function.h"
 #include "smt/smt.h"
+#include "util/errors.h"
 #include <cassert>
 
 using namespace smt;
+using namespace util;
 using namespace std;
 
 namespace IR {
@@ -53,7 +55,7 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   if (hit_half_memory_limit())
-    throw OutOfMemory();
+    throw AliveException("Out of memory; skipping function.", false);
 
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
@@ -115,7 +117,8 @@ bool State::startBB(const BasicBlock &bb) {
 
 void State::addJump(const BasicBlock &dst, expr &&cond) {
   if (seen_bbs.count(&dst))
-    throw LoopInCFGDetected();
+    throw AliveException("Loops are not supported yet! Skipping function.",
+                         false);
 
   cond &= domain.first;
   auto p = predecessor_data[&dst].try_emplace(current_bb, DomainTy({}, {}),

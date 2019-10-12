@@ -107,12 +107,12 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
                   const char *msg, bool check_each_var) {
 
   if (r.isInvalid()) {
-    errs.add("Invalid expr");
+    errs.add("Invalid expr", false);
     return;
   }
 
   if (r.isUnknown()) {
-    errs.add("Timeout");
+    errs.add("Timeout", false);
     return;
   }
 
@@ -171,7 +171,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     print_varval(s, tgt_state, m, var, type, tgt);
   }
 
-  errs.add(s.str());
+  errs.add(s.str(), true);
 }
 
 
@@ -264,7 +264,7 @@ static void check_refinement(Errors &errs, Transform &t,
   pre &= src_state.getPre() && tgt_state.getPre();
 
   if (check_expr(axioms && preprocess(t, qvars, uvars, expr(pre))).isUnsat()) {
-    errs.add("Precondition is always false");
+    errs.add("Precondition is always false", false);
     return;
   }
 
@@ -308,10 +308,8 @@ Errors TransformVerify::verify() const {
     sym_exec(src_state);
     tgt_state.copyGlobalVarBidsFromSrc(src_state);
     sym_exec(tgt_state);
-  } catch (LoopInCFGDetected&) {
-    return "Loops are not supported yet! Skipping function.";
-  } catch (OutOfMemory&) {
-    return "Out of memory; skipping function.";
+  } catch (AliveException e) {
+    return move(e);
   }
 
   Errors errs;

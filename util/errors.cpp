@@ -7,42 +7,43 @@ using namespace std;
 
 namespace util {
 
-Errors::Errors(const char *str) {
-  add(str);
+Errors::Errors(const char *str, bool is_unsound) {
+  add(str, is_unsound);
 }
 
-Errors::Errors(string &&str) {
-  add(move(str));
+Errors::Errors(string &&str, bool is_unsound) {
+  add(move(str), is_unsound);
 }
 
-void Errors::add(const char *str) {
-  errs.emplace_back(str);
+Errors::Errors(AliveException &&e) {
+  add(move(e));
 }
 
-void Errors::add(string &&str) {
-  errs.emplace_back(str);
+void Errors::add(const char *str, bool is_unsound) {
+  errs.emplace_back(str, is_unsound);
 }
 
-bool Errors::isTimeout() const {
-  return errs.size() == 1 && errs[0] == "Timeout";
+void Errors::add(string &&str, bool is_unsound) {
+  errs.emplace_back(move(str), is_unsound);
 }
 
-bool Errors::isInvalidExpr() const {
-  return errs.size() == 1 && errs[0] == "Invalid expr";
+void Errors::add(AliveException &&e) {
+  add(move(e.msg), e.is_unsound);
 }
 
-bool Errors::isOOM() const {
-  return errs.size() == 1 && errs[0] == "Out of memory; skipping function.";
-}
-
-bool Errors::isLoopyCFG() const {
-  return errs.size() == 1 &&
-         errs[0] == "Loops are not supported yet! Skipping function.";
+bool Errors::isUnsound() const {
+  for (auto &[msg, unsound] : errs) {
+    (void)msg;
+    if (unsound)
+      return true;
+  }
+  return false;
 }
 
 ostream& operator<<(ostream &os, const Errors &errs) {
-  for (auto &err : errs.errs) {
-    os << "ERROR: " << err << '\n';
+  for (auto &[msg, unsound] : errs.errs) {
+    (void)unsound;
+    os << "ERROR: " << msg << '\n';
   }
   return os;
 }
