@@ -6,7 +6,7 @@ Name: add undef1
 
 
 Name: add undef2
-%r = add undef, %in
+%r = add i11 undef, %in
   =>
 %r = undef  ; undef + x -> undef
 

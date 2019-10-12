@@ -1080,6 +1080,9 @@ expr expr::toBVBool() const {
 }
 
 expr expr::float2BV() const {
+  if (auto app = isAppOf(Z3_OP_FPA_TO_FP))
+    return Z3_get_app_arg(ctx(), app, 0);
+
   return unop_fold(Z3_mk_fpa_to_ieee_bv);
 }
 
@@ -1088,7 +1091,13 @@ expr expr::float2Real() const {
 }
 
 expr expr::BV2float(const expr &type) const {
-  C(type);
+  C2(type);
+  if (auto app = isAppOf(Z3_OP_FPA_TO_IEEE_BV)) {
+    expr arg = Z3_get_app_arg(ctx(), app, 0);
+    if (arg.sort() == type.sort())
+      return arg;
+  }
+
   return simplify_const(Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort()), *this);
 }
 

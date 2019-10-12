@@ -1,5 +1,11 @@
 Name: identity
+%t = fneg half %a
+  =>
 %t = fneg %a
+
+
+Name: identity2
+%t = fneg <2xfloat> %a
   =>
 %t = fneg %a
 
