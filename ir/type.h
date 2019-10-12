@@ -5,6 +5,7 @@
 
 #include "smt/expr.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -58,8 +59,7 @@ public:
   virtual bool isVectorType() const;
   bool isAggregateType() const;
 
-  virtual smt::expr enforceIntType(unsigned bits) const;
-  smt::expr enforceIntType() const;
+  virtual smt::expr enforceIntType(unsigned bits = 0) const;
   smt::expr enforceIntOrPtrType() const;
   virtual smt::expr enforcePtrType() const;
   virtual smt::expr enforceStructType() const;
@@ -68,11 +68,11 @@ public:
   virtual smt::expr enforceFloatType() const;
 
   virtual smt::expr enforceVectorType(
-    smt::expr (Type::*elementTy)() const) const;
+    const std::function<smt::expr(const Type&)> &enforceElem) const;
   smt::expr enforceScalarOrVectorType(
-    smt::expr(Type::*elementTy)() const) const;
+    const std::function<smt::expr(const Type&)> &enforceElem) const;
 
-  smt::expr enforceIntOrVectorType() const;
+  smt::expr enforceIntOrVectorType(unsigned bits = 0) const;
   smt::expr enforceIntOrPtrOrVectorType() const;
   smt::expr enforceFloatOrVectorType() const;
 
@@ -266,8 +266,8 @@ public:
 
   smt::expr getTypeConstraints() const override;
   bool isVectorType() const override;
-  smt::expr
-    enforceVectorType(smt::expr(Type::*elementTy)() const) const override;
+  smt::expr enforceVectorType(
+    const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
 };
 
@@ -320,8 +320,8 @@ public:
   smt::expr enforceAggregateType(
     std::vector<Type*> *element_types) const override;
   smt::expr enforceFloatType() const override;
-  smt::expr
-    enforceVectorType(smt::expr(Type:: *elementTy)() const) const override;
+  smt::expr enforceVectorType(
+    const std::function<smt::expr(const Type&)> &enforceElem) const override;
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;

@@ -130,10 +130,6 @@ expr Type::enforceIntType(unsigned bits) const {
   return false;
 }
 
-expr Type::enforceIntType() const {
-  return enforceIntType(0);
-}
-
 expr Type::enforceIntOrPtrType() const {
   return enforceIntType() || enforcePtrType();
 }
@@ -154,24 +150,29 @@ expr Type::enforceFloatType() const {
   return false;
 }
 
-expr Type::enforceVectorType(expr(Type::*elementTy)() const) const {
+expr
+Type::enforceVectorType(const function<expr(const Type&)> &enforceElem) const {
   return false;
 }
 
-expr Type::enforceScalarOrVectorType(expr(Type::*elementTy)() const) const {
-  return (this->*elementTy)() || enforceVectorType(elementTy);
+expr Type::enforceScalarOrVectorType(
+       const function<expr(const Type&)> &enforceElem) const {
+  return enforceElem(*this) || enforceVectorType(enforceElem);
 }
 
-expr Type::enforceIntOrVectorType() const {
-  return enforceScalarOrVectorType(&Type::enforceIntType);
+expr Type::enforceIntOrVectorType(unsigned bits) const {
+  return enforceScalarOrVectorType(
+           [&](auto &ty) { return ty.enforceIntType(bits); });
 }
 
 expr Type::enforceIntOrPtrOrVectorType() const {
-  return enforceScalarOrVectorType(&Type::enforceIntOrPtrType);
+  return enforceScalarOrVectorType(
+           [&](auto &ty) { return ty.enforceIntOrPtrType(); });
 }
 
 expr Type::enforceFloatOrVectorType() const {
-  return enforceScalarOrVectorType(&Type::enforceFloatType);
+  return enforceScalarOrVectorType(
+           [&](auto &ty) { return ty.enforceFloatType(); });
 }
 
 const FloatType* Type::getAsFloatType() const {
@@ -737,8 +738,9 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
-expr VectorType::enforceVectorType(expr(Type::*elementTy)() const) const {
-  return (children[0]->*elementTy)();
+expr VectorType::enforceVectorType(
+    const function<expr(const Type&)> &enforceElem) const {
+  return enforceElem(*children[0]);
 }
 
 void VectorType::print(ostream &os) const {
@@ -964,8 +966,9 @@ expr SymbolicType::enforceFloatType() const {
   return isFloat();
 }
 
-expr SymbolicType::enforceVectorType(expr(Type::*elementTy)() const) const {
-  return v ? (isVector() && v->enforceVectorType(elementTy)) : false;
+expr SymbolicType::enforceVectorType(
+    const function<expr(const Type&)> &enforceElem) const {
+  return v ? (isVector() && v->enforceVectorType(enforceElem)) : false;
 }
 
 const FloatType* SymbolicType::getAsFloatType() const {
