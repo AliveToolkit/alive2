@@ -8,12 +8,22 @@ Name: uitofp
   =>
 %r = 255.0
 
-Name: sitofp
+Name: fp2si
 %r = fptosi -1.0
   =>
 %r = -1
 
-Name: sitofp
+Name: fp2si 2
+%r = fptosi -200.0 to i2
+  =>
+%r = poison
+
+Name: fp2ui
 %r = fptoui 255.0 to i8
   =>
 %r = -1
+
+Name: fp2ui 2
+%r = fptoui -1.0 to i8
+  =>
+%r = poison

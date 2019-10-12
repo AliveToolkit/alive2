@@ -680,7 +680,7 @@ void ConversionOp::print(ostream &os) const {
 
 StateValue ConversionOp::toSMT(State &s) const {
   auto &[v, vp] = s[*val];
-  expr newval;
+  expr newval, np = vp;
   auto to_bw = getType().bits();
 
   switch (op) {
@@ -713,9 +713,15 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case FPToSInt:
     newval = v.fp2sint(to_bw);
+    np &= v.foge(expr::IntSMin(getType().bits()).sint2fp(v));
+    np &= v.fole(expr::IntSMax(getType().bits()).sint2fp(v));
+    np &= !v.isInf();
     break;
   case FPToUInt:
     newval = v.fp2uint(to_bw);
+    np &= v.foge(expr::mkFloat(0, v));
+    np &= v.fole(expr::IntUMax(getType().bits()).uint2fp(v));
+    np &= !v.isInf();
     break;
   case Ptr2Int:
     newval = s.getMemory().ptr2int(v).zextOrTrunc(getType().bits());
@@ -724,7 +730,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     newval = s.getMemory().int2ptr(v);
     break;
   }
-  return { move(newval), expr(vp) };
+  return { move(newval), move(np) };
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {

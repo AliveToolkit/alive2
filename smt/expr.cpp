@@ -175,6 +175,11 @@ expr expr::mkInt(const char *n, unsigned bits) {
   return bits ? Z3_mk_numeral(ctx(), n, mkBVSort(bits)) : expr();
 }
 
+expr expr::mkFloat(double n, const expr &type) {
+  C2(type);
+  return Z3_mk_fpa_numeral_double(ctx(), n, type.sort());
+}
+
 expr expr::mkHalf(float n) {
   return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_half(ctx()));
 }
@@ -223,13 +228,19 @@ expr expr::mkFreshVar(const char *prefix, const expr &type) {
 expr expr::IntSMin(unsigned bits) {
   if (bits == 0)
     return {};
-  return mkUInt(1, 1).concat(mkUInt(0, bits-1));
+  expr v = mkUInt(1, 1);
+  if (bits > 1)
+    v = v.concat(mkUInt(0, bits - 1));
+  return v;
 }
 
 expr expr::IntSMax(unsigned bits) {
   if (bits == 0)
     return {};
-  return mkUInt(0, 1).concat(mkInt(-1, bits-1));
+  expr v = mkUInt(0, 1);
+  if (bits > 1)
+    v = v.concat(mkInt(-1, bits - 1));
+  return v;
 }
 
 expr expr::IntUMax(unsigned bits) {
