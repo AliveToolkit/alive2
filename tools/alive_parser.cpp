@@ -1069,13 +1069,15 @@ vector<Transform> parse(string_view buf) {
 
     // copy inputs from src to target
     decltype(identifiers) identifiers_tgt;
-    for (auto &[name, val] : identifiers) {
-      if (dynamic_cast<Input*>(val)) {
-        auto input = make_unique<Input>(val->getType(), string(name));
+    for (auto &val : t.src.getInputs()) {
+      auto &name = val.getName();
+      if (dynamic_cast<const Input*>(&val)) {
+        auto input = make_unique<Input>(val.getType(), string(name));
         identifiers_tgt.emplace(name, input.get());
         t.tgt.addInput(move(input));
-      } else if (dynamic_cast<ConstantInput*>(val)) {
-        auto input = make_unique<ConstantInput>(val->getType(), string(name));
+      } else {
+        assert(dynamic_cast<const ConstantInput*>(&val));
+        auto input = make_unique<ConstantInput>(val.getType(), string(name));
         identifiers_tgt.emplace(name, input.get());
         t.tgt.addInput(move(input));
       }

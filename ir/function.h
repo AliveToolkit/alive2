@@ -98,6 +98,8 @@ public:
 
   bool hasReturn() const;
 
+  void syncDataWithSrc(const Function &src);
+
   auto& getBBs() { return BB_order; }
   const auto& getBBs() const { return BB_order; }
 

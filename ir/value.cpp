@@ -115,6 +115,13 @@ StateValue GlobalVariable::toSMT(State &s) const {
 }
 
 
+Input::Input(Type &type, string &&name)
+  : Value(type, string(name)), smt_name(move(name)) {}
+
+void Input::copySMTName(const Input &other) {
+  smt_name = other.smt_name;
+}
+
 void Input::print(ostream &os) const {
   UNREACHABLE();
 }
@@ -123,7 +130,7 @@ StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
-  auto [val, vars] = getType().mkInput(s, getName().c_str());
+  auto [val, vars] = getType().mkInput(s, smt_name.c_str());
 
   if (!config::disable_undef_input) {
     vector<pair<expr, expr>> repls;
@@ -148,7 +155,7 @@ StateValue Input::toSMT(State &s) const {
 }
 
 expr Input::getTyVar() const {
-  string tyname = "ty_" + getName();
+  string tyname = "ty_" + smt_name;
   return expr::mkVar(tyname.c_str(), 2);
 }
 

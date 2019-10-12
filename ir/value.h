@@ -105,9 +105,10 @@ public:
 
 
 class Input final : public Value {
+  std::string smt_name;
 public:
-  Input(Type &type, std::string &&name) :
-    Value(type, std::move(name)) {}
+  Input(Type &type, std::string &&name);
+  void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTyVar() const;

@@ -3,8 +3,10 @@
 
 #include "ir/function.h"
 #include "ir/instr.h"
+#include "util/errors.h"
 
 using namespace smt;
+using namespace util;
 using namespace std;
 
 namespace IR {
@@ -106,6 +108,20 @@ bool Function::hasReturn() const {
       return true;
   }
   return false;
+}
+
+void Function::syncDataWithSrc(const Function &src) {
+  auto IS = src.inputs.begin(), ES = src.inputs.end();
+  auto IT = inputs.begin(), ET = inputs.end();
+
+  for (; IS != ES && IT != ET; ++IS, ++IT) {
+    if (auto in_tgt = dynamic_cast<Input*>(IT->get()))
+      in_tgt->copySMTName(*dynamic_cast<Input*>(IS->get()));
+  }
+
+  if (IS != ES || IT != ET)
+    throw AliveException("Source and target have different number of args",
+                         false);
 }
 
 Function::instr_iterator::

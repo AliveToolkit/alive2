@@ -298,6 +298,8 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
       tgt_instrs.emplace(i.getName(), &i);
     }
   }
+
+  t.tgt.syncDataWithSrc(t.src);
 }
 
 Errors TransformVerify::verify() const {
@@ -373,20 +375,6 @@ TypingAssignments TransformVerify::getTypings() const {
 
   // return type
   c &= t.src.getType() == t.tgt.getType();
-
-  // input types
-  {
-    unordered_map<string, const Value*> tgt_inputs;
-    for (auto &i : t.tgt.getInputs()) {
-      tgt_inputs.emplace(i.getName(), &i);
-    }
-
-    for (auto &i : t.src.getInputs()) {
-      auto tgt_i = tgt_inputs.find(i.getName());
-      if (tgt_i != tgt_inputs.end())
-        c &= i.getType() == tgt_i->second->getType();
-    }
-  }
 
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
