@@ -34,7 +34,7 @@ expr Type::sizeVar() const {
 }
 
 expr Type::is(unsigned t) const {
-  return typeVar() == expr::mkUInt(t, var_type_bits);
+  return typeVar() == t;
 }
 
 expr Type::isInt() const    { return is(SymbolicType::Int); }
@@ -346,8 +346,16 @@ expr FloatType::toBV(expr e) const {
   return e.float2BV();
 }
 
+StateValue FloatType::toBV(StateValue v) const {
+  return Type::toBV(move(v));
+}
+
 expr FloatType::fromBV(expr e) const {
   return e.BV2float(getDummyValue(true).value);
+}
+
+StateValue FloatType::fromBV(StateValue v) const {
+  return Type::fromBV(move(v));
 }
 
 expr FloatType::sizeVar() const {
@@ -523,7 +531,7 @@ AggregateType::AggregateType(string &&name, bool symbolic)
 
   // FIXME: limitation below is for vectors; what about structs and arrays?
   for (unsigned i = 0; i < num; ++i) {
-    sym[i] = make_unique<SymbolicType>("v_" + name,
+    sym[i] = make_unique<SymbolicType>("v#" + to_string(i) + '_' + name,
                                         (1 << SymbolicType::Int) |
                                         (1 << SymbolicType::Float) |
                                         (1 << SymbolicType::Ptr));
@@ -650,8 +658,16 @@ expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
   return r;
 }
 
+expr AggregateType::toBV(expr e) const {
+  return Type::toBV(move(e));
+}
+
 StateValue AggregateType::toBV(StateValue v) const {
   return v;
+}
+
+expr AggregateType::fromBV(expr e) const {
+  return Type::fromBV(move(e));
 }
 
 StateValue AggregateType::fromBV(StateValue v) const {
@@ -663,8 +679,8 @@ AggregateType::refines(const StateValue &src, const StateValue &tgt) const {
   set<expr> poison, value;
   for (unsigned i = 0; i < elements; ++i) {
     auto [p, v] = children[i]->refines(extract(src, i), extract(tgt, i));
-    poison.insert(p);
-    value.insert(v);
+    poison.insert(move(p));
+    value.insert(move(v));
   }
   return { expr::mk_and(poison), expr::mk_and(value) };
 }
@@ -677,7 +693,7 @@ AggregateType::mkInput(State &s, const char *name) const {
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
     auto [v, vs] = children[i]->mkInput(s, c_name.c_str());
-    v = children[i]->toBV(v);
+    v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
     vars.insert(vars.end(), vs.begin(), vs.end());
   }
@@ -801,32 +817,24 @@ SymbolicType::SymbolicType(string &&name, unsigned type_mask)
     s.emplace(string(name));
 }
 
+#define DISPATCH(call, undef)     \
+  switch (typ) {                  \
+  case Int:       return i->call; \
+  case Float:     return f->call; \
+  case Ptr:       return p->call; \
+  case Array:     return a->call; \
+  case Vector:    return v->call; \
+  case Struct:    return s->call; \
+  case Undefined: undef;          \
+  }                               \
+  UNREACHABLE()
+
 unsigned SymbolicType::bits() const {
-  switch (typ) {
-  case Int:    return i->bits();
-  case Float:  return f->bits();
-  case Ptr:    return p->bits();
-  case Array:  return a->bits();
-  case Vector: return v->bits();
-  case Struct: return s->bits();
-  case Undefined:
-    assert(0 && "undefined at SymbolicType::bits()");
-  }
-  UNREACHABLE();
+  DISPATCH(bits(), UNREACHABLE());
 }
 
 StateValue SymbolicType::getDummyValue(bool non_poison) const {
-  switch (typ) {
-  case Int:    return i->getDummyValue(non_poison);
-  case Float:  return f->getDummyValue(non_poison);
-  case Ptr:    return p->getDummyValue(non_poison);
-  case Array:  return a->getDummyValue(non_poison);
-  case Vector: return v->getDummyValue(non_poison);
-  case Struct: return s->getDummyValue(non_poison);
-  case Undefined:
-    break;
-  }
-  UNREACHABLE();
+  DISPATCH(getDummyValue(non_poison), UNREACHABLE());
 }
 
 expr SymbolicType::getTypeConstraints() const {
@@ -835,8 +843,7 @@ expr SymbolicType::getTypeConstraints() const {
   if (f) c |= isFloat()  && f->getTypeConstraints();
   if (p) c |= isPtr()    && p->getTypeConstraints();
   if (a) c |= isArray()  && a->getTypeConstraints();
-  // FIXME: disabled temporarily until BinOps/etc support vectors
-  //if (v) c |= isVector() && v->getTypeConstraints();
+  if (v) c |= isVector() && v->getTypeConstraints();
   if (s) c |= isStruct() && s->getTypeConstraints();
   return c;
 }
@@ -865,7 +872,7 @@ expr SymbolicType::operator==(const Type &b) const {
     if (p && rhs->p) c |= isPtr()    && *p == *rhs->p;
     if (a && rhs->a) c |= isArray()  && *a == *rhs->a;
     if (v && rhs->v) c |= isVector() && *v == *rhs->v;
-    // FIXME: add support for this: c |= isStruct() && s == rhs->s;
+    if (s && rhs->s) c |= isStruct() && *s == *rhs->s;
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
@@ -896,7 +903,7 @@ expr SymbolicType::sameType(const Type &b) const {
     if (p && rhs->p) c |= isPtr()    && p->sameType(*rhs->p);
     if (a && rhs->a) c |= isArray()  && a->sameType(*rhs->a);
     if (v && rhs->v) c |= isVector() && v->sameType(*rhs->v);
-    // FIXME: add support for this: c |= isStruct() && s.sameType(rhs->s);
+    if (s && rhs->s) c |= isStruct() && s->sameType(*rhs->s);
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::sameType");
@@ -976,64 +983,55 @@ const FloatType* SymbolicType::getAsFloatType() const {
 }
 
 const AggregateType* SymbolicType::getAsAggregateType() const {
-  // TODO: needs a proxy or something
-  return &*s;
+  switch (typ) {
+  case Int:
+  case Float:
+  case Ptr:
+    return nullptr;
+  case Array:     return &*a;
+  case Vector:    return &*v;
+  case Struct:    return &*s;
+  case Undefined: return &*s; // FIXME: needs a proxy or something
+  }
+  UNREACHABLE();
 }
 
 const StructType* SymbolicType::getAsStructType() const {
   return &*s;
 }
 
+expr SymbolicType::toBV(expr e) const {
+  DISPATCH(toBV(move(e)), UNREACHABLE());
+}
+
+StateValue SymbolicType::toBV(StateValue val) const {
+  DISPATCH(toBV(move(val)), UNREACHABLE());
+}
+
+expr SymbolicType::fromBV(expr e) const {
+  DISPATCH(fromBV(move(e)), UNREACHABLE());
+}
+
+StateValue SymbolicType::fromBV(StateValue val) const {
+  DISPATCH(fromBV(move(val)), UNREACHABLE());
+}
+
 pair<expr, expr>
 SymbolicType::refines(const StateValue &src, const StateValue &tgt) const {
-  switch (typ) {
-  case Int:       return i->refines(src, tgt);
-  case Float:     return f->refines(src, tgt);
-  case Ptr:       return p->refines(src, tgt);
-  case Array:     return a->refines(src, tgt);
-  case Vector:    return v->refines(src, tgt);
-  case Struct:    return s->refines(src, tgt);
-  case Undefined: UNREACHABLE();
-  }
-  UNREACHABLE();
+  DISPATCH(refines(src, tgt), UNREACHABLE());
 }
 
 pair<expr, vector<expr>>
 SymbolicType::mkInput(State &st, const char *name) const {
-  switch (typ) {
-  case Int:       return i->mkInput(st, name);
-  case Float:     return f->mkInput(st, name);
-  case Ptr:       return p->mkInput(st, name);
-  case Array:     return a->mkInput(st, name);
-  case Vector:    return v->mkInput(st, name);
-  case Struct:    return s->mkInput(st, name);
-  case Undefined: UNREACHABLE();
-  }
-  UNREACHABLE();
+  DISPATCH(mkInput(st, name), UNREACHABLE());
 }
 
 void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
-  switch (typ) {
-  case Int:       i->printVal(os, st, e); break;
-  case Float:     f->printVal(os, st, e); break;
-  case Ptr:       p->printVal(os, st, e); break;
-  case Array:     a->printVal(os, st, e); break;
-  case Vector:    v->printVal(os, st, e); break;
-  case Struct:    s->printVal(os, st, e); break;
-  case Undefined: UNREACHABLE();
-  }
+  DISPATCH(printVal(os, st, e), UNREACHABLE());
 }
 
 void SymbolicType::print(ostream &os) const {
-  switch (typ) {
-  case Int:       i->print(os); break;
-  case Float:     f->print(os); break;
-  case Ptr:       p->print(os); break;
-  case Array:     a->print(os); break;
-  case Vector:    v->print(os); break;
-  case Struct:    s->print(os); break;
-  case Undefined: break;
-  }
+  DISPATCH(print(os), return);
 }
 
 }

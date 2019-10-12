@@ -173,7 +173,9 @@ public:
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
   smt::expr toBV(smt::expr e) const override;
+  IR::StateValue toBV(IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
+  IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
@@ -239,7 +241,9 @@ public:
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType(
     std::vector<Type *> *element_types) const override;
+  smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
+  smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
@@ -325,6 +329,10 @@ public:
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;
+  smt::expr toBV(smt::expr e) const override;
+  IR::StateValue toBV(IR::StateValue v) const override;
+  smt::expr fromBV(smt::expr e) const override;
+  IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(const IR::StateValue &a, const IR::StateValue &b) const override;
   std::pair<smt::expr, std::vector<smt::expr>>

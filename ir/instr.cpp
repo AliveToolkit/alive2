@@ -171,8 +171,8 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
 
 StateValue BinOp::toSMT(State &s) const {
   bool use_default_op = true;
-  std::function<StateValue(const expr&, const expr&, const expr&, const expr&,
-                           const Type&)> fn, scalar_op;
+  function<StateValue(const expr&, const expr&, const expr&, const expr&,
+                      const Type&)> fn, scalar_op;
 
   switch (op) {
   case Add:
@@ -444,8 +444,8 @@ StateValue BinOp::toSMT(State &s) const {
     };
   }
 
-  auto a = s[*lhs];
-  auto b = s[*rhs];
+  auto &a = s[*lhs];
+  auto &b = s[*rhs];
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -531,42 +531,58 @@ void UnaryOp::print(ostream &os) const {
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
-  auto &[v, vp] = s[*val];
-  expr newval;
+  function<expr(const expr&)> fn;
 
   switch (op) {
   case Copy:
-    newval = v;
+    fn = [](auto v) { return v; };
     break;
   case BitReverse:
-    newval = v.bitreverse();
+    fn = [](auto v) { return v.bitreverse(); };
     break;
   case BSwap:
-    newval = v.bswap();;
+    fn = [](auto v) { return v.bswap(); };
     break;
   case Ctpop:
-    newval = v.ctpop();
+    fn = [](auto v) { return v.ctpop(); };
     break;
   case FNeg:
-    newval = v.fneg();
+    fn = [](auto v) { return v.fneg(); };
     break;
   }
-  return { move(newval), expr(vp) };
+
+  auto &v = s[*val];
+
+  if (getType().isVectorType()) {
+    vector<StateValue> vals;
+    auto ty = getType().getAsAggregateType();
+    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+      auto vi = ty->extract(v, i);
+      vals.emplace_back(fn(vi.value), move(vi.non_poison));
+    }
+    return ty->aggregateVals(vals);
+  }
+  return { fn(v.value), expr(v.non_poison) };
 }
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
-  expr instrconstr = true;
+  expr instrconstr;
   switch(op) {
+  case Copy:
+    instrconstr = true;
+    break;
   case BSwap:
-    instrconstr = val->getType().sizeVar().urem(expr::mkUInt(16, 8)) == 0;
-    [[fallthrough]];
+    instrconstr = getType().enforceScalarOrVectorType([](auto &scalar) {
+                    return scalar.enforceIntType() &&
+                           scalar.sizeVar().urem(expr::mkUInt(16, 8)) == 0;
+                  });
+    break;
   case BitReverse:
   case Ctpop:
-    instrconstr &= getType().enforceIntOrVectorType();
-  case Copy:
+    instrconstr = getType().enforceIntOrVectorType();
     break;
   case FNeg:
-    instrconstr = getType().enforceFloatType();
+    instrconstr = getType().enforceFloatOrVectorType();
     break;
   }
 
@@ -625,7 +641,7 @@ StateValue TernaryOp::toSMT(State &s) const {
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType().enforceIntOrVectorType() &&
+         getType().enforceIntType() && // FIXME: vectors
          getType() == a->getType() &&
          getType() == b->getType() &&
          getType() == c->getType();
@@ -713,33 +729,34 @@ StateValue ConversionOp::toSMT(State &s) const {
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
   expr c;
+  // TODO: add vector support
   switch (op) {
   case SExt:
   case ZExt:
-    c = getType().enforceIntOrVectorType() &&
+    c = getType().enforceIntType() &&
         getType().sameType(val->getType()) &&
         val->getType().sizeVar().ult(getType().sizeVar());
     break;
   case Trunc:
-    c = getType().enforceIntOrVectorType() &&
+    c = getType().enforceIntType() &&
         getType().sameType(val->getType()) &&
         getType().sizeVar().ult(val->getType().sizeVar());
     break;
   case BitCast:
     // FIXME: input can only be ptr if result is a ptr as well
-    c = getType().enforceIntOrPtrOrVectorType() &&
+    c = getType().enforceIntType() &&
         getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
   case UIntToFP:
     // FIXME: output is vector iff input is vector
-    c = getType().enforceFloatOrVectorType() &&
-        val->getType().enforceIntOrVectorType();
+    c = getType().enforceFloatType() &&
+        val->getType().enforceIntType();
     break;
   case FPToSInt:
   case FPToUInt:
-    c = getType().enforceIntOrVectorType() &&
-        val->getType().enforceFloatOrVectorType();
+    c = getType().enforceIntType() &&
+        val->getType().enforceFloatType();
     break;
   case Ptr2Int:
     c = getType().enforceIntType() &&
@@ -782,9 +799,10 @@ StateValue Select::toSMT(State &s) const {
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
+  // TODO: vector support
   return cond->getType().enforceIntType(1) &&
          Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrOrVectorType() &&
+         getType().enforceIntOrPtrType() &&
          getType() == a->getType() &&
          getType() == b->getType();
 }
@@ -1076,9 +1094,10 @@ StateValue ICmp::toSMT(State &s) const {
 }
 
 expr ICmp::getTypeConstraints(const Function &f) const {
+  // TODO: add vector support
   return Value::getTypeConstraints() &&
          getType().enforceIntType(1) &&
-         a->getType().enforceIntOrPtrOrVectorType() &&
+         a->getType().enforceIntOrPtrType() &&
          a->getType() == b->getType();
 }
 
@@ -1369,7 +1388,7 @@ StateValue Switch::toSMT(State &s) const {
 expr Switch::getTypeConstraints(const Function &f) const {
   expr typ = value->getType().enforceIntType();
   for (auto &p : targets) {
-    typ &= p.first->getType().enforceIntType();
+    typ &= p.first->getType() == value->getType();
   }
   return typ;
 }
@@ -1600,7 +1619,8 @@ StateValue GEP::toSMT(State &s) const {
 }
 
 expr GEP::getTypeConstraints(const Function &f) const {
-  auto c = getType() == ptr->getType() &&
+  auto c = Value::getTypeConstraints() &&
+           getType() == ptr->getType() &&
            getType().enforcePtrType();
   for (auto &[sz, idx] : idxs) {
     (void)sz;

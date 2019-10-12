@@ -138,8 +138,13 @@ StateValue Input::toSMT(State &s) const {
     val = expr::mkIf(type.extract(0, 0) == 0, val, val.subst(repls));
   }
 
+  expr poison = getType().getDummyValue(false).non_poison;
+  expr non_poison = getType().getDummyValue(true).non_poison;
+
   return { move(val),
-           config::disable_poison_input ? true : type.extract(1, 1) == 0 };
+           config::disable_poison_input
+             ? move(non_poison)
+             : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
 }
 
 expr Input::getTyVar() const {
