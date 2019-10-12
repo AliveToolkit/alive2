@@ -1185,17 +1185,31 @@ void Freeze::print(ostream &os) const {
 }
 
 StateValue Freeze::toSMT(State &s) const {
-  auto &[v, p] = s[*val];
+  auto &v = s[*val];
   s.resetUndefVars();
 
-  if (p.isTrue())
-    return { expr(v), expr(p) };
+  auto scalar = [&](auto &v, auto &np, auto &ty) -> StateValue {
+    if (np.isTrue())
+      return { expr(v), expr(np) };
 
-  StateValue ret_type = getType().getDummyValue(true);
-  expr nondet = expr::mkFreshVar("nondet", ret_type.value);
-  s.addQuantVar(nondet);
+    StateValue ret_type = ty.getDummyValue(true);
+    expr nondet = expr::mkFreshVar("nondet", ret_type.value);
+    s.addQuantVar(nondet);
+    return { expr::mkIf(np, v, move(nondet)), move(ret_type.non_poison) };
+  };
 
-  return { expr::mkIf(p, v, move(nondet)), move(ret_type.non_poison) };
+  // TODO: support recursive aggregates
+
+  if (getType().isAggregateType()) {
+    vector<StateValue> vals;
+    auto ty = getType().getAsAggregateType();
+    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+      auto vi = ty->extract(v, i);
+      vals.emplace_back(scalar(vi.value, vi.non_poison, ty->getChild(i)));
+    }
+    return ty->aggregateVals(vals);
+  }
+  return scalar(v.value, v.non_poison, getType());
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {

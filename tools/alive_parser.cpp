@@ -967,6 +967,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case MALLOC:
     return parse_malloc(name);
   case INT_TYPE:
+  case HALF:
+  case FLOAT:
+  case DOUBLE:
+  case VECTOR_TYPE_PREFIX:
   case NUM:
   case FP_NUM:
   case TRUE:

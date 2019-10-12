@@ -1,10 +1,10 @@
 Name: add max
-%r = uadd_sat %x, -1
+%r = uadd_sat i4 %x, -1
   =>
 %r = -1
 
 Name: uadd undef
-%r = uadd_sat %x, undef
+%r = uadd_sat i7 %x, undef
   =>
 %r = %x
 
@@ -41,6 +41,6 @@ Name: usub overflow
 %r = 0
 
 Name: usub undef
-%r = usub_sat %x, undef
+%r = usub_sat i7 %x, undef
   =>
 %r = %x

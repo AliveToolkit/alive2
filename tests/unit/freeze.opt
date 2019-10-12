@@ -5,11 +5,21 @@ Name: add
 %x = add %y, %y
 
 Name: poison
-%x = poison
+%x = i32 poison
+  =>
+%x = freeze poison
+
+Name: poison2
+%x = <2 x i4> poison
   =>
 %x = freeze poison
 
 Name: undef
-%r = undef
+%r = i8 undef
+  =>
+%r = freeze undef
+
+Name: undef2
+%r = half undef
   =>
 %r = freeze undef
