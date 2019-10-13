@@ -43,17 +43,25 @@ expr IntConst::getTypeConstraints() const {
 FloatConst::FloatConst(Type &type, double val)
   : Constant(type, to_string(val)), val(val) {}
 
+FloatConst::FloatConst(Type &type, std::string &&val)
+  : Constant(type, string(val)), val(move(val)) {}
+
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
          getType().enforceFloatType();
 }
 
 StateValue FloatConst::toSMT(State &s) const {
+  if (auto str = get_if<string>(&val))
+    return { expr::mkNumber(str->c_str(), getType().getDummyValue(true).value),
+             true };
+
   expr e;
+  double v = get<double>(val);
   switch (getType().getAsFloatType()->getFpType()) {
-  case FloatType::Half:    e = expr::mkHalf((float)val); break;
-  case FloatType::Float:   e = expr::mkFloat((float)val); break;
-  case FloatType::Double:  e = expr::mkDouble(val); break;
+  case FloatType::Half:    e = expr::mkHalf((float)v); break;
+  case FloatType::Float:   e = expr::mkFloat((float)v); break;
+  case FloatType::Double:  e = expr::mkDouble(v); break;
   case FloatType::Unknown: UNREACHABLE();
   }
   return { move(e), true };

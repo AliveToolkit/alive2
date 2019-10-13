@@ -192,6 +192,11 @@ expr expr::mkDouble(double n) {
   return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx()));
 }
 
+expr expr::mkNumber(const char *n, const expr &type) {
+  C2(type);
+  return Z3_mk_numeral(ctx(), n, type.sort());
+}
+
 expr expr::mkConst(Z3_func_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
@@ -1170,6 +1175,16 @@ expr expr::store(const expr &idx, const expr &val) const {
 
 expr expr::load(const expr &idx) const {
   C(idx);
+
+  // TODO: add support for alias analysis plugin
+  if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
+    expr cmp = idx == Z3_get_app_arg(ctx(), app, 1);
+
+    if (cmp.isTrue())
+      return Z3_get_app_arg(ctx(), app, 2);
+    if (cmp.isFalse())
+      return expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+  }
   return Z3_mk_select(ctx(), ast(), idx());
 }
 

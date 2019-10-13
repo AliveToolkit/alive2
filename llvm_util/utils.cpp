@@ -104,7 +104,25 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
+  case llvm::Type::VectorTyID: {
+    auto &cache = type_cache[ty];
+    if (!cache) {
+      auto vty = cast<llvm::VectorType>(ty);
+      // TODO: non-fixed sized vectors
+      if (vty->isScalable())
+        goto err;
+
+      auto elems = vty->getElementCount().Min;
+      auto ety = llvm_type2alive(vty->getElementType());
+      if (!ety || elems > 128)
+        return nullptr;
+      cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
+                                      elems, *ety);
+    }
+    return cache.get();
+  }
   default:
+err:
     *out << "Unsupported type: " << *ty << '\n';
     return nullptr;
   }
@@ -141,16 +159,23 @@ Value* get_operand(llvm::Value *v) {
 
   if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
     auto &apfloat = cnst->getValueAPF();
-    auto apint = apfloat.bitcastToAPInt();
-    double val;
-    if (apint.getBitWidth() == 32) {
-      val = apfloat.convertToFloat();
-    } else if (apint.getBitWidth() == 64) {
-      val = apfloat.convertToDouble();
-    } else // TODO
-      return nullptr;
-
-    auto c = make_unique<FloatConst>(*ty, val);
+    unique_ptr<FloatConst> c;
+    switch (ty->getAsFloatType()->getFpType()) {
+    case FloatType::Half: {
+      llvm::SmallString<32> str;
+      apfloat.toString(str);
+      c = make_unique<FloatConst>(*ty, str.str());
+      break;
+    }
+    case FloatType::Float:
+      c = make_unique<FloatConst>(*ty, apfloat.convertToFloat());
+      break;
+    case FloatType::Double:
+      c = make_unique<FloatConst>(*ty, apfloat.convertToDouble());
+      break;
+    case FloatType::Unknown:
+      UNREACHABLE();
+    }
     auto ret = c.get();
     current_fn->addConstant(move(c));
     return ret;
@@ -199,6 +224,17 @@ Value* get_operand(llvm::Value *v) {
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
+    vector<Value*> vals;
+    for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
+      vals.emplace_back(get_operand(*I));
+    }
+    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto ret = val.get();
+    current_fn->addConstant(move(val));
+    return ret;
+  }
+
+  if (auto cnst = dyn_cast<llvm::ConstantAggregateZero>(v)) {
     vector<Value*> vals;
     for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
       vals.emplace_back(get_operand(*I));

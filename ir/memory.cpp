@@ -61,13 +61,13 @@ public:
 
   expr is_ptr() const {
     auto bit = p.bits() - 1;
-    return p.extract(bit, bit);
+    return p.extract(bit, bit) == 1;
   }
 
   // Assuming that this is a pointer byte
   expr ptr_nonpoison() const {
     auto bit = p.bits() - 2;
-    return p.extract(bit, bit);
+    return p.extract(bit, bit) == 1;
   }
 
   expr ptr_value() const { return p.extract(p.bits() - 3, 3); }
@@ -128,8 +128,8 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
       } else {
         non_poison &= ptr_value == loaded_ptr;
       }
-      non_poison &= b.is_ptr() == 1;
-      non_poison &= b.ptr_nonpoison() == 1;
+      non_poison &= b.is_ptr();
+      non_poison &= b.ptr_nonpoison();
       non_poison &= b.ptr_byteoffset() == i;
       first = false;
     }
@@ -141,20 +141,15 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 
     StateValue val;
     bool first = true;
-    // The result is poison if any byte is a pointer byte.
-    expr non_poison = true;
+    IntType i8Ty("", 8);
 
     for (auto &b: bytes) {
-      StateValue v(b.nonptr_value(), b.nonptr_nonpoison());
-
+      expr ptr_np = i8Ty.toBV({ b.nonptr_nonpoison(), !b.is_ptr() }).non_poison;
+      StateValue v(b.nonptr_value(), ptr_np | b.nonptr_nonpoison());
       val = first ? move(v) : v.concat(val);
       first = false;
-      non_poison &= b.is_ptr() == 0;
     }
-
-    val = toType.fromBV(val.trunc(bitsize));
-    val.non_poison &= non_poison;
-    return val;
+    return toType.fromBV(val.trunc(bitsize));
   }
 }
 }
@@ -391,7 +386,7 @@ Memory::Memory(State &state) : state(&state) {
     // All non-local blocks cannot initially contain pointers to local blocks.
     auto byte = Byte(*this, blocks_val.load(idx()));
     Pointer loadedptr(*this, byte.ptr_value());
-    expr cond = byte.is_ptr() == 0 || byte.ptr_nonpoison() == 0 ||
+    expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
                 !loadedptr.is_local();
     state.addPre(expr::mkForAll({ idx() }, move(cond)));
 

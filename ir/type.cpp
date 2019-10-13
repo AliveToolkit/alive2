@@ -728,10 +728,7 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
   assert(elements != 0);
   this->elements = elements;
   defined = true;
-
-  for (unsigned i = 0; i < elements; ++i) {
-    children.emplace_back(&elementTy);
-  }
+  children.resize(elements, &elementTy);
 }
 
 expr VectorType::getTypeConstraints() const {
