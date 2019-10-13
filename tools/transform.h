@@ -38,6 +38,7 @@ public:
   bool operator!() const { return !(bool)*this; }
   operator bool() const;
   void operator++(void);
+  bool hasSingleTyping() const { return has_only_one_solution; }
 
   friend class TransformVerify;
 };

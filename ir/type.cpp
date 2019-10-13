@@ -475,6 +475,10 @@ expr PtrType::getTypeConstraints() const {
   return sizeVar() == bits();
 }
 
+expr PtrType::sizeVar() const {
+  return defined ? expr::mkUInt(bits(), var_bw_bits) : Type::sizeVar();
+}
+
 expr PtrType::operator==(const PtrType &rhs) const {
   return sizeVar() == rhs.sizeVar() &&
          ASVar() == rhs.ASVar();

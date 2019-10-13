@@ -750,7 +750,7 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
     break;
   case BitCast:
     // FIXME: input can only be ptr if result is a ptr as well
-    c = getType().enforceIntType() &&
+    c = (getType().enforceIntOrPtrType() || getType().enforceFloatType()) &&
         getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
@@ -1350,6 +1350,8 @@ StateValue Branch::toSMT(State &s) const {
 }
 
 expr Branch::getTypeConstraints(const Function &f) const {
+  if (!cond)
+    return true;
   return cond->getType().enforceIntType(1);
 }
 

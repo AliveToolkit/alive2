@@ -197,6 +197,7 @@ public:
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   smt::expr operator==(const PtrType &rhs) const;
   smt::expr sameType(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;

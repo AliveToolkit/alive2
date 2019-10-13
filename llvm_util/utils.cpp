@@ -234,6 +234,17 @@ Value* get_operand(llvm::Value *v) {
     return ret;
   }
 
+  if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
+    vector<Value*> vals;
+    for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
+      vals.emplace_back(get_operand(cnst->getElementAsConstant(i)));
+    }
+    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto ret = val.get();
+    current_fn->addConstant(move(val));
+    return ret;
+  }
+
   if (auto cnst = dyn_cast<llvm::ConstantAggregateZero>(v)) {
     vector<Value*> vals;
     for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {

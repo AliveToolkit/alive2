@@ -124,6 +124,16 @@ struct TVPass : public llvm::FunctionPass {
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 
+    {
+      auto types = verifier.getTypings();
+      if (!types) {
+        *out << "Transformation doesn't verify!\n"
+                "ERROR: progrm doesn't type check!\n\n";
+        return false;
+      }
+      assert(types.hasSingleTyping());
+    }
+
     if (Errors errs = verifier.verify()) {
       *out << "Transformation doesn't verify!\n" << errs << endl;
       if (opt_error_fatal && errs.isUnsound()) {

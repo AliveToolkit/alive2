@@ -251,6 +251,16 @@ int main(int argc, char **argv) {
   TransformVerify verifier(t, false);
   t.print(cout, print_opts);
 
+  {
+    auto types = verifier.getTypings();
+    if (!types) {
+      cerr << "Transformation doesn't verify!\n"
+              "ERROR: progrm doesn't type check!\n\n";
+      return false;
+    }
+    assert(types.hasSingleTyping());
+  }
+
   Errors errs = verifier.verify();
   bool result(errs);
   if (result) {
