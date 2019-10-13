@@ -144,8 +144,8 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
     IntType i8Ty("", 8);
 
     for (auto &b: bytes) {
-      expr ptr_np = i8Ty.toBV({ b.nonptr_nonpoison(), !b.is_ptr() }).non_poison;
-      StateValue v(b.nonptr_value(), ptr_np | b.nonptr_nonpoison());
+      StateValue v(b.nonptr_value(),
+                   i8Ty.combine_poison(!b.is_ptr(), b.nonptr_nonpoison()));
       val = first ? move(v) : v.concat(val);
       first = false;
     }

@@ -67,12 +67,14 @@ public:
     std::vector<Type*> *element_types = nullptr) const;
   virtual smt::expr enforceFloatType() const;
 
+  smt::expr enforceVectorType() const;
   virtual smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const;
   smt::expr enforceScalarOrVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const;
 
   smt::expr enforceIntOrVectorType(unsigned bits = 0) const;
+  smt::expr enforceIntOrFloatOrPtrOrVectorType() const;
   smt::expr enforceIntOrPtrOrVectorType() const;
   smt::expr enforceFloatOrVectorType() const;
 
@@ -84,6 +86,10 @@ public:
   virtual IR::StateValue toBV(IR::StateValue v) const;
   virtual smt::expr fromBV(smt::expr e) const;
   virtual IR::StateValue fromBV(IR::StateValue v) const;
+
+  // combine existing poison value in BV repr with a new boolean expr
+  smt::expr combine_poison(const smt::expr &boolean,
+                           const smt::expr &orig) const;
 
   // returns pair of refinement constraints for <poison, !poison && value>
   virtual std::pair<smt::expr, smt::expr>

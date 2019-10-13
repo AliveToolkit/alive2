@@ -150,6 +150,10 @@ expr Type::enforceFloatType() const {
   return false;
 }
 
+expr Type::enforceVectorType() const {
+  return enforceVectorType([](auto &ty) { return true; });
+}
+
 expr
 Type::enforceVectorType(const function<expr(const Type&)> &enforceElem) const {
   return false;
@@ -163,6 +167,11 @@ expr Type::enforceScalarOrVectorType(
 expr Type::enforceIntOrVectorType(unsigned bits) const {
   return enforceScalarOrVectorType(
            [&](auto &ty) { return ty.enforceIntType(bits); });
+}
+
+expr Type::enforceIntOrFloatOrPtrOrVectorType() const {
+  return enforceScalarOrVectorType(
+    [&](auto &ty) { return ty.enforceIntOrPtrType() || ty.enforceFloatType();});
 }
 
 expr Type::enforceIntOrPtrOrVectorType() const {
@@ -192,7 +201,7 @@ expr Type::toBV(expr e) const {
 }
 
 StateValue Type::toBV(StateValue v) const {
-  expr val = toBV(v.value);
+  expr val = toBV(move(v.value));
   auto bw = val.bits();
   return { move(val),
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
@@ -204,6 +213,14 @@ expr Type::fromBV(expr e) const {
 
 StateValue Type::fromBV(StateValue v) const {
   return { fromBV(v.value), v.non_poison == 0 };
+}
+
+expr Type::combine_poison(const expr &boolean, const expr &orig) const {
+  if (orig.isBool())
+    return boolean && orig;
+
+  auto bw = orig.bits();
+  return expr::mkIf(boolean, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) | orig;
 }
 
 ostream& operator<<(ostream &os, const Type &t) {

@@ -749,8 +749,10 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
         getType().sizeVar().ult(val->getType().sizeVar());
     break;
   case BitCast:
-    // FIXME: input can only be ptr if result is a ptr as well
-    c = (getType().enforceIntOrPtrType() || getType().enforceFloatType()) &&
+    c = ((getType().enforcePtrType() && val->getType().enforcePtrType()) ||
+         ((getType().enforceIntType() || getType().enforceFloatType()) &&
+          (val->getType().enforceIntType() ||
+           val->getType().enforceFloatType()))) &&
         getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
@@ -796,19 +798,41 @@ void Select::print(ostream &os) const {
 }
 
 StateValue Select::toSMT(State &s) const {
-  auto &[c, cp] = s[*cond];
-  auto &[av, ap] = s[*a];
-  auto &[bv, bp] = s[*b];
-  auto cond = c == 1u;
-  return { expr::mkIf(cond, av, bv),
-           cp && expr::mkIf(cond, ap, bp) };
+  auto &cv = s[*cond];
+  auto &av = s[*a];
+  auto &bv = s[*b];
+
+  auto scalar = [](const auto &a, const auto &b, const auto &c) -> StateValue {
+    auto cond = c.value == 1;
+    return { expr::mkIf(cond, a.value, b.value),
+             c.non_poison && expr::mkIf(cond, a.non_poison, b.non_poison) };
+  };
+
+  if (auto agg = getType().getAsAggregateType()) {
+    vector<StateValue> vals;
+    auto cond_agg = cond->getType().getAsAggregateType();
+
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(agg->extract(av, i), agg->extract(bv, i),
+                               cond_agg ? cond_agg->extract(cv, i) : cv));
+    }
+    return agg->aggregateVals(vals);
+  }
+  return scalar(av, bv, cv);
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
-  // TODO: vector support
-  return cond->getType().enforceIntType(1) &&
+  expr elems_sz = false;
+  if (auto cond_agg = cond->getType().getAsAggregateType())
+    if (auto agg = getType().getAsAggregateType())
+      elems_sz = cond_agg->numElements() == agg->numElements();
+
+  return (cond->getType().enforceIntType(1) ||
+          (cond->getType().enforceIntOrVectorType(1) &&
+           getType().enforceVectorType() &&
+           elems_sz)) &&
          Value::getTypeConstraints() &&
-         getType().enforceIntOrPtrType() &&
+         getType().enforceIntOrFloatOrPtrOrVectorType() &&
          getType() == a->getType() &&
          getType() == b->getType();
 }
@@ -984,7 +1008,13 @@ StateValue FnCall::toSMT(State &s) const {
 
 expr FnCall::getTypeConstraints(const Function &f) const {
   // TODO : also need to name each arg type smt var uniquely
-  return Value::getTypeConstraints();
+  auto r = Value::getTypeConstraints();
+  // TODO: add aggregate support
+  for (auto arg : args) {
+    r &= !arg->getType().enforceStructType();
+    r &= !arg->getType().enforceVectorType();
+  }
+  return r;
 }
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
