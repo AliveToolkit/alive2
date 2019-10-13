@@ -117,6 +117,9 @@ void Function::syncDataWithSrc(const Function &src) {
   for (; IS != ES && IT != ET; ++IS, ++IT) {
     if (auto in_tgt = dynamic_cast<Input*>(IT->get()))
       in_tgt->copySMTName(*dynamic_cast<Input*>(IS->get()));
+
+    if (!(IS->get()->getType() == IT->get()->getType()).isTrue())
+      throw AliveException("Source and target args have different type", false);
   }
 
   if (IS != ES || IT != ET)
