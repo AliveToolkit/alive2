@@ -84,6 +84,7 @@ llvm::cl::opt<bool> opt_disable_undef_input(
 
 ostream *out;
 ofstream out_file;
+string report_filename;
 optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
@@ -125,8 +126,14 @@ struct TVPass : public llvm::FunctionPass {
 
     if (Errors errs = verifier.verify()) {
       *out << "Transformation doesn't verify!\n" << errs << endl;
-      if (opt_error_fatal && errs.isUnsound())
+      if (opt_error_fatal && errs.isUnsound()) {
+        if (opt_smt_stats)
+          smt::solver_print_stats(*out);
+        if (!report_filename.empty())
+          cerr << "Report written to " << report_filename << endl;
+
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
+      }
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -169,6 +176,7 @@ struct TVPass : public llvm::FunctionPass {
       if (!out_file.is_open())
         llvm::report_fatal_error("Alive2: Couldn't open report file!");
 
+      report_filename = path;
       *out << "Source: " << source_file << endl;
     } else
       out = &cerr;
