@@ -331,12 +331,15 @@ expr Pointer::is_readonly() const {
   return m.blocks_readonly.load(get_bid());
 }
 
-Pointer Pointer::mkNullPointer(Memory &m) {
+Pointer Pointer::mkNullPointer(const Memory &m) {
   // A null pointer points to block 0.
   return Pointer(m, 0, false);
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
+  if ((p == Pointer::mkNullPointer(p.getMemory())).isTrue())
+    return os << "null";
+
   os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
      << ", block_id=";
   p.get_bid().simplify().printUnsigned(os);

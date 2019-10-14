@@ -87,7 +87,7 @@ public:
   // TODO: add a bool flag that says whether the twin memory model is used.
   // In the twin memory model, a null pointer is a physical pointer with
   // absolute address 0.
-  static Pointer mkNullPointer(Memory &m);
+  static Pointer mkNullPointer(const Memory &m);
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
