@@ -81,21 +81,6 @@ static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   return M;
 }
 
-static llvm::Function *getSingleFunction(llvm::Module *M) {
-  llvm::Function *Ret = 0;
-  for (auto &F : *M) {
-    if (F.getInstructionCount() == 0)
-      continue;
-    if (!Ret)
-      Ret = &F;
-    else
-      llvm::report_fatal_error("Bitcode contains multiple functions");
-  }
-  if (!Ret)
-      llvm::report_fatal_error("Bitcode contains no functions");
-  return Ret;
-}
-
 // adapted from FunctionComparator.cpp
 static int cmpNumbers(uint64_t L, uint64_t R) {
   if (L < R) return -1;
@@ -189,61 +174,32 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
   }
 }
 
-int main(int argc, char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
-  llvm::PrettyStackTraceProgram X(argc, argv);
-  llvm::EnableDebugBuffering = true;
-  llvm::llvm_shutdown_obj llvm_shutdown;  // Call llvm_shutdown() on exit.
-  llvm::LLVMContext Context;
+bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
+                      const llvm::DataLayout &DL, llvm::Triple &targetTriple,
+                      int &goodCount, int &badCount, int &errorCount) {
+  if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
+    cerr << "Only functions with identical signatures can be checked";
+    ++errorCount;
+    return true;
+  }
 
-  llvm::cl::ParseCommandLineOptions(argc, argv,
-                                  "Alive2 stand-alone translation validator\n");
-
-  smt::smt_initializer smt_init;
   TransformPrintOpts print_opts;
-
-  smt::solver_print_queries(opt_smt_verbose);
-  smt::solver_tactic_verbose(false);
-  smt::set_query_timeout(to_string(opt_smt_to));
-  smt::set_memory_limit(1024 * 1024 * 1024);
-  //config::skip_smt = opt_smt_skip;
-  config::symexec_print_each_value = opt_se_verbose;
-  config::disable_undef_input = opt_disable_undef;
-  config::disable_poison_input = opt_disable_poison;
-
-  auto M1 = openInputFile(Context, opt_file1);
-  if (!M1.get())
-    llvm::report_fatal_error("Could not read bitcode from '" + opt_file1 + "'");
-  auto F1 = getSingleFunction(M1.get());
-
-  auto M2 = openInputFile(Context, opt_file2);
-  if (!M2.get())
-    llvm::report_fatal_error(
-      "Could not read bitcode from '" + opt_file2 + "'");
-  auto F2 = getSingleFunction(M2.get());
-
-  if (cmpTypes(F1->getFunctionType(), F2->getFunctionType(), F1, F2))
-    llvm::report_fatal_error(
-      "Only functions with identical signatures can be checked");
-
-  if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
-    llvm::report_fatal_error("Modules have different target triple");
-
-  auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
-  auto TLI = llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(*F1);
-  auto &DL = M1->getDataLayout();
-
+  smt::smt_initializer smt_init;
   llvm_util::initializer llvm_util_init(cerr, DL);
 
-  auto Func1 = llvm2alive(*F1, TLI);
-  if (!Func1)
-    llvm::report_fatal_error(
-      "Could not translate '" + opt_file1 + "' to Alive IR");
+  auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F1));
+  if (!Func1) {
+    cerr << "Could not translate '" + (std::string)F1.getName() + "' to Alive IR";
+    ++errorCount;
+    return true;
+  }
 
-  auto Func2 = llvm2alive(*F2, TLI);
-  if (!Func2)
-    llvm::report_fatal_error(
-      "Could not translate '" + opt_file2 + "' to Alive IR");
+  auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F2));
+  if (!Func2) {
+    cerr << "Could not translate '" + (std::string)F2.getName() + "' to Alive IR";
+    ++errorCount;
+    return true;
+  }
 
   Transform t;
   t.src = move(*Func1);
@@ -265,8 +221,10 @@ int main(int argc, char **argv) {
   bool result(errs);
   if (result) {
     cerr << "Transformation doesn't verify!\n" << errs << endl;
+    ++badCount;
   } else {
     cerr << "Transformation seems to be correct!\n\n";
+    ++goodCount;
   }
 
   if (opt_bidirectional) {
@@ -286,5 +244,61 @@ int main(int argc, char **argv) {
     }
   }
 
+  return result;
+}
+
+int main(int argc, char **argv) {
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
+  llvm::PrettyStackTraceProgram X(argc, argv);
+  llvm::EnableDebugBuffering = true;
+  llvm::llvm_shutdown_obj llvm_shutdown;  // Call llvm_shutdown() on exit.
+  llvm::LLVMContext Context;
+
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                  "Alive2 stand-alone translation validator\n");
+
+  smt::solver_print_queries(opt_smt_verbose);
+  smt::solver_tactic_verbose(false);
+  smt::set_query_timeout(to_string(opt_smt_to));
+  smt::set_memory_limit(1024 * 1024 * 1024);
+  //config::skip_smt = opt_smt_skip;
+  config::symexec_print_each_value = opt_se_verbose;
+  config::disable_undef_input = opt_disable_undef;
+  config::disable_poison_input = opt_disable_poison;
+
+  auto M1 = openInputFile(Context, opt_file1);
+  if (!M1.get())
+    llvm::report_fatal_error(
+      "Could not read bitcode from '" + opt_file1 + "'");
+
+  auto M2 = openInputFile(Context, opt_file2);
+  if (!M2.get())
+    llvm::report_fatal_error(
+      "Could not read bitcode from '" + opt_file2 + "'");
+
+  if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
+    llvm::report_fatal_error("Modules have different target triple");
+
+  auto &DL = M1.get()->getDataLayout();
+  auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
+
+  bool result = false;
+  int goodCount = 0, badCount = 0, errorCount = 0;
+  // FIXME: quadratic, may not be suitable for very large modules
+  // emitted by opt-fuzz
+  for (auto &F1 : *M1.get()) {
+    std::string s = F1.getName();
+    for (auto &F2 : *M2.get()) {
+      if (F1.getName().equals(F2.getName()))
+        result |= compareFunctions(F1, F2, DL, targetTriple, goodCount,
+                                   badCount, errorCount);
+    }
+  }
+
+  cerr << "Summary:\n";
+  cerr << "  " << goodCount << " correct transformations\n";
+  cerr << "  " << badCount << " incorrect transformations\n";
+  cerr << "  " << errorCount << " errors\n";
+  
   return result;
 }
