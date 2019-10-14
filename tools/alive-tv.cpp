@@ -178,7 +178,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       const llvm::DataLayout &DL, llvm::Triple &targetTriple,
                       int &goodCount, int &badCount, int &errorCount) {
   if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
-    cerr << "Only functions with identical signatures can be checked";
+    cerr << "Only functions with identical signatures can be checked\n";
     ++errorCount;
     return true;
   }
@@ -189,14 +189,14 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F1));
   if (!Func1) {
-    cerr << "Could not translate '" + (std::string)F1.getName() + "' to Alive IR";
+    cerr << "Could not translate '" + (std::string)F1.getName() + "' to Alive IR\n";
     ++errorCount;
     return true;
   }
 
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F2));
   if (!Func2) {
-    cerr << "Could not translate '" + (std::string)F2.getName() + "' to Alive IR";
+    cerr << "Could not translate '" + (std::string)F2.getName() + "' to Alive IR\n";
     ++errorCount;
     return true;
   }
