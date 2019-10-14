@@ -179,13 +179,16 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
                        const set<expr> &undef_qvars, expr && e) {
 
   // restrict type variable from taking disabled values
-  for (auto &i : t.src.getInputs()) {
-    auto var = static_cast<const Input &>(i).getTyVar();
-
-    if (config::disable_undef_input)
-      e &= var != 1;
-    if (config::disable_poison_input)
-      e &= var.extract(1, 1) == 0;
+  if (config::disable_undef_input || config::disable_poison_input) {
+    for (auto &i : t.src.getInputs()) {
+      if (auto in = dynamic_cast<const Input*>(&i)) {
+        auto var = in->getTyVar();
+        if (config::disable_undef_input)
+          e &= var != 1;
+        if (config::disable_poison_input)
+          e &= var.extract(1, 1) == 0;
+      }
+    }
   }
 
   if (qvars.empty() || e.isFalse())
