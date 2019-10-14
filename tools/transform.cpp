@@ -205,7 +205,10 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
   expr nums[3] = { expr::mkUInt(0, 2), expr::mkUInt(1, 2), expr::mkUInt(2, 2) };
 
   for (auto &i : t.src.getInputs()) {
-    auto var = static_cast<const Input&>(i).getTyVar();
+    auto in = dynamic_cast<const Input*>(&i);
+    if (!in)
+      continue;
+    auto var = in->getTyVar();
 
     for (auto &[e, v] : instances) {
       for (unsigned i = 0; i <= 2; ++i) {
