@@ -211,7 +211,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     auto types = verifier.getTypings();
     if (!types) {
       cerr << "Transformation doesn't verify!\n"
-              "ERROR: progrm doesn't type check!\n\n";
+              "ERROR: program doesn't type check!\n\n";
       return false;
     }
     assert(types.hasSingleTyping());
