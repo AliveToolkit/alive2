@@ -214,7 +214,8 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     if (!types) {
       cerr << "Transformation doesn't verify!\n"
               "ERROR: program doesn't type check!\n\n";
-      return false;
+      ++errorCount;
+      return true;
     }
     assert(types.hasSingleTyping());
   }
