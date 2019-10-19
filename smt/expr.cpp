@@ -1107,7 +1107,7 @@ expr expr::float2Real() const {
 }
 
 expr expr::BV2float(const expr &type) const {
-  C2(type);
+  C(type);
   if (auto app = isAppOf(Z3_OP_FPA_TO_IEEE_BV)) {
     expr arg = Z3_get_app_arg(ctx(), app, 0);
     if (arg.sort() == type.sort())
