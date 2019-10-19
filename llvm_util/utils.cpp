@@ -210,7 +210,8 @@ Value* get_operand(llvm::Value *v) {
     }
     Value *initval = nullptr;
     if (gv->hasInitializer() && gv->isConstant()) {
-      initval = get_operand(gv->getInitializer());
+      if (!(initval = get_operand(gv->getInitializer())))
+        return nullptr;
     }
     int size = DL->getTypeAllocSize(gv->getValueType());
     int align = gv->getAlignment();
@@ -226,7 +227,10 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
     vector<Value*> vals;
     for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
-      vals.emplace_back(get_operand(*I));
+      if (auto op = get_operand(*I))
+        vals.emplace_back(op);
+      else
+        return nullptr;
     }
     auto val = make_unique<AggregateConst>(*ty, move(vals));
     auto ret = val.get();
@@ -237,7 +241,10 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
     vector<Value*> vals;
     for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      vals.emplace_back(get_operand(cnst->getElementAsConstant(i)));
+      if (auto op = get_operand(cnst->getElementAsConstant(i)))
+        vals.emplace_back(op);
+      else
+        return nullptr;
     }
     auto val = make_unique<AggregateConst>(*ty, move(vals));
     auto ret = val.get();
@@ -248,7 +255,10 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantAggregateZero>(v)) {
     vector<Value*> vals;
     for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      vals.emplace_back(get_operand(cnst->getElementValue(i)));
+      if (auto op = get_operand(cnst->getElementValue(i)))
+        vals.emplace_back(op);
+      else
+        return nullptr;
     }
     auto val = make_unique<AggregateConst>(*ty, move(vals));
     auto ret = val.get();
