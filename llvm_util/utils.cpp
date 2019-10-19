@@ -161,12 +161,10 @@ Value* get_operand(llvm::Value *v) {
     auto &apfloat = cnst->getValueAPF();
     unique_ptr<FloatConst> c;
     switch (ty->getAsFloatType()->getFpType()) {
-    case FloatType::Half: {
-      llvm::SmallString<32> str;
-      apfloat.toString(str);
-      c = make_unique<FloatConst>(*ty, str.str());
+    case FloatType::Half:
+      c = make_unique<FloatConst>(*ty,
+                                  apfloat.bitcastToAPInt().getLimitedValue());
       break;
-    }
     case FloatType::Float:
       c = make_unique<FloatConst>(*ty, apfloat.convertToFloat());
       break;

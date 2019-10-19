@@ -32,10 +32,10 @@ public:
 
 
 class FloatConst final : public Constant {
-  std::variant<double, std::string> val;
+  std::variant<double, uint64_t> val;
 public:
   FloatConst(Type &type, double val);
-  FloatConst(Type &type, std::string &&val);
+  FloatConst(Type &type, uint64_t val);
 
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints() const override;

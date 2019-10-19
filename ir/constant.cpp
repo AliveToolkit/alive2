@@ -43,8 +43,8 @@ expr IntConst::getTypeConstraints() const {
 FloatConst::FloatConst(Type &type, double val)
   : Constant(type, to_string(val)), val(val) {}
 
-FloatConst::FloatConst(Type &type, std::string &&val)
-  : Constant(type, string(val)), val(move(val)) {}
+FloatConst::FloatConst(Type &type, uint64_t val)
+  : Constant(type, to_string(val)), val(val) {}
 
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
@@ -52,9 +52,11 @@ expr FloatConst::getTypeConstraints() const {
 }
 
 StateValue FloatConst::toSMT(State &s) const {
-  if (auto str = get_if<string>(&val))
-    return { expr::mkNumber(str->c_str(), getType().getDummyValue(true).value),
+  if (auto n = get_if<uint64_t>(&val)) {
+    return { expr::mkUInt(*n, getType().bits())
+               .BV2float(getType().getDummyValue(true).value),
              true };
+  }
 
   expr e;
   double v = get<double>(val);
