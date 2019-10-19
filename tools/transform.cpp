@@ -24,9 +24,8 @@ using namespace std;
 static bool is_undef(const expr &e) {
   if (e.isConst())
     return false;
-  Solver s;
-  s.add(expr::mkForAll(e.vars(), expr::mkVar("#undef", e) != e));
-  return s.check().isUnsat();
+  return check_expr(expr::mkForAll(e.vars(), expr::mkVar("#undef", e) != e)).
+           isUnsat();
 }
 
 static void print_single_varval(ostream &os, State &st, const Model &m,
@@ -269,29 +268,27 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
   pre &= src_state.getPre() && tgt_state.getPre();
 
-  if (check_expr(axioms && preprocess(t, qvars, uvars, expr(pre))).isUnsat()) {
-    errs.add("Precondition is always false", false);
-    return;
-  }
-
   auto [poison_cnstr, value_cnstr] = type.refines(a, b);
+  expr pre_dom = pre && (dom_a && dom_b);
 
-  // TODO: these checks continue continue if prev queries timesout
-  // requires && dom_b on 2nd & 3rd fmls. could be good for perf as well?
   Solver::check({
     { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a && !poison_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre_dom && !poison_cnstr),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a && !value_cnstr),
+    { axioms && preprocess(t, qvars, uvars, pre_dom && !value_cnstr),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}
   });
+
+  if (check_expr(axioms && preprocess(t, qvars, uvars, move(pre))).isUnsat()) {
+    errs.add("Precondition is always false", false);
+  }
 }
 
 
