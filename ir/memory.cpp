@@ -391,7 +391,7 @@ Memory::Memory(State &state) : state(&state) {
     Pointer loadedptr(*this, byte.ptr_value());
     expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
                 !loadedptr.is_local();
-    state.addPre(expr::mkForAll({ idx() }, move(cond)));
+    state.addAxiom(expr::mkForAll({ idx() }, move(cond)));
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
@@ -412,8 +412,8 @@ Memory::Memory(State &state) : state(&state) {
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
   auto nullPtr = Pointer::mkNullPointer(*this);
-  state.addPre(nullPtr.get_address() == 0);
-  state.addPre(nullPtr.block_size() == 0);
+  state.addAxiom(nullPtr.get_address() == 0);
+  state.addAxiom(nullPtr.block_size() == 0);
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -465,7 +465,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   } else {
     // The memory block was initially alive.
     // TODO: const global variables should be read-only
-    state->addPre(mk_liveness_uf().load(p.get_bid()));
+    state->addAxiom(mk_liveness_uf().load(p.get_bid()));
   }
   blocks_kind = blocks_kind.store(p.get_bid(),
                                   expr::mkUInt(blockKind == HEAP, 1));
@@ -577,10 +577,10 @@ expr Memory::int2ptr(const expr &val) {
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
-  ret.blocks_val   = expr::mkIf(cond, then.blocks_val, els.blocks_val);
+  ret.blocks_val      = expr::mkIf(cond, then.blocks_val, els.blocks_val);
   ret.blocks_liveness = expr::mkIf(cond, then.blocks_liveness,
                                    els.blocks_liveness);
-  ret.blocks_kind = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
+  ret.blocks_kind     = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
   return ret;
 }
 
