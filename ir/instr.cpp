@@ -632,27 +632,43 @@ void TernaryOp::print(ostream &os) const {
 }
 
 StateValue TernaryOp::toSMT(State &s) const {
-  auto &[av, ap] = s[*a];
-  auto &[bv, bp] = s[*b];
-  auto &[cv, cp] = s[*c];
-  expr newval;
-  expr not_poison = ap && bp && cp;
+  auto &av = s[*a];
+  auto &bv = s[*b];
+  auto &cv = s[*c];
+  function<expr(const expr&, const expr&, const expr&)> fn;
 
   switch (op) {
   case FShl:
-    newval = expr::fshl(av, bv, cv);
+    fn = [](auto a, auto b, auto c) {
+      return expr::fshl(a, b, c);
+    };
     break;
   case FShr:
-    newval = expr::fshr(av, bv, cv);
+    fn = [](auto a, auto b, auto c) {
+      return expr::fshr(a, b, c);
+    };
     break;
   }
 
-  return { move(newval), move(not_poison) };
+  if (getType().isVectorType()) {
+    vector<StateValue> vals;
+    auto ty = getType().getAsAggregateType();
+    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+      auto ai = ty->extract(av, i);
+      auto bi = ty->extract(bv, i);
+      auto ci = ty->extract(cv, i);
+      vals.emplace_back(fn(ai.value, bi.value, ci.value),
+                        ai.non_poison && bi.non_poison && ci.non_poison);
+    }
+    return ty->aggregateVals(vals);
+  }
+  return { fn(av.value, bv.value, cv.value),
+           av.non_poison && bv.non_poison && cv.non_poison };
 }
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType().enforceIntType() && // FIXME: vectors
+         getType().enforceIntOrVectorType() &&
          getType() == a->getType() &&
          getType() == b->getType() &&
          getType() == c->getType();
