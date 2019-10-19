@@ -1038,6 +1038,9 @@ StateValue FnCall::toSMT(State &s) const {
   }
 
   // FIXME: broken for functions that return aggregate types
+  if (getType().isAggregateType())
+    return {};
+
   auto poison_name = fnName + "#poison";
   add_implies_axiom(poison_name);
 
