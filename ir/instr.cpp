@@ -170,13 +170,13 @@ static expr fm_poison(const expr &a, const expr &b, const expr &val,
 }
 
 StateValue BinOp::toSMT(State &s) const {
-  bool use_default_op = true;
-  function<StateValue(const expr&, const expr&, const expr&, const expr&,
-                      const Type&)> fn, scalar_op;
+  bool vertical_zip = false;
+  function<StateValue(const expr&, const expr&, const expr&, const expr&)>
+    fn, scalar_op;
 
   switch (op) {
   case Add:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.add_no_soverflow(b);
@@ -187,7 +187,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case Sub:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.sub_no_soverflow(b);
@@ -198,7 +198,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case Mul:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr non_poison = true;
       if (flags & NSW)
         non_poison &= a.mul_no_soverflow(b);
@@ -209,7 +209,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SDiv:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr non_poison = true;
       div_ub(s, a, b, ap, bp, true);
       if (flags & Exact)
@@ -219,7 +219,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case UDiv:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr non_poison = true;
       div_ub(s, a, b, ap, bp, false);
       if (flags & Exact)
@@ -229,21 +229,21 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SRem:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       div_ub(s, a, b, ap, bp, true);
       return { a.srem(b), true };
     };
     break;
 
   case URem:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       div_ub(s, a, b, ap, bp, false);
       return { a.urem(b), true };
     };
     break;
 
   case Shl:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto non_poison = b.ult(b.bits());
       if (flags & NSW)
         non_poison &= a.shl_no_soverflow(b);
@@ -255,7 +255,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case AShr:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto non_poison = b.ult(b.bits());
       if (flags & Exact)
         non_poison &= a.ashr_exact(b);
@@ -264,7 +264,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case LShr:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto non_poison = b.ult(b.bits());
       if (flags & Exact)
         non_poison &= a.lshr_exact(b);
@@ -273,130 +273,105 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SAdd_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.sadd_sat(b), true };
     };
     break;
 
   case UAdd_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.uadd_sat(b), true };
     };
     break;
 
   case SSub_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.ssub_sat(b), true };
     };
     break;
 
   case USub_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.usub_sat(b), true };
     };
     break;
 
   case And:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a & b, true };
     };
     break;
 
   case Or:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a | b, true };
     };
     break;
 
   case Xor:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a ^ b, true };
     };
     break;
 
   case Cttz:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.cttz(),
                b == 0u || a != 0u };
     };
     break;
 
   case Ctlz:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.ctlz(),
                b == 0u || a != 0u };
     };
     break;
 
   case SAdd_Overflow:
-    // FIXME: these overflow ops are wrong for vectors
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a + b, expr(non_poison) } };
-      vals.emplace_back((!a.add_no_soverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a + b, (!a.add_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case UAdd_Overflow:
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a + b, expr(non_poison) } };
-      vals.emplace_back((!a.add_no_uoverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a + b, (!a.add_no_uoverflow(b)).toBVBool() };
     };
     break;
 
   case SSub_Overflow:
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a - b, expr(non_poison) } };
-      vals.emplace_back((!a.sub_no_soverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a - b, (!a.sub_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case USub_Overflow:
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a - b, expr(non_poison) } };
-      vals.emplace_back((!a.sub_no_uoverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a - b, (!a.sub_no_uoverflow(b)).toBVBool() };
     };
     break;
 
   case SMul_Overflow:
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a * b, expr(non_poison) } };
-      vals.emplace_back((!a.mul_no_soverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a * b, (!a.mul_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case UMul_Overflow:
-    use_default_op = false;
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto non_poison = ap && bp;
-      vector<StateValue> vals = { { a * b, expr(non_poison) } };
-      vals.emplace_back((!a.mul_no_uoverflow(b)).toBVBool(),
-                        move(non_poison));
-      return t.getAsAggregateType()->aggregateVals(vals);
+    vertical_zip = true;
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return { a * b, (!a.mul_no_uoverflow(b)).toBVBool() };
     };
     break;
 
   case FAdd:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto val = a.fadd(b);
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
@@ -404,7 +379,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FSub:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto val = a.fsub(b);
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
@@ -412,7 +387,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FMul:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto val = a.fmul(b);
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
@@ -420,7 +395,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FDiv:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto val = a.fdiv(b);
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
@@ -428,7 +403,7 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case FRem:
-    fn = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       auto val = expr();
       auto non_poison = !fm_poison(a, b, val, flags);
@@ -437,9 +412,18 @@ StateValue BinOp::toSMT(State &s) const {
     break;
   }
 
-  if (use_default_op) {
-    scalar_op = [&](auto a, auto ap, auto b, auto bp, auto &t) -> StateValue {
-      auto [v, np] = fn(a, ap, b, bp, t);
+  function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
+                                       const expr&)> zip_op;
+  if (vertical_zip) {
+    zip_op = [&](auto a, auto ap, auto b, auto bp) {
+      auto [v1, v2] = fn(a, ap, b, bp);
+      expr non_poison = ap && bp;
+      StateValue sv1(move(v1), expr(non_poison));
+      return make_pair(move(sv1), StateValue(move(v2), move(non_poison)));
+    };
+  } else {
+    scalar_op = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      auto [v, np] = fn(a, ap, b, bp);
       return { move(v), ap && bp && np };
     };
   }
@@ -447,18 +431,43 @@ StateValue BinOp::toSMT(State &s) const {
   auto &a = s[*lhs];
   auto &b = s[*rhs];
 
-  if (getType().isVectorType()) {
-    vector<StateValue> vals;
+  if (lhs->getType().isVectorType()) {
     auto ty = getType().getAsAggregateType();
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      auto ai = ty->extract(a, i);
-      auto bi = ty->extract(b, i);
-      vals.emplace_back(scalar_op(ai.value, ai.non_poison, bi.value,
-                                  bi.non_poison, ty->getChild(i)));
+    vector<StateValue> vals;
+
+    if (vertical_zip) {
+      auto ty = lhs->getType().getAsAggregateType();
+      vector<StateValue> vals1, vals2;
+
+      for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+        auto ai = ty->extract(a, i);
+        auto bi = ty->extract(b, i);
+        auto [v1, v2] = zip_op(ai.value, ai.non_poison, bi.value,
+                               bi.non_poison);
+        vals1.emplace_back(move(v1));
+        vals2.emplace_back(move(v2));
+      }
+      vals.emplace_back(ty->aggregateVals(vals1));
+      vals.emplace_back(ty->aggregateVals(vals2));
+    } else {
+      for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+        auto ai = ty->extract(a, i);
+        auto bi = ty->extract(b, i);
+        vals.emplace_back(scalar_op(ai.value, ai.non_poison, bi.value,
+                                    bi.non_poison));
+      }
     }
     return ty->aggregateVals(vals);
   }
-  return scalar_op(a.value, a.non_poison, b.value, b.non_poison, getType());
+
+  if (vertical_zip) {
+    vector<StateValue> vals;
+    auto [v1, v2] = zip_op(a.value, a.non_poison, b.value, b.non_poison);
+    vals.emplace_back(move(v1));
+    vals.emplace_back(move(v2));
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  return scalar_op(a.value, a.non_poison, b.value, b.non_poison);
 }
 
 expr BinOp::getTypeConstraints(const Function &f) const {
@@ -477,7 +486,9 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     if (auto ty = getType().getAsStructType()) {
       instrconstr &= ty->numElements() == 2 &&
                      ty->getChild(0) == lhs->getType() &&
-                     ty->getChild(1).enforceIntOrVectorType(1);
+                     ty->getChild(1).enforceIntOrVectorType(1) &&
+                     ty->getChild(1).enforceVectorType() ==
+                       lhs->getType().enforceVectorType();
     }
     break;
   case Cttz:
