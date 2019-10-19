@@ -450,11 +450,22 @@ StateValue BinOp::toSMT(State &s) const {
       vals.emplace_back(ty->aggregateVals(vals1));
       vals.emplace_back(ty->aggregateVals(vals2));
     } else {
+      StateValue tmp;
       for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
         auto ai = ty->extract(a, i);
-        auto bi = ty->extract(b, i);
-        vals.emplace_back(scalar_op(ai.value, ai.non_poison, bi.value,
-                                    bi.non_poison));
+        const StateValue *bi;
+        switch (op) {
+        case Cttz:
+        case Ctlz:
+          bi = &b;
+          break;
+        default:
+          tmp = ty->extract(b, i);
+          bi = &tmp;
+          break;
+        }
+        vals.emplace_back(scalar_op(ai.value, ai.non_poison, bi->value,
+                                    bi->non_poison));
       }
     }
     return ty->aggregateVals(vals);
