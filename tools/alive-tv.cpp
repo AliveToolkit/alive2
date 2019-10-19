@@ -21,6 +21,7 @@
 #include "llvm/Support/SourceMgr.h"
 
 #include <iostream>
+#include <utility>
 
 using namespace tools;
 using namespace util;
@@ -174,9 +175,11 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
   }
 }
 
-bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
-                      const llvm::DataLayout &DL, llvm::Triple &targetTriple,
-                      int &goodCount, int &badCount, int &errorCount) {
+static optional<smt::smt_initializer> smt_init;
+
+static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
+                             llvm::Triple &targetTriple, unsigned &goodCount,
+                             unsigned &badCount, unsigned &errorCount) {
   if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
     cerr << "Only functions with identical signatures can be checked\n";
     ++errorCount;
@@ -184,8 +187,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   TransformPrintOpts print_opts;
-  smt::smt_initializer smt_init;
-  llvm_util::initializer llvm_util_init(cerr, DL);
 
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F1));
   if (!Func1) {
@@ -201,6 +202,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     return true;
   }
 
+  smt_init->reset();
   Transform t;
   t.src = move(*Func1);
   t.tgt = move(*Func2);
@@ -228,7 +230,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   if (opt_bidirectional) {
-    smt_init.reset();
+    smt_init->reset();
     Transform t2;
     t2.src = move(t.tgt);
     t2.tgt = move(t.src);
@@ -282,15 +284,18 @@ int main(int argc, char **argv) {
   auto &DL = M1.get()->getDataLayout();
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
 
+  llvm_util::initializer llvm_util_init(cerr, DL);
+  smt_init.emplace();
+
   bool result = false;
-  int goodCount = 0, badCount = 0, errorCount = 0;
+  unsigned goodCount = 0, badCount = 0, errorCount = 0;
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
   for (auto &F1 : *M1.get()) {
     std::string s = F1.getName();
     for (auto &F2 : *M2.get()) {
       if (F1.getName().equals(F2.getName()))
-        result |= compareFunctions(F1, F2, DL, targetTriple, goodCount,
+        result |= compareFunctions(F1, F2, targetTriple, goodCount,
                                    badCount, errorCount);
     }
   }
@@ -300,5 +305,7 @@ int main(int argc, char **argv) {
   cerr << "  " << badCount << " incorrect transformations\n";
   cerr << "  " << errorCount << " errors\n";
   
+  smt_init.reset();
+
   return result;
 }
