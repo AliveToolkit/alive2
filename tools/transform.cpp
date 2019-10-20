@@ -111,7 +111,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   }
 
   if (r.isUnknown()) {
-    errs.add("Timeout", false);
+    errs.add("Timeout", true);
     return;
   }
 
