@@ -1096,7 +1096,7 @@ void ICmp::print(ostream &os) const {
 }
 
 static StateValue build_icmp_chain(const expr &var,
-                                   function<StateValue(ICmp::Cond)> &fn,
+                                   const function<StateValue(ICmp::Cond)> &fn,
                                    ICmp::Cond cond = ICmp::Any,
                                    StateValue last = StateValue()) {
   auto old_cond = cond;
@@ -1159,7 +1159,7 @@ StateValue ICmp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
-    function fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
+    auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
     return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
   };
