@@ -223,8 +223,13 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   Errors errs = verifier.verify();
   bool result(errs);
   if (result) {
-    cerr << "Transformation doesn't verify!\n" << errs << endl;
-    ++badCount;
+    if (errs.isTimeout()) {
+      cerr << errs << endl;
+      ++errorCount;
+    } else {
+      cerr << "Transformation doesn't verify!\n" << errs << endl;
+      ++badCount;
+    }
   } else {
     cerr << "Transformation seems to be correct!\n\n";
     ++goodCount;
