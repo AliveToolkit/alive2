@@ -68,6 +68,9 @@ public:
   virtual smt::expr enforceFloatType() const;
 
   smt::expr enforceVectorType() const;
+  // enforce same number of elements if other is a vector
+  smt::expr enforceVectorTypeIff(const Type &other) const;
+  smt::expr enforceVectorTypeEquiv(const Type &other) const;
   virtual smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const;
   smt::expr enforceScalarOrVectorType(

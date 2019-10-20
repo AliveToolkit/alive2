@@ -154,6 +154,18 @@ expr Type::enforceVectorType() const {
   return enforceVectorType([](auto &ty) { return true; });
 }
 
+expr Type::enforceVectorTypeIff(const Type &other) const {
+  expr elems = false;
+  if (auto agg = getAsAggregateType())
+    if (auto agg2 = other.getAsAggregateType())
+      elems = agg->numElements() == agg2->numElements();
+  return !other.enforceVectorType() || (enforceVectorType() && elems);
+}
+
+expr Type::enforceVectorTypeEquiv(const Type &other) const {
+  return enforceVectorTypeIff(other) && other.enforceVectorTypeIff(*this);
+}
+
 expr
 Type::enforceVectorType(const function<expr(const Type&)> &enforceElem) const {
   return false;

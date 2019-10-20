@@ -235,8 +235,7 @@ public:
     default:
       UNREACHABLE();
     }
-    RETURN_IDENTIFIER(make_unique<ICmp>(get_int_type(1), value_name(i),
-                                        cond, *a, *b));
+    RETURN_IDENTIFIER(make_unique<ICmp>(*ty, value_name(i), cond, *a, *b));
   }
 
   RetTy visitFCmpInst(llvm::FCmpInst &i) {

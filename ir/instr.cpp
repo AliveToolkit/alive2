@@ -498,8 +498,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
       instrconstr &= ty->numElements() == 2 &&
                      ty->getChild(0) == lhs->getType() &&
                      ty->getChild(1).enforceIntOrVectorType(1) &&
-                     ty->getChild(1).enforceVectorType() ==
-                       lhs->getType().enforceVectorType();
+                     ty->getChild(1).enforceVectorTypeEquiv(lhs->getType());
     }
     break;
   case Cttz:
@@ -860,16 +859,9 @@ StateValue Select::toSMT(State &s) const {
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
-  expr elems_sz = false;
-  if (auto cond_agg = cond->getType().getAsAggregateType())
-    if (auto agg = getType().getAsAggregateType())
-      elems_sz = cond_agg->numElements() == agg->numElements();
-
-  return (cond->getType().enforceIntType(1) ||
-          (cond->getType().enforceIntOrVectorType(1) &&
-           getType().enforceVectorType() &&
-           elems_sz)) &&
-         Value::getTypeConstraints() &&
+  return Value::getTypeConstraints() &&
+         cond->getType().enforceIntOrVectorType(1) &&
+         getType().enforceVectorTypeIff(cond->getType()) &&
          getType().enforceIntOrFloatOrPtrOrVectorType() &&
          getType() == a->getType() &&
          getType() == b->getType();
@@ -1120,15 +1112,15 @@ static StateValue build_icmp_chain(const expr &var,
 StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
-  auto &av = a_eval.value, &bv = b_eval.value;
-  function<StateValue(Cond)> fn;
-  expr val, non_poison = a_eval.non_poison && b_eval.non_poison;
+  function<StateValue(const expr&, const expr&, Cond)> fn;
 
-  if (a->getType().isPtrType()) {
-    Pointer lhs(s.getMemory(), av);
-    Pointer rhs(s.getMemory(), bv);
-
-    fn = [&](Cond cond) {
+  auto &elem_ty = a->getType();
+  if (elem_ty.isPtrType() ||
+      (elem_ty.isVectorType() &&
+       elem_ty.getAsAggregateType()->getChild(0).isPtrType())) {
+    fn = [&](auto &av, auto &bv, Cond cond) {
+      Pointer lhs(s.getMemory(), av);
+      Pointer rhs(s.getMemory(), bv);
       switch (cond) {
       case EQ:  return StateValue(lhs == rhs, true);
       case NE:  return StateValue(lhs != rhs, true);
@@ -1147,7 +1139,7 @@ StateValue ICmp::toSMT(State &s) const {
     };
 
   } else {  // integer comparison
-    fn = [&](Cond cond) {
+    fn = [&](auto &av, auto &bv, Cond cond) {
       switch (cond) {
       case EQ:  return StateValue(av == bv, true);
       case NE:  return StateValue(av != bv, true);
@@ -1166,15 +1158,29 @@ StateValue ICmp::toSMT(State &s) const {
     };
   }
 
-  StateValue cmp = cond != Any ? fn(cond) : build_icmp_chain(cond_var(), fn);
-  return { cmp.value.toBVBool(), move(non_poison) && move(cmp.non_poison) };
+  auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
+    function fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
+    auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
+    return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
+  };
+
+  if (auto ret_agg = getType().getAsAggregateType()) {
+    auto elem_agg = elem_ty.getAsAggregateType();
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = elem_agg->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(elem_agg->extract(a_eval, i),
+                               elem_agg->extract(b_eval, i)));
+    }
+    return ret_agg->aggregateVals(vals);
+  }
+  return scalar(a_eval, b_eval);
 }
 
 expr ICmp::getTypeConstraints(const Function &f) const {
-  // TODO: add vector support
   return Value::getTypeConstraints() &&
-         getType().enforceIntType(1) &&
-         a->getType().enforceIntOrPtrType() &&
+         getType().enforceIntOrVectorType(1) &&
+         getType().enforceVectorTypeEquiv(a->getType()) &&
+         a->getType().enforceIntOrPtrOrVectorType() &&
          a->getType() == b->getType();
 }
 
