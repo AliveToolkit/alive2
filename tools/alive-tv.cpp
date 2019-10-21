@@ -293,8 +293,11 @@ int main(int argc, char **argv) {
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
   for (auto &F1 : *M1.get()) {
-    std::string s = F1.getName();
+    if (F1.isDeclaration())
+      continue;
     for (auto &F2 : *M2.get()) {
+      if (F2.isDeclaration())
+        continue;
       if (F1.getName().equals(F2.getName()))
         result |= compareFunctions(F1, F2, targetTriple, goodCount,
                                    badCount, errorCount);
