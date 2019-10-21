@@ -1,0 +1,52 @@
+Name: constant-folding-1
+%r = extractelement <2 x i4> <i4 3, i4 poison>, i8 0
+  =>
+%r = 3
+
+
+Name: constant-folding-2
+%r = extractelement <4 x i64> <i64 3, i64 poison, i64 8, i64 16>, i8 3
+  =>
+%r = 16
+
+
+Name: constant-folding-3
+%r = extractelement <2 x i4> <i4 3, i4 undef>, i8 1
+  =>
+%r = 5
+
+
+Name: constant-folding-4
+%r = extractelement <2 x i4> <i4 3, i4 poison>, i8 1
+  =>
+%r = 5
+
+
+Name: constant-folding-5
+%r = extractelement <2 x i4> <i4 3, i4 poison>, i8 3
+  =>
+%r = poison
+
+
+Name: constant-folding-6
+%r = extractelement <2 x i4> <i4 3, i4 4>, i8 poison
+  =>
+%r = poison
+
+
+Name: constant-folding-7
+%r = extractelement <2 x float> <float 3.0, float 4.0>, i8 poison
+  =>
+%r = poison
+
+
+Name: constant-folding-8
+%r = extractelement <2 x float> <float 3.0, float 4.0>, i8 0
+  =>
+%r = 3.0
+
+
+Name: constant-folding-9
+%r = extractelement <2 x float> <float 3.0, float 4.0>, i8 3
+  =>
+%r = poison

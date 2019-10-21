@@ -892,6 +892,42 @@ static unique_ptr<Instr> parse_malloc(string_view name) {
   return make_unique<Malloc>(pointer_type, string(name), op, false);
 }
 
+static unique_ptr<Instr> parse_extractelement(string_view name) {
+  // %p = extractelement vty %v, ty %idx
+  auto &ty_a = parse_type();
+  auto &a = parse_operand(ty_a);
+  parse_comma();
+  auto &ty_idx = parse_type();
+  auto &idx = parse_operand(ty_idx);
+  return make_unique<ExtractElement>(get_sym_type(), string(name), a, idx);
+}
+
+static unique_ptr<Instr> parse_insertelement(string_view name) {
+  // %p = insertelement vty %v, ty %n, ty %idx
+  auto &ty_a = parse_type();
+  auto &a = parse_operand(ty_a);
+  parse_comma();
+  auto &ty_e = parse_type();
+  auto &e = parse_operand(ty_e);
+  parse_comma();
+  auto &ty_idx = parse_type();
+  auto &idx = parse_operand(ty_idx);
+  return make_unique<InsertElement>(get_sym_type(), string(name), a, e, idx);
+}
+
+static unique_ptr<Instr> parse_shufflevector(string_view name) {
+  // %p = shufflevector ty %a, ty %b, ty %c
+  auto &ty_a = parse_type();
+  auto &a = parse_operand(ty_a);
+  parse_comma();
+  auto &ty_b = parse_type();
+  auto &b = parse_operand(ty_b);
+  parse_comma();
+  auto &ty_m = parse_vector_type();
+  auto &m = parse_operand(ty_m);
+  return make_unique<ShuffleVector>(get_sym_type(), string(name), a, b, m);
+}
+
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
   auto &ty = parse_type();
@@ -966,6 +1002,12 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_call(name);
   case MALLOC:
     return parse_malloc(name);
+  case EXTRACTELEMENT:
+    return parse_extractelement(name);
+  case INSERTELEMENT:
+    return parse_insertelement(name);
+  case SHUFFLEVECTOR:
+    return parse_shufflevector(name);
   case INT_TYPE:
   case HALF:
   case FLOAT:

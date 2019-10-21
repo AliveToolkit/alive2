@@ -489,4 +489,46 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
+class ExtractElement final : public Instr {
+  Value *a, *idx;
+public:
+  ExtractElement(Type &type, std::string &&name, Value &a, Value &idx)
+    : Instr(type, move(name)), a(&a), idx(&idx) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class InsertElement final : public Instr {
+  Value *a, *e, *idx;
+public:
+  InsertElement(Type &type, std::string &&name, Value &a, Value &e, Value &idx)
+    : Instr(type, move(name)), a(&a), e(&e), idx(&idx) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class ShuffleVector final : public Instr {
+  Value *a, *b, *m;
+public:
+  ShuffleVector(Type &type, std::string &&name, Value &a, Value &b, Value &m)
+    : Instr(type, move(name)), a(&a), b(&b), m(&m) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
 }

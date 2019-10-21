@@ -162,6 +162,14 @@ expr Type::enforceVectorTypeIff(const Type &other) const {
   return !other.enforceVectorType() || (enforceVectorType() && elems);
 }
 
+expr Type::enforceVectorTypeSameChildTy(const Type &other) const {
+  expr elems = false;
+  if (auto agg = getAsAggregateType())
+    if (auto agg2 = other.getAsAggregateType())
+      elems = (agg->getChild(0) == agg2->getChild(0));
+  return elems;
+}
+
 expr Type::enforceVectorTypeEquiv(const Type &other) const {
   return enforceVectorTypeIff(other) && other.enforceVectorTypeIff(*this);
 }
@@ -620,6 +628,30 @@ StateValue AggregateType::extract(const StateValue &val,
 
   return elementTy.fromBV({ (val.value << idx).extract(h, l),
                             (val.non_poison << idx).extract(h, l) });
+}
+
+StateValue AggregateType::update(const StateValue &val,
+                                 const StateValue &n,
+                                 const expr &index) const {
+  auto &elementTy = *children[0];
+  for (unsigned i = 1; i < elements; ++i) {
+    assert(elementTy.bits() == children[i]->bits());
+  }
+
+  unsigned bw_elem = elementTy.bits();
+  unsigned bw_val = val.value.bits();
+  assert(bw_val == val.non_poison.bits());
+
+  expr shift = (expr::mkUInt(elements - 1, bw_val) - index.zextOrTrunc(bw_val)) *
+    expr::mkUInt(bw_elem, bw_val);
+  expr mask = ~(expr::mkInt(-1, bw_elem).zext(bw_val - bw_elem) << shift);
+
+  StateValue n_bv = elementTy.toBV(n);
+  expr nv_shifted = (n_bv.value.zext(bw_val - bw_elem) << shift);
+  expr np_shifted = (n_bv.non_poison.zext(bw_val - bw_elem) << shift);
+
+  return fromBV({ (val.value & mask) | nv_shifted,
+                  (val.non_poison & mask) | np_shifted});
 }
 
 unsigned AggregateType::bits() const {

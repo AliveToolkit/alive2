@@ -71,6 +71,7 @@ public:
   // enforce same number of elements if other is a vector
   smt::expr enforceVectorTypeIff(const Type &other) const;
   smt::expr enforceVectorTypeEquiv(const Type &other) const;
+  smt::expr enforceVectorTypeSameChildTy(const Type &other) const;
   virtual smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const;
   smt::expr enforceScalarOrVectorType(
@@ -241,6 +242,9 @@ public:
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
   IR::StateValue extract(const IR::StateValue &val,
                          const smt::expr &index) const;
+  IR::StateValue update(const IR::StateValue &val,
+                        const IR::StateValue &n,
+                        const smt::expr &idx) const;
   Type& getChild(unsigned index) const { return *children[index]; }
 
   unsigned bits() const override;
