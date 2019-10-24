@@ -576,18 +576,16 @@ expr expr::lshr(const expr &rhs) const {
 
 expr expr::fshl(const expr &a, const expr &b, const expr &c) {
   C2(a);
-  auto nbits = a.bits();
-  expr c_mod_width = c.urem(mkUInt(nbits, nbits)).zext(nbits);
-  expr res = a.concat(b) << c_mod_width;
-  return res.extract(2 * nbits - 1, nbits); // upper half (MSB)
+  auto width = mkUInt(a.bits(), a.bits());
+  expr c_mod_width = c.urem(width);
+  return a << c_mod_width | b.lshr(width - c_mod_width);
 }
 
 expr expr::fshr(const expr &a, const expr &b, const expr &c) {
   C2(a);
-  auto nbits = a.bits();
-  expr c_mod_width = c.urem(mkUInt(nbits, nbits)).zext(nbits);
-  expr res = a.concat(b).lshr(c_mod_width);
-  return res.extract(nbits - 1, 0); // lower half (LSB)
+  auto width = mkUInt(a.bits(), a.bits());
+  expr c_mod_width = c.urem(width);
+  return a << (width - c_mod_width) | b.lshr(c_mod_width);
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {
