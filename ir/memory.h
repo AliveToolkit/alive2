@@ -36,8 +36,13 @@ class Pointer {
 
   unsigned total_bits() const;
 
-  smt::expr get_value(const char *name, const smt::FunctionExpr &fn,
-                      const smt::expr &ret_type) const;
+  template<class FnExpr>
+  smt::expr get_value(const char *name, const FnExpr &fn,
+                      const smt::expr &ret_type) const {
+    auto bid = get_short_bid();
+    return smt::expr::mkIf(is_local(), fn(bid),
+                           smt::expr::mkUF(name, { bid }, ret_type));
+  }
 
 public:
   Pointer(const Memory &m, const char *var_name);
@@ -50,7 +55,9 @@ public:
   smt::expr get_bid() const;
   smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
   smt::expr get_offset() const;
-  smt::expr get_address(bool simplify = true) const;
+  smt::expr get_address(bool simplify = true,
+      std::optional<std::function<smt::expr(const smt::expr&)>> local_addrs =
+          std::nullopt) const; // local_addrs: short_bid -> addr array
 
   smt::expr block_size(bool simplify = true) const;
 
@@ -161,9 +168,11 @@ public:
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);
+  StateValue memcmp(const smt::expr &ptr1, const smt::expr &ptr2,
+                    const smt::expr &bytesize, bool eqonly, unsigned bitwidth);
 
-  smt::expr ptr2int(const smt::expr &ptr);
-  smt::expr int2ptr(const smt::expr &val);
+  smt::expr ptr2int(const smt::expr &ptr) const;
+  smt::expr int2ptr(const smt::expr &val) const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

@@ -506,6 +506,22 @@ public:
 };
 
 
+class Memcmp final : public Instr {
+  Value *ptr1, *ptr2, *num;
+  bool equalchk;
+public:
+  Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
+         bool equalchk): Instr(type, std::move(name)), ptr1(&ptr1), ptr2(&ptr2),
+                         num(&num), equalchk(equalchk) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class ExtractElement final : public Instr {
   Value *v, *idx;
 public:

@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <functional>
 
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_func_decl* Z3_decl;
@@ -242,6 +243,7 @@ public:
   expr extract(unsigned high, unsigned low) const;
 
   expr toBVBool() const;
+  expr toBool() const;
   expr float2BV() const;
   expr float2Real() const;
   expr BV2float(const expr &type) const;
@@ -255,6 +257,10 @@ public:
   // of the desired type
   static expr mkUF(const char *name, const std::vector<expr> &args,
                    const expr &range);
+  static expr mkRecFnApp(const char *name, const std::vector<expr> &argdefs,
+                         const expr &range,
+                         std::function<expr(const expr&)> funbody,
+                         const std::vector<expr> &args);
 
   static expr mkArray(const char *name, const expr &domain, const expr &range);
   expr store(const expr &idx, const expr &val) const;
@@ -263,6 +269,8 @@ public:
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
   static expr mkLambda(const std::set<expr> &vars, const expr &val);
+
+  expr app(const std::vector<expr> &args) const;
 
   expr simplify() const;
 

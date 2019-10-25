@@ -1172,6 +1172,10 @@ expr expr::toBVBool() const {
   return mkIf(*this, mkUInt(1, sort), mkUInt(0, sort));
 }
 
+expr expr::toBool() const {
+  return *this == mkUInt(1, 1);
+}
+
 expr expr::float2BV() const {
   if (auto app = isAppOf(Z3_OP_FPA_TO_FP))
     return Z3_get_app_arg(ctx(), app, 0);
@@ -1239,6 +1243,36 @@ expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
                               num_args, z3_sorts.data(), range.sort());
   return Z3_mk_app(ctx(), decl, num_args, z3_args.data());
 }
+
+expr expr::mkRecFnApp(const char *name, const vector<expr> &argdefs,
+                      const expr &range, function<expr(const expr&)> funbody,
+                      const vector<expr> &args) {
+  C2(range);
+  assert(args.size() == argdefs.size());
+  auto num_args = args.size();
+  vector<Z3_ast> z3_argdefs, z3_args;
+  vector<Z3_sort> z3_sorts;
+  z3_argdefs.reserve(num_args);
+  z3_args.reserve(num_args);
+  z3_sorts.reserve(num_args);
+
+  for (auto &arg : args) {
+    if (!arg.isValid())
+      return {};
+    z3_args.emplace_back(arg());
+    z3_sorts.emplace_back(arg.sort());
+  }
+  for (auto &argdef : argdefs) {
+    z3_argdefs.emplace_back(argdef());
+  }
+
+  auto decl = Z3_mk_rec_func_decl(ctx(), Z3_mk_string_symbol(ctx(), name),
+                                  num_args, z3_sorts.data(), range.sort());
+  expr f_app = Z3_mk_app(ctx(), decl, num_args, z3_args.data());
+  Z3_add_rec_def(ctx(), decl, num_args, z3_argdefs.data(), funbody(f_app)());
+  return f_app;
+}
+
 
 expr expr::mkArray(const char *name, const expr &domain, const expr &range) {
   C2(domain, range);
@@ -1347,6 +1381,16 @@ expr expr::mkLambda(const set<expr> &vars, const expr &val) {
     vars_ast[i++] = (Z3_app)v();
   }
   return Z3_mk_lambda_const(ctx(), vars.size(), vars_ast.get(), val());
+}
+
+expr expr::app(const vector<expr> &args) const {
+  C();
+  unique_ptr<Z3_ast[]> args_ast(new Z3_ast[args.size()]);
+  unsigned i = 0;
+  for (auto &v : args) {
+    args_ast[i++] = v();
+  }
+  return Z3_mk_app(ctx(), decl(), args.size(), args_ast.get());
 }
 
 expr expr::simplify() const {

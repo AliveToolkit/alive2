@@ -1739,7 +1739,7 @@ StateValue Calloc::toSMT(State &s) const {
 
   expr is_null = p == Pointer::mkNullPointer(s.getMemory())();
   expr calloc_sz = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), size);
-  
+
   // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
@@ -1993,12 +1993,49 @@ StateValue Memcpy::toSMT(State &s) const {
 
 expr Memcpy::getTypeConstraints(const Function &f) const {
   return dst->getType().enforcePtrType() &&
-         dst->getType().enforcePtrType() &&
+         src->getType().enforcePtrType() &&
          bytes->getType().enforceIntType();
 }
 
 unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
   return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
+}
+
+vector<Value*> Memcmp::operands() const {
+  return { ptr1, ptr2, num };
+}
+
+void Memcmp::rauw(const Value &what, Value &with) {
+  RAUW(ptr1);
+  RAUW(ptr2);
+  RAUW(num);
+}
+
+void Memcmp::print(ostream &os) const {
+  os << getName() << " = " << (equalchk ? "bcmp " : "memcmp ") << *ptr1
+     << ", " << *ptr2 << ", " << *num;
+}
+
+StateValue Memcmp::toSMT(State &s) const {
+  auto &[vptr1, np1] = s[*ptr1];
+  auto &[vptr2, np2] = s[*ptr2];
+  auto &[vnum, npn] = s[*num];
+  s.addUB(vnum.ugt(0).implies(np1 && np2));
+  s.addUB(npn);
+
+  unsigned bw = getType().bits();
+  return s.getMemory().memcmp(vptr1, vptr2, vnum, equalchk, bw);
+}
+
+expr Memcmp::getTypeConstraints(const Function &f) const {
+  return ptr1->getType().enforcePtrType() &&
+         ptr2->getType().enforcePtrType() &&
+         num->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
+  return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
+                             equalchk);
 }
 
 

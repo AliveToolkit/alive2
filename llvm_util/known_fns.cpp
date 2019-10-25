@@ -44,7 +44,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
-  if (!decl || !TLI.getLibFunc(*decl, libfn))
+  if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
     return { nullptr, false };
 
   switch (libfn) {
@@ -52,6 +52,15 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
     RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
                                       UnaryOp::Copy));
+  case llvm::LibFunc_memcmp:
+  case llvm::LibFunc_bcmp: {
+    auto ptr1 = get_operand(i.getArgOperand(0));
+    auto ptr2 = get_operand(i.getArgOperand(1));
+    auto bytesize = get_operand(i.getArgOperand(2));
+    bool eqchk = libfn == llvm::LibFunc_bcmp;
+    RETURN_KNOWN(make_unique<Memcmp>(*ty, value_name(i), *ptr1, *ptr2,
+                                     *bytesize, eqchk));
+  }
   default:
     RETURN_FAIL_KNOWN();
   }

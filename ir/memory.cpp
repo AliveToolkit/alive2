@@ -80,6 +80,22 @@ public:
 
   const expr& operator()() const { return p; }
 
+  expr no_poison_bit() const {
+    IntType ty("", 8);
+    auto v = ty.toBV(ty.getDummyValue(true));
+    return expr::mkIf(is_ptr(), ptr_nonpoison(),
+                      nonptr_nonpoison() == v.non_poison);
+  }
+
+  expr as_int8(optional<function<expr(const expr&)>> p2i = nullopt) const {
+    Pointer p(m, ptr_value());
+    auto three = expr::mkUInt(3, m.bitsPtrSize());
+    return expr::mkIf(is_ptr(),
+      (p.get_address(true, p2i).lshr(
+            ptr_byteoffset().zext(m.bitsPtrSize() - 3) << three).trunc(8)),
+      nonptr_value());
+  }
+
   static Byte mkPoisonByte(const Memory &m) {
     IntType ty("", 8);
     auto v = ty.toBV(ty.getDummyValue(false));
@@ -195,19 +211,17 @@ expr Pointer::get_offset() const {
   return p.extract(m.bitsOffset() - 1, 0).sextOrTrunc(m.bits_size_t);
 }
 
-expr Pointer::get_value(const char *name, const FunctionExpr &fn,
-                        const expr &ret_type) const {
-  auto bid = get_short_bid();
-  return expr::mkIf(is_local(), fn(bid), expr::mkUF(name, { bid }, ret_type));
-}
-
-expr Pointer::get_address(bool simplify) const {
+expr Pointer::get_address(bool simplify,
+                          optional<function<expr(const expr&)>> local_addrs)
+                          const {
   expr offset = get_offset();
 
   // fast path for null ptrs
   if (simplify && (get_bid() == 0).isTrue())
     return offset;
 
+  if (local_addrs)
+    return offset + get_value("blk_addr", local_addrs.value(), offset);
   return offset + get_value("blk_addr", m.local_blk_addr, offset);
 }
 
@@ -381,7 +395,7 @@ static void store_lambda(const Pointer &p, const expr &cond, const expr &val,
                   expr::mkIf(!is_local && cond, val, non_local.load(idx)));
 }
 
-static expr load(const Pointer &p, expr &local, expr &non_local) {
+static expr load(const Pointer &p, const expr &local, const expr &non_local) {
   auto idx = p.short_ptr();
   return expr::mkIf(p.is_local(), local.load(idx), non_local.load(idx));
 }
@@ -615,11 +629,110 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   }
 }
 
-expr Memory::ptr2int(const expr &ptr) {
+StateValue Memory::memcmp(const expr &ptr1, const expr &ptr2,
+                          const expr &bytesize, bool eqonly, unsigned bitwidth) {
+  Pointer pp1(*this, ptr1), pp2(*this, ptr2);
+  pp1.is_dereferenceable(bytesize, 1, false);
+  pp2.is_dereferenceable(bytesize, 1, false);
+
+  expr zero_bw = expr::mkInt((int64_t)0, bitwidth);
+  // res: any positive number (if memcmp), or any non-zero (if bcmp)
+  expr res = expr::mkFreshVar("memcmp_res", zero_bw);
+  // res_neg: any negative number
+  expr res_neg = expr::mkFreshVar("memcmp_res_neg", zero_bw);
+  state->addQuantVar(res);
+  if (!eqonly) {
+    // memcmp
+    state->addQuantVar(res_neg);
+    state->addPre(res_neg.slt(zero_bw));
+    state->addPre(res.sgt(zero_bw));
+  } else {
+    // bcmp
+    // the result is just non-zero
+    state->addPre(res != zero_bw);
+    // res_neg is never used.
+  }
+
+  expr i = expr::mkFreshVar("i", expr::mkUInt(0, bitsOffset()));
+  expr ptr1_var = expr::mkFreshVar("p1", ptr1);
+  expr ptr2_var = expr::mkFreshVar("p2", ptr1);
+  expr bytesz_var = expr::mkFreshVar("sz", bytesize);
+  expr local_val_var = expr::mkFreshVar("local_vals", local_block_val);
+  expr local_addr_var = expr::mkArray("local_addrs", pp1.get_short_bid(),
+                                      pp1.get_address());
+  expr non_local_val_var = expr::mkFreshVar("non_local_vals", non_local_block_val);
+
+  // Declaration of memcmp recursive function:
+  //   def memcmp(i, p1, p2, sz, // compares *(p1+i) and *(p2+i) where i<sz
+  //              res, res_neg,  // If *(p1+i) > *(p2+i), return res,
+  //                             //   otherwise res_neg
+  //              local_val,     // memory.local_block_val
+  //              non_local_val, // memory.non_local_block_val
+  //              local_addr     // memory.local_blk_addr
+  //    ) -> BitVec<bitwidth + 1>
+  // From the result, most-significant 'bitwidth' bits return the result.
+  // The least-significant bit returns whether the result is poison or not.
+  vector<expr> arg_defs = {
+    i, ptr1_var, ptr2_var, bytesz_var, res, res_neg,
+    local_val_var, non_local_val_var, local_addr_var
+  };
+  expr bid = expr::mkVar("bid", pp1.get_short_bid());
+  vector<expr> args = {
+    expr::mkUInt(0, i.bits()), ptr1, ptr2, bytesize, res, res_neg,
+    local_block_val, non_local_block_val,
+    expr::mkLambda({ bid }, local_blk_addr(bid))
+  };
+
+  // A pointer-to-integer cast fn that encodes "local_addrs[bid]" where
+  // "local_addrs" is an argument given to the recursive function.
+  auto ptr_to_i = [local_addr_var](const expr &short_bid) {
+    return local_addr_var.load(short_bid);
+  };
+  // Now, define the memcmp recursive function.
+  auto memcmp_body = [ptr1_var, ptr2_var, i, bytesz_var, res, res_neg,
+                      local_val_var, non_local_val_var, bitwidth,
+                      &arg_defs, &ptr_to_i, eqonly, this]
+      (const expr &decl) -> expr {
+    Pointer p1(*this, ptr1_var);
+    Pointer p2(*this, ptr2_var);
+
+    Byte b1(*this, ::load(p1 + i, local_val_var, non_local_val_var));
+    Byte b2(*this, ::load(p2 + i, local_val_var, non_local_val_var));
+    expr b1int8 = b1.as_int8(ptr_to_i); // *(p1+i)
+    expr b2int8 = b2.as_int8(ptr_to_i); // *(p2+i)
+    expr b1_np = b1.no_poison_bit();
+    expr b2_np = b2.no_poison_bit();
+
+    // Arguments to the next recursive call
+    vector<expr> next_args = arg_defs;
+    next_args[0] = i + expr::mkUInt(1, i.bits());
+
+    return
+      expr::mkIf(bytesz_var.ule(i), // out of bounds?
+        expr::mkUInt(1, bitwidth + 1), // answer is 0, and non-poison
+        expr::mkIf(b1_np && b2_np, // If the bytes are not poison
+          expr::mkIf(b1int8 == b2int8,
+            decl.app(next_args), // call recursively (with i++)
+            (eqonly ? // Is this function bcmp?
+                res : // then, return a non-zero result
+                expr::mkIf(b1int8.uge(b2int8), res, res_neg)) // has sign
+              .concat(expr::mkUInt(1, 1)) // result is not poison
+          ),
+          expr::mkUInt(0, bitwidth + 1)
+        )
+      );
+  };
+
+  auto value = expr::mkRecFnApp("memcmp_fn", arg_defs,
+      expr::mkUInt(0, bitwidth + 1), memcmp_body, args);
+  return { value.extract(bitwidth, 1), value.extract(0, 0).toBool() };
+}
+
+expr Memory::ptr2int(const expr &ptr) const {
   return Pointer(*this, ptr).get_address();
 }
 
-expr Memory::int2ptr(const expr &val) {
+expr Memory::int2ptr(const expr &val) const {
   // TODO
   return {};
 }
