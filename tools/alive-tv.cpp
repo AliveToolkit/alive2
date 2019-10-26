@@ -223,7 +223,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   Errors errs = verifier.verify();
   bool result(errs);
   if (result) {
-    if (errs.isTimeout()) {
+    if (errs.isUnsound()) {
       cerr << errs << endl;
       ++errorCount;
     } else {
@@ -298,11 +298,10 @@ int main(int argc, char **argv) {
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
   for (auto &F1 : *M1.get()) {
-    if (F1.getInstructionCount() < 1)
+    if (F1.isDeclaration())
       continue;
-    std::string s = F1.getName();
     for (auto &F2 : *M2.get()) {
-      if (F2.getInstructionCount() < 1)
+      if (F2.isDeclaration())
         continue;
       if (F1.getName().equals(F2.getName()))
         result |= compareFunctions(F1, F2, targetTriple, goodCount,
