@@ -452,9 +452,14 @@ expr expr::urem(const expr &rhs) const {
   if (eq(rhs))
     return mkUInt(0, sort());
 
-  if (rhs.isZero())
-    return rhs;
+  uint64_t n, log;
+  if (rhs.isUInt(n)) {
+    if (n <= 1)
+      return mkUInt(0, sort());
 
+    if (is_power2(n, &log))
+      return mkUInt(0, bits() - log).concat(extract(log - 1, 0));
+  }
   return binop_fold(rhs, Z3_mk_bvurem);
 }
 
