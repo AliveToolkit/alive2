@@ -1,0 +1,44 @@
+Name: single shift by masked value
+%c_mod_width = urem i4 %c, i4 4
+%t = lshr i4 %b, i4 %c_mod_width
+  =>
+%t = fshr i4 0, i4 %b, i4 %c
+
+Name: single shift by value
+%t = lshr i32 %b, i32 %c
+  =>
+%t = fshr i32 0, i32 %b, i32 %c
+
+Name: rotate by masked value
+%c_mod_width = urem i32 %c, 32
+%neg_c_mod_width = sub i32 32, %c_mod_width
+%highpart = shl i32 %b, %neg_c_mod_width
+%lowpart = lshr i32 %b, %c_mod_width
+%t = or i32 %highpart, %lowpart
+  =>
+%t = fshr i32 %b, i32 %b, i32 %c
+
+Name: rotate by value
+%neg_c = sub i32 32, %c
+%highpart = shl i32 %b, %neg_c
+%lowpart = lshr i32 %b, %c
+%t = or i32 %highpart, %lowpart
+  =>
+%t = fshr i32 %b, i32 %b, i32 %c
+
+Name: funnel shift by masked value
+%c_mod_width = urem i32 %c, 32
+%neg_c_mod_width = sub i32 32, %c_mod_width
+%highpart = shl i32 %a, %neg_c_mod_width
+%lowpart = lshr i32 %b, %c_mod_width
+%t = or i32 %highpart, %lowpart
+  =>
+%t = fshr i32 %a, i32 %b, i32 %c
+
+Name: funnel shift by value
+%neg_c = sub i32 32, %c
+%highpart = shl i32 %a, %neg_c
+%lowpart = lshr i32 %b, %c
+%t = or i32 %highpart, %lowpart
+  =>
+%t = fshr i32 %a, i32 %b, i32 %c
