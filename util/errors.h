@@ -35,7 +35,6 @@ public:
 
   explicit operator bool() const { return !errs.empty(); }
   bool isUnsound() const;
-  bool isTimeout() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Errors &e);
 };

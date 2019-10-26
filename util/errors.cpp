@@ -40,16 +40,6 @@ bool Errors::isUnsound() const {
   return false;
 }
 
-// this is a bit of a hack, we can replace it when we get better error
-// reporting infrastructure
-bool Errors::isTimeout() const {
-  for (auto &[msg, unsound] : errs) {
-    if (msg.find("Timeout") != string::npos)
-      return true;
-  }
-  return false;
-}
-
 ostream& operator<<(ostream &os, const Errors &errs) {
   for (auto &[msg, unsound] : errs.errs) {
     (void)unsound;
