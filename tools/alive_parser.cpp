@@ -844,7 +844,7 @@ static unique_ptr<Instr> parse_fcmp(string_view name) {
                                 get_constant(cond_t == TRUE, bool_ty),
                                 UnaryOp::Copy);
   default:
-    return make_unique<FCmp>(bool_ty, string(name), cond, a, b);
+    return make_unique<FCmp>(bool_ty, string(name), cond, a, b, 0);
   }
   UNREACHABLE();
 }

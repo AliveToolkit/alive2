@@ -198,14 +198,17 @@ class FCmp final : public Instr {
 public:
   enum Cond { OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
               UEQ, UGT, UGE, ULT, ULE, UNE, UNO };
+  enum Flags { None = 0, NNaN = 1, NInf = 2, Reassoc = 4 };
 
 private:
   Value *a, *b;
   Cond cond;
+  unsigned flags = 0;
 
 public:
-  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b)
-    : Instr(type, move(name)), a(&a), b(&b), cond(cond) {}
+  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
+       unsigned flags)
+    : Instr(type, move(name)), a(&a), b(&b), cond(cond), flags(flags) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

@@ -270,11 +270,16 @@ public:
       UNREACHABLE();
     }
 
-    // TODO: support FP fast-math stuff
-    if (i.getFastMathFlags().any())
-      return error(i);
+    unsigned flags = 0;
+    if (i.getFastMathFlags().noNaNs())
+      flags |= FCmp::NNaN;
+    if (i.getFastMathFlags().noInfs())
+      flags |= FCmp::NInf;
+    if (i.getFastMathFlags().allowReassoc())
+      flags |= FCmp::Reassoc;
 
-    RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b));
+    RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b,
+                                        flags));
   }
 
   RetTy visitSelectInst(llvm::SelectInst &i) {

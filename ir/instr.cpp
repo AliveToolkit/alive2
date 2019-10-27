@@ -1215,8 +1215,15 @@ void FCmp::print(ostream &os) const {
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
   }
-  os << getName() << " = fcmp " << condtxt << print_type(getType())
-     << a->getName() << ", " << b->getName();
+  os << getName() << " = fcmp ";
+  if (flags & NNaN)
+    os << "nnan ";
+  if (flags & NInf)
+    os << "ninf ";
+  if (flags & Reassoc)
+    os << "reassoc ";
+  os << condtxt << print_type(getType()) << a->getName() << ", "
+     << b->getName();
 }
 
 StateValue FCmp::toSMT(State &s) const {
@@ -1242,7 +1249,15 @@ StateValue FCmp::toSMT(State &s) const {
     case UNE: val = av.fune(bv); break;
     case UNO: val = av.funo(bv); break;
     }
-    return { val.toBVBool(), a.non_poison && b.non_poison };
+    expr np = a.non_poison && b.non_poison;
+    if (flags & NNaN)
+      np &= !av.isNaN() && !bv.isNaN();
+    if (flags & NInf)
+      np &= !av.isInf() && !bv.isInf();
+    if (flags & Reassoc)
+      np &= expr(); // TODO
+
+    return { val.toBVBool(), move(np) };
   };
 
   if (auto agg = a->getType().getAsAggregateType()) {
@@ -1264,7 +1279,7 @@ expr FCmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FCmp::dup(const string &suffix) const {
-  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b);
+  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, flags);
 }
 
 
