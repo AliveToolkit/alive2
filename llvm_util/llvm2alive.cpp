@@ -257,15 +257,13 @@ public:
     case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
     case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
     case llvm::CmpInst::FCMP_TRUE: {
-      auto tru = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(get_int_type(1),
-                                             value_name(i), *tru,
+      auto tru = get_operand(llvm::ConstantInt::getTrue(i.getType()));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *tru,
                                              UnaryOp::Copy));
     }
     case llvm::CmpInst::FCMP_FALSE: {
-      auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(get_int_type(1),
-                                             value_name(i), *fals,
+      auto fals = get_operand(llvm::ConstantInt::getFalse(i.getType()));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *fals,
                                              UnaryOp::Copy));
     }
     default:
@@ -276,8 +274,7 @@ public:
     if (i.getFastMathFlags().any())
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<FCmp>(get_int_type(1), value_name(i),
-                                        cond, *a, *b));
+    RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b));
   }
 
   RetTy visitSelectInst(llvm::SelectInst &i) {

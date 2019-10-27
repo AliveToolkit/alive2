@@ -1164,14 +1164,13 @@ StateValue ICmp::toSMT(State &s) const {
     return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
   };
 
-  if (auto ret_agg = getType().getAsAggregateType()) {
-    auto elem_agg = elem_ty.getAsAggregateType();
+  if (auto agg = elem_ty.getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = elem_agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(elem_agg->extract(a_eval, i),
-                               elem_agg->extract(b_eval, i)));
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(agg->extract(a_eval, i),
+                               agg->extract(b_eval, i)));
     }
-    return ret_agg->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
   return scalar(a_eval, b_eval);
 }
@@ -1221,32 +1220,46 @@ void FCmp::print(ostream &os) const {
 }
 
 StateValue FCmp::toSMT(State &s) const {
-  auto &[av, ap] = s[*a];
-  auto &[bv, bp] = s[*b];
-  expr val;
-  switch (cond) {
-  case OEQ:   val = av.foeq(bv); break;
-  case OGT:   val = av.fogt(bv); break;
-  case OGE:   val = av.foge(bv); break;
-  case OLT:   val = av.folt(bv); break;
-  case OLE:   val = av.fole(bv); break;
-  case ONE:   val = av.fone(bv); break;
-  case ORD:   val = av.ford(bv); break;
-  case UEQ:   val = av.fueq(bv); break;
-  case UGT:   val = av.fugt(bv); break;
-  case UGE:   val = av.fuge(bv); break;
-  case ULT:   val = av.fult(bv); break;
-  case ULE:   val = av.fule(bv); break;
-  case UNE:   val = av.fune(bv); break;
-  case UNO:   val = av.funo(bv); break;
+  auto &a_eval = s[*a];
+  auto &b_eval = s[*b];
+
+  auto fn = [&](const auto &a, const auto &b) -> StateValue {
+    const expr &av = a.value, &bv = b.value;
+    expr val;
+    switch (cond) {
+    case OEQ: val = av.foeq(bv); break;
+    case OGT: val = av.fogt(bv); break;
+    case OGE: val = av.foge(bv); break;
+    case OLT: val = av.folt(bv); break;
+    case OLE: val = av.fole(bv); break;
+    case ONE: val = av.fone(bv); break;
+    case ORD: val = av.ford(bv); break;
+    case UEQ: val = av.fueq(bv); break;
+    case UGT: val = av.fugt(bv); break;
+    case UGE: val = av.fuge(bv); break;
+    case ULT: val = av.fult(bv); break;
+    case ULE: val = av.fule(bv); break;
+    case UNE: val = av.fune(bv); break;
+    case UNO: val = av.funo(bv); break;
+    }
+    return { val.toBVBool(), a.non_poison && b.non_poison };
+  };
+
+  if (auto agg = a->getType().getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(fn(agg->extract(a_eval, i), agg->extract(b_eval, i)));
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return { val.toBVBool(), ap && bp };
+  return fn(a_eval, b_eval);
 }
 
 expr FCmp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType().enforceIntType(1) &&
-         a->getType().enforceFloatType() &&
+         getType().enforceIntOrVectorType(1) &&
+         getType().enforceVectorTypeEquiv(a->getType()) &&
+         a->getType().enforceFloatOrVectorType() &&
          a->getType() == b->getType();
 }
 
@@ -1346,13 +1359,9 @@ StateValue Phi::toSMT(State &s) const {
     if (!pre) // jump from unreachable BB
       continue;
 
-    auto v = s[*val];
-    if (first) {
-      ret = v;
-      first = false;
-    } else {
-      ret = StateValue::mkIf(*pre, v, ret);
-    }
+    auto &v = s[*val];
+    ret = first ? v : StateValue::mkIf(*pre, v, ret);
+    first = false;
   }
   return ret;
 }
@@ -1469,17 +1478,17 @@ void Switch::print(ostream &os) const {
 }
 
 StateValue Switch::toSMT(State &s) const {
-  auto val = s[*value];
+  auto &val = s[*value];
   expr default_cond(true);
 
   for (auto &[value_cond, bb] : targets) {
-    auto target = s[*value_cond];
+    auto &target = s[*value_cond];
     assert(target.non_poison.isTrue());
     s.addJump({ val.value == target.value, expr(val.non_poison) }, bb);
     default_cond &= val.value != target.value;
   }
 
-  s.addJump({ move(default_cond), move(val.non_poison) }, default_target);
+  s.addJump({ move(default_cond), expr(val.non_poison) }, default_target);
   s.addUB(false);
   return {};
 }
