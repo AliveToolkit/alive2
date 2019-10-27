@@ -110,8 +110,6 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
   assert(!bytes.empty());
 
   if (toType.isPtrType()) {
-    bool first = true;
-
     expr loaded_ptr;
     // The result is not poison if all of these hold:
     // (1) There's no poison byte, and they are all pointer bytes
@@ -123,7 +121,7 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
       auto &b = bytes[i];
       expr ptr_value = b.ptr_value();
 
-      if (first) {
+      if (i == 0) {
         loaded_ptr = move(ptr_value);
       } else {
         non_poison &= ptr_value == loaded_ptr;
@@ -131,7 +129,6 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
       non_poison &= b.is_ptr();
       non_poison &= b.ptr_nonpoison();
       non_poison &= b.ptr_byteoffset() == i;
-      first = false;
     }
     return { move(loaded_ptr), move(non_poison) };
 
