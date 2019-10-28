@@ -14,7 +14,8 @@ using namespace std;
 namespace IR {
 
 State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this), return_domain(false) {
+  : f(f), source(source), memory(*this, f.isLittleEndian()),
+    return_domain(false) {
   return_val.first = f.getType().getDummyValue(false);
 }
 
