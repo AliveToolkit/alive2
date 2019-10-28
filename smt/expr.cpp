@@ -701,6 +701,10 @@ expr expr::isFPNeg() const {
   return unop_fold(Z3_mk_fpa_is_negative);
 }
 
+expr expr::isFPNegZero() const {
+  return isFPZero() && isFPNeg();
+}
+
 // TODO: make rounding mode customizable
 expr expr::fadd(const expr &rhs) const {
   C(rhs);

@@ -35,17 +35,19 @@ public:
             SMul_Overflow, UMul_Overflow,
             FAdd, FSub, FMul, FDiv, FRem,
             And, Or, Xor, Cttz, Ctlz  };
-  enum Flags { None = 0, NSW = 1, NUW = 2, NSWNUW = 3, Exact = 4,
-               NNAN = 8, NINF = 16, NNANNINF = 24};
+  enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2,
+               NNaN = 1 << 3, NInf = 1 << 4, NSZ = 1 << 5, ARCP = 1 << 6,
+               Contract = 1 << 7, Reassoc = 1 << 8,
+               FastMath = NNaN | NInf | NSZ | ARCP | Contract | Reassoc };
 
 private:
   Value *lhs, *rhs;
   Op op;
-  Flags flags;
+  unsigned flags;
 
 public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-        Flags flags = None);
+        unsigned flags = 0);
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

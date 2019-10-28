@@ -128,23 +128,23 @@ public:
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
 
-    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().noNaNs())
-      flags |= BinOp::NNAN;
-    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().noInfs())
-      flags |= BinOp::NINF;
-
-    // TODO: support FP fast-math stuff
-    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any()) {
-      auto FMFlag = i.getFastMathFlags();
-      if (FMFlag.allowReassoc() || FMFlag.allowReciprocal() ||
-          FMFlag.allowContract() || FMFlag.approxFunc() ||
-          FMFlag.noSignedZeros () || FMFlag.isFast())
-      return error(i);
+    if (isa<llvm::FPMathOperator>(i)) {
+      auto FM = i.getFastMathFlags();
+      if (FM.noNaNs())
+        flags |= BinOp::NNaN;
+      if (FM.noInfs())
+        flags |= BinOp::NInf;
+      if (FM.noSignedZeros())
+        flags |= BinOp::NSZ;
+      if (FM.allowReciprocal())
+        flags |= BinOp::ARCP;
+      if (FM.allowContract())
+        flags |= BinOp::Contract;
+      if (FM.allowReassoc())
+        flags |= BinOp::Reassoc;
     }
-
-
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
-                                         (BinOp::Flags)flags));
+                                         flags));
   }
 
   RetTy visitCastInst(llvm::CastInst &i) {

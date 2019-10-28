@@ -169,6 +169,7 @@ public:
   expr isInf() const;
   expr isFPZero() const;
   expr isFPNeg() const;
+  expr isFPNegZero() const;
 
   expr fadd(const expr &rhs) const;
   expr fsub(const expr &rhs) const;

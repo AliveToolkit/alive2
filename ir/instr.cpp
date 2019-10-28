@@ -45,14 +45,14 @@ expr Instr::getTypeConstraints() const {
 
 
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
-             Flags flags)
+             unsigned flags)
   : Instr(type, move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags) {
   switch (op) {
   case Add:
   case Sub:
   case Mul:
   case Shl:
-    assert((flags & NSWNUW) == flags);
+    assert((flags & (NSW | NUW)) == flags);
     break;
   case SDiv:
   case UDiv:
@@ -65,7 +65,7 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case FMul:
   case FDiv:
   case FRem:
-    assert((flags & NNANNINF) == flags);
+    assert((flags & FastMath) == flags);
     break;
   case SRem:
   case URem:
@@ -101,52 +101,63 @@ void BinOp::rauw(const Value &what, Value &with) {
 void BinOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case Add:  str = "add"; break;
-  case Sub:  str = "sub"; break;
-  case Mul:  str = "mul"; break;
-  case SDiv: str = "sdiv"; break;
-  case UDiv: str = "udiv"; break;
-  case SRem: str = "srem"; break;
-  case URem: str = "urem"; break;
-  case Shl:  str = "shl"; break;
-  case AShr: str = "ashr"; break;
-  case LShr: str = "lshr"; break;
-  case SAdd_Sat: str = "sadd_sat"; break;
-  case UAdd_Sat: str = "uadd_sat"; break;
-  case SSub_Sat: str = "ssub_sat"; break;
-  case USub_Sat: str = "usub_sat"; break;
-  case And:  str = "and"; break;
-  case Or:   str = "or"; break;
-  case Xor:  str = "xor"; break;
-  case Cttz: str = "cttz"; break;
-  case Ctlz: str = "ctlz"; break;
-  case SAdd_Overflow: str = "sadd_overflow"; break;
-  case UAdd_Overflow: str = "uadd_overflow"; break;
-  case SSub_Overflow: str = "ssub_overflow"; break;
-  case USub_Overflow: str = "usub_overflow"; break;
-  case SMul_Overflow: str = "smul_overflow"; break;
-  case UMul_Overflow: str = "umul_overflow"; break;
-  case FAdd: str = "fadd"; break;
-  case FSub: str = "fsub"; break;
-  case FMul: str = "fmul"; break;
-  case FDiv: str = "fdiv"; break;
-  case FRem: str = "frem"; break;
+  case Add:           str = "add "; break;
+  case Sub:           str = "sub "; break;
+  case Mul:           str = "mul "; break;
+  case SDiv:          str = "sdiv "; break;
+  case UDiv:          str = "udiv "; break;
+  case SRem:          str = "srem "; break;
+  case URem:          str = "urem "; break;
+  case Shl:           str = "shl "; break;
+  case AShr:          str = "ashr "; break;
+  case LShr:          str = "lshr "; break;
+  case SAdd_Sat:      str = "sadd_sat "; break;
+  case UAdd_Sat:      str = "uadd_sat "; break;
+  case SSub_Sat:      str = "ssub_sat "; break;
+  case USub_Sat:      str = "usub_sat "; break;
+  case And:           str = "and "; break;
+  case Or:            str = "or "; break;
+  case Xor:           str = "xor "; break;
+  case Cttz:          str = "cttz "; break;
+  case Ctlz:          str = "ctlz "; break;
+  case SAdd_Overflow: str = "sadd_overflow "; break;
+  case UAdd_Overflow: str = "uadd_overflow "; break;
+  case SSub_Overflow: str = "ssub_overflow "; break;
+  case USub_Overflow: str = "usub_overflow "; break;
+  case SMul_Overflow: str = "smul_overflow "; break;
+  case UMul_Overflow: str = "umul_overflow "; break;
+  case FAdd:          str = "fadd "; break;
+  case FSub:          str = "fsub "; break;
+  case FMul:          str = "fmul "; break;
+  case FDiv:          str = "fdiv "; break;
+  case FRem:          str = "frem "; break;
   }
 
-  const char *flag = nullptr;
-  switch (flags) {
-  case None:   flag = " "; break;
-  case NSW:    flag = " nsw "; break;
-  case NUW:    flag = " nuw "; break;
-  case NSWNUW: flag = " nsw nuw "; break;
-  case NNAN:   flag = " nnan "; break;
-  case NINF:   flag = " ninf "; break;
-  case NNANNINF: flag = " nnan ninf "; break;
-  case Exact:  flag = " exact "; break;
-  }
+  os << getName() << " = " << str;
 
-  os << getName() << " = " << str << flag << print_type(getType())
-     << lhs->getName() << ", " << rhs->getName();
+  if (flags & NSW)
+    os << "nsw ";
+  if (flags & NUW)
+    os << "nuw ";
+  if (flags & Exact)
+    os << "exact ";
+  if ((flags & FastMath) == FastMath) {
+    os << "fast ";
+  } else {
+    if (flags & NNaN)
+      os << "nnan ";
+    if (flags & NInf)
+      os << "ninf ";
+    if (flags & NSZ)
+      os << "nsz ";
+    if (flags & ARCP)
+      os << "arcp ";
+    if (flags & Contract)
+      os << "contract ";
+    if (flags & Reassoc)
+      os << "reassoc ";
+  }
+  os << print_type(getType()) << lhs->getName() << ", " << rhs->getName();
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -159,13 +170,18 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
 }
 
 static expr fm_poison(const expr &a, const expr &b, const expr &val,
-                      BinOp::Flags flags) {
+                      unsigned flags) {
   expr ret = false;
-  if (flags & BinOp::NINF)
-    ret |= a.isInf() || b.isInf() || val.isInf();
-  if (flags & BinOp::NNAN)
+  if (flags & BinOp::NNaN)
     ret |= a.isNaN() || b.isNaN() || val.isNaN();
-
+  if (flags & BinOp::NInf)
+    ret |= a.isInf() || b.isInf() || val.isInf();
+  if (flags & BinOp::ARCP)
+    ret |= expr(); // TODO
+  if (flags & BinOp::Contract)
+    ret |= expr(); // TODO
+  if (flags & BinOp::Reassoc)
+    ret |= expr(); // TODO
   return ret;
 }
 
@@ -173,6 +189,12 @@ StateValue BinOp::toSMT(State &s) const {
   bool vertical_zip = false;
   function<StateValue(const expr&, const expr&, const expr&, const expr&)>
     fn, scalar_op;
+
+  auto fm_arg = [&](const expr &val) {
+    if (flags & NSZ)
+      return expr::mkIf(val.isFPNegZero(), expr::mkNumber("0", val), val);
+    return val;
+  };
 
   switch (op) {
   case Add:
@@ -372,7 +394,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = a.fadd(b);
+      auto val = fm_arg(a).fadd(fm_arg(b));
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
     };
@@ -380,7 +402,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FSub:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = a.fsub(b);
+      auto val = fm_arg(a).fsub(fm_arg(b));
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
     };
@@ -388,7 +410,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FMul:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = a.fmul(b);
+      auto val = fm_arg(a).fmul(fm_arg(b));
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
     };
@@ -396,7 +418,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FDiv:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = a.fdiv(b);
+      auto val = fm_arg(a).fdiv(fm_arg(b));
       auto non_poison = !fm_poison(a, b, val, flags);
       return { move(val), move(non_poison) };
     };

@@ -547,13 +547,13 @@ static Value& parse_operand(Type &type) {
   UNREACHABLE();
 }
 
-static BinOp::Flags parse_nsw_nuw() {
-  BinOp::Flags flags = BinOp::None;
+static unsigned parse_nsw_nuw() {
+  unsigned flags = BinOp::None;
   while (true) {
     if (tokenizer.consumeIf(NSW)) {
-      flags = (BinOp::Flags)(flags | BinOp::NSW);
+      flags |= BinOp::NSW;
     } else if (tokenizer.consumeIf(NUW)) {
-      flags = (BinOp::Flags)(flags | BinOp::NUW);
+      flags |= BinOp::NUW;
     } else {
       break;
     }
@@ -561,19 +561,19 @@ static BinOp::Flags parse_nsw_nuw() {
   return flags;
 }
 
-static BinOp::Flags parse_exact() {
+static unsigned parse_exact() {
   if (tokenizer.consumeIf(EXACT))
     return BinOp::Exact;
   return BinOp::None;
 }
 
-static BinOp::Flags parse_fast_math() {
-  BinOp::Flags flags = BinOp::None;
+static unsigned parse_fast_math() {
+  unsigned flags = BinOp::None;
   while (true) {
-    if (tokenizer.consumeIf(NINF)) {
-      flags = (BinOp::Flags)(flags | BinOp::NINF);
-    } else if (tokenizer.consumeIf(NNAN)) {
-      flags = (BinOp::Flags)(flags | BinOp::NNAN);
+    if (tokenizer.consumeIf(NNAN)) {
+      flags |= BinOp::NNaN;
+    } else if (tokenizer.consumeIf(NINF)) {
+      flags |= BinOp::NInf;
     } else {
       break;
     }
@@ -582,7 +582,7 @@ static BinOp::Flags parse_fast_math() {
 }
 
 
-static BinOp::Flags parse_binop_flags(token op_token) {
+static unsigned parse_binop_flags(token op_token) {
   switch (op_token) {
   case ADD:
   case SUB:
@@ -624,7 +624,7 @@ static BinOp::Flags parse_binop_flags(token op_token) {
 }
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
-  BinOp::Flags flags = parse_binop_flags(op_token);
+  auto flags = parse_binop_flags(op_token);
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
