@@ -32,6 +32,14 @@ class Pointer {
 
   unsigned total_bits() const;
 
+  enum MemBlkCategory {
+    LOCAL_BLOCKS,
+    NONLOCAL_BLOCKS,
+    BOTH
+  };
+  smt::expr get_value_from_uf(const char *name, const smt::expr &ret,
+                              MemBlkCategory category = BOTH) const;
+
 public:
   Pointer(const Memory &m, const char *var_name);
   Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
@@ -107,15 +115,12 @@ class Memory {
 
   smt::expr blocks_val; // array: (bid, offset) -> Byte
   smt::expr blocks_liveness; // array: bid -> bool
-  smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
-  smt::expr blocks_readonly; // array: bid -> bool, true if readonly
 
   std::string mkName(const char *str, bool src) const;
   std::string mkName(const char *str) const;
 
-  smt::expr mk_val_array(const char *name) const;
-  smt::expr mk_liveness_uf() const;
-  smt::expr mk_readonly_array(const char *name) const;
+  smt::expr mk_val_array() const;
+  smt::expr mk_liveness_array() const;
 
 public:
   enum BlockKind {
