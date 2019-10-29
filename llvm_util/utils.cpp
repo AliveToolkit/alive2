@@ -123,7 +123,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   }
   default:
 err:
-    *out << "Unsupported type: " << *ty << '\n';
+    *out << "ERROR: Unsupported type: " << *ty << '\n';
     return nullptr;
   }
 }
