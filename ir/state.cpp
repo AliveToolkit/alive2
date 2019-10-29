@@ -165,6 +165,11 @@ void State::addReturn(const StateValue &val) {
   domain.first = false;
 }
 
+void State::addPre(smt::expr &&cond, bool pre_on_quantifier) {
+  if (pre_on_quantifier) precondition_quant &= std::move(cond);
+  else precondition &= std::move(cond);
+}
+
 void State::addUB(expr &&ub) {
   domain.first &= move(ub);
   domain.second.insert(undef_vars.begin(), undef_vars.end());
