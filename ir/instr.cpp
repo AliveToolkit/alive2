@@ -1928,7 +1928,7 @@ void ExtractElement::print(ostream &os) const {
 StateValue ExtractElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = v->getType().getAsAggregateType();
-  expr inbounds = iv.ult(vty->numElementsConst());
+  expr inbounds = !iv.uge(vty->numElementsConst());
   auto [rv, rp] = vty->extract(s[*v], iv);
   return { move(rv), ip && inbounds && rp };
 }
