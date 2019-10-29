@@ -502,7 +502,7 @@ public:
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
   RetTy error(llvm::Instruction &i) {
-    *out << "Unsupported instruction: " << i << '\n';
+    *out << "ERROR: Unsupported instruction: " << i << '\n';
     return {};
   }
 
@@ -556,7 +556,7 @@ public:
         break;
       }
       default:
-        *out << "Unsupported metadata: " << ID << '\n';
+        *out << "ERROR: Unsupported metadata: " << ID << '\n';
         return false;
       }
     }
