@@ -1714,6 +1714,53 @@ unique_ptr<Instr> Malloc::dup(const string &suffix) const {
   return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
 }
 
+vector<Value*> Calloc::operands() const {
+  return { num, size };
+}
+
+void Calloc::rauw(const Value &what, Value &with) {
+  RAUW(num);
+  RAUW(size);
+}
+
+void Calloc::print(std::ostream &os) const {
+  os << getName() << " = calloc " << *num << " " << *size;
+}
+
+StateValue Calloc::toSMT(State &s) const {
+  auto &[nm, np_num] = s[*num];
+  auto &[sz, np_sz] = s[*size];
+  s.addUB(np_num && np_sz);
+
+  s.addUB(nm.mul_no_uoverflow(sz));
+
+  // TODO: check calloc align.
+  auto p = s.getMemory().alloc(nm * sz, 8, Memory::HEAP);
+
+  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, nm * sz, 1);
+
+  if (isNonNull)
+    return { move(p), true };
+
+  auto nullp = Pointer::mkNullPointer(s.getMemory());
+  auto flag = expr::mkFreshVar("calloc_isnull", expr(true));
+  // TODO: We're moving from nondet. allocation to memory usage tracking, so
+  // this part should be changed.
+  s.addQuantVar(flag);
+  return { expr::mkIf(move(flag), nullp.release(), move(p)), true };
+}
+
+expr Calloc::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforcePtrType() &&
+         num->getType().enforceIntType() &&
+         size->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Calloc::dup(const string &suffix) const {
+  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size,
+                             isNonNull);
+}
 
 vector<Value*> Free::operands() const {
   return { ptr };

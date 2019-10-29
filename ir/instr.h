@@ -389,6 +389,23 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+class Calloc final : public Instr {
+  Value *num, *size;
+  bool isNonNull;
+public:
+  Calloc(Type &type, std::string &&name, Value &num, Value &size,
+         bool isNonNull)
+    : Instr(type, std::move(name)), num(&num), size(&size),
+            isNonNull(isNonNull) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
 class Free final : public Instr {
   Value *ptr;
 public:
