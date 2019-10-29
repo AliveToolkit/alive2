@@ -1977,7 +1977,8 @@ expr InsertElement::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
-  return make_unique<InsertElement>(getType(), getName() + suffix, *v, *e, *idx);
+  return make_unique<InsertElement>(getType(), getName() + suffix,
+                                    *v, *e, *idx);
 }
 
 
@@ -2027,7 +2028,8 @@ expr ShuffleVector::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
-  return make_unique<ShuffleVector>(getType(), getName() + suffix, *v1, *v2, *mask);
+  return make_unique<ShuffleVector>(getType(), getName() + suffix,
+                                    *v1, *v2, *mask);
 }
 
 }
