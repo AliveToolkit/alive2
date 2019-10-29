@@ -301,8 +301,39 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
       tgt_instrs.emplace(i.getName(), &i);
     }
   }
+}
 
-  t.tgt.syncDataWithSrc(t.src);
+Errors TransformVerify::sync() {
+  try {
+    t.tgt.syncDataWithSrc(t.src);
+
+    // Check sizes of global variables
+    auto globals_tgt = t.tgt.getGlobalVars();
+    auto globals_src = t.src.getGlobalVars();
+    for (auto GVS: globals_src) {
+      auto I = find_if(globals_tgt.begin(), globals_tgt.end(),
+        [GVS](auto *GV) -> bool { return GVS->getName() == GV->getName(); });
+      if (I == globals_tgt.end())
+        continue;
+
+      auto GVT = *I;
+      if (GVS->size() != GVT->size()) {
+        stringstream ss;
+        ss << "Global variable " << GVS->getName() << " in source and "
+          << "target has different sizes (" << GVS->size() << ", "
+          << GVT->size() << ")";
+        throw AliveException(ss.str(), false);
+      } else if (GVS->isConst() != GVT->isConst()) {
+        stringstream ss;
+        ss << "Global variable " << GVS->getName() << " in source and "
+          << "target has different constness";
+        throw AliveException(ss.str(), false);
+      }
+    }
+  } catch (AliveException &ae) {
+    return Errors(move(ae));
+  }
+  return Errors();
 }
 
 Errors TransformVerify::verify() const {

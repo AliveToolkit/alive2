@@ -51,6 +51,7 @@ class TransformVerify {
 
 public:
   TransformVerify(Transform &t, bool check_each_var);
+  util::Errors sync();
   util::Errors verify() const;
   TypingAssignments getTypings() const;
   void fixupTypes(const TypingAssignments &ty);

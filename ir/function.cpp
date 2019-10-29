@@ -4,6 +4,7 @@
 #include "ir/function.h"
 #include "ir/instr.h"
 #include "util/errors.h"
+#include <sstream>
 
 using namespace smt;
 using namespace util;
@@ -86,6 +87,16 @@ const BasicBlock& Function::getBB(string_view name) const {
 
 void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(move(c));
+}
+
+vector<GlobalVariable *> Function::getGlobalVars() const {
+  vector<GlobalVariable *> gvs;
+  for (auto I = constants.begin(), E = constants.end(); I != E; ++I) {
+    const unique_ptr<Value> &c = *I;
+    if (auto *gv = dynamic_cast<GlobalVariable *>(c.get()))
+      gvs.push_back(gv);
+  }
+  return gvs;
 }
 
 void Function::addPredicate(unique_ptr<Predicate> &&p) {
