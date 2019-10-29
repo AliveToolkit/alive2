@@ -322,7 +322,7 @@ expr Pointer::is_block_alive() const {
 
 expr Pointer::is_at_heap() const {
   // TODO: use bitvector instead of UF if there are few allocations
-  return get_value_from_uf("blks_at_heap", false, LOCAL_BLOCKS);
+  return get_value_from_uf("blks_at_heap", false, BOTH);
 }
 
 expr Pointer::is_readonly() const {
@@ -460,6 +460,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     // The memory block was initially alive.
     state->addAxiom(mk_liveness_array().load(p.get_bid()));
     state->addAxiom(p.is_readonly() == expr(blockKind == CONSTGLOBAL));
+    state->addAxiom(p.is_at_heap() == expr(false));
   }
 
   return p.release();
