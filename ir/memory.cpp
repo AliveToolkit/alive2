@@ -196,14 +196,19 @@ expr Pointer::get_offset() const {
   return p.extract(m.bitsBid() + m.bits_for_offset - 1, m.bitsBid());
 }
 
+expr Pointer::get_value_from_uf(const char *name, const expr &ret,
+                                MemBlkCategory category) const {
+  auto local_name = m.mkName(name);
+  auto localret = category == NONLOCAL_BLOCKS ? ret :
+                  expr::mkUF(local_name.c_str(), { get_local_bid() }, ret);
+  auto nonlocalret = category == LOCAL_BLOCKS ? ret :
+                     expr::mkUF(name, { get_nonlocal_bid() }, ret);
+  return expr::mkIf(is_local(), localret, nonlocalret);
+}
+
 expr Pointer::get_address() const {
   expr offset = get_offset().sextOrTrunc(m.bits_size_t);
-  auto local_name = m.mkName("blks_addr");
-  return
-    offset +
-      expr::mkIf(is_local(),
-                 expr::mkUF(local_name.c_str(), { get_local_bid() }, offset),
-                 expr::mkUF("blks_addr", { get_nonlocal_bid() }, offset));
+  return offset + get_value_from_uf("blks_addr", offset);
 }
 
 expr Pointer::block_size() const {
@@ -211,12 +216,7 @@ expr Pointer::block_size() const {
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
   expr range = expr::mkUInt(0, m.bits_size_t - 1);
-  auto local_name = m.mkName("blks_size");
-  return
-    expr::mkUInt(0, 1).concat(
-      expr::mkIf(is_local(),
-                 expr::mkUF(local_name.c_str(), { get_local_bid() }, range),
-                 expr::mkUF("blks_size", { get_nonlocal_bid() }, range)));
+  return expr::mkUInt(0, 1).concat(get_value_from_uf("blks_size", range));
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -321,11 +321,13 @@ expr Pointer::is_block_alive() const {
 }
 
 expr Pointer::is_at_heap() const {
-  return m.blocks_kind.load(get_bid()) == 1;
+  // TODO: use bitvector instead of UF if there are few allocations
+  return get_value_from_uf("blks_at_heap", false, BOTH);
 }
 
 expr Pointer::is_readonly() const {
-  return m.blocks_readonly.load(get_bid());
+  // TODO: use bitvector instead of UF if there are few allocations
+  return get_value_from_uf("blks_readonly", false, NONLOCAL_BLOCKS);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
@@ -354,17 +356,14 @@ string Memory::mkName(const char *str) const {
   return mkName(str, state->isSource());
 }
 
-expr Memory::mk_val_array(const char *name) const {
-  return expr::mkArray(name, expr::mkUInt(0, bitsBid() + bits_for_offset),
-                             expr::mkUInt(0, bitsByte()));
+expr Memory::mk_val_array() const {
+  return expr::mkArray("blks_val",
+                       expr::mkUInt(0, bitsBid() + bits_for_offset),
+                       expr::mkUInt(0, bitsByte()));
 }
 
-expr Memory::mk_liveness_uf() const {
+expr Memory::mk_liveness_array() const {
   return expr::mkArray("blks_liveness", expr::mkUInt(0, bitsBid()), true);
-}
-
-expr Memory::mk_readonly_array(const char *name) const {
-  return expr::mkArray("blks_readonly", expr::mkUInt(0, bitsBid()), false);
 }
 
 // last_bid stores 1 + the last memory block id.
@@ -378,9 +377,8 @@ static unsigned last_idx_ptr;
 
 Memory::Memory(State &state, bool little_endian)
     : state(&state), little_endian(little_endian) {
-  blocks_val = mk_val_array("blks_val");
-  blocks_readonly = mk_readonly_array("blks_readonly");
-  blocks_liveness = mk_liveness_uf();
+  blocks_val = mk_val_array();
+  blocks_liveness = mk_liveness_array();
   {
     Pointer idx(*this, "#idx0");
 
@@ -403,9 +401,6 @@ Memory::Memory(State &state, bool little_endian)
     val = !is_local && blocks_liveness.load(bid);
     blocks_liveness = expr::mkLambda({ bid }, move(val));
   }
-
-  blocks_kind = expr::mkArray("blks_kind", expr::mkUInt(0, bitsBid()),
-                              expr::mkUInt(0, 1));
 
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
@@ -460,15 +455,13 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   if (is_local) {
     blocks_liveness = blocks_liveness.store(p.get_bid(), true);
+    state->addPre(p.is_at_heap() == expr(blockKind == HEAP));
   } else {
     // The memory block was initially alive.
-    // TODO: const global variables should be read-only
-    state->addAxiom(mk_liveness_uf().load(p.get_bid()));
+    state->addAxiom(mk_liveness_array().load(p.get_bid()));
+    state->addAxiom(p.is_readonly() == expr(blockKind == CONSTGLOBAL));
+    state->addAxiom(p.is_at_heap() == expr(false));
   }
-  blocks_kind = blocks_kind.store(p.get_bid(),
-                                  expr::mkUInt(blockKind == HEAP, 1));
-  blocks_readonly = blocks_readonly.store(p.get_bid(),
-                                          blockKind == CONSTGLOBAL);
 
   return p.release();
 }
@@ -579,7 +572,6 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.blocks_val      = expr::mkIf(cond, then.blocks_val, els.blocks_val);
   ret.blocks_liveness = expr::mkIf(cond, then.blocks_liveness,
                                    els.blocks_liveness);
-  ret.blocks_kind     = expr::mkIf(cond, then.blocks_kind, els.blocks_kind);
   return ret;
 }
 
