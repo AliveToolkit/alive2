@@ -568,7 +568,7 @@ public:
     if (!type)
       return {};
 
-    Function Fn(*type, f.getName());
+    Function Fn(*type, f.getName(), DL().isLittleEndian());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {

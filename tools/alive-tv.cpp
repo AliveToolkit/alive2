@@ -188,14 +188,16 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   TransformPrintOpts print_opts;
 
-  auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F1));
+  auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
+                                    .getTLI(F1));
   if (!Func1) {
     cerr << "Could not translate '" + (std::string)F1.getName() + "' to Alive IR\n";
     ++errorCount;
     return true;
   }
 
-  auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F2));
+  auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
+                                    .getTLI(F2));
   if (!Func2) {
     cerr << "Could not translate '" + (std::string)F2.getName() + "' to Alive IR\n";
     ++errorCount;
@@ -313,7 +315,7 @@ int main(int argc, char **argv) {
   cerr << "  " << goodCount << " correct transformations\n";
   cerr << "  " << badCount << " incorrect transformations\n";
   cerr << "  " << errorCount << " errors\n";
-  
+
   smt_init.reset();
 
   return result;

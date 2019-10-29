@@ -376,7 +376,8 @@ static unsigned last_local_bid;
 static unsigned last_nonlocal_bid;
 static unsigned last_idx_ptr;
 
-Memory::Memory(State &state) : state(&state) {
+Memory::Memory(State &state, bool little_endian)
+    : state(&state), little_endian(little_endian) {
   blocks_val = mk_val_array("blks_val");
   blocks_readonly = mk_readonly_array("blks_readonly");
   blocks_liveness = mk_liveness_uf();
@@ -490,8 +491,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytes.size(), align, true);
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
-    // FIXME: support big-endian
-    blocks_val = blocks_val.store((ptr + i).release(), bytes[i]());
+    auto ptr_i = little_endian ? (ptr + i) : (ptr + (e - i - 1));
+    blocks_val = blocks_val.store(ptr_i.release(), bytes[i]());
   }
 }
 
@@ -504,7 +505,8 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
 
   vector<Byte> loadedBytes;
   for (unsigned i = 0; i < bytesize; ++i) {
-    loadedBytes.emplace_back(*this, blocks_val.load((ptr + i).release()));
+    auto ptr_i = little_endian ? (ptr + i) : (ptr + (bytesize - i - 1));
+    loadedBytes.emplace_back(*this, blocks_val.load(ptr_i.release()));
   }
   return bytesToValue(loadedBytes, type);
 }

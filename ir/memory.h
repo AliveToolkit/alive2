@@ -103,6 +103,8 @@ class Memory {
   // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
 
+  bool little_endian;
+
   smt::expr blocks_val; // array: (bid, offset) -> Byte
   smt::expr blocks_liveness; // array: bid -> bool
   smt::expr blocks_kind; // array: bid -> uint(1bit), 1 if heap, 0 otherwise
@@ -120,7 +122,7 @@ public:
     HEAP, STACK, GLOBAL, CONSTGLOBAL
   };
 
-  Memory(State &state);
+  Memory(State &state, bool little_endian);
 
   static void resetGlobalData();
   static void resetLocalBids();

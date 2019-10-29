@@ -56,6 +56,8 @@ class Function final {
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
 
+  bool little_endian;
+
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
   std::vector<std::unique_ptr<Predicate>> predicates;
@@ -64,8 +66,8 @@ class Function final {
 
 public:
   Function() {}
-  Function(Type &type, std::string &&name)
-    : type(&type), name(std::move(name)) {}
+  Function(Type &type, std::string &&name, bool little_endian = true)
+    : type(&type), name(std::move(name)), little_endian(little_endian) {}
 
   const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
@@ -97,6 +99,7 @@ public:
   }
 
   bool hasReturn() const;
+  bool isLittleEndian() const { return little_endian; }
 
   void syncDataWithSrc(const Function &src);
 
