@@ -1911,121 +1911,123 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
   return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
 }
 
+
 vector<Value*> ExtractElement::operands() const {
-  return { a, idx };
+  return { v, idx };
 }
 
 void ExtractElement::rauw(const Value &what, Value &with) {
-  RAUW(a);
+  RAUW(v);
   RAUW(idx);
 }
 
 void ExtractElement::print(ostream &os) const {
-  os << getName() << " = extractelement " << *a << ", " << *idx;
+  os << getName() << " = extractelement " << *v << ", " << *idx;
 }
 
 StateValue ExtractElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
-  auto aty = a->getType().getAsAggregateType();
-  expr inbounds = iv.ult(aty->numElementsConst());
-  auto [rv, rp] = aty->extract(s[*a], iv);
+  auto vty = v->getType().getAsAggregateType();
+  expr inbounds = iv.ult(vty->numElementsConst());
+  auto [rv, rp] = vty->extract(s[*v], iv);
   return { move(rv), ip && inbounds && rp };
 }
 
 expr ExtractElement::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         a->getType().enforceVectorType([&](auto &ty) { return ty == getType(); }) &&
+         v->getType().enforceVectorType([&](auto &ty)
+                                        { return ty == getType(); }) &&
          idx->getType().enforceIntType();
 }
 
 unique_ptr<Instr> ExtractElement::dup(const string &suffix) const {
-  return make_unique<ExtractElement>(getType(), getName() + suffix, *a, *idx);
+  return make_unique<ExtractElement>(getType(), getName() + suffix, *v, *idx);
 }
 
 
 vector<Value*> InsertElement::operands() const {
-  return { a, e, idx };
+  return { v, e, idx };
 }
 
 void InsertElement::rauw(const Value &what, Value &with) {
-  RAUW(a);
+  RAUW(v);
   RAUW(e);
   RAUW(idx);
 }
 
 void InsertElement::print(ostream &os) const {
-  os << getName() << " = insertelement" << *a << ", " << *e << ", " << *idx;
+  os << getName() << " = insertelement" << *v << ", " << *e << ", " << *idx;
 }
 
 StateValue InsertElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
-  auto aty = a->getType().getAsAggregateType();
-  expr inbounds = iv.ult(aty->numElementsConst());
-  auto [rv, rp] = aty->update(s[*a], s[*e], iv);
+  auto vty = v->getType().getAsAggregateType();
+  expr inbounds = !iv.uge(vty->numElementsConst());
+  auto [rv, rp] = vty->update(s[*v], s[*e], iv);
   return { move(rv), expr::mkIf(ip && inbounds,
-                                move(rp), expr::mkInt(-1, aty->bits())) };
+                                move(rp), expr::mkInt(-1, vty->bits())) };
 }
 
 expr InsertElement::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType() == a->getType() &&
-         a->getType().enforceVectorType([&](auto &ty) { return ty == e->getType(); }) &&
+         getType() == v->getType() &&
+         v->getType().enforceVectorType([&](auto &ty)
+                                        { return ty == e->getType(); }) &&
          idx->getType().enforceIntType();
 }
 
 unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
-  return make_unique<InsertElement>(getType(), getName() + suffix, *a, *e, *idx);
+  return make_unique<InsertElement>(getType(), getName() + suffix, *v, *e, *idx);
 }
 
 
 vector<Value*> ShuffleVector::operands() const {
-  return { a, b, m };
+  return { v1, v2, mask };
 }
 
 void ShuffleVector::rauw(const Value &what, Value &with) {
-  RAUW(a);
-  RAUW(b);
-  RAUW(m);
+  RAUW(v1);
+  RAUW(v2);
+  RAUW(mask);
 }
 
 void ShuffleVector::print(ostream &os) const {
-  os << getName() << " = shufflevector " << *a << ", " << *b << ", " << *m;
+  os << getName() << " = shufflevector " << *v1 << ", " << *v2 << ", " << *mask;
 }
 
 StateValue ShuffleVector::toSMT(State &s) const {
-  auto aty = a->getType().getAsAggregateType();
-  auto mty = m->getType().getAsAggregateType();
+  auto vty = v1->getType().getAsAggregateType();
+  auto mty = mask->getType().getAsAggregateType();
   auto ty = getType().getAsAggregateType();
   vector<StateValue> vals;
 
-  for (unsigned i = 0, e = mty->numElementsConst(); i!= e; ++i) {
-    auto [iv, ip] = mty->extract(s[*m], i);
-    expr sz = expr::mkUInt(aty->numElementsConst(), 32);
-    auto [av, ap] = aty->extract(s[*a], iv.urem(sz));
-    auto [bv, bp] = aty->extract(s[*b], iv.urem(sz));
-    expr inbounds = iv.ult(sz + sz);
-    expr v = expr::mkIf(iv.ult(sz), move(av), move(bv));
-    expr np = ip && inbounds && expr::mkIf(iv.ult(sz), move(ap), move(bp));
-    StateValue sv = { move(v), move(np) };
-    vals.emplace_back(move(sv));
+  for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
+    auto [iv, ip] = mty->extract(s[*mask], i);
+    expr sz = expr::mkUInt(vty->numElementsConst(), 32);
+    auto [lv, lp] = vty->extract(s[*v1], iv);
+    auto [rv, rp] = vty->extract(s[*v2], iv - sz);
+    expr v = expr::mkIf(iv.uge(sz), rv, lv);
+    expr np = expr::mkIf(iv.uge(sz), rp, lp);
+    expr inbounds = !iv.uge(sz + sz);
+    vals.emplace_back(move(v), ip && inbounds && np);
   }
 
-  return ty -> aggregateVals(vals);
+  return ty->aggregateVals(vals);
 }
 
 expr ShuffleVector::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         getType().enforceVectorTypeSameChildTy(a->getType()) &&
-         getType().enforceVectorTypeEquiv(m->getType()) &&
-         a->getType().enforceVectorType() &&
-         a->getType() == b->getType() &&
+         getType().enforceVectorTypeSameChildTy(v1->getType()) &&
+         getType().enforceVectorTypeEquiv(mask->getType()) &&
+         v1->getType().enforceVectorType() &&
+         v1->getType() == v2->getType() &&
          // mask is a vector of i32
-         m->getType().enforceVectorType([](auto &ty)
-                                        { return ty.enforceIntType(32); });
+         mask->getType().enforceVectorType([](auto &ty)
+                                           { return ty.enforceIntType(32); });
 }
 
 unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
-  return make_unique<ShuffleVector>(getType(), getName() + suffix, *a, *b, *m);
+  return make_unique<ShuffleVector>(getType(), getName() + suffix, *v1, *v2, *mask);
 }
 
 }

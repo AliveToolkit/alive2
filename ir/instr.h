@@ -491,10 +491,10 @@ public:
 
 
 class ExtractElement final : public Instr {
-  Value *a, *idx;
+  Value *v, *idx;
 public:
-  ExtractElement(Type &type, std::string &&name, Value &a, Value &idx)
-    : Instr(type, move(name)), a(&a), idx(&idx) {}
+  ExtractElement(Type &type, std::string &&name, Value &v, Value &idx)
+    : Instr(type, move(name)), v(&v), idx(&idx) {}
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -505,10 +505,10 @@ public:
 
 
 class InsertElement final : public Instr {
-  Value *a, *e, *idx;
+  Value *v, *e, *idx;
 public:
-  InsertElement(Type &type, std::string &&name, Value &a, Value &e, Value &idx)
-    : Instr(type, move(name)), a(&a), e(&e), idx(&idx) {}
+  InsertElement(Type &type, std::string &&name, Value &v, Value &e, Value &idx)
+    : Instr(type, move(name)), v(&v), e(&e), idx(&idx) {}
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -519,10 +519,10 @@ public:
 
 
 class ShuffleVector final : public Instr {
-  Value *a, *b, *m;
+  Value *v1, *v2, *mask;
 public:
-  ShuffleVector(Type &type, std::string &&name, Value &a, Value &b, Value &m)
-    : Instr(type, move(name)), a(&a), b(&b), m(&m) {}
+  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2, Value &m)
+    : Instr(type, move(name)), v1(&v1), v2(&v2), mask(&m) {}
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
