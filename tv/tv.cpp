@@ -122,10 +122,6 @@ struct TVPass : public llvm::FunctionPass {
     t.src = move(old_fn->second.first);
     t.tgt = move(*fn);
     TransformVerify verifier(t, false);
-    if (Errors errs = verifier.sync()) {
-      *out << "Transformation doesn't verify!\n" << errs << endl;
-      return false;
-    }
     t.print(*out, print_opts);
 
     {

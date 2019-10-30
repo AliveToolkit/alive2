@@ -303,7 +303,7 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
   }
 }
 
-Errors TransformVerify::sync() {
+Errors TransformVerify::verify() const {
   try {
     t.tgt.syncDataWithSrc(t.src);
   } catch (AliveException &ae) {
@@ -333,10 +333,7 @@ Errors TransformVerify::sync() {
       return { ss.str(), false };
     }
   }
-  return {};
-}
 
-Errors TransformVerify::verify() const {
   State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
 
