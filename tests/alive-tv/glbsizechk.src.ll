@@ -5,4 +5,4 @@ define i32 @f() {
   ret i32 %v
 }
 
-; ERROR: Global variable @g in source and target has different sizes (4, 1)
+; ERROR: Global variable @g has different size in source and target (4 vs 1 bytes)

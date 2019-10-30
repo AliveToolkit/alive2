@@ -306,34 +306,34 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 Errors TransformVerify::sync() {
   try {
     t.tgt.syncDataWithSrc(t.src);
-
-    // Check sizes of global variables
-    auto globals_tgt = t.tgt.getGlobalVars();
-    auto globals_src = t.src.getGlobalVars();
-    for (auto GVS: globals_src) {
-      auto I = find_if(globals_tgt.begin(), globals_tgt.end(),
-        [GVS](auto *GV) -> bool { return GVS->getName() == GV->getName(); });
-      if (I == globals_tgt.end())
-        continue;
-
-      auto GVT = *I;
-      if (GVS->size() != GVT->size()) {
-        stringstream ss;
-        ss << "Global variable " << GVS->getName() << " in source and "
-          << "target has different sizes (" << GVS->size() << ", "
-          << GVT->size() << ")";
-        throw AliveException(ss.str(), false);
-      } else if (GVS->isConst() != GVT->isConst()) {
-        stringstream ss;
-        ss << "Global variable " << GVS->getName() << " in source and "
-          << "target has different constness";
-        throw AliveException(ss.str(), false);
-      }
-    }
   } catch (AliveException &ae) {
     return Errors(move(ae));
   }
-  return Errors();
+
+  // Check sizes of global variables
+  auto globals_tgt = t.tgt.getGlobalVars();
+  auto globals_src = t.src.getGlobalVars();
+  for (auto GVS : globals_src) {
+    auto I = find_if(globals_tgt.begin(), globals_tgt.end(),
+      [GVS](auto *GV) -> bool { return GVS->getName() == GV->getName(); });
+    if (I == globals_tgt.end())
+      continue;
+
+    auto GVT = *I;
+    if (GVS->size() != GVT->size()) {
+      stringstream ss;
+      ss << "Global variable " << GVS->getName() << " has different size in"
+        << " source and target (" << GVS->size() << " vs " << GVT->size()
+        << " bytes)";
+      return { ss.str(), false };
+    } else if (GVS->isConst() != GVT->isConst()) {
+      stringstream ss;
+      ss << "Global variable " << GVS->getName() << " in source and "
+        << "target has different constness";
+      return { ss.str(), false };
+    }
+  }
+  return {};
 }
 
 Errors TransformVerify::verify() const {
