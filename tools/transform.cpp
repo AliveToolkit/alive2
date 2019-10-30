@@ -271,7 +271,6 @@ static void check_refinement(Errors &errs, Transform &t,
   expr srcpre_quant = src_state.getPreOnQuantifiers();
 
   auto [poison_cnstr, value_cnstr] = type.refines(a, b);
-  expr pre_dom = pre && (dom_a && dom_b);
   expr dom_a_b = dom_a && dom_b;
 
   Solver::check({
@@ -292,7 +291,7 @@ static void check_refinement(Errors &errs, Transform &t,
       }}
   });
 
-  if (check_expr(axioms && preprocess(t, qvars, uvars, pre && srcpre_quant))
+  if (check_expr(axioms && preprocess(t, {}, {}, pre && srcpre_quant))
       .isUnsat()) {
     errs.add("Precondition is always false", false);
   }
