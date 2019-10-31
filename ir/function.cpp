@@ -4,7 +4,6 @@
 #include "ir/function.h"
 #include "ir/instr.h"
 #include "util/errors.h"
-#include <sstream>
 
 using namespace smt;
 using namespace util;
