@@ -391,15 +391,18 @@ Memory::Memory(State &state, bool little_endian)
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    expr is_local = idx.is_local();
-    expr val = expr::mkIf(is_local, expr::mkUInt(0, bitsByte()),
+    expr val = expr::mkIf(idx.is_local(), expr::mkUInt(0, bitsByte()),
                           blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
-
+  }
+  {
     // all local blocks are dead in the beginning
-    expr bid = idx.get_bid();
-    val = !is_local && blocks_liveness.load(bid);
-    blocks_liveness = expr::mkLambda({ bid }, move(val));
+    expr bid_var = expr::mkVar("#bid0", bitsBid());
+    Pointer bid_ptr(*this, expr::mkUInt(0, bitsOffset()),
+                    bid_var.extract(bitsBid() - 1, bits_for_nonlocal_bid),
+                    bid_var.extract(bits_for_nonlocal_bid - 1, 0));
+    expr val = !bid_ptr.is_local() && blocks_liveness.load(bid_ptr.get_bid());
+    blocks_liveness = expr::mkLambda({ move(bid_var) }, move(val));
   }
 
   // Initialize a memory block for null pointer.
