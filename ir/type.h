@@ -21,6 +21,7 @@ class AggregateType;
 class FloatType;
 class StructType;
 class SymbolicType;
+class VectorType;
 class VoidType;
 class State;
 struct StateValue;
@@ -85,6 +86,7 @@ public:
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
   virtual const StructType* getAsStructType() const;
+  virtual const VectorType* getAsVectorType() const;
 
   virtual smt::expr toBV(smt::expr e) const;
   virtual IR::StateValue toBV(IR::StateValue v) const;
@@ -240,11 +242,6 @@ public:
 
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
-  IR::StateValue extract(const IR::StateValue &val,
-                         const smt::expr &index) const;
-  IR::StateValue update(const IR::StateValue &val,
-                        const IR::StateValue &n,
-                        const smt::expr &idx) const;
   Type& getChild(unsigned index) const { return *children[index]; }
 
   unsigned bits() const override;
@@ -282,11 +279,17 @@ public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
   VectorType(std::string &&name, unsigned elements, Type &elementTy);
 
+  IR::StateValue extract(const IR::StateValue &val,
+                         const smt::expr &index) const;
+  IR::StateValue update(const IR::StateValue &val,
+                        const IR::StateValue &n,
+                        const smt::expr &idx) const;
   smt::expr getTypeConstraints() const override;
   bool isVectorType() const override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
+  const VectorType* getAsVectorType() const override;
 };
 
 
@@ -343,6 +346,7 @@ public:
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;
+  const VectorType* getAsVectorType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;

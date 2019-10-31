@@ -215,6 +215,10 @@ const StructType* Type::getAsStructType() const {
   return nullptr;
 }
 
+const VectorType* Type::getAsVectorType() const {
+  return nullptr;
+}
+
 expr Type::toBV(expr e) const {
   return e;
 }
@@ -611,47 +615,6 @@ StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
                                    val.non_poison.extract(h, l) });
 }
 
-StateValue AggregateType::extract(const StateValue &val,
-                                  const expr &index) const {
-  auto &elementTy = *children[0];
-  for (unsigned i = 1; i < elements; ++i) {
-    assert(elementTy.bits() == children[i]->bits());
-  }
-  unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = val.value.bits();
-  assert(bw_val == val.non_poison.bits());
-  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
-
-  unsigned h = elements * bw_elem - 1;
-  unsigned l = (elements - 1) * bw_elem;
-
-  return elementTy.fromBV({ (val.value << idx).extract(h, l),
-                            (val.non_poison << idx).extract(h, l) });
-}
-
-StateValue AggregateType::update(const StateValue &val,
-                                 const StateValue &n,
-                                 const expr &index) const {
-  auto &elementTy = *children[0];
-  for (unsigned i = 1; i < elements; ++i) {
-    assert(elementTy.bits() == children[i]->bits());
-  }
-
-  unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = bits();
-
-  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
-  expr fill = expr::mkUInt(0, bw_val - bw_elem);
-  expr mask = ~expr::mkInt(-1, bw_elem).concat(fill).lshr(idx);
-
-  StateValue n_bv = elementTy.toBV(n);
-  expr nv_shifted = n_bv.value.concat(fill).lshr(idx);
-  expr np_shifted = n_bv.non_poison.concat(fill).lshr(idx);
-
-  return fromBV({ (val.value & mask) | nv_shifted,
-                  (val.non_poison & mask) | np_shifted});
-}
-
 unsigned AggregateType::bits() const {
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
@@ -794,6 +757,47 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
   children.resize(elements, &elementTy);
 }
 
+StateValue VectorType::extract(const StateValue &val,
+                               const expr &index) const {
+  auto &elementTy = *children[0];
+  for (unsigned i = 1; i < elements; ++i) {
+    assert(elementTy.bits() == children[i]->bits());
+  }
+  unsigned bw_elem = elementTy.bits();
+  unsigned bw_val = val.value.bits();
+  assert(bw_val == val.non_poison.bits());
+  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+
+  unsigned h = elements * bw_elem - 1;
+  unsigned l = (elements - 1) * bw_elem;
+
+  return elementTy.fromBV({ (val.value << idx).extract(h, l),
+                            (val.non_poison << idx).extract(h, l) });
+}
+
+StateValue VectorType::update(const StateValue &val,
+                              const StateValue &n,
+                              const expr &index) const {
+  auto &elementTy = *children[0];
+  for (unsigned i = 1; i < elements; ++i) {
+    assert(elementTy.bits() == children[i]->bits());
+  }
+
+  unsigned bw_elem = elementTy.bits();
+  unsigned bw_val = bits();
+
+  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+  expr fill = expr::mkUInt(0, bw_val - bw_elem);
+  expr mask = ~expr::mkInt(-1, bw_elem).concat(fill).lshr(idx);
+
+  StateValue n_bv = elementTy.toBV(n);
+  expr nv_shifted = n_bv.value.concat(fill).lshr(idx);
+  expr np_shifted = n_bv.non_poison.concat(fill).lshr(idx);
+
+  return fromBV({ (val.value & mask) | nv_shifted,
+                  (val.non_poison & mask) | np_shifted});
+}
+
 expr VectorType::getTypeConstraints() const {
   auto &elementTy = *children[0];
   expr r = AggregateType::getTypeConstraints() &&
@@ -822,6 +826,10 @@ expr VectorType::enforceVectorType(
 void VectorType::print(ostream &os) const {
   if (elements)
     os << '<' << elements << " x " << *children[0] << '>';
+}
+
+const VectorType* VectorType::getAsVectorType() const {
+  return this;
 }
 
 
@@ -1058,6 +1066,10 @@ const AggregateType* SymbolicType::getAsAggregateType() const {
 
 const StructType* SymbolicType::getAsStructType() const {
   return &*s;
+}
+
+const VectorType* SymbolicType::getAsVectorType() const {
+  return &*v;
 }
 
 expr SymbolicType::toBV(expr e) const {
