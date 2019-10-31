@@ -1964,8 +1964,8 @@ StateValue InsertElement::toSMT(State &s) const {
   auto vty = v->getType().getAsAggregateType();
   expr inbounds = iv.ult(vty->numElementsConst());
   auto [rv, rp] = vty->update(s[*v], s[*e], iv);
-  return { move(rv), expr::mkIf(ip && inbounds,
-                                move(rp), expr::mkInt(-1, vty->bits())) };
+  return { move(rv), expr::mkIf(ip && inbounds, move(rp),
+                                vty->getDummyValue(false).non_poison) };
 }
 
 expr InsertElement::getTypeConstraints(const Function &f) const {
