@@ -326,12 +326,18 @@ Errors TransformVerify::verify() const {
         << " source and target (" << GVS->size() << " vs " << GVT->size()
         << " bytes)";
       return { ss.str(), false };
-    } else if (GVS->isConst() != GVT->isConst()) {
+    } else if (GVS->isConst() && !GVT->isConst()) {
       stringstream ss;
-      ss << "Global variable " << GVS->getName() << " in source and "
-        << "target has different constness";
+      ss << "Transformation is wrong because global variable " << GVS->getName()
+        << " is const in source but not in target";
+      return { ss.str(), true };
+    } else if (!GVS->isConst() && GVT->isConst()) {
+      stringstream ss;
+      ss << "Can't verify this because global variable " << GVS->getName()
+        << " is const in target but not in source";
       return { ss.str(), false };
     }
+
   }
 
   State::resetGlobals();

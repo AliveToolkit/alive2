@@ -5,4 +5,4 @@ define i32 @f() {
   ret i32 %v
 }
 
-; ERROR: Global variable @g in source and target has different constness
+; ERROR: Can't verify this because global variable @g is const in target but not in source
