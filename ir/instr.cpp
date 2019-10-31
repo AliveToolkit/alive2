@@ -1928,7 +1928,7 @@ void ExtractElement::print(ostream &os) const {
 StateValue ExtractElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = v->getType().getAsAggregateType();
-  expr inbounds = !iv.uge(vty->numElementsConst());
+  expr inbounds = iv.ult(vty->numElementsConst());
   auto [rv, rp] = vty->extract(s[*v], iv);
   return { move(rv), ip && inbounds && rp };
 }
@@ -1962,7 +1962,7 @@ void InsertElement::print(ostream &os) const {
 StateValue InsertElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = v->getType().getAsAggregateType();
-  expr inbounds = !iv.uge(vty->numElementsConst());
+  expr inbounds = iv.ult(vty->numElementsConst());
   auto [rv, rp] = vty->update(s[*v], s[*e], iv);
   return { move(rv), expr::mkIf(ip && inbounds,
                                 move(rp), expr::mkInt(-1, vty->bits())) };
@@ -1998,22 +1998,21 @@ void ShuffleVector::print(ostream &os) const {
 
 StateValue ShuffleVector::toSMT(State &s) const {
   auto vty = v1->getType().getAsAggregateType();
+  expr sz = expr::mkUInt(vty->numElementsConst(), 32);
   auto mty = mask->getType().getAsAggregateType();
-  auto ty = getType().getAsAggregateType();
   vector<StateValue> vals;
 
   for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
     auto [iv, ip] = mty->extract(s[*mask], i);
-    expr sz = expr::mkUInt(vty->numElementsConst(), 32);
     auto [lv, lp] = vty->extract(s[*v1], iv);
     auto [rv, rp] = vty->extract(s[*v2], iv - sz);
     expr v = expr::mkIf(iv.uge(sz), rv, lv);
     expr np = expr::mkIf(iv.uge(sz), rp, lp);
-    expr inbounds = !iv.uge(sz + sz);
+    expr inbounds = iv.ult(sz + sz);
     vals.emplace_back(move(v), ip && inbounds && np);
   }
 
-  return ty->aggregateVals(vals);
+  return getType().getAsAggregateType()->aggregateVals(vals);
 }
 
 expr ShuffleVector::getTypeConstraints(const Function &f) const {
