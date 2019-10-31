@@ -99,6 +99,8 @@ public:
                  Value *initval, bool isconst) :
     Value(type, std::move(name)), allocsize(allocsize), align(align),
     initval(initval), isconst(isconst) {}
+  int size() const { return allocsize; }
+  int isConst() const { return isconst; }
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

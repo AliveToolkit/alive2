@@ -301,11 +301,46 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
       tgt_instrs.emplace(i.getName(), &i);
     }
   }
-
-  t.tgt.syncDataWithSrc(t.src);
 }
 
 Errors TransformVerify::verify() const {
+  try {
+    t.tgt.syncDataWithSrc(t.src);
+  } catch (AliveException &ae) {
+    return Errors(move(ae));
+  }
+
+  // Check sizes of global variables
+  auto globals_tgt = t.tgt.getGlobalVars();
+  auto globals_src = t.src.getGlobalVars();
+  for (auto GVS : globals_src) {
+    auto I = find_if(globals_tgt.begin(), globals_tgt.end(),
+      [GVS](auto *GV) -> bool { return GVS->getName() == GV->getName(); });
+    if (I == globals_tgt.end())
+      continue;
+
+    auto GVT = *I;
+    if (GVS->size() != GVT->size()) {
+      stringstream ss;
+      ss << "Unsupported interprocedural transformation: global variable "
+        << GVS->getName() << " has different size in source and target ("
+        << GVS->size() << " vs " << GVT->size()
+        << " bytes)";
+      return { ss.str(), false };
+    } else if (GVS->isConst() && !GVT->isConst()) {
+      stringstream ss;
+      ss << "Transformation is incorrect because global variable "
+        << GVS->getName() << " is const in source but not in target";
+      return { ss.str(), true };
+    } else if (!GVS->isConst() && GVT->isConst()) {
+      stringstream ss;
+      ss << "Unsupported interprocedural transformation: global variable "
+        << GVS->getName() << " is const in target but not in source";
+      return { ss.str(), false };
+    }
+
+  }
+
   State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
 

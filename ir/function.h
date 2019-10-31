@@ -86,6 +86,8 @@ public:
     return constants;
   }
 
+  std::vector<GlobalVariable *> getGlobalVars() const;
+
   void addPredicate(std::unique_ptr<Predicate> &&p);
 
   void addUndef(std::unique_ptr<UndefValue> &&c);
