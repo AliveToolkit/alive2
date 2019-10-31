@@ -209,7 +209,6 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   t.src = move(*Func1);
   t.tgt = move(*Func2);
   TransformVerify verifier(t, false);
-
   t.print(cout, print_opts);
 
   {

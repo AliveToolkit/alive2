@@ -5,4 +5,4 @@ define i32 @f() {
   ret i32 %v
 }
 
-; ERROR: Transformation is wrong because global variable @g is const in source but not in target
+; ERROR: Transformation is incorrect because global variable @g is const in source but not in target

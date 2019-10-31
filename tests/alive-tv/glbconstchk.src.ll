@@ -5,4 +5,4 @@ define i32 @f() {
   ret i32 %v
 }
 
-; ERROR: Can't verify this because global variable @g is const in target but not in source
+; ERROR: Unsupported interprocedural transformation: global variable @g is const in target but not in source

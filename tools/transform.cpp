@@ -322,19 +322,20 @@ Errors TransformVerify::verify() const {
     auto GVT = *I;
     if (GVS->size() != GVT->size()) {
       stringstream ss;
-      ss << "Global variable " << GVS->getName() << " has different size in"
-        << " source and target (" << GVS->size() << " vs " << GVT->size()
+      ss << "Unsupported interprocedural transformation: global variable "
+        << GVS->getName() << " has different size in source and target ("
+        << GVS->size() << " vs " << GVT->size()
         << " bytes)";
       return { ss.str(), false };
     } else if (GVS->isConst() && !GVT->isConst()) {
       stringstream ss;
-      ss << "Transformation is wrong because global variable " << GVS->getName()
-        << " is const in source but not in target";
+      ss << "Transformation is incorrect because global variable "
+        << GVS->getName() << " is const in source but not in target";
       return { ss.str(), true };
     } else if (!GVS->isConst() && GVT->isConst()) {
       stringstream ss;
-      ss << "Can't verify this because global variable " << GVS->getName()
-        << " is const in target but not in source";
+      ss << "Unsupported interprocedural transformation: global variable "
+        << GVS->getName() << " is const in target but not in source";
       return { ss.str(), false };
     }
 
