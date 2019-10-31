@@ -1,6 +1,6 @@
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
-define i8 @calloc_init(i8* %ptr0) {
+define i8 @calloc_init() {
   %ptr = call noalias i8* @calloc(i64 1, i64 1)
   %i = ptrtoint i8* %ptr to i64
   %cmp = icmp eq i64 %i, 0
