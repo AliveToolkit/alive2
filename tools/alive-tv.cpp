@@ -19,6 +19,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Transforms/Utils/FunctionComparator.h"
 
 #include <iostream>
 #include <utility>
@@ -86,108 +87,17 @@ static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   return M;
 }
 
-// adapted from FunctionComparator.cpp
-static int cmpNumbers(uint64_t L, uint64_t R) {
-  if (L < R) return -1;
-  if (L > R) return 1;
-  return 0;
-}
-
-// adapted from FunctionComparator.cpp
-static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
-                    llvm::Function *FnL, llvm::Function *FnR) {
-  llvm::PointerType *PTyL = llvm::dyn_cast<llvm::PointerType>(TyL);
-  llvm::PointerType *PTyR = llvm::dyn_cast<llvm::PointerType>(TyR);
-
-  const llvm::DataLayout &DL = FnL->getParent()->getDataLayout();
-  if (PTyL && PTyL->getAddressSpace() == 0)
-    TyL = DL.getIntPtrType(TyL);
-  if (PTyR && PTyR->getAddressSpace() == 0)
-    TyR = DL.getIntPtrType(TyR);
-
-  if (TyL == TyR)
-    return 0;
-
-  if (int Res = cmpNumbers(TyL->getTypeID(), TyR->getTypeID()))
-    return Res;
-
-  switch (TyL->getTypeID()) {
-  default:
-    llvm_unreachable("Unknown type!");
-  case llvm::Type::IntegerTyID:
-    return cmpNumbers(llvm::cast<llvm::IntegerType>(TyL)->getBitWidth(),
-                      llvm::cast<llvm::IntegerType>(TyR)->getBitWidth());
-  // TyL == TyR would have returned true earlier, because types are uniqued.
-  case llvm::Type::VoidTyID:
-  case llvm::Type::FloatTyID:
-  case llvm::Type::DoubleTyID:
-  case llvm::Type::X86_FP80TyID:
-  case llvm::Type::FP128TyID:
-  case llvm::Type::PPC_FP128TyID:
-  case llvm::Type::LabelTyID:
-  case llvm::Type::MetadataTyID:
-  case llvm::Type::TokenTyID:
-    return 0;
-
-  case llvm::Type::PointerTyID:
-    assert(PTyL && PTyR && "Both types must be pointers here.");
-    return cmpNumbers(PTyL->getAddressSpace(), PTyR->getAddressSpace());
-
-  case llvm::Type::StructTyID: {
-    llvm::StructType *STyL = llvm::cast<llvm::StructType>(TyL);
-    llvm::StructType *STyR = llvm::cast<llvm::StructType>(TyR);
-    if (STyL->getNumElements() != STyR->getNumElements())
-      return cmpNumbers(STyL->getNumElements(), STyR->getNumElements());
-
-    if (STyL->isPacked() != STyR->isPacked())
-      return cmpNumbers(STyL->isPacked(), STyR->isPacked());
-
-    for (unsigned i = 0, e = STyL->getNumElements(); i != e; ++i) {
-      if (int Res = cmpTypes(STyL->getElementType(i), STyR->getElementType(i), FnL, FnR))
-        return Res;
-    }
-    return 0;
-  }
-
-  case llvm::Type::FunctionTyID: {
-    llvm::FunctionType *FTyL = llvm::cast<llvm::FunctionType>(TyL);
-    llvm::FunctionType *FTyR = llvm::cast<llvm::FunctionType>(TyR);
-    if (FTyL->getNumParams() != FTyR->getNumParams())
-      return cmpNumbers(FTyL->getNumParams(), FTyR->getNumParams());
-
-    if (FTyL->isVarArg() != FTyR->isVarArg())
-      return cmpNumbers(FTyL->isVarArg(), FTyR->isVarArg());
-
-    if (int Res = cmpTypes(FTyL->getReturnType(), FTyR->getReturnType(), FnL, FnR))
-      return Res;
-
-    for (unsigned i = 0, e = FTyL->getNumParams(); i != e; ++i) {
-      if (int Res = cmpTypes(FTyL->getParamType(i), FTyR->getParamType(i), FnL, FnR))
-        return Res;
-    }
-    return 0;
-  }
-
-  case llvm::Type::ArrayTyID:
-  case llvm::Type::VectorTyID: {
-    auto *STyL = llvm::cast<llvm::SequentialType>(TyL);
-    auto *STyR = llvm::cast<llvm::SequentialType>(TyR);
-    if (STyL->getNumElements() != STyR->getNumElements())
-      return cmpNumbers(STyL->getNumElements(), STyR->getNumElements());
-    return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
-  }
-  }
-}
-
 static optional<smt::smt_initializer> smt_init;
 
 static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                              llvm::Triple &targetTriple, unsigned &goodCount,
                              unsigned &badCount, unsigned &errorCount) {
-  if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
-    cerr << "ERROR: Only functions with identical signatures can be checked\n";
-    ++errorCount;
-    return true;
+  llvm::GlobalNumberState GN;
+  llvm::FunctionComparator FCmp(&F1, &F2, &GN);
+  if (!FCmp.compare()) {
+    cerr << "Syntactically equivalent LLVM functions.\n";
+    ++goodCount;
+    return false;
   }
 
   TransformPrintOpts print_opts;
