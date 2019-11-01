@@ -78,6 +78,11 @@ public:
   expr nonptr_value() const { return p.extract(7, 0); }
 
   const expr& operator()() const { return p; }
+
+  static Byte mkPoisonByte(const Memory &m) {
+    // Poison byte is just 0. This definition helps Z3 raise less timeout.
+    return Byte(m, expr::mkUInt(0, 8), expr::mkUInt(0, 8));
+  }
 };
 
 
@@ -99,8 +104,9 @@ vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
 
     for (unsigned i = 0; i < bytesize; ++i) {
       expr data  = bvval.value.extract((i + 1) * 8 - 1, i * 8);
-      expr np    = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
-      bytes.emplace_back(mem, data, np);
+      expr p     = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
+      // p is 1 if val is poison (according to the definition of toBV).
+      bytes.emplace_back(mem, data, ~p);
     }
   }
   return bytes;
@@ -141,8 +147,10 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
     IntType i8Ty("", 8);
 
     for (auto &b: bytes) {
+      // Type.fromBV after this loop assumes that v.non_poison is 0 if
+      // it is not poison
       StateValue v(b.nonptr_value(),
-                   i8Ty.combine_poison(!b.is_ptr(), b.nonptr_nonpoison()));
+                   i8Ty.combine_poison(!b.is_ptr(), ~b.nonptr_nonpoison()));
       val = first ? move(v) : v.concat(val);
       first = false;
     }
@@ -391,8 +399,8 @@ Memory::Memory(State &state, bool little_endian)
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    expr val = expr::mkIf(idx.is_local(), expr::mkUInt(0, bitsByte()),
-                          blocks_val.load(idx()));
+    auto poisonByte = Byte::mkPoisonByte(*this);
+    expr val = expr::mkIf(idx.is_local(), poisonByte(), blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
   {
