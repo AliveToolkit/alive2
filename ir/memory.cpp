@@ -328,7 +328,7 @@ expr Pointer::is_block_alive() const {
 
 expr Pointer::is_at_heap() const {
   // TODO: use bitvector instead of UF if there are few allocations
-  return get_value_from_uf("blks_at_heap", false, BOTH);
+  return get_value_from_uf("blks_at_heap", false);
 }
 
 expr Pointer::is_readonly() const {
@@ -453,26 +453,30 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   if (bid_out)
     *bid_out = bid;
 
-  Pointer p(*this, bid, is_local);
-  state->addPre(p.is_aligned(align));
+  expr size_zext = size.zextOrTrunc(bits_size_t);
+  expr less_half = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
 
-  expr size_zextOrTrunced = size.zextOrTrunc(bits_size_t);
-  state->addPre(p.block_size() == size_zextOrTrunced);
-  // TODO: If its address space is not 0, its address can be 0.
-  state->addPre(p.get_address() != 0);
+  Pointer p(*this, bid, is_local);
+  // TODO: If address space is not 0, the address can be 0.
   // TODO: address of new blocks should be disjoint from other live blocks
+  // FIXME: non-zero constraint can go away when disjoint constr is in place
+  state->addPre(less_half.implies(p.is_aligned(align) &&
+                                  p.block_size() == size_zext &&
+                                  p.get_address() != 0));
 
   if (is_local) {
-    blocks_liveness = blocks_liveness.store(p.get_bid(), true);
-    state->addPre(p.is_at_heap() == expr(blockKind == HEAP));
+    blocks_liveness = expr::mkIf(less_half,
+                                 blocks_liveness.store(p.get_bid(), true),
+                                 blocks_liveness);
   } else {
     // The memory block was initially alive.
-    state->addAxiom(mk_liveness_array().load(p.get_bid()));
-    state->addAxiom(p.is_readonly() == expr(blockKind == CONSTGLOBAL));
-    state->addAxiom(p.is_at_heap() == expr(false));
+    state->addPre(less_half.implies(mk_liveness_array().load(p.get_bid())));
+    state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
+                                             : !p.is_readonly());
   }
+  state->addAxiom(blockKind == HEAP ? p.is_at_heap() : !p.is_at_heap());
 
-  return p.release();
+  return expr::mkIf(less_half, p(), Pointer::mkNullPointer(*this)());
 }
 
 
@@ -480,9 +484,9 @@ void Memory::free(const expr &ptr) {
   Pointer p(*this, ptr);
   auto isNullPointer = p == Pointer::mkNullPointer(*this);
 
-  state->addUB(isNullPointer || ((p.get_offset() == 0) &&
-                                 (p.is_block_alive()) &&
-                                 (p.is_at_heap())));
+  state->addUB(isNullPointer || (p.get_offset() == 0 &&
+                                 p.is_block_alive() &&
+                                 p.is_at_heap()));
   blocks_liveness = blocks_liveness.store(p.get_bid(), false);
 }
 

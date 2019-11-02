@@ -1655,7 +1655,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
   if (isNonNull)
-    return { move(p), true };
+    return { move(p), expr(np) };
 
   auto nullp = Pointer::mkNullPointer(s.getMemory());
   auto flag = expr::mkFreshVar("malloc_isnull", expr(true));

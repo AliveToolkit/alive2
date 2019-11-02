@@ -863,6 +863,10 @@ expr expr::operator==(const expr &rhs) const {
     return true;
   if (isConst() && rhs.isConst())
     return false;
+  if (rhs.isTrue())
+    return *this;
+  if (rhs.isFalse())
+    return !*this;
 
   if (auto app = isAppOf(Z3_OP_ITE)) {
     expr c = Z3_get_app_arg(ctx(), app, 0);
