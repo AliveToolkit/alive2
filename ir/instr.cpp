@@ -1651,7 +1651,6 @@ void Malloc::print(std::ostream &os) const {
 
 StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
-  s.addUB(np);
   // TODO: malloc's alignment is implementation defined.
   auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
@@ -1661,7 +1660,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto nullp = Pointer::mkNullPointer(s.getMemory());
   auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
   s.addQuantVar(flag);
-  return { expr::mkIf(move(flag), nullp.release(), move(p)), true };
+  return { expr::mkIf(move(flag), nullp.release(), move(p)), expr(np) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
