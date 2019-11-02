@@ -78,6 +78,12 @@ public:
   expr nonptr_value() const { return p.extract(7, 0); }
 
   const expr& operator()() const { return p; }
+
+  static Byte mkPoisonByte(const Memory &m) {
+    IntType ty("", 8);
+    auto v = ty.toBV(ty.getDummyValue(false));
+    return { m, v.value, v.non_poison };
+  }
 };
 
 
@@ -391,7 +397,7 @@ Memory::Memory(State &state, bool little_endian)
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    expr val = expr::mkIf(idx.is_local(), expr::mkUInt(0, bitsByte()),
+    expr val = expr::mkIf(idx.is_local(), Byte::mkPoisonByte(*this)(),
                           blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
   }
