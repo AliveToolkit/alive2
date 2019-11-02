@@ -305,11 +305,12 @@ int main(int argc, char **argv) {
     if (F1.isDeclaration())
       continue;
     for (auto &F2 : *M2.get()) {
-      if (F2.isDeclaration())
+      if (F2.isDeclaration() ||
+          F1.getName() != F2.getName())
         continue;
-      if (F1.getName().equals(F2.getName()))
-        result |= compareFunctions(F1, F2, targetTriple, goodCount,
-                                   badCount, errorCount);
+      result |= compareFunctions(F1, F2, targetTriple, goodCount, badCount,
+                                 errorCount);
+      break;
     }
   }
 
