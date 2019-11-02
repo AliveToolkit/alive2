@@ -498,6 +498,23 @@ public:
     return error(i);
   }
 
+  RetTy visitExtractElementInst(llvm::ExtractElementInst &i) {
+    PARSE_BINOP();
+    RETURN_IDENTIFIER(make_unique<ExtractElement>(*ty, value_name(i), *a, *b));
+  }
+
+  RetTy visitInsertElementInst(llvm::InsertElementInst &i) {
+    PARSE_TRIOP();
+    RETURN_IDENTIFIER(make_unique<InsertElement>(*ty, value_name(i), *a, *b,
+                                                 *c));
+  }
+
+  RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
+    PARSE_TRIOP();
+    RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
+                                                 *c));
+  }
+
   RetTy visitDbgInfoIntrinsic(llvm::DbgInfoIntrinsic&) { return {}; }
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 

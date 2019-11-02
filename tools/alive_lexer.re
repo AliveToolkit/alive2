@@ -217,6 +217,9 @@ space+ {
 "free" { return FREE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
+"extractelement" { return EXTRACTELEMENT; }
+"insertelement" { return INSERTELEMENT; }
+"shufflevector" { return SHUFFLEVECTOR; }
 "ret" { return RETURN; }
 "bswap" { return BSWAP; }
 "bitreverse" { return BITREVERSE; }

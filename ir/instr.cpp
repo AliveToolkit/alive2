@@ -1911,4 +1911,124 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
   return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
 }
 
+
+vector<Value*> ExtractElement::operands() const {
+  return { v, idx };
+}
+
+void ExtractElement::rauw(const Value &what, Value &with) {
+  RAUW(v);
+  RAUW(idx);
+}
+
+void ExtractElement::print(ostream &os) const {
+  os << getName() << " = extractelement " << *v << ", " << *idx;
+}
+
+StateValue ExtractElement::toSMT(State &s) const {
+  auto &[iv, ip] = s[*idx];
+  auto vty = v->getType().getAsVectorType();
+  expr inbounds = iv.ult(vty->numElementsConst());
+  auto [rv, rp] = vty->extract(s[*v], iv);
+  return { move(rv), ip && inbounds && rp };
+}
+
+expr ExtractElement::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         v->getType().enforceVectorType([&](auto &ty)
+                                        { return ty == getType(); }) &&
+         idx->getType().enforceIntType();
+}
+
+unique_ptr<Instr> ExtractElement::dup(const string &suffix) const {
+  return make_unique<ExtractElement>(getType(), getName() + suffix, *v, *idx);
+}
+
+
+vector<Value*> InsertElement::operands() const {
+  return { v, e, idx };
+}
+
+void InsertElement::rauw(const Value &what, Value &with) {
+  RAUW(v);
+  RAUW(e);
+  RAUW(idx);
+}
+
+void InsertElement::print(ostream &os) const {
+  os << getName() << " = insertelement" << *v << ", " << *e << ", " << *idx;
+}
+
+StateValue InsertElement::toSMT(State &s) const {
+  auto &[iv, ip] = s[*idx];
+  auto vty = v->getType().getAsVectorType();
+  expr inbounds = iv.ult(vty->numElementsConst());
+  auto [rv, rp] = vty->update(s[*v], s[*e], iv);
+  return { move(rv), expr::mkIf(ip && inbounds, move(rp),
+                                vty->getDummyValue(false).non_poison) };
+}
+
+expr InsertElement::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType() == v->getType() &&
+         v->getType().enforceVectorType([&](auto &ty)
+                                        { return ty == e->getType(); }) &&
+         idx->getType().enforceIntType();
+}
+
+unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
+  return make_unique<InsertElement>(getType(), getName() + suffix,
+                                    *v, *e, *idx);
+}
+
+
+vector<Value*> ShuffleVector::operands() const {
+  return { v1, v2, mask };
+}
+
+void ShuffleVector::rauw(const Value &what, Value &with) {
+  RAUW(v1);
+  RAUW(v2);
+  RAUW(mask);
+}
+
+void ShuffleVector::print(ostream &os) const {
+  os << getName() << " = shufflevector " << *v1 << ", " << *v2 << ", " << *mask;
+}
+
+StateValue ShuffleVector::toSMT(State &s) const {
+  auto vty = v1->getType().getAsVectorType();
+  expr sz = expr::mkUInt(vty->numElementsConst(), 32);
+  auto mty = mask->getType().getAsAggregateType();
+  vector<StateValue> vals;
+
+  for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
+    auto [iv, ip] = mty->extract(s[*mask], i);
+    auto [lv, lp] = vty->extract(s[*v1], iv);
+    auto [rv, rp] = vty->extract(s[*v2], iv - sz);
+    expr v = expr::mkIf(iv.uge(sz), rv, lv);
+    expr np = expr::mkIf(iv.uge(sz), rp, lp);
+    expr inbounds = iv.ult(sz + sz);
+    vals.emplace_back(move(v), ip && inbounds && np);
+  }
+
+  return getType().getAsAggregateType()->aggregateVals(vals);
+}
+
+expr ShuffleVector::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforceVectorTypeSameChildTy(v1->getType()) &&
+         getType().enforceVectorTypeEquiv(mask->getType()) &&
+         v1->getType().enforceVectorType() &&
+         v1->getType() == v2->getType() &&
+         // mask is a vector of i32
+         mask->getType().enforceVectorType([](auto &ty)
+                                           { return ty.enforceIntType(32); });
+}
+
+unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
+  return make_unique<ShuffleVector>(getType(), getName() + suffix,
+                                    *v1, *v2, *mask);
+}
+
 }
