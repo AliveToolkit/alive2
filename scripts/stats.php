@@ -15,6 +15,8 @@ foreach (glob("logs/*.txt") as $f) {
   $txt = file_get_contents($f);
   preg_match_all('/ERROR: (.+)/S', $txt, $m);
   foreach($m[1] as $err) {
+    if (strstr($err, 'Unsupported '))
+      continue;
     @++$errors[$err];
   }
 

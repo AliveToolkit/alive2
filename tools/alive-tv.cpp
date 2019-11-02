@@ -181,7 +181,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                              llvm::Triple &targetTriple, unsigned &goodCount,
                              unsigned &badCount, unsigned &errorCount) {
   if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
-    cerr << "Only functions with identical signatures can be checked\n";
+    cerr << "ERROR: Only functions with identical signatures can be checked\n";
     ++errorCount;
     return true;
   }
@@ -191,7 +191,8 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F1));
   if (!Func1) {
-    cerr << "Could not translate '" + (std::string)F1.getName() + "' to Alive IR\n";
+    cerr << "ERROR: Could not translate '" << F1.getName().str()
+         << "' to Alive IR\n";
     ++errorCount;
     return true;
   }
@@ -199,7 +200,8 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F2));
   if (!Func2) {
-    cerr << "Could not translate '" + (std::string)F2.getName() + "' to Alive IR\n";
+    cerr << "ERROR: Could not translate '" << F2.getName().str()
+         << "' to Alive IR\n";
     ++errorCount;
     return true;
   }
@@ -311,10 +313,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  cerr << "Summary:\n";
-  cerr << "  " << goodCount << " correct transformations\n";
-  cerr << "  " << badCount << " incorrect transformations\n";
-  cerr << "  " << errorCount << " errors\n";
+  cerr << "Summary:\n"
+          "  " << goodCount << " correct transformations\n"
+          "  " << badCount << " incorrect transformations\n"
+          "  " << errorCount << " errors\n";
 
   smt_init.reset();
 

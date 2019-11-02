@@ -56,7 +56,7 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   if (hit_half_memory_limit())
-    throw AliveException("ERROR: Out of memory; skipping function.", false);
+    throw AliveException("Out of memory; skipping function.", false);
 
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
@@ -118,7 +118,7 @@ bool State::startBB(const BasicBlock &bb) {
 
 void State::addJump(const BasicBlock &dst, expr &&cond) {
   if (seen_bbs.count(&dst))
-    throw AliveException("ERROR: Loops are not supported yet! Skipping function.",
+    throw AliveException("Loops are not supported yet! Skipping function.",
                          false);
 
   cond &= domain.first;
