@@ -86,7 +86,6 @@ public:
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
   virtual const StructType* getAsStructType() const;
-  virtual const VectorType* getAsVectorType() const;
 
   virtual smt::expr toBV(smt::expr e) const;
   virtual IR::StateValue toBV(IR::StateValue v) const;
@@ -289,7 +288,6 @@ public:
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
-  const VectorType* getAsVectorType() const override;
 };
 
 
@@ -346,7 +344,6 @@ public:
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;
-  const VectorType* getAsVectorType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;

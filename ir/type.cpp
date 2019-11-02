@@ -215,10 +215,6 @@ const StructType* Type::getAsStructType() const {
   return nullptr;
 }
 
-const VectorType* Type::getAsVectorType() const {
-  return nullptr;
-}
-
 expr Type::toBV(expr e) const {
   return e;
 }
@@ -760,12 +756,8 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
 StateValue VectorType::extract(const StateValue &val,
                                const expr &index) const {
   auto &elementTy = *children[0];
-  for (unsigned i = 1; i < elements; ++i) {
-    assert(elementTy.bits() == children[i]->bits());
-  }
   unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = val.value.bits();
-  assert(bw_val == val.non_poison.bits());
+  unsigned bw_val = val.bits();
   expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
 
   unsigned h = elements * bw_elem - 1;
@@ -779,10 +771,6 @@ StateValue VectorType::update(const StateValue &val,
                               const StateValue &n,
                               const expr &index) const {
   auto &elementTy = *children[0];
-  for (unsigned i = 1; i < elements; ++i) {
-    assert(elementTy.bits() == children[i]->bits());
-  }
-
   unsigned bw_elem = elementTy.bits();
   unsigned bw_val = bits();
 
@@ -826,10 +814,6 @@ expr VectorType::enforceVectorType(
 void VectorType::print(ostream &os) const {
   if (elements)
     os << '<' << elements << " x " << *children[0] << '>';
-}
-
-const VectorType* VectorType::getAsVectorType() const {
-  return this;
 }
 
 
@@ -1066,10 +1050,6 @@ const AggregateType* SymbolicType::getAsAggregateType() const {
 
 const StructType* SymbolicType::getAsStructType() const {
   return &*s;
-}
-
-const VectorType* SymbolicType::getAsVectorType() const {
-  return &*v;
 }
 
 expr SymbolicType::toBV(expr e) const {
