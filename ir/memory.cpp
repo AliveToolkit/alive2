@@ -244,7 +244,7 @@ expr Pointer::add_no_overflow(const expr &offset) const {
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {
-  return get_bid() == rhs.get_bid() && get_offset() == rhs.get_offset();
+  return p == rhs.p;
 }
 
 expr Pointer::operator!=(const Pointer &rhs) const {
@@ -341,8 +341,12 @@ Pointer Pointer::mkNullPointer(const Memory &m) {
   return Pointer(m, 0, false);
 }
 
+expr Pointer::isNull() const {
+  return *this == mkNullPointer(m);
+}
+
 ostream& operator<<(ostream &os, const Pointer &p) {
-  if ((p == Pointer::mkNullPointer(p.getMemory())).isTrue())
+  if (p.isNull().isTrue())
     return os << "null";
 
   os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
@@ -486,11 +490,9 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
 void Memory::free(const expr &ptr) {
   Pointer p(*this, ptr);
-  auto isNullPointer = p == Pointer::mkNullPointer(*this);
-
-  state->addUB(isNullPointer || (p.get_offset() == 0 &&
-                                 p.is_block_alive() &&
-                                 p.is_at_heap()));
+  state->addUB(p.isNull() || (p.get_offset() == 0 &&
+                              p.is_block_alive() &&
+                              p.is_at_heap()));
   blocks_liveness = blocks_liveness.store(p.get_bid(), false);
 }
 

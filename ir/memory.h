@@ -91,11 +91,8 @@ public:
 
   const Memory& getMemory() const { return m; }
 
-  // Makes a null pointer.
-  // TODO: add a bool flag that says whether the twin memory model is used.
-  // In the twin memory model, a null pointer is a physical pointer with
-  // absolute address 0.
   static Pointer mkNullPointer(const Memory &m);
+  smt::expr isNull() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
