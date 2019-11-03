@@ -176,20 +176,6 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
 static expr preprocess(Transform &t, const set<expr> &qvars,
                        const set<expr> &undef_qvars, expr && e) {
-
-  // restrict type variable from taking disabled values
-  if (config::disable_undef_input || config::disable_poison_input) {
-    for (auto &i : t.src.getInputs()) {
-      if (auto in = dynamic_cast<const Input*>(&i)) {
-        auto var = in->getTyVar();
-        if (config::disable_undef_input)
-          e &= var != 1;
-        if (config::disable_poison_input)
-          e &= var.extract(1, 1) == 0;
-      }
-    }
-  }
-
   if (qvars.empty() || e.isFalse())
     return move(e);
 
@@ -262,6 +248,23 @@ static void check_refinement(Errors &errs, Transform &t,
   };
 
   expr axioms = src_state.getAxioms() && tgt_state.getAxioms();
+
+  // restrict type variable from taking disabled values
+  if (config::disable_undef_input || config::disable_poison_input) {
+    for (auto &i : t.src.getInputs()) {
+      if (auto in = dynamic_cast<const Input*>(&i)) {
+        auto var = in->getTyVar();
+        if (config::disable_undef_input) {
+          if (config::disable_poison_input)
+            axioms &= var == 0;
+          else
+            axioms &= var != 1;
+        } else if (config::disable_poison_input)
+          axioms &= var.extract(1, 1) == 0;
+      }
+    }
+  }
+
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
   src_state.startParsingPre();
