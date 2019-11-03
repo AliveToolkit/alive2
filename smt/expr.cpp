@@ -814,6 +814,19 @@ expr expr::operator&(const expr &rhs) const {
     return r;
   };
 
+  auto get_bool = [](const expr &e) {
+    if (auto app = e.isAppOf(Z3_OP_ITE)) {
+      expr cond = Z3_get_app_arg(ctx(), app, 0);
+      expr then = Z3_get_app_arg(ctx(), app, 1);
+      expr els = Z3_get_app_arg(ctx(), app, 2);
+      if ((then == 1).isTrue() && (els == 0).isTrue())
+        return cond;
+      if ((then == 0).isTrue() && (els == 1).isTrue())
+        return !cond;
+    }
+    return expr();
+  };
+
   if (bits() <= 64) {
     if (auto f = fold_extract(*this, rhs);
         f.isValid())
@@ -821,6 +834,14 @@ expr expr::operator&(const expr &rhs) const {
     if (auto f = fold_extract(rhs, *this);
         f.isValid())
       return f;
+
+    if (bits() == 1) {
+      if (auto a = get_bool(*this);
+          a.isValid())
+        if(auto b = get_bool(rhs);
+           b.isValid())
+          return (a && b).toBVBool();
+    }
   }
   return binopc(Z3_mk_bvand, isAllOnes, isZero);
 }
@@ -861,12 +882,48 @@ expr expr::operator~() const {
 expr expr::operator==(const expr &rhs) const {
   if (eq(rhs))
     return true;
-  if (isConst() && rhs.isConst())
-    return false;
+  if (isConst()) {
+    if (rhs.isConst())
+      return false;
+    return rhs == *this;
+  }
   if (rhs.isTrue())
     return *this;
   if (rhs.isFalse())
     return !*this;
+
+  if (auto app = isAppOf(Z3_OP_CONCAT)) {
+    unsigned num_args = Z3_get_app_num_args(ctx(), app);
+    if (rhs.isConst()) {
+      set<expr> eqs;
+      unsigned high = bits();
+      for (unsigned i = 0; i < num_args; ++i) {
+        expr arg = Z3_get_app_arg(ctx(), app, i);
+        unsigned low = high - arg.bits();
+        eqs.emplace(arg == rhs.extract(high - 1, low));
+        high = low;
+      }
+      return mk_and(eqs);
+    }
+
+    if (auto app_rhs = rhs.isAppOf(Z3_OP_CONCAT);
+        app_rhs != nullptr &&
+        num_args == Z3_get_app_num_args(ctx(), app_rhs)) {
+      set<expr> eqs;
+      bool ok = true;
+      for (unsigned i = 0; i < num_args; ++i) {
+        expr lhs = Z3_get_app_arg(ctx(), app, i);
+        expr rhs = Z3_get_app_arg(ctx(), app_rhs, i);
+        if (lhs.bits() != rhs.bits()) {
+          ok = false;
+          break;
+        }
+        eqs.emplace(lhs == rhs);
+      }
+      if (ok)
+        return mk_and(eqs);
+    }
+  }
 
   if (auto app = isAppOf(Z3_OP_ITE)) {
     expr c = Z3_get_app_arg(ctx(), app, 0);
