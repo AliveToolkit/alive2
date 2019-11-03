@@ -49,16 +49,20 @@ static llvm::cl::opt<bool> opt_disable_poison("disable-poison-input",
     llvm::cl::desc("Alive: Assume inputs are not poison (default=false)"));
 
 static llvm::cl::opt<bool> opt_se_verbose(
-    "tv-se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
-    llvm::cl::init(false));
+    "se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
+     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<unsigned> opt_smt_to(
-  "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries (default=1000)"),
+  "smt-to", llvm::cl::desc("Alive: timeout for SMT queries (default=1000)"),
   llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
 
 static llvm::cl::opt<bool> opt_smt_verbose(
-    "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
-    llvm::cl::init(false));
+    "smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
+static llvm::cl::opt<bool> opt_smt_stats(
+    "smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_bidirectional("bidirectional",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
@@ -318,6 +322,9 @@ int main(int argc, char **argv) {
           "  " << goodCount << " correct transformations\n"
           "  " << badCount << " incorrect transformations\n"
           "  " << errorCount << " errors\n";
+
+  if (opt_smt_stats)
+    smt::solver_print_stats(cerr);
 
   smt_init.reset();
 
