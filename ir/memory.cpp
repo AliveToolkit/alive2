@@ -388,12 +388,14 @@ Memory::Memory(State &state, bool little_endian)
   {
     Pointer idx(*this, "#idx0");
 
-    // All non-local blocks cannot initially contain pointers to local blocks.
-    auto byte = Byte(*this, blocks_val.load(idx()));
-    Pointer loadedptr(*this, byte.ptr_value());
-    expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
-                !loadedptr.is_local();
-    state.addAxiom(expr::mkForAll({ idx() }, move(cond)));
+    if (state.isSource()) {
+      // All non-local blocks cannot initially contain pointers to local blocks.
+      auto byte = Byte(*this, blocks_val.load(idx()));
+      Pointer loadedptr(*this, byte.ptr_value());
+      expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
+                  !loadedptr.is_local();
+      state.addAxiom(expr::mkForAll({ idx() }, move(cond)));
+    }
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
@@ -413,9 +415,11 @@ Memory::Memory(State &state, bool little_endian)
 
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
-  auto nullPtr = Pointer::mkNullPointer(*this);
-  state.addAxiom(nullPtr.get_address() == 0);
-  state.addAxiom(nullPtr.block_size() == 0);
+  if (state.isSource()) {
+    auto nullPtr = Pointer::mkNullPointer(*this);
+    state.addAxiom(nullPtr.get_address() == 0);
+    state.addAxiom(nullPtr.block_size() == 0);
+  }
 
   assert(bits_for_offset <= bits_size_t);
 }
