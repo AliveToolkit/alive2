@@ -462,7 +462,8 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 }
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
-                   optional<unsigned> bidopt, unsigned *bid_out) {
+                   optional<unsigned> bidopt, unsigned *bid_out,
+                   expr precond) {
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 
@@ -480,6 +481,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   size_zext = size_zext.trunc(bits_size_t - 1);
   size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t-1));
+
+  allocated &= precond;
 
   Pointer p(*this, bid, is_local);
   auto short_bid = p.get_short_bid();
@@ -519,7 +522,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                       p.get_address() != 0));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
   }
-
   return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
 }
 
