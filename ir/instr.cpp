@@ -1800,40 +1800,74 @@ unique_ptr<Instr> Alloc::dup(const string &suffix) const {
 
 
 vector<Value*> Malloc::operands() const {
-  return { size };
+  if (!isRealloc)
+    return { size };
+  else
+    return { ptr, size };
 }
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
+  if (isRealloc)
+    RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
-  os << getName() << " = malloc " << *size;
+  if (!isRealloc)
+    os << getName() << " = malloc " << *size;
+  else
+    os << getName() << " = realloc " << *ptr << ", " << *size;
 }
 
 StateValue Malloc::toSMT(State &s) const {
-  auto &[sz, np] = s.getAndAddUndefs(*size);
-  // TODO: malloc's alignment is implementation defined.
-  expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
+  if (!isRealloc) {
+    auto &[sz, np] = s[*size];
+    // TODO: malloc's alignment is implementation defined.
+    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
 
-  if (isNonNull) {
-    // TODO: In C++ we need to throw an exception if the allocation fails, but
-    // exception hasn't been modeled yet
-    s.addPre(move(allocated));
+    return { move(p), expr(np) };
+  } else {
+    auto &[p, np_ptr] = s[*ptr];
+    auto &[sz, np_size] = s[*size];
+    s.addUB(np_ptr);
+
+    // If sz > p_sz, it is filled it with poison (local_block_val is
+    // initialized with poison).
+    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true,
+                                                  nonnull);
+
+    Pointer ptr(s.getMemory(), p);
+    expr p_sz = ptr.block_size();
+    expr sz_zext = sz.zextOrTrunc(p_sz.bits());
+
+    expr memcpy_size = expr::mkIf(allocated,
+                                  expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext),
+                                  expr::mkUInt(0, p_sz.bits()));
+
+    // If memcpy's size is zero, then both ptrs can be NULL.
+    s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
+
+    // 1) realloc(ptr, 0) always free the ptr.
+    // 2) If allocation failed, we should not free previous ptr.
+    expr nullp = Pointer::mkNullPointer(s.getMemory())();
+    s.getMemory().free(expr::mkIf((sz == 0) || allocated, p, nullp), true);
+
+    return { move(p_new), expr(np_size) };
   }
-
-  return { move(p), expr(np) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforcePtrType() &&
-         size->getType().enforceIntType();
+         size->getType().enforceIntType() &&
+         (isRealloc ? ptr->getType().enforcePtrType() : true);
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
-  return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
+  return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr,
+                             isNonNull, isRealloc);
 }
 
 

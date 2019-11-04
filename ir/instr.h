@@ -399,13 +399,17 @@ public:
 
 
 class Malloc final : public Instr {
-  Value *size;
+  Value *ptr, *size;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
   bool isNonNull;
+  bool isRealloc;
+
 public:
-  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
-    : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
+  Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
+         bool isNonNull, bool isRealloc = false)
+    : Instr(type, std::move(name)), ptr(&ptr), size(&size),
+      isNonNull(isNonNull), isRealloc(isRealloc) {}
 
   Value& getSize() const { return *size; }
   std::vector<Value*> operands() const override;
@@ -414,6 +418,7 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+  bool isReallocCall() const { return isRealloc; }
 };
 
 
