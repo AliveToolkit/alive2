@@ -161,54 +161,43 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name)
-  : m(m), p(expr::mkVar(var_name, total_bits())) {}
+  : m(m), p(expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()))) {}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
-  expr bid_expr;
-  if (local)
-    bid_expr = expr::mkUInt((uint64_t)bid << m.bits_for_nonlocal_bid,
-                            m.bitsBid());
-  else
-    bid_expr = expr::mkUInt(bid, m.bitsBid());
-  p = expr::mkUInt(0, m.bits_for_offset).concat(bid_expr);
+  expr bid_expr = expr::mkUInt(bid, m.bitsBid() - 1);
+  p = expr::mkUInt(local, m.bits_for_offset + 1).concat(bid_expr);
 }
 
-Pointer::Pointer(const Memory &m, const expr &offset, const expr &local_bid,
-                 const expr &nonlocal_bid)
-  : m(m), p(offset.concat(local_bid).concat(nonlocal_bid)) {}
+Pointer::Pointer(const Memory &m, const expr &offset, const expr &bid)
+  : m(m), p(offset.concat(bid)) {}
 
 unsigned Pointer::total_bits() const {
-  return m.bitsBid() + m.bits_for_offset;
+  return m.bitsBid() + m.bitsOffset();
 }
 
 expr Pointer::is_local() const {
-  // bid == 0 is the global null block
-  return get_local_bid() != 0;
+  return p.extract(m.bitsBid() - 1, m.bitsBid() - 1) == 1;
 }
 
 expr Pointer::get_bid() const {
   return p.extract(m.bitsBid() - 1, 0);
 }
 
-expr Pointer::get_local_bid() const {
-  return p.extract(m.bitsBid() - 1, m.bits_for_nonlocal_bid);
-}
-
-expr Pointer::get_nonlocal_bid() const {
-  return p.extract(m.bits_for_nonlocal_bid - 1, 0);
+expr Pointer::get_short_bid() const {
+  return p.extract(m.bitsBid() - 2, 0);
 }
 
 expr Pointer::get_offset() const {
-  return p.extract(m.bitsBid() + m.bits_for_offset - 1, m.bitsBid());
+  return p.extract(m.bitsBid() + m.bitsOffset() - 1, m.bitsBid());
 }
 
 expr Pointer::get_value_from_uf(const char *name, const expr &ret,
                                 MemBlkCategory category) const {
   auto local_name = m.mkName(name);
   auto localret = category == NONLOCAL_BLOCKS ? ret :
-                  expr::mkUF(local_name.c_str(), { get_local_bid() }, ret);
+                  expr::mkUF(local_name.c_str(), { get_short_bid() }, ret);
   auto nonlocalret = category == LOCAL_BLOCKS ? ret :
-                     expr::mkUF(name, { get_nonlocal_bid() }, ret);
+                     expr::mkUF(name, { get_short_bid() }, ret);
   return expr::mkIf(is_local(), localret, nonlocalret);
 }
 
@@ -378,19 +367,15 @@ expr Memory::mk_liveness_array() const {
 
 // last_bid stores 1 + the last memory block id.
 // Global block id 0 is reserved for a null block.
-// TODO: In the twin memory, there is no null block, so the initial last_bid
-// should depend on whether the twin memory is used or not.
-// Local bid > 0 since bids == 0 is the global block 0
 static unsigned last_local_bid;
 static unsigned last_nonlocal_bid;
-static unsigned last_idx_ptr;
 
 Memory::Memory(State &state, bool little_endian)
     : state(&state), little_endian(little_endian) {
   blocks_val = mk_val_array();
   blocks_liveness = mk_liveness_array();
   {
-    Pointer idx(*this, "#idx0");
+    Pointer idx(*this, "#idx");
 
     if (state.isSource()) {
       // All non-local blocks cannot initially contain pointers to local blocks.
@@ -410,9 +395,7 @@ Memory::Memory(State &state, bool little_endian)
   {
     // all local blocks are dead in the beginning
     expr bid_var = expr::mkVar("#bid0", bitsBid());
-    Pointer bid_ptr(*this, expr::mkUInt(0, bitsOffset()),
-                    bid_var.extract(bitsBid() - 1, bits_for_nonlocal_bid),
-                    bid_var.extract(bits_for_nonlocal_bid - 1, 0));
+    Pointer bid_ptr(*this, expr::mkUInt(0, bitsOffset()), bid_var);
     expr val = !bid_ptr.is_local() && blocks_liveness.load(bid_ptr.get_bid());
     blocks_liveness = expr::mkLambda({ move(bid_var) }, move(val));
   }
@@ -429,22 +412,21 @@ Memory::Memory(State &state, bool little_endian)
 }
 
 void Memory::resetGlobalData() {
-  last_local_bid = 1;
+  resetLocalBids();
   last_nonlocal_bid = 1;
-  last_idx_ptr = 1;
 }
 
 void Memory::resetLocalBids() {
-  last_local_bid = 1;
+  last_local_bid = 0;
 }
 
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
-  unsigned bits = bits_for_nonlocal_bid + bits_for_offset;
+  unsigned bits = bits_for_bid - 1 + bits_for_offset;
   expr var = expr::mkVar(name, bits);
-  expr offset = var.extract(bits - 1, bits_for_nonlocal_bid);
-  expr bid = var.extract(bits_for_nonlocal_bid - 1, 0);
-  expr local_bid = expr::mkUInt(0, bits_for_local_bid);
-  return { Pointer(*this, offset, local_bid, bid).release(), { var } };
+  expr offset = var.extract(bits - 1, bits_for_bid - 1);
+  expr bid = var.extract(bits_for_bid - 2, 0);
+  expr is_local = expr::mkUInt(0, 1);
+  return { Pointer(*this, offset, is_local.concat(bid)).release(), { var } };
 }
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
@@ -539,9 +521,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
       blocks_val = blocks_val.store(p, bytes[0]());
     }
   } else {
-    string name = "#idx_" + to_string(last_idx_ptr++);
-    Pointer idx(*this, name.c_str());
-
+    Pointer idx(*this, "#idx");
     expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytesize).both();
     expr val = expr::mkIf(cond, bytes[0](), blocks_val.load(idx()));
     blocks_val = expr::mkLambda({ idx() }, move(val));
@@ -565,8 +545,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
       blocks_val = blocks_val.store(dst_i, old_val.load(src_i));
     }
   } else {
-    string name = "#idx_" + to_string(last_idx_ptr++);
-    Pointer dst_idx(*this, expr::mkVar(name.c_str(), dst.bits()));
+    Pointer dst_idx(*this, "#idx");
     Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
 
     expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytesize).both();

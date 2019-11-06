@@ -500,7 +500,7 @@ expr PtrType::ASVar() const {
 
 unsigned PtrType::bits() const {
   // TODO: make this configurable
-  return 64+8+8;
+  return 64 + 12;
 }
 
 StateValue PtrType::getDummyValue(bool non_poison) const {

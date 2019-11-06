@@ -19,9 +19,10 @@ class State;
 
 class Pointer {
   const Memory &m;
-// [offset, local_bid, nonlocal_bid]
-  // A pointer is pointing to a local memory block if local_bid is non-zero and
-  // nonlocal_bid is zero. A local memory block is a memory block that is
+
+  // [offset, bid]
+  // The top bit of bid is 1 if the block is local, 0 otherwise.
+  // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
   // not include allocated blocks from a nested function call. A heap-allocated
   // block can also be a local memory block.
@@ -44,14 +45,12 @@ public:
   Pointer(const Memory &m, const char *var_name);
   Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(const Memory &m, unsigned bid, bool local);
-  Pointer(const Memory &m, const smt::expr &offset, const smt::expr &local_bid,
-          const smt::expr &nonlocal_bid);
+  Pointer(const Memory &m, const smt::expr &offset, const smt::expr &bid);
 
   smt::expr is_local() const;
 
   smt::expr get_bid() const;
-  smt::expr get_local_bid() const;
-  smt::expr get_nonlocal_bid() const;
+  smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
   smt::expr get_offset() const;
   smt::expr get_address() const;
 
@@ -103,8 +102,7 @@ class Memory {
 
   // FIXME: these should be tuned per function
   unsigned bits_for_offset = 64;
-  unsigned bits_for_local_bid = 8;
-  unsigned bits_for_nonlocal_bid = 8;
+  unsigned bits_for_bid = 12;
   // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
 
@@ -161,8 +159,7 @@ public:
                      const Memory &els);
 
   unsigned bitsOffset() const { return bits_for_offset; }
-  unsigned bitsBid() const { return bits_for_local_bid +
-                                    bits_for_nonlocal_bid; }
+  unsigned bitsBid() const { return bits_for_bid; }
   unsigned bitsByte() const { return 1 + 1 + bitsBid() + bitsOffset() + 3; }
   unsigned bitsPtrSize() const { return bits_size_t; }
 
