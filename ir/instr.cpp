@@ -1955,7 +1955,7 @@ void InsertElement::rauw(const Value &what, Value &with) {
 }
 
 void InsertElement::print(ostream &os) const {
-  os << getName() << " = insertelement" << *v << ", " << *e << ", " << *idx;
+  os << getName() << " = insertelement " << *v << ", " << *e << ", " << *idx;
 }
 
 StateValue InsertElement::toSMT(State &s) const {
