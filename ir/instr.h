@@ -391,12 +391,9 @@ public:
 
 class Calloc final : public Instr {
   Value *num, *size;
-  bool isNonNull;
 public:
-  Calloc(Type &type, std::string &&name, Value &num, Value &size,
-         bool isNonNull)
-    : Instr(type, std::move(name)), num(&num), size(&size),
-            isNonNull(isNonNull) {}
+  Calloc(Type &type, std::string &&name, Value &num, Value &size)
+    : Instr(type, std::move(name)), num(&num), size(&size) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

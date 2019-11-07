@@ -8,7 +8,6 @@
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <functional>
-#include <iostream>
 
 using namespace smt;
 using namespace std;
@@ -1758,8 +1757,7 @@ expr Calloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Calloc::dup(const string &suffix) const {
-  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size,
-                             isNonNull);
+  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size);
 }
 
 vector<Value*> Free::operands() const {
