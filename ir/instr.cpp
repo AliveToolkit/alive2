@@ -1045,8 +1045,8 @@ StateValue FnCall::toSMT(State &s) const {
   StateValue ret_type = getType().getDummyValue(true);
   expr val = expr::mkUF(fnName.c_str(), value_args, ret_type.value);
   if (!all_args_np.isTrue()) {
-    auto var_name = fnName + '#' + fresh_id();
-    auto var = expr::mkVar(var_name.c_str(), ret_type.value);
+    auto var_name = fnName + "_val";
+    auto var = expr::mkFreshVar(var_name.c_str(), ret_type.value);
     s.addQuantVar(var);
     val = expr::mkIf(all_args_np, val, var);
   }
@@ -1557,7 +1557,7 @@ void Return::rauw(const Value &what, Value &with) {
 
 void Return::print(ostream &os) const {
   os << "ret ";
-  if (&getType() != &Type::voidTy)
+  if (!isVoid())
     os << print_type(getType());
   os << val->getName();
 }

@@ -19,11 +19,6 @@ State::State(const Function &f, bool source)
   return_val.first = f.getType().getDummyValue(false);
 }
 
-void State::resetGlobals() {
-  Value::reset_gbl_id();
-  Memory::resetGlobalData();
-}
-
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
@@ -51,8 +46,7 @@ const StateValue& State::operator[](const Value &val) {
 
   vector<pair<expr, expr>> repls;
   for (auto &u : uvars) {
-    auto name = UndefValue::getFreshName();
-    repls.emplace_back(u, expr::mkVar(name.c_str(), u));
+    repls.emplace_back(u, expr::mkFreshVar("undef", u));
   }
 
   if (hit_half_memory_limit())
@@ -206,7 +200,12 @@ void State::copyGlobalVarBidsFromSrc(const State &src) {
   assert(src.isSource());
   glbvar_bids = src.glbvar_bids;
 
-  Memory::resetLocalBids();
+  memory.resetLocalBids();
+}
+
+
+global_state_destroy::~global_state_destroy() {
+  s.getMemory().resetGlobalData();
 }
 
 }

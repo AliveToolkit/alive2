@@ -26,12 +26,12 @@ protected:
     : type(type), name(std::move(name)) {}
 
   void setName(std::string &&str) { name = std::move(str); }
-  static std::string fresh_id();
 
 public:
   auto bits() const { return type.bits(); }
   auto& getName() const { return name; }
   auto& getType() const { return type; }
+  bool isVoid() const;
 
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;
@@ -39,8 +39,6 @@ public:
   void fixupTypes(const smt::Model &m);
 
   static VoidValue voidVal;
-
-  static void reset_gbl_id();
 
   friend std::ostream& operator<<(std::ostream &os, const Value &val);
 
@@ -53,8 +51,6 @@ public:
   UndefValue(Type &type) : Value(type, "undef") {}
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
-
-  static std::string getFreshName();
 };
 
 

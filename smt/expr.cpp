@@ -1292,9 +1292,9 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
                             val());
 }
 
-expr expr::mkLambda(const set<expr> &vars, expr &&val) {
-  if (vars.empty() || val.isConst() || !val.isValid())
-    return move(val);
+expr expr::mkLambda(const set<expr> &vars, const expr &val) {
+  C2(val);
+  assert(!vars.empty());
 
   unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
   unsigned i = 0;

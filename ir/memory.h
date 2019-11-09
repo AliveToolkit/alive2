@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+namespace smt { class FunctionExpr; }
+
 namespace IR {
 
 class Memory;
@@ -20,7 +22,7 @@ class State;
 class Pointer {
   const Memory &m;
 
-  // [offset, bid]
+  // [bid, offset]
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -33,19 +35,14 @@ class Pointer {
 
   unsigned total_bits() const;
 
-  enum MemBlkCategory {
-    LOCAL_BLOCKS,
-    NONLOCAL_BLOCKS,
-    BOTH
-  };
-  smt::expr get_value_from_uf(const char *name, const smt::expr &ret,
-                              MemBlkCategory category = BOTH) const;
+  smt::expr get_value(const char *name, const smt::FunctionExpr &fn,
+                      const smt::expr &ret_type) const;
 
 public:
   Pointer(const Memory &m, const char *var_name);
   Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(const Memory &m, unsigned bid, bool local);
-  Pointer(const Memory &m, const smt::expr &offset, const smt::expr &bid);
+  Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
 
   smt::expr is_local() const;
 
@@ -57,6 +54,7 @@ public:
   smt::expr block_size() const;
 
   const smt::expr& operator()() const { return p; }
+  smt::expr short_ptr() const;
   smt::expr release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
@@ -85,8 +83,14 @@ public:
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
   smt::expr is_block_alive() const;
-  smt::expr is_at_heap() const;
   smt::expr is_readonly() const;
+
+  enum AllocType {
+    NON_HEAP,
+    MALLOC,
+    CXX_NEW,
+  };
+  smt::expr get_alloc_type() const;
 
   const Memory& getMemory() const { return m; }
 
@@ -108,11 +112,11 @@ class Memory {
 
   bool little_endian;
 
-  smt::expr blocks_val; // array: (bid, offset) -> Byte
-  smt::expr blocks_liveness; // array: bid -> bool
+  smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
+  smt::expr local_block_val;
 
-  std::string mkName(const char *str, bool src) const;
-  std::string mkName(const char *str) const;
+  smt::expr non_local_block_liveness; // array: bid -> bool
+  smt::expr local_block_liveness;
 
   smt::expr mk_val_array() const;
   smt::expr mk_liveness_array() const;
@@ -124,8 +128,8 @@ public:
 
   Memory(State &state, bool little_endian);
 
-  static void resetGlobalData();
-  static void resetLocalBids();
+  void resetGlobalData();
+  void resetLocalBids();
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 

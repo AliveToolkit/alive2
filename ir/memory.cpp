@@ -3,6 +3,7 @@
 
 #include "ir/memory.h"
 #include "ir/state.h"
+#include "smt/exprs.h"
 #include "util/compiler.h"
 
 using namespace IR;
@@ -57,6 +58,7 @@ public:
     unsigned padding = m.bitsByte() - 1 - 8 - 8;
     p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
                           .concat(data);
+    assert(p.bits() == m.bitsByte());
   }
 
   expr is_ptr() const {
@@ -158,52 +160,55 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 }
 
 
+static FunctionExpr local_blk_addr, local_blk_size, local_blk_kind;
+static bool globals_initialized = false;
+
+
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name)
-  : m(m), p(expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()))) {}
+  : m(m), p(expr::mkUInt(0, 1).concat(
+                expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
   expr bid_expr = expr::mkUInt(bid, m.bitsBid() - 1);
-  p = expr::mkUInt(local, m.bits_for_offset + 1).concat(bid_expr);
+  p = expr::mkUInt(local, 1).concat(bid_expr)
+                            .concat(expr::mkUInt(0, m.bits_for_offset));
 }
 
-Pointer::Pointer(const Memory &m, const expr &offset, const expr &bid)
-  : m(m), p(offset.concat(bid)) {}
+Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
+  : m(m), p(bid.concat(offset)) {}
 
 unsigned Pointer::total_bits() const {
   return m.bitsBid() + m.bitsOffset();
 }
 
 expr Pointer::is_local() const {
-  return p.extract(m.bitsBid() - 1, m.bitsBid() - 1) == 1;
+  auto bit = total_bits() - 1;
+  return p.extract(bit, bit) == 1;
 }
 
 expr Pointer::get_bid() const {
-  return p.extract(m.bitsBid() - 1, 0);
+  return p.extract(total_bits() - 1, m.bitsOffset());
 }
 
 expr Pointer::get_short_bid() const {
-  return p.extract(m.bitsBid() - 2, 0);
+  return p.extract(total_bits() - 2, m.bitsOffset());
 }
 
 expr Pointer::get_offset() const {
-  return p.extract(m.bitsBid() + m.bitsOffset() - 1, m.bitsBid());
+  return p.extract(m.bitsOffset() - 1, 0).sextOrTrunc(m.bits_size_t);
 }
 
-expr Pointer::get_value_from_uf(const char *name, const expr &ret,
-                                MemBlkCategory category) const {
-  auto local_name = m.mkName(name);
-  auto localret = category == NONLOCAL_BLOCKS ? ret :
-                  expr::mkUF(local_name.c_str(), { get_short_bid() }, ret);
-  auto nonlocalret = category == LOCAL_BLOCKS ? ret :
-                     expr::mkUF(name, { get_short_bid() }, ret);
-  return expr::mkIf(is_local(), localret, nonlocalret);
+expr Pointer::get_value(const char *name, const FunctionExpr &fn,
+                        const expr &ret_type) const {
+  auto bid = get_short_bid();
+  return expr::mkIf(is_local(), fn(bid), expr::mkUF(name, { bid }, ret_type));
 }
 
 expr Pointer::get_address() const {
-  expr offset = get_offset().sextOrTrunc(m.bits_size_t);
-  return offset + get_value_from_uf("blks_addr", offset);
+  expr offset = get_offset();
+  return offset + get_value("blk_addr", local_blk_addr, offset);
 }
 
 expr Pointer::block_size() const {
@@ -211,13 +216,17 @@ expr Pointer::block_size() const {
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
   expr range = expr::mkUInt(0, m.bits_size_t - 1);
-  return expr::mkUInt(0, 1).concat(get_value_from_uf("blks_size", range));
+  return expr::mkUInt(0, 1)
+           .concat(get_value("blk_size", local_blk_size, range));
+}
+
+expr Pointer::short_ptr() const {
+  return p.extract(total_bits() - 2, 0);
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
-  expr off = (get_offset().sextOrTrunc(m.bits_size_t) +
-              bytes.zextOrTrunc(m.bits_size_t)).trunc(m.bits_for_offset);
-  return { m, off.concat(get_bid()) };
+  expr off = (get_offset() + bytes.zextOrTrunc(m.bits_size_t));
+  return { m, get_bid(), off.trunc(m.bits_for_offset) };
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
@@ -257,7 +266,7 @@ DEFINE_CMP(ugt)
 expr Pointer::inbounds() const {
   // equivalent to offset >= 0 && offset <= block_size
   // because block_size u<= 0x7FFF..
-  return get_offset().sextOrTrunc(m.bits_size_t).ule(block_size());
+  return get_offset().ule(block_size());
 }
 
 expr Pointer::is_aligned(unsigned align) const {
@@ -270,7 +279,7 @@ expr Pointer::is_aligned(unsigned align) const {
 void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
                                  bool iswrite) {
   expr block_sz = block_size();
-  expr offset = get_offset().sextOrTrunc(m.bits_size_t);
+  expr offset = get_offset();
   expr bytes = bytes0.zextOrTrunc(m.bits_size_t);
 
   // 1) check that offset is within bounds and that arith doesn't overflow
@@ -305,29 +314,29 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
 void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
                            const expr &len2) const {
   m.state->addUB(get_bid() != ptr2.get_bid() ||
-                  disjoint(get_offset().sextOrTrunc(m.bits_size_t),
+                  disjoint(get_offset(),
                            len1.zextOrTrunc(m.bits_size_t),
-                           ptr2.get_offset().sextOrTrunc(m.bits_size_t),
+                           ptr2.get_offset(),
                            len2.zextOrTrunc(m.bits_size_t)));
 }
 
 expr Pointer::is_block_alive() const {
-  return m.blocks_liveness.load(get_bid());
+  auto bid = get_short_bid();
+  return expr::mkIf(is_local(), m.local_block_liveness.load(bid),
+                    m.non_local_block_liveness.load(bid));
 }
 
-expr Pointer::is_at_heap() const {
-  // TODO: use bitvector instead of UF if there are few allocations
-  return get_value_from_uf("blks_at_heap", false);
+expr Pointer::get_alloc_type() const {
+  return get_value("blk_kind", local_blk_kind, expr::mkUInt(0, 2));
 }
 
 expr Pointer::is_readonly() const {
-  // TODO: use bitvector instead of UF if there are few allocations
-  return get_value_from_uf("blks_readonly", false, NONLOCAL_BLOCKS);
+  return !is_local() && expr::mkUF("blk_readonly", { get_short_bid() }, false);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
   // A null pointer points to block 0.
-  return Pointer(m, 0, false);
+  return { m, 0, false };
 }
 
 expr Pointer::isNull() const {
@@ -347,58 +356,80 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
-string Memory::mkName(const char *str, bool src) const {
-  return string(str) + (src ? "_src" : "_tgt");
+static void store(const Pointer &p, const expr &val, expr &local,
+                  expr &non_local, bool index_bid = false) {
+  auto is_local = p.is_local();
+  auto idx = index_bid ? p.get_short_bid() : p.short_ptr();
+  local = expr::mkIf(is_local, local.store(idx, val), local);
+  non_local = expr::mkIf(!is_local, non_local.store(idx, val), non_local);
 }
 
-string Memory::mkName(const char *str) const {
-  return mkName(str, state->isSource());
+static void store_lambda(const Pointer &p, const expr &cond, const expr &val,
+                         expr &local, expr &non_local) {
+  auto is_local = p.is_local();
+  auto idx = p.short_ptr();
+
+  if (!is_local.isFalse())
+    local = expr::mkLambda({ idx },
+              expr::mkIf(is_local && cond, val, local.load(idx)));
+
+  if (!is_local.isTrue())
+    non_local = expr::mkLambda({ idx },
+                  expr::mkIf(!is_local && cond, val, non_local.load(idx)));
+}
+
+static expr load(const Pointer &p, expr &local, expr &non_local) {
+  auto idx = p.short_ptr();
+  return expr::mkIf(p.is_local(), local.load(idx), non_local.load(idx));
 }
 
 expr Memory::mk_val_array() const {
-  return expr::mkArray("blks_val",
-                       expr::mkUInt(0, bitsBid() + bits_for_offset),
+  return expr::mkArray("blk_val",
+                       expr::mkUInt(0, bitsBid() - 1 + bits_for_offset),
                        expr::mkUInt(0, bitsByte()));
 }
 
 expr Memory::mk_liveness_array() const {
-  return expr::mkArray("blks_liveness", expr::mkUInt(0, bitsBid()), true);
+  return expr::mkArray("blk_liveness", expr::mkUInt(0, bitsBid() - 1), true);
 }
 
 // last_bid stores 1 + the last memory block id.
 // Global block id 0 is reserved for a null block.
-static unsigned last_local_bid;
-static unsigned last_nonlocal_bid;
+static unsigned last_local_bid = 0;
+static unsigned last_nonlocal_bid = 1;
 
 Memory::Memory(State &state, bool little_endian)
-    : state(&state), little_endian(little_endian) {
-  blocks_val = mk_val_array();
-  blocks_liveness = mk_liveness_array();
+  : state(&state), little_endian(little_endian) {
+  if (!globals_initialized) {
+    local_blk_addr.reset(expr::mkUInt(0, bits_size_t));
+    local_blk_size.reset(expr::mkUInt(0, bits_size_t - 1));
+    local_blk_kind.reset(expr::mkUInt(0, 2));
+    globals_initialized = true;
+  }
+
+  non_local_block_val = mk_val_array();
+  non_local_block_liveness = mk_liveness_array();
   {
-    Pointer idx(*this, "#idx");
+    Pointer ptr(*this, "#idx");
+    auto idx = ptr.short_ptr();
 
     if (state.isSource()) {
       // All non-local blocks cannot initially contain pointers to local blocks.
-      auto byte = Byte(*this, blocks_val.load(idx()));
+      auto byte = Byte(*this, non_local_block_val.load(idx));
       Pointer loadedptr(*this, byte.ptr_value());
-      expr cond = !byte.is_ptr() || !byte.ptr_nonpoison() ||
-                  !loadedptr.is_local();
-      state.addAxiom(expr::mkForAll({ idx() }, move(cond)));
+      expr cond = (byte.is_ptr() && byte.ptr_nonpoison())
+                    .implies(!loadedptr.is_local());
+      state.addAxiom(expr::mkForAll({ idx }, move(cond)));
     }
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    expr val = expr::mkIf(idx.is_local(), Byte::mkPoisonByte(*this)(),
-                          blocks_val.load(idx()));
-    blocks_val = expr::mkLambda({ idx() }, move(val));
+    local_block_val = expr::mkLambda({ idx }, Byte::mkPoisonByte(*this)());
   }
-  {
-    // all local blocks are dead in the beginning
-    expr bid_var = expr::mkVar("#bid0", bitsBid());
-    Pointer bid_ptr(*this, expr::mkUInt(0, bitsOffset()), bid_var);
-    expr val = !bid_ptr.is_local() && blocks_liveness.load(bid_ptr.get_bid());
-    blocks_liveness = expr::mkLambda({ move(bid_var) }, move(val));
-  }
+
+  // all local blocks are dead in the beginning
+  local_block_liveness
+    = expr::mkLambda({ expr::mkVar("#bid0", bitsBid() - 1) }, false);
 
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
@@ -414,19 +445,27 @@ Memory::Memory(State &state, bool little_endian)
 void Memory::resetGlobalData() {
   resetLocalBids();
   last_nonlocal_bid = 1;
+  local_blk_addr.reset(expr());
+  local_blk_size.reset(expr());
+  local_blk_kind.reset(expr());
+  globals_initialized = false;
 }
 
 void Memory::resetLocalBids() {
   last_local_bid = 0;
+  local_blk_addr.clear();
+  local_blk_size.clear();
+  local_blk_kind.clear();
 }
 
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
   unsigned bits = bits_for_bid - 1 + bits_for_offset;
   expr var = expr::mkVar(name, bits);
-  expr offset = var.extract(bits - 1, bits_for_bid - 1);
-  expr bid = var.extract(bits_for_bid - 2, 0);
+  expr offset = var.extract(bits_for_offset - 1, 0);
+  expr bid = var.extract(bits - 1, bits_for_offset);
   expr is_local = expr::mkUInt(0, 1);
-  return { Pointer(*this, offset, is_local.concat(bid)).release(), { var } };
+  return { Pointer(*this, is_local.concat(bid), offset).release(),
+           { move(var) } };
 }
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
@@ -444,38 +483,52 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     *bid_out = bid;
 
   expr size_zext = size.zextOrTrunc(bits_size_t);
-  expr less_half = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
+  expr allocated = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
+
+  size_zext = size_zext.trunc(bits_size_t - 1);
+  size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t));
 
   Pointer p(*this, bid, is_local);
+  auto short_bid = p.get_short_bid();
   // TODO: If address space is not 0, the address can be 0.
   // TODO: address of new blocks should be disjoint from other live blocks
   // FIXME: non-zero constraint can go away when disjoint constr is in place
-  state->addPre(less_half.implies(p.is_aligned(align) &&
-                                  p.block_size() == size_zext &&
-                                  p.get_address() != 0));
+  // TODO: add support for C++ allocs
+
+  unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
 
   if (is_local) {
-    blocks_liveness = expr::mkIf(less_half,
-                                 blocks_liveness.store(p.get_bid(), true),
-                                 blocks_liveness);
+    auto blk_addr = expr::mkFreshVar("local_addr",
+                                     expr::mkUInt(0, bits_size_t));
+    state->addQuantVar(blk_addr);
+    local_blk_addr.add(expr(short_bid), move(blk_addr));
+    local_blk_size.add(expr(short_bid), move(size_zext));
+    local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
+
+    local_block_liveness
+      = expr::mkIf(allocated,
+                   local_block_liveness.store(short_bid, true),
+                   local_block_liveness);
   } else {
-    // The memory block was initially alive.
-    state->addPre(less_half.implies(mk_liveness_array().load(p.get_bid())));
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
                                              : !p.is_readonly());
+    // The memory block was initially alive.
+    state->addAxiom(allocated.implies(mk_liveness_array().load(short_bid) &&
+                                      p.is_aligned(align) &&
+                                      p.block_size() == size_zext.zext(1) &&
+                                      p.get_address() != 0));
+    state->addAxiom(p.get_alloc_type() == alloc_ty);
   }
-  state->addAxiom(blockKind == HEAP ? p.is_at_heap() : !p.is_at_heap());
 
-  return expr::mkIf(less_half, p(), Pointer::mkNullPointer(*this)());
+  return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
 }
-
 
 void Memory::free(const expr &ptr) {
   Pointer p(*this, ptr);
   state->addUB(p.isNull() || (p.get_offset() == 0 &&
                               p.is_block_alive() &&
-                              p.is_at_heap()));
-  blocks_liveness = blocks_liveness.store(p.get_bid(), false);
+                              p.get_alloc_type() == Pointer::MALLOC));
+  ::store(p, false, local_block_liveness, non_local_block_liveness, true);
 }
 
 void Memory::store(const expr &p, const StateValue &v, const Type &type,
@@ -486,7 +539,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   ptr.is_dereferenceable(bytes.size(), align, true);
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
     auto ptr_i = little_endian ? (ptr + i) : (ptr + (e - i - 1));
-    blocks_val = blocks_val.store(ptr_i.release(), bytes[i]());
+    ::store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
   }
 }
 
@@ -500,7 +553,8 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
   vector<Byte> loadedBytes;
   for (unsigned i = 0; i < bytesize; ++i) {
     auto ptr_i = little_endian ? (ptr + i) : (ptr + (bytesize - i - 1));
-    loadedBytes.emplace_back(*this, blocks_val.load(ptr_i.release()));
+    loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
+                                           non_local_block_val));
   }
   return bytesToValue(loadedBytes, type);
 }
@@ -517,14 +571,12 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   uint64_t n;
   if (bytesize.isUInt(n) && n <= 4) {
     for (unsigned i = 0; i < n; ++i) {
-      auto p = (ptr + i).release();
-      blocks_val = blocks_val.store(p, bytes[0]());
+      ::store(ptr + i, bytes[0](), local_block_val, non_local_block_val);
     }
   } else {
     Pointer idx(*this, "#idx");
     expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytesize).both();
-    expr val = expr::mkIf(cond, bytes[0](), blocks_val.load(idx()));
-    blocks_val = expr::mkLambda({ idx() }, move(val));
+    store_lambda(idx, cond, bytes[0](), local_block_val, non_local_block_val);
   }
 }
 
@@ -538,20 +590,18 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
 
   uint64_t n;
   if (bytesize.isUInt(n) && n <= 4) {
-    auto old_val = blocks_val;
+    auto old_local = local_block_val, old_nonlocal = non_local_block_val;
     for (unsigned i = 0; i < n; ++i) {
-      auto src_i = (src + i).release();
-      auto dst_i = (dst + i).release();
-      blocks_val = blocks_val.store(dst_i, old_val.load(src_i));
+      ::store(dst + i, ::load(src + i, old_local, old_nonlocal),
+              local_block_val, non_local_block_val);
     }
   } else {
     Pointer dst_idx(*this, "#idx");
     Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
-
     expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytesize).both();
-    expr val = expr::mkIf(cond, blocks_val.load(src_idx()),
-                          blocks_val.load(dst_idx()));
-    blocks_val = expr::mkLambda({ dst_idx() }, move(val));
+    store_lambda(dst_idx, cond,
+                 ::load(src_idx, local_block_val, non_local_block_val),
+                 local_block_val, non_local_block_val);
   }
 }
 
@@ -567,9 +617,14 @@ expr Memory::int2ptr(const expr &val) {
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
-  ret.blocks_val      = expr::mkIf(cond, then.blocks_val, els.blocks_val);
-  ret.blocks_liveness = expr::mkIf(cond, then.blocks_liveness,
-                                   els.blocks_liveness);
+  ret.non_local_block_val      = expr::mkIf(cond, then.non_local_block_val,
+                                            els.non_local_block_val);
+  ret.local_block_val          = expr::mkIf(cond, then.local_block_val,
+                                            els.local_block_val);
+  ret.non_local_block_liveness = expr::mkIf(cond, then.non_local_block_liveness,
+                                            els.non_local_block_liveness);
+  ret.local_block_liveness     = expr::mkIf(cond, then.local_block_liveness,
+                                            els.local_block_liveness);
   return ret;
 }
 

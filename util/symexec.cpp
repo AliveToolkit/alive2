@@ -8,7 +8,6 @@
 #include <iostream>
 
 using namespace IR;
-using namespace util;
 using namespace std;
 
 namespace util {

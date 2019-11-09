@@ -10,18 +10,12 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
-static unsigned gbl_fresh_id = 0;
-
 namespace IR {
 
 VoidValue Value::voidVal;
 
-void Value::reset_gbl_id() {
-  gbl_fresh_id = 0;
-}
-
-string Value::fresh_id() {
-  return to_string(++gbl_fresh_id);
+bool Value::isVoid() const {
+  return &getType() == &Type::voidTy;
 }
 
 expr Value::getTypeConstraints() const {
@@ -35,7 +29,7 @@ void Value::fixupTypes(const Model &m) {
 ostream& operator<<(ostream &os, const Value &val) {
   auto t = val.getType().toString();
   os << t;
-  if (&val.getType() != &Type::voidTy) {
+  if (!val.isVoid()) {
     if (!t.empty()) os << ' ';
     os << val.getName();
   }
@@ -48,15 +42,10 @@ void UndefValue::print(ostream &os) const {
 }
 
 StateValue UndefValue::toSMT(State &s) const {
-  auto name = getFreshName();
   auto val = getType().getDummyValue(true);
-  expr var = expr::mkVar(name.c_str(), val.value);
+  expr var = expr::mkFreshVar("undef", val.value);
   s.addUndefVar(var);
   return { move(var), move(val.non_poison) };
-}
-
-string UndefValue::getFreshName() {
-  return "undef_" + fresh_id();
 }
 
 
@@ -93,7 +82,7 @@ void GlobalVariable::print(ostream &os) const {
 }
 
 StateValue GlobalVariable::toSMT(State &s) const {
-  auto sizeexpr = expr::mkInt(allocsize, 64);
+  auto sizeexpr = expr::mkUInt(allocsize, 64);
   expr ptrval;
   unsigned glbvar_bid;
   auto blkkind = isconst ? Memory::CONSTGLOBAL : Memory::GLOBAL;
@@ -136,8 +125,7 @@ StateValue Input::toSMT(State &s) const {
     vector<pair<expr, expr>> repls;
 
     for (auto &v : vars) {
-      string uname = UndefValue::getFreshName();
-      expr undef = expr::mkVar(uname.c_str(), v);
+      expr undef = expr::mkFreshVar("undef", v);
       s.addUndefVar(undef);
       repls.emplace_back(v, move(undef));
     }

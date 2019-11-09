@@ -341,11 +341,10 @@ Errors TransformVerify::verify() const {
         << GVS->getName() << " is const in target but not in source";
       return { ss.str(), false };
     }
-
   }
 
-  State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
+  global_state_destroy gbl_destroy(src_state);
 
   try {
     sym_exec(src_state);
@@ -419,7 +418,8 @@ TypingAssignments TransformVerify::getTypings() const {
 
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
-      c &= i.eqType(*tgt_instrs.at(i.getName()));
+      if (!i.isVoid())
+        c &= i.eqType(*tgt_instrs.at(i.getName()));
     }
   }
   return { move(c) };

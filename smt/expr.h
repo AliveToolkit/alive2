@@ -260,7 +260,7 @@ public:
 
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
-  static expr mkLambda(const std::set<expr> &vars, expr &&val);
+  static expr mkLambda(const std::set<expr> &vars, const expr &val);
 
   expr simplify() const;
 

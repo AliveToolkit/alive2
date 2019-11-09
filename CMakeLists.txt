@@ -61,6 +61,7 @@ add_library(ir STATIC ${IR_SRCS})
 set(SMT_SRCS
   smt/ctx.cpp
   smt/expr.cpp
+  smt/exprs.cpp
   smt/smt.cpp
   smt/solver.cpp
 )
