@@ -27,8 +27,10 @@ expr DisjointExpr::operator()() const {
       return val;
 
     ret = first ? val : expr::mkIf(domain, val, ret);
-    first = true;
+    first = false;
   }
+  if (first)
+    return default_val;
   return ret;
 }
 
@@ -43,14 +45,11 @@ void FunctionExpr::clear() {
 
 void FunctionExpr::reset(expr &&val) {
   clear();
-  empty_val = move(val);
+  default_val = move(val);
 }
 
 expr FunctionExpr::operator()(expr &key) const {
-  if (fn.empty())
-    return empty_val;
-
-  DisjointExpr disj;
+  DisjointExpr disj(default_val);
   for (auto &[k, v] : fn) {
     disj.add(expr(v), k == key);
   }

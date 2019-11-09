@@ -282,21 +282,19 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
   expr offset = get_offset();
   expr bytes = bytes0.zextOrTrunc(m.bits_size_t);
 
-  // 1) check that offset is within bounds and that arith doesn't overflow
+  // check that offset is within bounds and that arith doesn't overflow
   expr cond = (offset + bytes).ule(block_sz);
   cond &= offset.add_no_uoverflow(bytes);
 
-  // 2) check block's address is aligned
-  m.state->addUB(is_aligned(align));
-
-  // 3) check block is alive
   cond &= is_block_alive();
 
-  // 4) If it is write, it should not be readonly
   if (iswrite)
     cond &= !is_readonly();
 
-  m.state->addUB(bytes.ugt(0).implies(cond));
+  m.state->addUB(bytes.uge(1).implies(cond));
+
+  // address must be always aligned regardless of access size
+  m.state->addUB(is_aligned(align));
 }
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
@@ -486,7 +484,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   expr allocated = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
 
   size_zext = size_zext.trunc(bits_size_t - 1);
-  size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t));
+  size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t-1));
 
   Pointer p(*this, bid, is_local);
   auto short_bid = p.get_short_bid();
