@@ -498,9 +498,13 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
 
   if (is_local) {
-    auto blk_addr = expr::mkFreshVar("local_addr",
-                                     expr::mkUInt(0, bits_size_t));
-    state->addQuantVar(blk_addr);
+    auto align_bits = ilog2(align);
+    auto addr_var = expr::mkFreshVar("local_addr",
+                                     expr::mkUInt(0, bits_size_t - align_bits));
+    state->addQuantVar(addr_var);
+    auto blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
+                               : addr_var;
+
     local_blk_addr.add(expr(short_bid), move(blk_addr));
     local_blk_size.add(expr(short_bid), move(size_zext));
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
@@ -509,6 +513,9 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       = expr::mkIf(allocated,
                    local_block_liveness.store(short_bid, true),
                    local_block_liveness);
+
+    state->addPre(allocated.implies(p.get_address() != 0));
+
   } else {
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
                                              : !p.is_readonly());
