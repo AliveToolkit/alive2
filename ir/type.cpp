@@ -71,33 +71,6 @@ expr Type::operator==(const Type &b) const {
   return false;
 }
 
-expr Type::sameType(const Type &b) const {
-  if (this == &b)
-    return true;
-
-#define CMP(Ty)                                                                \
-  if (auto lhs = dynamic_cast<const Ty*>(this)) {                              \
-    if (auto rhs = dynamic_cast<const Ty*>(&b))                                \
-      return lhs->sameType(*rhs);                                              \
-  }
-
-  CMP(IntType)
-  CMP(FloatType)
-  CMP(PtrType)
-  CMP(ArrayType)
-  CMP(VectorType)
-  CMP(StructType)
-#undef CMP
-
-  if (auto lhs = dynamic_cast<const SymbolicType*>(this))
-    return lhs->sameType(b);
-
-  if (auto rhs = dynamic_cast<const SymbolicType*>(&b))
-    return rhs->sameType(*this);
-
-  return false;
-}
-
 bool Type::isIntType() const {
   return false;
 }
@@ -201,6 +174,11 @@ expr Type::enforceIntOrPtrOrVectorType() const {
 expr Type::enforceFloatOrVectorType() const {
   return enforceScalarOrVectorType(
            [&](auto &ty) { return ty.enforceFloatType(); });
+}
+
+expr Type::enforcePtrOrVectorType() const {
+  return enforceScalarOrVectorType(
+           [&](auto &ty) { return ty.enforcePtrType(); });
 }
 
 const FloatType* Type::getAsFloatType() const {
@@ -315,10 +293,6 @@ expr IntType::operator==(const IntType &rhs) const {
   return sizeVar() == rhs.sizeVar();
 }
 
-expr IntType::sameType(const IntType &rhs) const {
-  return true;
-}
-
 void IntType::fixup(const Model &m) {
   if (!defined)
     bitwidth = m.getUInt(sizeVar());
@@ -419,10 +393,6 @@ expr FloatType::operator==(const FloatType &rhs) const {
   return sizeVar() == rhs.sizeVar();
 }
 
-expr FloatType::sameType(const FloatType &rhs) const {
-  return true;
-}
-
 void FloatType::fixup(const Model &m) {
   if (defined)
     return;
@@ -518,10 +488,6 @@ expr PtrType::sizeVar() const {
 expr PtrType::operator==(const PtrType &rhs) const {
   return sizeVar() == rhs.sizeVar() &&
          ASVar() == rhs.ASVar();
-}
-
-expr PtrType::sameType(const PtrType &rhs) const {
-  return *this == rhs;
 }
 
 void PtrType::fixup(const Model &m) {
@@ -643,16 +609,6 @@ expr AggregateType::operator==(const AggregateType &rhs) const {
   for (unsigned i = 0, e = min(children.size(), rhs.children.size());
        i != e; ++i) {
     res &= elems.ugt(i).implies(*children[i] == *rhs.children[i]);
-  }
-  return res;
-}
-
-expr AggregateType::sameType(const AggregateType &rhs) const {
-  expr elems = numElements();
-  expr res = elems == rhs.numElements();
-  for (unsigned i = 0, e = min(children.size(), rhs.children.size());
-       i != e; ++i) {
-    res &= elems.ugt(i).implies(children[i]->sameType(*rhs.children[i]));
   }
   return res;
 }
@@ -802,6 +758,10 @@ expr VectorType::getTypeConstraints() const {
   return r;
 }
 
+expr VectorType::sizeVar() const {
+  return children[0]->sizeVar();
+}
+
 bool VectorType::isVectorType() const {
   return true;
 }
@@ -928,37 +888,6 @@ expr SymbolicType::operator==(const Type &b) const {
     return move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
-  UNREACHABLE();
-}
-
-expr SymbolicType::sameType(const Type &b) const {
-  if (this == &b)
-    return true;
-
-  if (auto rhs = dynamic_cast<const IntType*>(&b))
-    return isInt() && (i ? i->sameType(*rhs) : false);
-  if (auto rhs = dynamic_cast<const FloatType*>(&b))
-    return isFloat() && (f ? f->sameType(*rhs) : false);
-  if (auto rhs = dynamic_cast<const PtrType*>(&b))
-    return isPtr() && (p ? p->sameType(*rhs) : false);
-  if (auto rhs = dynamic_cast<const ArrayType*>(&b))
-    return isArray() && (a ? a->sameType(*rhs) : false);
-  if (auto rhs = dynamic_cast<const VectorType*>(&b))
-    return isVector() && (v ? v->sameType(*rhs) : false);
-  if (auto rhs = dynamic_cast<const StructType*>(&b))
-    return isStruct() && (s ? s->sameType(*rhs) : false);
-
-  if (auto rhs = dynamic_cast<const SymbolicType*>(&b)) {
-    expr c(false);
-    if (i && rhs->i) c |= isInt()    && i->sameType(*rhs->i);
-    if (f && rhs->f) c |= isFloat()  && f->sameType(*rhs->f);
-    if (p && rhs->p) c |= isPtr()    && p->sameType(*rhs->p);
-    if (a && rhs->a) c |= isArray()  && a->sameType(*rhs->a);
-    if (v && rhs->v) c |= isVector() && v->sameType(*rhs->v);
-    if (s && rhs->s) c |= isStruct() && s->sameType(*rhs->s);
-    return move(c) && typeVar() == rhs->typeVar();
-  }
-  assert(0 && "unhandled case in SymbolicType::sameType");
   UNREACHABLE();
 }
 

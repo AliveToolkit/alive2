@@ -49,7 +49,6 @@ public:
   virtual smt::expr getTypeConstraints() const = 0;
   virtual smt::expr sizeVar() const;
   smt::expr operator==(const Type &rhs) const;
-  smt::expr sameType(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
   virtual bool isIntType() const;
@@ -82,6 +81,7 @@ public:
   smt::expr enforceIntOrFloatOrPtrOrVectorType() const;
   smt::expr enforceIntOrPtrOrVectorType() const;
   smt::expr enforceFloatOrVectorType() const;
+  smt::expr enforcePtrOrVectorType() const;
 
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
@@ -145,7 +145,6 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
-  smt::expr sameType(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
@@ -178,7 +177,6 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const FloatType &rhs) const;
-  smt::expr sameType(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isFloatType() const override;
   smt::expr enforceFloatType() const override;
@@ -210,7 +208,6 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const PtrType &rhs) const;
-  smt::expr sameType(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isPtrType() const override;
   smt::expr enforcePtrType() const override;
@@ -247,7 +244,6 @@ public:
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const AggregateType &rhs) const;
-  smt::expr sameType(const AggregateType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType(
     std::vector<Type *> *element_types) const override;
@@ -284,6 +280,7 @@ public:
                         const IR::StateValue &n,
                         const smt::expr &idx) const;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   bool isVectorType() const override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
@@ -325,7 +322,6 @@ public:
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr operator==(const Type &rhs) const;
-  smt::expr sameType(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;
   bool isFloatType() const override;

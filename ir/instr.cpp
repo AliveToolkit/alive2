@@ -738,103 +738,144 @@ void ConversionOp::print(ostream &os) const {
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
-  auto &[v, vp] = s[*val];
-  expr newval, np = vp;
-  auto to_bw = getType().bits();
+  auto &v = s[*val];
+  function<StateValue(const expr &, const Type &, const Type &)> fn;
 
   switch (op) {
   case SExt:
-    newval = v.sext(to_bw - val->bits());
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.sext(to_type.bits() - val.bits()), true };
+    };
     break;
   case ZExt:
-    newval = v.zext(to_bw - val->bits());
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.zext(to_type.bits() - val.bits()), true };
+    };
     break;
   case Trunc:
-    newval = v.trunc(to_bw);
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.trunc(to_type.bits()), true };
+    };
     break;
   case BitCast:
-    if ((getType().isIntType() && val->getType().isIntType()) ||
-        (getType().isFloatType() && val->getType().isFloatType()) ||
-        (getType().isPtrType() && val->getType().isPtrType()))
-      newval = v;
-    else if (getType().isIntType() && val->getType().isFloatType())
-      newval = v.float2BV();
-    else if (getType().isFloatType() && val->getType().isIntType())
-      newval = v.BV2float(getType().getDummyValue(true).value);
-    else
-      UNREACHABLE();
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      expr newval;
+      if ((to_type.isIntType() && from_type.isIntType()) ||
+          (to_type.isFloatType() && from_type.isFloatType()) ||
+          (to_type.isPtrType() && from_type.isPtrType()))
+        newval = val;
+      else if (to_type.isIntType() && from_type.isFloatType())
+        newval = val.float2BV();
+      else if (to_type.isFloatType() && from_type.isIntType())
+        newval = val.BV2float(to_type.getDummyValue(true).value);
+      else
+        UNREACHABLE();
+      return { move(newval), true };
+    };
     break;
   case SIntToFP:
-    newval = v.sint2fp(getType().getDummyValue(false).value);
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.sint2fp(to_type.getDummyValue(false).value), true };
+    };
     break;
   case UIntToFP:
-    newval = v.uint2fp(getType().getDummyValue(false).value);
+    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.uint2fp(to_type.getDummyValue(false).value), true };
+    };
     break;
   case FPToSInt:
-    newval = v.fp2sint(to_bw);
-    np &= v.foge(expr::IntSMin(getType().bits()).sint2fp(v));
-    np &= v.fole(expr::IntSMax(getType().bits()).sint2fp(v));
-    np &= !v.isInf();
+    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.fp2sint(to_type.bits()),
+               val.foge(expr::IntSMin(getType().bits()).sint2fp(val)) &&
+               val.fole(expr::IntSMax(getType().bits()).sint2fp(val)) &&
+               !val.isInf() };
+    };
     break;
   case FPToUInt:
-    newval = v.fp2uint(to_bw);
-    np &= v.foge(expr::mkFloat(0, v));
-    np &= v.fole(expr::IntUMax(getType().bits()).uint2fp(v));
-    np &= !v.isInf();
+    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { val.fp2uint(to_type.bits()),
+               val.foge(expr::mkFloat(0, val)) &&
+               val.fole(expr::IntUMax(getType().bits()).uint2fp(val)) &&
+               !val.isInf() };
+    };
     break;
   case Ptr2Int:
-    newval = s.getMemory().ptr2int(v).zextOrTrunc(getType().bits());
+    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true };
+    };
     break;
   case Int2Ptr:
-    newval = s.getMemory().int2ptr(v);
+    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+      return { s.getMemory().int2ptr(val), true };
+    };
     break;
   }
-  return { move(newval), move(np) };
+
+  auto scalar = [&](const StateValue &sv, const Type &from_type,
+                    const Type &to_type) -> StateValue {
+    auto [v, np] = fn(sv.value, from_type, to_type);
+    return { move(v), sv.non_poison && np };
+  };
+
+  if (getType().isVectorType()) {
+    vector<StateValue> vals;
+    auto valty = val->getType().getAsAggregateType();
+    auto retty = getType().getAsAggregateType();
+    for (unsigned i = 0, e = valty->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(valty->extract(v, i), valty->getChild(i),
+                               retty->getChild(i)));
+    }
+    return retty->aggregateVals(vals);
+  }
+  return scalar(v, val->getType(), getType());
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
   expr c;
-  // TODO: add vector support
   switch (op) {
   case SExt:
   case ZExt:
-    c = getType().enforceIntType() &&
-        getType().sameType(val->getType()) &&
+    c = getType().enforceIntOrVectorType() &&
+        val->getType().enforceIntOrVectorType() &&
         val->getType().sizeVar().ult(getType().sizeVar());
     break;
   case Trunc:
-    c = getType().enforceIntType() &&
-        getType().sameType(val->getType()) &&
+    c = getType().enforceIntOrVectorType() &&
+        val->getType().enforceIntOrVectorType() &&
         getType().sizeVar().ult(val->getType().sizeVar());
     break;
   case BitCast:
-    c = ((getType().enforcePtrType() && val->getType().enforcePtrType()) ||
-         ((getType().enforceIntType() || getType().enforceFloatType()) &&
-          (val->getType().enforceIntType() ||
-           val->getType().enforceFloatType()))) &&
-        getType().sizeVar() == val->getType().sizeVar();
+    c = (getType().enforcePtrOrVectorType() &&
+         val->getType().enforcePtrOrVectorType()) ||
+        ((getType().enforceIntOrVectorType() ||
+          getType().enforceFloatOrVectorType()) &&
+         (val->getType().enforceIntOrVectorType() ||
+          val->getType().enforceFloatOrVectorType()));
+
+    c &= getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
   case UIntToFP:
-    // FIXME: output is vector iff input is vector
-    c = getType().enforceFloatType() &&
-        val->getType().enforceIntType();
+    c = getType().enforceFloatOrVectorType() &&
+        val->getType().enforceIntOrVectorType();
     break;
   case FPToSInt:
   case FPToUInt:
-    c = getType().enforceIntType() &&
-        val->getType().enforceFloatType();
+    c = getType().enforceIntOrVectorType() &&
+        val->getType().enforceFloatOrVectorType();
     break;
   case Ptr2Int:
-    c = getType().enforceIntType() &&
-        val->getType().enforcePtrType();
+    c = getType().enforceIntOrVectorType() &&
+        val->getType().enforcePtrOrVectorType();
     break;
   case Int2Ptr:
-    c = getType().enforcePtrType() &&
-        val->getType().enforceIntType();
+    c = getType().enforcePtrOrVectorType() &&
+        val->getType().enforceIntOrVectorType();
     break;
   }
-  return Value::getTypeConstraints() && move(c);
+  return Value::getTypeConstraints() &&
+         move(c) &&
+         getType().enforceVectorTypeEquiv(val->getType());
 }
 
 unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {
