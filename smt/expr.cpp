@@ -104,13 +104,13 @@ void expr::decRef() {
 }
 
 void expr::operator=(expr &&other) {
-  ~expr();
+  this->~expr();
   ptr = 0;
   swap(ptr, other.ptr);
 }
 
 void expr::operator=(const expr &other) {
-  ~expr();
+  this->~expr();
   if (!other.isValid()) {
     ptr = 0;
   } else if (other.isZ3Ast()) {
