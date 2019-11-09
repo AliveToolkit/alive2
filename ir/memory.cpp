@@ -45,7 +45,7 @@ public:
     expr byteofs = expr::mkUInt(i, 3);
     expr np = non_poison.toBVBool();
     p = expr::mkUInt(1, 1).concat(np).concat(ptr()).concat(byteofs);
-    assert(p.bits() == m.bitsByte());
+    assert(!p.isValid() || p.bits() == m.bitsByte());
   }
 
   // Creates a non-pointer byte that has data and non_poison.
