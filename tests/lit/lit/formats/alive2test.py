@@ -38,6 +38,7 @@ def readFile(path):
 class Alive2Test(TestFormat):
   def __init__(self):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
+    self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
 
   def getTestsInDirectory(self, testSuite, path_in_suite,
@@ -76,12 +77,17 @@ class Alive2Test(TestFormat):
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
     out, err, exitCode = executeCommand(cmd)
 
-    m = self.regex_errs.search(input)
-    if m == None:
+    expect_err = self.regex_errs.search(input)
+    xfail = self.regex_xfail.search(input)
+
+    if expect_err is None and xfail is None:
       if exitCode == 0 and string.find(out + err, ok_string) != -1:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
-    if exitCode != 0 and string.find(err, m.group(1)) != -1:
-      return lit.Test.PASS, ''
+    if exitCode != 0:
+      if expect_err != None and string.find(err, expect_err.group(1)) != -1:
+        return lit.Test.PASS, ''
+      if string.find(err, xfail.group(1)) != -1:
+        return lit.Test.XFAIL, ''
     return lit.Test.FAIL, out + err

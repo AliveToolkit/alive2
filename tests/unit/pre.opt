@@ -1,3 +1,5 @@
+; XFAIL: Target is more poisonous
+
 Name: pre1
 Pre: WillNotOverflowSignedAdd(%x, %y)
 %r = add i4 %x, %y

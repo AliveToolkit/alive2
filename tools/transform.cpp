@@ -267,29 +267,34 @@ static void check_refinement(Errors &errs, Transform &t,
 
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
-  src_state.startParsingPre();
-  expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  pre &= src_state.getPre() && tgt_state.getPre();
+  // FIXME: broken handling of transformation precondition
+  //src_state.startParsingPre();
+  //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
+  expr pre_src = src_state.getPre();
+  expr pre_tgt = tgt_state.getPre();
 
   auto [poison_cnstr, value_cnstr] = type.refines(a, b);
-  expr pre_dom = pre && (dom_a && dom_b);
+  expr dom = dom_a && dom_b;
 
   Solver::check({
-    { axioms && preprocess(t, qvars, uvars, pre && dom_a.notImplies(dom_b)),
+    { axioms && preprocess(t, qvars, uvars,
+                           pre_tgt && pre_src.implies(dom_a.notImplies(dom_b))),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre_dom && !poison_cnstr),
+    { axioms && preprocess(t, qvars, uvars,
+                           pre_tgt && pre_src.implies(dom && !poison_cnstr)),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { axioms && preprocess(t, qvars, uvars, pre_dom && !value_cnstr),
+    { axioms && preprocess(t, qvars, uvars,
+                           pre_tgt && pre_src.implies(dom && !value_cnstr)),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }}
   });
 
-  if (check_expr(axioms && preprocess(t, qvars, uvars, move(pre))).isUnsat()) {
+  if (!errs && check_expr(axioms && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
   }
 }
