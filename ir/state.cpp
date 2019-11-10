@@ -149,7 +149,7 @@ void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
-  return_val.add(StateValue(val), expr(domain.first));
+  return_val.add(val, domain.first);
   return_domain |= domain.first;
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.second.begin(), domain.second.end());

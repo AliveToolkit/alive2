@@ -6,6 +6,7 @@
 #include "smt/expr.h"
 #include <map>
 #include <set>
+#include <utility>
 
 namespace smt {
 
@@ -19,8 +20,29 @@ public:
   DisjointExpr(const T &default_val) : default_val(default_val) {}
   DisjointExpr(T &&default_val) : default_val(std::move(default_val)) {}
 
-  void add(T &&val, expr &&domain);
-  T operator()() const;
+  template <typename V, typename D>
+  void add(V &&val, D &&domain) {
+    if (domain.isFalse())
+      return;
+    if (domain.isTrue())
+      vals.clear();
+
+    auto [I, inserted] = vals.try_emplace(std::forward<V>(val),
+                                          std::forward<D>(domain));
+    if (!inserted)
+      I->second |= std::forward<D>(domain);
+  }
+
+  T operator()() const {
+    std::optional<T> ret;
+    for (auto &[val, domain] : vals) {
+      if (domain.isTrue())
+        return val;
+
+      ret = ret ? T::mkIf(domain, val, *ret) : val;
+    }
+    return ret.value_or(default_val);
+  }
 };
 
 
