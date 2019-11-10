@@ -51,7 +51,7 @@ public:
   smt::expr get_offset() const;
   smt::expr get_address() const;
 
-  smt::expr block_size() const;
+  smt::expr block_size(bool simplify = true) const;
 
   const smt::expr& operator()() const { return p; }
   smt::expr short_ptr() const;

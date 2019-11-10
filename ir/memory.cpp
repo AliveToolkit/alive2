@@ -211,10 +211,15 @@ expr Pointer::get_address() const {
   return offset + get_value("blk_addr", local_blk_addr, offset);
 }
 
-expr Pointer::block_size() const {
+expr Pointer::block_size(bool simplify) const {
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
+
+  // fast path for null ptrs
+  if (simplify && (get_bid() == 0).isTrue())
+    return expr::mkUInt(0, m.bits_size_t);
+
   expr range = expr::mkUInt(0, m.bits_size_t - 1);
   return expr::mkUInt(0, 1)
            .concat(get_value("blk_size", local_blk_size, range));
@@ -434,7 +439,7 @@ Memory::Memory(State &state, bool little_endian)
   if (state.isSource()) {
     auto nullPtr = Pointer::mkNullPointer(*this);
     state.addAxiom(nullPtr.get_address() == 0);
-    state.addAxiom(nullPtr.block_size() == 0);
+    state.addAxiom(nullPtr.block_size(false) == 0);
   }
 
   assert(bits_for_offset <= bits_size_t);
