@@ -473,7 +473,7 @@ Memory::Memory(State &state, bool little_endian)
   // the block) should not overflow.
   avail_space = expr::mkVar("avail_space", bitsPtrSize());
   if (state.isSource()) {
-    state.addAxiom(avail_space.ult(expr::mkInt(-2, bitsPtrSize())));
+    state.addAxiom(avail_space.ult(expr::mkInt(-2 * max_align, bitsPtrSize())));
   }
 
   // TODO: replace the magic number 2 with the result of analysis.
@@ -498,12 +498,28 @@ Memory::Memory(State &state, bool little_endian)
                              avail_space);
   }
 
-  // Initialize a memory block for null pointer.
-  // TODO: in twin memory model, this is not needed.
   if (state.isSource()) {
+    // Initialize a memory block for null pointer.
+    // TODO: in twin memory model, this is not needed.
     auto nullPtr = Pointer::mkNullPointer(*this);
     state.addAxiom(nullPtr.get_address(false) == 0);
     state.addAxiom(nullPtr.block_size(false) == 0);
+
+    // Non-local blocks are disjoint.
+    // Ignore null pointer block
+    for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
+      Pointer p1(*this, bid, false);
+      for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
+        Pointer p2(*this, bid2, false);
+        state.addAxiom((p1.is_block_alive() && p2.is_block_alive())
+            .implies(disjoint(p1.get_address(), p1.block_size(),
+                              p2.get_address(), p2.block_size())));
+      }
+      // Non-local blocks' addr + size does not overflow.
+      state.addAxiom(p1.get_address().add_no_uoverflow(p1.block_size()));
+      // Size is less than half of memory
+      state.addAxiom(p1.block_size().extract(bits_size_t-1, bits_size_t-1) == 0);
+    }
   }
 
   assert(bits_for_offset <= bits_size_t);
@@ -559,8 +575,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   Pointer p(*this, bid, is_local);
   auto short_bid = p.get_short_bid();
   // TODO: If address space is not 0, the address can be 0.
-  // TODO: address of new blocks should be disjoint from other live blocks
-  // FIXME: non-zero constraint can go away when disjoint constr is in place
   // TODO: add support for C++ allocs
 
   unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
@@ -577,6 +591,16 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     auto size_upperbound = size_zext0 + expr::mkUInt(align - 1, bitsPtrSize());
     allocated &= size_upperbound.ule(avail_space);
 
+    // Disjointness of block's address range with other local blocks
+    for (auto &itm : local_blk_addr) {
+      auto zero = expr::mkUInt(0, bitsOffset());
+      // itm.first is short bid, so concat prefix 1.
+      Pointer p2(*this, expr::mkUInt(1, 1).concat(itm.first), zero);
+      state->addPre((allocated && p2.is_block_alive())
+          .implies(disjoint(blk_addr, size_zext0, p2.get_address(),
+                            p2.block_size())));
+    }
+
     local_blk_addr.add(expr(short_bid), move(blk_addr));
     local_blk_size.add(expr(short_bid), move(size_zext));
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
@@ -590,6 +614,20 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
     state->addPre(allocated.implies(p.get_address() != 0));
 
+    // addr + size does not overflow.
+    // C std states that one byte past the block boundary does not overflow
+    state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
+
+    // Disjointness of block's address range with nonlocal blocks
+    unsigned non_local_bid_upperbound = 2; // TODO: replace this magic number with
+                                           // something else from analysis
+    // Ignore null block.
+    for (unsigned bid2 = 1; bid2 <= non_local_bid_upperbound; ++bid2) {
+      Pointer p2(*this, bid2, false);
+      state->addPre((p.is_block_alive() && p2.is_block_alive())
+          .implies(disjoint(p.get_address(), p.block_size(),
+                            p2.get_address(), p2.block_size())));
+    }
   } else {
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
                                              : !p.is_readonly());

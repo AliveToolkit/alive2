@@ -1,4 +1,4 @@
-; TEST-ARGS: -root-only
+; TEST-ARGS: -root-only -smt-to:15000
 
 Name: single shift by masked value
 %c_mod_width = urem i32 %c, i32 32

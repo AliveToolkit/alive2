@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=9000
+; TEST-ARGS: -smt-to=30000
 
 define i8 @malloc_undef() {
   %ptr = call i8* @malloc(i64 undef)
