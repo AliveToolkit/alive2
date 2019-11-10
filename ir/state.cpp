@@ -19,6 +19,10 @@ State::State(const Function &f, bool source)
   return_val.first = f.getType().getDummyValue(false);
 }
 
+void State::resetGlobals() {
+  Memory::resetGlobalData();
+}
+
 const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
@@ -200,12 +204,7 @@ void State::copyGlobalVarBidsFromSrc(const State &src) {
   assert(src.isSource());
   glbvar_bids = src.glbvar_bids;
 
-  memory.resetLocalBids();
-}
-
-
-global_state_destroy::~global_state_destroy() {
-  s.getMemory().resetGlobalData();
+  Memory::resetLocalBids();
 }
 
 }

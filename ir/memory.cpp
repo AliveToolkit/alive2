@@ -3,7 +3,6 @@
 
 #include "ir/memory.h"
 #include "ir/state.h"
-#include "smt/exprs.h"
 #include "util/compiler.h"
 
 using namespace IR;
@@ -160,10 +159,6 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 }
 
 
-static FunctionExpr local_blk_addr, local_blk_size, local_blk_kind;
-static bool globals_initialized = false;
-
-
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name)
@@ -213,7 +208,7 @@ expr Pointer::get_address(bool simplify) const {
   if (simplify && (get_bid() == 0).isTrue())
     return offset;
 
-  return offset + get_value("blk_addr", local_blk_addr, offset);
+  return offset + get_value("blk_addr", m.local_blk_addr, offset);
 }
 
 expr Pointer::block_size(bool simplify) const {
@@ -227,7 +222,7 @@ expr Pointer::block_size(bool simplify) const {
 
   expr range = expr::mkUInt(0, m.bits_size_t - 1);
   return expr::mkUInt(0, 1)
-           .concat(get_value("blk_size", local_blk_size, range));
+           .concat(get_value("blk_size", m.local_blk_size, range));
 }
 
 expr Pointer::short_ptr() const {
@@ -335,7 +330,7 @@ expr Pointer::is_block_alive() const {
 }
 
 expr Pointer::get_alloc_type() const {
-  return get_value("blk_kind", local_blk_kind, expr::mkUInt(0, 2));
+  return get_value("blk_kind", m.local_blk_kind, expr::mkUInt(0, 2));
 }
 
 expr Pointer::is_readonly() const {
@@ -408,12 +403,9 @@ static unsigned last_nonlocal_bid = 1;
 
 Memory::Memory(State &state, bool little_endian)
   : state(&state), little_endian(little_endian) {
-  if (!globals_initialized) {
-    local_blk_addr.reset(expr::mkUInt(0, bits_size_t));
-    local_blk_size.reset(expr::mkUInt(0, bits_size_t - 1));
-    local_blk_kind.reset(expr::mkUInt(0, 2));
-    globals_initialized = true;
-  }
+  local_blk_addr.reset(expr::mkUInt(0, bits_size_t));
+  local_blk_size.reset(expr::mkUInt(0, bits_size_t - 1));
+  local_blk_kind.reset(expr::mkUInt(0, 2));
 
   non_local_block_val = mk_val_array();
   non_local_block_liveness = mk_liveness_array();
@@ -453,17 +445,10 @@ Memory::Memory(State &state, bool little_endian)
 void Memory::resetGlobalData() {
   resetLocalBids();
   last_nonlocal_bid = 1;
-  local_blk_addr.reset(expr());
-  local_blk_size.reset(expr());
-  local_blk_kind.reset(expr());
-  globals_initialized = false;
 }
 
 void Memory::resetLocalBids() {
   last_local_bid = 0;
-  local_blk_addr.clear();
-  local_blk_size.clear();
-  local_blk_kind.clear();
 }
 
 pair<expr, vector<expr>> Memory::mkInput(const char *name) {
@@ -648,6 +633,9 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
                                             els.non_local_block_liveness);
   ret.local_block_liveness     = expr::mkIf(cond, then.local_block_liveness,
                                             els.local_block_liveness);
+  ret.local_blk_addr.add(els.local_blk_addr);
+  ret.local_blk_size.add(els.local_blk_size);
+  ret.local_blk_kind.add(els.local_blk_kind);
   return ret;
 }
 

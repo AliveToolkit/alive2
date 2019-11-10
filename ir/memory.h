@@ -6,6 +6,7 @@
 #include "ir/state_value.h"
 #include "ir/type.h"
 #include "smt/expr.h"
+#include "smt/exprs.h"
 #include <optional>
 #include <ostream>
 #include <string>
@@ -118,6 +119,10 @@ class Memory {
   smt::expr non_local_block_liveness; // array: bid -> bool
   smt::expr local_block_liveness;
 
+  smt::FunctionExpr local_blk_addr;
+  smt::FunctionExpr local_blk_size;
+  smt::FunctionExpr local_blk_kind;
+
   smt::expr mk_val_array() const;
   smt::expr mk_liveness_array() const;
 
@@ -128,8 +133,8 @@ public:
 
   Memory(State &state, bool little_endian);
 
-  void resetGlobalData();
-  void resetLocalBids();
+  static void resetGlobalData();
+  static void resetLocalBids();
 
   std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
 

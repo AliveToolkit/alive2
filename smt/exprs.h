@@ -29,8 +29,8 @@ class FunctionExpr {
 
 public:
   void add(expr &&key, expr &&val);
+  void add(const FunctionExpr &other);
   void del(const expr &key);
-  void clear();
   void reset(smt::expr &&default_val);
   expr operator()(expr &key) const;
 };

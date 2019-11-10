@@ -39,16 +39,16 @@ void FunctionExpr::add(expr &&key, expr &&val) {
   ENSURE(fn.emplace(move(key), move(val)).second);
 }
 
+void FunctionExpr::add(const FunctionExpr &other) {
+  fn.insert(other.fn.begin(), other.fn.end());
+}
+
 void FunctionExpr::del(const expr &key) {
   fn.erase(key);
 }
 
-void FunctionExpr::clear() {
-  fn.clear();
-}
-
 void FunctionExpr::reset(expr &&val) {
-  clear();
+  fn.clear();
   default_val = move(val);
 }
 

@@ -66,6 +66,8 @@ private:
 public:
   State(const Function &f, bool source);
 
+  static void resetGlobals();
+
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const ValTy& at(const Value &val) const;
@@ -112,14 +114,6 @@ public:
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);
-};
-
-
-class global_state_destroy {
-  State &s;
-public:
-  global_state_destroy(State &s) : s(s) {}
-  ~global_state_destroy();
 };
 
 }

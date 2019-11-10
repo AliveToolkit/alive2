@@ -348,8 +348,8 @@ Errors TransformVerify::verify() const {
     }
   }
 
+  State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
-  global_state_destroy gbl_destroy(src_state);
 
   try {
     sym_exec(src_state);
