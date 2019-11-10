@@ -39,6 +39,10 @@ void FunctionExpr::add(expr &&key, expr &&val) {
   ENSURE(fn.emplace(move(key), move(val)).second);
 }
 
+void FunctionExpr::del(const expr &key) {
+  fn.erase(key);
+}
+
 void FunctionExpr::clear() {
   fn.clear();
 }

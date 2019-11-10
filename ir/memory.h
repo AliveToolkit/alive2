@@ -49,7 +49,7 @@ public:
   smt::expr get_bid() const;
   smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
   smt::expr get_offset() const;
-  smt::expr get_address() const;
+  smt::expr get_address(bool simplify = true) const;
 
   smt::expr block_size(bool simplify = true) const;
 

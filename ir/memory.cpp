@@ -206,8 +206,13 @@ expr Pointer::get_value(const char *name, const FunctionExpr &fn,
   return expr::mkIf(is_local(), fn(bid), expr::mkUF(name, { bid }, ret_type));
 }
 
-expr Pointer::get_address() const {
+expr Pointer::get_address(bool simplify) const {
   expr offset = get_offset();
+
+  // fast path for null ptrs
+  if (simplify && (get_bid() == 0).isTrue())
+    return offset;
+
   return offset + get_value("blk_addr", local_blk_addr, offset);
 }
 
@@ -438,7 +443,7 @@ Memory::Memory(State &state, bool little_endian)
   // TODO: in twin memory model, this is not needed.
   if (state.isSource()) {
     auto nullPtr = Pointer::mkNullPointer(*this);
-    state.addAxiom(nullPtr.get_address() == 0);
+    state.addAxiom(nullPtr.get_address(false) == 0);
     state.addAxiom(nullPtr.block_size(false) == 0);
   }
 
@@ -539,6 +544,14 @@ void Memory::free(const expr &ptr) {
                               p.is_block_alive() &&
                               p.get_alloc_type() == Pointer::MALLOC));
   ::store(p, false, local_block_liveness, non_local_block_liveness, true);
+
+  // optimization: if this is a local block, remove all associated information
+  if (p.is_local().isTrue() && p.get_short_bid().isConst()) {
+    expr bid = p.get_short_bid();
+    local_blk_addr.del(bid);
+    local_blk_size.del(bid);
+    local_blk_kind.del(bid);
+  }
 }
 
 void Memory::store(const expr &p, const StateValue &v, const Type &type,
