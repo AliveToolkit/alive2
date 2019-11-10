@@ -28,10 +28,11 @@ class FunctionExpr {
   expr default_val;
 
 public:
+  FunctionExpr() {}
+  FunctionExpr(expr &&default_val) : default_val(std::move(default_val)) {}
   void add(expr &&key, expr &&val);
   void add(const FunctionExpr &other);
   void del(const expr &key);
-  void reset(smt::expr &&default_val);
   expr operator()(expr &key) const;
 };
 

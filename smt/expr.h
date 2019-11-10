@@ -61,6 +61,7 @@ class expr {
   static expr mkUInt(uint64_t n, Z3_sort sort);
   static expr mkInt(int64_t n, Z3_sort sort);
   static expr mkConst(Z3_func_decl decl);
+  static expr mkQuantVar(unsigned i, Z3_sort sort);
 
 public:
   expr() : ptr(0) {}
@@ -116,6 +117,7 @@ public:
   bool isUInt(uint64_t &n) const;
   bool isInt(int64_t &n) const;
 
+  bool isIf(expr &cond, expr &then, expr &els) const;
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isNot(expr &neg) const;

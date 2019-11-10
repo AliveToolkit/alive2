@@ -47,11 +47,6 @@ void FunctionExpr::del(const expr &key) {
   fn.erase(key);
 }
 
-void FunctionExpr::reset(expr &&val) {
-  fn.clear();
-  default_val = move(val);
-}
-
 expr FunctionExpr::operator()(expr &key) const {
   DisjointExpr disj(default_val);
   for (auto &[k, v] : fn) {

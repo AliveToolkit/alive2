@@ -402,10 +402,10 @@ static unsigned last_local_bid = 0;
 static unsigned last_nonlocal_bid = 1;
 
 Memory::Memory(State &state, bool little_endian)
-  : state(&state), little_endian(little_endian) {
-  local_blk_addr.reset(expr::mkUInt(0, bits_size_t));
-  local_blk_size.reset(expr::mkUInt(0, bits_size_t - 1));
-  local_blk_kind.reset(expr::mkUInt(0, 2));
+  : state(&state), little_endian(little_endian),
+    local_blk_addr(expr::mkUInt(0, bits_size_t)),
+    local_blk_size(expr::mkUInt(0, bits_size_t - 1)),
+    local_blk_kind(expr::mkUInt(0, 2)) {
 
   non_local_block_val = mk_val_array();
   non_local_block_liveness = mk_liveness_array();

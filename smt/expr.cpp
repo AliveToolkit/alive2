@@ -201,6 +201,10 @@ expr expr::mkConst(Z3_func_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
 
+expr expr::mkQuantVar(unsigned i, Z3_sort sort) {
+  return Z3_mk_bound(ctx(), i, sort);
+}
+
 expr expr::mkVar(const char *name, const expr &type) {
   C2(type);
   return ::mkVar(name, type.sort());
@@ -326,6 +330,16 @@ bool expr::isInt(int64_t &n) const {
   if (bw < 64)
     n = (int64_t)((uint64_t)n << (64 - bw)) >> (64 - bw);
   return true;
+}
+
+bool expr::isIf(expr &cond, expr &then, expr &els) const {
+  if (auto app = isAppOf(Z3_OP_ITE)) {
+    cond = Z3_get_app_arg(ctx(), app, 0);
+    then = Z3_get_app_arg(ctx(), app, 1);
+    els = Z3_get_app_arg(ctx(), app, 2);
+    return true;
+  }
+  return false;
 }
 
 bool expr::isConcat(expr &a, expr &b) const {
@@ -815,10 +829,8 @@ expr expr::operator&(const expr &rhs) const {
   };
 
   auto get_bool = [](const expr &e) {
-    if (auto app = e.isAppOf(Z3_OP_ITE)) {
-      expr cond = Z3_get_app_arg(ctx(), app, 0);
-      expr then = Z3_get_app_arg(ctx(), app, 1);
-      expr els = Z3_get_app_arg(ctx(), app, 2);
+    expr cond, then, els;
+    if (e.isIf(cond, then, els)) {
       if ((then == 1).isTrue() && (els == 0).isTrue())
         return cond;
       if ((then == 0).isTrue() && (els == 1).isTrue())
@@ -925,11 +937,8 @@ expr expr::operator==(const expr &rhs) const {
     }
   }
 
-  if (auto app = isAppOf(Z3_OP_ITE)) {
-    expr c = Z3_get_app_arg(ctx(), app, 0);
-    expr t = Z3_get_app_arg(ctx(), app, 1);
-    expr e = Z3_get_app_arg(ctx(), app, 2);
-
+  expr c, t, e;
+  if (isIf(c, t, e)) {
 #if 0
     // TODO: benchmark
     // (= (ite c t e) (ite c x y)) -> (ite c (= t x) (= e y))
@@ -1252,7 +1261,43 @@ expr expr::load(const expr &idx) const {
       return Z3_get_app_arg(ctx(), app, 2);
     if (cmp.isFalse())
       return expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+
+  } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
+             Z3_is_lambda(ctx(), ast())) {
+    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
+    expr body = Z3_get_quantifier_body(ctx(), ast());
+    if (body.isConst())
+      return body;
+
+    auto extract_load = [&idx](expr &e, const expr &var) {
+      if (auto app = e.isAppOf(Z3_OP_SELECT)) { // load(array, idx)
+        assert(expr(Z3_get_app_arg(ctx(), app, 1)).eq(var));
+        e = expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+        return true;
+      }
+      return false;
+    };
+
+    expr cond, then, els;
+    if (body.isIf(cond, then, els)) {
+      auto sort = Z3_get_quantifier_bound_sort(ctx(), ast(), 0);
+      expr var = expr::mkQuantVar(0, sort);
+      cond = cond.subst(var, idx).simplify();
+      if (cond.isTrue()) {
+        if (then.isConst())
+          return then;
+        if (extract_load(then, var))
+          return then;
+      }
+      if (cond.isFalse()) {
+        if (els.isConst())
+          return els;
+        if (extract_load(els, var))
+          return els;
+      }
+    }
   }
+
   return Z3_mk_select(ctx(), ast(), idx());
 }
 
