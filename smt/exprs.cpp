@@ -2,13 +2,15 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/exprs.h"
+#include "ir/state_value.h"
 #include "util/compiler.h"
 
 using namespace std;
 
 namespace smt {
 
-void DisjointExpr::add(expr &&val, expr &&domain) {
+template <typename T>
+void DisjointExpr<T>::add(T &&val, expr &&domain) {
   if (domain.isFalse())
     return;
   if (domain.isTrue())
@@ -19,20 +21,24 @@ void DisjointExpr::add(expr &&val, expr &&domain) {
     I->second |= move(domain);
 }
 
-expr DisjointExpr::operator()() const {
-  expr ret;
+template <typename T>
+T DisjointExpr<T>::operator()() const {
+  T ret;
   bool first = true;
   for (auto &[val, domain] : vals) {
     if (domain.isTrue())
       return val;
 
-    ret = first ? val : expr::mkIf(domain, val, ret);
+    ret = first ? val : T::mkIf(domain, val, ret);
     first = false;
   }
   if (first)
     return default_val;
   return ret;
 }
+
+template class DisjointExpr<expr>;
+template class DisjointExpr<IR::StateValue>;
 
 
 void FunctionExpr::add(expr &&key, expr &&val) {

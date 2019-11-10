@@ -15,9 +15,7 @@ namespace IR {
 
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this, f.isLittleEndian()),
-    return_domain(false) {
-  return_val.first = f.getType().getDummyValue(false);
-}
+    return_domain(false), return_val(f.getType().getDummyValue(false)) {}
 
 void State::resetGlobals() {
   Memory::resetGlobalData();
@@ -151,14 +149,10 @@ void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
-  if (return_domain.isFalse()) {
-    return_val.first = val;
-  } else {
-    return_val.first = StateValue::mkIf(domain.first, val, return_val.first);
-  }
+  return_val.add(StateValue(val), expr(domain.first));
   return_domain |= domain.first;
-  return_val.second.insert(undef_vars.begin(), undef_vars.end());
-  return_val.second.insert(domain.second.begin(), domain.second.end());
+  return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  return_undef_vars.insert(domain.second.begin(), domain.second.end());
   undef_vars.clear();
   domain.first = false;
 }

@@ -35,6 +35,9 @@ struct StateValue {
   StateValue
     subst(const std::vector<std::pair<smt::expr, smt::expr>> &repls) const;
 
+  // for container use only
+  bool operator<(const StateValue &rhs) const;
+
   friend std::ostream& operator<<(std::ostream &os, const StateValue &val);
 };
 

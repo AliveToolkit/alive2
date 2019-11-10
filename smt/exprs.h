@@ -9,17 +9,18 @@
 
 namespace smt {
 
+template <typename T>
 class DisjointExpr {
-  std::map<expr, expr> vals; // val -> domain
-  expr default_val;
+  std::map<T, expr> vals; // val -> domain
+  T default_val;
 
 public:
   DisjointExpr() {}
-  DisjointExpr(const expr &default_val)
-    : default_val(default_val) {}
+  DisjointExpr(const T &default_val) : default_val(default_val) {}
+  DisjointExpr(T &&default_val) : default_val(std::move(default_val)) {}
 
-  void add(expr &&val, expr &&domain);
-  expr operator()() const;
+  void add(T &&val, expr &&domain);
+  T operator()() const;
 };
 
 

@@ -6,6 +6,7 @@
 #include "ir/memory.h"
 #include "ir/state_value.h"
 #include "smt/expr.h"
+#include "smt/exprs.h"
 #include <array>
 #include <ostream>
 #include <set>
@@ -60,8 +61,8 @@ private:
 
   // return_domain: a boolean expression describing return condition
   smt::expr return_domain;
-  // FIXME: replace with disjoint expr builder
-  ValTy return_val;
+  smt::DisjointExpr<StateValue> return_val;
+  std::set<smt::expr> return_undef_vars;
 
 public:
   State(const Function &f, bool source);
@@ -99,7 +100,10 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
 
   auto& returnDomain() const { return return_domain; }
-  auto& returnVal() const { return return_val; }
+
+  std::pair<StateValue, const std::set<smt::expr>&> returnVal() const {
+    return { return_val(), return_undef_vars };
+  }
 
   void startParsingPre() { disable_undef_rewrite = true; }
 

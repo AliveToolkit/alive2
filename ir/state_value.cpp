@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/state_value.h"
+#include <tuple>
 
 using namespace smt;
 using namespace std;
@@ -44,6 +45,10 @@ bool StateValue::eq(const StateValue &other) const {
 
 StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
   return { value.subst(repls), non_poison.subst(repls) };
+}
+
+bool StateValue::operator<(const StateValue &rhs) const {
+  return tie(value, non_poison) < tie(rhs.value, rhs.non_poison);
 }
 
 ostream& operator<<(ostream &os, const StateValue &val) {
