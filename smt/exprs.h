@@ -41,7 +41,7 @@ public:
 
       ret = ret ? T::mkIf(domain, val, *ret) : val;
     }
-    return ret ? *ret : default_val.value();
+    return ret ? *ret : *default_val;
   }
 };
 

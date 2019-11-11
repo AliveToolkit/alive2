@@ -1,3 +1,5 @@
+; TEST-ARGS: -root-only
+
 Name: single shift by masked value
 %c_mod_width = urem i4 %c, i4 4
 %t = lshr i4 %b, i4 %c_mod_width
