@@ -28,4 +28,8 @@ expr FunctionExpr::operator()(expr &key) const {
   return disj();
 }
 
+bool FunctionExpr::operator<(const FunctionExpr &rhs) const {
+  return tie(fn, default_val) < tie(rhs.fn, rhs.default_val);
+}
+
 }

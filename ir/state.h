@@ -62,6 +62,7 @@ private:
   // return_domain: a boolean expression describing return condition
   smt::expr return_domain;
   smt::DisjointExpr<StateValue> return_val;
+  smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
 
 public:

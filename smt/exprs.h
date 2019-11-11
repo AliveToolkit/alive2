@@ -13,7 +13,7 @@ namespace smt {
 template <typename T>
 class DisjointExpr {
   std::map<T, expr> vals; // val -> domain
-  T default_val;
+  std::optional<T> default_val;
 
 public:
   DisjointExpr() {}
@@ -41,7 +41,7 @@ public:
 
       ret = ret ? T::mkIf(domain, val, *ret) : val;
     }
-    return ret.value_or(default_val);
+    return ret ? *ret : default_val.value();
   }
 };
 
@@ -57,6 +57,9 @@ public:
   void add(const FunctionExpr &other);
   void del(const expr &key);
   expr operator()(expr &key) const;
+
+  // for container use only
+  bool operator<(const FunctionExpr &rhs) const;
 };
 
 }

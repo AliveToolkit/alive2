@@ -15,7 +15,8 @@ namespace IR {
 
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this, f.isLittleEndian()),
-    return_domain(false), return_val(f.getType().getDummyValue(false)) {}
+    return_domain(false), return_val(f.getType().getDummyValue(false)),
+    return_memory(memory) {}
 
 void State::resetGlobals() {
   Memory::resetGlobalData();
@@ -93,7 +94,8 @@ bool State::startBB(const BasicBlock &bb) {
 
   domain.first = false;
   domain.second.clear();
-  bool first = true;
+
+  DisjointExpr<Memory> in_memory;
 
   for (auto &[src, data] : I->second) {
     (void)src;
@@ -101,15 +103,15 @@ bool State::startBB(const BasicBlock &bb) {
     auto &[cond, vars] = dom;
     domain.first |= cond;
     domain.second.insert(vars.begin(), vars.end());
-
-    if (first) {
-      memory = mem;
-      first = false;
-    } else {
-      memory = Memory::mkIf(cond, mem, memory);
-    }
+    in_memory.add(mem, cond);
   }
-  return !domain.first.isFalse();
+
+  if (domain.first.isFalse())
+    return false;
+
+  memory = in_memory();
+
+  return true;
 }
 
 void State::addJump(const BasicBlock &dst, expr &&cond) {
@@ -150,6 +152,7 @@ void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
 
 void State::addReturn(const StateValue &val) {
   return_val.add(val, domain.first);
+  return_memory.add(memory, domain.first);
   return_domain |= domain.first;
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.second.begin(), domain.second.end());

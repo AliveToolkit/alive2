@@ -172,6 +172,9 @@ public:
   unsigned bitsByte() const { return 1 + 1 + bitsBid() + bitsOffset() + 3; }
   unsigned bitsPtrSize() const { return bits_size_t; }
 
+  // for container use only
+  bool operator<(const Memory &rhs) const;
+
   friend class Pointer;
 };
 
