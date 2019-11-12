@@ -463,7 +463,7 @@ pair<expr, vector<expr>> Memory::mkInput(const char *name) {
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out,
-                   expr precond) {
+                   const expr &precond) {
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 

@@ -1730,12 +1730,14 @@ void Calloc::print(std::ostream &os) const {
 StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s[*num];
   auto &[sz, np_sz] = s[*size];
-  expr calloc_sz = expr::mkIf(nm.mul_no_uoverflow(sz), expr(nm * sz),
-                              expr::mkUInt(0, sz.bits()));
 
   // TODO: check calloc align.
   auto p = s.getMemory().alloc(nm * sz, 8, Memory::HEAP, std::nullopt,
                                nullptr, nm.mul_no_uoverflow(sz));
+
+  expr is_null = p == Pointer::mkNullPointer(s.getMemory())();
+
+  expr calloc_sz = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), nm * sz);
   
   // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
@@ -1753,7 +1755,8 @@ expr Calloc::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforcePtrType() &&
          num->getType().enforceIntType() &&
-         size->getType().enforceIntType();
+         size->getType().enforceIntType() &&
+         num->getType() == size->getType();
 }
 
 unique_ptr<Instr> Calloc::dup(const string &suffix) const {

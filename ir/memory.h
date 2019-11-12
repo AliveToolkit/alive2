@@ -148,7 +148,7 @@ public:
   smt::expr alloc(const smt::expr &size, unsigned align, BlockKind blockKind,
                   std::optional<unsigned> bid = std::nullopt,
                   unsigned *bid_out = nullptr,
-                  smt::expr precond = smt::expr(true));
+                  const smt::expr &precond = smt::expr(true));
 
   void free(const smt::expr &ptr);
 
