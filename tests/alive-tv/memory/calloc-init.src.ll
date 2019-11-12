@@ -6,7 +6,7 @@ define i8 @calloc_init() {
   %cmp = icmp eq i64 %i, 0
   br i1 %cmp, label %BB1, label %BB2
 BB1:
-  ret i8 0
+  ret i8 1
 BB2:
   %v = load i8, i8* %ptr
   call void @free(i8* %ptr)
