@@ -119,6 +119,8 @@ class Memory {
   smt::expr non_local_block_liveness; // array: bid -> bool
   smt::expr local_block_liveness;
 
+  smt::expr avail_space; // The size of available space in memory.
+
   smt::FunctionExpr local_blk_addr;
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_kind;

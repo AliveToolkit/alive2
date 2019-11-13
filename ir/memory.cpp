@@ -431,6 +431,36 @@ Memory::Memory(State &state, bool little_endian)
   local_block_liveness
     = expr::mkLambda({ expr::mkVar("#bid0", bitsBid() - 1) }, false);
 
+  // The first byte of the memory cannot be allocated because it is for a null
+  // pointer.
+  // The last byte of the memory cannot be allocated because ptr + size
+  // (where size is the size of the block and ptr is the beginning address of
+  // the block) should not overflow.
+  avail_space = expr::mkUInt(-2, bitsPtrSize());
+
+  // TODO: replace the magic number 2 with the result of analysis.
+  // This is just set as 2 to make existing unit tests run without timeout.
+  unsigned non_local_bid_upperbound = 2;
+  // Maximum alignment that a non-local block can have
+  // TODO: get this from data layout?
+  auto max_align_minus1 = expr::mkUInt(8 - 1, bitsPtrSize());
+
+  // Omit null pointer
+  for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
+    Pointer p(*this, bid, false);
+
+    // The required space size should consider alignment
+    auto size_upperbound = p.block_size() + max_align_minus1;
+
+    if (state.isSource()) {
+      state.addAxiom(p.is_block_alive().implies(
+          size_upperbound.ule(avail_space)));
+    }
+    avail_space = avail_space - expr::mkIf(p.is_block_alive(),
+                                           p.block_size(),
+                                           expr::mkUInt(0, bitsPtrSize()));
+  }
+
   // Initialize a memory block for null pointer.
   // TODO: in twin memory model, this is not needed.
   if (state.isSource()) {
@@ -476,10 +506,10 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   if (bid_out)
     *bid_out = bid;
 
-  expr size_zext = size.zextOrTrunc(bits_size_t);
-  expr allocated = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
+  expr size_zext0 = size.zextOrTrunc(bits_size_t);
+  expr allocated = size_zext0.extract(bits_size_t - 1, bits_size_t - 1) == 0;
 
-  size_zext = size_zext.trunc(bits_size_t - 1);
+  expr size_zext = size_zext0.trunc(bits_size_t - 1);
   size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t-1));
 
   allocated &= precond;
@@ -494,6 +524,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
 
   if (is_local) {
+    assert(align != 0);
     auto align_bits = ilog2(align);
     auto addr_var = expr::mkFreshVar("local_addr",
                                      expr::mkUInt(0, bits_size_t - align_bits));
@@ -501,11 +532,17 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     auto blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
                                : addr_var;
 
+    auto size_upperbound = size_zext0 + expr::mkUInt(align - 1, bitsPtrSize());
+    allocated &= size_upperbound.ule(avail_space);
+
     local_blk_addr.add(expr(short_bid), move(blk_addr));
     local_blk_size.add(expr(short_bid), move(size_zext));
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
 
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
+    avail_space = avail_space - expr::mkIf(allocated, size_zext0,
+                                           expr::mkUInt(0, bitsPtrSize()));
+
     state->addPre(allocated.implies(p.get_address() != 0));
 
   } else {
