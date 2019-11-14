@@ -2088,6 +2088,7 @@ void ShuffleVector::print(ostream &os) const {
 
 StateValue ShuffleVector::toSMT(State &s) const {
   auto vty = static_cast<const VectorType*>(v1->getType().getAsAggregateType());
+  auto &elemty = vty->getChild(0);
   expr sz = expr::mkUInt(vty->numElementsConst(), 32);
   auto mty = mask->getType().getAsAggregateType();
   vector<StateValue> vals;
@@ -2099,7 +2100,11 @@ StateValue ShuffleVector::toSMT(State &s) const {
     expr v = expr::mkIf(iv.uge(sz), rv, lv);
     expr np = expr::mkIf(iv.uge(sz), rp, lp);
     expr inbounds = iv.ult(sz + sz);
-    vals.emplace_back(move(v), ip && inbounds && np);
+    auto dummy = elemty.getDummyValue(true);
+    expr undef = expr::mkFreshVar("nondet", dummy.value);
+    s.addQuantVar(undef);
+    vals.emplace_back(expr::mkIf(inbounds, v,  undef),
+                      expr::mkIf(inbounds, np, dummy.non_poison) && ip);
   }
 
   return getType().getAsAggregateType()->aggregateVals(vals);
