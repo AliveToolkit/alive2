@@ -167,6 +167,11 @@ public:
     RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val, op));
   }
 
+  RetTy visitFreezeInst(llvm::FreezeInst &i) {
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<Freeze>(*ty, value_name(i), *val));
+  }
+
   RetTy visitCallInst(llvm::CallInst &i) {
     auto [call_val, known] = known_call(i, TLI, *BB);
     if (call_val)
