@@ -12,18 +12,6 @@ ret 0
 %p = malloc i16 8
 ret 0
 
-Name: malloc_doublefree_ub
-; This optimization is correct because src's malloc nondeterministically
-; returns a non-null ptr, raising double free
-%p = malloc i16 8
-free * %p
-free * %p
-ret 1
-  =>
-%p = malloc i16 8
-free * %p
-ret 2
-
 Name: free_null
 ret 1
   =>

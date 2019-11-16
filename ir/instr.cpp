@@ -1663,8 +1663,11 @@ void Alloc::print(std::ostream &os) const {
 
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
-  s.addUB(np);
-  return { s.getMemory().alloc(sz, align, Memory::STACK), true };
+  auto &m = s.getMemory();
+  auto p = m.alloc(sz, align, Memory::STACK);
+  // Alloca cannot be null; when OOM, the program halts with stack overflow.
+  s.addUB(np && p != Pointer::mkNullPointer(m)());
+  return { move(p), true };
 }
 
 expr Alloc::getTypeConstraints(const Function &f) const {
@@ -1695,13 +1698,12 @@ StateValue Malloc::toSMT(State &s) const {
   // TODO: malloc's alignment is implementation defined.
   auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
-  if (isNonNull)
-    return { move(p), expr(np) };
+  if (isNonNull) {
+    // If p is not allowed to be null, it is UB.
+    s.addUB(p != Pointer::mkNullPointer(s.getMemory())());
+  }
 
-  auto nullp = Pointer::mkNullPointer(s.getMemory());
-  auto flag = expr::mkFreshVar("malloc_isnull", expr(true));
-  s.addQuantVar(flag);
-  return { expr::mkIf(move(flag), nullp.release(), move(p)), expr(np) };
+  return { move(p), expr(np) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -1739,7 +1741,7 @@ StateValue Calloc::toSMT(State &s) const {
 
   expr is_null = p == Pointer::mkNullPointer(s.getMemory())();
   expr calloc_sz = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), size);
-  
+
   // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
