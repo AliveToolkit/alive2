@@ -1699,7 +1699,8 @@ StateValue Malloc::toSMT(State &s) const {
   auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
   if (isNonNull) {
-    // If p is not allowed to be null, it is UB.
+    // TODO: In C++ we need to throw an exception if the allocation fails, but
+    // exception hasn't been modeled yet
     s.addUB(p != Pointer::mkNullPointer(s.getMemory())());
   }
 
@@ -1746,12 +1747,7 @@ StateValue Calloc::toSMT(State &s) const {
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
   auto nullp = Pointer::mkNullPointer(s.getMemory());
-  auto flag = expr::mkFreshVar("calloc_isnull", true);
-  // TODO: We're moving from nondet. allocation to memory usage tracking, so
-  // this part should be changed.
-  s.addQuantVar(flag);
-  return { expr::mkIf(flag, nullp.release(), move(p)),
-           np_num && np_sz };
+  return { move(p), np_num && np_sz };
 }
 
 expr Calloc::getTypeConstraints(const Function &f) const {

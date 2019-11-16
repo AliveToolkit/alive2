@@ -438,7 +438,7 @@ Memory::Memory(State &state, bool little_endian)
   // the block) should not overflow.
   avail_space = expr::mkVar("avail_space", bitsPtrSize());
   if (state.isSource()) {
-    state.addAxiom(avail_space.ult(expr::mkUInt(-2, bitsPtrSize())));
+    state.addAxiom(avail_space.ult(expr::mkInt(-2, bitsPtrSize())));
   }
 
   // TODO: replace the magic number 2 with the result of analysis.
@@ -459,9 +459,8 @@ Memory::Memory(State &state, bool little_endian)
       state.addAxiom(p.is_block_alive().implies(
           size_upperbound.ule(avail_space)));
     }
-    avail_space = avail_space - expr::mkIf(p.is_block_alive(),
-                                           p.block_size(),
-                                           expr::mkUInt(0, bitsPtrSize()));
+    avail_space = expr::mkIf(p.is_block_alive(), avail_space - p.block_size(),
+                             avail_space);
   }
 
   // Initialize a memory block for null pointer.
@@ -543,8 +542,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
 
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
-    avail_space = avail_space - expr::mkIf(allocated, size_zext0,
-                                           expr::mkUInt(0, bitsPtrSize()));
+
+    avail_space = expr::mkIf(allocated, avail_space - size_zext0, avail_space);
 
     state->addPre(allocated.implies(p.get_address() != 0));
 
