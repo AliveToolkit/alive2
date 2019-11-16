@@ -505,11 +505,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     local_blk_size.add(expr(short_bid), move(size_zext));
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
 
-    local_block_liveness
-      = expr::mkIf(allocated,
-                   local_block_liveness.store(short_bid, true),
-                   local_block_liveness);
-
+    local_block_liveness = local_block_liveness.store(short_bid, allocated);
     state->addPre(allocated.implies(p.get_address() != 0));
 
   } else {
