@@ -5,6 +5,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include <array>
 #include <cassert>
 #include <sstream>
 
@@ -334,18 +335,15 @@ void IntType::print(ostream &os) const {
 }
 
 
+static array<unsigned, 3> float_sizes = {
+  /* Half */ 16,
+  /* Float */ 32,
+  /* Double */ 64,
+};
+
 unsigned FloatType::bits() const {
-  switch (fpType) {
-  case Half:
-    return 16;
-  case Float:
-    return 32;
-  case Double:
-    return 64;
-  case Unknown:
-    UNREACHABLE();
-  }
-  UNREACHABLE();
+  assert(fpType != Unknown);
+  return float_sizes[fpType];
 }
 
 const FloatType* FloatType::getAsFloatType() const {
@@ -386,7 +384,12 @@ StateValue FloatType::getDummyValue(bool non_poison) const {
 expr FloatType::getTypeConstraints() const {
   if (defined)
     return true;
-  return sizeVar().ult(Unknown);
+
+  expr r(false);
+  for (auto sz : float_sizes) {
+    r |= sizeVar() == sz;
+  }
+  return r;
 }
 
 expr FloatType::operator==(const FloatType &rhs) const {
@@ -397,12 +400,14 @@ void FloatType::fixup(const Model &m) {
   if (defined)
     return;
 
-  switch (m.getUInt(sizeVar())) {
-  case 16: fpType = Half; break;
-  case 32: fpType = Float; break;
-  case 64: fpType = Double; break;
-  default: UNREACHABLE();
+  unsigned m_sz = m.getUInt(sizeVar());
+  for (unsigned i = 0, e = float_sizes.size(); i != e; ++i) {
+    if (m_sz == float_sizes[i]) {
+      fpType = FpType(i);
+      return;
+    }
   }
+  UNREACHABLE();
 }
 
 bool FloatType::isFloatType() const {
