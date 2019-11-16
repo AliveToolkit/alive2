@@ -110,6 +110,9 @@ class Memory {
   unsigned bits_for_bid = 12;
   // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
+  // maximum alignment of memory blocks
+  // TODO: fill this from target data
+  unsigned max_align = 8;
 
   bool little_endian;
 

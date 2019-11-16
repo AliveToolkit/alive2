@@ -444,16 +444,14 @@ Memory::Memory(State &state, bool little_endian)
   // TODO: replace the magic number 2 with the result of analysis.
   // This is just set as 2 to make existing unit tests run without timeout.
   unsigned non_local_bid_upperbound = 2;
-  // Maximum alignment that a non-local block can have
-  // TODO: get this from data layout?
-  auto max_align_minus1 = expr::mkUInt(8 - 1, bitsPtrSize());
 
   // Omit null pointer
   for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
     Pointer p(*this, bid, false);
 
     // The required space size should consider alignment
-    auto size_upperbound = p.block_size() + max_align_minus1;
+    auto size_upperbound = p.block_size() + expr::mkUInt(max_align - 1,
+                                                         bitsPtrSize());
 
     if (state.isSource()) {
       state.addAxiom(p.is_block_alive().implies(
