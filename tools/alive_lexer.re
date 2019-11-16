@@ -124,6 +124,15 @@ space+ {
   return NUM;
 }
 
+"0x"[0-9a-fA-F]+ {
+  yylval.num = strtoull((char*)YYTEXT, nullptr, 16);
+  if (yylval.num == ULLONG_MAX && errno == ERANGE) {
+    COPY_STR();
+    return NUM_STR;
+  }
+  return NUM;
+}
+
 "%" [a-zA-Z0-9_.]+ {
   COPY_STR();
   return REGISTER;
