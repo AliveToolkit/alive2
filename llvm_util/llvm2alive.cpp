@@ -7,6 +7,7 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -58,6 +59,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   llvm::Function &f;
   const llvm::TargetLibraryInfo &TLI;
+  vector<llvm::Instruction *> i_constexprs;
+
   using RetTy = unique_ptr<Instr>;
 
   auto DL() const { return f.getParent()->getDataLayout(); }
@@ -72,6 +75,25 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   unsigned pref_alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlignment();
     return a != 0 ? a : DL().getPrefTypeAlignment(ty);
+  }
+
+  auto convert_constexpr(llvm::ConstantExpr *cexpr) {
+    llvm::Instruction *newI = cexpr->getAsInstruction();
+    static unsigned constexpr_idx = 0;
+    stringstream ss;
+    ss << "__constexpr_" << constexpr_idx++;
+    newI->setName(ss.str());
+
+    i_constexprs.push_back(newI);
+    auto ptr = this->visit(*newI);
+    auto i = ptr.get();
+    BB->addInstr(move(ptr));
+    return i;
+  }
+
+  auto get_operand(llvm::Value *v) {
+    return llvm_util::get_operand(v,
+        [this](auto I) { return convert_constexpr(I); });
   }
 
 public:
@@ -173,7 +195,8 @@ public:
   }
 
   RetTy visitCallInst(llvm::CallInst &i) {
-    auto [call_val, known] = known_call(i, TLI, *BB);
+    auto [call_val, known] = known_call(i, TLI, *BB,
+        [this](auto I) { return convert_constexpr(I); });
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 
@@ -637,6 +660,11 @@ public:
         } else
           return {};
       }
+    }
+
+    for (auto &inst : i_constexprs) {
+      remove_value_name(*inst); // otherwise value_names maintain freed pointers
+      inst->deleteValue();
     }
 
     return move(Fn);

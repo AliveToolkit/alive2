@@ -5,6 +5,7 @@
 #include "llvm_util/utils.h"
 #include "ir/function.h"
 #include "ir/instr.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include <vector>
@@ -19,14 +20,15 @@ namespace llvm_util {
 
 pair<unique_ptr<Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
-           BasicBlock &BB) {
+           BasicBlock &BB,
+           function<Instr*(llvm::ConstantExpr *)> constexpr_conv) {
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
     RETURN_FAIL_KNOWN();
 
   vector<Value*> args;
   for (auto &arg : i.args()) {
-    auto a = get_operand(arg);
+    auto a = get_operand(arg, constexpr_conv);
     if (!a)
       RETURN_FAIL_KNOWN();
     args.emplace_back(a);
