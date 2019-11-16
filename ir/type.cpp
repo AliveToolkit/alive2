@@ -369,7 +369,7 @@ StateValue FloatType::fromBV(StateValue v) const {
 }
 
 expr FloatType::sizeVar() const {
-  return defined ? expr::mkUInt(getFpType(), var_bw_bits) : Type::sizeVar();
+  return defined ? expr::mkUInt(bits(), var_bw_bits) : Type::sizeVar();
 }
 
 StateValue FloatType::getDummyValue(bool non_poison) const {
@@ -397,9 +397,12 @@ void FloatType::fixup(const Model &m) {
   if (defined)
     return;
 
-  unsigned fp_typ = m.getUInt(sizeVar());
-  assert(fp_typ < (unsigned)Unknown);
-  fpType = FpType(fp_typ);
+  switch (m.getUInt(sizeVar())) {
+  case 16: fpType = Half; break;
+  case 32: fpType = Float; break;
+  case 64: fpType = Double; break;
+  default: UNREACHABLE();
+  }
 }
 
 bool FloatType::isFloatType() const {
