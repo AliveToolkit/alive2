@@ -577,6 +577,11 @@ public:
           BB->addInstr(make_unique<Assume>(*range, true));
         break;
       }
+
+      case LLVMContext::MD_tbaa:
+        // skip this for now
+        break;
+
       default:
         *out << "ERROR: Unsupported metadata: " << ID << '\n';
         return false;
