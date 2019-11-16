@@ -437,16 +437,18 @@ pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
 }
 
 void FloatType::printVal(ostream &os, State &s, const expr &e) const {
+  if (e.isNaN().isTrue()) {
+    os << "NaN";
+    return;
+  }
   e.float2BV().printHexadecimal(os);
   os << " (";
-  if (e.isNaN().simplify().isTrue()) {
-    os << "NaN";
-  } else if (e.isFPZero().simplify().isTrue()) {
-    os << (e.isFPNeg().simplify().isTrue() ? "-0.0" : "+0.0");
-  } else if (e.isInf().simplify().isTrue()) {
-    os << (e.isFPNeg().simplify().isTrue() ? "-oo" : "+oo");
+  if (e.isFPZero().isTrue()) {
+    os << (e.isFPNeg().isTrue() ? "-0.0" : "+0.0");
+  } else if (e.isInf().isTrue()) {
+    os << (e.isFPNeg().isTrue() ? "-oo" : "+oo");
   } else {
-    os << e.float2Real().simplify().numeral_string();
+    os << e.float2Real().numeral_string();
   }
   os << ')';
 }
