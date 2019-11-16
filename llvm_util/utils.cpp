@@ -8,6 +8,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/Support/raw_ostream.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
