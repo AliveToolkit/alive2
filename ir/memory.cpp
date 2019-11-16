@@ -31,7 +31,7 @@ class Byte {
 public:
   // Creates a byte with its raw representation.
   Byte(const Memory &m, expr &&byterepr) : m(m), p(move(byterepr)) {
-    assert(p.bits() == m.bitsByte());
+    assert(!p.isValid() || p.bits() == m.bitsByte());
   }
 
   // Creates a pointer byte that represents i'th byte of p.
@@ -51,13 +51,13 @@ public:
   // data and non_poison should have 8 bits.
   Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
     assert(m.bitsByte() > 1 + 8 + 8);
-    assert(data.bits() == 8);
-    assert(non_poison.bits() == 8);
+    assert(!data.isValid() || data.bits() == 8);
+    assert(!non_poison.isValid() || non_poison.bits() == 8);
 
     unsigned padding = m.bitsByte() - 1 - 8 - 8;
     p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
                           .concat(data);
-    assert(p.bits() == m.bitsByte());
+    assert(!p.isValid() || p.bits() == m.bitsByte());
   }
 
   expr is_ptr() const {
@@ -571,7 +571,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
-  assert(val.bits() == 8);
+  assert(!val.isValid() || val.bits() == 8);
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytesize, align, true);
 
