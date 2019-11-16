@@ -2,3 +2,5 @@
 %r = bitcast %v to i32
   =>
 %r = i32 0x7f800001
+
+; XFAIL: Value mismatch

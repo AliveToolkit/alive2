@@ -5,4 +5,4 @@ Name: NaN
 %v = fdiv half %a, 0.0
 %r = bitcast %v to i16
 
-; ERROR: Timeout
+; XFAIL: Value mismatch
