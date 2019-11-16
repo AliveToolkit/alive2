@@ -436,7 +436,10 @@ Memory::Memory(State &state, bool little_endian)
   // The last byte of the memory cannot be allocated because ptr + size
   // (where size is the size of the block and ptr is the beginning address of
   // the block) should not overflow.
-  avail_space = expr::mkUInt(-2, bitsPtrSize());
+  avail_space = expr::mkVar("avail_space", bitsPtrSize());
+  if (state.isSource()) {
+    state.addAxiom(avail_space.ule(expr::mkUInt(-2, bitsPtrSize())));
+  }
 
   // TODO: replace the magic number 2 with the result of analysis.
   // This is just set as 2 to make existing unit tests run without timeout.
