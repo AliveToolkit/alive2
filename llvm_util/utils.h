@@ -11,6 +11,9 @@ class BasicBlock;
 class DataLayout;
 class Type;
 class Value;
+class GlobalVariable;
+class Function;
+
 }
 
 namespace IR {
@@ -21,6 +24,9 @@ class Value;
 }
 
 namespace llvm_util {
+
+std::vector<llvm::GlobalVariable *> getUsedGlobalVariables(llvm::Function &F);
+
 
 IR::BasicBlock& getBB(const llvm::BasicBlock *bb);
 

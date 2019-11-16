@@ -8,6 +8,7 @@
 #include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
+#include <map>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -21,6 +22,24 @@ namespace smt { class Model; }
 namespace IR {
 
 class Function;
+
+// A list of instructions for initializing global variables
+class Initializers final {
+  // (global var name, instruction list) list
+  std::map<std::string, std::vector<std::unique_ptr<Instr>>> instrs;
+
+public:
+  Initializers() {}
+
+  void addInstr(const std::string &glb_name, std::unique_ptr<Instr> &&inst)
+  { instrs[glb_name].push_back(move(inst)); }
+
+  bool empty() const { return instrs.empty(); }
+  auto begin() const { return instrs.begin(); }
+  auto end() const { return instrs.end(); }
+
+  friend std::ostream& operator<<(std::ostream &os, const Initializers &inits);
+};
 
 class BasicBlock final {
   std::string name;

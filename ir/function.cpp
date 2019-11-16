@@ -11,6 +11,21 @@ using namespace std;
 
 namespace IR {
 
+ostream& operator<<(ostream &os, const Initializers &inits) {
+  os << "<init> {\n";
+  for (auto &init : inits.instrs) {
+    os << "  ; @" << init.first << "\n";
+    for (auto &inst : init.second) {
+      os << "  ";
+      inst->print(os);
+      os << "\n";
+    }
+  }
+  os << "}\n";
+  return os;
+}
+
+
 expr BasicBlock::getTypeConstraints(const Function &f) const {
   expr t(true);
   for (auto &i : instrs()) {

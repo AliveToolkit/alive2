@@ -293,8 +293,10 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
 
   cond &= is_block_alive();
 
-  if (iswrite)
+  if (iswrite && !m.state->isInitializationPhase()) {
+    // In initialization phase, read-only blocks' values are being updated.
     cond &= !is_readonly();
+  }
 
   m.state->addUB(bytes.uge(1).implies(cond));
 

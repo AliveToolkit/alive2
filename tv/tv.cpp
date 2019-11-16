@@ -88,7 +88,7 @@ string report_filename;
 optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
-unordered_map<string, pair<Function, unsigned>> fns;
+unordered_map<string, pair<pair<Initializers, Function>, unsigned>> fns;
 
 
 struct TVPass : public llvm::FunctionPass {
@@ -105,10 +105,10 @@ struct TVPass : public llvm::FunctionPass {
       return false;
     }
 
-    auto [old_fn, inserted] = fns.try_emplace(fn->getName(), move(*fn), 0);
+    auto [old_fn, inserted] = fns.try_emplace(fn->second.getName(), move(*fn), 0);
 
     if (opt_print_dot) {
-      auto &f = inserted ? old_fn->second.first : *fn;
+      auto &f = inserted ? old_fn->second.first.second : fn->second;
       ofstream file(f.getName() + '.' + to_string(old_fn->second.second++)
                       + ".dot");
       CFG(f).printDot(file);
@@ -119,8 +119,10 @@ struct TVPass : public llvm::FunctionPass {
 
     smt_init->reset();
     Transform t;
-    t.src = move(old_fn->second.first);
-    t.tgt = move(*fn);
+    t.src_inits = move(old_fn->second.first.first);
+    t.src = move(old_fn->second.first.second);
+    t.tgt_inits = move(fn->first);
+    t.tgt = move(fn->second);
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 
@@ -148,7 +150,7 @@ struct TVPass : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    old_fn->second.first = move(t.tgt);
+    old_fn->second.first = { move(t.tgt_inits), move(t.tgt) };
     return false;
   }
 

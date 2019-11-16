@@ -19,6 +19,6 @@ struct initializer {
   initializer(std::ostream &os, const llvm::DataLayout &DL);
 };
 
-std::optional<IR::Function> llvm2alive(llvm::Function &F,
-                                       const llvm::TargetLibraryInfo &TLI);
+std::optional<std::pair<IR::Initializers, IR::Function>>
+llvm2alive(llvm::Function &F, const llvm::TargetLibraryInfo &TLI);
 }

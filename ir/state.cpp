@@ -13,8 +13,8 @@ using namespace std;
 
 namespace IR {
 
-State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this, f.isLittleEndian()),
+State::State(const Initializers &inits, const Function &f, bool source)
+  : inits(inits), f(f), source(source), memory(*this, f.isLittleEndian()),
     return_domain(false), return_val(f.getType().getDummyValue(false)),
     return_memory(memory) {}
 

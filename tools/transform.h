@@ -7,6 +7,7 @@
 #include "smt/solver.h"
 #include "util/errors.h"
 #include <string>
+#include <optional>
 #include <ostream>
 #include <unordered_map>
 
@@ -19,6 +20,7 @@ struct TransformPrintOpts {
 
 struct Transform {
   std::string name;
+  IR::Initializers src_inits, tgt_inits;
   IR::Function src, tgt;
   IR::Predicate *precondition = nullptr;
 

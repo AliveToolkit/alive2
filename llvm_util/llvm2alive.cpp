@@ -5,10 +5,12 @@
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include <utility>
 #include <vector>
+#include <sstream>
 
 using namespace llvm_util;
 using namespace IR;
@@ -601,12 +603,40 @@ public:
     return true;
   }
 
-  optional<Function> run() {
+  llvm::Instruction *convertConstExprToInstruction(const llvm::Value *V,
+      vector<llvm::Instruction *> &convertedInsts) {
+    auto CE = dyn_cast<llvm::ConstantExpr>(V);
+    if (!CE)
+      return nullptr;
+
+    vector<llvm::Value *> newOps;
+    newOps.resize(CE->getNumOperands());
+    unsigned i = 0;
+    for (auto OI = CE->op_begin(), OE = CE->op_end(); OI != OE; ++OI) {
+      // Recursively convert nested constexprs
+      newOps[i++] = convertConstExprToInstruction(*OI, convertedInsts);
+    }
+    auto I = CE->getAsInstruction();
+    for (i = 0; i < CE->getNumOperands(); i++) {
+      if (newOps[i])
+        I->setOperand(i, newOps[i]);
+    }
+
+    static unsigned constexpr_idx = 0;
+    stringstream ss;
+    ss << "__constexpr_" << constexpr_idx++;
+    I->setName(ss.str());
+    convertedInsts.push_back(I);
+    return I;
+  }
+
+  std::optional<std::pair<IR::Initializers, IR::Function>> run() {
     auto type = llvm_type2alive(f.getReturnType());
     if (!type)
       return {};
 
     Function Fn(*type, f.getName(), DL().isLittleEndian());
+    Initializers Init;
     reset_state(Fn);
 
     for (auto &arg : f.args()) {
@@ -624,22 +654,70 @@ public:
       Fn.getBB(value_name(bb));
     }
 
+    // If global variables contain constexprs, run them as instructions.
+    auto globals = getUsedGlobalVariables(f);
+    for (auto global : globals) {
+      if (!global->hasInitializer())
+        continue;
+      const llvm::ConstantExpr *CE = dyn_cast<llvm::ConstantExpr>(
+          global->getInitializer());
+      if (!CE) continue;
+
+      vector<llvm::Instruction *> insts;
+
+      auto value = convertConstExprToInstruction(CE, insts);
+      assert(value != nullptr);
+      insts.push_back(new llvm::StoreInst(value, global));
+      for (auto i : insts)
+        Init.addInstr(global->getName(), visit(*i));
+
+      for (auto I = insts.rbegin(), E = insts.rend(); I != E; ++I)
+        (*I)->deleteValue();
+    }
+
+    // Process function body.
     for (auto &bb : f) {
       BB = &Fn.getBB(value_name(bb));
-      for (auto &i : bb) {
-        if (auto I = visit(i)) {
-          auto alive_i = I.get();
-          BB->addInstr(move(I));
+      for (auto I = bb.begin(), E = bb.end(); I != E; ++I) {
+        llvm::Instruction *llvm_inst = &*I;
+        vector<llvm::Instruction *> insts;
+        unsigned opidx = 0;
 
-          if (i.hasMetadataOtherThanDebugLoc() &&
-              !handleMetadata(i, *alive_i))
+        for (auto OI = llvm_inst->op_begin(), OE = llvm_inst->op_end();
+             OI != OE; ++OI) {
+          if (auto result = convertConstExprToInstruction(*OI, insts))
+            llvm_inst->setOperand(opidx, result);
+          opidx++;
+        }
+        insts.push_back(llvm_inst);
+
+        for (auto i : insts) {
+          if (auto Inst = visit(*i)) {
+            auto alive_i = Inst.get();
+            BB->addInstr(move(Inst));
+
+            if (i->hasMetadataOtherThanDebugLoc() &&
+                !handleMetadata(*i, *alive_i))
+              return {};
+          } else
             return {};
-        } else
-          return {};
+        }
+
+        insts.pop_back();
+        // Now remove insts created from constexpr.
+        if (!insts.empty()) {
+          // This function is not used again, so put undef
+          auto undef = llvm::UndefValue::get(insts.back()->getType());
+          for (auto II = insts.begin(), IE = insts.end(); II != IE; ++II) {
+            llvm::Instruction *inst = *II;
+            inst->replaceAllUsesWith(undef);
+            inst->deleteValue();
+          }
+        }
       }
     }
 
-    return move(Fn);
+    return { { move(Init), move(Fn) } };
   }
 };
 }
@@ -651,8 +729,8 @@ initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
   init_llvm_utils(os, DL);
 }
 
-optional<IR::Function> llvm2alive(llvm::Function &F,
-                                  const llvm::TargetLibraryInfo &TLI) {
+std::optional<std::pair<IR::Initializers, IR::Function>>
+llvm2alive(llvm::Function &F, const llvm::TargetLibraryInfo &TLI) {
   return llvm2alive_(F, TLI).run();
 }
 

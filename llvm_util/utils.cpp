@@ -4,11 +4,12 @@
 #include "llvm_util/utils.h"
 #include "ir/constant.h"
 #include "ir/function.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/GlobalVariable.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -41,9 +42,34 @@ ostream *out;
 
 const llvm::DataLayout *DL;
 
+static void _getUsedGlobalVariables(llvm::User *U,
+    llvm::SmallPtrSet<llvm::Value *, 16> &Visited,
+    llvm::SmallPtrSet<llvm::GlobalVariable *, 16> &GlobalVars) {
+  Visited.insert(U);
+  for (auto I = U->op_begin(), E = U->op_end(); I != E; ++I) {
+    llvm::Value *V = I->get();
+    if (Visited.count(V)) continue;
+    else if (llvm::GlobalVariable *GV = dyn_cast<llvm::GlobalVariable>(V)) {
+      GlobalVars.insert(GV);
+    }
+  }
+}
+
 }
 
 namespace llvm_util {
+
+vector<llvm::GlobalVariable *> getUsedGlobalVariables(llvm::Function &F) {
+  llvm::SmallPtrSet<llvm::Value *, 16> Visited;
+  llvm::SmallPtrSet<llvm::GlobalVariable *, 16> GlobalVars;
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      ::_getUsedGlobalVariables(&I, Visited, GlobalVars);
+    }
+  }
+  return vector<llvm::GlobalVariable *>(GlobalVars.begin(), GlobalVars.end());
+}
+
 
 BasicBlock& getBB(const llvm::BasicBlock *bb) {
   return current_fn->getBB(value_name(*bb));
@@ -209,8 +235,11 @@ Value* get_operand(llvm::Value *v) {
     }
     Value *initval = nullptr;
     if (gv->hasInitializer() && gv->isConstant()) {
-      if (!(initval = get_operand(gv->getInitializer())))
-        return nullptr;
+      auto init_llvmval = gv->getInitializer();
+      if (!isa<llvm::ConstantExpr>(init_llvmval))
+        // If it is constantexpr, llvm2alive will create instructions for this.
+        if (!(initval = get_operand(init_llvmval)))
+          return nullptr;
     }
     int size = DL->getTypeAllocSize(gv->getValueType());
     int align = gv->getAlignment();

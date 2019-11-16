@@ -356,7 +356,8 @@ Errors TransformVerify::verify() const {
   }
 
   State::resetGlobals();
-  State src_state(t.src, true), tgt_state(t.tgt, false);
+  State src_state(t.src_inits, t.src, true),
+        tgt_state(t.tgt_inits, t.tgt, false);
 
   try {
     sym_exec(src_state);
@@ -454,8 +455,14 @@ void Transform::print(ostream &os, const TransformPrintOpts &opt) const {
     precondition->print(os << "Pre: ");
     os << '\n';
   }
+  if (!src_inits.empty()) {
+    os << src_inits;
+  }
   src.print(os, opt.print_fn_header);
   os << "=>\n";
+  if (!tgt_inits.empty()) {
+    os << tgt_inits;
+  }
   tgt.print(os, opt.print_fn_header);
 }
 

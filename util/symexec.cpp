@@ -13,6 +13,7 @@ using namespace std;
 namespace util {
 
 void sym_exec(State &s) {
+  Initializers &inits = const_cast<Initializers&>(s.getInitializers());
   Function &f = const_cast<Function&>(s.getFn());
 
   // add constants & inputs to State table first of all
@@ -24,6 +25,19 @@ void sym_exec(State &s) {
 
   s.exec(Value::voidVal);
 
+  // Run initializers
+  for (auto &glbinits : inits) {
+    for (auto &i : glbinits.second) {
+      auto val = s.exec(*i);
+      auto &name = i->getName();
+
+      if (config::symexec_print_each_value && name[0] == '%')
+        cout << name << " = " << val << '\n';
+    }
+  }
+  s.finishInitializer();
+
+  // Run the function.
   for (auto &bb : f.getBBs()) {
     if (!s.startBB(*bb))
       continue;

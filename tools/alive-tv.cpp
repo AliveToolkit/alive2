@@ -192,28 +192,34 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   TransformPrintOpts print_opts;
 
-  auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
+  auto M1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F1));
-  if (!Func1) {
+  if (!M1) {
     cerr << "ERROR: Could not translate '" << F1.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
     return true;
   }
+  auto &Init1 = M1->first;
+  auto &Func1 = M1->second;
 
-  auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
+  auto M2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F2));
-  if (!Func2) {
+  if (!M2) {
     cerr << "ERROR: Could not translate '" << F2.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
     return true;
   }
+  auto &Init2 = M2->first;
+  auto &Func2 = M2->second;
 
   smt_init->reset();
   Transform t;
-  t.src = move(*Func1);
-  t.tgt = move(*Func2);
+  t.src_inits = move(Init1);
+  t.src = move(Func1);
+  t.tgt_inits = move(Init2);
+  t.tgt = move(Func2);
   TransformVerify verifier(t, false);
   t.print(cout, print_opts);
 
@@ -246,7 +252,9 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   if (opt_bidirectional) {
     smt_init->reset();
     Transform t2;
+    t2.src_inits = move(t.tgt_inits);
     t2.src = move(t.tgt);
+    t2.tgt_inits = move(t.src_inits);
     t2.tgt = move(t.src);
     TransformVerify verifier2(t2, false);
     t2.print(cout, print_opts);

@@ -21,6 +21,7 @@ namespace IR {
 class Value;
 class BasicBlock;
 class Function;
+class Initializers;
 
 class State {
 public:
@@ -29,6 +30,7 @@ public:
   using DomainTy = std::pair<smt::expr, std::set<smt::expr>>;
 
 private:
+  const Initializers &inits;
   const Function &f;
   bool source;
   bool disable_undef_rewrite = false;
@@ -58,6 +60,7 @@ private:
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 32> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
+  bool is_initialization_phase = true; // Is initializer running?
 
   // return_domain: a boolean expression describing return condition
   smt::expr return_domain;
@@ -66,7 +69,7 @@ private:
   std::set<smt::expr> return_undef_vars;
 
 public:
-  State(const Function &f, bool source);
+  State(const Initializers &inits, const Function &f, bool source);
 
   static void resetGlobals();
 
@@ -92,6 +95,10 @@ public:
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   void resetUndefVars();
+
+  auto &getInitializers() const { return inits; }
+  bool isInitializationPhase() const { return is_initialization_phase; }
+  void finishInitializer() { is_initialization_phase = false; }
 
   auto& getFn() const { return f; }
   auto& getMemory() { return memory; }
