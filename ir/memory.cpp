@@ -438,7 +438,7 @@ Memory::Memory(State &state, bool little_endian)
   // the block) should not overflow.
   avail_space = expr::mkVar("avail_space", bitsPtrSize());
   if (state.isSource()) {
-    state.addAxiom(avail_space.ule(expr::mkUInt(-2, bitsPtrSize())));
+    state.addAxiom(avail_space.ult(expr::mkUInt(-2, bitsPtrSize())));
   }
 
   // TODO: replace the magic number 2 with the result of analysis.
