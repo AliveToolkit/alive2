@@ -342,7 +342,8 @@ expr Pointer::refined(const Pointer &other) const {
   expr local = other.is_heap_allocated();
   local &= other.is_block_alive();
   local &= other.block_size().uge(block_size());
-  local &= block_refined(other);
+  // TODO: this induces an infinite loop; need a quantifier or rec function
+  //local &= block_refined(other);
 
   local = (is_heap_allocated() && is_block_alive()).implies(local);
 
@@ -350,8 +351,24 @@ expr Pointer::refined(const Pointer &other) const {
 }
 
 expr Pointer::block_refined(const Pointer &other) const {
-  // TODO
-  return true;
+  expr offset = expr::mkFreshVar("#offset", get_offset());
+  Pointer p(m, get_bid(), offset);
+  Pointer q(other.m, other.get_bid(), offset);
+
+  Byte val(m, m.non_local_block_val.load(p.short_ptr()));
+  Byte val2(other.m, other.m.non_local_block_val.load(q.short_ptr()));
+
+  // TODO: do we need to type memory and do a type-specific refinement check?
+  expr np1 = val.nonptr_nonpoison();
+  expr int_cnstr = (val2.nonptr_nonpoison() & np1) == np1 &&
+                   (val.nonptr_value() & np1) == (val2.nonptr_value() & np1);
+
+  Pointer load_ptr(m, val.ptr_value());
+  Pointer load_ptr2(other.m, val2.ptr_value());
+  expr ptr_cnstr = val.ptr_nonpoison().implies(load_ptr.refined(load_ptr2));
+
+  expr cond = expr::mkIf(val.is_ptr(), ptr_cnstr, int_cnstr);
+  return offset.ult(p.block_size()).implies(cond);
 }
 
 expr Pointer::is_readonly() const {
@@ -371,11 +388,11 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   if (p.isNull().isTrue())
     return os << "null";
 
-  os << "pointer(" << (p.is_local().simplify().isTrue() ? "local" : "non-local")
+  os << "pointer(" << (p.is_local().isTrue() ? "local" : "non-local")
      << ", block_id=";
-  p.get_bid().simplify().printUnsigned(os);
+  p.get_bid().printUnsigned(os);
   os << ", offset=";
-  p.get_offset().simplify().printSigned(os);
+  p.get_offset().printSigned(os);
   return os << ')';
 }
 
@@ -681,6 +698,12 @@ expr Memory::ptr2int(const expr &ptr) {
 expr Memory::int2ptr(const expr &val) {
   // TODO
   return {};
+}
+
+expr Memory::refined(const Memory &other) const {
+  Pointer p(*this, "#idx");
+  Pointer q(other, p());
+  return p.block_refined(q);
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

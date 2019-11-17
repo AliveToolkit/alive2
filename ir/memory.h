@@ -157,7 +157,7 @@ public:
   smt::expr alloc(const smt::expr &size, unsigned align, BlockKind blockKind,
                   std::optional<unsigned> bid = std::nullopt,
                   unsigned *bid_out = nullptr,
-                  const smt::expr &precond = smt::expr(true));
+                  const smt::expr &precond = true);
 
   void free(const smt::expr &ptr);
 
@@ -173,6 +173,8 @@ public:
 
   smt::expr ptr2int(const smt::expr &ptr);
   smt::expr int2ptr(const smt::expr &val);
+
+  smt::expr refined(const Memory &other) const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

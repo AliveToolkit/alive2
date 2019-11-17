@@ -274,6 +274,8 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre_tgt = tgt_state.getPre();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
+  expr memory_cnstr
+    = src_state.returnMemory().refined(tgt_state.returnMemory());
   expr dom = dom_a && dom_b;
 
   Solver::check({
@@ -291,6 +293,11 @@ static void check_refinement(Errors &errs, Transform &t,
                            pre_tgt && pre_src.implies(dom && !value_cnstr)),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
+      }},
+    { axioms && preprocess(t, qvars, uvars,
+                           pre_tgt && pre_src.implies(dom && !memory_cnstr)),
+      [&](const Result &r) {
+        err(r, true, "Mismatch in memory");
       }}
   });
 
