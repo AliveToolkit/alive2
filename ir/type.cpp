@@ -575,11 +575,14 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
 }
 
 StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
+  if (!val.isValid())
+    return {};
+
   unsigned total_till_now = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_till_now += children[i]->bits();
   }
-  unsigned high = val.value.bits() - total_till_now;
+  unsigned high = val.bits() - total_till_now;
   unsigned h = high - 1;
   unsigned l = high - children[index]->bits();
 

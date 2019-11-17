@@ -1173,8 +1173,9 @@ expr expr::toBVBool() const {
 }
 
 expr expr::float2BV() const {
-  if (auto app = isAppOf(Z3_OP_FPA_TO_FP))
-    return Z3_get_app_arg(ctx(), app, 0);
+  if (auto app = isAppOf(Z3_OP_FPA_TO_FP)) // ((_ to_fp e s) BV)
+    if (Z3_get_app_num_args(ctx(), app) == 1)
+      return Z3_get_app_arg(ctx(), app, 0);
 
   return unop_fold(Z3_mk_fpa_to_ieee_bv);
 }
