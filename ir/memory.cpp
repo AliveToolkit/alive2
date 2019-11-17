@@ -683,10 +683,12 @@ bool Memory::operator<(const Memory &rhs) const {
   // FIXME: remove this once we move to C++20
   return
     tie(non_local_block_val, local_block_val, non_local_block_liveness,
-        local_block_liveness, local_blk_addr, local_blk_size, local_blk_kind) <
+        local_block_liveness, local_blk_addr, local_blk_size, local_blk_kind,
+        avail_space) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
-        rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_kind);
+        rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_kind,
+        rhs.avail_space);
 }
 
 }
