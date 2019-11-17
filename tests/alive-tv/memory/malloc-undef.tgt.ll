@@ -1,3 +1,5 @@
+; TEST-ARGS: -smt-to=9000
+
 define i8 @malloc_undef() {
   %ptr = call i8* @malloc(i64 undef)
   %addr = ptrtoint i8* %ptr to i64
