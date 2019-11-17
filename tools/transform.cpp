@@ -273,7 +273,7 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre_src = src_state.getPre();
   expr pre_tgt = tgt_state.getPre();
 
-  auto [poison_cnstr, value_cnstr] = type.refines(a, b);
+  auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr dom = dom_a && dom_b;
 
   Solver::check({

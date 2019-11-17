@@ -92,6 +92,10 @@ public:
     CXX_NEW,
   };
   smt::expr get_alloc_type() const;
+  smt::expr is_heap_allocated() const;
+
+  smt::expr refined(const Pointer &other) const;
+  smt::expr block_refined(const Pointer &other) const;
 
   const Memory& getMemory() const { return m; }
 

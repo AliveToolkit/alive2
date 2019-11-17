@@ -98,7 +98,8 @@ public:
 
   // returns pair of refinement constraints for <poison, !poison && value>
   virtual std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src, const IR::StateValue &tgt) const = 0;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const = 0;
 
   virtual std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const = 0;
@@ -123,7 +124,8 @@ public:
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -149,7 +151,8 @@ public:
   bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -186,7 +189,8 @@ public:
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -212,7 +216,8 @@ public:
   bool isPtrType() const override;
   smt::expr enforcePtrType() const override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -252,7 +257,8 @@ public:
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &src,const IR::StateValue &tgt) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
@@ -345,7 +351,8 @@ public:
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const IR::StateValue &a, const IR::StateValue &b) const override;
+    refines(State &src_s, State &tgt_s, const StateValue &src,
+            const StateValue &tgt) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;

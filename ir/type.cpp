@@ -252,7 +252,8 @@ void VoidType::fixup(const Model &m) {
 }
 
 pair<expr, expr>
-VoidType::refines(const StateValue &src, const StateValue &tgt) const {
+VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                  const StateValue &tgt) const {
   return { true, true };
 }
 
@@ -308,7 +309,8 @@ expr IntType::enforceIntType(unsigned bits) const {
 }
 
 pair<expr, expr>
-IntType::refines(const StateValue &src, const StateValue &tgt) const {
+IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                 const StateValue &tgt) const {
   return { src.non_poison.implies(tgt.non_poison),
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
@@ -419,7 +421,8 @@ expr FloatType::enforceFloatType() const {
 }
 
 pair<expr, expr>
-FloatType::refines(const StateValue &src, const StateValue &tgt) const {
+FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                   const StateValue &tgt) const {
   expr non_poison = src.non_poison && tgt.non_poison;
   return { src.non_poison.implies(tgt.non_poison),
            (non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
@@ -514,9 +517,13 @@ expr PtrType::enforcePtrType() const {
 }
 
 pair<expr, expr>
-PtrType::refines(const StateValue &src, const StateValue &tgt) const {
+PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                 const StateValue &tgt) const {
+  Pointer p(src_s.getMemory(), src.value);
+  Pointer q(tgt_s.getMemory(), tgt.value);
+
   return { src.non_poison.implies(tgt.non_poison),
-           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
+           (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
 }
 
 pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
@@ -666,10 +673,12 @@ StateValue AggregateType::fromBV(StateValue v) const {
 }
 
 pair<expr, expr>
-AggregateType::refines(const StateValue &src, const StateValue &tgt) const {
+AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                       const StateValue &tgt) const {
   set<expr> poison, value;
   for (unsigned i = 0; i < elements; ++i) {
-    auto [p, v] = children[i]->refines(extract(src, i), extract(tgt, i));
+    auto [p, v] = children[i]->refines(src_s, tgt_s, extract(src, i),
+                                       extract(tgt, i));
     poison.insert(move(p));
     value.insert(move(v));
   }
@@ -1011,8 +1020,9 @@ StateValue SymbolicType::fromBV(StateValue val) const {
 }
 
 pair<expr, expr>
-SymbolicType::refines(const StateValue &src, const StateValue &tgt) const {
-  DISPATCH(refines(src, tgt), UNREACHABLE());
+SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
+                      const StateValue &tgt) const {
+  DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
 }
 
 pair<expr, vector<expr>>

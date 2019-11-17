@@ -333,6 +333,27 @@ expr Pointer::get_alloc_type() const {
   return get_value("blk_kind", m.local_blk_kind, expr::mkUInt(0, 2));
 }
 
+expr Pointer::is_heap_allocated() const {
+  return get_alloc_type() != NON_HEAP;
+}
+
+expr Pointer::refined(const Pointer &other) const {
+  // This refers to a block that was malloc'ed within the function
+  expr local = other.is_heap_allocated();
+  local &= other.is_block_alive();
+  local &= other.block_size().uge(block_size());
+  local &= block_refined(other);
+
+  local = (is_heap_allocated() && is_block_alive()).implies(local);
+
+  return expr::mkIf(is_local(), local, *this == other);
+}
+
+expr Pointer::block_refined(const Pointer &other) const {
+  // TODO
+  return true;
+}
+
 expr Pointer::is_readonly() const {
   return !is_local() && expr::mkUF("blk_readonly", { get_short_bid() }, false);
 }
