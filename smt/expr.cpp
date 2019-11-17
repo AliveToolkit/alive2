@@ -231,6 +231,7 @@ expr expr::mkDoubleVar(const char *name) {
 }
 
 expr expr::mkFreshVar(const char *prefix, const expr &type) {
+  C2(type);
   return Z3_mk_fresh_const(ctx(), prefix, type.sort());
 }
 
@@ -420,6 +421,7 @@ expr expr::operator+(const expr &rhs) const {
 }
 
 expr expr::operator-(const expr &rhs) const {
+  C();
   if (eq(rhs))
     return mkUInt(0, sort());
   return *this + mkInt(-1, sort()) * rhs;
@@ -463,6 +465,7 @@ expr expr::srem(const expr &rhs) const {
 }
 
 expr expr::urem(const expr &rhs) const {
+  C();
   if (eq(rhs))
     return mkUInt(0, sort());
 
@@ -508,6 +511,7 @@ expr expr::ssub_sat(const expr &rhs) const {
 }
 
 expr expr::usub_sat(const expr &rhs) const {
+  C();
   return mkIf(rhs.uge(*this),
               mkUInt(0, sort()),
               *this - rhs);
@@ -557,6 +561,7 @@ expr expr::udiv_exact(const expr &rhs) const {
 }
 
 expr expr::operator<<(const expr &rhs) const {
+  C();
   if (isZero() || rhs.isZero())
     return *this;
 
@@ -579,6 +584,7 @@ expr expr::ashr(const expr &rhs) const {
 }
 
 expr expr::lshr(const expr &rhs) const {
+  C();
   if (isZero() || rhs.isZero())
     return *this;
 
@@ -1046,6 +1052,7 @@ expr expr::ule(const expr &rhs) const {
 }
 
 expr expr::ult(const expr &rhs) const {
+  C();
   uint64_t n;
   if (rhs.isUInt(n))
     return n == 0 ? false : ule(mkUInt(n - 1, sort()));
@@ -1230,8 +1237,7 @@ expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
   z3_sorts.reserve(num_args);
 
   for (auto &arg : args) {
-    if (!arg.isValid())
-      return {};
+    C2(arg);
     z3_args.emplace_back(arg());
     z3_sorts.emplace_back(arg.sort());
   }
@@ -1434,7 +1440,7 @@ void expr::printUnsigned(ostream &os) const {
 void expr::printSigned(ostream &os) const {
   if (isSigned()) {
     os << '-';
-    (~*this + mkUInt(1, sort())).simplify().printUnsigned(os);
+    (~*this + mkUInt(1, sort())).printUnsigned(os);
   } else {
     printUnsigned(os);
   }
@@ -1442,7 +1448,7 @@ void expr::printSigned(ostream &os) const {
 
 void expr::printHexadecimal(ostream &os) const {
   auto rem = bits() % 4;
-  os << (rem == 0 ? *this : zext(4 - rem)).simplify();
+  os << (rem == 0 ? *this : zext(4 - rem));
 }
 
 string expr::numeral_string() const {
