@@ -517,8 +517,6 @@ Memory::Memory(State &state, bool little_endian)
       }
       // Non-local blocks' addr + size does not overflow.
       state.addAxiom(p1.get_address().add_no_uoverflow(p1.block_size()));
-      // Size is less than half of memory
-      state.addAxiom(p1.block_size().extract(bits_size_t-1, bits_size_t-1) == 0);
     }
   }
 
@@ -592,8 +590,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     allocated &= size_upperbound.ule(avail_space);
 
     // Disjointness of block's address range with other local blocks
+    auto zero = expr::mkUInt(0, bitsOffset());
     for (auto &itm : local_blk_addr) {
-      auto zero = expr::mkUInt(0, bitsOffset());
       // itm.first is short bid, so concat prefix 1.
       Pointer p2(*this, expr::mkUInt(1, 1).concat(itm.first), zero);
       state->addPre((allocated && p2.is_block_alive())

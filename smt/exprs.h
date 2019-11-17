@@ -57,8 +57,8 @@ public:
   void add(const FunctionExpr &other);
   void del(const expr &key);
   expr operator()(expr &key) const;
-  const decltype(fn)::const_iterator begin() const { return fn.begin(); }
-  const decltype(fn)::const_iterator end() const { return fn.end(); }
+  auto begin() const { return fn.begin(); }
+  auto end() const { return fn.end(); }
 
   // for container use only
   bool operator<(const FunctionExpr &rhs) const;
