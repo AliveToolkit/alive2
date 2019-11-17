@@ -343,6 +343,7 @@ expr Pointer::refined(const Pointer &other) const {
   local &= other.is_block_alive();
   local &= other.block_size().uge(block_size());
   // TODO: this induces an infinite loop; need a quantifier or rec function
+  // TODO: needs variable offset
   //local &= block_refined(other);
 
   local = (is_heap_allocated() && is_block_alive()).implies(local);
@@ -351,24 +352,20 @@ expr Pointer::refined(const Pointer &other) const {
 }
 
 expr Pointer::block_refined(const Pointer &other) const {
-  expr offset = expr::mkFreshVar("#offset", get_offset());
-  Pointer p(m, get_bid(), offset);
-  Pointer q(other.m, other.get_bid(), offset);
-
-  Byte val(m, m.non_local_block_val.load(p.short_ptr()));
-  Byte val2(other.m, other.m.non_local_block_val.load(q.short_ptr()));
+  Byte val(m, m.non_local_block_val.load(short_ptr()));
+  Byte val2(other.m, other.m.non_local_block_val.load(other.short_ptr()));
 
   // TODO: do we need to type memory and do a type-specific refinement check?
   expr np1 = val.nonptr_nonpoison();
-  expr int_cnstr = (val2.nonptr_nonpoison() & np1) == np1 &&
-                   (val.nonptr_value() & np1) == (val2.nonptr_value() & np1);
+  expr int_cnstr = (val2.nonptr_nonpoison() | np1) == np1 &&
+                   (val.nonptr_value() | np1) == (val2.nonptr_value() | np1);
 
   Pointer load_ptr(m, val.ptr_value());
   Pointer load_ptr2(other.m, val2.ptr_value());
   expr ptr_cnstr = val.ptr_nonpoison().implies(load_ptr.refined(load_ptr2));
 
   expr cond = expr::mkIf(val.is_ptr(), ptr_cnstr, int_cnstr);
-  return offset.ult(p.block_size()).implies(cond);
+  return get_offset().ult(block_size()).implies(cond);
 }
 
 expr Pointer::is_readonly() const {

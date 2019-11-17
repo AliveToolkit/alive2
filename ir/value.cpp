@@ -125,9 +125,7 @@ StateValue Input::toSMT(State &s) const {
     vector<pair<expr, expr>> repls;
 
     for (auto &v : vars) {
-      expr undef = expr::mkFreshVar("undef", v);
-      s.addUndefVar(undef);
-      repls.emplace_back(v, move(undef));
+      s.addUndefVar(repls.emplace_back(v, expr::mkFreshVar("undef", v)).second);
     }
 
     val = expr::mkIf(type.extract(0, 0) == 0, val, val.subst(repls));
