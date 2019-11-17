@@ -1,3 +1,4 @@
+; TEST-ARGS: -smt-to=9000
 ; ERROR: Value mismatch
 
 define i8 @malloc_undef() {

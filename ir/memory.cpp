@@ -457,7 +457,9 @@ Memory::Memory(State &state, bool little_endian)
       state.addAxiom(p.is_block_alive().implies(
           size_upperbound.ule(avail_space)));
     }
-    avail_space = expr::mkIf(p.is_block_alive(), avail_space - p.block_size(),
+    // size_upperbound should be subtracted here (not size_zext0) because we
+    // need to simulate fragmentation from blocks' alignment.
+    avail_space = expr::mkIf(p.is_block_alive(), avail_space - size_upperbound,
                              avail_space);
   }
 
@@ -541,7 +543,10 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
 
-    avail_space = expr::mkIf(allocated, avail_space - size_zext0, avail_space);
+    // size_upperbound should be subtracted here (not size_zext0) because we
+    // need to simulate fragmentation from blocks' alignment.
+    avail_space = expr::mkIf(allocated, avail_space - size_upperbound,
+                             avail_space);
 
     state->addPre(allocated.implies(p.get_address() != 0));
 
