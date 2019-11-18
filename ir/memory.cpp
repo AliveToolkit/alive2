@@ -466,37 +466,15 @@ Memory::Memory(State &state, bool little_endian)
   local_block_liveness
     = expr::mkLambda({ expr::mkVar("#bid0", bitsBid() - 1) }, false);
 
-  // The first byte of the memory cannot be allocated because it is for a null
-  // pointer.
+  // A memory space is separated into non-local area / local area.
+  // Non-local area is the lower half of memory (to include null pointer),
+  // local area is the upper half.
+  // This helps efficient encoding of disjointness between local and nonlocal
+  // blocks.
   // The last byte of the memory cannot be allocated because ptr + size
   // (where size is the size of the block and ptr is the beginning address of
   // the block) should not overflow.
-  avail_space = expr::mkVar("avail_space", bitsPtrSize());
-  if (state.isSource()) {
-    state.addAxiom(avail_space.ult(expr::mkInt(-2 * max_align, bitsPtrSize())));
-  }
-
-  // TODO: replace the magic number 2 with the result of analysis.
-  // This is just set as 2 to make existing unit tests run without timeout.
-  unsigned non_local_bid_upperbound = 2;
-
-  // Omit null pointer
-  for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
-    Pointer p(*this, bid, false);
-
-    // The required space size should consider alignment
-    auto size_upperbound = p.block_size() + expr::mkUInt(max_align - 1,
-                                                         bitsPtrSize());
-
-    if (state.isSource()) {
-      state.addAxiom(p.is_block_alive().implies(
-          size_upperbound.ule(avail_space)));
-    }
-    // size_upperbound should be subtracted here (not size_zext0) because we
-    // need to simulate fragmentation from blocks' alignment.
-    avail_space = expr::mkIf(p.is_block_alive(), avail_space - size_upperbound,
-                             avail_space);
-  }
+  local_avail_space = expr::mkUInt((1ull << 63) - 1, bitsPtrSize());
 
   if (state.isSource()) {
     // Initialize a memory block for null pointer.
@@ -505,8 +483,12 @@ Memory::Memory(State &state, bool little_endian)
     state.addAxiom(nullPtr.get_address(false) == 0);
     state.addAxiom(nullPtr.block_size(false) == 0);
 
+    // TODO: replace the magic number 2 with the result of analysis.
+    // This is just set as 2 to make existing unit tests run without timeout.
+    unsigned non_local_bid_upperbound = 2;
     // Non-local blocks are disjoint.
     // Ignore null pointer block
+    auto memsz_half = expr::mkUInt((1ull << 63), bitsPtrSize());
     for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
       for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
@@ -515,8 +497,10 @@ Memory::Memory(State &state, bool little_endian)
             .implies(disjoint(p1.get_address(), p1.block_size(),
                               p2.get_address(), p2.block_size())));
       }
-      // Non-local blocks' addr + size does not overflow.
-      state.addAxiom(p1.get_address().add_no_uoverflow(p1.block_size()));
+      // Non-local blocks' addr, addr + size is not greater than a half of
+      // memory.
+      state.addAxiom(p1.get_address().ule(memsz_half));
+      state.addAxiom(memsz_half.uge(p1.get_address() + p1.block_size()));
     }
   }
 
@@ -587,7 +571,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                : addr_var;
 
     auto size_upperbound = size_zext0 + expr::mkUInt(align - 1, bitsPtrSize());
-    allocated &= size_upperbound.ule(avail_space);
+    allocated &= size_upperbound.ule(local_avail_space);
 
     // Disjointness of block's address range with other local blocks
     auto zero = expr::mkUInt(0, bitsOffset());
@@ -606,26 +590,20 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
 
     // size_upperbound should be subtracted here (not size_zext0) because we
-    // need to simulate fragmentation from blocks' alignment.
-    avail_space = expr::mkIf(allocated, avail_space - size_upperbound,
-                             avail_space);
+    // need to consider blocks' alignment.
+    local_avail_space = expr::mkIf(allocated,
+                                   local_avail_space - size_upperbound,
+                                   local_avail_space);
 
-    state->addPre(allocated.implies(p.get_address() != 0));
+    // Local block area is at the top half of the memory.
+    // This also encodes the non-zero-ness of the address
+    state->addPre(allocated.implies(p.get_address()
+        .extract(bitsPtrSize() - 1, bitsPtrSize() - 1) == 1));
 
     // addr + size does not overflow.
     // C std states that one byte past the block boundary does not overflow
     state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
 
-    // Disjointness of block's address range with nonlocal blocks
-    unsigned non_local_bid_upperbound = 2; // TODO: replace this magic number with
-                                           // something else from analysis
-    // Ignore null block.
-    for (unsigned bid2 = 1; bid2 <= non_local_bid_upperbound; ++bid2) {
-      Pointer p2(*this, bid2, false);
-      state->addPre((p.is_block_alive() && p2.is_block_alive())
-          .implies(disjoint(p.get_address(), p.block_size(),
-                            p2.get_address(), p2.block_size())));
-    }
   } else {
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
                                              : !p.is_readonly());
@@ -766,11 +744,11 @@ bool Memory::operator<(const Memory &rhs) const {
   return
     tie(non_local_block_val, local_block_val, non_local_block_liveness,
         local_block_liveness, local_blk_addr, local_blk_size, local_blk_kind,
-        avail_space) <
+        local_avail_space) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_kind,
-        rhs.avail_space);
+        rhs.local_avail_space);
 }
 
 }

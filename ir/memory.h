@@ -113,9 +113,6 @@ class Memory {
   unsigned bits_for_bid = 12;
   // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
-  // maximum alignment of memory blocks
-  // TODO: fill this from target data
-  unsigned max_align = 8;
 
   bool little_endian;
 
@@ -125,7 +122,7 @@ class Memory {
   smt::expr non_local_block_liveness; // array: bid -> bool
   smt::expr local_block_liveness;
 
-  smt::expr avail_space; // The size of available space in memory.
+  smt::expr local_avail_space; // available space in local block area.
 
   smt::FunctionExpr local_blk_addr;
   smt::FunctionExpr local_blk_size;
