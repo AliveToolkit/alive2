@@ -44,7 +44,7 @@ void UndefValue::print(ostream &os) const {
 StateValue UndefValue::toSMT(State &s) const {
   auto val = getType().getDummyValue(true);
   expr var = expr::mkFreshVar("undef", val.value);
-  s.addUndefVar(var);
+  s.addUndefVar(expr(var));
   return { move(var), move(val.non_poison) };
 }
 
@@ -119,16 +119,14 @@ StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
-  auto [val, vars] = getType().mkInput(s, smt_name.c_str());
+  auto val = getType().mkInput(s, smt_name.c_str());
 
   if (!config::disable_undef_input) {
-    vector<pair<expr, expr>> repls;
-
+    auto [undef, vars] = getType().mkUndefInput(s);
     for (auto &v : vars) {
-      s.addUndefVar(repls.emplace_back(v, expr::mkFreshVar("undef", v)).second);
+      s.addUndefVar(move(v));
     }
-
-    val = expr::mkIf(type.extract(0, 0) == 0, val, val.subst(repls));
+    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
   expr poison = getType().getDummyValue(false).non_poison;

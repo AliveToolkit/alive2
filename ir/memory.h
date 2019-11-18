@@ -11,7 +11,6 @@
 #include <ostream>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace smt { class FunctionExpr; }
 
@@ -145,7 +144,8 @@ public:
   static void resetGlobalData();
   static void resetLocalBids();
 
-  std::pair<smt::expr, std::vector<smt::expr>> mkInput(const char *name);
+  smt::expr mkInput(const char *name) const;
+  std::pair<smt::expr, smt::expr> mkUndefInput() const;
 
   // Allocates a new memory block.
   // If bid is not specified, it creates a fresh block id by increasing

@@ -518,14 +518,19 @@ void Memory::resetLocalBids() {
   last_local_bid = 0;
 }
 
-pair<expr, vector<expr>> Memory::mkInput(const char *name) {
+expr Memory::mkInput(const char *name) const {
   unsigned bits = bits_for_bid - 1 + bits_for_offset;
   expr var = expr::mkVar(name, bits);
   expr offset = var.extract(bits_for_offset - 1, 0);
   expr bid = var.extract(bits - 1, bits_for_offset);
   expr is_local = expr::mkUInt(0, 1);
-  return { Pointer(*this, is_local.concat(bid), offset).release(),
-           { move(var) } };
+  return Pointer(*this, is_local.concat(bid), offset).release();
+}
+
+pair<expr, expr> Memory::mkUndefInput() const {
+  expr offset = expr::mkFreshVar("undef", expr::mkUInt(0, bits_for_offset));
+  Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset);
+  return { p.release(), move(offset) };
 }
 
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,

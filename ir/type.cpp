@@ -221,6 +221,11 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
   return expr::mkIf(boolean, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) | orig;
 }
 
+pair<expr, vector<expr>> Type::mkUndefInput(State &s) const {
+  auto var = expr::mkFreshVar("undef", mkInput(s, ""));
+  return { var, { var } };
+}
+
 ostream& operator<<(ostream &os, const Type &t) {
   t.print(os);
   return os;
@@ -257,7 +262,7 @@ VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { true, true };
 }
 
-pair<expr, vector<expr>> VoidType::mkInput(State &s, const char *name) const {
+expr VoidType::mkInput(State &s, const char *name) const {
   UNREACHABLE();
 }
 
@@ -315,9 +320,8 @@ IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
-pair<expr, vector<expr>> IntType::mkInput(State &s, const char *name) const {
-  auto var = expr::mkVar(name, bits());
-  return { var, { var } };
+expr IntType::mkInput(State &s, const char *name) const {
+  return expr::mkVar(name, bits());
 }
 
 void IntType::printVal(ostream &os, State &s, const expr &e) const {
@@ -428,15 +432,14 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
 }
 
-pair<expr, vector<expr>> FloatType::mkInput(State &s, const char *name) const {
-  expr var;
+expr FloatType::mkInput(State &s, const char *name) const {
   switch (fpType) {
-  case Half:    var = expr::mkHalfVar(name); break;
-  case Float:   var = expr::mkFloatVar(name); break;
-  case Double:  var = expr::mkDoubleVar(name); break;
+  case Half:    return expr::mkHalfVar(name);
+  case Float:   return expr::mkFloatVar(name);
+  case Double:  return expr::mkDoubleVar(name);
   case Unknown: UNREACHABLE();
   }
-  return { var, { var } };
+  UNREACHABLE();
 }
 
 void FloatType::printVal(ostream &os, State &s, const expr &e) const {
@@ -526,8 +529,13 @@ PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
 }
 
-pair<expr, vector<expr>> PtrType::mkInput(State &s, const char *name) const {
+expr PtrType::mkInput(State &s, const char *name) const {
   return s.getMemory().mkInput(name);
+}
+
+pair<expr, vector<expr>> PtrType::mkUndefInput(State &s) const {
+  auto [val, var] = s.getMemory().mkUndefInput();
+  return { move(val), { move(var) } };
 }
 
 void PtrType::printVal(ostream &os, State &s, const expr &e) const {
@@ -685,14 +693,23 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { expr::mk_and(poison), expr::mk_and(value) };
 }
 
-pair<expr, vector<expr>>
-AggregateType::mkInput(State &s, const char *name) const {
+expr AggregateType::mkInput(State &s, const char *name) const {
+  expr val;
+  for (unsigned i = 0; i < elements; ++i) {
+    string c_name = string(name) + "#" + to_string(i);
+    auto v = children[i]->mkInput(s, c_name.c_str());
+    v = children[i]->toBV(move(v));
+    val = i == 0 ? move(v) : val.concat(v);
+  }
+  return val;
+}
+
+pair<expr, vector<expr>> AggregateType::mkUndefInput(State &s) const {
   expr val;
   vector<expr> vars;
 
   for (unsigned i = 0; i < elements; ++i) {
-    string c_name = string(name) + "#" + to_string(i);
-    auto [v, vs] = children[i]->mkInput(s, c_name.c_str());
+    auto [v, vs] = children[i]->mkUndefInput(s);
     v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
     vars.insert(vars.end(), vs.begin(), vs.end());
@@ -1025,10 +1042,14 @@ SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
   DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
 }
 
-pair<expr, vector<expr>>
-SymbolicType::mkInput(State &st, const char *name) const {
+expr SymbolicType::mkInput(State &st, const char *name) const {
   DISPATCH(mkInput(st, name), UNREACHABLE());
 }
+
+pair<expr, vector<expr>> SymbolicType::mkUndefInput(State &st) const {
+  DISPATCH(mkUndefInput(st), UNREACHABLE());
+}
+
 
 void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
   DISPATCH(printVal(os, st, e), UNREACHABLE());

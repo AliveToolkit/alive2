@@ -101,8 +101,10 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const = 0;
 
+  virtual smt::expr mkInput(State &s, const char *name) const = 0;
   virtual std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const = 0;
+    mkUndefInput(State &s) const;
+
   virtual void printVal(std::ostream &os, State &s,
                         const smt::expr &e) const = 0;
 
@@ -126,8 +128,7 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -153,8 +154,7 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -191,8 +191,7 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -218,8 +217,9 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+    mkUndefInput(State &s) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -259,8 +259,9 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+    mkUndefInput(State &s) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   const AggregateType* getAsAggregateType() const override;
 };
@@ -353,8 +354,9 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  smt::expr mkInput(State &s, const char *name) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkInput(State &s, const char *name) const override;
+    mkUndefInput(State &s) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };

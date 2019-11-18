@@ -174,8 +174,8 @@ void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
 
-void State::addUndefVar(const expr &var) {
-  undef_vars.emplace(var);
+void State::addUndefVar(expr &&var) {
+  undef_vars.emplace(move(var));
 }
 
 void State::resetUndefVars() {

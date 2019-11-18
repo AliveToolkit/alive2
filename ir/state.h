@@ -90,7 +90,7 @@ public:
   void addUB(const smt::expr &ub);
 
   void addQuantVar(const smt::expr &var);
-  void addUndefVar(const smt::expr &var);
+  void addUndefVar(smt::expr &&var);
   void resetUndefVars();
 
   auto& getFn() const { return f; }
