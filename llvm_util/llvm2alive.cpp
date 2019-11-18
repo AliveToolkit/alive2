@@ -337,9 +337,14 @@ public:
       if (!op)
         return error(i);
 
-      // TODO: support for struct indexing
-      if (I.getStructTypeOrNull())
-        return error(i);
+      if (auto structTy = I.getStructTypeOrNull()) {
+        llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()),
+                                I.getOperand() };
+        auto offset = DL().getIndexedOffsetInType(structTy,
+                llvm::makeArrayRef(vals, 2));
+        gep->addIdx(offset, *make_intconst(1, 64));
+        continue;
+      }
 
       gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()), *op);
     }
