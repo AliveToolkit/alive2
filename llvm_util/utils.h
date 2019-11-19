@@ -5,6 +5,7 @@
 
 #include <ostream>
 #include <string>
+#include <vector>
 
 namespace llvm {
 class BasicBlock;

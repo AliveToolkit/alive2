@@ -12,7 +12,6 @@
 #include "llvm/IR/GlobalVariable.h"
 #include <unordered_map>
 #include <utility>
-#include <vector>
 
 using namespace IR;
 using namespace std;
