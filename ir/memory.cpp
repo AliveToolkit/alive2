@@ -474,9 +474,15 @@ Memory::Memory(State &state, bool little_endian)
   // The last byte of the memory cannot be allocated because ptr + size
   // (where size is the size of the block and ptr is the beginning address of
   // the block) should not overflow.
-  local_avail_space = expr::mkUInt((1ull << 63) - 1, bitsPtrSize());
+
+  // The initially available space of local area. Src and tgt shares this
+  // value.
+  local_avail_space = expr::mkVar("local_avail_space", bitsPtrSize());
+  auto memsz_half = expr::mkUInt((1ull << 63), bitsPtrSize());
 
   if (state.isSource()) {
+    state.addAxiom(local_avail_space.ult(memsz_half));
+
     // Initialize a memory block for null pointer.
     // TODO: in twin memory model, this is not needed.
     auto nullPtr = Pointer::mkNullPointer(*this);
@@ -488,7 +494,6 @@ Memory::Memory(State &state, bool little_endian)
     unsigned non_local_bid_upperbound = 2;
     // Non-local blocks are disjoint.
     // Ignore null pointer block
-    auto memsz_half = expr::mkUInt((1ull << 63), bitsPtrSize());
     for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
       for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
