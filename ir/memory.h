@@ -124,7 +124,7 @@ class Memory {
 
   smt::expr local_avail_space; // available space in local block area.
 
-  smt::FunctionExpr local_blk_addr;
+  smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_kind;
 
