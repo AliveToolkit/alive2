@@ -104,8 +104,8 @@ class Alive2Test(TestFormat):
       return lit.Test.FAIL, out + err
 
     if exitCode != 0:
-      if expect_err != None and string.find(err, expect_err.group(1)) != -1:
+      if expect_err != None and err.find(expect_err.group(1)) != -1:
         return lit.Test.PASS, ''
-      if xfail != None and string.find(err, xfail.group(1)) != -1:
+      if xfail != None and err.find(xfail.group(1)) != -1:
         return lit.Test.XFAIL, ''
     return lit.Test.FAIL, out + err

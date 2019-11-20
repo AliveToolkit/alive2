@@ -11,7 +11,7 @@ $stats       = array();
 $knownfns    = array();
 $unsupported = array();
 
-foreach (glob("logs/*.txt") as $f) {
+foreach (glob("$logs/*.txt") as $f) {
   $txt = file_get_contents($f);
   preg_match_all('/ERROR: (.+)/S', $txt, $m);
   foreach($m[1] as $err) {
