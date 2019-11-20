@@ -1,3 +1,5 @@
+; TEST-ARGS: -smt-to=9000
+
 define i32 @free_ub_alloca() {
   %1 = alloca i32
   %2 = bitcast i32* %1 to i8*

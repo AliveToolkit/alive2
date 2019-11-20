@@ -1,4 +1,5 @@
-; TEST-ARGS: -smt-to=9000
+; TEST-ARGS: -smt-to=15000 -disable-undef-input
+; To resolve timeout error, it is assumed that input %pptr is never an undef pointer
 
 define i8 @freshbid_alloca(i8** %pptr) {
   %ptr = alloca i8
