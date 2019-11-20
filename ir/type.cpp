@@ -1050,7 +1050,6 @@ pair<expr, vector<expr>> SymbolicType::mkUndefInput(State &st) const {
   DISPATCH(mkUndefInput(st), UNREACHABLE());
 }
 
-
 void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
   DISPATCH(printVal(os, st, e), UNREACHABLE());
 }

@@ -499,17 +499,20 @@ Memory::Memory(State &state, bool little_endian)
     // Ignore null pointer block
     for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
+      expr disj(true);
+
       for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
         Pointer p2(*this, bid2, false);
-        state.addAxiom((p1.is_block_alive() && p2.is_block_alive())
-            .implies(disjoint(p1.get_address(), p1.block_size(),
-                              p2.get_address(), p2.block_size())));
+        disj &= p2.is_block_alive()
+                    .implies(disjoint(p1.get_address(), p1.block_size(),
+                                      p2.get_address(), p2.block_size()));
       }
-      // Non-local blocks' addr, addr + size is not greater than a half of
-      // memory.
-      auto memsz_half = expr::mkUInt((1ull << 63), bitsPtrSize());
-      state.addAxiom(p1.get_address().ule(memsz_half));
-      state.addAxiom(memsz_half.uge(p1.get_address() + p1.block_size()));
+      state.addAxiom(p1.is_block_alive().implies(disj));
+
+      // Ensure block doesn't spill to local memory
+      auto bit = bitsPtrSize() - 2;
+      state.addAxiom((p1.get_address() + p1.block_size())
+                       .extract(bit, bit) == 0);
     }
   }
 
@@ -555,11 +558,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   if (bid_out)
     *bid_out = bid;
 
-  expr size_zext0 = size.zextOrTrunc(bits_size_t);
-  expr allocated = size_zext0.extract(bits_size_t - 1, bits_size_t - 1) == 0;
-
-  expr size_zext = size_zext0.trunc(bits_size_t - 1);
-  size_zext = expr::mkIf(allocated, size_zext, expr::mkUInt(0, bits_size_t-1));
+  expr size_zext = size.zextOrTrunc(bits_size_t);
+  expr allocated = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
 
   allocated &= precond;
 
@@ -573,29 +573,33 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   if (is_local) {
     assert(align != 0);
     auto align_bits = ilog2(align);
+
     // MSB of local block area's address is 1.
-    auto addr_var = expr::mkFreshVar("local_addr",
-        expr::mkUInt(0, bits_size_t - align_bits - 1));
+    auto addr_var
+      = expr::mkFreshVar("local_addr",
+                         expr::mkUInt(0, bits_size_t - align_bits - 1));
     state->addQuantVar(addr_var);
     auto blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
                                : addr_var;
 
-    auto size_upperbound = size_zext0 + expr::mkUInt(align - 1, bitsPtrSize());
+    auto size_upperbound = size_zext + expr::mkUInt(align - 1, bitsPtrSize());
     allocated &= size_upperbound.ule(local_avail_space.zext(1));
 
     // Disjointness of block's address range with other local blocks
     auto zero = expr::mkUInt(0, bitsOffset());
     auto one = expr::mkUInt(1, 1);
-    for (auto &itm : local_blk_addr) {
-      // itm.first is short bid, so concat prefix 1.
-      Pointer p2(*this, one.concat(itm.first), zero);
-      state->addPre((allocated && p2.is_block_alive())
-          .implies(disjoint(one.concat(blk_addr), size_zext0, p2.get_address(),
-                            p2.block_size())));
+    expr disj(true);
+    for (auto &[sbid, addr] : local_blk_addr) {
+      (void)addr;
+      Pointer p2(*this, one.concat(sbid), zero);
+      disj &= p2.is_block_alive()
+          .implies(disjoint(one.concat(blk_addr), size_zext, p2.get_address(),
+                            p2.block_size()));
     }
+    state->addPre(allocated.implies(disj));
 
     local_blk_addr.add(expr(short_bid), move(blk_addr));
-    local_blk_size.add(expr(short_bid), move(size_zext));
+    local_blk_size.add(expr(short_bid), size_zext.trunc(bits_size_t - 1));
     local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
 
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
@@ -607,13 +611,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                    local_avail_space - size_upperbound_trunc,
                                    local_avail_space);
 
-    // Local block area is at the top half of the memory.
-    // This also encodes the non-zero-ness of the address
-    state->addPre(allocated.implies(p.get_address()
-        .extract(bitsPtrSize() - 1, bitsPtrSize() - 1) == 1));
-
     // addr + size does not overflow.
-    // C std states that one byte past the block boundary does not overflow
     state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
 
   } else {
@@ -622,7 +620,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     // The memory block was initially alive.
     state->addAxiom(allocated.implies(mk_liveness_array().load(short_bid) &&
                                       p.is_aligned(align) &&
-                                      p.block_size() == size_zext.zext(1) &&
+                                      p.block_size() == size_zext &&
                                       p.get_address() != 0));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
   }
