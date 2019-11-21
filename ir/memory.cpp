@@ -510,7 +510,7 @@ Memory::Memory(State &state, bool little_endian)
       state.addAxiom(p1.is_block_alive().implies(disj));
 
       // Ensure block doesn't spill to local memory
-      auto bit = bitsPtrSize() - 2;
+      auto bit = bitsPtrSize() - 1;
       state.addAxiom((p1.get_address() + p1.block_size())
                        .extract(bit, bit) == 0);
     }
