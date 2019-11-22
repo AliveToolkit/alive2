@@ -23,7 +23,6 @@ extern unsigned num_max_nonlocals_inst;
 // The upperbound of # of local blocks (max(src, tgt))
 extern unsigned num_locals;
 // The upperbound of # of nonlocal blocks
-// It is num_globals + num_ptrinputs + num_max_nonlocals_inst + 1(null block).
 extern unsigned num_nonlocals;
 // The number of bits needed for encoding block id.
 extern unsigned bits_for_bid;
