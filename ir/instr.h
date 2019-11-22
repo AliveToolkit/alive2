@@ -113,6 +113,7 @@ public:
   ConversionOp(Type &type, std::string &&name, Value &val, Op op)
     : Instr(type, std::move(name)), val(&val), op(op) {}
 
+  Op getOp() const { return op; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

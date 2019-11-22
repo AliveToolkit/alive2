@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+; -disable-undef-input is here to relax timeout
 @glb = global i8 0
 
 define i8 @glb_arg_noalias(i8** %pptr) {
