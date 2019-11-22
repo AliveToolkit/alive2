@@ -100,6 +100,13 @@ public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI)
       : f(f), TLI(TLI) {}
 
+  ~llvm2alive_() {
+    for (auto &inst : i_constexprs) {
+      remove_value_name(*inst); // otherwise value_names maintain freed pointers
+      inst->deleteValue();
+    }
+  }
+
   RetTy visitUnaryOperator(llvm::UnaryOperator &i) {
     PARSE_UNOP();
     UnaryOp::Op op;
@@ -660,11 +667,6 @@ public:
         } else
           return {};
       }
-    }
-
-    for (auto &inst : i_constexprs) {
-      remove_value_name(*inst); // otherwise value_names maintain freed pointers
-      inst->deleteValue();
     }
 
     return move(Fn);
