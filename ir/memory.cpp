@@ -494,12 +494,12 @@ Memory::Memory(State &state, bool little_endian)
 
     // Non-local blocks are disjoint.
     // Ignore null pointer block
-    unsigned non_local_bid_upperbound = 1 << ilog2(2 * num_nonlocals - 1);
-    for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
+    unsigned non_local_bid_upperbound = (1 << ilog2(2 * num_nonlocals - 1)) - 1;
+    for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
       expr disj(true);
 
-      for (unsigned bid2 = bid + 1; bid2 < non_local_bid_upperbound; ++bid2) {
+      for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
         Pointer p2(*this, bid2, false);
         disj &= p2.is_block_alive()
                     .implies(disjoint(p1.get_address(), p1.block_size(),
