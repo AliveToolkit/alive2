@@ -73,7 +73,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
       ostringstream ss;
       ss << var;
       auto name = ss.str();
-      found_undef |= string_view(name).substr(0, 6) == "undef_";
+      found_undef |= string_view(name).substr(0, 6) == "undef!";
     }
     if (found_undef)
       os << "\t[based on undef value]";

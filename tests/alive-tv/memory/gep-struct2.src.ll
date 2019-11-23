@@ -1,4 +1,3 @@
-; TEST-ARGS: -smt-to=2000
 target datalayout = "e-i32:32-i128:32-i8:8"
 
 %0 = type [10 x { i32, i128, [5 x { i32, i8, i8 }] }]
