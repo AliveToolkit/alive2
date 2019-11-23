@@ -747,24 +747,29 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
   children.resize(elements, &elementTy);
 }
 
-StateValue VectorType::extract(const StateValue &val,
+StateValue VectorType::extract(const StateValue &vector,
                                const expr &index) const {
   auto &elementTy = *children[0];
   unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = val.bits();
+  unsigned bw_val = vector.bits();
   expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
 
   unsigned h = elements * bw_elem - 1;
   unsigned l = (elements - 1) * bw_elem;
 
-  return elementTy.fromBV({ (val.value << idx).extract(h, l),
-                            (val.non_poison << idx).extract(h, l) });
+  return elementTy.fromBV({ (vector.value << idx).extract(h, l),
+                            (vector.non_poison << idx).extract(h, l) });
 }
 
-StateValue VectorType::update(const StateValue &val,
-                              const StateValue &n,
+StateValue VectorType::update(const StateValue &vector,
+                              const StateValue &val,
                               const expr &index) const {
   auto &elementTy = *children[0];
+  StateValue val_bv = elementTy.toBV(val);
+
+  if (elements == 1)
+    return val_bv;
+
   unsigned bw_elem = elementTy.bits();
   unsigned bw_val = bits();
 
@@ -772,12 +777,11 @@ StateValue VectorType::update(const StateValue &val,
   expr fill = expr::mkUInt(0, bw_val - bw_elem);
   expr mask = ~expr::mkInt(-1, bw_elem).concat(fill).lshr(idx);
 
-  StateValue n_bv = elementTy.toBV(n);
-  expr nv_shifted = n_bv.value.concat(fill).lshr(idx);
-  expr np_shifted = n_bv.non_poison.concat(fill).lshr(idx);
+  expr nv_shifted = val_bv.value.concat(fill).lshr(idx);
+  expr np_shifted = val_bv.non_poison.concat(fill).lshr(idx);
 
-  return fromBV({ (val.value & mask) | nv_shifted,
-                  (val.non_poison & mask) | np_shifted});
+  return fromBV({ (vector.value & mask) | nv_shifted,
+                  (vector.non_poison & mask) | np_shifted});
 }
 
 expr VectorType::getTypeConstraints() const {

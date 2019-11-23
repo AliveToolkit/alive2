@@ -281,10 +281,10 @@ public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
   VectorType(std::string &&name, unsigned elements, Type &elementTy);
 
-  IR::StateValue extract(const IR::StateValue &val,
+  IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index) const;
-  IR::StateValue update(const IR::StateValue &val,
-                        const IR::StateValue &n,
+  IR::StateValue update(const IR::StateValue &vector,
+                        const IR::StateValue &val,
                         const smt::expr &idx) const;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
