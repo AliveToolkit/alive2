@@ -60,6 +60,12 @@ string value_name(const llvm::Value &v) {
                                         : '%' + to_string(value_id_counter++);
 }
 
+void remove_value_name(const llvm::Value &v) {
+  auto itr = value_names.find(&v);
+  if (itr != value_names.end())
+    value_names.erase(itr);
+}
+
 Type& get_int_type(unsigned bits) {
   if (bits >= int_types.size())
     int_types.resize(bits + 1);
@@ -138,7 +144,8 @@ Value* make_intconst(uint64_t val, int bits) {
 }
 
 
-Value* get_operand(llvm::Value *v) {
+Value* get_operand(llvm::Value *v,
+    function<Instr*(llvm::ConstantExpr *)> constexpr_conv) {
   if (isa<llvm::Instruction>(v) || isa<llvm::Argument>(v))
     return identifiers[v];
 
@@ -209,7 +216,10 @@ Value* get_operand(llvm::Value *v) {
     }
     Value *initval = nullptr;
     if (gv->hasInitializer() && gv->isConstant()) {
-      if (!(initval = get_operand(gv->getInitializer())))
+      if (isa<llvm::ConstantExpr>(gv->getInitializer()))
+        // TODO: not supported
+        return nullptr;
+      else if (!(initval = get_operand(gv->getInitializer(), constexpr_conv)))
         return nullptr;
     }
     int size = DL->getTypeAllocSize(gv->getValueType());
@@ -226,7 +236,7 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
     vector<Value*> vals;
     for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
-      if (auto op = get_operand(*I))
+      if (auto op = get_operand(*I, constexpr_conv))
         vals.emplace_back(op);
       else
         return nullptr;
@@ -240,7 +250,7 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
     vector<Value*> vals;
     for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      if (auto op = get_operand(cnst->getElementAsConstant(i)))
+      if (auto op = get_operand(cnst->getElementAsConstant(i), constexpr_conv))
         vals.emplace_back(op);
       else
         return nullptr;
@@ -254,7 +264,7 @@ Value* get_operand(llvm::Value *v) {
   if (auto cnst = dyn_cast<llvm::ConstantAggregateZero>(v)) {
     vector<Value*> vals;
     for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      if (auto op = get_operand(cnst->getElementValue(i)))
+      if (auto op = get_operand(cnst->getElementValue(i), constexpr_conv))
         vals.emplace_back(op);
       else
         return nullptr;
@@ -263,6 +273,10 @@ Value* get_operand(llvm::Value *v) {
     auto ret = val.get();
     current_fn->addConstant(move(val));
     return ret;
+  }
+
+  if (auto cexpr = dyn_cast<llvm::ConstantExpr>(v)) {
+    return constexpr_conv(cexpr);
   }
 
   return nullptr;
