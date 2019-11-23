@@ -158,6 +158,10 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 }
 }
 
+static bool observes_addresses() {
+  return IR::has_ptr2int || IR::has_int2ptr;
+}
+
 
 namespace IR {
 
@@ -493,19 +497,20 @@ Memory::Memory(State &state, bool little_endian)
   // value.
   local_avail_space = expr::mkVar("local_avail_space", bitsPtrSize() - 1);
 
-  if (state.isSource()) {
+  if (state.isSource())
+    state.addAxiom(Pointer::mkNullPointer(*this).block_size(false) == 0);
+
+  if (state.isSource() && observes_addresses()) {
     // Initialize a memory block for null pointer.
     // TODO: in twin memory model, this is not needed.
-    auto nullPtr = Pointer::mkNullPointer(*this);
-    state.addAxiom(nullPtr.get_address(false) == 0);
-    state.addAxiom(nullPtr.block_size(false) == 0);
+    state.addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
 
     // Non-local blocks are disjoint.
     // Ignore null pointer block
     unsigned non_local_bid_upperbound = 1 << (bits_for_bid - 1);
     for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
-      expr disj(true);
+      expr disj = p1.get_address() != 0;
 
       for (unsigned bid2 = bid + 1; bid2 < non_local_bid_upperbound; ++bid2) {
         Pointer p2(*this, bid2, false);
@@ -519,6 +524,21 @@ Memory::Memory(State &state, bool little_endian)
       auto bit = bitsPtrSize() - 1;
       state.addAxiom((p1.get_address() + p1.block_size())
                        .extract(bit, bit) == 0);
+    }
+  }
+
+  // ensure globals fit in their reserved space
+  if (state.isSource()) {
+    auto sum_globals = expr::mkUInt(0, bitsPtrSize() - 1);
+
+    unsigned non_local_bid_upperbound = 1 << (bits_for_bid - 1);
+    for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
+      Pointer p(*this, bid, false);
+      auto sz = p.block_size().extract(bitsPtrSize() - 2, 0);
+      state.addAxiom(p.is_block_alive()
+                      .implies(sum_globals.add_no_uoverflow(sz)));
+      sum_globals = expr::mkIf(p.is_block_alive(), sum_globals + sz,
+                               sum_globals);
     }
   }
 
@@ -603,17 +623,19 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     allocated &= size_upperbound.ule(local_avail_space.zext(1));
 
     // Disjointness of block's address range with other local blocks
-    auto zero = expr::mkUInt(0, bitsOffset());
-    auto one = expr::mkUInt(1, 1);
-    expr disj(true);
-    for (auto &[sbid, addr] : local_blk_addr) {
-      (void)addr;
-      Pointer p2(*this, one.concat(sbid), zero);
-      disj &= p2.is_block_alive()
-          .implies(disjoint(one.concat(blk_addr), size_zext, p2.get_address(),
-                            p2.block_size()));
+    if (observes_addresses()) {
+      auto zero = expr::mkUInt(0, bitsOffset());
+      auto one = expr::mkUInt(1, 1);
+      expr disj(true);
+      for (auto &[sbid, addr] : local_blk_addr) {
+        (void)addr;
+        Pointer p2(*this, one.concat(sbid), zero);
+        disj &= p2.is_block_alive()
+            .implies(disjoint(one.concat(blk_addr), size_zext, p2.get_address(),
+                              p2.block_size()));
+      }
+      state->addPre(allocated.implies(disj));
     }
-    state->addPre(allocated.implies(disj));
 
     local_blk_addr.add(expr(short_bid), move(blk_addr));
     local_blk_size.add(expr(short_bid), size_zext.trunc(bits_size_t - 1));
@@ -629,7 +651,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                    local_avail_space);
 
     // addr + size does not overflow.
-    state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
+    if (observes_addresses())
+      state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
 
   } else {
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
@@ -637,8 +660,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     // The memory block was initially alive.
     state->addAxiom(allocated.implies(mk_liveness_array().load(short_bid) &&
                                       p.is_aligned(align) &&
-                                      p.block_size() == size_zext &&
-                                      p.get_address() != 0));
+                                      p.block_size() == size_zext));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
   }
   return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());

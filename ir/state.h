@@ -29,10 +29,12 @@ extern unsigned bits_for_bid;
 // The number of bits needed for encoding pointer's offset.
 extern unsigned bits_for_offset;
 extern bool nullptr_is_used;
+extern bool has_int2ptr;
+extern bool has_ptr2int;
 
 void initConstants(unsigned num_globals, unsigned num_ptrinputs,
                    unsigned num_max_nonlocals_inst, unsigned num_locals,
-                   bool nullptr_is_used);
+                   bool nullptr_is_used, bool has_int2ptr, bool has_ptr2int);
 
 
 class Value;

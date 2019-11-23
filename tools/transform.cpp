@@ -379,14 +379,18 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   bool nullptr_is_used = false;
+  bool has_int2ptr = false;
+  bool has_ptr2int = false;
+
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {
-          if (has_nullptr(op)) {
-            nullptr_is_used = true;
-            break;
-          }
+          nullptr_is_used |= has_nullptr(op);
+        }
+        if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
+          has_int2ptr |= conv->getOp() == ConversionOp::Int2Ptr;
+          has_ptr2int |= conv->getOp() == ConversionOp::Ptr2Int;
         }
       }
     }
@@ -396,17 +400,17 @@ static void calculateAndInitConstants(Transform &t) {
     for (auto gvs : { &globals_src , &globals_tgt }) {
       for (auto gv : *gvs) {
         if (auto init = gv->initVal()) {
-          if (has_nullptr(init)) {
-            nullptr_is_used = true;
-            break;
-          }
+          if (nullptr_is_used |= has_nullptr(init))
+            goto exit_gv_loop;
         }
       }
     }
   }
+exit_gv_loop:
 
   initConstants(num_globals, num_ptrinputs, num_inst_nonlocals,
-                max(num_locals_src, num_locals_tgt), nullptr_is_used);
+                max(num_locals_src, num_locals_tgt), nullptr_is_used,
+                has_int2ptr, has_ptr2int);
 }
 
 
