@@ -442,11 +442,19 @@ expr Memory::mk_liveness_array() const {
 static unsigned last_local_bid = 0;
 static unsigned last_nonlocal_bid = 1;
 
+static bool memory_unused() {
+  // +1 for the null block
+  return num_locals == 0 && num_nonlocals == 1 && !nullptr_is_used;
+}
+
 Memory::Memory(State &state, bool little_endian)
   : state(&state), little_endian(little_endian),
     local_blk_addr(expr::mkUInt(0, bits_size_t - 1)),
     local_blk_size(expr::mkUInt(0, bits_size_t - 1)),
     local_blk_kind(expr::mkUInt(0, 2)) {
+
+  if (memory_unused())
+    return;
 
   non_local_block_val = mk_val_array();
   non_local_block_liveness = mk_liveness_array();
@@ -494,12 +502,12 @@ Memory::Memory(State &state, bool little_endian)
 
     // Non-local blocks are disjoint.
     // Ignore null pointer block
-    unsigned non_local_bid_upperbound = (1 << ilog2(2 * num_nonlocals - 1)) - 1;
-    for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
+    unsigned non_local_bid_upperbound = 1 << (bits_for_bid - 1);
+    for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
       expr disj(true);
 
-      for (unsigned bid2 = bid + 1; bid2 <= non_local_bid_upperbound; ++bid2) {
+      for (unsigned bid2 = bid + 1; bid2 < non_local_bid_upperbound; ++bid2) {
         Pointer p2(*this, bid2, false);
         disj &= p2.is_block_alive()
                     .implies(disjoint(p1.get_address(), p1.block_size(),
@@ -552,6 +560,8 @@ pair<expr, expr> Memory::mkUndefInput() const {
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out,
                    const expr &precond) {
+  assert(!memory_unused());
+
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 
@@ -635,6 +645,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 }
 
 void Memory::free(const expr &ptr) {
+  assert(!memory_unused());
   Pointer p(*this, ptr);
   state->addUB(p.isNull() || (p.get_offset() == 0 &&
                               p.is_block_alive() &&
@@ -652,6 +663,7 @@ void Memory::free(const expr &ptr) {
 
 void Memory::store(const expr &p, const StateValue &v, const Type &type,
                    unsigned align) {
+  assert(!memory_unused());
   vector<Byte> bytes = valueToBytes(v, type, *this);
 
   Pointer ptr(*this, p);
@@ -663,6 +675,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 }
 
 StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
+  assert(!memory_unused());
   auto bitsize = type.isPtrType() ? bitsPtrSize() : type.bits();
   unsigned bytesize = divide_up(bitsize, 8);
 
@@ -680,6 +693,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
+  assert(!memory_unused());
   assert(!val.isValid() || val.bits() == 8);
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytesize, align, true);
@@ -701,6 +715,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
                     unsigned align_dst, unsigned align_src, bool is_move) {
+  assert(!memory_unused());
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytesize, align_dst, true);
   src.is_dereferenceable(bytesize, align_src, false);
@@ -725,15 +740,20 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
 }
 
 expr Memory::ptr2int(const expr &ptr) {
+  assert(!memory_unused());
   return Pointer(*this, ptr).get_address();
 }
 
 expr Memory::int2ptr(const expr &val) {
+  assert(!memory_unused());
   // TODO
   return {};
 }
 
 expr Memory::refined(const Memory &other) const {
+  if (memory_unused())
+    return true;
+
   Pointer p(*this, "#idx");
   Pointer q(other, p());
   return p.block_refined(q);

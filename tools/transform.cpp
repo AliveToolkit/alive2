@@ -136,16 +136,16 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   }
 
   set<string> seen_vars;
-  for (auto &st : { src_state, tgt_state }) {
+  for (auto st : { &src_state, &tgt_state }) {
     if (!check_each_var) {
-      if (st.isSource()) {
+      if (st->isSource()) {
         s << "\nSource:\n";
       } else {
         s << "\nTarget:\n";
       }
     }
 
-    for (auto &[var, val, used] : st.getValues()) {
+    for (auto &[var, val, used] : st->getValues()) {
       (void)used;
       auto &name = var->getName();
       if (name == var_name)
@@ -157,7 +157,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
         continue;
 
       s << *var << " = ";
-      print_varval(s, const_cast<State&>(st), m, var, var->getType(),
+      print_varval(s, const_cast<State&>(*st), m, var, var->getType(),
                    val.first);
       s << '\n';
     }
@@ -306,6 +306,20 @@ static void check_refinement(Errors &errs, Transform &t,
   }
 }
 
+static bool has_nullptr(const Value *v) {
+  if (dynamic_cast<const NullPointerValue*>(v))
+    return true;
+
+  if (auto agg = dynamic_cast<const AggregateConst*>(v)) {
+    for (auto val : agg->getVals()) {
+      if (has_nullptr(val))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
@@ -364,8 +378,35 @@ static void calculateAndInitConstants(Transform &t) {
     });
   }
 
+  bool nullptr_is_used = false;
+  for (auto fn : { &t.src, &t.tgt }) {
+    for (auto BB : fn->getBBs()) {
+      for (auto &I : BB->instrs()) {
+        for (auto op : I.operands()) {
+          if (has_nullptr(op)) {
+            nullptr_is_used = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!nullptr_is_used) {
+    for (auto gvs : { &globals_src , &globals_tgt }) {
+      for (auto gv : *gvs) {
+        if (auto init = gv->initVal()) {
+          if (has_nullptr(init)) {
+            nullptr_is_used = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   initConstants(num_globals, num_ptrinputs, num_inst_nonlocals,
-                max(num_locals_src, num_locals_tgt));
+                max(num_locals_src, num_locals_tgt), nullptr_is_used);
 }
 
 
