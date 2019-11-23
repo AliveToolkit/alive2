@@ -749,6 +749,9 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
 
 StateValue VectorType::extract(const StateValue &vector,
                                const expr &index) const {
+  if (!vector.isValid())
+    return {};
+
   auto &elementTy = *children[0];
   unsigned bw_elem = elementTy.bits();
   unsigned bw_val = vector.bits();
