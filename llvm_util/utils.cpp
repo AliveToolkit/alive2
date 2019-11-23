@@ -61,9 +61,7 @@ string value_name(const llvm::Value &v) {
 }
 
 void remove_value_name(const llvm::Value &v) {
-  auto itr = value_names.find(&v);
-  if (itr != value_names.end())
-    value_names.erase(itr);
+  value_names.erase(&v);
 }
 
 Type& get_int_type(unsigned bits) {
@@ -145,7 +143,7 @@ Value* make_intconst(uint64_t val, int bits) {
 
 
 Value* get_operand(llvm::Value *v,
-    function<Instr*(llvm::ConstantExpr *)> constexpr_conv) {
+                   function<Value*(llvm::ConstantExpr*)> constexpr_conv) {
   if (isa<llvm::Instruction>(v) || isa<llvm::Argument>(v))
     return identifiers[v];
 

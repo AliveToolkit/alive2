@@ -18,7 +18,6 @@ class Value;
 namespace IR {
 class BasicBlock;
 class Function;
-class Instr;
 class Type;
 class Value;
 }
@@ -35,7 +34,7 @@ IR::Type* llvm_type2alive(const llvm::Type *ty);
 
 IR::Value* make_intconst(uint64_t val, int bits);
 IR::Value* get_operand(llvm::Value *v,
-  std::function<IR::Instr*(llvm::ConstantExpr *)> constexpr_conv);
+  std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv);
 
 void add_identifier(const llvm::Value &llvm, IR::Value &v);
 

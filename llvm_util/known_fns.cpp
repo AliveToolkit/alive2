@@ -21,7 +21,7 @@ namespace llvm_util {
 pair<unique_ptr<Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            BasicBlock &BB,
-           function<Instr*(llvm::ConstantExpr *)> constexpr_conv) {
+           function<Value*(llvm::ConstantExpr *)> constexpr_conv) {
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
     RETURN_FAIL_KNOWN();

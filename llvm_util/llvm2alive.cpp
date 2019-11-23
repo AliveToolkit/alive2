@@ -7,7 +7,6 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -77,15 +76,16 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return a != 0 ? a : DL().getPrefTypeAlignment(ty);
   }
 
-  auto convert_constexpr(llvm::ConstantExpr *cexpr) {
+  Value* convert_constexpr(llvm::ConstantExpr *cexpr) {
     llvm::Instruction *newI = cexpr->getAsInstruction();
     static unsigned constexpr_idx = 0;
-    stringstream ss;
-    ss << "__constexpr_" << constexpr_idx++;
-    newI->setName(ss.str());
-
+    newI->setName("__constexpr_" + to_string(constexpr_idx++));
     i_constexprs.push_back(newI);
+
     auto ptr = this->visit(*newI);
+    if (!ptr)
+      return nullptr;
+
     auto i = ptr.get();
     BB->addInstr(move(ptr));
     return i;
