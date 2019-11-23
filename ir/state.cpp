@@ -13,6 +13,29 @@ using namespace std;
 
 namespace IR {
 
+unsigned num_max_nonlocals_inst;
+unsigned num_locals;
+unsigned num_nonlocals;
+unsigned bits_for_bid;
+unsigned bits_for_offset;
+
+void initConstants(unsigned num_globals, unsigned num_ptrinputs,
+                   unsigned num_max_nonlocals_inst, unsigned num_locals) {
+  IR::bits_for_offset = 64;
+  IR::num_max_nonlocals_inst = num_max_nonlocals_inst;
+  IR::num_locals = num_locals;
+  // Include null block
+  IR::num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
+
+  unsigned maxblks = max(num_locals, num_nonlocals);
+  if (maxblks == 1)
+    IR::bits_for_bid = 2; // local/non-local bit + one bit for bid
+  else {
+    unsigned n = ilog2(2 * maxblks - 1); // floor(log2(maxblks))
+    IR::bits_for_bid = 1 + n;
+  }
+}
+
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this, f.isLittleEndian()),
     return_domain(false), return_val(f.getType().getDummyValue(false)),

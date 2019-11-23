@@ -306,6 +306,69 @@ static void check_refinement(Errors &errs, Transform &t,
   }
 }
 
+static void calculateAndInitConstants(Transform &t) {
+  const auto &globals_tgt = t.tgt.getGlobalVars();
+  const auto &globals_src = t.src.getGlobalVars();
+  unsigned num_globals = globals_src.size();
+
+  for (auto GVT : globals_tgt) {
+    auto I = find_if(globals_src.begin(), globals_src.end(),
+      [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
+    if (I == globals_src.end())
+      ++num_globals;
+  }
+
+  unsigned num_ptrinputs = 0;
+  const auto &inputs = t.src.getInputs();
+  for (auto &arg : inputs) {
+    // An argument with aggregate type with pointer member isn't regarded
+    // as a source of non-local pointer, because its member should be extracted
+    // with extractelement / extractvalue instructions, which are also counted
+    // as source of non-local blocks.
+    num_ptrinputs += arg.getType().isPtrType();
+  }
+
+  auto returns_local = [](const Instr &inst) {
+    return dynamic_cast<const Alloc *>(&inst) != nullptr ||
+           dynamic_cast<const Malloc *>(&inst) != nullptr ||
+           dynamic_cast<const Calloc *>(&inst) != nullptr;
+  };
+  auto returns_nonlocal = [](const Instr &inst) {
+    if (!inst.getType().isPtrType())
+      return false;
+    if (auto conv = dynamic_cast<const ConversionOp *>(&inst)) {
+      if (conv->getOp() == ConversionOp::BitCast)
+        return false;
+    }
+    if (dynamic_cast<const GEP *>(&inst))
+      return false;
+    return true;
+  };
+
+  // The number of instructions that can return a pointer to a non-local block.
+  unsigned num_inst_nonlocals = 0;
+  // The number of local blocks.
+  unsigned num_locals_src = 0, num_locals_tgt = 0;
+  for (auto BB : t.src.getBBs()) {
+    const auto &instrs = BB->instrs();
+    for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
+      num_locals_src += returns_local(i);
+      num_inst_nonlocals += returns_nonlocal(i);
+    });
+  }
+  for (auto BB : t.tgt.getBBs()) {
+    const auto &instrs = BB->instrs();
+    for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
+      num_locals_tgt += returns_local(i);
+      num_inst_nonlocals += returns_nonlocal(i);
+    });
+  }
+
+  initConstants(num_globals, num_ptrinputs, num_inst_nonlocals,
+                max(num_locals_src, num_locals_tgt));
+}
+
+
 
 namespace tools {
 
@@ -355,6 +418,7 @@ Errors TransformVerify::verify() const {
     }
   }
 
+  ::calculateAndInitConstants(t);
   State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
 

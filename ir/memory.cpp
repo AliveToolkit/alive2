@@ -166,16 +166,16 @@ Pointer::Pointer(const Memory &m, const char *var_name)
                 expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
-  expr bid_expr = expr::mkUInt(bid, m.bitsBid() - 1);
+  expr bid_expr = expr::mkUInt(bid, bits_for_bid - 1);
   p = expr::mkUInt(local, 1).concat(bid_expr)
-                            .concat(expr::mkUInt(0, m.bits_for_offset));
+                            .concat(expr::mkUInt(0, bits_for_offset));
 }
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
   : m(m), p(bid.concat(offset)) {}
 
 unsigned Pointer::total_bits() const {
-  return m.bitsBid() + m.bitsOffset();
+  return bits_for_bid + m.bitsOffset();
 }
 
 expr Pointer::is_local() const {
@@ -237,11 +237,11 @@ expr Pointer::short_ptr() const {
 
 Pointer Pointer::operator+(const expr &bytes) const {
   expr off = (get_offset() + bytes.zextOrTrunc(m.bits_size_t));
-  return { m, get_bid(), off.trunc(m.bits_for_offset) };
+  return { m, get_bid(), off.trunc(bits_for_offset) };
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
-  return *this + expr::mkUInt(bytes, m.bits_for_offset);
+  return *this + expr::mkUInt(bytes, bits_for_offset);
 }
 
 void Pointer::operator+=(const expr &bytes) {
@@ -309,7 +309,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
 }
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
-  is_dereferenceable(expr::mkUInt(bytes, m.bits_for_offset), align, iswrite);
+  is_dereferenceable(expr::mkUInt(bytes, bits_for_offset), align, iswrite);
 }
 
 // general disjoint check for unsigned integer
@@ -429,12 +429,12 @@ static expr load(const Pointer &p, expr &local, expr &non_local) {
 
 expr Memory::mk_val_array() const {
   return expr::mkArray("blk_val",
-                       expr::mkUInt(0, bitsBid() - 1 + bits_for_offset),
+                       expr::mkUInt(0, bits_for_bid - 1 + bits_for_offset),
                        expr::mkUInt(0, bitsByte()));
 }
 
 expr Memory::mk_liveness_array() const {
-  return expr::mkArray("blk_liveness", expr::mkUInt(0, bitsBid() - 1), true);
+  return expr::mkArray("blk_liveness", expr::mkUInt(0, bits_for_bid - 1), true);
 }
 
 // last_bid stores 1 + the last memory block id.
@@ -470,7 +470,7 @@ Memory::Memory(State &state, bool little_endian)
 
   // all local blocks are dead in the beginning
   local_block_liveness
-    = expr::mkLambda({ expr::mkVar("#bid0", bitsBid() - 1) }, false);
+    = expr::mkLambda({ expr::mkVar("#bid0", bits_for_bid - 1) }, false);
 
   // A memory space is separated into non-local area / local area.
   // Non-local area is the lower half of memory (to include null pointer),
@@ -492,11 +492,9 @@ Memory::Memory(State &state, bool little_endian)
     state.addAxiom(nullPtr.get_address(false) == 0);
     state.addAxiom(nullPtr.block_size(false) == 0);
 
-    // TODO: replace the magic number 2 with the result of analysis.
-    // This is just set as 2 to make existing unit tests run with less timeout.
-    unsigned non_local_bid_upperbound = 2;
     // Non-local blocks are disjoint.
     // Ignore null pointer block
+    unsigned non_local_bid_upperbound = (1 << ilog2(2 * num_nonlocals - 1)) - 1;
     for (unsigned bid = 1; bid <= non_local_bid_upperbound; ++bid) {
       Pointer p1(*this, bid, false);
       expr disj(true);
@@ -528,6 +526,14 @@ void Memory::resetLocalBids() {
   last_local_bid = 0;
 }
 
+unsigned Memory::bitsOffset() const {
+  return bits_for_offset;
+}
+
+unsigned Memory::bitsByte() const {
+  return 1 + 1 + bits_for_bid + bitsOffset() + 3;
+}
+
 expr Memory::mkInput(const char *name) const {
   unsigned bits = bits_for_bid - 1 + bits_for_offset;
   expr var = expr::mkVar(name, bits);
@@ -551,6 +557,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   auto &last_bid = is_local ? last_local_bid : last_nonlocal_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
+  assert((is_local && bid < num_locals) || (!is_local && bid < num_nonlocals));
   if (!bidopt)
     ++last_bid;
   assert(bid < last_bid);

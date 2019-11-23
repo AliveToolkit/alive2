@@ -108,9 +108,6 @@ public:
 class Memory {
   State *state;
 
-  // FIXME: these should be tuned per function
-  unsigned bits_for_offset = 64;
-  unsigned bits_for_bid = 12;
   // bits_size_t is equivalent to the size of a pointer.
   unsigned bits_size_t = 64;
 
@@ -176,9 +173,8 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
-  unsigned bitsOffset() const { return bits_for_offset; }
-  unsigned bitsBid() const { return bits_for_bid; }
-  unsigned bitsByte() const { return 1 + 1 + bitsBid() + bitsOffset() + 3; }
+  unsigned bitsOffset() const;
+  unsigned bitsByte() const;
   unsigned bitsPtrSize() const { return bits_size_t; }
 
   // for container use only

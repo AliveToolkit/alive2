@@ -18,6 +18,21 @@
 
 namespace IR {
 
+// The upperbound of # of non-local pointers that are returned by instructions.
+extern unsigned num_max_nonlocals_inst;
+// The upperbound of # of local blocks (max(src, tgt))
+extern unsigned num_locals;
+// The upperbound of # of nonlocal blocks
+extern unsigned num_nonlocals;
+// The number of bits needed for encoding block id.
+extern unsigned bits_for_bid;
+// The number of bits needed for encoding pointer's offset.
+extern unsigned bits_for_offset;
+
+void initConstants(unsigned num_globals, unsigned num_ptrinputs,
+                   unsigned num_max_nonlocals_inst, unsigned num_locals);
+
+
 class Value;
 class BasicBlock;
 class Function;
