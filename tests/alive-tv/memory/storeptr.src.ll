@@ -1,10 +1,9 @@
-; TEST-ARGS: -smt-to=15000
+; TEST-ARGS: -disable-undef-input
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
 define i16 @f(i16** %pptr) {
   %ptr0 = call i8* @malloc(i64 2)
-  %iaddr = ptrtoint i8* %ptr0 to i64
-  %c = icmp eq i64 %iaddr, 0
+  %c = icmp eq i8* %ptr0, null
   br i1 %c, label %BB1, label %BB2
 BB1:
   ret i16 0

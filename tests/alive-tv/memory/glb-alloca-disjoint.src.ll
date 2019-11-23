@@ -1,5 +1,4 @@
 ; target: 64 bits ptr addr
-; TEST-ARGS: -smt-to=5000
 target datalayout = "p:64:64:64"
 @x = global i32 0
 

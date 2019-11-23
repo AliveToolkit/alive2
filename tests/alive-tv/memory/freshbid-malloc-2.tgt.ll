@@ -1,5 +1,4 @@
 ; target: 64 bits ptr addr
-; TEST-ARGS: -smt-to=12000
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
 define i8 @freshbid_malloc(i8** %pptr) {
@@ -18,4 +17,3 @@ BB2:
 }
 
 declare noalias i8* @malloc(i64)
-declare void @free(i8*)

@@ -1,4 +1,3 @@
-; TEST-ARGS: -smt-to=15000
 ; target: 64 bits ptr addr
 target datalayout = "p:64:64:64"
 

@@ -1,11 +1,9 @@
-; TEST-ARGS: -smt-to=9000
 ; target: 64 bits ptr addr
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
 define i8 @alloca_malloc() {
   %ptr = call noalias i8* @malloc(i64 1)
-  %i = ptrtoint i8* %ptr to i64
-  %cmp = icmp eq i64 %i, 0
+  %cmp = icmp eq i8* %ptr, null
   br i1 %cmp, label %BB1, label %BB2
 BB1:
   ret i8 0
