@@ -400,7 +400,7 @@ static void calculateAndInitConstants(Transform &t) {
     for (auto gvs : { &globals_src , &globals_tgt }) {
       for (auto gv : *gvs) {
         if (auto init = gv->initVal()) {
-          if (nullptr_is_used |= has_nullptr(init))
+          if ((nullptr_is_used |= has_nullptr(init)))
             goto exit_gv_loop;
         }
       }
