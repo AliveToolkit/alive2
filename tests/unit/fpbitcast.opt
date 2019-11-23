@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+
 Name: NaN
 %v = fdiv half %a, 0.0
 %r = bitcast %v to i16
@@ -5,4 +7,14 @@ Name: NaN
 %v = fdiv half %a, 0.0
 %r = bitcast %v to i16
 
-; XFAIL: Value mismatch
+Name: NaN 2
+%v = fdiv float 0.0, 0.0
+%r = bitcast %v to i32
+  =>
+%r = i32 0x7f800001
+
+Name: NaN 3
+%v = fdiv float 0.0, 0.0
+%r = bitcast %v to i32
+  =>
+%r = i32 0xff800002

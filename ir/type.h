@@ -176,6 +176,8 @@ public:
     : Type(std::move(name)), fpType(fpType), defined(true) {}
   unsigned bits() const override;
   FpType getFpType() const { return fpType; };
+  smt::expr toInt(State &s, const smt::expr &fp) const;
+
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;

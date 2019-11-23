@@ -1,7 +1,0 @@
-%v = fdiv float 0.0, 0.0
-%r = bitcast %v to i32
-  =>
-%r = i32 0x7f800002
-
-; TODO
-; XFAIL: Value mismatch

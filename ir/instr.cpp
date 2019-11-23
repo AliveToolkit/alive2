@@ -758,14 +758,14 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case BitCast:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [&s](auto &val, auto &from_type, auto &to_type) -> StateValue {
       expr newval;
       if ((to_type.isIntType() && from_type.isIntType()) ||
           (to_type.isFloatType() && from_type.isFloatType()) ||
           (to_type.isPtrType() && from_type.isPtrType()))
         newval = val;
       else if (to_type.isIntType() && from_type.isFloatType())
-        newval = val.float2BV();
+        newval = from_type.getAsFloatType()->toInt(s, val);
       else if (to_type.isFloatType() && from_type.isIntType())
         newval = val.BV2float(to_type.getDummyValue(true).value);
       else

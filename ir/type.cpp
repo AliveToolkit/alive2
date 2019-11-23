@@ -341,15 +341,40 @@ void IntType::print(ostream &os) const {
 }
 
 
-static array<unsigned, 3> float_sizes = {
-  /* Half */ 16,
-  /* Float */ 32,
-  /* Double */ 64,
+// total bits, exponent bits
+static array<pair<unsigned, unsigned>, 3> float_sizes = {
+  /* Half */   make_pair(16, 5),
+  /* Float */  make_pair(32, 8),
+  /* Double */ make_pair(64, 11),
 };
 
 unsigned FloatType::bits() const {
   assert(fpType != Unknown);
-  return float_sizes[fpType];
+  return float_sizes[fpType].first;
+}
+
+expr FloatType::toInt(State &s, const expr &fp) const {
+  expr isnan = fp.isNaN();
+  expr val = fp.float2BV();
+
+  if (isnan.isFalse())
+    return val;
+
+  unsigned exp_bits = float_sizes[fpType].second;
+  unsigned fraction_bits = bits() - exp_bits - 1;
+  unsigned var_bits = fraction_bits + 1;
+
+  expr var = expr::mkFreshVar("NaN", expr::mkUInt(0, var_bits));
+  expr fraction = var.extract(fraction_bits - 1, 0);
+
+  // sign bit, exponent (-1), fraction (non-zero)
+  expr nan = var.extract(fraction_bits, fraction_bits)
+                .concat(expr::mkInt(-1, exp_bits))
+                .concat(fraction);
+  s.addPre(fraction != 0);
+  s.addQuantVar(var);
+
+  return expr::mkIf(isnan, nan, val);
 }
 
 const FloatType* FloatType::getAsFloatType() const {
@@ -393,7 +418,7 @@ expr FloatType::getTypeConstraints() const {
 
   expr r(false);
   for (auto sz : float_sizes) {
-    r |= sizeVar() == sz;
+    r |= sizeVar() == sz.first;
   }
   return r;
 }
@@ -408,7 +433,7 @@ void FloatType::fixup(const Model &m) {
 
   unsigned m_sz = m.getUInt(sizeVar());
   for (unsigned i = 0, e = float_sizes.size(); i != e; ++i) {
-    if (m_sz == float_sizes[i]) {
+    if (m_sz == float_sizes[i].first) {
       fpType = FpType(i);
       return;
     }
