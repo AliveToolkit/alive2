@@ -278,32 +278,44 @@ static void check_refinement(Errors &errs, Transform &t,
     = src_state.returnMemory().refined(tgt_state.returnMemory());
   expr dom = dom_a && dom_b;
 
+  if (check_expr(axioms && (pre_src && pre_tgt)).isUnsat()) {
+    errs.add("Precondition is always false", false);
+    return;
+  }
+
+  auto mk_fml = [&](const expr &refines) -> expr {
+    // from the check above we already know that
+    // \exists v,v' . pre_tgt(v') && pre_src(v) is SAT (or timeout)
+    // so \forall v . pre_tgt && (!pre_src(v) || refines) simplifies to:
+    // (pre_tgt && !pre_src) || (!pre_src && false) ->   [assume refines=false]
+    // \forall v . (pre_tgt && !pre_src(v)) ->  [\exists v . pre_src(v)]
+    // false
+    if (refines.isFalse())
+      return refines;
+
+    return axioms &&
+             preprocess(t, qvars, uvars, pre_tgt && pre_src.implies(refines));
+  };
+
   Solver::check({
-    { axioms && preprocess(t, qvars, uvars,
-                           pre_tgt && pre_src.implies(dom_a.notImplies(dom_b))),
+    { mk_fml(dom_a.notImplies(dom_b)),
       [&](const Result &r) {
         err(r, false, "Source is more defined than target");
       }},
-    { axioms && preprocess(t, qvars, uvars,
-                           pre_tgt && pre_src.implies(dom && !poison_cnstr)),
+    { mk_fml(dom && !poison_cnstr),
       [&](const Result &r) {
         err(r, true, "Target is more poisonous than source");
       }},
-    { axioms && preprocess(t, qvars, uvars,
-                           pre_tgt && pre_src.implies(dom && !value_cnstr)),
+    { mk_fml(dom && !value_cnstr),
       [&](const Result &r) {
         err(r, true, "Value mismatch");
       }},
-    { axioms && preprocess(t, qvars, uvars,
-                           pre_tgt && pre_src.implies(dom && !memory_cnstr)),
+    { mk_fml(dom && !memory_cnstr),
+      // FIXME: counterxample is broken (eg should print memory id that differs)
       [&](const Result &r) {
         err(r, true, "Mismatch in memory");
       }}
   });
-
-  if (!errs && check_expr(axioms && (pre_src && pre_tgt)).isUnsat()) {
-    errs.add("Precondition is always false", false);
-  }
 }
 
 static bool has_nullptr(const Value *v) {
