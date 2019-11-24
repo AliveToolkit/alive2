@@ -283,7 +283,7 @@ static void check_refinement(Errors &errs, Transform &t,
     return;
   }
 
-  auto mk_fml = [&](const expr &refines) -> expr {
+  auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that
     // \exists v,v' . pre_tgt(v') && pre_src(v) is SAT (or timeout)
     // so \forall v . pre_tgt && (!pre_src(v) || refines) simplifies to:
@@ -291,7 +291,7 @@ static void check_refinement(Errors &errs, Transform &t,
     // \forall v . (pre_tgt && !pre_src(v)) ->  [\exists v . pre_src(v)]
     // false
     if (refines.isFalse())
-      return refines;
+      return move(refines);
 
     return axioms &&
              preprocess(t, qvars, uvars, pre_tgt && pre_src.implies(refines));
