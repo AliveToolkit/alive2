@@ -5,6 +5,7 @@
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include <utility>
@@ -59,6 +60,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   llvm::Function &f;
   const llvm::TargetLibraryInfo &TLI;
   vector<llvm::Instruction *> i_constexprs;
+  vector<string_view> gvnamesInSrc;
 
   using RetTy = unique_ptr<Instr>;
 
@@ -97,8 +99,9 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   }
 
 public:
-  llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI)
-      : f(f), TLI(TLI) {}
+  llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
+              vector<string_view> &&gvnamesInSrc)
+      : f(f), TLI(TLI), gvnamesInSrc(move(gvnamesInSrc)) {}
 
   ~llvm2alive_() {
     for (auto &inst : i_constexprs) {
@@ -685,6 +688,50 @@ public:
       }
     }
 
+    // If there is a global variable with initializer, put them at init block.
+    auto &entryName = Fn.getFirstBB().getName();
+    auto &InitBB = Fn.getBB("__globalvars_init", true);
+    BB = &InitBB;
+    auto M = f.getParent();
+    for (auto &gvname : gvnamesInSrc) {
+      auto gv = M->getGlobalVariable(string(gvname), true);
+      if (!gv) {
+        // global variable removed or renamed
+        *out << "ERROR: Unsupported interprocedural transformation\n";
+        return {};
+      }
+      // If gvname already exists in tgt, get_operand will immediately return
+      get_operand(gv);
+    }
+
+    map<string, unique_ptr<Store>> stores;
+    // Converting initializer may add new global variables to Fn
+    // (Fn.numConstants() increases in that case)
+    for (unsigned i = 0; i != Fn.numConstants(); ++i) {
+      auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
+      if (!GV)
+        continue;
+
+      auto gv = M->getGlobalVariable(GV->getName().substr(1), true);
+      assert(gv);
+      if (!gv->hasInitializer())
+        continue;
+      else if (auto CE = dyn_cast<llvm::ConstantExpr>(gv->getInitializer())) {
+        auto storedval = convert_constexpr(CE);
+        auto globalvar = get_operand(gv);
+        if (!storedval || !globalvar)
+          return {};
+        // Alignment is already enforced by Memory::alloc.
+        stores.emplace(gv->getName(),
+                       make_unique<Store>(*globalvar, *storedval, 1));
+      }
+    }
+
+    for (auto &itm : stores)
+      // Insert stores in lexicographical order of global var's names
+      InitBB.addInstr(move(itm.second));
+    InitBB.addInstr(make_unique<Branch>(Fn.getBB(entryName)));
+
     return move(Fn);
   }
 };
@@ -698,8 +745,9 @@ initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
 }
 
 optional<IR::Function> llvm2alive(llvm::Function &F,
-                                  const llvm::TargetLibraryInfo &TLI) {
-  return llvm2alive_(F, TLI).run();
+                                  const llvm::TargetLibraryInfo &TLI,
+                                  vector<string_view> &&gvnamesInSrc) {
+  return llvm2alive_(F, TLI, move(gvnamesInSrc)).run();
 }
 
 }

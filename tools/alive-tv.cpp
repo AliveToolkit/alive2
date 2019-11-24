@@ -202,7 +202,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
-                                    .getTLI(F2));
+                                    .getTLI(F2), Func1->getGlobalVarNames());
   if (!Func2) {
     cerr << "ERROR: Could not translate '" << F2.getName().str()
          << "' to Alive IR\n";

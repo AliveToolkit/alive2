@@ -214,11 +214,10 @@ Value* get_operand(llvm::Value *v,
     }
     Value *initval = nullptr;
     if (gv->hasInitializer() && gv->isConstant()) {
-      if (isa<llvm::ConstantExpr>(gv->getInitializer()))
-        // TODO: not supported
-        return nullptr;
-      else if (!(initval = get_operand(gv->getInitializer(), constexpr_conv)))
-        return nullptr;
+      auto initializer = gv->getInitializer();
+      if (!isa<llvm::ConstantExpr>(initializer))
+        if (!(initval = get_operand(gv->getInitializer(), constexpr_conv)))
+          return nullptr;
     }
     int size = DL->getTypeAllocSize(gv->getValueType());
     int align = gv->getAlignment();

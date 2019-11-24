@@ -78,15 +78,18 @@ public:
   void fixupTypes(const smt::Model &m);
 
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
-  BasicBlock& getBB(std::string_view name);
+  BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;
 
   void addConstant(std::unique_ptr<Value> &&c);
   util::const_strip_unique_ptr<decltype(constants)> getConstants() const {
     return constants;
   }
+  unsigned numConstants() const { return constants.size(); }
+  Value &getConstant(int idx) const { return *constants[idx]; }
 
   std::vector<GlobalVariable *> getGlobalVars() const;
+  std::vector<std::string_view> getGlobalVarNames() const;
 
   void addPredicate(std::unique_ptr<Predicate> &&p);
 

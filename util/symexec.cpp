@@ -24,6 +24,7 @@ void sym_exec(State &s) {
 
   s.exec(Value::voidVal);
 
+  bool first = true;
   for (auto &bb : f.getBBs()) {
     if (!s.startBB(*bb))
       continue;
@@ -34,6 +35,10 @@ void sym_exec(State &s) {
 
       if (config::symexec_print_each_value && name[0] == '%')
         cout << name << " = " << val << '\n';
+    }
+    if (first) {
+      s.finishInitializer();
+      first = false;
     }
   }
 
