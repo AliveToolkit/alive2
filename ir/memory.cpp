@@ -81,6 +81,11 @@ public:
 
   const expr& operator()() const { return p; }
 
+  expr operator==(const Byte &rhs) const {
+    assert(&m == &rhs.m);
+    return p == rhs.p;
+  }
+
   static Byte mkPoisonByte(const Memory &m) {
     IntType ty("", 8);
     auto v = ty.toBV(ty.getDummyValue(false));
@@ -352,7 +357,7 @@ expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
   expr local = other.is_heap_allocated();
   local &= other.is_block_alive();
-  local &= other.block_size().uge(block_size());
+  local &= other.block_size() == block_size();
   // TODO: this induces an infinite loop; need a quantifier or rec function
   // TODO: needs variable offset
   //local &= block_refined(other);
@@ -382,7 +387,8 @@ expr Pointer::block_refined(const Pointer &other) const {
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
   // already there and don't need checking
   if (!m.did_pointer_store && !other.m.did_pointer_store)
-    return liveness && (check && !val.is_ptr()).implies(int_cnstr);
+    return liveness &&
+           check.implies(expr::mkIf(val.is_ptr(), val == val2, int_cnstr));
 
   Pointer load_ptr(m, val.ptr_value());
   Pointer load_ptr2(other.m, val2.ptr_value());
