@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/memory.h"
+#include "ir/globals.h"
 #include "ir/state.h"
 #include "util/compiler.h"
 
@@ -451,8 +452,8 @@ static bool memory_unused() {
   return num_locals == 0 && num_nonlocals == 1 && !nullptr_is_used;
 }
 
-Memory::Memory(State &state, bool little_endian)
-  : state(&state), little_endian(little_endian),
+Memory::Memory(State &state)
+  : state(&state),
     local_blk_addr(expr::mkUInt(0, bits_size_t - 1)),
     local_blk_size(expr::mkUInt(0, bits_size_t - 1)),
     local_blk_kind(expr::mkUInt(0, 2)) {

@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/type.h"
+#include "ir/globals.h"
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"

@@ -13,41 +13,9 @@ using namespace std;
 
 namespace IR {
 
-unsigned num_max_nonlocals_inst;
-unsigned num_locals;
-unsigned num_nonlocals;
-unsigned bits_for_bid;
-unsigned bits_for_offset;
-bool nullptr_is_used;
-bool has_int2ptr;
-bool has_ptr2int;
-
-void initConstants(unsigned num_globals, unsigned num_ptrinputs,
-                   unsigned num_max_nonlocals_inst, unsigned num_locals,
-                   bool nullptr_is_used, bool has_int2ptr, bool has_ptr2int) {
-  IR::bits_for_offset = 64;
-  IR::num_max_nonlocals_inst = num_max_nonlocals_inst;
-  IR::num_locals = num_locals;
-  // Include null block
-  IR::num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
-
-  IR::nullptr_is_used = nullptr_is_used;
-  IR::has_int2ptr = has_int2ptr;
-  IR::has_ptr2int = has_ptr2int;
-
-  unsigned maxblks = max(num_locals, num_nonlocals);
-  if (maxblks == 1)
-    IR::bits_for_bid = 2; // local/non-local bit + one bit for bid
-  else {
-    unsigned n = ilog2(2 * maxblks - 1); // floor(log2(maxblks))
-    IR::bits_for_bid = 1 + n;
-  }
-}
-
 State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this, f.isLittleEndian()),
-    return_domain(false), return_val(f.getType().getDummyValue(false)),
-    return_memory(memory) {}
+  : f(f), source(source), memory(*this), return_domain(false),
+    return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {
   Memory::resetGlobalData();

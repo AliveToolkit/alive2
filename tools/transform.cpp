@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "tools/transform.h"
+#include "ir/globals.h"
 #include "ir/state.h"
 #include "smt/expr.h"
 #include "smt/smt.h"
@@ -372,27 +373,29 @@ static void calculateAndInitConstants(Transform &t) {
   };
 
   // The number of instructions that can return a pointer to a non-local block.
-  unsigned num_inst_nonlocals = 0;
+  num_max_nonlocals_inst = 0;
   // The number of local blocks.
   unsigned num_locals_src = 0, num_locals_tgt = 0;
+
   for (auto BB : t.src.getBBs()) {
     const auto &instrs = BB->instrs();
     for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
       num_locals_src += returns_local(i);
-      num_inst_nonlocals += returns_nonlocal(i);
+      num_max_nonlocals_inst += returns_nonlocal(i);
     });
   }
   for (auto BB : t.tgt.getBBs()) {
     const auto &instrs = BB->instrs();
     for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
       num_locals_tgt += returns_local(i);
-      num_inst_nonlocals += returns_nonlocal(i);
+      num_max_nonlocals_inst += returns_nonlocal(i);
     });
   }
+  num_locals = max(num_locals_src, num_locals_tgt);
 
-  bool nullptr_is_used = false;
-  bool has_int2ptr = false;
-  bool has_ptr2int = false;
+  nullptr_is_used = false;
+  has_int2ptr = false;
+  has_ptr2int = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
@@ -420,9 +423,17 @@ static void calculateAndInitConstants(Transform &t) {
   }
 exit_gv_loop:
 
-  initConstants(num_globals, num_ptrinputs, num_inst_nonlocals,
-                max(num_locals_src, num_locals_tgt), nullptr_is_used,
-                has_int2ptr, has_ptr2int);
+  // Include null block
+  num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
+
+  // floor(log2(maxblks)) + 1 for local bit
+  unsigned maxblks = max(num_locals, num_nonlocals);
+  bits_for_bid = (maxblks == 1 ? 1 : ilog2(2 * maxblks - 1)) + 1;
+
+  // TODO
+  bits_for_offset = 64;
+
+  little_endian = t.src.isLittleEndian();
 }
 
 
@@ -475,7 +486,7 @@ Errors TransformVerify::verify() const {
     }
   }
 
-  ::calculateAndInitConstants(t);
+  calculateAndInitConstants(t);
   State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
 

@@ -48,6 +48,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 set(IR_SRCS
   ir/constant.cpp
   ir/function.cpp
+  ir/globals.cpp
   ir/instr.cpp
   ir/memory.cpp
   ir/precondition.cpp
