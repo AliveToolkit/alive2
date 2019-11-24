@@ -432,6 +432,7 @@ exit_gv_loop:
 
   // TODO
   bits_for_offset = 64;
+  bits_size_t = 64;
 
   little_endian = t.src.isLittleEndian();
 }

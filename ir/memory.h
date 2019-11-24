@@ -108,8 +108,7 @@ public:
 class Memory {
   State *state;
 
-  // bits_size_t is equivalent to the size of a pointer.
-  unsigned bits_size_t = 64;
+  bool did_pointer_store = false;
 
   smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
   smt::expr local_block_val;
@@ -125,6 +124,9 @@ class Memory {
 
   smt::expr mk_val_array() const;
   smt::expr mk_liveness_array() const;
+
+  void store(const Pointer &p, const smt::expr &val, smt::expr &local,
+             smt::expr &non_local, bool index_bid = false);
 
 public:
   enum BlockKind {
@@ -171,9 +173,7 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
-  unsigned bitsOffset() const;
   unsigned bitsByte() const;
-  unsigned bitsPtrSize() const { return bits_size_t; }
 
   // for container use only
   bool operator<(const Memory &rhs) const;

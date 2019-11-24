@@ -10,6 +10,7 @@ unsigned num_locals;
 unsigned num_nonlocals;
 unsigned bits_for_bid;
 unsigned bits_for_offset;
+unsigned bits_size_t;
 bool little_endian;
 bool nullptr_is_used;
 bool has_int2ptr;

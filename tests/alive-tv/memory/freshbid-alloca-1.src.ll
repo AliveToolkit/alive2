@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 define i8 @freshbid_alloca(i8* %ptr0) {
   %ptr = alloca i8
   store i8 10, i8* %ptr

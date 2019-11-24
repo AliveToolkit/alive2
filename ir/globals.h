@@ -20,6 +20,9 @@ extern unsigned bits_for_bid;
 // Number of bits needed for encoding a pointer's offset
 extern unsigned bits_for_offset;
 
+/// sizeof(size_t). This is assume to be equal to pointer size
+extern unsigned bits_size_t;
+
 extern bool little_endian;
 
 /// Wether the null pointer is used in either function

@@ -3,6 +3,7 @@
 
 #include "ir/instr.h"
 #include "ir/function.h"
+#include "ir/globals.h"
 #include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/solver.h"
@@ -1825,7 +1826,6 @@ void GEP::print(std::ostream &os) const {
 
 StateValue GEP::toSMT(State &s) const {
   auto [val, non_poison] = s[*ptr];
-  unsigned bits_offset = s.getMemory().bitsOffset();
 
   Pointer ptr(s.getMemory(), move(val));
   if (inbounds)
@@ -1833,8 +1833,8 @@ StateValue GEP::toSMT(State &s) const {
 
   for (auto &[sz, idx] : idxs) {
     auto &[v, np] = s[*idx];
-    auto multiplier = expr::mkUInt(sz, bits_offset);
-    auto val = v.sextOrTrunc(bits_offset);
+    auto multiplier = expr::mkUInt(sz, bits_for_offset);
+    auto val = v.sextOrTrunc(bits_for_offset);
     auto inc = multiplier * val;
 
     if (inbounds) {
