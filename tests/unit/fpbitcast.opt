@@ -1,4 +1,4 @@
-; TEST-ARGS: -disable-undef-input -smt-to:20000
+; TEST-ARGS: -disable-undef-input -smt-to:40000
 
 Name: NaN
 %v = fdiv half %a, 0.0
