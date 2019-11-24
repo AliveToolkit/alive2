@@ -82,7 +82,6 @@ public:
   const expr& operator()() const { return p; }
 
   expr operator==(const Byte &rhs) const {
-    assert(&m == &rhs.m);
     return p == rhs.p;
   }
 
