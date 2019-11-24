@@ -16,8 +16,7 @@ void context::init() {
   Z3_global_param_set("timeout", get_query_timeout());
   // Disable Z3's use of UFs for NaNs when converting FPs to BVs
   // They generate incorrect formulas when quantifiers are involved
-  // FIXME: this needs Z3 >= 4.8.7, which hasn't been released yet
-  //Z3_global_param_set("rewriter.hi_fp_unspecified", "true");
+  Z3_global_param_set("rewriter.hi_fp_unspecified", "true");
   ctx = Z3_mk_context_rc(nullptr);
 }
 
