@@ -166,8 +166,8 @@ static bool observes_addresses() {
 
 namespace IR {
 
-Pointer::Pointer(const Memory &m, const char *var_name)
-  : m(m), p(expr::mkUInt(0, 1).concat(
+Pointer::Pointer(const Memory &m, const char *var_name, const expr &local)
+  : m(m), p(local.toBVBool().concat(
                 expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
@@ -746,7 +746,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
       store(ptr + i, bytes[0](), local_block_val, non_local_block_val);
     }
   } else {
-    Pointer idx(*this, "#idx");
+    Pointer idx(*this, "#idx", ptr.is_local());
     expr cond = idx.uge(ptr).both() && idx.ult(ptr + bytesize).both();
     store_lambda(idx, cond, bytes[0](), local_block_val, non_local_block_val);
   }
@@ -769,7 +769,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
             local_block_val, non_local_block_val);
     }
   } else {
-    Pointer dst_idx(*this, "#idx");
+    Pointer dst_idx(*this, "#idx", dst.is_local());
     Pointer src_idx = src + (dst_idx.get_offset() - dst.get_offset());
     expr cond = dst_idx.uge(dst).both() && dst_idx.ult(dst + bytesize).both();
     store_lambda(dst_idx, cond,
