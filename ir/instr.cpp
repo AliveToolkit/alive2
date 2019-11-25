@@ -1747,7 +1747,6 @@ StateValue Calloc::toSMT(State &s) const {
   // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
-  auto nullp = Pointer::mkNullPointer(s.getMemory());
   return { move(p), np_num && np_sz };
 }
 

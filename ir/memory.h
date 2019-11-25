@@ -39,7 +39,8 @@ class Pointer {
                       const smt::expr &ret_type) const;
 
 public:
-  Pointer(const Memory &m, const char *var_name);
+  Pointer(const Memory &m, const char *var_name,
+          const smt::expr &local = false);
   Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
