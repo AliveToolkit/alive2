@@ -35,7 +35,11 @@ find_package(Z3 4.8.5 REQUIRED)
 include_directories(${Z3_INCLUDE_DIR})
 
 find_program(RE2C re2c)
-message(STATUS "RE2C: ${RE2C}")
+if (RE2C)
+  message(STATUS "RE2C: ${RE2C}")
+else()
+  message(SEND_ERROR "re2c executable not found")
+endif()
 add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/tools"
                    COMMAND ${RE2C} ARGS "-d" "-b" "-T" "--no-generation-date"
