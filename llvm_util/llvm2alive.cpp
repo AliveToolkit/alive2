@@ -635,8 +635,11 @@ public:
     auto attrs = arg.getParent()->getAttributes()
                  .getParamAttributes(arg.getArgNo());
     for (auto attr : attrs) {
-      *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
-      return false;
+      switch (attr.getKindAsEnum()) {
+      default:
+        *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
+        return false;
+      }
     }
     return true;
   }
