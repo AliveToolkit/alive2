@@ -631,6 +631,16 @@ public:
     return true;
   }
 
+  bool handleAttributes(llvm::Argument &arg) {
+    auto attrs = arg.getParent()->getAttributes()
+                 .getParamAttributes(arg.getArgNo());
+    for (auto attr : attrs) {
+      *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
+      return false;
+    }
+    return true;
+  }
+
   optional<Function> run() {
     auto type = llvm_type2alive(f.getReturnType());
     if (!type)
@@ -646,6 +656,9 @@ public:
       auto val = make_unique<Input>(*ty, value_name(arg));
       add_identifier(arg, *val.get());
       Fn.addInput(move(val));
+
+      if (!handleAttributes(arg))
+        return {};
     }
 
     // create all BBs upfront to keep LLVM's order
