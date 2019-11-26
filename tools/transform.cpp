@@ -320,7 +320,9 @@ static void check_refinement(Errors &errs, Transform &t,
 }
 
 static bool has_nullptr(const Value *v) {
-  if (dynamic_cast<const NullPointerValue*>(v))
+  if (dynamic_cast<const NullPointerValue*>(v) ||
+      (dynamic_cast<const UndefValue*>(v) && v->getType().isPtrType()))
+      // undef pointer points to the nullblk
     return true;
 
   if (auto agg = dynamic_cast<const AggregateConst*>(v)) {
