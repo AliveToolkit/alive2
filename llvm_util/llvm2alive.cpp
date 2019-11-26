@@ -634,7 +634,7 @@ public:
   bool handleAttributes(llvm::Argument &arg) {
     auto attrs = arg.getParent()->getAttributes()
                  .getParamAttributes(arg.getArgNo());
-    for (auto attr : attrs) {
+    for (auto &attr : attrs) {
       switch (attr.getKindAsEnum()) {
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
