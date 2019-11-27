@@ -382,15 +382,19 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto BB : t.src.getBBs()) {
     const auto &instrs = BB->instrs();
     for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
-      num_locals_src += returns_local(i);
-      num_max_nonlocals_inst += returns_nonlocal(i);
+      if (returns_local(i))
+        ++num_locals_src;
+      else if (returns_nonlocal(i))
+        ++num_max_nonlocals_inst;
     });
   }
   for (auto BB : t.tgt.getBBs()) {
     const auto &instrs = BB->instrs();
     for_each(instrs.begin(), instrs.end(), [&](const auto &i) {
-      num_locals_tgt += returns_local(i);
-      num_max_nonlocals_inst += returns_nonlocal(i);
+      if (returns_local(i))
+        ++num_locals_tgt;
+      else if (returns_nonlocal(i))
+        ++num_max_nonlocals_inst;
     });
   }
   num_locals = max(num_locals_src, num_locals_tgt);
