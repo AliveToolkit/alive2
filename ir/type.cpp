@@ -614,6 +614,12 @@ AggregateType::AggregateType(string &&name, bool symbolic)
   }
 }
 
+AggregateType::AggregateType(string &&name, vector<Type*> &&vchildren,
+                             vector<bool> &&vis_padding)
+: Type(move(name)), children(move(vchildren)), is_padding(move(vis_padding)) {
+  assert(children.size() == is_padding.size());
+}
+
 expr AggregateType::numElements() const {
   return defined ? expr::mkUInt(elements, var_vector_elements) :
                    var("elements", var_vector_elements);
@@ -817,6 +823,7 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
   this->elements = elements;
   defined = true;
   children.resize(elements, &elementTy);
+  is_padding.resize(elements, false);
 }
 
 StateValue VectorType::extract(const StateValue &vector,
@@ -894,8 +901,9 @@ void VectorType::print(ostream &os) const {
 }
 
 
-StructType::StructType(string &&name, vector<Type*> &&children)
-  : AggregateType(move(name), move(children)) {
+StructType::StructType(string &&name, vector<Type*> &&children,
+                       vector<bool> &&is_padding)
+  : AggregateType(move(name), move(children), move(is_padding)) {
   elements = this->children.size();
   defined = true;
 }

@@ -235,13 +235,14 @@ public:
 class AggregateType : public Type {
 protected:
   std::vector<Type*> children;
+  std::vector<bool> is_padding;
   std::vector<std::unique_ptr<SymbolicType>> sym;
   unsigned elements;
   bool defined = false;
 
   AggregateType(std::string &&name, bool symbolic = true);
-  AggregateType(std::string &&name, std::vector<Type*> &&children)
-    : Type(std::move(name)), children(std::move(children)) {}
+  AggregateType(std::string &&name, std::vector<Type*> &&children,
+                std::vector<bool> &&is_padding);
 
 public:
   smt::expr numElements() const;
@@ -250,6 +251,7 @@ public:
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
   Type& getChild(unsigned index) const { return *children[index]; }
+  unsigned isPadding(unsigned i) const { return is_padding[i]; }
 
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
@@ -307,7 +309,8 @@ public:
 class StructType final : public AggregateType {
 public:
   StructType(std::string &&name) : AggregateType(std::move(name)) {}
-  StructType(std::string &&name, std::vector<Type*> &&children);
+  StructType(std::string &&name, std::vector<Type*> &&children,
+             std::vector<bool> &&is_padding);
 
   bool isStructType() const override;
   smt::expr enforceStructType() const override;
