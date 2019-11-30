@@ -1171,6 +1171,12 @@ expr expr::extract(unsigned high, unsigned low) const {
         return a.extract(high - b_bw, low - b_bw);
     }
   }
+  {
+    expr cond, then, els;
+    if (isIf(cond, then, els) && then.isConst() && els.isConst()) {
+      return mkIf(cond, then.extract(high, low), els.extract(high, low));
+    }
+  }
   return simplify_const(Z3_mk_extract(ctx(), high, low, ast()), *this);
 }
 
