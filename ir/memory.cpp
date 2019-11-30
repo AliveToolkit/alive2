@@ -471,7 +471,8 @@ static unsigned last_nonlocal_bid = 1;
 
 static bool memory_unused() {
   // +1 for the null block
-  return num_locals == 0 && num_nonlocals == 1 && !nullptr_is_used;
+  return num_locals == 0 && num_nonlocals == 1 && !nullptr_is_used &&
+         !observes_addresses();
 }
 
 Memory::Memory(State &state)
