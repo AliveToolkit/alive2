@@ -2089,14 +2089,31 @@ StateValue ShuffleVector::toSMT(State &s) const {
   auto mty = mask->getType().getAsAggregateType();
   vector<StateValue> vals;
 
+  auto &vect1 = s[*v1];
+  auto &vect2 = s[*v2];
+  auto &mask_vector = static_cast<AggregateConst*>(mask)->getVals();
+
   for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
-    auto [iv, ip] = mty->extract(s[*mask], i);
-    auto [lv, lp] = vty->extract(s[*v1], iv);
-    auto [rv, rp] = vty->extract(s[*v2], iv - sz);
-    expr v = expr::mkIf(iv.uge(sz), rv, lv);
-    expr np = expr::mkIf(iv.uge(sz), rp, lp);
+    auto mask = mask_vector[i];
+    // mask must be either a constant or undef
+    // special case undef to yield undef
+    if (dynamic_cast<UndefValue*>(mask)) {
+      vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s));
+      continue;
+    }
+
+    auto &[iv, ip] = s[*mask];
+    assert(ip.isTrue());
+    auto [lv, lp] = vty->extract(vect1, iv);
+    auto [rv, rp] = vty->extract(vect2, iv - sz);
+
+    expr val = expr::mkIf(iv.uge(sz), rv, lv);
     expr inbounds = iv.ult(sz + sz);
-    vals.emplace_back(move(v), ip && inbounds && np);
+    if (!inbounds.isTrue())
+      val = expr::mkIf(inbounds, val,
+                       UndefValue(vty->getChild(0)).toSMT(s).value);
+
+    vals.emplace_back(move(val), !inbounds || expr::mkIf(iv.uge(sz), rp, lp));
   }
 
   return getType().getAsAggregateType()->aggregateVals(vals);

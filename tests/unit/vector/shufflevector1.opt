@@ -46,12 +46,12 @@ Name: constant-folding-8
 
 
 Name: constant-folding-9
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <3 x i32> <i32 poison, i32 1, i32 4>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <3 x i32> <i32 undef, i32 1, i32 4>
   =>
-%r = <3 x i4> <i4 poison, i4 5, i4 poison>
+%r = <3 x i4> <i4 undef, i4 5, i4 undef>
 
 
 Name: constant-folding-10
-%r = shufflevector <2 x float> <float 3.0, float 5.0>, <2 x float> <float 4.0, float 6.0>, <3 x i32> <i32 poison, i32 1, i32 4>
+%r = shufflevector <2 x float> <float 3.0, float 5.0>, <2 x float> <float 4.0, float 6.0>, <3 x i32> <i32 undef, i32 1, i32 4>
   =>
-%r = <3 x float> <float poison, float 5.0, float poison>
+%r = <3 x float> <float undef, float 5.0, float undef>

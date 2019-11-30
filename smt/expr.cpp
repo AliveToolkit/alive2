@@ -398,6 +398,7 @@ expr expr::binop_commutative(const expr &rhs,
 
 expr expr::binop_commutative(const expr &rhs,
                              Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast)) const {
+  assert(!isValid() || !rhs.isValid() || sort() == rhs.sort());
   auto cmp = *this < rhs;
   return (cmp ? *this : rhs).binop_fold(cmp ? rhs : *this, op);
 }
