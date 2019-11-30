@@ -417,18 +417,6 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  if (!nullptr_is_used) {
-    for (auto gvs : { &globals_src , &globals_tgt }) {
-      for (auto gv : *gvs) {
-        if (auto init = gv->initVal()) {
-          if ((nullptr_is_used |= has_nullptr(init)))
-            goto exit_gv_loop;
-        }
-      }
-    }
-  }
-exit_gv_loop:
-
   // Include null block
   num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
 

@@ -82,20 +82,14 @@ class GlobalVariable final : public Value {
   // The size of this global variable (in bytes)
   uint64_t allocsize;
   unsigned align;
-  // Initial value stored at this global variable.
-  // This is initialized only if the global is constant.
-  // If it has no initial value, this is nullptr.
-  Value *initval;
-  // initval can be null even if isconst is true if this is an external const.
   bool isconst;
 public:
   GlobalVariable(Type &type, std::string &&name, uint64_t allocsize,
-                 unsigned align, Value *initval, bool isconst) :
+                 unsigned align, bool isconst) :
     Value(type, std::move(name)), allocsize(allocsize), align(align),
-    initval(initval), isconst(isconst) {}
+    isconst(isconst) {}
   uint64_t size() const { return allocsize; }
   bool isConst() const { return isconst; }
-  const Value* initVal() const { return initval; }
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

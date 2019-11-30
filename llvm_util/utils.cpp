@@ -212,22 +212,15 @@ Value* get_operand(llvm::Value *v,
         // TODO: Global variable of opaque type is not supported.
         return nullptr;
     }
-    Value *initval = nullptr;
-    if (gv->hasInitializer() && gv->isConstant()) {
-      auto initializer = gv->getInitializer();
-      if (!isa<llvm::ConstantExpr>(initializer))
-        if (!(initval = get_operand(initializer, constexpr_conv)))
-          return nullptr;
-    }
+
     int size = DL->getTypeAllocSize(gv->getValueType());
     int align = gv->getAlignment();
     auto name = "@" + gv->getName().str();
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
-                                           initval, gv->isConstant());
-    auto ret = val.get();
-    gvar = ret;
+                                           gv->isConstant());
+    gvar = val.get();
     current_fn->addConstant(move(val));
-    return ret;
+    return gvar;
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {

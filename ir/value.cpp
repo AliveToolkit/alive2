@@ -96,10 +96,6 @@ StateValue GlobalVariable::toSMT(State &s) const {
                                  &glbvar_bid);
     s.addGlobalVarBid(getName(), glbvar_bid);
   }
-  if (initval) {
-    assert(isconst);
-    s.getMemory().store(ptrval, s[*initval], initval->getType(), align);
-  }
   return { move(ptrval), true };
 }
 

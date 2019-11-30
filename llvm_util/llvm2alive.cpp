@@ -713,19 +713,18 @@ public:
       auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
       if (!GV)
         continue;
-
       auto gv = M->getGlobalVariable(GV->getName().substr(1), true);
-      if (!gv->hasInitializer())
+      if (!gv->isConstant() || !gv->hasInitializer())
         continue;
-      else if (auto CE = dyn_cast<llvm::ConstantExpr>(gv->getInitializer())) {
-        auto storedval = convert_constexpr(CE);
-        auto globalvar = get_operand(gv);
-        if (!storedval || !globalvar)
-          return {};
-        // Alignment is already enforced by Memory::alloc.
-        stores.emplace(gv->getName(),
-                       make_unique<Store>(*globalvar, *storedval, 1));
-      }
+
+      auto storedval = get_operand(gv->getInitializer());
+      auto globalvar = get_operand(gv);
+      if (!storedval || !globalvar)
+        return {};
+
+      // Alignment is already enforced by Memory::alloc.
+      stores.emplace(gv->getName(),
+                     make_unique<Store>(*globalvar, *storedval, 1));
     }
 
     for (auto &itm : stores)
