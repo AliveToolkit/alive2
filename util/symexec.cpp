@@ -25,6 +25,11 @@ void sym_exec(State &s) {
   s.exec(Value::voidVal);
 
   bool first = true;
+  if (f.getFirstBB().getName() != "__globalvars_init") {
+    s.finishInitializer();
+    first = false;
+  }
+
   for (auto &bb : f.getBBs()) {
     if (!s.startBB(*bb))
       continue;
@@ -36,15 +41,15 @@ void sym_exec(State &s) {
       if (config::symexec_print_each_value && name[0] == '%')
         cout << name << " = " << val << '\n';
     }
-    if (first) {
+
+    if (first)
       s.finishInitializer();
-      first = false;
-    }
+    first = false;
   }
 
   if (config::symexec_print_each_value) {
-    cout << "domain = " << s.returnDomain() << '\n';
-    cout << "return = " << s.returnVal().first << "\n\n";
+    cout << "domain = " << s.returnDomain()
+         << "\nreturn = " << s.returnVal().first << "\n\n";
   }
 }
 

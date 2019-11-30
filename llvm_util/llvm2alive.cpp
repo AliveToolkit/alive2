@@ -20,6 +20,7 @@ using llvm::LLVMContext;
 namespace {
 
 ostream *out;
+unsigned constexpr_idx;
 
 #if 0
 string_view s(llvm::StringRef str) {
@@ -80,7 +81,6 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
   Value* convert_constexpr(llvm::ConstantExpr *cexpr) {
     llvm::Instruction *newI = cexpr->getAsInstruction();
-    static unsigned constexpr_idx = 0;
     newI->setName("__constexpr_" + to_string(constexpr_idx++));
     i_constexprs.push_back(newI);
 
@@ -648,6 +648,8 @@ public:
   }
 
   optional<Function> run() {
+    constexpr_idx = 0;
+
     auto type = llvm_type2alive(f.getReturnType());
     if (!type)
       return {};
@@ -713,7 +715,6 @@ public:
         continue;
 
       auto gv = M->getGlobalVariable(GV->getName().substr(1), true);
-      assert(gv);
       if (!gv->hasInitializer())
         continue;
       else if (auto CE = dyn_cast<llvm::ConstantExpr>(gv->getInitializer())) {

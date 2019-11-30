@@ -106,7 +106,8 @@ struct TVPass : public llvm::FunctionPass {
                                   itr->second.first.getGlobalVarNames());
 
     if (!init_fn) {
-      fns.erase(F.getName());
+      if (!first)
+        fns.erase(itr);
       return false;
     }
 

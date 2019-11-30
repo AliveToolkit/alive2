@@ -216,7 +216,7 @@ Value* get_operand(llvm::Value *v,
     if (gv->hasInitializer() && gv->isConstant()) {
       auto initializer = gv->getInitializer();
       if (!isa<llvm::ConstantExpr>(initializer))
-        if (!(initval = get_operand(gv->getInitializer(), constexpr_conv)))
+        if (!(initval = get_operand(initializer, constexpr_conv)))
           return nullptr;
     }
     int size = DL->getTypeAllocSize(gv->getValueType());
