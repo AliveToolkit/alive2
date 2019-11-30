@@ -73,10 +73,14 @@ void Function::fixupTypes(const Model &m) {
   }
 }
 
-BasicBlock& Function::getBB(string_view name) {
+BasicBlock& Function::getBB(string_view name, bool push_front) {
   auto p = BBs.try_emplace(string(name), name);
-  if (p.second)
-    BB_order.push_back(&p.first->second);
+  if (p.second) {
+    if (push_front)
+      BB_order.insert(BB_order.begin(), &p.first->second);
+    else
+      BB_order.push_back(&p.first->second);
+  }
   return p.first->second;
 }
 
@@ -96,6 +100,14 @@ vector<GlobalVariable *> Function::getGlobalVars() const {
       gvs.push_back(gv);
   }
   return gvs;
+}
+
+vector<string_view> Function::getGlobalVarNames() const {
+  vector<string_view> gvnames;
+  auto gvs = getGlobalVars();
+  transform(gvs.begin(), gvs.end(), back_inserter(gvnames),
+            [](auto itm) { return string_view(itm->getName()).substr(1); });
+  return gvnames;
 }
 
 void Function::addPredicate(unique_ptr<Predicate> &&p) {

@@ -32,6 +32,7 @@ private:
   const Function &f;
   bool source;
   bool disable_undef_rewrite = false;
+  bool is_initialization_phase = true;
   smt::expr precondition = true;
   smt::expr axioms = true;
 
@@ -92,6 +93,9 @@ public:
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   void resetUndefVars();
+
+  bool isInitializationPhase() const { return is_initialization_phase; }
+  void finishInitializer() { is_initialization_phase = false; }
 
   auto& getFn() const { return f; }
   auto& getMemory() { return memory; }

@@ -711,7 +711,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   vector<Byte> bytes = valueToBytes(v, type, *this);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes.size(), align, true);
+  ptr.is_dereferenceable(bytes.size(), align, !state->isInitializationPhase());
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
     auto ptr_i = little_endian ? (ptr + i) : (ptr + (e - i - 1));
     store(ptr_i, bytes[i](), local_block_val, non_local_block_val);

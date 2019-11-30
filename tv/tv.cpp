@@ -99,28 +99,39 @@ struct TVPass : public llvm::FunctionPass {
   bool runOnFunction(llvm::Function &F) override {
     auto &TLI = getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
 
-    auto fn = llvm2alive(F, TLI);
-    if (!fn) {
+    const string &name = F.getName();
+    auto itr = fns.find(name);
+    bool first = itr == fns.end();
+    auto init_fn = llvm2alive(F, TLI, first ? vector<string_view>() :
+                                  itr->second.first.getGlobalVarNames());
+
+    if (!init_fn) {
       fns.erase(F.getName());
       return false;
     }
 
-    auto [old_fn, inserted] = fns.try_emplace(fn->getName(), move(*fn), 0);
+    decltype(init_fn) old_init_fn;
+    if (first)
+      itr = fns.try_emplace(name, move(*init_fn), 0).first;
+    else {
+      old_init_fn = move(itr->second.first);
+      itr->second.first = move(*init_fn);
+    }
 
     if (opt_print_dot) {
-      auto &f = inserted ? old_fn->second.first : *fn;
-      ofstream file(f.getName() + '.' + to_string(old_fn->second.second++)
-                      + ".dot");
+      auto &f = itr->second.first;
+      ofstream file(f.getName() + '.'
+                    + to_string(itr->second.second++) + ".dot");
       CFG(f).printDot(file);
     }
 
-    if (inserted)
+    if (first)
       return false;
 
     smt_init->reset();
     Transform t;
-    t.src = move(old_fn->second.first);
-    t.tgt = move(*fn);
+    t.src = move(*old_init_fn);
+    t.tgt = move(itr->second.first);
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 
@@ -148,7 +159,7 @@ struct TVPass : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    old_fn->second.first = move(t.tgt);
+    itr->second.first = move(t.tgt);
     return false;
   }
 

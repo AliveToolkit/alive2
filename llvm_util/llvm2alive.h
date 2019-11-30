@@ -6,6 +6,8 @@
 #include "ir/function.h"
 #include <optional>
 #include <ostream>
+#include <string>
+#include <vector>
 
 namespace llvm {
 class DataLayout;
@@ -20,5 +22,6 @@ struct initializer {
 };
 
 std::optional<IR::Function> llvm2alive(llvm::Function &F,
-                                       const llvm::TargetLibraryInfo &TLI);
+    const llvm::TargetLibraryInfo &TLI,
+    std::vector<std::string_view> &&gvnamesInSrc = {});
 }
