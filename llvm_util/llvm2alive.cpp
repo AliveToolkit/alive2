@@ -730,7 +730,11 @@ public:
     for (auto &itm : stores)
       // Insert stores in lexicographical order of global var's names
       InitBB.addInstr(move(itm.second));
-    InitBB.addInstr(make_unique<Branch>(Fn.getBB(entryName)));
+
+    if (InitBB.empty())
+      Fn.removeBB(InitBB);
+    else
+      InitBB.addInstr(make_unique<Branch>(Fn.getBB(entryName)));
 
     return move(Fn);
   }

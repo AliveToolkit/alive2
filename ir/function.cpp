@@ -88,6 +88,17 @@ const BasicBlock& Function::getBB(string_view name) const {
   return BBs.at(string(name));
 }
 
+void Function::removeBB(BasicBlock &BB) {
+  BBs.erase(BB.getName());
+
+  for (auto I = BB_order.begin(), E = BB_order.end(); I != E; ++I) {
+    if (*I == &BB) {
+      BB_order.erase(I);
+      break;
+    }
+  }
+}
+
 void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(move(c));
 }
