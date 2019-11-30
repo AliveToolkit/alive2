@@ -2089,6 +2089,9 @@ StateValue ShuffleVector::toSMT(State &s) const {
   auto mty = mask->getType().getAsAggregateType();
   vector<StateValue> vals;
 
+  if (dynamic_cast<UndefValue*>(mask))
+    return UndefValue(getType()).toSMT(s);
+
   auto &vect1 = s[*v1];
   auto &vect2 = s[*v2];
   auto &mask_vector = static_cast<AggregateConst*>(mask)->getVals();
