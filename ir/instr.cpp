@@ -759,7 +759,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case BitCast:
-    fn = [&s](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { to_type.fromBV(val), true };
     };
     break;
@@ -774,18 +774,18 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToSInt:
-    fn = [&](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.fp2sint(to_type.bits()),
-               val.foge(expr::IntSMin(getType().bits()).sint2fp(val)) &&
-               val.fole(expr::IntSMax(getType().bits()).sint2fp(val)) &&
+               val.foge(expr::IntSMin(to_type.bits()).sint2fp(val)) &&
+               val.fole(expr::IntSMax(to_type.bits()).sint2fp(val)) &&
                !val.isInf() };
     };
     break;
   case FPToUInt:
-    fn = [&](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.fp2uint(to_type.bits()),
                val.foge(expr::mkFloat(0, val)) &&
-               val.fole(expr::IntUMax(getType().bits()).uint2fp(val)) &&
+               val.fole(expr::IntUMax(to_type.bits()).uint2fp(val)) &&
                !val.isInf() };
     };
     break;
