@@ -14,7 +14,7 @@ using namespace std;
 namespace IR {
 
 State::State(const Function &f, bool source)
-  : f(f), source(source), memory(*this), return_domain(false),
+  : f(f), source(source), memory(*this),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {
@@ -152,7 +152,7 @@ void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
 void State::addReturn(const StateValue &val) {
   return_val.add(val, domain.first);
   return_memory.add(memory, domain.first);
-  return_domain |= domain.first;
+  return_domain.add(move(domain.first));
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.second.begin(), domain.second.end());
   undef_vars.clear();

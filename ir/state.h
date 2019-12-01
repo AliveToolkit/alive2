@@ -33,8 +33,8 @@ private:
   bool source;
   bool disable_undef_rewrite = false;
   bool is_initialization_phase = true;
-  smt::expr precondition = true;
-  smt::expr axioms = true;
+  smt::AndExpr precondition;
+  smt::AndExpr axioms;
 
   const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
@@ -61,7 +61,7 @@ private:
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   // return_domain: a boolean expression describing return condition
-  smt::expr return_domain;
+  smt::OrExpr return_domain;
   smt::DisjointExpr<StateValue> return_val;
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -85,8 +85,8 @@ public:
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
 
-  void addAxiom(smt::expr &&axiom) { axioms &= std::move(axiom); }
-  void addPre(smt::expr &&cond) { precondition &= std::move(cond); }
+  void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
+  void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
 

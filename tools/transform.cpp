@@ -248,7 +248,8 @@ static void check_refinement(Errors &errs, Transform &t,
           check_each_var);
   };
 
-  expr axioms = src_state.getAxioms() && tgt_state.getAxioms();
+  AndExpr axioms = src_state.getAxioms();
+  axioms.add(tgt_state.getAxioms());
 
   // restrict type variable from taking disabled values
   if (config::disable_undef_input || config::disable_poison_input) {
@@ -257,11 +258,11 @@ static void check_refinement(Errors &errs, Transform &t,
         auto var = in->getTyVar();
         if (config::disable_undef_input) {
           if (config::disable_poison_input)
-            axioms &= var == 0;
+            axioms.add(var == 0);
           else
-            axioms &= var != 1;
+            axioms.add(var != 1);
         } else if (config::disable_poison_input)
-          axioms &= var.extract(1, 1) == 0;
+          axioms.add(var.extract(1, 1) == 0);
       }
     }
   }
@@ -271,15 +272,16 @@ static void check_refinement(Errors &errs, Transform &t,
   // FIXME: broken handling of transformation precondition
   //src_state.startParsingPre();
   //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  expr pre_src = src_state.getPre();
-  expr pre_tgt = tgt_state.getPre();
+  expr pre_src = src_state.getPre()();
+  expr pre_tgt = tgt_state.getPre()();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr memory_cnstr
     = src_state.returnMemory().refined(tgt_state.returnMemory());
+  expr axioms_expr = axioms();
   expr dom = dom_a && dom_b;
 
-  if (check_expr(axioms && (pre_src && pre_tgt)).isUnsat()) {
+  if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
     return;
   }
@@ -294,7 +296,7 @@ static void check_refinement(Errors &errs, Transform &t,
     if (refines.isFalse())
       return move(refines);
 
-    return axioms &&
+    return axioms_expr &&
              preprocess(t, qvars, uvars, pre_tgt && pre_src.implies(refines));
   };
 
@@ -512,8 +514,8 @@ Errors TransformVerify::verify() const {
   }
 
   check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-                   src_state.returnDomain(), src_state.returnVal(),
-                   tgt_state.returnDomain(), tgt_state.returnVal(),
+                   src_state.returnDomain()(), src_state.returnVal(),
+                   tgt_state.returnDomain()(), tgt_state.returnVal(),
                    check_each_var);
 
   return errs;

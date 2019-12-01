@@ -5,9 +5,32 @@
 
 #include "smt/expr.h"
 #include <map>
+#include <ostream>
+#include <set>
 #include <utility>
 
 namespace smt {
+
+class AndExpr {
+  std::set<expr> exprs;
+
+public:
+  void add(expr &&e);
+  void add(const AndExpr &other);
+  expr operator()() const;
+  friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
+};
+
+
+class OrExpr {
+  std::set<expr> exprs;
+
+public:
+  void add(expr &&e);
+  expr operator()() const;
+  friend std::ostream &operator<<(std::ostream &os, const OrExpr &e);
+};
+
 
 template <typename T>
 class DisjointExpr {

@@ -8,6 +8,36 @@ using namespace std;
 
 namespace smt {
 
+void AndExpr::add(expr &&e) {
+  exprs.insert(move(e));
+}
+
+void AndExpr::add(const AndExpr &other) {
+  exprs.insert(other.exprs.begin(), other.exprs.end());
+}
+
+expr AndExpr::operator()() const {
+  return expr::mk_and(exprs);
+}
+
+ostream &operator<<(ostream &os, const AndExpr &e) {
+  return os << e();
+}
+
+
+void OrExpr::add(expr &&e) {
+  exprs.insert(move(e));
+}
+
+expr OrExpr::operator()() const {
+  return expr::mk_or(exprs);
+}
+
+ostream &operator<<(ostream &os, const OrExpr &e) {
+  return os << e();
+}
+
+
 void FunctionExpr::add(const expr &key, expr &&val) {
   ENSURE(fn.emplace(key, move(val)).second);
 }
