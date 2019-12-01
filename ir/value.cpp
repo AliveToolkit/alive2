@@ -78,8 +78,8 @@ StateValue NullPointerValue::toSMT(State &s) const {
 
 
 void GlobalVariable::print(ostream &os) const {
-  os << getName() << " = " << (isconst ? "constant " : "global ") << getType()
-     << ", align " << align;
+  os << getName() << " = " << (isconst ? "constant " : "global ") << allocsize
+     << " bytes, align " << align;
 }
 
 StateValue GlobalVariable::toSMT(State &s) const {

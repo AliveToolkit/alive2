@@ -386,6 +386,8 @@ public:
 
   RetTy visitLoadInst(llvm::LoadInst &i) {
     // TODO: Add support for isVolatile(), getOrdering()
+    if (!i.isSimple())
+      return error(i);
     PARSE_UNOP();
     RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val,
                                         alignment(i, i.getType())));
@@ -393,6 +395,8 @@ public:
 
   RetTy visitStoreInst(llvm::StoreInst &i) {
     // TODO: Add support for isVolatile(), getOrdering()
+    if (!i.isSimple())
+      return error(i);
     auto val = get_operand(i.getValueOperand());
     auto ptr = get_operand(i.getPointerOperand());
     if (!val || !ptr)
