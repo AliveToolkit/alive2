@@ -23,6 +23,9 @@ extern unsigned bits_for_offset;
 /// sizeof(size_t). This is assume to be equal to pointer size
 extern unsigned bits_size_t;
 
+/// Number of bits for a byte.
+extern unsigned bits_byte;
+
 extern bool little_endian;
 
 /// Wether the null pointer is used in either function

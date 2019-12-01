@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/value.h"
+#include "ir/constant.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include "util/config.h"
@@ -24,6 +25,15 @@ expr Value::getTypeConstraints() const {
 
 void Value::fixupTypes(const Model &m) {
   type.fixup(m);
+}
+
+bool Value::isInt(int64_t &i) const {
+  auto ci = dynamic_cast<const IntConst *>(this);
+  if (ci) {
+    if (auto ii = ci->getInt())
+      i = *ii;
+  }
+  return ci;
 }
 
 ostream& operator<<(ostream &os, const Value &val) {

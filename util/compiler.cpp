@@ -61,4 +61,12 @@ uint64_t divide_up(uint64_t n, uint64_t amount) {
   return (n + amount - 1) / amount;
 }
 
+uint64_t gcd(uint64_t n, uint64_t m) {
+  assert(n != 0 || m != 0);
+  if (n < m) return gcd(m, n);
+  else if (m == 0) return n;
+  else if (n % m == 0) return m;
+  return gcd(m, n % m);
+}
+
 }

@@ -10,6 +10,7 @@
 #include "util/config.h"
 #include "util/errors.h"
 #include "util/symexec.h"
+#include <algorithm>
 #include <map>
 #include <set>
 #include <sstream>
@@ -346,6 +347,9 @@ static void calculateAndInitConstants(Transform &t) {
   const auto &globals_src = t.src.getGlobalVars();
   unsigned num_globals = globals_src.size();
 
+  // TODO: get this from data layout, varies among address spaces
+  bits_size_t = 64;
+
   for (auto GVT : globals_tgt) {
     auto I = find_if(globals_src.begin(), globals_src.end(),
       [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
@@ -379,6 +383,44 @@ static void calculateAndInitConstants(Transform &t) {
       return false;
     return true;
   };
+  // Returns access size. 0 if no access, -1 if unknown
+  const uint64_t UNKNOWN = -1, NO_ACCESS = 0;
+  auto get_access_size = [&](const Instr &inst) -> uint64_t {
+    int64_t sz, num;
+    if (auto alc = dynamic_cast<const Alloc *>(&inst))
+      return alc->getSize()->isInt(sz) ? (uint64_t)sz : UNKNOWN;
+    else if (auto mlc = dynamic_cast<const Malloc *>(&inst))
+      return mlc->getSize()->isInt(sz) ? (uint64_t)sz : UNKNOWN;
+    else if (auto clc = dynamic_cast<const Calloc *>(&inst))
+      return clc->getSize()->isInt(sz) && clc->getNum()->isInt(num) ?
+              (uint64_t)(sz * num) : UNKNOWN;
+
+    Type *value_ty = nullptr;
+    if (auto st = dynamic_cast<const Store *>(&inst))
+      value_ty = &st->value()->getType();
+    else if (auto ld = dynamic_cast<const Load *>(&inst))
+      value_ty = &ld->getType();
+
+    if (value_ty) {
+      if (auto ity = dynamic_cast<const IntType *>(value_ty))
+        return util::divide_up(ity->bits(), 8);
+      else if (auto fty = dynamic_cast<const FloatType *>(value_ty))
+        return fty->bits() / 8;
+      else if (auto pty = dynamic_cast<const PtrType *>(value_ty))
+        return bits_size_t / 8;
+      // Aggregate types should consider padding
+      return UNKNOWN;
+    }
+
+    if (dynamic_cast<const BinOp *>(&inst) ||
+        dynamic_cast<const UnaryOp *>(&inst) ||
+        dynamic_cast<const TernaryOp *>(&inst) ||
+        dynamic_cast<const ConversionOp *>(&inst) ||
+        dynamic_cast<const Return *>(&inst))
+      return NO_ACCESS;
+
+    return UNKNOWN;
+  };
 
   // The number of instructions that can return a pointer to a non-local block.
   num_max_nonlocals_inst = 0;
@@ -408,6 +450,8 @@ static void calculateAndInitConstants(Transform &t) {
   nullptr_is_used = false;
   has_int2ptr = false;
   has_ptr2int = false;
+  // Mininum access size (in bytes)
+  uint64_t min_access_size = UNKNOWN;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
@@ -418,6 +462,13 @@ static void calculateAndInitConstants(Transform &t) {
         if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
           has_int2ptr |= conv->getOp() == ConversionOp::Int2Ptr;
           has_ptr2int |= conv->getOp() == ConversionOp::Ptr2Int;
+        }
+
+        auto accsz = get_access_size(I);
+        if (accsz != NO_ACCESS){
+          min_access_size = accsz == UNKNOWN ? 1 :
+              (min_access_size == UNKNOWN ? accsz :
+                                            gcd(min_access_size, accsz));
         }
       }
     }
@@ -432,7 +483,23 @@ static void calculateAndInitConstants(Transform &t) {
 
   // TODO
   bits_for_offset = 64;
-  bits_size_t = 64;
+
+  // size of byte
+  if (num_nonlocals != 1 || t.src.getType().isPtrType())
+    // Be conservative, run when there are unescaped local blocks only.
+    min_access_size = 1;
+  else if (min_access_size >= 1024) {
+    // If size is too large, bitvectors explode
+    uint64_t i = 1024;
+    while (i) {
+      if (min_access_size % i == 0) {
+        min_access_size = i;
+        break;
+      }
+      i >>= 1;
+    }
+  }
+  bits_byte = 8 * (unsigned)min_access_size;
 
   little_endian = t.src.isLittleEndian();
 
@@ -443,6 +510,7 @@ static void calculateAndInitConstants(Transform &t) {
                      "bits_for_bid: " << bits_for_bid << "\n"
                      "bits_for_offset: " << bits_for_offset << "\n"
                      "bits_size_t: " << bits_size_t << "\n"
+                     "bits_byte: " << bits_byte << "\n"
                      "little_endian: " << little_endian << "\n"
                      "nullptr_is_used: " << nullptr_is_used << "\n"
                      "has_int2ptr: " << has_int2ptr << "\n"
