@@ -317,7 +317,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
   cond &= is_block_alive();
 
   if (iswrite)
-    cond &= !is_readonly();
+    cond &= is_writable();
 
   m.state->addUB(bytes.uge(1).implies(cond));
 
@@ -406,15 +406,15 @@ expr Pointer::block_refined(const Pointer &other) const {
          check.implies(expr::mkIf(val.is_ptr(), ptr_cnstr, int_cnstr));
 }
 
-expr Pointer::is_readonly() const {
+expr Pointer::is_writable() const {
   auto local = is_local();
   auto bid = get_short_bid();
 
   if (local.isFalse()) {
-    if (auto val = m.non_local_blk_readonly.lookup(bid))
+    if (auto val = m.non_local_blk_writable.lookup(bid))
       return *val;
   }
-  return !local && expr::mkUF("blk_readonly", { bid }, false);
+  return local || expr::mkUF("blk_writable", { bid }, false);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
@@ -689,15 +689,15 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       state->addPre(p.get_address().add_no_uoverflow(p.block_size()));
 
   } else {
-    state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
-                                             : !p.is_readonly());
+    state->addAxiom(blockKind == CONSTGLOBAL ? !p.is_writable()
+                                             : p.is_writable());
     // The memory block was initially alive.
     state->addAxiom(mk_liveness_array().load(short_bid) == allocated);
     state->addAxiom(p.block_size() == size_zext);
     state->addAxiom(p.is_aligned(align));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
 
-    non_local_blk_readonly.add(short_bid, blockKind == CONSTGLOBAL);
+    non_local_blk_writable.add(short_bid, blockKind != CONSTGLOBAL);
     non_local_blk_size.add(short_bid, size_zext.trunc(bits_size_t - 1));
     non_local_blk_align.add(short_bid, expr::mkUInt(align_bits, 8));
     non_local_blk_kind.add(short_bid, expr::mkUInt(alloc_ty, 2));
@@ -837,7 +837,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.local_blk_addr.add(els.local_blk_addr);
   ret.local_blk_size.add(els.local_blk_size);
   ret.local_blk_kind.add(els.local_blk_kind);
-  ret.non_local_blk_readonly.add(els.non_local_blk_readonly);
+  ret.non_local_blk_writable.add(els.non_local_blk_writable);
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
@@ -851,12 +851,12 @@ bool Memory::operator<(const Memory &rhs) const {
     tie(did_pointer_store, non_local_block_val, local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_kind, local_avail_space,
-        non_local_blk_readonly, non_local_blk_size, non_local_blk_align,
+        non_local_blk_writable, non_local_blk_size, non_local_blk_align,
         non_local_blk_kind) <
     tie(rhs.did_pointer_store, rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_kind,
-        rhs.local_avail_space, rhs.non_local_blk_readonly,
+        rhs.local_avail_space, rhs.non_local_blk_writable,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind);
 }

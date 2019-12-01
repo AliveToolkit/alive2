@@ -85,7 +85,7 @@ public:
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
   smt::expr is_block_alive() const;
-  smt::expr is_readonly() const;
+  smt::expr is_writable() const;
 
   enum AllocType {
     NON_HEAP,
@@ -124,7 +124,7 @@ class Memory {
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_kind;
 
-  smt::FunctionExpr non_local_blk_readonly;
+  smt::FunctionExpr non_local_blk_writable;
   smt::FunctionExpr non_local_blk_size;
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
