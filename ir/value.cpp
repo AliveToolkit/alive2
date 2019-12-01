@@ -78,7 +78,8 @@ StateValue NullPointerValue::toSMT(State &s) const {
 
 
 void GlobalVariable::print(ostream &os) const {
-  UNREACHABLE();
+  os << getName() << " = " << (isconst ? "constant " : "global ") << getType()
+     << ", align " << align;
 }
 
 StateValue GlobalVariable::toSMT(State &s) const {
