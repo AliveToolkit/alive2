@@ -79,7 +79,7 @@ public:
   StateValue ugt(const Pointer &rhs) const;
 
   smt::expr inbounds() const;
-  smt::expr is_aligned(unsigned align) const;
+  smt::expr is_aligned(unsigned align, bool exact = false) const;
   void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
   void is_dereferenceable(const smt::expr &bytes, unsigned align, bool iswrite);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
@@ -122,6 +122,7 @@ class Memory {
 
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
+  smt::FunctionExpr local_blk_align;
   smt::FunctionExpr local_blk_kind;
 
   smt::FunctionExpr non_local_blk_writable;
