@@ -5,7 +5,6 @@
 
 #include "smt/expr.h"
 #include <map>
-#include <set>
 #include <utility>
 
 namespace smt {
@@ -53,10 +52,13 @@ class FunctionExpr {
 public:
   FunctionExpr() {}
   FunctionExpr(expr &&default_val) : default_val(std::move(default_val)) {}
-  void add(expr &&key, expr &&val);
+  void add(const expr &key, expr &&val);
   void add(const FunctionExpr &other);
   void del(const expr &key);
-  expr operator()(expr &key) const;
+
+  expr operator()(const expr &key) const;
+  const expr* lookup(const expr &key) const;
+
   auto begin() const { return fn.begin(); }
   auto end() const { return fn.end(); }
 

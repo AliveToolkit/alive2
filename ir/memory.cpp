@@ -204,10 +204,17 @@ expr Pointer::get_offset() const {
   return p.extract(bits_for_offset - 1, 0).sextOrTrunc(bits_size_t);
 }
 
-expr Pointer::get_value(const char *name, const FunctionExpr &fn,
+expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
+                        const FunctionExpr &nonlocal_fn,
                         const expr &ret_type) const {
+  auto local = is_local();
   auto bid = get_short_bid();
-  return expr::mkIf(is_local(), fn(bid), expr::mkUF(name, { bid }, ret_type));
+
+  if (local.isFalse()) {
+    if (auto val = nonlocal_fn.lookup(bid))
+      return *val;
+  }
+  return expr::mkIf(local, local_fn(bid), expr::mkUF(name, { bid }, ret_type));
 }
 
 expr Pointer::get_address(bool simplify) const {
@@ -226,18 +233,13 @@ expr Pointer::get_address(bool simplify) const {
       expr::mkUInt(0, 1).concat(expr::mkUF("blk_addr", { bid }, retty)));
 }
 
-expr Pointer::block_size(bool simplify) const {
+expr Pointer::block_size() const {
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
-
-  // fast path for null ptrs
-  if (simplify && (get_bid() == 0).isTrue())
-    return expr::mkUInt(0, bits_size_t);
-
-  expr range = expr::mkUInt(0, bits_size_t - 1);
   return expr::mkUInt(0, 1)
-           .concat(get_value("blk_size", m.local_blk_size, range));
+           .concat(get_value("blk_size", m.local_blk_size, m.non_local_blk_size,
+                             expr::mkUInt(0, bits_size_t - 1)));
 }
 
 expr Pointer::short_ptr() const {
@@ -290,9 +292,15 @@ expr Pointer::inbounds() const {
 }
 
 expr Pointer::is_aligned(unsigned align) const {
-  if (auto bits = ilog2(align))
-    return get_address().extract(bits-1, 0) == 0;
-  return true;
+  if (align <= 1)
+    return true;
+
+  auto bits = ilog2(align);
+  if (is_local().isFalse()) {
+    if (auto val = m.non_local_blk_align.lookup(get_short_bid()))
+      return val->uge(bits);
+  }
+  return get_address().extract(bits-1, 0) == 0;
 }
 
 // When bytes is 0, pointer is always derefenceable
@@ -345,7 +353,8 @@ expr Pointer::is_block_alive() const {
 }
 
 expr Pointer::get_alloc_type() const {
-  return get_value("blk_kind", m.local_blk_kind, expr::mkUInt(0, 2));
+  return get_value("blk_kind", m.local_blk_kind, m.non_local_blk_kind,
+                   expr::mkUInt(0, 2));
 }
 
 expr Pointer::is_heap_allocated() const {
@@ -398,7 +407,14 @@ expr Pointer::block_refined(const Pointer &other) const {
 }
 
 expr Pointer::is_readonly() const {
-  return !is_local() && expr::mkUF("blk_readonly", { get_short_bid() }, false);
+  auto local = is_local();
+  auto bid = get_short_bid();
+
+  if (local.isFalse()) {
+    if (auto val = m.non_local_blk_readonly.lookup(bid))
+      return *val;
+  }
+  return !local && expr::mkUF("blk_readonly", { bid }, false);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
@@ -521,15 +537,10 @@ Memory::Memory(State &state)
   // value.
   local_avail_space = expr::mkVar("local_avail_space", bits_size_t - 1);
 
-  if (state.isSource()) {
-    auto nullp = Pointer::mkNullPointer(*this);
-    state.addAxiom(nullp.block_size(false) == 0);
-    state.addAxiom(!nullp.is_block_alive());
-  }
+  // Initialize a memory block for null pointer.
+  alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, 0, nullptr, false);
 
   if (state.isSource() && observes_addresses()) {
-    // Initialize a memory block for null pointer.
-    // TODO: in twin memory model, this is not needed.
     state.addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
 
     // Non-local blocks are disjoint.
@@ -630,10 +641,10 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
 
-  if (is_local) {
-    assert(align != 0);
-    auto align_bits = ilog2(align);
+  assert(align != 0);
+  auto align_bits = ilog2(align);
 
+  if (is_local) {
     // MSB of local block area's address is 1.
     auto addr_var
       = expr::mkFreshVar("local_addr",
@@ -660,9 +671,9 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       state->addPre(allocated.implies(disj));
     }
 
-    local_blk_addr.add(expr(short_bid), move(blk_addr));
-    local_blk_size.add(expr(short_bid), size_zext.trunc(bits_size_t - 1));
-    local_blk_kind.add(expr(short_bid), expr::mkUInt(alloc_ty, 2));
+    local_blk_addr.add(short_bid, move(blk_addr));
+    local_blk_size.add(short_bid, size_zext.trunc(bits_size_t - 1));
+    local_blk_kind.add(short_bid, expr::mkUInt(alloc_ty, 2));
 
     local_block_liveness = local_block_liveness.store(short_bid, allocated);
 
@@ -681,10 +692,15 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     state->addAxiom(blockKind == CONSTGLOBAL ? p.is_readonly()
                                              : !p.is_readonly());
     // The memory block was initially alive.
-    state->addAxiom(allocated.implies(mk_liveness_array().load(short_bid) &&
-                                      p.is_aligned(align) &&
-                                      p.block_size() == size_zext));
+    state->addAxiom(mk_liveness_array().load(short_bid) == allocated);
+    state->addAxiom(p.block_size() == size_zext);
+    state->addAxiom(p.is_aligned(align));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
+
+    non_local_blk_readonly.add(short_bid, blockKind == CONSTGLOBAL);
+    non_local_blk_size.add(short_bid, size_zext.trunc(bits_size_t - 1));
+    non_local_blk_align.add(short_bid, expr::mkUInt(align_bits, 8));
+    non_local_blk_kind.add(short_bid, expr::mkUInt(alloc_ty, 2));
   }
   return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
 }
@@ -821,6 +837,10 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.local_blk_addr.add(els.local_blk_addr);
   ret.local_blk_size.add(els.local_blk_size);
   ret.local_blk_kind.add(els.local_blk_kind);
+  ret.non_local_blk_readonly.add(els.non_local_blk_readonly);
+  ret.non_local_blk_size.add(els.non_local_blk_size);
+  ret.non_local_blk_align.add(els.non_local_blk_align);
+  ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.did_pointer_store |= els.did_pointer_store;
   return ret;
 }
@@ -830,11 +850,15 @@ bool Memory::operator<(const Memory &rhs) const {
   return
     tie(did_pointer_store, non_local_block_val, local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
-        local_blk_size, local_blk_kind, local_avail_space) <
+        local_blk_size, local_blk_kind, local_avail_space,
+        non_local_blk_readonly, non_local_blk_size, non_local_blk_align,
+        non_local_blk_kind) <
     tie(rhs.did_pointer_store, rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_kind,
-        rhs.local_avail_space);
+        rhs.local_avail_space, rhs.non_local_blk_readonly,
+        rhs.non_local_blk_size, rhs.non_local_blk_align,
+        rhs.non_local_blk_kind);
 }
 
 }

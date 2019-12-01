@@ -41,6 +41,12 @@ ostream *out;
 
 const llvm::DataLayout *DL;
 
+template <typename T>
+unsigned alignment(const T &i, llvm::Type *ty) {
+  auto a = i.getAlignment();
+  return a != 0 ? a : DL->getABITypeAlignment(ty);
+}
+
 }
 
 namespace llvm_util {
@@ -213,9 +219,9 @@ Value* get_operand(llvm::Value *v,
         return nullptr;
     }
 
-    int size = DL->getTypeAllocSize(gv->getValueType());
-    int align = gv->getAlignment();
-    auto name = "@" + gv->getName().str();
+    unsigned size = DL->getTypeAllocSize(gv->getValueType());
+    unsigned align = alignment(*gv, gv->getValueType());
+    string name = '@' + gv->getName().str();
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
                                            gv->isConstant());
     gvar = val.get();

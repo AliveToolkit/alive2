@@ -35,7 +35,8 @@ class Pointer {
 
   unsigned total_bits() const;
 
-  smt::expr get_value(const char *name, const smt::FunctionExpr &fn,
+  smt::expr get_value(const char *name, const smt::FunctionExpr &local_fn,
+                      const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type) const;
 
 public:
@@ -52,7 +53,7 @@ public:
   smt::expr get_offset() const;
   smt::expr get_address(bool simplify = true) const;
 
-  smt::expr block_size(bool simplify = true) const;
+  smt::expr block_size() const;
 
   const smt::expr& operator()() const { return p; }
   smt::expr short_ptr() const;
@@ -122,6 +123,11 @@ class Memory {
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_kind;
+
+  smt::FunctionExpr non_local_blk_readonly;
+  smt::FunctionExpr non_local_blk_size;
+  smt::FunctionExpr non_local_blk_align;
+  smt::FunctionExpr non_local_blk_kind;
 
   smt::expr mk_val_array() const;
   smt::expr mk_liveness_array() const;

@@ -8,8 +8,8 @@ using namespace std;
 
 namespace smt {
 
-void FunctionExpr::add(expr &&key, expr &&val) {
-  ENSURE(fn.emplace(move(key), move(val)).second);
+void FunctionExpr::add(const expr &key, expr &&val) {
+  ENSURE(fn.emplace(key, move(val)).second);
 }
 
 void FunctionExpr::add(const FunctionExpr &other) {
@@ -20,12 +20,17 @@ void FunctionExpr::del(const expr &key) {
   fn.erase(key);
 }
 
-expr FunctionExpr::operator()(expr &key) const {
+expr FunctionExpr::operator()(const expr &key) const {
   DisjointExpr disj(default_val);
   for (auto &[k, v] : fn) {
     disj.add(v, k == key);
   }
   return disj();
+}
+
+const expr* FunctionExpr::lookup(const expr &key) const {
+  auto I = fn.find(key);
+  return I != fn.end() ? &I->second : nullptr;
 }
 
 bool FunctionExpr::operator<(const FunctionExpr &rhs) const {
