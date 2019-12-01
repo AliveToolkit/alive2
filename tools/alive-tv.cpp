@@ -60,6 +60,10 @@ static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_debug(
+    "dbg", llvm::cl::desc("Alive: print debugging info"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::cl::opt<bool> opt_smt_stats(
     "smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -281,6 +285,7 @@ int main(int argc, char **argv) {
   config::symexec_print_each_value = opt_se_verbose;
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
+  config::debug = opt_debug;
 
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get())

@@ -431,6 +431,18 @@ static void calculateAndInitConstants(Transform &t) {
   bits_size_t = 64;
 
   little_endian = t.src.isLittleEndian();
+
+  if (config::debug)
+    config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst << "\n"
+                     "num_locals: " << num_locals << "\n"
+                     "num_nonlocals: " << num_nonlocals << "\n"
+                     "bits_for_bid: " << bits_for_bid << "\n"
+                     "bits_for_offset: " << bits_for_offset << "\n"
+                     "bits_size_t: " << bits_size_t << "\n"
+                     "little_endian: " << little_endian << "\n"
+                     "nullptr_is_used: " << nullptr_is_used << "\n"
+                     "has_int2ptr: " << has_int2ptr << "\n"
+                     "has_ptr2int: " << has_ptr2int << "\n";
 }
 
 
