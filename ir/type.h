@@ -48,6 +48,7 @@ public:
 
   virtual smt::expr getTypeConstraints() const = 0;
   virtual smt::expr sizeVar() const;
+  virtual smt::expr scalarSize() const;
   smt::expr operator==(const Type &rhs) const;
   virtual void fixup(const smt::Model &m) = 0;
 
@@ -89,6 +90,8 @@ public:
 
   virtual smt::expr toBV(smt::expr e) const;
   virtual IR::StateValue toBV(IR::StateValue v) const;
+  virtual smt::expr toInt(State &s, smt::expr v) const;
+  virtual IR::StateValue toInt(State &s, IR::StateValue v) const;
   virtual smt::expr fromBV(smt::expr e) const;
   virtual IR::StateValue fromBV(IR::StateValue v) const;
 
@@ -176,7 +179,6 @@ public:
     : Type(std::move(name)), fpType(fpType), defined(true) {}
   unsigned bits() const override;
   FpType getFpType() const { return fpType; };
-  smt::expr toInt(State &s, const smt::expr &fp) const;
 
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
@@ -188,6 +190,8 @@ public:
   const FloatType* getAsFloatType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
@@ -250,12 +254,15 @@ public:
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
   smt::expr operator==(const AggregateType &rhs) const;
   void fixup(const smt::Model &m) override;
   smt::expr enforceAggregateType(
     std::vector<Type *> *element_types) const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
@@ -289,7 +296,7 @@ public:
                         const IR::StateValue &val,
                         const smt::expr &idx) const;
   smt::expr getTypeConstraints() const override;
-  smt::expr sizeVar() const override;
+  smt::expr scalarSize() const override;
   bool isVectorType() const override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
@@ -351,6 +358,8 @@ public:
   const StructType* getAsStructType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>

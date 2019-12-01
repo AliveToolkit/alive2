@@ -739,53 +739,42 @@ void ConversionOp::print(ostream &os) const {
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
-  auto &v = s[*val];
-  function<StateValue(const expr &, const Type &, const Type &)> fn;
+  auto v = s[*val];
+  function<StateValue(const expr &, const Type &)> fn;
 
   switch (op) {
   case SExt:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.sext(to_type.bits() - val.bits()), true };
     };
     break;
   case ZExt:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.zext(to_type.bits() - val.bits()), true };
     };
     break;
   case Trunc:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.trunc(to_type.bits()), true };
     };
     break;
   case BitCast:
-    fn = [&s](auto &val, auto &from_type, auto &to_type) -> StateValue {
-      expr newval;
-      if ((to_type.isIntType() && from_type.isIntType()) ||
-          (to_type.isFloatType() && from_type.isFloatType()) ||
-          (to_type.isPtrType() && from_type.isPtrType()))
-        newval = val;
-      else if (to_type.isIntType() && from_type.isFloatType())
-        newval = from_type.getAsFloatType()->toInt(s, val);
-      else if (to_type.isFloatType() && from_type.isIntType())
-        newval = val.BV2float(to_type.getDummyValue(true).value);
-      else
-        UNREACHABLE();
-      return { move(newval), true };
+    fn = [&s](auto &val, auto &to_type) -> StateValue {
+      return { to_type.fromBV(val), true };
     };
     break;
   case SIntToFP:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.sint2fp(to_type.getDummyValue(false).value), true };
     };
     break;
   case UIntToFP:
-    fn = [](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [](auto &val, auto &to_type) -> StateValue {
       return { val.uint2fp(to_type.getDummyValue(false).value), true };
     };
     break;
   case FPToSInt:
-    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [&](auto &val, auto &to_type) -> StateValue {
       return { val.fp2sint(to_type.bits()),
                val.foge(expr::IntSMin(getType().bits()).sint2fp(val)) &&
                val.fole(expr::IntSMax(getType().bits()).sint2fp(val)) &&
@@ -793,7 +782,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToUInt:
-    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [&](auto &val, auto &to_type) -> StateValue {
       return { val.fp2uint(to_type.bits()),
                val.foge(expr::mkFloat(0, val)) &&
                val.fole(expr::IntUMax(getType().bits()).uint2fp(val)) &&
@@ -801,34 +790,47 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case Ptr2Int:
-    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [&](auto &val, auto &to_type) -> StateValue {
       return { s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true };
     };
     break;
   case Int2Ptr:
-    fn = [&](auto &val, auto &from_type, auto &to_type) -> StateValue {
+    fn = [&](auto &val, auto &to_type) -> StateValue {
       return { s.getMemory().int2ptr(val), true };
     };
     break;
   }
 
-  auto scalar = [&](const StateValue &sv, const Type &from_type,
-                    const Type &to_type) -> StateValue {
-    auto [v, np] = fn(sv.value, from_type, to_type);
+  auto scalar = [&](const StateValue &sv, const Type &to_type) -> StateValue {
+    auto [v, np] = fn(sv.value, to_type);
     return { move(v), sv.non_poison && np };
   };
 
+  if (op == BitCast)
+    v = val->getType().toInt(s, move(v));
+
   if (getType().isVectorType()) {
     vector<StateValue> vals;
-    auto valty = val->getType().getAsAggregateType();
     auto retty = getType().getAsAggregateType();
-    for (unsigned i = 0, e = valty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(valty->extract(v, i), valty->getChild(i),
-                               retty->getChild(i)));
+    auto elems = retty->numElementsConst();
+
+    // bitcast vect elems size may vary, so create a new data type whose
+    // element size is aligned with the output vector elem size
+    IntType elem_ty("int", retty->bits() / elems);
+    VectorType int_ty("vec", elems, elem_ty);
+    auto valty = op == BitCast ? &int_ty : val->getType().getAsAggregateType();
+
+    for (unsigned i = 0; i != elems; ++i) {
+      vals.emplace_back(scalar(valty->extract(v, i), retty->getChild(i)));
     }
     return retty->aggregateVals(vals);
   }
-  return scalar(v, val->getType(), getType());
+
+  // turn poison data into boolean, while keeping value in BV
+  if (op == BitCast)
+    v = IntType("int", getType().bits()).fromBV(v);
+
+  return scalar(v, getType());
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
@@ -838,22 +840,17 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
   case ZExt:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforceIntOrVectorType() &&
-        val->getType().sizeVar().ult(getType().sizeVar());
+        val->getType().scalarSize().ult(getType().scalarSize());
     break;
   case Trunc:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforceIntOrVectorType() &&
-        getType().sizeVar().ult(val->getType().sizeVar());
+        getType().scalarSize().ult(val->getType().scalarSize());
     break;
   case BitCast:
-    c = (getType().enforcePtrOrVectorType() &&
-         val->getType().enforcePtrOrVectorType()) ||
-        ((getType().enforceIntOrVectorType() ||
-          getType().enforceFloatOrVectorType()) &&
-         (val->getType().enforceIntOrVectorType() ||
-          val->getType().enforceFloatOrVectorType()));
-
-    c &= getType().sizeVar() == val->getType().sizeVar();
+    c = getType().enforceIntOrFloatOrPtrOrVectorType() &&
+        val->getType().enforceIntOrFloatOrPtrOrVectorType() &&
+        getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
   case UIntToFP:
@@ -874,9 +871,11 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
         val->getType().enforceIntOrVectorType();
     break;
   }
-  return Value::getTypeConstraints() &&
-         move(c) &&
-         getType().enforceVectorTypeEquiv(val->getType());
+
+  c &= Value::getTypeConstraints();
+  if (op != BitCast)
+    c &= getType().enforceVectorTypeEquiv(val->getType());
+  return c;
 }
 
 unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {

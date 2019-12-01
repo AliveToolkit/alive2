@@ -35,6 +35,10 @@ expr Type::sizeVar() const {
   return var("bw", var_bw_bits);
 }
 
+expr Type::scalarSize() const {
+  return sizeVar();
+}
+
 expr Type::is(unsigned t) const {
   return typeVar() == t;
 }
@@ -206,6 +210,17 @@ StateValue Type::toBV(StateValue v) const {
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
 
+expr Type::toInt(State &s, expr v) const {
+  return toBV(move(v));
+}
+
+StateValue Type::toInt(State &s, StateValue v) const {
+  expr val = toInt(s, move(v.value));
+  auto bw = val.bits();
+  return { move(val),
+           expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
+}
+
 expr Type::fromBV(expr e) const {
   return e;
 }
@@ -354,7 +369,7 @@ unsigned FloatType::bits() const {
   return float_sizes[fpType].first;
 }
 
-expr FloatType::toInt(State &s, const expr &fp) const {
+expr FloatType::toInt(State &s, expr fp) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
@@ -376,6 +391,10 @@ expr FloatType::toInt(State &s, const expr &fp) const {
   s.addQuantVar(var);
 
   return expr::mkIf(isnan, nan, val);
+}
+
+StateValue FloatType::toInt(State &s, StateValue v) const {
+  return Type::toInt(s, move(v));
 }
 
 const FloatType* FloatType::getAsFloatType() const {
@@ -656,6 +675,16 @@ expr AggregateType::getTypeConstraints() const {
   return r;
 }
 
+expr AggregateType::sizeVar() const {
+  expr elems = numElements();
+  expr sz = expr::mkUInt(0, var_bw_bits);
+
+  for (unsigned i = 0; i < elements; ++i) {
+    sz = expr::mkIf(elems.ugt(i), sz + children[i]->sizeVar(), sz);
+  }
+  return sz;
+}
+
 expr AggregateType::operator==(const AggregateType &rhs) const {
   expr elems = numElements();
   expr res = elems == rhs.numElements();
@@ -695,6 +724,23 @@ expr AggregateType::toBV(expr e) const {
 
 StateValue AggregateType::toBV(StateValue v) const {
   return v;
+}
+
+expr AggregateType::toInt(State &s, expr v) const {
+  UNREACHABLE();
+}
+
+StateValue AggregateType::toInt(State &s, StateValue v) const {
+  // structs can be empty
+  if (elements == 0)
+    return { expr::mkUInt(0, 1), true };
+
+  StateValue ret;
+  for (unsigned i = 0; i < elements; ++i) {
+    auto vv = children[i]->toInt(s, extract(v, i));
+    ret = i == 0 ? move(vv) : ret.concat(vv);
+  }
+  return ret;
 }
 
 expr AggregateType::fromBV(expr e) const {
@@ -829,7 +875,7 @@ expr VectorType::getTypeConstraints() const {
   return r;
 }
 
-expr VectorType::sizeVar() const {
+expr VectorType::scalarSize() const {
   return children[0]->sizeVar();
 }
 
@@ -1058,6 +1104,14 @@ expr SymbolicType::toBV(expr e) const {
 
 StateValue SymbolicType::toBV(StateValue val) const {
   DISPATCH(toBV(move(val)), UNREACHABLE());
+}
+
+expr SymbolicType::toInt(State &st, expr e) const {
+  DISPATCH(toInt(st, move(e)), UNREACHABLE());
+}
+
+StateValue SymbolicType::toInt(State &st, StateValue val) const {
+  DISPATCH(toInt(st, move(val)), UNREACHABLE());
 }
 
 expr SymbolicType::fromBV(expr e) const {
