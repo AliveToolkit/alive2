@@ -275,6 +275,10 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre_src = src_state.getPre()();
   expr pre_tgt = tgt_state.getPre()();
 
+  // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src = tgt
+  if (pre_src.eq(pre_tgt))
+    pre_src = true;
+
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr memory_cnstr
     = src_state.returnMemory().refined(tgt_state.returnMemory());
