@@ -40,6 +40,7 @@ class Alive2Test(TestFormat):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
+    self.regex_check = re.compile(r";\s*CHECK:(.*)")
 
   def getTestsInDirectory(self, testSuite, path_in_suite,
                           litConfig, localConfig):
@@ -97,6 +98,10 @@ class Alive2Test(TestFormat):
 
     expect_err = self.regex_errs.search(input)
     xfail = self.regex_xfail.search(input)
+    chk = self.regex_check.search(input)
+
+    if chk != None and (out + err).find(chk.group(1).strip()) == -1:
+      return lit.Test.FAIL, out + err
 
     if expect_err is None and xfail is None:
       if exitCode == 0 and string.find(out + err, ok_string) != -1:
