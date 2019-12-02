@@ -370,8 +370,6 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-  Value *getSize() const { return size; }
-  unsigned getAlign() const { return align; }
 };
 
 
@@ -390,7 +388,6 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-  Value *getSize() const { return size; }
 };
 
 
@@ -452,6 +449,7 @@ public:
     : Instr(type, std::move(name)), ptr(&ptr), align(align) {}
 
   std::vector<Value*> operands() const override;
+  unsigned getAlign() const { return align; }
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -468,8 +466,9 @@ public:
     : Instr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
 
   std::vector<Value*> operands() const override;
-  Value *value() const { return val; }
-  Value *pointer() const { return ptr; }
+  Value *getValue() const { return val; }
+  Value *getPointer() const { return ptr; }
+  unsigned getAlign() const { return align; }
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

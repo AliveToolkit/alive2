@@ -303,7 +303,8 @@ expr Pointer::inbounds() const {
 }
 
 expr Pointer::is_aligned(unsigned align, bool exact) const {
-  if (!exact && align <= 1)
+  assert(align != 0);
+  if (!exact && align == 1)
     return true;
 
   auto bits = ilog2(align);

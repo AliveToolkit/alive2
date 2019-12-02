@@ -386,28 +386,30 @@ static void calculateAndInitConstants(Transform &t) {
   // Returns access size. 0 if no access, -1 if unknown
   const uint64_t UNKNOWN = -1, NO_ACCESS = 0;
   auto get_access_size = [&](const Instr &inst) -> uint64_t {
-    int64_t sz, num;
-    if (auto alc = dynamic_cast<const Alloc *>(&inst))
-      return alc->getSize()->isInt(sz) ? (uint64_t)sz : UNKNOWN;
-    else if (auto mlc = dynamic_cast<const Malloc *>(&inst))
-      return mlc->getSize()->isInt(sz) ? (uint64_t)sz : UNKNOWN;
-    else if (auto clc = dynamic_cast<const Calloc *>(&inst))
-      return clc->getSize()->isInt(sz) && clc->getNum()->isInt(num) ?
-              (uint64_t)(sz * num) : UNKNOWN;
+    if (dynamic_cast<const Alloc *>(&inst) ||
+        dynamic_cast<const Malloc *>(&inst))
+      // They are uninitialized (no actual bytes written), so assume that they
+      // are not accessed.
+      // Calloc is different: it contains memset to zero
+      return NO_ACCESS;
 
     Type *value_ty = nullptr;
-    if (auto st = dynamic_cast<const Store *>(&inst))
-      value_ty = &st->value()->getType();
-    else if (auto ld = dynamic_cast<const Load *>(&inst))
+    unsigned align = 0;
+    if (auto st = dynamic_cast<const Store *>(&inst)) {
+      value_ty = &st->getValue()->getType();
+      align = st->getAlign();
+    } else if (auto ld = dynamic_cast<const Load *>(&inst)) {
       value_ty = &ld->getType();
+      align = ld->getAlign();
+    }
 
     if (value_ty) {
       if (auto ity = dynamic_cast<const IntType *>(value_ty))
-        return util::divide_up(ity->bits(), 8);
+        return gcd(align, util::divide_up(ity->bits(), 8));
       else if (auto fty = dynamic_cast<const FloatType *>(value_ty))
-        return fty->bits() / 8;
+        return gcd(align, fty->bits() / 8);
       else if (auto pty = dynamic_cast<const PtrType *>(value_ty))
-        return bits_size_t / 8;
+        return gcd(align, bits_size_t / 8);
       // Aggregate types should consider padding
       return UNKNOWN;
     }
