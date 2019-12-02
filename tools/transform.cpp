@@ -408,7 +408,7 @@ static void calculateAndInitConstants(Transform &t) {
         return gcd(align, util::divide_up(ity->bits(), 8));
       else if (auto fty = dynamic_cast<const FloatType *>(value_ty))
         return gcd(align, fty->bits() / 8);
-      else if (auto pty = dynamic_cast<const PtrType *>(value_ty))
+      else if (dynamic_cast<const PtrType *>(value_ty))
         return gcd(align, bits_size_t / 8);
       // Aggregate types should consider padding
       return UNKNOWN;
