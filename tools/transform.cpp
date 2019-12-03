@@ -384,8 +384,15 @@ static void calculateAndInitConstants(Transform &t) {
     return true;
   };
   // Returns access size. 0 if no access, -1 if unknown
-  const uint64_t UNKNOWN = -1, NO_ACCESS = 0;
+  const uint64_t UNKNOWN = 1, NO_ACCESS = 0;
   auto get_access_size = [&](const Instr &inst) -> uint64_t {
+    if (dynamic_cast<const BinOp *>(&inst) ||
+        dynamic_cast<const UnaryOp *>(&inst) ||
+        dynamic_cast<const TernaryOp *>(&inst) ||
+        dynamic_cast<const ConversionOp *>(&inst) ||
+        dynamic_cast<const Return *>(&inst))
+      return NO_ACCESS;
+
     if (dynamic_cast<const Alloc *>(&inst) ||
         dynamic_cast<const Malloc *>(&inst))
       // They are uninitialized (no actual bytes written), so assume that they
@@ -413,13 +420,6 @@ static void calculateAndInitConstants(Transform &t) {
       // Aggregate types should consider padding
       return UNKNOWN;
     }
-
-    if (dynamic_cast<const BinOp *>(&inst) ||
-        dynamic_cast<const UnaryOp *>(&inst) ||
-        dynamic_cast<const TernaryOp *>(&inst) ||
-        dynamic_cast<const ConversionOp *>(&inst) ||
-        dynamic_cast<const Return *>(&inst))
-      return NO_ACCESS;
 
     return UNKNOWN;
   };
@@ -453,7 +453,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_int2ptr = false;
   has_ptr2int = false;
   // Mininum access size (in bytes)
-  uint64_t min_access_size = UNKNOWN;
+  uint64_t min_access_size = 512;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
@@ -467,11 +467,8 @@ static void calculateAndInitConstants(Transform &t) {
         }
 
         auto accsz = get_access_size(I);
-        if (accsz != NO_ACCESS){
-          min_access_size = accsz == UNKNOWN ? 1 :
-              (min_access_size == UNKNOWN ? accsz :
-                                            gcd(min_access_size, accsz));
-        }
+        if (accsz != NO_ACCESS)
+          min_access_size = gcd(min_access_size, accsz);
       }
     }
   }
@@ -487,20 +484,6 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = 64;
 
   // size of byte
-  if (num_nonlocals != 1 || t.src.getType().isPtrType())
-    // Be conservative, run when there are unescaped local blocks only.
-    min_access_size = 1;
-  else if (min_access_size >= 1024) {
-    // If size is too large, bitvectors explode
-    uint64_t i = 1024;
-    while (i) {
-      if (min_access_size % i == 0) {
-        min_access_size = i;
-        break;
-      }
-      i >>= 1;
-    }
-  }
   bits_byte = 8 * (unsigned)min_access_size;
 
   little_endian = t.src.isLittleEndian();

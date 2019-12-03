@@ -642,10 +642,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   if (bid_out)
     *bid_out = bid;
 
-  uint64_t sz_uint;
-  if (size.isUInt(sz_uint))
-    assert(8 * sz_uint % bits_byte == 0);
-
   expr size_zext = size.zextOrTrunc(bits_size_t);
   expr allocated = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
 
@@ -753,6 +749,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 
   Pointer ptr(*this, p);
   unsigned bytesz = bits_byte / 8;
+  assert(align % bytesz == 0);
+
   ptr.is_dereferenceable(bytes.size() * bytesz, align,
                          !state->isInitializationPhase());
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
@@ -768,6 +766,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
   assert(bits_byte == 8 || bitsize % bits_byte == 0);
   unsigned bytecount = divide_up(bitsize, bits_byte);
   unsigned bytesz = bits_byte / 8;
+  assert(align % bytesz == 0);
 
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytecount * bytesz, align, false);

@@ -31,8 +31,8 @@ public:
   auto bits() const { return type.bits(); }
   auto& getName() const { return name; }
   auto& getType() const { return type; }
-  bool isVoid() const;
   bool isInt(int64_t &i) const;
+  bool isVoid() const;
 
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;
