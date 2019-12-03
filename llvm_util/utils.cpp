@@ -237,7 +237,7 @@ Value* get_operand(llvm::Value *v,
       else
         return nullptr;
     }
-    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
     return ret;
@@ -251,7 +251,7 @@ Value* get_operand(llvm::Value *v,
       else
         return nullptr;
     }
-    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
     return ret;
@@ -265,7 +265,7 @@ Value* get_operand(llvm::Value *v,
       else
         return nullptr;
     }
-    auto val = make_unique<AggregateConst>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
     return ret;

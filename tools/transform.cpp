@@ -331,7 +331,7 @@ static bool has_nullptr(const Value *v) {
       // undef pointer points to the nullblk
     return true;
 
-  if (auto agg = dynamic_cast<const AggregateConst*>(v)) {
+  if (auto agg = dynamic_cast<const AggregateValue*>(v)) {
     for (auto val : agg->getVals()) {
       if (has_nullptr(val))
         return true;

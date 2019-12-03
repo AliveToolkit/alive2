@@ -483,7 +483,7 @@ static Value& parse_vector_constant(Type &type) {
 
   tokenizer.ensure(CSGT);
 
-  auto c = make_unique<AggregateConst>(type, move(vals));
+  auto c = make_unique<AggregateValue>(type, move(vals));
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;

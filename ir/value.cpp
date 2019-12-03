@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/instr.h"
 #include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
@@ -134,6 +135,49 @@ StateValue Input::toSMT(State &s) const {
              ? move(non_poison)
              : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
 }
+
+
+static string agg_str(vector<Value*> &vals) {
+  string r = "{ ";
+  bool first = true;
+  for (auto val : vals) {
+    if (!first)
+      r += ", ";
+    r += val->getName();
+    first = false;
+  }
+  return r + " }";
+}
+
+
+AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
+  : Value(type, agg_str(vals)), vals(move(vals)) {}
+
+StateValue AggregateValue::toSMT(State &s) const {
+  vector<StateValue> state_vals;
+  for (auto val : vals) {
+    state_vals.emplace_back(val->toSMT(s));
+  }
+  return getType().getAsAggregateType()->aggregateVals(state_vals);
+}
+
+expr AggregateValue::getTypeConstraints() const {
+  expr r = Value::getTypeConstraints();
+  vector<Type*> types;
+  for (auto val : vals) {
+    types.emplace_back(&val->getType());
+    if (dynamic_cast<const Instr*>(val))
+      // Should use getTypeConstraints(const Function &).
+      continue;
+    r &= val->getTypeConstraints();
+  }
+  return r && getType().enforceAggregateType(&types);
+}
+
+void AggregateValue::print(std::ostream &os) const {
+  UNREACHABLE();
+}
+
 
 expr Input::getTyVar() const {
   string tyname = "ty_" + smt_name;
