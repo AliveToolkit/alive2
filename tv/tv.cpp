@@ -6,10 +6,15 @@
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "llvm/ADT/Any.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -98,6 +103,7 @@ unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
 bool has_failure = false;
+bool is_clangtv = false;
 
 
 struct TVPass final : public llvm::FunctionPass {
@@ -106,11 +112,28 @@ struct TVPass final : public llvm::FunctionPass {
   TVPass() : FunctionPass(ID) {}
 
   bool runOnFunction(llvm::Function &F) override {
-    auto &TLI = getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
+    if (F.isDeclaration())
+      // This can happen at EntryExitInstrumenter pass.
+      return false;
+
+    llvm::TargetLibraryInfo *TLI = nullptr;
+    unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
+    if (is_clangtv) {
+      // When used as a clang plugin, this is run as a plain function rather
+      // than a registered pass, so getAnalysis() cannot be used.
+      TLI =
+        new llvm::TargetLibraryInfo(
+          llvm::TargetLibraryInfoImpl(
+            llvm::Triple(F.getParent()->getTargetTriple())),
+          &F);
+      TLI_holder = unique_ptr<llvm::TargetLibraryInfo>(TLI);
+    } else {
+      TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
+    }
 
     auto [I, first] = fns.try_emplace(F.getName().str());
-    auto fn = llvm2alive(F, TLI, first ? vector<string_view>()
-                                       : I->second.first.getGlobalVarNames());
+    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
+                                        : I->second.first.getGlobalVarNames());
     if (!fn) {
       fns.erase(I);
       return false;
@@ -238,5 +261,111 @@ struct TVPass final : public llvm::FunctionPass {
 
 char TVPass::ID = 0;
 llvm::RegisterPass<TVPass> X("tv", "Translation Validator", false, false);
+
+
+
+#ifdef CLANG_PLUGIN
+/// Classes and functions for running translation validation on clang
+/// Uses new pass manager's callback.
+
+struct TVInitPass : public llvm::PassInfoMixin<TVInitPass> {
+  llvm::PreservedAnalyses run(llvm::Module &M,
+                              llvm::ModuleAnalysisManager &MAM) {
+    TVPass().doInitialization(M);
+    return llvm::PreservedAnalyses::all();
+  }
+};
+
+struct TVFinalizePass : public llvm::PassInfoMixin<TVFinalizePass> {
+  static bool finalized;
+  llvm::PreservedAnalyses run(llvm::Function &F,
+                              llvm::FunctionAnalysisManager &FAM) {
+    if (!finalized) {
+      finalized = true;
+      TVPass().doFinalization(*F.getParent());
+    }
+    return llvm::PreservedAnalyses::all();
+  }
+};
+
+bool TVFinalizePass::finalized = false;
+
+// Extracting Module out of IR unit.
+// Excerpted from LLVM's StandardInstrumentation.cpp
+static const llvm::Module * unwrapModule(llvm::Any IR) {
+  using namespace llvm;
+
+  if (any_isa<const Module *>(IR))
+    return any_cast<const Module *>(IR);
+  else if (any_isa<const llvm::Function *>(IR))
+    return any_cast<const llvm::Function *>(IR)->getParent();
+  else if (any_isa<const LazyCallGraph::SCC *>(IR)) {
+    auto C = any_cast<const LazyCallGraph::SCC *>(IR);
+    assert(C->begin() != C->end()); // there's at least one function
+    return C->begin()->getFunction().getParent();
+  } else if (any_isa<const Loop *>(IR))
+    return any_cast<const Loop *>(IR)->getHeader()->getParent()->getParent();
+
+  llvm_unreachable("Unknown IR unit");
+}
+
+static bool do_skip(const llvm::StringRef &ref) {
+  const vector<string_view> pass_list = {
+    "::TVInitPass", "::TVFinalizePass",
+    "ArgumentPromotionPass", "DeadArgumentEliminationPass",
+    "HotColdSplittingPass", "InlinerPass",
+    "GlobalOptPass", "IPSCCPPass"
+  };
+  auto sref = ref.str();
+  auto ends_with = [](const string_view &a, const string_view &suffix) {
+    return a.size() >= suffix.size() &&
+           a.substr(a.size() - suffix.size()) == suffix;
+  };
+  return
+    std::find_if(pass_list.begin(), pass_list.end(), [&](string_view elem) {
+        return ends_with(sref, elem);
+      }) != pass_list.end();
+}
+
+// Entry point for this plugin
+extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+llvmGetPassPluginInfo() {
+  return {
+    LLVM_PLUGIN_API_VERSION, "Alive2 Translation Validation", "",
+    [](llvm::PassBuilder &PB) {
+      is_clangtv = true;
+      PB.registerPipelineStartEPCallback(
+        [](llvm::ModulePassManager &MPM) { MPM.addPass(TVInitPass()); }
+      );
+      PB.registerOptimizerLastEPCallback(
+        [](llvm::FunctionPassManager &FPM, llvm::PassBuilder::OptimizationLevel)
+        { FPM.addPass(TVFinalizePass()); }
+      );
+      auto f = [](llvm::StringRef P, llvm::Any IR) {
+        static int count = 0;
+        if (!out) {
+          // TVInitPass is not called yet.
+          // This can happen at very early passes, such as
+          // ForceFunctionAttrsPass.
+          return;
+        }
+
+        if (do_skip(P)) {
+          *out << "-- " << ++count << ". " << P.str() << " : Skipping\n";
+          return;
+        } else if (TVFinalizePass::finalized)
+          return;
+
+        *out << "-- " << ++count << ". " << P.str() << "\n";
+        TVPass tv;
+        auto M = const_cast<llvm::Module *>(unwrapModule(IR));
+        for (auto &F: *M)
+          tv.runOnFunction(F);
+      };
+      PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(move(f));
+    }
+  };
+}
+#endif
 
 }
