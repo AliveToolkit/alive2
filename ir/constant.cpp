@@ -70,40 +70,6 @@ StateValue FloatConst::toSMT(State &s) const {
 }
 
 
-static string agg_const_str(vector<Value*> &vals) {
-  string r = "{ ";
-  bool first = true;
-  for (auto val : vals) {
-    if (!first)
-      r += ", ";
-    r += val->getName();
-    first = false;
-  }
-  return r + " }";
-}
-
-AggregateConst::AggregateConst(Type &type, vector<Value*> &&vals)
-  : Constant(type, agg_const_str(vals)), vals(move(vals)) {}
-
-StateValue AggregateConst::toSMT(State &s) const {
-  vector<StateValue> state_vals;
-  for (auto val : vals) {
-    state_vals.emplace_back(val->toSMT(s));
-  }
-  return getType().getAsAggregateType()->aggregateVals(state_vals);
-}
-
-expr AggregateConst::getTypeConstraints() const {
-  expr r = Value::getTypeConstraints();
-  vector<Type*> types;
-  for (auto val : vals) {
-    types.emplace_back(&val->getType());
-    r &= val->getTypeConstraints();
-  }
-  return r && getType().enforceAggregateType(&types);
-}
-
-
 StateValue ConstantInput::toSMT(State &s) const {
   auto type = getType().getDummyValue(false).value;
   return { expr::mkVar(getName().c_str(), type), true };

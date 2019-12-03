@@ -2093,7 +2093,7 @@ StateValue ShuffleVector::toSMT(State &s) const {
 
   auto &vect1 = s[*v1];
   auto &vect2 = s[*v2];
-  auto &mask_vector = static_cast<AggregateConst*>(mask)->getVals();
+  auto &mask_vector = static_cast<AggregateValue*>(mask)->getVals();
 
   for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
     auto mask = mask_vector[i];

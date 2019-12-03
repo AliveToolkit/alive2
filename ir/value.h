@@ -95,6 +95,17 @@ public:
 };
 
 
+class AggregateValue final : public Value {
+  std::vector<Value*> vals;
+public:
+  AggregateValue(Type &type, std::vector<Value*> &&vals);
+  auto& getVals() const { return vals; }
+  smt::expr getTypeConstraints() const override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+};
+
+
 class Input final : public Value {
   std::string smt_name;
 public:
