@@ -383,44 +383,30 @@ static void calculateAndInitConstants(Transform &t) {
       return false;
     return true;
   };
+
   // Returns access size. 0 if no access, -1 if unknown
   const uint64_t UNKNOWN = 1, NO_ACCESS = 0;
   auto get_access_size = [&](const Instr &inst) -> uint64_t {
-    if (dynamic_cast<const BinOp *>(&inst) ||
-        dynamic_cast<const UnaryOp *>(&inst) ||
-        dynamic_cast<const TernaryOp *>(&inst) ||
-        dynamic_cast<const ConversionOp *>(&inst) ||
-        dynamic_cast<const Return *>(&inst))
-      return NO_ACCESS;
+    if (dynamic_cast<const Calloc *>(&inst) ||
+        dynamic_cast<const Memcpy *>(&inst) ||
+        dynamic_cast<const Memset *>(&inst))
+      // TODO
+      return UNKNOWN;
 
-    if (dynamic_cast<const Alloc *>(&inst) ||
-        dynamic_cast<const Malloc *>(&inst))
-      // They are uninitialized (no actual bytes written), so assume that they
-      // are not accessed.
-      // Calloc is different: it contains memset to zero
-      return NO_ACCESS;
-
-    Type *value_ty = nullptr;
-    unsigned align = 0;
+    Type *value_ty;
+    unsigned align;
     if (auto st = dynamic_cast<const Store *>(&inst)) {
       value_ty = &st->getValue()->getType();
       align = st->getAlign();
     } else if (auto ld = dynamic_cast<const Load *>(&inst)) {
       value_ty = &ld->getType();
       align = ld->getAlign();
-    }
+    } else
+      return NO_ACCESS;
 
-    if (value_ty) {
-      if (dynamic_cast<const IntType *>(value_ty) ||
-          dynamic_cast<const FloatType *>(value_ty))
-        return gcd(align, util::divide_up(value_ty->bits(), 8));
-      else if (dynamic_cast<const PtrType *>(value_ty))
-        return gcd(align, bits_size_t / 8);
-      // Aggregate types should consider padding
-      return UNKNOWN;
-    }
-
-    return UNKNOWN;
+    if (dynamic_cast<const PtrType *>(value_ty))
+      return gcd(align, bits_size_t / 8);
+    return gcd(align, util::divide_up(value_ty->bits(), 8));
   };
 
   // The number of instructions that can return a pointer to a non-local block.
