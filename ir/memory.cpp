@@ -16,14 +16,14 @@ namespace {
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
 // Pointer byte's representation:
-//   +-+------------------+-------------------+----------------+-------------+
-//   |1| non-poison byte? | ptr offset        | block id       | byte offset |
-//   | | (1 bit)          | (bits_for_offset) | (bits_for_bid) | (3 bits)    |
-//   +-+------------------+-------------------+----------------+-------------+
+//   +-+-------+-----------+------------------+----------------+-------------+
+//   |1|padding|non-poison?| ptr offset       | block id       | byte offset |
+//   | |       |(1 bit)    | (bits_for_offset)| (bits_for_bid) | (3 bits)    |
+//   +-+-------+-----------+------------------+----------------+-------------+
 // Non-pointer byte's representation:
 //   +-+--------------------------+--------------------+---------------------+
-//   |0| padding(000000000)       | non-poison bits?   | data                |
-//   | |                          | (8 bits)           | (8 bits)            |
+//   |0| padding(zero)            | non-poison bits?   | data                |
+//   | |                          | (bits_byte)        | (bits_byte)         |
 //   +-+--------------------------+--------------------+---------------------+
 class Byte {
   const Memory &m;
@@ -44,20 +44,25 @@ public:
 
     expr byteofs = expr::mkUInt(i, 3);
     expr np = non_poison.toBVBool();
-    p = expr::mkUInt(1, 1).concat(np).concat(ptr()).concat(byteofs);
+    unsigned padding = m.bitsByte() - 1 - 1 - bits_for_offset - bits_for_bid - 3;
+    p = expr::mkUInt(1, 1);
+    if (padding)
+      p = p.concat(expr::mkUInt(0, padding));
+    p = p.concat(np).concat(ptr()).concat(byteofs);
     assert(!p.isValid() || p.bits() == m.bitsByte());
   }
 
   // Creates a non-pointer byte that has data and non_poison.
-  // data and non_poison should have 8 bits.
+  // data and non_poison should have bits_byte bits.
   Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
-    assert(m.bitsByte() > 1 + 8 + 8);
-    assert(!data.isValid() || data.bits() == 8);
-    assert(!non_poison.isValid() || non_poison.bits() == 8);
+    assert(!data.isValid() || data.bits() == bits_byte);
+    assert(!non_poison.isValid() || non_poison.bits() == bits_byte);
 
-    unsigned padding = m.bitsByte() - 1 - 8 - 8;
-    p = expr::mkUInt(0, 1).concat(expr::mkUInt(0, padding)).concat(non_poison)
-                          .concat(data);
+    unsigned padding = m.bitsByte() - 1 - 2 * bits_byte;
+    p = expr::mkUInt(0, 1);
+    if (padding)
+      p = p.concat(expr::mkUInt(0, padding));
+    p = p.concat(non_poison).concat(data);
     assert(!p.isValid() || p.bits() == m.bitsByte());
   }
 
@@ -72,12 +77,15 @@ public:
     return p.extract(bit, bit) == 1;
   }
 
-  expr ptr_value() const { return p.extract(p.bits() - 3, 3); }
+  expr ptr_value() const {
+    return p.extract(bits_for_offset + bits_for_bid + 2, 3);
+  }
   expr ptr_byteoffset() const { return p.extract(2, 0); }
 
   // Assuming that this is a non-pointer byte
-  expr nonptr_nonpoison() const { return p.extract(15, 8); };
-  expr nonptr_value() const { return p.extract(7, 0); }
+  expr nonptr_nonpoison() const { return p.extract(bits_byte * 2 - 1,
+                                                   bits_byte); };
+  expr nonptr_value() const { return p.extract(bits_byte - 1, 0); }
 
   const expr& operator()() const { return p; }
 
@@ -86,7 +94,7 @@ public:
   }
 
   static Byte mkPoisonByte(const Memory &m) {
-    IntType ty("", 8);
+    IntType ty("", bits_byte);
     auto v = ty.toBV(ty.getDummyValue(false));
     return { m, v.value, v.non_poison };
   }
@@ -98,20 +106,21 @@ vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
   vector<Byte> bytes;
   if (fromType.isPtrType()) {
     Pointer p(mem, val.value);
-    unsigned bytesize = bits_size_t / 8;
+    unsigned bytesize = bits_size_t / bits_byte;
 
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
   } else {
     StateValue bvval = fromType.toBV(val);
     unsigned bitsize = bvval.bits();
-    unsigned bytesize = divide_up(bitsize, 8);
+    unsigned bytesize = divide_up(bitsize, bits_byte);
 
-    bvval = bvval.zext(bytesize * 8 - bitsize);
+    bvval = bvval.zext(bytesize * bits_byte - bitsize);
 
     for (unsigned i = 0; i < bytesize; ++i) {
-      expr data  = bvval.value.extract((i + 1) * 8 - 1, i * 8);
-      expr np    = bvval.non_poison.extract((i + 1) * 8 - 1, i * 8);
+      expr data  = bvval.value.extract((i + 1) * bits_byte - 1, i * bits_byte);
+      expr np    = bvval.non_poison.extract((i + 1) * bits_byte - 1,
+                                            i * bits_byte);
       bytes.emplace_back(mem, data, np);
     }
   }
@@ -122,6 +131,7 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
   assert(!bytes.empty());
 
   if (toType.isPtrType()) {
+    assert(bytes.size() == bits_size_t / bits_byte);
     expr loaded_ptr;
     // The result is not poison if all of these hold:
     // (1) There's no poison byte, and they are all pointer bytes
@@ -146,15 +156,15 @@ StateValue bytesToValue(const vector<Byte> &bytes, const Type &toType) {
 
   } else {
     auto bitsize = toType.bits();
-    assert(divide_up(bitsize, 8) == bytes.size());
+    assert(divide_up(bitsize, bits_byte) == bytes.size());
 
     StateValue val;
     bool first = true;
-    IntType i8Ty("", 8);
+    IntType ibyteTy("", bits_byte);
 
     for (auto &b: bytes) {
       StateValue v(b.nonptr_value(),
-                   i8Ty.combine_poison(!b.is_ptr(), b.nonptr_nonpoison()));
+                   ibyteTy.combine_poison(!b.is_ptr(), b.nonptr_nonpoison()));
       val = first ? move(v) : v.concat(val);
       first = false;
     }
@@ -293,7 +303,8 @@ expr Pointer::inbounds() const {
 }
 
 expr Pointer::is_aligned(unsigned align, bool exact) const {
-  if (!exact && align <= 1)
+  assert(align != 0);
+  if (!exact && align == 1)
     return true;
 
   auto bits = ilog2(align);
@@ -595,7 +606,7 @@ void Memory::resetLocalBids() {
 }
 
 unsigned Memory::bitsByte() const {
-  return 1 + 1 + bits_for_bid + bits_for_offset + 3;
+  return max(1 + 1 + bits_for_bid + bits_for_offset + 3, 1 + 2 * bits_byte);
 }
 
 expr Memory::mkInput(const char *name) const {
@@ -737,9 +748,14 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   vector<Byte> bytes = valueToBytes(v, type, *this);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytes.size(), align, !state->isInitializationPhase());
+  unsigned bytesz = bits_byte / 8;
+  assert(align % bytesz == 0);
+
+  ptr.is_dereferenceable(bytes.size() * bytesz, align,
+                         !state->isInitializationPhase());
   for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
-    auto ptr_i = little_endian ? (ptr + i) : (ptr + (e - i - 1));
+    auto ptr_i = little_endian ? (ptr + i * bytesz) :
+                                 (ptr + (e - i - 1) * bytesz);
     store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
   }
 }
@@ -747,14 +763,18 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
   assert(!memory_unused());
   auto bitsize = type.isPtrType() ? bits_size_t : type.bits();
-  unsigned bytesize = divide_up(bitsize, 8);
+  assert(bits_byte == 8 || bitsize % bits_byte == 0);
+  unsigned bytecount = divide_up(bitsize, bits_byte);
+  unsigned bytesz = bits_byte / 8;
+  assert(align % bytesz == 0);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytesize, align, false);
+  ptr.is_dereferenceable(bytecount * bytesz, align, false);
 
   vector<Byte> loadedBytes;
-  for (unsigned i = 0; i < bytesize; ++i) {
-    auto ptr_i = little_endian ? (ptr + i) : (ptr + (bytesize - i - 1));
+  for (unsigned i = 0; i < bytecount; ++i) {
+    auto ptr_i = little_endian ? (ptr + i * bytesz) :
+                                 (ptr + (bytecount - i - 1) * bytesz);
     loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
                                            non_local_block_val));
   }
@@ -764,11 +784,12 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
   assert(!memory_unused());
+  assert(bits_byte == 8);
   assert(!val.isValid() || val.bits() == 8);
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytesize, align, true);
 
-  vector<Byte> bytes = valueToBytes(val, IntType("", 8), *this);
+  vector<Byte> bytes = valueToBytes(val, IntType("", bits_byte), *this);
   assert(bytes.size() == 1);
 
   uint64_t n;
@@ -786,6 +807,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
                     unsigned align_dst, unsigned align_src, bool is_move) {
   assert(!memory_unused());
+  assert(bits_byte == 8);
   Pointer dst(*this, d), src(*this, s);
   dst.is_dereferenceable(bytesize, align_dst, true);
   src.is_dereferenceable(bytesize, align_src, false);
