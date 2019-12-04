@@ -2,7 +2,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/value.h"
-#include "ir/constant.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include "util/config.h"
@@ -14,15 +13,6 @@ using namespace util;
 namespace IR {
 
 VoidValue Value::voidVal;
-
-bool Value::isInt(int64_t &i) const {
-  auto ci = dynamic_cast<const IntConst *>(this);
-  if (ci) {
-    if (auto ii = ci->getInt())
-      i = *ii;
-  }
-  return ci;
-}
 
 bool Value::isVoid() const {
   return &getType() == &Type::voidTy;

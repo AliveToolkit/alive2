@@ -31,7 +31,6 @@ public:
   auto bits() const { return type.bits(); }
   auto& getName() const { return name; }
   auto& getType() const { return type; }
-  bool isInt(int64_t &i) const;
   bool isVoid() const;
 
   virtual void print(std::ostream &os) const = 0;
