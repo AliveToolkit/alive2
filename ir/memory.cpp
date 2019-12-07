@@ -779,7 +779,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 
   } else {
     vector<Byte> bytes = valueToBytes(v, type, *this);
-    assert(bytes.size() * bytesz == getStoreByteSize(type));
+    assert(!v.isValid() || bytes.size() * bytesz == getStoreByteSize(type));
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       auto ptr_i = ptr + (little_endian ? i * bytesz :
