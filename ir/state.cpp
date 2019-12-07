@@ -183,16 +183,24 @@ void State::resetUndefVars() {
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {
-  ENSURE(glbvar_bids.emplace(glbvar, bid).second);
+  ENSURE(glbvar_bids.emplace(glbvar, make_pair(bid, true)).second);
 }
 
-bool State::hasGlobalVarBid(const string &glbvar, unsigned &bid) const {
+bool State::hasGlobalVarBid(const string &glbvar, unsigned &bid,
+                            bool &allocated) const {
   auto itr = glbvar_bids.find(glbvar);
   bool found = itr != glbvar_bids.end();
   if (found) {
-    bid = itr->second;
+    bid = itr->second.first;
+    allocated = itr->second.second;
   }
   return found;
+}
+
+void State::markGlobalAsAllocated(const string &glbvar) {
+  auto itr = glbvar_bids.find(glbvar);
+  assert(itr != glbvar_bids.end());
+  itr->second.second = true;
 }
 
 void State::copyGlobalVarBidsFromSrc(const State &src) {

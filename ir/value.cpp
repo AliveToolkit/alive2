@@ -87,12 +87,18 @@ StateValue GlobalVariable::toSMT(State &s) const {
   auto sizeexpr = expr::mkUInt(allocsize, 64);
   expr ptrval;
   unsigned glbvar_bid;
+  bool allocated;
   auto blkkind = isconst ? Memory::CONSTGLOBAL : Memory::GLOBAL;
 
-  if (s.hasGlobalVarBid(getName(), glbvar_bid)) {
-    // Use the same block id that is used by src
-    assert(!s.isSource());
-    ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, glbvar_bid);
+  if (s.hasGlobalVarBid(getName(), glbvar_bid, allocated)) {
+    if (!allocated) {
+      // Use the same block id that is used by src
+      assert(!s.isSource());
+      ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, glbvar_bid);
+      s.markGlobalAsAllocated(getName());
+    } else {
+      ptrval = Pointer(s.getMemory(), glbvar_bid, false).release();
+    }
   } else {
     ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, nullopt,
                                  &glbvar_bid);

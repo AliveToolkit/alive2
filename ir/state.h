@@ -50,8 +50,8 @@ private:
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
-  // Global variables' memory block ids
-  std::unordered_map<std::string, unsigned> glbvar_bids;
+  // Global variables' memory block ids & Memory::alloc has been called?
+  std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
 
   // temp state
   DomainTy domain;
@@ -118,8 +118,10 @@ public:
 
   void addGlobalVarBid(const std::string &glbvar, unsigned bid);
   // Checks whether glbvar has block id assigned.
-  // If it has, bid is updated with the block id.
-  bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid) const;
+  // If it has, bid is updated with the block id, and allocated is updated too.
+  bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid,
+                       bool &allocated) const;
+  void markGlobalAsAllocated(const std::string &glbvar);
   void copyGlobalVarBidsFromSrc(const State &src);
 
 private:
