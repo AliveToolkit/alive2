@@ -816,7 +816,10 @@ bool ArrayType::isArrayType() const {
 }
 
 void ArrayType::print(ostream &os) const {
-  os << '[' << elements << " x " << *children[0] << ']';
+  if (children.empty())
+    os << "(empty array)";
+  else
+    os << '[' << elements << " x " << *children[0] << ']';
 }
 
 
