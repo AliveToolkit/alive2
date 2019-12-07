@@ -742,43 +742,91 @@ void Memory::free(const expr &ptr) {
   }
 }
 
-void Memory::store(const expr &p, const StateValue &v, const Type &type,
-                   unsigned align) {
-  assert(!memory_unused());
-  vector<Byte> bytes = valueToBytes(v, type, *this);
+static unsigned getTypeSizeInByte(Type &ty) {
+  if (dynamic_cast<IntType *>(&ty) || dynamic_cast<FloatType *>(&ty))
+    return divide_up(ty.bits(), 8);
+  else if (dynamic_cast<PtrType *>(&ty))
+    return divide_up(bits_size_t, 8);
 
+  auto aty = dynamic_cast<AggregateType *>(&ty);
+  assert(aty);
+  unsigned totsz = 0;
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i)
+    totsz += getTypeSizeInByte(aty->getChild(i));
+  return totsz;
+}
+
+void Memory::store(const expr &p, const StateValue &v, const Type &type,
+                   unsigned align, bool deref_check) {
+  assert(!memory_unused());
   Pointer ptr(*this, p);
   unsigned bytesz = bits_byte / 8;
   assert(align % bytesz == 0);
 
-  ptr.is_dereferenceable(bytes.size() * bytesz, align,
-                         !state->isInitializationPhase());
-  for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
-    auto ptr_i = little_endian ? (ptr + i * bytesz) :
-                                 (ptr + (e - i - 1) * bytesz);
-    store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
+  bool do_write = !state->isInitializationPhase();
+
+  if (type.isAggregateType()) {
+    auto aty = dynamic_cast<const AggregateType *>(&type);
+
+    unsigned byteofs = 0;
+    for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+      auto ptr_i = ptr + byteofs;
+      byteofs += getTypeSizeInByte(aty->getChild(i));
+      store(ptr_i(), aty->extract(v, i), aty->getChild(i), 1, false);
+    }
+
+    if (deref_check)
+      ptr.is_dereferenceable(byteofs, align, do_write);
+  } else {
+    vector<Byte> bytes = valueToBytes(v, type, *this);
+    if (deref_check)
+      ptr.is_dereferenceable(bytes.size() * bytesz, align, do_write);
+
+    for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
+      auto ptr_i = little_endian ? (ptr + i * bytesz) :
+                                   (ptr + (e - i - 1) * bytesz);
+      store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
+    }
   }
 }
 
-StateValue Memory::load(const expr &p, const Type &type, unsigned align) {
+StateValue Memory::load(const expr &p, const Type &type, unsigned align,
+                        bool deref_check) {
   assert(!memory_unused());
-  auto bitsize = type.isPtrType() ? bits_size_t : type.bits();
-  assert(bits_byte == 8 || bitsize % bits_byte == 0);
-  unsigned bytecount = divide_up(bitsize, bits_byte);
   unsigned bytesz = bits_byte / 8;
   assert(align % bytesz == 0);
 
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytecount * bytesz, align, false);
+  if (type.isAggregateType()) {
+    auto aty = dynamic_cast<const AggregateType *>(&type);
+    vector<StateValue> member_vals;
+    unsigned byteofs = 0;
+    for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+      auto ptr_i = ptr + byteofs;
+      byteofs += getTypeSizeInByte(aty->getChild(i));
+      member_vals.push_back(load(ptr_i(), aty->getChild(i), 1, false));
+    }
 
-  vector<Byte> loadedBytes;
-  for (unsigned i = 0; i < bytecount; ++i) {
-    auto ptr_i = little_endian ? (ptr + i * bytesz) :
-                                 (ptr + (bytecount - i - 1) * bytesz);
-    loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
-                                           non_local_block_val));
+    if (deref_check)
+      ptr.is_dereferenceable(byteofs, align, false);
+
+    return aty->aggregateVals(member_vals);
+  } else {
+    auto bitsize = type.isPtrType() ? bits_size_t : type.bits();
+    assert(bits_byte == 8 || bitsize % bits_byte == 0);
+    unsigned bytecount = divide_up(bitsize, bits_byte);
+    if (deref_check)
+      ptr.is_dereferenceable(bytecount * bytesz, align, false);
+
+    vector<Byte> loadedBytes;
+    for (unsigned i = 0; i < bytecount; ++i) {
+      auto ptr_i = little_endian ? (ptr + i * bytesz) :
+                                   (ptr + (bytecount - i - 1) * bytesz);
+      loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
+                                            non_local_block_val));
+    }
+    return bytesToValue(loadedBytes, type);
   }
-  return bytesToValue(loadedBytes, type);
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,

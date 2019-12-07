@@ -164,8 +164,9 @@ public:
   void free(const smt::expr &ptr);
 
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
-             unsigned align);
-  StateValue load(const smt::expr &ptr, const Type &type, unsigned align);
+             unsigned align, bool deref_check = true);
+  StateValue load(const smt::expr &ptr, const Type &type, unsigned align,
+                  bool deref_check = true);
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align);
