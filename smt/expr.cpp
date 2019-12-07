@@ -1049,6 +1049,9 @@ expr expr::ule(const expr &rhs) const {
   if (rhs.isZero())
     return *this == rhs;
 
+  if (rhs.isAllOnes())
+    return true;
+
   return binop_fold(rhs, Z3_mk_bvule);
 }
 
@@ -1322,10 +1325,14 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   if (cond.isFalse())
     return els;
 
-  if (then.isTrue() && els.isFalse())
-    return cond;
-  if (then.isFalse() && els.isTrue())
-    return !cond;
+  if (then.isTrue())
+    return cond || els;
+  if (then.isFalse())
+    return !cond && els;
+  if (els.isTrue())
+    return !cond || then;
+  if (els.isFalse())
+    return cond && then;
 
   expr notcond;
   Z3_ast c, t = then(), e = els();

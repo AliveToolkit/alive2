@@ -23,6 +23,7 @@ void sym_exec(State &s) {
   }
 
   s.exec(Value::voidVal);
+  s.getMemory().mkAxioms();
 
   bool first = true;
   if (f.getFirstBB().getName() != "__globalvars_init") {

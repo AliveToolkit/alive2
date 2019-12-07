@@ -143,6 +143,8 @@ public:
 
   Memory(State &state);
 
+  void mkAxioms() const;
+
   static void resetGlobalData();
   static void resetLocalBids();
 

@@ -438,7 +438,8 @@ static void calculateAndInitConstants(Transform &t) {
   has_int2ptr = false;
   has_ptr2int = false;
   // Mininum access size (in bytes)
-  uint64_t min_access_size = 512;
+  uint64_t min_access_size = 16;
+  bool does_mem_access = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
@@ -452,8 +453,10 @@ static void calculateAndInitConstants(Transform &t) {
         }
 
         auto accsz = get_access_size(I);
-        if (accsz != NO_ACCESS)
+        if (accsz != NO_ACCESS) {
           min_access_size = gcd(min_access_size, accsz);
+          does_mem_access = true;
+        }
       }
     }
   }
@@ -469,7 +472,7 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = 64;
 
   // size of byte
-  bits_byte = 8 * (unsigned)min_access_size;
+  bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size : 1);
 
   little_endian = t.src.isLittleEndian();
 

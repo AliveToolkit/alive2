@@ -514,15 +514,15 @@ Memory::Memory(State &state)
   non_local_block_val = mk_val_array();
   non_local_block_liveness = mk_liveness_array();
   {
-    Pointer ptr(*this, "#idx");
-    auto idx = ptr.short_ptr();
+    auto idx = Pointer(*this, "#idx").short_ptr();
 
     if (state.isSource()) {
       // All non-local blocks cannot initially contain pointers to local blocks.
       auto byte = Byte(*this, non_local_block_val.load(idx));
       Pointer loadedptr(*this, byte.ptr_value());
       expr cond = (byte.is_ptr() && byte.ptr_nonpoison())
-                    .implies(!loadedptr.is_local());
+                    .implies(!loadedptr.is_local() &&
+                             loadedptr.get_bid().ult(num_nonlocals));
       state.addAxiom(expr::mkForAll({ idx }, move(cond)));
     }
 
@@ -551,49 +551,50 @@ Memory::Memory(State &state)
   // Initialize a memory block for null pointer.
   alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, 0, nullptr, false);
 
-  if (state.isSource() && observes_addresses()) {
-    state.addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
+  assert(bits_for_offset <= bits_size_t);
+}
 
-    if (num_nonlocals > 1) {
-      // Non-local blocks are disjoint.
-      // Ignore null pointer block
-      unsigned non_local_bid_upperbound = 1 << (bits_for_bid - 1);
-      for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
-        Pointer p1(*this, bid, false);
-        expr disj = p1.get_address() != 0;
+void Memory::mkAxioms() const {
+  if (memory_unused() || !state->isSource())
+    return;
 
-        // Ensure block doesn't spill to local memory
-        auto bit = bits_size_t - 1;
-        disj &= (p1.get_address() + p1.block_size()).extract(bit, bit) == 0;
+  if (observes_addresses()) {
+    state->addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
 
-        // disjointness constraint
-        for (unsigned bid2 = bid + 1; bid2 < non_local_bid_upperbound; ++bid2) {
-          Pointer p2(*this, bid2, false);
-          disj &= p2.is_block_alive()
-                    .implies(disjoint(p1.get_address(), p1.block_size(),
-                                      p2.get_address(), p2.block_size()));
-        }
-        state.addAxiom(p1.is_block_alive().implies(disj));
+    // Non-local blocks are disjoint.
+    // Ignore null pointer block
+    for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+      Pointer p1(*this, bid, false);
+      expr disj = p1.get_address() != 0;
+
+      // Ensure block doesn't spill to local memory
+      auto bit = bits_size_t - 1;
+      disj &= (p1.get_address() + p1.block_size()).extract(bit, bit) == 0;
+
+      // disjointness constraint
+      for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
+        Pointer p2(*this, bid2, false);
+        disj &= p2.is_block_alive()
+                  .implies(disjoint(p1.get_address(), p1.block_size(),
+                                    p2.get_address(), p2.block_size()));
       }
+      state->addAxiom(p1.is_block_alive().implies(disj));
     }
   }
 
   // ensure globals fit in their reserved space
-  if (state.isSource() && num_nonlocals > 1) {
+  {
     auto sum_globals = expr::mkUInt(0, bits_size_t - 1);
 
-    unsigned non_local_bid_upperbound = 1 << (bits_for_bid - 1);
-    for (unsigned bid = 1; bid < non_local_bid_upperbound; ++bid) {
+    for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
       Pointer p(*this, bid, false);
       auto sz = p.block_size().extract(bits_size_t - 2, 0);
-      state.addAxiom(p.is_block_alive()
-                      .implies(sum_globals.add_no_uoverflow(sz)));
+      state->addAxiom(p.is_block_alive()
+                       .implies(sum_globals.add_no_uoverflow(sz)));
       sum_globals = expr::mkIf(p.is_block_alive(), sum_globals + sz,
                                sum_globals);
     }
   }
-
-  assert(bits_for_offset <= bits_size_t);
 }
 
 void Memory::resetGlobalData() {
@@ -615,6 +616,7 @@ expr Memory::mkInput(const char *name) const {
   expr offset = var.extract(bits_for_offset - 1, 0);
   expr bid = var.extract(bits - 1, bits_for_offset);
   expr is_local = expr::mkUInt(0, 1);
+  state->addAxiom(bid.ule(num_nonlocals - 1));
   return Pointer(*this, is_local.concat(bid), offset).release();
 }
 

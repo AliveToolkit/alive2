@@ -9,7 +9,8 @@ using namespace std;
 namespace smt {
 
 void AndExpr::add(expr &&e) {
-  exprs.insert(move(e));
+  if (!e.isTrue())
+    exprs.insert(move(e));
 }
 
 void AndExpr::add(const AndExpr &other) {
@@ -26,7 +27,8 @@ ostream &operator<<(ostream &os, const AndExpr &e) {
 
 
 void OrExpr::add(expr &&e) {
-  exprs.insert(move(e));
+  if (!e.isFalse())
+    exprs.insert(move(e));
 }
 
 expr OrExpr::operator()() const {
