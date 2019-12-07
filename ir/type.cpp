@@ -210,6 +210,14 @@ StateValue Type::toBV(StateValue v) const {
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
 
+expr Type::fromBV(expr e) const {
+  return e;
+}
+
+StateValue Type::fromBV(StateValue v) const {
+  return { fromBV(move(v.value)), v.non_poison == 0 };
+}
+
 expr Type::toInt(State &s, expr v) const {
   return toBV(move(v));
 }
@@ -221,12 +229,12 @@ StateValue Type::toInt(State &s, StateValue v) const {
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
 
-expr Type::fromBV(expr e) const {
-  return e;
+expr Type::fromInt(expr e) const {
+  return fromBV(move(e));
 }
 
-StateValue Type::fromBV(StateValue v) const {
-  return { fromBV(v.value), v.non_poison == 0 };
+StateValue Type::fromInt(StateValue v) const {
+  return { fromInt(move(v.value)), v.non_poison == 0 };
 }
 
 expr Type::combine_poison(const expr &boolean, const expr &orig) const {
@@ -369,6 +377,26 @@ unsigned FloatType::bits() const {
   return float_sizes[fpType].first;
 }
 
+const FloatType* FloatType::getAsFloatType() const {
+  return this;
+}
+
+expr FloatType::toBV(expr e) const {
+  return e.float2BV();
+}
+
+StateValue FloatType::toBV(StateValue v) const {
+  return Type::toBV(move(v));
+}
+
+expr FloatType::fromBV(expr e) const {
+  return e.BV2float(getDummyValue(true).value);
+}
+
+StateValue FloatType::fromBV(StateValue v) const {
+  return Type::fromBV(move(v));
+}
+
 expr FloatType::toInt(State &s, expr fp) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
@@ -395,26 +423,6 @@ expr FloatType::toInt(State &s, expr fp) const {
 
 StateValue FloatType::toInt(State &s, StateValue v) const {
   return Type::toInt(s, move(v));
-}
-
-const FloatType* FloatType::getAsFloatType() const {
-  return this;
-}
-
-expr FloatType::toBV(expr e) const {
-  return e.float2BV();
-}
-
-StateValue FloatType::toBV(StateValue v) const {
-  return Type::toBV(move(v));
-}
-
-expr FloatType::fromBV(expr e) const {
-  return e.BV2float(getDummyValue(true).value);
-}
-
-StateValue FloatType::fromBV(StateValue v) const {
-  return Type::fromBV(move(v));
 }
 
 expr FloatType::sizeVar() const {
@@ -561,6 +569,22 @@ bool PtrType::isPtrType() const {
 
 expr PtrType::enforcePtrType() const {
   return true;
+}
+
+expr PtrType::toInt(State &s, expr v) const {
+  return v;
+}
+
+StateValue PtrType::toInt(State &s, StateValue v) const {
+  return Type::toInt(s, move(v));
+}
+
+expr PtrType::fromInt(expr v) const {
+  return v;
+}
+
+StateValue PtrType::fromInt(StateValue v) const {
+  return Type::fromInt(move(v));
 }
 
 pair<expr, expr>
@@ -732,6 +756,14 @@ StateValue AggregateType::toBV(StateValue v) const {
   return v;
 }
 
+expr AggregateType::fromBV(expr e) const {
+  return Type::fromBV(move(e));
+}
+
+StateValue AggregateType::fromBV(StateValue v) const {
+  return v;
+}
+
 expr AggregateType::toInt(State &s, expr v) const {
   UNREACHABLE();
 }
@@ -744,17 +776,17 @@ StateValue AggregateType::toInt(State &s, StateValue v) const {
   StateValue ret;
   for (unsigned i = 0; i < elements; ++i) {
     auto vv = children[i]->toInt(s, extract(v, i));
-    ret = i == 0 ? move(vv) : ret.concat(vv);
+    ret = i == 0 ? move(vv) : (little_endian ? vv.concat(ret) : ret.concat(vv));
   }
   return ret;
 }
 
-expr AggregateType::fromBV(expr e) const {
-  return Type::fromBV(move(e));
+expr AggregateType::fromInt(expr v) const {
+  UNREACHABLE();
 }
 
-StateValue AggregateType::fromBV(StateValue v) const {
-  return v;
+StateValue AggregateType::fromInt(StateValue v) const {
+  UNREACHABLE();
 }
 
 pair<expr, expr>
@@ -1117,6 +1149,14 @@ StateValue SymbolicType::toBV(StateValue val) const {
   DISPATCH(toBV(move(val)), UNREACHABLE());
 }
 
+expr SymbolicType::fromBV(expr e) const {
+  DISPATCH(fromBV(move(e)), UNREACHABLE());
+}
+
+StateValue SymbolicType::fromBV(StateValue val) const {
+  DISPATCH(fromBV(move(val)), UNREACHABLE());
+}
+
 expr SymbolicType::toInt(State &st, expr e) const {
   DISPATCH(toInt(st, move(e)), UNREACHABLE());
 }
@@ -1125,12 +1165,12 @@ StateValue SymbolicType::toInt(State &st, StateValue val) const {
   DISPATCH(toInt(st, move(val)), UNREACHABLE());
 }
 
-expr SymbolicType::fromBV(expr e) const {
-  DISPATCH(fromBV(move(e)), UNREACHABLE());
+expr SymbolicType::fromInt(expr e) const {
+  DISPATCH(fromInt(move(e)), UNREACHABLE());
 }
 
-StateValue SymbolicType::fromBV(StateValue val) const {
-  DISPATCH(fromBV(move(val)), UNREACHABLE());
+StateValue SymbolicType::fromInt(StateValue val) const {
+  DISPATCH(fromInt(move(val)), UNREACHABLE());
 }
 
 pair<expr, expr>

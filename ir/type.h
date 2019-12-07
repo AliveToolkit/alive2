@@ -90,10 +90,13 @@ public:
 
   virtual smt::expr toBV(smt::expr e) const;
   virtual IR::StateValue toBV(IR::StateValue v) const;
-  virtual smt::expr toInt(State &s, smt::expr v) const;
-  virtual IR::StateValue toInt(State &s, IR::StateValue v) const;
   virtual smt::expr fromBV(smt::expr e) const;
   virtual IR::StateValue fromBV(IR::StateValue v) const;
+
+  virtual smt::expr toInt(State &s, smt::expr v) const;
+  virtual IR::StateValue toInt(State &s, IR::StateValue v) const;
+  virtual smt::expr fromInt(smt::expr v) const;
+  virtual IR::StateValue fromInt(IR::StateValue v) const;
 
   // combine existing poison value in BV repr with a new boolean expr
   smt::expr combine_poison(const smt::expr &boolean,
@@ -190,10 +193,10 @@ public:
   const FloatType* getAsFloatType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
-  smt::expr toInt(State &s, smt::expr v) const override;
-  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -220,6 +223,10 @@ public:
   void fixup(const smt::Model &m) override;
   bool isPtrType() const override;
   smt::expr enforcePtrType() const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
+  smt::expr fromInt(smt::expr v) const override;
+  IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -263,10 +270,12 @@ public:
     std::vector<Type *> *element_types) const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
-  smt::expr toInt(State &s, smt::expr v) const override;
-  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
+  smt::expr fromInt(smt::expr v) const override;
+  IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -362,10 +371,12 @@ public:
   const StructType* getAsStructType() const override;
   smt::expr toBV(smt::expr e) const override;
   IR::StateValue toBV(IR::StateValue v) const override;
-  smt::expr toInt(State &s, smt::expr v) const override;
-  IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromBV(smt::expr e) const override;
   IR::StateValue fromBV(IR::StateValue v) const override;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
+  smt::expr fromInt(smt::expr v) const override;
+  IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;

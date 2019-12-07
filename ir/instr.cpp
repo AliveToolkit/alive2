@@ -740,41 +740,41 @@ void ConversionOp::print(ostream &os) const {
 
 StateValue ConversionOp::toSMT(State &s) const {
   auto v = s[*val];
-  function<StateValue(const expr &, const Type &)> fn;
+  function<StateValue(expr &&, const Type &)> fn;
 
   switch (op) {
   case SExt:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.sext(to_type.bits() - val.bits()), true };
     };
     break;
   case ZExt:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.zext(to_type.bits() - val.bits()), true };
     };
     break;
   case Trunc:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.trunc(to_type.bits()), true };
     };
     break;
   case BitCast:
-    fn = [](auto &val, auto &to_type) -> StateValue {
-      return { to_type.fromBV(val), true };
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return { to_type.fromInt(move(val)), true };
     };
     break;
   case SIntToFP:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.sint2fp(to_type.getDummyValue(false).value), true };
     };
     break;
   case UIntToFP:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.uint2fp(to_type.getDummyValue(false).value), true };
     };
     break;
   case FPToSInt:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.fp2sint(to_type.bits()),
                val.foge(expr::IntSMin(to_type.bits()).sint2fp(val)) &&
                val.fole(expr::IntSMax(to_type.bits()).sint2fp(val)) &&
@@ -782,7 +782,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToUInt:
-    fn = [](auto &val, auto &to_type) -> StateValue {
+    fn = [](auto &&val, auto &to_type) -> StateValue {
       return { val.fp2uint(to_type.bits()),
                val.foge(expr::mkFloat(0, val)) &&
                val.fole(expr::IntUMax(to_type.bits()).uint2fp(val)) &&
@@ -790,19 +790,19 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case Ptr2Int:
-    fn = [&](auto &val, auto &to_type) -> StateValue {
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
       return { s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true };
     };
     break;
   case Int2Ptr:
-    fn = [&](auto &val, auto &to_type) -> StateValue {
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
       return { s.getMemory().int2ptr(val), true };
     };
     break;
   }
 
-  auto scalar = [&](const StateValue &sv, const Type &to_type) -> StateValue {
-    auto [v, np] = fn(sv.value, to_type);
+  auto scalar = [&](StateValue &&sv, const Type &to_type) -> StateValue {
+    auto [v, np] = fn(move(sv.value), to_type);
     return { move(v), sv.non_poison && np };
   };
 
@@ -821,16 +821,17 @@ StateValue ConversionOp::toSMT(State &s) const {
     auto valty = op == BitCast ? &int_ty : val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      vals.emplace_back(scalar(valty->extract(v, i), retty->getChild(i)));
+      unsigned idx = little_endian ? elems - i - 1 : i;
+      vals.emplace_back(scalar(valty->extract(v, idx), retty->getChild(idx)));
     }
     return retty->aggregateVals(vals);
   }
 
-  // turn poison data into boolean, while keeping value in BV
+  // turn poison data into boolean
   if (op == BitCast)
-    v = IntType("int", getType().bits()).fromBV(v);
+    v.non_poison = v.non_poison == 0;
 
-  return scalar(v, getType());
+  return scalar(move(v), getType());
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
