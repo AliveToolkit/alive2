@@ -743,10 +743,10 @@ void Memory::free(const expr &ptr) {
 }
 
 static unsigned getStoreByteSize(const Type &ty) {
-  if (dynamic_cast<const PtrType*>(&ty))
+  if (ty.isPtrType())
     return divide_up(bits_size_t, 8);
 
-  if (auto aty = dynamic_cast<const AggregateType*>(&ty)) {
+  if (auto aty = ty.getAsAggregateType()) {
     unsigned sz = 0;
     for (unsigned i = 0; i < aty->numElementsConst(); ++i)
       sz += getStoreByteSize(aty->getChild(i));
@@ -766,9 +766,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
     ptr.is_dereferenceable(getStoreByteSize(type), align,
                            !state->isInitializationPhase());
 
-  if (type.isAggregateType()) {
-    auto aty = static_cast<const AggregateType*>(&type);
-
+  if (auto aty = type.getAsAggregateType()) {
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto ptr_i = ptr + byteofs;
@@ -800,8 +798,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
   if (deref_check)
     ptr.is_dereferenceable(bytecount, align, false);
 
-  if (type.isAggregateType()) {
-    auto aty = static_cast<const AggregateType*>(&type);
+  if (auto aty = type.getAsAggregateType()) {
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
