@@ -474,7 +474,7 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
                    const StateValue &tgt) const {
   expr non_poison = src.non_poison && tgt.non_poison;
   return { src.non_poison.implies(tgt.non_poison),
-           (non_poison && !src.value.isNaN()).implies(src.value == tgt.value) };
+           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
 expr FloatType::mkInput(State &s, const char *name) const {
