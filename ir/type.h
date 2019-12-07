@@ -281,7 +281,8 @@ public:
 class ArrayType final : public AggregateType {
 public:
   ArrayType(std::string &&name) : AggregateType(std::move(name)) {}
-  smt::expr getTypeConstraints() const override;
+  ArrayType(std::string &&name, unsigned elements, Type &elementTy);
+
   bool isArrayType() const override;
   void print(std::ostream &os) const override;
 };
