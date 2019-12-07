@@ -805,7 +805,6 @@ const AggregateType* AggregateType::getAsAggregateType() const {
 
 ArrayType::ArrayType(string &&name, unsigned elements, Type &elementTy)
   : AggregateType(move(name), false) {
-  assert(elements != 0);
   this->elements = elements;
   defined = true;
   children.resize(elements, &elementTy);
