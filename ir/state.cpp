@@ -207,6 +207,8 @@ void State::copyGlobalVarBidsFromSrc(const State &src) {
   assert(glbvar_bids.empty());
   assert(src.isSource());
   glbvar_bids = src.glbvar_bids;
+  for (auto &itm : glbvar_bids)
+    itm.second.second = false;
 
   Memory::resetLocalBids();
 }
