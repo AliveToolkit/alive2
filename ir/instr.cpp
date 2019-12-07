@@ -850,6 +850,8 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
   case BitCast:
     c = getType().enforceIntOrFloatOrPtrOrVectorType() &&
         val->getType().enforceIntOrFloatOrPtrOrVectorType() &&
+        getType().enforcePtrOrVectorType() ==
+          val->getType().enforcePtrOrVectorType() &&
         getType().sizeVar() == val->getType().sizeVar();
     break;
   case SIntToFP:
