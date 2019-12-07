@@ -816,8 +816,7 @@ bool ArrayType::isArrayType() const {
 }
 
 void ArrayType::print(ostream &os) const {
-  if (elements)
-    os << '[' << elements << " x " << *children[0] << ']';
+  os << '[' << elements << " x " << *children[0] << ']';
 }
 
 
