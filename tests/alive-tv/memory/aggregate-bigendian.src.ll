@@ -15,4 +15,18 @@ define i8 @test2({{i32,i8},i32}* %x) {
   ret i8 %r
 }
 
+define i32 @test3({{i32,i8},i32}* %x) {
+  store {{i32,i8},i32} {{i32,i8} { i32 -559038737, i8 186 }, i32 -889275714 }, {{i32,i8},i32}* %x
+  %y = getelementptr {{i32,i8},i32}, {{i32,i8},i32}* %x, i32 0, i32 1
+  %r = load i32, i32* %y
+  ret i32 %r
+}
 
+define i16 @test4({{i32,i8},i32}* %x) {
+  store {{i32,i8},i32} {{i32,i8} { i32 -559038737, i8 186 }, i32 -889275714 }, {{i32,i8},i32}* %x
+  %y = getelementptr {{i32,i8},i32}, {{i32,i8},i32}* %x, i32 0, i32 0, i32 0
+  %z = bitcast i32* %y to i16*
+  %w = getelementptr i16, i16* %z, i32 2
+  %r = load i16, i16* %w
+  ret i16 %r
+}

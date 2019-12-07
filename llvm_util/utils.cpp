@@ -104,14 +104,37 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     auto &cache = type_cache[ty];
     if (!cache) {
       vector<Type*> elems;
-      for (auto e : cast<llvm::StructType>(ty)->elements()) {
-        if (auto ty = llvm_type2alive(e))
+      vector<bool> is_padding;
+      auto strty = cast<llvm::StructType>(ty);
+      auto layout = DL->getStructLayout(const_cast<llvm::StructType *>(strty));
+      for (unsigned i = 0; i < strty->getNumElements(); ++i) {
+        auto e = strty->getElementType(i);
+        unsigned ofs = layout->getElementOffset(i);
+        unsigned sz = DL->getTypeStoreSize(e);
+
+        if (auto ty = llvm_type2alive(e)) {
           elems.push_back(ty);
-        else
+          is_padding.push_back(false);
+        } else
           return nullptr;
+
+        unsigned ofs_next = i + 1 == strty->getNumElements() ?
+                DL->getTypeAllocSize(const_cast<llvm::StructType *>(strty)) :
+                layout->getElementOffset(i + 1);
+        assert(ofs + sz <= ofs_next);
+
+        if (ofs_next != ofs + sz) {
+          unsigned padsz = 8 * (ofs_next - ofs - sz);
+          auto padding_ty = llvm::IntegerType::get(strty->getContext(), padsz);
+          if (auto ty = llvm_type2alive(padding_ty)) {
+            elems.push_back(ty);
+            is_padding.push_back(true);
+          } else
+            return nullptr;
+        }
       }
       cache = make_unique<StructType>("ty_" + to_string(type_id_counter++),
-                                      move(elems));
+                                      move(elems), move(is_padding));
     }
     return cache.get();
   }
@@ -231,11 +254,25 @@ Value* get_operand(llvm::Value *v,
 
   if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
     vector<Value*> vals;
-    for (auto I = cnst->op_begin(), E = cnst->op_end(); I != E; ++I) {
-      if (auto op = get_operand(*I, constexpr_conv))
-        vals.emplace_back(op);
-      else
-        return nullptr;
+    auto aty = dynamic_cast<AggregateType *>(ty);
+    unsigned opi = 0;
+
+    for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+      if (aty->isPadding(i)) {
+        auto &padty = aty->getChild(i);
+        assert(padty.isIntType());
+        auto poison = make_unique<PoisonValue>(padty);
+        auto ret = poison.get();
+
+        current_fn->addConstant(move(poison));
+        vals.emplace_back(ret);
+      } else {
+        if (auto op = get_operand(cnst->getOperand(opi), constexpr_conv))
+          vals.emplace_back(op);
+        else
+          return nullptr;
+        ++opi;
+      }
     }
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();

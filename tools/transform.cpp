@@ -404,6 +404,10 @@ static void calculateAndInitConstants(Transform &t) {
     } else
       return NO_ACCESS;
 
+    if (dynamic_cast<const AggregateType *>(value_ty))
+      // TODO: AggregateType's elements are splitted and stored, so
+      // should they be checked instead
+      return UNKNOWN;
     if (dynamic_cast<const PtrType *>(value_ty))
       return gcd(align, bits_size_t / 8);
     return gcd(align, util::divide_up(value_ty->bits(), 8));
