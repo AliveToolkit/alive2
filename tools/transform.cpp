@@ -372,14 +372,15 @@ static void calculateAndInitConstants(Transform &t) {
            dynamic_cast<const Malloc *>(&inst) != nullptr ||
            dynamic_cast<const Calloc *>(&inst) != nullptr;
   };
+
   auto returns_nonlocal = [](const Instr &inst) {
     if (!inst.getType().isPtrType())
       return false;
-    if (auto conv = dynamic_cast<const ConversionOp *>(&inst)) {
-      if (conv->getOp() == ConversionOp::BitCast)
-        return false;
-    }
-    if (dynamic_cast<const GEP *>(&inst))
+    if (dynamic_cast<const ConversionOp*>(&inst) ||
+        dynamic_cast<const GEP*>(&inst) ||
+        dynamic_cast<const Freeze*>(&inst) ||
+        dynamic_cast<const Phi*>(&inst) ||
+        dynamic_cast<const Select*>(&inst))
       return false;
     return true;
   };
