@@ -155,6 +155,19 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
+  case llvm::Type::ArrayTyID: {
+    auto &cache = type_cache[ty];
+    if (!cache) {
+      auto aty = cast<llvm::ArrayType>(ty);
+      auto elems = aty->getNumElements();
+      auto ety = llvm_type2alive(aty->getElementType());
+      if (!ety || elems > 128)
+        return nullptr;
+      cache = make_unique<ArrayType>("ty_" + to_string(type_id_counter++),
+                                     elems, *ety);
+    }
+    return cache.get();
+  }
   default:
 err:
     *out << "ERROR: Unsupported type: " << *ty << '\n';
@@ -233,10 +246,7 @@ Value* get_operand(llvm::Value *v,
     if (gvar)
       return gvar;
 
-    if (gv->getValueType()->isArrayTy()) {
-      // TODO: Array type of a global variable is not supported.
-      return nullptr;
-    } else if (auto st = dyn_cast<llvm::StructType>(gv->getValueType())) {
+    if (auto st = dyn_cast<llvm::StructType>(gv->getValueType())) {
       if (st->isOpaque())
         // TODO: Global variable of opaque type is not supported.
         return nullptr;

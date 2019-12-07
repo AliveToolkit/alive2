@@ -803,9 +803,13 @@ const AggregateType* AggregateType::getAsAggregateType() const {
 }
 
 
-expr ArrayType::getTypeConstraints() const {
-  // TODO
-  return false;
+ArrayType::ArrayType(string &&name, unsigned elements, Type &elementTy)
+  : AggregateType(move(name), false) {
+  assert(elements != 0);
+  this->elements = elements;
+  defined = true;
+  children.resize(elements, &elementTy);
+  is_padding.resize(elements, false);
 }
 
 bool ArrayType::isArrayType() const {
@@ -813,7 +817,8 @@ bool ArrayType::isArrayType() const {
 }
 
 void ArrayType::print(ostream &os) const {
-  os << "TODO";
+  if (elements)
+    os << '[' << elements << " x " << *children[0] << ']';
 }
 
 
