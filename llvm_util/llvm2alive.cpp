@@ -643,6 +643,13 @@ public:
                  .getParamAttributes(arg.getArgNo());
     for (auto &attr : attrs) {
       switch (attr.getKindAsEnum()) {
+      case llvm::Attribute::ByVal:
+      case llvm::Attribute::InReg:
+      case llvm::Attribute::SExt:
+      case llvm::Attribute::ZExt:
+        // not important for IR verification
+        continue;
+
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return false;

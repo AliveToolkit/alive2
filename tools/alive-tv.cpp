@@ -103,6 +103,9 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
   llvm::PointerType *PTyL = llvm::dyn_cast<llvm::PointerType>(TyL);
   llvm::PointerType *PTyR = llvm::dyn_cast<llvm::PointerType>(TyR);
 
+  if (FnL->getAttributes() != FnR->getAttributes())
+    return -1;
+
   const llvm::DataLayout &DL = FnL->getParent()->getDataLayout();
   if (PTyL && PTyL->getAddressSpace() == 0)
     TyL = DL.getIntPtrType(TyL);
