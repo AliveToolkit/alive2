@@ -230,19 +230,19 @@ expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
 
 expr Pointer::get_address(bool simplify) const {
   assert(observes_addresses());
-  expr offset = get_offset();
-
-  // fast path for null ptrs
-  if (simplify && (get_bid() == 0).isTrue())
-    return offset;
 
   auto bid = get_short_bid();
+  auto zero = expr::mkUInt(0, bits_for_offset - 1);
+  // fast path for null ptrs
+  auto non_local
+    = simplify && bid.isZero() ? zero : expr::mkUF("blk_addr", { bid }, zero);
+
   // Local block area is the upper half of the memory
   // Non-local block area is the lower half
-  auto retty = expr::mkUInt(0, bits_for_offset - 1);
-  return offset + expr::mkIf(is_local(),
-      expr::mkUInt(1, 1).concat(m.local_blk_addr(bid)),
-      expr::mkUInt(0, 1).concat(expr::mkUF("blk_addr", { bid }, retty)));
+  return get_offset() +
+           expr::mkIf(is_local(),
+                      expr::mkUInt(1, 1).concat(m.local_blk_addr(bid)),
+                      expr::mkUInt(0, 1).concat(non_local));
 }
 
 expr Pointer::block_size() const {
