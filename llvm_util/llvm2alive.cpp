@@ -701,13 +701,40 @@ public:
       }
     }
 
+    auto getGlobalVariable = [this](const string &name) -> llvm::GlobalVariable * {
+      auto M = f.getParent();
+      // If name is a numeric value, the result should be manually found
+      bool is_numeric = name.size() == 1 && name[0] == '0';
+      unsigned numeric_id = 0;
+      if (!is_numeric) {
+        is_numeric = true;
+        bool first = true;
+        for (char c : name) {
+          if (!(('0' + first) <= c && c <= '9')) {
+            is_numeric = false;
+            break;
+          }
+          first = false;
+          numeric_id = numeric_id * 10 + (c - '0');
+        }
+      }
+      if (!is_numeric)
+        return M->getGlobalVariable(name, true);
+      else {
+        auto itr = M->global_begin();
+        if (distance(itr, M->global_end()) <= numeric_id)
+          return nullptr;
+        advance(itr, numeric_id);
+        return &(*itr);
+      }
+    };
+
     // If there is a global variable with initializer, put them at init block.
     auto &entryName = Fn.getFirstBB().getName();
     auto &InitBB = Fn.getBB("__globalvars_init", true);
     BB = &InitBB;
-    auto M = f.getParent();
     for (auto &gvname : gvnamesInSrc) {
-      auto gv = M->getGlobalVariable(string(gvname), true);
+      auto gv = getGlobalVariable(string(gvname));
       if (!gv) {
         // global variable removed or renamed
         *out << "ERROR: Unsupported interprocedural transformation\n";
@@ -724,7 +751,7 @@ public:
       auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
       if (!GV)
         continue;
-      auto gv = M->getGlobalVariable(GV->getName().substr(1), true);
+      auto gv = getGlobalVariable(GV->getName().substr(1));
       if (!gv->isConstant() || !gv->hasInitializer())
         continue;
 

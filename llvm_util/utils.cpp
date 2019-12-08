@@ -8,10 +8,12 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <sstream>
 
 using namespace IR;
 using namespace std;
@@ -248,7 +250,23 @@ Value* get_operand(llvm::Value *v,
 
     unsigned size = DL->getTypeAllocSize(gv->getValueType());
     unsigned align = gv->getPointerAlignment(*DL).valueOrOne().value();
-    string name = '@' + gv->getName().str();
+    string name;
+    if (!gv->hasName()) {
+      unsigned id = 0;
+      auto M = gv->getParent();
+      auto i = M->global_begin(), e = M->global_end();
+      for (; i != e; ++i) {
+        if (&(*i) == gv)
+          break;
+        id++;
+      }
+      assert(i != e);
+      stringstream ss;
+      ss << '@' << id;
+      name = ss.str();
+    } else {
+      name = '@' + gv->getName().str();
+    }
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
                                            gv->isConstant());
     gvar = val.get();
