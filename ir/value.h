@@ -89,6 +89,7 @@ public:
     Value(type, std::move(name)), allocsize(allocsize), align(align),
     isconst(isconst) {}
   uint64_t size() const { return allocsize; }
+  unsigned getAlignment() const { return align; }
   bool isConst() const { return isconst; }
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

@@ -722,13 +722,11 @@ public:
         continue;
 
       auto storedval = get_operand(gv->getInitializer());
-      auto globalvar = get_operand(gv);
-      if (!storedval || !globalvar)
+      if (!storedval)
         return {};
 
-      // Alignment is already enforced by Memory::alloc.
       stores.emplace(gv->getName(),
-                     make_unique<Store>(*globalvar, *storedval, 1));
+                     make_unique<Store>(*GV, *storedval, GV->getAlignment()));
     }
 
     for (auto &itm : stores)
