@@ -79,6 +79,7 @@ public:
   StateValue ugt(const Pointer &rhs) const;
 
   smt::expr inbounds() const;
+  smt::expr block_alignment() const;
   smt::expr is_aligned(unsigned align, bool exact = false) const;
   void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
   void is_dereferenceable(const smt::expr &bytes, unsigned align, bool iswrite);
@@ -96,6 +97,7 @@ public:
   smt::expr is_heap_allocated() const;
 
   smt::expr refined(const Pointer &other) const;
+  smt::expr block_val_refined(const Pointer &other) const;
   smt::expr block_refined(const Pointer &other) const;
 
   const Memory& getMemory() const { return m; }

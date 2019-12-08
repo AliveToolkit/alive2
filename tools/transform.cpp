@@ -380,6 +380,7 @@ static void calculateAndInitConstants(Transform &t) {
         dynamic_cast<const GEP*>(&inst) ||
         dynamic_cast<const Freeze*>(&inst) ||
         dynamic_cast<const Phi*>(&inst) ||
+        dynamic_cast<const Return*>(&inst) ||
         dynamic_cast<const Select*>(&inst))
       return false;
     return true;

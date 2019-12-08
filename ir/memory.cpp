@@ -303,14 +303,18 @@ expr Pointer::inbounds() const {
   return get_offset().ule(block_size());
 }
 
+expr Pointer::block_alignment() const {
+  return get_value("blk_align", m.local_blk_align, m.non_local_blk_align,
+                   expr::mkUInt(0, 8));
+}
+
 expr Pointer::is_aligned(unsigned align, bool exact) const {
   assert(align != 0);
   if (!exact && align == 1)
     return true;
 
   auto bits = ilog2(align);
-  expr blk_align = get_value("blk_align", m.local_blk_align,
-                             m.non_local_blk_align, expr::mkUInt(0, 8));
+  expr blk_align = block_alignment();
   return exact ? blk_align == bits : blk_align.uge(bits);
 }
 
@@ -376,7 +380,8 @@ expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
   expr local = other.is_heap_allocated();
   local &= other.is_block_alive();
-  local &= other.block_size() == block_size();
+  local &= block_size() == other.block_size();
+  local &= get_offset() == other.get_offset();
   // TODO: this induces an infinite loop; need a quantifier or rec function
   // TODO: needs variable offset
   //local &= block_refined(other);
@@ -386,35 +391,58 @@ expr Pointer::refined(const Pointer &other) const {
   return expr::mkIf(is_local(), local, *this == other);
 }
 
-expr Pointer::block_refined(const Pointer &other) const {
-  if (m.non_local_block_val.eq(other.m.non_local_block_val) &&
-      m.non_local_block_liveness.eq(other.m.non_local_block_liveness))
-    return true;
-
-  expr liveness = is_block_alive() == other.is_block_alive();
-
+expr Pointer::block_val_refined(const Pointer &other) const {
   Byte val(m, m.non_local_block_val.load(short_ptr()));
   Byte val2(other.m, other.m.non_local_block_val.load(other.short_ptr()));
 
-  expr check = is_block_alive() && get_offset().ult(block_size());
-
-  // TODO: do we need to type memory and do a type-specific refinement check?
+  // refinement if offset had non-ptr value
   expr np1 = val.nonptr_nonpoison();
   expr int_cnstr = (val2.nonptr_nonpoison() | np1) == np1 &&
                    (val.nonptr_value() | np1) == (val2.nonptr_value() | np1);
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
   // already there and don't need checking
-  if (!m.did_pointer_store && !other.m.did_pointer_store)
-    return liveness &&
-           check.implies(expr::mkIf(val.is_ptr(), val == val2, int_cnstr));
+  expr is_ptr = val.is_ptr();
+  expr is_ptr2 = val2.is_ptr();
+  expr ptr_cnstr;
+  if ((!m.did_pointer_store && !other.m.did_pointer_store) ||
+      is_ptr.isFalse() || is_ptr2.isFalse()) {
+    ptr_cnstr = val == val2;
+  } else {
+    Pointer load_ptr(m, val.ptr_value());
+    Pointer load_ptr2(other.m, val2.ptr_value());
+    ptr_cnstr = val.ptr_nonpoison().implies(val2.ptr_nonpoison() &&
+                                            load_ptr.refined(load_ptr2));
+  }
+  return is_ptr == is_ptr2 &&
+         expr::mkIf(is_ptr, ptr_cnstr, int_cnstr);
+}
 
-  Pointer load_ptr(m, val.ptr_value());
-  Pointer load_ptr2(other.m, val2.ptr_value());
-  expr ptr_cnstr = val.ptr_nonpoison().implies(load_ptr.refined(load_ptr2));
+expr Pointer::block_refined(const Pointer &other) const {
+  expr blk_size = block_size();
+  expr val_refines(true);
+  uint64_t bytes;
 
-  return liveness &&
-         check.implies(expr::mkIf(val.is_ptr(), ptr_cnstr, int_cnstr));
+  if (blk_size.isUInt(bytes) && bytes <= 8) {
+    expr bid = get_bid();
+    expr ptr_offset = get_offset();
+
+    for (unsigned off = 0; off < bytes; ++off) {
+      expr off_expr = expr::mkUInt(off, bits_for_offset);
+      Pointer p(m, bid, off_expr);
+      Pointer q(other.m, p());
+      val_refines &= (ptr_offset == off_expr).implies(p.block_val_refined(q));
+    }
+  } else {
+    val_refines = block_val_refined(other);
+  }
+
+  return is_block_alive() == other.is_block_alive() &&
+         blk_size == other.block_size() &&
+         get_alloc_type() == other.get_alloc_type() &&
+         is_writable() == other.is_writable() &&
+         block_alignment().ule(other.block_alignment()) &&
+         (is_block_alive() && get_offset().ult(blk_size)).implies(val_refines);
 }
 
 expr Pointer::is_writable() const {
@@ -887,9 +915,18 @@ expr Memory::refined(const Memory &other) const {
   if (memory_unused())
     return true;
 
-  Pointer p(*this, "#idx");
-  Pointer q(other, p());
-  return p.block_refined(q);
+  Pointer ptr(*this, "#idx");
+  expr ptr_bid = ptr.get_bid();
+  expr offset = ptr.get_offset();
+  expr ret(true);
+
+  for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+    expr bid_expr = expr::mkUInt(bid, bits_for_bid);
+    Pointer p(*this, bid_expr, offset);
+    Pointer q(other, p());
+    ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
+  }
+  return ptr_bid.ult(num_nonlocals).implies(ret);
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
