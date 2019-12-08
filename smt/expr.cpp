@@ -1288,8 +1288,10 @@ expr expr::load(const expr &idx) const {
 
     auto extract_load = [&idx](expr &e, const expr &var) {
       if (auto app = e.isAppOf(Z3_OP_SELECT)) { // load(array, idx)
-        assert(expr(Z3_get_app_arg(ctx(), app, 1)).eq(var));
-        e = expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+        expr lambda_idx = Z3_get_app_arg(ctx(), app, 1);
+        expr new_idx = lambda_idx.subst(var, idx).simplify();
+        assert(!idx.isValid() || !lambda_idx.eq(new_idx));
+        e = expr(Z3_get_app_arg(ctx(), app, 0)).load(new_idx);
         return true;
       }
       return false;
