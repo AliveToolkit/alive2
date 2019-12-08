@@ -25,7 +25,8 @@ static unsigned num_invalid = 0;
 static unsigned num_trivial = 0;
 static unsigned num_sats = 0;
 static unsigned num_unsats = 0;
-static unsigned num_unknown = 0;
+static unsigned num_timeout = 0;
+static unsigned num_errors = 0;
 
 namespace {
 class Tactic {
@@ -281,7 +282,7 @@ expr Solver::assertions() const {
 Result Solver::check() const {
   if (config::skip_smt) {
     ++num_skips;
-    return Result::UNKNOWN;
+    return Result::SKIP;
   }
 
   if (!valid) {
@@ -302,9 +303,15 @@ Result Solver::check() const {
   case Z3_L_TRUE:
     ++num_sats;
     return Z3_solver_get_model(ctx(), s);
-  case Z3_L_UNDEF:
-    ++num_unknown;
-    return Result::UNKNOWN;
+  case Z3_L_UNDEF: {
+    string reason = Z3_solver_get_reason_unknown(ctx(), s);
+    if (reason == "timeout") {
+      ++num_timeout;
+      return Result::TIMEOUT;
+    }
+    ++num_errors;
+    return { Result::ERROR, move(reason) };
+  }
   default:
     UNREACHABLE();
   }
@@ -344,7 +351,8 @@ void solver_print_stats(ostream &os) {
   float total = num_queries / 100.0;
   float trivial_pc = num_queries == 0 ? 0 :
                        (num_trivial * 100.0) / (num_trivial + num_queries);
-  float unknown_pc = num_queries == 0 ? 0 : num_unknown / total;
+  float to_pc      = num_queries == 0 ? 0 : num_timeout / total;
+  float error_pc   = num_queries == 0 ? 0 : num_errors / total;
   float sat_pc     = num_queries == 0 ? 0 : num_sats / total;
   float unsat_pc   = num_queries == 0 ? 0 : num_unsats / total;
 
@@ -354,7 +362,8 @@ void solver_print_stats(ostream &os) {
         "Num invalid: " << num_invalid << "\n"
         "Num skips:   " << num_skips << "\n"
         "Num trivial: " << num_trivial << " (" << trivial_pc << "%)\n"
-        "Num unknown: " << num_unknown << " (" << unknown_pc << "%)\n"
+        "Num timeout: " << num_timeout << " (" << to_pc << "%)\n"
+        "Num errors:  " << num_errors << " (" << error_pc << "%)\n"
         "Num SAT:     " << num_sats << " (" << sat_pc << "%)\n"
         "Num UNSAT:   " << num_unsats << " (" << unsat_pc << "%)\n";
 }

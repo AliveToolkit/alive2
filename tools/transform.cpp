@@ -112,8 +112,18 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     return;
   }
 
-  if (r.isUnknown()) {
+  if (r.isTimeout()) {
     errs.add("Timeout", false);
+    return;
+  }
+
+  if (r.isError()) {
+    errs.add("SMT Error: " + r.getReason(), false);
+    return;
+  }
+
+  if (r.isSkip()) {
+    errs.add("Skip", false);
     return;
   }
 
@@ -607,7 +617,7 @@ void TypingAssignments::operator++(void) {
     EnableSMTQueriesTMP tmp;
     s.block(r.getModel(), &sneg);
     r = s.check();
-    assert(!r.isUnknown());
+    assert(r.isSat() || r.isUnsat());
   }
 }
 

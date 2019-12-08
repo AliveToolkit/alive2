@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <ostream>
+#include <string>
 #include <utility>
 
 typedef struct _Z3_model* Z3_model;
@@ -57,14 +58,18 @@ public:
 
 class Result {
 public:
-  enum answer { UNSAT, SAT, INVALID, UNKNOWN };
+  enum answer { UNSAT, SAT, INVALID, SKIP, TIMEOUT, ERROR };
 
-  Result() : a(UNKNOWN) {}
+  Result() : a(ERROR) {}
 
   bool isSat() const { return a == SAT; }
   bool isUnsat() const { return a == UNSAT; }
   bool isInvalid() const { return a == INVALID; }
-  bool isUnknown() const { return a == UNKNOWN; }
+  bool isSkip() const { return a == SKIP; }
+  bool isTimeout() const { return a == TIMEOUT; }
+  bool isError() const { return a == ERROR; }
+
+  auto& getReason() const { return reason; }
 
   const Model& getModel() const {
     assert(isSat());
@@ -74,8 +79,10 @@ public:
 private:
   Model m;
   answer a;
+  std::string reason;
 
   Result(answer a) : a(a) {}
+  Result(answer a, std::string &&reason) : a(a), reason(std::move(reason)) {}
   Result(Z3_model m) : m(m), a(SAT) {}
 
   friend class Solver;
