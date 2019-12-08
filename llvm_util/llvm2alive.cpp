@@ -10,7 +10,7 @@
 #include "llvm/IR/Operator.h"
 #include <utility>
 #include <vector>
-
+#include <iostream>
 using namespace llvm_util;
 using namespace IR;
 using namespace std;
@@ -362,6 +362,11 @@ public:
       return error(i);
 
     auto gep = make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds());
+    auto gep_struct_ofs = [&i, this](llvm::StructType *sty, llvm::Value *ofs) {
+      llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()), ofs };
+      return this->DL().getIndexedOffsetInType(sty,
+          llvm::makeArrayRef(vals, 2));
+    };
 
     // reference: GEPOperator::accumulateConstantOffset()
     for (auto I = llvm::gep_type_begin(i), E = llvm::gep_type_end(i);
@@ -371,11 +376,35 @@ public:
         return error(i);
 
       if (auto structTy = I.getStructTypeOrNull()) {
-        llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()),
-                                I.getOperand() };
-        auto offset = DL().getIndexedOffsetInType(structTy,
-                llvm::makeArrayRef(vals, 2));
-        gep->addIdx(offset, *make_intconst(1, 64));
+        auto opty = I.getOperand()->getType();
+        auto ofs_ty = llvm::IntegerType::get(i.getContext(), 64);
+
+        if (auto opvty = llvm::dyn_cast<llvm::VectorType>(opty)) {
+          assert(!opvty->isScalable());
+          vector<llvm::Constant *> offsets;
+
+          for (unsigned i = 0; i < opvty->getElementCount().Min; ++i) {
+            llvm::Constant *constofs = nullptr;
+            if (auto cdv = llvm::dyn_cast<llvm::ConstantDataVector>(
+                I.getOperand())) {
+              constofs = cdv->getElementAsConstant(i);
+            } else if (auto cv = llvm::dyn_cast<llvm::ConstantAggregateZero>(
+                I.getOperand())) {
+              constofs = cv->getSequentialElement();
+            } else {
+              assert(false);
+            }
+            offsets.push_back(llvm::ConstantInt::get(ofs_ty,
+                (uint64_t)gep_struct_ofs(structTy, constofs)));
+          }
+
+          auto ofs_vector = llvm::ConstantVector::get(
+              llvm::makeArrayRef(offsets.data(), offsets.size()));
+          gep->addIdx(1, *get_operand(ofs_vector));
+        } else {
+          gep->addIdx(1, *make_intconst(
+              gep_struct_ofs(structTy, I.getOperand()), 64));
+        }
         continue;
       }
 

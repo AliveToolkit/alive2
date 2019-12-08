@@ -282,6 +282,7 @@ public:
   smt::expr mkInput(State &s, const char *name) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
     mkUndefInput(State &s) const override;
+  unsigned numPointerElements() const;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   const AggregateType* getAsAggregateType() const override;
 };
