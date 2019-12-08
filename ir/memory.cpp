@@ -728,7 +728,9 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   } else {
     state->addAxiom(blockKind == CONSTGLOBAL ? !p.is_writable()
                                              : p.is_writable());
-    // The memory block was initially alive.
+    non_local_block_liveness
+      = non_local_block_liveness.store(short_bid, allocated);
+    // TODO: benchmark; the following line is redundant
     state->addAxiom(mk_liveness_array().load(short_bid) == allocated);
     state->addAxiom(p.block_size() == size_zext);
     state->addAxiom(p.is_aligned(align, true));
