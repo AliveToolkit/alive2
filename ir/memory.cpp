@@ -217,14 +217,15 @@ expr Pointer::get_offset() const {
 expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
                         const FunctionExpr &nonlocal_fn,
                         const expr &ret_type) const {
-  auto local = is_local();
   auto bid = get_short_bid();
+  expr non_local;
 
-  if (local.isFalse()) {
-    if (auto val = nonlocal_fn.lookup(bid))
-      return *val;
-  }
-  return expr::mkIf(local, local_fn(bid), expr::mkUF(name, { bid }, ret_type));
+  if (auto val = nonlocal_fn.lookup(bid))
+    non_local = *val;
+  else
+    non_local = expr::mkUF(name, { bid }, ret_type);
+
+  return expr::mkIf(is_local(), local_fn(bid), non_local);
 }
 
 expr Pointer::get_address(bool simplify) const {
@@ -417,14 +418,8 @@ expr Pointer::block_refined(const Pointer &other) const {
 }
 
 expr Pointer::is_writable() const {
-  auto local = is_local();
-  auto bid = get_short_bid();
-
-  if (local.isFalse()) {
-    if (auto val = m.non_local_blk_writable.lookup(bid))
-      return *val;
-  }
-  return local || expr::mkUF("blk_writable", { bid }, false);
+  return get_value("blk_writable", FunctionExpr(true), m.non_local_blk_writable,
+                   true);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
