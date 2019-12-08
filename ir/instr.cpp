@@ -821,7 +821,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     auto valty = op == BitCast ? &int_ty : val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      unsigned idx = little_endian ? elems - i - 1 : i;
+      unsigned idx = (little_endian && op == BitCast) ? elems - i - 1 : i;
       vals.emplace_back(scalar(valty->extract(v, idx), retty->getChild(idx)));
     }
     return retty->aggregateVals(vals);
