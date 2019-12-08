@@ -880,6 +880,10 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   if (!is_move)
     src.is_disjoint(bytesize, dst, bytesize);
 
+  // copy to itself
+  if ((src == dst).isTrue())
+    return;
+
   uint64_t n;
   if (bytesize.isUInt(n) && n <= 4) {
     auto old_local = local_block_val, old_nonlocal = non_local_block_val;
