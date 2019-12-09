@@ -110,6 +110,11 @@ space+ {
   return VECTOR_TYPE_PREFIX;
 }
 
+"[" space* @tag1 [0-9][0-9]* space* "x" {
+  yylval.num = strtoull((char*)tag1, nullptr, 10);
+  return ARRAY_TYPE_PREFIX;
+}
+
 [-+]? [0-9]* "." [0-9]+ ([eE] [-+]? [0-9]+)? {
   yylval.fp_num = strtod((char*)YYTEXT, nullptr);
   return FP_NUM;
@@ -177,6 +182,8 @@ space+ {
 "<"  { return CSLT; }
 ">u" { return CUGT; }
 "<u" { return CULT; }
+"]"  { return RSQBRACKET; }
+"["  { return LSQBRACKET; }
 
 "true" { return TRUE; }
 "false" { return FALSE; }
