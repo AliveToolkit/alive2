@@ -256,14 +256,14 @@ Value* get_operand(llvm::Value *v,
       auto M = gv->getParent();
       auto i = M->global_begin(), e = M->global_end();
       for (; i != e; ++i) {
+        if (i->hasName())
+          continue;
         if (&(*i) == gv)
           break;
         id++;
       }
       assert(i != e);
-      stringstream ss;
-      ss << '@' << id;
-      name = ss.str();
+      name = '@' + to_string(id);
     } else {
       name = '@' + gv->getName().str();
     }

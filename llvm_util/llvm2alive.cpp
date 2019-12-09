@@ -704,28 +704,22 @@ public:
     auto getGlobalVariable = [this](const string &name) -> llvm::GlobalVariable * {
       auto M = f.getParent();
       // If name is a numeric value, the result should be manually found
-      bool is_numeric = name.size() == 1 && name[0] == '0';
-      unsigned numeric_id = 0;
-      if (!is_numeric) {
-        is_numeric = true;
-        bool first = true;
-        for (char c : name) {
-          if (!(('0' + first) <= c && c <= '9')) {
-            is_numeric = false;
-            break;
-          }
-          first = false;
-          numeric_id = numeric_id * 10 + (c - '0');
-        }
-      }
-      if (!is_numeric)
+      const char *chrs = name.data();
+      char *end_ptr;
+      auto numeric_id = strtoul(chrs, &end_ptr, 10);
+
+      if (end_ptr - chrs != name.size())
         return M->getGlobalVariable(name, true);
       else {
-        auto itr = M->global_begin();
-        if (distance(itr, M->global_end()) <= numeric_id)
-          return nullptr;
-        advance(itr, numeric_id);
-        return &(*itr);
+        auto itr = M->global_begin(), end = M->global_end();
+        for (; itr != end; ++itr) {
+          if (itr->hasName())
+            continue;
+          if (!numeric_id)
+            return &(*itr);
+          numeric_id--;
+        }
+        return nullptr;
       }
     };
 
@@ -759,7 +753,7 @@ public:
       if (!storedval)
         return {};
 
-      stores.emplace(gv->getName(),
+      stores.emplace(GV->getName(),
                      make_unique<Store>(*GV, *storedval, GV->getAlignment()));
     }
 
