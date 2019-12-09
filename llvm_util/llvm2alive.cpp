@@ -701,13 +701,34 @@ public:
       }
     }
 
+    auto getGlobalVariable = [this](const string &name) -> llvm::GlobalVariable * {
+      auto M = f.getParent();
+      // If name is a numeric value, the result should be manually found
+      const char *chrs = name.data();
+      char *end_ptr;
+      auto numeric_id = strtoul(chrs, &end_ptr, 10);
+
+      if (end_ptr - chrs != name.size())
+        return M->getGlobalVariable(name, true);
+      else {
+        auto itr = M->global_begin(), end = M->global_end();
+        for (; itr != end; ++itr) {
+          if (itr->hasName())
+            continue;
+          if (!numeric_id)
+            return &(*itr);
+          numeric_id--;
+        }
+        return nullptr;
+      }
+    };
+
     // If there is a global variable with initializer, put them at init block.
     auto &entryName = Fn.getFirstBB().getName();
     auto &InitBB = Fn.getBB("__globalvars_init", true);
     BB = &InitBB;
-    auto M = f.getParent();
     for (auto &gvname : gvnamesInSrc) {
-      auto gv = M->getGlobalVariable(string(gvname), true);
+      auto gv = getGlobalVariable(string(gvname));
       if (!gv) {
         // global variable removed or renamed
         *out << "ERROR: Unsupported interprocedural transformation\n";
@@ -724,7 +745,7 @@ public:
       auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
       if (!GV)
         continue;
-      auto gv = M->getGlobalVariable(GV->getName().substr(1), true);
+      auto gv = getGlobalVariable(GV->getName().substr(1));
       if (!gv->isConstant() || !gv->hasInitializer())
         continue;
 
@@ -732,7 +753,7 @@ public:
       if (!storedval)
         return {};
 
-      stores.emplace(gv->getName(),
+      stores.emplace(GV->getName(),
                      make_unique<Store>(*GV, *storedval, GV->getAlignment()));
     }
 
