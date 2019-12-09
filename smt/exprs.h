@@ -40,6 +40,7 @@ class DisjointExpr {
 public:
   DisjointExpr() {}
   DisjointExpr(const T &default_val) : default_val(default_val) {}
+  DisjointExpr(const std::optional<T> &default_val) : default_val(default_val){}
   DisjointExpr(T &&default_val) : default_val(std::move(default_val)) {}
 
   template <typename V, typename D>
@@ -55,7 +56,7 @@ public:
       I->second |= std::forward<D>(domain);
   }
 
-  T operator()() const {
+  std::optional<T> operator()() const {
     std::optional<T> ret;
     for (auto &[val, domain] : vals) {
       if (domain.isTrue())
@@ -63,14 +64,18 @@ public:
 
       ret = ret ? T::mkIf(domain, val, *ret) : val;
     }
-    return ret ? *ret : *default_val;
+    if (ret)
+      return *ret;
+    if (default_val)
+      return *default_val;
+    return {};
   }
 };
 
 
 class FunctionExpr {
   std::map<expr, expr> fn; // key -> val
-  expr default_val;
+  std::optional<expr> default_val;
 
 public:
   FunctionExpr() {}
@@ -79,7 +84,7 @@ public:
   void add(const FunctionExpr &other);
   void del(const expr &key);
 
-  expr operator()(const expr &key) const;
+  std::optional<expr> operator()(const expr &key) const;
   const expr* lookup(const expr &key) const;
 
   auto begin() const { return fn.begin(); }

@@ -184,10 +184,10 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local)
   : m(m), p(local.toBVBool().concat(
                 expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
 
-Pointer::Pointer(const Memory &m, unsigned bid, bool local) : m(m) {
-  expr bid_expr = expr::mkUInt(bid, bits_for_bid - 1);
-  p = expr::mkUInt(local, 1).concat(bid_expr)
-                            .concat(expr::mkUInt(0, bits_for_offset));
+Pointer::Pointer(const Memory &m, unsigned bid, bool local)
+  : m(m), p(expr::mkUInt(local, 1).concat(expr::mkUInt(bid, bits_for_bid - 1))
+                                  .concat(expr::mkUInt(0, bits_for_offset))) {
+  assert((local && bid < num_locals) || (!local && bid < num_nonlocals));
 }
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
@@ -225,7 +225,9 @@ expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
   else
     non_local = expr::mkUF(name, { bid }, ret_type);
 
-  return expr::mkIf(is_local(), local_fn(bid), non_local);
+  if (auto local = local_fn(bid))
+    return expr::mkIf(is_local(), *local, non_local);
+  return non_local;
 }
 
 expr Pointer::get_address(bool simplify) const {
@@ -236,13 +238,17 @@ expr Pointer::get_address(bool simplify) const {
   // fast path for null ptrs
   auto non_local
     = simplify && bid.isZero() ? zero : expr::mkUF("blk_addr", { bid }, zero);
-
-  // Local block area is the upper half of the memory
   // Non-local block area is the lower half
-  return get_offset() +
-           expr::mkIf(is_local(),
-                      expr::mkUInt(1, 1).concat(m.local_blk_addr(bid)),
-                      expr::mkUInt(0, 1).concat(non_local));
+  non_local = expr::mkUInt(0, 1).concat(non_local);
+
+  expr addr;
+  if (auto local = m.local_blk_addr(bid))
+    // Local block area is the upper half of the memory
+    addr = expr::mkIf(is_local(), expr::mkUInt(1, 1).concat(*local), non_local);
+  else
+    addr = move(non_local);
+
+  return addr + get_offset();
 }
 
 expr Pointer::block_size() const {
@@ -524,13 +530,7 @@ static bool memory_unused() {
          !observes_addresses();
 }
 
-Memory::Memory(State &state)
-  : state(&state),
-    local_blk_addr(expr::mkUInt(0, bits_size_t - 1)),
-    local_blk_size(expr::mkUInt(0, bits_size_t - 1)),
-    local_blk_align(expr::mkUInt(0, 8)),
-    local_blk_kind(expr::mkUInt(0, 2)) {
-
+Memory::Memory(State &state) : state(&state) {
   if (memory_unused())
     return;
 

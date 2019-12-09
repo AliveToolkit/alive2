@@ -105,10 +105,10 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
 
   auto& returnDomain() const { return return_domain; }
-  Memory returnMemory() const { return return_memory(); }
+  Memory returnMemory() const { return *return_memory(); }
 
   std::pair<StateValue, const std::set<smt::expr>&> returnVal() const {
-    return { return_val(), return_undef_vars };
+    return { *return_val(), return_undef_vars };
   }
 
   void startParsingPre() { disable_undef_rewrite = true; }

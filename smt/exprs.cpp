@@ -52,7 +52,7 @@ void FunctionExpr::del(const expr &key) {
   fn.erase(key);
 }
 
-expr FunctionExpr::operator()(const expr &key) const {
+optional<expr> FunctionExpr::operator()(const expr &key) const {
   DisjointExpr disj(default_val);
   for (auto &[k, v] : fn) {
     disj.add(v, k == key);

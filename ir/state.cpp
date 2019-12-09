@@ -108,7 +108,7 @@ bool State::startBB(const BasicBlock &bb) {
   if (domain.first.isFalse())
     return false;
 
-  memory = in_memory();
+  memory = *in_memory();
 
   return true;
 }
