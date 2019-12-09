@@ -154,12 +154,21 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto aty = cast<llvm::ArrayType>(ty);
+      auto elemty = aty->getElementType();
       auto elems = aty->getNumElements();
-      auto ety = llvm_type2alive(aty->getElementType());
+      auto ety = llvm_type2alive(elemty);
       if (!ety || elems > 128)
         return nullptr;
+
+      auto sz_with_padding = DL->getTypeAllocSize(elemty);
+      auto sz = DL->getTypeStoreSize(elemty);
+      assert(DL->getTypeAllocSize(const_cast<llvm::ArrayType *>(aty)) ==
+             elems * sz_with_padding);
+      Type *paddingTy = sz == sz_with_padding ? 0 :
+          llvm_type2alive(llvm::IntegerType::get(aty->getContext(),
+                                                 8 * (sz_with_padding - sz)));
       cache = make_unique<ArrayType>("ty_" + to_string(type_id_counter++),
-                                     elems, *ety);
+                                     elems, *ety, paddingTy);
     }
     return cache.get();
   }
@@ -273,9 +282,9 @@ Value* get_operand(llvm::Value *v,
     return gvar;
   }
 
-  if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
-    vector<Value*> vals;
-    auto aty = dynamic_cast<AggregateType *>(ty);
+  auto fillAggregateValues = [&constexpr_conv](AggregateType *aty,
+      function<llvm::Value *(unsigned)> get_elem, vector<Value*> &vals) -> bool
+  {
     unsigned opi = 0;
 
     for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
@@ -288,13 +297,22 @@ Value* get_operand(llvm::Value *v,
         current_fn->addConstant(move(poison));
         vals.emplace_back(ret);
       } else {
-        if (auto op = get_operand(cnst->getOperand(opi), constexpr_conv))
+        if (auto op = get_operand(get_elem(opi), constexpr_conv))
           vals.emplace_back(op);
         else
-          return nullptr;
+          return false;
         ++opi;
       }
     }
+    return true;
+  };
+
+  if (auto cnst = dyn_cast<llvm::ConstantAggregate>(v)) {
+    vector<Value*> vals;
+    if (!fillAggregateValues(dynamic_cast<AggregateType *>(ty),
+            [&cnst](auto i) { return cnst->getOperand(i); }, vals))
+      return nullptr;
+
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
@@ -303,12 +321,10 @@ Value* get_operand(llvm::Value *v,
 
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
     vector<Value*> vals;
-    for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      if (auto op = get_operand(cnst->getElementAsConstant(i), constexpr_conv))
-        vals.emplace_back(op);
-      else
-        return nullptr;
-    }
+    if (!fillAggregateValues(dynamic_cast<AggregateType *>(ty),
+            [&cnst](auto i) { return cnst->getElementAsConstant(i); }, vals))
+      return nullptr;
+
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
@@ -317,12 +333,10 @@ Value* get_operand(llvm::Value *v,
 
   if (auto cnst = dyn_cast<llvm::ConstantAggregateZero>(v)) {
     vector<Value*> vals;
-    for (unsigned i = 0, e = cnst->getNumElements(); i != e; ++i) {
-      if (auto op = get_operand(cnst->getElementValue(i), constexpr_conv))
-        vals.emplace_back(op);
-      else
-        return nullptr;
-    }
+    if (!fillAggregateValues(dynamic_cast<AggregateType *>(ty),
+            [&cnst](auto i) { return cnst->getElementValue(i); }, vals))
+      return nullptr;
+
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));

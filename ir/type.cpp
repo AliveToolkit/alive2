@@ -835,12 +835,23 @@ const AggregateType* AggregateType::getAsAggregateType() const {
 }
 
 
-ArrayType::ArrayType(string &&name, unsigned elements, Type &elementTy)
+ArrayType::ArrayType(string &&name, unsigned elements, Type &elementTy,
+                     Type *paddingTy)
   : AggregateType(move(name), false) {
-  this->elements = elements;
   defined = true;
-  children.resize(elements, &elementTy);
-  is_padding.resize(elements, false);
+  if (paddingTy) {
+    this->elements = elements * 2;
+    children.resize(elements * 2, &elementTy);
+    is_padding.resize(elements * 2, false);
+    for (unsigned i = 1; i < elements * 2; i += 2) {
+      children[i] = paddingTy;
+      is_padding[i] = true;
+    }
+  } else {
+    this->elements = elements;
+    children.resize(elements, &elementTy);
+    is_padding.resize(elements, false);
+  }
 }
 
 bool ArrayType::isArrayType() const {
@@ -850,8 +861,15 @@ bool ArrayType::isArrayType() const {
 void ArrayType::print(ostream &os) const {
   if (children.empty())
     os << "(empty array)";
-  else
-    os << '[' << elements << " x " << *children[0] << ']';
+  else {
+    bool has_padding = elements > 1 && isPadding(1);
+    assert(!has_padding || elements % 2 == 0);
+    os << '[' << (has_padding ? elements / 2 : elements) << " x "
+       << *children[0];
+    if (has_padding)
+       os << ", padding: " << *children[1];
+    os << ']';
+  }
 }
 
 
