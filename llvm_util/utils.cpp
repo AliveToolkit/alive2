@@ -260,7 +260,7 @@ Value* get_operand(llvm::Value *v,
           continue;
         if (&(*i) == gv)
           break;
-        id++;
+        ++id;
       }
       assert(i != e);
       name = '@' + to_string(id);
