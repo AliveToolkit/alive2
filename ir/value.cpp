@@ -162,7 +162,7 @@ AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
 StateValue AggregateValue::toSMT(State &s) const {
   vector<StateValue> state_vals;
   for (auto val : vals) {
-    state_vals.emplace_back(val->toSMT(s));
+    state_vals.emplace_back(s[*val]);
   }
   return getType().getAsAggregateType()->aggregateVals(state_vals);
 }

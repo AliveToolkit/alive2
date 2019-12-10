@@ -21,14 +21,15 @@ namespace llvm_util {
 pair<unique_ptr<Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            BasicBlock &BB,
-           function<Value*(llvm::ConstantExpr *)> constexpr_conv) {
+           function<Value*(llvm::ConstantExpr *)> constexpr_conv,
+           function<Value*(AggregateValue *)> copy_inserter) {
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
     RETURN_FAIL_KNOWN();
 
   vector<Value*> args;
   for (auto &arg : i.args()) {
-    auto a = get_operand(arg, constexpr_conv);
+    auto a = get_operand(arg, constexpr_conv, copy_inserter);
     if (!a)
       RETURN_FAIL_KNOWN();
     args.emplace_back(a);

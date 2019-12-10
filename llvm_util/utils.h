@@ -16,6 +16,7 @@ class Value;
 }
 
 namespace IR {
+class AggregateValue;
 class BasicBlock;
 class Function;
 class Type;
@@ -34,7 +35,8 @@ IR::Type* llvm_type2alive(const llvm::Type *ty);
 
 IR::Value* make_intconst(uint64_t val, int bits);
 IR::Value* get_operand(llvm::Value *v,
-  std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv);
+  std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
+  std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);
 
 void add_identifier(const llvm::Value &llvm, IR::Value &v);
 

@@ -25,6 +25,7 @@ namespace llvm_util {
 std::pair<std::unique_ptr<IR::Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            IR::BasicBlock &BB,
-           std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv);
+           std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
+           std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);
 
 }

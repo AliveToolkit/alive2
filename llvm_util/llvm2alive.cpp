@@ -21,6 +21,7 @@ namespace {
 
 ostream *out;
 unsigned constexpr_idx;
+unsigned copy_idx;
 
 #if 0
 string_view s(llvm::StringRef str) {
@@ -93,9 +94,20 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return i;
   }
 
+
+  Value* copy_inserter(AggregateValue *ag) {
+    auto v = make_unique<UnaryOp>(*const_cast<Type *>(&ag->getType()),
+                                  "__copy_" + to_string(copy_idx++), *ag,
+                                  UnaryOp::Copy);
+    auto val = v.get();
+    BB->addInstr(move(v));
+    return val;
+  }
+
   auto get_operand(llvm::Value *v) {
     return llvm_util::get_operand(v,
-        [this](auto I) { return convert_constexpr(I); });
+        [this](auto I) { return convert_constexpr(I); },
+        [this](auto ag) { return copy_inserter(ag); });
   }
 
 public:
@@ -206,7 +218,8 @@ public:
 
   RetTy visitCallInst(llvm::CallInst &i) {
     auto [call_val, known] = known_call(i, TLI, *BB,
-        [this](auto I) { return convert_constexpr(I); });
+        [this](auto I) { return convert_constexpr(I); },
+        [this](auto ag) { return copy_inserter(ag); });
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 

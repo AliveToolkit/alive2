@@ -189,7 +189,8 @@ Value* make_intconst(uint64_t val, int bits) {
 
 
 Value* get_operand(llvm::Value *v,
-                   function<Value*(llvm::ConstantExpr*)> constexpr_conv) {
+                   function<Value*(llvm::ConstantExpr*)> constexpr_conv,
+                   function<Value*(AggregateValue*)> copy_inserter) {
   if (isa<llvm::Instruction>(v) || isa<llvm::Argument>(v))
     return identifiers[v];
 
@@ -282,7 +283,7 @@ Value* get_operand(llvm::Value *v,
     return gvar;
   }
 
-  auto fillAggregateValues = [&constexpr_conv](AggregateType *aty,
+  auto fillAggregateValues = [&](AggregateType *aty,
       function<llvm::Value *(unsigned)> get_elem, vector<Value*> &vals) -> bool
   {
     unsigned opi = 0;
@@ -297,7 +298,7 @@ Value* get_operand(llvm::Value *v,
         current_fn->addConstant(move(poison));
         vals.emplace_back(ret);
       } else {
-        if (auto op = get_operand(get_elem(opi), constexpr_conv))
+        if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter))
           vals.emplace_back(op);
         else
           return false;
@@ -315,8 +316,8 @@ Value* get_operand(llvm::Value *v,
 
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
-    current_fn->addConstant(move(val));
-    return ret;
+    current_fn->addAggregate(move(val));
+    return copy_inserter(ret);
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
