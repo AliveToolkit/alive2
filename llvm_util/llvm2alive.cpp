@@ -721,7 +721,7 @@ public:
       char *end_ptr;
       auto numeric_id = strtoul(chrs, &end_ptr, 10);
 
-      if (end_ptr - chrs != name.size())
+      if ((unsigned)(end_ptr - chrs) != (unsigned)name.size())
         return M->getGlobalVariable(name, true);
       else {
         auto itr = M->global_begin(), end = M->global_end();
