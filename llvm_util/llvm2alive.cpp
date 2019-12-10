@@ -97,7 +97,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
   Value* copy_inserter(AggregateValue *ag) {
     auto v = make_unique<UnaryOp>(*const_cast<Type *>(&ag->getType()),
-                                  "__copy_" + to_string(copy_idx++), *ag,
+                                  "%__copy_" + to_string(copy_idx++), *ag,
                                   UnaryOp::Copy);
     auto val = v.get();
     BB->addInstr(move(v));
