@@ -104,10 +104,10 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return val;
   }
 
-  auto get_operand(llvm::Value *v) {
+  auto get_operand(llvm::Value *v, bool enable_copy_inserter = true) {
     return llvm_util::get_operand(v,
         [this](auto I) { return convert_constexpr(I); },
-        [this](auto ag) { return copy_inserter(ag); });
+        [&](auto ag) { return enable_copy_inserter ? copy_inserter(ag) : ag; });
   }
 
 public:
@@ -570,7 +570,10 @@ public:
   }
 
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
-    PARSE_TRIOP();
+    PARSE_BINOP();
+    auto c = get_operand(i.getOperand(2), false);
+    if (!c)
+      return error(i);
     RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
                                                  *c));
   }

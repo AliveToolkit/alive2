@@ -317,12 +317,7 @@ Value* get_operand(llvm::Value *v,
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addAggregate(move(val));
-    // If none of the operands contains constexpr, no copy is needed.
-    // This is needed for shufflevector's idiom too.
-    return all_of(cnst->op_begin(), cnst->op_end(), [](auto &v) -> bool
-        { return llvm::isa<llvm::ConstantInt>(v) ||
-                 llvm::isa<llvm::UndefValue>(*v); }) ?
-        ret : copy_inserter(ret);
+    return copy_inserter(ret);
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {
