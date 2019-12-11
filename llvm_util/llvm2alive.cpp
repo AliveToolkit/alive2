@@ -673,6 +673,7 @@ public:
 
   optional<Function> run() {
     constexpr_idx = 0;
+    copy_idx = 0;
 
     auto type = llvm_type2alive(f.getReturnType());
     if (!type)

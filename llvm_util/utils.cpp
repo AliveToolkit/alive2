@@ -317,8 +317,7 @@ Value* get_operand(llvm::Value *v,
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     if (all_of(cnst->op_begin(), cnst->op_end(), [](auto &V) -> bool
-        { return llvm::isa<llvm::UndefValue>(V) ||
-                 llvm::isa<llvm::ConstantInt>(V); })) {
+        { return llvm::isa<llvm::ConstantData>(V); })) {
       current_fn->addConstant(move(val));
       return ret;
     } else {
