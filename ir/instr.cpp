@@ -1852,7 +1852,7 @@ StateValue GEP::toSMT(State &s) const {
       if (inbounds)
         non_poison &= ptr.inbounds();
     }
-    return { ptr.release(), expr(non_poison) };
+    return { ptr.release(), move(non_poison) };
   };
 
   if (auto ptr_aty = ptr->getType().getAsAggregateType()) {

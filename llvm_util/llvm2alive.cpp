@@ -10,7 +10,7 @@
 #include "llvm/IR/Operator.h"
 #include <utility>
 #include <vector>
-#include <iostream>
+
 using namespace llvm_util;
 using namespace IR;
 using namespace std;
