@@ -110,7 +110,7 @@ space+ {
   return VECTOR_TYPE_PREFIX;
 }
 
-"[" space* @tag1 [0-9][0-9]* space* "x" {
+"[" space* @tag1 [0-9]+ space* "x" {
   yylval.num = strtoull((char*)tag1, nullptr, 10);
   return ARRAY_TYPE_PREFIX;
 }
