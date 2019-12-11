@@ -62,6 +62,7 @@ class Function final {
   std::vector<std::unique_ptr<Value>> constants;
   std::vector<std::unique_ptr<Predicate>> predicates;
   std::vector<std::unique_ptr<Value>> undefs;
+  std::vector<std::unique_ptr<AggregateValue>> aggregates;
   std::vector<std::unique_ptr<Value>> inputs;
 
 public:
@@ -98,6 +99,8 @@ public:
   util::const_strip_unique_ptr<decltype(undefs)> getUndefs() const {
     return undefs;
   }
+
+  void addAggregate(std::unique_ptr<AggregateValue> &&a);
 
   void addInput(std::unique_ptr<Value> &&c);
   util::const_strip_unique_ptr<decltype(inputs)> getInputs() const {

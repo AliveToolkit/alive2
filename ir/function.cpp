@@ -129,6 +129,10 @@ void Function::addUndef(unique_ptr<UndefValue> &&u) {
   undefs.emplace_back(move(u));
 }
 
+void Function::addAggregate(unique_ptr<AggregateValue> &&a) {
+  aggregates.emplace_back(move(a));
+}
+
 void Function::addInput(unique_ptr<Value> &&i) {
   assert(dynamic_cast<Input *>(i.get()) ||
          dynamic_cast<ConstantInput*>(i.get()));

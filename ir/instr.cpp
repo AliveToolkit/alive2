@@ -579,8 +579,10 @@ StateValue UnaryOp::toSMT(State &s) const {
 
   switch (op) {
   case Copy:
-    fn = [](auto v) { return v; };
-    break;
+    if (dynamic_cast<AggregateValue *>(val))
+      // Aggregate value is not registered at state.
+      return val->toSMT(s);
+    return s[*val];
   case BitReverse:
     fn = [](auto v) { return v.bitreverse(); };
     break;
