@@ -370,11 +370,11 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned num_ptrinputs = 0;
   const auto &inputs = t.src.getInputs();
   for (auto &arg : inputs) {
-    // An argument with aggregate type with pointer member isn't regarded
-    // as a source of non-local pointer, because its member should be extracted
-    // with extractelement / extractvalue instructions, which are also counted
-    // as source of non-local blocks.
+    // An argument with aggregate type with pointer member is dealt separately
     num_ptrinputs += arg.getType().isPtrType();
+
+    if (auto aty = arg.getType().getAsAggregateType())
+      num_ptrinputs += aty->numPointerElements();
   }
 
   auto returns_local = [](const Instr &inst) {

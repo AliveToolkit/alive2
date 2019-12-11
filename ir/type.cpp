@@ -826,6 +826,17 @@ pair<expr, vector<expr>> AggregateType::mkUndefInput(State &s) const {
   return { move(val), move(vars) };
 }
 
+unsigned AggregateType::numPointerElements() const {
+  unsigned count = 0;
+  for (unsigned i = 0; i < elements; ++i) {
+    if (children[i]->isPtrType())
+      count++;
+    else if (auto aty = children[i]->getAsAggregateType())
+      count += aty->numPointerElements();
+  }
+  return count;
+}
+
 void AggregateType::printVal(ostream &os, State &s, const expr &e) const {
   UNREACHABLE();
 }

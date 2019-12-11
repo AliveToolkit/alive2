@@ -1828,39 +1828,65 @@ void GEP::print(std::ostream &os) const {
 }
 
 StateValue GEP::toSMT(State &s) const {
-  auto [val, non_poison] = s[*ptr];
-
-  Pointer ptr(s.getMemory(), move(val));
-  if (inbounds)
-    non_poison &= ptr.inbounds();
-
-  for (auto &[sz, idx] : idxs) {
-    auto &[v, np] = s[*idx];
-    auto multiplier = expr::mkUInt(sz, bits_for_offset);
-    auto val = v.sextOrTrunc(bits_for_offset);
-    auto inc = multiplier * val;
-
-    if (inbounds) {
-      non_poison &= multiplier.mul_no_soverflow(val);
-      non_poison &= ptr.add_no_overflow(inc);
-    }
-
-    ptr += inc;
-    non_poison &= np;
+  auto scalar = [&](const StateValue &ptrval,
+                    vector<pair<unsigned, StateValue>> &offsets)
+      -> StateValue {
+    auto non_poison = ptrval.non_poison;
+    Pointer ptr(s.getMemory(), ptrval.value);
 
     if (inbounds)
       non_poison &= ptr.inbounds();
+
+    for (auto &[sz, idx] : offsets) {
+      auto &[v, np] = idx;
+      auto multiplier = expr::mkUInt(sz, bits_for_offset);
+      auto val = v.sextOrTrunc(bits_for_offset);
+      auto inc = multiplier * val;
+
+      if (inbounds) {
+        non_poison &= multiplier.mul_no_soverflow(val);
+        non_poison &= ptr.add_no_overflow(inc);
+      }
+
+      ptr += inc;
+      non_poison &= np;
+
+      if (inbounds)
+        non_poison &= ptr.inbounds();
+    }
+    return { ptr.release(), move(non_poison) };
+  };
+
+  if (auto ptr_aty = ptr->getType().getAsAggregateType()) {
+    vector<StateValue> vals;
+    auto &ptrval = s[*ptr];
+    for (unsigned i = 0, e = ptr_aty->numElementsConst(); i != e; ++i) {
+      vector<pair<unsigned, StateValue>> offsets;
+      for (auto &[sz, idx] : idxs) {
+        if (auto idx_aty = idx->getType().getAsAggregateType())
+          offsets.emplace_back(sz, idx_aty->extract(s[*idx], i));
+        else
+          offsets.emplace_back(sz, s[*idx]);
+      }
+      vals.emplace_back(scalar(ptr_aty->extract(ptrval, i), offsets));
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return { ptr.release(), move(non_poison) };
+  vector<pair<unsigned, StateValue>> offsets;
+  for (auto &[sz, idx] : idxs)
+    offsets.emplace_back(sz, s[*idx]);
+  return scalar(s[*ptr], offsets);
 }
 
 expr GEP::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints() &&
            getType() == ptr->getType() &&
-           getType().enforcePtrType();
+           getType().enforcePtrOrVectorType();
   for (auto &[sz, idx] : idxs) {
     (void)sz;
-    c &= idx->getType().enforceIntType();
+    // It is allowed to have non-vector idx with vector pointer operand
+    c &= idx->getType().enforceIntOrVectorType() &&
+          getType().enforceVectorTypeIff(idx->getType());
   }
   return c;
 }
