@@ -104,10 +104,10 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return val;
   }
 
-  auto get_operand(llvm::Value *v, bool enable_copy_inserter = true) {
+  auto get_operand(llvm::Value *v) {
     return llvm_util::get_operand(v,
         [this](auto I) { return convert_constexpr(I); },
-        [&](auto ag) { return enable_copy_inserter ? copy_inserter(ag) : ag; });
+        [&](auto ag) { return copy_inserter(ag); });
   }
 
 public:
