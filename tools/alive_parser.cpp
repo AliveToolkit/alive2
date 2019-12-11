@@ -413,7 +413,7 @@ static Value& parse_const_expr(Type &type) {
     return get_constant(yylval.str, type);
   case IDENTIFIER: {
     string_view name = yylval.str;
-    std::vector<Value*> args;
+    vector<Value*> args;
     tokenizer.ensure(LPAREN);
     if (!tokenizer.consumeIf(RPAREN)) {
       do {
@@ -498,18 +498,15 @@ static Value& get_or_copy_instr(const string &name) {
   return *ret;
 }
 
-static Value& parse_aggregate_constant(Type &type) {
-  std::vector<Value*> vals;
+static Value& parse_aggregate_constant(Type &type, token close_tk) {
+  vector<Value*> vals;
   do {
     Type &elemTy = parse_scalar_type();
     Value *elem = &parse_operand(elemTy);
     vals.emplace_back(elem);
   } while (tokenizer.consumeIf(COMMA));
 
-  auto closingTk = *tokenizer;
-  if (closingTk != CSGT && closingTk != RSQBRACKET)
-    error(string("expected token: ") + token_name[CSGT] + " or " +
-          token_name[RSQBRACKET] + ", got: " + token_name[closingTk]);
+  tokenizer.ensure(close_tk);
 
   auto c = make_unique<AggregateValue>(type, move(vals));
   auto ret = c.get();
@@ -526,8 +523,9 @@ static Value& parse_operand(Type &type) {
   case NUM_STR:
     return get_num_constant(yylval.str, type);
   case CSLT:
+    return parse_aggregate_constant(type, CSGT);
   case LSQBRACKET:
-    return parse_aggregate_constant(type);
+    return parse_aggregate_constant(type, RSQBRACKET);
   case TRUE:
     return get_constant(1, type);
   case FALSE:
