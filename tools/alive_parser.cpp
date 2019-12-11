@@ -130,7 +130,7 @@ struct tokenizer_t {
 
   bool isType() {
     // TODO: support other aggregate types
-    return isScalarType() || isVectorType();
+    return isScalarType() || isVectorType() || isArrayType();
   }
 
   bool isScalarType() {
@@ -140,6 +140,10 @@ struct tokenizer_t {
 
   bool isVectorType() {
     return peek() == VECTOR_TYPE_PREFIX;
+  }
+
+  bool isArrayType() {
+    return peek() == ARRAY_TYPE_PREFIX;
   }
 
 private:
@@ -318,6 +322,8 @@ static Type& get_pointer_type(unsigned address_space_number) {
 
 static unsigned vector_num;
 static vector<unique_ptr<VectorType>> vector_types;
+static unsigned array_num;
+static vector<unique_ptr<ArrayType>> array_types;
 
 static Type& parse_scalar_type() {
   switch (*tokenizer) {
@@ -356,9 +362,15 @@ static Type& parse_vector_type() {
                             elements, elemTy)).get();
 }
 
+static Type& parse_array_type();
+
 static Type& parse_type(bool optional = true) {
   if (tokenizer.isScalarType()) {
     return parse_scalar_type();
+  }
+
+  if (tokenizer.isArrayType()) {
+    return parse_array_type();
   }
 
   if (tokenizer.isVectorType()) {
@@ -371,6 +383,17 @@ static Type& parse_type(bool optional = true) {
     error("Expecting a type", tokenizer.peek());
 
   UNREACHABLE();
+}
+
+static Type& parse_array_type() {
+  tokenizer.ensure(ARRAY_TYPE_PREFIX);
+  unsigned elements = yylval.num;
+
+  Type &elemTy = parse_type(false);
+  tokenizer.ensure(RSQBRACKET);
+  return *array_types.emplace_back(
+          make_unique<ArrayType>("aty_" + to_string(array_num++),
+                                  elements, elemTy)).get();
 }
 
 static Type& try_parse_type(Type &default_type) {
@@ -475,7 +498,7 @@ static Value& get_or_copy_instr(const string &name) {
   return *ret;
 }
 
-static Value& parse_vector_constant(Type &type) {
+static Value& parse_aggregate_constant(Type &type) {
   std::vector<Value*> vals;
   do {
     Type &elemTy = parse_scalar_type();
@@ -483,7 +506,10 @@ static Value& parse_vector_constant(Type &type) {
     vals.emplace_back(elem);
   } while (tokenizer.consumeIf(COMMA));
 
-  tokenizer.ensure(CSGT);
+  auto closingTk = *tokenizer;
+  if (closingTk != CSGT && closingTk != RSQBRACKET)
+    error(string("expected token: ") + token_name[CSGT] + " or " +
+          token_name[RSQBRACKET] + ", got: " + token_name[closingTk]);
 
   auto c = make_unique<AggregateValue>(type, move(vals));
   auto ret = c.get();
@@ -500,7 +526,8 @@ static Value& parse_operand(Type &type) {
   case NUM_STR:
     return get_num_constant(yylval.str, type);
   case CSLT:
-    return parse_vector_constant(type);
+  case LSQBRACKET:
+    return parse_aggregate_constant(type);
   case TRUE:
     return get_constant(1, type);
   case FALSE:
@@ -1022,6 +1049,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case UNDEF:
   case POISON:
   case REGISTER:
+  case ARRAY_TYPE_PREFIX:
     return parse_copyop(name, t);
   default:
     tokenizer.unget(t);
