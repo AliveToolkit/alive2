@@ -316,8 +316,15 @@ Value* get_operand(llvm::Value *v,
 
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
-    current_fn->addAggregate(move(val));
-    return copy_inserter(ret);
+    if (all_of(cnst->op_begin(), cnst->op_end(), [](auto &V) -> bool
+        { return llvm::isa<llvm::UndefValue>(V) ||
+                 llvm::isa<llvm::ConstantInt>(V); })) {
+      current_fn->addConstant(move(val));
+      return ret;
+    } else {
+      current_fn->addAggregate(move(val));
+      return copy_inserter(ret);
+    }
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantDataSequential>(v)) {

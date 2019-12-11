@@ -570,10 +570,7 @@ public:
   }
 
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
-    PARSE_BINOP();
-    auto c = get_operand(i.getOperand(2), false);
-    if (!c)
-      return error(i);
+    PARSE_TRIOP();
     RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
                                                  *c));
   }
