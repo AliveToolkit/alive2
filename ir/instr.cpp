@@ -575,16 +575,14 @@ void UnaryOp::print(ostream &os) const {
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
-  if (op == Copy) {
+  function<expr(const expr&)> fn;
+
+  switch (op) {
+  case Copy:
     if (dynamic_cast<AggregateValue *>(val))
       // Aggregate value is not registered at state.
       return val->toSMT(s);
     return s[*val];
-  }
-
-  function<expr(const expr&)> fn;
-
-  switch (op) {
   case BitReverse:
     fn = [](auto v) { return v.bitreverse(); };
     break;
@@ -597,8 +595,6 @@ StateValue UnaryOp::toSMT(State &s) const {
   case FNeg:
     fn = [](auto v) { return v.fneg(); };
     break;
-  default:
-    UNREACHABLE();
   }
 
   auto &v = s[*val];
