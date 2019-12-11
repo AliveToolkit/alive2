@@ -387,8 +387,10 @@ static void calculateAndInitConstants(Transform &t) {
     if (!inst.getType().isPtrType())
       return false;
     if (dynamic_cast<const ConversionOp*>(&inst) ||
-        dynamic_cast<const GEP*>(&inst) ||
+        dynamic_cast<const ExtractElement*>(&inst) ||
+        dynamic_cast<const ExtractValue*>(&inst) ||
         dynamic_cast<const Freeze*>(&inst) ||
+        dynamic_cast<const GEP*>(&inst) ||
         dynamic_cast<const Phi*>(&inst) ||
         dynamic_cast<const Return*>(&inst) ||
         dynamic_cast<const Select*>(&inst))
