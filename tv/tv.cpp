@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <utility>
 
-#if __GNUC__ < 8
+#if (__GNUC__ < 8) && (!__APPLE__)
 # include <experimental/filesystem>
   namespace fs = std::experimental::filesystem;
 #else
