@@ -684,9 +684,28 @@ pair<expr, expr> Memory::mkUndefInput() const {
   return { p.release(), move(offset) };
 }
 
-expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
-                   optional<unsigned> bidopt, unsigned *bid_out,
-                   const expr &precond) {
+static expr encodeDisjointnessOfLocalBlk(const Memory& M, const expr &addr,
+                                          const expr &sz,
+                                          FunctionExpr &blk_addr) {
+  assert(addr.bits() == bits_size_t && sz.bits() == bits_size_t);
+  // addr + size does not overflow
+  expr disj = true;
+
+  // Disjointness of block's address range with other local blocks
+  auto one = expr::mkUInt(1, 1);
+  auto zero = expr::mkUInt(0, bits_for_offset);
+  for (auto &[sbid, addr0] : blk_addr) {
+    (void)addr0;
+    Pointer p2(M, one.concat(sbid), zero);
+    disj &= p2.is_block_alive()
+              .implies(disjoint(addr, sz, p2.get_address(), p2.block_size()));
+  }
+  return disj;
+}
+
+pair<expr, expr> Memory::alloc(const expr &size, unsigned align,
+                               BlockKind blockKind, optional<unsigned> bidopt,
+                               unsigned *bid_out, const expr &precond) {
   assert(!memory_unused());
 
   // Produce a local block if blockKind is heap or stack.
@@ -731,22 +750,13 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       expr blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
                                  : addr_var;
 
-      auto one = expr::mkUInt(1, 1);
-      expr full_addr = one.concat(blk_addr);
-
-      // addr + size does not overflow
-      expr disj = full_addr.add_no_uoverflow(size_zext);
+      auto full_addr = expr::mkUInt(1, 1).concat(blk_addr);
 
       // Disjointness of block's address range with other local blocks
-      auto zero = expr::mkUInt(0, bits_for_offset);
-      for (auto &[sbid, addr] : local_blk_addr) {
-        (void)addr;
-        Pointer p2(*this, one.concat(sbid), zero);
-        disj &= p2.is_block_alive()
-                  .implies(disjoint(full_addr, size_zext, p2.get_address(),
-                                    p2.block_size()));
-      }
-      state->addPre(allocated.implies(disj));
+      state->addPre(allocated.implies(encodeDisjointnessOfLocalBlk(*this,
+                                        full_addr, size_zext, local_blk_addr)));
+      // addr + size does not overflow
+      state->addPre(full_addr.add_no_uoverflow(size_zext));
 
       local_blk_addr.add(short_bid, move(blk_addr));
     }
@@ -778,19 +788,46 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   (is_local ? local_blk_size : non_local_blk_size)
     .add(short_bid, size_zext.trunc(bits_size_t - 1));
   (is_local ? local_blk_align : non_local_blk_align)
-    .add(short_bid, expr::mkUInt(align_bits, 8));
+    .add(short_bid, expr::mkUInt(align_bits, align));
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
-  return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
+  return { p(), allocated };
 }
 
-void Memory::free(const expr &ptr) {
+void Memory::start_lifetime(const expr &ptr_local) {
+  assert(!memory_unused());
+  Pointer p(*this, ptr_local);
+  local_block_liveness = local_block_liveness.store(p.get_short_bid(), true);
+
+  if (observes_addresses()) {
+    auto align = *local_blk_align(p.get_short_bid());
+    auto size_upperbound = p.block_size() + align.zextOrTrunc(bits_size_t) -
+                           expr::mkUInt(1, bits_size_t);
+    auto allocated = size_upperbound.ule(local_avail_space.zext(1));
+
+    // Disjointness of block's address range with other local blocks
+    auto disj = encodeDisjointnessOfLocalBlk(*this, p.get_address(),
+                                            p.block_size(), local_blk_addr);
+    state->addPre(allocated.implies(move(disj)));
+    state->addUB(allocated);
+
+    // size_upperbound should be subtracted here (not size_zext0) because we
+    // need to consider blocks' alignment.
+    auto size_upperbound_trunc = size_upperbound.trunc(bits_size_t - 1);
+    local_avail_space = expr::mkIf(allocated,
+                                   local_avail_space - size_upperbound_trunc,
+                                   local_avail_space);
+  }
+}
+
+void Memory::free(const expr &ptr, bool unconstrained) {
   assert(!memory_unused());
   Pointer p(*this, ptr);
-  state->addUB(p.isNull() || (p.get_offset() == 0 &&
-                              p.is_block_alive() &&
-                              p.get_alloc_type() == Pointer::MALLOC));
+  if (!unconstrained)
+    state->addUB(p.isNull() || (p.get_offset() == 0 &&
+                                p.is_block_alive() &&
+                                (p.get_alloc_type() == Pointer::MALLOC)));
   store(p, false, local_block_liveness, non_local_block_liveness, true);
 
   // optimization: if this is a local block, remove all associated information

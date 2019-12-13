@@ -372,9 +372,12 @@ public:
 class Alloc final : public Instr {
   Value *size;
   unsigned align;
+  bool initially_dead;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, unsigned align)
-    : Instr(type, std::move(name)), size(&size), align(align) {}
+  Alloc(Type &type, std::string &&name, Value &size, unsigned align,
+        bool initially_dead)
+    : Instr(type, std::move(name)), size(&size), align(align),
+      initially_dead(initially_dead) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -420,10 +423,27 @@ public:
 };
 
 
-class Free final : public Instr {
+class StartLifetime final : public Instr {
   Value *ptr;
 public:
-  Free(Value &ptr) : Instr(Type::voidTy, "free"), ptr(&ptr) {}
+  StartLifetime(Value &ptr) : Instr(Type::voidTy, "start_lifetime"),
+      ptr(&ptr) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class Free final : public Instr {
+  Value *ptr;
+  bool unconstrained;
+public:
+  Free(Value &ptr, bool unconstrained = false) : Instr(Type::voidTy, "free"),
+      ptr(&ptr), unconstrained(unconstrained) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

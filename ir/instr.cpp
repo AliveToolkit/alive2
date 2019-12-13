@@ -1706,14 +1706,18 @@ void Alloc::rauw(const Value &what, Value &with) {
 
 void Alloc::print(std::ostream &os) const {
   os << getName() << " = alloca " << *size << ", align " << align;
+  if (initially_dead)
+    os << ", dead";
 }
 
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   auto &m = s.getMemory();
-  auto p = m.alloc(sz, align, Memory::STACK);
+  auto [p, allocated] = m.alloc(sz, align, Memory::STACK, nullopt,
+                                 nullptr, !initially_dead);
   // Alloca cannot be null; when OOM, the program halts with stack overflow.
-  s.addUB(np && p != Pointer::mkNullPointer(m)());
+  s.addUB(np && (allocated || initially_dead));
+  auto nullp = Pointer::mkNullPointer(m)();
   return { move(p), true };
 }
 
@@ -1724,7 +1728,8 @@ expr Alloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
-  return make_unique<Alloc>(getType(), getName() + suffix, *size, align);
+  return make_unique<Alloc>(getType(), getName() + suffix, *size, align,
+                            initially_dead);
 }
 
 
@@ -1743,15 +1748,16 @@ void Malloc::print(std::ostream &os) const {
 StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   // TODO: malloc's alignment is implementation defined.
-  auto p = s.getMemory().alloc(sz, 8, Memory::HEAP);
+  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP);
 
   if (isNonNull) {
     // TODO: In C++ we need to throw an exception if the allocation fails, but
     // exception hasn't been modeled yet
-    s.addUB(p != Pointer::mkNullPointer(s.getMemory())());
+    s.addUB(move(allocated));
   }
 
-  return { move(p), expr(np) };
+  expr nullp = Pointer::mkNullPointer(s.getMemory())();
+  return { expr::mkIf(move(allocated), move(p), move(nullp)), expr(np) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -1784,11 +1790,13 @@ StateValue Calloc::toSMT(State &s) const {
 
   // TODO: check calloc align.
   expr size = nm * sz;
-  auto p = s.getMemory().alloc(size, 8, Memory::HEAP, std::nullopt,
-                               nullptr, nm.mul_no_uoverflow(sz));
+  auto [p0, allocated] = s.getMemory().alloc(size, 8, Memory::HEAP,
+                                            std::nullopt, nullptr,
+                                            nm.mul_no_uoverflow(sz));
 
-  expr is_null = p == Pointer::mkNullPointer(s.getMemory())();
-  expr calloc_sz = expr::mkIf(is_null, expr::mkUInt(0, sz.bits()), size);
+  expr nullp = Pointer::mkNullPointer(s.getMemory())();
+  expr p = expr::mkIf(allocated, move(p0), move(nullp));
+  expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
 
   // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
@@ -1809,6 +1817,34 @@ unique_ptr<Instr> Calloc::dup(const string &suffix) const {
 }
 
 
+vector<Value*> StartLifetime::operands() const {
+  return { ptr };
+}
+
+void StartLifetime::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void StartLifetime::print(std::ostream &os) const {
+  os << "start_lifetime " << *ptr;
+}
+
+StateValue StartLifetime::toSMT(State &s) const {
+  auto &[p, np] = s[*ptr];
+  s.addUB(np);
+  s.getMemory().start_lifetime(p);
+  return {};
+}
+
+expr StartLifetime::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
+  return make_unique<StartLifetime>(*ptr);
+}
+
+
 vector<Value*> Free::operands() const {
   return { ptr };
 }
@@ -1818,13 +1854,13 @@ void Free::rauw(const Value &what, Value &with) {
 }
 
 void Free::print(std::ostream &os) const {
-  os << "free " << *ptr;
+  os << "free " << *ptr << (unconstrained ? " unconstrained" : "");
 }
 
 StateValue Free::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
-  s.getMemory().free(p);
+  s.getMemory().free(p, unconstrained);
   return {};
 }
 
@@ -1833,7 +1869,7 @@ expr Free::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Free::dup(const string &suffix) const {
-  return make_unique<Free>(*ptr);
+  return make_unique<Free>(*ptr, unconstrained);
 }
 
 

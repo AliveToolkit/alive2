@@ -94,14 +94,14 @@ StateValue GlobalVariable::toSMT(State &s) const {
     if (!allocated) {
       // Use the same block id that is used by src
       assert(!s.isSource());
-      ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, glbvar_bid);
+      ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, glbvar_bid).first;
       s.markGlobalAsAllocated(getName());
     } else {
       ptrval = Pointer(s.getMemory(), glbvar_bid, false).release();
     }
   } else {
     ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, nullopt,
-                                 &glbvar_bid);
+                                 &glbvar_bid).first;
     s.addGlobalVarBid(getName(), glbvar_bid);
   }
   return { move(ptrval), true };

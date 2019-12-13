@@ -4,6 +4,7 @@
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
@@ -357,10 +358,26 @@ public:
     if (!ty)
       return error(i);
 
+    // If the alloca has any lifetime.start use, the alloca is initially dead.
+    bool has_lifetime_start = false;
+    auto lifetime_chk = [](llvm::User *U) -> bool {
+      auto I = llvm::dyn_cast<llvm::IntrinsicInst>(U);
+      return I && I->getIntrinsicID() == llvm::Intrinsic::lifetime_start;
+    };
+    for (auto I = i.user_begin(), E = i.user_end();
+         I != E && !has_lifetime_start; ++I) {
+      has_lifetime_start |= lifetime_chk(*I);
+      if (auto BI = llvm::dyn_cast<llvm::BitCastInst>(*I)) {
+        has_lifetime_start |= find_if(BI->user_begin(), BI->user_end(),
+                                      lifetime_chk) != BI->user_end();
+      }
+    }
+
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
     RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
-                        pref_alignment(i, i.getAllocatedType())));
+                        pref_alignment(i, i.getAllocatedType()),
+                        has_lifetime_start));
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
@@ -568,6 +585,22 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
                                                op));
+    }
+    case llvm::Intrinsic::lifetime_start:
+    {
+      PARSE_BINOP();
+      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
+          i.getOperand(1), DL())))
+        return error(i);
+      RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
+    }
+    case llvm::Intrinsic::lifetime_end:
+    {
+      PARSE_BINOP();
+      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
+          i.getOperand(1), DL())))
+        return error(i);
+      RETURN_IDENTIFIER(make_unique<Free>(*b, true));
     }
 
     // do nothing intrinsics
