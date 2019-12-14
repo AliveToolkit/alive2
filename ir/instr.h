@@ -27,6 +27,19 @@ public:
 };
 
 
+struct FastMathFlags final {
+  enum Flags {
+    None = 0, NNaN = 1 << 0, NInf = 1 << 1, NSZ = 1 << 2, ARCP = 1 << 3,
+    Contract = 1 << 4, Reassoc = 1 << 5, AFN = 1 << 6,
+    FastMath = NNaN | NInf | NSZ | ARCP | Contract | Reassoc | AFN
+  };
+  unsigned flags = None;
+
+  bool isNone() const { return flags == None; }
+  friend std::ostream& operator<<(std::ostream &os, const FastMathFlags &fm);
+};
+
+
 class BinOp final : public Instr {
 public:
   enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
@@ -35,19 +48,17 @@ public:
             SMul_Overflow, UMul_Overflow,
             FAdd, FSub, FMul, FDiv, FRem,
             And, Or, Xor, Cttz, Ctlz  };
-  enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2,
-               NNaN = 1 << 3, NInf = 1 << 4, NSZ = 1 << 5, ARCP = 1 << 6,
-               Contract = 1 << 7, Reassoc = 1 << 8,
-               FastMath = NNaN | NInf | NSZ | ARCP | Contract | Reassoc };
+  enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2 };
 
 private:
   Value *lhs, *rhs;
   Op op;
   unsigned flags;
+  FastMathFlags fmath;
 
 public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-        unsigned flags = 0);
+        unsigned flags = 0, FastMathFlags fmath = {});
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -65,10 +76,12 @@ public:
 private:
   Value *val;
   Op op;
+  FastMathFlags fmath;
 
 public:
-  UnaryOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(&val), op(op) {}
+  UnaryOp(Type &type, std::string &&name, Value &val, Op op,
+          FastMathFlags fmath = {})
+    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -201,17 +214,16 @@ class FCmp final : public Instr {
 public:
   enum Cond { OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
               UEQ, UGT, UGE, ULT, ULE, UNE, UNO };
-  enum Flags { None = 0, NNaN = 1, NInf = 2, Reassoc = 4 };
 
 private:
   Value *a, *b;
   Cond cond;
-  unsigned flags = 0;
+  FastMathFlags fmath;
 
 public:
   FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
-       unsigned flags)
-    : Instr(type, move(name)), a(&a), b(&b), cond(cond), flags(flags) {}
+       FastMathFlags fmath)
+    : Instr(type, move(name)), a(&a), b(&b), cond(cond), fmath(fmath) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

@@ -45,28 +45,53 @@ expr Instr::getTypeConstraints() const {
 }
 
 
+ostream& operator<<(ostream &os, const FastMathFlags &fm) {
+  if (fm.flags == FastMathFlags::FastMath)
+    return os << "fast ";
+
+  if (fm.flags & FastMathFlags::NNaN)
+    os << "nnan ";
+  if (fm.flags & FastMathFlags::NInf)
+    os << "ninf ";
+  if (fm.flags & FastMathFlags::NSZ)
+    os << "nsz ";
+  if (fm.flags & FastMathFlags::ARCP)
+    os << "arcp ";
+  if (fm.flags & FastMathFlags::Contract)
+    os << "contract ";
+  if (fm.flags & FastMathFlags::Reassoc)
+    os << "reassoc ";
+  if (fm.flags & FastMathFlags::AFN)
+    os << "afn ";
+  return os;
+}
+
+
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
-             unsigned flags)
-  : Instr(type, move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags) {
+             unsigned flags, FastMathFlags fmath)
+  : Instr(type, move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags),
+    fmath(fmath) {
   switch (op) {
   case Add:
   case Sub:
   case Mul:
   case Shl:
     assert((flags & (NSW | NUW)) == flags);
+    assert(fmath.isNone());
     break;
   case SDiv:
   case UDiv:
   case AShr:
   case LShr:
     assert((flags & Exact) == flags);
+    assert(fmath.isNone());
     break;
   case FAdd:
   case FSub:
   case FMul:
   case FDiv:
   case FRem:
-    assert((flags & FastMath) == flags);
+    assert(flags == None);
     break;
   case SRem:
   case URem:
@@ -85,7 +110,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case USub_Overflow:
   case SMul_Overflow:
   case UMul_Overflow:
-    assert(flags == 0);
+    assert(flags == None);
+    assert(fmath.isNone());
     break;
   }
 }
@@ -142,23 +168,8 @@ void BinOp::print(ostream &os) const {
     os << "nuw ";
   if (flags & Exact)
     os << "exact ";
-  if ((flags & FastMath) == FastMath) {
-    os << "fast ";
-  } else {
-    if (flags & NNaN)
-      os << "nnan ";
-    if (flags & NInf)
-      os << "ninf ";
-    if (flags & NSZ)
-      os << "nsz ";
-    if (flags & ARCP)
-      os << "arcp ";
-    if (flags & Contract)
-      os << "contract ";
-    if (flags & Reassoc)
-      os << "reassoc ";
-  }
-  os << print_type(getType()) << lhs->getName() << ", " << rhs->getName();
+  os << fmath
+     << print_type(getType()) << lhs->getName() << ", " << rhs->getName();
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -184,8 +195,9 @@ static expr any_fp_zero(State &s, expr v) {
 }
 
 static StateValue fm_poison(State &s, expr a, expr b,
-                            function<expr(expr&,expr&)> fn, unsigned flags) {
-  if (flags & BinOp::NSZ) {
+                            function<expr(expr&,expr&)> fn,
+                            FastMathFlags fmath, bool only_input) {
+  if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
   }
@@ -193,17 +205,25 @@ static StateValue fm_poison(State &s, expr a, expr b,
   expr val = fn(a, b);
   expr non_poison(true);
 
-  if (flags & BinOp::NNaN)
-    non_poison &= !a.isNaN() && !b.isNaN() && !val.isNaN();
-  if (flags & BinOp::NInf)
-    non_poison &= !a.isInf() && !b.isInf() && !val.isInf();
-  if (flags & BinOp::ARCP)
+  if (fmath.flags & FastMathFlags::NNaN) {
+    non_poison &= !a.isNaN() && !b.isNaN();
+    if (!only_input)
+      non_poison &= !val.isNaN();
+  }
+  if (fmath.flags & FastMathFlags::NInf) {
+    non_poison &= !a.isInf() && !b.isInf();
+    if (!only_input)
+      non_poison &= !val.isInf();
+  }
+  if (fmath.flags & FastMathFlags::ARCP)
     non_poison &= expr(); // TODO
-  if (flags & BinOp::Contract)
+  if (fmath.flags & FastMathFlags::Contract)
     non_poison &= expr(); // TODO
-  if (flags & BinOp::Reassoc)
+  if (fmath.flags & FastMathFlags::Reassoc)
     non_poison &= expr(); // TODO
-  if (flags & BinOp::NSZ)
+  if (fmath.flags & FastMathFlags::AFN)
+    non_poison &= expr(); // TODO
+  if (fmath.flags & FastMathFlags::NSZ)
     val = any_fp_zero(s, move(val));
 
   return { move(val), move(non_poison) };
@@ -413,35 +433,36 @@ StateValue BinOp::toSMT(State &s) const {
   case FAdd:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fadd(b); },
-                       flags);
+                       fmath, false);
     };
     break;
 
   case FSub:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fsub(b); },
-                       flags);
+                       fmath, false);
     };
     break;
 
   case FMul:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fmul(b); },
-                       flags);
+                       fmath, false);
     };
     break;
 
   case FDiv:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fdiv(b); },
-                       flags);
+                       fmath, false);
     };
     break;
 
   case FRem:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return expr(); }, flags);
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return expr(); }, fmath,
+                       false);
     };
     break;
   }
@@ -560,7 +581,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> BinOp::dup(const string &suffix) const {
-  return make_unique<BinOp>(getType(), getName()+suffix, *lhs, *rhs, op, flags);
+  return make_unique<BinOp>(getType(), getName()+suffix, *lhs, *rhs, op, flags,
+                            fmath);
 }
 
 
@@ -582,7 +604,8 @@ void UnaryOp::print(ostream &os) const {
   case FNeg:        str = "fneg "; break;
   }
 
-  os << getName() << " = " << str << print_type(getType()) << val->getName();
+  os << getName() << " = " << str << fmath << print_type(getType())
+     << val->getName();
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
@@ -604,6 +627,9 @@ StateValue UnaryOp::toSMT(State &s) const {
     fn = [](auto v) { return v.ctpop(); };
     break;
   case FNeg:
+    // TODO
+    if (!fmath.isNone())
+      return {};
     fn = [](auto v) { return v.fneg(); };
     break;
   }
@@ -649,7 +675,7 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
-  return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op);
+  return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op, fmath);
 }
 
 
@@ -1294,15 +1320,8 @@ void FCmp::print(ostream &os) const {
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
   }
-  os << getName() << " = fcmp ";
-  if (flags & NNaN)
-    os << "nnan ";
-  if (flags & NInf)
-    os << "ninf ";
-  if (flags & Reassoc)
-    os << "reassoc ";
-  os << condtxt << print_type(getType()) << a->getName() << ", "
-     << b->getName();
+  os << getName() << " = fcmp " << fmath << condtxt << print_type(getType())
+     << a->getName() << ", " << b->getName();
 }
 
 StateValue FCmp::toSMT(State &s) const {
@@ -1310,33 +1329,27 @@ StateValue FCmp::toSMT(State &s) const {
   auto &b_eval = s[*b];
 
   auto fn = [&](const auto &a, const auto &b) -> StateValue {
-    const expr &av = a.value, &bv = b.value;
-    expr val;
-    switch (cond) {
-    case OEQ: val = av.foeq(bv); break;
-    case OGT: val = av.fogt(bv); break;
-    case OGE: val = av.foge(bv); break;
-    case OLT: val = av.folt(bv); break;
-    case OLE: val = av.fole(bv); break;
-    case ONE: val = av.fone(bv); break;
-    case ORD: val = av.ford(bv); break;
-    case UEQ: val = av.fueq(bv); break;
-    case UGT: val = av.fugt(bv); break;
-    case UGE: val = av.fuge(bv); break;
-    case ULT: val = av.fult(bv); break;
-    case ULE: val = av.fule(bv); break;
-    case UNE: val = av.fune(bv); break;
-    case UNO: val = av.funo(bv); break;
-    }
-    expr np = a.non_poison && b.non_poison;
-    if (flags & NNaN)
-      np &= !av.isNaN() && !bv.isNaN();
-    if (flags & NInf)
-      np &= !av.isInf() && !bv.isInf();
-    if (flags & Reassoc)
-      np &= expr(); // TODO
-
-    return { val.toBVBool(), move(np) };
+    auto cmp = [&](const expr &a, const expr &b) {
+      switch (cond) {
+      case OEQ: return a.foeq(b);
+      case OGT: return a.fogt(b);
+      case OGE: return a.foge(b);
+      case OLT: return a.folt(b);
+      case OLE: return a.fole(b);
+      case ONE: return a.fone(b);
+      case ORD: return a.ford(b);
+      case UEQ: return a.fueq(b);
+      case UGT: return a.fugt(b);
+      case UGE: return a.fuge(b);
+      case ULT: return a.fult(b);
+      case ULE: return a.fule(b);
+      case UNE: return a.fune(b);
+      case UNO: return a.funo(b);
+      }
+      UNREACHABLE();
+    };
+    auto [val, np] = fm_poison(s, a.value, b.value, cmp, fmath, true);
+    return { val.toBVBool(), a.non_poison && b.non_poison && np };
   };
 
   if (auto agg = a->getType().getAsAggregateType()) {
@@ -1358,7 +1371,7 @@ expr FCmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FCmp::dup(const string &suffix) const {
-  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, flags);
+  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, fmath);
 }
 
 

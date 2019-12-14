@@ -57,6 +57,29 @@ string_view s(llvm::StringRef str) {
     return ret;                    \
   } while (0)
 
+
+FastMathFlags parse_fmath(llvm::Instruction &i) {
+  FastMathFlags fmath;
+  if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
+    if (op->hasNoNaNs())
+      fmath.flags |= FastMathFlags::NNaN;
+    if (op->hasNoInfs())
+      fmath.flags |= FastMathFlags::NInf;
+    if (op->hasNoSignedZeros())
+      fmath.flags |= FastMathFlags::NSZ;
+    if (op->hasAllowReciprocal())
+      fmath.flags |= FastMathFlags::ARCP;
+    if (op->hasAllowContract())
+      fmath.flags |= FastMathFlags::Contract;
+    if (op->hasAllowReassoc())
+      fmath.flags |= FastMathFlags::Reassoc;
+    if (op->hasApproxFunc())
+      fmath.flags |= FastMathFlags::AFN;
+  }
+  return fmath;
+}
+
+
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   llvm::Function &f;
@@ -94,7 +117,6 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return i;
   }
 
-
   Value* copy_inserter(AggregateValue *ag) {
     auto v = make_unique<UnaryOp>(*const_cast<Type *>(&ag->getType()),
                                   "%__copy_" + to_string(copy_idx++), *ag,
@@ -130,12 +152,8 @@ public:
     default:
       return error(i);
     }
-
-    // TODO: support FP fast-math stuff
-    if (isa<llvm::FPMathOperator>(i) && i.getFastMathFlags().any())
-      return error(i);
-
-    RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+    RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,
+                                           parse_fmath(i)));
   }
 
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
@@ -171,24 +189,8 @@ public:
       flags |= BinOp::NUW;
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
-
-    if (isa<llvm::FPMathOperator>(i)) {
-      auto FM = i.getFastMathFlags();
-      if (FM.noNaNs())
-        flags |= BinOp::NNaN;
-      if (FM.noInfs())
-        flags |= BinOp::NInf;
-      if (FM.noSignedZeros())
-        flags |= BinOp::NSZ;
-      if (FM.allowReciprocal())
-        flags |= BinOp::ARCP;
-      if (FM.allowContract())
-        flags |= BinOp::Contract;
-      if (FM.allowReassoc())
-        flags |= BinOp::Reassoc;
-    }
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
-                                         flags));
+                                         flags, parse_fmath(i)));
   }
 
   RetTy visitCastInst(llvm::CastInst &i) {
@@ -320,17 +322,8 @@ public:
     default:
       UNREACHABLE();
     }
-
-    unsigned flags = 0;
-    if (i.getFastMathFlags().noNaNs())
-      flags |= FCmp::NNaN;
-    if (i.getFastMathFlags().noInfs())
-      flags |= FCmp::NInf;
-    if (i.getFastMathFlags().allowReassoc())
-      flags |= FCmp::Reassoc;
-
     RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b,
-                                        flags));
+                                        parse_fmath(i)));
   }
 
   RetTy visitSelectInst(llvm::SelectInst &i) {
@@ -392,16 +385,15 @@ public:
         auto opty = I.getOperand()->getType();
         auto ofs_ty = llvm::IntegerType::get(i.getContext(), 64);
 
-        if (auto opvty = llvm::dyn_cast<llvm::VectorType>(opty)) {
+        if (auto opvty = dyn_cast<llvm::VectorType>(opty)) {
           assert(!opvty->isScalable());
           vector<llvm::Constant *> offsets;
 
           for (unsigned i = 0; i < opvty->getElementCount().Min; ++i) {
             llvm::Constant *constofs = nullptr;
-            if (auto cdv = llvm::dyn_cast<llvm::ConstantDataVector>(
-                I.getOperand())) {
+            if (auto cdv = dyn_cast<llvm::ConstantDataVector>(I.getOperand())) {
               constofs = cdv->getElementAsConstant(i);
-            } else if (auto cv = llvm::dyn_cast<llvm::ConstantAggregateZero>(
+            } else if (auto cv = dyn_cast<llvm::ConstantAggregateZero>(
                 I.getOperand())) {
               constofs = cv->getSequentialElement();
             } else {

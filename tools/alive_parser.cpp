@@ -594,18 +594,31 @@ static unsigned parse_exact() {
   return BinOp::None;
 }
 
-static unsigned parse_fast_math() {
-  unsigned flags = BinOp::None;
+static FastMathFlags parse_fast_math(token op_token) {
+  FastMathFlags fmath;
   while (true) {
     if (tokenizer.consumeIf(NNAN)) {
-      flags |= BinOp::NNaN;
+      fmath.flags |= FastMathFlags::NNaN;
     } else if (tokenizer.consumeIf(NINF)) {
-      flags |= BinOp::NInf;
+      fmath.flags |= FastMathFlags::NInf;
     } else {
       break;
     }
   }
-  return flags;
+
+  switch (op_token) {
+  case FADD:
+  case FSUB:
+  case FMUL:
+  case FDIV:
+  case FREM:
+  case FCMP:
+    break;
+  default:
+    if (!fmath.isNone())
+      error("Unexpected fast-math tokens");
+  }
+  return fmath;
 }
 
 
@@ -626,7 +639,6 @@ static unsigned parse_binop_flags(token op_token) {
   case FMUL:
   case FDIV:
   case FREM:
-    return parse_fast_math();
   case SREM:
   case UREM:
   case UADD_SAT:
@@ -652,6 +664,7 @@ static unsigned parse_binop_flags(token op_token) {
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto flags = parse_binop_flags(op_token);
+  auto fmath = parse_fast_math(op_token);
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
@@ -712,7 +725,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags);
+  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags, fmath);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -871,7 +884,8 @@ static unique_ptr<Instr> parse_fcmp(string_view name) {
                                 get_constant(cond_t == TRUE, bool_ty),
                                 UnaryOp::Copy);
   default:
-    return make_unique<FCmp>(bool_ty, string(name), cond, a, b, 0);
+    return make_unique<FCmp>(bool_ty, string(name), cond, a, b,
+                             parse_fast_math(FCMP));
   }
   UNREACHABLE();
 }
