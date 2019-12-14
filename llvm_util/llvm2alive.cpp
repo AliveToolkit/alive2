@@ -8,7 +8,9 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
+#include "util/errors.h"
 #include <utility>
+#include <set>
 #include <vector>
 
 using namespace llvm_util;
@@ -86,6 +88,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   const llvm::TargetLibraryInfo &TLI;
   vector<llvm::Instruction *> i_constexprs;
   vector<string_view> gvnamesInSrc;
+  set<llvm::BasicBlock *> BBvisited;
 
   using RetTy = unique_ptr<Instr>;
 
@@ -446,7 +449,10 @@ public:
 
     auto phi = make_unique<Phi>(*ty, value_name(i));
     for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
-      auto op = get_operand(i.getIncomingValue(idx));
+      auto incoming = BBvisited.count(i.getIncomingBlock(idx)) ?
+                      i.getIncomingValue(idx) :
+                      llvm::UndefValue::get(i.getType());
+      auto op = get_operand(incoming);
       if (!op)
         return error(i);
       phi->addValue(*op, value_name(*i.getIncomingBlock(idx)));
@@ -734,6 +740,7 @@ public:
         } else
           return {};
       }
+      BBvisited.insert(&bb);
     }
 
     auto getGlobalVariable = [this](const string &name) -> llvm::GlobalVariable * {
