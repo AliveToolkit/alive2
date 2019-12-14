@@ -170,32 +170,49 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
     s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
 }
 
-static expr fm_poison(const expr &a, const expr &b, const expr &val,
-                      unsigned flags) {
-  expr ret = false;
+static expr any_fp_zero(State &s, expr v) {
+  expr is_zero = v.isFPZero();
+  if (is_zero.isFalse())
+    return v;
+
+  expr var = expr::mkFreshVar("anyzero", true);
+  s.addQuantVar(var);
+  return expr::mkIf(is_zero,
+                    expr::mkIf(var, expr::mkNumber("0", v),
+                               expr::mkNumber("-0", v)),
+                    v);
+}
+
+static StateValue fm_poison(State &s, expr a, expr b,
+                            function<expr(expr&,expr&)> fn, unsigned flags) {
+  if (flags & BinOp::NSZ) {
+    a = any_fp_zero(s, move(a));
+    b = any_fp_zero(s, move(b));
+  }
+
+  expr val = fn(a, b);
+  expr non_poison(true);
+
   if (flags & BinOp::NNaN)
-    ret |= a.isNaN() || b.isNaN() || val.isNaN();
+    non_poison &= !a.isNaN() && !b.isNaN() && !val.isNaN();
   if (flags & BinOp::NInf)
-    ret |= a.isInf() || b.isInf() || val.isInf();
+    non_poison &= !a.isInf() && !b.isInf() && !val.isInf();
   if (flags & BinOp::ARCP)
-    ret |= expr(); // TODO
+    non_poison &= expr(); // TODO
   if (flags & BinOp::Contract)
-    ret |= expr(); // TODO
+    non_poison &= expr(); // TODO
   if (flags & BinOp::Reassoc)
-    ret |= expr(); // TODO
-  return ret;
+    non_poison &= expr(); // TODO
+  if (flags & BinOp::NSZ)
+    val = any_fp_zero(s, move(val));
+
+  return { move(val), move(non_poison) };
 }
 
 StateValue BinOp::toSMT(State &s) const {
   bool vertical_zip = false;
   function<StateValue(const expr&, const expr&, const expr&, const expr&)>
     fn, scalar_op;
-
-  auto fm_arg = [&](const expr &val) {
-    if (flags & NSZ)
-      return expr::mkIf(val.isFPNegZero(), expr::mkNumber("0", val), val);
-    return val;
-  };
 
   switch (op) {
   case Add:
@@ -395,42 +412,36 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = fm_arg(a).fadd(fm_arg(b));
-      auto non_poison = !fm_poison(a, b, val, flags);
-      return { move(val), move(non_poison) };
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fadd(b); },
+                       flags);
     };
     break;
 
   case FSub:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = fm_arg(a).fsub(fm_arg(b));
-      auto non_poison = !fm_poison(a, b, val, flags);
-      return { move(val), move(non_poison) };
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fsub(b); },
+                       flags);
     };
     break;
 
   case FMul:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = fm_arg(a).fmul(fm_arg(b));
-      auto non_poison = !fm_poison(a, b, val, flags);
-      return { move(val), move(non_poison) };
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fmul(b); },
+                       flags);
     };
     break;
 
   case FDiv:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto val = fm_arg(a).fdiv(fm_arg(b));
-      auto non_poison = !fm_poison(a, b, val, flags);
-      return { move(val), move(non_poison) };
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fdiv(b); },
+                       flags);
     };
     break;
 
   case FRem:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      auto val = expr();
-      auto non_poison = !fm_poison(a, b, val, flags);
-      return { move(val), move(non_poison) };
+      return fm_poison(s, a, b, [](expr &a, expr &b) { return expr(); }, flags);
     };
     break;
   }
