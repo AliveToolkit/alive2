@@ -483,9 +483,8 @@ static void calculateAndInitConstants(Transform &t) {
   // Include null block
   num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
 
-  // floor(log2(maxblks)) + 1 for local bit
-  unsigned maxblks = max(num_locals, num_nonlocals);
-  bits_for_bid = (maxblks == 1 ? 1 : ilog2(2 * maxblks - 1)) + 1;
+  // ceil(log2(maxblks)) + 1 for local bit
+  bits_for_bid = ilog2(max(num_locals, num_nonlocals)) + 1 + 1;
 
   // TODO
   bits_for_offset = 64;
