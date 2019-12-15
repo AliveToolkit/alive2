@@ -3,6 +3,7 @@
 
 #include "smt/exprs.h"
 #include "util/compiler.h"
+#include <vector>
 
 using namespace std;
 
@@ -42,6 +43,24 @@ expr OrExpr::operator()() const {
 
 ostream &operator<<(ostream &os, const OrExpr &e) {
   return os << e();
+}
+
+
+template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite) {
+  assert(unpack_ite);
+  vector<pair<expr, expr>> worklist = { {e, true} };
+  expr cond, then, els;
+
+  do {
+    auto [v, c] = worklist.back();
+    worklist.pop_back();
+    if (v.isIf(cond, then, els)) {
+      worklist.emplace_back(move(then), c && cond);
+      worklist.emplace_back(move(els), c && !cond);
+    } else {
+      add(move(v), move(c));
+    }
+  } while (!worklist.empty());
 }
 
 

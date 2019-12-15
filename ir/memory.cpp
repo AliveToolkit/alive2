@@ -324,26 +324,51 @@ expr Pointer::is_aligned(unsigned align, bool exact) const {
   return exact ? blk_align == bits : blk_align.uge(bits);
 }
 
-// When bytes is 0, pointer is always derefenceable
-void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
-                                 bool iswrite) {
-  expr block_sz = block_size();
-  expr offset = get_offset();
-  expr bytes = bytes0.zextOrTrunc(bits_size_t);
+static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
+                                           unsigned align, bool iswrite) {
+  expr block_sz = p.block_size();
+  expr offset = p.get_offset();
 
   // check that offset is within bounds and that arith doesn't overflow
   expr cond = (offset + bytes).ule(block_sz);
   cond &= offset.add_no_uoverflow(bytes);
 
-  cond &= is_block_alive();
+  cond &= p.is_block_alive();
 
   if (iswrite)
-    cond &= is_writable();
+    cond &= p.is_writable();
 
-  m.state->addUB(bytes.uge(1).implies(cond));
+  return { move(cond), p.is_aligned(align) };
+}
+
+// When bytes is 0, pointer is always derefenceable
+void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
+                                 bool iswrite) {
+  expr bytes = bytes0.zextOrTrunc(bits_size_t);
+  DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
+
+  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true)) {
+    Pointer ptr(m, ptr_expr);
+    auto [ub, aligned] = ::is_dereferenceable(ptr, bytes, align, iswrite);
+
+    // record pointer if not definitely unfeasible
+    if (!ub.isFalse() && !aligned.isFalse())
+      all_ptrs.add(ptr_expr, domain);
+
+    UB.add(move(ub), domain);
+    is_aligned.add(move(aligned), domain);
+  }
+
+  m.state->addUB(bytes == 0 || *UB());
 
   // address must be always aligned regardless of access size
-  m.state->addUB(is_aligned(align));
+  m.state->addUB(*is_aligned());
+
+  // trim set of valid ptrs
+  if (auto ptrs = all_ptrs())
+    p = *ptrs;
+  else
+    p = mkNullPointer(m).p;
 }
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
@@ -730,8 +755,6 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                              : p.is_writable());
     non_local_block_liveness
       = non_local_block_liveness.store(short_bid, allocated);
-    // TODO: benchmark; the following line is redundant
-    state->addAxiom(mk_liveness_array().load(short_bid) == allocated);
     state->addAxiom(p.block_size() == size_zext);
     state->addAxiom(p.is_aligned(align, true));
     state->addAxiom(p.get_alloc_type() == alloc_ty);

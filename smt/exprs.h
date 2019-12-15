@@ -43,6 +43,7 @@ public:
   DisjointExpr(const T &default_val) : default_val(default_val) {}
   DisjointExpr(const std::optional<T> &default_val) : default_val(default_val){}
   DisjointExpr(T &&default_val) : default_val(std::move(default_val)) {}
+  DisjointExpr(const expr &e, bool unpack_ite);
 
   template <typename V, typename D>
   void add(V &&val, D &&domain) {
@@ -71,6 +72,9 @@ public:
       return *default_val;
     return {};
   }
+
+  auto begin() const { return vals.begin(); }
+  auto end() const   { return vals.end(); }
 };
 
 
