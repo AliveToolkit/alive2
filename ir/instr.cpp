@@ -223,7 +223,7 @@ static StateValue fm_poison(State &s, expr a, expr b,
     non_poison &= expr(); // TODO
   if (fmath.flags & FastMathFlags::AFN)
     non_poison &= expr(); // TODO
-  if (fmath.flags & FastMathFlags::NSZ)
+  if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
 
   return { move(val), move(non_poison) };
