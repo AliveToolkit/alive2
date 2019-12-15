@@ -104,6 +104,7 @@ public:
 
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
+  smt::expr isNonZero() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };

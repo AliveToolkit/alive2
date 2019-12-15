@@ -108,9 +108,13 @@ public:
 
 
 class Input final : public Value {
-  std::string smt_name;
 public:
-  Input(Type &type, std::string &&name);
+  enum Attributes { None = 0, NonNull = 1<<0 };
+private:
+  std::string smt_name;
+  unsigned attributes;
+public:
+  Input(Type &type, std::string &&name, unsigned attributes = 0);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

@@ -108,41 +108,6 @@ StateValue GlobalVariable::toSMT(State &s) const {
 }
 
 
-Input::Input(Type &type, string &&name)
-  : Value(type, string(name)), smt_name(move(name)) {}
-
-void Input::copySMTName(const Input &other) {
-  smt_name = other.smt_name;
-}
-
-void Input::print(ostream &os) const {
-  UNREACHABLE();
-}
-
-StateValue Input::toSMT(State &s) const {
-  // 00: normal, 01: undef, else: poison
-  expr type = getTyVar();
-
-  auto val = getType().mkInput(s, smt_name.c_str());
-
-  if (!config::disable_undef_input) {
-    auto [undef, vars] = getType().mkUndefInput(s);
-    for (auto &v : vars) {
-      s.addUndefVar(move(v));
-    }
-    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
-  }
-
-  expr poison = getType().getDummyValue(false).non_poison;
-  expr non_poison = getType().getDummyValue(true).non_poison;
-
-  return { move(val),
-           config::disable_poison_input
-             ? move(non_poison)
-             : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
-}
-
-
 static string agg_str(vector<Value*> &vals) {
   string r = "{ ";
   bool first = true;
@@ -154,7 +119,6 @@ static string agg_str(vector<Value*> &vals) {
   }
   return r + " }";
 }
-
 
 AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
   : Value(type, agg_str(vals)), vals(move(vals)) {}
@@ -185,6 +149,51 @@ void AggregateValue::print(std::ostream &os) const {
   UNREACHABLE();
 }
 
+
+static string attr_str(unsigned attributes) {
+  string ret;
+  if (attributes & Input::NonNull)
+    ret += "nonnull ";
+  return ret;
+}
+
+Input::Input(Type &type, string &&name, unsigned attributes)
+  : Value(type, attr_str(attributes) + name), smt_name(move(name)),
+    attributes(attributes) {}
+
+void Input::copySMTName(const Input &other) {
+  smt_name = other.smt_name;
+}
+
+void Input::print(ostream &os) const {
+  UNREACHABLE();
+}
+
+StateValue Input::toSMT(State &s) const {
+  // 00: normal, 01: undef, else: poison
+  expr type = getTyVar();
+
+  auto val = getType().mkInput(s, smt_name.c_str());
+
+  if (!config::disable_undef_input) {
+    auto [undef, vars] = getType().mkUndefInput(s);
+    for (auto &v : vars) {
+      s.addUndefVar(move(v));
+    }
+    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
+  }
+
+  if (attributes & NonNull)
+    s.addPre(Pointer(s.getMemory(), val).isNonZero());
+
+  expr poison = getType().getDummyValue(false).non_poison;
+  expr non_poison = getType().getDummyValue(true).non_poison;
+
+  return { move(val),
+           config::disable_poison_input
+             ? move(non_poison)
+             : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
+}
 
 expr Input::getTyVar() const {
   string tyname = "ty_" + smt_name;

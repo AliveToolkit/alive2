@@ -490,6 +490,12 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
+expr Pointer::isNonZero() const {
+  if (observes_addresses())
+    return get_address() != 0;
+  return get_bid() != 0 || get_offset() != 0;
+}
+
 ostream& operator<<(ostream &os, const Pointer &p) {
   if (p.isNull().isTrue())
     return os << "null";

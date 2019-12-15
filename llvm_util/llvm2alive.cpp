@@ -674,10 +674,10 @@ public:
     return true;
   }
 
-  bool handleAttributes(BasicBlock &initBB, llvm::Argument &arg) {
-    auto attrs = arg.getParent()->getAttributes()
-                 .getParamAttributes(arg.getArgNo());
-    for (auto &attr : attrs) {
+  optional<unsigned> handleAttributes(llvm::Argument &arg) {
+    unsigned attrs = 0;
+    for (auto &attr : arg.getParent()->getAttributes()
+                         .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
       case llvm::Attribute::ByVal:
       case llvm::Attribute::InReg:
@@ -687,26 +687,16 @@ public:
         // they don't change
         continue;
 
-      case llvm::Attribute::NonNull: {
-        auto op = get_operand(&arg);
-        auto null = get_operand(llvm::ConstantPointerNull::get(
-                                  cast<llvm::PointerType>(arg.getType())));
-        if (!op || !null)
-          return false;
-        auto ne = make_unique<ICmp>(get_int_type(1),
-                                    "%nonnull#" + value_name(arg), ICmp::NE,
-                                    *op, *null);
-        auto ne_ptr = ne.get();
-        initBB.addInstr(move(ne));
-        initBB.addInstr(make_unique<Assume>(*ne_ptr, true));
+      case llvm::Attribute::NonNull:
+        attrs |= Input::NonNull;
         continue;
-      }
+
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
-        return false;
+        return {};
       }
     }
-    return true;
+    return attrs;
   }
 
   optional<Function> run() {
@@ -720,18 +710,14 @@ public:
     Function Fn(*type, f.getName(), DL().isLittleEndian());
     reset_state(Fn);
 
-    auto &InitBB = Fn.getBB("#init", true);
-
     for (auto &arg : f.args()) {
       auto ty = llvm_type2alive(arg.getType());
-      if (!ty)
+      auto attrs = handleAttributes(arg);
+      if (!ty || !attrs)
         return {};
-      auto val = make_unique<Input>(*ty, value_name(arg));
+      auto val = make_unique<Input>(*ty, value_name(arg), *attrs);
       add_identifier(arg, *val.get());
       Fn.addInput(move(val));
-
-      if (!handleAttributes(InitBB, arg))
-        return {};
     }
 
     // create all BBs upfront to keep LLVM's order
@@ -779,7 +765,9 @@ public:
     };
 
     // If there is a global variable with initializer, put them at init block.
-    BB = &InitBB;
+    auto &entry_name = Fn.getFirstBB().getName();
+    BB = &Fn.getBB("#init", true);
+
     for (auto &gvname : gvnamesInSrc) {
       auto gv = getGlobalVariable(string(gvname));
       if (!gv) {
@@ -812,12 +800,12 @@ public:
 
     for (auto &itm : stores)
       // Insert stores in lexicographical order of global var's names
-      InitBB.addInstr(move(itm.second));
+      BB->addInstr(move(itm.second));
 
-    if (InitBB.empty())
-      Fn.removeBB(InitBB);
+    if (BB->empty())
+      Fn.removeBB(*BB);
     else
-      InitBB.addInstr(make_unique<Branch>(Fn.getBB(Fn.getBBs()[1]->getName())));
+      BB->addInstr(make_unique<Branch>(string(entry_name)));
 
     return move(Fn);
   }
