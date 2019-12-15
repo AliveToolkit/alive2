@@ -805,7 +805,7 @@ public:
     if (BB->empty())
       Fn.removeBB(*BB);
     else
-      BB->addInstr(make_unique<Branch>(string(entry_name)));
+      BB->addInstr(make_unique<Branch>(Fn.getBB(entry_name)));
 
     return move(Fn);
   }
