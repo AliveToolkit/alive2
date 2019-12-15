@@ -674,7 +674,7 @@ public:
     return true;
   }
 
-  bool handleAttributes(llvm::Argument &arg) {
+  bool handleAttributes(BasicBlock &initBB, llvm::Argument &arg) {
     auto attrs = arg.getParent()->getAttributes()
                  .getParamAttributes(arg.getArgNo());
     for (auto &attr : attrs) {
@@ -683,9 +683,24 @@ public:
       case llvm::Attribute::InReg:
       case llvm::Attribute::SExt:
       case llvm::Attribute::ZExt:
-        // not important for IR verification
+        // TODO: not important for IR verification, but we should check that
+        // they don't change
         continue;
 
+      case llvm::Attribute::NonNull: {
+        auto op = get_operand(&arg);
+        auto null = get_operand(llvm::ConstantPointerNull::get(
+                                  cast<llvm::PointerType>(arg.getType())));
+        if (!op || !null)
+          return false;
+        auto ne = make_unique<ICmp>(get_int_type(1),
+                                    "%nonnull#" + value_name(arg), ICmp::NE,
+                                    *op, *null);
+        auto ne_ptr = ne.get();
+        initBB.addInstr(move(ne));
+        initBB.addInstr(make_unique<Assume>(*ne_ptr, true));
+        continue;
+      }
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return false;
@@ -705,6 +720,8 @@ public:
     Function Fn(*type, f.getName(), DL().isLittleEndian());
     reset_state(Fn);
 
+    auto &InitBB = Fn.getBB("#init", true);
+
     for (auto &arg : f.args()) {
       auto ty = llvm_type2alive(arg.getType());
       if (!ty)
@@ -713,7 +730,7 @@ public:
       add_identifier(arg, *val.get());
       Fn.addInput(move(val));
 
-      if (!handleAttributes(arg))
+      if (!handleAttributes(InitBB, arg))
         return {};
     }
 
@@ -738,7 +755,8 @@ public:
       }
     }
 
-    auto getGlobalVariable = [this](const string &name) -> llvm::GlobalVariable * {
+    auto getGlobalVariable =
+      [this](const string &name) -> llvm::GlobalVariable* {
       auto M = f.getParent();
       // If name is a numeric value, the result should be manually found
       const char *chrs = name.data();
@@ -761,8 +779,6 @@ public:
     };
 
     // If there is a global variable with initializer, put them at init block.
-    auto &entryName = Fn.getFirstBB().getName();
-    auto &InitBB = Fn.getBB("__globalvars_init", true);
     BB = &InitBB;
     for (auto &gvname : gvnamesInSrc) {
       auto gv = getGlobalVariable(string(gvname));
@@ -801,7 +817,7 @@ public:
     if (InitBB.empty())
       Fn.removeBB(InitBB);
     else
-      InitBB.addInstr(make_unique<Branch>(Fn.getBB(entryName)));
+      InitBB.addInstr(make_unique<Branch>(Fn.getBB(Fn.getBBs()[1]->getName())));
 
     return move(Fn);
   }
