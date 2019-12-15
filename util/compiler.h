@@ -43,6 +43,7 @@ struct const_strip_unique_ptr {
 };
 
 unsigned ilog2(uint64_t n);
+unsigned ilog2_ceil(uint64_t n);
 bool is_power2(uint64_t n, uint64_t *log = nullptr);
 unsigned num_sign_bits(uint64_t n);
 unsigned num_leading_zeros(uint64_t n);

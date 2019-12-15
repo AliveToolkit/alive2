@@ -482,7 +482,7 @@ static void calculateAndInitConstants(Transform &t) {
   num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
 
   // ceil(log2(maxblks)) + 1 for local bit
-  bits_for_bid = ilog2(max(num_locals, num_nonlocals)) + 1 + 1;
+  bits_for_bid = max(2u, ilog2_ceil(max(num_locals, num_nonlocals)) + 1);
 
   // TODO
   bits_for_offset = 64;
