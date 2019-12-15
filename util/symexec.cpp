@@ -26,7 +26,7 @@ void sym_exec(State &s) {
   s.getMemory().mkAxioms();
 
   bool first = true;
-  if (f.getFirstBB().getName() != "__globalvars_init") {
+  if (f.getFirstBB().getName() != "#init") {
     s.finishInitializer();
     first = false;
   }
