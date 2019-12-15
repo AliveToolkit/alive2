@@ -624,12 +624,12 @@ AggregateType::AggregateType(string &&name, bool symbolic)
     return;
 
   // create symbolic type with a finite number of children
-  unsigned num = 4;
-  sym.resize(num);
-  children.resize(num);
+  elements = 4;
+  sym.resize(elements);
+  children.resize(elements);
 
   // FIXME: limitation below is for vectors; what about structs and arrays?
-  for (unsigned i = 0; i < num; ++i) {
+  for (unsigned i = 0; i < elements; ++i) {
     sym[i] = make_unique<SymbolicType>("v#" + to_string(i) + '_' + name,
                                         (1 << SymbolicType::Int) |
                                         (1 << SymbolicType::Float) |
@@ -642,6 +642,7 @@ AggregateType::AggregateType(string &&name, vector<Type*> &&vchildren,
                              vector<bool> &&vis_padding)
 : Type(move(name)), children(move(vchildren)), is_padding(move(vis_padding)) {
   assert(children.size() == is_padding.size());
+  elements = children.size();
 }
 
 expr AggregateType::numElements() const {
@@ -1033,6 +1034,22 @@ SymbolicType::SymbolicType(string &&name, unsigned type_mask)
   }                               \
   UNREACHABLE()
 
+#define DISPATCH_EXPR(call)                                               \
+  expr ret;                                                               \
+  if (i)                                                                  \
+    ret = i->call;                                                        \
+  if (f)                                                                  \
+    ret = ret.isValid() ? expr::mkIf(isFloat(), f->call, ret) : f->call;  \
+  if (p)                                                                  \
+    ret = ret.isValid() ? expr::mkIf(isPtr(), p->call, ret) : p->call;    \
+  if (a)                                                                  \
+    ret = ret.isValid() ? expr::mkIf(isArray(), a->call, ret) : a->call;  \
+  if (v)                                                                  \
+    ret = ret.isValid() ? expr::mkIf(isVector(), v->call, ret) : v->call; \
+  if (s)                                                                  \
+    ret = ret.isValid() ? expr::mkIf(isStruct(), s->call, ret) : s->call; \
+  return ret
+
 unsigned SymbolicType::bits() const {
   DISPATCH(bits(), UNREACHABLE());
 }
@@ -1050,6 +1067,14 @@ expr SymbolicType::getTypeConstraints() const {
   if (v) c |= isVector() && v->getTypeConstraints();
   if (s) c |= isStruct() && s->getTypeConstraints();
   return c;
+}
+
+expr SymbolicType::sizeVar() const {
+  DISPATCH_EXPR(sizeVar());
+}
+
+expr SymbolicType::scalarSize() const {
+  DISPATCH_EXPR(scalarSize());
 }
 
 expr SymbolicType::operator==(const Type &b) const {

@@ -770,6 +770,8 @@ void ConversionOp::print(ostream &os) const {
   case UIntToFP: str = "uitofp "; break;
   case FPToSInt: str = "fptosi "; break;
   case FPToUInt: str = "fptoui "; break;
+  case FPExt:    str = "fpext "; break;
+  case FPTrunc:  str = "fptrunc "; break;
   case Ptr2Int:  str = "ptrtoint "; break;
   case Int2Ptr:  str = "int2ptr "; break;
   }
@@ -826,6 +828,12 @@ StateValue ConversionOp::toSMT(State &s) const {
                val.foge(expr::mkFloat(0, val)) &&
                val.fole(expr::IntUMax(to_type.bits()).uint2fp(val)) &&
                !val.isInf() };
+    };
+    break;
+  case FPExt:
+  case FPTrunc:
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return { val.float2Float(to_type.getDummyValue(false).value), true };
     };
     break;
   case Ptr2Int:
@@ -903,6 +911,16 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
   case FPToUInt:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforceFloatOrVectorType();
+    break;
+  case FPExt:
+    c = getType().enforceFloatOrVectorType() &&
+        val->getType().enforceFloatOrVectorType() &&
+        val->getType().scalarSize().ult(getType().scalarSize());
+    break;
+  case FPTrunc:
+    c = getType().enforceFloatOrVectorType() &&
+        val->getType().enforceFloatOrVectorType() &&
+        val->getType().scalarSize().ugt(getType().scalarSize());
     break;
   case Ptr2Int:
     c = getType().enforceIntOrVectorType() &&

@@ -784,6 +784,8 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   case UITOFP:   op = ConversionOp::UIntToFP; break;
   case FPTOSI:   op = ConversionOp::FPToSInt; break;
   case FPTOUI:   op = ConversionOp::FPToUInt; break;
+  case FPEXT:    op = ConversionOp::FPExt; break;
+  case FPTRUNC:  op = ConversionOp::FPTrunc; break;
   case PTRTOINT: op = ConversionOp::Ptr2Int; break;
   default:
     UNREACHABLE();
@@ -1025,6 +1027,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case UITOFP:
   case FPTOSI:
   case FPTOUI:
+  case FPEXT:
+  case FPTRUNC:
   case PTRTOINT:
     return parse_conversionop(name, t);
   case SELECT:

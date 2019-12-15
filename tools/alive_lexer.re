@@ -270,6 +270,8 @@ space+ {
 "fptoui" { return FPTOUI; }
 "sitofp" { return SITOFP; }
 "uitofp" { return UITOFP; }
+"fpext" { return FPEXT; }
+"fptrunc" { return FPTRUNC; }
 "ptrtoint" { return PTRTOINT; }
 "half" { return HALF;}
 "float" { return FLOAT;}

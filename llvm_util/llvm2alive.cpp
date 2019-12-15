@@ -207,6 +207,8 @@ public:
     case llvm::Instruction::FPToUI:   op = ConversionOp::FPToUInt; break;
     case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
     case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
+    case llvm::Instruction::FPExt:    op = ConversionOp::FPExt; break;
+    case llvm::Instruction::FPTrunc:  op = ConversionOp::FPTrunc; break;
     default:
       return error(i);
     }

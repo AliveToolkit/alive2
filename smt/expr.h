@@ -245,6 +245,7 @@ public:
   expr float2BV() const;
   expr float2Real() const;
   expr BV2float(const expr &type) const;
+  expr float2Float(const expr &type) const;
 
   expr fp2sint(unsigned bits) const;
   expr fp2uint(unsigned bits) const;

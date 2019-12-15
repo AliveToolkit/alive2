@@ -352,6 +352,8 @@ public:
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
+  smt::expr sizeVar() const override;
+  smt::expr scalarSize() const override;
   smt::expr operator==(const Type &rhs) const;
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;

@@ -116,7 +116,7 @@ public:
 class ConversionOp final : public Instr {
 public:
   enum Op { SExt, ZExt, Trunc, BitCast, SIntToFP, UIntToFP, FPToSInt, FPToUInt,
-            Ptr2Int, Int2Ptr };
+            FPExt, FPTrunc, Ptr2Int, Int2Ptr };
 
 private:
   Value *val;

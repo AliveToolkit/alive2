@@ -1212,6 +1212,12 @@ expr expr::BV2float(const expr &type) const {
   return simplify_const(Z3_mk_fpa_to_fp_bv(ctx(), ast(), type.sort()), *this);
 }
 
+expr expr::float2Float(const expr &type) const {
+  C(type);
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return Z3_mk_fpa_to_fp_float(ctx(), rm, ast(), type.sort());
+}
+
 expr expr::fp2sint(unsigned bits) const {
   C();
   auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
