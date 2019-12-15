@@ -17,6 +17,7 @@ class AndExpr {
 public:
   void add(expr &&e);
   void add(const AndExpr &other);
+  void del(const AndExpr &other);
   expr operator()() const;
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
 };

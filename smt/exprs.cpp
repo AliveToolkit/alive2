@@ -17,6 +17,11 @@ void AndExpr::add(const AndExpr &other) {
   exprs.insert(other.exprs.begin(), other.exprs.end());
 }
 
+void AndExpr::del(const AndExpr &other) {
+  for (auto &e : other.exprs)
+    exprs.erase(e);
+}
+
 expr AndExpr::operator()() const {
   return expr::mk_and(exprs);
 }

@@ -283,12 +283,13 @@ static void check_refinement(Errors &errs, Transform &t,
   // FIXME: broken handling of transformation precondition
   //src_state.startParsingPre();
   //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  expr pre_src = src_state.getPre()();
-  expr pre_tgt = tgt_state.getPre()();
+  auto pre_src_and = src_state.getPre();
+  auto &pre_tgt_and = tgt_state.getPre();
 
   // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src = tgt
-  if (pre_src.eq(pre_tgt))
-    pre_src = true;
+  pre_src_and.del(pre_tgt_and);
+  expr pre_src = pre_src_and();
+  expr pre_tgt = pre_tgt_and();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr memory_cnstr
