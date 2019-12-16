@@ -6,6 +6,8 @@
 #include "smt/smt.h"
 #include "util/errors.h"
 #include <cassert>
+#include <sstream>
+#include <string_view>
 
 using namespace smt;
 using namespace util;
@@ -180,6 +182,33 @@ void State::addUndefVar(expr &&var) {
 void State::resetUndefVars() {
   quantified_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
+}
+
+static void collectUndefVars(State &s, set<expr> &undef_vars,
+                             vector<pair<expr,expr>> &repls, const expr &val) {
+  for (auto &var : val.vars()) {
+    ostringstream ss;
+    ss << var;
+    auto name = ss.str();
+    if (string_view(name).substr(0, 6) == "undef!" &&
+        undef_vars.emplace(var).second) {
+      auto newvar = expr::mkFreshVar("undef", var);
+      repls.emplace_back(var, newvar);
+      s.addUndefVar(move(newvar));
+    }
+  }
+}
+
+StateValue State::rewriteUndef(StateValue &&val) {
+  set<expr> undef_vars;
+  vector<pair<expr, expr>> repls;
+  collectUndefVars(*this, undef_vars, repls, val.value);
+  collectUndefVars(*this, undef_vars, repls, val.non_poison);
+  if (undef_vars.empty())
+    return val;
+  if (hit_half_memory_limit())
+    throw AliveException("Out of memory; skipping function.", false);
+  return { val.value.subst(repls), val.non_poison.subst(repls) };
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {

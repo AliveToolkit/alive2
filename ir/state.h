@@ -94,6 +94,8 @@ public:
   void addUndefVar(smt::expr &&var);
   void resetUndefVars();
 
+  StateValue rewriteUndef(StateValue &&val);
+
   bool isInitializationPhase() const { return is_initialization_phase; }
   void finishInitializer() { is_initialization_phase = false; }
 

@@ -861,6 +861,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
   if (deref_check)
     ptr.is_dereferenceable(bytecount, align, false);
 
+  StateValue ret;
   if (auto aty = type.getAsAggregateType()) {
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
@@ -870,7 +871,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
       byteofs += getStoreByteSize(aty->getChild(i));
     }
     assert(byteofs == bytecount);
-    return aty->aggregateVals(member_vals);
+    ret = aty->aggregateVals(member_vals);
 
   } else {
     vector<Byte> loadedBytes;
@@ -881,8 +882,9 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
       loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
                                              non_local_block_val));
     }
-    return bytesToValue(loadedBytes, type);
+    ret = bytesToValue(loadedBytes, type);
   }
+  return state->rewriteUndef(move(ret));
 }
 
 Byte Memory::load(const Pointer &p) {
