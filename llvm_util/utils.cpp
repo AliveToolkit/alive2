@@ -42,6 +42,20 @@ ostream *out;
 
 const llvm::DataLayout *DL;
 
+bool hasOpaqueType(llvm::Type *ty) {
+  if (auto aty = llvm::dyn_cast<llvm::StructType>(ty)) {
+    if (aty->isOpaque())
+      return true;
+
+    for (auto elemty : aty->elements())
+      if (hasOpaqueType(elemty))
+        return true;
+  } else if (auto sty = llvm::dyn_cast<llvm::SequentialType>(ty))
+    return hasOpaqueType(sty->getElementType());
+
+  return false;
+}
+
 }
 
 namespace llvm_util {
@@ -255,11 +269,9 @@ Value* get_operand(llvm::Value *v,
     if (gvar)
       return gvar;
 
-    if (auto st = dyn_cast<llvm::StructType>(gv->getValueType())) {
-      if (st->isOpaque())
-        // TODO: Global variable of opaque type is not supported.
-        return nullptr;
-    }
+    if (hasOpaqueType(gv->getValueType()))
+      // TODO: Global variable of opaque type is not supported.
+      return nullptr;
 
     unsigned size = DL->getTypeAllocSize(gv->getValueType());
     unsigned align = gv->getPointerAlignment(*DL).valueOrOne().value();
