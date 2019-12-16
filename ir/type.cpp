@@ -657,9 +657,14 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
     return { expr::mkUInt(0, 1), true };
 
   StateValue v;
+  bool first = true;
   for (unsigned idx = 0; idx < elements; ++idx) {
+    if (children[idx]->bits() == 0)
+      continue;
+
     auto vv = children[idx]->toBV(vals[idx]);
-    v = idx == 0 ? move(vv) : v.concat(vv);
+    v = first ? move(vv) : v.concat(vv);
+    first = false;
   }
   return v;
 }
@@ -689,6 +694,9 @@ unsigned AggregateType::bits() const {
 }
 
 StateValue AggregateType::getDummyValue(bool non_poison) const {
+  if (elements == 0)
+    return { expr::mkUInt(0, 1), expr::mkUInt(non_poison, 1) };
+
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
     vals.emplace_back(children[i]->getDummyValue(non_poison));
