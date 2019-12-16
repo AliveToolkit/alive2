@@ -6,7 +6,8 @@ set -e
 # insert-gcov-profiling, safe-stack, switch-to-lookup, pgo-instr-gen: inserts new global variables
 # place-safepoints: places new function calls (@do_safepoint)
 # loop-extract: extracts a top-level loop into a distinct function
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa insert-gcov-profiling switch-to-lookup safe-stack pgo-instr-gen loop-extract -Os -Oz -O1 -O2 -O3"
+# extract-blocks: extract specified blocks into a distinct function
+PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa insert-gcov-profiling switch-to-lookup safe-stack pgo-instr-gen loop-extract extract-blocks -Os -Oz -O1 -O2 -O3"
 
 TV="-tv"
 for p in $PASSES; do
