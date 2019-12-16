@@ -825,9 +825,12 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   if (auto aty = type.getAsAggregateType()) {
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
+      auto &child = aty->getChild(i);
+      if (child.bits() == 0)
+        continue;
       auto ptr_i = ptr + byteofs;
-      store(ptr_i(), aty->extract(v, i), aty->getChild(i), 1, false);
-      byteofs += getStoreByteSize(aty->getChild(i));
+      store(ptr_i(), aty->extract(v, i), child, 1, false);
+      byteofs += getStoreByteSize(child);
     }
     assert(byteofs == getStoreByteSize(type));
 
