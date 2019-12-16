@@ -299,7 +299,8 @@ static void check_refinement(Errors &errs, Transform &t,
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr, ptr_refinement] = src_mem.refined(tgt_mem);
+  auto [memory_cnstr, ptr_refinement0] = src_mem.refined(tgt_mem);
+  auto &ptr_refinement = ptr_refinement0;
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
