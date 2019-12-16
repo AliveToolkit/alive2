@@ -101,11 +101,12 @@ static void print_varval(ostream &os, State &st, const Model &m,
 }
 
 
+using print_var_val_ty = function<void(ostream&, const Model&)>;
+
 static void error(Errors &errs, State &src_state, State &tgt_state,
-                  const Result &r, bool print_var, const Value *var,
-                  const Type &type,
-                  const StateValue &src, const StateValue &tgt,
-                  const char *msg, bool check_each_var) {
+                  const Result &r, const Value *var,
+                  const char *msg, bool check_each_var,
+                  print_var_val_ty print_var_val) {
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
@@ -175,13 +176,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     }
   }
 
-  if (print_var) {
-    s << "Source value: ";
-    print_varval(s, src_state, m, var, type, src);
-    s << "\nTarget value: ";
-    print_varval(s, tgt_state, m, var, type, tgt);
-  }
-
+  print_var_val(s, m);
   errs.add(s.str(), true);
 }
 
@@ -254,9 +249,15 @@ static void check_refinement(Errors &errs, Transform &t,
   auto qvars = src_state.getQuantVars();
   qvars.insert(ap.second.begin(), ap.second.end());
 
-  auto err = [&](const Result &r, bool print_var, const char *msg) {
-    error(errs, src_state, tgt_state, r, print_var, var, type, a, b, msg,
-          check_each_var);
+  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
+    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
+  };
+
+  auto print_value = [&](ostream &s, const Model &m) {
+    s << "Source value: ";
+    print_varval(s, src_state, m, var, type, a);
+    s << "\nTarget value: ";
+    print_varval(s, tgt_state, m, var, type, b);
   };
 
   AndExpr axioms = src_state.getAxioms();
@@ -291,11 +292,14 @@ static void check_refinement(Errors &errs, Transform &t,
   expr pre_src = pre_src_and();
   expr pre_tgt = pre_tgt_and();
 
-  auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
-  expr memory_cnstr
-    = src_state.returnMemory().refined(tgt_state.returnMemory());
   expr axioms_expr = axioms();
   expr dom = dom_a && dom_b;
+
+  auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
+
+  auto src_mem = src_state.returnMemory();
+  auto tgt_mem = tgt_state.returnMemory();
+  auto [memory_cnstr, ptr_refinement] = src_mem.refined(tgt_mem);
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
@@ -316,23 +320,30 @@ static void check_refinement(Errors &errs, Transform &t,
              preprocess(t, qvars, uvars, pre_tgt && pre_src.implies(refines));
   };
 
+  auto print_ptr_load = [&](ostream &s, const Model &m) {
+    Pointer p(src_mem, m[ptr_refinement()]);
+    s << "\nMismatch in " << p
+      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p)()])
+      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p)()]);
+  };
+
   Solver::check({
     { mk_fml(dom_a.notImplies(dom_b)),
       [&](const Result &r) {
-        err(r, false, "Source is more defined than target");
+        err(r, [](ostream&, const Model&){},
+            "Source is more defined than target");
       }},
     { mk_fml(dom && !poison_cnstr),
       [&](const Result &r) {
-        err(r, true, "Target is more poisonous than source");
+        err(r, print_value, "Target is more poisonous than source");
       }},
     { mk_fml(dom && !value_cnstr),
       [&](const Result &r) {
-        err(r, true, "Value mismatch");
+        err(r, print_value, "Value mismatch");
       }},
     { mk_fml(dom && !memory_cnstr),
-      // FIXME: counterxample is broken (eg should print memory id that differs)
       [&](const Result &r) {
-        err(r, true, "Mismatch in memory");
+        err(r, print_ptr_load, "Mismatch in memory");
       }}
   });
 }

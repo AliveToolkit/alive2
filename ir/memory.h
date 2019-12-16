@@ -12,12 +12,58 @@
 #include <string>
 #include <utility>
 
-namespace smt { class FunctionExpr; }
-
 namespace IR {
 
 class Memory;
+class Pointer;
 class State;
+
+
+// A data structure that represents a byte.
+// A byte is either a pointer byte or a non-pointer byte.
+// Pointer byte's representation:
+//   +-+-------+-----------+------------------+----------------+-------------+
+//   |1|padding|non-poison?| ptr offset       | block id       | byte offset |
+//   | |       |(1 bit)    | (bits_for_offset)| (bits_for_bid) | (3 bits)    |
+//   +-+-------+-----------+------------------+----------------+-------------+
+// Non-pointer byte's representation:
+//   +-+--------------------------+--------------------+---------------------+
+//   |0| padding(zero)            | non-poison bits?   | data                |
+//   | |                          | (bits_byte)        | (bits_byte)         |
+//   +-+--------------------------+--------------------+---------------------+
+class Byte {
+  const Memory &m;
+  smt::expr p;
+
+public:
+  // Creates a byte with its raw representation.
+  Byte(const Memory &m, smt::expr &&byterepr);
+
+  // Creates a pointer byte that represents i'th byte of p.
+  // non_poison should be an one-bit vector or boolean.
+  Byte(const Pointer &ptr, unsigned i, const smt::expr &non_poison);
+
+  // Creates a non-pointer byte that has data and non_poison.
+  // data and non_poison should have bits_byte bits.
+  Byte(const Memory &m, const smt::expr &data, const smt::expr &non_poison);
+
+  smt::expr is_ptr() const;
+  smt::expr ptr_nonpoison() const;
+  smt::expr ptr_value() const;
+  smt::expr ptr_byteoffset() const;
+  smt::expr nonptr_nonpoison() const;
+  smt::expr nonptr_value() const;
+
+  const smt::expr& operator()() const { return p; }
+
+  smt::expr operator==(const Byte &rhs) const {
+    return p == rhs.p;
+  }
+
+  static Byte mkPoisonByte(const Memory &m);
+  friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
+};
+
 
 class Pointer {
   const Memory &m;
@@ -173,6 +219,9 @@ public:
   StateValue load(const smt::expr &ptr, const Type &type, unsigned align,
                   bool deref_check = true);
 
+  // raw load
+  Byte load(const Pointer &p);
+
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align);
   void memcpy(const smt::expr &dst, const smt::expr &src,
@@ -182,7 +231,7 @@ public:
   smt::expr ptr2int(const smt::expr &ptr);
   smt::expr int2ptr(const smt::expr &val);
 
-  smt::expr refined(const Memory &other) const;
+  std::pair<smt::expr,Pointer> refined(const Memory &other) const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
