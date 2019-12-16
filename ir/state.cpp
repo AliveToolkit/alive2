@@ -205,7 +205,7 @@ StateValue State::rewriteUndef(StateValue &&val) {
   collectUndefVars(*this, undef_vars, repls, val.value);
   collectUndefVars(*this, undef_vars, repls, val.non_poison);
   if (undef_vars.empty())
-    return val;
+    return move(val);
   if (hit_half_memory_limit())
     throw AliveException("Out of memory; skipping function.", false);
   return { val.value.subst(repls), val.non_poison.subst(repls) };
