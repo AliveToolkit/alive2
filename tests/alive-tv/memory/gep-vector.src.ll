@@ -17,3 +17,10 @@ define <2 x i1> @test6b(<2 x i32> %X, <2 x %S*> %P) {
   ret <2 x i1> %C
 }
 
+; from Transforms/InstCombine/gep-vector.ll
+@block = global [64 x [8192 x i8]] zeroinitializer, align 1
+
+define <2 x i8*> @vectorindex1() {
+  %1 = getelementptr inbounds [64 x [8192 x i8]], [64 x [8192 x i8]]* @block, i64 0, <2 x i64> <i64 0, i64 1>, i64 8192
+  ret <2 x i8*> %1
+}
