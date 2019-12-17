@@ -679,7 +679,6 @@ public:
     for (auto &attr : arg.getParent()->getAttributes()
                          .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
-      case llvm::Attribute::ByVal:
       case llvm::Attribute::InReg:
       case llvm::Attribute::SExt:
       case llvm::Attribute::ZExt:
