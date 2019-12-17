@@ -1899,10 +1899,15 @@ StateValue GEP::toSMT(State &s) const {
     return { ptr.release(), move(non_poison) };
   };
 
-  if (auto ptr_aty = ptr->getType().getAsAggregateType()) {
+  if (auto aty = getType().getAsAggregateType()) {
     vector<StateValue> vals;
-    auto &ptrval = s[*ptr];
-    for (unsigned i = 0, e = ptr_aty->numElementsConst(); i != e; ++i) {
+    auto ptrval = s[*ptr];
+    if (!ptr->getType().isVectorType()) {
+      vector<StateValue> ptrvals(aty->numElementsConst(), ptrval);
+      ptrval = getType().getAsAggregateType()->aggregateVals(ptrvals);
+    }
+
+    for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
       vector<pair<unsigned, StateValue>> offsets;
       for (auto &[sz, idx] : idxs) {
         if (auto idx_aty = idx->getType().getAsAggregateType())
@@ -1910,7 +1915,7 @@ StateValue GEP::toSMT(State &s) const {
         else
           offsets.emplace_back(sz, s[*idx]);
       }
-      vals.emplace_back(scalar(ptr_aty->extract(ptrval, i), offsets));
+      vals.emplace_back(scalar(aty->extract(ptrval, i), offsets));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
@@ -1922,7 +1927,7 @@ StateValue GEP::toSMT(State &s) const {
 
 expr GEP::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints() &&
-           getType() == ptr->getType() &&
+           getType().enforceVectorTypeIff(ptr->getType()) &&
            getType().enforcePtrOrVectorType();
   for (auto &[sz, idx] : idxs) {
     (void)sz;
