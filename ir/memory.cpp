@@ -70,6 +70,12 @@ expr Byte::nonptr_value() const {
   return p.extract(bits_byte - 1, 0);
 }
 
+expr Byte::is_poison() const {
+  expr np = nonptr_nonpoison();
+  return expr::mkIf(is_ptr(), !ptr_nonpoison(),
+                              np == expr::mkInt(-1, np.bits()));
+}
+
 Byte Byte::mkPoisonByte(const Memory &m) {
   IntType ty("", bits_byte);
   auto v = ty.toBV(ty.getDummyValue(false));
@@ -77,20 +83,16 @@ Byte Byte::mkPoisonByte(const Memory &m) {
 }
 
 ostream& operator<<(ostream &os, const Byte &byte) {
+  if (byte.is_poison().isTrue())
+    return os << "poison";
+
   if (byte.is_ptr().isTrue()) {
-    if (byte.ptr_nonpoison().isTrue()) {
-      os << Pointer(byte.m, byte.ptr_value())
-         << ", byte offset=";
-      byte.ptr_byteoffset().printSigned(os);
-    } else {
-      os << "poison";
-    }
+    os << Pointer(byte.m, byte.ptr_value()) << ", byte offset=";
+    byte.ptr_byteoffset().printSigned(os);
   } else {
     auto np = byte.nonptr_nonpoison();
     auto val = byte.nonptr_value();
-    if (np.isAllOnes()) {
-      os << "poison";
-    } else if (np.isZero()) {
+    if (np.isZero()) {
       val.printHexadecimal(os);
     } else {
       os << "#b";
@@ -446,11 +448,10 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   } else {
     Pointer load_ptr(m, val.ptr_value());
     Pointer load_ptr2(other.m, val2.ptr_value());
-    ptr_cnstr = val.ptr_nonpoison().implies(val2.ptr_nonpoison() &&
-                                            load_ptr.refined(load_ptr2));
+    ptr_cnstr = val2.ptr_nonpoison() && load_ptr.refined(load_ptr2);
   }
-  return is_ptr == is_ptr2 &&
-         expr::mkIf(is_ptr, ptr_cnstr, int_cnstr);
+  return val.is_poison() ||
+         (is_ptr == is_ptr2 && expr::mkIf(is_ptr, ptr_cnstr, int_cnstr));
 }
 
 expr Pointer::block_refined(const Pointer &other) const {

@@ -53,6 +53,7 @@ public:
   smt::expr ptr_byteoffset() const;
   smt::expr nonptr_nonpoison() const;
   smt::expr nonptr_value() const;
+  smt::expr is_poison() const;
 
   const smt::expr& operator()() const { return p; }
 
