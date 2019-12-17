@@ -1871,8 +1871,7 @@ void GEP::print(std::ostream &os) const {
 
 StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
-                    vector<pair<unsigned, StateValue>> &offsets)
-      -> StateValue {
+                    vector<pair<unsigned, StateValue>> &offsets) -> StateValue {
     auto non_poison = ptrval.non_poison;
     Pointer ptr(s.getMemory(), ptrval.value);
 
@@ -1901,11 +1900,8 @@ StateValue GEP::toSMT(State &s) const {
 
   if (auto aty = getType().getAsAggregateType()) {
     vector<StateValue> vals;
-    auto ptrval = s[*ptr];
-    if (!ptr->getType().isVectorType()) {
-      vector<StateValue> ptrvals(aty->numElementsConst(), ptrval);
-      ptrval = getType().getAsAggregateType()->aggregateVals(ptrvals);
-    }
+    auto &ptrval = s[*ptr];
+    bool ptr_isvect = ptr->getType().isVectorType();
 
     for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
       vector<pair<unsigned, StateValue>> offsets;
@@ -1915,7 +1911,8 @@ StateValue GEP::toSMT(State &s) const {
         else
           offsets.emplace_back(sz, s[*idx]);
       }
-      vals.emplace_back(scalar(aty->extract(ptrval, i), offsets));
+      vals.emplace_back(scalar(ptr_isvect ? aty->extract(ptrval, i) : ptrval,
+                               offsets));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
