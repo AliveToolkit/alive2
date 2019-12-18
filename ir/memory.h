@@ -127,7 +127,8 @@ public:
 
   smt::expr inbounds() const;
   smt::expr block_alignment() const;
-  smt::expr is_aligned(unsigned align, bool exact = false) const;
+  smt::expr is_block_aligned(unsigned align, bool exact = false) const;
+  smt::expr is_aligned(unsigned align) const;
   void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
   void is_dereferenceable(const smt::expr &bytes, unsigned align, bool iswrite);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,

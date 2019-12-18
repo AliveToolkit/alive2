@@ -320,7 +320,7 @@ expr Pointer::block_alignment() const {
                    expr::mkUInt(0, 8));
 }
 
-expr Pointer::is_aligned(unsigned align, bool exact) const {
+expr Pointer::is_block_aligned(unsigned align, bool exact) const {
   assert(align != 0);
   if (!exact && align == 1)
     return true;
@@ -328,6 +328,23 @@ expr Pointer::is_aligned(unsigned align, bool exact) const {
   auto bits = ilog2(align);
   expr blk_align = block_alignment();
   return exact ? blk_align == bits : blk_align.uge(bits);
+}
+
+expr Pointer::is_aligned(unsigned align) const {
+  assert(align != 0);
+  if (align == 1)
+    return true;
+
+  auto bits = ilog2(align);
+
+  if (!observes_addresses())
+    // This is stricter than checking get_address(), but as addresses are not
+    // observed, program shouldn't be able to distinguish this from checking
+    // get_address()
+    return is_block_aligned(align, false) &&
+           get_offset().extract(bits - 1, 0) == 0;
+
+  return get_address().extract(bits - 1, 0) == 0;
 }
 
 static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
@@ -767,7 +784,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     non_local_block_liveness
       = non_local_block_liveness.store(short_bid, allocated);
     state->addAxiom(p.block_size() == size_zext);
-    state->addAxiom(p.is_aligned(align, true));
+    state->addAxiom(p.is_block_aligned(align, true));
     state->addAxiom(p.get_alloc_type() == alloc_ty);
 
     if (align_bits && observes_addresses())
