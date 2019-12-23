@@ -28,11 +28,15 @@ extern unsigned bits_byte;
 
 extern bool little_endian;
 
-/// Wether the null pointer is used in either function
+/// Whether the null pointer is used in either function
 extern bool nullptr_is_used;
 
-/// Wether int2ptr or ptr2int are used in either function
+/// Whether int2ptr or ptr2int are used in either function
 extern bool has_int2ptr;
 extern bool has_ptr2int;
+
+/// Whether malloc or free/delete is used in either function
+extern bool has_malloc;
+extern bool has_free;
 
 }

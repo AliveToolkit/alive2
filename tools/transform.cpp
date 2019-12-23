@@ -466,6 +466,9 @@ static void calculateAndInitConstants(Transform &t) {
   nullptr_is_used = false;
   has_int2ptr = false;
   has_ptr2int = false;
+  has_malloc  = false;
+  has_free    = false;
+
   // Mininum access size (in bytes)
   uint64_t min_access_size = 16;
   bool does_mem_access = false;
@@ -476,10 +479,14 @@ static void calculateAndInitConstants(Transform &t) {
         for (auto op : I.operands()) {
           nullptr_is_used |= has_nullptr(op);
         }
+
         if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
           has_int2ptr |= conv->getOp() == ConversionOp::Int2Ptr;
           has_ptr2int |= conv->getOp() == ConversionOp::Ptr2Int;
         }
+
+        has_malloc |= dynamic_cast<const Malloc*>(&I) != nullptr;
+        has_free   |= dynamic_cast<const Free *>(&I) != nullptr;
 
         auto accsz = get_access_size(I);
         if (accsz != NO_ACCESS) {
@@ -515,7 +522,9 @@ static void calculateAndInitConstants(Transform &t) {
                      "little_endian: " << little_endian << "\n"
                      "nullptr_is_used: " << nullptr_is_used << "\n"
                      "has_int2ptr: " << has_int2ptr << "\n"
-                     "has_ptr2int: " << has_ptr2int << "\n";
+                     "has_ptr2int: " << has_ptr2int << "\n"
+                     "has_malloc: " << has_malloc << "\n"
+                     "has_free: " << has_free << "\n";
 }
 
 

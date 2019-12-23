@@ -430,12 +430,31 @@ void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
 }
 
 expr Pointer::is_block_alive() const {
+  // If programs have no free(), we assume all blocks are always live.
+  // For non-local blocks, there's enough non-determinism through block size,
+  // that can be 0 or non-0
+  if (!has_free)
+    return true;
+
   auto bid = get_short_bid();
   return expr::mkIf(is_local(), m.local_block_liveness.load(bid),
                     m.non_local_block_liveness.load(bid));
 }
 
 expr Pointer::get_alloc_type() const {
+  // If programs have no malloc & free, we don't need to store this information
+  // since it is only used to check if free/delete is ok and
+  // for memory refinement of local malloc'ed blocks
+  if (!has_malloc && !has_free)
+    return expr::mkUInt(NON_HEAP, 2);
+
+  // if malloc is used, but no free, we can still ignore info for non-locals
+  if (!has_free) {
+    FunctionExpr non_local;
+    non_local.add(get_short_bid(), expr::mkUInt(NON_HEAP, 2));
+    return get_value("blk_kind", m.local_blk_kind, non_local, expr());
+
+  }
   return get_value("blk_kind", m.local_blk_kind, m.non_local_blk_kind,
                    expr::mkUInt(0, 2));
 }
@@ -819,7 +838,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 }
 
 void Memory::free(const expr &ptr) {
-  assert(!memory_unused());
+  assert(!memory_unused() && has_free);
   Pointer p(*this, ptr);
   state->addUB(p.isNull() || (p.get_offset() == 0 &&
                               p.is_block_alive() &&
