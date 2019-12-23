@@ -1273,6 +1273,11 @@ expr expr::mkArray(const char *name, const expr &domain, const expr &range) {
   return ::mkVar(name, Z3_mk_array_sort(ctx(), domain.sort(), range.sort()));
 }
 
+expr expr::mkConstArray(const expr &domain, const expr &value) {
+  C2(domain, value);
+  return Z3_mk_const_array(ctx(), domain.sort(), value());
+}
+
 expr expr::store(const expr &idx, const expr &val) const {
   C(idx, val);
   return Z3_mk_store(ctx(), ast(), idx(), val());
@@ -1283,12 +1288,15 @@ expr expr::load(const expr &idx) const {
 
   // TODO: add support for alias analysis plugin
   if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
-    expr cmp = idx == Z3_get_app_arg(ctx(), app, 1);
+    expr cmp = expr(idx == Z3_get_app_arg(ctx(), app, 1)).simplify();
 
     if (cmp.isTrue())
       return Z3_get_app_arg(ctx(), app, 2);
     if (cmp.isFalse())
       return expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+
+  } else if (auto app = isAppOf(Z3_OP_CONST_ARRAY)) {
+    return Z3_get_app_arg(ctx(), app, 0);
 
   } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
              Z3_is_lambda(ctx(), ast())) {

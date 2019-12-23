@@ -259,6 +259,8 @@ public:
                    const expr &range);
 
   static expr mkArray(const char *name, const expr &domain, const expr &range);
+  static expr mkConstArray(const expr &domain, const expr &value);
+
   expr store(const expr &idx, const expr &val) const;
   expr load(const expr &idx) const;
 

@@ -205,8 +205,8 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local)
                 expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local)
-  : m(m), p(expr::mkUInt(local, 1).concat(expr::mkUInt(bid, bits_for_bid - 1))
-                                  .concat(expr::mkUInt(0, bits_for_offset))) {
+  : m(m), p(expr::mkUInt(local, 1).concat(expr::mkUInt(bid, bits_for_bid - 1)
+                                  .concat(expr::mkUInt(0, bits_for_offset)))) {
   assert((local && bid < num_locals) || (!local && bid < num_nonlocals));
 }
 
@@ -619,12 +619,12 @@ Memory::Memory(State &state) : state(&state) {
 
     // initialize all local blocks as non-pointer, poison value
     // This is okay because loading a pointer as non-pointer is also poison.
-    local_block_val = expr::mkLambda({ idx }, Byte::mkPoisonByte(*this)());
+    local_block_val = expr::mkConstArray(idx, Byte::mkPoisonByte(*this)());
   }
 
   // all local blocks are dead in the beginning
   local_block_liveness
-    = expr::mkLambda({ expr::mkVar("#bid0", bits_for_bid - 1) }, false);
+    = expr::mkConstArray(expr::mkUInt(0, bits_for_bid - 1), false);
 
   // A memory space is separated into non-local area / local area.
   // Non-local area is the lower half of memory (to include null pointer),
@@ -705,11 +705,10 @@ unsigned Memory::bitsByte() const {
 expr Memory::mkInput(const char *name) const {
   unsigned bits = bits_for_bid - 1 + bits_for_offset;
   expr var = expr::mkVar(name, bits);
-  expr offset = var.extract(bits_for_offset - 1, 0);
   expr bid = var.extract(bits - 1, bits_for_offset);
   expr is_local = expr::mkUInt(0, 1);
   state->addAxiom(bid.ule(num_nonlocals - 1));
-  return Pointer(*this, is_local.concat(bid), offset).release();
+  return Pointer(*this, is_local.concat(var)).release();
 }
 
 pair<expr, expr> Memory::mkUndefInput() const {
