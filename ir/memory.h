@@ -162,8 +162,6 @@ public:
 class Memory {
   State *state;
 
-  bool did_pointer_store = false;
-
   smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
   smt::expr local_block_val;
 
@@ -243,6 +241,8 @@ public:
 
   // for container use only
   bool operator<(const Memory &rhs) const;
+
+  friend std::ostream &operator<<(std::ostream &os, const Memory &m);
 
   friend class Pointer;
 };

@@ -92,11 +92,15 @@ public:
   std::optional<expr> operator()(const expr &key) const;
   const expr* lookup(const expr &key) const;
 
+  FunctionExpr simplify() const;
+
   auto begin() const { return fn.begin(); }
   auto end() const { return fn.end(); }
 
   // for container use only
   bool operator<(const FunctionExpr &rhs) const;
+
+  friend std::ostream& operator<<(std::ostream &os, const FunctionExpr &e);
 };
 
 }

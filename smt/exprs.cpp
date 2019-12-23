@@ -89,8 +89,29 @@ const expr* FunctionExpr::lookup(const expr &key) const {
   return I != fn.end() ? &I->second : nullptr;
 }
 
+FunctionExpr FunctionExpr::simplify() const {
+  FunctionExpr newfn;
+  if (default_val)
+    newfn.default_val = default_val->simplify();
+
+  for (auto &[k, v] : fn) {
+    newfn.add(k.simplify(), v.simplify());
+  }
+  return newfn;
+}
+
 bool FunctionExpr::operator<(const FunctionExpr &rhs) const {
   return tie(fn, default_val) < tie(rhs.fn, rhs.default_val);
+}
+
+ostream& operator<<(ostream &os, const FunctionExpr &f) {
+  os << "{\n";
+  for (auto &[k, v] : f) {
+    os << k << ": " << v << '\n';
+  }
+  if (f.default_val)
+    os << "default: " << *f.default_val << '\n';
+  return os << '}';
 }
 
 }

@@ -11,6 +11,8 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
+static bool did_pointer_store = false;
+
 namespace IR {
 
 Byte::Byte(const Memory &m, expr &&byterepr) : m(m), p(move(byterepr)) {
@@ -471,8 +473,7 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   expr is_ptr = val.is_ptr();
   expr is_ptr2 = val2.is_ptr();
   expr ptr_cnstr;
-  if ((!m.did_pointer_store && !other.m.did_pointer_store) ||
-      is_ptr.isFalse() || is_ptr2.isFalse()) {
+  if (!did_pointer_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
     ptr_cnstr = val == val2;
   } else {
     Pointer load_ptr(m, val.ptr_value());
@@ -690,6 +691,7 @@ void Memory::mkAxioms() const {
 void Memory::resetGlobalData() {
   resetLocalBids();
   last_nonlocal_bid = 1;
+  did_pointer_store = false;
 }
 
 void Memory::resetLocalBids() {
@@ -1030,25 +1032,43 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
-  ret.did_pointer_store |= els.did_pointer_store;
   return ret;
 }
 
 bool Memory::operator<(const Memory &rhs) const {
   // FIXME: remove this once we move to C++20
   return
-    tie(did_pointer_store, non_local_block_val, local_block_val,
+    tie(non_local_block_val, local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind, local_avail_space,
         non_local_blk_writable, non_local_blk_size, non_local_blk_align,
         non_local_blk_kind) <
-    tie(rhs.did_pointer_store, rhs.non_local_block_val, rhs.local_block_val,
+    tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind,
         rhs.local_avail_space, rhs.non_local_blk_writable,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind);
+}
+
+#define P(msg, local, nonlocal)                            \
+  os << msg "\nLocal: " << m.local.simplify()              \
+     << "\nNon-local: " << m.nonlocal.simplify() << "\n\n"
+
+ostream& operator<<(ostream &os, const Memory &m) {
+  if (memory_unused())
+    return os;
+  os << "\n\nMEMORY\n======\n";
+  P("BLOCK VALUE:", local_block_val, non_local_block_val);
+  P("BLOCK LIVENESS:", local_block_liveness, non_local_block_liveness);
+  P("BLOCK SIZE:", local_blk_size, non_local_blk_size);
+  P("BLOCK ALIGN:", local_blk_align, non_local_blk_align);
+  P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
+  return os << "LOCAL BLOCK ADDR: " << m.local_blk_addr
+            << "\nNON-LOCAL BLOCK WRITABLE: " << m.non_local_blk_writable
+            << "\nLOCAL AVAIL SPACE: " << m.local_avail_space
+            << "\nDid pointer store: " << did_pointer_store << '\n';
 }
 
 }
