@@ -4,6 +4,7 @@
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
@@ -568,6 +569,30 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
                                                op));
+    }
+    case llvm::Intrinsic::lifetime_start:
+    {
+      PARSE_BINOP();
+      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
+          i.getOperand(1), DL())))
+        return error(i);
+      // TODO: a dummy instruction
+      static int lifetime_start_dummy = 0;
+      string name = "__unused_ls_" + to_string(lifetime_start_dummy++);
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(b->getType(), move(name), *b,
+                                             UnaryOp::Copy));
+    }
+    case llvm::Intrinsic::lifetime_end:
+    {
+      PARSE_BINOP();
+      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
+          i.getOperand(1), DL())))
+        return error(i);
+      // TODO: a dummy instruction
+      static int lifetime_end_dummy = 0;
+      string name = "__unused_le_" + to_string(lifetime_end_dummy++);
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(b->getType(), move(name), *b,
+                                             UnaryOp::Copy));
     }
 
     // do nothing intrinsics
