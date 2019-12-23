@@ -54,9 +54,7 @@ public:
   smt::expr nonptr_nonpoison() const;
   smt::expr nonptr_value() const;
   smt::expr is_poison(bool fullbit = true) const;
-  // Returns whether its value is integer zero or null pointer.
-  // If poison is true, poison value is allowed
-  smt::expr is_zero(bool allow_poison = true) const;
+  smt::expr is_zero() const; // zero or null
 
   const smt::expr& operator()() const { return p; }
 

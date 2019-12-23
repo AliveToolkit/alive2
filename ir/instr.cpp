@@ -174,11 +174,10 @@ void BinOp::print(ostream &os) const {
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
-  auto bits = b.bits();
   s.addUB(bp);
   s.addUB(b != 0);
   if (sign)
-    s.addUB((ap && a != expr::IntSMin(bits)) || b != expr::mkInt(-1, bits));
+    s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
 }
 
 static expr any_fp_zero(State &s, expr v) {

@@ -79,6 +79,7 @@ public:
 
   static expr mkUInt(uint64_t n, unsigned bits);
   static expr mkInt(int64_t n, unsigned bits);
+  static expr mkInt(int64_t n, const expr &type);
   static expr mkInt(const char *n, unsigned bits);
   static expr mkFloat(double n, const expr &type);
   static expr mkHalf(float n);

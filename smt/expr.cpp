@@ -171,6 +171,11 @@ expr expr::mkInt(int64_t n, unsigned bits) {
   return bits ? mkInt(n, mkBVSort(bits)) : expr();
 }
 
+expr expr::mkInt(int64_t n, const expr &type) {
+  C2(type);
+  return mkInt(n, type.sort());
+}
+
 expr expr::mkInt(const char *n, unsigned bits) {
   return bits ? Z3_mk_numeral(ctx(), n, mkBVSort(bits)) : expr();
 }

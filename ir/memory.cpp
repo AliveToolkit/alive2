@@ -73,17 +73,15 @@ expr Byte::nonptr_value() const {
 expr Byte::is_poison(bool fullbit) const {
   expr np = nonptr_nonpoison();
   return expr::mkIf(is_ptr(), !ptr_nonpoison(),
-                              fullbit ? np == expr::mkInt(-1, np.bits()) :
-                                        !(np == expr::mkUInt(0, np.bits())));
+                              fullbit ? np == expr::mkInt(-1, np)
+                                      : np != 0);
 }
 
-expr Byte::is_zero(bool allow_poison) const {
-  auto nullp = Pointer::mkNullPointer(m);
-  auto np = nonptr_nonpoison(), nv = nonptr_value();
+expr Byte::is_zero() const {
   return expr::mkIf(is_ptr(),
-                    (ptr_nonpoison() || allow_poison) && ptr_value() == nullp(),
-                    (np == expr::mkUInt(0, np.bits()) || allow_poison) &&
-                        nv == expr::mkUInt(0, nv.bits()));
+                    ptr_nonpoison() &&
+                      ptr_value() == Pointer::mkNullPointer(m)(),
+                    nonptr_nonpoison() == 0 && nonptr_value() == 0);
 }
 
 Byte Byte::mkPoisonByte(const Memory &m) {
@@ -147,10 +145,10 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
 static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
                                const Type &toType) {
   assert(!bytes.empty());
-  auto nullp = Pointer::mkNullPointer(m);
 
   if (toType.isPtrType()) {
     assert(bytes.size() == bits_size_t / bits_byte);
+    auto nullp = Pointer::mkNullPointer(m);
     expr loaded_ptr;
     // The result is not poison if all of these hold:
     // (1) There's no poison byte, and they are all pointer bytes
@@ -169,9 +167,9 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       } else {
         non_poison &= ptr_value == loaded_ptr;
       }
-      non_poison &= b.is_ptr() || b.nonptr_value() == 0;
+      non_poison &= expr::mkIf(b.is_ptr(), b.ptr_byteoffset() == i,
+                                           b.nonptr_value() == 0);
       non_poison &= !b.is_poison(false);
-      non_poison &= b.is_ptr().implies(b.ptr_byteoffset() == i);
     }
     return { move(loaded_ptr), move(non_poison) };
 
@@ -182,13 +180,10 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     StateValue val;
     bool first = true;
     IntType ibyteTy("", bits_byte);
-    auto zero = expr::mkUInt(0, bits_byte);
 
     for (auto &b: bytes) {
-      auto ptr_p = b.is_ptr().implies(b.ptr_value() == nullp() &&
-                                      b.ptr_nonpoison());
-      auto p = ibyteTy.combine_poison(move(ptr_p), b.nonptr_nonpoison());
-      StateValue v(expr::mkIf(b.is_ptr(), zero, b.nonptr_value()), move(p));
+      StateValue v(b.nonptr_value(),
+                   ibyteTy.combine_poison(!b.is_ptr(), b.nonptr_nonpoison()));
       val = first ? move(v) : v.concat(val);
       first = false;
     }
@@ -487,7 +482,7 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   return val.is_poison() ||
          expr::mkIf(is_ptr == is_ptr2,
                     expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
-                    val.is_zero() && val2.is_zero(false));
+                    val.is_zero() && val2.is_zero());
 }
 
 expr Pointer::block_refined(const Pointer &other) const {
