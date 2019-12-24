@@ -816,6 +816,17 @@ expr expr::funo(const expr &rhs) const {
   return !ford(rhs());
 }
 
+static expr get_bool(const expr &e) {
+  expr cond, then, els;
+  if (e.isIf(cond, then, els)) {
+    if ((then == 1).isTrue() && (els == 0).isTrue())
+      return cond;
+    if ((then == 0).isTrue() && (els == 1).isTrue())
+      return !cond;
+  }
+  return {};
+}
+
 expr expr::operator&(const expr &rhs) const {
   if (eq(rhs))
     return *this;
@@ -840,17 +851,6 @@ expr expr::operator&(const expr &rhs) const {
     return r;
   };
 
-  auto get_bool = [](const expr &e) {
-    expr cond, then, els;
-    if (e.isIf(cond, then, els)) {
-      if ((then == 1).isTrue() && (els == 0).isTrue())
-        return cond;
-      if ((then == 0).isTrue() && (els == 1).isTrue())
-        return !cond;
-    }
-    return expr();
-  };
-
   if (bits() <= 64) {
     if (auto f = fold_extract(*this, rhs);
         f.isValid())
@@ -873,6 +873,15 @@ expr expr::operator&(const expr &rhs) const {
 expr expr::operator|(const expr &rhs) const {
   if (eq(rhs))
     return *this;
+
+  if (bits() == 1) {
+    if (auto a = get_bool(*this);
+        a.isValid())
+      if (auto b = get_bool(rhs);
+        b.isValid())
+        return (a || b).toBVBool();
+  }
+
   return binopc(Z3_mk_bvor, isZero, isAllOnes);
 }
 
@@ -880,9 +889,9 @@ expr expr::operator^(const expr &rhs) const {
   if (eq(rhs))
     return mkUInt(0, sort());
   if (isAllOnes())
-    return ~rhs;
+    return bits() == 1 ? (rhs == 0).toBVBool() : ~rhs;
   if (rhs.isAllOnes())
-    return ~*this;
+    return bits() == 1 ? (*this == 0).toBVBool() : ~*this;
   return binopc(Z3_mk_bvxor, isZero, alwaysFalse);
 }
 
