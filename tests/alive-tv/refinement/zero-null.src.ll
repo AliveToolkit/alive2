@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-poison-input
-
 define void @f(i64* %p) {
   store i64 0, i64* %p
   ret void

@@ -12,6 +12,7 @@ using namespace std;
 using namespace util;
 
 static bool did_pointer_store = false;
+static unsigned ptr_next_idx = 0;
 
 namespace IR {
 
@@ -201,8 +202,10 @@ static bool observes_addresses() {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name, const expr &local)
-  : m(m), p(local.toBVBool().concat(
-                expr::mkFreshVar(var_name, expr::mkUInt(0, total_bits()-1)))) {}
+  : m(m) {
+  string name = string(var_name) + '!' + to_string(ptr_next_idx++);
+  p = local.toBVBool().concat(expr::mkVar(name.c_str(), total_bits() - 1));
+}
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local)
   : m(m), p(expr::mkUInt(local, 1).concat(expr::mkUInt(bid, bits_for_bid - 1)
@@ -213,7 +216,7 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
   : m(m), p(bid.concat(offset)) {}
 
-unsigned Pointer::total_bits() const {
+unsigned Pointer::total_bits() {
   return bits_for_bid + bits_for_offset;
 }
 
@@ -625,23 +628,12 @@ Memory::Memory(State &state) : state(&state) {
 
   non_local_block_val = mk_val_array();
   non_local_block_liveness = mk_liveness_array();
-  {
-    auto idx = Pointer(*this, "#idx").short_ptr();
 
-    if (state.isSource()) {
-      // All non-local blocks cannot initially contain pointers to local blocks.
-      auto byte = Byte(*this, non_local_block_val.load(idx));
-      Pointer loadedptr(*this, byte.ptr_value());
-      expr cond = (byte.is_ptr() && byte.ptr_nonpoison())
-                    .implies(!loadedptr.is_local() &&
-                             loadedptr.get_bid().ult(num_nonlocals));
-      state.addAxiom(expr::mkForAll({ idx }, move(cond)));
-    }
-
-    // initialize all local blocks as non-pointer, poison value
-    // This is okay because loading a pointer as non-pointer is also poison.
-    local_block_val = expr::mkConstArray(idx, Byte::mkPoisonByte(*this)());
-  }
+  // initialize all local blocks as non-pointer, poison value
+  // This is okay because loading a pointer as non-pointer is also poison.
+  local_block_val
+    = expr::mkConstArray(expr::mkUInt(0, bits_for_bid + bits_for_offset - 1),
+                         Byte::mkPoisonByte(*this)());
 
   // all local blocks are dead in the beginning
   local_block_liveness
@@ -669,6 +661,17 @@ Memory::Memory(State &state) : state(&state) {
 void Memory::mkAxioms() const {
   if (memory_unused() || !state->isSource())
     return;
+
+  {
+    auto idx = Pointer(*this, "#idx").short_ptr();
+    // All non-local blocks cannot initially contain pointers to local blocks.
+    auto byte = Byte(*this, non_local_block_val.load(idx));
+    Pointer loadedptr(*this, byte.ptr_value());
+    expr cond = (byte.is_ptr() && byte.ptr_nonpoison())
+                  .implies(!loadedptr.is_local() &&
+                           loadedptr.get_bid().ult(num_nonlocals));
+    state->addAxiom(expr::mkForAll({ idx }, move(cond)));
+  }
 
   if (observes_addresses()) {
     state->addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
@@ -717,6 +720,7 @@ void Memory::resetGlobalData() {
 
 void Memory::resetLocalBids() {
   last_local_bid = 0;
+  ptr_next_idx = 0;
 }
 
 unsigned Memory::bitsByte() const {

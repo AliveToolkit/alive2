@@ -81,7 +81,7 @@ class Pointer {
   // TODO: missing support for address space
   smt::expr p;
 
-  unsigned total_bits() const;
+  static unsigned total_bits();
 
   smt::expr get_value(const char *name, const smt::FunctionExpr &local_fn,
                       const smt::FunctionExpr &nonlocal_fn,

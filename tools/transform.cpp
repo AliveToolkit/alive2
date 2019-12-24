@@ -406,7 +406,8 @@ static void calculateAndInitConstants(Transform &t) {
         dynamic_cast<const GEP*>(&inst) ||
         dynamic_cast<const Phi*>(&inst) ||
         dynamic_cast<const Return*>(&inst) ||
-        dynamic_cast<const Select*>(&inst))
+        dynamic_cast<const Select*>(&inst) ||
+        dynamic_cast<const UnaryOp*>(&inst))
       return false;
     return true;
   };
