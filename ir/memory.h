@@ -213,6 +213,8 @@ public:
                   unsigned *bid_out = nullptr,
                   const smt::expr &precond = true);
 
+  // Start lifetime of a local block.
+  void start_lifetime(const smt::expr &ptr_local);
   void free(const smt::expr &ptr);
 
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,

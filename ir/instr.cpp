@@ -1808,6 +1808,34 @@ unique_ptr<Instr> Calloc::dup(const string &suffix) const {
 }
 
 
+vector<Value*> StartLifetime::operands() const {
+  return { ptr };
+}
+
+void StartLifetime::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void StartLifetime::print(std::ostream &os) const {
+  os << "start_lifetime " << *ptr;
+}
+
+StateValue StartLifetime::toSMT(State &s) const {
+  auto &[p, np] = s[*ptr];
+  s.addUB(np);
+  s.getMemory().start_lifetime(p);
+  return {};
+}
+
+expr StartLifetime::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
+  return make_unique<StartLifetime>(*ptr);
+}
+
+
 vector<Value*> Free::operands() const {
   return { ptr };
 }
