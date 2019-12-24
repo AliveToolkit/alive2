@@ -746,7 +746,6 @@ static expr encodeDisjointnessOfLocalBlk(const Memory& M, const expr &addr,
                                          const expr &sz,
                                          FunctionExpr &blk_addr) {
   assert(addr.bits() == bits_size_t && sz.bits() == bits_size_t);
-  // addr + size does not overflow
   expr disj = true;
 
   // Disjointness of block's address range with other local blocks
