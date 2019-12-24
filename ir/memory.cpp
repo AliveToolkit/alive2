@@ -837,6 +837,13 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
 }
 
+void Memory::start_lifetime(const expr &ptr_local) {
+  assert(!memory_unused());
+  Pointer p(*this, ptr_local);
+  local_block_liveness = local_block_liveness.store(p.get_short_bid(), true);
+  // TODO: encode disjointness of lock blocks if lifetime starts
+}
+
 void Memory::free(const expr &ptr) {
   assert(!memory_unused() && has_free);
   Pointer p(*this, ptr);

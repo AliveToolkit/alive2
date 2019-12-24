@@ -576,11 +576,7 @@ public:
       if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
           i.getOperand(1), DL())))
         return error(i);
-      // TODO: a dummy instruction
-      static int lifetime_start_dummy = 0;
-      string name = "__unused_ls_" + to_string(lifetime_start_dummy++);
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(b->getType(), move(name), *b,
-                                             UnaryOp::Copy));
+      RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
     }
     case llvm::Intrinsic::lifetime_end:
     {
