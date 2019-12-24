@@ -588,11 +588,7 @@ public:
       if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
           i.getOperand(1), DL())))
         return error(i);
-      // TODO: a dummy instruction
-      static int lifetime_end_dummy = 0;
-      string name = "__unused_le_" + to_string(lifetime_end_dummy++);
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(b->getType(), move(name), *b,
-                                             UnaryOp::Copy));
+      RETURN_IDENTIFIER(make_unique<Free>(*b, false));
     }
 
     // do nothing intrinsics
