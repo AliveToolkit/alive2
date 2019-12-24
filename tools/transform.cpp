@@ -463,17 +463,24 @@ static void calculateAndInitConstants(Transform &t) {
   }
   num_locals = max(num_locals_src, num_locals_tgt);
 
-  nullptr_is_used = false;
-  has_int2ptr = false;
-  has_ptr2int = false;
-  has_malloc  = false;
-  has_free    = false;
+  nullptr_is_used  = false;
+  has_global_const = false;
+  has_int2ptr      = false;
+  has_ptr2int      = false;
+  has_malloc       = false;
+  has_free         = false;
 
   // Mininum access size (in bytes)
   uint64_t min_access_size = 16;
   bool does_mem_access = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
+    for (auto &c : fn->getConstants()) {
+      if (auto gv = dynamic_cast<const GlobalVariable*>(&c)) {
+        has_global_const |= gv->isConst();
+      }
+    }
+
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {

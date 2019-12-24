@@ -533,6 +533,8 @@ expr Pointer::block_refined(const Pointer &other) const {
 }
 
 expr Pointer::is_writable() const {
+  if (!has_global_const)
+    return true;
   return get_value("blk_writable", FunctionExpr(true), m.non_local_blk_writable,
                    true);
 }
@@ -813,6 +815,7 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                                    local_avail_space);
 
   } else {
+    assert(has_global_const || blockKind != CONSTGLOBAL);
     state->addAxiom(blockKind == CONSTGLOBAL ? !p.is_writable()
                                              : p.is_writable());
     non_local_block_liveness

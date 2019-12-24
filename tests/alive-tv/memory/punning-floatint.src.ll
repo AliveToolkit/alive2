@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=9000
-
 define float @float_int_punning(float %f) {
   %ptr = alloca i32
   %if = bitcast float %f to i32

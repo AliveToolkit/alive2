@@ -1,5 +1,4 @@
-; TEST-ARGS: -disable-undef-input -dbg
-; -disable-undef-input was given to address timeout.
+; TEST-ARGS: -dbg
 
 define i32 @calloc_init(i32 %x) {
   %ptr0 = call noalias i8* @calloc(i64 1, i64 4)
