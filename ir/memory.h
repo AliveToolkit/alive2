@@ -215,7 +215,10 @@ public:
 
   // Start lifetime of a local block.
   void start_lifetime(const smt::expr &ptr_local);
-  void free(const smt::expr &ptr);
+
+  // If unconstrained is true, the pointer offset, liveness, and block kind
+  // are not checked.
+  void free(const smt::expr &ptr, bool unconstrained);
 
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align, bool deref_check = true);

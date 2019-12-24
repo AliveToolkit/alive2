@@ -437,8 +437,10 @@ public:
 
 class Free final : public Instr {
   Value *ptr;
+  bool heaponly;
 public:
-  Free(Value &ptr) : Instr(Type::voidTy, "free"), ptr(&ptr) {}
+  Free(Value &ptr, bool heaponly = true) : Instr(Type::voidTy, "free"),
+      ptr(&ptr), heaponly(heaponly) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

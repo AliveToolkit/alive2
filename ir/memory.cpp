@@ -844,12 +844,13 @@ void Memory::start_lifetime(const expr &ptr_local) {
   // TODO: encode disjointness of lock blocks if lifetime starts
 }
 
-void Memory::free(const expr &ptr) {
+void Memory::free(const expr &ptr, bool unconstrained) {
   assert(!memory_unused() && has_free);
   Pointer p(*this, ptr);
-  state->addUB(p.isNull() || (p.get_offset() == 0 &&
-                              p.is_block_alive() &&
-                              p.get_alloc_type() == Pointer::MALLOC));
+  if (!unconstrained)
+    state->addUB(p.isNull() || (p.get_offset() == 0 &&
+                                p.is_block_alive() &&
+                                p.get_alloc_type() == Pointer::MALLOC));
   store(p, false, local_block_liveness, non_local_block_liveness, true);
 
   // optimization: if this is a local block, remove all associated information
