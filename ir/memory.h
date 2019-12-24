@@ -213,6 +213,9 @@ public:
                   unsigned *bid_out = nullptr,
                   const smt::expr &precond = true);
 
+  // Start lifetime of a local block.
+  void start_lifetime(const smt::expr &ptr_local);
+
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
   void free(const smt::expr &ptr, bool unconstrained);

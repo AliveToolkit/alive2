@@ -420,6 +420,21 @@ public:
 };
 
 
+class StartLifetime final : public Instr {
+  Value *ptr;
+public:
+  StartLifetime(Value &ptr) : Instr(Type::voidTy, "start_lifetime"),
+      ptr(&ptr) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class Free final : public Instr {
   Value *ptr;
   bool heaponly;
