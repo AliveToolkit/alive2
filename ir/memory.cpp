@@ -742,6 +742,25 @@ pair<expr, expr> Memory::mkUndefInput() const {
   return { p.release(), move(offset) };
 }
 
+static expr encodeDisjointnessOfLocalBlk(const Memory& M, const expr &addr,
+                                         const expr &sz,
+                                         FunctionExpr &blk_addr) {
+  assert(addr.bits() == bits_size_t && sz.bits() == bits_size_t);
+  expr disj = true;
+
+  // Disjointness of block's address range with other local blocks
+  auto one = expr::mkUInt(1, 1);
+  auto zero = expr::mkUInt(0, bits_for_offset);
+  for (auto &[sbid, addr0] : blk_addr) {
+    (void)addr0;
+    Pointer p2(M, one.concat(sbid), zero);
+    disj &= p2.is_block_alive()
+              .implies(disjoint(addr, sz, p2.get_address(), p2.block_size()));
+  }
+  return disj;
+}
+
+
 expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out,
                    const expr &precond) {
@@ -789,22 +808,14 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       expr blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
                                  : addr_var;
 
-      auto one = expr::mkUInt(1, 1);
-      expr full_addr = one.concat(blk_addr);
+      auto full_addr = expr::mkUInt(1, 1).concat(blk_addr);
 
       // addr + size does not overflow
-      expr disj = full_addr.add_no_uoverflow(size_zext);
-
       // Disjointness of block's address range with other local blocks
-      auto zero = expr::mkUInt(0, bits_for_offset);
-      for (auto &[sbid, addr] : local_blk_addr) {
-        (void)addr;
-        Pointer p2(*this, one.concat(sbid), zero);
-        disj &= p2.is_block_alive()
-                  .implies(disjoint(full_addr, size_zext, p2.get_address(),
-                                    p2.block_size()));
-      }
-      state->addPre(allocated.implies(disj));
+      state->addPre(allocated.implies(full_addr.add_no_uoverflow(size_zext) &&
+                                      encodeDisjointnessOfLocalBlk(*this,
+                                          full_addr, size_zext,
+                                          local_blk_addr)));
 
       local_blk_addr.add(short_bid, move(blk_addr));
     }
