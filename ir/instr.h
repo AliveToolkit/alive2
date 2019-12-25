@@ -372,9 +372,12 @@ public:
 class Alloc final : public Instr {
   Value *size;
   unsigned align;
+  bool initially_dead;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, unsigned align)
-    : Instr(type, std::move(name)), size(&size), align(align) {}
+  Alloc(Type &type, std::string &&name, Value &size, unsigned align,
+        bool initially_dead)
+    : Instr(type, std::move(name)), size(&size), align(align),
+      initially_dead(initially_dead) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

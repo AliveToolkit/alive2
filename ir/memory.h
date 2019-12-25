@@ -200,17 +200,15 @@ public:
   smt::expr mkInput(const char *name) const;
   std::pair<smt::expr, smt::expr> mkUndefInput() const;
 
-  // Allocates a new memory block.
+  // Allocates a new memory block and returns (pointer expr, allocated).
   // If bid is not specified, it creates a fresh block id by increasing
   // last_bid.
   // If bid is specified, the bid is used, and last_bid is not increased.
-  // In this case, it is caller's responsibility to give a unique bid, and
-  // bumpLastBid() should be called in advance to correctly do this.
+  // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
-  smt::expr alloc(const smt::expr &size, unsigned align, BlockKind blockKind,
-                  std::optional<unsigned> bid = std::nullopt,
-                  unsigned *bid_out = nullptr,
-                  const smt::expr &precond = true);
+  std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, unsigned align,
+      BlockKind blockKind, std::optional<unsigned> bid = std::nullopt,
+      unsigned *bid_out = nullptr, const smt::expr &precond = true);
 
   // Start lifetime of a local block.
   void start_lifetime(const smt::expr &ptr_local);

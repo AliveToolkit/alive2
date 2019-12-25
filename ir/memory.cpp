@@ -793,7 +793,7 @@ static expr disjoint_local_blocks(const Memory &m, const expr &addr,
   return disj;
 }
 
-expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
+pair<expr, expr> Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                    optional<unsigned> bidopt, unsigned *bid_out,
                    const expr &precond) {
   assert(!memory_unused());
@@ -886,14 +886,33 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
-  return expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)());
+  return { p(), allocated };
 }
 
 void Memory::start_lifetime(const expr &ptr_local) {
   assert(!memory_unused());
   Pointer p(*this, ptr_local);
+
+  if (observes_addresses()) {
+    auto align = *local_blk_align(p.get_short_bid());
+    auto size_upperbound = p.block_size() + align.zextOrTrunc(bits_size_t) -
+                           expr::mkUInt(1, bits_size_t);
+    auto allocated = !local_block_liveness.load(p.get_short_bid()) &&
+                     size_upperbound.ule(local_avail_space.zext(1));
+
+    // Disjointness of block's address range with other local blocks
+    state->addPre(
+      allocated.implies(disjoint_local_blocks(*this, p.get_address(),
+                                      p.block_size(), local_blk_addr)));
+
+    // size_upperbound should be subtracted here (not size_zext0) because we
+    // need to consider blocks' alignment.
+    auto size_upperbound_trunc = size_upperbound.trunc(bits_size_t - 1);
+    local_avail_space = expr::mkIf(allocated,
+                                   local_avail_space - size_upperbound_trunc,
+                                   local_avail_space);
+  }
   local_block_liveness = local_block_liveness.store(p.get_short_bid(), true);
-  // TODO: encode disjointness of lock blocks if lifetime starts
 }
 
 void Memory::free(const expr &ptr, bool unconstrained) {
