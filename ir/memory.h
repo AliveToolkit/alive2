@@ -211,7 +211,8 @@ public:
       unsigned *bid_out = nullptr, const smt::expr &precond = true);
 
   // Start lifetime of a local block.
-  void start_lifetime(const smt::expr &ptr_local);
+  // Returns whether it is successfully allocated.
+  smt::expr start_lifetime(const smt::expr &ptr_local);
 
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
