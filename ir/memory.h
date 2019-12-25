@@ -49,6 +49,7 @@ public:
 
   smt::expr is_ptr() const;
   smt::expr ptr_nonpoison() const;
+  Pointer ptr() const;
   smt::expr ptr_value() const;
   smt::expr ptr_byteoffset() const;
   smt::expr nonptr_nonpoison() const;
@@ -62,6 +63,10 @@ public:
     return p == rhs.p;
   }
 
+  static unsigned bitsByte();
+
+  static Byte mkPtrByte(const Memory &m, const smt::expr &val);
+  static Byte mkNonPtrByte(const Memory &m, const smt::expr &val);
   static Byte mkPoisonByte(const Memory &m);
   friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
 };
@@ -89,7 +94,7 @@ class Pointer {
 
 public:
   Pointer(const Memory &m, const char *var_name,
-          const smt::expr &local = false);
+          const smt::expr &local = false, bool unique_name = true);
   Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
@@ -180,12 +185,6 @@ class Memory {
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
 
-  smt::expr mk_val_array() const;
-  smt::expr mk_liveness_array() const;
-
-  void store(const Pointer &p, const smt::expr &val, smt::expr &local,
-             smt::expr &non_local, bool index_bid = false);
-
 public:
   enum BlockKind {
     HEAP, STACK, GLOBAL, CONSTGLOBAL
@@ -241,8 +240,6 @@ public:
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
-
-  unsigned bitsByte() const;
 
   // for container use only
   bool operator<(const Memory &rhs) const;
