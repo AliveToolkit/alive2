@@ -204,6 +204,11 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
 
     for (auto &[e, v] : instances) {
       for (unsigned i = 0; i <= 2; ++i) {
+        if (config::disable_undef_input && i == 1)
+          continue;
+        if (config::disable_poison_input && i == 2)
+          continue;
+
         expr newexpr = e.subst(var, nums[i]);
         if (newexpr.eq(e)) {
           instances2[move(newexpr)] = v;
