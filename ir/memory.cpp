@@ -661,7 +661,6 @@ Memory::Memory(State &state) : state(&state) {
       auto bid = ptr_val.ptr().get_bid().extract(bits_for_bid - 2, 0);
       state.addAxiom(expr::mkForAll({ idx }, bid.ule(num_nonlocals - 1)));
     }
-  }
 #else
     non_local_block_val
       = expr::mkArray("blk_val",

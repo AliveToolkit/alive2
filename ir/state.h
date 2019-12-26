@@ -8,8 +8,10 @@
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include <array>
+#include <map>
 #include <ostream>
 #include <set>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -66,6 +68,15 @@ private:
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
 
+  // store data for function calls:
+  // inputs: non-ptr arguments, ptr arguments, memory
+  // outputs: values, UB
+  std::map<std::string,
+           std::map<std::tuple<std::vector<StateValue>, std::vector<StateValue>,
+                               Memory>,
+                    std::pair<std::vector<StateValue>, smt::expr>>>
+    fn_call_data;
+
 public:
   State(const Function &f, bool source);
 
@@ -89,6 +100,11 @@ public:
   void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
+
+  const std::vector<StateValue>
+    addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
+              std::vector<StateValue> &&ptr_inputs,
+              const std::vector<Type*> &out_types);
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
@@ -124,7 +140,9 @@ public:
   bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid,
                        bool &allocated) const;
   void markGlobalAsAllocated(const std::string &glbvar);
-  void copyGlobalVarBidsFromSrc(const State &src);
+  void syncSEdataWithSrc(const State &src);
+
+  void mkAxioms(const State &tgt);
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

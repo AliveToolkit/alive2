@@ -171,6 +171,51 @@ void State::addUB(const expr &ub) {
   domain.second.insert(undef_vars.begin(), undef_vars.end());
 }
 
+const vector<StateValue>
+State::addFnCall(const string &name, vector<StateValue> &&inputs,
+                 vector<StateValue> &&ptr_inputs,
+                 const vector<Type*> &out_types) {
+  expr all_args_np(true);
+  for (auto &v : inputs) {
+    all_args_np &= v.non_poison;
+  }
+  for (auto &v : ptr_inputs) {
+    all_args_np &= v.non_poison;
+  }
+
+  auto [I, inserted]
+    = fn_call_data[name].try_emplace({move(inputs), move(ptr_inputs), memory});
+
+  if (inserted) {
+    vector<StateValue> values;
+    string valname = name + "#val";
+    string npname = name + "#np";
+    for (auto t : out_types) {
+      values.emplace_back(
+        expr::mkFreshVar(valname.c_str(), t->getDummyValue(false).value),
+        expr::mkFreshVar(npname.c_str(), false));
+    }
+
+    string ub_name = string(name) + "#ub";
+    I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false) };
+  }
+
+  addUB(I->second.second);
+  if (all_args_np.isTrue())
+    return I->second.first;
+
+  // if any of the arguments is poison, yield an arbitrary value, such that
+  // f(poison) -> f(42) works
+  vector<StateValue> ret;
+  auto var_name = name + "#pval";
+  for (auto &[v, np] : I->second.first) {
+    auto var = expr::mkFreshVar(var_name.c_str(), v);
+    ret.emplace_back(expr::mkIf(all_args_np, v, var), expr(np));
+    addQuantVar(var);
+  }
+  return ret;
+}
+
 void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
@@ -232,14 +277,51 @@ void State::markGlobalAsAllocated(const string &glbvar) {
   itr->second.second = true;
 }
 
-void State::copyGlobalVarBidsFromSrc(const State &src) {
+void State::syncSEdataWithSrc(const State &src) {
   assert(glbvar_bids.empty());
-  assert(src.isSource());
+  assert(src.isSource() && !isSource());
   glbvar_bids = src.glbvar_bids;
   for (auto &itm : glbvar_bids)
     itm.second.second = false;
 
+  fn_call_data = src.fn_call_data;
+
   Memory::resetLocalBids();
+}
+
+void State::mkAxioms(const State &tgt) {
+  assert(isSource() && !tgt.isSource());
+  memory.mkAxioms();
+
+  // axioms for function calls
+  // TODO: handle refinement of pointers & memory
+  for (auto &[fn, data] : tgt.fn_call_data) {
+    (void)fn;
+    for (auto I = data.begin(), E = data.end(); I != E; ++I) {
+      auto &[ins, ptr_ins, mem] = I->first;
+      auto &[rets, ub] = I->second;
+
+      for (auto I2 = data.begin(); I2 != E; ++I2) {
+        auto &[ins2, ptr_ins2, mem2] = I2->first;
+        auto &[rets2, ub2] = I2->second;
+
+        expr refines(true), is_val_eq(true);
+        for (unsigned i = 0, e = ins.size(); i != e; ++i) {
+          expr eq_val = ins[i].value == ins2[i].value;
+          is_val_eq &= eq_val;
+          refines &= !ins[i].non_poison || (eq_val && ins2[i].non_poison);
+        }
+
+        expr ref_expr(true), eq_expr(true);
+        for (unsigned i = 0, e = rets.size(); i != e; ++i) {
+          eq_expr &= rets[i].value == rets2[i].value;
+          ref_expr &= rets[i].non_poison.implies(rets2[i].non_poison);
+        }
+        addAxiom(is_val_eq.implies(eq_expr));
+        addAxiom(refines.implies(ref_expr && ub.implies(ub2)));
+      }
+    }
+  }
 }
 
 }

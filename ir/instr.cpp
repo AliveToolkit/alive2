@@ -1088,88 +1088,63 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
+static void unpack_inputs(Type &ty, const StateValue &value,
+                          vector<StateValue> &inputs,
+                          vector<StateValue> &ptr_inputs) {
+  if (auto agg = ty.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      unpack_inputs(agg->getChild(i), agg->extract(value, i), inputs,
+                    ptr_inputs);
+    }
+  } else {
+    (ty.isPtrType() ? ptr_inputs : inputs).emplace_back(value);
+  }
+}
+
+static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
+  if (auto agg = ty.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      unpack_ret_ty(out_types, agg->getChild(i));
+    }
+  } else {
+    out_types.emplace_back(&ty);
+  }
+}
+
+static StateValue pack_return(Type &ty, vector<StateValue> &vals,
+                              unsigned &idx) {
+  if (auto agg = ty.getAsAggregateType()) {
+    vector<StateValue> vs;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      vs.emplace_back(pack_return(agg->getChild(i), vals, idx));
+    }
+    return agg->aggregateVals(vs);
+  }
+  return vals[idx++];
+}
+
 StateValue FnCall::toSMT(State &s) const {
   if (!valid) {
     s.addUB({});
     return {};
   }
 
-  // TODO: add support for memory
-  // TODO: add support for global variables
-  vector<expr> all_args, value_args;
-  expr all_args_np(true);
+  vector<StateValue> inputs, ptr_inputs;
+  vector<Type*> out_types;
 
   for (auto arg : args) {
-    auto &[v, np] = s[*arg];
-    all_args.emplace_back(v);
-    all_args.emplace_back(np);
-    value_args.emplace_back(v);
-    all_args_np &= np;
+    unpack_inputs(arg->getType(), s[*arg], inputs, ptr_inputs);
   }
+  unpack_ret_ty(out_types, getType());
 
-  auto add_implies_axiom = [&](const string &fn) {
-    vector<expr> vars_src, vars_tgt;
-    unsigned i = 0;
-    for (auto &arg : all_args) {
-      auto name = "v" + to_string(i++);
-      vars_src.emplace_back(expr::mkVar(name.c_str(), arg));
-      name = "v" + to_string(i++);
-      vars_tgt.emplace_back(expr::mkVar(name.c_str(), arg));
-    }
-
-    // fn src implies fn tgt if each src arg is poison or it's equal to tgt
-    set<expr> vars_set(vars_src.begin(), vars_src.end());
-    vars_set.insert(vars_tgt.begin(), vars_tgt.end());
-
-    expr cond(true);
-    for (unsigned i = 0, e = vars_src.size(); i != e; i += 2) {
-      cond &= !vars_src[i + 1] ||
-              (vars_src[i] == vars_tgt[i] && vars_tgt[i+1]);
-    }
-
-    auto fn_src = expr::mkUF(fn.c_str(), vars_src, false);
-    auto fn_tgt = expr::mkUF(fn.c_str(), vars_tgt, false);
-    s.addAxiom(expr::mkForAll(vars_set, cond.implies(fn_src.implies(fn_tgt))));
-  };
-
-  // impact of the function on the domain of the program
-  // TODO: constraint when certain attributes are on
-  auto ub_name = fnName + "#ub";
-  s.addUB(expr::mkUF(ub_name.c_str(), all_args, false));
-  add_implies_axiom(ub_name);
-
-  if (dynamic_cast<VoidType*>(&getType()))
-    return {};
-
-  // create a new variable that can take any value if function is poison
-  StateValue ret_type = getType().getDummyValue(true);
-  expr val = expr::mkUF(fnName.c_str(), value_args, ret_type.value);
-  if (!all_args_np.isTrue()) {
-    auto var_name = fnName + "_val";
-    auto var = expr::mkFreshVar(var_name.c_str(), ret_type.value);
-    s.addQuantVar(var);
-    val = expr::mkIf(all_args_np, val, var);
-  }
-
-  // FIXME: broken for functions that return aggregate types
-  if (getType().isAggregateType())
-    return {};
-
-  auto poison_name = fnName + "#poison";
-  add_implies_axiom(poison_name);
-
-  return { move(val), expr::mkUF(poison_name.c_str(), all_args, false) };
+  unsigned idx = 0;
+  auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types);
+  return pack_return(getType(), ret, idx);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
   // TODO : also need to name each arg type smt var uniquely
-  auto r = Value::getTypeConstraints();
-  // TODO: add aggregate support
-  for (auto arg : args) {
-    r &= !arg->getType().enforceStructType();
-    r &= !arg->getType().enforceVectorType();
-  }
-  return r;
+  return Value::getTypeConstraints();
 }
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
