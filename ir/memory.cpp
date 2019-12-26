@@ -903,14 +903,6 @@ void Memory::free(const expr &ptr, bool unconstrained) {
                                 p.is_block_alive() &&
                                 p.get_alloc_type() == Pointer::MALLOC));
   ::store(p, false, local_block_liveness, non_local_block_liveness, true);
-
-  // optimization: if this is a local block, remove all associated information
-  if (p.is_local().isTrue() && p.get_short_bid().isConst()) {
-    expr bid = p.get_short_bid();
-    local_blk_addr.del(bid);
-    local_blk_size.del(bid);
-    local_blk_kind.del(bid);
-  }
 }
 
 static unsigned getStoreByteSize(const Type &ty) {
