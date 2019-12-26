@@ -843,7 +843,8 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       auto full_addr = expr::mkUInt(1, 1).concat(blk_addr);
 
       // addr + size does not overflow
-      state->addPre(full_addr.add_no_uoverflow(size_zext));
+      if (!size.uge(align).isFalse())
+        state->addPre(full_addr.add_no_uoverflow(size_zext));
 
       // Disjointness of block's address range with other local blocks
       state->addPre(
