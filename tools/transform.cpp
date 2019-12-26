@@ -215,7 +215,7 @@ static expr preprocess(Transform &t, const set<expr> &qvars,
           continue;
 
         // keep 'var' variables for counterexample printing
-        instances2[move(newexpr)] = v && var == nums[i];
+        instances2.try_emplace(move(newexpr), v && var == nums[i]);
       }
     }
     instances = move(instances2);
