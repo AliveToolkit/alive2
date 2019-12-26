@@ -177,11 +177,19 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  const vector<Type*> &out_types) {
   // TODO: handle changes to memory due to fn call
   expr all_args_np(true);
+  bool all_valid = true;
   for (auto &v : inputs) {
     all_args_np &= v.non_poison;
+    all_valid &= v.isValid();
   }
   for (auto &v : ptr_inputs) {
     all_args_np &= v.non_poison;
+    all_valid &= v.isValid();
+  }
+
+  if (!all_valid) {
+    addUB(expr());
+    return vector<StateValue>(out_types.size());
   }
 
   auto [I, inserted]
