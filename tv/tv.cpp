@@ -89,6 +89,9 @@ optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, pair<Function, unsigned>> fns;
+unsigned initialized = 0;
+bool showed_stats = false;
+bool report_dir_created = false;
 
 
 struct TVPass : public llvm::FunctionPass {
@@ -165,12 +168,10 @@ struct TVPass : public llvm::FunctionPass {
   }
 
   bool doInitialization(llvm::Module &module) override {
-    static bool done = false;
-    if (done)
+    if (initialized++)
       return false;
-    done = true;
 
-    if (!opt_report_dir.empty()) {
+    if (!report_dir_created && !opt_report_dir.empty()) {
       static default_random_engine re;
       static uniform_int_distribution<unsigned> rand;
       static bool seeded = false;
@@ -200,9 +201,11 @@ struct TVPass : public llvm::FunctionPass {
 
       report_filename = path;
       *out << "Source: " << source_file << endl;
-    } else
+      report_dir_created = true;
+    } else if (opt_report_dir.empty())
       out = &cerr;
 
+    showed_stats = false;
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
     smt::set_query_timeout(to_string(opt_smt_to));
@@ -218,13 +221,13 @@ struct TVPass : public llvm::FunctionPass {
   }
 
   bool doFinalization(llvm::Module&) override {
-    static bool showed_stats = false;
     if (opt_smt_stats && !showed_stats) {
       smt::solver_print_stats(*out);
       showed_stats = true;
     }
     llvm_util_init.reset();
     smt_init.reset();
+    initialized--;
     return false;
   }
 
