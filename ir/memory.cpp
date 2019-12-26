@@ -777,10 +777,8 @@ pair<expr, expr> Memory::mkUndefInput() const {
   return { p.release(), move(offset) };
 }
 
-static expr encodeDisjointnessOfLocalBlk(const Memory &m, const expr &addr,
-                                         const expr &sz,
-                                         FunctionExpr &blk_addr) {
-  assert(addr.bits() == bits_size_t && sz.bits() == bits_size_t);
+static expr disjoint_local_blocks(const Memory &m, const expr &addr,
+                                  const expr &sz, FunctionExpr &blk_addr) {
   expr disj = true;
 
   // Disjointness of block's address range with other local blocks
@@ -845,11 +843,12 @@ expr Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       auto full_addr = expr::mkUInt(1, 1).concat(blk_addr);
 
       // addr + size does not overflow
+      state->addPre(full_addr.add_no_uoverflow(size_zext));
+
       // Disjointness of block's address range with other local blocks
-      state->addPre(allocated.implies(full_addr.add_no_uoverflow(size_zext) &&
-                                      encodeDisjointnessOfLocalBlk(*this,
-                                          full_addr, size_zext,
-                                          local_blk_addr)));
+      state->addPre(
+        allocated.implies(disjoint_local_blocks(*this, full_addr, size_zext,
+                                                local_blk_addr)));
 
       local_blk_addr.add(short_bid, move(blk_addr));
     }
