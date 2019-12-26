@@ -175,6 +175,7 @@ const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<StateValue> &&ptr_inputs,
                  const vector<Type*> &out_types) {
+  // TODO: handle changes to memory due to fn call
   expr all_args_np(true);
   for (auto &v : inputs) {
     all_args_np &= v.non_poison;
@@ -289,12 +290,11 @@ void State::syncSEdataWithSrc(const State &src) {
   Memory::resetLocalBids();
 }
 
-void State::mkAxioms(const State &tgt) {
+void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
   memory.mkAxioms();
 
   // axioms for function calls
-  // TODO: handle refinement of pointers & memory
   for (auto &[fn, data] : tgt.fn_call_data) {
     (void)fn;
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
@@ -312,13 +312,27 @@ void State::mkAxioms(const State &tgt) {
           refines &= !ins[i].non_poison || (eq_val && ins2[i].non_poison);
         }
 
+        for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
+          expr eq_val = Pointer(memory, ptr_ins[i].value)
+                          .refined(Pointer(memory, ptr_ins2[i].value));
+          is_val_eq &= eq_val;
+          refines &= ptr_ins[i].non_poison
+                       .implies(eq_val && ptr_ins2[i].non_poison);
+        }
+
+        {
+          expr mem_refined = mem.refined(mem2).first;
+          is_val_eq &= mem_refined;
+          refines &= mem_refined;
+        }
+
         expr ref_expr(true), eq_expr(true);
         for (unsigned i = 0, e = rets.size(); i != e; ++i) {
           eq_expr &= rets[i].value == rets2[i].value;
           ref_expr &= rets[i].non_poison.implies(rets2[i].non_poison);
         }
-        addAxiom(is_val_eq.implies(eq_expr));
-        addAxiom(refines.implies(ref_expr && ub.implies(ub2)));
+        tgt.addPre(is_val_eq.implies(eq_expr));
+        tgt.addPre(refines.implies(ref_expr && ub.implies(ub2)));
       }
     }
   }

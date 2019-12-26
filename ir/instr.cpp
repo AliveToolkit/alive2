@@ -1070,7 +1070,7 @@ void FnCall::rauw(const Value &what, Value &with) {
 }
 
 void FnCall::print(ostream &os) const {
-  if (!dynamic_cast<VoidType*>(&getType()))
+  if (!isVoid())
     os << getName() << " = ";
 
   os << "call " << print_type(getType()) << fnName << '(';
@@ -1135,11 +1135,12 @@ StateValue FnCall::toSMT(State &s) const {
   for (auto arg : args) {
     unpack_inputs(arg->getType(), s[*arg], inputs, ptr_inputs);
   }
-  unpack_ret_ty(out_types, getType());
+  if (!isVoid())
+    unpack_ret_ty(out_types, getType());
 
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types);
-  return pack_return(getType(), ret, idx);
+  return isVoid() ? StateValue() : pack_return(getType(), ret, idx);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {

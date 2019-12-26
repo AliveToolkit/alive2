@@ -142,7 +142,7 @@ public:
   void markGlobalAsAllocated(const std::string &glbvar);
   void syncSEdataWithSrc(const State &src);
 
-  void mkAxioms(const State &tgt);
+  void mkAxioms(State &tgt);
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);
