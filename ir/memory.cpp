@@ -886,7 +886,7 @@ pair<expr, expr> Memory::alloc(const expr &size, unsigned align, BlockKind block
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
-  return { p(), allocated };
+  return { p.release(), move(allocated) };
 }
 
 expr Memory::start_lifetime(const expr &ptr_local) {
