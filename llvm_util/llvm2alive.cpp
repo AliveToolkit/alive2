@@ -9,6 +9,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -349,6 +350,23 @@ public:
     RETURN_IDENTIFIER(move(inst));
   }
 
+  bool hasLifetimeStart(llvm::User &i, std::set<llvm::Value *> &visited) {
+    for (auto I = i.user_begin(), E = i.user_end(); I != E; ++I) {
+      llvm::User *U = *I;
+      if (!visited.insert(U).second)
+        continue;
+      if (auto I = llvm::dyn_cast<llvm::IntrinsicInst>(U)) {
+        if (I->getIntrinsicID() == llvm::Intrinsic::lifetime_start)
+          return true;
+      }
+      if ((llvm::isa<llvm::BitCastInst>(U) ||
+           llvm::isa<llvm::GetElementPtrInst>(U) ||
+           llvm::isa<llvm::PHINode>(U)) && hasLifetimeStart(*U, visited))
+        return true;
+    }
+    return false;
+  }
+
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
     // TODO
     if (i.isArrayAllocation() || !i.isStaticAlloca())
@@ -358,10 +376,12 @@ public:
     if (!ty)
       return error(i);
 
+    std::set<llvm::Value *> visited;
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
     RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
-                        pref_alignment(i, i.getAllocatedType())));
+                        pref_alignment(i, i.getAllocatedType()),
+                        hasLifetimeStart(i, visited)));
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
