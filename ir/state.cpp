@@ -174,8 +174,11 @@ void State::addUB(const expr &ub) {
 const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<StateValue> &&ptr_inputs,
-                 const vector<Type*> &out_types) {
+                 const vector<Type*> &out_types, bool reads_memory,
+                 bool writes_memory) {
   // TODO: handle changes to memory due to fn call
+  // TODO: can read/write=false fn calls be removed?
+
   expr all_args_np(true);
   bool all_valid = true;
   for (auto &v : inputs) {
@@ -192,8 +195,13 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
+  optional<Memory> mem_in;
+  if (reads_memory)
+    mem_in = memory;
+
   auto [I, inserted]
-    = fn_call_data[name].try_emplace({move(inputs), move(ptr_inputs), memory});
+    = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
+                                       move(mem_in)});
 
   if (inserted) {
     vector<StateValue> values;
@@ -328,8 +336,8 @@ void State::mkAxioms(State &tgt) {
                        .implies(eq_val && ptr_ins2[i].non_poison);
         }
 
-        {
-          expr mem_refined = mem.refined(mem2).first;
+        if (mem && mem2) {
+          expr mem_refined = mem->refined(*mem2).first;
           is_val_eq &= mem_refined;
           refines &= mem_refined;
         }

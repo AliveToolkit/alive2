@@ -9,6 +9,7 @@
 #include "smt/exprs.h"
 #include <array>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <string>
@@ -69,11 +70,11 @@ private:
   std::set<smt::expr> return_undef_vars;
 
   // store data for function calls:
-  // inputs: non-ptr arguments, ptr arguments, memory
+  // inputs: non-ptr arguments, ptr arguments, optinal memory
   // outputs: values, UB
   std::map<std::string,
            std::map<std::tuple<std::vector<StateValue>, std::vector<StateValue>,
-                               Memory>,
+                               std::optional<Memory>>,
                     std::pair<std::vector<StateValue>, smt::expr>>>
     fn_call_data;
 
@@ -104,7 +105,8 @@ public:
   const std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<StateValue> &&ptr_inputs,
-              const std::vector<Type*> &out_types);
+              const std::vector<Type*> &out_types, bool reads_memory,
+              bool writes_memory);
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);

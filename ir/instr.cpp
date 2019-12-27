@@ -1084,6 +1084,11 @@ void FnCall::print(ostream &os) const {
   }
   os << ')';
 
+  if (flags & NoRead)
+    os << " noread";
+  if (flags & NoWrite)
+    os << " nowrite";
+
   if (!valid)
     os << "\t; WARNING: unknown known function";
 }
@@ -1139,7 +1144,8 @@ StateValue FnCall::toSMT(State &s) const {
     unpack_ret_ty(out_types, getType());
 
   unsigned idx = 0;
-  auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types);
+  auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types,
+                         !(flags & NoRead), !(flags & NoWrite));
   return isVoid() ? StateValue() : pack_return(getType(), ret, idx);
 }
 
@@ -1150,7 +1156,7 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               valid);
+                               flags, valid);
   r->args = args;
   return r;
 }

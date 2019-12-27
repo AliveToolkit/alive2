@@ -169,13 +169,18 @@ public:
 
 
 class FnCall final : public Instr {
+public:
+  enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1 };
+private:
   std::string fnName;
   std::vector<Value*> args;
+  unsigned flags;
   bool valid;
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         bool valid = true)
-    : Instr(type, std::move(name)), fnName(std::move(fnName)), valid(valid) {}
+         unsigned flags = None, bool valid = true)
+    : Instr(type, std::move(name)), fnName(std::move(fnName)), flags(flags),
+      valid(valid) {}
   void addArg(Value &arg);
 
   std::vector<Value*> operands() const override;

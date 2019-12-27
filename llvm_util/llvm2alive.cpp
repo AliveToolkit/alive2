@@ -238,8 +238,17 @@ public:
     if (!ty)
       return error(i);
 
+    unsigned flags = 0;
+    if (i.hasFnAttr(llvm::Attribute::ReadOnly))
+      flags |= FnCall::NoWrite;
+    if (i.hasFnAttr(llvm::Attribute::ReadNone))
+      flags |= FnCall::NoRead | FnCall::NoWrite;
+    if (i.hasFnAttr(llvm::Attribute::WriteOnly))
+      flags |= FnCall::NoRead;
+
     string fn_name = '@' + fn->getName().str();
-    auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), !known);
+    auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
+                                    !known);
     for (auto &arg : i.args()) {
       auto a = get_operand(arg);
       if (!a)
