@@ -1088,6 +1088,8 @@ void FnCall::print(ostream &os) const {
     os << " noread";
   if (flags & NoWrite)
     os << " nowrite";
+  if (flags & ArgMemOnly)
+    os << " argmemonly";
   if (flags & NNaN)
     os << " NNaN";
 
@@ -1151,7 +1153,8 @@ StateValue FnCall::toSMT(State &s) const {
 
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types,
-                         !(flags & NoRead), !(flags & NoWrite));
+                         !(flags & NoRead), !(flags & NoWrite),
+                         flags & ArgMemOnly);
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 

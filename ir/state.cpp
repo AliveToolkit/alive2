@@ -175,7 +175,7 @@ const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<StateValue> &&ptr_inputs,
                  const vector<Type*> &out_types, bool reads_memory,
-                 bool writes_memory) {
+                 bool writes_memory, bool argmemonly) {
   // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
 
@@ -197,7 +197,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   auto [I, inserted]
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                       memory, reads_memory });
+                                       memory, reads_memory, argmemonly });
 
   if (inserted) {
     vector<StateValue> values;
@@ -310,12 +310,12 @@ void State::mkAxioms(State &tgt) {
   for (auto &[fn, data] : fn_call_data) {
     (void)fn;
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
-      auto &[ins, ptr_ins, mem, reads] = I->first;
+      auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
       auto &[rets, ub] = I->second;
 
       auto &data2 = tgt.fn_call_data.at(fn);
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
-        auto &[ins2, ptr_ins2, mem2, reads2] = I2->first;
+        auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
         auto &[rets2, ub2] = I2->second;
 
         expr refines(true), is_val_eq(true);
@@ -326,6 +326,8 @@ void State::mkAxioms(State &tgt) {
         }
 
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
+          // TODO: needs to take read/read2 as input to control if mem blocks
+          // need to be compared
           expr eq_val = Pointer(mem, ptr_ins[i].value)
                           .fninput_refined(Pointer(mem2, ptr_ins2[i].value));
           is_val_eq &= eq_val;
@@ -333,7 +335,7 @@ void State::mkAxioms(State &tgt) {
                        .implies(eq_val && ptr_ins2[i].non_poison);
         }
 
-        if (reads && reads2) {
+        if (reads && reads2 && !argmem && !argmem2) {
           expr mem_refined = mem.refined(mem2).first;
           is_val_eq &= mem_refined;
           refines &= mem_refined;

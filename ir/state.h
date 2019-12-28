@@ -69,11 +69,11 @@ private:
   std::set<smt::expr> return_undef_vars;
 
   // store data for function calls:
-  // inputs: non-ptr arguments, ptr arguments, memory, reads memory?
+  // inputs: non-ptr arguments, ptr arguments, memory, reads memory?, argmemonly
   // outputs: values, UB
   std::map<std::string,
            std::map<std::tuple<std::vector<StateValue>, std::vector<StateValue>,
-                               Memory, bool>,
+                               Memory, bool, bool>,
                     std::pair<std::vector<StateValue>, smt::expr>>>
     fn_call_data;
 
@@ -105,7 +105,7 @@ public:
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<StateValue> &&ptr_inputs,
               const std::vector<Type*> &out_types, bool reads_memory,
-              bool writes_memory);
+              bool writes_memory, bool argmemonly);
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);

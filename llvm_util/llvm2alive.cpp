@@ -245,6 +245,8 @@ public:
       flags |= FnCall::NoRead | FnCall::NoWrite;
     if (i.hasFnAttr(llvm::Attribute::WriteOnly))
       flags |= FnCall::NoRead;
+    if (i.hasFnAttr(llvm::Attribute::ArgMemOnly))
+      flags |= FnCall::ArgMemOnly;
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         flags |= FnCall::NNaN;
