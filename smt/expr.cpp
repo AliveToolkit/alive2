@@ -767,7 +767,7 @@ expr expr::fneg() const {
 }
 
 expr expr::foeq(const expr &rhs) const {
-  return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_eq);
+  return ford(rhs) && binop_commutative(rhs, Z3_mk_fpa_eq);
 }
 
 expr expr::fogt(const expr &rhs) const {
@@ -787,7 +787,7 @@ expr expr::fole(const expr &rhs) const {
 }
 
 expr expr::fone(const expr &rhs) const {
-  return ford(rhs) && !binop_fold(rhs, Z3_mk_fpa_eq);
+  return ford(rhs) && !binop_commutative(rhs, Z3_mk_fpa_eq);
 }
 
 expr expr::ford(const expr &rhs) const {
@@ -795,7 +795,7 @@ expr expr::ford(const expr &rhs) const {
 }
 
 expr expr::fueq(const expr &rhs) const {
-  return funo(rhs) || binop_fold(rhs, Z3_mk_fpa_eq);
+  return funo(rhs) || binop_commutative(rhs, Z3_mk_fpa_eq);
 }
 
 expr expr::fugt(const expr &rhs) const {
@@ -815,7 +815,7 @@ expr expr::fule(const expr &rhs) const {
 }
 
 expr expr::fune(const expr &rhs) const {
-  return funo(rhs) || !binop_fold(rhs, Z3_mk_fpa_eq);
+  return funo(rhs) || !binop_commutative(rhs, Z3_mk_fpa_eq);
 }
 
 expr expr::funo(const expr &rhs) const {
