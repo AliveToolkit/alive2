@@ -230,6 +230,8 @@ public:
   expr ult(uint64_t rhs) const;
   expr uge(uint64_t rhs) const;
   expr ugt(uint64_t rhs) const;
+  expr sle(int64_t rhs) const;
+  expr sge(int64_t rhs) const;
   expr operator==(uint64_t rhs) const;
   expr operator!=(uint64_t rhs) const;
 

@@ -151,6 +151,7 @@ public:
   smt::expr is_heap_allocated() const;
 
   smt::expr refined(const Pointer &other) const;
+  smt::expr fninput_refined(const Pointer &other) const;
   smt::expr block_val_refined(const Pointer &other) const;
   smt::expr block_refined(const Pointer &other) const;
 

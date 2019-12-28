@@ -1131,6 +1131,16 @@ expr expr::ugt(uint64_t rhs) const {
   return ugt(mkUInt(rhs, sort()));
 }
 
+expr expr::sle(int64_t rhs) const {
+  C();
+  return sle(mkInt(rhs, sort()));
+}
+
+expr expr::sge(int64_t rhs) const {
+  C();
+  return sge(mkInt(rhs, sort()));
+}
+
 expr expr::operator==(uint64_t rhs) const {
   C();
   return *this == mkUInt(rhs, sort());

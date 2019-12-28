@@ -492,17 +492,48 @@ expr Pointer::is_heap_allocated() const {
 
 expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
-  expr local = other.is_heap_allocated();
-  local &= other.is_block_alive();
+  expr local = get_alloc_type() == other.get_alloc_type();
   local &= block_size() == other.block_size();
   local &= get_offset() == other.get_offset();
-  // TODO: this induces an infinite loop; need a quantifier or rec function
-  // TODO: needs variable offset
+
+  // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  local = (is_heap_allocated() && is_block_alive()).implies(local);
+  return is_block_alive().implies(
+           other.is_block_alive() &&
+             expr::mkIf(is_local(), is_heap_allocated().implies(local),
+                        *this == other));
+}
 
-  return expr::mkIf(is_local(), local, *this == other);
+expr Pointer::fninput_refined(const Pointer &other) const {
+  expr size = block_size();
+  expr off = get_offset();
+  expr size2 = other.block_size();
+  expr off2 = other.get_offset();
+
+  // We allow alloca->anything, but not local malloc->alloca/non-local ptr
+  // because we can't go from a free'able pointer to a non-free'able
+  expr local
+    = expr::mkIf(is_heap_allocated(),
+                 other.is_local() && other.is_heap_allocated() && off == off2 &&
+                   size2.uge(size),
+
+                 // must maintain same dereferenceability before & after
+                 expr::mkIf(off.sle(-1),
+                            off == off2 && size2.uge(size),
+                            off2.sge(0) &&
+                              expr::mkIf(off.sle(size),
+                                         off2.sle(size2) && off2.uge(off) &&
+                                           (size2 - off2).uge(size - off),
+                                         off2.sgt(size2) && off == off2 &&
+                                           size2.uge(size))));
+
+  // TODO: this induces an infinite loop
+  // block_refined(other);
+
+  return is_block_alive().implies(
+           other.is_block_alive() &&
+             expr::mkIf(is_local(), local, *this == other));
 }
 
 expr Pointer::block_val_refined(const Pointer &other) const {

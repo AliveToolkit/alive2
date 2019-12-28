@@ -330,7 +330,7 @@ void State::mkAxioms(State &tgt) {
 
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           expr eq_val = Pointer(memory, ptr_ins[i].value)
-                          .refined(Pointer(memory, ptr_ins2[i].value));
+                          .fninput_refined(Pointer(memory, ptr_ins2[i].value));
           is_val_eq &= eq_val;
           refines &= ptr_ins[i].non_poison
                        .implies(eq_val && ptr_ins2[i].non_poison);
