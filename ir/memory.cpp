@@ -510,7 +510,7 @@ expr Pointer::is_block_alive() const {
   // If programs have no free(), we assume all blocks are always live.
   // For non-local blocks, there's enough non-determinism through block size,
   // that can be 0 or non-0
-  if (!has_free)
+  if (!has_free && !has_dead_allocas)
     return true;
 
   auto bid = get_short_bid();
@@ -970,30 +970,25 @@ pair<expr, expr> Memory::alloc(const expr &size, unsigned align, BlockKind block
   return { p.release(), move(allocated) };
 }
 
-expr Memory::start_lifetime(const expr &ptr_local) {
+void Memory::start_lifetime(const expr &ptr_local) {
   assert(!memory_unused());
   Pointer p(*this, ptr_local);
 
   auto align = *local_blk_align(p.get_short_bid());
-  auto size_upperbound = p.block_size() + align.zextOrTrunc(bits_size_t) -
-                         expr::mkUInt(1, bits_size_t);
-  auto allocated = size_upperbound.ule(local_avail_space.zext(1));
+  auto one = expr::mkUInt(1, bits_size_t);
+  auto size_upperbound = p.block_size() +
+                         (one << align.zextOrTrunc(bits_size_t)) - one;
+  state->addUB(size_upperbound.ule(local_avail_space.zext(1)));
 
-  if (observes_addresses()) {
-    // Disjointness of block's address range with other local blocks
-    state->addPre(
-      allocated.implies(disjoint_local_blocks(*this, p.get_address(),
-                                      p.block_size(), local_blk_addr)));
-  }
-  auto size_upperbound_trunc = size_upperbound.trunc(bits_size_t - 1);
-  // Reduces memory usage even if the alloca was alive before lifetime.start
+  if (observes_addresses())
+    state->addPre(disjoint_local_blocks(*this, p.get_address(), p.block_size(),
+                  local_blk_addr));
+
+  // Reduces available space even if the alloca was alive before lifetime.start
   // for performance
-  local_avail_space = expr::mkIf(allocated,
-                                 local_avail_space - size_upperbound_trunc,
-                                 local_avail_space);
-  // alloca is always alive after lifetime.start(), otherwise it should be UB
+  local_avail_space = local_avail_space - size_upperbound.trunc(bits_size_t-1);
+
   local_block_liveness = local_block_liveness.store(p.get_short_bid(), true);
-  return allocated;
 }
 
 void Memory::free(const expr &ptr, bool unconstrained) {

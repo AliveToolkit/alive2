@@ -503,6 +503,9 @@ static void calculateAndInitConstants(Transform &t) {
           has_ptr2int |= conv->getOp() == ConversionOp::Ptr2Int;
         }
 
+        if (auto alloc = dynamic_cast<const Alloc*>(&I))
+          has_dead_allocas |= alloc->initDead();
+
         has_malloc |= dynamic_cast<const Malloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free *>(&I) != nullptr;
 

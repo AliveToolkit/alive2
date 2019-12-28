@@ -1817,9 +1817,8 @@ void StartLifetime::print(std::ostream &os) const {
 
 StateValue StartLifetime::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
-  expr allocated = s.getMemory().start_lifetime(p);
-  // This should be coherent with Alloc's OOM semantics
-  s.addUB(np && allocated);
+  s.addUB(np);
+  s.getMemory().start_lifetime(p);
   return {};
 }
 

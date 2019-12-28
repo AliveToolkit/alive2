@@ -384,6 +384,7 @@ public:
     : Instr(type, std::move(name)), size(&size), align(align),
       initially_dead(initially_dead) {}
 
+  bool initDead() const { return initially_dead; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

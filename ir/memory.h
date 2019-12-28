@@ -132,7 +132,7 @@ public:
   StateValue ugt(const Pointer &rhs) const;
 
   smt::expr inbounds() const;
-  smt::expr block_alignment() const;
+  smt::expr block_alignment() const; // log(bits)
   smt::expr is_block_aligned(unsigned align, bool exact = false) const;
   smt::expr is_aligned(unsigned align) const;
   void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
@@ -212,8 +212,7 @@ public:
       unsigned *bid_out = nullptr, const smt::expr &precond = true);
 
   // Start lifetime of a local block.
-  // Returns whether it is successfully allocated.
-  smt::expr start_lifetime(const smt::expr &ptr_local);
+  void start_lifetime(const smt::expr &ptr_local);
 
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.

@@ -195,13 +195,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
-  optional<Memory> mem_in;
-  if (reads_memory)
-    mem_in = memory;
-
   auto [I, inserted]
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                       move(mem_in)});
+                                       memory, reads_memory });
 
   if (inserted) {
     vector<StateValue> values;
@@ -311,33 +307,34 @@ void State::mkAxioms(State &tgt) {
   memory.mkAxioms();
 
   // axioms for function calls
-  for (auto &[fn, data] : tgt.fn_call_data) {
+  for (auto &[fn, data] : fn_call_data) {
     (void)fn;
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
-      auto &[ins, ptr_ins, mem] = I->first;
+      auto &[ins, ptr_ins, mem, reads] = I->first;
       auto &[rets, ub] = I->second;
 
-      for (auto I2 = data.begin(); I2 != E; ++I2) {
-        auto &[ins2, ptr_ins2, mem2] = I2->first;
+      auto &data2 = tgt.fn_call_data.at(fn);
+      for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
+        auto &[ins2, ptr_ins2, mem2, reads2] = I2->first;
         auto &[rets2, ub2] = I2->second;
 
         expr refines(true), is_val_eq(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
           expr eq_val = ins[i].value == ins2[i].value;
           is_val_eq &= eq_val;
-          refines &= !ins[i].non_poison || (eq_val && ins2[i].non_poison);
+          refines &= ins[i].non_poison.implies(eq_val && ins2[i].non_poison);
         }
 
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
-          expr eq_val = Pointer(memory, ptr_ins[i].value)
-                          .fninput_refined(Pointer(memory, ptr_ins2[i].value));
+          expr eq_val = Pointer(mem, ptr_ins[i].value)
+                          .fninput_refined(Pointer(mem2, ptr_ins2[i].value));
           is_val_eq &= eq_val;
           refines &= ptr_ins[i].non_poison
                        .implies(eq_val && ptr_ins2[i].non_poison);
         }
 
-        if (mem && mem2) {
-          expr mem_refined = mem->refined(*mem2).first;
+        if (reads && reads2) {
+          expr mem_refined = mem.refined(mem2).first;
           is_val_eq &= mem_refined;
           refines &= mem_refined;
         }
