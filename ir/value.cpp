@@ -154,6 +154,8 @@ static string attr_str(unsigned attributes) {
   string ret;
   if (attributes & Input::NonNull)
     ret += "nonnull ";
+  if (attributes & Input::NoCapture)
+    ret += "nocapture ";
   return ret;
 }
 

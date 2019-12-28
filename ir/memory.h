@@ -238,6 +238,9 @@ public:
 
   std::pair<smt::expr,Pointer> refined(const Memory &other) const;
 
+  // Encodes existence of a pointer byte with a non-local short_bid.
+  smt::expr has_noptrbyte(const smt::expr &short_bid) const;
+
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 

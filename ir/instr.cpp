@@ -1641,7 +1641,30 @@ void Return::print(ostream &os) const {
 }
 
 StateValue Return::toSMT(State &s) const {
+  // Encode nocapture semantics.
+  auto noub = expr(true);
+  for (const auto &I: s.getFn().getInputs()) {
+    auto inp = dynamic_cast<const Input *>(&I);
+    if (!inp->getType().isPtrType() ||
+        !inp->hasAttribute(Input::NoCapture))
+      continue;
+
+    auto &[v1, np1] = s[I];
+    Pointer p(s.getMemory(), v1);
+    auto bid = p.get_short_bid();
+    auto cond = np1 && s.getMemory().has_noptrbyte(bid);
+
+    if (val->getType().isPtrType()) {
+      auto &[vret, npret] = s[*val];
+      Pointer pret(s.getMemory(), vret);
+      cond &= npret.implies(pret.get_short_bid() != bid);
+    }
+
+    noub &= move(cond);
+  }
+  s.addUB(move(noub));
   s.addReturn(s[*val]);
+
   return {};
 }
 
