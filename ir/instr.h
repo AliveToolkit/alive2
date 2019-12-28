@@ -170,7 +170,7 @@ public:
 
 class FnCall final : public Instr {
 public:
-  enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1 };
+  enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1, NNaN = 1 << 2 };
 private:
   std::string fnName;
   std::vector<Value*> args;

@@ -245,6 +245,10 @@ public:
       flags |= FnCall::NoRead | FnCall::NoWrite;
     if (i.hasFnAttr(llvm::Attribute::WriteOnly))
       flags |= FnCall::NoRead;
+    if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
+      if (op->hasNoNaNs())
+        flags |= FnCall::NNaN;
+    }
 
     string fn_name = '@' + fn->getName().str();
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,

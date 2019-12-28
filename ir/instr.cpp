@@ -1088,6 +1088,8 @@ void FnCall::print(ostream &os) const {
     os << " noread";
   if (flags & NoWrite)
     os << " nowrite";
+  if (flags & NNaN)
+    os << " NNaN";
 
   if (!valid)
     os << "\t; WARNING: unknown known function";
@@ -1117,15 +1119,19 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
 }
 
 static StateValue pack_return(Type &ty, vector<StateValue> &vals,
-                              unsigned &idx) {
+                              unsigned flags, unsigned &idx) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vs.emplace_back(pack_return(agg->getChild(i), vals, idx));
+      vs.emplace_back(pack_return(agg->getChild(i), vals, flags, idx));
     }
     return agg->aggregateVals(vs);
   }
-  return vals[idx++];
+
+  auto ret = vals[idx++];
+  if (ty.isFloatType() && (flags & FnCall::NNaN))
+    ret.non_poison &= !ret.value.isNaN();
+  return ret;
 }
 
 StateValue FnCall::toSMT(State &s) const {
@@ -1146,7 +1152,7 @@ StateValue FnCall::toSMT(State &s) const {
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types,
                          !(flags & NoRead), !(flags & NoWrite));
-  return isVoid() ? StateValue() : pack_return(getType(), ret, idx);
+  return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
