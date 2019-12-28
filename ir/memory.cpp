@@ -36,10 +36,11 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
 
   unsigned padding = bitsByte() - does_int_mem_access - 1 - bits_for_offset
                                 - bits_for_bid - 3;
-  if (does_int_mem_access)
+  if (does_int_mem_access) {
     p = expr::mkUInt(1, 1);
-  if (padding)
-    p = concat_if(p, expr::mkUInt(0, padding));
+    if (padding)
+      p = concat_if(p, expr::mkUInt(0, padding));
+  }
   p = concat_if(p, non_poison.toBVBool())
         .concat(ptr()).concat(expr::mkUInt(i, 3));
   assert(!p.isValid() || p.bits() == bitsByte());
@@ -73,7 +74,7 @@ expr Byte::is_ptr() const {
 expr Byte::ptr_nonpoison() const {
   if (!does_ptr_mem_access)
     return true;
-  auto bit = p.bits() - 2;
+  auto bit = bits_for_offset + bits_for_bid + 3;
   return p.extract(bit, bit) == 1;
 }
 
@@ -270,6 +271,7 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
   if (unique_name)
     name += '!' + to_string(ptr_next_idx++);
   p = local.toBVBool().concat(expr::mkVar(name.c_str(), total_bits() - 1));
+  assert(!p.isValid() || p.bits() == total_bits());
 }
 
 Pointer::Pointer(const Memory &m, expr repr) : m(m), p(move(repr)) {
@@ -280,10 +282,13 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
   : m(m), p(expr::mkUInt(local, 1).concat(expr::mkUInt(bid, bits_for_bid - 1)
                                   .concat(expr::mkUInt(0, bits_for_offset)))) {
   assert((local && bid < num_locals) || (!local && bid < num_nonlocals));
+  assert(!p.isValid() || p.bits() == total_bits());
 }
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
-  : m(m), p(bid.concat(offset)) {}
+  : m(m), p(bid.concat(offset)) {
+  assert(!p.isValid() || p.bits() == total_bits());
+}
 
 unsigned Pointer::total_bits() {
   return bits_for_bid + bits_for_offset;
@@ -743,17 +748,19 @@ Memory::Memory(State &state) : state(&state) {
     non_local_block_val =
       expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
 
-    if (state.isSource()) {
-      auto bid = ptr_val.ptr().get_bid().extract(bits_for_bid - 2, 0);
-      state.addAxiom(expr::mkForAll({ idx }, bid.ule(num_nonlocals - 1)));
-    }
+    if (state.isSource())
+      state.addAxiom(expr::mkForAll({ idx },
+                       ptr_val.ptr().get_short_bid().ule(num_nonlocals - 1)));
 #else
-    Byte byte(*this, non_local_block_val.load(idx));
-    Pointer loadedptr = byte.ptr();
-    state.addAxiom(
-      expr::mkForAll({ idx },
-        byte.is_ptr().implies(!loadedptr.is_local() &&
-                              loadedptr.get_bid().ult(num_nonlocals))));
+    if (state.isSource()) {
+      Byte byte(*this, non_local_block_val.load(idx));
+      Pointer loadedptr = byte.ptr();
+      expr bid = loadedptr.get_short_bid();
+      state.addAxiom(
+        expr::mkForAll({ idx },
+          byte.is_ptr().implies(!loadedptr.is_local() &&
+                                bid.ule(num_nonlocals - 1))));
+    }
 #endif
   }
 
@@ -844,12 +851,10 @@ void Memory::resetLocalBids() {
 }
 
 expr Memory::mkInput(const char *name) const {
-  unsigned bits = bits_for_bid - 1 + bits_for_offset;
-  expr var = expr::mkVar(name, bits);
-  expr bid = var.extract(bits - 1, bits_for_offset);
-  expr is_local = expr::mkUInt(0, 1);
-  state->addAxiom(bid.ule(num_nonlocals - 1));
-  return Pointer(*this, is_local.concat(var)).release();
+  expr var = expr::mkVar(name, bits_for_bid - 1 + bits_for_offset);
+  Pointer p(*this, expr::mkUInt(0, 1).concat(var));
+  state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
+  return p.release();
 }
 
 pair<expr, expr> Memory::mkUndefInput() const {
