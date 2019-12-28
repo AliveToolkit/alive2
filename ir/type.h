@@ -391,4 +391,7 @@ public:
   void print(std::ostream &os) const override;
 };
 
+
+bool hasPtr(const Type &t);
+
 }

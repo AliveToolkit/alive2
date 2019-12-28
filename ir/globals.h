@@ -41,4 +41,8 @@ extern bool has_ptr2int;
 extern bool has_malloc;
 extern bool has_free;
 
+/// Whether the programs do memory accesses that load/store int/ptrs
+extern bool does_int_mem_access;
+extern bool does_ptr_mem_access;
+
 }

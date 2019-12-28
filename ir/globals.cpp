@@ -19,5 +19,7 @@ bool has_int2ptr;
 bool has_ptr2int;
 bool has_malloc;
 bool has_free;
+bool does_int_mem_access;
+bool does_ptr_mem_access;
 
 }

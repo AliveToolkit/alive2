@@ -1260,4 +1260,17 @@ void SymbolicType::print(ostream &os) const {
   DISPATCH(print(os), return);
 }
 
+
+bool hasPtr(const Type &t) {
+  if (t.isPtrType())
+    return true;
+
+  if (auto agg = t.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (hasPtr(agg->getChild(i)))
+        return true;
+    }
+  }
+  return false;
+}
 }

@@ -437,11 +437,14 @@ static void calculateAndInitConstants(Transform &t) {
     } else
       return NO_ACCESS;
 
-    if (dynamic_cast<const AggregateType *>(value_ty))
+    does_ptr_mem_access |= hasPtr(*value_ty);
+    does_int_mem_access |= value_ty->enforcePtrOrVectorType().isFalse();
+
+    if (value_ty->isAggregateType())
       // TODO: AggregateType's elements are splitted and stored, so
       // should they be checked instead
       return UNKNOWN;
-    if (dynamic_cast<const PtrType *>(value_ty))
+    if (value_ty->isPtrType())
       return gcd(align, bits_size_t / 8);
     return gcd(align, util::divide_up(value_ty->bits(), 8));
   };
@@ -475,6 +478,8 @@ static void calculateAndInitConstants(Transform &t) {
   has_ptr2int      = false;
   has_malloc       = false;
   has_free         = false;
+  does_ptr_mem_access = false;
+  does_int_mem_access = false;
 
   // Mininum access size (in bytes)
   uint64_t min_access_size = 16;
@@ -537,7 +542,10 @@ static void calculateAndInitConstants(Transform &t) {
                      "has_int2ptr: " << has_int2ptr << "\n"
                      "has_ptr2int: " << has_ptr2int << "\n"
                      "has_malloc: " << has_malloc << "\n"
-                     "has_free: " << has_free << "\n";
+                     "has_free: " << has_free << "\n"
+                     "does_ptr_mem_access: " << does_ptr_mem_access << "\n"
+                     "does_int_mem_access: " << does_int_mem_access << "\n"
+    ;
 }
 
 

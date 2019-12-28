@@ -86,8 +86,6 @@ class Pointer {
   // TODO: missing support for address space
   smt::expr p;
 
-  static unsigned total_bits();
-
   smt::expr get_value(const char *name, const smt::FunctionExpr &local_fn,
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type) const;
@@ -95,9 +93,11 @@ class Pointer {
 public:
   Pointer(const Memory &m, const char *var_name,
           const smt::expr &local = false, bool unique_name = true);
-  Pointer(const Memory &m, smt::expr p) : m(m), p(std::move(p)) {}
+  Pointer(const Memory &m, smt::expr p);
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
+
+  static unsigned total_bits();
 
   smt::expr is_local() const;
 
