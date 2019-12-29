@@ -755,7 +755,7 @@ Memory::Memory(State &state) : state(&state) {
                     expr::mkUInt(0, Byte::bitsByte()));
 
   // Non-local blocks cannot initially contain pointers to local blocks.
-  if (does_ptr_mem_access && num_locals > 0) {
+  if (does_ptr_mem_access) {
     auto idx = Pointer(*this, "#idx", false, false).short_ptr();
 #if 0
     if (num_nonlocals > 0) {
