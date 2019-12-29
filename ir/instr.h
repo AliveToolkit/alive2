@@ -127,6 +127,7 @@ public:
     : Instr(type, std::move(name)), val(&val), op(op) {}
 
   Op getOp() const { return op; }
+  Value* getValue() const { return val; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -470,6 +471,7 @@ public:
     : Instr(type, std::move(name)), ptr(&ptr), inbounds(inbounds) {}
 
   void addIdx(unsigned obj_size, Value &idx);
+  Value* getPtr() const { return ptr; }
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -487,6 +489,7 @@ public:
   Load(Type &type, std::string &&name, Value &ptr, unsigned align)
     : Instr(type, std::move(name)), ptr(&ptr), align(align) {}
 
+  Value* getPtr() const { return ptr; }
   std::vector<Value*> operands() const override;
   unsigned getAlign() const { return align; }
   void rauw(const Value &what, Value &with) override;

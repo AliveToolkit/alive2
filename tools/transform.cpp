@@ -356,7 +356,7 @@ static void check_refinement(Errors &errs, Transform &t,
 
 static bool has_nullptr(const Value *v) {
   if (dynamic_cast<const NullPointerValue*>(v) ||
-      (dynamic_cast<const UndefValue*>(v) && v->getType().isPtrType()))
+      (dynamic_cast<const UndefValue*>(v) && hasPtr(v->getType())))
       // undef pointer points to the nullblk
     return true;
 
@@ -368,6 +368,66 @@ static bool has_nullptr(const Value *v) {
   }
 
   return false;
+}
+
+static unsigned num_ptrs(const Type &ty) {
+  unsigned n = ty.isPtrType();
+  if (auto aty = ty.getAsAggregateType())
+    n += aty->numPointerElements();
+  return n;
+}
+
+static bool returns_local(const Value &v) {
+  return dynamic_cast<const Alloc*>(&v) ||
+         dynamic_cast<const Malloc*>(&v) ||
+         dynamic_cast<const Calloc*>(&v);
+}
+
+static bool may_be_nonlocal(Value *ptr) {
+  vector<Value*> todo = { ptr };
+  set<Value*> seen;
+  do {
+    ptr = todo.back();
+    todo.pop_back();
+    if (!seen.insert(ptr).second)
+      continue;
+
+    if (returns_local(*ptr))
+      continue;
+
+    if (auto gep = dynamic_cast<GEP*>(ptr)) {
+      todo.emplace_back(gep->getPtr());
+      continue;
+    }
+
+    if (auto c = dynamic_cast<ConversionOp*>(ptr)) {
+      if (c->getOp() == ConversionOp::BitCast) {
+        todo.emplace_back(c->getValue());
+        continue;
+      }
+    }
+
+    if (auto phi = dynamic_cast<Phi*>(ptr)) {
+      for (auto &op : phi->operands())
+        todo.emplace_back(op);
+      continue;
+    }
+    return true;
+
+  } while (!todo.empty());
+
+  return false;
+}
+
+static bool returns_nonlocal(const Instr &inst) {
+  if (dynamic_cast<const FnCall *>(&inst))
+    return num_ptrs(inst.getType());
+
+  if (auto load = dynamic_cast<const Load *>(&inst)) {
+    if (may_be_nonlocal(load->getPtr()))
+      return num_ptrs(inst.getType());
+  }
+  return 0u;
 }
 
 static void calculateAndInitConstants(Transform &t) {
@@ -388,34 +448,8 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned num_ptrinputs = 0;
   const auto &inputs = t.src.getInputs();
   for (auto &arg : inputs) {
-    // An argument with aggregate type with pointer member is dealt separately
-    num_ptrinputs += arg.getType().isPtrType();
-
-    if (auto aty = arg.getType().getAsAggregateType())
-      num_ptrinputs += aty->numPointerElements();
+    num_ptrinputs += num_ptrs(arg.getType());
   }
-
-  auto returns_local = [](const Instr &inst) {
-    return dynamic_cast<const Alloc *>(&inst) != nullptr ||
-           dynamic_cast<const Malloc *>(&inst) != nullptr ||
-           dynamic_cast<const Calloc *>(&inst) != nullptr;
-  };
-
-  auto returns_nonlocal = [](const Instr &inst) {
-    if (!inst.getType().isPtrType())
-      return false;
-    if (dynamic_cast<const ConversionOp*>(&inst) ||
-        dynamic_cast<const ExtractElement*>(&inst) ||
-        dynamic_cast<const ExtractValue*>(&inst) ||
-        dynamic_cast<const Freeze*>(&inst) ||
-        dynamic_cast<const GEP*>(&inst) ||
-        dynamic_cast<const Phi*>(&inst) ||
-        dynamic_cast<const Return*>(&inst) ||
-        dynamic_cast<const Select*>(&inst) ||
-        dynamic_cast<const UnaryOp*>(&inst))
-      return false;
-    return true;
-  };
 
   // Returns access size. 0 if no access, -1 if unknown
   const uint64_t UNKNOWN = 1, NO_ACCESS = 0;
@@ -458,16 +492,16 @@ static void calculateAndInitConstants(Transform &t) {
     for (auto &i : BB->instrs()) {
       if (returns_local(i))
         ++num_locals_src;
-      else if (returns_nonlocal(i))
-        ++num_max_nonlocals_inst;
+      else
+        num_max_nonlocals_inst += returns_nonlocal(i);
     }
   }
   for (auto BB : t.tgt.getBBs()) {
     for (auto &i : BB->instrs()) {
       if (returns_local(i))
         ++num_locals_tgt;
-      else if (returns_nonlocal(i))
-        ++num_max_nonlocals_inst;
+      else
+        num_max_nonlocals_inst += returns_nonlocal(i);
     }
   }
   num_locals = max(num_locals_src, num_locals_tgt);
@@ -484,6 +518,7 @@ static void calculateAndInitConstants(Transform &t) {
   // Mininum access size (in bytes)
   uint64_t min_access_size = 16;
   bool does_mem_access = false;
+  bool has_load = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto &c : fn->getConstants()) {
@@ -509,6 +544,7 @@ static void calculateAndInitConstants(Transform &t) {
         has_malloc |= dynamic_cast<const Malloc*>(&I) != nullptr;
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
+        has_load   |= dynamic_cast<const Load*>(&I) != nullptr;
 
         auto accsz = get_access_size(I);
         if (accsz != NO_ACCESS) {
@@ -521,7 +557,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals > 0 || nullptr_is_used || has_malloc)
+  if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load)
     ++num_nonlocals;
 
   // ceil(log2(maxblks)) + 1 for local bit
