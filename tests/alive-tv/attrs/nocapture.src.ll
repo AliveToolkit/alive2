@@ -1,4 +1,3 @@
-; TEST-ARGS: -disable-undef-input -disable-poison-input
 @x = global i8* null
 
 define void @f1(i8* nocapture %p) {
