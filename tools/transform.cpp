@@ -507,7 +507,8 @@ static void calculateAndInitConstants(Transform &t) {
           has_dead_allocas |= alloc->initDead();
 
         has_malloc |= dynamic_cast<const Malloc*>(&I) != nullptr;
-        has_free   |= dynamic_cast<const Free *>(&I) != nullptr;
+        has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
+        has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
 
         auto accsz = get_access_size(I);
         if (accsz != NO_ACCESS) {
@@ -518,11 +519,14 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  // Include null block
-  num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst + 1;
+  num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst;
+  // check if null block is needed
+  if (num_nonlocals > 0 || nullptr_is_used || has_malloc)
+    ++num_nonlocals;
 
   // ceil(log2(maxblks)) + 1 for local bit
-  bits_for_bid = max(2u, ilog2_ceil(max(num_locals, num_nonlocals)) + 1);
+  bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
+                   + (num_locals && num_nonlocals);
 
   // TODO
   bits_for_offset = 64;
@@ -550,7 +554,6 @@ static void calculateAndInitConstants(Transform &t) {
                      "does_int_mem_access: " << does_int_mem_access << "\n"
     ;
 }
-
 
 
 namespace tools {
