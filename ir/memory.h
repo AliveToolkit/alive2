@@ -88,7 +88,7 @@ class Pointer {
 
   smt::expr get_value(const char *name, const smt::FunctionExpr &local_fn,
                       const smt::FunctionExpr &nonlocal_fn,
-                      const smt::expr &ret_type) const;
+                      const smt::expr &ret_type, bool src_name = false) const;
 
 public:
   Pointer(const Memory &m, const char *var_name,
@@ -193,7 +193,7 @@ public:
 
   Memory(State &state);
 
-  void mkAxioms() const;
+  void mkAxioms(const Memory &other) const;
 
   static void resetGlobalData();
   static void resetLocalBids();

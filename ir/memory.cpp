@@ -331,14 +331,18 @@ expr Pointer::get_offset() const {
 
 expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
                         const FunctionExpr &nonlocal_fn,
-                        const expr &ret_type) const {
+                        const expr &ret_type, bool src_name) const {
   auto bid = get_short_bid();
   expr non_local;
 
   if (auto val = nonlocal_fn.lookup(bid))
     non_local = *val;
-  else
-    non_local = expr::mkUF(name, { bid }, ret_type);
+  else {
+    string uf = name;
+    if (src_name)
+      uf += m.state->isSource() ? "_src" : "_tgt";
+    non_local = expr::mkUF(uf.c_str(), { bid }, ret_type);
+  }
 
   if (auto local = local_fn(bid))
     return expr::mkIf(is_local(), *local, non_local);
@@ -426,7 +430,7 @@ expr Pointer::inbounds() const {
 
 expr Pointer::block_alignment() const {
   return get_value("blk_align", m.local_blk_align, m.non_local_blk_align,
-                   expr::mkUInt(0, 8));
+                   expr::mkUInt(0, 8), true);
 }
 
 expr Pointer::is_block_aligned(unsigned align, bool exact) const {
@@ -824,9 +828,16 @@ Memory::Memory(State &state) : state(&state) {
   assert(bits_for_offset <= bits_size_t);
 }
 
-void Memory::mkAxioms() const {
-  if (memory_unused() || !state->isSource())
+void Memory::mkAxioms(const Memory &other) const {
+  assert(state->isSource() && !other.state->isSource());
+  if (memory_unused())
     return;
+
+  // transformation can increase alignment
+  for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+    state->addAxiom(Pointer(*this, bid, false).block_alignment().ule(
+                      Pointer(other, bid, false).block_alignment()));
+  }
 
   if (observes_addresses() && num_nonlocals > 0) {
     state->addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);

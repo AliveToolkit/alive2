@@ -304,7 +304,7 @@ void State::syncSEdataWithSrc(const State &src) {
 
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
-  memory.mkAxioms();
+  memory.mkAxioms(tgt.memory);
 
   // axioms for function calls
   for (auto &[fn, data] : fn_call_data) {
