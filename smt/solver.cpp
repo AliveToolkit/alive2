@@ -387,6 +387,7 @@ void solver_init() {
     "qe-light",
     "simplify",
     "elim-uncnstr",
+    "reduce-args",
     "qe-light",
     "simplify",
     "smt"
