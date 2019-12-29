@@ -205,7 +205,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     string npname = name + "#np";
     for (auto t : out_types) {
       values.emplace_back(
-        expr::mkFreshVar(valname.c_str(), t->getDummyValue(false).value),
+        t->isPtrType()
+          ? memory.mkFnRet(valname.c_str())
+          : expr::mkFreshVar(valname.c_str(), t->getDummyValue(false).value),
         expr::mkFreshVar(npname.c_str(), false));
     }
 

@@ -904,6 +904,15 @@ pair<expr, expr> Memory::mkUndefInput() const {
   return { p.release(), move(offset) };
 }
 
+expr Memory::mkFnRet(const char *name) const {
+  // TODO: can only alias with escaped local blocks!
+  Pointer p(*this, expr::mkVar(name, bits_for_bid + bits_for_offset));
+  state->addAxiom(expr::mkIf(p.is_local(),
+                  p.get_short_bid().ule(num_locals - 1),
+                  p.get_short_bid().ule(num_nonlocals - 1)));
+  return p.release();
+}
+
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
                                   const expr &sz, FunctionExpr &blk_addr) {
   expr disj = true;

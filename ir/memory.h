@@ -200,6 +200,7 @@ public:
 
   smt::expr mkInput(const char *name) const;
   std::pair<smt::expr, smt::expr> mkUndefInput() const;
+  smt::expr mkFnRet(const char *name) const;
 
   // Allocates a new memory block and returns (pointer expr, allocated).
   // If bid is not specified, it creates a fresh block id by increasing
