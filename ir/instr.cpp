@@ -2046,11 +2046,13 @@ void Memset::print(ostream &os) const {
 StateValue Memset::toSMT(State &s) const {
   auto &[vptr, np_ptr] = s[*ptr];
   auto &[vbytes, np_bytes] = s[*bytes];
-  s.addUB(vbytes.ugt(0).implies(np_ptr));
+  s.addUB((vbytes != 0).implies(np_ptr));
   s.addUB(np_bytes);
+
   if (vbytes.bits() > bits_size_t)
-    s.addUB(np_bytes.implies(vbytes.ule(
-        expr::mkInt(-1, bits_size_t).zext(vbytes.bits() - bits_size_t))));
+    s.addUB(
+      vbytes.ule(expr::IntUMax(bits_size_t).zext(vbytes.bits() - bits_size_t)));
+
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align);
   return {};
 }
