@@ -7,7 +7,8 @@ set -e
 # place-safepoints: places new function calls (@do_safepoint)
 # loop-extract: extracts a top-level loop into a distinct function
 # extract-blocks: extract specified blocks into a distinct function
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa insert-gcov-profiling switch-to-lookup safe-stack pgo-instr-gen loop-extract extract-blocks place-safepoints -Os -Oz -O1 -O2 -O3"
+# attributor, functionattrs: inter procedural pass that deduces and/or propagates attributes
+PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa insert-gcov-profiling switch-to-lookup safe-stack pgo-instr-gen loop-extract extract-blocks place-safepoints attributor functionattrs -Os -Oz -O1 -O2 -O3"
 
 TV="-tv"
 for p in $PASSES; do
