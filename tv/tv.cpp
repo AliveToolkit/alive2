@@ -92,6 +92,7 @@ unordered_map<string, pair<Function, unsigned>> fns;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
+bool has_failure = false;
 
 
 struct TVPass : public llvm::FunctionPass {
@@ -159,6 +160,7 @@ struct TVPass : public llvm::FunctionPass {
 
         llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
       }
+      has_failure |= errs.isUnsound();
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -224,6 +226,13 @@ struct TVPass : public llvm::FunctionPass {
     if (opt_smt_stats && !showed_stats) {
       smt::solver_print_stats(*out);
       showed_stats = true;
+
+      if (has_failure) {
+        if (!report_filename.empty())
+          cerr << "Report written to " << report_filename << endl;
+
+        llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
+      }
     }
     llvm_util_init.reset();
     smt_init.reset();
