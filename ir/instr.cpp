@@ -1642,7 +1642,8 @@ void Return::print(ostream &os) const {
 
 StateValue Return::toSMT(State &s) const {
   // Encode nocapture semantics.
-  auto noub = expr(true);
+  vector<expr> nonpoisons;
+  vector<expr> bids;
   for (const auto &I: s.getFn().getInputs()) {
     auto inp = dynamic_cast<const Input *>(&I);
     if (!inp->getType().isPtrType() ||
@@ -1650,19 +1651,18 @@ StateValue Return::toSMT(State &s) const {
       continue;
 
     auto &[v1, np1] = s[I];
-    Pointer p(s.getMemory(), v1);
-    auto bid = p.get_short_bid();
-    auto cond = np1 && s.getMemory().has_noptrbyte(bid);
+    auto bid = Pointer(s.getMemory(), v1).get_bid();
+    nonpoisons.emplace_back(np1);
+    bids.emplace_back(bid);
 
     if (val->getType().isPtrType()) {
       auto &[vret, npret] = s[*val];
-      Pointer pret(s.getMemory(), vret);
-      cond &= npret.implies(pret.get_short_bid() != bid);
+      s.addUB((np1 && npret).implies(
+          Pointer(s.getMemory(), vret).get_bid() != bid));
     }
-
-    noub &= move(cond);
   }
-  s.addUB(move(noub));
+  if (bids.size() != 0)
+    s.addUB(s.getMemory().has_noptrbyte(nonpoisons, bids));
   s.addReturn(s[*val]);
 
   return {};
