@@ -742,10 +742,6 @@ public:
         attrs |= Input::NonNull;
         continue;
 
-      case llvm::Attribute::NoCapture:
-        attrs |= Input::NoCapture;
-        continue;
-
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return {};

@@ -1640,47 +1640,8 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
-static void addUBForNoCaptureRet(State &s, const vector<expr> &nonpoisons,
-    const vector<expr> &bids, const StateValue &svret, const Type &t) {
-  auto &[vret, npret] = svret;
-  if (t.isPtrType()) {
-    for (unsigned i = 0, e = nonpoisons.size(); i != e; ++i) {
-      s.addUB((nonpoisons[i] && npret).implies(
-          Pointer(s.getMemory(), vret).get_bid() != bids[i]));
-    }
-    return;
-  }
-
-  if (auto agg = t.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      addUBForNoCaptureRet(s, nonpoisons, bids, agg->extract(svret, i),
-                            agg->getChild(i));
-    }
-  }
-}
-
 StateValue Return::toSMT(State &s) const {
-  // Encode nocapture semantics.
-  vector<expr> nonpoisons;
-  vector<expr> bids;
-  for (const auto &I: s.getFn().getInputs()) {
-    auto inp = dynamic_cast<const Input *>(&I);
-    if (!inp->getType().isPtrType() ||
-        !inp->hasAttribute(Input::NoCapture))
-      continue;
-
-    auto &[v1, np1] = s[I];
-    auto bid = Pointer(s.getMemory(), v1).get_bid();
-    nonpoisons.emplace_back(np1);
-    bids.emplace_back(bid);
-  }
-  auto &retval = s[*val];
-  if (bids.size() != 0) {
-    addUBForNoCaptureRet(s, nonpoisons, bids, retval, val->getType());
-    s.addUB(s.getMemory().has_noptrbyte(nonpoisons, bids));
-  }
-  s.addReturn(retval);
-
+  s.addReturn(s[*val]);
   return {};
 }
 
