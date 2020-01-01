@@ -20,13 +20,8 @@ define i8* @f4(i8* nocapture %p) {
   ret i8* %p2
 }
 
-;define {i8*, i8*} @f5(i8* nocapture %p) {
-;  %v = insertvalue {i8*, i8*} undef, i8* %p, 1
-;  ret {i8*, i8*} %v
-;}
+define <2 x i8*> @f5(i8* nocapture %p) {
+  %v = insertelement <2 x i8*> undef, i8* %p, i32 1
+  ret <2 x i8*> %v
+}
 
-;define {i8*, {i8*, i8*}} @f6(i8* nocapture %p) {
-;  %v = insertvalue {i8*, i8*} undef, i8* %p, 0
-;  %w = insertvalue {i8*, {i8*, i8*}} undef, {i8*, i8*} %v, 1
-;  ret {i8*, {i8*, i8*}} %w
-;}
