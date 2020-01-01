@@ -1640,18 +1640,20 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
-static void addUBForNoCaptureRet(State &s, const expr &bid,
-    const expr &npptr, const StateValue &svret, const Type &t) {
+static void addUBForNoCaptureRet(State &s, const vector<expr> &nonpoisons,
+    const vector<expr> &bids, const StateValue &svret, const Type &t) {
   auto &[vret, npret] = svret;
   if (t.isPtrType()) {
-    s.addUB((npptr && npret).implies(
-        Pointer(s.getMemory(), vret).get_bid() != bid));
+    for (unsigned i = 0, e = nonpoisons.size(); i != e; ++i) {
+      s.addUB((nonpoisons[i] && npret).implies(
+          Pointer(s.getMemory(), vret).get_bid() != bids[i]));
+    }
     return;
   }
 
   if (auto agg = t.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      addUBForNoCaptureRet(s, bid, npptr, agg->extract(svret, i),
+      addUBForNoCaptureRet(s, nonpoisons, bids, agg->extract(svret, i),
                             agg->getChild(i));
     }
   }
@@ -1671,11 +1673,11 @@ StateValue Return::toSMT(State &s) const {
     auto bid = Pointer(s.getMemory(), v1).get_bid();
     nonpoisons.emplace_back(np1);
     bids.emplace_back(bid);
-
-    addUBForNoCaptureRet(s, bid, np1, s[*val], val->getType());
   }
-  if (bids.size() != 0)
+  if (bids.size() != 0) {
+    addUBForNoCaptureRet(s, nonpoisons, bids, s[*val], val->getType());
     s.addUB(s.getMemory().has_noptrbyte(nonpoisons, bids));
+  }
   s.addReturn(s[*val]);
 
   return {};
