@@ -109,7 +109,7 @@ public:
 
 class Input final : public Value {
 public:
-  enum Attributes { None = 0, NonNull = 1<<0 };
+  enum Attributes { None = 0, NonNull = 1<<0, NoCapture = 1<<1 };
 private:
   std::string smt_name;
   unsigned attributes;
@@ -117,6 +117,7 @@ public:
   Input(Type &type, std::string &&name, unsigned attributes = 0);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
+  bool hasAttribute(Attributes a) const { return (attributes & a) != 0; }
   StateValue toSMT(State &s) const override;
   smt::expr getTyVar() const;
 };

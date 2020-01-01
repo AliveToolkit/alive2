@@ -1233,6 +1233,26 @@ pair<expr,Pointer> Memory::refined(const Memory &other) const {
             move(ptr) };
 }
 
+expr Memory::has_noptrbyte(const vector<expr> &conds,
+                           const vector<expr> &bids) const {
+  assert(conds.size() != 0 && conds.size() == bids.size());
+  expr res(true);
+  auto ofs = expr::mkFreshVar("ofs", expr::mkUInt(0, bits_for_offset));
+
+  for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+    Pointer p(*this, expr::mkUInt(bid, bits_for_bid), ofs);
+    Byte b(*this, non_local_block_val.load(p.short_ptr()));
+    Pointer loadp(*this, b.ptr_value());
+
+    expr c(true);
+    for (unsigned i = 0, e = bids.size(); i < e; ++i)
+      c &= conds[i].implies(loadp.get_bid() != bids[i]);
+    res &= p.is_block_alive().implies(
+      expr::mkForAll({ ofs }, (b.is_ptr() && b.ptr_nonpoison()).implies(c)));
+  }
+  return res;
+}
+
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
