@@ -22,10 +22,10 @@ class State;
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
 // Pointer byte's representation:
-//   +-+-------+-----------+----------------+-------------------+-------------+
-//   |1|padding|non-poison?| block id       | ptr offset        | byte offset |
-//   | |       |(1 bit)    | (bits_for_bid) | (bits_for_offset) | (3 bits)    |
-//   +-+-------+-----------+----------------+-------------------+-------------+
+//   +-+-------+-----------+----------------+------------------+-------------+
+//   |1|padding|non-poison?|     Pointer (see class below)     | byte offset |
+//   | |       |(1 bit)    |                                   | (3 bits)    |
+//   +-+-------+-----------+----------------+------------------+-------------+
 // Non-pointer byte's representation:
 //   +-+--------------------------+--------------------+---------------------+
 //   |0| padding(zero)            | non-poison bits?   | data                |
