@@ -1196,9 +1196,6 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     store_lambda(dst_idx, cond,
                  ::load(src_idx, local_block_val, non_local_block_val),
                  local_block_val, non_local_block_val);
-
-    // we don't know what was copied; it could have been a pointer
-    did_pointer_store = true;
   }
 }
 
