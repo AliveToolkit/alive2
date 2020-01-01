@@ -1674,11 +1674,12 @@ StateValue Return::toSMT(State &s) const {
     nonpoisons.emplace_back(np1);
     bids.emplace_back(bid);
   }
+  auto &retval = s[*val];
   if (bids.size() != 0) {
-    addUBForNoCaptureRet(s, nonpoisons, bids, s[*val], val->getType());
+    addUBForNoCaptureRet(s, nonpoisons, bids, retval, val->getType());
     s.addUB(s.getMemory().has_noptrbyte(nonpoisons, bids));
   }
-  s.addReturn(s[*val]);
+  s.addReturn(retval);
 
   return {};
 }
