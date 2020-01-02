@@ -1042,7 +1042,7 @@ void Memory::start_lifetime(const expr &ptr_local) {
 }
 
 void Memory::free(const expr &ptr, bool unconstrained) {
-  assert(!memory_unused() && has_free);
+  assert(!memory_unused() && (has_free || has_dead_allocas));
   Pointer p(*this, ptr);
   if (!unconstrained)
     state->addUB(p.isNull() || (p.get_offset() == 0 &&
