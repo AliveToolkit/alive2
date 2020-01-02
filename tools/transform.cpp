@@ -537,8 +537,16 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_access_size = 16;
   bool does_mem_access = false;
   bool has_load = false;
+  // The number of bits needed to encode pointer attributes
+  bits_for_ptrattrs = 0;
 
   for (auto fn : { &t.src, &t.tgt }) {
+    for (auto &v : fn->getInputs()) {
+      auto i = dynamic_cast<const Input*>(&v);
+      if (i && i->hasAttribute(Input::NoCapture))
+        bits_for_ptrattrs = 1;
+    }
+
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {

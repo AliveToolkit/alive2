@@ -538,7 +538,7 @@ expr PtrType::ASVar() const {
 }
 
 unsigned PtrType::bits() const {
-  return bits_for_offset + bits_for_bid;
+  return Pointer::total_bits();
 }
 
 StateValue PtrType::getDummyValue(bool non_poison) const {

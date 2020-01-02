@@ -254,6 +254,9 @@ public:
 
   std::pair<smt::expr,Pointer> refined(const Memory &other) const;
 
+  // Returns true if a nocapture pointer byte is not in the memory.
+  smt::expr check_nocapture() const;
+
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
