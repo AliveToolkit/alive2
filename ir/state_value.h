@@ -28,7 +28,6 @@ struct StateValue {
   StateValue concat(const StateValue &other) const;
 
   bool isValid() const;
-  smt::expr both() const { return value && non_poison; }
 
   bool eq(const StateValue &other) const;
 

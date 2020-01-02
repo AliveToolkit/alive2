@@ -122,6 +122,8 @@ public:
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isNot(expr &neg) const;
+  bool isConstArray(expr &val) const;
+  bool isStore(expr &array, expr &idx, expr &val) const;
 
   // best effort; returns number of statically known bits
   unsigned min_leading_zeros() const;

@@ -377,6 +377,24 @@ bool expr::isNot(expr &neg) const {
   return false;
 }
 
+bool expr::isConstArray(expr &val) const {
+  if (auto app = isAppOf(Z3_OP_CONST_ARRAY)) {
+    val = Z3_get_app_arg(ctx(), app, 0);
+    return true;
+  }
+  return false;
+}
+
+bool expr::isStore(expr &array, expr &idx, expr &val) const {
+  if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
+    array = Z3_get_app_arg(ctx(), app, 0);
+    idx = Z3_get_app_arg(ctx(), app, 1);
+    val = Z3_get_app_arg(ctx(), app, 2);
+    return true;
+  }
+  return false;
+}
+
 unsigned expr::min_leading_zeros() const {
   expr a, b;
   uint64_t n;
@@ -1305,6 +1323,15 @@ expr expr::mkConstArray(const expr &domain, const expr &value) {
 
 expr expr::store(const expr &idx, const expr &val) const {
   C(idx, val);
+  expr array, str_idx, str_val;
+  if (isStore(array, str_idx, str_val)) {
+    if ((idx == str_idx).simplify().isTrue())
+      return array.store(idx, val);
+
+  } else if (isConstArray(str_val)) {
+    if (str_val.eq(val))
+      return *this;
+  }
   return Z3_mk_store(ctx(), ast(), idx(), val());
 }
 
@@ -1312,16 +1339,16 @@ expr expr::load(const expr &idx) const {
   C(idx);
 
   // TODO: add support for alias analysis plugin
-  if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
-    expr cmp = expr(idx == Z3_get_app_arg(ctx(), app, 1)).simplify();
-
+  expr array, str_idx, val;
+  if (isStore(array, str_idx, val)) { // store(array, idx, val)
+    expr cmp = (idx == str_idx).simplify();
     if (cmp.isTrue())
-      return Z3_get_app_arg(ctx(), app, 2);
+      return val;
     if (cmp.isFalse())
-      return expr(Z3_get_app_arg(ctx(), app, 0)).load(idx);
+      return array.load(idx);
 
-  } else if (auto app = isAppOf(Z3_OP_CONST_ARRAY)) {
-    return Z3_get_app_arg(ctx(), app, 0);
+  } else if (isConstArray(val)) {
+    return val;
 
   } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
              Z3_is_lambda(ctx(), ast())) {

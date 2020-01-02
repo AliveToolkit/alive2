@@ -8,6 +8,4 @@ define i1 @malloc_null() {
   ret i1 %eq
 }
 
-; ERROR: Value mismatch
-
 declare noalias i8* @malloc(i64)

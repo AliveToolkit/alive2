@@ -11,6 +11,7 @@
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace IR {
 
@@ -174,14 +175,12 @@ class Memory {
   smt::expr non_local_block_liveness; // array: bid -> bool
   smt::expr local_block_liveness;
 
-  smt::expr local_avail_space; // available space in local block area.
-
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_align;
   smt::FunctionExpr local_blk_kind;
 
-  smt::FunctionExpr non_local_blk_writable;
+  std::vector<unsigned> non_local_blk_nonwritable;
   smt::FunctionExpr non_local_blk_size;
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
@@ -209,8 +208,9 @@ public:
   // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
   std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, unsigned align,
-      BlockKind blockKind, std::optional<unsigned> bid = std::nullopt,
-      unsigned *bid_out = nullptr, const smt::expr &precond = true);
+      BlockKind blockKind, const smt::expr &precond = true,
+      const smt::expr &nonnull = false,
+      std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);
 
   // Start lifetime of a local block.
   void start_lifetime(const smt::expr &ptr_local);

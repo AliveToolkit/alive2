@@ -181,10 +181,28 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 }
 
 
-static expr preprocess(Transform &t, const set<expr> &qvars,
+static expr preprocess(Transform &t, const set<expr> &qvars0,
                        const set<expr> &undef_qvars, expr && e) {
-  if (qvars.empty() || e.isFalse())
-    return move(e);
+  if (hit_half_memory_limit())
+    return expr::mkForAll(qvars0, move(e));
+
+  // TODO: benchmark
+  if (0) {
+    expr var = expr::mkBoolVar("malloc_never_fails");
+    e = expr::mkIf(var,
+                   e.subst(var, true).simplify(),
+                   e.subst(var, false).simplify());
+  }
+
+  // eliminate all quantified boolean vars; Z3 gets too slow with those
+  auto qvars = qvars0;
+  for (auto &var : qvars0) {
+    if (!var.isBool())
+      continue;
+    e = e.subst(var, true).simplify() &&
+        e.subst(var, false).simplify();
+    qvars.erase(var);
+  }
 
   // TODO: maybe try to instantiate undet_xx vars?
   if (undef_qvars.empty() || hit_half_memory_limit())
@@ -456,9 +474,11 @@ static void calculateAndInitConstants(Transform &t) {
   auto get_access_size = [&](const Instr &inst) -> uint64_t {
     if (dynamic_cast<const Calloc *>(&inst) ||
         dynamic_cast<const Memcpy *>(&inst) ||
-        dynamic_cast<const Memset *>(&inst))
+        dynamic_cast<const Memset *>(&inst)) {
       // TODO
+      does_int_mem_access = true;
       return UNKNOWN;
+    }
 
     Type *value_ty;
     unsigned align;
@@ -507,7 +527,6 @@ static void calculateAndInitConstants(Transform &t) {
   num_locals = max(num_locals_src, num_locals_tgt);
 
   nullptr_is_used  = false;
-  has_global_const = false;
   has_int2ptr      = false;
   has_ptr2int      = false;
   has_malloc       = false;
@@ -521,12 +540,6 @@ static void calculateAndInitConstants(Transform &t) {
   bool has_load = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
-    for (auto &c : fn->getConstants()) {
-      if (auto gv = dynamic_cast<const GlobalVariable*>(&c)) {
-        has_global_const |= gv->isConst();
-      }
-    }
-
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {

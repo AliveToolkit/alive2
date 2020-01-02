@@ -17,6 +17,4 @@ BB2:
 declare noalias i8* @malloc(i64)
 declare void @free(i8*)
 
-; If there is '%ptr == null` check guard, this optimization is invalid
-; because source can safely return whereas alloca may raise OOM (which is UB).
-; ERROR: Source is more defined than target
+; ERROR: Value mismatch

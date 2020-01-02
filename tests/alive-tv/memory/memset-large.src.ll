@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=2000 -disable-undef-input
+; TEST-ARGS: -smt-to=10000
 declare void @llvm.memset.p0i8.i128(i8*, i8, i128, i1)
 
 define void @f(i8* %p, i128 %n) {

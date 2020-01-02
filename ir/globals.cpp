@@ -14,7 +14,6 @@ unsigned bits_size_t;
 unsigned bits_byte;
 bool little_endian;
 bool nullptr_is_used;
-bool has_global_const;
 bool has_int2ptr;
 bool has_ptr2int;
 bool has_malloc;

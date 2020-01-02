@@ -1702,12 +1702,11 @@ void Alloc::print(std::ostream &os) const {
 
 StateValue Alloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
-  auto &m = s.getMemory();
-  auto [p, allocated] = m.alloc(sz, align, Memory::STACK, nullopt,
-                                 nullptr, !initially_dead);
-  // Alloca cannot be null; when OOM, the program halts with stack overflow.
-  s.addUB(np && (allocated || initially_dead));
-  return { move(p), true };
+  s.addUB(np);
+  expr ptr = s.getMemory().alloc(sz, align, Memory::STACK, true, true).first;
+  if (initially_dead)
+    s.getMemory().free(ptr, true);
+  return { move(ptr), true };
 }
 
 expr Alloc::getTypeConstraints(const Function &f) const {
@@ -1737,16 +1736,16 @@ void Malloc::print(std::ostream &os) const {
 StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s[*size];
   // TODO: malloc's alignment is implementation defined.
-  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP);
+  expr nonnull = expr::mkBoolVar("malloc_never_fails");
+  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true, nonnull);
 
   if (isNonNull) {
     // TODO: In C++ we need to throw an exception if the allocation fails, but
     // exception hasn't been modeled yet
-    s.addUB(move(allocated));
+    s.addPre(move(allocated));
   }
 
-  expr nullp = Pointer::mkNullPointer(s.getMemory())();
-  return { expr::mkIf(move(allocated), move(p), move(nullp)), expr(np) };
+  return { move(p), expr(np) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -1779,15 +1778,11 @@ StateValue Calloc::toSMT(State &s) const {
 
   // TODO: check calloc align.
   expr size = nm * sz;
-  auto [p0, allocated] = s.getMemory().alloc(size, 8, Memory::HEAP,
-                                            std::nullopt, nullptr,
-                                            nm.mul_no_uoverflow(sz));
+  expr nonnull = expr::mkBoolVar("malloc_never_fails");
+  auto [p, allocated] = s.getMemory().alloc(size, 8, Memory::HEAP,
+                                            nm.mul_no_uoverflow(sz), nonnull);
 
-  expr nullp = Pointer::mkNullPointer(s.getMemory())();
-  expr p = expr::mkIf(allocated, move(p0), move(nullp));
   expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
-
-  // If memset's size is zero, then ptr can be NULL.
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
   return { move(p), np_num && np_sz };

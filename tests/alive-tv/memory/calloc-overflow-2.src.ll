@@ -12,7 +12,5 @@ BB2:
   ret i8 1
 }
 
-; ERROR: Value mismatch
-
 declare noalias i8* @calloc(i64, i64)
 declare void @free(i8*)
