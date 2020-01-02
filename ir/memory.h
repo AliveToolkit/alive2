@@ -76,7 +76,7 @@ public:
 class Pointer {
   const Memory &m;
 
-  // [bid, offset]
+  // [bid, offset, is-nocapture]
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -84,6 +84,8 @@ class Pointer {
   // block can also be a local memory block.
   // Otherwise, a pointer is pointing to a non-local block, which can be either
   // of global variable, heap, or a stackframe that is not this function call.
+  // The lowest bit represents whether the pointer value came from nocapture
+  // argument. If block is local, is-nocapture cannot be 1.
   // TODO: missing support for address space
   smt::expr p;
 
@@ -93,10 +95,13 @@ class Pointer {
 
 public:
   Pointer(const Memory &m, const char *var_name,
-          const smt::expr &local = false, bool unique_name = true);
+          const smt::expr &local = false, bool unique_name = true,
+          bool has_attr = true);
   Pointer(const Memory &m, smt::expr p);
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
+  Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
+          const smt::expr &attrs);
 
   static unsigned total_bits();
 
@@ -105,11 +110,15 @@ public:
   smt::expr get_bid() const;
   smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
   smt::expr get_offset() const;
+  smt::expr get_attrs() const;
   smt::expr get_address(bool simplify = true) const;
 
   smt::expr block_size() const;
 
   const smt::expr& operator()() const { return p; }
+  // Returns expr with short_bid+offset. It strips attrs away.
+  // If this pointer is constructed with var_name (has_attr with false),
+  // the returned expr is the variable.
   smt::expr short_ptr() const;
   smt::expr release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
@@ -151,6 +160,7 @@ public:
   };
   smt::expr get_alloc_type() const;
   smt::expr is_heap_allocated() const;
+  smt::expr is_nocapture() const;
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninput_refined(const Pointer &other) const;
@@ -162,6 +172,8 @@ public:
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
   smt::expr isNonZero() const;
+
+  void strip_attrs();
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };

@@ -244,6 +244,7 @@ public:
   expr zextOrTrunc(unsigned tobw) const;
 
   expr concat(const expr &rhs) const;
+  expr concat_zeros(unsigned bits) const;
   expr extract(unsigned high, unsigned low) const;
 
   expr toBVBool() const;

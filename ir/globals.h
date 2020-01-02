@@ -14,6 +14,9 @@ extern unsigned num_locals;
 // Upperbound of the number of nonlocal blocks
 extern unsigned num_nonlocals;
 
+/// Number of bits needed for attributes of pointers (e.g. nocapture).
+extern unsigned bits_for_ptrattrs;
+
 /// Number of bits needed for encoding a memory block id
 extern unsigned bits_for_bid;
 

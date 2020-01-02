@@ -1196,6 +1196,10 @@ expr expr::concat(const expr &rhs) const {
   return binop_fold(rhs, Z3_mk_concat);
 }
 
+expr expr::concat_zeros(unsigned bits) const {
+  return bits ? concat(expr::mkUInt(0, bits)) : *this;
+}
+
 expr expr::extract(unsigned high, unsigned low) const {
   C();
   assert(high >= low && high < bits());

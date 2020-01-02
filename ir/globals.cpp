@@ -8,6 +8,7 @@ namespace IR {
 unsigned num_max_nonlocals_inst;
 unsigned num_locals;
 unsigned num_nonlocals;
+unsigned bits_for_ptrattrs;
 unsigned bits_for_bid;
 unsigned bits_for_offset;
 unsigned bits_size_t;
