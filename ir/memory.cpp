@@ -706,7 +706,7 @@ expr Pointer::is_byval() const {
 }
 
 expr Pointer::is_nocapture() const {
-  if (bits_for_ptrattrs == 0)
+  if (!has_nocapture)
     return false;
   return p.extract(0, 0) == 1;
 }

@@ -42,6 +42,9 @@ extern bool has_ptr2int;
 extern bool has_malloc;
 extern bool has_free;
 
+/// Whether any function argument (not function call arg) has the attribute
+extern bool has_nocapture;
+
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;
 
