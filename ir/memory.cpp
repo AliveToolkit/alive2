@@ -707,7 +707,7 @@ expr Pointer::is_byval() const {
 expr Pointer::is_nocapture() const {
   if (bits_for_ptrattrs == 0)
     return false;
-  return get_attrs() == 1;
+  return p.extract(0, 0) == 1;
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
