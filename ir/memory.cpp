@@ -272,6 +272,19 @@ static unsigned bits_shortbid() {
   return bits_for_bid - ptr_has_local_bit();
 }
 
+static expr attr_to_bitvec(unsigned attributes) {
+  if (!bits_for_ptrattrs)
+    return expr();
+  auto e = expr::mkUInt(0, bits_for_ptrattrs);
+  auto idx = 0;
+  auto to_bit = [&](bool b, Input::Attribute a) -> expr {
+    return expr::mkUInt(b ? (((attributes & a) ? 1 : 0) << idx++) : 0,
+                        bits_for_ptrattrs);
+  };
+  e = e | to_bit(has_nocapture, Input::NoCapture);
+  e = e | to_bit(has_readonly, Input::ReadOnly);
+  return e;
+}
 
 namespace IR {
 
@@ -494,7 +507,7 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
   cond &= p.is_block_alive();
 
   if (iswrite)
-    cond &= p.is_writable();
+    cond &= p.is_writable() && !p.is_readonly();
 
   // try some constant folding; these are implied by the conditions above
   if (bytes.ugt(block_sz).isTrue() ||
@@ -709,6 +722,12 @@ expr Pointer::is_nocapture() const {
   if (!has_nocapture)
     return false;
   return p.extract(0, 0) == 1;
+}
+
+expr Pointer::is_readonly() const {
+  if (!has_readonly)
+    return false;
+  return p.extract(has_nocapture, has_nocapture) == 1;
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
@@ -950,10 +969,7 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, unsigned attributes) const {
-  bool is_nocapture = (attributes & Input::NoCapture) != 0;
-  Pointer p(*this, name, false, false,
-            bits_for_ptrattrs ? expr::mkUInt(is_nocapture, bits_for_ptrattrs) :
-                                expr());
+  Pointer p(*this, name, false, false, attr_to_bitvec(attributes));
   if (attributes & Input::NonNull)
     state->addAxiom(p.isNonZero());
   state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
@@ -976,10 +992,8 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
                           one << var.zextOrTrunc(bits_for_offset));
     offset = undef.extract(bits_undef - 1, log_offset) | shl;
   }
-  bool is_nocapture = (attributes & Input::NoCapture) != 0;
   Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset,
-            bits_for_ptrattrs ? expr::mkUInt(is_nocapture, bits_for_ptrattrs) :
-                                expr());
+            attr_to_bitvec(attributes));
   return { p.release(), move(undef) };
 }
 

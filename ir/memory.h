@@ -76,7 +76,7 @@ public:
 class Pointer {
   const Memory &m;
 
-  // [bid, offset, is-nocapture]
+  // [bid, offset, is-readonly, is-nocapture]
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -84,8 +84,9 @@ class Pointer {
   // block can also be a local memory block.
   // Otherwise, a pointer is pointing to a non-local block, which can be either
   // of global variable, heap, or a stackframe that is not this function call.
-  // The lowest bit represents whether the pointer value came from nocapture
-  // argument. If block is local, is-nocapture cannot be 1.
+  // The lowest bits represent whether the pointer value came from a nocapture/
+  // readonly argument. If block is local, is-readonly or is-nocapture cannot
+  // be 1.
   // TODO: missing support for address space
   smt::expr p;
 
@@ -161,6 +162,7 @@ public:
   smt::expr get_alloc_type() const;
   smt::expr is_heap_allocated() const;
   smt::expr is_nocapture() const;
+  smt::expr is_readonly() const;
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninput_refined(const Pointer &other) const;

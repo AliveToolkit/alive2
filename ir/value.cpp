@@ -164,6 +164,8 @@ static string attr_str(unsigned attributes) {
     ret += "byval ";
   if (attributes & Input::NoCapture)
     ret += "nocapture ";
+  if (attributes & Input::ReadOnly)
+    ret += "readonly ";
   return ret;
 }
 

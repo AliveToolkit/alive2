@@ -585,7 +585,8 @@ static void calculateAndInitConstants(Transform &t) {
   // The number of bits needed to encode pointer attributes
   // nonnull and byval isn't encoded in ptr attribute bits
   has_nocapture = has_attr(Input::NoCapture);
-  bits_for_ptrattrs = has_nocapture;
+  has_readonly = has_attr(Input::ReadOnly);
+  bits_for_ptrattrs = has_nocapture + has_readonly;
 
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
