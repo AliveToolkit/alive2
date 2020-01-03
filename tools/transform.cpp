@@ -537,16 +537,8 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_access_size = 16;
   bool does_mem_access = false;
   bool has_load = false;
-  // The number of bits needed to encode pointer attributes
-  bits_for_ptrattrs = 0;
 
   for (auto fn : { &t.src, &t.tgt }) {
-    for (auto &v : fn->getInputs()) {
-      auto i = dynamic_cast<const Input*>(&v);
-      if (i && i->hasAttribute(Input::NoCapture))
-        bits_for_ptrattrs = 1;
-    }
-
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {
@@ -579,6 +571,20 @@ static void calculateAndInitConstants(Transform &t) {
   // check if null block is needed
   if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load)
     ++num_nonlocals;
+
+  auto has_attr = [&](Input::Attributes a) -> bool {
+    for (auto fn : { &t.src, &t.tgt }) {
+      for (auto &v : fn->getInputs()) {
+        auto i = dynamic_cast<const Input*>(&v);
+        if (i && i->hasAttribute(a))
+          return true;
+      }
+    }
+    return false;
+  };
+  // The number of bits needed to encode pointer attributes
+  // NonNull isn't encoded in ptr attribute bits
+  bits_for_ptrattrs = has_attr(Input::NoCapture);
 
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
