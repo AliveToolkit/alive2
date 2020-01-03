@@ -162,6 +162,8 @@ static string attr_str(unsigned attributes) {
     ret += "nonnull ";
   if (attributes & Input::ByVal)
     ret += "byval ";
+  if (attributes & Input::NoCapture)
+    ret += "nocapture ";
   return ret;
 }
 

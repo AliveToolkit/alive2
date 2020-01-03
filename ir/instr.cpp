@@ -1640,8 +1640,28 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
+static void addUBForNoCaptureRet(State &s, const StateValue &svret,
+                                 const Type &t) {
+  auto &[vret, npret] = svret;
+  if (t.isPtrType()) {
+    s.addUB(npret.implies(!Pointer(s.getMemory(), vret).is_nocapture()));
+    return;
+  }
+
+  if (auto agg = t.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      addUBForNoCaptureRet(s, agg->extract(svret, i), agg->getChild(i));
+    }
+  }
+}
+
 StateValue Return::toSMT(State &s) const {
-  s.addReturn(s[*val]);
+  // Encode nocapture semantics.
+  auto &retval = s[*val];
+  s.addUB(s.getMemory().check_nocapture());
+  addUBForNoCaptureRet(s, retval, val->getType());
+  s.addReturn(retval);
+
   return {};
 }
 

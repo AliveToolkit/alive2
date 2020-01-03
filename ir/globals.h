@@ -14,6 +14,9 @@ extern unsigned num_locals;
 // Upperbound of the number of nonlocal blocks
 extern unsigned num_nonlocals;
 
+/// Number of bits needed for attributes of pointers (e.g. nocapture).
+extern unsigned bits_for_ptrattrs;
+
 /// Number of bits needed for encoding a memory block id
 extern unsigned bits_for_bid;
 
@@ -38,6 +41,9 @@ extern bool has_ptr2int;
 /// Whether malloc or free/delete is used in either function
 extern bool has_malloc;
 extern bool has_free;
+
+/// Whether any function argument (not function call arg) has the attribute
+extern bool has_nocapture;
 
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;

@@ -572,6 +572,21 @@ static void calculateAndInitConstants(Transform &t) {
   if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load)
     ++num_nonlocals;
 
+  auto has_attr = [&](Input::Attribute a) -> bool {
+    for (auto fn : { &t.src, &t.tgt }) {
+      for (auto &v : fn->getInputs()) {
+        auto i = dynamic_cast<const Input*>(&v);
+        if (i && i->hasAttribute(a))
+          return true;
+      }
+    }
+    return false;
+  };
+  // The number of bits needed to encode pointer attributes
+  // nonnull and byval isn't encoded in ptr attribute bits
+  has_nocapture = has_attr(Input::NoCapture);
+  bits_for_ptrattrs = has_nocapture;
+
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
                    + (num_locals && num_nonlocals);
