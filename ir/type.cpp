@@ -4,7 +4,6 @@
 #include "ir/type.h"
 #include "ir/globals.h"
 #include "ir/state.h"
-#include "ir/value.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <array>
@@ -816,7 +815,7 @@ expr AggregateType::mkInput(State &s, const char *name, unsigned attrs) const {
   expr val;
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
-    auto v = children[i]->mkInput(s, c_name.c_str(), 0); // don't propagate attr
+    auto v = children[i]->mkInput(s, c_name.c_str(), attrs);
     v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
   }
@@ -829,7 +828,7 @@ AggregateType::mkUndefInput(State &s, unsigned attrs) const {
   vector<expr> vars;
 
   for (unsigned i = 0; i < elements; ++i) {
-    auto [v, vs] = children[i]->mkUndefInput(s, 0); // don't propagate attr
+    auto [v, vs] = children[i]->mkUndefInput(s, attrs);
     v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
     vars.insert(vars.end(), vs.begin(), vs.end());

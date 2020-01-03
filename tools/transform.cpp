@@ -572,7 +572,7 @@ static void calculateAndInitConstants(Transform &t) {
   if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load)
     ++num_nonlocals;
 
-  auto has_attr = [&](Input::Attributes a) -> bool {
+  auto has_attr = [&](Input::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
       for (auto &v : fn->getInputs()) {
         auto i = dynamic_cast<const Input*>(&v);
