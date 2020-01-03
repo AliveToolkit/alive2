@@ -955,7 +955,7 @@ expr Memory::mkInput(const char *name, unsigned attributes) const {
             bits_for_ptrattrs ? expr::mkUInt(is_nocapture, bits_for_ptrattrs) :
                                 expr());
   if (attributes & Input::NonNull)
-    state->addPre(p.isNonZero());
+    state->addAxiom(p.isNonZero());
   state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
 
   return p.release();
