@@ -276,7 +276,7 @@ void CFG::printDot(ostream &os) const {
   os << "digraph {\n"
         "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
-  for (const auto &[src, dst, instr] : *this) {
+  for (auto [src, dst, instr] : *this) {
     (void)instr;
     os << '"' << bb_dot_name(src.getName()) << "\" -> \""
        << bb_dot_name(dst.getName()) << "\";\n";
