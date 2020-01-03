@@ -18,6 +18,7 @@ public:
   void add(expr &&e);
   void add(const AndExpr &other);
   void del(const AndExpr &other);
+  bool contains(const expr &e) const;
   expr operator()() const;
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
 };

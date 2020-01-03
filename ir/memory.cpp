@@ -4,6 +4,7 @@
 #include "ir/memory.h"
 #include "ir/globals.h"
 #include "ir/state.h"
+#include "ir/value.h"
 #include "util/compiler.h"
 
 using namespace IR;
@@ -660,7 +661,8 @@ expr Pointer::block_refined(const Pointer &other) const {
          blk_size == other.block_size() &&
          get_alloc_type() == other.get_alloc_type() &&
          is_writable() == other.is_writable() &&
-         block_alignment().ule(other.block_alignment()) &&
+         m.state->simplifyWithAxioms(
+           block_alignment().ule(other.block_alignment())) &&
          (is_block_alive() && get_offset().ult(blk_size)).implies(val_refines);
 }
 
@@ -900,27 +902,44 @@ void Memory::resetLocalBids() {
   ptr_next_idx = 0;
 }
 
-expr Memory::mkInput(const char *name) const {
+expr Memory::mkInput(const char *name, unsigned attributes) const {
   Pointer p(*this,
     prepend_if(expr::mkUInt(0, 1),
                expr::mkVar(name, bits_shortbid() + bits_for_offset),
                ptr_has_local_bit()));
   state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
+
+  if (attributes & Input::NonNull)
+    state->addAxiom(p.isNonZero());
+
   return p.release();
 }
 
-pair<expr, expr> Memory::mkUndefInput() const {
-  expr offset = expr::mkFreshVar("undef", expr::mkUInt(0, bits_for_offset));
+pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
+  bool nonnull = attributes & Input::NonNull;
+  unsigned log_offset = ilog2_ceil(bits_for_offset);
+  unsigned bits_undef = bits_for_offset + nonnull * log_offset;
+  expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));
+  expr offset = undef;
+
+  if (nonnull) {
+    expr var = undef.extract(log_offset - 1, 0);
+    expr one = expr::mkUInt(1, bits_for_offset);
+    expr shl = expr::mkIf(var.ugt(bits_for_offset-1),
+                          one,
+                          one << var.zextOrTrunc(bits_for_offset));
+    offset = undef.extract(bits_undef - 1, log_offset) | shl;
+  }
   Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset);
-  return { p.release(), move(offset) };
+  return { p.release(), move(undef) };
 }
 
 expr Memory::mkFnRet(const char *name) const {
   // TODO: can only alias with escaped local blocks!
   Pointer p(*this, expr::mkVar(name, bits_for_bid + bits_for_offset));
   state->addAxiom(expr::mkIf(p.is_local(),
-                  p.get_short_bid().ule(num_locals - 1),
-                  p.get_short_bid().ule(num_nonlocals - 1)));
+                             p.get_short_bid().ule(num_locals - 1),
+                             p.get_short_bid().ule(num_nonlocals - 1)));
   return p.release();
 }
 
@@ -1232,8 +1251,7 @@ pair<expr,Pointer> Memory::refined(const Memory &other) const {
     Pointer q(other, p());
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
-  return { (ptr_bid != 0 && ptr_bid.ule(num_nonlocals - 1)).implies(ret),
-            move(ptr) };
+  return { move(ret), move(ptr) };
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

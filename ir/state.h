@@ -144,6 +144,7 @@ public:
   void syncSEdataWithSrc(const State &src);
 
   void mkAxioms(State &tgt);
+  smt::expr simplifyWithAxioms(smt::expr &&e) const;
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

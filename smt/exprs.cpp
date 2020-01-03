@@ -23,6 +23,10 @@ void AndExpr::del(const AndExpr &other) {
     exprs.erase(e);
 }
 
+bool AndExpr::contains(const expr &e) const {
+  return exprs.count(e);
+}
+
 expr AndExpr::operator()() const {
   return expr::mk_and(exprs);
 }

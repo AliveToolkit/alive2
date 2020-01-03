@@ -245,8 +245,8 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
   return expr::mkIf(boolean, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) | orig;
 }
 
-pair<expr, vector<expr>> Type::mkUndefInput(State &s) const {
-  auto var = expr::mkFreshVar("undef", mkInput(s, ""));
+pair<expr, vector<expr>> Type::mkUndefInput(State &s, unsigned attrs) const {
+  auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
   return { var, { var } };
 }
 
@@ -286,7 +286,7 @@ VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { true, true };
 }
 
-expr VoidType::mkInput(State &s, const char *name) const {
+expr VoidType::mkInput(State &s, const char *name, unsigned attributes) const {
   UNREACHABLE();
 }
 
@@ -344,7 +344,7 @@ IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
-expr IntType::mkInput(State &s, const char *name) const {
+expr IntType::mkInput(State &s, const char *name, unsigned attributes) const {
   return expr::mkVar(name, bits());
 }
 
@@ -485,7 +485,7 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
-expr FloatType::mkInput(State &s, const char *name) const {
+expr FloatType::mkInput(State &s, const char *name, unsigned attrs) const {
   switch (fpType) {
   case Half:    return expr::mkHalfVar(name);
   case Float:   return expr::mkFloatVar(name);
@@ -597,12 +597,12 @@ PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
 }
 
-expr PtrType::mkInput(State &s, const char *name) const {
-  return s.getMemory().mkInput(name);
+expr PtrType::mkInput(State &s, const char *name, unsigned attrs) const {
+  return s.getMemory().mkInput(name, attrs);
 }
 
-pair<expr, vector<expr>> PtrType::mkUndefInput(State &s) const {
-  auto [val, var] = s.getMemory().mkUndefInput();
+pair<expr, vector<expr>> PtrType::mkUndefInput(State &s, unsigned attrs) const {
+  auto [val, var] = s.getMemory().mkUndefInput(attrs);
   return { move(val), { move(var) } };
 }
 
@@ -811,23 +811,24 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { expr::mk_and(poison), expr::mk_and(value) };
 }
 
-expr AggregateType::mkInput(State &s, const char *name) const {
+expr AggregateType::mkInput(State &s, const char *name, unsigned attrs) const {
   expr val;
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
-    auto v = children[i]->mkInput(s, c_name.c_str());
+    auto v = children[i]->mkInput(s, c_name.c_str(), attrs);
     v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
   }
   return val;
 }
 
-pair<expr, vector<expr>> AggregateType::mkUndefInput(State &s) const {
+pair<expr, vector<expr>>
+AggregateType::mkUndefInput(State &s, unsigned attrs) const {
   expr val;
   vector<expr> vars;
 
   for (unsigned i = 0; i < elements; ++i) {
-    auto [v, vs] = children[i]->mkUndefInput(s);
+    auto [v, vs] = children[i]->mkUndefInput(s, attrs);
     v = children[i]->toBV(move(v));
     val = i == 0 ? move(v) : val.concat(v);
     vars.insert(vars.end(), vs.begin(), vs.end());
@@ -1244,12 +1245,13 @@ SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
   DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
 }
 
-expr SymbolicType::mkInput(State &st, const char *name) const {
-  DISPATCH(mkInput(st, name), UNREACHABLE());
+expr SymbolicType::mkInput(State &st, const char *name, unsigned attrs) const {
+  DISPATCH(mkInput(st, name, attrs), UNREACHABLE());
 }
 
-pair<expr, vector<expr>> SymbolicType::mkUndefInput(State &st) const {
-  DISPATCH(mkUndefInput(st), UNREACHABLE());
+pair<expr, vector<expr>>
+SymbolicType::mkUndefInput(State &st, unsigned attrs) const {
+  DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }
 
 void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {

@@ -197,8 +197,8 @@ public:
   static void resetGlobalData();
   static void resetLocalBids();
 
-  smt::expr mkInput(const char *name) const;
-  std::pair<smt::expr, smt::expr> mkUndefInput() const;
+  smt::expr mkInput(const char *name, unsigned attributes) const;
+  std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
   smt::expr mkFnRet(const char *name) const;
 
   // Allocates a new memory block and returns (pointer expr, allocated).

@@ -9,4 +9,4 @@ define void @destroysrc(%S* %src, %S* %dst) {
   ret void
 }
 
-declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i1 immarg)
+declare void @llvm.memset.p0i8.i64(i8*, i8, i64, i1)

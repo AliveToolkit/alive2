@@ -1081,14 +1081,10 @@ expr expr::notImplies(const expr &rhs) const {
 }
 
 expr expr::ule(const expr &rhs) const {
-  if (eq(rhs) || isZero())
+  if (eq(rhs) || isZero() || rhs.isAllOnes())
     return true;
-
-  if (rhs.isZero())
+  if (rhs.isZero() || isAllOnes())
     return *this == rhs;
-
-  if (rhs.isAllOnes())
-    return true;
 
   return binop_fold(rhs, Z3_mk_bvule);
 }

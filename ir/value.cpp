@@ -174,18 +174,15 @@ StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
-  auto val = getType().mkInput(s, smt_name.c_str());
+  auto val = getType().mkInput(s, smt_name.c_str(), attributes);
 
   if (!config::disable_undef_input) {
-    auto [undef, vars] = getType().mkUndefInput(s);
+    auto [undef, vars] = getType().mkUndefInput(s, attributes);
     for (auto &v : vars) {
       s.addUndefVar(move(v));
     }
     val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
-
-  if (attributes & NonNull)
-    s.addPre(Pointer(s.getMemory(), val).isNonZero());
 
   expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;

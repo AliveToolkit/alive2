@@ -7,6 +7,4 @@ define i32* @f(i32* %ptr, i32 %val, i64 %len) {
   ret i32* %ptr
 }
 
-declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i1 immarg) #0
-
-attributes #0 = { argmemonly nounwind willreturn }
+declare void @llvm.memset.p0i8.i64(i8*, i8, i64, i1)

@@ -355,4 +355,8 @@ void State::mkAxioms(State &tgt) {
   }
 }
 
+expr State::simplifyWithAxioms(smt::expr &&e) const {
+  return axioms.contains(e) ? expr(true) : move(e);
+}
+
 }
