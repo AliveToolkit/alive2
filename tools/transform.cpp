@@ -464,8 +464,7 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   unsigned num_ptrinputs = 0;
-  const auto &inputs = t.src.getInputs();
-  for (auto &arg : inputs) {
+  for (auto &arg : t.src.getInputs()) {
     num_ptrinputs += num_ptrs(arg.getType());
   }
 

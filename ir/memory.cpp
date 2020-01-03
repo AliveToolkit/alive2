@@ -588,12 +588,9 @@ expr Pointer::fninput_refined(const Pointer &other) const {
   expr size2 = other.block_size();
   expr off2 = other.get_offset();
 
-  // We allow alloca->anything, but not local malloc->alloca/non-local ptr
-  // because we can't go from a free'able pointer to a non-free'able
   expr local
     = expr::mkIf(is_heap_allocated(),
-                 other.is_local() && other.is_heap_allocated() && off == off2 &&
-                   size2.uge(size),
+                 other.is_heap_allocated() && off == off2 && size2.uge(size),
 
                  // must maintain same dereferenceability before & after
                  expr::mkIf(off.sle(-1),
@@ -604,6 +601,7 @@ expr Pointer::fninput_refined(const Pointer &other) const {
                                            (size2 - off2).uge(size - off),
                                          off2.sgt(size2) && off == off2 &&
                                            size2.uge(size))));
+  local = (other.is_local() || other.is_byval()) && local;
 
   // TODO: this induces an infinite loop
   // block_refined(other);
@@ -673,6 +671,15 @@ expr Pointer::is_writable() const {
     non_local &= this_bid != bid;
   }
   return is_local() || non_local;
+}
+
+expr Pointer::is_byval() const {
+  auto this_bid = get_short_bid();
+  expr non_local(false);
+  for (auto bid : m.byval_blks) {
+    non_local |= this_bid == bid;
+  }
+  return !is_local() && non_local;
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
@@ -900,6 +907,10 @@ void Memory::resetGlobalData() {
 void Memory::resetLocalBids() {
   last_local_bid = 0;
   ptr_next_idx = 0;
+}
+
+void Memory::markByVal(unsigned bid) {
+  byval_blks.emplace_back(bid);
 }
 
 expr Memory::mkInput(const char *name, unsigned attributes) const {
@@ -1249,6 +1260,8 @@ pair<expr,Pointer> Memory::refined(const Memory &other) const {
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
+    if ((p.is_byval() && q.is_byval()).isTrue())
+      continue;
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
   return { move(ret), move(ptr) };
@@ -1275,6 +1288,8 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
+  ret.byval_blks.insert(ret.byval_blks.end(), els.byval_blks.begin(),
+                        els.byval_blks.end());
   return ret;
 }
 
@@ -1285,13 +1300,13 @@ bool Memory::operator<(const Memory &rhs) const {
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_nonwritable, non_local_blk_size, non_local_blk_align,
-        non_local_blk_kind) <
+        non_local_blk_kind, byval_blks) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind, rhs.non_local_blk_nonwritable,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
-        rhs.non_local_blk_kind);
+        rhs.non_local_blk_kind, rhs.byval_blks);
 }
 
 #define P(msg, local, nonlocal)                            \

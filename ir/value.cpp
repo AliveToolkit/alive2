@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/instr.h"
+#include "ir/globals.h"
 #include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
@@ -83,29 +84,33 @@ void GlobalVariable::print(ostream &os) const {
      << " bytes, align " << align;
 }
 
-StateValue GlobalVariable::toSMT(State &s) const {
-  auto sizeexpr = expr::mkUInt(allocsize, 64);
-  expr ptrval;
-  unsigned glbvar_bid;
+static expr get_global(State &s, const string &name, const expr &size,
+                       unsigned align, bool isconst, unsigned &bid) {
+  expr ptr;
   bool allocated;
   auto blkkind = isconst ? Memory::CONSTGLOBAL : Memory::GLOBAL;
 
-  if (s.hasGlobalVarBid(getName(), glbvar_bid, allocated)) {
+  if (s.hasGlobalVarBid(name, bid, allocated)) {
     if (!allocated) {
       // Use the same block id that is used by src
       assert(!s.isSource());
-      ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, true, true,
-                                   glbvar_bid).first;
-      s.markGlobalAsAllocated(getName());
+      ptr = s.getMemory().alloc(size, align, blkkind, true, true, bid).first;
+      s.markGlobalAsAllocated(name);
     } else {
-      ptrval = Pointer(s.getMemory(), glbvar_bid, false).release();
+      ptr = Pointer(s.getMemory(), bid, false).release();
     }
   } else {
-    ptrval = s.getMemory().alloc(sizeexpr, align, blkkind, true, true, nullopt,
-                                 &glbvar_bid).first;
-    s.addGlobalVarBid(getName(), glbvar_bid);
+    ptr = s.getMemory().alloc(size, align, blkkind, true, true, nullopt,
+                              &bid).first;
+    s.addGlobalVarBid(name, bid);
   }
-  return { move(ptrval), true };
+  return ptr;
+}
+
+StateValue GlobalVariable::toSMT(State &s) const {
+  unsigned bid;
+  expr size = expr::mkUInt(allocsize, bits_size_t);
+  return { get_global(s, getName(), size, align, isconst, bid), true };
 }
 
 
@@ -155,6 +160,8 @@ static string attr_str(unsigned attributes) {
   string ret;
   if (attributes & Input::NonNull)
     ret += "nonnull ";
+  if (attributes & Input::ByVal)
+    ret += "byval ";
   return ret;
 }
 
@@ -174,7 +181,16 @@ StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
-  auto val = getType().mkInput(s, smt_name.c_str(), attributes);
+  expr val;
+  if (attributes & ByVal) {
+    unsigned bid;
+    string sz_name = getName() + "#size";
+    expr size = expr::mkVar(sz_name.c_str(), bits_size_t-1).zext(1);
+    val = get_global(s, getName(), size, 1, false, bid);
+    s.getMemory().markByVal(bid);
+  } else {
+    val = getType().mkInput(s, smt_name.c_str(), attributes);
+  }
 
   if (!config::disable_undef_input) {
     auto [undef, vars] = getType().mkUndefInput(s, attributes);

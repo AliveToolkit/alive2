@@ -738,6 +738,10 @@ public:
         // they don't change
         continue;
 
+      case llvm::Attribute::ByVal:
+        attrs |= Input::ByVal;
+        continue;
+
       case llvm::Attribute::NonNull:
         attrs |= Input::NonNull;
         continue;

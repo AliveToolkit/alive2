@@ -142,6 +142,7 @@ public:
                    const smt::expr &len2) const;
   smt::expr is_block_alive() const;
   smt::expr is_writable() const;
+  smt::expr is_byval() const;
 
   enum AllocType {
     NON_HEAP,
@@ -185,6 +186,8 @@ class Memory {
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
 
+  std::vector<unsigned> byval_blks;
+
 public:
   enum BlockKind {
     HEAP, STACK, GLOBAL, CONSTGLOBAL
@@ -197,6 +200,7 @@ public:
   static void resetGlobalData();
   static void resetLocalBids();
 
+  void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, unsigned attributes) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
   smt::expr mkFnRet(const char *name) const;

@@ -109,7 +109,7 @@ public:
 
 class Input final : public Value {
 public:
-  enum Attributes { None = 0, NonNull = 1<<0 };
+  enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1 };
 private:
   std::string smt_name;
   unsigned attributes;
