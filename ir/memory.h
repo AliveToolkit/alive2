@@ -173,8 +173,6 @@ public:
   smt::expr isNull() const;
   smt::expr isNonZero() const;
 
-  void strip_attrs();
-
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
 

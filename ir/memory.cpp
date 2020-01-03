@@ -421,7 +421,8 @@ expr Pointer::add_no_overflow(const expr &offset) const {
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {
-  return p == rhs.p;
+  return p.extract(total_bits() - 1, bits_for_ptrattrs) ==
+         rhs.p.extract(total_bits() - 1, bits_for_ptrattrs);
 }
 
 expr Pointer::operator!=(const Pointer &rhs) const {
@@ -726,13 +727,6 @@ expr Pointer::isNonZero() const {
   if (observes_addresses())
     return get_address() != 0;
   return !isNull();
-}
-
-void Pointer::strip_attrs() {
-  if (!bits_for_ptrattrs)
-    return;
-  p = p.extract(total_bits() - 1, bits_for_ptrattrs)
-       .concat_zeros(bits_for_ptrattrs);
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {

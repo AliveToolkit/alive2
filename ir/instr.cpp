@@ -1233,9 +1233,7 @@ StateValue ICmp::toSMT(State &s) const {
        elem_ty.getAsAggregateType()->getChild(0).isPtrType())) {
     fn = [&](auto &av, auto &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
-      lhs.strip_attrs();
       Pointer rhs(s.getMemory(), bv);
-      rhs.strip_attrs();
       switch (cond) {
       case EQ:  return StateValue(lhs == rhs, true);
       case NE:  return StateValue(lhs != rhs, true);
