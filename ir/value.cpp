@@ -202,11 +202,6 @@ StateValue Input::toSMT(State &s) const {
     val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
-  if (getType().isPtrType()) {
-    auto nocap = Pointer(s.getMemory(), val).is_nocapture();
-    s.addAxiom((attributes & NoCapture) ? nocap : !nocap);
-  }
-
   expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;
 

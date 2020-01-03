@@ -276,15 +276,15 @@ static unsigned bits_shortbid() {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
-                 bool unique_name, bool has_attr) : m(m) {
+                 bool unique_name, const expr &attr) : m(m) {
   string name = var_name;
   if (unique_name)
     name += '!' + to_string(ptr_next_idx++);
-  unsigned bits = total_bits() - ptr_has_local_bit() -
-                  (has_attr ? 0 : bits_for_ptrattrs);
+  unsigned bits = total_bits() - ptr_has_local_bit() - bits_for_ptrattrs;
   p = prepend_if(local.toBVBool(), expr::mkVar(name.c_str(), bits),
-                 ptr_has_local_bit())
-                 .concat_zeros(has_attr ? 0 : bits_for_ptrattrs);
+                 ptr_has_local_bit());
+  if (bits_for_ptrattrs)
+    p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
   assert(!p.isValid() || p.bits() == total_bits());
 }
 
@@ -308,8 +308,10 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
 }
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
-                 const expr &attrs)
-  : m(m), p(bid.concat(offset).concat(attrs)) {
+                 const expr &attr) : m(m) {
+  p = bid.concat(offset);
+  if (bits_for_ptrattrs)
+    p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
   assert(!p.isValid() || p.bits() == total_bits());
 }
 
@@ -804,7 +806,7 @@ Memory::Memory(State &state) : state(&state) {
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
   if (does_ptr_mem_access) {
-    auto idx = Pointer(*this, "#idx", false, false, false).short_ptr();
+    auto idx = Pointer(*this, "#idx", false, false, expr()).short_ptr();
 #if 0
     if (num_nonlocals > 0) {
       expr is_ptr = expr::mkUF("blk_init_isptr", { idx }, true);
@@ -954,11 +956,13 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, unsigned attributes) const {
-  Pointer p(*this, name, false, false);
-  state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
-
+  bool is_nocapture = (attributes & Input::NoCapture) != 0;
+  Pointer p(*this, name, false, false,
+            bits_for_ptrattrs ? expr::mkUInt(is_nocapture, bits_for_ptrattrs) :
+                                expr());
   if (attributes & Input::NonNull)
-    state->addAxiom(p.isNonZero());
+    state->addPre(p.isNonZero());
+  state->addAxiom(p.get_short_bid().ule(num_nonlocals - 1));
 
   return p.release();
 }
@@ -978,8 +982,10 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
                           one << var.zextOrTrunc(bits_for_offset));
     offset = undef.extract(bits_undef - 1, log_offset) | shl;
   }
-  // Undef pointer does not have any attribute.
-  Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset);
+  bool is_nocapture = (attributes & Input::NoCapture) != 0;
+  Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset,
+            bits_for_ptrattrs ? expr::mkUInt(is_nocapture, bits_for_ptrattrs) :
+                                expr());
   return { p.release(), move(undef) };
 }
 
