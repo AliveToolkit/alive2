@@ -1661,7 +1661,6 @@ StateValue Return::toSMT(State &s) const {
   s.addUB(s.getMemory().check_nocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
   s.addReturn(retval);
-
   return {};
 }
 

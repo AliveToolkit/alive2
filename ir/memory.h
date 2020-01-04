@@ -100,9 +100,8 @@ public:
           const smt::expr &attr = smt::expr());
   Pointer(const Memory &m, smt::expr p);
   Pointer(const Memory &m, unsigned bid, bool local);
-  Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
-          const smt::expr &attrs);
+          const smt::expr &attrs = smt::expr());
 
   static unsigned total_bits();
 

@@ -275,15 +275,15 @@ static unsigned bits_shortbid() {
 static expr attr_to_bitvec(unsigned attributes) {
   if (!bits_for_ptrattrs)
     return expr();
-  auto e = expr::mkUInt(0, bits_for_ptrattrs);
+
+  uint64_t bits = 0;
   auto idx = 0;
-  auto to_bit = [&](bool b, Input::Attribute a) -> expr {
-    return expr::mkUInt(b ? (((attributes & a) ? 1 : 0) << idx++) : 0,
-                        bits_for_ptrattrs);
+  auto to_bit = [&](bool b, Input::Attribute a) -> uint64_t {
+    return b ? (((attributes & a) ? 1 : 0) << idx++) : 0;
   };
-  e = e | to_bit(has_nocapture, Input::NoCapture);
-  e = e | to_bit(has_readonly, Input::ReadOnly);
-  return e;
+  bits |= to_bit(has_nocapture, Input::NoCapture);
+  bits |= to_bit(has_readonly, Input::ReadOnly);
+  return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
 namespace IR {
@@ -298,7 +298,7 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
                  ptr_has_local_bit());
   if (bits_for_ptrattrs)
     p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
-  assert(!p.isValid() || p.bits() == total_bits());
+  assert(!local.isValid() || p.bits() == total_bits());
 }
 
 Pointer::Pointer(const Memory &m, expr repr) : m(m), p(move(repr)) {
@@ -315,17 +315,11 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
   assert(p.bits() == total_bits());
 }
 
-Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset)
-  : m(m), p(bid.concat(offset).concat_zeros(bits_for_ptrattrs)) {
-  assert(!p.isValid() || p.bits() == total_bits());
-}
-
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
-                 const expr &attr) : m(m) {
-  p = bid.concat(offset);
+                 const expr &attr) : m(m), p(bid.concat(offset)) {
   if (bits_for_ptrattrs)
     p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
-  assert(!p.isValid() || p.bits() == total_bits());
+  assert(!bid.isValid() || !offset.isValid() || p.bits() == total_bits());
 }
 
 unsigned Pointer::total_bits() {
@@ -356,6 +350,7 @@ expr Pointer::get_offset() const {
 }
 
 expr Pointer::get_attrs() const {
+  assert(bits_for_ptrattrs > 0);
   return p.extract(bits_for_ptrattrs - 1, 0);
 }
 
@@ -415,10 +410,8 @@ expr Pointer::short_ptr() const {
 
 Pointer Pointer::operator+(const expr &bytes) const {
   expr off = (get_offset() + bytes.zextOrTrunc(bits_size_t));
-  if (bits_for_ptrattrs)
-    return { m, get_bid(), off.trunc(bits_for_offset), get_attrs() };
-  else
-    return { m, get_bid(), off.trunc(bits_for_offset) };
+  return { m, get_bid(), off.trunc(bits_for_offset),
+           bits_for_ptrattrs ? get_attrs() : expr() };
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
@@ -719,8 +712,13 @@ expr Pointer::is_byval() const {
 }
 
 expr Pointer::is_nocapture() const {
-  if (!has_nocapture)
+  if (!has_nocapture || !did_pointer_store)
     return false;
+
+  // local pointers can't be no-capture
+  if (is_local().isTrue())
+    return false;
+
   return p.extract(0, 0) == 1;
 }
 
