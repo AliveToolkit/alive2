@@ -567,6 +567,22 @@ public:
 };
 
 
+class Strlen final : public Instr {
+  Value *ptr;
+public:
+  Strlen(Type &type, std::string &&name, Value &ptr)
+    : Instr(type, std::move(name)), ptr(&ptr) {}
+
+  Value *getPointer() const { return ptr; }
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class ExtractElement final : public Instr {
   Value *v, *idx;
 public:

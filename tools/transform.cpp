@@ -462,6 +462,15 @@ static optional<int64_t> get_int(const Value &val) {
 
 static uint64_t max_mem_access, max_alloc_size;
 
+static uint64_t get_globalvar_size(const Value *V) {
+  auto cop = dynamic_cast<const ConversionOp *>(V);
+  if (cop && cop->getOp() == ConversionOp::BitCast)
+    return get_globalvar_size(&cop->getValue());
+  if (auto glb = dynamic_cast<const GlobalVariable *>(V))
+    return glb->size();
+  return UINT64_MAX;
+}
+
 static uint64_t max_gep(const Instr &inst) {
   if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
     // if addresses are observed, then expose full ptr range
@@ -504,6 +513,11 @@ static uint64_t max_gep(const Instr &inst) {
       max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
     else
       max_mem_access = UINT64_MAX;
+    return 0;
+  }
+  if (auto slen = dynamic_cast<const Strlen *>(&inst)) {
+    max_mem_access = max(max_mem_access,
+                         get_globalvar_size(slen->getPointer()));
     return 0;
   }
 
@@ -563,7 +577,8 @@ static uint64_t get_access_size(const Type &ty) {
 
 static uint64_t get_access_size(const Instr &inst) {
   if (dynamic_cast<const Calloc*>(&inst) ||
-      dynamic_cast<const Memcpy *>(&inst)) {
+      dynamic_cast<const Memcpy *>(&inst) ||
+      dynamic_cast<const Strlen*>(&inst)) {
     // TODO
     does_int_mem_access = true;
     return 1;

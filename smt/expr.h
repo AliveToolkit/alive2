@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include <cstdint>
+#include <functional>
 #include <ostream>
 #include <set>
 #include <string>
@@ -276,6 +277,10 @@ public:
   // of the desired type
   static expr mkUF(const char *name, const std::vector<expr> &args,
                    const expr &range);
+  static expr mkRecFnApp(const char *name, const std::vector<expr> &argdefs,
+                         const expr &range,
+                         std::function<expr(const expr&)> funbody,
+                         const std::vector<expr> &args);
 
   static expr mkArray(const char *name, const expr &domain, const expr &range);
   static expr mkConstArray(const expr &domain, const expr &value);
@@ -286,6 +291,10 @@ public:
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
   static expr mkLambda(const std::set<expr> &vars, const expr &val);
+
+  // If this is a function call, returns a new app with arguments replaced with
+  // args
+  expr app(const std::vector<expr> &args) const;
 
   expr simplify() const;
 

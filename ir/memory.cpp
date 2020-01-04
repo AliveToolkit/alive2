@@ -500,22 +500,23 @@ DEFINE_CMP(ult)
 DEFINE_CMP(uge)
 DEFINE_CMP(ugt)
 
-static expr inbounds(const Pointer &p) {
+static expr inbounds(const Pointer &p, bool strict) {
   if (isUndef(p.get_offset()))
     return false;
 
   // equivalent to offset >= 0 && offset <= block_size
   // because block_size u<= 0x7FFF..FF
-  return p.get_offset_sizet().ule(p.block_size());
+  auto ofs = p.get_offset_sizet();
+  return strict ? ofs.ult(p.block_size()) : ofs.ule(p.block_size());
 }
 
-expr Pointer::inbounds(bool simplify_ptr) {
+expr Pointer::inbounds(bool simplify_ptr, bool strict) {
   if (!simplify_ptr)
-    return ::inbounds(*this);
+    return ::inbounds(*this, strict);
 
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
-    expr inb = ::inbounds(Pointer(m, ptr_expr));
+    expr inb = ::inbounds(Pointer(m, ptr_expr), strict);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
     ret.add(move(inb), domain);

@@ -4,6 +4,7 @@
 #include "ir/instr.h"
 #include "ir/function.h"
 #include "ir/globals.h"
+#include "ir/memory.h"
 #include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/exprs.h"
@@ -2217,6 +2218,79 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
 unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
   return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
 }
+
+
+vector<Value*> Strlen::operands() const {
+  return { ptr };
+}
+
+void Strlen::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void Strlen::print(ostream &os) const {
+  os << getName() << " = strlen " << *ptr;
+}
+
+StateValue Strlen::toSMT(State &s) const {
+  auto &[eptr, np_ptr] = s[*ptr];
+  s.addUB(np_ptr);
+
+  const auto &m = s.getMemory();
+  auto &localval = m.get_local_block_val();
+  auto &nonlocalval = m.get_non_local_block_val();
+  Pointer p(m, eptr);
+  vector<expr> strlen_call_args
+    = { p.get_bid(), p.get_offset(), p.block_size(), localval, nonlocalval };
+
+  // Define an SMT recursive function for strlen:
+  // def strlen_fn(bid, ofs, blksz, local_vals, nonlocal_vals)
+  //    -> BitVec<bits_offset_t+1>:
+  // Result: [found offset; ub?(0 if ub)]
+  auto bid = expr::mkVar("bid", bits_for_bid);
+  auto ofs = expr::mkVar("ofs", bits_for_offset);
+  auto blksz = expr::mkVar("blksz", expr::mkUInt(0, bits_size_t));
+  auto lbval = expr::mkVar("lbval", m.get_local_block_val());
+  auto nlbval = expr::mkVar("nlbval", m.get_non_local_block_val());
+
+  auto strlen_fbody = [&](const expr &decl) -> expr {
+    vector<expr> next_recfn_args
+      = { bid, ofs + expr::mkUInt(1, ofs.bits()), blksz, lbval, nlbval };
+
+    Pointer ptr(m, bid, ofs);
+    Byte byte(m, expr::mkIf(ptr.is_local(), lbval.load(ptr.short_ptr()),
+                                            nlbval.load(ptr.short_ptr())));
+    auto is_ub = blksz.ule(ptr.get_offset().zextOrTrunc(bits_size_t)) ||
+                 byte.is_ptr() || byte.is_poison(false);
+    return
+      expr::mkIf(is_ub, expr::mkUInt(0, 1 + bits_for_offset),
+                        expr::mkIf(byte.is_zero(),
+                                   ofs.concat(expr::mkUInt(1, 1)),
+                                   decl.app(next_recfn_args)));
+  };
+  auto result
+    = expr::mkRecFnApp("strlen_fn", { bid, ofs, blksz, lbval, nlbval },
+                       expr::mkUInt(0, bits_for_offset + 1), strlen_fbody,
+                       strlen_call_args);
+
+  s.addUB(result.extract(0, 0) == expr::mkUInt(1, 1));
+  auto len = (result.extract(result.bits() - 1, 1) - p.get_offset())
+             .zextOrTrunc(getType().bits());
+  p.is_dereferenceable(len + expr::mkUInt(1, len.bits()), 1, false);
+
+  return { move(len), true };
+}
+
+expr Strlen::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr->getType().enforcePtrType() &&
+         getType().enforceIntType();
+}
+
+unique_ptr<Instr> Strlen::dup(const string &suffix) const {
+  return make_unique<Strlen>(getType(), getName() + suffix, *ptr);
+}
+
 
 
 vector<Value*> ExtractElement::operands() const {
