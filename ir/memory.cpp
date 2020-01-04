@@ -493,14 +493,16 @@ expr Pointer::is_aligned(unsigned align) const {
   return get_address().extract(bits - 1, 0) == 0;
 }
 
-static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
+static pair<expr, expr> is_dereferenceable(const Pointer &p,
+                                           const expr &bytes_off,
+                                           const expr &bytes,
                                            unsigned align, bool iswrite) {
   expr block_sz = p.block_size();
-  expr offset = p.get_offset_sizet();
+  expr offset = p.get_offset();
 
   // check that offset is within bounds and that arith doesn't overflow
-  expr cond = (offset + bytes).ule(block_sz);
-  cond &= offset.add_no_uoverflow(bytes);
+  expr cond = (offset + bytes_off).sextOrTrunc(bits_size_t).ule(block_sz);
+  cond &= offset.add_no_uoverflow(bytes_off);
 
   cond &= p.is_block_alive();
 
@@ -509,7 +511,7 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
 
   // try some constant folding; these are implied by the conditions above
   if (bytes.ugt(block_sz).isTrue() ||
-      offset.uge(block_sz).isTrue())
+      offset.sextOrTrunc(bits_size_t).uge(block_sz).isTrue())
     cond = false;
 
   return { move(cond), p.is_aligned(align) };
@@ -518,12 +520,14 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
 // When bytes is 0, pointer is always derefenceable
 void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
                                  bool iswrite) {
+  expr bytes_off = bytes0.zextOrTrunc(bits_for_offset);
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true)) {
     Pointer ptr(m, ptr_expr);
-    auto [ub, aligned] = ::is_dereferenceable(ptr, bytes, align, iswrite);
+    auto [ub, aligned] = ::is_dereferenceable(ptr, bytes_off, bytes, align,
+                                              iswrite);
 
     // record pointer if not definitely unfeasible
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.block_size().isZero())
@@ -546,7 +550,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
 }
 
 void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
-  is_dereferenceable(expr::mkUInt(bytes, bits_for_offset), align, iswrite);
+  is_dereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite);
 }
 
 // general disjoint check for unsigned integer
@@ -1132,7 +1136,7 @@ void Memory::free(const expr &ptr, bool unconstrained) {
   ::store(p, false, local_block_liveness, non_local_block_liveness, true);
 }
 
-static unsigned getStoreByteSize(const Type &ty) {
+unsigned Memory::getStoreByteSize(const Type &ty) {
   if (ty.isPtrType())
     return divide_up(bits_size_t, 8);
 

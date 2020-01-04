@@ -474,10 +474,10 @@ static uint64_t max_gep(const Instr &inst) {
     return abs(off);
   }
   if (auto load = dynamic_cast<const Load*>(&inst)) {
-    return divide_up(load->getType().bits(), 8);
+    return Memory::getStoreByteSize(load->getType());
   }
   if (auto store = dynamic_cast<const Store*>(&inst)) {
-    return divide_up(store->getValue().bits(), 8);
+    return Memory::getStoreByteSize(store->getValue().getType());
   }
   if (auto cpy = dynamic_cast<const Memcpy*>(&inst)) {
     if (auto bytes = get_int(cpy->getBytes()))

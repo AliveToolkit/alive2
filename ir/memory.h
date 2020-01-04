@@ -234,6 +234,7 @@ public:
   // are not checked.
   void free(const smt::expr &ptr, bool unconstrained);
 
+  static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align, bool deref_check = true);
   StateValue load(const smt::expr &ptr, const Type &type, unsigned align,
