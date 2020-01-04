@@ -6,13 +6,13 @@
 #include "ir/state.h"
 #include "ir/value.h"
 #include "util/compiler.h"
+#include <string>
 
 using namespace IR;
 using namespace smt;
 using namespace std;
 using namespace util;
 
-static bool did_pointer_store = false;
 static unsigned ptr_next_idx = 0;
 
 static expr concat_if(const expr &ifvalid, expr &&e) {
@@ -21,6 +21,11 @@ static expr concat_if(const expr &ifvalid, expr &&e) {
 
 static expr prepend_if(const expr &pre, expr &&e, bool prepend) {
   return prepend ? pre.concat(e) : move(e);
+}
+
+static string local_name(const State *s, const char *name) {
+  string n = name;
+  return n + (s->isSource() ? "_src" : "_tgt");
 }
 
 namespace IR {
@@ -363,9 +368,7 @@ expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
   if (auto val = nonlocal_fn.lookup(bid))
     non_local = *val;
   else {
-    string uf = name;
-    if (src_name)
-      uf += m.state->isSource() ? "_src" : "_tgt";
+    string uf = src_name ? local_name(m.state, name) : name;
     non_local = expr::mkUF(uf.c_str(), { bid }, ret_type);
   }
 
@@ -654,7 +657,7 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   expr is_ptr = val.is_ptr();
   expr is_ptr2 = val2.is_ptr();
   expr ptr_cnstr;
-  if (!did_pointer_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
+  if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
     ptr_cnstr = val == val2;
   } else {
     ptr_cnstr = val2.ptr_nonpoison() && val.ptr().refined(val2.ptr());
@@ -712,7 +715,7 @@ expr Pointer::is_byval() const {
 }
 
 expr Pointer::is_nocapture() const {
-  if (!has_nocapture || !did_pointer_store)
+  if (!has_nocapture)
     return false;
 
   // local pointers can't be no-capture
@@ -756,7 +759,7 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   os << ", offset=";
   p.get_offset().printSigned(os);
 
-  if (bits_for_ptrattrs) {
+  if (bits_for_ptrattrs && !p.get_attrs().isZero()) {
     os << ", attrs=";
     p.get_attrs().printUnsigned(os);
   }
@@ -766,10 +769,6 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 
 static void store(const Pointer &p, const expr &val, expr &local,
                   expr &non_local, bool index_bid = false) {
-  // check if we are potentially storing a pointer
-  if (!index_bid)
-    did_pointer_store |= !Byte(p.getMemory(), expr(val)).is_ptr().isFalse();
-
   auto is_local = p.is_local();
   auto idx = index_bid ? p.get_short_bid() : p.short_ptr();
   local = expr::mkIf(is_local, local.store(idx, val), local);
@@ -954,7 +953,6 @@ void Memory::mkAxioms(const Memory &other) const {
 void Memory::resetGlobalData() {
   resetLocalBids();
   last_nonlocal_bid = 1;
-  did_pointer_store = false;
 }
 
 void Memory::resetLocalBids() {
@@ -1318,7 +1316,11 @@ pair<expr,Pointer> Memory::refined(const Memory &other) const {
 }
 
 expr Memory::check_nocapture() const {
-  auto ofs = expr::mkFreshVar("ofs", expr::mkUInt(0, bits_for_offset));
+  if (!does_ptr_store)
+    return true;
+
+  auto name = local_name(state, "#offset_nocapture");
+  auto ofs = expr::mkVar(name.c_str(), bits_for_offset);
   expr res(true);
 
   for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
@@ -1326,12 +1328,12 @@ expr Memory::check_nocapture() const {
     Byte b(*this, non_local_block_val.load(p.short_ptr()));
     Pointer loadp(*this, b.ptr_value());
     res &= p.is_block_alive().implies(
-        expr::mkForAll({ ofs },
-            (b.is_ptr() && b.ptr_nonpoison()).implies(!loadp.is_nocapture())));
+             (b.is_ptr() && b.ptr_nonpoison()).implies(!loadp.is_nocapture()));
   }
+  if (!res.isTrue())
+    state->addQuantVar(ofs);
   return res;
 }
-
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
@@ -1388,8 +1390,7 @@ ostream& operator<<(ostream &os, const Memory &m) {
   P("BLOCK SIZE:", local_blk_size, non_local_blk_size);
   P("BLOCK ALIGN:", local_blk_align, non_local_blk_align);
   P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
-  return os << "LOCAL BLOCK ADDR: " << m.local_blk_addr
-            << "\nDid pointer store: " << did_pointer_store << '\n';
+  return os << "LOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
 }
 
 }

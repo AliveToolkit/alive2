@@ -52,5 +52,6 @@ extern bool has_dead_allocas;
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;
+extern bool does_ptr_store;
 
 }

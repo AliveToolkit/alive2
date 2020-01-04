@@ -484,6 +484,7 @@ static void calculateAndInitConstants(Transform &t) {
     if (auto st = dynamic_cast<const Store *>(&inst)) {
       value_ty = &st->getValue()->getType();
       align = st->getAlign();
+      does_ptr_store |= hasPtr(*value_ty);
     } else if (auto ld = dynamic_cast<const Load *>(&inst)) {
       value_ty = &ld->getType();
       align = ld->getAlign();
@@ -530,6 +531,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_ptr2int      = false;
   has_malloc       = false;
   has_free         = false;
+  does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
 
@@ -614,6 +616,7 @@ static void calculateAndInitConstants(Transform &t) {
                      "has_ptr2int: " << has_ptr2int << "\n"
                      "has_malloc: " << has_malloc << "\n"
                      "has_free: " << has_free << "\n"
+                     "does_ptr_store: " << does_ptr_store << "\n"
                      "does_ptr_mem_access: " << does_ptr_mem_access << "\n"
                      "does_int_mem_access: " << does_int_mem_access << "\n"
     ;
