@@ -446,6 +446,31 @@ static bool returns_nonlocal(const Instr &inst) {
   return 0u;
 }
 
+static uint64_t max_gep(const Instr &inst) {
+  if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
+    // if addresses are observed, then expose full ptr range
+    if (conv->getOp() == ConversionOp::Int2Ptr ||
+        conv->getOp() == ConversionOp::Ptr2Int)
+      return UINT64_MAX;
+  }
+
+  if (auto gep = dynamic_cast<const GEP*>(&inst)) {
+    int64_t off = 0;
+    for (auto &[mul, v] : gep->getIdxs()) {
+      if (auto i = dynamic_cast<IntConst*>(v)) {
+        if (auto n = i->getInt()) {
+          off += mul * *n;
+          continue;
+        }
+      }
+      return UINT64_MAX;
+    }
+    return abs(off);
+  }
+
+  return 0;
+}
+
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
@@ -505,6 +530,7 @@ static void calculateAndInitConstants(Transform &t) {
   num_max_nonlocals_inst = 0;
   // The number of local blocks.
   unsigned num_locals_src = 0, num_locals_tgt = 0;
+  uint64_t max_gep_src = 0, max_gep_tgt = 0;
 
   for (auto BB : t.src.getBBs()) {
     for (auto &i : BB->instrs()) {
@@ -512,6 +538,7 @@ static void calculateAndInitConstants(Transform &t) {
         ++num_locals_src;
       else
         num_max_nonlocals_inst += returns_nonlocal(i);
+      max_gep_src = add_saturate(max_gep_src, max_gep(i));
     }
   }
   for (auto BB : t.tgt.getBBs()) {
@@ -520,6 +547,7 @@ static void calculateAndInitConstants(Transform &t) {
         ++num_locals_tgt;
       else
         num_max_nonlocals_inst += returns_nonlocal(i);
+      max_gep_tgt = add_saturate(max_gep_tgt, max_gep(i));
     }
   }
   num_locals = max(num_locals_src, num_locals_tgt);
@@ -592,8 +620,12 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
                    + (num_locals && num_nonlocals);
 
-  // TODO
-  bits_for_offset = 64;
+  // reserve a multiple of 4 for the number of offset bits to make SMT &
+  // counterexamples more readable
+  // Allow an extra bit for the sign, and another for power-of-2 cases
+  // e.g. gep(p, 8) -> log(8)=3, but +8 = 01000 (5 bits)
+  auto max_geps = ilog2_ceil(max(max_gep_src, max_gep_tgt)) + 2;
+  bits_for_offset = min(round_up(max(max_geps, 1u), 4), (uint64_t)bits_size_t);
 
   // size of byte
   bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size : 1);

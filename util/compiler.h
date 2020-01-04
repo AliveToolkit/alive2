@@ -49,6 +49,9 @@ unsigned num_sign_bits(uint64_t n);
 unsigned num_leading_zeros(uint64_t n);
 unsigned num_trailing_zeros(uint64_t n);
 
+uint64_t add_saturate(uint64_t a, uint64_t b);
+
 uint64_t divide_up(uint64_t n, uint64_t amount); // division with ceiling
+uint64_t round_up(uint64_t n, uint64_t amount);
 uint64_t gcd(uint64_t a, uint64_t b);
 }

@@ -62,8 +62,17 @@ unsigned num_trailing_zeros(uint64_t n) {
 #endif
 }
 
+uint64_t add_saturate(uint64_t a, uint64_t b) {
+  auto res = a + b;
+  return (res >= a && res >= b) ? res : UINT64_MAX;
+}
+
 uint64_t divide_up(uint64_t n, uint64_t amount) {
   return (n + amount - 1) / amount;
+}
+
+uint64_t round_up(uint64_t n, uint64_t amount) {
+  return divide_up(n, amount) * amount;
 }
 
 uint64_t gcd(uint64_t n, uint64_t m) {

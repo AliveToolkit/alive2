@@ -11,6 +11,7 @@
 #include <functional>
 
 using namespace smt;
+using namespace util;
 using namespace std;
 
 #define RAUW(val)    \
@@ -1920,11 +1921,13 @@ StateValue GEP::toSMT(State &s) const {
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
+      assert(ilog2_ceil(sz) <= bits_for_offset);
       auto multiplier = expr::mkUInt(sz, bits_for_offset);
       auto val = v.sextOrTrunc(bits_for_offset);
       auto inc = multiplier * val;
 
       if (inbounds) {
+        non_poison &= val.sextOrTrunc(v.bits()) == v;
         non_poison &= multiplier.mul_no_soverflow(val);
         non_poison &= ptr.add_no_overflow(inc);
       }

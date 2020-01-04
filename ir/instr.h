@@ -472,6 +472,7 @@ public:
 
   void addIdx(unsigned obj_size, Value &idx);
   Value* getPtr() const { return ptr; }
+  auto& getIdxs() const { return idxs; }
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

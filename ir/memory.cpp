@@ -350,8 +350,11 @@ expr Pointer::get_short_bid() const {
 }
 
 expr Pointer::get_offset() const {
-  return p.extract(bits_for_offset + bits_for_ptrattrs - 1, bits_for_ptrattrs)
-          .sextOrTrunc(bits_size_t);
+  return p.extract(bits_for_offset + bits_for_ptrattrs - 1, bits_for_ptrattrs);
+}
+
+expr Pointer::get_offset_sizet() const {
+  return get_offset().sextOrTrunc(bits_size_t);
 }
 
 expr Pointer::get_attrs() const {
@@ -395,7 +398,7 @@ expr Pointer::get_address(bool simplify) const {
   else
     addr = move(non_local);
 
-  return addr + get_offset();
+  return addr + get_offset_sizet();
 }
 
 expr Pointer::block_size() const {
@@ -412,8 +415,7 @@ expr Pointer::short_ptr() const {
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
-  expr off = (get_offset() + bytes.zextOrTrunc(bits_size_t));
-  return { m, get_bid(), off.trunc(bits_for_offset),
+  return { m, get_bid(), get_offset() + bytes.zextOrTrunc(bits_for_offset),
            bits_for_ptrattrs ? get_attrs() : expr() };
 }
 
@@ -456,7 +458,7 @@ DEFINE_CMP(ugt)
 expr Pointer::inbounds() const {
   // equivalent to offset >= 0 && offset <= block_size
   // because block_size u<= 0x7FFF..
-  return get_offset().ule(block_size());
+  return get_offset_sizet().ule(block_size());
 }
 
 expr Pointer::block_alignment() const {
@@ -494,7 +496,7 @@ expr Pointer::is_aligned(unsigned align) const {
 static pair<expr, expr> is_dereferenceable(const Pointer &p, const expr &bytes,
                                            unsigned align, bool iswrite) {
   expr block_sz = p.block_size();
-  expr offset = p.get_offset();
+  expr offset = p.get_offset_sizet();
 
   // check that offset is within bounds and that arith doesn't overflow
   expr cond = (offset + bytes).ule(block_sz);
@@ -558,9 +560,9 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
 void Pointer::is_disjoint(const expr &len1, const Pointer &ptr2,
                            const expr &len2) const {
   m.state->addUB(get_bid() != ptr2.get_bid() ||
-                  disjoint(get_offset(),
+                  disjoint(get_offset_sizet(),
                            len1.zextOrTrunc(bits_size_t),
-                           ptr2.get_offset(),
+                           ptr2.get_offset_sizet(),
                            len2.zextOrTrunc(bits_size_t)));
 }
 
@@ -616,9 +618,9 @@ expr Pointer::refined(const Pointer &other) const {
 
 expr Pointer::fninput_refined(const Pointer &other) const {
   expr size = block_size();
-  expr off = get_offset();
+  expr off = get_offset_sizet();
   expr size2 = other.block_size();
-  expr off2 = other.get_offset();
+  expr off2 = other.get_offset_sizet();
 
   expr local
     = expr::mkIf(is_heap_allocated(),
@@ -693,7 +695,8 @@ expr Pointer::block_refined(const Pointer &other) const {
          is_writable() == other.is_writable() &&
          m.state->simplifyWithAxioms(
            block_alignment().ule(other.block_alignment())) &&
-         (is_block_alive() && get_offset().ult(blk_size)).implies(val_refines);
+         (is_block_alive() && get_offset_sizet().ult(blk_size))
+           .implies(val_refines);
 }
 
 expr Pointer::is_writable() const {
