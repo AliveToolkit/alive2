@@ -617,15 +617,14 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_ptrattrs = has_nocapture + has_readonly;
 
   // ceil(log2(maxblks)) + 1 for local bit
-  bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals)))
+  bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals), false))
                    + (num_locals && num_nonlocals);
 
   // reserve a multiple of 4 for the number of offset bits to make SMT &
   // counterexamples more readable
-  // Allow an extra bit for the sign, and another for power-of-2 cases
-  // e.g. gep(p, 8) -> log(8)=3, but +8 = 01000 (5 bits)
-  auto max_geps = ilog2_ceil(max(max_gep_src, max_gep_tgt)) + 2;
-  bits_for_offset = min(round_up(max(max_geps, 1u), 4), (uint64_t)bits_size_t);
+  // Allow an extra bit for the sign
+  auto max_geps = ilog2_ceil(max(max_gep_src, max_gep_tgt), true) + 1;
+  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)bits_size_t);
 
   // size of byte
   bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size : 1);

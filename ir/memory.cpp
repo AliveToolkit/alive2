@@ -978,7 +978,7 @@ expr Memory::mkInput(const char *name, unsigned attributes) const {
 
 pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
   bool nonnull = attributes & Input::NonNull;
-  unsigned log_offset = ilog2_ceil(bits_for_offset);
+  unsigned log_offset = ilog2_ceil(bits_for_offset, false);
   unsigned bits_undef = bits_for_offset + nonnull * log_offset;
   expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));
   expr offset = undef;

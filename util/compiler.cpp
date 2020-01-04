@@ -18,9 +18,9 @@ unsigned ilog2(uint64_t n) {
 #endif
 }
 
-unsigned ilog2_ceil(uint64_t n) {
+unsigned ilog2_ceil(uint64_t n, bool up_power2) {
   auto log = ilog2(n);
-  return is_power2(n) ? log : log + 1;
+  return !up_power2 && is_power2(n) ? log : log + 1;
 }
 
 bool is_power2(uint64_t n, uint64_t *log) {

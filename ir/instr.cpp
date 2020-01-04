@@ -1921,7 +1921,6 @@ StateValue GEP::toSMT(State &s) const {
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
-      assert(ilog2_ceil(sz) <= bits_for_offset);
       auto multiplier = expr::mkUInt(sz, bits_for_offset);
       auto val = v.sextOrTrunc(bits_for_offset);
       auto inc = multiplier * val;
@@ -1931,6 +1930,12 @@ StateValue GEP::toSMT(State &s) const {
         non_poison &= multiplier.mul_no_soverflow(val);
         non_poison &= ptr.add_no_overflow(inc);
       }
+
+#ifndef NDEBUG
+      int64_t n;
+      if (inc.isInt(n))
+        assert(ilog2_ceil(abs(n), true) <= bits_for_offset);
+#endif
 
       ptr += inc;
       non_poison &= np;
