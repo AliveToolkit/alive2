@@ -44,6 +44,7 @@ extern bool has_free;
 
 /// Whether any function argument (not function call arg) has the attribute
 extern bool has_nocapture;
+extern bool has_readonly;
 
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;

@@ -750,6 +750,10 @@ public:
         attrs |= Input::NoCapture;
         continue;
 
+      case llvm::Attribute::ReadOnly:
+        attrs |= Input::ReadOnly;
+        continue;
+
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return {};
