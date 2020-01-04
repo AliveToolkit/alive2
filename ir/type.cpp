@@ -256,7 +256,7 @@ ostream& operator<<(ostream &os, const Type &t) {
 }
 
 string Type::toString() const {
-  stringstream s;
+  ostringstream s;
   print(s);
   return s.str();
 }
@@ -423,6 +423,49 @@ expr FloatType::toInt(State &s, expr fp) const {
 
 StateValue FloatType::toInt(State &s, StateValue v) const {
   return Type::toInt(s, move(v));
+}
+
+bool FloatType::isNaNInt(const expr &e) const {
+  if (!e.isValid())
+    return false;
+
+  auto bw = e.bits();
+  unsigned exp_bits = float_sizes[fpType].second;
+  unsigned fraction_bits = bw - exp_bits - 1;
+
+  expr sign = e.extract(bw - 1, bw - 1);
+  expr exponent = e.extract(bw - 2, fraction_bits);
+  expr fraction = e.extract(fraction_bits - 1, 0);
+  assert(exponent.bits() == exp_bits);
+
+  expr nan, nan2;
+  unsigned h, l;
+  bool ok = sign.isExtract(nan, h, l) && fraction.isExtract(nan2, h, l) &&
+            nan.eq(nan2);
+  auto nan_name = nan.str();
+  ok &= string_view(nan_name).substr(0, 4) == "NaN!";
+
+  return ok && exponent.isAllOnes();
+}
+
+expr FloatType::fromInt(expr e) const {
+  if (isNaNInt(e))
+    return expr::mkNaN(getDummyValue(true).value);
+
+  expr cond, then, els, n, n2;
+  // match (ite (isNaN x) int_nan (fp.to_ieee_bv x))
+  if (e.isIf(cond, then, els) &&
+      cond.isNaNCheck(n) &&
+      isNaNInt(then) &&
+      els.isfloat2BV(n2) &&
+      n.eq(n2))
+    return n;
+
+  return fromBV(move(e));
+}
+
+StateValue FloatType::fromInt(StateValue v) const {
+  return Type::fromInt(move(v));
 }
 
 expr FloatType::sizeVar() const {

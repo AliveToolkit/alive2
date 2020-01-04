@@ -72,9 +72,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
     // needed, not because it's undef
     bool found_undef = false;
     for (auto &var : partial.vars()) {
-      ostringstream ss;
-      ss << var;
-      auto name = ss.str();
+      auto name = var.str();
       found_undef |= string_view(name).substr(0, 6) == "undef!";
     }
     if (found_undef)

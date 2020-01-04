@@ -179,6 +179,8 @@ private:
   FpType fpType = Unknown;
   bool defined = false;
 
+  bool isNaNInt(const smt::expr &e) const;
+
 public:
   FloatType(std::string &&name) : Type(std::move(name)) {}
   FloatType(std::string &&name, FpType fpType)
@@ -200,6 +202,8 @@ public:
   IR::StateValue fromBV(IR::StateValue v) const override;
   smt::expr toInt(State &s, smt::expr v) const override;
   IR::StateValue toInt(State &s, IR::StateValue v) const override;
+  smt::expr fromInt(smt::expr v) const override;
+  IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;

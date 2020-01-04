@@ -191,7 +191,7 @@ ostream& operator<<(ostream &os, const Byte &byte) {
 }
 
 static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
-                                 const Memory &mem) {
+                                 const Memory &mem, State *s) {
   vector<Byte> bytes;
   if (fromType.isPtrType()) {
     Pointer p(mem, val.value);
@@ -200,7 +200,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
   } else {
-    StateValue bvval = fromType.toBV(val);
+    StateValue bvval = fromType.toInt(*s, val);
     unsigned bitsize = bvval.bits();
     unsigned bytesize = divide_up(bitsize, bits_byte);
 
@@ -261,7 +261,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromBV(val.trunc(bitsize));
+    return toType.fromInt(val.trunc(bitsize));
   }
 }
 
@@ -1166,7 +1166,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
     assert(byteofs == getStoreByteSize(type));
 
   } else {
-    vector<Byte> bytes = valueToBytes(v, type, *this);
+    vector<Byte> bytes = valueToBytes(v, type, *this, state);
     assert(!v.isValid() || bytes.size() * bytesz == getStoreByteSize(type));
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
@@ -1238,7 +1238,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytesize, align, true);
 
-  vector<Byte> bytes = valueToBytes(val, IntType("", bits_byte), *this);
+  vector<Byte> bytes = valueToBytes(val, IntType("", bits_byte), *this, state);
   assert(bytes.size() == 1);
 
   uint64_t n;

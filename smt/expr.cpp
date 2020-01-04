@@ -197,6 +197,11 @@ expr expr::mkDouble(double n) {
   return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx()));
 }
 
+expr expr::mkNaN(const expr &type) {
+  C2(type);
+  return Z3_mk_fpa_nan(ctx(), type.sort());
+}
+
 expr expr::mkNumber(const char *n, const expr &type) {
   C2(type);
   return Z3_mk_numeral(ctx(), n, type.sort());
@@ -390,6 +395,22 @@ bool expr::isStore(expr &array, expr &idx, expr &val) const {
     array = Z3_get_app_arg(ctx(), app, 0);
     idx = Z3_get_app_arg(ctx(), app, 1);
     val = Z3_get_app_arg(ctx(), app, 2);
+    return true;
+  }
+  return false;
+}
+
+bool expr::isNaNCheck(expr &fp) const {
+  if (auto app = isAppOf(Z3_OP_FPA_IS_NAN)) {
+    fp = Z3_get_app_arg(ctx(), app, 0);
+    return true;
+  }
+  return false;
+}
+
+bool expr::isfloat2BV(expr &fp) const {
+  if (auto app = isAppOf(Z3_OP_FPA_TO_IEEE_BV)) {
+    fp = Z3_get_app_arg(ctx(), app, 0);
     return true;
   }
   return false;
@@ -1541,6 +1562,10 @@ void expr::printHexadecimal(ostream &os) const {
 string expr::numeral_string() const {
   C();
   return Z3_get_numeral_decimal_string(ctx(), ast(), 12);
+}
+
+string expr::str() const {
+  return isValid() ? Z3_ast_to_string(ctx(), ast()) : "(null)";
 }
 
 ostream& operator<<(ostream &os, const expr &e) {

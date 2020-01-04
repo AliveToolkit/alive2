@@ -1,6 +1,6 @@
-define float @f(float* %ptr) {
-  %f = fdiv float 0.0, 0.0
-  store float %f, float* %ptr
-  %x = load float, float* %ptr
-  ret float %x
+define half @f(half* %ptr) {
+  %f = fdiv half 0.0, 0.0
+  store half %f, half* %ptr
+  %x = load half, half* %ptr
+  ret half %x
 }

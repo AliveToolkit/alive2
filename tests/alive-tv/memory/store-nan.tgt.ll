@@ -1,5 +1,5 @@
-define float @f(float* %ptr) {
-  %f = fdiv float 0.0, 0.0
-  store float %f, float* %ptr
-  ret float %f
+define half @f(half* %ptr) {
+  %f = fdiv half 0.0, 0.0
+  store half %f, half* %ptr
+  ret half %f
 }

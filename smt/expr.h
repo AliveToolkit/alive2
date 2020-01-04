@@ -85,6 +85,7 @@ public:
   static expr mkHalf(float n);
   static expr mkFloat(float n);
   static expr mkDouble(double n);
+  static expr mkNaN(const expr &type);
   static expr mkNumber(const char *n, const expr &type);
   static expr mkVar(const char *name, const expr &type);
   static expr mkVar(const char *name, unsigned bits);
@@ -124,6 +125,9 @@ public:
   bool isNot(expr &neg) const;
   bool isConstArray(expr &val) const;
   bool isStore(expr &array, expr &idx, expr &val) const;
+
+  bool isNaNCheck(expr &fp) const;
+  bool isfloat2BV(expr &fp) const;
 
   // best effort; returns number of statically known bits
   unsigned min_leading_zeros() const;
@@ -285,6 +289,7 @@ public:
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
   std::string numeral_string() const;
+  std::string str() const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only
