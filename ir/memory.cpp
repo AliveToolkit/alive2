@@ -481,7 +481,7 @@ expr Pointer::is_aligned(unsigned align) const {
   if (align == 1)
     return true;
 
-  auto bits = ilog2(align);
+  auto bits = min(ilog2(align), bits_for_offset);
 
   if (!observes_addresses())
     // This is stricter than checking get_address(), but as addresses are not

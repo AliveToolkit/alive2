@@ -412,13 +412,13 @@ static bool may_be_nonlocal(Value *ptr) {
       continue;
 
     if (auto gep = dynamic_cast<GEP*>(ptr)) {
-      todo.emplace_back(gep->getPtr());
+      todo.emplace_back(&gep->getPtr());
       continue;
     }
 
     if (auto c = dynamic_cast<ConversionOp*>(ptr)) {
       if (c->getOp() == ConversionOp::BitCast) {
-        todo.emplace_back(c->getValue());
+        todo.emplace_back(&c->getValue());
         continue;
       }
     }
@@ -440,10 +440,18 @@ static bool returns_nonlocal(const Instr &inst) {
     return num_ptrs(inst.getType());
 
   if (auto load = dynamic_cast<const Load *>(&inst)) {
-    if (may_be_nonlocal(load->getPtr()))
+    if (may_be_nonlocal(&load->getPtr()))
       return num_ptrs(inst.getType());
   }
   return 0u;
+}
+
+static optional<int64_t> get_int(const Value &val) {
+  if (auto i = dynamic_cast<const IntConst*>(&val)) {
+    if (auto n = i->getInt())
+      return *n;
+  }
+  return {};
 }
 
 static uint64_t max_gep(const Instr &inst) {
@@ -457,17 +465,30 @@ static uint64_t max_gep(const Instr &inst) {
   if (auto gep = dynamic_cast<const GEP*>(&inst)) {
     int64_t off = 0;
     for (auto &[mul, v] : gep->getIdxs()) {
-      if (auto i = dynamic_cast<IntConst*>(v)) {
-        if (auto n = i->getInt()) {
-          off += mul * *n;
-          continue;
-        }
+      if (auto n = get_int(*v)) {
+        off += mul * *n;
+        continue;
       }
       return UINT64_MAX;
     }
     return abs(off);
   }
-
+  if (auto load = dynamic_cast<const Load*>(&inst)) {
+    return divide_up(load->getType().bits(), 8);
+  }
+  if (auto store = dynamic_cast<const Store*>(&inst)) {
+    return divide_up(store->getValue().bits(), 8);
+  }
+  if (auto cpy = dynamic_cast<const Memcpy*>(&inst)) {
+    if (auto bytes = get_int(cpy->getBytes()))
+      return *bytes;
+    return UINT64_MAX;
+  }
+  if (auto memset = dynamic_cast<const Memset*>(&inst)) {
+    if (auto bytes = get_int(memset->getBytes()))
+      return *bytes;
+    return UINT64_MAX;
+  }
   return 0;
 }
 
@@ -505,7 +526,7 @@ static void calculateAndInitConstants(Transform &t) {
     Type *value_ty;
     unsigned align;
     if (auto st = dynamic_cast<const Store *>(&inst)) {
-      value_ty = &st->getValue()->getType();
+      value_ty = &st->getValue().getType();
       align = st->getAlign();
       does_ptr_store |= hasPtr(*value_ty);
     } else if (auto ld = dynamic_cast<const Load *>(&inst)) {

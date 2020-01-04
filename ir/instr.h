@@ -127,7 +127,7 @@ public:
     : Instr(type, std::move(name)), val(&val), op(op) {}
 
   Op getOp() const { return op; }
-  Value* getValue() const { return val; }
+  Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -426,8 +426,6 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-  Value *getNum() const { return num; }
-  Value *getSize() const { return size; }
 };
 
 
@@ -471,7 +469,7 @@ public:
     : Instr(type, std::move(name)), ptr(&ptr), inbounds(inbounds) {}
 
   void addIdx(unsigned obj_size, Value &idx);
-  Value* getPtr() const { return ptr; }
+  Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
 
   std::vector<Value*> operands() const override;
@@ -490,7 +488,7 @@ public:
   Load(Type &type, std::string &&name, Value &ptr, unsigned align)
     : Instr(type, std::move(name)), ptr(&ptr), align(align) {}
 
-  Value* getPtr() const { return ptr; }
+  Value& getPtr() const { return *ptr; }
   std::vector<Value*> operands() const override;
   unsigned getAlign() const { return align; }
   void rauw(const Value &what, Value &with) override;
@@ -509,8 +507,8 @@ public:
     : Instr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
 
   std::vector<Value*> operands() const override;
-  Value *getValue() const { return val; }
-  Value *getPointer() const { return ptr; }
+  Value& getValue() const { return *val; }
+  Value& getPtr() const { return *ptr; }
   unsigned getAlign() const { return align; }
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -528,6 +526,7 @@ public:
     : Instr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
             align(align) {}
 
+  Value& getBytes() const { return *bytes; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -547,6 +546,7 @@ public:
     : Instr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
             align_dst(align_dst), align_src(align_src), move(move) {}
 
+  Value& getBytes() const { return *bytes; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
