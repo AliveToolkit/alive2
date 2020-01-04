@@ -82,6 +82,11 @@ llvm::cl::opt<bool> opt_disable_undef_input(
   llvm::cl::desc("Alive: Assume function input cannot be undef"),
   llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_debug(
+  "tv-dbg",
+  llvm::cl::desc("Alive: Show debug data"),
+  llvm::cl::init(false), llvm::cl::Hidden);
+
 ostream *out;
 ofstream out_file;
 string report_filename;
@@ -216,6 +221,7 @@ struct TVPass : public llvm::FunctionPass {
     config::symexec_print_each_value = opt_se_verbose;
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
+    config::debug = opt_debug;
 
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();
