@@ -454,12 +454,14 @@ static optional<int64_t> get_int(const Value &val) {
   return {};
 }
 
+static uint64_t max_mem_access, max_alloc_size;
+
 static uint64_t max_gep(const Instr &inst) {
   if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
     // if addresses are observed, then expose full ptr range
     if (conv->getOp() == ConversionOp::Int2Ptr ||
         conv->getOp() == ConversionOp::Ptr2Int)
-      return UINT64_MAX;
+      return max_mem_access = max_alloc_size = UINT64_MAX;
   }
 
   if (auto gep = dynamic_cast<const GEP*>(&inst)) {
@@ -474,20 +476,52 @@ static uint64_t max_gep(const Instr &inst) {
     return abs(off);
   }
   if (auto load = dynamic_cast<const Load*>(&inst)) {
-    return Memory::getStoreByteSize(load->getType());
+    max_mem_access = max(max_mem_access,
+                         (uint64_t)Memory::getStoreByteSize(load->getType()));
+    return 0;
   }
   if (auto store = dynamic_cast<const Store*>(&inst)) {
-    return Memory::getStoreByteSize(store->getValue().getType());
+    max_mem_access
+      = max(max_mem_access,
+            (uint64_t)Memory::getStoreByteSize(store->getValue().getType()));
+    return 0;
   }
   if (auto cpy = dynamic_cast<const Memcpy*>(&inst)) {
     if (auto bytes = get_int(cpy->getBytes()))
-      return *bytes;
-    return UINT64_MAX;
+      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
+    else
+      max_mem_access = UINT64_MAX;
+    return 0;
   }
-  if (auto memset = dynamic_cast<const Memset*>(&inst)) {
+  if (auto memset = dynamic_cast<const Memset *>(&inst)) {
     if (auto bytes = get_int(memset->getBytes()))
-      return *bytes;
-    return UINT64_MAX;
+      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
+    else
+      max_mem_access = UINT64_MAX;
+    return 0;
+  }
+
+  Value *size;
+  uint64_t mul = 1;
+  if (auto alloc = dynamic_cast<const Alloc*>(&inst)) {
+    size = &alloc->getSize();
+  } else if (auto alloc = dynamic_cast<const Malloc*>(&inst)) {
+    size = &alloc->getSize();
+  } else if (auto alloc = dynamic_cast<const Calloc*>(&inst)) {
+    size = &alloc->getSize();
+    if (auto n = get_int(alloc->getNum())) {
+      mul = *n;
+    } else {
+      max_alloc_size = UINT64_MAX;
+    }
+  } else {
+    return 0;
+  }
+
+  if (auto bytes = get_int(*size)) {
+    max_alloc_size = max(max_alloc_size, mul * abs(*bytes));
+  } else {
+    max_alloc_size = UINT64_MAX;
   }
   return 0;
 }
@@ -498,7 +532,7 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned num_globals = globals_src.size();
 
   // TODO: get this from data layout, varies among address spaces
-  bits_size_t = 64;
+  bits_program_pointer = 64;
 
   for (auto GVT : globals_tgt) {
     auto I = find_if(globals_src.begin(), globals_src.end(),
@@ -552,6 +586,8 @@ static void calculateAndInitConstants(Transform &t) {
   // The number of local blocks.
   unsigned num_locals_src = 0, num_locals_tgt = 0;
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
+  max_alloc_size = 0;
+  max_mem_access = 0;
 
   for (auto BB : t.src.getBBs()) {
     for (auto &i : BB->instrs()) {
@@ -644,8 +680,14 @@ static void calculateAndInitConstants(Transform &t) {
   // reserve a multiple of 4 for the number of offset bits to make SMT &
   // counterexamples more readable
   // Allow an extra bit for the sign
-  auto max_geps = ilog2_ceil(max(max_gep_src, max_gep_tgt), true) + 1;
-  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)bits_size_t);
+  auto max_geps
+    = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_mem_access),
+                 true) + 1;
+  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)bits_program_pointer);
+
+  // we need an extra bit because 1st bit of size is always 0
+  bits_size_t = ilog2_ceil(max_alloc_size, true);
+  bits_size_t = min(max(bits_for_offset, bits_size_t)+1, bits_program_pointer);
 
   // size of byte
   bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size : 1);
@@ -658,6 +700,9 @@ static void calculateAndInitConstants(Transform &t) {
                      "num_nonlocals: " << num_nonlocals << "\n"
                      "bits_for_bid: " << bits_for_bid << "\n"
                      "bits_for_offset: " << bits_for_offset << "\n"
+                     "bits_program_pointer: " << bits_program_pointer << "\n"
+                     "max_alloc_size: " << max_alloc_size << "\n"
+                     "max_mem_access: " << max_mem_access << "\n"
                      "bits_size_t: " << bits_size_t << "\n"
                      "bits_byte: " << bits_byte << "\n"
                      "little_endian: " << little_endian << "\n"

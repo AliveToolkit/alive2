@@ -1926,7 +1926,8 @@ StateValue GEP::toSMT(State &s) const {
       auto inc = multiplier * val;
 
       if (inbounds) {
-        non_poison &= val.sextOrTrunc(v.bits()) == v;
+        if (sz != 0)
+          non_poison &= val.sextOrTrunc(v.bits()) == v;
         non_poison &= multiplier.mul_no_soverflow(val);
         non_poison &= ptr.add_no_overflow(inc);
       }

@@ -386,6 +386,7 @@ public:
     : Instr(type, std::move(name)), size(&size), align(align),
       initially_dead(initially_dead) {}
 
+  Value& getSize() const { return *size; }
   bool initDead() const { return initially_dead; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -405,6 +406,7 @@ public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
     : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
 
+  Value& getSize() const { return *size; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -420,6 +422,8 @@ public:
   Calloc(Type &type, std::string &&name, Value &num, Value &size)
     : Instr(type, std::move(name)), num(&num), size(&size) {}
 
+  Value& getNum() const { return *num; }
+  Value& getSize() const { return *size; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

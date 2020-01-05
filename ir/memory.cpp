@@ -37,7 +37,7 @@ Byte::Byte(const Memory &m, expr &&byterepr) : m(m), p(move(byterepr)) {
 Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
   : m(ptr.getMemory()) {
   // TODO: support pointers larger than 64 bits.
-  assert(bits_size_t <= 64 && bits_size_t % 8 == 0);
+  assert(bits_program_pointer <= 64 && bits_program_pointer % 8 == 0);
 
   if (!does_ptr_mem_access) {
     p = expr::mkUInt(0, bitsByte());
@@ -195,7 +195,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
   vector<Byte> bytes;
   if (fromType.isPtrType()) {
     Pointer p(mem, val.value);
-    unsigned bytesize = bits_size_t / bits_byte;
+    unsigned bytesize = bits_program_pointer / bits_byte;
 
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
@@ -221,7 +221,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
   assert(!bytes.empty());
 
   if (toType.isPtrType()) {
-    assert(bytes.size() == bits_size_t / bits_byte);
+    assert(bytes.size() == bits_program_pointer / bits_byte);
     auto nullp = Pointer::mkNullPointer(m);
     expr loaded_ptr;
     // The result is not poison if all of these hold:
@@ -903,28 +903,30 @@ void Memory::mkAxioms(const Memory &other) const {
                       Pointer(other, bid, false).block_alignment()));
   }
 
-  if (observes_addresses() && num_nonlocals > 0) {
+  if (!observes_addresses())
+    return;
+
+  if (num_nonlocals > 0)
     state->addAxiom(Pointer::mkNullPointer(*this).get_address(false) == 0);
 
-    // Non-local blocks are disjoint.
-    // Ignore null pointer block
-    for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
-      Pointer p1(*this, bid, false);
-      expr disj = p1.get_address() != 0;
+  // Non-local blocks are disjoint.
+  // Ignore null pointer block
+  for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+    Pointer p1(*this, bid, false);
+    expr disj = p1.get_address() != 0;
 
-      // Ensure block doesn't spill to local memory
-      auto bit = bits_size_t - 1;
-      disj &= (p1.get_address() + p1.block_size()).extract(bit, bit) == 0;
+    // Ensure block doesn't spill to local memory
+    auto bit = bits_size_t - 1;
+    disj &= (p1.get_address() + p1.block_size()).extract(bit, bit) == 0;
 
-      // disjointness constraint
-      for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
-        Pointer p2(*this, bid2, false);
-        disj &= p2.is_block_alive()
-                  .implies(disjoint(p1.get_address(), p1.block_size(),
-                                    p2.get_address(), p2.block_size()));
-      }
-      state->addAxiom(p1.is_block_alive().implies(disj));
+    // disjointness constraint
+    for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
+      Pointer p2(*this, bid2, false);
+      disj &= p2.is_block_alive()
+                .implies(disjoint(p1.get_address(), p1.block_size(),
+                                  p2.get_address(), p2.block_size()));
     }
+    state->addAxiom(p1.is_block_alive().implies(disj));
   }
 
   // ensure globals fit in their reserved space
@@ -1138,7 +1140,7 @@ void Memory::free(const expr &ptr, bool unconstrained) {
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
   if (ty.isPtrType())
-    return divide_up(bits_size_t, 8);
+    return divide_up(bits_program_pointer, 8);
 
   if (auto aty = ty.getAsAggregateType()) {
     unsigned sz = 0;

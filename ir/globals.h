@@ -23,7 +23,10 @@ extern unsigned bits_for_bid;
 // Number of bits needed for encoding a pointer's offset
 extern unsigned bits_for_offset;
 
-/// sizeof(size_t). This is assume to be equal to pointer size
+/// Size of a program pointer in bytes
+extern unsigned bits_program_pointer;
+
+/// sizeof(size_t)
 extern unsigned bits_size_t;
 
 /// Number of bits for a byte.

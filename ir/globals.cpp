@@ -11,6 +11,7 @@ unsigned num_nonlocals;
 unsigned bits_for_ptrattrs;
 unsigned bits_for_bid;
 unsigned bits_for_offset;
+unsigned bits_program_pointer;
 unsigned bits_size_t;
 unsigned bits_byte;
 bool little_endian;
