@@ -227,6 +227,7 @@ Solver::Solver(bool simple) {
 
 Solver::~Solver() {
   Z3_solver_dec_ref(ctx(), s);
+  tactic->reset_solver();
 }
 
 void Solver::add(const expr &e) {
