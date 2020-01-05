@@ -289,7 +289,7 @@ public:
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
   std::string numeral_string() const;
-  std::string str() const;
+  std::string fn_name() const; // empty if not a function
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only

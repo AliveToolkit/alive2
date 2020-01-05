@@ -1564,8 +1564,10 @@ string expr::numeral_string() const {
   return Z3_get_numeral_decimal_string(ctx(), ast(), 12);
 }
 
-string expr::str() const {
-  return isValid() ? Z3_ast_to_string(ctx(), ast()) : "(null)";
+string expr::fn_name() const {
+  if (isApp())
+    return Z3_get_symbol_string(ctx(), Z3_get_decl_name(ctx(), decl()));
+  return "";
 }
 
 ostream& operator<<(ostream &os, const expr &e) {
