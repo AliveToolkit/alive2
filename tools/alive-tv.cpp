@@ -60,6 +60,10 @@ static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_tactic_verbose(
+  "tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
+  llvm::cl::init(false));
+
 static llvm::cl::opt<bool> opt_debug(
     "dbg", llvm::cl::desc("Alive: print debugging info"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -282,7 +286,7 @@ int main(int argc, char **argv) {
                                   "Alive2 stand-alone translation validator\n");
 
   smt::solver_print_queries(opt_smt_verbose);
-  smt::solver_tactic_verbose(false);
+  smt::solver_tactic_verbose(opt_tactic_verbose);
   smt::set_query_timeout(to_string(opt_smt_to));
   smt::set_memory_limit((uint64_t)opt_max_mem * 1024 * 1024);
   //config::skip_smt = opt_smt_skip;
