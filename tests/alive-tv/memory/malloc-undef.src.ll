@@ -1,4 +1,5 @@
-; ERROR: Value mismatch
+; NOTE: This should fail, but malloc of quantified variable is not supported.
+; (it spuriously succeeds)
 
 define i8 @malloc_undef() {
   %ptr = call i8* @malloc(i64 undef)

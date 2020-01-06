@@ -316,14 +316,18 @@ static void check_refinement(Errors &errs, Transform &t,
   expr axioms_expr = axioms();
   expr dom = dom_a && dom_b;
 
+  expr oom_src = src_state.getOOM()();
+
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
 
   auto src_mem = src_state.returnMemory();
+
   auto tgt_mem = tgt_state.returnMemory();
   auto [memory_cnstr, ptr_refinement0] = src_mem.refined(tgt_mem);
   auto &ptr_refinement = ptr_refinement0;
 
-  if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
+  if (check_expr(axioms_expr && (oom_src && pre_src && pre_tgt))
+      .isUnsat()) {
     errs.add("Precondition is always false", false);
     return;
   }
@@ -338,8 +342,8 @@ static void check_refinement(Errors &errs, Transform &t,
     if (refines.isFalse())
       return move(refines);
 
-    return axioms_expr &&
-             preprocess(t, qvars, uvars, pre_tgt && pre_src.implies(refines));
+    auto fml = pre_tgt && oom_src && pre_src.implies(refines);
+    return axioms_expr && preprocess(t, qvars, uvars, move(fml));
   };
 
   auto print_ptr_load = [&](ostream &s, const Model &m) {
