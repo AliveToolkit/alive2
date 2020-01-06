@@ -955,8 +955,11 @@ void Memory::mkAxioms(const Memory &other) const {
       Pointer p(m, bid, true);
       if (auto sz = m.local_blk_size.lookup(p.get_short_bid())) {
         auto size = sz->extract(bits_size_t - 2, 0);
-        m.state->addPre(sum.add_no_uoverflow(size));
-        sum = sum + size;
+        auto align = expr::mkUInt(1, bits_size_t - 1) << p.block_alignment();
+        align = align - expr::mkUInt(1, align.bits());
+        m.state->addOOM(size.add_no_uoverflow(align));
+        m.state->addOOM(sum.add_no_uoverflow(size + align));
+        sum = sum + size + align;
       }
     }
   };
