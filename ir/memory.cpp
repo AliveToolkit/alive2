@@ -666,7 +666,9 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
     ptr_cnstr = val == val2;
   } else {
-    ptr_cnstr = val2.ptr_nonpoison() && val.ptr().refined(val2.ptr());
+    ptr_cnstr = val2.ptr_nonpoison() &&
+                val.ptr_byteoffset() == val2.ptr_byteoffset() &&
+                val.ptr().refined(val2.ptr());
   }
   return val.is_poison() ||
          expr::mkIf(is_ptr == is_ptr2,
