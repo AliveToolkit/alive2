@@ -609,6 +609,12 @@ static void calculateAndInitConstants(Transform &t) {
   }
   num_locals = max(num_locals_src, num_locals_tgt);
 
+  for (auto glbs : { &globals_src, &globals_tgt}) {
+    for (auto &glb : *glbs) {
+      max_mem_access = max(glb->size(), max_mem_access);
+    }
+  }
+
   nullptr_is_used  = false;
   has_int2ptr      = false;
   has_ptr2int      = false;
