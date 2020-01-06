@@ -948,20 +948,6 @@ void Memory::mkAxioms(const Memory &other) const {
     state->addAxiom(p1.is_block_alive().implies(disj));
   }
 
-  // ensure globals fit in their reserved space
-  {
-    auto sum_globals = expr::mkUInt(0, bits_size_t - 1);
-
-    for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
-      Pointer p(*this, bid, false);
-      auto sz = p.block_size().extract(bits_size_t - 2, 0);
-      state->addAxiom(p.is_block_alive()
-                       .implies(sum_globals.add_no_uoverflow(sz)));
-      sum_globals = expr::mkIf(p.is_block_alive(), sum_globals + sz,
-                               sum_globals);
-    }
-  }
-
   // ensure locals fit in their reserved space
   auto locals_fit = [](const Memory &m) {
     auto sum = expr::mkUInt(0, bits_size_t - 1);
