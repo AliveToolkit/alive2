@@ -321,7 +321,6 @@ static void check_refinement(Errors &errs, Transform &t,
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
 
   auto src_mem = src_state.returnMemory();
-
   auto tgt_mem = tgt_state.returnMemory();
   auto [memory_cnstr, ptr_refinement0] = src_mem.refined(tgt_mem);
   auto &ptr_refinement = ptr_refinement0;
