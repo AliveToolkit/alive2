@@ -70,11 +70,12 @@ private:
 
   // store data for function calls:
   // inputs: non-ptr arguments, ptr arguments, memory, reads memory?, argmemonly
-  // outputs: values, UB
+  // outputs: values, UB, memory state
   std::map<std::string,
            std::map<std::tuple<std::vector<StateValue>, std::vector<StateValue>,
                                Memory, bool, bool>,
-                    std::pair<std::vector<StateValue>, smt::expr>>>
+                    std::tuple<std::vector<StateValue>, smt::expr,
+                               Memory::CallState>>>
     fn_call_data;
 
 public:
@@ -114,7 +115,7 @@ public:
   StateValue rewriteUndef(StateValue &&val);
 
   bool isInitializationPhase() const { return is_initialization_phase; }
-  void finishInitializer() { is_initialization_phase = false; }
+  void finishInitializer();
 
   auto& getFn() const { return f; }
   auto& getMemory() { return memory; }

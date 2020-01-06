@@ -146,7 +146,7 @@ Byte Byte::mkPtrByte(const Memory &m, const expr &val) {
     byte = expr::mkUInt(1, 1);
   if (padding)
     byte = concat_if(byte, expr::mkUInt(0, padding));
-  return { m, concat_if(byte, expr(val)) };
+  return { m, concat_if(byte, expr(val)).concat_zeros(bits_for_ptrattrs) };
 }
 
 Byte Byte::mkNonPtrByte(const Memory &m, const expr &val) {
@@ -574,7 +574,7 @@ expr Pointer::is_block_alive() const {
   // If programs have no free(), we assume all blocks are always live.
   // For non-local blocks, there's enough non-determinism through block size,
   // that can be 0 or non-0
-  if (!has_free && !has_dead_allocas)
+  if (!has_free && !has_fncall && !has_dead_allocas)
     return true;
 
   auto bid = get_short_bid();
@@ -818,60 +818,68 @@ static bool memory_unused() {
          !observes_addresses();
 }
 
+static expr mk_block_val_array() {
+  return expr::mkArray("blk_val",
+                       expr::mkUInt(0, bits_shortbid() + bits_for_offset),
+                       expr::mkUInt(0, Byte::bitsByte()));
+}
+
+static expr mk_liveness_array() {
+  return expr::mkArray("blk_liveness", expr::mkUInt(0, bits_shortbid()), true);
+}
+
+static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
+  if (!does_ptr_mem_access)
+    return;
+
+  auto idx = Pointer(m, "#idx", false, false, expr()).short_ptr();
+#if 0
+  if (num_nonlocals > 0) {
+    expr is_ptr = does_int_mem_access
+                    ? expr::mkUF("blk_init_isptr", { idx }, true)
+                    : true;
+    expr int_val
+      = Byte::mkNonPtrByte(m, expr::mkUF("blk_init_nonptr", { idx },
+                                         expr::mkUInt(0, bits_byte * 2)))();
+
+    expr np = expr::mkUF("blk_init_ptr_np", { idx }, expr::mkUInt(0, 1));
+    expr bid_off = expr::mkUF("blk_init_ptr_bid_off", { idx },
+      expr::mkUInt(0, bits_shortbid() + bits_for_offset + 3));
+    bid_off = prepend_if(expr::mkUInt(0, 1), move(bid_off),
+                          ptr_has_local_bit());
+    Byte ptr_val = Byte::mkPtrByte(m, np.concat(bid_off));
+    assert(ptr_val.ptr().is_local().isFalse());
+
+    val = expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
+
+    s.addAxiom(expr::mkForAll({ idx },
+                        ptr_val.ptr().get_short_bid().ule(num_nonlocals - 1)));
+  } else {
+    Byte byte(m, val.load(idx));
+    s.addAxiom(expr::mkForAll({ idx }, !byte.is_ptr()));
+  }
+#else
+  Byte byte(m, val.load(idx));
+  Pointer loadedptr = byte.ptr();
+  expr bid = loadedptr.get_short_bid();
+  s.addAxiom(
+    expr::mkForAll({ idx },
+      byte.is_ptr().implies(!loadedptr.is_local() &&
+                            !loadedptr.is_nocapture() &&
+                            bid.ule(num_nonlocals - 1))));
+#endif
+}
+
 Memory::Memory(State &state) : state(&state) {
   if (memory_unused())
     return;
 
-  non_local_block_val
-    = expr::mkArray("blk_val",
-                    expr::mkUInt(0, bits_shortbid() + bits_for_offset),
-                    expr::mkUInt(0, Byte::bitsByte()));
+  non_local_block_val = mk_block_val_array();
+  non_local_block_liveness = mk_liveness_array();
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
-  if (does_ptr_mem_access) {
-    auto idx = Pointer(*this, "#idx", false, false, expr()).short_ptr();
-#if 0
-    if (num_nonlocals > 0) {
-      expr is_ptr = expr::mkUF("blk_init_isptr", { idx }, true);
-      expr int_val
-        = Byte::mkNonPtrByte(*this, expr::mkUF("blk_init_nonptr", { idx },
-                                             expr::mkUInt(0, bits_byte * 2)))();
-
-      expr np = expr::mkUF("blk_init_ptr_np", { idx }, expr::mkUInt(0, 1));
-      expr bid_off = expr::mkUF("blk_init_ptr_bid_off", { idx },
-        expr::mkUInt(0, bits_shortbid() + bits_for_offset + 3));
-      bid_off = prepend_if(expr::mkUInt(0, 1), move(bid_off),
-                           ptr_has_local_bit());
-      Byte ptr_val = Byte::mkPtrByte(*this, np.concat(bid_off));
-      assert(ptr_val.ptr().is_local().isFalse());
-
-      non_local_block_val =
-        expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
-
-      if (state.isSource())
-        state.addAxiom(expr::mkForAll({ idx },
-                         ptr_val.ptr().get_short_bid().ule(num_nonlocals - 1)));
-    } else {
-      Byte byte(*this, non_local_block_val.load(idx));
-      state.addAxiom(expr::mkForAll({ idx }, !byte.is_ptr()));
-    }
-#else
-    if (state.isSource()) {
-      Byte byte(*this, non_local_block_val.load(idx));
-      Pointer loadedptr = byte.ptr();
-      expr bid = loadedptr.get_short_bid();
-      state.addAxiom(
-        expr::mkForAll({ idx },
-          byte.is_ptr().implies(!loadedptr.is_local() &&
-                                !loadedptr.is_nocapture() &&
-                                bid.ule(num_nonlocals - 1))));
-    }
-#endif
-  }
-
-  non_local_block_liveness
-    = expr::mkArray("blk_liveness", expr::mkUInt(0, bits_shortbid()), true);
+  mk_nonlocal_val_axioms(state, *this, non_local_block_val);
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
@@ -897,6 +905,10 @@ Memory::Memory(State &state) : state(&state) {
     alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, false, false, 0);
 
   assert(bits_for_offset <= bits_size_t);
+}
+
+void Memory::finishInitialization() {
+  initial_non_local_block_val = non_local_block_val;
 }
 
 void Memory::mkAxioms(const Memory &other) const {
@@ -1018,6 +1030,39 @@ pair<expr,expr> Memory::mkFnRet(const char *name) const {
                              p.get_short_bid().ule(num_locals - 1),
                              p.get_short_bid().ule(num_nonlocals - 1)));
   return { p.release(), move(var) };
+}
+
+expr Memory::CallState::operator==(const CallState &st) const {
+  if (empty || st.empty)
+    return true;
+  return block_val_var == st.block_val_var &&
+         liveness_var == st.liveness_var;
+}
+
+Memory::CallState Memory::mkCallState() const {
+  Memory::CallState st;
+  st.empty = false;
+
+  auto blk_val = mk_block_val_array();
+  st.block_val_var = expr::mkFreshVar("blk_val", blk_val);
+  st.non_local_block_val
+    = initial_non_local_block_val.subst(blk_val, st.block_val_var);
+
+  // functions can free an object, but cannot bring a dead one back to live
+  auto idx = expr::mkFreshVar("#idx", expr::mkUInt(0, bits_shortbid()));
+  st.liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
+  st.non_local_block_liveness
+    = expr::mkLambda( { idx }, non_local_block_liveness.load(idx) &&
+                               st.liveness_var.load(idx));
+  return st;
+}
+
+void Memory::setState(const Memory::CallState &st) {
+  non_local_block_val = st.non_local_block_val;
+  // TODO: missing condition that if fn calls are refined, so is the liveness
+  // data
+  //non_local_block_liveness = st.non_local_block_liveness;
+  mk_nonlocal_val_axioms(*state, *this, non_local_block_val);
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
@@ -1379,13 +1424,16 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
 
 bool Memory::operator<(const Memory &rhs) const {
   // FIXME: remove this once we move to C++20
+  // NOTE: we don't compare field state so that memories from src/tgt can
+  // compare equal
   return
-    tie(non_local_block_val, local_block_val,
+    tie(non_local_block_val, local_block_val, initial_non_local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_nonwritable, non_local_blk_size, non_local_blk_align,
         non_local_blk_kind, byval_blks) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
+        rhs.initial_non_local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind, rhs.non_local_blk_nonwritable,

@@ -195,6 +195,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
+  // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto [I, inserted]
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
                                        memory, reads_memory, argmemonly });
@@ -217,19 +218,24 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     string ub_name = string(name) + "#ub";
-    I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false) };
+    I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
+                  writes_memory ? memory.mkCallState() : Memory::CallState() };
   }
 
-  addUB(I->second.second);
+  addUB(get<1>(I->second));
+
+  if (writes_memory)
+    memory.setState(get<2>(I->second));
+
   if (all_args_np.isTrue())
-    return I->second.first;
+    return get<0>(I->second);
 
   // if any of the arguments is poison, yield an arbitrary value, such that
   // f(poison) -> f(42) works
   vector<StateValue> ret;
   auto T = out_types.begin();
   auto var_name = name + "#pval";
-  for (auto &[v, np] : I->second.first) {
+  for (auto &[v, np] : get<0>(I->second)) {
     auto [val_poison, var] = mk_val(**T, var_name);
     ret.emplace_back(expr::mkIf(all_args_np, v, val_poison), expr(np));
     addQuantVar(move(var));
@@ -278,6 +284,11 @@ StateValue State::rewriteUndef(StateValue &&val) {
   return { val.value.subst(repls), val.non_poison.subst(repls) };
 }
 
+void State::finishInitializer() {
+  is_initialization_phase = false;
+  memory.finishInitialization();
+}
+
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {
   ENSURE(glbvar_bids.emplace(glbvar, make_pair(bid, true)).second);
 }
@@ -320,12 +331,12 @@ void State::mkAxioms(State &tgt) {
     (void)fn;
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
       auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
-      auto &[rets, ub] = I->second;
+      auto &[rets, ub, mem_state] = I->second;
 
       auto &data2 = tgt.fn_call_data.at(fn);
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
-        auto &[rets2, ub2] = I2->second;
+        auto &[rets2, ub2, mem_state2] = I2->second;
 
         expr refines(true), is_val_eq(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
@@ -356,7 +367,8 @@ void State::mkAxioms(State &tgt) {
           ref_expr &= rets[i].non_poison.implies(rets2[i].non_poison);
         }
         tgt.addPre(is_val_eq.implies(eq_expr));
-        tgt.addPre(refines.implies(ref_expr && ub.implies(ub2)));
+        tgt.addPre(refines.implies(ref_expr && ub.implies(ub2) &&
+                                   mem_state == mem_state2));
       }
     }
   }

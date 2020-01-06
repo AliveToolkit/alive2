@@ -185,6 +185,7 @@ class Memory {
 
   smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
   smt::expr local_block_val;
+  smt::expr initial_non_local_block_val;
 
   smt::expr non_local_block_liveness; // array: bid -> bool
   smt::expr local_block_liveness;
@@ -206,8 +207,22 @@ public:
     HEAP, STACK, GLOBAL, CONSTGLOBAL
   };
 
+  // TODO: missing local_* equivalents
+  class CallState {
+    smt::expr non_local_block_val;
+    smt::expr block_val_var;
+    smt::expr non_local_block_liveness;
+    smt::expr liveness_var;
+    bool empty = true;
+
+  public:
+    smt::expr operator==(const CallState &st) const;
+    friend class Memory;
+  };
+
   Memory(State &state);
 
+  void finishInitialization();
   void mkAxioms(const Memory &other) const;
 
   static void resetGlobalData();
@@ -216,7 +231,10 @@ public:
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, unsigned attributes) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
+
   std::pair<smt::expr, smt::expr> mkFnRet(const char *name) const;
+  CallState mkCallState() const;
+  void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
   // If bid is not specified, it creates a fresh block id by increasing

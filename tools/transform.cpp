@@ -620,6 +620,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_ptr2int      = false;
   has_malloc       = false;
   has_free         = false;
+  has_fncall       = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
@@ -648,6 +649,7 @@ static void calculateAndInitConstants(Transform &t) {
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
         has_load   |= dynamic_cast<const Load*>(&I) != nullptr;
+        has_fncall |= dynamic_cast<const FnCall*>(&I) != nullptr;
 
         auto accsz = get_access_size(I);
         if (accsz != NO_ACCESS) {
@@ -660,8 +662,12 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load)
+  if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load ||
+      has_fncall)
     ++num_nonlocals;
+
+  // Allow at least one non-const global for calls to change
+  num_nonlocals += has_fncall;
 
   auto has_attr = [&](Input::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {

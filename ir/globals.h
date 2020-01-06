@@ -45,6 +45,8 @@ extern bool has_ptr2int;
 extern bool has_malloc;
 extern bool has_free;
 
+extern bool has_fncall;
+
 /// Whether any function argument (not function call arg) has the attribute
 extern bool has_nocapture;
 extern bool has_readonly;
