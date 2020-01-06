@@ -314,7 +314,7 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
   : m(m), p(
     prepend_if(expr::mkUInt(local, 1),
                expr::mkUInt(bid, bits_shortbid())
-                 .concat(expr::mkUInt(0, bits_for_offset + bits_for_ptrattrs)),
+                 .concat_zeros(bits_for_offset + bits_for_ptrattrs),
                ptr_has_local_bit())) {
   assert((local && bid < num_locals) || (!local && bid < num_nonlocals));
   assert(p.bits() == total_bits());
@@ -738,6 +738,11 @@ expr Pointer::is_readonly() const {
   return p.extract(has_nocapture, has_nocapture) == 1;
 }
 
+void Pointer::strip_attrs() {
+  p = p.extract(total_bits()-1, bits_for_ptrattrs)
+       .concat_zeros(bits_for_ptrattrs);
+}
+
 Pointer Pointer::mkNullPointer(const Memory &m) {
   assert(num_nonlocals > 0);
   // A null pointer points to block 0 without any attribute.
@@ -1002,13 +1007,15 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
   return { p.release(), move(undef) };
 }
 
-expr Memory::mkFnRet(const char *name) const {
+pair<expr,expr> Memory::mkFnRet(const char *name) const {
   // TODO: can only alias with escaped local blocks!
-  Pointer p(*this, expr::mkVar(name, Pointer::total_bits()));
+  expr var
+    = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
+  Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
   state->addAxiom(expr::mkIf(p.is_local(),
                              p.get_short_bid().ule(num_locals - 1),
                              p.get_short_bid().ule(num_nonlocals - 1)));
-  return p.release();
+  return { p.release(), move(var) };
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
@@ -1070,9 +1077,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
                            expr::mkUInt(0, bits_size_t - align_bits - 1));
       state->addQuantVar(addr_var);
 
-      expr blk_addr = align_bits ? addr_var.concat(expr::mkUInt(0, align_bits))
-                                 : addr_var;
-
+      expr blk_addr = addr_var.concat_zeros(align_bits);
       auto full_addr = expr::mkUInt(1, 1).concat(blk_addr);
 
       // addr + size does not overflow

@@ -163,6 +163,8 @@ public:
   smt::expr is_nocapture() const;
   smt::expr is_readonly() const;
 
+  void strip_attrs();
+
   smt::expr refined(const Pointer &other) const;
   smt::expr fninput_refined(const Pointer &other) const;
   smt::expr block_val_refined(const Pointer &other) const;
@@ -214,7 +216,7 @@ public:
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, unsigned attributes) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
-  smt::expr mkFnRet(const char *name) const;
+  std::pair<smt::expr, smt::expr> mkFnRet(const char *name) const;
 
   // Allocates a new memory block and returns (pointer expr, allocated).
   // If bid is not specified, it creates a fresh block id by increasing

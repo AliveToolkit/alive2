@@ -199,16 +199,21 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
                                        memory, reads_memory, argmemonly });
 
+  auto mk_val = [this](const Type &t, const string &name) {
+    if (t.isPtrType())
+      return memory.mkFnRet(name.c_str());
+
+    auto v = expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
+    return make_pair(v, v);
+  };
+
   if (inserted) {
     vector<StateValue> values;
     string valname = name + "#val";
     string npname = name + "#np";
     for (auto t : out_types) {
-      values.emplace_back(
-        t->isPtrType()
-          ? memory.mkFnRet(valname.c_str())
-          : expr::mkFreshVar(valname.c_str(), t->getDummyValue(false).value),
-        expr::mkFreshVar(npname.c_str(), false));
+      values.emplace_back(mk_val(*t, valname).first,
+                          expr::mkFreshVar(npname.c_str(), false));
     }
 
     string ub_name = string(name) + "#ub";
@@ -222,11 +227,13 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   // if any of the arguments is poison, yield an arbitrary value, such that
   // f(poison) -> f(42) works
   vector<StateValue> ret;
+  auto T = out_types.begin();
   auto var_name = name + "#pval";
   for (auto &[v, np] : I->second.first) {
-    auto var = expr::mkFreshVar(var_name.c_str(), v);
-    ret.emplace_back(expr::mkIf(all_args_np, v, var), expr(np));
-    addQuantVar(var);
+    auto [val_poison, var] = mk_val(**T, var_name);
+    ret.emplace_back(expr::mkIf(all_args_np, v, val_poison), expr(np));
+    addQuantVar(move(var));
+    ++T;
   }
   return ret;
 }

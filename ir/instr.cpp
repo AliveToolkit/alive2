@@ -1098,16 +1098,20 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static void unpack_inputs(Type &ty, const StateValue &value,
+static void unpack_inputs(State&s, Type &ty, const StateValue &value,
                           vector<StateValue> &inputs,
                           vector<StateValue> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      unpack_inputs(agg->getChild(i), agg->extract(value, i), inputs,
+      unpack_inputs(s, agg->getChild(i), agg->extract(value, i), inputs,
                     ptr_inputs);
     }
+  } else if (ty.isPtrType()) {
+    Pointer p(s.getMemory(), value.value);
+    p.strip_attrs();
+    ptr_inputs.emplace_back(p.release(), expr(value.non_poison));
   } else {
-    (ty.isPtrType() ? ptr_inputs : inputs).emplace_back(value);
+    inputs.emplace_back(value);
   }
 }
 
@@ -1147,7 +1151,7 @@ StateValue FnCall::toSMT(State &s) const {
   vector<Type*> out_types;
 
   for (auto arg : args) {
-    unpack_inputs(arg->getType(), s[*arg], inputs, ptr_inputs);
+    unpack_inputs(s, arg->getType(), s[*arg], inputs, ptr_inputs);
   }
   if (!isVoid())
     unpack_ret_ty(out_types, getType());

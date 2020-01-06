@@ -36,3 +36,10 @@ A:
 B:
   ret i8* null
 }
+
+define i8* @f7(i8* %a, i8* nocapture %b) {
+  %v = call i8* @g(i8* %a)
+  ret i8* %v
+}
+
+declare i8* @g(i8*)
