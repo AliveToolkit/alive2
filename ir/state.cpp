@@ -327,8 +327,10 @@ void State::mkAxioms(State &tgt) {
   memory.mkAxioms(tgt.memory);
 
   // axioms for function calls
+  // We would potentially need to do refinement check of tgt x tgt, but it
+  // doesn't seem to be needed in practice for optimizations
+  // since there's no introduction of calls in tgt
   for (auto &[fn, data] : fn_call_data) {
-    (void)fn;
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
       auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
       auto &[rets, ub, mem_state] = I->second;
@@ -367,8 +369,9 @@ void State::mkAxioms(State &tgt) {
           ref_expr &= rets[i].non_poison.implies(rets2[i].non_poison);
         }
         tgt.addPre(is_val_eq.implies(eq_expr));
-        tgt.addPre(refines.implies(ref_expr && ub.implies(ub2) &&
-                                   mem_state == mem_state2));
+        tgt.addPre(refines.implies(ref_expr &&
+                                   ub.implies(ub2) &&
+                                   mem_state.implies(mem_state2)));
       }
     }
   }

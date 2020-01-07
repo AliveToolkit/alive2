@@ -672,6 +672,9 @@ static void calculateAndInitConstants(Transform &t) {
   // Allow at least one non-const global for calls to change
   num_nonlocals += has_fncall;
 
+  if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
+    does_int_mem_access = true;
+
   auto has_attr = [&](Input::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
       for (auto &v : fn->getInputs()) {

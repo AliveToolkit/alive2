@@ -1,0 +1,9 @@
+; TEST-ARGS: -root-only
+; ERROR: Value mismatch
+
+  %c = call i32 @f(i32 3)
+  %d = call i32 @f(i32 3)
+  %r = icmp eq i32 %c, %d
+  ret %r
+=>
+  ret true

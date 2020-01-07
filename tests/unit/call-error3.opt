@@ -1,4 +1,4 @@
-; ERROR: Value mismatch
+; ERROR: Target is more poisonous
 
 %c = call i32 @f(i32 3)
 %d = call i32 @f(i32 poison)

@@ -216,7 +216,7 @@ public:
     bool empty = true;
 
   public:
-    smt::expr operator==(const CallState &st) const;
+    smt::expr implies(const CallState &st) const;
     friend class Memory;
   };
 

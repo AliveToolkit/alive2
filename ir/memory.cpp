@@ -1021,9 +1021,11 @@ pair<expr,expr> Memory::mkFnRet(const char *name) const {
   return { p.release(), move(var) };
 }
 
-expr Memory::CallState::operator==(const CallState &st) const {
+expr Memory::CallState::implies(const CallState &st) const {
   if (empty || st.empty)
     return true;
+  // NOTE: using equality here is an approximation.
+  // TODO: benchmark using quantifiers to state implication
   return block_val_var == st.block_val_var &&
          liveness_var == st.liveness_var;
 }
@@ -1041,16 +1043,14 @@ Memory::CallState Memory::mkCallState() const {
   auto idx = expr::mkFreshVar("#idx", expr::mkUInt(0, bits_shortbid()));
   st.liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
   st.non_local_block_liveness
-    = expr::mkLambda( { idx }, non_local_block_liveness.load(idx) &&
-                               st.liveness_var.load(idx));
+    = expr::mkLambda({ idx }, non_local_block_liveness.load(idx) &&
+                              st.liveness_var.load(idx));
   return st;
 }
 
 void Memory::setState(const Memory::CallState &st) {
   non_local_block_val = st.non_local_block_val;
-  // TODO: missing condition that if fn calls are refined, so is the liveness
-  // data
-  //non_local_block_liveness = st.non_local_block_liveness;
+  non_local_block_liveness = st.non_local_block_liveness;
   mk_nonlocal_val_axioms(*state, *this, non_local_block_val);
 }
 
