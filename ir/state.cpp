@@ -196,9 +196,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   // TODO: this doesn't need to compare the full memory, just a subset of fields
-  auto [I, inserted]
+  auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
                                        memory, reads_memory, argmemonly });
+  auto &I = call_data_pair.first;
+  bool inserted = call_data_pair.second;
 
   auto mk_val = [&](const Type &t, const string &name) {
     if (t.isPtrType())
