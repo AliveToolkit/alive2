@@ -1010,13 +1010,23 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
   return { p.release(), move(undef) };
 }
 
-pair<expr,expr> Memory::mkFnRet(const char *name) const {
+pair<expr,expr>
+Memory::mkFnRet(const char *name, const vector<StateValue> &ptr_inputs) const {
   // TODO: can only alias with escaped local blocks!
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
+
+  // TODO: missing escaped local ptrs
+  expr local(false);
+  for (auto &in : ptr_inputs) {
+    Pointer inp(*this, in.value);
+    if (!inp.is_local().isFalse())
+      local |= in.non_poison && p.get_bid() == inp.get_bid();
+  }
+
   state->addAxiom(expr::mkIf(p.is_local(),
-                             p.get_short_bid().ule(num_locals - 1),
+                             local,
                              p.get_short_bid().ule(num_nonlocals - 1)));
   return { p.release(), move(var) };
 }

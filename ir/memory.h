@@ -232,7 +232,8 @@ public:
   smt::expr mkInput(const char *name, unsigned attributes) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
 
-  std::pair<smt::expr, smt::expr> mkFnRet(const char *name) const;
+  std::pair<smt::expr, smt::expr>
+    mkFnRet(const char *name, const std::vector<StateValue> &ptr_inputs) const;
   CallState mkCallState() const;
   void setState(const CallState &st);
 

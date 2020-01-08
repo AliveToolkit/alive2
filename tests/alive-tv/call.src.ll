@@ -41,6 +41,13 @@ define void @f7() {
   ret void
 }
 
+define void @f8() {
+  %p = alloca i8, align 1
+  %call = call i8* @k()
+  %x = load i8, i8* %call, align 1
+  ret void
+}
+
 declare i8 @g(i8*)
 declare i8 @h(i8*) readnone
 declare i8* @k()

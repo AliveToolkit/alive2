@@ -200,9 +200,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
                                        memory, reads_memory, argmemonly });
 
-  auto mk_val = [this](const Type &t, const string &name) {
+  auto mk_val = [&](const Type &t, const string &name) {
     if (t.isPtrType())
-      return memory.mkFnRet(name.c_str());
+      return memory.mkFnRet(name.c_str(), get<1>(I->first));
 
     auto v = expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
     return make_pair(v, v);
