@@ -1758,9 +1758,7 @@ void Malloc::print(std::ostream &os) const {
 }
 
 StateValue Malloc::toSMT(State &s) const {
-  auto &[sz, np] = s[*size];
-  for (auto uvar: s.at(*size).second)
-    s.addQuantVar(move(uvar));
+  auto &[sz, np] = s.getAndAddUndefs(*size);
   // TODO: malloc's alignment is implementation defined.
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true, nonnull);
@@ -1799,12 +1797,8 @@ void Calloc::print(std::ostream &os) const {
 }
 
 StateValue Calloc::toSMT(State &s) const {
-  auto &[nm, np_num] = s[*num];
-  auto &[sz, np_sz] = s[*size];
-  for (auto uvar: s.at(*size).second)
-    s.addQuantVar(move(uvar));
-  for (auto uvar: s.at(*num).second)
-    s.addQuantVar(move(uvar));
+  auto &[nm, np_num] = s.getAndAddUndefs(*num);
+  auto &[sz, np_sz] = s.getAndAddUndefs(*size);
 
   // TODO: check calloc align.
   expr size = nm * sz;
