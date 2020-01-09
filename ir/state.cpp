@@ -69,6 +69,13 @@ const StateValue& State::operator[](const Value &val) {
   return tmp_values[i_tmp_values++] = move(sval_new);
 }
 
+const StateValue& State::getAndAddUndefs(const Value &val) {
+  auto &v = (*this)[val];
+  for (auto uvar: at(val).second)
+    addQuantVar(move(uvar));
+  return v;
+}
+
 const State::ValTy& State::at(const Value &val) const {
   return get<1>(values[values_map.at(&val)]);
 }

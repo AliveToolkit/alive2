@@ -1,4 +1,3 @@
-; TEST-ARGS: -disable-undef-input
 define i8* @f(i64 %size) {
 entry:
   %call = call noalias i8* @malloc(i64 %size)
@@ -12,4 +11,20 @@ entry:
   ret i8* %call
 }
 
-declare dso_local noalias i8* @malloc(i64)
+define i8* @f_observed2(i64 %size) {
+entry:
+  %call = call noalias i8* @calloc(i64 4, i64 %size)
+  %unused = ptrtoint i8* %call to i64
+  ret i8* %call
+}
+
+define i8* @f_observed3(i64 %size) {
+entry:
+  %unused0 = bitcast i64 %size to i64
+  %call = call noalias i8* @calloc(i64 4, i64 %size)
+  %unused = ptrtoint i8* %call to i64
+  ret i8* %call
+}
+
+declare noalias i8* @malloc(i64)
+declare noalias i8* @calloc(i64, i64)
