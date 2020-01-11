@@ -612,9 +612,11 @@ static void calculateAndInitConstants(Transform &t) {
   }
   num_locals = max(num_locals_src, num_locals_tgt);
 
+  uint64_t min_global_size = UINT64_MAX;
   for (auto glbs : { &globals_src, &globals_tgt}) {
     for (auto &glb : *glbs) {
       max_mem_access = max(glb->size(), max_mem_access);
+      min_global_size = min(glb->size(), min_global_size);
     }
   }
 
@@ -708,7 +710,9 @@ static void calculateAndInitConstants(Transform &t) {
   bits_size_t = min(max(bits_for_offset, bits_size_t)+1, bits_program_pointer);
 
   // size of byte
-  bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size : 1);
+  min_access_size = min(min_global_size, min_access_size);
+  bits_byte = 8 * ((does_mem_access || has_fncall)
+                     ? (unsigned)min_access_size : 1);
 
   little_endian = t.src.isLittleEndian();
 
