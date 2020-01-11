@@ -298,6 +298,7 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
   string name = var_name;
   if (unique_name)
     name += '!' + to_string(ptr_next_idx++);
+
   unsigned bits = total_bits() - ptr_has_local_bit() - bits_for_ptrattrs;
   p = prepend_if(local.toBVBool(), expr::mkVar(name.c_str(), bits),
                  ptr_has_local_bit());
@@ -586,7 +587,7 @@ expr Pointer::get_alloc_type() const {
   // If programs have no malloc & free, we don't need to store this information
   // since it is only used to check if free/delete is ok and
   // for memory refinement of local malloc'ed blocks
-  if (!has_malloc && !has_free)
+  if (!has_malloc && !has_free && !has_fncall)
     return expr::mkUInt(NON_HEAP, 2);
 
   // if malloc is used, but no free, we can still ignore info for non-locals
@@ -1036,25 +1037,72 @@ expr Memory::CallState::implies(const CallState &st) const {
     return true;
   // NOTE: using equality here is an approximation.
   // TODO: benchmark using quantifiers to state implication
-  return block_val_var == st.block_val_var &&
-         liveness_var == st.liveness_var;
+  expr ret(true);
+  if (block_val_var.isValid() && st.block_val_var.isValid())
+    ret &= block_val_var == st.block_val_var;
+  if (liveness_var.isValid() && st.liveness_var.isValid())
+    ret &= liveness_var == st.liveness_var;
+  return ret;
 }
 
-Memory::CallState Memory::mkCallState() const {
+Memory::CallState
+Memory::mkCallState(const vector<StateValue> *ptr_inputs) const {
   Memory::CallState st;
   st.empty = false;
 
   auto blk_val = mk_block_val_array();
   st.block_val_var = expr::mkFreshVar("blk_val", blk_val);
-  st.non_local_block_val
-    = initial_non_local_block_val.subst(blk_val, st.block_val_var);
-
-  // functions can free an object, but cannot bring a dead one back to live
-  auto idx = expr::mkFreshVar("#idx", expr::mkUInt(0, bits_shortbid()));
   st.liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
-  st.non_local_block_liveness
-    = expr::mkLambda({ idx }, non_local_block_liveness.load(idx) &&
-                              st.liveness_var.load(idx));
+
+  {
+    Pointer p(*this, "#idx", false);
+    expr modifies(true);
+
+    if (ptr_inputs) {
+      modifies = false;
+      for (auto &arg : *ptr_inputs) {
+        Pointer argp(*this, arg.value);
+        modifies |= arg.non_poison && argp.get_bid() == p.get_bid();
+      }
+    }
+
+    st.non_local_block_val
+      = initial_non_local_block_val.subst(blk_val, st.block_val_var);
+
+    if (!modifies.isTrue()) {
+      auto idx = p.short_ptr();
+      st.non_local_block_val
+        = expr::mkLambda({ idx },
+                         expr::mkIf(modifies, st.non_local_block_val.load(idx),
+                                    non_local_block_val.load(idx)));
+    }
+  }
+  {
+    auto bid = expr::mkFreshVar("#idx", expr::mkUInt(0, bits_shortbid()));
+    Pointer p(*this,
+              prepend_if(expr::mkUInt(0, 1), expr(bid), ptr_has_local_bit()),
+              expr::mkUInt(0, bits_for_offset));
+
+    expr modifies = p.is_heap_allocated();
+    if (ptr_inputs) {
+      expr c(false);
+      for (auto &arg : *ptr_inputs) {
+        c |= arg.non_poison &&
+             Pointer(*this, arg.value).get_bid() == p.get_bid();
+      }
+      modifies &= c;
+    }
+
+    if (modifies.isFalse()) {
+      st.non_local_block_liveness = non_local_block_liveness;
+      st.liveness_var = expr();
+    } else {
+      // functions can free an object, but cannot bring a dead one back to live
+      st.non_local_block_liveness
+        = expr::mkLambda({ bid }, non_local_block_liveness.load(bid) &&
+                                  modifies.implies(st.liveness_var.load(bid)));
+    }
+  }
   return st;
 }
 
@@ -1354,12 +1402,13 @@ expr Memory::int2ptr(const expr &val) {
   return {};
 }
 
-pair<expr,Pointer> Memory::refined(const Memory &other) const {
+pair<expr,Pointer> Memory::refined(const Memory &other,
+                                   const vector<StateValue> *set_ptrs) const {
   if (num_nonlocals <= 1)
     return { true, Pointer(*this, expr()) };
 
   assert(!memory_unused());
-  Pointer ptr(*this, "#idx_refinement", false, false);
+  Pointer ptr(*this, "#idx_refinement", false);
   expr ptr_bid = ptr.get_bid();
   expr offset = ptr.get_offset();
   expr ret(true);
@@ -1372,6 +1421,16 @@ pair<expr,Pointer> Memory::refined(const Memory &other) const {
       continue;
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
+
+  // restrict refinement check to set of request blocks
+  if (set_ptrs) {
+    expr c(false);
+    for (auto &ptr : *set_ptrs) {
+      c |= ptr.non_poison && Pointer(*this, ptr.value).get_bid() == ptr_bid;
+    }
+    ret = c.implies(ret);
+  }
+
   return { move(ret), move(ptr) };
 }
 

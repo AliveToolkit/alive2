@@ -234,7 +234,7 @@ public:
 
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name, const std::vector<StateValue> &ptr_inputs) const;
-  CallState mkCallState() const;
+  CallState mkCallState(const std::vector<StateValue> *ptr_inputs) const;
   void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
@@ -273,7 +273,9 @@ public:
   smt::expr ptr2int(const smt::expr &ptr);
   smt::expr int2ptr(const smt::expr &val);
 
-  std::pair<smt::expr,Pointer> refined(const Memory &other) const;
+  std::pair<smt::expr,Pointer>
+    refined(const Memory &other,
+            const std::vector<StateValue> *set_ptrs = nullptr) const;
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr check_nocapture() const;

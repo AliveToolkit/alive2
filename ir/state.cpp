@@ -228,7 +228,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
     string ub_name = string(name) + "#ub";
     I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
-                  writes_memory ? memory.mkCallState() : Memory::CallState() };
+                  writes_memory
+                  ? memory.mkCallState(argmemonly ? &get<1>(I->first) : nullptr)
+                  : Memory::CallState() };
   }
 
   addUB(get<1>(I->second));
@@ -349,6 +351,9 @@ void State::mkAxioms(State &tgt) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
         auto &[rets2, ub2, mem_state2] = I2->second;
 
+        if (reads != reads2 || argmem != argmem2)
+          continue;
+
         expr refines(true), is_val_eq(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
           expr eq_val = ins[i].value == ins2[i].value;
@@ -366,8 +371,9 @@ void State::mkAxioms(State &tgt) {
                        .implies(eq_val && ptr_ins2[i].non_poison);
         }
 
-        if (reads && reads2 && !argmem && !argmem2) {
-          expr mem_refined = mem.refined(mem2).first;
+        if (reads2) {
+          auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
+          expr mem_refined = mem.refined(mem2, restrict_ptrs).first;
           is_val_eq &= mem_refined;
           refines &= mem_refined;
         }
