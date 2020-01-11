@@ -47,7 +47,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
-  if (!decl || !TLI.getLibFunc(*decl, libfn))
+  if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
     return { nullptr, false };
 
   switch (libfn) {
