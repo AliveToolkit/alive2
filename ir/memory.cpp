@@ -681,12 +681,13 @@ expr Pointer::block_refined(const Pointer &other) const {
   expr blk_size = block_size();
   expr val_refines(true);
   uint64_t bytes;
+  auto bytes_per_byte = bits_byte / 8;
 
-  if (blk_size.isUInt(bytes) && bytes <= 8) {
+  if (blk_size.isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
     expr bid = get_bid();
     expr ptr_offset = get_offset();
 
-    for (unsigned off = 0; off < bytes; ++off) {
+    for (unsigned off = 0; off < bytes; off += bytes_per_byte) {
       expr off_expr = expr::mkUInt(off, bits_for_offset);
       Pointer p(m, bid, off_expr);
       Pointer q(other.m, p());
@@ -1149,6 +1150,8 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   expr size_zext = size.zextOrTrunc(bits_size_t);
   expr nooverflow = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
+  assert(bits_byte == 8 || is_local ||
+         size_zext.urem(expr::mkUInt(bits_byte/8, bits_size_t)).isZero());
 
   expr allocated = precond && nooverflow;
   state->addPre(nonnull.implies(allocated));

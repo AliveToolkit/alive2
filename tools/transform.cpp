@@ -631,7 +631,7 @@ static void calculateAndInitConstants(Transform &t) {
   does_int_mem_access = false;
 
   // Mininum access size (in bytes)
-  uint64_t min_access_size = 16;
+  uint64_t min_access_size = 8;
   bool does_mem_access = false;
   bool has_load = false;
 
@@ -689,6 +689,7 @@ static void calculateAndInitConstants(Transform &t) {
   };
   // The number of bits needed to encode pointer attributes
   // nonnull and byval isn't encoded in ptr attribute bits
+  bool has_byval = has_attr(Input::ByVal);
   has_nocapture = has_attr(Input::NoCapture);
   has_readonly = has_attr(Input::ReadOnly);
   bits_for_ptrattrs = has_nocapture + has_readonly;
@@ -711,7 +712,9 @@ static void calculateAndInitConstants(Transform &t) {
 
   // size of byte
   min_access_size = min(min_global_size, min_access_size);
-  bits_byte = 8 * ((does_mem_access || has_fncall)
+  if (has_byval)
+    min_access_size = 1;
+  bits_byte = 8 * ((does_mem_access || num_globals != 0)
                      ? (unsigned)min_access_size : 1);
 
   little_endian = t.src.isLittleEndian();
