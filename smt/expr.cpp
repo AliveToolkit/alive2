@@ -1548,7 +1548,7 @@ vector<expr> expr::allLeafs(const expr &e) {
   do {
     expr v = worklist.back();
     worklist.pop_back();
-    if (!seen.insert(v()).second)
+    if (!seen.insert(v.isValid() ? v() : nullptr).second)
       continue;
 
     expr cond, then, els;
