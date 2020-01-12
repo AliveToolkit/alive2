@@ -623,7 +623,7 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  nullptr_is_used  = false;
+  bool nullptr_is_used = false;
   has_int2ptr      = false;
   has_ptr2int      = false;
   has_malloc       = false;

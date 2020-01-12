@@ -34,9 +34,6 @@ extern unsigned bits_byte;
 
 extern bool little_endian;
 
-/// Whether the null pointer is used in either function
-extern bool nullptr_is_used;
-
 /// Whether int2ptr or ptr2int are used in either function
 extern bool has_int2ptr;
 extern bool has_ptr2int;

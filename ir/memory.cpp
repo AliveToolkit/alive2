@@ -844,9 +844,7 @@ static unsigned last_local_bid = 0;
 static unsigned last_nonlocal_bid = 1;
 
 static bool memory_unused() {
-  // +1 for the null block
-  return num_locals == 0 && num_nonlocals == 1 && !nullptr_is_used &&
-         !observes_addresses();
+  return num_locals == 0 && num_nonlocals == 0;
 }
 
 static expr mk_block_val_array() {
