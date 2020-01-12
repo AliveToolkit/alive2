@@ -15,7 +15,7 @@ using namespace std;
 
 namespace IR {
 
-State::State(const Function &f, bool source)
+State::State(Function &f, bool source)
   : f(f), source(source), memory(*this),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
@@ -122,14 +122,15 @@ bool State::startBB(const BasicBlock &bb) {
   return true;
 }
 
-void State::addJump(const BasicBlock &dst, expr &&cond) {
-  if (seen_bbs.count(&dst))
-    throw AliveException("Loops are not supported yet! Skipping function.",
-                         false);
+void State::addJump(const BasicBlock &dst0, expr &&cond) {
+  auto dst = &dst0;
+  if (seen_bbs.count(dst)) {
+    dst = &f.getBB("#sink");
+  }
 
   cond &= domain.first;
-  auto p = predecessor_data[&dst].try_emplace(current_bb, DomainTy({}, {}),
-                                              memory);
+  auto p = predecessor_data[dst].try_emplace(current_bb, DomainTy({}, {}),
+                                             memory);
   if (!p.second) {
     p.first->second.second = Memory::mkIf(cond, memory, p.first->second.second);
     p.first->second.first.first |= move(cond);
@@ -298,6 +299,23 @@ StateValue State::rewriteUndef(StateValue &&val) {
 void State::finishInitializer() {
   is_initialization_phase = false;
   memory.finishInitialization();
+}
+
+expr State::sinkDomain() const {
+  auto bb = f.getBBIfExists("#sink");
+  if (!bb)
+    return false;
+
+  auto I = predecessor_data.find(bb);
+  if (I == predecessor_data.end())
+    return false;
+
+  expr ret(false);
+  for (auto &[src, data] : I->second) {
+    (void)src;
+    ret |= data.first.first;
+  }
+  return ret;
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {

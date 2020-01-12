@@ -88,6 +88,11 @@ const BasicBlock& Function::getBB(string_view name) const {
   return BBs.at(string(name));
 }
 
+const BasicBlock* Function::getBBIfExists(std::string_view name) const {
+  auto I = BBs.find(string(name));
+  return I != BBs.end() ? &I->second : nullptr;
+}
+
 void Function::removeBB(BasicBlock &BB) {
   BBs.erase(BB.getName());
 

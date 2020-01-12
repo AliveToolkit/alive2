@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=5000
+; TEST-ARGS: -disable-poison-input
 
 define i8* @f(i64 %size) {
 entry:

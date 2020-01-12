@@ -86,8 +86,9 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   llvm::Function &f;
   const llvm::TargetLibraryInfo &TLI;
-  vector<llvm::Instruction *> i_constexprs;
+  vector<llvm::Instruction*> i_constexprs;
   vector<string_view> gvnamesInSrc;
+  vector<tuple<Phi*, llvm::PHINode*, unsigned>> todo_phis;
 
   using RetTy = unique_ptr<Instr>;
 
@@ -484,10 +485,11 @@ public:
 
     auto phi = make_unique<Phi>(*ty, value_name(i));
     for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
-      auto op = get_operand(i.getIncomingValue(idx));
-      if (!op)
-        return error(i);
-      phi->addValue(*op, value_name(*i.getIncomingBlock(idx)));
+      if (auto op = get_operand(i.getIncomingValue(idx))) {
+        phi->addValue(*op, value_name(*i.getIncomingBlock(idx)));
+      } else {
+        todo_phis.emplace_back(phi.get(), &i, idx);
+      }
     }
 
     RETURN_IDENTIFIER(move(phi));
@@ -802,6 +804,16 @@ public:
         } else
           return {};
       }
+    }
+
+    // patch phi nodes for recursive defs
+    for (auto &[phi, llvm_i, idx] : todo_phis) {
+      auto op = get_operand(llvm_i->getIncomingValue(idx));
+      if (!op) {
+        error(*llvm_i);
+        return {};
+      }
+      phi->addValue(*op, value_name(*llvm_i->getIncomingBlock(idx)));
     }
 
     auto getGlobalVariable =

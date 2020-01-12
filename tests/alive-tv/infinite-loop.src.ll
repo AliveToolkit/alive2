@@ -10,6 +10,3 @@ loop:
 }
 
 declare void @g()
-
-; Currently loops are not supported, so following error appears.
-; ERROR: Loops are not supported yet! Skipping function.

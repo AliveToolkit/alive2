@@ -35,8 +35,7 @@ unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
 unsigned type_id_counter; // for unamed types
 
 Function *current_fn;
-unordered_map<const llvm::Value*, Value*> identifiers;
-unordered_map<const llvm::GlobalVariable*, GlobalVariable*> globalvars;
+unordered_map<const llvm::Value*, Value*> value_cache;
 
 ostream *out;
 
@@ -205,18 +204,25 @@ Value* make_intconst(uint64_t val, int bits) {
   return ret;
 }
 
+#define RETURN_CACHE(val)                           \
+  do {                                              \
+    auto val_cpy = val;                             \
+    ENSURE(value_cache.emplace(v, val_cpy).second); \
+    return val_cpy;                                 \
+  } while (0)
+
 
 Value* get_operand(llvm::Value *v,
                    function<Value*(llvm::ConstantExpr*)> constexpr_conv,
                    function<Value*(AggregateValue*)> copy_inserter) {
-  if (isa<llvm::Instruction>(v) || isa<llvm::Argument>(v))
-    return identifiers[v];
+  if (auto I = value_cache.find(v);
+      I != value_cache.end())
+    return I->second;
 
   auto ty = llvm_type2alive(v->getType());
   if (!ty)
     return nullptr;
 
-  // TODO: cache these?
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
     unique_ptr<IntConst> c;
     if (cnst->getBitWidth() <= 64)
@@ -225,7 +231,7 @@ Value* get_operand(llvm::Value *v,
       c = make_unique<IntConst>(*ty, cnst->getValue().toString(10, false));
     auto ret = c.get();
     current_fn->addConstant(move(c));
-    return ret;
+    RETURN_CACHE(ret);
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
@@ -247,28 +253,24 @@ Value* get_operand(llvm::Value *v,
     }
     auto ret = c.get();
     current_fn->addConstant(move(c));
-    return ret;
+    RETURN_CACHE(ret);
   }
 
   if (isa<llvm::UndefValue>(v)) {
     auto val = make_unique<UndefValue>(*ty);
     auto ret = val.get();
     current_fn->addUndef(move(val));
-    return ret;
+    RETURN_CACHE(ret);
   }
 
   if (isa<llvm::ConstantPointerNull>(v)) {
     auto val = make_unique<NullPointerValue>(*ty);
     auto ret = val.get();
     current_fn->addConstant(move(val));
-    return ret;
+    RETURN_CACHE(ret);
   }
 
   if (auto gv = dyn_cast<llvm::GlobalVariable>(v)) {
-    auto &gvar = globalvars[gv];
-    if (gvar)
-      return gvar;
-
     if (hasOpaqueType(gv->getValueType()))
       // TODO: Global variable of opaque type is not supported.
       return nullptr;
@@ -294,9 +296,9 @@ Value* get_operand(llvm::Value *v,
     }
     auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
                                            gv->isConstant());
-    gvar = val.get();
+    auto gvar = val.get();
     current_fn->addConstant(move(val));
-    return gvar;
+    RETURN_CACHE(gvar);
   }
 
   auto fillAggregateValues = [&](AggregateType *aty,
@@ -363,7 +365,7 @@ Value* get_operand(llvm::Value *v,
     auto val = make_unique<AggregateValue>(*ty, move(vals));
     auto ret = val.get();
     current_fn->addConstant(move(val));
-    return ret;
+    RETURN_CACHE(ret);
   }
 
   if (auto cexpr = dyn_cast<llvm::ConstantExpr>(v)) {
@@ -375,7 +377,7 @@ Value* get_operand(llvm::Value *v,
 
 
 void add_identifier(const llvm::Value &llvm, Value &v) {
-  identifiers.emplace(&llvm, &v);
+  value_cache.emplace(&llvm, &v);
 }
 
 
@@ -402,9 +404,8 @@ void init_llvm_utils(ostream &os, const llvm::DataLayout &dataLayout) {
 
 void reset_state(Function &f) {
   current_fn = &f;
-  identifiers.clear();
+  value_cache.clear();
   value_names.clear();
-  globalvars.clear();
   value_id_counter = 0;
 }
 

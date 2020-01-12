@@ -31,7 +31,8 @@ public:
   using DomainTy = std::pair<smt::expr, std::set<smt::expr>>;
 
 private:
-  const Function &f;
+  // TODO: make this const again
+  Function &f;
   bool source;
   bool disable_undef_rewrite = false;
   bool is_initialization_phase = true;
@@ -80,7 +81,7 @@ private:
     fn_call_data;
 
 public:
-  State(const Function &f, bool source);
+  State(Function &f, bool source);
 
   static void resetGlobals();
 
@@ -129,6 +130,7 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
 
   auto& returnDomain() const { return return_domain; }
+  smt::expr sinkDomain() const;
   Memory returnMemory() const { return *return_memory(); }
 
   std::pair<StateValue, const std::set<smt::expr>&> returnVal() const {

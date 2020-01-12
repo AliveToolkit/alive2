@@ -81,6 +81,7 @@ public:
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;
+  const BasicBlock* getBBIfExists(std::string_view name) const;
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);
