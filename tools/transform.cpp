@@ -438,15 +438,19 @@ static bool may_be_nonlocal(Value *ptr) {
   return false;
 }
 
-static bool returns_nonlocal(const Instr &inst) {
-  if (dynamic_cast<const FnCall *>(&inst))
-    return num_ptrs(inst.getType());
+static unsigned returns_nonlocal(const Instr &inst) {
+  bool rets_nonloc = false;
 
-  if (auto load = dynamic_cast<const Load *>(&inst)) {
-    if (may_be_nonlocal(&load->getPtr()))
-      return num_ptrs(inst.getType());
+  if (dynamic_cast<const FnCall *>(&inst)) {
+    rets_nonloc = true;
   }
-  return 0u;
+  else if (auto load = dynamic_cast<const Load *>(&inst)) {
+    rets_nonloc = may_be_nonlocal(&load->getPtr());
+  }
+  else if (auto conv = dynamic_cast<const ConversionOp *>(&inst)) {
+    rets_nonloc = conv->getOp() == ConversionOp::Int2Ptr;
+  }
+  return rets_nonloc ? num_ptrs(inst.getType()) : 0;
 }
 
 static optional<int64_t> get_int(const Value &val) {
