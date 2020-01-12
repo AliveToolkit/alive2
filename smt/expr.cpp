@@ -1541,6 +1541,27 @@ set<expr> expr::vars() const {
   return result;
 }
 
+vector<expr> expr::allLeafs(const expr &e) {
+  vector<expr> ret;
+  vector<expr> worklist = { e };
+  unordered_set<Z3_ast> seen;
+  do {
+    expr v = worklist.back();
+    worklist.pop_back();
+    if (!seen.insert(v()).second)
+      continue;
+
+    expr cond, then, els;
+    if (v.isIf(cond, then, els)) {
+      worklist.emplace_back(move(then));
+      worklist.emplace_back(move(els));
+    } else {
+      ret.emplace_back(move(v));
+    }
+  } while (!worklist.empty());
+  return ret;
+}
+
 void expr::printUnsigned(ostream &os) const {
   os << numeral_string();
 }

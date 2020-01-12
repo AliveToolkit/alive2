@@ -285,6 +285,9 @@ public:
 
   std::set<expr> vars() const;
 
+  // returns set of all possible leaf expressions (best-effort simplification)
+  static std::vector<expr> allLeafs(const expr &e);
+
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;

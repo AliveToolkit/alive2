@@ -783,19 +783,34 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
+static vector<expr> extract_possible_local_bids(Memory &m, const Byte &b) {
+  vector<expr> ret;
+  expr zero = expr::mkUInt(0, bits_for_offset);
+  for (auto ptr_val : expr::allLeafs(b.ptr_value())) {
+    for (auto bid : expr::allLeafs(Pointer(m, move(ptr_val)).get_bid())) {
+      Pointer ptr(m, bid, zero);
+      if (!ptr.is_local().isFalse())
+        ret.emplace_back(ptr.get_short_bid());
+    }
+  }
+  return ret;
+}
+
 void Memory::store(const Pointer &p, const expr &val, expr &local,
                    expr &non_local, bool index_bid) {
-  if (!index_bid) {
-    Byte b(*this, expr(val));
-    if (!b.is_ptr().isFalse() && !b.ptr().is_local().isFalse()) {
+  if (!index_bid && num_locals > 0) {
+    Byte byte(*this, expr(val));
+    if (byte.is_ptr().isTrue()) {
       uint64_t bid;
-      if (b.ptr().get_short_bid().isUInt(bid)) {
-        if (bid < num_locals)
-          escaped_local_blks[bid] = true;
-      } else {
-        // may escape a local ptr, but we don't know which one
-        escaped_local_blks.clear();
-        escaped_local_blks.resize(num_locals, true);
+      for (const auto &bid_expr : extract_possible_local_bids(*this, byte)) {
+        if (bid_expr.isUInt(bid)) {
+          if (bid < num_locals)
+            escaped_local_blks[bid] = true;
+        } else {
+          // may escape a local ptr, but we don't know which one
+          escaped_local_blks.clear();
+          escaped_local_blks.resize(num_locals, true);
+        }
       }
     }
   }
@@ -1524,9 +1539,10 @@ bool Memory::operator<(const Memory &rhs) const {
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks);
 }
 
-#define P(msg, local, nonlocal)                            \
-  os << msg "\nLocal: " << m.local.simplify()              \
-     << "\nNon-local: " << m.nonlocal.simplify() << "\n\n"
+#define P(msg, local, nonlocal)                                              \
+  os << msg "\n";                                                            \
+  if (num_locals > 0) os << "Local: " << m.local.simplify() << '\n';         \
+  if (num_locals > 0) os << "Non-local: " << m.nonlocal.simplify() << "\n\n"
 
 ostream& operator<<(ostream &os, const Memory &m) {
   if (memory_unused())
@@ -1537,7 +1553,14 @@ ostream& operator<<(ostream &os, const Memory &m) {
   P("BLOCK SIZE:", local_blk_size, non_local_blk_size);
   P("BLOCK ALIGN:", local_blk_align, non_local_blk_align);
   P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
-  return os << "LOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
+  if (num_locals > 0) {
+    os << "ESCAPED LOCAL BLOCKS: ";
+    for (unsigned i = 0; i < num_locals; ++i) {
+      os << m.escaped_local_blks[i];
+    }
+    os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
+  }
+  return os;
 }
 
 }
