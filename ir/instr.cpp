@@ -6,6 +6,7 @@
 #include "ir/globals.h"
 #include "ir/type.h"
 #include "smt/expr.h"
+#include "smt/exprs.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <functional>
@@ -1471,19 +1472,13 @@ void Phi::print(ostream &os) const {
 }
 
 StateValue Phi::toSMT(State &s) const {
-  StateValue ret;
-  bool first = true;
-
+  DisjointExpr<StateValue> ret;
   for (auto &[val, bb] : values) {
-    auto pre = s.jumpCondFrom(s.getFn().getBB(bb));
-    if (!pre) // jump from unreachable BB
-      continue;
-
-    auto &v = s[*val];
-    ret = first ? v : StateValue::mkIf(*pre, v, ret);
-    first = false;
+    // check if this was a jump from unreachable BB
+    if (auto pre = s.jumpCondFrom(s.getFn().getBB(bb)))
+      ret.add(s[*val], *pre);
   }
-  return ret;
+  return *ret();
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {
