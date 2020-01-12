@@ -615,8 +615,11 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_global_size = UINT64_MAX;
   for (auto glbs : { &globals_src, &globals_tgt}) {
     for (auto &glb : *glbs) {
-      max_mem_access = max(glb->size(), max_mem_access);
-      min_global_size = min(glb->size(), min_global_size);
+      auto sz = max(glb->size(), (uint64_t)1u);
+      max_mem_access = max(sz, max_mem_access);
+      min_global_size = min_global_size != UINT64_MAX
+                          ? gcd(sz, min_global_size)
+                          : sz;
     }
   }
 
@@ -711,7 +714,20 @@ static void calculateAndInitConstants(Transform &t) {
   bits_size_t = min(max(bits_for_offset, bits_size_t)+1, bits_program_pointer);
 
   // size of byte
-  min_access_size = min(min_global_size, min_access_size);
+  if (num_globals != 0) {
+    if (does_mem_access)
+      min_access_size = gcd(min_global_size, min_access_size);
+    else {
+      min_access_size = min_global_size;
+      while (min_access_size > 8) {
+        if (min_access_size % 2) {
+          min_access_size = 1;
+          break;
+        }
+        min_access_size /= 2;
+      }
+    }
+  }
   if (has_byval)
     min_access_size = 1;
   bits_byte = 8 * ((does_mem_access || num_globals != 0)

@@ -201,6 +201,10 @@ class Memory {
   smt::FunctionExpr non_local_blk_kind;
 
   std::vector<unsigned> byval_blks;
+  std::vector<bool> escaped_local_blks;
+
+  void store(const Pointer &p, const smt::expr &val, smt::expr &local,
+             smt::expr &non_local, bool index_bid = false);
 
 public:
   enum BlockKind {

@@ -783,8 +783,22 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
-static void store(const Pointer &p, const expr &val, expr &local,
-                  expr &non_local, bool index_bid = false) {
+void Memory::store(const Pointer &p, const expr &val, expr &local,
+                   expr &non_local, bool index_bid) {
+  if (!index_bid) {
+    Byte b(*this, expr(val));
+    if (!b.is_ptr().isFalse() && !b.ptr().is_local().isFalse()) {
+      uint64_t bid;
+      if (b.ptr().get_short_bid().isUInt(bid)) {
+        if (bid < num_locals)
+          escaped_local_blks[bid] = true;
+      } else {
+        // may escape a local ptr, but we don't know which one
+        escaped_local_blks.clear();
+        escaped_local_blks.resize(num_locals, true);
+      }
+    }
+  }
   auto is_local = p.is_local();
   auto idx = index_bid ? p.get_short_bid() : p.short_ptr();
   local = expr::mkIf(is_local, local.store(idx, val), local);
@@ -906,6 +920,8 @@ Memory::Memory(State &state) : state(&state) {
   if (num_nonlocals > 0)
     alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, false, false, 0);
 
+  escaped_local_blks.resize(num_locals, false);
+
   assert(bits_for_offset <= bits_size_t);
 }
 
@@ -1014,21 +1030,23 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
 
 pair<expr,expr>
 Memory::mkFnRet(const char *name, const vector<StateValue> &ptr_inputs) const {
-  // TODO: can only alias with escaped local blocks!
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
 
-  // TODO: missing escaped local ptrs
-  expr local(false);
+  set<expr> local;
   for (auto &in : ptr_inputs) {
     Pointer inp(*this, in.value);
     if (!inp.is_local().isFalse())
-      local |= in.non_poison && p.get_bid() == inp.get_bid();
+      local.emplace(in.non_poison && p.get_bid() == inp.get_bid());
+  }
+  for (unsigned i = 0; i < num_locals; ++i) {
+    if (escaped_local_blks[i])
+      local.emplace(p.get_short_bid() == i);
   }
 
   state->addAxiom(expr::mkIf(p.is_local(),
-                             local,
+                             expr::mk_or(local),
                              p.get_short_bid().ule(num_nonlocals - 1)));
   return { p.release(), move(var) };
 }
@@ -1200,7 +1218,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       non_local_blk_nonwritable.emplace_back(bid);
   }
 
-  ::store(p, allocated, local_block_liveness, non_local_block_liveness, true);
+  store(p, allocated, local_block_liveness, non_local_block_liveness, true);
   (is_local ? local_blk_size : non_local_blk_size)
     .add(short_bid, size_zext.trunc(bits_size_t - 1));
   (is_local ? local_blk_align : non_local_blk_align)
@@ -1237,7 +1255,7 @@ void Memory::free(const expr &ptr, bool unconstrained) {
     state->addUB(p.isNull() || (p.get_offset() == 0 &&
                                 p.is_block_alive() &&
                                 p.get_alloc_type() == Pointer::MALLOC));
-  ::store(p, false, local_block_liveness, non_local_block_liveness, true);
+  store(p, false, local_block_liveness, non_local_block_liveness, true);
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
@@ -1283,7 +1301,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       auto ptr_i = ptr + (little_endian ? i * bytesz :
                                           (e - i - 1) * bytesz);
-      ::store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
+      store(ptr_i, bytes[i](), local_block_val, non_local_block_val);
     }
   }
 }
@@ -1355,7 +1373,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   uint64_t n;
   if (bytesize.isUInt(n) && n <= 4) {
     for (unsigned i = 0; i < n; ++i) {
-      ::store(ptr + i, bytes[0](), local_block_val, non_local_block_val);
+      store(ptr + i, bytes[0](), local_block_val, non_local_block_val);
     }
   } else {
     Pointer idx(*this, "#idx", ptr.is_local());
@@ -1382,7 +1400,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   if (bytesize.isUInt(n) && n <= 4) {
     auto old_local = local_block_val, old_nonlocal = non_local_block_val;
     for (unsigned i = 0; i < n; ++i) {
-      ::store(dst + i, ::load(src + i, old_local, old_nonlocal),
+      store(dst + i, ::load(src + i, old_local, old_nonlocal),
               local_block_val, non_local_block_val);
     }
   } else {
@@ -1480,6 +1498,10 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.byval_blks.insert(ret.byval_blks.end(), els.byval_blks.begin(),
                         els.byval_blks.end());
+  for (unsigned i = 0; i < num_locals; ++i) {
+    if (els.escaped_local_blks[i])
+      ret.escaped_local_blks[i] = true;
+  }
   return ret;
 }
 
@@ -1492,14 +1514,14 @@ bool Memory::operator<(const Memory &rhs) const {
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_nonwritable, non_local_blk_size, non_local_blk_align,
-        non_local_blk_kind, byval_blks) <
+        non_local_blk_kind, byval_blks, escaped_local_blks) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.initial_non_local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind, rhs.non_local_blk_nonwritable,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
-        rhs.non_local_blk_kind, rhs.byval_blks);
+        rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks);
 }
 
 #define P(msg, local, nonlocal)                            \
