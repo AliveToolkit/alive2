@@ -1537,10 +1537,10 @@ bool Memory::operator<(const Memory &rhs) const {
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks);
 }
 
-#define P(msg, local, nonlocal)                                              \
-  os << msg "\n";                                                            \
-  if (num_locals > 0) os << "Local: " << m.local.simplify() << '\n';         \
-  if (num_locals > 0) os << "Non-local: " << m.nonlocal.simplify() << "\n\n"
+#define P(msg, local, nonlocal)                                                \
+  os << msg "\n";                                                              \
+  if (num_locals > 0) os << "Local: " << m.local.simplify() << '\n';           \
+  if (num_nonlocals > 0) os << "Non-local: " << m.nonlocal.simplify() << "\n\n"
 
 ostream& operator<<(ostream &os, const Memory &m) {
   if (memory_unused())
