@@ -43,11 +43,13 @@ void UndefValue::print(ostream &os) const {
   UNREACHABLE();
 }
 
+
 StateValue UndefValue::toSMT(State &s) const {
   auto val = getType().getDummyValue(true);
   expr var = expr::mkFreshVar("undef", val.value);
   s.addUndefVar(expr(var));
-  return { move(var), move(val.non_poison) };
+  StateValue undefv(move(var), move(val.non_poison));
+  return undefv;
 }
 
 
