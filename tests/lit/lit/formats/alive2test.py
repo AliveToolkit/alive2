@@ -76,10 +76,10 @@ class Alive2Test(TestFormat):
     if alive_tv:
        # Run identity check first
        srcpath = test
-       looperr_string = 'Loops are not supported yet! Skipping function'
+       invalid_expr = 'Invalid expr'
        resultchk = lambda msg, exitCode: \
            (exitCode == 0 and msg.find(ok_string) != -1) or \
-           (exitCode != 0 and msg.find(looperr_string) != -1)
+           (exitCode != 0 and msg.find(invalid_expr) != -1)
 
        out, err, exitCode = executeCommand(cmd + [srcpath, srcpath])
        if not resultchk(out + err, exitCode):
