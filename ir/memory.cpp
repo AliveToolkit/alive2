@@ -366,6 +366,9 @@ expr Pointer::get_attrs() const {
 expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
                         const FunctionExpr &nonlocal_fn,
                         const expr &ret_type, bool src_name) const {
+  if (!p.isValid())
+    return {};
+
   auto bid = get_short_bid();
   expr non_local;
 
