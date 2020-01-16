@@ -1,3 +1,3 @@
-define i64 @f(i64 %x, i64 %y) {
+define i64 @f(i64 %x) {
   unreachable
 }
