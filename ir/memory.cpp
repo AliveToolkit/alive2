@@ -388,7 +388,7 @@ expr Pointer::get_address(bool simplify) const {
   assert(observes_addresses());
 
   auto bid = get_short_bid();
-  auto zero = expr::mkUInt(0, bits_for_offset - 1);
+  auto zero = expr::mkUInt(0, bits_size_t - 1);
   // fast path for null ptrs
   auto non_local
     = simplify && bid.isZero() ? zero : expr::mkUF("blk_addr", { bid }, zero);
