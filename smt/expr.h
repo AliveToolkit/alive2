@@ -119,6 +119,7 @@ public:
   bool isUInt(uint64_t &n) const;
   bool isInt(int64_t &n) const;
 
+  bool isEq(expr &lhs, expr &rhs);
   bool isIf(expr &cond, expr &then, expr &els) const;
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
@@ -284,6 +285,7 @@ public:
   expr subst(const expr &from, const expr &to) const;
 
   std::set<expr> vars() const;
+  static std::set<expr> vars(const std::vector<const expr*> &exprs);
 
   // returns set of all possible leaf expressions (best-effort simplification)
   static std::vector<expr> allLeafs(const expr &e);

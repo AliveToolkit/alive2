@@ -343,6 +343,15 @@ bool expr::isInt(int64_t &n) const {
   return true;
 }
 
+bool expr::isEq(expr &lhs, expr &rhs) {
+  if (auto app = isAppOf(Z3_OP_EQ)) {
+    lhs = Z3_get_app_arg(ctx(), app, 0);
+    rhs = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
 bool expr::isIf(expr &cond, expr &then, expr &els) const {
   if (auto app = isAppOf(Z3_OP_ITE)) {
     cond = Z3_get_app_arg(ctx(), app, 0);
@@ -1214,6 +1223,11 @@ expr expr::zextOrTrunc(unsigned tobw) const {
 }
 
 expr expr::concat(const expr &rhs) const {
+  expr a, b;
+  unsigned h, l, h2, l2;
+  if (isExtract(a, h, l) && rhs.isExtract(b, h2, l2) && a.eq(b) && l == h2+1)
+    return a.extract(h, l2);
+
   return binop_fold(rhs, Z3_mk_concat);
 }
 
@@ -1492,15 +1506,24 @@ expr expr::subst(const expr &from, const expr &to) const {
 }
 
 set<expr> expr::vars() const {
-  C();
+  return vars({ this });
+}
+
+set<expr> expr::vars(const vector<const expr*> &exprs) {
   set<expr> result;
-  unordered_set<Z3_ast> todo{ ast() };
-  unordered_set<Z3_ast> seen = todo;
+  vector<Z3_ast> todo;
+  unordered_set<Z3_ast> seen;
+
+  for (auto e : exprs) {
+    C2(*e);
+    auto ast = e->ast();
+    if (seen.emplace(ast).second)
+      todo.emplace_back(ast);
+  }
 
   do {
-    auto I = todo.begin();
-    auto ast = *I;
-    todo.erase(I);
+    auto ast = todo.back();
+    todo.pop_back();
 
     switch (Z3_get_ast_kind(ctx(), ast)) {
     case Z3_VAR_AST:
@@ -1510,7 +1533,7 @@ set<expr> expr::vars() const {
     case Z3_QUANTIFIER_AST: {
       auto body = Z3_get_quantifier_body(ctx(), ast);
       if (seen.emplace(body).second)
-        todo.emplace(body);
+        todo.emplace_back(body);
       break;
     }
 
@@ -1529,7 +1552,7 @@ set<expr> expr::vars() const {
       for (unsigned i = 0; i < num_args; ++i) {
         auto arg = Z3_get_app_arg(ctx(), app, i);
         if (seen.emplace(arg).second)
-          todo.emplace(arg);
+          todo.emplace_back(arg);
       }
       break;
     }

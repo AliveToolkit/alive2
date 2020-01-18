@@ -31,6 +31,7 @@ struct StateValue {
 
   bool eq(const StateValue &other) const;
 
+  std::set<smt::expr> vars() const;
   StateValue
     subst(const std::vector<std::pair<smt::expr, smt::expr>> &repls) const;
 

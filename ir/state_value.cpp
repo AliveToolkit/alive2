@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/state_value.h"
+#include "util/compiler.h"
 #include <tuple>
 
 using namespace smt;
@@ -43,8 +44,28 @@ bool StateValue::eq(const StateValue &other) const {
   return value.eq(other.value) && non_poison.eq(other.non_poison);
 }
 
+set<expr> StateValue::vars() const {
+  return expr::vars({ &value, &non_poison });
+}
+
 StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
-  return { value.subst(repls), non_poison.subst(repls) };
+  if (!value.isValid() || !non_poison.isValid())
+    return { value.subst(repls), non_poison.subst(repls) };
+
+  // create dummy expr so we can do a single subst (more efficient than 2)
+  expr v1 = expr::mkVar("#1", value);
+  expr v2 = expr::mkVar("#2", non_poison);
+  expr val = expr::mkIf(non_poison == v2, value, v1).subst(repls);
+
+  expr cond, then, els, a, b, np;
+  ENSURE(val.isIf(cond, then, els));
+  if (cond.isEq(a, b)) {
+    np = a.eq(v2) ? move(b) : move(a);
+  } else {
+    assert(non_poison.isBool() && non_poison.isConst());
+    np = non_poison;
+  }
+  return { then.eq(v1) ? move(els) : move(then), move(np) };
 }
 
 bool StateValue::operator<(const StateValue &rhs) const {
