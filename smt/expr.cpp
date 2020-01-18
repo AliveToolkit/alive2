@@ -966,7 +966,10 @@ expr expr::operator~() const {
   return unop_fold(Z3_mk_bvnot);
 }
 
-expr expr::operator==(const expr &rhs) const {
+expr expr::cmp_eq(const expr &rhs, bool simplify) const {
+  if (!simplify)
+    goto end;
+
   if (eq(rhs))
     return true;
   if (isConst()) {
@@ -1012,28 +1015,35 @@ expr expr::operator==(const expr &rhs) const {
     }
   }
 
-  expr c, t, e;
-  if (isIf(c, t, e)) {
+  {
+    expr c, t, e;
+    if (isIf(c, t, e)) {
 #if 0
-    // TODO: benchmark
-    // (= (ite c t e) (ite c x y)) -> (ite c (= t x) (= e y))
-    if (auto rhs_app = rhs.isAppOf(Z3_OP_ITE)) {
-      expr c2 = Z3_get_app_arg(ctx(), rhs_app, 0);
-      if (c.eq(c2))
-        return mkIf(c,
-                    t == Z3_get_app_arg(ctx(), rhs_app, 1),
-                    e == Z3_get_app_arg(ctx(), rhs_app, 2));
-    }
+      // TODO: benchmark
+      // (= (ite c t e) (ite c x y)) -> (ite c (= t x) (= e y))
+      if (auto rhs_app = rhs.isAppOf(Z3_OP_ITE)) {
+        expr c2 = Z3_get_app_arg(ctx(), rhs_app, 0);
+        if (c.eq(c2))
+          return mkIf(c,
+                      t == Z3_get_app_arg(ctx(), rhs_app, 1),
+                      e == Z3_get_app_arg(ctx(), rhs_app, 2));
+      }
 #endif
-
-    // (= (ite c t e) x) -> (ite c (= t x) (= e x))
-    if (rhs.isConst() || (t.isConst() && e.isConst()))
-      return mkIf(c, t == rhs, e == rhs);
-
-  } else if (rhs.isAppOf(Z3_OP_ITE)) {
-    return rhs == *this;
+      // (= (ite c t e) x) -> (ite c (= t x) (= e x))
+      if (rhs.isConst() || (t.isConst() && e.isConst()))
+        return mkIf(c, t == rhs, e == rhs);
+    }
+    else if (rhs.isAppOf(Z3_OP_ITE)) {
+      return rhs == *this;
+    }
   }
+
+end:
   return binop_commutative(rhs, Z3_mk_eq);
+}
+
+expr expr::operator==(const expr &rhs) const {
+  return cmp_eq(rhs, true);
 }
 
 expr expr::operator!=(const expr &rhs) const {

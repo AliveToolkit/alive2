@@ -55,7 +55,7 @@ StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
   // create dummy expr so we can do a single subst (more efficient than 2)
   expr v1 = expr::mkVar("#1", value);
   expr v2 = expr::mkVar("#2", non_poison);
-  expr val = expr::mkIf(non_poison == v2, value, v1).subst(repls);
+  expr val = expr::mkIf(non_poison.cmp_eq(v2, false), value, v1).subst(repls);
 
   expr cond, then, els, a, b, np;
   ENSURE(val.isIf(cond, then, els));

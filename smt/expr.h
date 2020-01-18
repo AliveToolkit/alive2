@@ -209,6 +209,7 @@ public:
   expr operator!() const;
   expr operator~() const;
 
+  expr cmp_eq(const expr &rhs, bool simplify) const; // same as operator==
   expr operator==(const expr &rhs) const;
   expr operator!=(const expr &rhs) const;
 
