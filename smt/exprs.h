@@ -44,7 +44,7 @@ public:
   DisjointExpr(const T &default_val) : default_val(default_val) {}
   DisjointExpr(const std::optional<T> &default_val) : default_val(default_val){}
   DisjointExpr(T &&default_val) : default_val(std::move(default_val)) {}
-  DisjointExpr(const expr &e, bool unpack_ite);
+  DisjointExpr(const expr &e, bool unpack_ite, bool unpack_concat = false);
 
   template <typename V, typename D>
   void add(V &&val, D &&domain) {
@@ -74,8 +74,17 @@ public:
     return {};
   }
 
+  std::optional<T> lookup(const expr &domain) const {
+    for (auto &[v, d] : vals) {
+      if (d.eq(domain))
+        return v;
+    }
+    return {};
+  }
+
   auto begin() const { return vals.begin(); }
   auto end() const   { return vals.end(); }
+  auto size() const  { return vals.size(); }
 };
 
 

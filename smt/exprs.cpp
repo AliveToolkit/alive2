@@ -50,18 +50,52 @@ ostream &operator<<(ostream &os, const OrExpr &e) {
 }
 
 
-template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite) {
+template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
+                                            bool unpack_concat) {
   assert(unpack_ite);
   vector<pair<expr, expr>> worklist = { {e, true} };
-  expr cond, then, els;
+  expr cond, then, els, a, b;
+  unsigned high, low;
 
   do {
     auto [v, c] = worklist.back();
     worklist.pop_back();
+
     if (v.isIf(cond, then, els)) {
       worklist.emplace_back(move(then), c && cond);
       worklist.emplace_back(move(els), c && !cond);
-    } else {
+    }
+    else if (unpack_concat && v.isConcat(a, b)) {
+      DisjointExpr<expr> lhs(a, unpack_ite, unpack_concat);
+      DisjointExpr<expr> rhs(b, unpack_ite, unpack_concat);
+      if (lhs.size() == 1 && rhs.size() == 1) {
+        add(move(v), move(c));
+        continue;
+      }
+
+      for (auto &[lhs_v, lhs_domain] : lhs) {
+        if (auto rhs_val = rhs.lookup(lhs_domain)) {
+          add(lhs_v.concat(*rhs_val), lhs_domain);
+        } else {
+          for (auto &[rhs_v, rhs_domain] : rhs) {
+            add(lhs_v.concat(rhs_v.subst(lhs_domain, true).simplify()),
+                lhs_domain && rhs_domain);
+          }
+        }
+      }
+    }
+    else if (unpack_concat && v.isExtract(a, high, low)) {
+      DisjointExpr<expr> vals(a, unpack_ite, true);
+      if (vals.size() == 1) {
+        add(move(v), move(c));
+        continue;
+      }
+
+      for (auto &[v, domain] : vals) {
+        add(v.extract(high, low), domain);
+      }
+    }
+    else {
       add(move(v), move(c));
     }
   } while (!worklist.empty());

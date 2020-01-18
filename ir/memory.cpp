@@ -528,7 +528,7 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
-  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true)) {
+  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
     Pointer ptr(m, ptr_expr);
     auto [ub, aligned] = ::is_dereferenceable(ptr, bytes_off, bytes, align,
                                               iswrite);
