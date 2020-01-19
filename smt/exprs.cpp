@@ -75,11 +75,11 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
 
       for (auto &[lhs_v, lhs_domain] : lhs) {
         if (auto rhs_val = rhs.lookup(lhs_domain)) {
-          add(lhs_v.concat(*rhs_val), lhs_domain);
+          add(lhs_v.concat(*rhs_val), c && lhs_domain);
         } else {
           for (auto &[rhs_v, rhs_domain] : rhs) {
             add(lhs_v.concat(rhs_v.subst(lhs_domain, true).simplify()),
-                lhs_domain && rhs_domain);
+                c && lhs_domain && rhs_domain);
           }
         }
       }
@@ -92,7 +92,7 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
       }
 
       for (auto &[v, domain] : vals) {
-        add(v.extract(high, low), domain);
+        add(v.extract(high, low), c && domain);
       }
     }
     else {
