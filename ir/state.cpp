@@ -359,8 +359,7 @@ void State::mkAxioms(State &tgt) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
         auto &[rets2, ub2, mem_state2] = I2->second;
 
-        if (reads != reads2 || argmem != argmem2 || ins.size() != ins2.size()
-            || ptr_ins.size() != ptr_ins2.size())
+        if (reads != reads2 || argmem != argmem2)
           continue;
 
         expr refines(true), is_val_eq(true);

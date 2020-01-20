@@ -10,6 +10,7 @@
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <functional>
+#include <sstream>
 
 using namespace smt;
 using namespace util;
@@ -1151,15 +1152,18 @@ StateValue FnCall::toSMT(State &s) const {
   vector<StateValue> inputs, ptr_inputs;
   vector<Type*> out_types;
 
+  ostringstream fnName_mangled;
+  fnName_mangled << fnName;
   for (auto arg : args) {
     unpack_inputs(s, arg->getType(), s[*arg], inputs, ptr_inputs);
+    fnName_mangled << "#" << arg->getType().toString();
   }
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
 
   unsigned idx = 0;
-  auto ret = s.addFnCall(fnName, move(inputs), move(ptr_inputs), out_types,
-                         !(flags & NoRead), !(flags & NoWrite),
+  auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
+                         out_types, !(flags & NoRead), !(flags & NoWrite),
                          flags & ArgMemOnly);
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
