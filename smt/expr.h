@@ -36,8 +36,10 @@ class expr {
 
   expr binop_commutative(const expr &rhs,
                          Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast),
+                         expr (expr::*expr_op)(const expr &) const,
                          bool (expr::*identity)() const,
-                         bool (expr::*absorvent)() const) const;
+                         bool (expr::*absorvent)() const,
+                         int z3_app = 0) const;
   expr binop_commutative(const expr &rhs,
                          Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast)) const;
 

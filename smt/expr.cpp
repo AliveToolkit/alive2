@@ -442,13 +442,31 @@ unsigned expr::min_leading_zeros() const {
 
 expr expr::binop_commutative(const expr &rhs,
                              Z3_ast (*op)(Z3_context, Z3_ast, Z3_ast),
+                             expr (expr::*expr_op)(const expr &) const,
                              bool (expr::*identity)() const,
-                             bool (expr::*absorvent)() const) const {
+                             bool (expr::*absorvent)() const,
+                             int z3_app) const {
   if ((this->*absorvent)() || (rhs.*identity)())
     return *this;
 
   if ((rhs.*absorvent)() || (this->*identity)())
     return rhs;
+
+  if (z3_app) {
+    if (isConst()) {
+      if (auto app = rhs.isAppOf(z3_app)) {
+        expr app_a = Z3_get_app_arg(ctx(), app, 0);
+        expr app_b = Z3_get_app_arg(ctx(), app, 1);
+        if (app_a.isConst())
+          return ((this->*expr_op)(app_a).*expr_op)(app_b);
+        if (app_b.isConst())
+          return ((this->*expr_op)(app_b).*expr_op)(app_a);
+      }
+    }
+    else if (rhs.isConst())
+      return rhs.binop_commutative(*this, op, expr_op, identity, absorvent,
+                                   z3_app);
+  }
 
   return binop_commutative(rhs, op);
 }
@@ -471,11 +489,12 @@ expr expr::unop_fold(Z3_ast(*op)(Z3_context, Z3_ast)) const {
   return simplify_const(op(ctx(), ast()), *this);
 }
 
-#define binopc(op, identity, absorvent)                             \
-  binop_commutative(rhs, op, &expr::identity, &expr::absorvent)
+#define binopc(op, exprop, z3app, identity, absorvent)                         \
+  binop_commutative(rhs, op, &expr::exprop, &expr::identity, &expr::absorvent, \
+                    z3app)
 
 expr expr::operator+(const expr &rhs) const {
-  return binopc(Z3_mk_bvadd, isZero, alwaysFalse);
+  return binopc(Z3_mk_bvadd, operator+, Z3_OP_BADD, isZero, alwaysFalse);
 }
 
 expr expr::operator-(const expr &rhs) const {
@@ -486,7 +505,7 @@ expr expr::operator-(const expr &rhs) const {
 }
 
 expr expr::operator*(const expr &rhs) const {
-  return binopc(Z3_mk_bvmul, isOne, isZero);
+  return binopc(Z3_mk_bvmul, operator*, Z3_OP_BMUL, isOne, isZero);
 }
 
 expr expr::sdiv(const expr &rhs) const {
@@ -927,7 +946,7 @@ expr expr::operator&(const expr &rhs) const {
           return (a && b).toBVBool();
     }
   }
-  return binopc(Z3_mk_bvand, isAllOnes, isZero);
+  return binopc(Z3_mk_bvand, operator&, Z3_OP_BAND, isAllOnes, isZero);
 }
 
 expr expr::operator|(const expr &rhs) const {
@@ -944,7 +963,7 @@ expr expr::operator|(const expr &rhs) const {
         return (a || b).toBVBool();
   }
 
-  return binopc(Z3_mk_bvor, isZero, isAllOnes);
+  return binopc(Z3_mk_bvor, operator|, Z3_OP_BOR, isZero, isAllOnes);
 }
 
 expr expr::operator^(const expr &rhs) const {
@@ -954,7 +973,7 @@ expr expr::operator^(const expr &rhs) const {
     return bits() == 1 ? (rhs == 0).toBVBool() : ~rhs;
   if (rhs.isAllOnes())
     return bits() == 1 ? (*this == 0).toBVBool() : ~*this;
-  return binopc(Z3_mk_bvxor, isZero, alwaysFalse);
+  return binopc(Z3_mk_bvxor, operator^, Z3_OP_BXOR, isZero, alwaysFalse);
 }
 
 expr expr::operator!() const {
