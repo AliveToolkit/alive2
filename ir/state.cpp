@@ -180,7 +180,7 @@ void State::addUB(const expr &ub) {
 
 const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
-                 vector<StateValue> &&ptr_inputs,
+                 vector<pair<StateValue, bool>> &&ptr_inputs,
                  const vector<Type*> &out_types, bool reads_memory,
                  bool writes_memory, bool argmemonly) {
   // TODO: handle changes to memory due to fn call
@@ -193,8 +193,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     all_valid &= v.isValid();
   }
   for (auto &v : ptr_inputs) {
-    all_args_np &= v.non_poison;
-    all_valid &= v.isValid();
+    all_args_np &= v.first.non_poison;
+    all_valid &= v.first.isValid();
   }
 
   if (!all_valid) {
@@ -373,11 +373,14 @@ void State::mkAxioms(State &tgt) {
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
-          expr eq_val = Pointer(mem, ptr_ins[i].value)
-                          .fninput_refined(Pointer(mem2, ptr_ins2[i].value));
+          auto &[ptr_in, is_byval] = ptr_ins[i];
+          auto &[ptr_in2, is_byval2] = ptr_ins2[i];
+          (void)is_byval;
+          expr eq_val = Pointer(mem, ptr_in.value)
+                      .fninput_refined(Pointer(mem2, ptr_in2.value), is_byval2);
           is_val_eq &= eq_val;
-          refines &= ptr_ins[i].non_poison
-                       .implies(eq_val && ptr_ins2[i].non_poison);
+          refines &= ptr_in.non_poison
+                       .implies(eq_val && ptr_in2.non_poison);
         }
 
         if (reads2) {

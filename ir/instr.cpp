@@ -1112,8 +1112,9 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 }
 
 
-void FnCall::addArg(Value &arg) {
+void FnCall::addArg(Value &arg, unsigned flags) {
   args.emplace_back(&arg);
+  argflags.emplace_back(flags);
 }
 
 vector<Value*> FnCall::operands() const {
@@ -1154,18 +1155,19 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static void unpack_inputs(State&s, Type &ty, const StateValue &value,
-                          vector<StateValue> &inputs,
-                          vector<StateValue> &ptr_inputs) {
+static void unpack_inputs(State&s, Type &ty, unsigned argflag,
+                          const StateValue &value, vector<StateValue> &inputs,
+                          vector<pair<StateValue, bool>> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      unpack_inputs(s, agg->getChild(i), agg->extract(value, i), inputs,
-                    ptr_inputs);
+      unpack_inputs(s, agg->getChild(i), argflag, agg->extract(value, i),
+                    inputs, ptr_inputs);
     }
   } else if (ty.isPtrType()) {
     Pointer p(s.getMemory(), value.value);
     p.strip_attrs();
-    ptr_inputs.emplace_back(p.release(), expr(value.non_poison));
+    ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
+                            argflag & FnCall::ArgByVal);
   } else {
     inputs.emplace_back(value);
   }
@@ -1203,13 +1205,16 @@ StateValue FnCall::toSMT(State &s) const {
     return {};
   }
 
-  vector<StateValue> inputs, ptr_inputs;
+  vector<StateValue> inputs;
+  vector<pair<StateValue, bool>> ptr_inputs;
   vector<Type*> out_types;
 
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
-  for (auto arg : args) {
-    unpack_inputs(s, arg->getType(), s[*arg], inputs, ptr_inputs);
+  for (unsigned i = 0, sz = args.size(); i < sz; ++i) {
+    auto arg = args[i];
+    auto flag = argflags[i];
+    unpack_inputs(s, arg->getType(), flag, s[*arg], inputs, ptr_inputs);
     fnName_mangled << "#" << arg->getType().toString();
   }
   fnName_mangled << '!' << getType();

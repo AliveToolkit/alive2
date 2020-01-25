@@ -169,7 +169,7 @@ public:
   void strip_attrs();
 
   smt::expr refined(const Pointer &other) const;
-  smt::expr fninput_refined(const Pointer &other) const;
+  smt::expr fninput_refined(const Pointer &other, bool is_byval_arg) const;
   smt::expr block_val_refined(const Pointer &other) const;
   smt::expr block_refined(const Pointer &other) const;
 
@@ -239,8 +239,11 @@ public:
   std::pair<smt::expr, smt::expr> mkUndefInput(unsigned attributes) const;
 
   std::pair<smt::expr, smt::expr>
-    mkFnRet(const char *name, const std::vector<StateValue> &ptr_inputs) const;
-  CallState mkCallState(const std::vector<StateValue> *ptr_inputs) const;
+    mkFnRet(const char *name,
+            const std::vector<std::pair<StateValue, bool>> &ptr_inputs) const;
+  CallState
+    mkCallState(const std::vector<std::pair<StateValue, bool>> *ptr_inputs)
+      const;
   void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
@@ -281,7 +284,8 @@ public:
 
   std::pair<smt::expr,Pointer>
     refined(const Memory &other,
-            const std::vector<StateValue> *set_ptrs = nullptr) const;
+            const std::vector<std::pair<StateValue, bool>> *set_ptrs = nullptr)
+      const;
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr check_nocapture() const;

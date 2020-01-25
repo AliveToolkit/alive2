@@ -71,10 +71,12 @@ private:
   std::set<smt::expr> return_undef_vars;
 
   // store data for function calls:
-  // inputs: non-ptr arguments, ptr arguments, memory, reads memory?, argmemonly
+  // inputs: non-ptr arguments, (ptr arguments, is by_val arg?), memory,
+  //         reads memory?, argmemonly
   // outputs: values, UB, memory state
   std::map<std::string,
-           std::map<std::tuple<std::vector<StateValue>, std::vector<StateValue>,
+           std::map<std::tuple<std::vector<StateValue>,
+                               std::vector<std::pair<StateValue, bool>>,
                                Memory, bool, bool>,
                     std::tuple<std::vector<StateValue>, smt::expr,
                                Memory::CallState>>>
@@ -108,7 +110,7 @@ public:
 
   const std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
-              std::vector<StateValue> &&ptr_inputs,
+              std::vector<std::pair<StateValue, bool>> &&ptr_inputs,
               const std::vector<Type*> &out_types, bool reads_memory,
               bool writes_memory, bool argmemonly);
 

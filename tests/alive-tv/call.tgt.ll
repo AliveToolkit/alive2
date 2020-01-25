@@ -39,6 +39,11 @@ define i8 @f6(i8* byval %p) {
   ret i8 %b
 }
 
+define i8 @f6_2(i8* %p) {
+  %b = call i8 @g2(i8* byval %p)
+  ret i8 %b
+}
+
 define void @f7() {
   %ptr = call i8* @k()
   %a = load i8, i8* %ptr, align 4
@@ -52,6 +57,7 @@ define void @f8() {
 }
 
 declare i8 @g(i8*)
+declare i8 @g2(i8* byval)
 declare i8 @h(i8*) readnone
 declare i8* @k()
 

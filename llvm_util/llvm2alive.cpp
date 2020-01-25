@@ -260,11 +260,15 @@ public:
     string fn_name = '@' + fn->getName().str();
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
                                     !known);
-    for (auto &arg : i.args()) {
-      auto a = get_operand(arg);
+    for (unsigned idx = 0, cnt = i.getNumArgOperands(); idx != cnt; ++idx) {
+      auto a = get_operand(i.getArgOperand(idx));
       if (!a)
         return error(i);
-      call->addArg(*a);
+
+      unsigned attr = FnCall::ArgNone;
+      if (fn->getArg(idx)->hasByValAttr())
+        attr |= FnCall::ArgByVal;
+      call->addArg(*a, attr);
     }
     RETURN_IDENTIFIER(move(call));
   }

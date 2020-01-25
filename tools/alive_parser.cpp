@@ -922,7 +922,7 @@ static unique_ptr<Instr> parse_call(string_view name) {
       tokenizer.ensure(COMMA);
     first = false;
     auto &ty = parse_type();
-    call->addArg(parse_operand(ty));
+    call->addArg(parse_operand(ty), FnCall::ArgNone);
   }
   tokenizer.ensure(RPAREN);
   return call;
