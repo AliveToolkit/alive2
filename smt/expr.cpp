@@ -886,8 +886,10 @@ static expr get_bool(const expr &e) {
 }
 
 expr expr::operator&(const expr &rhs) const {
-  if (eq(rhs))
+  if (eq(rhs) || isZero() || rhs.isAllOnes())
     return *this;
+  if (isAllOnes() || rhs.isZero())
+    return rhs;
 
   auto fold_extract = [](auto &a, auto &b) {
     uint64_t n;
@@ -929,8 +931,10 @@ expr expr::operator&(const expr &rhs) const {
 }
 
 expr expr::operator|(const expr &rhs) const {
-  if (eq(rhs))
+  if (eq(rhs) || isAllOnes() || rhs.isZero())
     return *this;
+  if (isZero() || rhs.isAllOnes())
+    return rhs;
 
   if (bits() == 1) {
     if (auto a = get_bool(*this);
