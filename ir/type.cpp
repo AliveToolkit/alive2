@@ -11,6 +11,7 @@
 #include <sstream>
 
 using namespace smt;
+using namespace util;
 using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
@@ -21,6 +22,11 @@ static constexpr unsigned var_vector_elements = 10;
 namespace IR {
 
 VoidType Type::voidTy;
+
+unsigned Type::np_bits() const {
+  auto bw = bits();
+  return does_sub_byte_access ? bw : (unsigned)divide_up(bw, bits_byte);
+}
 
 expr Type::var(const char *var, unsigned bits) const {
   auto str = name + '_' + var;
@@ -205,7 +211,7 @@ expr Type::toBV(expr e) const {
 
 StateValue Type::toBV(StateValue v) const {
   expr val = toBV(move(v.value));
-  auto bw = val.bits();
+  auto bw = np_bits();
   return { move(val),
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
@@ -224,7 +230,7 @@ expr Type::toInt(State &s, expr v) const {
 
 StateValue Type::toInt(State &s, StateValue v) const {
   expr val = toInt(s, move(v.value));
-  auto bw = val.bits();
+  auto bw = np_bits();
   return { move(val),
            expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
 }
@@ -238,11 +244,8 @@ StateValue Type::fromInt(StateValue v) const {
 }
 
 expr Type::combine_poison(const expr &boolean, const expr &orig) const {
-  if (orig.isBool())
-    return boolean && orig;
-
-  auto bw = orig.bits();
-  return expr::mkIf(boolean, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) | orig;
+  return
+    expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
 }
 
 pair<expr, vector<expr>> Type::mkUndefInput(State &s, unsigned attrs) const {
@@ -584,6 +587,10 @@ unsigned PtrType::bits() const {
   return Pointer::total_bits();
 }
 
+unsigned PtrType::np_bits() const {
+  return 1;
+}
+
 StateValue PtrType::getDummyValue(bool non_poison) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
@@ -713,25 +720,35 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
 }
 
 StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
-  if (!val.isValid())
-    return {};
-
-  unsigned total_till_now = 0;
+  unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
-    total_till_now += children[i]->bits();
+    total_value += children[i]->bits();
+    total_np += children[i]->np_bits();
   }
-  unsigned high = val.bits() - total_till_now;
-  unsigned h = high - 1;
-  unsigned l = high - children[index]->bits();
+  unsigned high_val = bits() - total_value;
+  unsigned h_val = high_val - 1;
+  unsigned l_val = high_val - children[index]->bits();
 
-  return children[index]->fromBV({ val.value.extract(h, l),
-                                   val.non_poison.extract(h, l) });
+  unsigned high_np = np_bits() - total_np;
+  unsigned h_np = high_np - 1;
+  unsigned l_np = high_np - children[index]->np_bits();
+
+  return children[index]->fromBV({ val.value.extract(h_val, l_val),
+                                   val.non_poison.extract(h_np, l_np) });
 }
 
 unsigned AggregateType::bits() const {
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
     bw += children[i]->bits();
+  }
+  return bw;
+}
+
+unsigned AggregateType::np_bits() const {
+  unsigned bw = 0;
+  for (unsigned i = 0; i < elements; ++i) {
+    bw += children[i]->np_bits();
   }
   return bw;
 }
@@ -948,19 +965,21 @@ VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
 
 StateValue VectorType::extract(const StateValue &vector,
                                const expr &index) const {
-  if (!vector.isValid())
-    return {};
-
   auto &elementTy = *children[0];
   unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = vector.bits();
-  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+  unsigned bw_val = bw_elem * elements;
+  expr idx_v = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+  unsigned h_val = elements * bw_elem - 1;
+  unsigned l_val = (elements - 1) * bw_elem;
 
-  unsigned h = elements * bw_elem - 1;
-  unsigned l = (elements - 1) * bw_elem;
+  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np = bw_np_elem * elements;
+  expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
+  unsigned h_np = elements * bw_np_elem - 1;
+  unsigned l_np = (elements - 1) * bw_np_elem;
 
-  return elementTy.fromBV({ (vector.value << idx).extract(h, l),
-                            (vector.non_poison << idx).extract(h, l) });
+  return elementTy.fromBV({(vector.value << idx_v).extract(h_val, l_val),
+                           (vector.non_poison << idx_np).extract(h_np, l_np)});
 }
 
 StateValue VectorType::update(const StateValue &vector,
@@ -973,17 +992,21 @@ StateValue VectorType::update(const StateValue &vector,
     return val_bv;
 
   unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = bits();
+  unsigned bw_val = bw_elem * elements;
+  expr idx_v = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
+  expr fill_v = expr::mkUInt(0, bw_val - bw_elem);
+  expr mask_v = ~expr::mkInt(-1, bw_elem).concat(fill_v).lshr(idx_v);
+  expr nv_shifted = val_bv.value.concat(fill_v).lshr(idx_v);
 
-  expr idx = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
-  expr fill = expr::mkUInt(0, bw_val - bw_elem);
-  expr mask = ~expr::mkInt(-1, bw_elem).concat(fill).lshr(idx);
+  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np = bw_np_elem * elements;
+  expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
+  expr fill_np = expr::mkUInt(0, bw_np - bw_np_elem);
+  expr mask_np = ~expr::mkInt(-1, bw_np_elem).concat(fill_np).lshr(idx_np);
+  expr np_shifted = val_bv.non_poison.concat(fill_np).lshr(idx_np);
 
-  expr nv_shifted = val_bv.value.concat(fill).lshr(idx);
-  expr np_shifted = val_bv.non_poison.concat(fill).lshr(idx);
-
-  return fromBV({ (vector.value & mask) | nv_shifted,
-                  (vector.non_poison & mask) | np_shifted});
+  return fromBV({ (vector.value & mask_v) | nv_shifted,
+                  (vector.non_poison & mask_np) | np_shifted});
 }
 
 expr VectorType::getTypeConstraints() const {
@@ -1104,6 +1127,10 @@ SymbolicType::SymbolicType(string &&name, unsigned type_mask)
 
 unsigned SymbolicType::bits() const {
   DISPATCH(bits(), UNREACHABLE());
+}
+
+unsigned SymbolicType::np_bits() const {
+  DISPATCH(np_bits(), UNREACHABLE());
 }
 
 StateValue SymbolicType::getDummyValue(bool non_poison) const {

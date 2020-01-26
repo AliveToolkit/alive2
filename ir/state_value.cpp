@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/state_value.h"
+#include "ir/globals.h"
 #include "util/compiler.h"
 #include <tuple>
 
@@ -18,18 +19,21 @@ StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
 
 StateValue StateValue::zext(unsigned amount) const {
   return { value.zext(amount),
-           non_poison.isBool() ? expr(non_poison) : non_poison.zext(amount) };
+           (!does_sub_byte_access || non_poison.isBool())
+             ? expr(non_poison) : non_poison.zext(amount) };
 }
 
 StateValue StateValue::trunc(unsigned amount) const {
   return { value.trunc(amount),
-           non_poison.isBool() ? expr(non_poison) : non_poison.trunc(amount) };
+           (!does_sub_byte_access || non_poison.isBool())
+             ? expr(non_poison) : non_poison.trunc(amount) };
 }
 
 StateValue StateValue::zextOrTrunc(unsigned tobw) const {
   return
     { value.zextOrTrunc(tobw),
-      non_poison.isBool() ? expr(non_poison) : non_poison.zextOrTrunc(tobw) };
+      (!does_sub_byte_access || non_poison.isBool())
+        ? expr(non_poison) : non_poison.zextOrTrunc(tobw) };
 }
 
 StateValue StateValue::concat(const StateValue &other) const {

@@ -863,6 +863,10 @@ StateValue ConversionOp::toSMT(State &s) const {
     auto retty = getType().getAsAggregateType();
     auto elems = retty->numElementsConst();
 
+    // NOP: ptr vect -> ptr vect
+    if (op == BitCast && retty->getChild(0).isPtrType())
+      return v;
+
     // bitcast vect elems size may vary, so create a new data type whose
     // element size is aligned with the output vector elem size
     IntType elem_ty("int", retty->bits() / elems);

@@ -42,6 +42,7 @@ protected:
 public:
   Type(std::string &&name) : name(std::move(name)) {}
   virtual unsigned bits() const = 0;
+  virtual unsigned np_bits() const;
 
   // to use when one needs the corresponding SMT type
   virtual IR::StateValue getDummyValue(bool non_poison) const = 0;
@@ -224,6 +225,7 @@ public:
 
   PtrType(unsigned addr_space);
   unsigned bits() const override;
+  unsigned np_bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
@@ -270,6 +272,7 @@ public:
   bool isPadding(unsigned i) const { return is_padding[i]; }
 
   unsigned bits() const override;
+  unsigned np_bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
@@ -360,6 +363,7 @@ public:
   SymbolicType(std::string &&name, unsigned type_mask);
 
   unsigned bits() const override;
+  unsigned np_bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;

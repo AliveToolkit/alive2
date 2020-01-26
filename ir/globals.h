@@ -56,4 +56,7 @@ extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;
 extern bool does_ptr_store;
 
+/// Whether the programs do memory accesses of less than bits_byte
+extern bool does_sub_byte_access;
+
 }

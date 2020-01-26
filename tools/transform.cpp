@@ -533,6 +533,19 @@ static uint64_t max_gep(const Instr &inst) {
   return 0;
 }
 
+static bool has_sub_byte(const Type &t) {
+  if (auto agg = t.getAsAggregateType()) {
+    if (t.isVectorType())
+      return agg->getChild(0).bits() % 8;
+
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
+      if (has_sub_byte(agg->getChild(i)))
+        return true;
+    }
+  }
+  return false;
+}
+
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
@@ -641,12 +654,14 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_access_size = 8;
   bool does_mem_access = false;
   bool has_load = false;
+  does_sub_byte_access = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {
           nullptr_is_used |= has_nullptr(op);
+          does_sub_byte_access |= has_sub_byte(op->getType());
         }
 
         if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
@@ -662,6 +677,8 @@ static void calculateAndInitConstants(Transform &t) {
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
         has_load   |= dynamic_cast<const Load*>(&I) != nullptr;
         has_fncall |= dynamic_cast<const FnCall*>(&I) != nullptr;
+
+        does_sub_byte_access |= has_sub_byte(I.getType());
 
         auto accsz = get_access_size(I);
         if (accsz != NO_ACCESS) {
@@ -759,6 +776,7 @@ static void calculateAndInitConstants(Transform &t) {
                      "does_ptr_store: " << does_ptr_store << "\n"
                      "does_ptr_mem_access: " << does_ptr_mem_access << "\n"
                      "does_int_mem_access: " << does_int_mem_access << "\n"
+                     "does_sub_byte_access: " << does_sub_byte_access << "\n"
     ;
 }
 

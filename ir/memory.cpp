@@ -15,6 +15,10 @@ using namespace util;
 
 static unsigned ptr_next_idx = 0;
 
+static unsigned bits_int_poison() {
+  return does_sub_byte_access ? bits_byte : 1;
+}
+
 static expr concat_if(const expr &ifvalid, expr &&e) {
   return ifvalid.isValid() ? ifvalid.concat(e) : move(e);
 }
@@ -58,14 +62,14 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
 
 Byte::Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
   assert(!data.isValid() || data.bits() == bits_byte);
-  assert(!non_poison.isValid() || non_poison.bits() == bits_byte);
+  assert(!non_poison.isValid() || non_poison.bits() == bits_int_poison());
 
   if (!does_int_mem_access) {
     p = expr::mkUInt(0, bitsByte());
     return;
   }
 
-  unsigned padding = bitsByte() - 2 * bits_byte;
+  unsigned padding = bitsByte() - bits_byte - bits_int_poison();
   p = non_poison.concat(data);
   if (padding)
     p = expr::mkUInt(0, padding).concat(p);
@@ -106,8 +110,8 @@ expr Byte::ptr_byteoffset() const {
 
 expr Byte::nonptr_nonpoison() const {
   if (!does_int_mem_access)
-    return expr::mkUInt(0, bits_byte);
-  return p.extract(bits_byte * 2 - 1, bits_byte);
+    return expr::mkUInt(0, bits_int_poison());
+  return p.extract(bits_byte + bits_int_poison() - 1, bits_byte);
 }
 
 expr Byte::nonptr_value() const {
@@ -132,7 +136,7 @@ expr Byte::is_zero() const {
 unsigned Byte::bitsByte() {
   bool is_ptr_bit = does_int_mem_access && does_ptr_mem_access;
   unsigned ptr_bits = does_ptr_mem_access * (1 + Pointer::total_bits() + 3);
-  unsigned int_bits = does_int_mem_access * (2 * bits_byte);
+  unsigned int_bits = does_int_mem_access * (bits_byte + bits_int_poison());
   // allow at least 1 bit if there's no memory access
   return max(1u, is_ptr_bit + max(ptr_bits, int_bits));
 }
@@ -153,7 +157,7 @@ Byte Byte::mkNonPtrByte(const Memory &m, const expr &val) {
   if (!does_int_mem_access)
     return { m, expr::mkUInt(0, bitsByte()) };
 
-  unsigned padding = bitsByte() - 2 * bits_byte;
+  unsigned padding = bitsByte() - bits_byte - bits_int_poison();
   expr byte = padding ? expr::mkUInt(0, padding).concat(val) : val;
   return { m, move(byte) };
 }
@@ -178,8 +182,8 @@ ostream& operator<<(ostream &os, const Byte &byte) {
       val.printHexadecimal(os);
     } else {
       os << "#b";
-      for (unsigned i = 0; i < bits_byte; ++i) {
-        unsigned idx = bits_byte - i - 1;
+      for (unsigned i = 0; i < bits_int_poison(); ++i) {
+        unsigned idx = bits_int_poison() - i - 1;
         auto is_poison = (np.extract(idx, idx) == 1).isTrue();
         auto v = (val.extract(idx, idx) == 1).isTrue();
         os << (is_poison ? 'p' : (v ? '1' : '0'));
@@ -205,11 +209,11 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     unsigned bytesize = divide_up(bitsize, bits_byte);
 
     bvval = bvval.zext(bytesize * bits_byte - bitsize);
+    unsigned np_mul = does_sub_byte_access ? bits_byte : 1;
 
     for (unsigned i = 0; i < bytesize; ++i) {
-      expr data  = bvval.value.extract((i + 1) * bits_byte - 1, i * bits_byte);
-      expr np    = bvval.non_poison.extract((i + 1) * bits_byte - 1,
-                                            i * bits_byte);
+      expr data = bvval.value.extract((i + 1) * bits_byte - 1, i * bits_byte);
+      expr np   = bvval.non_poison.extract((i + 1) * np_mul - 1, i * np_mul);
       bytes.emplace_back(mem, data, np);
     }
   }
@@ -659,8 +663,11 @@ expr Pointer::block_val_refined(const Pointer &other) const {
 
   // refinement if offset had non-ptr value
   expr np1 = val.nonptr_nonpoison();
-  expr int_cnstr = (val2.nonptr_nonpoison() | np1) == np1 &&
-                   (val.nonptr_value() | np1) == (val2.nonptr_value() | np1);
+  expr int_cnstr = does_sub_byte_access
+                     ? (val2.nonptr_nonpoison() | np1) == np1 &&
+                       (val.nonptr_value() | np1) == (val2.nonptr_value() | np1)
+                     : val2.nonptr_nonpoison() == 0 &&
+                       val.nonptr_value() == val2.nonptr_value();
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
   // already there and don't need checking
