@@ -100,7 +100,7 @@ bool report_dir_created = false;
 bool has_failure = false;
 
 
-struct TVPass : public llvm::FunctionPass {
+struct TVPass final : public llvm::FunctionPass {
   static char ID;
 
   TVPass() : FunctionPass(ID) {}
@@ -157,15 +157,9 @@ struct TVPass : public llvm::FunctionPass {
 
     if (Errors errs = verifier.verify()) {
       *out << "Transformation doesn't verify!\n" << errs << endl;
-      if (opt_error_fatal && errs.isUnsound()) {
-        if (opt_smt_stats)
-          smt::solver_print_stats(*out);
-        if (!report_filename.empty())
-          cerr << "Report written to " << report_filename << endl;
-
-        llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
-      }
       has_failure |= errs.isUnsound();
+      if (opt_error_fatal && has_failure)
+        doFinalization(*F.getParent());
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -229,20 +223,20 @@ struct TVPass : public llvm::FunctionPass {
   }
 
   bool doFinalization(llvm::Module&) override {
-    if (opt_smt_stats && !showed_stats) {
-      smt::solver_print_stats(*out);
+    if (!showed_stats) {
       showed_stats = true;
-
-      if (has_failure) {
-        if (!report_filename.empty())
-          cerr << "Report written to " << report_filename << endl;
-
-        llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
-      }
+      if (opt_smt_stats)
+        smt::solver_print_stats(*out);
+      if (has_failure && !report_filename.empty())
+        cerr << "Report written to " << report_filename << endl;
     }
+
     llvm_util_init.reset();
     smt_init.reset();
-    initialized--;
+    --initialized;
+
+    if (has_failure)
+      llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
     return false;
   }
 
