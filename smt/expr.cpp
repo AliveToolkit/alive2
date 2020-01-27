@@ -454,7 +454,8 @@ expr expr::binop_commutative(const expr &rhs,
 
   if (z3_app) {
     if (isConst()) {
-      if (auto app = rhs.isAppOf(z3_app)) {
+      auto app = rhs.isAppOf(z3_app);
+      if (app && Z3_get_app_num_args(ctx(), app) == 2) {
         expr app_a = Z3_get_app_arg(ctx(), app, 0);
         expr app_b = Z3_get_app_arg(ctx(), app, 1);
         if (app_a.isConst())
