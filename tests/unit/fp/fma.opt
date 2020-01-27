@@ -1,0 +1,41 @@
+Name: fma, passthrough 
+%t = fma float 0.0, float 0.0, float 0.0
+  =>
+%t = 0.0
+
+Name: fma, identical constant
+%t = fma float 1.0, float 2.0, float 3.0
+  =>
+%t = fma float 1.0, float 2.0, float 3.0
+
+Name: fma, constant
+%t = fma float 1.0, float 2.0, float 3.0
+  =>
+%t = 5.0
+
+Name: fma, multiply by zero, add zero
+%t = fma nnan float %a, float 0.0, float 0.0
+  =>
+%t = 0.0
+
+Name: fma, multiply zero, add constant
+%t = fma nnan nsz float 0.0, float %b, float %c
+  =>
+%t = %c
+
+Name: fma, multiply neg zero, add constant
+%t = fma nnan nsz float -0.0, float %b, float 4.0 
+  =>
+%t = 4.0
+
+Name: fma, multiply one, add zero
+%t = fma nsz half 1.0, half %b, half 0.0
+  =>
+%t = %b
+
+Name: fma => fadd(fmul(a,b),c)
+%m = fmul half 5.0, half 4.0
+%t = fadd half 2.0, %m
+  =>
+%m = fmul half 5.0, half 4.0
+%t = fma half 5.0, half 4.0, half 2.0

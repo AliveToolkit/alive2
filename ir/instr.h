@@ -94,15 +94,16 @@ public:
 
 class TernaryOp final : public Instr {
 public:
-  enum Op { FShl, FShr };
+  enum Op { FShl, FShr, FMA };
 
 private:
   Value *a, *b, *c;
   Op op;
+  FastMathFlags fmath;
 
 public:
-  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c, Op op)
-      : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
+  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c, Op op,
+            FastMathFlags fmath = {});
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

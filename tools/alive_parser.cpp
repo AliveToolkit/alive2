@@ -601,6 +601,8 @@ static FastMathFlags parse_fast_math(token op_token) {
       fmath.flags |= FastMathFlags::NNaN;
     } else if (tokenizer.consumeIf(NINF)) {
       fmath.flags |= FastMathFlags::NInf;
+    } else if (tokenizer.consumeIf(NSZ)) {
+      fmath.flags |= FastMathFlags::NSZ;
     } else {
       break;
     }
@@ -613,6 +615,7 @@ static FastMathFlags parse_fast_math(token op_token) {
   case FDIV:
   case FREM:
   case FCMP:
+  case FMA:
     break;
   default:
     if (!fmath.isNone())
@@ -745,14 +748,13 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
 }
 
 static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
+  auto fmath = parse_fast_math(op_token);
+
   TernaryOp::Op op;
   switch (op_token) {
-  case FSHL:
-    op = TernaryOp::FShl;
-    break;
-  case FSHR:
-    op = TernaryOp::FShr;
-    break;
+  case FSHL: op = TernaryOp::FShl; break;
+  case FSHR: op = TernaryOp::FShr; break;
+  case FMA:  op = TernaryOp::FMA; break;
   default:
     UNREACHABLE();
   }
@@ -765,7 +767,7 @@ static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
   parse_comma();
   auto &cty = parse_type();
   auto &c = parse_operand(cty);
-  return make_unique<TernaryOp>(aty, string(name), a, b, c, op);
+  return make_unique<TernaryOp>(aty, string(name), a, b, c, op, fmath);
 }
 
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
@@ -1018,6 +1020,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_unaryop(name, t);
   case FSHL:
   case FSHR:
+  case FMA:
     return parse_ternary(name, t);
   case BITCAST:
   case SEXT:

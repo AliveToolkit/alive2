@@ -814,6 +814,12 @@ expr expr::fdiv(const expr &rhs) const {
   return Z3_mk_fpa_div(ctx(), rm, ast(), rhs());
 }
 
+expr expr::fma(const expr &a, const expr &b, const expr &c) {
+  C2(a, b, c);
+  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  return Z3_mk_fpa_fma(ctx(), rm, a(), b(), c());
+}
+
 expr expr::fneg() const {
   return unop_fold(Z3_mk_fpa_neg);
 }
