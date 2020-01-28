@@ -3,9 +3,3 @@ Name: target more poisonous than source
 %t = fma float %a, float %b, float %c
   =>
 %t = poison
-
-Name: value mismatch (2.0 * 4.0) + 1.0 => 8.0
-; ERROR: Value mismatch for float %t
-%t = fma float 2.0, float 4.0, float 1.0
-  =>
-%t = 8.0

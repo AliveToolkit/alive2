@@ -202,19 +202,21 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
-    c = any_fp_zero(s, move(c));
+    if (c.isValid()) c = any_fp_zero(s, move(c));
   }
 
   expr val = fn(a, b, c);
   expr non_poison(true);
 
   if (fmath.flags & FastMathFlags::NNaN) {
-    non_poison &= !a.isNaN() && !b.isNaN() && !c.isNaN();
+    non_poison &= !a.isNaN() && !b.isNaN();
+    if (c.isValid()) non_poison &= !c.isNaN();
     if (!only_input)
       non_poison &= !val.isNaN();
   }
   if (fmath.flags & FastMathFlags::NInf) {
-    non_poison &= !a.isInf() && !b.isInf() && !c.isInf();
+    non_poison &= !a.isInf() && !b.isInf();
+    if (c.isValid()) non_poison &= !c.isInf();
     if (!only_input)
       non_poison &= !val.isInf();
   }
@@ -697,7 +699,7 @@ TernaryOp::TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &
     case FShl:
       assert(fmath.isNone());
       break;
-    default:
+    case FMA:
       break;
   }
 }
@@ -737,19 +739,19 @@ StateValue TernaryOp::toSMT(State &s) const {
 
   switch (op) {
   case FShl:
-    fn = [&](auto a, auto b, auto c) -> StateValue {
+    fn = [](auto a, auto b, auto c) -> StateValue {
       return { expr::fshl(a, b, c), true };
     };
     break;
 
   case FShr:
-    fn = [&](auto a, auto b, auto c) -> StateValue {
+    fn = [](auto a, auto b, auto c) -> StateValue {
       return { expr::fshr(a, b, c), true };
     };
     break;
 
   case FMA:
-    fn = [&](auto a, auto b, auto c) -> StateValue{
+    fn = [&](auto a, auto b, auto c) -> StateValue {
       return fm_poison(s, a, b, c, [](expr &a, expr &b, expr &c) { 
                                    return expr::fma(a, b, c); }, fmath, false);
     };
@@ -757,8 +759,8 @@ StateValue TernaryOp::toSMT(State &s) const {
   }
 
   if (getType().isVectorType()) {
-    auto ty = getType().getAsAggregateType();
     vector<StateValue> vals;
+    auto ty = getType().getAsAggregateType();
 
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
       auto ai = ty->extract(av, i);
