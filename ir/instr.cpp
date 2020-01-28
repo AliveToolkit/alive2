@@ -198,11 +198,12 @@ static expr any_fp_zero(State &s, expr v) {
 
 static StateValue fm_poison(State &s, expr a, expr b, expr c, 
                             function<expr(expr&,expr&,expr&)> fn, 
-                            FastMathFlags fmath, bool only_input){
+                            FastMathFlags fmath, bool only_input, 
+                            bool is_ternary = true){
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
-    if (c.isValid()) c = any_fp_zero(s, move(c));
+    if (is_ternary) c = any_fp_zero(s, move(c));
   }
 
   expr val = fn(a, b, c);
@@ -210,13 +211,13 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
 
   if (fmath.flags & FastMathFlags::NNaN) {
     non_poison &= !a.isNaN() && !b.isNaN();
-    if (c.isValid()) non_poison &= !c.isNaN();
+    if (is_ternary) non_poison &= !c.isNaN();
     if (!only_input)
       non_poison &= !val.isNaN();
   }
   if (fmath.flags & FastMathFlags::NInf) {
     non_poison &= !a.isInf() && !b.isInf();
-    if (c.isValid()) non_poison &= !c.isInf();
+    if (is_ternary) non_poison &= !c.isInf();
     if (!only_input)
       non_poison &= !val.isInf();
   }
@@ -237,9 +238,9 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
 static StateValue fm_poison(State &s, expr a, expr b,
                             function<expr(expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input) {
-  return fm_poison(s, a, b, expr(), 
+  return fm_poison(s, move(a), move(b), expr(), 
                    [&](expr &a, expr &b, expr &c) { return fn(a, b); }, 
-                   fmath, only_input);
+                   fmath, only_input, false);
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -691,9 +692,9 @@ unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
   return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op, fmath);
 }
 
-TernaryOp::TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c, Op op,
-            FastMathFlags fmath)
-    : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath) {
+TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c, 
+                     Op op, FastMathFlags fmath)
+    : Instr(type, move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath) {
   switch (op) {
     case FShr:
     case FShl:
