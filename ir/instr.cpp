@@ -196,24 +196,28 @@ static expr any_fp_zero(State &s, expr v) {
                     v);
 }
 
-static StateValue fm_poison(State &s, expr a, expr b,
-                            function<expr(expr&,expr&)> fn,
-                            FastMathFlags fmath, bool only_input) {
+static StateValue fm_poison(State &s, expr a, expr b, expr c, 
+                            function<expr(expr&,expr&,expr&)> fn, 
+                            FastMathFlags fmath, bool only_input, 
+                            bool is_ternary = true){
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
+    if (is_ternary) c = any_fp_zero(s, move(c));
   }
 
-  expr val = fn(a, b);
+  expr val = fn(a, b, c);
   expr non_poison(true);
 
   if (fmath.flags & FastMathFlags::NNaN) {
     non_poison &= !a.isNaN() && !b.isNaN();
+    if (is_ternary) non_poison &= !c.isNaN();
     if (!only_input)
       non_poison &= !val.isNaN();
   }
   if (fmath.flags & FastMathFlags::NInf) {
     non_poison &= !a.isInf() && !b.isInf();
+    if (is_ternary) non_poison &= !c.isInf();
     if (!only_input)
       non_poison &= !val.isInf();
   }
@@ -229,6 +233,14 @@ static StateValue fm_poison(State &s, expr a, expr b,
     val = any_fp_zero(s, move(val));
 
   return { move(val), move(non_poison) };
+}
+
+static StateValue fm_poison(State &s, expr a, expr b,
+                            function<expr(expr&,expr&)> fn,
+                            FastMathFlags fmath, bool only_input) {
+  return fm_poison(s, move(a), move(b), expr(), 
+                   [&](expr &a, expr &b, expr &c) { return fn(a, b); }, 
+                   fmath, only_input, false);
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -680,6 +692,18 @@ unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
   return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op, fmath);
 }
 
+TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c, 
+                     Op op, FastMathFlags fmath)
+    : Instr(type, move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath) {
+  switch (op) {
+    case FShr:
+    case FShl:
+      assert(fmath.isNone());
+      break;
+    case FMA:
+      break;
+  }
+}
 
 vector<Value*> TernaryOp::operands() const {
   return { a, b, c };
@@ -700,26 +724,37 @@ void TernaryOp::print(ostream &os) const {
   case FShr:
     str = "fshr ";
     break;
+  case FMA:
+    str = "fma ";
+    break;
   }
 
-  os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
+  os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
 }
 
 StateValue TernaryOp::toSMT(State &s) const {
   auto &av = s[*a];
   auto &bv = s[*b];
   auto &cv = s[*c];
-  function<expr(const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const expr&, const expr&, const expr&)> fn;
 
   switch (op) {
   case FShl:
-    fn = [](auto a, auto b, auto c) {
-      return expr::fshl(a, b, c);
+    fn = [](auto a, auto b, auto c) -> StateValue {
+      return { expr::fshl(a, b, c), true };
     };
     break;
+
   case FShr:
-    fn = [](auto a, auto b, auto c) {
-      return expr::fshr(a, b, c);
+    fn = [](auto a, auto b, auto c) -> StateValue {
+      return { expr::fshr(a, b, c), true };
+    };
+    break;
+
+  case FMA:
+    fn = [&](auto a, auto b, auto c) -> StateValue {
+      return fm_poison(s, a, b, c, [](expr &a, expr &b, expr &c) { 
+                                   return expr::fma(a, b, c); }, fmath, false);
     };
     break;
   }
@@ -727,25 +762,36 @@ StateValue TernaryOp::toSMT(State &s) const {
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto ty = getType().getAsAggregateType();
+
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
       auto ai = ty->extract(av, i);
       auto bi = ty->extract(bv, i);
       auto ci = ty->extract(cv, i);
-      vals.emplace_back(fn(ai.value, bi.value, ci.value),
-                        ai.non_poison && bi.non_poison && ci.non_poison);
+      auto [v, np] = fn(ai.value, bi.value, ci.value);
+      vals.emplace_back(move(v), ai.non_poison && bi.non_poison 
+                              && ci.non_poison && np);
     }
     return ty->aggregateVals(vals);
   }
-  return { fn(av.value, bv.value, cv.value),
-           av.non_poison && bv.non_poison && cv.non_poison };
+  auto [v, np] = fn(av.value, bv.value, cv.value);
+  return { move(v), av.non_poison && bv.non_poison && cv.non_poison && np };
 }
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforceIntOrVectorType() &&
-         getType() == a->getType() &&
-         getType() == b->getType() &&
-         getType() == c->getType();
+  expr instrconstr = Value::getTypeConstraints() &&
+                     getType() == a->getType() &&
+                     getType() == b->getType() &&
+                     getType() == c->getType();
+  switch(op) {
+    case FShl:
+    case FShr:
+      instrconstr &= getType().enforceIntOrVectorType();
+      break;
+    case FMA:
+      instrconstr &= getType().enforceFloatOrVectorType();
+      break;
+  }
+  return instrconstr;
 }
 
 unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {

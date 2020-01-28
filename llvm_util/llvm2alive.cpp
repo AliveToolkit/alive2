@@ -596,16 +596,18 @@ public:
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
+    case llvm::Intrinsic::fma:
     {
       PARSE_TRIOP();
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
       case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
+      case llvm::Intrinsic::fma:  op = TernaryOp::FMA; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
-                                               op));
+                                               op, parse_fmath(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     {

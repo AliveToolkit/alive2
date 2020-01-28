@@ -1,0 +1,5 @@
+Name: target more poisonous than source
+; ERROR: Target is more poisonous than source for float %t
+%t = fma float %a, float %b, float %c
+  =>
+%t = poison

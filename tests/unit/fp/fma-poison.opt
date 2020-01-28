@@ -1,0 +1,9 @@
+Name: add poison
+%t = fma float %a, float %b, float poison
+  =>
+%t = poison
+
+Name: mul poison
+%t = fma float poison, float poison, float %c
+  =>
+%t = poison

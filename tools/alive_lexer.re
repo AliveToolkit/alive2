@@ -233,6 +233,7 @@ space+ {
 "free" { return FREE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
+"fma" { return FMA; }
 "extractelement" { return EXTRACTELEMENT; }
 "insertelement" { return INSERTELEMENT; }
 "shufflevector" { return SHUFFLEVECTOR; }
@@ -278,6 +279,7 @@ space+ {
 "double" { return DOUBLE;}
 "nnan" { return NNAN; }
 "ninf" { return NINF; }
+"nsz" { return NSZ; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {
