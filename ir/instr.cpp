@@ -196,10 +196,10 @@ static expr any_fp_zero(State &s, expr v) {
                     v);
 }
 
-static StateValue fm_poison(State &s, expr a, expr b, expr c, 
-                            function<expr(expr&,expr&,expr&)> fn, 
-                            FastMathFlags fmath, bool only_input, 
-                            bool is_ternary = true){
+static StateValue fm_poison(State &s, expr a, expr b, expr c,
+                            function<expr(expr&,expr&,expr&)> fn,
+                            FastMathFlags fmath, bool only_input,
+                            bool is_ternary = true) {
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
@@ -238,8 +238,8 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
 static StateValue fm_poison(State &s, expr a, expr b,
                             function<expr(expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input) {
-  return fm_poison(s, move(a), move(b), expr(), 
-                   [&](expr &a, expr &b, expr &c) { return fn(a, b); }, 
+  return fm_poison(s, move(a), move(b), expr(),
+                   [&](expr &a, expr &b, expr &c) { return fn(a, b); },
                    fmath, only_input, false);
 }
 
@@ -692,7 +692,8 @@ unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
   return make_unique<UnaryOp>(getType(), getName() + suffix, *val, op, fmath);
 }
 
-TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c, 
+
+TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c,
                      Op op, FastMathFlags fmath)
     : Instr(type, move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath) {
   switch (op) {
@@ -753,7 +754,7 @@ StateValue TernaryOp::toSMT(State &s) const {
 
   case FMA:
     fn = [&](auto a, auto b, auto c) -> StateValue {
-      return fm_poison(s, a, b, c, [](expr &a, expr &b, expr &c) { 
+      return fm_poison(s, a, b, c, [](expr &a, expr &b, expr &c) {
                                    return expr::fma(a, b, c); }, fmath, false);
     };
     break;
@@ -768,8 +769,8 @@ StateValue TernaryOp::toSMT(State &s) const {
       auto bi = ty->extract(bv, i);
       auto ci = ty->extract(cv, i);
       auto [v, np] = fn(ai.value, bi.value, ci.value);
-      vals.emplace_back(move(v), ai.non_poison && bi.non_poison 
-                              && ci.non_poison && np);
+      vals.emplace_back(move(v), ai.non_poison && bi.non_poison &&
+                                 ci.non_poison && np);
     }
     return ty->aggregateVals(vals);
   }
