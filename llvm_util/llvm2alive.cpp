@@ -87,7 +87,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   llvm::Function &f;
   const llvm::TargetLibraryInfo &TLI;
   vector<llvm::Instruction*> i_constexprs;
-  vector<string_view> gvnamesInSrc;
+  const vector<string_view> &gvnamesInSrc;
   vector<tuple<Phi*, llvm::PHINode*, unsigned>> todo_phis;
 
   using RetTy = unique_ptr<Instr>;
@@ -137,8 +137,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
-              vector<string_view> &&gvnamesInSrc)
-      : f(f), TLI(TLI), gvnamesInSrc(move(gvnamesInSrc)) {}
+              const vector<string_view> &gvnamesInSrc)
+      : f(f), TLI(TLI), gvnamesInSrc(gvnamesInSrc) {}
 
   ~llvm2alive_() {
     for (auto &inst : i_constexprs) {
@@ -774,7 +774,7 @@ public:
     if (!type)
       return {};
 
-    Function Fn(*type, f.getName(), DL().isLittleEndian());
+    Function Fn(*type, f.getName().str(), DL().isLittleEndian());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {
@@ -898,8 +898,8 @@ initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
 
 optional<IR::Function> llvm2alive(llvm::Function &F,
                                   const llvm::TargetLibraryInfo &TLI,
-                                  vector<string_view> &&gvnamesInSrc) {
-  return llvm2alive_(F, TLI, move(gvnamesInSrc)).run();
+                                  const vector<string_view> &gvnamesInSrc) {
+  return llvm2alive_(F, TLI, gvnamesInSrc).run();
 }
 
 }

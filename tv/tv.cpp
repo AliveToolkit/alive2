@@ -108,30 +108,20 @@ struct TVPass final : public llvm::FunctionPass {
   bool runOnFunction(llvm::Function &F) override {
     auto &TLI = getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
 
-    const string &name = F.getName();
-    auto itr = fns.find(name);
-    bool first = itr == fns.end();
-    auto init_fn = llvm2alive(F, TLI, first ? vector<string_view>() :
-                                  itr->second.first.getGlobalVarNames());
-
-    if (!init_fn) {
-      if (!first)
-        fns.erase(itr);
+    auto [I, first] = fns.try_emplace(F.getName().str());
+    auto fn = llvm2alive(F, TLI, first ? vector<string_view>()
+                                       : I->second.first.getGlobalVarNames());
+    if (!fn) {
+      fns.erase(I);
       return false;
     }
 
-    decltype(init_fn) old_init_fn;
-    if (first)
-      itr = fns.try_emplace(name, move(*init_fn), 0).first;
-    else {
-      old_init_fn = move(itr->second.first);
-      itr->second.first = move(*init_fn);
-    }
+    auto old_fn = move(I->second.first);
+    I->second.first = move(*fn);
 
     if (opt_print_dot) {
-      auto &f = itr->second.first;
-      ofstream file(f.getName() + '.'
-                    + to_string(itr->second.second++) + ".dot");
+      auto &f = I->second.first;
+      ofstream file(f.getName() + '.' + to_string(I->second.second++) + ".dot");
       CFG(f).printDot(file);
     }
 
@@ -140,8 +130,8 @@ struct TVPass final : public llvm::FunctionPass {
 
     smt_init->reset();
     Transform t;
-    t.src = move(*old_init_fn);
-    t.tgt = move(itr->second.first);
+    t.src = move(old_fn);
+    t.tgt = move(I->second.first);
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 
@@ -164,7 +154,7 @@ struct TVPass final : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    itr->second.first = move(t.tgt);
+    I->second.first = move(t.tgt);
     return false;
   }
 

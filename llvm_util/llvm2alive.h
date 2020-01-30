@@ -23,5 +23,5 @@ struct initializer {
 
 std::optional<IR::Function> llvm2alive(llvm::Function &F,
     const llvm::TargetLibraryInfo &TLI,
-    std::vector<std::string_view> &&gvnamesInSrc = {});
+    const std::vector<std::string_view> &gvnamesInSrc = {});
 }
