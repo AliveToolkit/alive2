@@ -147,7 +147,7 @@ expr Byte::nonptr_value() const {
 expr Byte::is_poison(bool fullbit) const {
   expr np = nonptr_nonpoison();
   if (byte_has_ptr_bit() && bits_int_poison() == 1) {
-    assert(ptr_nonpoison().eq(np == 0));
+    assert(!np.isValid() || ptr_nonpoison().eq(np == 0));
     return np == 1;
   }
   return expr::mkIf(is_ptr(), !ptr_nonpoison(),
