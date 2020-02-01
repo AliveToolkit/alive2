@@ -155,14 +155,7 @@ expr Byte::is_poison(bool fullbit) const {
 }
 
 expr Byte::is_zero() const {
-  if (byte_has_ptr_bit() && bits_int_poison() == 1) {
-    assert(ptr_nonpoison().eq(nonptr_nonpoison() == 0));
-    return ptr_nonpoison() &&
-             expr::mkIf(is_ptr(), ptr().isNull(), nonptr_value() == 0);
-  }
-  return expr::mkIf(is_ptr(),
-                    ptr_nonpoison() && ptr().isNull(),
-                    nonptr_nonpoison() == 0 && nonptr_value() == 0);
+  return expr::mkIf(is_ptr(), ptr().isNull(), nonptr_value() == 0);
 }
 
 unsigned Byte::bitsByte() {
@@ -713,7 +706,8 @@ expr Pointer::block_val_refined(const Pointer &other) const {
   return val.is_poison() ||
          expr::mkIf(is_ptr == is_ptr2,
                     expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
-                    val.is_zero() && val2.is_zero());
+                    // allow null ptr <-> zero
+                    val.is_zero() && !val2.is_poison() && val2.is_zero());
 }
 
 expr Pointer::block_refined(const Pointer &other) const {
