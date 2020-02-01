@@ -15,6 +15,10 @@ using namespace util;
 
 static unsigned ptr_next_idx = 0;
 
+static bool byte_has_ptr_bit() {
+  return does_int_mem_access && does_ptr_mem_access;
+}
+
 static unsigned bits_int_poison() {
   return does_sub_byte_access ? bits_byte : 1;
 }
@@ -22,6 +26,15 @@ static unsigned bits_int_poison() {
 static unsigned bits_ptr_byte_offset() {
   assert(bits_byte <= bits_program_pointer);
   return bits_byte != bits_program_pointer ? 3 : 0;
+}
+
+static unsigned padding_ptr_byte() {
+  return Byte::bitsByte() - does_int_mem_access - 1 - Pointer::total_bits()
+                          - bits_ptr_byte_offset();
+}
+
+static unsigned padding_nonptr_byte() {
+  return Byte::bitsByte() - does_ptr_mem_access - bits_byte - bits_int_poison();
 }
 
 static expr concat_if(const expr &ifvalid, expr &&e) {
@@ -33,8 +46,7 @@ static expr prepend_if(const expr &pre, expr &&e, bool prepend) {
 }
 
 static string local_name(const State *s, const char *name) {
-  string n = name;
-  return n + (s->isSource() ? "_src" : "_tgt");
+  return string(name) + (s->isSource() ? "_src" : "_tgt");
 }
 
 namespace IR {
@@ -54,16 +66,14 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
     return;
   }
 
-  unsigned padding = bitsByte() - does_int_mem_access - 1
-                               - Pointer::total_bits() - bits_ptr_byte_offset();
-  if (does_int_mem_access) {
+  if (byte_has_ptr_bit())
     p = expr::mkUInt(1, 1);
-    if (padding)
-      p = concat_if(p, expr::mkUInt(0, padding));
-  }
-  p = concat_if(p, non_poison.toBVBool()).concat(ptr());
+  p = concat_if(p,
+                expr::mkIf(non_poison, expr::mkUInt(0, 1), expr::mkUInt(1, 1)))
+      .concat(ptr());
   if (bits_ptr_byte_offset())
     p = p.concat(expr::mkUInt(i, bits_ptr_byte_offset()));
+  p = p.concat_zeros(padding_ptr_byte());
   assert(!p.isValid() || p.bits() == bitsByte());
 }
 
@@ -76,10 +86,9 @@ Byte::Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
     return;
   }
 
-  unsigned padding = bitsByte() - bits_byte - bits_int_poison();
-  p = non_poison.concat(data);
-  if (padding)
-    p = expr::mkUInt(0, padding).concat(p);
+  if (byte_has_ptr_bit())
+    p = expr::mkUInt(0, 1);
+  p = concat_if(p, non_poison.concat(data).concat_zeros(padding_nonptr_byte()));
   assert(!p.isValid() || p.bits() == bitsByte());
 }
 
@@ -95,8 +104,8 @@ expr Byte::is_ptr() const {
 expr Byte::ptr_nonpoison() const {
   if (!does_ptr_mem_access)
     return true;
-  auto bit = Pointer::total_bits() + bits_ptr_byte_offset();
-  return p.extract(bit, bit) == 1;
+  auto bit = p.bits() - 1 - byte_has_ptr_bit();
+  return p.extract(bit, bit) == 0;
 }
 
 Pointer Byte::ptr() const {
@@ -107,8 +116,8 @@ expr Byte::ptr_value() const {
   if (!does_ptr_mem_access)
     return expr::mkUInt(0, Pointer::total_bits());
 
-  auto bw_off = bits_ptr_byte_offset();
-  return p.extract(Pointer::total_bits() + bw_off - 1, bw_off);
+  auto start = bits_ptr_byte_offset() + padding_ptr_byte();
+  return p.extract(Pointer::total_bits() + start - 1, start);
 }
 
 expr Byte::ptr_byteoffset() const {
@@ -116,62 +125,70 @@ expr Byte::ptr_byteoffset() const {
     return expr::mkUInt(0, bits_ptr_byte_offset());
   if (bits_ptr_byte_offset() == 0)
     return expr::mkUInt(0, 1);
-  return p.extract(bits_ptr_byte_offset() - 1, 0);
+
+  unsigned start = padding_ptr_byte();
+  return p.extract(bits_ptr_byte_offset() + start - 1, start);
 }
 
 expr Byte::nonptr_nonpoison() const {
   if (!does_int_mem_access)
     return expr::mkUInt(0, bits_int_poison());
-  return p.extract(bits_byte + bits_int_poison() - 1, bits_byte);
+  unsigned start = padding_nonptr_byte() + bits_byte;
+  return p.extract(start + bits_int_poison() - 1, start);
 }
 
 expr Byte::nonptr_value() const {
   if (!does_int_mem_access)
     return expr::mkUInt(0, bits_byte);
-  return p.extract(bits_byte - 1, 0);
+  unsigned start = padding_nonptr_byte();
+  return p.extract(start + bits_byte - 1, start);
 }
 
 expr Byte::is_poison(bool fullbit) const {
   expr np = nonptr_nonpoison();
+  if (byte_has_ptr_bit() && bits_int_poison() == 1) {
+    assert(ptr_nonpoison().eq(np == 0));
+    return np == 1;
+  }
   return expr::mkIf(is_ptr(), !ptr_nonpoison(),
-                              fullbit ? np == expr::mkInt(-1, np)
-                                      : np != 0);
+                              fullbit ? np == -1ull : np != 0);
 }
 
 expr Byte::is_zero() const {
+  if (byte_has_ptr_bit() && bits_int_poison() == 1) {
+    assert(ptr_nonpoison().eq(nonptr_nonpoison() == 0));
+    return ptr_nonpoison() &&
+             expr::mkIf(is_ptr(), ptr().isNull(), nonptr_value() == 0);
+  }
   return expr::mkIf(is_ptr(),
                     ptr_nonpoison() && ptr().isNull(),
                     nonptr_nonpoison() == 0 && nonptr_value() == 0);
 }
 
 unsigned Byte::bitsByte() {
-  bool is_ptr_bit = does_int_mem_access && does_ptr_mem_access;
   unsigned ptr_bits = does_ptr_mem_access *
                         (1 + Pointer::total_bits() + bits_ptr_byte_offset());
   unsigned int_bits = does_int_mem_access * (bits_byte + bits_int_poison());
   // allow at least 1 bit if there's no memory access
-  return max(1u, is_ptr_bit + max(ptr_bits, int_bits));
+  return max(1u, byte_has_ptr_bit() + max(ptr_bits, int_bits));
 }
 
 Byte Byte::mkPtrByte(const Memory &m, const expr &val) {
   assert(does_ptr_mem_access);
-  unsigned padding = bitsByte() - does_int_mem_access - 1
-                               - Pointer::total_bits() - bits_ptr_byte_offset();
   expr byte;
-  if (does_int_mem_access)
+  if (byte_has_ptr_bit())
     byte = expr::mkUInt(1, 1);
-  if (padding)
-    byte = concat_if(byte, expr::mkUInt(0, padding));
-  return { m, concat_if(byte, expr(val)).concat_zeros(bits_for_ptrattrs) };
+  return { m, concat_if(byte, expr(val))
+                .concat_zeros(bits_for_ptrattrs + padding_ptr_byte()) };
 }
 
 Byte Byte::mkNonPtrByte(const Memory &m, const expr &val) {
   if (!does_int_mem_access)
     return { m, expr::mkUInt(0, bitsByte()) };
-
-  unsigned padding = bitsByte() - bits_byte - bits_int_poison();
-  expr byte = padding ? expr::mkUInt(0, padding).concat(val) : val;
-  return { m, move(byte) };
+  expr byte;
+  if (byte_has_ptr_bit())
+    byte = expr::mkUInt(0, 1);
+  return { m, concat_if(byte, expr(val)).concat_zeros(padding_nonptr_byte()) };
 }
 
 Byte Byte::mkPoisonByte(const Memory &m) {

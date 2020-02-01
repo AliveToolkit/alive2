@@ -22,15 +22,16 @@ class State;
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
 // Pointer byte's representation:
-//   +-+-------+-----------+----------------+------------------+-------------+
-//   |1|padding|non-poison?|     Pointer (see class below)     | byte offset |
-//   | |       |(1 bit)    |                                   | (3 bits)    |
-//   +-+-------+-----------+----------------+------------------+-------------+
+//   +-+-----------+-----------------------------+---------------+---------+
+//   |1|non-poison?|  Pointer (see class below)  | byte offset   | padding |
+//   | |(1 bit)    |                             | (0 or 3 bits) |         |
+//   +-+-----------+-----------------------------+---------------+---------+
 // Non-pointer byte's representation:
-//   +-+--------------------------+--------------------+---------------------+
-//   |0| padding(zero)            | non-poison bits?   | data                |
-//   | |                          | (bits_byte)        | (bits_byte)         |
-//   +-+--------------------------+--------------------+---------------------+
+//   +-+--------------------+--------------------+-------------------------+
+//   |0| non-poison bit(s)  | data               |         padding         |
+//   | | (bits_byte)        | (bits_byte)        |                         |
+//   +-+--------------------+--------------------+-------------------------+
+
 class Byte {
   const Memory &m;
   smt::expr p;
