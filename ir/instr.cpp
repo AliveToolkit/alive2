@@ -203,7 +203,8 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     b = any_fp_zero(s, move(b));
-    if (is_ternary) c = any_fp_zero(s, move(c));
+    if (is_ternary)
+      c = any_fp_zero(s, move(c));
   }
 
   expr val = fn(a, b, c);
@@ -211,13 +212,15 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
 
   if (fmath.flags & FastMathFlags::NNaN) {
     non_poison &= !a.isNaN() && !b.isNaN();
-    if (is_ternary) non_poison &= !c.isNaN();
+    if (is_ternary)
+      non_poison &= !c.isNaN();
     if (!only_input)
       non_poison &= !val.isNaN();
   }
   if (fmath.flags & FastMathFlags::NInf) {
     non_poison &= !a.isInf() && !b.isInf();
-    if (is_ternary) non_poison &= !c.isInf();
+    if (is_ternary)
+      non_poison &= !c.isInf();
     if (!only_input)
       non_poison &= !val.isInf();
   }
@@ -347,56 +350,56 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case SAdd_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.sadd_sat(b), true };
     };
     break;
 
   case UAdd_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.uadd_sat(b), true };
     };
     break;
 
   case SSub_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.ssub_sat(b), true };
     };
     break;
 
   case USub_Sat:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.usub_sat(b), true };
     };
     break;
 
   case And:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a & b, true };
     };
     break;
 
   case Or:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a | b, true };
     };
     break;
 
   case Xor:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a ^ b, true };
     };
     break;
 
   case Cttz:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.cttz(),
                b == 0u || a != 0u };
     };
     break;
 
   case Ctlz:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.ctlz(),
                b == 0u || a != 0u };
     };
@@ -404,42 +407,42 @@ StateValue BinOp::toSMT(State &s) const {
 
   case SAdd_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a + b, (!a.add_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case UAdd_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a + b, (!a.add_no_uoverflow(b)).toBVBool() };
     };
     break;
 
   case SSub_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a - b, (!a.sub_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case USub_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a - b, (!a.sub_no_uoverflow(b)).toBVBool() };
     };
     break;
 
   case SMul_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a * b, (!a.mul_no_soverflow(b)).toBVBool() };
     };
     break;
 
   case UMul_Overflow:
     vertical_zip = true;
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a * b, (!a.mul_no_uoverflow(b)).toBVBool() };
     };
     break;
