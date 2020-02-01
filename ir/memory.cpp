@@ -19,6 +19,11 @@ static unsigned bits_int_poison() {
   return does_sub_byte_access ? bits_byte : 1;
 }
 
+static unsigned bits_ptr_byte_offset() {
+  assert(bits_byte <= bits_program_pointer);
+  return bits_byte != bits_program_pointer ? 3 : 0;
+}
+
 static expr concat_if(const expr &ifvalid, expr &&e) {
   return ifvalid.isValid() ? ifvalid.concat(e) : move(e);
 }
@@ -42,6 +47,7 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
   : m(ptr.getMemory()) {
   // TODO: support pointers larger than 64 bits.
   assert(bits_program_pointer <= 64 && bits_program_pointer % 8 == 0);
+  assert(i == 0 || bits_ptr_byte_offset() > 0);
 
   if (!does_ptr_mem_access) {
     p = expr::mkUInt(0, bitsByte());
@@ -49,14 +55,15 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
   }
 
   unsigned padding = bitsByte() - does_int_mem_access - 1
-                                - Pointer::total_bits() - 3;
+                               - Pointer::total_bits() - bits_ptr_byte_offset();
   if (does_int_mem_access) {
     p = expr::mkUInt(1, 1);
     if (padding)
       p = concat_if(p, expr::mkUInt(0, padding));
   }
-  p = concat_if(p, non_poison.toBVBool())
-        .concat(ptr()).concat(expr::mkUInt(i, 3));
+  p = concat_if(p, non_poison.toBVBool()).concat(ptr());
+  if (bits_ptr_byte_offset())
+    p = p.concat(expr::mkUInt(i, bits_ptr_byte_offset()));
   assert(!p.isValid() || p.bits() == bitsByte());
 }
 
@@ -88,7 +95,7 @@ expr Byte::is_ptr() const {
 expr Byte::ptr_nonpoison() const {
   if (!does_ptr_mem_access)
     return true;
-  auto bit = Pointer::total_bits() + 3;
+  auto bit = Pointer::total_bits() + bits_ptr_byte_offset();
   return p.extract(bit, bit) == 1;
 }
 
@@ -99,13 +106,17 @@ Pointer Byte::ptr() const {
 expr Byte::ptr_value() const {
   if (!does_ptr_mem_access)
     return expr::mkUInt(0, Pointer::total_bits());
-  return p.extract(Pointer::total_bits() + 3 - 1, 3);
+
+  auto bw_off = bits_ptr_byte_offset();
+  return p.extract(Pointer::total_bits() + bw_off - 1, bw_off);
 }
 
 expr Byte::ptr_byteoffset() const {
   if (!does_ptr_mem_access)
-    return expr::mkUInt(0, 3);
-  return p.extract(2, 0);
+    return expr::mkUInt(0, bits_ptr_byte_offset());
+  if (bits_ptr_byte_offset() == 0)
+    return expr::mkUInt(0, 1);
+  return p.extract(bits_ptr_byte_offset() - 1, 0);
 }
 
 expr Byte::nonptr_nonpoison() const {
@@ -135,7 +146,8 @@ expr Byte::is_zero() const {
 
 unsigned Byte::bitsByte() {
   bool is_ptr_bit = does_int_mem_access && does_ptr_mem_access;
-  unsigned ptr_bits = does_ptr_mem_access * (1 + Pointer::total_bits() + 3);
+  unsigned ptr_bits = does_ptr_mem_access *
+                        (1 + Pointer::total_bits() + bits_ptr_byte_offset());
   unsigned int_bits = does_int_mem_access * (bits_byte + bits_int_poison());
   // allow at least 1 bit if there's no memory access
   return max(1u, is_ptr_bit + max(ptr_bits, int_bits));
@@ -144,7 +156,7 @@ unsigned Byte::bitsByte() {
 Byte Byte::mkPtrByte(const Memory &m, const expr &val) {
   assert(does_ptr_mem_access);
   unsigned padding = bitsByte() - does_int_mem_access - 1
-                                - Pointer::total_bits() - 3;
+                               - Pointer::total_bits() - bits_ptr_byte_offset();
   expr byte;
   if (does_int_mem_access)
     byte = expr::mkUInt(1, 1);
