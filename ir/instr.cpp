@@ -1814,7 +1814,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np] = s.getAndAddUndefs(*size);
   // TODO: malloc's alignment is implementation defined.
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true, nonnull);
+  auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
 
   if (isNonNull) {
     // TODO: In C++ we need to throw an exception if the allocation fails, but
@@ -1852,17 +1852,19 @@ void Calloc::print(std::ostream &os) const {
 StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s.getAndAddUndefs(*num);
   auto &[sz, np_sz] = s.getAndAddUndefs(*size);
+  auto np = np_num && np_sz;
 
   // TODO: check calloc align.
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p, allocated] = s.getMemory().alloc(size, 8, Memory::HEAP,
-                                            nm.mul_no_uoverflow(sz), nonnull);
+                                            np && nm.mul_no_uoverflow(sz),
+                                            nonnull);
 
   expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
 
-  return { move(p), np_num && np_sz };
+  return { move(p), move(np) };
 }
 
 expr Calloc::getTypeConstraints(const Function &f) const {
