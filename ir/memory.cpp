@@ -485,10 +485,21 @@ DEFINE_CMP(ult)
 DEFINE_CMP(uge)
 DEFINE_CMP(ugt)
 
-expr Pointer::inbounds() const {
+static expr inbounds(const Pointer &p) {
+  if (isUndef(p.get_offset()))
+    return false;
+
   // equivalent to offset >= 0 && offset <= block_size
-  // because block_size u<= 0x7FFF..
-  return get_offset_sizet().ule(block_size());
+  // because block_size u<= 0x7FFF..FF
+  return p.get_offset_sizet().ule(p.block_size());
+}
+
+expr Pointer::inbounds() const {
+  DisjointExpr<expr> ret(expr(false));
+  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
+    ret.add(::inbounds(Pointer(m, ptr_expr)), domain);
+  }
+  return *ret();
 }
 
 expr Pointer::block_alignment() const {
