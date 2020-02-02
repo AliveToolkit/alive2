@@ -3,10 +3,10 @@
 
 #include "ir/state.h"
 #include "ir/function.h"
+#include "ir/globals.h"
 #include "smt/smt.h"
 #include "util/errors.h"
 #include <cassert>
-#include <string_view>
 
 using namespace smt;
 using namespace util;
@@ -271,7 +271,7 @@ void State::resetUndefVars() {
 StateValue State::rewriteUndef(StateValue &&val) {
   vector<pair<expr, expr>> repls;
   for (auto &var : val.vars()) {
-    if (string_view(var.fn_name()).substr(0, 6) == "undef!") {
+    if (isUndef(var)) {
       auto newvar = expr::mkFreshVar("undef", var);
       repls.emplace_back(var, newvar);
       addUndefVar(move(newvar));

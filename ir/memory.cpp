@@ -541,7 +541,8 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p,
 
   // try some constant folding; these are implied by the conditions above
   if (bytes.ugt(block_sz).isTrue() ||
-      offset.sextOrTrunc(bits_size_t).uge(block_sz).isTrue())
+      offset.sextOrTrunc(bits_size_t).uge(block_sz).isTrue() ||
+      isUndef(offset))
     cond = false;
 
   return { move(cond), p.is_aligned(align) };
@@ -802,16 +803,24 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   if (p.isNull().isTrue())
     return os << "null";
 
+#define P(field, fn)   \
+  if (field.isConst()) \
+    field.fn(os);      \
+  else                 \
+    os << field
+
   os << "pointer(" << (p.is_local().isTrue() ? "local" : "non-local")
      << ", block_id=";
-  p.get_bid().printUnsigned(os);
+  P(p.get_bid(), printUnsigned);
+
   os << ", offset=";
-  p.get_offset().printSigned(os);
+  P(p.get_offset(), printSigned);
 
   if (bits_for_ptrattrs && !p.get_attrs().isZero()) {
     os << ", attrs=";
-    p.get_attrs().printUnsigned(os);
+    P(p.get_attrs(), printUnsigned);
   }
+#undef P
   return os << ')';
 }
 

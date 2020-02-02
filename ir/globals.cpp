@@ -2,6 +2,11 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/globals.h"
+#include "smt/expr.h"
+#include <string_view>
+
+using namespace smt;
+using namespace std;
 
 namespace IR {
 
@@ -27,5 +32,11 @@ bool does_int_mem_access;
 bool does_ptr_mem_access;
 bool does_ptr_store;
 bool does_sub_byte_access;
+
+
+bool isUndef(const expr &e) {
+  auto name = e.fn_name();
+  return string_view(name).substr(0, 6) == "undef!";
+}
 
 }

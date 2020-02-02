@@ -3,6 +3,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+namespace smt { class expr; }
+
 namespace IR {
 
 /// Upperbound of the number of non-local pointers returned by instructions
@@ -58,5 +60,8 @@ extern bool does_ptr_store;
 
 /// Whether the programs do memory accesses of less than bits_byte
 extern bool does_sub_byte_access;
+
+
+bool isUndef(const smt::expr &e);
 
 }
