@@ -1029,7 +1029,8 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
 
   {
     expr lhs_a, lhs_b, rhs_a, rhs_b;
-    if (isEq(lhs_a, lhs_b) && rhs.isEq(rhs_a, rhs_b) && lhs_a.eq(rhs_a))
+    if (isEq(lhs_a, lhs_b) && lhs_a.bits() == 1 && rhs.isEq(rhs_a, rhs_b) &&
+        lhs_a.eq(rhs_a))
       return lhs_b == rhs_b;
   }
 
