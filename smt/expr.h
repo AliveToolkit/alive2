@@ -125,6 +125,7 @@ public:
   bool isIf(expr &cond, expr &then, expr &els) const;
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
+  bool isAnd(expr &a, expr &b) const;
   bool isNot(expr &neg) const;
   bool isConstArray(expr &val) const;
   bool isStore(expr &array, expr &idx, expr &val) const;

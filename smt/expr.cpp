@@ -387,6 +387,17 @@ bool expr::isExtract(expr &e, unsigned &high, unsigned &low) const {
   return false;
 }
 
+bool expr::isAnd(expr &a, expr &b) const {
+  if (auto app = isAppOf(Z3_OP_AND)) {
+    if (Z3_get_domain_size(ctx(), decl()) != 2)
+      return false;
+    a = Z3_get_app_arg(ctx(), app, 0);
+    b = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
 bool expr::isNot(expr &neg) const {
   if (auto app = isAppOf(Z3_OP_NOT)) {
     neg = Z3_get_app_arg(ctx(), app, 0);
@@ -1300,6 +1311,8 @@ expr expr::extract(unsigned high, unsigned low) const {
         return b.extract(high, low);
       if (low >= b_bw)
         return a.extract(high - b_bw, low - b_bw);
+      if (low == 0)
+        return a.extract(high - b_bw, 0).concat(b);
     }
   }
   {

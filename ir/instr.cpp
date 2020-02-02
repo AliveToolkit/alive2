@@ -1973,8 +1973,7 @@ StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
                     vector<pair<unsigned, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
-    AndExpr non_poison;
-    non_poison.add(ptrval.non_poison);
+    AndExpr non_poison(ptrval.non_poison);
 
     if (inbounds)
       non_poison.add(ptr.inbounds(true));

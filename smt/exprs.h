@@ -15,6 +15,10 @@ class AndExpr {
   std::set<expr> exprs;
 
 public:
+  AndExpr() {}
+  template <typename T>
+  AndExpr(T &&e) { add(std::forward<T>(e)); }
+
   void add(const expr &e);
   void add(expr &&e);
   void add(const AndExpr &other);

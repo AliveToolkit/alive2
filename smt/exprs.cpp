@@ -10,13 +10,29 @@ using namespace std;
 namespace smt {
 
 void AndExpr::add(const expr &e) {
-  if (!e.isTrue())
-    exprs.insert(e);
+  if (e.isTrue())
+    return;
+
+  expr a, b;
+  if (e.isAnd(a, b)) {
+    add(move(a));
+    add(move(b));
+    return;
+  }
+  exprs.insert(e);
 }
 
 void AndExpr::add(expr &&e) {
-  if (!e.isTrue())
-    exprs.insert(move(e));
+  if (e.isTrue())
+    return;
+
+  expr a, b;
+  if (e.isAnd(a, b)) {
+    add(move(a));
+    add(move(b));
+    return;
+  }
+  exprs.insert(move(e));
 }
 
 void AndExpr::add(const AndExpr &other) {
