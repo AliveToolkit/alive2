@@ -343,7 +343,7 @@ bool expr::isInt(int64_t &n) const {
   return true;
 }
 
-bool expr::isEq(expr &lhs, expr &rhs) {
+bool expr::isEq(expr &lhs, expr &rhs) const {
   if (auto app = isAppOf(Z3_OP_EQ)) {
     lhs = Z3_get_app_arg(ctx(), app, 0);
     rhs = Z3_get_app_arg(ctx(), app, 1);
@@ -1026,6 +1026,12 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
     return *this;
   if (rhs.isFalse())
     return !*this;
+
+  {
+    expr lhs_a, lhs_b, rhs_a, rhs_b;
+    if (isEq(lhs_a, lhs_b) && rhs.isEq(rhs_a, rhs_b) && lhs_a.eq(rhs_a))
+      return lhs_b == rhs_b;
+  }
 
   if (auto app = isAppOf(Z3_OP_CONCAT)) {
     unsigned num_args = Z3_get_app_num_args(ctx(), app);

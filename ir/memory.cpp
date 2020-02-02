@@ -249,7 +249,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
   if (toType.isPtrType()) {
     assert(bytes.size() == bits_program_pointer / bits_byte);
     auto nullp = Pointer::mkNullPointer(m);
-    expr loaded_ptr;
+    expr loaded_ptr, is_ptr;
     // The result is not poison if all of these hold:
     // (1) There's no poison byte, and they are all pointer bytes
     // (2) All of the bytes have the same information
@@ -260,18 +260,22 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       auto &b = bytes[i];
-      expr ptr_value = expr::mkIf(b.is_ptr(), b.ptr_value(), nullp());
+      expr ptr_value = b.ptr_value();
+      expr b_is_ptr  = b.is_ptr();
 
       if (i == 0) {
-        loaded_ptr = move(ptr_value);
+        loaded_ptr = ptr_value;
+        is_ptr     = move(b_is_ptr);
       } else {
-        non_poison &= ptr_value == loaded_ptr;
+        non_poison &= is_ptr == b_is_ptr;
       }
-      non_poison &= expr::mkIf(b.is_ptr(), b.ptr_byteoffset() == i,
-                                           b.nonptr_value() == 0);
+      non_poison &=
+        expr::mkIf(is_ptr,
+                   b.ptr_byteoffset() == i && ptr_value == loaded_ptr,
+                   b.nonptr_value() == 0);
       non_poison &= !b.is_poison(false);
     }
-    return { move(loaded_ptr), move(non_poison) };
+    return { expr::mkIf(is_ptr, loaded_ptr, nullp()), move(non_poison) };
 
   } else {
     auto bitsize = toType.bits();
