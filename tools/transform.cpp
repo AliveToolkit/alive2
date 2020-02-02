@@ -534,8 +534,10 @@ static uint64_t max_gep(const Instr &inst) {
 
 static bool has_sub_byte(const Type &t) {
   if (auto agg = t.getAsAggregateType()) {
-    if (t.isVectorType())
-      return agg->getChild(0).bits() % 8;
+    if (t.isVectorType()) {
+      auto &elemTy = agg->getChild(0);
+      return elemTy.isPtrType() ? false : (elemTy.bits() % 8);
+    }
 
     for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
       if (has_sub_byte(agg->getChild(i)))
@@ -636,6 +638,7 @@ static void calculateAndInitConstants(Transform &t) {
       min_global_size = min_global_size != UINT64_MAX
                           ? gcd(sz, min_global_size)
                           : sz;
+      min_global_size = gcd(min_global_size, glb->getAlignment());
     }
   }
 

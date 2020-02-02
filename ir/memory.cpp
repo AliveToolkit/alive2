@@ -521,7 +521,7 @@ expr Pointer::block_alignment() const {
 }
 
 expr Pointer::is_block_aligned(unsigned align, bool exact) const {
-  assert(align != 0);
+  assert(align >= bits_byte / 8);
   if (!exact && align == 1)
     return true;
 
@@ -531,7 +531,7 @@ expr Pointer::is_block_aligned(unsigned align, bool exact) const {
 }
 
 expr Pointer::is_aligned(unsigned align) const {
-  assert(align != 0);
+  assert(align >= bits_byte / 8);
   if (align == 1)
     return true;
 
@@ -997,7 +997,8 @@ Memory::Memory(State &state) : state(&state) {
 
   // Initialize a memory block for null pointer.
   if (num_nonlocals > 0)
-    alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, false, false, 0);
+    alloc(expr::mkUInt(0, bits_size_t), bits_program_pointer, GLOBAL, false,
+          false, 0);
 
   escaped_local_blks.resize(num_locals, false);
 
