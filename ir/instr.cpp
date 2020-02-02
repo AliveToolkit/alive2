@@ -1977,7 +1977,7 @@ StateValue GEP::toSMT(State &s) const {
     non_poison.add(ptrval.non_poison);
 
     if (inbounds)
-      non_poison.add(ptr.inbounds());
+      non_poison.add(ptr.inbounds(true));
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;

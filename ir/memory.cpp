@@ -494,11 +494,24 @@ static expr inbounds(const Pointer &p) {
   return p.get_offset_sizet().ule(p.block_size());
 }
 
-expr Pointer::inbounds() const {
-  DisjointExpr<expr> ret(expr(false));
+expr Pointer::inbounds(bool simplify_ptr) {
+  if (!simplify_ptr)
+    return ::inbounds(*this);
+
+  DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
-    ret.add(::inbounds(Pointer(m, ptr_expr)), domain);
+    expr inb = ::inbounds(Pointer(m, ptr_expr));
+    if (!inb.isFalse())
+      all_ptrs.add(ptr_expr, domain);
+    ret.add(move(inb), domain);
   }
+
+  // trim set of valid ptrs
+  if (auto ptrs = all_ptrs())
+    p = *ptrs;
+  else
+    p = expr::mkUInt(0, total_bits());
+
   return *ret();
 }
 
