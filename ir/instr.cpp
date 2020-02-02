@@ -1972,11 +1972,12 @@ void GEP::print(std::ostream &os) const {
 StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
                     vector<pair<unsigned, StateValue>> &offsets) -> StateValue {
-    auto non_poison = ptrval.non_poison;
     Pointer ptr(s.getMemory(), ptrval.value);
+    AndExpr non_poison;
+    non_poison.add(ptrval.non_poison);
 
     if (inbounds)
-      non_poison &= ptr.inbounds();
+      non_poison.add(ptr.inbounds());
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
@@ -1986,9 +1987,9 @@ StateValue GEP::toSMT(State &s) const {
 
       if (inbounds) {
         if (sz != 0)
-          non_poison &= val.sextOrTrunc(v.bits()) == v;
-        non_poison &= multiplier.mul_no_soverflow(val);
-        non_poison &= ptr.add_no_overflow(inc);
+          non_poison.add(val.sextOrTrunc(v.bits()) == v);
+        non_poison.add(multiplier.mul_no_soverflow(val));
+        non_poison.add(ptr.add_no_overflow(inc));
       }
 
 #ifndef NDEBUG
@@ -1998,12 +1999,12 @@ StateValue GEP::toSMT(State &s) const {
 #endif
 
       ptr += inc;
-      non_poison &= np;
+      non_poison.add(np);
 
       if (inbounds)
-        non_poison &= ptr.inbounds();
+        non_poison.add(ptr.inbounds());
     }
-    return { ptr.release(), move(non_poison) };
+    return { ptr.release(), non_poison() };
   };
 
   if (auto aty = getType().getAsAggregateType()) {

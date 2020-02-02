@@ -15,6 +15,7 @@ class AndExpr {
   std::set<expr> exprs;
 
 public:
+  void add(const expr &e);
   void add(expr &&e);
   void add(const AndExpr &other);
   void del(const AndExpr &other);

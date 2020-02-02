@@ -9,6 +9,11 @@ using namespace std;
 
 namespace smt {
 
+void AndExpr::add(const expr &e) {
+  if (!e.isTrue())
+    exprs.insert(e);
+}
+
 void AndExpr::add(expr &&e) {
   if (!e.isTrue())
     exprs.insert(move(e));
