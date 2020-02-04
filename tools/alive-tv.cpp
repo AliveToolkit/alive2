@@ -10,15 +10,19 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <iostream>
 #include <utility>
@@ -37,48 +41,48 @@ opt_file1(llvm::cl::Positional, llvm::cl::desc("first_bitcode_file"),
 
 static llvm::cl::opt<string>
 opt_file2(llvm::cl::Positional, llvm::cl::desc("second_bitcode_file"),
-    llvm::cl::Required, llvm::cl::value_desc("filename"),
+    llvm::cl::Optional, llvm::cl::value_desc("filename"),
     llvm::cl::cat(opt_alive));
 
 static llvm::cl::opt<bool> opt_disable_undef("disable-undef-input",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
-    llvm::cl::desc("Alive: Assume inputs are not undef (default=false)"));
+    llvm::cl::desc("Assume inputs are not undef (default=false)"));
 
 static llvm::cl::opt<bool> opt_disable_poison("disable-poison-input",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
-    llvm::cl::desc("Alive: Assume inputs are not poison (default=false)"));
+    llvm::cl::desc("Assume inputs are not poison (default=false)"));
 
 static llvm::cl::opt<bool> opt_se_verbose(
-    "se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
+    "se-verbose", llvm::cl::desc("Symbolic execution verbose mode"),
      llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<unsigned> opt_smt_to(
-  "smt-to", llvm::cl::desc("Alive: timeout for SMT queries (default=1000)"),
+  "smt-to", llvm::cl::desc("Timeout for SMT queries (default=1000)"),
   llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
 
 static llvm::cl::opt<bool> opt_smt_verbose(
-    "smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
+    "smt-verbose", llvm::cl::desc("SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_tactic_verbose(
-  "tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
-  llvm::cl::init(false));
+  "tactic-verbose", llvm::cl::desc("SMT Tactic verbose mode"),
+  llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_debug(
-    "dbg", llvm::cl::desc("Alive: print debugging info"),
+    "dbg", llvm::cl::desc("Print debugging info"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_smt_stats(
-    "smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
+    "smt-stats", llvm::cl::desc("Show SMT statistics"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<unsigned> opt_max_mem(
-     "max-mem", llvm::cl::desc("Alive: max memory (aprox)"),
-     llvm::cl::init(1024), llvm::cl::value_desc("MB"));
+     "max-mem", llvm::cl::desc("Max memory (approx)"),
+     llvm::cl::cat(opt_alive), llvm::cl::init(1024), llvm::cl::value_desc("MB"));
 
 static llvm::cl::opt<bool> opt_bidirectional("bidirectional",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
-    llvm::cl::desc("Alive: Run refinement check in both directions"));
+    llvm::cl::desc("Run refinement check in both directions"));
 
 static llvm::ExitOnError ExitOnErr;
 
@@ -275,6 +279,27 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return result;
 }
 
+void optimizeModule(llvm::Module *M) {
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  llvm::PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::FunctionPassManager FPM =
+    PB.buildFunctionSimplificationPipeline(llvm::PassBuilder::OptimizationLevel::O2,
+                                           llvm::PassBuilder::ThinLTOPhase::None);
+  llvm::ModulePassManager MPM;
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+  MPM.run(*M, MAM);
+}
+
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
@@ -282,8 +307,16 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj llvm_shutdown;  // Call llvm_shutdown() on exit.
   llvm::LLVMContext Context;
 
+  llvm::cl::HideUnrelatedOptions(opt_alive);
   llvm::cl::ParseCommandLineOptions(argc, argv,
-                                  "Alive2 stand-alone translation validator\n");
+    "Alive2 stand-alone translation validator:\n\n"
+    "This program takes either one or two LLVM IR files files as\n"
+    "command-line arguments. Both .bc and .ll files are supported. If two\n"
+    "files are provided, alive-tv checks that the second file refines the\n"
+    "first one. If one file is provided, alive-tv optimizes it using an\n"
+    "-O2 optimization pipeline and then verifies that the optimized code\n"
+    "refines the original code. This provides a convenient way to\n"
+    "demonstrate an optimizer bug.\n");
 
   smt::solver_print_queries(opt_smt_verbose);
   smt::solver_tactic_verbose(opt_tactic_verbose);
@@ -300,10 +333,16 @@ int main(int argc, char **argv) {
     llvm::report_fatal_error(
       "Could not read bitcode from '" + opt_file1 + "'");
 
-  auto M2 = openInputFile(Context, opt_file2);
-  if (!M2.get())
-    llvm::report_fatal_error(
-      "Could not read bitcode from '" + opt_file2 + "'");
+  std::unique_ptr<llvm::Module> M2;
+  if (opt_file2.empty()) {
+    M2 = CloneModule(*M1);
+    optimizeModule(M2.get());
+  } else {
+    M2 = openInputFile(Context, opt_file2);
+    if (!M2.get())
+      llvm::report_fatal_error(
+        "Could not read bitcode from '" + opt_file2 + "'");
+  }
 
   if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
     llvm::report_fatal_error("Modules have different target triple");

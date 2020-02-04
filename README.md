@@ -65,7 +65,20 @@ cmake -GNinja -DLLVM_DIR=~/llvm/build/lib/cmake/llvm -DBUILD_TV=1 -DCMAKE_BUILD_
 ```
 
 
-Translation validation of a single test case:
+Translation validation of one or more LLVM passes transforming an IR file on Linux:
+```
+~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll 
+```
+On a Mac:
+```
+~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll 
+```
+You can run any pass or combination of passes, but on the command line
+they must be placed in between the two invocations of the Alive2 `-tv`
+pass.
+
+
+Translation validation of a single LLVM unit test, using lit:
 ```
 ~/llvm/build/bin/llvm-lit -vv -Dopt=/home/user/alive2/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
@@ -85,11 +98,14 @@ Translation validation of the LLVM unit tests:
 ```
 
 
-Running Standalone Translation Validation Tool (alive-tv)
+Running the Standalone Translation Validation Tool (alive-tv)
 --------
 
-This tool takes two arguments: source and target (optimized) bitcode.
-For example, let's prove that removing `nsw` is correct for addition:
+This tool has two modes.
+
+In the first mode, specify a source (original) and target (optimized)
+IR file. For example, let's prove that removing `nsw` is correct
+for addition:
 
 ```
 $ ./alive-tv src.ll tgt.ll
@@ -108,7 +124,68 @@ define i32 @f(i32 %a, i32 %b) {
 Transformation seems to be correct!
 ```
 
-Flipping the inputs yields a counterexample, since it's not correct to
-add `nsw` without further information.
+Flipping the inputs yields a counterexample, since it's not correct, in general,
+to add `nsw`.
 If you are not interested in counterexamples using `undef`, you can use the
 command-line argument `-disable-undef-input`.
+
+In the second mode, specify a single unoptimized IR file. alive-tv
+will optimize it using an optimization pipeline similar to -O2, but
+without any interprocedural passes, and then attempt to validate the
+translation.
+
+For example, as of February 6 2020, the `release/10.x` branch contains
+an optimizer bug that can be triggered as follows:
+
+```
+$ cat foo.ll
+define i3 @foo(i3) {
+  %x1 = sub i3 0, %0
+  %x2 = icmp ne i3 %0, 0
+  %x3 = zext i1 %x2 to i3
+  %x4 = lshr i3 %x1, %x3
+  %x5 = lshr i3 %x4, %x3
+  ret i3 %x5
+}
+$ ./alive-tv foo.ll
+
+----------------------------------------
+define i3 @foo(i3 %0) {
+%1:
+  %x1 = sub i3 0, %0
+  %x2 = icmp ne i3 %0, 0
+  %x3 = zext i1 %x2 to i3
+  %x4 = lshr i3 %x1, %x3
+  %x5 = lshr i3 %x4, %x3
+  ret i3 %x5
+}
+=>
+define i3 @foo(i3 %0) {
+%1:
+  %x1 = sub i3 0, %0
+  ret i3 %x1
+}
+Transformation doesn't verify!
+ERROR: Value mismatch
+
+Example:
+i3 %0 = #x5 (5, -3)
+
+Source:
+i3 %x1 = #x3 (3)
+i1 %x2 = #x1 (1)
+i3 %x3 = #x1 (1)
+i3 %x4 = #x1 (1)
+i3 %x5 = #x0 (0)
+
+Target:
+i3 %x1 = #x3 (3)
+Source value: #x0 (0)
+Target value: #x3 (3)
+
+Summary:
+  0 correct transformations
+  1 incorrect transformations
+  0 errors
+$ 
+```
