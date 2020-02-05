@@ -2020,8 +2020,8 @@ StateValue GEP::toSMT(State &s) const {
         else
           offsets.emplace_back(sz, s[*idx]);
       }
-      vals.emplace_back(scalar(ptr_isvect ? aty->extract(ptrval, i) : ptrval,
-                               offsets));
+      vals.emplace_back(scalar(ptr_isvect ? aty->extract(ptrval, i) :
+                               (i == 0 ? ptrval : s[*ptr]), offsets));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
