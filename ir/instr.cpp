@@ -1212,6 +1212,7 @@ StateValue FnCall::toSMT(State &s) const {
     unpack_inputs(s, arg->getType(), s[*arg], inputs, ptr_inputs);
     fnName_mangled << "#" << arg->getType().toString();
   }
+  fnName_mangled << '!' << getType().toString();
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
 
