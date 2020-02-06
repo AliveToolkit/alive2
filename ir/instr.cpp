@@ -1821,21 +1821,27 @@ void Malloc::print(std::ostream &os) const {
 
 StateValue Malloc::toSMT(State &s) const {
   if (!isRealloc) {
-    auto &[sz, np] = s[*size];
+    auto &[sz, np] = s.getAndAddUndefs(*size);
     // TODO: malloc's alignment is implementation defined.
     expr nonnull = expr::mkBoolVar("malloc_never_fails");
     auto [p, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np, nonnull);
 
+    if (isNonNull) {
+      // TODO: In C++ we need to throw an exception if the allocation fails, but
+      // exception hasn't been modeled yet
+      s.addPre(move(allocated));
+    }
+
     return { move(p), expr(np) };
   } else {
-    auto &[p, np_ptr] = s[*ptr];
-    auto &[sz, np_size] = s[*size];
+    auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
+    auto &[sz, np_size] = s.getAndAddUndefs(*size);
     s.addUB(np_ptr);
 
     // If sz > p_sz, it is filled it with poison (local_block_val is
     // initialized with poison).
     expr nonnull = expr::mkBoolVar("malloc_never_fails");
-    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, true,
+    auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np_size,
                                                   nonnull);
 
     Pointer ptr(s.getMemory(), p);
