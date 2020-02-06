@@ -1533,7 +1533,19 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
   expr offset = ptr.get_offset();
   expr ret(true);
 
+  auto is_constglb = [](const Memory &m, unsigned bid) {
+    return
+      find(m.non_local_blk_nonwritable.begin(),
+           m.non_local_blk_nonwritable.end(), bid) !=
+        m.non_local_blk_nonwritable.end();
+  };
+
   for (unsigned bid = 1; bid < num_nonlocals; ++bid) {
+    if (!is_constglb(*this, bid) && is_constglb(other, bid)) {
+      // bid is introduced as a constant global in target.
+      // Skip refinement check in this case.
+      continue;
+    }
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
