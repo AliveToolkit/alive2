@@ -107,6 +107,9 @@ public:
 
   smt::expr is_local() const;
 
+  // Given that this pointer is nonlocal, encode wellformedness of this pointer
+  smt::expr nonlocal_wf() const;
+
   smt::expr get_bid() const;
   smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
   smt::expr get_offset() const;
@@ -208,6 +211,8 @@ class Memory {
   void store(const Pointer &p, const smt::expr &val, smt::expr &local,
              smt::expr &non_local, bool index_bid = false);
 
+  unsigned num_nonlocals() const;
+
 public:
   enum BlockKind {
     HEAP, STACK, GLOBAL, CONSTGLOBAL
@@ -231,8 +236,7 @@ public:
   void finishInitialization();
   void mkAxioms(const Memory &other) const;
 
-  static void resetGlobalData();
-  static void resetLocalBids();
+  static void resetBids(unsigned last_nonlocal);
 
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, unsigned attributes) const;

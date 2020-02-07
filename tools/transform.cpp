@@ -592,7 +592,8 @@ static uint64_t get_access_size(const Instr &inst) {
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
-  unsigned num_globals = globals_src.size();
+  unsigned num_globals_src = globals_src.size();
+  unsigned num_globals = num_globals_src;
 
   // TODO: get this from data layout, varies among address spaces
   bits_program_pointer = 64;
@@ -697,14 +698,16 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  num_nonlocals = num_globals + num_ptrinputs + num_max_nonlocals_inst;
+  num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals > 0 || nullptr_is_used || has_malloc || has_load ||
+  if (num_nonlocals_src > 0 || nullptr_is_used || has_malloc || has_load ||
       has_fncall)
-    ++num_nonlocals;
+    ++num_nonlocals_src;
 
   // Allow at least one non-const global for calls to change
-  num_nonlocals += has_fncall;
+  num_nonlocals_src += has_fncall;
+
+  num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
   if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
     does_int_mem_access = true;
@@ -768,6 +771,7 @@ static void calculateAndInitConstants(Transform &t) {
   if (config::debug)
     config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst << "\n"
                      "num_locals: " << num_locals << "\n"
+                     "num_nonlocals_src: " << num_nonlocals_src << "\n"
                      "num_nonlocals: " << num_nonlocals << "\n"
                      "bits_for_bid: " << bits_for_bid << "\n"
                      "bits_for_offset: " << bits_for_offset << "\n"

@@ -16,6 +16,9 @@ extern unsigned num_locals;
 // Upperbound of the number of nonlocal blocks
 extern unsigned num_nonlocals;
 
+// Upperbound of the number of nonlocal blocks in src (<= num_nonlocals)
+extern unsigned num_nonlocals_src;
+
 /// Number of bits needed for attributes of pointers (e.g. nocapture).
 extern unsigned bits_for_ptrattrs;
 
