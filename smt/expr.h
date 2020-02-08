@@ -65,6 +65,8 @@ class expr {
   static expr mkConst(Z3_func_decl decl);
   static expr mkQuantVar(unsigned i, Z3_sort sort);
 
+  bool isBinOp(expr &a, expr &b, int z3op) const;
+
 public:
   expr() : ptr(0) {}
 
@@ -127,6 +129,8 @@ public:
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isAnd(expr &a, expr &b) const;
   bool isNot(expr &neg) const;
+  bool isAdd(expr &a, expr &b) const;
+  bool isBasePlusOffset(expr &base, uint64_t &offset) const;
   bool isConstArray(expr &val) const;
   bool isStore(expr &array, expr &idx, expr &val) const;
 

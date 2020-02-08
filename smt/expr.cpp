@@ -215,6 +215,17 @@ expr expr::mkQuantVar(unsigned i, Z3_sort sort) {
   return Z3_mk_bound(ctx(), i, sort);
 }
 
+bool expr::isBinOp(expr &a, expr &b, int z3op) const {
+  if (auto app = isAppOf(z3op)) {
+    if (Z3_get_domain_size(ctx(), decl()) != 2)
+      return false;
+    a = Z3_get_app_arg(ctx(), app, 0);
+    b = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
 expr expr::mkVar(const char *name, const expr &type) {
   C2(type);
   return ::mkVar(name, type.sort());
@@ -344,12 +355,7 @@ bool expr::isInt(int64_t &n) const {
 }
 
 bool expr::isEq(expr &lhs, expr &rhs) const {
-  if (auto app = isAppOf(Z3_OP_EQ)) {
-    lhs = Z3_get_app_arg(ctx(), app, 0);
-    rhs = Z3_get_app_arg(ctx(), app, 1);
-    return true;
-  }
-  return false;
+  return isBinOp(lhs, rhs, Z3_OP_EQ);
 }
 
 bool expr::isIf(expr &cond, expr &then, expr &els) const {
@@ -388,14 +394,7 @@ bool expr::isExtract(expr &e, unsigned &high, unsigned &low) const {
 }
 
 bool expr::isAnd(expr &a, expr &b) const {
-  if (auto app = isAppOf(Z3_OP_AND)) {
-    if (Z3_get_domain_size(ctx(), decl()) != 2)
-      return false;
-    a = Z3_get_app_arg(ctx(), app, 0);
-    b = Z3_get_app_arg(ctx(), app, 1);
-    return true;
-  }
-  return false;
+  return isBinOp(a, b, Z3_OP_AND);
 }
 
 bool expr::isNot(expr &neg) const {
@@ -404,6 +403,27 @@ bool expr::isNot(expr &neg) const {
     return true;
   }
   return false;
+}
+
+bool expr::isAdd(expr &a, expr &b) const {
+  return isBinOp(a, b, Z3_OP_BADD);
+}
+
+bool expr::isBasePlusOffset(expr &base, uint64_t &offset) const {
+  expr a, b;
+  if (isAdd(a, b)) {
+    if (a.isUInt(offset)) {
+      base = b;
+      return true;
+    }
+    if (b.isUInt(offset)) {
+      base = a;
+      return true;
+    }
+  }
+  base = *this;
+  offset = 0;
+  return true;
 }
 
 bool expr::isConstArray(expr &val) const {
@@ -1027,11 +1047,23 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
   if (rhs.isFalse())
     return !*this;
 
+  // (= (= a bit) (= b bit)) -> (= a b)
   {
     expr lhs_a, lhs_b, rhs_a, rhs_b;
     if (isEq(lhs_a, lhs_b) && lhs_a.bits() == 1 && rhs.isEq(rhs_a, rhs_b) &&
         lhs_a.eq(rhs_a))
       return lhs_b == rhs_b;
+  }
+
+  // (= (+ a c1) (+ a  c2)) -> false
+  {
+    expr lhs_base, rhs_base;
+    uint64_t lhs_offset, rhs_offset;
+    if (isBasePlusOffset(lhs_base, lhs_offset) &&
+        rhs.isBasePlusOffset(rhs_base, rhs_offset) &&
+        lhs_base.eq(rhs_base) &&
+        lhs_offset != rhs_offset)
+      return false;
   }
 
   if (auto app = isAppOf(Z3_OP_CONCAT)) {
