@@ -547,6 +547,48 @@ static bool has_sub_byte(const Type &t) {
   return false;
 }
 
+static uint64_t get_access_size(const Type &ty) {
+  if (auto agg = ty.getAsAggregateType()) {
+    uint64_t sz = 1;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      auto n = get_access_size(agg->getChild(i));
+      sz = i == 0 ? n : gcd(sz, n);
+    }
+    return sz;
+  }
+  if (ty.isPtrType())
+    return bits_program_pointer / 8;
+  return divide_up(ty.bits(), 8);
+}
+
+static uint64_t get_access_size(const Instr &inst) {
+  if (dynamic_cast<const Calloc*>(&inst) ||
+      dynamic_cast<const Memcpy*>(&inst) ||
+      dynamic_cast<const Memset*>(&inst)) {
+    // TODO
+    does_int_mem_access = true;
+    return 1;
+  }
+
+  Type *value_ty;
+  unsigned align;
+  if (auto st = dynamic_cast<const Store*>(&inst)) {
+    value_ty = &st->getValue().getType();
+    align = st->getAlign();
+    does_ptr_store |= hasPtr(*value_ty);
+  } else if (auto ld = dynamic_cast<const Load*>(&inst)) {
+    value_ty = &ld->getType();
+    align = ld->getAlign();
+  }
+  else
+    return 0;
+
+  does_ptr_mem_access |= hasPtr(*value_ty);
+  does_int_mem_access |= value_ty->enforcePtrOrVectorType().isFalse();
+
+  return gcd(align, get_access_size(*value_ty));
+}
+
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
@@ -566,41 +608,6 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto &arg : t.src.getInputs()) {
     num_ptrinputs += num_ptrs(arg.getType());
   }
-
-  // Returns access size. 0 if no access, -1 if unknown
-  const uint64_t UNKNOWN = 1, NO_ACCESS = 0;
-  auto get_access_size = [&](const Instr &inst) -> uint64_t {
-    if (dynamic_cast<const Calloc *>(&inst) ||
-        dynamic_cast<const Memcpy *>(&inst) ||
-        dynamic_cast<const Memset *>(&inst)) {
-      // TODO
-      does_int_mem_access = true;
-      return UNKNOWN;
-    }
-
-    Type *value_ty;
-    unsigned align;
-    if (auto st = dynamic_cast<const Store *>(&inst)) {
-      value_ty = &st->getValue().getType();
-      align = st->getAlign();
-      does_ptr_store |= hasPtr(*value_ty);
-    } else if (auto ld = dynamic_cast<const Load *>(&inst)) {
-      value_ty = &ld->getType();
-      align = ld->getAlign();
-    } else
-      return NO_ACCESS;
-
-    does_ptr_mem_access |= hasPtr(*value_ty);
-    does_int_mem_access |= value_ty->enforcePtrOrVectorType().isFalse();
-
-    if (value_ty->isAggregateType())
-      // TODO: AggregateType's elements are splitted and stored, so
-      // should they be checked instead
-      return UNKNOWN;
-    if (value_ty->isPtrType())
-      return gcd(align, bits_size_t / 8);
-    return gcd(align, util::divide_up(value_ty->bits(), 8));
-  };
 
   // The number of instructions that can return a pointer to a non-local block.
   num_max_nonlocals_inst = 0;
@@ -682,8 +689,7 @@ static void calculateAndInitConstants(Transform &t) {
 
         does_sub_byte_access |= has_sub_byte(I.getType());
 
-        auto accsz = get_access_size(I);
-        if (accsz != NO_ACCESS) {
+        if (auto accsz = get_access_size(I)) {
           min_access_size = gcd(min_access_size, accsz);
           does_mem_access = true;
         }

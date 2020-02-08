@@ -1364,7 +1364,6 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   assert(!memory_unused());
   Pointer ptr(*this, p);
   unsigned bytesz = bits_byte / 8;
-  assert(align % bytesz == 0);
 
   if (deref_check)
     ptr.is_dereferenceable(getStoreByteSize(type), align,
@@ -1377,7 +1376,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
       if (child.bits() == 0)
         continue;
       auto ptr_i = ptr + byteofs;
-      store(ptr_i(), aty->extract(v, i), child, 1, false);
+      auto align_i = gcd(align, byteofs % align);
+      store(ptr_i(), aty->extract(v, i), child, align_i, false);
       byteofs += getStoreByteSize(child);
     }
     assert(byteofs == getStoreByteSize(type));
@@ -1385,6 +1385,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   } else {
     vector<Byte> bytes = valueToBytes(v, type, *this, state);
     assert(!v.isValid() || bytes.size() * bytesz == getStoreByteSize(type));
+    assert(align % bytesz == 0);
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       auto ptr_i = ptr + (little_endian ? i * bytesz :
@@ -1398,7 +1399,6 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
                         bool deref_check) {
   assert(!memory_unused());
   unsigned bytesz = bits_byte / 8;
-  assert(align % bytesz == 0);
   unsigned bytecount = getStoreByteSize(type);
 
   Pointer ptr(*this, p);
@@ -1411,13 +1411,15 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto ptr_i = ptr + byteofs;
-      member_vals.push_back(load(ptr_i(), aty->getChild(i), 1, false));
+      auto align_i = gcd(align, byteofs % align);
+      member_vals.push_back(load(ptr_i(), aty->getChild(i), align_i, false));
       byteofs += getStoreByteSize(aty->getChild(i));
     }
     assert(byteofs == bytecount);
     ret = aty->aggregateVals(member_vals);
 
   } else {
+    assert(align % bytesz == 0);
     vector<Byte> loadedBytes;
     bytecount /= bytesz;
     for (unsigned i = 0; i < bytecount; ++i) {
