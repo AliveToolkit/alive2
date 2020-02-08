@@ -2172,6 +2172,11 @@ StateValue Memcpy::toSMT(State &s) const {
   auto &[vbytes, np_bytes] = s[*bytes];
   s.addUB(vbytes.ugt(0).implies(np_dst && np_src));
   s.addUB(np_bytes);
+
+  if (vbytes.bits() > bits_size_t)
+    s.addUB(
+      vbytes.ule(expr::IntUMax(bits_size_t).zext(vbytes.bits() - bits_size_t)));
+
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
 }
