@@ -598,6 +598,10 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
 
   m.state->addUB(bytes == 0 || *UB());
 
+  // cannot store more bytes than address space
+  if (bytes0.bits() > bits_size_t)
+    m.state->addUB(bytes0.extract(bytes0.bits() - 1, bits_size_t) == 0);
+
   // address must be always aligned regardless of access size
   m.state->addUB(*is_aligned());
 

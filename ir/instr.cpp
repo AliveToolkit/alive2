@@ -2131,11 +2131,6 @@ StateValue Memset::toSMT(State &s) const {
   auto &[vbytes, np_bytes] = s[*bytes];
   s.addUB((vbytes != 0).implies(np_ptr));
   s.addUB(np_bytes);
-
-  if (vbytes.bits() > bits_size_t)
-    s.addUB(
-      vbytes.ule(expr::IntUMax(bits_size_t).zext(vbytes.bits() - bits_size_t)));
-
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align);
   return {};
 }
