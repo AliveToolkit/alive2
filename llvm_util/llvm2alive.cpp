@@ -4,17 +4,21 @@
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
+#include "util/sort.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
-#include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 using namespace llvm_util;
 using namespace IR;
+using namespace util;
 using namespace std;
 using llvm::cast, llvm::dyn_cast, llvm::isa;
 using llvm::LLVMContext;
@@ -366,7 +370,7 @@ public:
     RETURN_IDENTIFIER(move(inst));
   }
 
-  bool hasLifetimeStart(llvm::User &i, std::set<llvm::Value *> &visited) {
+  bool hasLifetimeStart(llvm::User &i, unordered_set<llvm::Value*> &visited) {
     for (auto I = i.user_begin(), E = i.user_end(); I != E; ++I) {
       llvm::User *U = *I;
       if (!visited.insert(U).second)
@@ -392,7 +396,7 @@ public:
     if (!ty)
       return error(i);
 
-    std::set<llvm::Value *> visited;
+    unordered_set<llvm::Value*> visited;
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
     RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
@@ -787,15 +791,38 @@ public:
       Fn.addInput(move(val));
     }
 
-    // create all BBs upfront to keep LLVM's order
-    // FIXME: this can go away once we have CFG analysis
-    for (auto &bb : f) {
-      Fn.getBB(value_name(bb));
+    // create all BBs upfront in topological order
+    vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;
+    {
+      edgesTy edges;
+      vector<llvm::BasicBlock*> bbs;
+      unordered_map<llvm::BasicBlock*, unsigned> bb_map;
+
+      auto bb_num = [&](llvm::BasicBlock *bb) {
+        auto [I, inserted] = bb_map.emplace(bb, bbs.size());
+        if (inserted) {
+          bbs.emplace_back(bb);
+          edges.emplace_back();
+        }
+        return I->second;
+      };
+
+      for (auto &bb : f) {
+        auto n = bb_num(&bb);
+        for (const auto &dst : llvm::successors(&bb)) {
+          auto n_dst = bb_num(dst);
+          edges[n].emplace(n_dst);
+        }
+      }
+
+      for (auto v : top_sort(edges)) {
+        sorted_bbs.emplace_back(&Fn.getBB(value_name(*bbs[v])), bbs[v]);
+      }
     }
 
-    for (auto &bb : f) {
-      BB = &Fn.getBB(value_name(bb));
-      for (auto &i : bb) {
+    for (auto &[alive_bb, llvm_bb] : sorted_bbs) {
+      BB = alive_bb;
+      for (auto &i : *llvm_bb) {
         if (auto I = visit(i)) {
           auto alive_i = I.get();
           BB->addInstr(move(I));
