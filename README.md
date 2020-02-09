@@ -12,7 +12,7 @@ Alive2 includes the following libraries:
 
 Included tools:
 * Alive drop-in replacement
-* Translation validation plugin for LLVM's `opt`
+* Translation validation plugins for clang and LLVM's `opt`
 * Standalone translation validation tool: `alive-tv`
 
 
@@ -55,9 +55,8 @@ LLVM can be built in the following way:
 ```
 cd llvm
 mkdir build
-cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DLLVM_BUILD_LLVM_DYLIB=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="llvm;clang" ../llvm
+cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="llvm;clang" ../llvm
 ```
-Note that `-DLLVM_BUILD_LLVM_DYLIB=ON` is optional, `-DBUILD_SHARED_LIBS=ON` works too.
 
 Alive2 should then be configured as follows:
 ```
