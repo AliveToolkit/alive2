@@ -110,7 +110,7 @@ public:
 class Input final : public Value {
 public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
-                   ReadOnly = 1 << 3 };
+                   ReadOnly = 1 << 3, ReadNone = 1 << 4 };
 private:
   std::string smt_name;
   unsigned attributes;

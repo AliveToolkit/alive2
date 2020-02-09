@@ -27,6 +27,7 @@ bool has_free;
 bool has_fncall;
 bool has_nocapture;
 bool has_readonly;
+bool has_readnone;
 bool has_dead_allocas;
 bool does_int_mem_access;
 bool does_ptr_mem_access;

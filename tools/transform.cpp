@@ -724,7 +724,8 @@ static void calculateAndInitConstants(Transform &t) {
   bool has_byval = has_attr(Input::ByVal);
   has_nocapture = has_attr(Input::NoCapture);
   has_readonly = has_attr(Input::ReadOnly);
-  bits_for_ptrattrs = has_nocapture + has_readonly;
+  has_readnone = has_attr(Input::ReadNone);
+  bits_for_ptrattrs = has_nocapture + has_readonly + has_readnone;
 
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals), false))

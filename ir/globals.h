@@ -49,6 +49,7 @@ extern bool has_fncall;
 /// Whether any function argument (not function call arg) has the attribute
 extern bool has_nocapture;
 extern bool has_readonly;
+extern bool has_readnone;
 
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;
