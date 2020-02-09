@@ -49,8 +49,8 @@ the ``-DZ3_INCLUDE_DIR=/path/to/z3/include`` argument to CMake
 Building and Running Translation Validation
 --------
 
-Alive2's `opt` translation validation requires a build of LLVM with RTTI and
-exceptions turned on.
+Alive2's `opt` and `clang` translation validation requires a build of LLVM with
+RTTI and exceptions turned on.
 LLVM can be built in the following way:
 ```
 cd llvm
@@ -63,6 +63,9 @@ Alive2 should then be configured as follows:
 ```
 cmake -GNinja -DLLVM_DIR=~/llvm/build/lib/cmake/llvm -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
 ```
+
+If you want to use Alive2 as a clang plugin, add `-DCLANG_PLUGIN=1` to the
+cmake command.
 
 
 Translation validation of a single test case:
@@ -82,6 +85,14 @@ Translation validation of the LLVM unit tests:
 
 ```
 ~/llvm/build/bin/llvm-lit -vv -Dopt=/home/user/alive2/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms
+```
+
+Running Alive2 as a Clang plugin:
+
+```
+$ clang -O3 <src.c> -S -emit-llvm \
+  -fpass-plugin=$HOME/alive2/build/tv/tv.so -fexperimental-new-pass-manager \
+  -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
 ```
 
 
