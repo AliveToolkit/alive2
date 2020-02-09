@@ -91,20 +91,10 @@ Running Alive2 as a Clang plugin:
 
 ```
 $ clang -O3 <src.c> -S -emit-llvm \
-  -fpass-plugin=$HOME/alive2/build/tv/tv.dylib -fexperimental-new-pass-manager \
-  -Xclang -load -Xclang $HOME/alive2/build/tv/tv.dylib \
-  -mllvm -tv-report-dir="build/logs" \
-  -mllvm -tv-exit-on-error
+  -fpass-plugin=$HOME/alive2/build/tv/tv.so -fexperimental-new-pass-manager \
+  -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
 ```
 
-If Alive2 finds an incorrect transformation, it will print a message like
-following:
-
-```
-$ clang -O3 ...<omitted>
-Report written to build/logs/a_2495581251.txt
-fatal error: error in backend: Alive2: Transform doesn't verify; aborting!
-```
 
 Running Standalone Translation Validation Tool (alive-tv)
 --------
