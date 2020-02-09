@@ -163,6 +163,7 @@ public:
   smt::expr is_heap_allocated() const;
   smt::expr is_nocapture() const;
   smt::expr is_readonly() const;
+  smt::expr is_readnone() const;
 
   void strip_attrs();
 

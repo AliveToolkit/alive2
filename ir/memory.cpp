@@ -318,6 +318,7 @@ static expr attr_to_bitvec(unsigned attributes) {
   };
   bits |= to_bit(has_nocapture, Input::NoCapture);
   bits |= to_bit(has_readonly, Input::ReadOnly);
+  bits |= to_bit(has_readnone, Input::ReadNone);
   return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
@@ -563,6 +564,7 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p,
   cond &= offset.add_no_uoverflow(bytes_off);
 
   cond &= p.is_block_alive();
+  cond &= !p.is_readnone();
 
   if (iswrite)
     cond &= p.is_writable() && !p.is_readonly();
@@ -806,6 +808,13 @@ expr Pointer::is_readonly() const {
   if (!has_readonly)
     return false;
   return p.extract(has_nocapture, has_nocapture) == 1;
+}
+
+expr Pointer::is_readnone() const {
+  if (!has_readnone)
+    return false;
+  unsigned idx = (unsigned)has_nocapture + (unsigned)has_readonly;
+  return p.extract(idx, idx) == 1;
 }
 
 void Pointer::strip_attrs() {
