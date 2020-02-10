@@ -372,10 +372,6 @@ expr Pointer::is_local() const {
   return p.extract(bit, bit) == 1;
 }
 
-expr Pointer::nonlocal_wf() const {
-  return get_short_bid().ule(m.num_nonlocals() - 1);
-}
-
 expr Pointer::get_bid() const {
   return p.extract(total_bits() - 1, bits_for_offset + bits_for_ptrattrs);
 }
@@ -973,7 +969,8 @@ static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
 
     val = expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
 
-    s.addAxiom(expr::mkForAll({ idx }, ptr_val.ptr().nonlocal_wf()));
+    s.addAxiom(expr::mkForAll({ idx },
+                    ptr_val.ptr().get_short_bid().ule(m.num_nonlocals() - 1)));
   } else {
     Byte byte(m, val.load(idx));
     s.addAxiom(expr::mkForAll({ idx }, !byte.is_ptr()));
@@ -981,11 +978,12 @@ static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
 #else
   Byte byte(m, val.load(idx));
   Pointer loadedptr = byte.ptr();
+  expr bid = loadedptr.get_short_bid();
   s.addAxiom(
     expr::mkForAll({ idx },
       byte.is_ptr().implies(!loadedptr.is_local() &&
                             !loadedptr.is_nocapture() &&
-                            loadedptr.nonlocal_wf())));
+                            bid.ule(m.num_nonlocals() - 1))));
 #endif
 }
 
@@ -1103,7 +1101,7 @@ expr Memory::mkInput(const char *name, unsigned attributes) const {
   Pointer p(*this, name, false, false, attr_to_bitvec(attributes));
   if (attributes & Input::NonNull)
     state->addAxiom(p.isNonZero());
-  state->addAxiom(p.nonlocal_wf());
+  state->addAxiom(p.get_short_bid().ule(num_nonlocals() - 1));
 
   return p.release();
 }
@@ -1146,7 +1144,8 @@ Memory::mkFnRet(const char *name, const vector<StateValue> &ptr_inputs) const {
   }
 
   state->addAxiom(expr::mkIf(p.is_local(),
-                             expr::mk_or(local), p.nonlocal_wf()));
+                             expr::mk_or(local),
+                             p.get_short_bid().ule(num_nonlocals() - 1)));
   return { p.release(), move(var) };
 }
 
@@ -1536,19 +1535,7 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
   expr offset = ptr.get_offset();
   expr ret(true);
 
-  auto is_constglb = [](const Memory &m, unsigned bid) {
-    return
-      find(m.non_local_blk_nonwritable.begin(),
-           m.non_local_blk_nonwritable.end(), bid) !=
-        m.non_local_blk_nonwritable.end();
-  };
-
-  for (unsigned bid = 1; bid < IR::num_nonlocals; ++bid) {
-    if (!is_constglb(*this, bid) && is_constglb(other, bid)) {
-      // bid is introduced as a constant global in target.
-      // Skip refinement check in this case.
-      continue;
-    }
+  for (unsigned bid = 1; bid < IR::num_nonlocals_src; ++bid) {
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
@@ -1556,6 +1543,16 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
       continue;
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
+
+  auto is_constglb = [](const Memory &m, unsigned bid) {
+    return
+      find(m.non_local_blk_nonwritable.begin(),
+           m.non_local_blk_nonwritable.end(), bid) !=
+        m.non_local_blk_nonwritable.end();
+  };
+
+  for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
+    assert(!is_constglb(*this, bid) && is_constglb(other, bid));
 
   // restrict refinement check to set of request blocks
   if (set_ptrs) {
