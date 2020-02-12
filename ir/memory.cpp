@@ -1544,6 +1544,7 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
 
+#ifndef NDEBUG
   auto is_constglb = [](const Memory &m, unsigned bid) {
     return
       find(m.non_local_blk_nonwritable.begin(),
@@ -1553,6 +1554,7 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
 
   for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
     assert(!is_constglb(*this, bid) && is_constglb(other, bid));
+#endif
 
   // restrict refinement check to set of request blocks
   if (set_ptrs) {
