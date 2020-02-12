@@ -231,8 +231,7 @@ public:
   void finishInitialization();
   void mkAxioms(const Memory &other) const;
 
-  static void resetGlobalData();
-  static void resetLocalBids();
+  static void resetBids(unsigned last_nonlocal);
 
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, unsigned attributes) const;
@@ -285,6 +284,8 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr check_nocapture() const;
+
+  unsigned num_nonlocals() const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

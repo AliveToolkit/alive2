@@ -19,7 +19,7 @@ State::State(Function &f, bool source)
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {
-  Memory::resetGlobalData();
+  Memory::resetBids(1);
 }
 
 const StateValue& State::exec(const Value &v) {
@@ -338,7 +338,8 @@ void State::syncSEdataWithSrc(const State &src) {
 
   fn_call_data = src.fn_call_data;
 
-  Memory::resetLocalBids();
+  // The bid of tgt global starts with num_nonlocals_src
+  Memory::resetBids(num_nonlocals_src);
 }
 
 void State::mkAxioms(State &tgt) {
