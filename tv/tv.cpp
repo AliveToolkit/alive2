@@ -121,12 +121,10 @@ struct TVPass final : public llvm::FunctionPass {
     if (is_clangtv) {
       // When used as a clang plugin, this is run as a plain function rather
       // than a registered pass, so getAnalysis() cannot be used.
-      TLI =
-        new llvm::TargetLibraryInfo(
-          llvm::TargetLibraryInfoImpl(
-            llvm::Triple(F.getParent()->getTargetTriple())),
-          &F);
-      TLI_holder = unique_ptr<llvm::TargetLibraryInfo>(TLI);
+      TLI_holder
+        = make_unique<llvm::TargetLibraryInfo>(llvm::TargetLibraryInfoImpl(
+           llvm::Triple(F.getParent()->getTargetTriple())), &F);
+      TLI = TLI_holder.get();
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
@@ -292,7 +290,7 @@ bool TVFinalizePass::finalized = false;
 
 // Extracting Module out of IR unit.
 // Excerpted from LLVM's StandardInstrumentation.cpp
-static const llvm::Module * unwrapModule(llvm::Any IR) {
+const llvm::Module * unwrapModule(llvm::Any IR) {
   using namespace llvm;
 
   if (any_isa<const Module *>(IR))
@@ -309,7 +307,7 @@ static const llvm::Module * unwrapModule(llvm::Any IR) {
   llvm_unreachable("Unknown IR unit");
 }
 
-static bool do_skip(const llvm::StringRef &ref) {
+bool do_skip(const llvm::StringRef &ref) {
   const vector<string_view> pass_list = {
     "::TVInitPass", "::TVFinalizePass",
     "ArgumentPromotionPass", "DeadArgumentEliminationPass",
