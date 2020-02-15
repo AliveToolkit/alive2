@@ -1800,7 +1800,7 @@ unique_ptr<Instr> Alloc::dup(const string &suffix) const {
 
 
 vector<Value*> Malloc::operands() const {
-  if (!isRealloc)
+  if (!ptr)
     return { size };
   else
     return { ptr, size };
@@ -1808,12 +1808,12 @@ vector<Value*> Malloc::operands() const {
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
-  if (isRealloc)
+  if (ptr)
     RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
-  if (!isRealloc)
+  if (!ptr)
     os << getName() << " = malloc " << *size;
   else
     os << getName() << " = realloc " << *ptr << ", " << *size;
@@ -1826,7 +1826,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np_size,
                                                 nonnull);
 
-  if (!isRealloc) {
+  if (!ptr) {
     if (isNonNull) {
       // TODO: In C++ we need to throw an exception if the allocation fails,
       // but exception hasn't been modeled yet
@@ -1865,12 +1865,13 @@ expr Malloc::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforcePtrType() &&
          size->getType().enforceIntType() &&
-         (isRealloc ? ptr->getType().enforcePtrType() : true);
+         (ptr ? ptr->getType().enforcePtrType() : true);
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
-  return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr,
-                             isNonNull, isRealloc);
+  if (ptr)
+    return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr);
+  return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
 }
 
 
