@@ -684,7 +684,7 @@ static void calculateAndInitConstants(Transform &t) {
 
         if (auto alloc = dynamic_cast<const Malloc*>(&I)) {
           has_malloc |= true;
-          has_free |= alloc->isReallocCall();
+          has_free |= alloc->isRealloc();
         }
 
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
