@@ -1808,15 +1808,16 @@ vector<Value*> Malloc::operands() const {
 
 void Malloc::rauw(const Value &what, Value &with) {
   RAUW(size);
-  if (ptr)
-    RAUW(ptr);
+  RAUW(ptr);
 }
 
 void Malloc::print(std::ostream &os) const {
+  os << getName();
   if (!ptr)
-    os << getName() << " = malloc " << *size;
+    os << " = malloc ";
   else
-    os << getName() << " = realloc " << *ptr << ", " << *size;
+    os << " = realloc " << *ptr << ", ";
+  os << *size;
 }
 
 StateValue Malloc::toSMT(State &s) const {
@@ -1832,14 +1833,9 @@ StateValue Malloc::toSMT(State &s) const {
       // but exception hasn't been modeled yet
       s.addPre(move(allocated));
     }
-
-    return { move(p_new), expr(np_size) };
   } else {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
-
-    // If sz > p_sz, it is filled it with poison in malloc (local_block_val is
-    // initialized with poison).
 
     Pointer ptr(s.getMemory(), p);
     expr p_sz = ptr.block_size();
@@ -1849,16 +1845,14 @@ StateValue Malloc::toSMT(State &s) const {
                                   expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext),
                                   expr::mkUInt(0, p_sz.bits()));
 
-    // If memcpy's size is zero, then both ptrs can be NULL.
-    s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, false);
+    s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, true);
 
     // 1) realloc(ptr, 0) always free the ptr.
     // 2) If allocation failed, we should not free previous ptr.
     expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    s.getMemory().free(expr::mkIf((sz == 0) || allocated, p, nullp), true);
-
-    return { move(p_new), expr(np_size) };
+    s.getMemory().free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
   }
+  return { move(p_new), expr(np_size) };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
