@@ -687,7 +687,11 @@ static void calculateAndInitConstants(Transform &t) {
         if (auto alloc = dynamic_cast<const Alloc*>(&I))
           has_dead_allocas |= alloc->initDead();
 
-        has_malloc |= dynamic_cast<const Malloc*>(&I) != nullptr;
+        if (auto alloc = dynamic_cast<const Malloc*>(&I)) {
+          has_malloc |= true;
+          has_free |= alloc->isRealloc();
+        }
+
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
         has_load   |= dynamic_cast<const Load*>(&I) != nullptr;

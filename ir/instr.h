@@ -399,15 +399,20 @@ public:
 
 
 class Malloc final : public Instr {
-  Value *size;
+  Value *ptr = nullptr, *size;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
-  bool isNonNull;
+  bool isNonNull = false;
+
 public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
     : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
 
+  Malloc(Type &type, std::string &&name, Value &ptr, Value &size)
+    : Instr(type, std::move(name)), ptr(&ptr), size(&size) {}
+
   Value& getSize() const { return *size; }
+  bool isRealloc() const { return ptr != nullptr; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
