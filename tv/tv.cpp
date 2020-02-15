@@ -208,8 +208,10 @@ struct TVPass final : public llvm::FunctionPass {
 
       out_file = ofstream(path);
       out = &out_file;
-      if (!out_file.is_open())
-        llvm::report_fatal_error("Alive2: Couldn't open report file!");
+      if (!out_file.is_open()) {
+        cerr << "Alive2: Couldn't open report file!" << endl;
+        exit(1);
+      }
 
       report_filename = path;
       *out << "Source: " << source_file << endl;
@@ -246,8 +248,10 @@ struct TVPass final : public llvm::FunctionPass {
     smt_init.reset();
     --initialized;
 
-    if (has_failure)
-      llvm::report_fatal_error("Alive2: Transform doesn't verify; aborting!");
+    if (has_failure) {
+      cerr << "Alive2: Transform doesn't verify; aborting!" << endl;
+      exit(1);
+    }
     return false;
   }
 
