@@ -402,23 +402,23 @@ class Malloc final : public Instr {
   Value *ptr = nullptr, *size;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
-  bool isNonNull = false, isRealloc = false;
+  bool isNonNull = false;
 
 public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
     : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
 
   Malloc(Type &type, std::string &&name, Value &ptr, Value &size)
-    : Instr(type, std::move(name)), ptr(&ptr), size(&size), isRealloc(true) {}
+    : Instr(type, std::move(name)), ptr(&ptr), size(&size) {}
 
   Value& getSize() const { return *size; }
+  bool isRealloc() const { return ptr != nullptr; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-  bool isReallocCall() const { return isRealloc; }
 };
 
 
