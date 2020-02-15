@@ -15,6 +15,11 @@ using namespace util;
 
 static unsigned ptr_next_idx = 0;
 
+static unsigned zero_bits_offset() {
+  assert(is_power2(bits_byte));
+  return ilog2(bits_byte / 8);
+}
+
 static bool byte_has_ptr_bit() {
   return does_int_mem_access && does_ptr_mem_access;
 }
@@ -330,9 +335,9 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
   if (unique_name)
     name += '!' + to_string(ptr_next_idx++);
 
-  unsigned bits = total_bits() - ptr_has_local_bit() - bits_for_ptrattrs;
-  p = prepend_if(local.toBVBool(), expr::mkVar(name.c_str(), bits),
-                 ptr_has_local_bit());
+  p = prepend_if(local.toBVBool(),
+                 expr::mkVar(name.c_str(), total_bits_short()),
+                 ptr_has_local_bit()).concat_zeros(zero_bits_offset());
   if (bits_for_ptrattrs)
     p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
   assert(!local.isValid() || p.bits() == total_bits());
@@ -361,6 +366,10 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 
 unsigned Pointer::total_bits() {
   return bits_for_ptrattrs + bits_for_bid + bits_for_offset;
+}
+
+unsigned Pointer::total_bits_short() {
+  return bits_shortbid() + bits_for_offset - zero_bits_offset();
 }
 
 expr Pointer::is_local() const {
@@ -445,7 +454,9 @@ expr Pointer::block_size() const {
 }
 
 expr Pointer::short_ptr() const {
-  return p.extract(total_bits() - 1 - ptr_has_local_bit(), bits_for_ptrattrs);
+  auto off = zero_bits_offset();
+  return p.extract(total_bits() - 1 - ptr_has_local_bit(),
+                   bits_for_ptrattrs + off);
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -936,7 +947,7 @@ static bool memory_unused() {
 
 static expr mk_block_val_array() {
   return expr::mkArray("blk_val",
-                       expr::mkUInt(0, bits_shortbid() + bits_for_offset),
+                       expr::mkUInt(0, Pointer::total_bits_short()),
                        expr::mkUInt(0, Byte::bitsByte()));
 }
 
@@ -1000,7 +1011,7 @@ Memory::Memory(State &state) : state(&state) {
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
   local_block_val
-    = expr::mkConstArray(expr::mkUInt(0, bits_shortbid() + bits_for_offset),
+    = expr::mkConstArray(expr::mkUInt(0, Pointer::total_bits_short()),
                          Byte::mkPoisonByte(*this)());
 
   // all local blocks are dead in the beginning

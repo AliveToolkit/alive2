@@ -76,7 +76,7 @@ public:
 class Pointer {
   const Memory &m;
 
-  // [bid, offset, is-readonly, is-nocapture]
+  // [bid, offset, attributes (1 bit for each)]
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -104,6 +104,7 @@ public:
           const smt::expr &attrs = smt::expr());
 
   static unsigned total_bits();
+  static unsigned total_bits_short();
 
   smt::expr is_local() const;
 
