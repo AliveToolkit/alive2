@@ -408,8 +408,7 @@ public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
     : Instr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
 
-  Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
-         bool isNonNull = false, bool isRealloc = true)
+  Malloc(Type &type, std::string &&name, Value &ptr, Value &size)
     : Instr(type, std::move(name)), ptr(&ptr), size(&size), isRealloc(true) {}
 
   Value& getSize() const { return *size; }
