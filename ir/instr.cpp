@@ -1870,7 +1870,7 @@ expr Malloc::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
   if (ptr)
-    return make_unique<Malloc>(getType(), getName() + suffix, *size, *ptr);
+    return make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size);
   return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
 }
 
