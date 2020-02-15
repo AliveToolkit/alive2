@@ -1,4 +1,4 @@
-; TEST-ARGS: -disable-poison-input
+; TEST-ARGS: -disable-undef-input
 
 define i8* @f(i64 %size) {
 entry:
