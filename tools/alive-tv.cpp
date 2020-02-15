@@ -279,7 +279,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return result;
 }
 
-void optimizeModule(llvm::Module *M) {
+static void optimizeModule(llvm::Module *M) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;

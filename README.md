@@ -69,11 +69,11 @@ cmake command.
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll 
+~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
 On a Mac:
 ```
-~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll 
+~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -161,7 +161,6 @@ $ ./alive-tv foo.ll
 
 ----------------------------------------
 define i3 @foo(i3 %0) {
-%1:
   %x1 = sub i3 0, %0
   %x2 = icmp ne i3 %0, 0
   %x3 = zext i1 %x2 to i3
@@ -171,7 +170,6 @@ define i3 @foo(i3 %0) {
 }
 =>
 define i3 @foo(i3 %0) {
-%1:
   %x1 = sub i3 0, %0
   ret i3 %x1
 }
@@ -197,5 +195,4 @@ Summary:
   0 correct transformations
   1 incorrect transformations
   0 errors
-$ 
 ```
