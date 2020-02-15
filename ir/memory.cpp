@@ -390,8 +390,7 @@ expr Pointer::get_offset_sizet() const {
 }
 
 expr Pointer::get_attrs() const {
-  assert(bits_for_ptrattrs > 0);
-  return p.extract(bits_for_ptrattrs - 1, 0);
+  return bits_for_ptrattrs ? p.extract(bits_for_ptrattrs - 1, 0) : expr();
 }
 
 expr Pointer::get_value(const char *name, const FunctionExpr &local_fn,
@@ -451,7 +450,7 @@ expr Pointer::short_ptr() const {
 
 Pointer Pointer::operator+(const expr &bytes) const {
   return { m, get_bid(), get_offset() + bytes.zextOrTrunc(bits_for_offset),
-           bits_for_ptrattrs ? get_attrs() : expr() };
+           get_attrs() };
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
@@ -1434,8 +1433,8 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
     vector<Byte> loadedBytes;
     bytecount /= bytesz;
     for (unsigned i = 0; i < bytecount; ++i) {
-      auto ptr_i = ptr + (little_endian ? i * bytesz :
-                                          (bytecount - i - 1) * bytesz);
+      auto ptr_i = ptr + (little_endian ? i * bytesz
+                                        : (bytecount - i - 1) * bytesz);
       loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
                                              non_local_block_val));
     }
@@ -1463,17 +1462,23 @@ static expr ptr_deref_within(const Pointer &idx, const Pointer &ptr,
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align) {
   assert(!memory_unused());
-  assert(bits_byte == 8);
   assert(!val.isValid() || val.bits() == 8);
+  unsigned bytesz = bits_byte / 8;
   Pointer ptr(*this, p);
   ptr.is_dereferenceable(bytesize, align, true);
 
-  vector<Byte> bytes = valueToBytes(val, IntType("", bits_byte), *this, state);
+  auto wval = val;
+  for (unsigned i = 1; i < bytesz; ++i) {
+    wval = wval.concat(val);
+  }
+  assert(!val.isValid() || wval.bits() == bits_byte);
+
+  auto bytes = valueToBytes(wval, IntType("", bits_byte), *this, state);
   assert(bytes.size() == 1);
 
   uint64_t n;
-  if (bytesize.isUInt(n) && n <= 4) {
-    for (unsigned i = 0; i < n; ++i) {
+  if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
+    for (unsigned i = 0; i < n; i += bytesz) {
       store(ptr + i, bytes[0](), local_block_val, non_local_block_val);
     }
   } else {

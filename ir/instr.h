@@ -532,6 +532,7 @@ public:
             align(align) {}
 
   Value& getBytes() const { return *bytes; }
+  unsigned getAlign() const { return align; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

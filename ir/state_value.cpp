@@ -37,7 +37,9 @@ StateValue StateValue::zextOrTrunc(unsigned tobw) const {
 }
 
 StateValue StateValue::concat(const StateValue &other) const {
-  return { value.concat(other.value), non_poison.concat(other.non_poison) };
+  return { value.concat(other.value),
+           non_poison.isBool() ? expr(non_poison)
+                               : non_poison.concat(other.non_poison) };
 }
 
 bool StateValue::isValid() const {

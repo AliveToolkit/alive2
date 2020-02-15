@@ -563,10 +563,16 @@ static uint64_t get_access_size(const Type &ty) {
 
 static uint64_t get_access_size(const Instr &inst) {
   if (dynamic_cast<const Calloc*>(&inst) ||
-      dynamic_cast<const Memcpy*>(&inst) ||
-      dynamic_cast<const Memset*>(&inst)) {
+      dynamic_cast<const Memcpy *>(&inst)) {
     // TODO
     does_int_mem_access = true;
+    return 1;
+  }
+
+  if (auto i = dynamic_cast<const Memset*>(&inst)) {
+    does_int_mem_access = true;
+    if (auto bytes = get_int(i->getBytes()))
+      return gcd(i->getAlign(), *bytes);
     return 1;
   }
 
@@ -579,8 +585,7 @@ static uint64_t get_access_size(const Instr &inst) {
   } else if (auto ld = dynamic_cast<const Load*>(&inst)) {
     value_ty = &ld->getType();
     align = ld->getAlign();
-  }
-  else
+  } else
     return 0;
 
   does_ptr_mem_access |= hasPtr(*value_ty);
@@ -769,28 +774,29 @@ static void calculateAndInitConstants(Transform &t) {
   little_endian = t.src.isLittleEndian();
 
   if (config::debug)
-    config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst << "\n"
-                     "num_locals: " << num_locals << "\n"
-                     "num_nonlocals_src: " << num_nonlocals_src << "\n"
-                     "num_nonlocals: " << num_nonlocals << "\n"
-                     "bits_for_bid: " << bits_for_bid << "\n"
-                     "bits_for_offset: " << bits_for_offset << "\n"
-                     "bits_program_pointer: " << bits_program_pointer << "\n"
-                     "max_alloc_size: " << max_alloc_size << "\n"
-                     "max_mem_access: " << max_mem_access << "\n"
-                     "bits_size_t: " << bits_size_t << "\n"
-                     "bits_byte: " << bits_byte << "\n"
-                     "little_endian: " << little_endian << "\n"
-                     "nullptr_is_used: " << nullptr_is_used << "\n"
-                     "has_int2ptr: " << has_int2ptr << "\n"
-                     "has_ptr2int: " << has_ptr2int << "\n"
-                     "has_malloc: " << has_malloc << "\n"
-                     "has_free: " << has_free << "\n"
-                     "does_ptr_store: " << does_ptr_store << "\n"
-                     "does_ptr_mem_access: " << does_ptr_mem_access << "\n"
-                     "does_int_mem_access: " << does_int_mem_access << "\n"
-                     "does_sub_byte_access: " << does_sub_byte_access << "\n"
-    ;
+    config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst
+                  << "\nnum_locals: " << num_locals
+                  << "\nnum_nonlocals_src: " << num_nonlocals_src
+                  << "\nnum_nonlocals: " << num_nonlocals
+                  << "\nbits_for_bid: " << bits_for_bid
+                  << "\nbits_for_offset: " << bits_for_offset
+                  << "\nbits_size_t: " << bits_size_t
+                  << "\nbits_program_pointer: " << bits_program_pointer
+                  << "\nmax_alloc_size: " << max_alloc_size
+                  << "\nmin_access_size: " << min_access_size
+                  << "\nmax_mem_access: " << max_mem_access
+                  << "\nbits_byte: " << bits_byte
+                  << "\nlittle_endian: " << little_endian
+                  << "\nnullptr_is_used: " << nullptr_is_used
+                  << "\nhas_int2ptr: " << has_int2ptr
+                  << "\nhas_ptr2int: " << has_ptr2int
+                  << "\nhas_malloc: " << has_malloc
+                  << "\nhas_free: " << has_free
+                  << "\ndoes_ptr_store: " << does_ptr_store
+                  << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
+                  << "\ndoes_int_mem_access: " << does_int_mem_access
+                  << "\ndoes_sub_byte_access: " << does_sub_byte_access
+                  << "\n";
 }
 
 
