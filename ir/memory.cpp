@@ -330,14 +330,16 @@ static expr attr_to_bitvec(unsigned attributes) {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
-                 bool unique_name, const expr &attr) : m(m) {
+                 bool unique_name, bool align, const expr &attr) : m(m) {
   string name = var_name;
   if (unique_name)
     name += '!' + to_string(ptr_next_idx++);
 
+  unsigned bits = total_bits_short() + !align * zero_bits_offset();
   p = prepend_if(local.toBVBool(),
-                 expr::mkVar(name.c_str(), total_bits_short()),
-                 ptr_has_local_bit()).concat_zeros(zero_bits_offset());
+                 expr::mkVar(name.c_str(), bits), ptr_has_local_bit());
+  if (align)
+    p = p.concat_zeros(zero_bits_offset());
   if (bits_for_ptrattrs)
     p = p.concat(attr.isValid() ? attr : expr::mkUInt(0, bits_for_ptrattrs));
   assert(!local.isValid() || p.bits() == total_bits());
@@ -959,7 +961,7 @@ static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
   if (!does_ptr_mem_access)
     return;
 
-  auto idx = Pointer(m, "#idx", false, false, expr()).short_ptr();
+  auto idx = Pointer(m, "#idx", false, false).short_ptr();
 #if 0
   if (m.num_nonlocals() > 0) {
     expr is_ptr = does_int_mem_access
@@ -1108,7 +1110,7 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, unsigned attributes) const {
-  Pointer p(*this, name, false, false, attr_to_bitvec(attributes));
+  Pointer p(*this, name, false, false, false, attr_to_bitvec(attributes));
   if (attributes & Input::NonNull)
     state->addAxiom(p.isNonZero());
   state->addAxiom(p.get_short_bid().ule(num_nonlocals() - 1));
