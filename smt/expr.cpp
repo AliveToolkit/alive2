@@ -1472,6 +1472,7 @@ expr expr::mkRecFnApp(const char *name, const vector<expr> &argdefs,
                                   num_args, z3_sorts.data(), range.sort());
   expr f_app = Z3_mk_app(ctx(), decl, num_args, z3_args.data());
   expr fbody = funbody(f_app)();
+  C2(fbody);
   Z3_add_rec_def(ctx(), decl, num_args, z3_argdefs.data(), fbody());
   return f_app;
 }
