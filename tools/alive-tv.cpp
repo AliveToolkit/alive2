@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
   cerr << "Summary:\n"
           "  " << goodCount << " correct transformations\n"
           "  " << badCount << " incorrect transformations\n"
-          "  " << errorCount << " errors\n";
+          "  " << errorCount << " Alive2 errors\n";
 
   if (opt_smt_stats)
     smt::solver_print_stats(cerr);
