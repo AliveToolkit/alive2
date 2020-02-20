@@ -44,6 +44,11 @@ define i8 @f6_2(i8* %p) {
   ret i8 %b
 }
 
+define i8 @f6_3() {
+  %b = call i8 @g2(i8* byval @glb)
+  ret i8 %b
+}
+
 define void @f7() {
   %ptr = call i8* @k()
   %a = load i8, i8* %ptr, align 4

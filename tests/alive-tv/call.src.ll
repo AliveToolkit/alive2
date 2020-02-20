@@ -48,6 +48,13 @@ define i8 @f6_2(i8* %p) {
   ret i8 %b
 }
 
+define i8 @f6_3() {
+  %a = alloca i8
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* @glb, i64 1, i1 false)
+  %b = call i8 @g2(i8* byval %a)
+  ret i8 %b
+}
+
 define void @f7() {
   %ptr = call i8* @k()
   %a = load i8, i8* %ptr, align 4
