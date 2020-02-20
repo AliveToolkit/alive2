@@ -1587,7 +1587,7 @@ Memory::refined(const Memory &other,
     for (auto &itm: *set_ptrs) {
       // TODO: deal with the byval arg case (itm.second)
       auto &ptr = itm.first;
-      c |= (ptr.non_poison && Pointer(*this, ptr.value).get_bid() == ptr_bid);
+      c |= ptr.non_poison && Pointer(*this, ptr.value).get_bid() == ptr_bid;
     }
     ret = c.implies(ret);
   }

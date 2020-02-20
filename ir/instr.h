@@ -177,8 +177,7 @@ public:
   enum ArgFlags { ArgNone = 0, ArgByVal = 1 << 0 };
 private:
   std::string fnName;
-  std::vector<Value*> args;
-  std::vector<unsigned> argflags;
+  std::vector<std::pair<Value*, unsigned>> args;
   unsigned flags;
   bool valid;
 public:

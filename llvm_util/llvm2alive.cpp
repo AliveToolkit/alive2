@@ -261,8 +261,8 @@ public:
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
                                     !known);
     auto argI = fn->arg_begin(), argE = fn->arg_end();
-    for (unsigned idx = 0, cnt = i.getNumArgOperands(); idx != cnt; ++idx) {
-      auto a = get_operand(i.getArgOperand(idx));
+    for (auto &arg : i.args()) {
+      auto a = get_operand(arg);
       if (!a)
         return error(i);
 

@@ -1113,17 +1113,19 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 
 
 void FnCall::addArg(Value &arg, unsigned flags) {
-  args.emplace_back(&arg);
-  argflags.emplace_back(flags);
+  args.emplace_back(&arg, flags);
 }
 
 vector<Value*> FnCall::operands() const {
-  return args;
+  vector<Value*> output;
+  transform(args.begin(), args.end(), back_inserter(output),
+            [](auto &p){ return p.first; });
+  return output;
 }
 
 void FnCall::rauw(const Value &what, Value &with) {
   for (auto &arg : args) {
-    RAUW(arg);
+    RAUW(arg.first);
   }
 }
 
@@ -1135,8 +1137,7 @@ void FnCall::print(ostream &os) const {
 
   bool first = true;
   for (unsigned i = 0, sz = args.size(); i != sz; ++i) {
-    auto arg = args[i];
-    auto flag = argflags[i];
+    auto [arg, flag] = args[i];
     if (!first)
       os << ", ";
 
@@ -1217,8 +1218,7 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
   for (unsigned i = 0, sz = args.size(); i < sz; ++i) {
-    auto arg = args[i];
-    auto flag = argflags[i];
+    auto [arg, flag] = args[i];
     unpack_inputs(s, arg->getType(), flag, s[*arg], inputs, ptr_inputs);
     fnName_mangled << "#" << arg->getType().toString();
   }
@@ -1242,7 +1242,6 @@ unique_ptr<Instr> FnCall::dup(const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
                                flags, valid);
   r->args = args;
-  r->argflags = argflags;
   return r;
 }
 

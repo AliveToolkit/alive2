@@ -375,7 +375,11 @@ void State::mkAxioms(State &tgt) {
           // need to be compared
           auto &[ptr_in, is_byval] = ptr_ins[i];
           auto &[ptr_in2, is_byval2] = ptr_ins2[i];
-          (void)is_byval;
+          if (!is_byval && is_byval2) {
+            // byval is added at target; this is not supported yet.
+            refines = false;
+            break;
+          }
           expr eq_val = Pointer(mem, ptr_in.value)
                       .fninput_refined(Pointer(mem2, ptr_in2.value), is_byval2);
           is_val_eq &= eq_val;
