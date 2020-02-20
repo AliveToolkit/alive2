@@ -37,6 +37,8 @@ void sym_exec(State &s) {
       continue;
 
     for (auto &i : bb->instrs()) {
+      if (first && dynamic_cast<const JumpInstr *>(&i))
+        s.finishInitializer();
       auto val = s.exec(i);
       auto &name = i.getName();
 
@@ -44,8 +46,6 @@ void sym_exec(State &s) {
         cout << name << " = " << val << '\n';
     }
 
-    if (first)
-      s.finishInitializer();
     first = false;
   }
 
