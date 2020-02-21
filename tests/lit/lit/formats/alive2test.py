@@ -49,20 +49,29 @@ class Alive2Test(TestFormat):
       filepath = os.path.join(source_path, filename)
       if not filename.startswith('.') and \
           not os.path.isdir(filepath) and \
-          (filename.endswith('.opt') or filename.endswith('.src.ll')):
+          (filename.endswith('.opt') or filename.endswith('.src.ll') or
+           filename.endswith('.srctgt.ll')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
 
 
   def execute(self, test, litConfig):
     test = test.getSourcePath()
 
-    alive_tv = test.endswith('.src.ll')
-    if alive_tv:
+    alive_tv_1 = test.endswith('.srctgt.ll')
+    if alive_tv_1:
       cmd = ['./alive-tv']
       ok_string = 'Transformation seems to be correct!'
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
-    else:
+
+    alive_tv_2 = test.endswith('.src.ll')
+    if alive_tv_2:
+      cmd = ['./alive-tv']
+      ok_string = 'Transformation seems to be correct!'
+      if not os.path.isfile('alive-tv'):
+        return lit.Test.UNSUPPORTED, ''
+
+    if not alive_tv_1 and not alive_tv_2:
       cmd = ['./alive']
       ok_string = 'Optimization is correct!'
 
@@ -73,7 +82,7 @@ class Alive2Test(TestFormat):
     if m != None:
       cmd += m.group(1).split()
 
-    if alive_tv:
+    if alive_tv_2:
        # Run identity check first
        srcpath = test
        invalid_expr = 'Invalid expr'
@@ -92,7 +101,7 @@ class Alive2Test(TestFormat):
 
 
     cmd.append(test)
-    if alive_tv:
+    if alive_tv_2:
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
     out, err, exitCode = executeCommand(cmd)
 

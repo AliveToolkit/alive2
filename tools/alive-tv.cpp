@@ -40,7 +40,7 @@ opt_file1(llvm::cl::Positional, llvm::cl::desc("first_bitcode_file"),
     llvm::cl::cat(opt_alive));
 
 static llvm::cl::opt<string>
-opt_file2(llvm::cl::Positional, llvm::cl::desc("second_bitcode_file"),
+opt_file2(llvm::cl::Positional, llvm::cl::desc("[second_bitcode_file]"),
     llvm::cl::Optional, llvm::cl::value_desc("filename"),
     llvm::cl::cat(opt_alive));
 
@@ -300,6 +300,39 @@ static void optimizeModule(llvm::Module *M) {
   MPM.run(*M, MAM);
 }
 
+static llvm::Function *findFunction(llvm::Module &M, const std::string FName) {
+  for (auto &F : M) {
+    if (F.isDeclaration())
+      continue;
+    if (FName.compare(F.getName()) != 0)
+      continue;
+    return &F;
+  }
+  return 0;
+}
+
+static const char *Usage =
+R"EOF(Alive2 stand-alone translation validator:
+
+This program takes either one or two LLVM IR files files as
+command-line arguments. Both .bc and .ll files are supported.
+
+If two files are provided, alive-tv checks that functions in the
+second file refine functions in the first file, matching up functions
+by name. Functions not found in both files are ignored. It is an error
+for a function to be found in both files unless they have the same
+signature.
+
+If one file is provided, there are two possibilities. If the file
+contains a function called "src" and also a function called "tgt",
+then alive-tv will determine whether src is refined by tgt. It is an
+error if src and tgt do not have the same signature. Otherwise,
+alive-tv will optimize the entire module using an optimization
+pipeline similar to -O2, and then verify that functions in the
+optimized module refine those in the original one. This provides a
+convenient way to demonstrate an existing optimizer bug.
+)EOF";
+
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
@@ -308,15 +341,7 @@ int main(int argc, char **argv) {
   llvm::LLVMContext Context;
 
   llvm::cl::HideUnrelatedOptions(opt_alive);
-  llvm::cl::ParseCommandLineOptions(argc, argv,
-    "Alive2 stand-alone translation validator:\n\n"
-    "This program takes either one or two LLVM IR files files as\n"
-    "command-line arguments. Both .bc and .ll files are supported. If two\n"
-    "files are provided, alive-tv checks that the second file refines the\n"
-    "first one. If one file is provided, alive-tv optimizes it using an\n"
-    "-O2 optimization pipeline and then verifies that the optimized code\n"
-    "refines the original code. This provides a convenient way to\n"
-    "demonstrate an optimizer bug.\n");
+  llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
   smt::solver_print_queries(opt_smt_verbose);
   smt::solver_tactic_verbose(opt_tactic_verbose);
@@ -335,8 +360,24 @@ int main(int argc, char **argv) {
 
   std::unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
-    M2 = CloneModule(*M1);
-    optimizeModule(M2.get());
+    auto SRC = findFunction(*M1, "src");
+    auto TGT = findFunction(*M1, "tgt");
+    if (SRC && TGT) {
+      auto &DL = M1.get()->getDataLayout();
+      auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
+
+      llvm_util::initializer llvm_util_init(cerr, DL);
+      smt_init.emplace();
+
+      unsigned goodCount = 0, badCount = 0, errorCount = 0;
+      bool result = compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
+                                     errorCount);
+      // exit alive-tv
+      return result;
+    } else {
+      M2 = CloneModule(*M1);
+      optimizeModule(M2.get());
+    }
   } else {
     M2 = openInputFile(Context, opt_file2);
     if (!M2.get())
