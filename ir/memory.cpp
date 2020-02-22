@@ -552,6 +552,9 @@ expr Pointer::is_aligned(unsigned align) const {
   if (align == 1)
     return true;
 
+  if (isUndef(get_offset()))
+    return false;
+
   auto bits = min(ilog2(align), bits_for_offset);
 
   if (!observes_addresses())

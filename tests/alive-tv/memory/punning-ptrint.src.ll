@@ -1,3 +1,5 @@
+; TEST-ARGS: -smt-to=5000
+
 define i8 @ptr_int_punning(i8** %pptr, i64 %n) {
   %ptr = alloca i8
   store i8* %ptr, i8** %pptr
