@@ -1720,7 +1720,11 @@ ostream& operator<<(ostream &os, const expr &e) {
 }
 
 bool expr::operator<(const expr &rhs) const {
-  C(rhs);
+  if (!isValid()) {
+    return rhs.isValid();
+  }
+  if (!rhs.isValid())
+    return false;
   assert((id() == rhs.id()) == eq(rhs));
   return id() < rhs.id();
 }

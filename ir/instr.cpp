@@ -1535,7 +1535,7 @@ StateValue Phi::toSMT(State &s) const {
   for (auto &[val, bb] : values) {
     // check if this was a jump from unreachable BB
     if (auto pre = s.jumpCondFrom(s.getFn().getBB(bb)))
-      ret.add(s[*val], *pre);
+      ret.add(s[*val], (*pre)());
   }
   return *ret();
 }

@@ -27,10 +27,26 @@ class Function;
 class State {
 public:
   using ValTy = std::pair<StateValue, std::set<smt::expr>>;
-  // DomainTy: (reachability from entry to this basic block, undef vars)
-  using DomainTy = std::pair<smt::expr, std::set<smt::expr>>;
 
 private:
+  struct CurrentDomain {
+    smt::expr path; // path from fn entry
+    smt::AndExpr UB;
+    std::set<smt::expr> undef_vars;
+
+    smt::expr operator()() const;
+    operator bool() const;
+    void reset();
+  };
+
+  struct DomainPreds {
+    smt::OrExpr path;
+    smt::DisjointExpr<smt::expr> UB;
+    std::set<smt::expr> undef_vars;
+
+    smt::expr operator()() const;
+  };
+
   // TODO: make this const again
   Function &f;
   bool source;
@@ -50,7 +66,8 @@ private:
   // dst BB -> src BB -> (domain data, memory)
   std::unordered_map<const BasicBlock*,
                      std::unordered_map<const BasicBlock*,
-                                        std::pair<DomainTy, Memory>>>
+                                        std::pair<DomainPreds,
+                                                  smt::DisjointExpr<Memory>>>>
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
@@ -58,7 +75,7 @@ private:
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
 
   // temp state
-  DomainTy domain;
+  CurrentDomain domain;
   Memory memory;
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 32> tmp_values;
@@ -89,7 +106,7 @@ public:
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
   const ValTy& at(const Value &val) const;
-  const smt::expr* jumpCondFrom(const BasicBlock &bb) const;
+  const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);

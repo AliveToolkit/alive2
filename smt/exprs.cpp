@@ -44,12 +44,20 @@ void AndExpr::del(const AndExpr &other) {
     exprs.erase(e);
 }
 
+void AndExpr::reset() {
+  exprs.clear();
+}
+
 bool AndExpr::contains(const expr &e) const {
   return exprs.count(e);
 }
 
 expr AndExpr::operator()() const {
   return expr::mk_and(exprs);
+}
+
+AndExpr::operator bool() const {
+  return !exprs.count(false);
 }
 
 ostream &operator<<(ostream &os, const AndExpr &e) {
@@ -60,6 +68,10 @@ ostream &operator<<(ostream &os, const AndExpr &e) {
 void OrExpr::add(expr &&e) {
   if (!e.isFalse())
     exprs.insert(move(e));
+}
+
+void OrExpr::add(const OrExpr &other) {
+  exprs.insert(other.exprs.begin(), other.exprs.end());
 }
 
 expr OrExpr::operator()() const {

@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include <cassert>
 #include <map>
 #include <ostream>
 #include <set>
@@ -23,8 +24,10 @@ public:
   void add(expr &&e);
   void add(const AndExpr &other);
   void del(const AndExpr &other);
+  void reset();
   bool contains(const expr &e) const;
   expr operator()() const;
+  operator bool() const;
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
 };
 
@@ -34,6 +37,7 @@ class OrExpr {
 
 public:
   void add(expr &&e);
+  void add(const OrExpr &other);
   expr operator()() const;
   friend std::ostream &operator<<(std::ostream &os, const OrExpr &e);
 };
@@ -62,6 +66,14 @@ public:
                                           std::forward<D>(domain));
     if (!inserted)
       I->second |= std::forward<D>(domain);
+  }
+
+  template <typename D>
+  void add_disj(const DisjointExpr<T> &other, D &&domain) {
+    assert(!default_val && !other.default_val);
+    for (auto &[v, d] : other.vals) {
+      add(v, d && std::forward<D>(domain));
+    }
   }
 
   std::optional<T> operator()() const {

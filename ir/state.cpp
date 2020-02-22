@@ -14,6 +14,25 @@ using namespace std;
 
 namespace IR {
 
+expr State::CurrentDomain::operator()() const {
+  return path && UB();
+}
+
+State::CurrentDomain::operator bool() const {
+  return !path.isFalse() && UB;
+}
+
+void State::CurrentDomain::reset() {
+  path = true;
+  UB.reset();
+  undef_vars.clear();
+}
+
+expr State::DomainPreds::operator()() const {
+  return path() && *UB();
+}
+
+
 State::State(Function &f, bool source)
   : f(f), source(source), memory(*this),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
@@ -79,10 +98,10 @@ const State::ValTy& State::at(const Value &val) const {
   return get<1>(values[values_map.at(&val)]);
 }
 
-const expr* State::jumpCondFrom(const BasicBlock &bb) const {
+const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   auto &pres = predecessor_data.at(current_bb);
   auto I = pres.find(&bb);
-  return I == pres.end() ? nullptr : &I->second.first.first;
+  return I == pres.end() ? nullptr : &I->second.first.path;
 }
 
 bool State::startBB(const BasicBlock &bb) {
@@ -90,30 +109,33 @@ bool State::startBB(const BasicBlock &bb) {
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
 
-  if (&f.getFirstBB() == &bb) {
-    domain.first = true;
+  domain.reset();
+
+  if (&f.getFirstBB() == &bb)
     return true;
-  }
 
   auto I = predecessor_data.find(&bb);
   if (I == predecessor_data.end())
     return false;
 
-  domain.first = false;
-  domain.second.clear();
-
   DisjointExpr<Memory> in_memory;
+  DisjointExpr<expr> UB;
+  OrExpr path;
 
   for (auto &[src, data] : I->second) {
     (void)src;
     auto &[dom, mem] = data;
-    auto &[cond, vars] = dom;
-    domain.first |= cond;
-    domain.second.insert(vars.begin(), vars.end());
-    in_memory.add(mem, cond);
+    path.add(dom.path);
+    expr p = dom.path();
+    UB.add_disj(dom.UB, p);
+    in_memory.add_disj(mem, move(p));
+    domain.undef_vars.insert(dom.undef_vars.begin(), dom.undef_vars.end());
   }
 
-  if (domain.first.isFalse())
+  domain.path = path();
+  domain.UB.add(*UB());
+
+  if (!domain)
     return false;
 
   memory = *in_memory();
@@ -127,55 +149,52 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
     dst = &f.getBB("#sink");
   }
 
-  cond &= domain.first;
-  auto p = predecessor_data[dst].try_emplace(current_bb, DomainTy({}, {}),
-                                             memory);
-  if (!p.second) {
-    p.first->second.second = Memory::mkIf(cond, memory, p.first->second.second);
-    p.first->second.first.first |= move(cond);
-    p.first->second.first.second.insert(undef_vars.begin(), undef_vars.end());
-  } else {
-    p.first->second.first.first  = move(cond);
-    p.first->second.first.second = undef_vars;
-  }
-  p.first->second.first.second.insert(domain.second.begin(),
-                                      domain.second.end());
+  cond &= domain.path;
+  auto &data = predecessor_data[dst][current_bb];
+  data.second.add(memory, cond);
+  data.first.UB.add(domain.UB(), cond);
+  data.first.path.add(move(cond));
+  data.first.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  data.first.undef_vars.insert(domain.undef_vars.begin(),
+                               domain.undef_vars.end());
 }
 
 void State::addJump(const BasicBlock &dst) {
   addJump(dst, true);
-  domain.first = false;
+  addUB(false);
 }
 
 void State::addJump(StateValue &&cond, const BasicBlock &dst) {
-  addJump(dst, move(cond.value) && move(cond.non_poison));
+  addUB(move(cond.non_poison));
+  addJump(dst, move(cond.value));
 }
 
 void State::addCondJump(const StateValue &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
-  addJump(dst_true,  cond.value == 1 && cond.non_poison);
-  addJump(dst_false, cond.value == 0 && cond.non_poison);
-  domain.first = false;
+  addUB(cond.non_poison);
+  addJump(dst_true,  cond.value == 1);
+  addJump(dst_false, cond.value == 0);
+  addUB(false);
 }
 
 void State::addReturn(const StateValue &val) {
-  return_val.add(val, domain.first);
-  return_memory.add(memory, domain.first);
-  return_domain.add(move(domain.first));
+  return_val.add(val, domain.path);
+  return_memory.add(memory, domain.path);
+  return_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
-  return_undef_vars.insert(domain.second.begin(), domain.second.end());
+  return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
-  domain.first = false;
+  addUB(false);
 }
 
 void State::addUB(expr &&ub) {
-  domain.first &= move(ub);
-  domain.second.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(move(ub));
+  domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addUB(const expr &ub) {
-  domain.first &= ub;
-  domain.second.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(ub);
+  domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 const vector<StateValue>
@@ -300,12 +319,12 @@ expr State::sinkDomain() const {
   if (I == predecessor_data.end())
     return false;
 
-  expr ret(false);
+  OrExpr ret;
   for (auto &[src, data] : I->second) {
     (void)src;
-    ret |= data.first.first;
+    ret.add(data.first());
   }
-  return ret;
+  return ret();
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {
@@ -401,7 +420,7 @@ void State::mkAxioms(State &tgt) {
   }
 }
 
-expr State::simplifyWithAxioms(smt::expr &&e) const {
+expr State::simplifyWithAxioms(expr &&e) const {
   return axioms.contains(e) ? expr(true) : move(e);
 }
 

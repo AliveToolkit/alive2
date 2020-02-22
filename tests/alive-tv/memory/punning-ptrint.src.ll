@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=5000
+; TEST-ARGS: -disable-poison-input
 
 define i8 @ptr_int_punning(i8** %pptr, i64 %n) {
   %ptr = alloca i8
