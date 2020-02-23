@@ -668,7 +668,7 @@ static void calculateAndInitConstants(Transform &t) {
   // Mininum access size (in bytes)
   uint64_t min_access_size = 8;
   bool does_mem_access = false;
-  bool has_load = false;
+  bool has_ptr_load = false;
   does_sub_byte_access = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
@@ -694,8 +694,9 @@ static void calculateAndInitConstants(Transform &t) {
 
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
-        has_load   |= dynamic_cast<const Load*>(&I) != nullptr;
         has_fncall |= dynamic_cast<const FnCall*>(&I) != nullptr;
+        if (auto *load = dynamic_cast<const Load*>(&I))
+          has_ptr_load |= hasPtr(load->getType());
 
         does_sub_byte_access |= has_sub_byte(I.getType());
 
@@ -709,8 +710,8 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals_src > 0 || nullptr_is_used || has_malloc || has_load ||
-      has_fncall)
+  if (num_nonlocals_src > 0 || num_globals > 0 ||
+      nullptr_is_used || has_malloc || has_ptr_load || has_fncall)
     ++num_nonlocals_src;
 
   // Allow at least one non-const global for calls to change
