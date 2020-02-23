@@ -1136,12 +1136,11 @@ void FnCall::print(ostream &os) const {
   os << "call " << print_type(getType()) << fnName << '(';
 
   bool first = true;
-  for (unsigned i = 0, sz = args.size(); i != sz; ++i) {
-    auto [arg, flag] = args[i];
+  for (auto &[arg, flags] : args) {
     if (!first)
       os << ", ";
 
-    if (flag & ArgByVal)
+    if (flags & ArgByVal)
       os << "byval ";
     os << *arg;
     first = false;
