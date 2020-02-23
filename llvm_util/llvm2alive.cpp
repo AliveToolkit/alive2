@@ -721,6 +721,7 @@ public:
         break;
 
       // non-relevant for correctness
+      case LLVMContext::MD_loop:
       case LLVMContext::MD_misexpect:
       case LLVMContext::MD_prof:
       case LLVMContext::MD_unpredictable:
