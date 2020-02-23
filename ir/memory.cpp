@@ -700,7 +700,7 @@ expr Pointer::refined(const Pointer &other) const {
                         *this == other));
 }
 
-expr Pointer::fninput_refined(const Pointer &other) const {
+expr Pointer::fninput_refined(const Pointer &other, bool is_byval_arg) const {
   expr size = block_size();
   expr off = get_offset_sizet();
   expr size2 = other.block_size();
@@ -719,7 +719,7 @@ expr Pointer::fninput_refined(const Pointer &other) const {
                                            (size2 - off2).uge(size - off),
                                          off2.sgt(size2) && off == off2 &&
                                            size2.uge(size))));
-  local = (other.is_local() || other.is_byval()) && local;
+  local = (other.is_local() || other.is_byval() || is_byval_arg) && local;
 
   // TODO: this induces an infinite loop
   // block_refined(other);
@@ -1142,16 +1142,18 @@ pair<expr, expr> Memory::mkUndefInput(unsigned attributes) const {
 }
 
 pair<expr,expr>
-Memory::mkFnRet(const char *name, const vector<StateValue> &ptr_inputs) const {
+Memory::mkFnRet(const char *name,
+                const vector<pair<StateValue, bool>> &ptr_inputs) const {
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
 
   set<expr> local;
   for (auto &in : ptr_inputs) {
-    Pointer inp(*this, in.value);
+    // TODO: callee cannot observe the bid if this is byval.
+    Pointer inp(*this, in.first.value);
     if (!inp.is_local().isFalse())
-      local.emplace(in.non_poison && p.get_bid() == inp.get_bid());
+      local.emplace(in.first.non_poison && p.get_bid() == inp.get_bid());
   }
   for (unsigned i = 0; i < num_locals; ++i) {
     if (escaped_local_blks[i])
@@ -1178,7 +1180,7 @@ expr Memory::CallState::implies(const CallState &st) const {
 }
 
 Memory::CallState
-Memory::mkCallState(const vector<StateValue> *ptr_inputs) const {
+Memory::mkCallState(const vector<pair<StateValue, bool>> *ptr_inputs) const {
   Memory::CallState st;
   st.empty = false;
 
@@ -1192,7 +1194,9 @@ Memory::mkCallState(const vector<StateValue> *ptr_inputs) const {
 
     if (ptr_inputs) {
       modifies = false;
-      for (auto &arg : *ptr_inputs) {
+      for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+        // TODO: byval's value cannot be modified.
+        (void)is_byval_arg;
         Pointer argp(*this, arg.value);
         modifies |= arg.non_poison && argp.get_bid() == p.get_bid();
       }
@@ -1218,7 +1222,9 @@ Memory::mkCallState(const vector<StateValue> *ptr_inputs) const {
     expr modifies = p.is_heap_allocated();
     if (ptr_inputs) {
       expr c(false);
-      for (auto &arg : *ptr_inputs) {
+      for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+        // TODO: liveness of a pointer given as byval doesn't change
+        (void)is_byval_arg;
         c |= arg.non_poison &&
              Pointer(*this, arg.value).get_bid() == p.get_bid();
       }
@@ -1545,8 +1551,9 @@ expr Memory::int2ptr(const expr &val) {
   return {};
 }
 
-pair<expr,Pointer> Memory::refined(const Memory &other,
-                                   const vector<StateValue> *set_ptrs) const {
+pair<expr,Pointer>
+Memory::refined(const Memory &other,
+                const vector<pair<StateValue, bool>> *set_ptrs) const {
   if (IR::num_nonlocals <= 1)
     return { true, Pointer(*this, expr()) };
 
@@ -1580,7 +1587,9 @@ pair<expr,Pointer> Memory::refined(const Memory &other,
   // restrict refinement check to set of request blocks
   if (set_ptrs) {
     expr c(false);
-    for (auto &ptr : *set_ptrs) {
+    for (auto &itm: *set_ptrs) {
+      // TODO: deal with the byval arg case (itm.second)
+      auto &ptr = itm.first;
       c |= ptr.non_poison && Pointer(*this, ptr.value).get_bid() == ptr_bid;
     }
     ret = c.implies(ret);
