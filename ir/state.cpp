@@ -134,13 +134,9 @@ bool State::startBB(const BasicBlock &bb) {
 
   domain.path = path();
   domain.UB.add(*UB());
-
-  if (!domain)
-    return false;
-
   memory = *in_memory();
 
-  return true;
+  return domain;
 }
 
 void State::addJump(const BasicBlock &dst0, expr &&cond) {
@@ -322,7 +318,7 @@ expr State::sinkDomain() const {
   OrExpr ret;
   for (auto &[src, data] : I->second) {
     (void)src;
-    ret.add(data.first());
+    ret.add(data.first.path());
   }
   return ret();
 }
@@ -363,7 +359,7 @@ void State::syncSEdataWithSrc(const State &src) {
 
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
-  memory.mkAxioms(tgt.memory);
+  returnMemory().mkAxioms(tgt.returnMemory());
 
   // axioms for function calls
   // We would potentially need to do refinement check of tgt x tgt, but it
