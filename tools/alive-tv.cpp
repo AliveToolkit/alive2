@@ -358,7 +358,14 @@ int main(int argc, char **argv) {
     llvm::report_fatal_error(
       "Could not read bitcode from '" + opt_file1 + "'");
 
-  std::unique_ptr<llvm::Module> M2;
+  auto &DL = M1.get()->getDataLayout();
+
+  llvm_util::initializer llvm_util_init(cerr, DL);
+  smt_init.emplace();
+
+  bool result = false;
+
+  unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
     auto SRC = findFunction(*M1, "src");
     auto TGT = findFunction(*M1, "tgt");
@@ -370,11 +377,9 @@ int main(int argc, char **argv) {
       smt_init.emplace();
 
       unsigned goodCount = 0, badCount = 0, errorCount = 0;
-      bool result = compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
-                                     errorCount);
-      smt_init.reset();
-      // exit alive-tv
-      return result;
+      result = compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
+                                errorCount);
+      goto end;
     } else {
       M2 = CloneModule(*M1);
       optimizeModule(M2.get());
@@ -389,13 +394,8 @@ int main(int argc, char **argv) {
   if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
     llvm::report_fatal_error("Modules have different target triple");
 
-  auto &DL = M1.get()->getDataLayout();
+  {
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
-
-  llvm_util::initializer llvm_util_init(cerr, DL);
-  smt_init.emplace();
-
-  bool result = false;
   unsigned goodCount = 0, badCount = 0, errorCount = 0;
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
@@ -416,7 +416,8 @@ int main(int argc, char **argv) {
           "  " << goodCount << " correct transformations\n"
           "  " << badCount << " incorrect transformations\n"
           "  " << errorCount << " Alive2 errors\n";
-
+  }
+end:
   if (opt_smt_stats)
     smt::solver_print_stats(cerr);
 
