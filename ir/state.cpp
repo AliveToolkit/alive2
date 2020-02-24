@@ -134,7 +134,8 @@ bool State::startBB(const BasicBlock &bb) {
 
   domain.path = path();
   domain.UB.add(*UB());
-  memory = *in_memory();
+  if (domain)
+    memory = *in_memory();
 
   return domain;
 }
