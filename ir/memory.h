@@ -143,7 +143,7 @@ public:
   StateValue uge(const Pointer &rhs) const;
   StateValue ugt(const Pointer &rhs) const;
 
-  smt::expr inbounds(bool simplify_ptr = false);
+  smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
   smt::expr block_alignment() const; // log(bits)
   smt::expr is_block_aligned(unsigned align, bool exact = false) const;
   smt::expr is_aligned(unsigned align) const;

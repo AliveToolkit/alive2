@@ -462,6 +462,15 @@ static optional<int64_t> get_int(const Value &val) {
 
 static uint64_t max_mem_access, max_alloc_size;
 
+static uint64_t get_globalvar_size(const Value *V) {
+  auto cop = dynamic_cast<const ConversionOp *>(V);
+  if (cop && cop->getOp() == ConversionOp::BitCast)
+    return get_globalvar_size(&cop->getValue());
+  if (auto glb = dynamic_cast<const GlobalVariable *>(V))
+    return glb->size();
+  return UINT64_MAX;
+}
+
 static uint64_t max_gep(const Instr &inst) {
   if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
     // if addresses are observed, then expose full ptr range
@@ -504,6 +513,11 @@ static uint64_t max_gep(const Instr &inst) {
       max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
     else
       max_mem_access = UINT64_MAX;
+    return 0;
+  }
+  if (auto slen = dynamic_cast<const Strlen *>(&inst)) {
+    max_mem_access = max(max_mem_access,
+                         get_globalvar_size(slen->getPointer()));
     return 0;
   }
 
@@ -571,6 +585,9 @@ static uint64_t get_access_size(const Instr &inst) {
     return 1;
   }
 
+  if (dynamic_cast<const Strlen*>(&inst))
+    return 1;
+
   if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
 #if 0
     if (auto bytes = get_int(i->getBytes()))
@@ -582,7 +599,6 @@ static uint64_t get_access_size(const Instr &inst) {
   }
 
   if (auto i = dynamic_cast<const Malloc*>(&inst)) {
-    // FIXME: memcpy doesn't have multi-byte support
     if (i->isRealloc())
       return 1;
   }
@@ -795,6 +811,8 @@ static void calculateAndInitConstants(Transform &t) {
   bits_byte = 8 * ((does_mem_access || num_globals != 0)
                      ? (unsigned)min_access_size : 1);
 
+  strlen_unroll_cnt = 10;
+
   little_endian = t.src.isLittleEndian();
 
   if (config::debug)
@@ -810,6 +828,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmin_access_size: " << min_access_size
                   << "\nmax_mem_access: " << max_mem_access
                   << "\nbits_byte: " << bits_byte
+                  << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
                   << "\nlittle_endian: " << little_endian
                   << "\nnullptr_is_used: " << nullptr_is_used
                   << "\nhas_int2ptr: " << has_int2ptr

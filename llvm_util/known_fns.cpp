@@ -47,6 +47,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
     RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
                                       UnaryOp::Copy));
+  case llvm::LibFunc_strlen:
+    RETURN_KNOWN(make_unique<Strlen>(*ty, value_name(i), *args[0]));
   default:
     RETURN_FAIL_KNOWN();
   }
