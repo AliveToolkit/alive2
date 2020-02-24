@@ -140,6 +140,9 @@ bool State::startBB(const BasicBlock &bb) {
 }
 
 void State::addJump(const BasicBlock &dst0, expr &&cond) {
+  if (cond.isFalse())
+    return;
+
   auto dst = &dst0;
   if (seen_bbs.count(dst)) {
     dst = &f.getBB("#sink");
