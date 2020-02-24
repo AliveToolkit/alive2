@@ -372,6 +372,7 @@ int main(int argc, char **argv) {
       unsigned goodCount = 0, badCount = 0, errorCount = 0;
       bool result = compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
                                      errorCount);
+      smt_init.reset();
       // exit alive-tv
       return result;
     } else {
