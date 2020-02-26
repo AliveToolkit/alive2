@@ -271,7 +271,7 @@ public:
                   bool deref_check = true);
 
   // raw load
-  Byte load(const Pointer &p);
+  Byte load(const Pointer &p) const;
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align);
@@ -279,8 +279,8 @@ public:
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);
 
-  smt::expr ptr2int(const smt::expr &ptr);
-  smt::expr int2ptr(const smt::expr &val);
+  smt::expr ptr2int(const smt::expr &ptr) const;
+  smt::expr int2ptr(const smt::expr &val) const;
 
   std::pair<smt::expr,Pointer>
     refined(const Memory &other,

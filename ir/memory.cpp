@@ -937,7 +937,7 @@ static void store_lambda(const Pointer &p, const expr &cond, const expr &val,
                   expr::mkIf(!is_local && cond, val, non_local.load(idx)));
 }
 
-static expr load(const Pointer &p, expr &local, expr &non_local) {
+static expr load(const Pointer &p, const expr &local, const expr &non_local) {
   auto idx = p.short_ptr();
   return expr::mkIf(p.is_local(), local.load(idx), non_local.load(idx));
 }
@@ -1465,7 +1465,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
   return state->rewriteUndef(move(ret));
 }
 
-Byte Memory::load(const Pointer &p) {
+Byte Memory::load(const Pointer &p) const {
   return { *this, ::load(p, local_block_val, non_local_block_val) };
 }
 
@@ -1540,12 +1540,12 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   }
 }
 
-expr Memory::ptr2int(const expr &ptr) {
+expr Memory::ptr2int(const expr &ptr) const {
   assert(!memory_unused());
   return Pointer(*this, ptr).get_address();
 }
 
-expr Memory::int2ptr(const expr &val) {
+expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused());
   // TODO
   return {};
