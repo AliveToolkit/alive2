@@ -147,8 +147,9 @@ public:
   smt::expr block_alignment() const; // log(bits)
   smt::expr is_block_aligned(unsigned align, bool exact = false) const;
   smt::expr is_aligned(unsigned align) const;
-  void is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
-  void is_dereferenceable(const smt::expr &bytes, unsigned align, bool iswrite);
+  smt::AndExpr is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
+  smt::AndExpr is_dereferenceable(const smt::expr &bytes, unsigned align,
+                                  bool iswrite);
   void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
   smt::expr is_block_alive() const;
@@ -267,8 +268,8 @@ public:
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align, bool deref_check = true);
-  StateValue load(const smt::expr &ptr, const Type &type, unsigned align,
-                  bool deref_check = true);
+  std::pair<StateValue, smt::AndExpr> load(const smt::expr &ptr,
+      const Type &type, unsigned align);
 
   // raw load
   Byte load(const Pointer &p) const;

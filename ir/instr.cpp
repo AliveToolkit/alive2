@@ -1206,7 +1206,7 @@ static StateValue pack_return(Type &ty, vector<StateValue> &vals,
 
 StateValue FnCall::toSMT(State &s) const {
   if (!valid) {
-    s.addUB({});
+    s.addUB(expr());
     return {};
   }
 
@@ -1671,7 +1671,7 @@ StateValue Switch::toSMT(State &s) const {
   }
 
   s.addJump({ move(default_cond), expr(val.non_poison) }, default_target);
-  s.addUB(false);
+  s.addUB(expr(false));
   return {};
 }
 
@@ -2109,7 +2109,9 @@ void Load::print(std::ostream &os) const {
 StateValue Load::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
-  return s.getMemory().load(p, getType(), align);
+  auto [sv, ub] = s.getMemory().load(p, getType(), align);
+  s.addUB(move(ub));
+  return sv;
 }
 
 expr Load::getTypeConstraints(const Function &f) const {
