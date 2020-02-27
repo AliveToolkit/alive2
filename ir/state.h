@@ -123,6 +123,7 @@ public:
   void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
+  void addUB(smt::AndExpr &&ubs);
   void addOOM(smt::expr &&oom) { ooms.add(std::move(oom)); }
 
   const std::vector<StateValue>

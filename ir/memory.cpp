@@ -594,8 +594,8 @@ static pair<expr, expr> is_dereferenceable(const Pointer &p,
 }
 
 // When bytes is 0, pointer is always derefenceable
-void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
-                                 bool iswrite) {
+AndExpr Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
+                                    bool iswrite) {
   expr bytes_off = bytes0.zextOrTrunc(bits_for_offset);
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
@@ -613,24 +613,28 @@ void Pointer::is_dereferenceable(const expr &bytes0, unsigned align,
     is_aligned.add(move(aligned), domain);
   }
 
-  m.state->addUB(bytes == 0 || *UB());
+  AndExpr exprs;
+  exprs.add(bytes == 0 || *UB());
 
   // cannot store more bytes than address space
   if (bytes0.bits() > bits_size_t)
-    m.state->addUB(bytes0.extract(bytes0.bits() - 1, bits_size_t) == 0);
+    exprs.add(bytes0.extract(bytes0.bits() - 1, bits_size_t) == 0);
 
   // address must be always aligned regardless of access size
-  m.state->addUB(*is_aligned());
+  exprs.add(*is_aligned());
 
   // trim set of valid ptrs
   if (auto ptrs = all_ptrs())
     p = *ptrs;
   else
     p = expr::mkUInt(0, total_bits());
+
+  return exprs;
 }
 
-void Pointer::is_dereferenceable(unsigned bytes, unsigned align, bool iswrite) {
-  is_dereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite);
+AndExpr Pointer::is_dereferenceable(unsigned bytes, unsigned align,
+                                    bool iswrite) {
+  return is_dereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite);
 }
 
 // general disjoint check for unsigned integer
@@ -1398,8 +1402,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   unsigned bytesz = bits_byte / 8;
 
   if (deref_check)
-    ptr.is_dereferenceable(getStoreByteSize(type), align,
-                           !state->isInitializationPhase());
+    state->addUB(ptr.is_dereferenceable(getStoreByteSize(type), align,
+                                        !state->isInitializationPhase()));
 
   if (auto aty = type.getAsAggregateType()) {
     unsigned byteofs = 0;
@@ -1427,15 +1431,14 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   }
 }
 
-StateValue Memory::load(const expr &p, const Type &type, unsigned align,
-                        bool deref_check) {
+pair<StateValue, AndExpr>
+Memory::load(const expr &p, const Type &type, unsigned align) {
   assert(!memory_unused());
   unsigned bytesz = bits_byte / 8;
   unsigned bytecount = getStoreByteSize(type);
 
   Pointer ptr(*this, p);
-  if (deref_check)
-    ptr.is_dereferenceable(bytecount, align, false);
+  auto ubs = ptr.is_dereferenceable(bytecount, align, false);
 
   StateValue ret;
   if (auto aty = type.getAsAggregateType()) {
@@ -1444,7 +1447,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto ptr_i = ptr + byteofs;
       auto align_i = gcd(align, byteofs % align);
-      member_vals.push_back(load(ptr_i(), aty->getChild(i), align_i, false));
+      member_vals.push_back(load(ptr_i(), aty->getChild(i), align_i).first);
       byteofs += getStoreByteSize(aty->getChild(i));
     }
     assert(byteofs == bytecount);
@@ -1462,7 +1465,7 @@ StateValue Memory::load(const expr &p, const Type &type, unsigned align,
     }
     ret = bytesToValue(*this, loadedBytes, type);
   }
-  return state->rewriteUndef(move(ret));
+  return { state->rewriteUndef(move(ret)), move(ubs) };
 }
 
 Byte Memory::load(const Pointer &p) const {
@@ -1487,7 +1490,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   assert(!val.isValid() || val.bits() == 8);
   unsigned bytesz = bits_byte / 8;
   Pointer ptr(*this, p);
-  ptr.is_dereferenceable(bytesize, align, true);
+  state->addUB(ptr.is_dereferenceable(bytesize, align, true));
 
   auto wval = val;
   for (unsigned i = 1; i < bytesz; ++i) {
@@ -1515,8 +1518,8 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   assert(!memory_unused());
   assert(bits_byte == 8);
   Pointer dst(*this, d), src(*this, s);
-  dst.is_dereferenceable(bytesize, align_dst, true);
-  src.is_dereferenceable(bytesize, align_src, false);
+  state->addUB(dst.is_dereferenceable(bytesize, align_dst, true));
+  state->addUB(src.is_dereferenceable(bytesize, align_src, false));
   if (!is_move)
     src.is_disjoint(bytesize, dst, bytesize);
 
