@@ -31,6 +31,7 @@ if (CYGWIN)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
 endif()
 
+find_package(ZLIB)
 find_package(Z3 4.8.5 REQUIRED)
 include_directories(${Z3_INCLUDE_DIR})
 

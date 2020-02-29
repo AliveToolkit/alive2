@@ -24,6 +24,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include <fstream>
 #include <iostream>
 #include <utility>
 
@@ -83,6 +84,10 @@ static llvm::cl::opt<unsigned> opt_max_mem(
 static llvm::cl::opt<bool> opt_bidirectional("bidirectional",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Run refinement check in both directions"));
+
+static llvm::cl::opt<string> opt_outputfile("o",
+    llvm::cl::init(""), llvm::cl::cat(opt_alive),
+    llvm::cl::desc("Specify output filename"));
 
 static llvm::ExitOnError ExitOnErr;
 
@@ -197,13 +202,13 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
 
 static optional<smt::smt_initializer> smt_init;
 
-static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
+static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
                              llvm::Triple &targetTriple, unsigned &goodCount,
                              unsigned &badCount, unsigned &errorCount) {
   if (cmpTypes(F1.getFunctionType(), F2.getFunctionType(), &F1, &F2)) {
     cerr << "ERROR: Only functions with identical signatures can be checked\n";
     ++errorCount;
-    return true;
+    return;
   }
 
   TransformPrintOpts print_opts;
@@ -214,7 +219,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     cerr << "ERROR: Could not translate '" << F1.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
-    return true;
+    return;
   }
 
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
@@ -223,7 +228,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     cerr << "ERROR: Could not translate '" << F2.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
-    return true;
+    return;
   }
 
   smt_init->reset();
@@ -239,7 +244,7 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
       cerr << "Transformation doesn't verify!\n"
               "ERROR: program doesn't type check!\n\n";
       ++errorCount;
-      return true;
+      return;
     }
     assert(types.hasSingleTyping());
   }
@@ -275,8 +280,6 @@ static bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
         cerr << "These functions are equivalent.\n\n";
     }
   }
-
-  return result;
 }
 
 static void optimizeModule(llvm::Module *M) {
@@ -353,6 +356,13 @@ int main(int argc, char **argv) {
   config::disable_poison_input = opt_disable_poison;
   config::debug = opt_debug;
 
+  // optionally, redirect cout and cerr to user-specified file 
+  if (!opt_outputfile.empty()) {
+    std::ofstream *OutFile = new std::ofstream(opt_outputfile);
+    std::cout.rdbuf(OutFile->rdbuf());
+    std::cerr.rdbuf(OutFile->rdbuf());
+  }
+  
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get())
     llvm::report_fatal_error(
@@ -363,7 +373,7 @@ int main(int argc, char **argv) {
   llvm_util::initializer llvm_util_init(cerr, DL);
   smt_init.emplace();
 
-  bool result = false;
+  unsigned goodCount = 0, badCount = 0, errorCount = 0;
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
@@ -376,9 +386,8 @@ int main(int argc, char **argv) {
       llvm_util::initializer llvm_util_init(cerr, DL);
       smt_init.emplace();
 
-      unsigned goodCount = 0, badCount = 0, errorCount = 0;
-      result = compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
-                                errorCount);
+      compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
+                       errorCount);
       goto end;
     } else {
       M2 = CloneModule(*M1);
@@ -396,7 +405,6 @@ int main(int argc, char **argv) {
 
   {
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
-  unsigned goodCount = 0, badCount = 0, errorCount = 0;
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
   for (auto &F1 : *M1.get()) {
@@ -406,8 +414,7 @@ int main(int argc, char **argv) {
       if (F2.isDeclaration() ||
           F1.getName() != F2.getName())
         continue;
-      result |= compareFunctions(F1, F2, targetTriple, goodCount, badCount,
-                                 errorCount);
+      compareFunctions(F1, F2, targetTriple, goodCount, badCount, errorCount);
       break;
     }
   }
@@ -417,11 +424,12 @@ int main(int argc, char **argv) {
           "  " << badCount << " incorrect transformations\n"
           "  " << errorCount << " Alive2 errors\n";
   }
+
 end:
   if (opt_smt_stats)
     smt::solver_print_stats(cerr);
 
   smt_init.reset();
 
-  return result;
+  return errorCount > 0;
 }

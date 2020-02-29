@@ -112,6 +112,10 @@ class Alive2Test(TestFormat):
     if chk != None and (out + err).find(chk.group(1).strip()) == -1:
       return lit.Test.FAIL, out + err
 
+    # wrong
+    if expect_err != None and xfail is None:
+      return lit.Test.PASS, ''
+
     if expect_err is None and xfail is None:
       if exitCode == 0 and (out + err).find(ok_string) != -1:
         return lit.Test.PASS, ''
