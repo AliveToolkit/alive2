@@ -572,9 +572,19 @@ static uint64_t get_access_size(const Instr &inst) {
   }
 
   if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
+#if 0
     if (auto bytes = get_int(i->getBytes()))
       return gcd(gcd(i->getSrcAlign(), i->getDstAlign()), *bytes);
+#endif
+    // FIXME: memcpy doesn't have multi-byte support
+    (void)i;
     return 1;
+  }
+
+  if (auto i = dynamic_cast<const Malloc*>(&inst)) {
+    // FIXME: memcpy doesn't have multi-byte support
+    if (i->isRealloc())
+      return 1;
   }
 
   if (auto i = dynamic_cast<const Memset*>(&inst)) {
