@@ -253,7 +253,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
                   writes_memory
                   ? memory.mkCallState(argmemonly ? &get<1>(I->first) : nullptr)
-                  : Memory::CallState() };
+                  : Memory::CallState(), true };
+  } else {
+    get<3>(I->second) = true;
   }
 
   addUB(get<1>(I->second));
@@ -360,6 +362,12 @@ void State::syncSEdataWithSrc(const State &src) {
     itm.second.second = false;
 
   fn_call_data = src.fn_call_data;
+  for (auto &[fn, map] : fn_call_data) {
+    for (auto &[in, data] : map) {
+      (void)in;
+      get<3>(data) = false;
+    }
+  }
 
   // The bid of tgt global starts with num_nonlocals_src
   Memory::resetBids(num_nonlocals_src);
@@ -376,14 +384,15 @@ void State::mkAxioms(State &tgt) {
   for (auto &[fn, data] : fn_call_data) {
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
       auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
-      auto &[rets, ub, mem_state] = I->second;
+      auto &[rets, ub, mem_state, used] = I->second;
+      assert(used); (void)used;
 
       auto &data2 = tgt.fn_call_data.at(fn);
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
-        auto &[rets2, ub2, mem_state2] = I2->second;
+        auto &[rets2, ub2, mem_state2, used2] = I2->second;
 
-        if (reads != reads2 || argmem != argmem2)
+        if (!used2 || reads != reads2 || argmem != argmem2)
           continue;
 
         expr refines(true), is_val_eq(true);

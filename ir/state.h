@@ -90,13 +90,13 @@ private:
   // store data for function calls:
   // inputs: non-ptr arguments, (ptr arguments, is by_val arg?), memory,
   //         reads memory?, argmemonly
-  // outputs: values, UB, memory state
+  // outputs: values, UB, memory state, used in this state?
   std::map<std::string,
            std::map<std::tuple<std::vector<StateValue>,
                                std::vector<std::pair<StateValue, bool>>,
                                Memory, bool, bool>,
                     std::tuple<std::vector<StateValue>, smt::expr,
-                               Memory::CallState>>>
+                               Memory::CallState, bool>>>
     fn_call_data;
 
 public:
