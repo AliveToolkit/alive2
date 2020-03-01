@@ -56,24 +56,22 @@ class Alive2Test(TestFormat):
 
   def execute(self, test, litConfig):
     test = test.getSourcePath()
+    ok_string = 'Transformation seems to be correct!'
 
     alive_tv_1 = test.endswith('.srctgt.ll')
     if alive_tv_1:
       cmd = ['./alive-tv']
-      ok_string = 'Transformation seems to be correct!'
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     alive_tv_2 = test.endswith('.src.ll')
     if alive_tv_2:
       cmd = ['./alive-tv']
-      ok_string = 'Transformation seems to be correct!'
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     if not alive_tv_1 and not alive_tv_2:
       cmd = ['./alive']
-      ok_string = 'Optimization is correct!'
 
     input = readFile(test)
 
@@ -112,18 +110,15 @@ class Alive2Test(TestFormat):
     if chk != None and (out + err).find(chk.group(1).strip()) == -1:
       return lit.Test.FAIL, out + err
 
-    # wrong
-    if expect_err != None and xfail is None:
-      return lit.Test.PASS, ''
-
     if expect_err is None and xfail is None:
       if exitCode == 0 and (out + err).find(ok_string) != -1:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
-    if exitCode != 0:
-      if expect_err != None and err.find(expect_err.group(1)) != -1:
-        return lit.Test.PASS, ''
-      if xfail != None and err.find(xfail.group(1)) != -1:
-        return lit.Test.XFAIL, ''
+    if expect_err != None and err.find(expect_err.group(1)) != -1:
+      return lit.Test.PASS, ''
+
+    if xfail != None and err.find(xfail.group(1)) != -1:
+      return lit.Test.XFAIL, ''
+
     return lit.Test.FAIL, out + err

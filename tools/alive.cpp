@@ -92,8 +92,6 @@ int main(int argc, char **argv) {
   TransformPrintOpts print_opts;
   print_opts.print_fn_header = false;
 
-  unsigned num_errors = 0;
-
   for (; argc_i < argc; ++argc_i) {
     cout << "Processing " << argv[argc_i] << "..\n";
     try {
@@ -102,7 +100,6 @@ int main(int argc, char **argv) {
 
         if (root_only && (!t.src.hasReturn() || !t.tgt.hasReturn())) {
           cerr << "Return instruction required with -root-only.\n";
-          ++num_errors;
           continue;
         }
 
@@ -113,7 +110,6 @@ int main(int argc, char **argv) {
         auto types = tv.getTypings();
         if (!types) {
           cerr << "Doesn't type check!\n";
-          ++num_errors;
           continue;
         }
 
@@ -123,7 +119,6 @@ int main(int argc, char **argv) {
           tv.fixupTypes(types);
           if (auto errs = tv.verify()) {
             cerr << errs;
-            ++num_errors;
             correct = false;
             break;
           }
@@ -131,7 +126,7 @@ int main(int argc, char **argv) {
         }
         cout << '\n';
         if (correct)
-          cout << "Optimization is correct!\n";
+          cout << "Transformation seems to be correct!\n";
       }
     } catch (const FileIOException &e) {
       cerr << "Couldn't read the file" << endl;
@@ -145,5 +140,5 @@ int main(int argc, char **argv) {
   if (show_smt_stats)
     smt::solver_print_stats(cout);
 
-  return num_errors;
+  return 0;
 }
