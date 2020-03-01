@@ -1562,7 +1562,7 @@ expr Memory::int2ptr(const expr &val) const {
 }
 
 pair<expr,Pointer>
-Memory::refined(const Memory &other,
+Memory::refined(const Memory &other, bool skip_constants,
                 const vector<pair<StateValue, bool>> *set_ptrs) const {
   if (IR::num_nonlocals <= 1)
     return { true, Pointer(*this, expr()) };
@@ -1573,7 +1573,18 @@ Memory::refined(const Memory &other,
   expr offset = ptr.get_offset();
   expr ret(true);
 
+  auto is_constglb = [](const Memory &m, unsigned bid) {
+    return
+      find(m.non_local_blk_nonwritable.begin(),
+           m.non_local_blk_nonwritable.end(), bid) !=
+        m.non_local_blk_nonwritable.end();
+  };
+
   for (unsigned bid = 1; bid < IR::num_nonlocals_src; ++bid) {
+    if (skip_constants && is_constglb(*this, bid)) {
+      assert(is_constglb(other, bid));
+      continue;
+    }
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
@@ -1583,13 +1594,6 @@ Memory::refined(const Memory &other,
   }
 
 #ifndef NDEBUG
-  auto is_constglb = [](const Memory &m, unsigned bid) {
-    return
-      find(m.non_local_blk_nonwritable.begin(),
-           m.non_local_blk_nonwritable.end(), bid) !=
-        m.non_local_blk_nonwritable.end();
-  };
-
   if (state->isSource() && !other.state->isSource()) {
     for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
       assert(!is_constglb(*this, bid) && is_constglb(other, bid));

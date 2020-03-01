@@ -412,7 +412,7 @@ void State::mkAxioms(State &tgt) {
 
         if (reads2) {
           auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
-          expr mem_refined = mem.refined(mem2, restrict_ptrs).first;
+          expr mem_refined = mem.refined(mem2, true, restrict_ptrs).first;
           is_val_eq &= mem_refined;
           refines &= mem_refined;
         }

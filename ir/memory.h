@@ -285,6 +285,7 @@ public:
 
   std::pair<smt::expr,Pointer>
     refined(const Memory &other,
+            bool skip_constants,
             const std::vector<std::pair<StateValue, bool>> *set_ptrs = nullptr)
       const;
 
