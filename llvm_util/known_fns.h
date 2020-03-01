@@ -4,19 +4,19 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/function.h"
-#include <functional>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace llvm {
 class CallInst;
-class ConstantExpr;
 class TargetLibraryInfo;
 }
 
 namespace IR {
 class BasicBlock;
 class Instr;
+class Value;
 }
 
 namespace llvm_util {
@@ -24,8 +24,6 @@ namespace llvm_util {
 // returned bool indicates whether it's a known function call
 std::pair<std::unique_ptr<IR::Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
-           IR::BasicBlock &BB,
-           std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
-           std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);
+           IR::BasicBlock &BB, const std::vector<IR::Value*> &args);
 
 }

@@ -228,9 +228,15 @@ public:
   }
 
   RetTy visitCallInst(llvm::CallInst &i) {
-    auto [call_val, known] = known_call(i, TLI, *BB,
-        [this](auto I) { return convert_constexpr(I); },
-        [this](auto ag) { return copy_inserter(ag); });
+    vector<Value *> args;
+    for (auto &arg : i.args()) {
+      auto a = get_operand(arg);
+      if (!a)
+        return error(i);
+      args.emplace_back(a);
+    }
+
+    auto [call_val, known] = known_call(i, TLI, *BB, args);
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 
@@ -261,19 +267,15 @@ public:
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
                                     !known);
     auto argI = fn->arg_begin(), argE = fn->arg_end();
-    for (auto &arg : i.args()) {
-      auto a = get_operand(arg);
-      if (!a)
-        return error(i);
-
+    for (auto &arg : args) {
       unsigned attr = FnCall::ArgNone;
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
           attr |= FnCall::ArgByVal;
-        argI++;
+        ++argI;
       }
-      call->addArg(*a, attr);
+      call->addArg(*arg, attr);
     }
     RETURN_IDENTIFIER(move(call));
   }
