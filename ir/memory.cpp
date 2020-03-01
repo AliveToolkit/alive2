@@ -1593,13 +1593,6 @@ Memory::refined(const Memory &other, bool skip_constants,
     ret &= (ptr_bid == bid_expr).implies(p.block_refined(q));
   }
 
-#ifndef NDEBUG
-  if (state->isSource() && !other.state->isSource()) {
-    for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
-      assert(!is_constglb(*this, bid) && is_constglb(other, bid));
-  }
-#endif
-
   // restrict refinement check to set of request blocks
   if (set_ptrs) {
     expr c(false);
