@@ -559,6 +559,8 @@ public:
             align_dst(align_dst), align_src(align_src), move(move) {}
 
   Value& getBytes() const { return *bytes; }
+  unsigned getSrcAlign() const { return align_src; }
+  unsigned getDstAlign() const { return align_dst; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

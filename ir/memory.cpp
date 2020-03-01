@@ -1056,9 +1056,15 @@ void Memory::mkAxioms(const Memory &other) const {
     return;
 
   // transformation can increase alignment
+  unsigned align = heap_block_alignment;
   for (unsigned bid = 1; bid < IR::num_nonlocals; ++bid) {
-    state->addAxiom(Pointer(*this, bid, false).block_alignment().ule(
-                      Pointer(other, bid, false).block_alignment()));
+    Pointer p(*this, bid, false);
+    Pointer q(other, bid, false);
+    auto p_align = p.block_alignment();
+    auto q_align = q.block_alignment();
+    state->addAxiom(expr::mkIf(p.is_heap_allocated(),
+                               p_align == align && q_align == align,
+                               p_align.ule(q_align)));
   }
 
   if (!observes_addresses())
@@ -1516,7 +1522,8 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
                     unsigned align_dst, unsigned align_src, bool is_move) {
   assert(!memory_unused());
-  assert(bits_byte == 8);
+  unsigned bytesz = bits_byte / 8;
+
   Pointer dst(*this, d), src(*this, s);
   state->addUB(dst.is_dereferenceable(bytesize, align_dst, true));
   state->addUB(src.is_dereferenceable(bytesize, align_src, false));
@@ -1528,11 +1535,11 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     return;
 
   uint64_t n;
-  if (bytesize.isUInt(n) && n <= 4) {
+  if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
     auto old_local = local_block_val, old_nonlocal = non_local_block_val;
-    for (unsigned i = 0; i < n; ++i) {
+    for (unsigned i = 0; i < n; i += bytesz) {
       store(dst + i, ::load(src + i, old_local, old_nonlocal),
-              local_block_val, non_local_block_val);
+            local_block_val, non_local_block_val);
     }
   } else {
     Pointer dst_idx(*this, "#idx", dst.is_local());

@@ -65,6 +65,8 @@ extern bool does_ptr_store;
 /// Whether the programs do memory accesses of less than bits_byte
 extern bool does_sub_byte_access;
 
+extern unsigned heap_block_alignment;
+
 
 bool isUndef(const smt::expr &e);
 

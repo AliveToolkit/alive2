@@ -1830,10 +1830,10 @@ void Malloc::print(std::ostream &os) const {
 
 StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
-  // TODO: malloc's alignment is implementation defined.
+  unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p_new, allocated] = s.getMemory().alloc(sz, 8, Memory::HEAP, np_size,
-                                                nonnull);
+  auto [p_new, allocated] = s.getMemory().alloc(sz, align, Memory::HEAP,
+                                                np_size, nonnull);
 
   if (!ptr) {
     if (isNonNull) {
@@ -1853,7 +1853,7 @@ StateValue Malloc::toSMT(State &s) const {
                                   expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext),
                                   expr::mkUInt(0, p_sz.bits()));
 
-    s.getMemory().memcpy(p_new, p, memcpy_size, 1, 1, true);
+    s.getMemory().memcpy(p_new, p, memcpy_size, align, align, true);
 
     // 1) realloc(ptr, 0) always free the ptr.
     // 2) If allocation failed, we should not free previous ptr.
@@ -1895,15 +1895,15 @@ StateValue Calloc::toSMT(State &s) const {
   auto &[sz, np_sz] = s.getAndAddUndefs(*size);
   auto np = np_num && np_sz;
 
-  // TODO: check calloc align.
+  unsigned align = heap_block_alignment;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(size, 8, Memory::HEAP,
+  auto [p, allocated] = s.getMemory().alloc(size, align, Memory::HEAP,
                                             np && nm.mul_no_uoverflow(sz),
                                             nonnull);
 
   expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
-  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, 1);
+  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, align);
 
   return { move(p), move(np) };
 }

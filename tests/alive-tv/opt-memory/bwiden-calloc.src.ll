@@ -9,8 +9,7 @@ define i32 @calloc_init(i32 %x) {
   ret i32 %v
 }
 
-; calloc's bwiden is not supported yet
-; CHECK: bits_byte: 8
+; CHECK: bits_byte: 32
 
 declare noalias i8* @calloc(i64, i64)
 declare void @free(i8*)

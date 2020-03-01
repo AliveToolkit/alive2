@@ -562,10 +562,18 @@ static uint64_t get_access_size(const Type &ty) {
 }
 
 static uint64_t get_access_size(const Instr &inst) {
-  if (dynamic_cast<const Calloc*>(&inst) ||
-      dynamic_cast<const Memcpy *>(&inst)) {
-    // TODO
+  if (auto i = dynamic_cast<const Calloc*>(&inst)) {
     does_int_mem_access = true;
+    if (auto n = get_int(i->getNum()))
+      if (auto sz = get_int(i->getSize()))
+        // assume calloc is 8 bytes aligned
+        return gcd(8, *n * *sz);
+    return 1;
+  }
+
+  if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
+    if (auto bytes = get_int(i->getBytes()))
+      return gcd(gcd(i->getSrcAlign(), i->getDstAlign()), *bytes);
     return 1;
   }
 
@@ -602,6 +610,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   // TODO: get this from data layout, varies among address spaces
   bits_program_pointer = 64;
+  heap_block_alignment = 8;
 
   for (auto GVT : globals_tgt) {
     auto I = find_if(globals_src.begin(), globals_src.end(),
