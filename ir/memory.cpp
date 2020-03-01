@@ -1583,8 +1583,10 @@ Memory::refined(const Memory &other,
         m.non_local_blk_nonwritable.end();
   };
 
-  for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
-    assert(!is_constglb(*this, bid) && is_constglb(other, bid));
+  if (state->isSource() && !other.state->isSource()) {
+    for (unsigned bid = IR::num_nonlocals_src; bid < IR::num_nonlocals; ++bid)
+      assert(!is_constglb(*this, bid) && is_constglb(other, bid));
+  }
 #endif
 
   // restrict refinement check to set of request blocks
@@ -1690,6 +1692,13 @@ ostream& operator<<(ostream &os, const Memory &m) {
       os << m.escaped_local_blks[i];
     }
     os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
+  }
+  if (!m.non_local_blk_nonwritable.empty()) {
+    os << "CONST NON-LOCALS:";
+    for (auto bid : m.non_local_blk_nonwritable) {
+      os << ' ' << bid;
+    }
+    os << '\n';
   }
   return os;
 }
