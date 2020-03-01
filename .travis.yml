@@ -45,19 +45,6 @@ script:
 
 matrix:
   include:
-    - env: CMAKE_CXX_COMPILER=g++ CMAKE_BUILD_TYPE=Debug
-      os: linux
-      dist: bionic
-      addons: &gcc7
-        apt:
-          packages:
-            - *default_packages
-
-    - env: CMAKE_CXX_COMPILER=g++ CMAKE_BUILD_TYPE=Release
-      os: linux
-      dist: bionic
-      addons: *gcc7
-
     - env: CMAKE_CXX_COMPILER=g++-8 CMAKE_BUILD_TYPE=Debug
       os: linux
       dist: bionic
@@ -120,7 +107,7 @@ matrix:
 
     - env: CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: osx
-      osx_image: xcode11
+      osx_image: xcode11.3
       addons: &mac
         homebrew:
           packages:
@@ -131,5 +118,5 @@ matrix:
 
     - env: CMAKE_BUILD_TYPE=Release
       os: osx
-      osx_image: xcode11
+      osx_image: xcode11.3
       addons: *mac
