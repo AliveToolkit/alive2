@@ -356,17 +356,19 @@ int main(int argc, char **argv) {
   config::disable_poison_input = opt_disable_poison;
   config::debug = opt_debug;
 
-  // optionally, redirect cout and cerr to user-specified file 
+  // optionally, redirect cout and cerr to user-specified file
+  optional<ofstream> OutFile;
   if (!opt_outputfile.empty()) {
-    std::ofstream *OutFile = new std::ofstream(opt_outputfile);
+    OutFile.emplace(opt_outputfile);
     std::cout.rdbuf(OutFile->rdbuf());
     std::cerr.rdbuf(OutFile->rdbuf());
   }
   
   auto M1 = openInputFile(Context, opt_file1);
-  if (!M1.get())
-    llvm::report_fatal_error(
-      "Could not read bitcode from '" + opt_file1 + "'");
+  if (!M1.get()) {
+    cerr << "Could not read bitcode from '" << opt_file1 << "'\n";
+    return -1;
+  }
 
   auto &DL = M1.get()->getDataLayout();
 
@@ -395,13 +397,16 @@ int main(int argc, char **argv) {
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
-    if (!M2.get())
-      llvm::report_fatal_error(
-        "Could not read bitcode from '" + opt_file2 + "'");
+    if (!M2.get()) {
+      cerr << "Could not read bitcode from '" << opt_file2 << "'\n";
+      return -1;
+    }
   }
 
-  if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple())
-    llvm::report_fatal_error("Modules have different target triple");
+  if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple()) {
+    cerr << "Modules have different target triples\n";
+    return -1;
+  }
 
   {
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
