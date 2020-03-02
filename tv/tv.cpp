@@ -143,7 +143,11 @@ struct TVPass final : public llvm::FunctionPass {
     if (opt_print_dot) {
       auto &f = I->second.first;
       ofstream file(f.getName() + '.' + to_string(I->second.second++) + ".dot");
-      CFG(f).printDot(file);
+      CFG cfg(f);
+      cfg.printDot(file);
+      ofstream fileDom(f.getName() + '.' + to_string(I->second.second++) +
+                       ".dom.dot");
+      DomTree(f, cfg).printDot(fileDom);
     }
 
     if (first)

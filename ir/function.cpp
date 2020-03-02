@@ -289,4 +289,66 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
+void DomTree::buildDominators() {
+  function<void(const BasicBlock*)> ensureExists;
+  ensureExists = [&](auto bb) {
+    if (dominators.find(bb) == dominators.end()) {
+      std::vector<const BasicBlock*> v{bb};
+      dominators.emplace(bb, move(v));
+    }
+  };
+
+  for (auto [src, dst, instr] : cfg) {
+    (void)instr;
+
+    ensureExists(&src);
+    ensureExists(&dst);
+    
+    // add dominators by definition
+    std::vector<const BasicBlock*> dstDoms = dominators[&dst];
+    if (dstDoms.size() > 1) {
+      dominators[&dst].clear();
+
+      // find intersection between topologically sorted vectors of
+      // predecessor bb's
+      std::vector<const BasicBlock*>::const_iterator srcIt, dstIt;
+      srcIt = dominators[&src].begin();
+      dstIt = dstDoms.begin();
+      while (srcIt != dominators[&src].end() &&
+             dstIt != dstDoms.end()) {
+        if (*srcIt == *dstIt) {
+          dominators[&dst].push_back(*srcIt);
+          srcIt++;
+          dstIt++;
+        } else {
+          dstIt++;
+        }
+      }
+      dominators[&dst].insert(dominators[&dst].end(), &dst);
+    } else {
+      // add predecessor's dominators to the start of current
+      dominators[&dst].insert(dominators[&dst].begin(),
+                              dominators[&src].begin(),
+                              dominators[&src].end());
+    }
+    dstDoms = dominators[&dst];
+    dstDoms = dominators[&dst];
+  }
+};
+
+void DomTree::printDot(std::ostream &os) const {
+  os << "digraph {\n"
+        "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
+
+  for (auto bb : f.getBBs()) {
+    if (dominators.at(bb).size() > 1) {
+      // print for before last element, last is itself
+      os << '"' << bb_dot_name(dominators.at(bb)[dominators.at(bb).size()-2]
+        ->getName()) << "\" -> \"" << bb_dot_name(bb->getName()) << "\";\n";
+    }
+  }
+  os << "}\n";
 }
+
+} 
+

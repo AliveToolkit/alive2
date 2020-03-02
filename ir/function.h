@@ -171,4 +171,17 @@ public:
   void printDot(std::ostream &os) const;
 };
 
+// Does not support loops
+class DomTree final {
+    Function& f;
+    CFG& cfg;
+    // src -> vec<bb's that dominate src in order of their depth in the CFG>
+    std::unordered_map<const BasicBlock*,
+                      std::vector<const BasicBlock*>> dominators;
+    void buildDominators();
+  public:
+    DomTree(Function &f, CFG& cfg) : f(f), cfg(cfg) { buildDominators(); }
+    void printDot(std::ostream &os) const;
+};
+
 }
