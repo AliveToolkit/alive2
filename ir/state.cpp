@@ -363,6 +363,7 @@ void State::syncSEdataWithSrc(const State &src) {
 
   fn_call_data = src.fn_call_data;
   for (auto &[fn, map] : fn_call_data) {
+   (void)fn;
     for (auto &[in, data] : map) {
       (void)in;
       get<3>(data) = false;
