@@ -180,7 +180,7 @@ class DomTree final {
                       std::vector<const BasicBlock*>> dominators;
     void buildDominators();
   public:
-    DomTree(Function &f, CFG& cfg) : f(f), cfg(cfg) { buildDominators(); }
+    DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
     void printDot(std::ostream &os) const;
 };
 
