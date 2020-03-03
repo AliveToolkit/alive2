@@ -317,7 +317,7 @@ void DomTree::buildDominators() {
           ++srcIt;
           ++dstIt;
         } else {
-          ++dstIt;
+          break;
         }
       }
       dstDoms.insert(dstDoms.end(), &dst);
