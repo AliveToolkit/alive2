@@ -298,9 +298,9 @@ void DomTree::buildDominators() {
     (void)instr;
 
     // Make sure each bb dominates itself.
-    std::vector<const BasicBlock*> &srcDoms = (dominators.try_emplace(&src, 
+    std::vector<const BasicBlock*> &srcDoms = (dominators.try_emplace(&src,
                       std::vector<const BasicBlock*>{&src})).first->second;
-    std::vector<const BasicBlock*> &dstDoms = (dominators.try_emplace(&dst, 
+    std::vector<const BasicBlock*> &dstDoms = (dominators.try_emplace(&dst,
                       std::vector<const BasicBlock*>{&dst})).first->second;
 
     if (dstDoms.size() > 1) {
