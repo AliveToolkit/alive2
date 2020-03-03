@@ -289,50 +289,42 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
+// Requires that CFG::edge_iterator visits each predecessor of a node before
+// the node itself and that the CFG is a DAG. Constructs dominators by: 
+// dom(x) = {intersect(dom(pred1), dom(pred2), ...)} U {x}. The result is a 
+// vector of dominator bb's of a given bb ordered by depth in CFG.
 void DomTree::buildDominators() {
-  function<void(const BasicBlock*)> ensureExists;
-  ensureExists = [&](auto bb) {
-    if (dominators.find(bb) == dominators.end()) {
-      std::vector<const BasicBlock*> v{bb};
-      dominators.emplace(bb, move(v));
-    }
-  };
-
   for (auto [src, dst, instr] : cfg) {
     (void)instr;
 
-    ensureExists(&src);
-    ensureExists(&dst);
-    
-    // add dominators by definition
-    std::vector<const BasicBlock*> dstDoms = dominators[&dst];
-    if (dstDoms.size() > 1) {
-      dominators[&dst].clear();
+    // Make sure each bb dominates itself.
+    std::vector<const BasicBlock*> &srcDoms = (dominators.try_emplace(&src, 
+                      std::vector<const BasicBlock*>{&src})).first->second;
+    std::vector<const BasicBlock*> &dstDoms = (dominators.try_emplace(&dst, 
+                      std::vector<const BasicBlock*>{&dst})).first->second;
 
-      // find intersection between topologically sorted vectors of
-      // predecessor bb's
+    if (dstDoms.size() > 1) {
+      std::vector<const BasicBlock*> doms_copy = dominators[&dst];
+      dstDoms.clear();
+
+      // get the intersection of all predecessor dominator sets of dst
       std::vector<const BasicBlock*>::const_iterator srcIt, dstIt;
-      srcIt = dominators[&src].begin();
-      dstIt = dstDoms.begin();
-      while (srcIt != dominators[&src].end() &&
-             dstIt != dstDoms.end()) {
+      srcIt = srcDoms.begin();
+      dstIt = doms_copy.begin();
+      while (srcIt != srcDoms.end() && dstIt != doms_copy.end()) {
         if (*srcIt == *dstIt) {
-          dominators[&dst].push_back(*srcIt);
-          srcIt++;
-          dstIt++;
+          dstDoms.push_back(*srcIt);
+          ++srcIt;
+          ++dstIt;
         } else {
-          dstIt++;
+          ++dstIt;
         }
       }
-      dominators[&dst].insert(dominators[&dst].end(), &dst);
+      dstDoms.insert(dstDoms.end(), &dst);
     } else {
       // add predecessor's dominators to the start of current
-      dominators[&dst].insert(dominators[&dst].begin(),
-                              dominators[&src].begin(),
-                              dominators[&src].end());
+      dstDoms.insert(dstDoms.begin(), srcDoms.begin(), srcDoms.end());
     }
-    dstDoms = dominators[&dst];
-    dstDoms = dominators[&dst];
   }
 };
 
@@ -341,9 +333,10 @@ void DomTree::printDot(std::ostream &os) const {
         "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
   for (auto bb : f.getBBs()) {
-    if (dominators.at(bb).size() > 1) {
+    auto &doms = dominators.at(bb);
+    if (doms.size() > 1) {
       // print for before last element, last is itself
-      os << '"' << bb_dot_name(dominators.at(bb)[dominators.at(bb).size()-2]
+      os << '"' << bb_dot_name(doms[doms.size()-2]
         ->getName()) << "\" -> \"" << bb_dot_name(bb->getName()) << "\";\n";
     }
   }

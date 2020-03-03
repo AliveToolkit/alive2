@@ -173,9 +173,9 @@ public:
 
 // Does not support loops
 class DomTree final {
-    Function& f;
-    CFG& cfg;
-    // src -> vec<bb's that dominate src in order of their depth in the CFG>
+    Function &f;
+    CFG &cfg;
+    // bb -> vec<dominator bb's ordered by depth in the CFG lowest first>.
     std::unordered_map<const BasicBlock*,
                       std::vector<const BasicBlock*>> dominators;
     void buildDominators();
