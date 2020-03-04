@@ -336,6 +336,8 @@ optimized module refine those in the original one. This provides a
 convenient way to demonstrate an existing optimizer bug.
 )EOF";
 
+static ofstream OutFile;
+
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
@@ -357,11 +359,10 @@ int main(int argc, char **argv) {
   config::debug = opt_debug;
 
   // optionally, redirect cout and cerr to user-specified file
-  optional<ofstream> OutFile;
   if (!opt_outputfile.empty()) {
-    OutFile.emplace(opt_outputfile);
-    std::cout.rdbuf(OutFile->rdbuf());
-    std::cerr.rdbuf(OutFile->rdbuf());
+    OutFile.open(opt_outputfile);
+    std::cout.rdbuf(OutFile.rdbuf());
+    std::cerr.rdbuf(OutFile.rdbuf());
   }
   
   auto M1 = openInputFile(Context, opt_file1);
