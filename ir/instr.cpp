@@ -2278,8 +2278,6 @@ StateValue Strlen::toSMT(State &s) const {
 
   // We want to only consider cases when strlen_unroll_cnt + p.offset is not
   // less than the size of the block.
-  // To encode this, we make src have UB if the block size is larger than that,
-  // and add precond to tgt in the same condition.
   auto unroll = expr::mkUInt(strlen_unroll_cnt, p.get_offset().bits());
   auto cond = p.get_offset().add_no_uoverflow(unroll).implies(
                 !(p + unroll).inbounds(false, true));
