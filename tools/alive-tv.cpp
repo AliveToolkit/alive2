@@ -362,7 +362,6 @@ int main(int argc, char **argv) {
   if (!opt_outputfile.empty()) {
     OutFile.open(opt_outputfile);
     std::cout.rdbuf(OutFile.rdbuf());
-    std::cerr.rdbuf(OutFile.rdbuf());
   }
   
   auto M1 = openInputFile(Context, opt_file1);
