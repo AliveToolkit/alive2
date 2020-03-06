@@ -317,6 +317,8 @@ static void check_refinement(Errors &errs, Transform &t,
 
   pre_tgt &= src_state.getOOM()();
   pre_tgt &= !tgt_state.sinkDomain();
+  pre_tgt &= src_state.getPre(true)();
+  pre_tgt &= tgt_state.getPre(true)();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
 

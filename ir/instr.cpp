@@ -2283,10 +2283,7 @@ StateValue Strlen::toSMT(State &s) const {
   auto unroll = expr::mkUInt(strlen_unroll_cnt, p.get_offset().bits());
   auto cond = p.get_offset().add_no_uoverflow(unroll).implies(
                 !(p + unroll).inbounds(false, true));
-  if (s.isSource())
-    s.addUB(move(cond));
-  else
-    s.addPre(move(cond));
+  s.addPre(move(cond), true);
 
   auto [found, ofs2] = nextNull(m, p.get_bid(), p.get_offset(), 0);
 
