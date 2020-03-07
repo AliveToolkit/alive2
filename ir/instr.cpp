@@ -1773,11 +1773,14 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
 
 
 vector<Value*> Alloc::operands() const {
+  if (mul)
+    return { size, mul };
   return { size };
 }
 
 void Alloc::rauw(const Value &what, Value &with) {
   RAUW(size);
+  RAUW(mul);
 }
 
 void Alloc::print(std::ostream &os) const {
