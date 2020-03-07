@@ -379,13 +379,13 @@ public:
 
 
 class Alloc final : public Instr {
-  Value *size;
+  Value *size, *mul;
   unsigned align;
   bool initially_dead;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, unsigned align,
+  Alloc(Type &type, std::string &&name, Value &size, Value *mul, unsigned align,
         bool initially_dead)
-    : Instr(type, std::move(name)), size(&size), align(align),
+    : Instr(type, std::move(name)), size(&size), mul(mul), align(align),
       initially_dead(initially_dead) {}
 
   Value& getSize() const { return *size; }

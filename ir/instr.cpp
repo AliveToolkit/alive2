@@ -1781,14 +1781,27 @@ void Alloc::rauw(const Value &what, Value &with) {
 }
 
 void Alloc::print(std::ostream &os) const {
-  os << getName() << " = alloca " << *size << ", align " << align;
+  os << getName() << " = alloca " << *size;
+  if (mul)
+    os << " x " << *mul;
+  os << ", align " << align;
   if (initially_dead)
     os << ", dead";
 }
 
 StateValue Alloc::toSMT(State &s) const {
-  auto &[sz, np] = s[*size];
-  s.addUB(np);
+  auto [sz, np] = s[*size];
+  s.addUB(move(np));
+
+  if (mul) {
+    auto &[mul_e, mul_np] = s[*mul];
+    s.addUB(mul_np);
+    sz = sz.zextOrTrunc(bits_size_t);
+    auto m = mul_e.zextOrTrunc(bits_size_t);
+    s.addUB(sz.mul_no_uoverflow(m));
+    sz = sz * m;
+  }
+
   expr ptr = s.getMemory().alloc(sz, align, Memory::STACK, true, true).first;
   if (initially_dead)
     s.getMemory().free(ptr, true);
@@ -1802,7 +1815,7 @@ expr Alloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
-  return make_unique<Alloc>(getType(), getName() + suffix, *size, align,
+  return make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align,
                             initially_dead);
 }
 

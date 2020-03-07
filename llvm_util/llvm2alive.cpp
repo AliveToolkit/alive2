@@ -399,18 +399,20 @@ public:
   }
 
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
-    // TODO
-    if (i.isArrayAllocation() || !i.isStaticAlloca())
-      return error(i);
-
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
       return error(i);
 
+    Value *mul = nullptr;
+    if (i.isArrayAllocation()) {
+      if (!(mul = get_operand(i.getArraySize())))
+        return error(i);
+    }
+
     unordered_set<llvm::Value*> visited;
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
-    RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size,
+    RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size, mul,
                         pref_alignment(i, i.getAllocatedType()),
                         hasLifetimeStart(i, visited)));
   }
