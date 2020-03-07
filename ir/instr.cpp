@@ -2241,56 +2241,38 @@ void Strlen::print(ostream &os) const {
   os << getName() << " = strlen " << *ptr;
 }
 
+static pair<expr,expr>
+find_null(State &s, Type &ty, const Pointer &ptr, AndExpr &prefix, unsigned i) {
+  auto [val, ub0] = s.getMemory().load((ptr + i)(), IntType("i8", 8), 1);
+  auto ub = ub0() && val.non_poison;
 
-// Given (bid, ofs0), encode an expression that returns the next offset ofs2
-// that has a null character.
-// Returns: <found?, ofs2>
-static pair<expr, expr>
-nextNull(const Memory &m, const expr &bid, const expr &ofs0, unsigned i) {
-  auto ofs = ofs0 + expr::mkUInt(i, ofs0.bits());
+  auto is_zero = val.value == 0;
+  auto result = expr::mkUInt(i, ty.bits());
 
-  if (i == strlen_unroll_cnt)
-    // Assume that this never happens.
-    return { expr(true), move(ofs) };
+  if (i == strlen_unroll_cnt - 1) {
+    s.addPre(prefix().implies(is_zero), true);
+    return { move(result), move(ub) };
+  }
 
-  Pointer ptr(m, bid, ofs);
-  Byte b = m.load(ptr);
+  if (is_zero.isTrue() || ub.isFalse())
+    return { move(result), move(ub) };
 
-  auto is_char = !b.is_ptr() && !b.is_poison(false);
-  auto strictly_inbounds = ptr.inbounds(false, true);
-  if (is_char.isFalse() || strictly_inbounds.isFalse())
-    return { expr(false), ofs };
-  else if (is_char.isTrue() && b.is_zero().isTrue() &&
-           strictly_inbounds.isTrue())
-    return { expr(true), ofs };
-
-  auto [found, ofs_next] = nextNull(m, bid, ofs0, i + 1);
-  return { is_char && strictly_inbounds && (b.is_zero() || found),
-           expr::mkIf(b.is_zero(), ofs, ofs_next) };
+  prefix.add(ub0);
+  prefix.add(val.non_poison);
+  prefix.add(!is_zero);
+  auto [val2, ub2] = find_null(s, ty, ptr, prefix, i + 1);
+  return { expr::mkIf(is_zero, result, val2),
+           ub && (is_zero || ub2) };
 }
 
 StateValue Strlen::toSMT(State &s) const {
   auto &[eptr, np_ptr] = s[*ptr];
   s.addUB(np_ptr);
-
-  const auto &m = s.getMemory();
-  Pointer p(m, eptr);
-
-  // We want to only consider cases when strlen_unroll_cnt + p.offset is not
-  // less than the size of the block.
-  auto unroll = expr::mkUInt(strlen_unroll_cnt, p.get_offset().bits());
-  auto cond = p.get_offset().add_no_uoverflow(unroll).implies(
-                !(p + unroll).inbounds(false, true));
-  s.addPre(move(cond), true);
-
-  auto [found, ofs2] = nextNull(m, p.get_bid(), p.get_offset(), 0);
-
-  s.addUB(found);
-  auto len = (ofs2 - p.get_offset()).zextOrTrunc(getType().bits());
-  // This is needed to check e.g. readnone flag.
-  p.is_dereferenceable(len + expr::mkUInt(1, len.bits()), 1, false);
-
-  return { move(len), true };
+  AndExpr prefix;
+  auto [val, ub]
+    = find_null(s, getType(), Pointer(s.getMemory(), eptr), prefix, 0);
+  s.addUB(move(ub));
+  return { move(val), true };
 }
 
 expr Strlen::getTypeConstraints(const Function &f) const {
