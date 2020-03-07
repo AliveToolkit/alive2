@@ -276,6 +276,10 @@ public:
   // of the desired type
   static expr mkUF(const char *name, const std::vector<expr> &args,
                    const expr &range);
+  static expr mkUF(const std::string &name, const std::vector<expr> &args,
+                   const expr &range) {
+    return mkUF(name.data(), args, range);
+  }
 
   static expr mkArray(const char *name, const expr &domain, const expr &range);
   static expr mkConstArray(const expr &domain, const expr &value);

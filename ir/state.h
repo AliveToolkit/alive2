@@ -52,7 +52,7 @@ private:
   bool source;
   bool disable_undef_rewrite = false;
   bool is_initialization_phase = true;
-  smt::AndExpr precondition;
+  smt::AndExpr precondition, preconditionForApprox;
   smt::AndExpr axioms;
   smt::AndExpr ooms;
 
@@ -120,7 +120,8 @@ public:
   void addReturn(const StateValue &val);
 
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
-  void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
+  void addPre(smt::expr &&cond, bool forApprox = false)
+  { (forApprox ? preconditionForApprox : precondition).add(std::move(cond)); }
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
@@ -144,7 +145,9 @@ public:
   auto& getFn() const { return f; }
   auto& getMemory() { return memory; }
   auto& getAxioms() const { return axioms; }
-  auto& getPre() const { return precondition; }
+  auto& getPre(bool forApprox = false) const
+  { return forApprox ? preconditionForApprox : precondition; }
+  auto& getPreForApprox() const { return preconditionForApprox; }
   auto& getOOM() const { return ooms; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }

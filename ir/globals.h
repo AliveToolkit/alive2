@@ -37,6 +37,8 @@ extern unsigned bits_size_t;
 /// Number of bits for a byte.
 extern unsigned bits_byte;
 
+extern unsigned strlen_unroll_cnt;
+
 extern bool little_endian;
 
 /// Whether int2ptr or ptr2int are used in either function

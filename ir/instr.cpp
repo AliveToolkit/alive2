@@ -2229,6 +2229,81 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
 }
 
 
+vector<Value*> Strlen::operands() const {
+  return { ptr };
+}
+
+void Strlen::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void Strlen::print(ostream &os) const {
+  os << getName() << " = strlen " << *ptr;
+}
+
+
+// Given (bid, ofs0), encode an expression that returns the next offset ofs2
+// that has a null character.
+// Returns: <found?, ofs2>
+static pair<expr, expr>
+nextNull(const Memory &m, const expr &bid, const expr &ofs0, unsigned i) {
+  auto ofs = ofs0 + expr::mkUInt(i, ofs0.bits());
+
+  if (i == strlen_unroll_cnt)
+    // Assume that this never happens.
+    return { expr(true), move(ofs) };
+
+  Pointer ptr(m, bid, ofs);
+  Byte b = m.load(ptr);
+
+  auto is_char = !b.is_ptr() && !b.is_poison(false);
+  auto strictly_inbounds = ptr.inbounds(false, true);
+  if (is_char.isFalse() || strictly_inbounds.isFalse())
+    return { expr(false), ofs };
+  else if (is_char.isTrue() && b.is_zero().isTrue() &&
+           strictly_inbounds.isTrue())
+    return { expr(true), ofs };
+
+  auto [found, ofs_next] = nextNull(m, bid, ofs0, i + 1);
+  return { is_char && strictly_inbounds && (b.is_zero() || found),
+           expr::mkIf(b.is_zero(), ofs, ofs_next) };
+}
+
+StateValue Strlen::toSMT(State &s) const {
+  auto &[eptr, np_ptr] = s[*ptr];
+  s.addUB(np_ptr);
+
+  const auto &m = s.getMemory();
+  Pointer p(m, eptr);
+
+  // We want to only consider cases when strlen_unroll_cnt + p.offset is not
+  // less than the size of the block.
+  auto unroll = expr::mkUInt(strlen_unroll_cnt, p.get_offset().bits());
+  auto cond = p.get_offset().add_no_uoverflow(unroll).implies(
+                !(p + unroll).inbounds(false, true));
+  s.addPre(move(cond), true);
+
+  auto [found, ofs2] = nextNull(m, p.get_bid(), p.get_offset(), 0);
+
+  s.addUB(found);
+  auto len = (ofs2 - p.get_offset()).zextOrTrunc(getType().bits());
+  // This is needed to check e.g. readnone flag.
+  p.is_dereferenceable(len + expr::mkUInt(1, len.bits()), 1, false);
+
+  return { move(len), true };
+}
+
+expr Strlen::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr->getType().enforcePtrType() &&
+         getType().enforceIntType();
+}
+
+unique_ptr<Instr> Strlen::dup(const string &suffix) const {
+  return make_unique<Strlen>(getType(), getName() + suffix, *ptr);
+}
+
+
 vector<Value*> ExtractElement::operands() const {
   return { v, idx };
 }

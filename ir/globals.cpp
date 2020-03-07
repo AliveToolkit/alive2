@@ -20,6 +20,7 @@ unsigned bits_for_offset;
 unsigned bits_program_pointer;
 unsigned bits_size_t;
 unsigned bits_byte;
+unsigned strlen_unroll_cnt;
 bool little_endian;
 bool has_int2ptr;
 bool has_ptr2int;
