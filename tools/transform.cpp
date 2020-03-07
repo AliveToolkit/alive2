@@ -601,6 +601,7 @@ static uint64_t get_access_size(const Instr &inst) {
   }
 
   if (auto i = dynamic_cast<const Malloc*>(&inst)) {
+    // FIXME: memcpy doesn't have multi-byte support
     if (i->isRealloc())
       return 1;
   }
