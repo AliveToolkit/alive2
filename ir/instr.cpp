@@ -618,6 +618,7 @@ void UnaryOp::print(ostream &os) const {
   case BitReverse:  str = "bitreverse "; break;
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
+  case IsConstant:  str = "is.constant"; break;
   case FNeg:        str = "fneg "; break;
   }
 
@@ -643,6 +644,16 @@ StateValue UnaryOp::toSMT(State &s) const {
   case Ctpop:
     fn = [](auto v) { return v.ctpop(); };
     break;
+  case IsConstant: {
+    expr one = expr::mkUInt(1, 1);
+    if (dynamic_cast<Constant *>(val))
+      return { move(one), true };
+
+    // may or may not be a constant
+    expr var = expr::mkFreshVar("is.const", one);
+    s.addQuantVar(var);
+    return { move(var), true };
+  }
   case FNeg:
     // TODO
     if (!fmath.isNone())
@@ -666,29 +677,29 @@ StateValue UnaryOp::toSMT(State &s) const {
 }
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
-  expr instrconstr;
+  expr instrconstr = getType() == val->getType();
   switch(op) {
   case Copy:
-    instrconstr = true;
     break;
   case BSwap:
-    instrconstr = getType().enforceScalarOrVectorType([](auto &scalar) {
-                    return scalar.enforceIntType() &&
-                           scalar.sizeVar().urem(expr::mkUInt(16, 8)) == 0;
-                  });
+    instrconstr &= getType().enforceScalarOrVectorType([](auto &scalar) {
+                     return scalar.enforceIntType() &&
+                            scalar.sizeVar().urem(expr::mkUInt(16, 8)) == 0;
+                   });
     break;
   case BitReverse:
   case Ctpop:
-    instrconstr = getType().enforceIntOrVectorType();
+    instrconstr &= getType().enforceIntOrVectorType();
+    break;
+  case IsConstant:
+    instrconstr = getType().enforceIntType(1);
     break;
   case FNeg:
-    instrconstr = getType().enforceFloatOrVectorType();
+    instrconstr &= getType().enforceFloatOrVectorType();
     break;
   }
 
-  return Value::getTypeConstraints() &&
-         getType() == val->getType() &&
-         move(instrconstr);
+  return Value::getTypeConstraints() && move(instrconstr);
 }
 
 unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {

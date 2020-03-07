@@ -599,6 +599,7 @@ public:
     case llvm::Intrinsic::bswap:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
+    case llvm::Intrinsic::is_constant:
     {
       PARSE_UNOP();
       UnaryOp::Op op;
@@ -607,6 +608,7 @@ public:
       case llvm::Intrinsic::bswap:      op = UnaryOp::BSwap; break;
       case llvm::Intrinsic::ctpop:      op = UnaryOp::Ctpop; break;
       case llvm::Intrinsic::expect:     op = UnaryOp::Copy; break;
+      case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
