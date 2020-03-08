@@ -9,8 +9,10 @@
 #include "smt/solver.h"
 #include "util/config.h"
 #include "util/errors.h"
+#include "util/stopwatch.h"
 #include "util/symexec.h"
 #include <algorithm>
+#include <iostream>
 #include <map>
 #include <set>
 #include <sstream>
@@ -894,6 +896,7 @@ Errors TransformVerify::verify() const {
     }
   }
 
+  StopWatch symexec_watch;
   calculateAndInitConstants(t);
   State::resetGlobals();
   State src_state(t.src, true), tgt_state(t.tgt, false);
@@ -905,6 +908,11 @@ Errors TransformVerify::verify() const {
     src_state.mkAxioms(tgt_state);
   } catch (AliveException e) {
     return move(e);
+  }
+
+  symexec_watch.stop();
+  if (symexec_watch.seconds() > 5) {
+    cerr << "WARNING: slow vcgen! Took " << symexec_watch << '\n';
   }
 
   Errors errs;

@@ -87,6 +87,7 @@ set(UTIL_SRCS
   util/errors.cpp
   util/file.cpp
   util/sort.cpp
+  util/stopwatch.cpp
   util/symexec.cpp
 )
 
