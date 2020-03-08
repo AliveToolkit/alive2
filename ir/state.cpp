@@ -403,6 +403,9 @@ void State::mkAxioms(State &tgt) {
           refines &= ins[i].non_poison.implies(eq_val && ins2[i].non_poison);
         }
 
+        if (is_val_eq.isFalse() && refines.isFalse())
+          continue;
+
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
