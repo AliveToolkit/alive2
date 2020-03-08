@@ -190,7 +190,7 @@ public:
 class FnCall final : public Instr {
 public:
   enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1, ArgMemOnly = 1 << 2,
-               NNaN = 1 << 3 };
+               NNaN = 1 << 3, NoReturn = 1 << 4 };
   enum ArgFlags { ArgNone = 0, ArgByVal = 1 << 0, ArgReturned = 1 << 1 };
 private:
   std::string fnName;
@@ -204,6 +204,7 @@ public:
       valid(valid) {}
   void addArg(Value &arg, unsigned flags);
 
+  bool hasFlag(unsigned i) const { return flags & i; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

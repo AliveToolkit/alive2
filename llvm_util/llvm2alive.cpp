@@ -258,6 +258,8 @@ public:
       flags |= FnCall::NoRead;
     if (i.hasFnAttr(llvm::Attribute::ArgMemOnly))
       flags |= FnCall::ArgMemOnly;
+    if (i.hasFnAttr(llvm::Attribute::NoReturn))
+      flags |= FnCall::NoReturn;
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         flags |= FnCall::NNaN;
@@ -872,6 +874,17 @@ public:
           if (i.hasMetadataOtherThanDebugLoc() &&
               !handleMetadata(i, *alive_i))
             return {};
+
+          auto FI = dynamic_cast<FnCall *>(alive_i);
+          if (FI && FI->hasFlag(FnCall::NoReturn)) {
+            llvm::Value *retval = nullptr;
+            if (!f.getReturnType()->isVoidTy())
+              retval = llvm::UndefValue::get(f.getReturnType());
+            auto tmp_ri = llvm::ReturnInst::Create(f.getContext(), retval);
+            BB->addInstr(visit(tmp_ri));
+            delete tmp_ri;
+            break;
+          }
         } else
           return {};
       }
