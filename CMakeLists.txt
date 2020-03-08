@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
+include(ProcessorCount)
 
 project(Alive2)
 
@@ -172,11 +173,22 @@ else()
   endif()
 endif()
 
+if (NOT DEFINED TEST_NTHREADS)
+  ProcessorCount(TEST_NTHREADS)
+  if (TEST_NTHREADS EQUAL 0)
+    set(TEST_NTHREADS 1)
+  endif()
+endif()
 add_custom_target("check"
                   COMMAND "python"
                           "${PROJECT_SOURCE_DIR}/tests/lit/lit.py"
                           "-s"
                           "${PROJECT_SOURCE_DIR}/tests"
+                          "-j${TEST_NTHREADS}"
                   DEPENDS "alive"
                   USES_TERMINAL
                  )
+
+if (BUILD_TV)
+  add_dependencies("check" "alive-tv")
+endif()
