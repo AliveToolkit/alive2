@@ -785,14 +785,14 @@ expr Pointer::block_refined(const Pointer &other) const {
     val_refines = block_val_refined(other);
   }
 
-  return is_block_alive() == other.is_block_alive() &&
+  expr alive = is_block_alive();
+  return alive == other.is_block_alive() &&
          blk_size == other.block_size() &&
          get_alloc_type() == other.get_alloc_type() &&
          is_writable() == other.is_writable() &&
          m.state->simplifyWithAxioms(
            block_alignment().ule(other.block_alignment())) &&
-         (is_block_alive() && get_offset_sizet().ult(blk_size))
-           .implies(val_refines);
+         (alive && get_offset_sizet().ult(blk_size)).implies(val_refines);
 }
 
 expr Pointer::is_writable() const {
