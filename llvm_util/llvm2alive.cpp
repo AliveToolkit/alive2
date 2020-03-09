@@ -273,6 +273,8 @@ public:
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
           attr |= FnCall::ArgByVal;
+        else if (argI->hasReturnedAttr())
+          attr |= FnCall::ArgReturned;
         ++argI;
       }
       call->addArg(*arg, attr);
