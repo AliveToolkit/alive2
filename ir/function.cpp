@@ -289,57 +289,94 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
-// Requires that CFG::edge_iterator visits each predecessor of a node before
-// the node itself and that the CFG is a DAG. Constructs dominators by: 
-// dom(x) = {intersect(dom(pred1), dom(pred2), ...)} U {x}. The result is a 
-// vector of dominator bb's of a given bb ordered by depth in CFG.
+// Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
+// A Simple, Fast Dominance Algorithm
+// http://www.cs.rice.edu/~keith/EMBED/dom.pdf
 void DomTree::buildDominators() {
-  for (auto [src, dst, instr] : cfg) {
+  unsigned bb_count = f.getBBs().size();
+
+  // build predecessor relationships
+  for (const auto &[p, b, instr] : cfg) {
     (void)instr;
 
-    // Make sure each bb dominates itself.
-    std::vector<const BasicBlock*> &srcDoms = (dominators.try_emplace(&src,
-                      std::vector<const BasicBlock*>{&src})).first->second;
-    std::vector<const BasicBlock*> &dstDoms = (dominators.try_emplace(&dst,
-                      std::vector<const BasicBlock*>{&dst})).first->second;
+    auto &b_node = doms[&b];
+    if (!b_node.get())
+      b_node = make_unique<DomTreeNode>(b);
+    
+    auto &pred = doms[&p];
+    if (!pred.get())
+      pred = make_unique<DomTreeNode>(p);
 
-    if (dstDoms.size() > 1) {
-      std::vector<const BasicBlock*> doms_copy = dominators[&dst];
-      dstDoms.clear();
+    b_node->preds.emplace_back(pred.get());
+  }
 
-      // get the intersection of all predecessor dominator sets of dst
-      std::vector<const BasicBlock*>::const_iterator srcIt, dstIt;
-      srcIt = srcDoms.begin();
-      dstIt = doms_copy.begin();
-      while (srcIt != srcDoms.end() && dstIt != doms_copy.end()) {
-        if (*srcIt == *dstIt) {
-          dstDoms.push_back(*srcIt);
-          ++srcIt;
-          ++dstIt;
-        } else {
-          break;
+  unsigned i = bb_count-1;
+  DomTreeNode *new_idom;
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (auto &b : f.getBBs()) {
+      auto &b_node = doms[b];
+      b_node->order = i;
+      if (i == bb_count-1)
+        b_node->dominator = b_node.get();
+      --i;
+
+      if (b_node->preds.empty())
+        continue;
+      new_idom = b_node->preds.front();
+      for (auto p : b_node->preds) {
+        if (p->dominator != nullptr) {
+          new_idom = intersect(p, new_idom);
         }
       }
-      dstDoms.insert(dstDoms.end(), &dst);
-    } else {
-      // add predecessor's dominators to the start of current
-      dstDoms.insert(dstDoms.begin(), srcDoms.begin(), srcDoms.end());
+
+      if (b_node->dominator != new_idom) {
+        b_node->dominator = new_idom;
+        changed = true;
+      }
     }
   }
-};
+}
+
+DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *b1, DomTreeNode *b2) {
+  auto finger1 = b1;
+  auto finger2 = b2;
+  while (finger1->order != finger2->order) {
+    while (finger1->order < finger2->order)
+      finger1 = finger1->dominator;
+    while (finger2->order < finger1->order)
+      finger2 = finger2->dominator;
+  }
+  return finger1;
+}
+
+// get immediate dominator BasicBlock
+auto DomTree::getIDominator(const BasicBlock &bb) const {
+  optional<const BasicBlock*> ret;
+
+  auto I = doms.find(&bb);
+  if (I != doms.end())
+    ret = &I->second->dominator->bb;
+
+  return ret;
+}
+
 
 void DomTree::printDot(std::ostream &os) const {
   os << "digraph {\n"
         "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
-  for (auto bb : f.getBBs()) {
-    auto &doms = dominators.at(bb);
-    if (doms.size() > 1) {
-      // print for before last element, last is itself
-      os << '"' << bb_dot_name(doms[doms.size()-2]
-        ->getName()) << "\" -> \"" << bb_dot_name(bb->getName()) << "\";\n";
+  for (auto I = f.getBBs().begin()+1, E = f.getBBs().end(); I != E; ++I) {
+    // test for unreachability
+    auto J = doms.find(*I);
+    if (J != doms.end()) {
+      auto node = J->second.get();
+      os << '"' << bb_dot_name(node->dominator->bb.getName()) << "\" -> \""
+        << bb_dot_name(node->bb.getName()) << "\";\n";
     }
   }
+
   os << "}\n";
 }
 

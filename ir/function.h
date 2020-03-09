@@ -171,16 +171,29 @@ public:
   void printDot(std::ostream &os) const;
 };
 
-// Does not support loops
 class DomTree final {
     Function &f;
     CFG &cfg;
-    // bb -> vec<dominator bb's ordered by depth in the CFG lowest first>.
-    std::unordered_map<const BasicBlock*,
-                      std::vector<const BasicBlock*>> dominators;
+
+    class DomTreeNode final {
+    public:
+      const BasicBlock &bb;
+      std::vector<DomTreeNode*> preds; // predecessors
+      DomTreeNode *dominator; // dominator of bb
+      unsigned order;
+
+      DomTreeNode();
+      DomTreeNode(const BasicBlock &bb) : bb(bb) {}
+      DomTreeNode(const BasicBlock &bb, int order) : bb(bb), order(order) {}
+    };
+
+    std::unordered_map<const BasicBlock*,std::unique_ptr<DomTreeNode>> doms;
+
     void buildDominators();
+    DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
   public:
     DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
+    auto getIDominator(const BasicBlock &bb) const;
     void printDot(std::ostream &os) const;
 };
 
