@@ -876,15 +876,8 @@ public:
             return {};
 
           auto FI = dynamic_cast<FnCall *>(alive_i);
-          if (FI && FI->hasFlag(FnCall::NoReturn)) {
-            llvm::Value *retval = nullptr;
-            if (!f.getReturnType()->isVoidTy())
-              retval = llvm::UndefValue::get(f.getReturnType());
-            auto tmp_ri = llvm::ReturnInst::Create(f.getContext(), retval);
-            BB->addInstr(visit(tmp_ri));
-            delete tmp_ri;
+          if (FI && FI->hasFlag(FnCall::NoReturn))
             break;
-          }
         } else
           return {};
       }

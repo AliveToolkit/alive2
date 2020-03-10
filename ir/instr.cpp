@@ -1250,6 +1250,8 @@ void FnCall::print(ostream &os) const {
     os << " argmemonly";
   if (flags & NNaN)
     os << " NNaN";
+  if (flags & NoReturn)
+    os << " noreturn";
 
   if (!valid)
     os << "\t; WARNING: unknown known function";
@@ -1331,6 +1333,10 @@ StateValue FnCall::toSMT(State &s) const {
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
                          out_types, !(flags & NoRead), !(flags & NoWrite),
                          flags & ArgMemOnly, move(returned_val));
+
+  if (flags & NoReturn)
+    // Return poison value.
+    s.addReturn(getType().getDummyValue(false));
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 
