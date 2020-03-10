@@ -182,18 +182,16 @@ class DomTree final {
       DomTreeNode *dominator; // dominator of bb
       unsigned order;
 
-      DomTreeNode();
       DomTreeNode(const BasicBlock &bb) : bb(bb) {}
-      DomTreeNode(const BasicBlock &bb, int order) : bb(bb), order(order) {}
     };
 
-    std::unordered_map<const BasicBlock*,std::unique_ptr<DomTreeNode>> doms;
+    std::unordered_map<const BasicBlock*, DomTreeNode> doms;
 
     void buildDominators();
     DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
   public:
     DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
-    auto getIDominator(const BasicBlock &bb) const;
+    const BasicBlock* getIDominator(const BasicBlock &bb) const;
     void printDot(std::ostream &os) const;
 };
 

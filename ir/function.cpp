@@ -299,67 +299,71 @@ void DomTree::buildDominators() {
   for (const auto &[p, b, instr] : cfg) {
     (void)instr;
 
-    auto &b_node = doms[&b];
-    if (!b_node.get())
-      b_node = make_unique<DomTreeNode>(b);
-    
-    auto &pred = doms[&p];
-    if (!pred.get())
-      pred = make_unique<DomTreeNode>(p);
-
-    b_node->preds.emplace_back(pred.get());
+    auto &b_node = doms.try_emplace(&b, DomTreeNode(b)).first->second;
+    auto &pred = doms.try_emplace(&p, DomTreeNode(p)).first->second;
+    b_node.preds.emplace_back(&pred);
   }
 
+  // initialization
   unsigned i = bb_count-1;
+  for (auto &b : f.getBBs()) {
+    auto I = doms.find(b);
+    if (I == doms.end())
+      continue;
+    
+    auto &b_node = I->second;
+    b_node.order = i;
+    b_node.dominator = nullptr;
+    if (i == bb_count-1)
+      b_node.dominator = &b_node;
+    --i;
+  }
+
   DomTreeNode *new_idom;
   bool changed = true;
   while (changed) {
     changed = false;
     for (auto &b : f.getBBs()) {
-      auto &b_node = doms[b];
-      b_node->order = i;
-      if (i == bb_count-1)
-        b_node->dominator = b_node.get();
-      --i;
-
-      if (b_node->preds.empty())
+      auto I = doms.find(b);
+      if (I == doms.end())
         continue;
-      new_idom = b_node->preds.front();
-      for (auto p : b_node->preds) {
+      auto &b_node = I->second;
+      
+      if (b_node.preds.empty())
+        continue;
+      
+      new_idom = b_node.preds.front();
+      for (auto p : b_node.preds) {
         if (p->dominator != nullptr) {
           new_idom = intersect(p, new_idom);
         }
       }
 
-      if (b_node->dominator != new_idom) {
-        b_node->dominator = new_idom;
+      if (b_node.dominator != new_idom) {
+        b_node.dominator = new_idom;
         changed = true;
       }
     }
   }
 }
 
-DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *b1, DomTreeNode *b2) {
-  auto finger1 = b1;
-  auto finger2 = b2;
-  while (finger1->order != finger2->order) {
-    while (finger1->order < finger2->order)
-      finger1 = finger1->dominator;
-    while (finger2->order < finger1->order)
-      finger2 = finger2->dominator;
+DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
+  while (f1->order != f2->order) {
+    while (f1->order < f2->order)
+      f1 = f1->dominator;
+    while (f2->order < f1->order)
+      f2 = f2->dominator;
   }
-  return finger1;
+  return f1;
 }
 
 // get immediate dominator BasicBlock
-auto DomTree::getIDominator(const BasicBlock &bb) const {
-  optional<const BasicBlock*> ret;
-
+const BasicBlock* DomTree::getIDominator(const BasicBlock &bb) const {
   auto I = doms.find(&bb);
   if (I != doms.end())
-    ret = &I->second->dominator->bb;
+    return &I->second.dominator->bb;
 
-  return ret;
+  return nullptr;
 }
 
 
@@ -371,9 +375,9 @@ void DomTree::printDot(std::ostream &os) const {
     // test for unreachability
     auto J = doms.find(*I);
     if (J != doms.end()) {
-      auto node = J->second.get();
-      os << '"' << bb_dot_name(node->dominator->bb.getName()) << "\" -> \""
-        << bb_dot_name(node->bb.getName()) << "\";\n";
+      auto node = J->second;
+      os << '"' << bb_dot_name(node.dominator->bb.getName()) << "\" -> \""
+        << bb_dot_name(node.bb.getName()) << "\";\n";
     }
   }
 
