@@ -913,7 +913,7 @@ public:
       if (!GV)
         continue;
       auto gv = getGlobalVariable(GV->getName().substr(1));
-      if (!gv->isConstant() || !gv->hasInitializer())
+      if (!gv->isConstant() || !gv->hasDefinitiveInitializer())
         continue;
 
       auto storedval = get_operand(gv->getInitializer());
