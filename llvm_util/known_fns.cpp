@@ -51,13 +51,11 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     if (llvm::isa<llvm::BitCastInst>(i.getArgOperand(0))) {
       auto BI = llvm::dyn_cast<llvm::BitCastInst>(i.getArgOperand(0));
       auto G = llvm::dyn_cast<llvm::GlobalVariable>(BI->getOperand(0));
-      if (G && G->isConstant() && G->hasInitializer()) {
+      if (G && G->isConstant() && G->hasDefinitiveInitializer()) {
         auto C = llvm::dyn_cast<llvm::ConstantDataArray>(G->getInitializer());
         if (C && C->isCString()) {
-          auto sz = llvm::ConstantInt::get(i.getType(), C->getAsCString().size());
           RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i),
-              *get_operand(sz, [](auto x){ return nullptr; },
-                               [](auto x){ return nullptr; }),
+              *make_intconst(C->getAsCString().size(), ty->bits()),
               UnaryOp::Copy));
         }
       }
