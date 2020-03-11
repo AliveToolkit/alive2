@@ -48,6 +48,17 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
                                       UnaryOp::Copy));
   case llvm::LibFunc_strlen:
+    if (auto BI = llvm::dyn_cast<llvm::BitCastInst>(i.getArgOperand(0))) {
+      auto G = llvm::dyn_cast<llvm::GlobalVariable>(BI->getOperand(0));
+      if (G && G->isConstant() && G->hasDefinitiveInitializer()) {
+        auto C = llvm::dyn_cast<llvm::ConstantDataArray>(G->getInitializer());
+        if (C && C->isCString()) {
+          RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i),
+              *make_intconst(C->getAsCString().size(), ty->bits()),
+              UnaryOp::Copy));
+        }
+      }
+    }
     RETURN_KNOWN(make_unique<Strlen>(*ty, value_name(i), *args[0]));
   default:
     RETURN_FAIL_KNOWN();
