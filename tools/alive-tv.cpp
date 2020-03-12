@@ -253,14 +253,14 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   bool result(errs);
   if (result) {
     if (errs.isUnsound()) {
-      cerr << "Transformation doesn't verify!\n" << errs << endl;
+      cout << "Transformation doesn't verify!\n" << errs << endl;
       ++badCount;
     } else {
       cerr << errs << endl;
       ++errorCount;
     }
   } else {
-    cerr << "Transformation seems to be correct!\n\n";
+    cout << "Transformation seems to be correct!\n\n";
     ++goodCount;
   }
 
@@ -273,11 +273,11 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     t2.print(cout, print_opts);
 
     if (Errors errs2 = verifier2.verify()) {
-      cerr << "Reverse transformation doesn't verify!\n" << errs2 << endl;
+      cout << "Reverse transformation doesn't verify!\n" << errs2 << endl;
     } else {
-      cerr << "Reverse transformation seems to be correct!\n\n";
+      cout << "Reverse transformation seems to be correct!\n\n";
       if (!result)
-        cerr << "These functions are equivalent.\n\n";
+        cout << "These functions are equivalent.\n\n";
     }
   }
 }
@@ -424,7 +424,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  cerr << "Summary:\n"
+  cout << "Summary:\n"
           "  " << goodCount << " correct transformations\n"
           "  " << badCount << " incorrect transformations\n"
           "  " << errorCount << " Alive2 errors\n";
@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
 
 end:
   if (opt_smt_stats)
-    smt::solver_print_stats(cerr);
+    smt::solver_print_stats(cout);
 
   smt_init.reset();
 
