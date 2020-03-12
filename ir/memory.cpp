@@ -490,7 +490,10 @@ expr Pointer::operator!=(const Pointer &rhs) const {
 #define DEFINE_CMP(op)                                                      \
 StateValue Pointer::op(const Pointer &rhs) const {                          \
   /* Note that attrs are not compared. */                                   \
-  return { get_offset().op(rhs.get_offset()), get_bid() == rhs.get_bid() }; \
+  expr nondet = expr::mkFreshVar("nondet", true);                           \
+  m.state->addQuantVar(nondet);                                             \
+  return { expr::mkIf(get_bid() == rhs.get_bid(),                           \
+                      get_offset().op(rhs.get_offset()), nondet), true };   \
 }
 
 DEFINE_CMP(sle)
