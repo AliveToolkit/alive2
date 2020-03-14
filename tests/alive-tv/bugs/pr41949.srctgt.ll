@@ -1,4 +1,4 @@
-; https://bugs.llvm.org/show_bug.cgi?id=41949
+; https://bugs.llvm.org/show_bug.cgi?id=41949 with minor fixes
 ;source_filename = "41949.ll"
 target datalayout = "E"
 
@@ -19,3 +19,4 @@ define i32 @tgt(i32* %p) {
   %v = load i32, i32* %u
   ret i32 %v
 } 
+; ERROR: Value mismatch
