@@ -1,4 +1,4 @@
-find_path(Z3_INCLUDE_DIR NAMES z3.h)
+find_path(Z3_INCLUDE_DIR NAMES z3.h PATH_SUFFIXES z3)
 find_library(Z3_LIBRARIES NAMES z3)
 
 message(STATUS "Z3: ${Z3_INCLUDE_DIR} ${Z3_LIBRARIES}")
