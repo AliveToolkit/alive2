@@ -191,7 +191,7 @@ class Memory {
   smt::expr local_block_val;
   smt::expr initial_non_local_block_val;
 
-  smt::expr non_local_block_liveness; // array: bid -> bool
+  smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
 
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
@@ -208,7 +208,7 @@ class Memory {
   std::vector<bool> escaped_local_blks;
 
   void store(const Pointer &p, const smt::expr &val, smt::expr &local,
-             smt::expr &non_local, bool index_bid = false);
+             smt::expr &non_local);
 
 public:
   enum BlockKind {
