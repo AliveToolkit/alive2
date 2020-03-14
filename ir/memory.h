@@ -157,7 +157,8 @@ public:
   smt::expr is_byval() const;
 
   enum AllocType {
-    NON_HEAP,
+    GLOBAL,
+    STACK,
     MALLOC,
     CXX_NEW,
   };
@@ -212,7 +213,7 @@ class Memory {
 
 public:
   enum BlockKind {
-    HEAP, STACK, GLOBAL, CONSTGLOBAL
+    MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
   };
 
   // TODO: missing local_* equivalents

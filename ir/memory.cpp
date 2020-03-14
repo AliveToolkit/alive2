@@ -706,8 +706,11 @@ expr Pointer::is_block_alive() const {
   if (!has_free && !has_fncall && !has_dead_allocas)
     return true;
 
-  // TODO: globals are always alive
+  // globals are always live
+  if ((get_alloc_type() == GLOBAL).isTrue())
+    return true;
 
+  // NULL block is dead
   if (num_nonlocals && get_bid().isZero())
     return false;
 
@@ -721,12 +724,12 @@ expr Pointer::get_alloc_type() const {
   // since it is only used to check if free/delete is ok and
   // for memory refinement of local malloc'ed blocks
   if (!has_malloc && !has_free && !has_fncall)
-    return expr::mkUInt(NON_HEAP, 2);
+    return expr::mkUInt(GLOBAL, 2);
 
   // if malloc is used, but no free, we can still ignore info for non-locals
   if (!has_free) {
     FunctionExpr non_local;
-    non_local.add(get_short_bid(), expr::mkUInt(NON_HEAP, 2));
+    non_local.add(get_short_bid(), expr::mkUInt(GLOBAL, 2));
     return get_value("blk_kind", m.local_blk_kind, non_local, expr());
 
   }
@@ -735,7 +738,8 @@ expr Pointer::get_alloc_type() const {
 }
 
 expr Pointer::is_heap_allocated() const {
-  return get_alloc_type() != NON_HEAP;
+  assert(MALLOC == 2 && CXX_NEW == 3);
+  return get_alloc_type().extract(1, 1) == 1;
 }
 
 expr Pointer::refined(const Pointer &other) const {
@@ -1011,7 +1015,11 @@ static expr mk_block_val_array() {
 }
 
 static expr mk_liveness_array() {
-  return num_nonlocals ? expr::mkVar("blk_liveness", num_nonlocals) : expr();
+  // consider all non_locals are initially alive
+  // block size can still be 0 to invalidate accesses
+  return num_nonlocals
+           ? (expr::mkInt(-1, num_nonlocals) << expr::mkUInt(1, num_nonlocals))
+           : expr();
 }
 
 static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
@@ -1359,7 +1367,14 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   auto short_bid = p.get_short_bid();
   // TODO: If address space is not 0, the address can be 0.
   // TODO: add support for C++ allocs
-  unsigned alloc_ty = blockKind == HEAP ? Pointer::MALLOC : Pointer::NON_HEAP;
+  unsigned alloc_ty = 0;
+  switch (blockKind) {
+  case MALLOC:      alloc_ty = Pointer::MALLOC; break;
+  case CXX_NEW:     alloc_ty = Pointer::CXX_NEW; break;
+  case STACK:       alloc_ty = Pointer::STACK; break;
+  case GLOBAL:
+  case CONSTGLOBAL: alloc_ty = Pointer::GLOBAL; break;
+  }
 
   assert(align != 0);
   auto align_bits = ilog2(align);

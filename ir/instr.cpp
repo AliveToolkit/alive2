@@ -1867,7 +1867,7 @@ StateValue Malloc::toSMT(State &s) const {
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
   unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p_new, allocated] = s.getMemory().alloc(sz, align, Memory::HEAP,
+  auto [p_new, allocated] = s.getMemory().alloc(sz, align, Memory::MALLOC,
                                                 np_size, nonnull);
 
   if (!ptr) {
@@ -1933,7 +1933,7 @@ StateValue Calloc::toSMT(State &s) const {
   unsigned align = heap_block_alignment;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(size, align, Memory::HEAP,
+  auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
                                             np && nm.mul_no_uoverflow(sz),
                                             nonnull);
 
