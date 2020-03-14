@@ -708,6 +708,9 @@ expr Pointer::is_block_alive() const {
 
   // TODO: globals are always alive
 
+  if (num_nonlocals && get_bid().isZero())
+    return false;
+
   auto bid = get_short_bid();
   return mkIf_fold(is_local(), load_bv(m.local_block_liveness, bid),
                    load_bv(m.non_local_block_liveness, bid));
@@ -990,7 +993,7 @@ static void store_lambda(const Pointer &p, const expr &cond, const expr &val,
 
 static expr load(const Pointer &p, const expr &local, const expr &non_local) {
   auto idx = p.short_ptr();
-  return expr::mkIf(p.is_local(), local.load(idx), non_local.load(idx));
+  return mkIf_fold(p.is_local(), local.load(idx), non_local.load(idx));
 }
 
 // Global block id 0 is reserved for a null block.
