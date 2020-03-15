@@ -1,5 +1,5 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=4374
-; TEST-ARGS: -smt-to=5000
+; TEST-ARGS: -disable-undef-input
 
 define float @src(float %a, float %b) nounwind {
 entry:
