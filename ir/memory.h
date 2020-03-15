@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+namespace smt { class Model; }
+
 namespace IR {
 
 class Memory;
@@ -301,6 +303,7 @@ public:
   // for container use only
   bool operator<(const Memory &rhs) const;
 
+  void print(std::ostream &os, const smt::Model &m) const;
   friend std::ostream &operator<<(std::ostream &os, const Memory &m);
 
   friend class Pointer;

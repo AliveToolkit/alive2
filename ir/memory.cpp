@@ -5,6 +5,7 @@
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "ir/value.h"
+#include "smt/solver.h"
 #include "util/compiler.h"
 #include <string>
 
@@ -1740,6 +1741,48 @@ bool Memory::operator<(const Memory &rhs) const {
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks);
 }
+
+#define P(name, expr) do {      \
+  auto v = m.eval(expr, false); \
+  uint64_t n;                   \
+  if (v.isUInt(n))              \
+    os << "\t" name ": " << n;  \
+  else if (v.isConst())         \
+    os << "\t" name ": " << v;  \
+  } while(0)
+
+void Memory::print(ostream &os, const Model &m) const {
+  if (memory_unused())
+    return;
+
+  auto print = [&](bool local, unsigned num_bids) {
+    for (unsigned bid = 0; bid < num_bids; ++bid) {
+      Pointer p(*this, bid, local);
+      uint64_t n;
+      ENSURE(p.get_bid().isUInt(n));
+      os << "Block " << n << " >";
+      P("size", p.block_size());
+      P("align", expr::mkInt(1, 32) << p.block_alignment().zextOrTrunc(32));
+      P("alloc type", p.get_alloc_type());
+      if (observes_addresses())
+        P("address", p.get_address());
+      os << '\n';
+    }
+  };
+
+  os << "\nMEMORY STATE\n============";
+
+  if (state->isSource() && IR::num_nonlocals) {
+    os << "\nNON-LOCAL BLOCKS:\n";
+    print(false, IR::num_nonlocals);
+  }
+
+  if (num_locals) {
+    os << "\nLOCAL BLOCKS:\n";
+    print(true, num_locals);
+  }
+}
+#undef P
 
 #define P(msg, local, nonlocal)                                                \
   os << msg "\n";                                                              \

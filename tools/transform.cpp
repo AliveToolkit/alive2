@@ -173,6 +173,8 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
                    val.first);
       s << '\n';
     }
+
+    st->getMemory().print(s, m);
   }
 
   print_var_val(s, m);
