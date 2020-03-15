@@ -41,8 +41,8 @@ static unsigned bits_int_poison() {
 }
 
 static unsigned bits_ptr_byte_offset() {
-  assert(bits_byte <= bits_program_pointer);
-  return bits_byte != bits_program_pointer ? 3 : 0;
+  assert(!does_ptr_mem_access || bits_byte <= bits_program_pointer);
+  return bits_byte < bits_program_pointer ? 3 : 0;
 }
 
 static unsigned padding_ptr_byte() {
