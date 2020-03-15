@@ -1,4 +1,4 @@
-; https://bugs.llvm.org/show_bug.cgi?id=27575
+; https://bugs.llvm.org/show_bug.cgi?id=33673
 ; To find counter-example from this, function should be able to throw or exit
 define void @src() {
   %p = alloca i32, align 4
