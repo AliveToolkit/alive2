@@ -289,58 +289,74 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
-// Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
-// A Simple, Fast Dominance Algorithm
-// http://www.cs.rice.edu/~keith/EMBED/dom.pdf
-void DomTree::buildDominators() {
-  unsigned bb_count = f.getBBs().size();
 
-  // build predecessor relationships
+void DomTree::buildDominators() {
+  // build predecessor and successor relationships
   for (const auto &[p, b, instr] : cfg) {
     (void)instr;
 
-    auto &b_node = doms.try_emplace(&b, DomTreeNode(b)).first->second;
-    auto &pred = doms.try_emplace(&p, DomTreeNode(p)).first->second;
-    b_node.preds.emplace_back(&pred);
+    auto &b_node = doms.try_emplace(&b, b).first->second;
+    auto &pred = doms.try_emplace(&p, p).first->second;
+    b_node.dominator = nullptr;
+    b_node.preds.push_back(&pred);
+    pred.children.push_back(&b_node);
   }
 
-  // initialization
-  unsigned i = bb_count-1;
-  for (auto &b : f.getBBs()) {
-    auto I = doms.find(b);
-    if (I == doms.end())
-      continue;
-    
-    auto &b_node = I->second;
-    b_node.order = i;
-    b_node.dominator = nullptr;
-    if (i == bb_count-1)
-      b_node.dominator = &b_node;
-    --i;
-  }
+  // JOHN B. KAM AND JEFFREY D. ULLMAN (1976).
+  // Adapted from Algorithm D in article "Global Data Flow Analysis 
+  // and Iterative Algorithms".
+  // This adapted version is almost identical to top_sort in sort.cpp.
+  // The resulting reverse post order works for building dominator trees
+  // even when CFG is cyclic.
+  // Sort a vector of DomTreeNode into reverse postorder.
+  vector<DomTreeNode*> sorted;
+  unordered_map<DomTreeNode*, bool> visited;
+  unsigned reverse_post_order = 1;
+  
+  function<void(DomTreeNode*)> visit = [&](DomTreeNode *node) {
+    if (visited[node])
+      return;
+    visited[node] = true;
+
+    for (auto child : node->children) {
+      visit(child);
+    }
+    // visit parent after visiting all children
+    sorted.push_back(node);
+    node->order = reverse_post_order;
+    // incr instead of decr because sorted is reversed later
+    ++reverse_post_order;
+  };
+
+  // assuming first bb is never moved
+  auto &entry = doms.at(&f.getFirstBB());
+  visit(&entry);
+  reverse(sorted.begin(), sorted.end());
+
+  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
+  // A Simple, Fast Dominance Algorithm
+  // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
+  // Makes multiple passes when CFG is cyclic to update incorrect initial
+  // dominator guesses.
+  entry.dominator = &entry;
 
   DomTreeNode *new_idom;
   bool changed = true;
   while (changed) {
     changed = false;
-    for (auto &b : f.getBBs()) {
-      auto I = doms.find(b);
-      if (I == doms.end())
-        continue;
-      auto &b_node = I->second;
-      
-      if (b_node.preds.empty())
+    for (auto b : sorted) {
+      if (b->preds.empty())
         continue;
       
-      new_idom = b_node.preds.front();
-      for (auto p : b_node.preds) {
+      new_idom = b->preds.front();
+      for (auto p : b->preds) {
         if (p->dominator != nullptr) {
           new_idom = intersect(p, new_idom);
         }
       }
 
-      if (b_node.dominator != new_idom) {
-        b_node.dominator = new_idom;
+      if (b->dominator != new_idom) {
+        b->dominator = new_idom;
         changed = true;
       }
     }

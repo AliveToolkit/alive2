@@ -179,6 +179,7 @@ class DomTree final {
     public:
       const BasicBlock &bb;
       std::vector<DomTreeNode*> preds; // predecessors
+      std::vector<DomTreeNode*> children;
       DomTreeNode *dominator; // dominator of bb
       unsigned order;
 
