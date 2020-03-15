@@ -56,8 +56,8 @@ class Function final {
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
 
-  unsigned bits_pointers;
-  bool little_endian;
+  unsigned bits_pointers = 64;
+  bool little_endian = true;
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
