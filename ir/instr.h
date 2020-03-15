@@ -389,6 +389,7 @@ public:
       initially_dead(initially_dead) {}
 
   Value& getSize() const { return *size; }
+  Value* getMul() const { return mul; }
   bool initDead() const { return initially_dead; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

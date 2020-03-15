@@ -531,6 +531,13 @@ static uint64_t max_gep(const Instr &inst) {
   uint64_t mul = 1;
   if (auto alloc = dynamic_cast<const Alloc*>(&inst)) {
     size = &alloc->getSize();
+    if (alloc->getMul()) {
+      if (auto n = get_int(*alloc->getMul())) {
+        mul = *n;
+      } else {
+        max_alloc_size = UINT64_MAX;
+      }
+    }
   } else if (auto alloc = dynamic_cast<const Malloc*>(&inst)) {
     size = &alloc->getSize();
   } else if (auto alloc = dynamic_cast<const Calloc*>(&inst)) {
