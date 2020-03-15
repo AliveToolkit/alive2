@@ -56,6 +56,7 @@ class Function final {
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
 
+  unsigned bits_pointers;
   bool little_endian;
 
   // constants used in this function
@@ -67,8 +68,10 @@ class Function final {
 
 public:
   Function() {}
-  Function(Type &type, std::string &&name, bool little_endian = true)
-    : type(&type), name(std::move(name)), little_endian(little_endian) {}
+  Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
+           bool little_endian = true)
+    : type(&type), name(std::move(name)), bits_pointers(bits_pointers),
+      little_endian(little_endian) {}
 
   const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
@@ -109,6 +112,7 @@ public:
   }
 
   bool hasReturn() const;
+  unsigned bitsPointers() const { return bits_pointers; }
   bool isLittleEndian() const { return little_endian; }
 
   void syncDataWithSrc(const Function &src);

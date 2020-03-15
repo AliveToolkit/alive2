@@ -639,8 +639,10 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned num_globals_src = globals_src.size();
   unsigned num_globals = num_globals_src;
 
-  // TODO: get this from data layout, varies among address spaces
-  bits_program_pointer = 64;
+  // FIXME: varies among address spaces
+  bits_program_pointer = t.src.bitsPointers();
+  assert(bits_program_pointer > 0 && bits_program_pointer <= 64);
+  assert(bits_program_pointer == t.tgt.bitsPointers());
   heap_block_alignment = 8;
 
   for (auto GVT : globals_tgt) {

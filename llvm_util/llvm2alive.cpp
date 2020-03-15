@@ -800,7 +800,8 @@ public:
     if (!type)
       return {};
 
-    Function Fn(*type, f.getName().str(), DL().isLittleEndian());
+    Function Fn(*type, f.getName().str(), 8 * DL().getPointerSize(),
+                DL().isLittleEndian());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {
