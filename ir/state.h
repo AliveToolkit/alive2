@@ -87,17 +87,25 @@ private:
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
 
-  // store data for function calls:
-  // inputs: non-ptr arguments, (ptr arguments, is by_val arg?), memory,
-  //         reads memory?, argmemonly
-  // outputs: values, UB, memory state, used in this state?
-  std::map<std::string,
-           std::map<std::tuple<std::vector<StateValue>,
-                               std::vector<std::pair<StateValue, bool>>,
-                               Memory, bool, bool>,
-                    std::tuple<std::vector<StateValue>, smt::expr,
-                               Memory::CallState, bool>>>
-    fn_call_data;
+  struct FnCallInput {
+    std::vector<StateValue> args_nonptr;
+    // (ptr arguments, is by_val arg?)
+    std::vector<std::pair<StateValue, bool>> args_ptr;
+    Memory m;
+    bool readsmem, argmemonly;
+    bool operator<(const FnCallInput &rhs) const {
+      return std::tie(args_nonptr, args_ptr, m, readsmem, argmemonly) <
+             std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.m, rhs.readsmem,
+                      rhs.argmemonly);
+    }
+  };
+  struct FnCallOutput {
+    std::vector<StateValue> retvals;
+    smt::expr ub;
+    Memory::CallState callstate;
+    bool used;
+  };
+  std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
 
 public:
   State(Function &f, bool source);
