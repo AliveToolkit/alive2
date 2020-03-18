@@ -5,6 +5,7 @@
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/version.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
@@ -314,8 +315,21 @@ static llvm::Function *findFunction(llvm::Module &M, const std::string FName) {
   return 0;
 }
 
-static const char *Usage =
-R"EOF(Alive2 stand-alone translation validator:
+static ofstream OutFile;
+
+int main(int argc, char **argv) {
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
+  llvm::PrettyStackTraceProgram X(argc, argv);
+  llvm::EnableDebugBuffering = true;
+  llvm::llvm_shutdown_obj llvm_shutdown; // Call llvm_shutdown() on exit.
+  llvm::LLVMContext Context;
+
+  std::string Usage =
+      R"EOF(Alive2 stand-alone translation validator:
+version )EOF";
+  Usage += alive_version;
+  Usage += R"EOF(
+see alive-tv --version  for LLVM version info,
 
 This program takes either one or two LLVM IR files files as
 command-line arguments. Both .bc and .ll files are supported.
@@ -336,15 +350,6 @@ optimized module refine those in the original one. This provides a
 convenient way to demonstrate an existing optimizer bug.
 )EOF";
 
-static ofstream OutFile;
-
-int main(int argc, char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
-  llvm::PrettyStackTraceProgram X(argc, argv);
-  llvm::EnableDebugBuffering = true;
-  llvm::llvm_shutdown_obj llvm_shutdown;  // Call llvm_shutdown() on exit.
-  llvm::LLVMContext Context;
-
   llvm::cl::HideUnrelatedOptions(opt_alive);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
@@ -363,7 +368,7 @@ int main(int argc, char **argv) {
     OutFile.open(opt_outputfile);
     std::cout.rdbuf(OutFile.rdbuf());
   }
-  
+
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get()) {
     cerr << "Could not read bitcode from '" << opt_file1 << "'\n";

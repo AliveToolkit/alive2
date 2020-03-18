@@ -7,6 +7,7 @@
 #include "tools/alive_parser.h"
 #include "util/config.h"
 #include "util/file.h"
+#include "util/version.h"
 #include <cstdlib>
 #include <iostream>
 #include <string_view>
@@ -19,19 +20,21 @@ using namespace std;
 
 
 static void show_help() {
-  cerr <<
-    "Usage: alive2 <options> <files.opt>\n"
-    "Options:\n"
-    " -root-only\t\tCheck the expression's root only\n"
-    " -v\t\t\tVerbose mode\n"
-    " -smt-stats\t\tShow SMT statistics\n"
-    " -smt-to:x\t\tTimeout for SMT queries in ms\n"
-    " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
-    " -smt-verbose\t\tPrint all SMT queries\n"
-    " -skip-smt\t\tSkip all SMT queries\n"
-    " -disable-poison-input\tAssume input variables can never be poison\n"
-    " -disable-undef-input\tAssume input variables can never be undef\n"
-    " -h / --help\t\tShow this help\n";
+  cerr << "Usage: alive2 <options> <files.opt>\n"
+          "version "
+       << alive_version
+       << "\n\n"
+          "Options:\n"
+          " -root-only\t\tCheck the expression's root only\n"
+          " -v\t\t\tVerbose mode\n"
+          " -smt-stats\t\tShow SMT statistics\n"
+          " -smt-to:x\t\tTimeout for SMT queries in ms\n"
+          " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
+          " -smt-verbose\t\tPrint all SMT queries\n"
+          " -skip-smt\t\tSkip all SMT queries\n"
+          " -disable-poison-input\tAssume input variables can never be poison\n"
+          " -disable-undef-input\tAssume input variables can never be undef\n"
+          " -h / --help / -v / --version\t\tShow this help\n";
 }
 
 
@@ -67,7 +70,8 @@ int main(int argc, char **argv) {
       config::disable_undef_input = true;
     else if (arg == "-disable-poison-input")
       config::disable_poison_input = true;
-    else if (arg == "-h" || arg == "--help") {
+    else if (arg == "-h" || arg == "--help" || arg == "-v" ||
+             arg == "--version") {
       show_help();
       return 0;
     } else {

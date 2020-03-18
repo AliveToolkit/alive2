@@ -32,6 +32,28 @@ if (CYGWIN)
   set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
 endif()
 
+find_package(Git REQUIRED)
+add_custom_command(
+  OUTPUT "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  COMMAND "${CMAKE_COMMAND}" -E echo_append "#define ALIVE_VERSION_MACRO " > "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty >> "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  VERBATIM
+)
+add_custom_command(
+  DEPENDS "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  OUTPUT "${CMAKE_BINARY_DIR}/version_gen.h"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_BINARY_DIR}/version_gen.h.tmp" "${CMAKE_BINARY_DIR}/version_gen.h"
+  COMMAND "${CMAKE_COMMAND}" -E remove -f "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  VERBATIM
+)
+add_custom_target(
+  generate_version ALL
+  DEPENDS "${CMAKE_BINARY_DIR}/version_gen.h"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+)
+
 find_package(ZLIB)
 find_package(Z3 4.8.5 REQUIRED)
 include_directories(${Z3_INCLUDE_DIR})
@@ -50,6 +72,7 @@ add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
                    DEPENDS "tools/alive_lexer.re")
 
 include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_BINARY_DIR})
 
 set(IR_SRCS
   ir/constant.cpp
@@ -83,6 +106,8 @@ set(TOOLS_SRCS
 add_library(tools STATIC ${TOOLS_SRCS})
 
 set(UTIL_SRCS
+  "${CMAKE_BINARY_DIR}/version_gen.h"
+  util/version.cpp
   util/compiler.cpp
   util/config.cpp
   util/errors.cpp
@@ -93,6 +118,7 @@ set(UTIL_SRCS
 )
 
 add_library(util STATIC ${UTIL_SRCS})
+add_dependencies(util generate_version)
 
 set(ALIVE_LIBS ir smt tools util)
 
