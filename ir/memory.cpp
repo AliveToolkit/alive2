@@ -1770,15 +1770,25 @@ void Memory::print(ostream &os, const Model &m) const {
     }
   };
 
-  os << "\nMEMORY STATE\n============";
+  bool did_header = false;
+  auto header = [&](const char *msg) {
+    if (!did_header) {
+      os << '\n'
+         << (state->isSource() ? "SOURCE" : "TARGET")
+         << " MEMORY STATE\n===================\n";
+    } else
+      os << '\n';
+    os << msg;
+    did_header = true;
+  };
 
   if (state->isSource() && IR::num_nonlocals) {
-    os << "\nNON-LOCAL BLOCKS:\n";
+    header("NON-LOCAL BLOCKS:\n");
     print(false, IR::num_nonlocals);
   }
 
   if (num_locals) {
-    os << "\nLOCAL BLOCKS:\n";
+    header("LOCAL BLOCKS:\n");
     print(true, num_locals);
   }
 }
