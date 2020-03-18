@@ -235,7 +235,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   auto mk_val = [&](const Type &t, const string &name) {
     if (t.isPtrType())
-      return memory.mkFnRet(name.c_str(), get<1>(I->first));
+      return memory.mkFnRet(name.c_str(), I->first.args_ptr);
 
     auto v = expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
     return make_pair(v, v);
@@ -257,26 +257,26 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     string ub_name = string(name) + "#ub";
     I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
                   writes_memory
-                  ? memory.mkCallState(argmemonly ? &get<1>(I->first) : nullptr)
+                  ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr)
                   : Memory::CallState(), true };
   } else {
-    get<3>(I->second) = true;
+    I->second.used = true;
   }
 
-  addUB(get<1>(I->second));
+  addUB(I->second.ub);
 
   if (writes_memory)
-    memory.setState(get<2>(I->second));
+    memory.setState(I->second.callstate);
 
   if (all_args_np.isTrue())
-    return get<0>(I->second);
+    return I->second.retvals;
 
   // if any of the arguments is poison, yield an arbitrary value, such that
   // f(poison) -> f(42) works
   vector<StateValue> ret;
   auto T = out_types.begin();
   auto var_name = name + "#pval";
-  for (auto &[v, np] : get<0>(I->second)) {
+  for (auto &[v, np] : I->second.retvals) {
     auto [val_poison, var] = mk_val(**T, var_name);
     ret.emplace_back(expr::mkIf(all_args_np, v, val_poison), expr(np));
     addQuantVar(move(var));
@@ -371,7 +371,7 @@ void State::syncSEdataWithSrc(const State &src) {
    (void)fn;
     for (auto &[in, data] : map) {
       (void)in;
-      get<3>(data) = false;
+      data.used = false;
     }
   }
 
