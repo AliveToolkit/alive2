@@ -36,7 +36,7 @@ find_package(Git REQUIRED)
 add_custom_command(
   OUTPUT "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
   COMMAND "${CMAKE_COMMAND}" -E echo_append "#define ALIVE_VERSION_MACRO " > "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
-  COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty >> "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --always >> "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   VERBATIM
 )
