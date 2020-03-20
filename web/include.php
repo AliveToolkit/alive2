@@ -9,6 +9,9 @@ function html_header($title) {
 <head>
 <title>Alive2: $title</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@2/dist/Chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tablesorter@2/dist/js/jquery.tablesorter.combined.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2/dist/css/theme.blue.min.css">
 <style>
 table {
   border-collapse: collapse

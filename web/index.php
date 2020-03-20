@@ -22,7 +22,10 @@ if ($hash && $test) {
       break;
   }
 
-  html_header("Test Failure: " . htmlspecialchars($t[0]));
+  $name_html = htmlspecialchars($t[0]);
+  html_header("Test Failure: $name_html");
+
+  echo "<p>Test source: <a href=\"https://github.com/llvm/llvm-project/blob/$run[5]/llvm/test/$name_html\">git</a></p>\n";
 
   echo "<h2>Log:</h2>\n<pre>";
   echo htmlspecialchars(file_get_contents("data/logs/$t[3].txt")), "</pre>\n";
@@ -43,10 +46,11 @@ LLVM git: <a href="https://github.com/llvm/llvm-project/commit/$run[5]">$run[5]<
 Alive2 git: <a href="https://github.com/AliveToolkit/alive2/commit/$run[3]">$run[3]</a></p>
 
 <p>Failed tests:</p>
-<table>
-<tr>
-<th>Test Name</th><th>Ok if undef ignored?</th>
-</tr>
+<table id="tabletests" class="tablesorter" style="width:auto">
+<thead><tr>
+<th>Test Name</th><th>Ok if undef ignored?</th><th>Failure reason</th>
+</tr></thead>
+<tbody>
 HTML;
 
   foreach ($tests as $test) {
@@ -54,10 +58,25 @@ HTML;
     echo "<tr><td><a href=\"index.php?hash=$hash&amp;test=".
          htmlspecialchars(urlencode($test[0])). "\">".
          htmlspecialchars($test[0])."</a></td>".
-         "<td style=\"text-align:center\">$check</td></tr>\n";
+         "<td style=\"text-align:center\">$check</td>".
+         "<td>".htmlspecialchars($test[4])."</td></tr>\n";
   }
 
-  echo "</table>\n";
+  echo <<< HTML
+</tbody></table>
+<script>
+$(function() {
+  $("#tabletests").tablesorter({
+    theme: 'blue',
+    widgets: [ 'zebra', 'resizable', 'stickyHeaders' ],
+    widgetOptions: {
+      storage_storageType: 's',
+      resizable_addLastColumn: true
+    }});
+});
+</script>
+
+HTML;
 }
 else {
   html_header('Project Zero LLVM Bugs');
@@ -107,8 +126,7 @@ function get_all_runs($data, $hash) {
   return $t;
 }
 
-// 0: test name, 1: ok with undef?, 2: stderr hash, log: hash
-// TODO CONFIRM THESE
+// 0: test name, 1: ok with undef?, 2: stderr hash, 3: log hash, 4: error reason
 function get_run_tests($hash) {
   $data = array();
   foreach (file("data/logs/$hash.txt") as $entry) {
@@ -181,7 +199,10 @@ new Chart(ctx, {
         display: true,
         scaleLabel: {
           display: true,
-          labelString: 'Test Failures'
+          labelString: 'Alive2 Test Failures'
+        },
+        ticks: {
+          beginAtZero: true
         }
       }]
     }

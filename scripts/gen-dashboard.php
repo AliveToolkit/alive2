@@ -31,16 +31,32 @@ foreach ($test_failures as $test) {
     die("Failed to get data for $test\n");
   }
 
-  $stderr = store_log(preg_replace('/Report written to \S+/S', '', $m[1]));
+  $err = $m[1];
+  $stderr = store_log(preg_replace('/Report written to \S+/S', '', $err));
 
-  preg_match('/Report written to (\S+)/S', $m[1], $m);
-  $log = store_log(empty($m[1]) ? '' : file_get_contents($m[1]));
+  preg_match('/Report written to (\S+)/S', $err, $m);
+  if (empty($m[1])) {
+    if (strstr($err, '(core dumped)') !== false) {
+      $error = 'Crash';
+    } else {
+      $error = '?';
+    }
+    $log = store_log('');
+  } else {
+    $log = file_get_contents($m[1]);
+    if (preg_match_all('/ERROR: (.+)/S', $log, $m)) {
+      $error = end($m[1]);
+    } else {
+      $error = '?';
+    }
+    $log = store_log($log);
+  }
   
   // TODO: check if correct without undef
   $ok_wo_undef = correct_without_undef($test);
   if (!$ok_wo_undef)
    ++$fail_without_undef;
-  $tests[] = array($test, $ok_wo_undef, $stderr, $log);
+  $tests[] = array($test, $ok_wo_undef, $stderr, $log, $error);
 }
 
 echo "Failures wo undef:\t$fail_without_undef\n";
