@@ -179,7 +179,6 @@ class DomTree final {
     public:
       const BasicBlock &bb;
       std::vector<DomTreeNode*> preds; // predecessors
-      std::vector<DomTreeNode*> children;
       DomTreeNode *dominator; // dominator of bb
       unsigned order;
 
@@ -189,7 +188,7 @@ class DomTree final {
     std::unordered_map<const BasicBlock*, DomTreeNode> doms;
 
     void buildDominators();
-    DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
+    static DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
   public:
     DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
     const BasicBlock* getIDominator(const BasicBlock &bb) const;
