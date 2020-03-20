@@ -378,6 +378,13 @@ static void check_refinement(Errors &errs, Transform &t,
   });
 }
 
+static const ConversionOp* is_bitcast(const Value &v) {
+  if (auto c = dynamic_cast<const ConversionOp*>(&v))
+    if (c->getOp() == ConversionOp::BitCast)
+      return c;
+  return nullptr;
+}
+
 static bool has_nullptr(const Value *v) {
   if (dynamic_cast<const NullPointerValue*>(v) ||
       (dynamic_cast<const UndefValue*>(v) && hasPtr(v->getType())))
@@ -424,11 +431,9 @@ static bool may_be_nonlocal(Value *ptr) {
       continue;
     }
 
-    if (auto c = dynamic_cast<ConversionOp*>(ptr)) {
-      if (c->getOp() == ConversionOp::BitCast) {
-        todo.emplace_back(&c->getValue());
-        continue;
-      }
+    if (auto c = is_bitcast(*ptr)) {
+      todo.emplace_back(&c->getValue());
+      continue;
     }
 
     if (auto phi = dynamic_cast<Phi*>(ptr)) {
@@ -469,9 +474,8 @@ static optional<int64_t> get_int(const Value &val) {
 static uint64_t max_mem_access, max_alloc_size;
 
 static uint64_t get_globalvar_size(const Value *V) {
-  auto cop = dynamic_cast<const ConversionOp *>(V);
-  if (cop && cop->getOp() == ConversionOp::BitCast)
-    return get_globalvar_size(&cop->getValue());
+  if (auto cast = is_bitcast(*V))
+    return get_globalvar_size(&cast->getValue());
   if (auto glb = dynamic_cast<const GlobalVariable *>(V))
     return glb->size();
   return UINT64_MAX;
@@ -633,6 +637,9 @@ static uint64_t get_access_size(const Instr &inst) {
   } else if (auto ld = dynamic_cast<const Load*>(&inst)) {
     value_ty = &ld->getType();
     align = ld->getAlign();
+  } else if (auto cast = is_bitcast(inst)) {
+    value_ty = &cast->getType();
+    align = 64; // just some high value
   } else
     return 0;
 
