@@ -11,3 +11,4 @@ define i32 @b() {
 define i32 @c() {
   ret i32 2
 }
+; ERROR: Value mismatch
