@@ -6,6 +6,7 @@ import lit.util
 from .base import TestFormat
 import os, re, signal, string, subprocess
 
+
 def executeCommand(command):
   p = subprocess.Popen(command,
                        stdout=subprocess.PIPE,
