@@ -59,16 +59,22 @@ static llvm::cl::opt<bool> opt_se_verbose(
      llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<unsigned> opt_smt_to(
-  "smt-to", llvm::cl::desc("Timeout for SMT queries (default=1000)"),
-  llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
+    "smt-to", llvm::cl::desc("Timeout for SMT queries (default=1000)"),
+    llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
 
 static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::list<std::string> opt_funcs(
+    "func",
+    llvm::cl::desc("Specify the name of a function to verify (without @)"),
+    llvm::cl::ZeroOrMore, llvm::cl::value_desc("function name"),
+    llvm::cl::cat(opt_alive));
+
 static llvm::cl::opt<bool> opt_tactic_verbose(
-  "tactic-verbose", llvm::cl::desc("SMT Tactic verbose mode"),
-  llvm::cl::cat(opt_alive), llvm::cl::init(false));
+    "tactic-verbose", llvm::cl::desc("SMT Tactic verbose mode"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_debug(
     "dbg", llvm::cl::desc("Print debugging info"),
@@ -414,6 +420,10 @@ convenient way to demonstrate an existing optimizer bug.
   }
 
   {
+  set<string> funcNames;
+  for (const string &fnname: opt_funcs)
+    funcNames.insert(fnname);
+
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
   // FIXME: quadratic, may not be suitable for very large modules
   // emitted by opt-fuzz
@@ -423,6 +433,8 @@ convenient way to demonstrate an existing optimizer bug.
     for (auto &F2 : *M2.get()) {
       if (F2.isDeclaration() ||
           F1.getName() != F2.getName())
+        continue;
+      if (!funcNames.empty() && funcNames.count(F1.getName().str()) == 0)
         continue;
       compareFunctions(F1, F2, targetTriple, goodCount, badCount, errorCount);
       break;
