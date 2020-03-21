@@ -6,7 +6,6 @@ import lit.util
 from .base import TestFormat
 import os, re, signal, string, subprocess
 
-
 def executeCommand(command):
   p = subprocess.Popen(command,
                        stdout=subprocess.PIPE,
@@ -41,6 +40,7 @@ class Alive2Test(TestFormat):
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
     self.regex_check = re.compile(r";\s*CHECK:(.*)")
+    self.regex_errs_out = re.compile("ERROR:.*")
 
   def getTestsInDirectory(self, testSuite, path_in_suite,
                           litConfig, localConfig):
@@ -111,14 +111,15 @@ class Alive2Test(TestFormat):
       return lit.Test.FAIL, out + err
 
     if expect_err is None and xfail is None:
-      if exitCode == 0 and (out + err).find(ok_string) != -1:
+      if exitCode == 0 and (out + err).find(ok_string) != -1 and \
+          self.regex_errs_out.search(out + err) is None:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
     if expect_err != None and (out + err).find(expect_err.group(1)) != -1:
       return lit.Test.PASS, ''
 
-    if xfail != None and err.find(xfail.group(1)) != -1:
+    if xfail != None and (out + err).find(xfail.group(1)) != -1:
       return lit.Test.XFAIL, ''
 
     return lit.Test.FAIL, out + err
