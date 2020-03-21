@@ -1,5 +1,3 @@
-; TEST-ARGS: -func=a -func=b
-
 define i32 @a() {
   ret i32 0
 }
