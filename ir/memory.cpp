@@ -1024,37 +1024,31 @@ static expr mk_liveness_array() {
 }
 
 static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
-  if (!does_ptr_mem_access)
-    return;
-  else if (m.num_nonlocals() == 0)
+  if (!does_ptr_mem_access || m.num_nonlocals() == 0)
     return;
 
   auto idx = Pointer(m, "#idx", false, false).short_ptr();
 #if 0
-  if (m.num_nonlocals() > 0) {
-    expr is_ptr = does_int_mem_access
-                    ? expr::mkUF("blk_init_isptr", { idx }, true)
-                    : true;
-    expr int_val
-      = Byte::mkNonPtrByte(m, expr::mkUF("blk_init_nonptr", { idx },
-                                         expr::mkUInt(0, bits_byte * 2)))();
+  expr is_ptr = does_int_mem_access
+                  ? expr::mkUF("blk_init_isptr", { idx }, true)
+                  : true;
+  expr int_val
+    = Byte::mkNonPtrByte(m, expr::mkUF("blk_init_nonptr", { idx },
+                                       expr::mkUInt(0, bits_byte * 2)))();
 
-    expr np = expr::mkUF("blk_init_ptr_np", { idx }, expr::mkUInt(0, 1));
-    expr bid_off = expr::mkUF("blk_init_ptr_bid_off", { idx },
-      expr::mkUInt(0, bits_shortbid() + bits_for_offset + 3));
-    bid_off = prepend_if(expr::mkUInt(0, 1), move(bid_off),
-                          ptr_has_local_bit());
-    Byte ptr_val = Byte::mkPtrByte(m, np.concat(bid_off));
-    assert(ptr_val.ptr().is_local().isFalse());
+  expr np = expr::mkUF("blk_init_ptr_np", { idx }, expr::mkUInt(0, 1));
+  expr bid_off = expr::mkUF("blk_init_ptr_bid_off", { idx },
+                   expr::mkUInt(0, bits_shortbid() + bits_for_offset + 3));
+  bid_off = prepend_if(expr::mkUInt(0, 1), move(bid_off),
+                       ptr_has_local_bit());
+  Byte ptr_val = Byte::mkPtrByte(m, np.concat(bid_off));
+  assert(ptr_val.ptr().is_local().isFalse());
 
-    val = expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
+  val = expr::mkLambda({ idx }, expr::mkIf(is_ptr, ptr_val(), int_val));
 
-    s.addAxiom(expr::mkForAll({ idx },
-                    ptr_val.ptr().get_short_bid().ule(m.num_nonlocals() - 1)));
-  } else {
-    Byte byte(m, val.load(idx));
-    s.addAxiom(expr::mkForAll({ idx }, !byte.is_ptr()));
-  }
+  s.addAxiom(
+    expr::mkForAll({ idx },
+                   ptr_val.ptr().get_short_bid().ule(m.num_nonlocals() - 1)));
 #else
   Byte byte(m, val.load(idx));
   Pointer loadedptr = byte.ptr();
