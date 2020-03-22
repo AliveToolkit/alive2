@@ -1026,6 +1026,8 @@ static expr mk_liveness_array() {
 static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
   if (!does_ptr_mem_access)
     return;
+  else if (m.num_nonlocals() == 0)
+    return;
 
   auto idx = Pointer(m, "#idx", false, false).short_ptr();
 #if 0
