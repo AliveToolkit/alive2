@@ -3,13 +3,12 @@
 set -e
 
 # IPO passes aren't supported ATM
-# insert-gcov-profiling, safe-stack, switch-to-lookup, pgo-instr-gen: inserts new global variables
 # place-safepoints: places new function calls (@do_safepoint)
 # loop-extract: extracts a top-level loop into a distinct function
 # extract-blocks: extract specified blocks into a distinct function
 # attributor, functionattrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa insert-gcov-profiling switch-to-lookup safe-stack pgo-instr-gen loop-extract extract-blocks place-safepoints attributor functionattrs metarenamer -Os -Oz -O1 -O2 -O3"
+PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks place-safepoints attributor functionattrs metarenamer -Os -Oz -O1 -O2 -O3"
 
 TV="-tv"
 for p in $PASSES; do
