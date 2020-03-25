@@ -1627,9 +1627,35 @@ void Branch::print(ostream &os) const {
     os << ", label " << dst_false->getName();
 }
 
+static pair<expr,expr> // <condition, not_undef>
+jump_undef_condition(State &s, const Value &val, const expr &e) {
+  if (isUndef(e))
+    return { expr::mkUInt(0, 1), false };
+
+  expr c, a, b, lhs, rhs, ty;
+  unsigned h, l;
+  uint64_t n;
+
+  // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
+  if (e.isIf(c, a, b) && isUndef(b) && c.isEq(lhs, rhs)) {
+    if (lhs.isUInt(n))
+      swap(lhs, rhs);
+
+    if (rhs.isUInt(n) && n == 0 &&
+        lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
+      return { move(a), c };
+  }
+
+  return { e, e == s[val].value };
+}
+
 StateValue Branch::toSMT(State &s) const {
   if (cond) {
-    s.addCondJump(s[*cond], dst_true, *dst_false);
+    auto &c = s[*cond];
+    auto [cond_val, not_undef] = jump_undef_condition(s, *cond, c.value);
+    s.addUB(c.non_poison);
+    s.addUB(not_undef);
+    s.addCondJump(cond_val, dst_true, *dst_false);
   } else {
     s.addJump(dst_true);
   }
@@ -1682,14 +1708,19 @@ StateValue Switch::toSMT(State &s) const {
   auto &val = s[*value];
   expr default_cond(true);
 
+  auto [cond_val, not_undef] = jump_undef_condition(s, *value, val.value);
+  s.addUB(val.non_poison);
+  s.addUB(not_undef);
+
   for (auto &[value_cond, bb] : targets) {
     auto &target = s[*value_cond];
     assert(target.non_poison.isTrue());
-    s.addJump({ val.value == target.value, expr(val.non_poison) }, bb);
-    default_cond &= val.value != target.value;
+    expr cmp = cond_val == target.value;
+    default_cond &= !cmp;
+    s.addJump(move(cmp), bb);
   }
 
-  s.addJump({ move(default_cond), expr(val.non_poison) }, default_target);
+  s.addJump(move(default_cond), default_target);
   s.addUB(expr(false));
   return {};
 }
