@@ -1,7 +1,8 @@
 Alive2 TODO list
 ================
 
-Making counterexamples easier to read:
+Making counterexamples easier to read
+-------------------------------------
 
 - don't use undef/poison in CEX unless necessary
 
@@ -21,3 +22,9 @@ Making counterexamples easier to read:
 
 - we'd like a reducer for IR, perhaps a C-Reduce hack if bugpoint
   isn't good enough
+
+Usability improvements not specifically related to counterexamples
+------------------------------------------------------------------
+
+- (optionally) make a note in the output when an optimization is
+  correct, but would not be correct under a different datalayout
