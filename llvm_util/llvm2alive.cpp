@@ -918,8 +918,11 @@ public:
         continue;
 
       auto storedval = get_operand(gv->getInitializer());
-      if (!storedval)
+      if (!storedval) {
+        *out << "ERROR: Unsupported constant: " << *gv->getInitializer()
+             << "\n";
         return {};
+      }
 
       stores.emplace(GV->getName(),
                      make_unique<Store>(*GV, *storedval, GV->getAlignment()));

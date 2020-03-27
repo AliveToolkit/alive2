@@ -25,7 +25,7 @@ foreach (glob("$logs/*.txt") as $f) {
     @$stats[$stat[1]] += (int)$stat[2];
   }
 
-  preg_match_all('/Unsupported (?:instruction|type|attribute):\s*(.+)/S', $txt, $m);
+  preg_match_all('/Unsupported (?:instruction|type|attribute|constant):\s*(.+)/S', $txt, $m);
   foreach ($m[1] as $str) {
     if (preg_match('/%\S+ = ([^%[(]+)/S', $str, $m2)) {
       @++$unsupported[trim($m2[1])];
