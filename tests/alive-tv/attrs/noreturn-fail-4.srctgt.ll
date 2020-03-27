@@ -1,4 +1,4 @@
-declare void @f() noreturn
+declare void @f()
 
 define i8 @src() {
   call void @f()
@@ -6,7 +6,8 @@ define i8 @src() {
 }
 
 define i8 @tgt() {
+  call void @f() noreturn
   ret i8 0
 }
 
-; ERROR: Mismatch in memory
+; ERROR: Target may never return

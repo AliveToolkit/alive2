@@ -260,12 +260,12 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 }
 
 
-static void check_refinement(Errors &errs, Transform &t,
-                             State &src_state, State &tgt_state,
-                             const Value *var, const Type &type,
-                             const expr &dom_a, const State::ValTy &ap,
-                             const expr &dom_b, const State::ValTy &bp,
-                             bool check_each_var) {
+static void
+check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
+                 const Value *var, const Type &type,
+                 const expr &dom_a, const expr &ub_a, const State::ValTy &ap,
+                 const expr &dom_b, const expr &ub_b, const State::ValTy &bp,
+                 bool check_each_var) {
   auto &a = ap.first;
   auto &b = bp.first;
 
@@ -358,10 +358,20 @@ static void check_refinement(Errors &errs, Transform &t,
   };
 
   Solver::check({
-    { mk_fml(dom_a.notImplies(dom_b)),
+    { mk_fml(ub_a.notImplies(ub_b)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source is more defined than target");
+      }},
+    { mk_fml(ub_a && dom_a && !dom_b),
+      [&](const Result &r) {
+        err(r, [](ostream&, const Model&){},
+            "Target may never return");
+      }},
+    { mk_fml(ub_a && !dom_a && dom_b),
+      [&](const Result &r) {
+        err(r, [](ostream&, const Model&){},
+            "Source may never return");
       }},
     { mk_fml(dom && !poison_cnstr),
       [&](const Result &r) {
@@ -945,7 +955,8 @@ Errors TransformVerify::verify() const {
 
       // TODO: add data-flow domain tracking for Alive, but not for TV
       check_refinement(errs, t, src_state, tgt_state, var, var->getType(),
-                       true, val, true, tgt_state.at(*tgt_instrs.at(name)),
+                       true, true, val,
+                       true, true, tgt_state.at(*tgt_instrs.at(name)),
                        check_each_var);
       if (errs)
         return errs;
@@ -953,9 +964,9 @@ Errors TransformVerify::verify() const {
   }
 
   check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-                   src_state.returnDomain()(), src_state.returnVal(),
-                   tgt_state.returnDomain()(), tgt_state.returnVal(),
-                   check_each_var);
+      src_state.returnDomain()(), src_state.returnUB()(), src_state.returnVal(),
+      tgt_state.returnDomain()(), tgt_state.returnUB()(), tgt_state.returnVal(),
+      check_each_var);
 
   return errs;
 }

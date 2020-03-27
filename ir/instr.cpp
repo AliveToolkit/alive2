@@ -1334,9 +1334,11 @@ StateValue FnCall::toSMT(State &s) const {
                          out_types, !(flags & NoRead), !(flags & NoWrite),
                          flags & ArgMemOnly, move(returned_val));
 
-  if (flags & NoReturn)
-    // Return poison value.
-    s.addReturn(getType().getDummyValue(false));
+  if (flags & NoReturn) {
+    // TODO: Even if a function call doesn't have noreturn, it can possibly
+    // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
+    s.addNoReturn(expr(false));
+  }
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 

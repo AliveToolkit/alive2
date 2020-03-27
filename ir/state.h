@@ -32,9 +32,10 @@ private:
   struct CurrentDomain {
     smt::expr path; // path from fn entry
     smt::AndExpr UB;
+    smt::AndExpr noreturn; // false if noreturn fn is called
     std::set<smt::expr> undef_vars;
 
-    smt::expr operator()() const;
+    smt::expr operator()(bool encode_noreturn) const;
     operator bool() const;
     void reset();
   };
@@ -83,6 +84,8 @@ private:
 
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
+  // return_ub: a boolean expression describing non-ub of the program
+  smt::OrExpr return_ub;
   smt::DisjointExpr<StateValue> return_val;
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -134,6 +137,7 @@ public:
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
+  void addNoReturn(smt::expr &&noreturn);
   void addOOM(smt::expr &&oom) { ooms.add(std::move(oom)); }
 
   const std::vector<StateValue>
@@ -165,6 +169,7 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
 
   auto& returnDomain() const { return return_domain; }
+  auto& returnUB() const { return return_ub; }
   smt::expr sinkDomain() const;
   Memory returnMemory() const { return *return_memory(); }
 

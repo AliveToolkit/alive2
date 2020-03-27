@@ -874,10 +874,6 @@ public:
           if (i.hasMetadataOtherThanDebugLoc() &&
               !handleMetadata(i, *alive_i))
             return {};
-
-          auto FI = dynamic_cast<FnCall *>(alive_i);
-          if (FI && FI->hasFlag(FnCall::NoReturn))
-            break;
         } else
           return {};
       }
