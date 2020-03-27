@@ -41,6 +41,7 @@ class Alive2Test(TestFormat):
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
     self.regex_check = re.compile(r";\s*CHECK:(.*)")
+    self.regex_check_not = re.compile(r";\s*CHECK-NOT:(.*)")
     self.regex_errs_out = re.compile("ERROR:.*")
 
   def getTestsInDirectory(self, testSuite, path_in_suite,
@@ -107,20 +108,27 @@ class Alive2Test(TestFormat):
     expect_err = self.regex_errs.search(input)
     xfail = self.regex_xfail.search(input)
     chk = self.regex_check.search(input)
+    chk_not = self.regex_check_not.search(input)
+
+    # Check XFAIL early.
+    if xfail != None and (out + err).find(xfail.group(1)) != -1:
+      return lit.Test.XFAIL, ''
 
     if chk != None and (out + err).find(chk.group(1).strip()) == -1:
       return lit.Test.FAIL, out + err
 
-    if expect_err is None and xfail is None:
+    if chk_not != None and (out + err).find(chk_not.group(1).strip()) != -1:
+      return lit.Test.FAIL, out + err
+
+    if expect_err is None and xfail is None and chk is None and chk_not is None:
+      # If there's no other test, correctness of the transformation should be
+      # checked.
       if exitCode == 0 and (out + err).find(ok_string) != -1 and \
           self.regex_errs_out.search(out + err) is None:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, out + err
 
-    if expect_err != None and (out + err).find(expect_err.group(1)) != -1:
-      return lit.Test.PASS, ''
+    if expect_err != None and (out + err).find(expect_err.group(1)) == -1:
+      return lit.Test.FAIL, out + err
 
-    if xfail != None and (out + err).find(xfail.group(1)) != -1:
-      return lit.Test.XFAIL, ''
-
-    return lit.Test.FAIL, out + err
+    return lit.Test.PASS, ''

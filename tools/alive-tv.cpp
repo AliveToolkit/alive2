@@ -84,6 +84,10 @@ static llvm::cl::opt<bool> opt_smt_stats(
     "smt-stats", llvm::cl::desc("Show SMT statistics"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_succinct(
+    "succinct", llvm::cl::desc("Make the output succinct"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::cl::opt<unsigned> opt_max_mem(
      "max-mem", llvm::cl::desc("Max memory (approx)"),
      llvm::cl::cat(opt_alive), llvm::cl::init(1024), llvm::cl::value_desc("MB"));
@@ -243,7 +247,8 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   t.src = move(*Func1);
   t.tgt = move(*Func2);
   TransformVerify verifier(t, false);
-  t.print(cout, print_opts);
+  if (!opt_succinct)
+    t.print(cout, print_opts);
 
   {
     auto types = verifier.getTypings();
@@ -260,7 +265,9 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   bool result(errs);
   if (result) {
     if (errs.isUnsound()) {
-      cout << "Transformation doesn't verify!\n" << errs << endl;
+      cout << "Transformation doesn't verify!\n";
+      if (!opt_succinct)
+        cout << errs << endl;
       ++badCount;
     } else {
       cerr << errs << endl;
