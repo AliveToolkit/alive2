@@ -1464,10 +1464,13 @@ unsigned Memory::getStoreByteSize(const Type &ty) {
 }
 
 void Memory::store(const expr &p, const StateValue &v, const Type &type,
-                   unsigned align, bool deref_check) {
+                   unsigned align, const set<expr> &undef_vars0,
+                   bool deref_check) {
   assert(!memory_unused());
   Pointer ptr(*this, p);
   unsigned bytesz = bits_byte / 8;
+
+  undef_vars.insert(undef_vars0.begin(), undef_vars0.end());
 
   if (deref_check)
     state->addUB(ptr.is_dereferenceable(getStoreByteSize(type), align,
@@ -1481,7 +1484,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
         continue;
       auto ptr_i = ptr + byteofs;
       auto align_i = gcd(align, byteofs % align);
-      store(ptr_i(), aty->extract(v, i), child, align_i, false);
+      store(ptr_i(), aty->extract(v, i), child, align_i, {}, false);
       byteofs += getStoreByteSize(child);
     }
     assert(byteofs == getStoreByteSize(type));
@@ -1533,7 +1536,7 @@ Memory::load(const expr &p, const Type &type, unsigned align) {
     }
     ret = bytesToValue(*this, loadedBytes, type);
   }
-  return { state->rewriteUndef(move(ret)), move(ubs) };
+  return { state->rewriteUndef(move(ret), undef_vars), move(ubs) };
 }
 
 Byte Memory::load(const Pointer &p) const {
@@ -1553,12 +1556,13 @@ static expr ptr_deref_within(const Pointer &idx, const Pointer &ptr,
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
-                    unsigned align) {
+                    unsigned align, const set<expr> &undef_vars0) {
   assert(!memory_unused());
   assert(!val.isValid() || val.bits() == 8);
   unsigned bytesz = bits_byte / 8;
   Pointer ptr(*this, p);
   state->addUB(ptr.is_dereferenceable(bytesize, align, true));
+  undef_vars.insert(undef_vars0.begin(), undef_vars0.end());
 
   auto wval = val;
   for (unsigned i = 1; i < bytesz; ++i) {
@@ -1728,14 +1732,15 @@ bool Memory::operator<(const Memory &rhs) const {
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_nonwritable, non_local_blk_size, non_local_blk_align,
-        non_local_blk_kind, byval_blks, escaped_local_blks) <
+        non_local_blk_kind, byval_blks, escaped_local_blks, undef_vars) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.initial_non_local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind, rhs.non_local_blk_nonwritable,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
-        rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks);
+        rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
+        rhs.undef_vars);
 }
 
 #define P(name, expr) do {      \

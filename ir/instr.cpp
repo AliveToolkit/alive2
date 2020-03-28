@@ -1969,7 +1969,7 @@ StateValue Calloc::toSMT(State &s) const {
                                             nonnull);
 
   expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
-  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, align);
+  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, align, {});
 
   return { move(p), move(np) };
 }
@@ -2206,7 +2206,7 @@ void Store::print(std::ostream &os) const {
 StateValue Store::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
-  s.getMemory().store(p, s[*val], val->getType(), align);
+  s.getMemory().store(p, s[*val], val->getType(), align, s.getUndefVars());
   return {};
 }
 
@@ -2239,7 +2239,8 @@ StateValue Memset::toSMT(State &s) const {
   auto &[vbytes, np_bytes] = s[*bytes];
   s.addUB((vbytes != 0).implies(np_ptr));
   s.addUB(np_bytes);
-  s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align);
+  s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
+                       s.getUndefVars());
   return {};
 }
 

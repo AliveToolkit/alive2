@@ -9,6 +9,7 @@
 #include "smt/exprs.h"
 #include <optional>
 #include <ostream>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -210,6 +211,8 @@ class Memory {
   std::vector<unsigned> byval_blks;
   std::vector<bool> escaped_local_blks;
 
+  std::set<smt::expr> undef_vars;
+
   void store(const Pointer &p, const smt::expr &val, smt::expr &local,
              smt::expr &non_local);
 
@@ -270,7 +273,8 @@ public:
 
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
-             unsigned align, bool deref_check = true);
+             unsigned align, const std::set<smt::expr> &undef_vars,
+             bool deref_check = true);
   std::pair<StateValue, smt::AndExpr> load(const smt::expr &ptr,
       const Type &type, unsigned align);
 
@@ -278,7 +282,8 @@ public:
   Byte load(const Pointer &p) const;
 
   void memset(const smt::expr &ptr, const StateValue &val,
-              const smt::expr &bytesize, unsigned align);
+              const smt::expr &bytesize, unsigned align,
+              const std::set<smt::expr> &undef_vars);
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);

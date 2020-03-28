@@ -302,21 +302,18 @@ void State::resetUndefVars() {
   undef_vars.clear();
 }
 
-StateValue State::rewriteUndef(StateValue &&val) {
-  vector<pair<expr, expr>> repls;
-  for (auto &var : val.vars()) {
-    if (isUndef(var)) {
-      auto newvar = expr::mkFreshVar("undef", var);
-      repls.emplace_back(var, newvar);
-      addUndefVar(move(newvar));
-    }
-  }
-
-  if (repls.empty())
+StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
+  if (undef_vars.empty())
     return move(val);
   if (hit_half_memory_limit())
     throw AliveException("Out of memory; skipping function.", false);
 
+  vector<pair<expr, expr>> repls;
+  for (auto &var : undef_vars) {
+    auto newvar = expr::mkFreshVar("undef", var);
+    repls.emplace_back(var, newvar);
+    addUndefVar(move(newvar));
+  }
   return val.subst(repls);
 }
 
