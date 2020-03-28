@@ -74,20 +74,6 @@ matrix:
       dist: bionic
       addons: *gcc9
 
-    - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
-      os: linux
-      dist: bionic
-      addons: &clang8
-        apt:
-          packages:
-            - *default_packages
-            - clang-8
-
-    - env: CMAKE_CXX_COMPILER=clang++-8 CMAKE_BUILD_TYPE=Release
-      os: linux
-      dist: bionic
-      addons: *clang8
-
     - env: CMAKE_CXX_COMPILER=clang++-9 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: linux
       dist: bionic
@@ -104,6 +90,23 @@ matrix:
       os: linux
       dist: bionic
       addons: *clang9
+
+    - env: CMAKE_CXX_COMPILER=clang++-10 CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
+      os: linux
+      dist: bionic
+      addons: &clang10
+        apt:
+          sources:
+            - sourceline: "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main"
+              key_url: "https://apt.llvm.org/llvm-snapshot.gpg.key"
+          packages:
+            - *default_packages
+            - clang-10
+
+    - env: CMAKE_CXX_COMPILER=clang++-10 CMAKE_BUILD_TYPE=Release
+      os: linux
+      dist: bionic
+      addons: *clang10
 
     - env: CMAKE_BUILD_TYPE=Debug CMAKE_CXX_FLAGS=-fsanitize=address,undefined
       os: osx
