@@ -104,6 +104,10 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   return I == pres.end() ? nullptr : &I->second.first.path;
 }
 
+bool State::isUndef(const expr &e) const {
+  return undef_vars.count(e) != 0;
+}
+
 bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
   ENSURE(seen_bbs.emplace(&bb).second);

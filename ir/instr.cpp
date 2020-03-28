@@ -1629,7 +1629,7 @@ void Branch::print(ostream &os) const {
 
 static pair<expr,expr> // <condition, not_undef>
 jump_undef_condition(State &s, const Value &val, const expr &e) {
-  if (isUndef(e))
+  if (s.isUndef(e))
     return { expr::mkUInt(0, 1), false };
 
   expr c, a, b, lhs, rhs, ty;
@@ -1637,7 +1637,7 @@ jump_undef_condition(State &s, const Value &val, const expr &e) {
   uint64_t n;
 
   // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
-  if (e.isIf(c, a, b) && isUndef(b) && c.isEq(lhs, rhs)) {
+  if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
     if (lhs.isUInt(n))
       swap(lhs, rhs);
 

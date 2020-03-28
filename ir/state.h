@@ -117,6 +117,7 @@ public:
   const StateValue& getAndAddUndefs(const Value &val);
   const ValTy& at(const Value &val) const;
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
+  bool isUndef(const smt::expr &e) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);
