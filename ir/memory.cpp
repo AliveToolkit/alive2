@@ -1720,6 +1720,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
     if (els.escaped_local_blks[i])
       ret.escaped_local_blks[i] = true;
   }
+  ret.undef_vars.insert(els.undef_vars.begin(), els.undef_vars.end());
   return ret;
 }
 
