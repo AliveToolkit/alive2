@@ -289,6 +289,11 @@ bool expr::isConst() const {
          Z3_get_bool_value(ctx(), ast()) != Z3_L_UNDEF;
 }
 
+bool expr::isBV() const {
+  C();
+  return Z3_get_sort_kind(ctx(), sort()) == Z3_BV_SORT;
+}
+
 bool expr::isBool() const {
   C();
   return Z3_get_sort_kind(ctx(), sort()) == Z3_BOOL_SORT;
@@ -1544,14 +1549,20 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
     return cond && then;
 
   expr notcond;
-  Z3_ast c, t = then(), e = els();
-  if (cond.isNot(notcond)) {
-    c = notcond();
-    swap(t, e);
-  } else {
-    c = cond();
+  if (cond.isNot(notcond))
+    return mkIf(notcond, els, then);
+
+  expr lhs, rhs;
+  // (ite (= x 1) 1 0) -> x
+  if (then.isBV() && then.bits() == 1 && then.isOne() && els.isZero() &&
+      cond.isEq(lhs, rhs) && lhs.isBV() && lhs.bits() == 1) {
+    if (lhs.isOne())
+      return rhs;
+    if (rhs.isOne())
+      return lhs;
   }
-  return Z3_mk_ite(ctx(), c, t, e);
+
+  return Z3_mk_ite(ctx(), cond(), then(), els());
 }
 
 expr expr::mkForAll(const set<expr> &vars, expr &&val) {
