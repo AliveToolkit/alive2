@@ -1125,6 +1125,102 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 }
 
 
+void InsertValue::addIdx(unsigned idx) {
+  idxs.emplace_back(idx);
+}
+
+vector<Value*> InsertValue::operands() const {
+  return { val, elt };
+}
+
+void InsertValue::rauw(const Value &what, Value &with) {
+  RAUW(val);
+  RAUW(elt);
+}
+
+void InsertValue::print(ostream &os) const {
+  os << getName() << " = insertvalue " << *val << ", " << *elt;
+  for (auto idx : idxs) {
+    os << ", " << idx;
+  }
+}
+
+StateValue InsertValue::toSMT(State &s) const {
+  auto sv = s[*val];
+
+  Type *type = &val->getType();
+  unsigned left_v_bits = 0, left_np_bits = 0;
+  unsigned total_v_bits = type->bits();
+  unsigned total_np_bits = type->np_bits();
+  for (unsigned i = 0; i < idxs.size() - 1; i++) {
+    auto ty = type->getAsAggregateType();
+    for (unsigned j = 0; j < idxs[i]; j++) {
+      left_v_bits += ty->getChild(j).bits();
+      left_np_bits += ty->getChild(j).np_bits();
+    }
+    sv = ty->extract(sv, idxs[i]);
+    type = &ty->getChild(idxs[i]);
+  }
+
+  auto ty = type->getAsAggregateType();
+  sv = ty->update(sv, s[*elt], idxs.back());
+
+  // Find the correct BV segment to update
+  auto orig_sv = s[*val];
+  unsigned bits = ty->bits();
+  unsigned np_bits = ty->np_bits();
+  expr ret_v = sv.value;
+  expr ret_np = sv.non_poison;
+  if (total_v_bits > bits && total_np_bits > np_bits) {
+    expr fill_v = expr::mkUInt(0, total_v_bits - bits);
+    expr idx_v = expr::mkUInt(left_v_bits, total_v_bits);
+    expr mask_v = ~expr::mkInt(-1, bits).concat(fill_v).lshr(idx_v);
+    expr nv_shifted = sv.value.concat(fill_v).lshr(idx_v);
+
+    expr idx_np = expr::mkUInt(left_np_bits, total_np_bits);
+    expr fill_np = expr::mkUInt(0, total_np_bits - np_bits);
+    expr mask_np = ~expr::mkInt(-1, np_bits).concat(fill_np).lshr(idx_np);
+    expr np_shifted = sv.non_poison.concat(fill_np).lshr(idx_np);
+
+    ret_v = (orig_sv.value & mask_v) | nv_shifted;
+    ret_np = (orig_sv.non_poison & mask_np) | np_shifted;
+  }
+
+  return { std::move(ret_v), std::move(ret_np) };
+}
+
+expr InsertValue::getTypeConstraints(const Function &f) const {
+  auto c = Value::getTypeConstraints() &&
+           val->getType().enforceAggregateType() &&
+           val->getType() == getType();
+
+  Type *type = &val->getType();
+  unsigned i = 0;
+  for (auto idx : idxs) {
+    auto ty = type->getAsAggregateType();
+    if (!ty) {
+      c = false;
+      break;
+    }
+    type = &ty->getChild(idx);
+
+    c &= ty->numElements().ugt(idx);
+    if (++i == idxs.size() && !c.isFalse())
+      c &= ty->getChild(idx) == elt->getType();
+  }
+
+  return c;
+}
+
+unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
+  auto ret = make_unique<InsertValue>(getType(), getName() + suffix, *val, *elt);
+  for (auto idx : idxs) {
+    ret->addIdx(idx);
+  }
+  return ret;
+}
+
+
 void FnCall::addArg(Value &arg, unsigned flags) {
   args.emplace_back(&arg, flags);
 }

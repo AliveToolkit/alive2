@@ -738,6 +738,30 @@ StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
                                    val.non_poison.extract(h_np, l_np) });
 }
 
+StateValue AggregateType::update(const StateValue &val,
+                                 const StateValue &elt,
+                                 unsigned index) const {
+  unsigned total_value = 0, total_np = 0;
+  for (unsigned i = 0; i < index; ++i) {
+    total_value += children[i]->bits();
+    total_np += children[i]->np_bits();
+  }
+  unsigned bw_elt = children[index]->bits();
+  expr idx_v = expr::mkUInt(total_value, bits());
+  expr fill_v = expr::mkUInt(0, bits() - bw_elt);
+  expr mask_v = ~expr::mkInt(-1, bw_elt).concat(fill_v).lshr(idx_v);
+  expr nv_shifted = children[index]->toBV(elt).value.concat(fill_v).lshr(idx_v);
+
+  unsigned bw_np_elt = children[index]->np_bits();
+  expr idx_np = expr::mkUInt(total_np, np_bits());
+  expr fill_np = expr::mkUInt(0, np_bits() - bw_np_elt);
+  expr mask_np = ~expr::mkInt(-1, bw_np_elt).concat(fill_np).lshr(idx_np);
+  expr np_shifted = children[index]->toBV(elt).non_poison.concat(fill_np).lshr(idx_np);
+
+  return fromBV({ (val.value & mask_v) | nv_shifted,
+                  (val.non_poison & mask_np) | np_shifted});
+}
+
 unsigned AggregateType::bits() const {
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {

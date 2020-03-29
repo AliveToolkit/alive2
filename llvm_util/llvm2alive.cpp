@@ -383,6 +383,22 @@ public:
     RETURN_IDENTIFIER(move(inst));
   }
 
+  RetTy visitInsertValueInst(llvm::InsertValueInst &i) {
+    auto ty = llvm_type2alive(i.getType());
+    auto val = get_operand(i.getAggregateOperand());
+    auto elt = get_operand(i.getInsertedValueOperand());
+    if (!ty || !val)
+      return error(i);
+
+    auto inst = make_unique<InsertValue>(*ty, value_name(i), *val, *elt);
+
+    for (auto idx : i.indices()) {
+      inst->addIdx(idx);
+    }
+
+    RETURN_IDENTIFIER(move(inst));
+  }
+
   bool hasLifetimeStart(llvm::User &i, unordered_set<llvm::Value*> &visited) {
     for (auto I = i.user_begin(), E = i.user_end(); I != E; ++I) {
       llvm::User *U = *I;

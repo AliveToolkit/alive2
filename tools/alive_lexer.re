@@ -244,6 +244,7 @@ space+ {
 "ctlz" { return CTLZ; }
 "ctpop" { return CTPOP; }
 "extractvalue" { return EXTRACTVALUE; }
+"insertvalue" { return INSERTVALUE; }
 "sadd_overflow" { return SADD_OVERFLOW; }
 "uadd_overflow" { return UADD_OVERFLOW; }
 "ssub_overflow" { return SSUB_OVERFLOW; }

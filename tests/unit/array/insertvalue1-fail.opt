@@ -1,0 +1,6 @@
+Name: insertvalue-1-fail
+%r = insertvalue [2 x i32] [i32 3, i32 1], i32 0, 1
+  =>
+%r = [2 x i32] [i32 3, i32 1]
+
+; ERROR: Value mismatch for [2 x i32] %r
