@@ -906,11 +906,6 @@ Errors TransformVerify::verify() const {
       ss << "Transformation is incorrect because global variable "
         << GVS->getName() << " is const in source but not in target";
       return { ss.str(), true };
-    } else if (!GVS->isConst() && GVT->isConst()) {
-      stringstream ss;
-      ss << "Unsupported interprocedural transformation: global variable "
-        << GVS->getName() << " is const in target but not in source";
-      return { ss.str(), false };
     }
   }
 

@@ -5,4 +5,4 @@ define i32 @f() {
   ret i32 %v
 }
 
-; ERROR: Unsupported interprocedural transformation: global variable @g is const in target but not in source
+; ERROR: Value mismatch
