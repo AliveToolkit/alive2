@@ -1108,7 +1108,7 @@ expr ExtractValue::getTypeConstraints(const Function &f) const {
     type = &ty->getChild(idx);
 
     c &= ty->numElements().ugt(idx);
-    if (++i == idxs.size())
+    if (++i == idxs.size() && !c.isFalse())
       c &= ty->getChild(idx) == getType();
   }
   return c;

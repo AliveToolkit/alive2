@@ -269,7 +269,7 @@ public:
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
   Type& getChild(unsigned index) const { return *children[index]; }
-  bool isPadding(unsigned i) const { return is_padding[i]; }
+  bool isPadding(unsigned i) const { return defined && is_padding[i]; }
 
   unsigned bits() const override;
   unsigned np_bits() const override;
