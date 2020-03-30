@@ -10,4 +10,4 @@ define i8 @tgt() {
   ret i8 0
 }
 
-; ERROR: Target may never return
+; ERROR: Target or source may never return
