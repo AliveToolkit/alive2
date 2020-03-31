@@ -25,7 +25,7 @@ if ($hash && $test) {
   $name_html = htmlspecialchars($t[0]);
   html_header("Test Failure: $name_html");
 
-  if (IS_ADMIN && $_POST['comment']) {
+  if (IS_ADMIN && isset($_POST['comment'])) {
     save_comment($t[0], $_POST['comment']);
     echo "<p>New comment saved!</p>\n";
   }
