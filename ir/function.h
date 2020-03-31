@@ -175,4 +175,28 @@ public:
   void printDot(std::ostream &os) const;
 };
 
+class DomTree final {
+    Function &f;
+    CFG &cfg;
+
+    class DomTreeNode final {
+    public:
+      const BasicBlock &bb;
+      std::vector<DomTreeNode*> preds; // predecessors
+      DomTreeNode *dominator; // dominator of bb 
+      unsigned order;
+
+      DomTreeNode(const BasicBlock &bb) : bb(bb) {}
+    };
+
+    std::unordered_map<const BasicBlock*, DomTreeNode> doms;
+
+    void buildDominators();
+    static DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
+  public:
+    DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
+    const BasicBlock* getIDominator(const BasicBlock &bb) const;
+    void printDot(std::ostream &os) const;
+};
+
 }

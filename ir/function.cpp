@@ -289,4 +289,103 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
+// Relies on Alive's top_sort run during llvm2alive conversion in order to
+// traverse the cfg in reverse postorder to build dominators.
+void DomTree::buildDominators() {
+  // build predecessors relationship
+  for (const auto &[p, b, instr] : cfg) {
+    (void)instr;
+
+    auto &b_node = doms.try_emplace(&b, b).first->second;
+    auto &pred = doms.try_emplace(&p, p).first->second;
+    b_node.dominator = nullptr;
+    b_node.preds.push_back(&pred);
+  }
+
+  // initialization
+  unsigned i = f.getBBs().size();
+  for (auto &b : f.getBBs()) {
+    auto I = doms.find(b);
+    if (I == doms.end())
+      continue;
+    
+    I->second.order = --i;
+    I->second.dominator = nullptr;
+  }
+
+  // assuming first bb is never moved
+  auto &entry = doms.at(&f.getFirstBB());
+  entry.dominator = &entry;
+
+  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
+  // A Simple, Fast Dominance Algorithm
+  // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
+  // Makes multiple passes when CFG is cyclic to update incorrect initial
+  // dominator guesses.
+  DomTreeNode *new_idom;
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (auto &b : f.getBBs()) {
+      auto I = doms.find(b);
+      if (I == doms.end())
+        continue;
+
+      auto &b_node = I->second;
+      if (b_node.preds.empty())
+        continue;
+      
+      new_idom = b_node.preds.front();
+      for (auto p : b_node.preds) {
+        if (p->dominator != nullptr) {
+          new_idom = intersect(p, new_idom);
+        }
+      }
+
+      if (b_node.dominator != new_idom) {
+        b_node.dominator = new_idom;
+        changed = true;
+      }
+    }
+  }
 }
+
+DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
+  while (f1->order != f2->order) {
+    while (f1->order < f2->order)
+      f1 = f1->dominator;
+    while (f2->order < f1->order)
+      f2 = f2->dominator;
+  }
+  return f1;
+}
+
+// get immediate dominator BasicBlock
+const BasicBlock* DomTree::getIDominator(const BasicBlock &bb) const {
+  auto I = doms.find(&bb);
+  if (I != doms.end())
+    return &I->second.dominator->bb;
+
+  return nullptr;
+}
+
+
+void DomTree::printDot(std::ostream &os) const {
+  os << "digraph {\n"
+        "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
+
+  for (auto I = f.getBBs().begin()+1, E = f.getBBs().end(); I != E; ++I) {
+    // test for unreachability
+    auto J = doms.find(*I);
+    if (J != doms.end()) {
+      auto node = J->second;
+      os << '"' << bb_dot_name(node.dominator->bb.getName()) << "\" -> \""
+        << bb_dot_name(node.bb.getName()) << "\";\n";
+    }
+  }
+
+  os << "}\n";
+}
+
+} 
+
