@@ -677,6 +677,7 @@ AggregateType::AggregateType(string &&name, bool symbolic)
   elements = 4;
   sym.resize(elements);
   children.resize(elements);
+  is_padding.resize(elements);
 
   // FIXME: limitation below is for vectors; what about structs and arrays?
   for (unsigned i = 0; i < elements; ++i) {
