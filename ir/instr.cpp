@@ -916,17 +916,19 @@ StateValue ConversionOp::toSMT(State &s) const {
     return { move(v), sv.non_poison && np };
   };
 
-  if (op == BitCast)
+  if (op == BitCast) {
+    // NOP: ptr vect -> ptr vect
+    if (getType().isVectorType() &&
+        getType().getAsAggregateType()->getChild(0).isPtrType())
+      return v;
+
     v = val->getType().toInt(s, move(v));
+  }
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto retty = getType().getAsAggregateType();
     auto elems = retty->numElementsConst();
-
-    // NOP: ptr vect -> ptr vect
-    if (op == BitCast && retty->getChild(0).isPtrType())
-      return v;
 
     // bitcast vect elems size may vary, so create a new data type whose
     // element size is aligned with the output vector elem size
