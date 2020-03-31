@@ -11,8 +11,8 @@ foreach (file('data/data.txt') as $entry) {
   $data[] = explode(',', trim($entry));
 }
 
-$hash = @$_GET['hash'];
-$test = @$_GET['test'];
+$hash = @$_REQUEST['hash'];
+$test = @$_REQUEST['test'];
 
 if ($hash && $test) {
   $run = get_all_runs($data, $hash);
@@ -25,7 +25,16 @@ if ($hash && $test) {
   $name_html = htmlspecialchars($t[0]);
   html_header("Test Failure: $name_html");
 
+  if (IS_ADMIN && $_POST['comment']) {
+    save_comment($t[0], $_POST['comment']);
+    echo "<p>New comment saved!</p>\n";
+  }
+
   echo "<p>Test source: <a href=\"https://github.com/llvm/llvm-project/blob/$run[5]/llvm/test/$name_html\">git</a></p>\n";
+
+  $comments = get_comments();
+  if (!empty($comments[$t[0]]))
+    echo "<p>Comments: {$comments[$t[0]][0]}</p>\n";
 
   echo "<h2>Log:</h2>\n<pre>";
   echo htmlspecialchars(file_get_contents("data/logs/$t[3].txt")), "</pre>\n";
@@ -35,10 +44,30 @@ if ($hash && $test) {
 
   if ($t[1])
     echo "<p>&nbsp;</p><p>NOTE: This test would pass if undef didn't exist!</p>";
+
+  if (IS_ADMIN) {
+    $c = htmlspecialchars(@$comments[$t[0]][1]);
+    echo <<< HTML
+<p>&nbsp;</p>
+<h2>Change comments (destructive action!!):</h2>
+<form action="index.php" method="post">
+<input type="hidden" name="hash" value="$hash">
+<input type="hidden" name="test" value="$name_html">
+<textarea rows="2" cols = "80" name= "comment">
+$c
+</textarea>
+<br>
+<input type="submit" value="Save">
+</form>
+<p>For LLVM bugs, enter as LLVM#42.</p>
+
+HTML;
+  }
 }
 else if ($hash) {
   $run = get_all_runs($data, $hash);
   $tests = get_run_tests($run[0]);
+  $comments = get_comments();
   html_header("Run $run[5] - " . format_date($run[6]));
   echo <<< HTML
 <p>$run[1] failures ($run[2] ignoring undef)<br>
@@ -48,7 +77,7 @@ Alive2 git: <a href="https://github.com/AliveToolkit/alive2/commit/$run[3]">$run
 <p>Failed tests:</p>
 <table id="tabletests" class="tablesorter" style="width:auto">
 <thead><tr>
-<th>Test Name</th><th>Ok if undef ignored?</th><th>Failure reason</th>
+<th>Test Name</th><th>Ok if undef ignored?</th><th>Failure reason</th><th>Comments</th>
 </tr></thead>
 <tbody>
 HTML;
@@ -59,7 +88,8 @@ HTML;
          htmlspecialchars(urlencode($test[0])). "\">".
          htmlspecialchars($test[0])."</a></td>".
          "<td style=\"text-align:center\">$check</td>".
-         "<td>".htmlspecialchars($test[4])."</td></tr>\n";
+         "<td>".htmlspecialchars($test[4])."</td>".
+         "<td>". @$comments[$test[0]][0] ."</td></tr>\n";
   }
 
   echo <<< HTML
@@ -133,6 +163,29 @@ function get_run_tests($hash) {
     $data[] = explode(',', trim($entry));
   }
   return $data;
+}
+
+function get_comments() {
+  foreach(file('data/comments.txt') as $line) {
+    $a = explode(',', trim($line));
+    if (sizeof($a) === 2)
+      $t = htmlspecialchars($a[1]);
+      $t = preg_replace('/LLVM#(\d+)/', '<a href="https://llvm.org/PR\1">LLVM PR\1</a>', $t);
+      $comments[$a[0]] = array($t, $a[1]);
+  }
+  return $comments;
+}
+
+function save_comment($test, $c) {
+  $cs = get_comments();
+  $c = trim($c);
+  $cs[$test] = array($c, $c);
+  $txt = '';
+  foreach ($cs as $f => $c) {
+    if ($c[1])
+      $txt .= "$f,$c[1]\n";
+  }
+  file_put_contents('data/comments.txt', $txt);
 }
 
 function do_plot($data) {

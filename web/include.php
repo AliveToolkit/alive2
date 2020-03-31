@@ -2,7 +2,16 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+ini_set('arg_separator.output', '&amp;');
+
+define('IS_ADMIN',
+       isset($_REQUEST['key']) &&
+       sha1($_REQUEST['key']) == 'a299db9fb7cea3851a60d8728a486633ac9f0d09');
+
 function html_header($title) {
+  if (IS_ADMIN)
+    output_add_rewrite_var('key', $_REQUEST['key']);
+
   echo <<< HTML
 <!DOCTYPE html>
 <html>
@@ -26,10 +35,19 @@ table, th, td {
 <h1>$title</h1>
 
 HTML;
+
+  if (IS_ADMIN)
+    echo "<p style=\"text-align:center; color:red\"><b>ADMIN MODE</b></p>\n";
 }
 
 function html_footer() {
+  $vars = '';
+  if (!empty($_REQUEST['test']))
+    $vars = '?hash='.@$_REQUEST['hash'];
+
   echo <<< HTML
+<p>&nbsp;</p>
+<p><a href="index.php$vars">&lt;-- Back</a></p>
 </body>
 </html>
 
