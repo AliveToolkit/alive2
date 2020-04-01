@@ -670,9 +670,12 @@ public:
   }
 
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
-    PARSE_TRIOP();
+    PARSE_BINOP();
+    vector<unsigned> mask;
+    for (auto m : i.getShuffleMask())
+      mask.push_back(m);
     RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
-                                                 *c));
+                                                 move(mask)));
   }
 
   RetTy visitDbgInfoIntrinsic(llvm::DbgInfoIntrinsic&) { return {}; }

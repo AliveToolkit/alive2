@@ -616,10 +616,12 @@ public:
 
 
 class ShuffleVector final : public Instr {
-  Value *v1, *v2, *mask;
+  Value *v1, *v2;
+  std::vector<unsigned> mask;
 public:
-  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2, Value &m)
-    : Instr(type, move(name)), v1(&v1), v2(&v2), mask(&m) {}
+  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
+                std::vector<unsigned> mask)
+    : Instr(type, move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

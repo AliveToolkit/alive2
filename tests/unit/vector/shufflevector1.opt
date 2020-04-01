@@ -1,57 +1,57 @@
 Name: constant-folding-1
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <1 x i32> <i32 0>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 0
   =>
 %r = <1 x i4> <i4 3>
 
 
 Name: constant-folding-2
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <1 x i32> <i32 1>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 1
   =>
 %r = <1 x i4> <i4 5>
 
 
 Name: constant-folding-3
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <1 x i32> <i32 2>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 2
   =>
 %r = <1 x i4> <i4 4>
 
 
 Name: constant-folding-4
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <1 x i32> <i32 3>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 3
   =>
 %r = <1 x i4> <i4 6>
 
 
 Name: constant-folding-5
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <2 x i32> <i32 3, i32 2>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 3, 2
   =>
 %r = <2 x i4> <i4 6, i4 4>
 
 Name: constant-folding-6
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <3 x i32> <i32 3, i32 2, i32 1>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 3, 2, 1
   =>
 %r = <3 x i4> <i4 6, i4 4, i4 5>
 
 
 Name: constant-folding-7
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 3, 2, 1, 0
   =>
 %r = <4 x i4> <i4 6, i4 4, i4 5, i4 3>
 
 
 Name: constant-folding-8
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, 3, 2, 1, 0
   =>
 %r = <4 x i4> <i4 6, i4 4, i4 5, i4 3>
 
 
 Name: constant-folding-9
-%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, <3 x i32> <i32 undef, i32 1, i32 4>
+%r = shufflevector <2 x i4> <i4 3, i4 5>, <2 x i4> <i4 4, i4 6>, -1, 1, 4
   =>
 %r = <3 x i4> <i4 undef, i4 5, i4 undef>
 
 
 Name: constant-folding-10
-%r = shufflevector <2 x float> <float 3.0, float 5.0>, <2 x float> <float 4.0, float 6.0>, <3 x i32> <i32 undef, i32 1, i32 4>
+%r = shufflevector <2 x float> <float 3.0, float 5.0>, <2 x float> <float 4.0, float 6.0>, -1, 1, 4
   =>
 %r = <3 x float> <float undef, float 5.0, float undef>

@@ -967,10 +967,13 @@ static unique_ptr<Instr> parse_shufflevector(string_view name) {
   parse_comma();
   auto &ty_b = parse_type();
   auto &b = parse_operand(ty_b);
-  parse_comma();
-  auto &ty_m = parse_vector_type();
-  auto &m = parse_operand(ty_m);
-  return make_unique<ShuffleVector>(get_sym_type(), string(name), a, b, m);
+
+  vector<unsigned> mask;
+  while (tokenizer.consumeIf(COMMA)) {
+    mask.push_back((unsigned)parse_number());
+  }
+  return make_unique<ShuffleVector>(get_sym_type(), string(name), a, b,
+                                    move(mask));
 }
 
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {

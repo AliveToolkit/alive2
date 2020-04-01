@@ -2426,53 +2426,35 @@ unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
 
 
 vector<Value*> ShuffleVector::operands() const {
-  return { v1, v2, mask };
+  return { v1, v2 };
 }
 
 void ShuffleVector::rauw(const Value &what, Value &with) {
   RAUW(v1);
   RAUW(v2);
-  RAUW(mask);
 }
 
 void ShuffleVector::print(ostream &os) const {
-  os << getName() << " = shufflevector " << *v1 << ", " << *v2 << ", " << *mask;
+  os << getName() << " = shufflevector " << *v1 << ", " << *v2;
+  for (auto m : mask)
+    os << ", " << m;
 }
 
 StateValue ShuffleVector::toSMT(State &s) const {
-  auto vty = static_cast<const VectorType*>(v1->getType().getAsAggregateType());
-  expr sz = expr::mkUInt(vty->numElementsConst(), 32);
-  auto mty = mask->getType().getAsAggregateType();
+  auto vty = v1->getType().getAsAggregateType();
+  auto sz = vty->numElementsConst();
   vector<StateValue> vals;
-
-  if (dynamic_cast<UndefValue*>(mask))
-    return UndefValue(getType()).toSMT(s);
 
   auto &vect1 = s[*v1];
   auto &vect2 = s[*v2];
-  auto &mask_vector = static_cast<AggregateValue*>(mask)->getVals();
 
-  for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
-    auto mask = mask_vector[i];
-    // mask must be either a constant or undef
-    // special case undef to yield undef
-    if (dynamic_cast<UndefValue*>(mask)) {
-      vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s));
-      continue;
+  for (auto m : mask) {
+    if (m >= 2 * sz) {
+      vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s).value, true);
+    } else {
+      vals.emplace_back(m < sz ? vty->extract(vect1, m)
+                               : vty->extract(vect2, m - sz));
     }
-
-    auto &[iv, ip] = s[*mask];
-    assert(ip.isTrue());
-    auto [lv, lp] = vty->extract(vect1, iv);
-    auto [rv, rp] = vty->extract(vect2, iv - sz);
-
-    expr val = expr::mkIf(iv.uge(sz), rv, lv);
-    expr inbounds = iv.ult(sz + sz);
-    if (!inbounds.isTrue())
-      val = expr::mkIf(inbounds, val,
-                       UndefValue(vty->getChild(0)).toSMT(s).value);
-
-    vals.emplace_back(move(val), !inbounds || expr::mkIf(iv.uge(sz), rp, lp));
   }
 
   return getType().getAsAggregateType()->aggregateVals(vals);
@@ -2481,17 +2463,14 @@ StateValue ShuffleVector::toSMT(State &s) const {
 expr ShuffleVector::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceVectorTypeSameChildTy(v1->getType()) &&
-         getType().enforceVectorTypeEquiv(mask->getType()) &&
+         getType().getAsAggregateType()->numElements() == mask.size() &&
          v1->getType().enforceVectorType() &&
-         v1->getType() == v2->getType() &&
-         // mask is a vector of i32
-         mask->getType().enforceVectorType([](auto &ty)
-                                           { return ty.enforceIntType(32); });
+         v1->getType() == v2->getType();
 }
 
 unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
   return make_unique<ShuffleVector>(getType(), getName() + suffix,
-                                    *v1, *v2, *mask);
+                                    *v1, *v2, mask);
 }
 
 }
