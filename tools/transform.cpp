@@ -612,6 +612,7 @@ static uint64_t get_access_size(const Instr &inst) {
 #endif
     // FIXME: memcpy doesn't have multi-byte support
     (void)i;
+    does_ptr_mem_access = true;
     return 1;
   }
 
