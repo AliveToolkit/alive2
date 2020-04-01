@@ -1,7 +1,7 @@
 ; ERROR: Mismatch in memory
 
 define void @src(i8* %p, i8* %q) {
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 4 %q, i8* align 4 %p, i64 1, i1 false)
+  tail call void @llvm.memcpy.p0i8.p0i8.i64(i8* %q, i8* %p, i64 1, i1 false)
   ret void
 }
 
