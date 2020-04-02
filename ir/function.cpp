@@ -289,31 +289,22 @@ void CFG::printDot(ostream &os) const {
   os << "}\n";
 }
 
+
 // Relies on Alive's top_sort run during llvm2alive conversion in order to
 // traverse the cfg in reverse postorder to build dominators.
 void DomTree::buildDominators() {
-  // build predecessors relationship
-  for (const auto &[p, b, instr] : cfg) {
-    (void)instr;
-
-    auto &b_node = doms.try_emplace(&b, b).first->second;
-    auto &pred = doms.try_emplace(&p, p).first->second;
-    b_node.dominator = nullptr;
-    b_node.preds.push_back(&pred);
-  }
-
   // initialization
   unsigned i = f.getBBs().size();
   for (auto &b : f.getBBs()) {
-    auto I = doms.find(b);
-    if (I == doms.end())
-      continue;
-    
-    I->second.order = --i;
-    I->second.dominator = nullptr;
+    doms.emplace(b, *b).first->second.order = --i;
   }
 
-  // assuming first bb is never moved
+  // build predecessors relationship
+  for (const auto &[src, tgt, instr] : cfg) {
+    (void)instr;
+    doms.at(&tgt).preds.push_back(&doms.at(&src));
+  }
+
   auto &entry = doms.at(&f.getFirstBB());
   entry.dominator = &entry;
 
@@ -322,20 +313,15 @@ void DomTree::buildDominators() {
   // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
   // Makes multiple passes when CFG is cyclic to update incorrect initial
   // dominator guesses.
-  DomTreeNode *new_idom;
-  bool changed = true;
-  while (changed) {
+  bool changed;
+  do {
     changed = false;
     for (auto &b : f.getBBs()) {
-      auto I = doms.find(b);
-      if (I == doms.end())
-        continue;
-
-      auto &b_node = I->second;
+      auto &b_node = doms.at(b);
       if (b_node.preds.empty())
         continue;
       
-      new_idom = b_node.preds.front();
+      auto new_idom = b_node.preds.front();
       for (auto p : b_node.preds) {
         if (p->dominator != nullptr) {
           new_idom = intersect(p, new_idom);
@@ -347,7 +333,7 @@ void DomTree::buildDominators() {
         changed = true;
       }
     }
-  }
+  } while (changed);
 }
 
 DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
@@ -362,25 +348,18 @@ DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
 
 // get immediate dominator BasicBlock
 const BasicBlock* DomTree::getIDominator(const BasicBlock &bb) const {
-  auto I = doms.find(&bb);
-  if (I != doms.end())
-    return &I->second.dominator->bb;
-
-  return nullptr;
+  auto dom = doms.at(&bb).dominator;
+  return dom ? &dom->bb : nullptr;
 }
-
 
 void DomTree::printDot(std::ostream &os) const {
   os << "digraph {\n"
         "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
   for (auto I = f.getBBs().begin()+1, E = f.getBBs().end(); I != E; ++I) {
-    // test for unreachability
-    auto J = doms.find(*I);
-    if (J != doms.end()) {
-      auto node = J->second;
-      os << '"' << bb_dot_name(node.dominator->bb.getName()) << "\" -> \""
-        << bb_dot_name(node.bb.getName()) << "\";\n";
+    if (auto dom = getIDominator(**I)) {
+      os << '"' << bb_dot_name(dom->getName()) << "\" -> \""
+         << bb_dot_name((*I)->getName()) << "\";\n";
     }
   }
 
