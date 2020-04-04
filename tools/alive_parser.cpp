@@ -828,7 +828,7 @@ static unique_ptr<Instr> parse_insertvalue(string_view name) {
   parse_comma();
   auto &elt_ty = parse_type();
   auto &elt = parse_operand(elt_ty);
-  auto instr = make_unique<InsertValue>(get_sym_type(), string(name), val, elt);
+  auto instr = make_unique<InsertValue>(elt_ty, string(name), val, elt);
 
   while (true) {
     if (!tokenizer.consumeIf(COMMA))
