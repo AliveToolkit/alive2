@@ -1145,15 +1145,15 @@ void InsertValue::print(ostream &os) const {
   }
 }
 
-StateValue update_repack(Type *type,
-                         const StateValue &val,
-                         const StateValue &elem,
-                         vector<unsigned> &indices) {
+static StateValue update_repack(Type *type,
+                                const StateValue &val,
+                                const StateValue &elem,
+                                vector<unsigned> &indices) {
   auto ty = type->getAsAggregateType();
   unsigned cur_idx = indices.back();
   indices.pop_back();
   vector<StateValue> vals;
-  for (unsigned i = 0; i < ty->numElementsConst(); ++i) {
+  for (unsigned i = 0, e = ty->numElementsConst(); i < e; ++i) {
     auto v = ty->extract(val, i);
     if (i == cur_idx) {
       vals.emplace_back(indices.empty() ?
@@ -1168,12 +1168,11 @@ StateValue update_repack(Type *type,
 }
 
 StateValue InsertValue::toSMT(State &s) const {
-  auto sv = s[*val];
-  auto elem = s[*elt];
+  auto &sv = s[*val];
+  auto &elem = s[*elt];
 
   Type *type = &val->getType();
-  vector<unsigned> idxs_reverse = idxs;
-  reverse(idxs_reverse.begin(), idxs_reverse.end());
+  vector<unsigned> idxs_reverse(idxs.rbegin(), idxs.rend());
   return update_repack(type, sv, elem, idxs_reverse);
 }
 
