@@ -1145,48 +1145,36 @@ void InsertValue::print(ostream &os) const {
   }
 }
 
+StateValue update_repack(Type *type,
+                         const StateValue &val,
+                         const StateValue &elem,
+                         vector<unsigned> &indices) {
+  auto ty = type->getAsAggregateType();
+  unsigned cur_idx = indices.back();
+  indices.pop_back();
+  vector<StateValue> vals;
+  for (unsigned i = 0; i < ty->numElementsConst(); ++i) {
+    auto v = ty->extract(val, i);
+    if (i == cur_idx) {
+      vals.emplace_back(indices.empty() ?
+                        elem :
+                        update_repack(&ty->getChild(i), v, elem, indices));
+    } else {
+      vals.emplace_back(v);
+    }
+  }
+
+  return ty->aggregateVals(vals);
+}
+
 StateValue InsertValue::toSMT(State &s) const {
   auto sv = s[*val];
+  auto elem = s[*elt];
 
   Type *type = &val->getType();
-  unsigned left_v_bits = 0, left_np_bits = 0;
-  unsigned total_v_bits = type->bits();
-  unsigned total_np_bits = type->np_bits();
-  for (unsigned i = 0; i < idxs.size() - 1; i++) {
-    auto ty = type->getAsAggregateType();
-    for (unsigned j = 0; j < idxs[i]; j++) {
-      left_v_bits += ty->getChild(j).bits();
-      left_np_bits += ty->getChild(j).np_bits();
-    }
-    sv = ty->extract(sv, idxs[i]);
-    type = &ty->getChild(idxs[i]);
-  }
-
-  auto ty = type->getAsAggregateType();
-  sv = ty->update(sv, s[*elt], idxs.back());
-
-  // Find the correct BV segment to update
-  auto orig_sv = s[*val];
-  unsigned bits = ty->bits();
-  unsigned np_bits = ty->np_bits();
-  expr ret_v = sv.value;
-  expr ret_np = sv.non_poison;
-  if (total_v_bits > bits && total_np_bits > np_bits) {
-    expr fill_v = expr::mkUInt(0, total_v_bits - bits);
-    expr idx_v = expr::mkUInt(left_v_bits, total_v_bits);
-    expr mask_v = ~expr::mkInt(-1, bits).concat(fill_v).lshr(idx_v);
-    expr nv_shifted = sv.value.concat(fill_v).lshr(idx_v);
-
-    expr idx_np = expr::mkUInt(left_np_bits, total_np_bits);
-    expr fill_np = expr::mkUInt(0, total_np_bits - np_bits);
-    expr mask_np = ~expr::mkInt(-1, np_bits).concat(fill_np).lshr(idx_np);
-    expr np_shifted = sv.non_poison.concat(fill_np).lshr(idx_np);
-
-    ret_v = (orig_sv.value & mask_v) | nv_shifted;
-    ret_np = (orig_sv.non_poison & mask_np) | np_shifted;
-  }
-
-  return { move(ret_v), move(ret_np) };
+  vector<unsigned> idxs_reverse = idxs;
+  reverse(idxs_reverse.begin(), idxs_reverse.end());
+  return update_repack(type, sv, elem, idxs_reverse);
 }
 
 expr InsertValue::getTypeConstraints(const Function &f) const {
