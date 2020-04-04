@@ -196,3 +196,8 @@ Summary:
   1 incorrect transformations
   0 errors
 ```
+
+LLVM Bugs Found by Alive2
+--------
+
+[BugList.md](BugList.md) shows the list of LLVM bugs found by Alive2.
