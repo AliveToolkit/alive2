@@ -1186,7 +1186,7 @@ StateValue InsertValue::toSMT(State &s) const {
     ret_np = (orig_sv.non_poison & mask_np) | np_shifted;
   }
 
-  return { std::move(ret_v), std::move(ret_np) };
+  return { move(ret_v), move(ret_np) };
 }
 
 expr InsertValue::getTypeConstraints(const Function &f) const {
@@ -1198,14 +1198,13 @@ expr InsertValue::getTypeConstraints(const Function &f) const {
   unsigned i = 0;
   for (auto idx : idxs) {
     auto ty = type->getAsAggregateType();
-    if (!ty) {
-      c = false;
-      break;
-    }
+    if (!ty)
+      return false;
+
     type = &ty->getChild(idx);
 
     c &= ty->numElements().ugt(idx);
-    if (++i == idxs.size() && !c.isFalse())
+    if (++i == idxs.size() && idx < ty->numElementsConst())
       c &= ty->getChild(idx) == elt->getType();
   }
 

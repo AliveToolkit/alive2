@@ -756,7 +756,9 @@ StateValue AggregateType::update(const StateValue &val,
   expr idx_np = expr::mkUInt(total_np, np_bits());
   expr fill_np = expr::mkUInt(0, np_bits() - bw_np_elt);
   expr mask_np = ~expr::mkInt(-1, bw_np_elt).concat(fill_np).lshr(idx_np);
-  expr np_shifted = children[index]->toBV(elt).non_poison.concat(fill_np).lshr(idx_np);
+  expr np_shifted = children[index]->toBV(elt).non_poison
+                                              .concat(fill_np)
+                                              .lshr(idx_np);
 
   return fromBV({ (val.value & mask_v) | nv_shifted,
                   (val.non_poison & mask_np) | np_shifted});
