@@ -856,7 +856,27 @@ expr AggregateType::fromInt(expr v) const {
 }
 
 StateValue AggregateType::fromInt(StateValue v) const {
-  UNREACHABLE();
+  // structs can be empty
+  if (elements == 0)
+    return { expr::mkUInt(0, 1), true };
+
+  vector<StateValue> child_vals(elements);
+  unsigned bits = 0, np_bits = 0;
+  for (unsigned i = 0; i < elements; ++i) {
+    unsigned idx = little_endian ? i : elements - 1 - i;
+    auto *child = children[idx];
+    if (child->bits() == 0)
+      continue;
+
+    auto bits2 = bits + child->bits();
+    auto np_bits2 = np_bits + child->np_bits();
+    child_vals[idx]
+      = children[i]->fromInt({ v.value.extract(bits2 - 1, bits),
+                               v.non_poison.extract(np_bits2 - 1, np_bits) });
+    bits = bits2;
+    np_bits = np_bits2;
+  }
+  return this->aggregateVals(child_vals);
 }
 
 pair<expr, expr>
@@ -1346,4 +1366,13 @@ bool hasPtr(const Type &t) {
   }
   return false;
 }
+
+bool isVectorWithNonByteInts(const Type &t) {
+  auto vty = dynamic_cast<const VectorType *>(&t);
+  if (!vty || vty->numElementsConst() == 0)
+    return false;
+  auto &child = vty->getChild(0);
+  return child.isIntType() && child.bits() % 8 != 0;
+}
+
 }

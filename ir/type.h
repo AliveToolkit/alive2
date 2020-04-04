@@ -408,5 +408,6 @@ public:
 
 
 bool hasPtr(const Type &t);
+bool isVectorWithNonByteInts(const Type &t);
 
 }
