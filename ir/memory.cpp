@@ -273,6 +273,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
   } else {
+    assert(!fromType.isAggregateType() || isNonPtrVector(fromType));
     StateValue bvval = fromType.toInt(*s, val);
     unsigned bitsize = bvval.bits();
     unsigned bytesize = divide_up(bitsize, bits_byte);
@@ -325,6 +326,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
              move(non_poison) };
 
   } else {
+    assert(!toType.isAggregateType() || isNonPtrVector(toType));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
 
@@ -1454,7 +1456,8 @@ unsigned Memory::getStoreByteSize(const Type &ty) {
   if (ty.isPtrType())
     return divide_up(bits_program_pointer, 8);
 
-  if (auto aty = ty.getAsAggregateType()) {
+  auto aty = ty.getAsAggregateType();
+  if (aty && !isNonPtrVector(ty)) {
     unsigned sz = 0;
     for (unsigned i = 0; i < aty->numElementsConst(); ++i)
       sz += getStoreByteSize(aty->getChild(i));
@@ -1476,7 +1479,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
     state->addUB(ptr.is_dereferenceable(getStoreByteSize(type), align,
                                         !state->isInitializationPhase()));
 
-  if (auto aty = type.getAsAggregateType()) {
+  auto aty = type.getAsAggregateType();
+  if (aty && !isNonPtrVector(type)) {
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto &child = aty->getChild(i);
@@ -1512,7 +1516,8 @@ Memory::load(const expr &p, const Type &type, unsigned align) {
   auto ubs = ptr.is_dereferenceable(bytecount, align, false);
 
   StateValue ret;
-  if (auto aty = type.getAsAggregateType()) {
+  auto aty = type.getAsAggregateType();
+  if (aty && !isNonPtrVector(type)) {
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {

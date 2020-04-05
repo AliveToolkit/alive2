@@ -267,7 +267,8 @@ public:
   unsigned numElementsConst() const { return elements; }
 
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
-  IR::StateValue extract(const IR::StateValue &val, unsigned index) const;
+  IR::StateValue extract(const IR::StateValue &val, unsigned index,
+                         bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }
   bool isPadding(unsigned i) const { return is_padding[i]; }
 
@@ -408,5 +409,6 @@ public:
 
 
 bool hasPtr(const Type &t);
+bool isNonPtrVector(const Type &t);
 
 }
