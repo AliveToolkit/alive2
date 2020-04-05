@@ -1160,7 +1160,7 @@ static StateValue update_repack(Type *type,
                         elem :
                         update_repack(&ty->getChild(i), v, elem, indices));
     } else {
-      vals.emplace_back(v);
+      vals.emplace_back(move(v));
     }
   }
 
