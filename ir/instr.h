@@ -170,6 +170,23 @@ public:
 };
 
 
+class InsertValue final : public Instr {
+  Value *val, *elt;
+  std::vector<unsigned> idxs;
+public:
+  InsertValue(Type &type, std::string &&name, Value &val, Value &elt)
+          : Instr(type, std::move(name)), val(&val), elt(&elt) {}
+  void addIdx(unsigned idx);
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class FnCall final : public Instr {
 public:
   enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1, ArgMemOnly = 1 << 2,

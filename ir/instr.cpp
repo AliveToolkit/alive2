@@ -1125,6 +1125,88 @@ unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
 }
 
 
+void InsertValue::addIdx(unsigned idx) {
+  idxs.emplace_back(idx);
+}
+
+vector<Value*> InsertValue::operands() const {
+  return { val, elt };
+}
+
+void InsertValue::rauw(const Value &what, Value &with) {
+  RAUW(val);
+  RAUW(elt);
+}
+
+void InsertValue::print(ostream &os) const {
+  os << getName() << " = insertvalue " << *val << ", " << *elt;
+  for (auto idx : idxs) {
+    os << ", " << idx;
+  }
+}
+
+static StateValue update_repack(Type *type,
+                                const StateValue &val,
+                                const StateValue &elem,
+                                vector<unsigned> &indices) {
+  auto ty = type->getAsAggregateType();
+  unsigned cur_idx = indices.back();
+  indices.pop_back();
+  vector<StateValue> vals;
+  for (unsigned i = 0, e = ty->numElementsConst(); i < e; ++i) {
+    auto v = ty->extract(val, i);
+    if (i == cur_idx) {
+      vals.emplace_back(indices.empty() ?
+                        elem :
+                        update_repack(&ty->getChild(i), v, elem, indices));
+    } else {
+      vals.emplace_back(move(v));
+    }
+  }
+
+  return ty->aggregateVals(vals);
+}
+
+StateValue InsertValue::toSMT(State &s) const {
+  auto &sv = s[*val];
+  auto &elem = s[*elt];
+
+  Type *type = &val->getType();
+  vector<unsigned> idxs_reverse(idxs.rbegin(), idxs.rend());
+  return update_repack(type, sv, elem, idxs_reverse);
+}
+
+expr InsertValue::getTypeConstraints(const Function &f) const {
+  auto c = Value::getTypeConstraints() &&
+           val->getType().enforceAggregateType() &&
+           val->getType() == getType();
+
+  Type *type = &val->getType();
+  unsigned i = 0;
+  for (auto idx : idxs) {
+    auto ty = type->getAsAggregateType();
+    if (!ty)
+      return false;
+
+    type = &ty->getChild(idx);
+
+    c &= ty->numElements().ugt(idx);
+    if (++i == idxs.size() && idx < ty->numElementsConst())
+      c &= ty->getChild(idx) == elt->getType();
+  }
+
+  return c;
+}
+
+unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
+  auto ret = make_unique<InsertValue>(getType(), getName() + suffix, *val, *elt);
+  for (auto idx : idxs) {
+    ret->addIdx(idx);
+  }
+  return ret;
+}
+
+
 void FnCall::addArg(Value &arg, unsigned flags) {
   args.emplace_back(&arg, flags);
 }
