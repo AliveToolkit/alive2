@@ -723,6 +723,9 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
 StateValue
 AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
     const {
+  if (children[index]->bits() == 0)
+    return { expr::mkUInt(0, 1), true };
+
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_value += children[i]->bits();
