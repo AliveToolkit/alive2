@@ -273,7 +273,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
   } else {
-    assert(!fromType.isAggregateType() || isIntVector(fromType));
+    assert(!fromType.isAggregateType() || isNonPtrVector(fromType));
     StateValue bvval = fromType.toInt(*s, val);
     unsigned bitsize = bvval.bits();
     unsigned bytesize = divide_up(bitsize, bits_byte);
@@ -326,7 +326,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
              move(non_poison) };
 
   } else {
-    assert(!toType.isAggregateType() || isIntVector(toType));
+    assert(!toType.isAggregateType() || isNonPtrVector(toType));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
 
@@ -1457,7 +1457,7 @@ unsigned Memory::getStoreByteSize(const Type &ty) {
     return divide_up(bits_program_pointer, 8);
 
   auto aty = ty.getAsAggregateType();
-  if (aty && !isIntVector(ty)) {
+  if (aty && !isNonPtrVector(ty)) {
     unsigned sz = 0;
     for (unsigned i = 0; i < aty->numElementsConst(); ++i)
       sz += getStoreByteSize(aty->getChild(i));
@@ -1480,7 +1480,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
                                         !state->isInitializationPhase()));
 
   auto aty = type.getAsAggregateType();
-  if (aty && !isIntVector(type)) {
+  if (aty && !isNonPtrVector(type)) {
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto &child = aty->getChild(i);
@@ -1517,7 +1517,7 @@ Memory::load(const expr &p, const Type &type, unsigned align) {
 
   StateValue ret;
   auto aty = type.getAsAggregateType();
-  if (aty && !isIntVector(type)) {
+  if (aty && !isNonPtrVector(type)) {
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {

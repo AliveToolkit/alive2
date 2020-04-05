@@ -720,22 +720,36 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
   return v;
 }
 
-StateValue AggregateType::extract(const StateValue &val, unsigned index) const {
+StateValue
+AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
+    const {
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_value += children[i]->bits();
     total_np += children[i]->np_bits();
   }
-  unsigned high_val = bits() - total_value;
-  unsigned h_val = high_val - 1;
-  unsigned l_val = high_val - children[index]->bits();
 
-  unsigned high_np = np_bits() - total_np;
-  unsigned h_np = high_np - 1;
-  unsigned l_np = high_np - children[index]->np_bits();
+  unsigned h_val, l_val, h_np, l_np;
+  if (fromInt && little_endian) {
+    h_val = total_value + children[index]->bits() - 1;
+    l_val = total_value;
 
-  return children[index]->fromBV({ val.value.extract(h_val, l_val),
-                                   val.non_poison.extract(h_np, l_np) });
+    h_np = total_np + children[index]->np_bits() - 1;
+    l_np = total_np;
+  } else {
+    unsigned high_val = bits() - total_value;
+    h_val = high_val - 1;
+    l_val = high_val - children[index]->bits();
+
+    unsigned high_np = np_bits() - total_np;
+    h_np = high_np - 1;
+    l_np = high_np - children[index]->np_bits();
+  }
+
+  StateValue sv(val.value.extract(h_val, l_val),
+                val.non_poison.extract(h_np, l_np));
+  return fromInt ? children[index]->fromInt(move(sv)) :
+                   children[index]->fromBV(move(sv));
 }
 
 unsigned AggregateType::bits() const {
@@ -856,26 +870,9 @@ expr AggregateType::fromInt(expr v) const {
 }
 
 StateValue AggregateType::fromInt(StateValue v) const {
-  // structs can be empty
-  if (elements == 0)
-    return { expr::mkUInt(0, 1), true };
-
-  vector<StateValue> child_vals(elements);
-  unsigned bits = 0, np_bits = 0;
-  for (unsigned i = 0; i < elements; ++i) {
-    unsigned idx = little_endian ? i : elements - 1 - i;
-    auto *child = children[idx];
-    if (child->bits() == 0)
-      continue;
-
-    auto bits2 = bits + child->bits();
-    auto np_bits2 = np_bits + child->np_bits();
-    child_vals[idx]
-      = children[i]->fromInt({ v.value.extract(bits2 - 1, bits),
-                               v.non_poison.extract(np_bits2 - 1, np_bits) });
-    bits = bits2;
-    np_bits = np_bits2;
-  }
+  vector<StateValue> child_vals;
+  for (unsigned i = 0; i < elements; ++i)
+    child_vals.emplace_back(extract(v, i, true));
   return this->aggregateVals(child_vals);
 }
 
@@ -1367,12 +1364,12 @@ bool hasPtr(const Type &t) {
   return false;
 }
 
-bool isIntVector(const Type &t) {
+bool isNonPtrVector(const Type &t) {
   auto vty = dynamic_cast<const VectorType *>(&t);
   if (!vty || vty->numElementsConst() == 0)
     return false;
   auto &child = vty->getChild(0);
-  return child.isIntType();
+  return !child.isPtrType();
 }
 
 }
