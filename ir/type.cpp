@@ -1367,12 +1367,12 @@ bool hasPtr(const Type &t) {
   return false;
 }
 
-bool isVectorWithNonByteInts(const Type &t) {
+bool isIntVector(const Type &t) {
   auto vty = dynamic_cast<const VectorType *>(&t);
   if (!vty || vty->numElementsConst() == 0)
     return false;
   auto &child = vty->getChild(0);
-  return child.isIntType() && child.bits() % 8 != 0;
+  return child.isIntType();
 }
 
 }
