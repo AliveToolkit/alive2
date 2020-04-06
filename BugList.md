@@ -99,10 +99,7 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 15. Incorrect optimization of gep without inbounds + load -> icmp eq
 (https://bugs.llvm.org/show_bug.cgi?id=45210)
 
-16. Invalid transform: gep p, (q-p) -> q
-(https://bugs.llvm.org/show_bug.cgi?id=45444)
-
-17. gep(ptr, undef) isn't undef
+16. gep(ptr, undef) isn't undef
 (https://bugs.llvm.org/show_bug.cgi?id=45445)
 
 
