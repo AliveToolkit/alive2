@@ -79,7 +79,11 @@ public:
 class Pointer {
   const Memory &m;
 
-  // [bid, offset, attributes (1 bit for each)]
+  // Pointer's representation:
+  //   +----------------+-------------------+---------------------+
+  //   | bid            | offset            | attrs               |
+  //   | (bits_for_bid) | (bits_for_offset) | (bits_for_ptrattrs) |
+  //   +----------------+-------------------+---------------------+
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -181,7 +185,7 @@ public:
   const Memory& getMemory() const { return m; }
 
   static Pointer mkNullPointer(const Memory &m);
-  smt::expr isNull() const;
+  smt::expr isNull(bool check_offset = true) const;
   smt::expr isNonZero() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);

@@ -815,11 +815,28 @@ expr Pointer::blockValRefined(const Pointer &other) const {
                 val.ptrByteoffset() == val2.ptrByteoffset() &&
                 val.ptr().refined(val2.ptr());
   }
+  // allow null ptr <-> zero
+  // If ptr points to a null block with ofs, its integer address is compared.
+  // Relevant transformations:
+  //   store ty* null  <-> memset i8 0
+  //   store ty* undef  -> memset i8 undef
+  expr val_i8 =
+    expr::mkIf(is_ptr,
+      (val.ptr().getOffset().lshr(val.ptrByteoffset() * bits_byte))
+          .zextOrTrunc(bits_byte),
+      val.nonptrValue());
+  expr val2_i8 =
+    expr::mkIf(is_ptr2,
+      (val2.ptr().getOffset().lshr(val.ptrByteoffset() * bits_byte))
+          .zextOrTrunc(bits_byte),
+      val2.nonptrValue());
+  expr null_punning = (!is_ptr2 || val2.ptr().isNull(false)) &&
+                      (!is_ptr || val.ptr().isNull(false)) &&
+                      !val2.isPoison() && val_i8 == val2_i8;
   return val.isPoison() ||
          expr::mkIf(is_ptr == is_ptr2,
                     expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
-                    // allow null ptr <-> zero
-                    val.isZero() && !val2.isPoison() && val2.isZero());
+                    move(null_punning));
 }
 
 expr Pointer::blockRefined(const Pointer &other) const {
@@ -906,10 +923,13 @@ Pointer Pointer::mkNullPointer(const Memory &m) {
   return { m, 0, false };
 }
 
-expr Pointer::isNull() const {
+expr Pointer::isNull(bool check_offset) const {
   if (!has_null_block)
     return false;
-  return *this == mkNullPointer(m);
+  auto np = mkNullPointer(m);
+  if (!check_offset)
+    return this->getBid() == np.getBid();
+  return *this == np;
 }
 
 expr Pointer::isNonZero() const {
