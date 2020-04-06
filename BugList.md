@@ -47,8 +47,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 14. Instcombine: incorrect transformation 'x > (x & undef)' -> 'x > undef'
 (https://bugs.llvm.org/show_bug.cgi?id=44383)
 
-15. Incorrect optimization of gep without inbounds + load -> icmp eq
-(https://bugs.llvm.org/show_bug.cgi?id=45210)
+15. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
+(https://bugs.llvm.org/show_bug.cgi?id=45447)
 
 
 ### Memory Operations (Load/Store/GEP/...)
@@ -98,6 +98,12 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 
 15. Incorrect optimization of gep without inbounds + load -> icmp eq
 (https://bugs.llvm.org/show_bug.cgi?id=45210)
+
+16. Invalid transform: gep p, (q-p) -> q
+(https://bugs.llvm.org/show_bug.cgi?id=45444)
+
+17. gep(ptr, undef) isn't undef
+(https://bugs.llvm.org/show_bug.cgi?id=45445)
 
 
 ### Bugs found in Z3
