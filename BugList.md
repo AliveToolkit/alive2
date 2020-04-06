@@ -1,12 +1,7 @@
-## The List of LLVM Bugs Found by Alive2
+## Bugs Found by Alive2
 
-This document enumerates the bugs in LLVM found by Alive2.
-This includes bugs found in the past version of Alive2 but not by the recent
-version anymore, or bugs that are found by locally modified version of Alive2.
-For example, [pr43616](https://bugs.llvm.org/show_bug.cgi?id=43616)
-is not found by Alive2 anymore because accepting a pair that converts a
-non-constant global variable into constant can introduce false negatives.
-Such pair is now reported as unsupported, but it was accepted in the past.
+This document lists the bugs found so far by Alive2 in LLVM & Z3.
+Please contact us or submit a PR if something is missing or inaccurate.
 
 
 ### Integer operations
@@ -90,6 +85,7 @@ Such pair is now reported as unsupported, but it was accepted in the past.
 
 11. [globalopt] optimization leaves store to a constant global
 (https://bugs.llvm.org/show_bug.cgi?id=43616)
+NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positives
 
 12. -expandmemcmp generates loads with incorrect alignment
 (https://bugs.llvm.org/show_bug.cgi?id=43880)
