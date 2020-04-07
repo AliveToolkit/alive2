@@ -540,7 +540,7 @@ StateValue BinOp::toSMT(State &s) const {
                                     bi->non_poison));
       }
     }
-    return ty->aggregateVals(vals);
+    return ty->aggregateVals(vals, true);
   }
 
   if (vertical_zip) {
@@ -548,7 +548,7 @@ StateValue BinOp::toSMT(State &s) const {
     auto [v1, v2] = zip_op(a.value, a.non_poison, b.value, b.non_poison);
     vals.emplace_back(move(v1));
     vals.emplace_back(move(v2));
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, true);
   }
   return scalar_op(a.value, a.non_poison, b.value, b.non_poison);
 }
@@ -567,8 +567,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
                   lhs->getType() == rhs->getType();
 
     if (auto ty = getType().getAsStructType()) {
-      instrconstr &= ty->numElements() == 2 &&
-                     ty->getChild(0) == lhs->getType() &&
+      // Note that ty->numElements() may not be 2 due to paddings
+      instrconstr &= ty->getChild(0) == lhs->getType() &&
                      ty->getChild(1).enforceIntOrVectorType(1) &&
                      ty->getChild(1).enforceVectorTypeEquiv(lhs->getType());
     }

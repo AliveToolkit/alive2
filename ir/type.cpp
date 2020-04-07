@@ -701,19 +701,36 @@ expr AggregateType::numElements() const {
                    var("elements", var_vector_elements);
 }
 
-StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
-  assert(vals.size() == elements);
+unsigned AggregateType::numPaddingsConst() const {
+  unsigned count = 0;
+  for (bool b : is_padding)
+    count += b;
+  return count;
+}
+
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
+                                        bool needsPadding) const {
+  assert(vals.size() + (needsPadding ? numPaddingsConst() : 0) == elements);
   // structs can be empty
-  if (vals.empty())
+  if (vals.empty() && !needsPadding)
     return { expr::mkUInt(0, 1), true };
 
   StateValue v;
   bool first = true;
+  unsigned val_idx = 0;
   for (unsigned idx = 0; idx < elements; ++idx) {
-    if (children[idx]->bits() == 0)
+    if (children[idx]->bits() == 0) {
+      assert(!isPadding(idx));
+      val_idx++;
       continue;
+    }
 
-    auto vv = children[idx]->toBV(vals[idx]);
+    StateValue vv;
+    if (needsPadding && isPadding(idx))
+      vv = children[idx]->getDummyValue(true);
+    else
+      vv = vals[val_idx++];
+    vv = children[idx]->toBV(vv);
     v = first ? move(vv) : v.concat(vv);
     first = false;
   }
