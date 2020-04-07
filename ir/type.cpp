@@ -730,7 +730,7 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
       vv = children[idx]->getDummyValue(true);
     else
       vv = vals[val_idx++];
-    vv = children[idx]->toBV(vv);
+    vv = children[idx]->toBV(move(vv));
     v = first ? move(vv) : v.concat(vv);
     first = false;
   }
