@@ -809,7 +809,7 @@ static void calculateAndInitConstants(Transform &t) {
   auto max_geps
     = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_mem_access),
                  true) + 1;
-  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)bits_program_pointer);
+  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
 
   // we need an extra bit because 1st bit of size is always 0
   bits_size_t = ilog2_ceil(max_alloc_size, true);

@@ -820,7 +820,7 @@ public:
       return {};
 
     Function Fn(*type, f.getName().str(), 8 * DL().getPointerSize(),
-                DL().isLittleEndian());
+                DL().getIndexSizeInBits(0), DL().isLittleEndian());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {
