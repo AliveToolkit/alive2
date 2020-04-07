@@ -234,6 +234,8 @@ space+ {
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
 "fma" { return FMA; }
+"fmaxnum" { return FMAXNUM; }
+"fminnum" { return FMINNUM; }
 "extractelement" { return EXTRACTELEMENT; }
 "insertelement" { return INSERTELEMENT; }
 "shufflevector" { return SHUFFLEVECTOR; }

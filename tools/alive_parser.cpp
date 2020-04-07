@@ -616,6 +616,8 @@ static FastMathFlags parse_fast_math(token op_token) {
   case FREM:
   case FCMP:
   case FMA:
+  case FMAXNUM:
+  case FMINNUM:
     break;
   default:
     if (!fmath.isNone())
@@ -642,6 +644,8 @@ static unsigned parse_binop_flags(token op_token) {
   case FMUL:
   case FDIV:
   case FREM:
+  case FMAXNUM:
+  case FMINNUM:
   case SREM:
   case UREM:
   case UADD_SAT:
@@ -725,6 +729,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case FMUL: op = BinOp::FMul; break;
   case FDIV: op = BinOp::FDiv; break;
   case FREM: op = BinOp::FRem; break;
+  case FMAXNUM: op = BinOp::FMaxNum; break;
+  case FMINNUM: op = BinOp::FMinNum; break;
   default:
     UNREACHABLE();
   }
@@ -1032,6 +1038,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FMUL:
   case FDIV:
   case FREM:
+  case FMAXNUM:
+  case FMINNUM:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:
