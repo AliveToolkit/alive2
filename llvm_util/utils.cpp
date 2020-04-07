@@ -49,8 +49,10 @@ bool hasOpaqueType(llvm::Type *ty) {
     for (auto elemty : aty->elements())
       if (hasOpaqueType(elemty))
         return true;
-  } else if (auto sty = llvm::dyn_cast<llvm::SequentialType>(ty))
-    return hasOpaqueType(sty->getElementType());
+  } else if (auto aty = llvm::dyn_cast<llvm::ArrayType>(ty))
+    return hasOpaqueType(aty->getElementType());
+  else if (auto vty = llvm::dyn_cast<llvm::VectorType>(ty))
+    return hasOpaqueType(vty->getElementType());
 
   return false;
 }

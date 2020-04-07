@@ -200,12 +200,22 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
     return 0;
   }
 
-  case llvm::Type::ArrayTyID:
-  case llvm::Type::VectorTyID: {
-    auto *STyL = llvm::cast<llvm::SequentialType>(TyL);
-    auto *STyR = llvm::cast<llvm::SequentialType>(TyR);
+  case llvm::Type::ArrayTyID: {
+    auto *STyL = llvm::cast<llvm::ArrayType>(TyL);
+    auto *STyR = llvm::cast<llvm::ArrayType>(TyR);
     if (STyL->getNumElements() != STyR->getNumElements())
       return cmpNumbers(STyL->getNumElements(), STyR->getNumElements());
+    return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
+  }
+  case llvm::Type::VectorTyID: {
+    auto *STyL = llvm::cast<llvm::VectorType>(TyL);
+    auto *STyR = llvm::cast<llvm::VectorType>(TyR);
+    if (STyL->getElementCount().Scalable != STyR->getElementCount().Scalable)
+      return cmpNumbers(STyL->getElementCount().Scalable,
+                        STyR->getElementCount().Scalable);
+    if (STyL->getElementCount().Min != STyR->getElementCount().Min)
+      return cmpNumbers(STyL->getElementCount().Min,
+                        STyR->getElementCount().Min);
     return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
   }
   }
