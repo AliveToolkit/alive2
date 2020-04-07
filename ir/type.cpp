@@ -727,7 +727,7 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
 
     StateValue vv;
     if (needsPadding && isPadding(idx))
-      vv = children[idx]->getDummyValue(true);
+      vv = children[idx]->getDummyValue(false);
     else
       vv = vals[val_idx++];
     vv = children[idx]->toBV(move(vv));
