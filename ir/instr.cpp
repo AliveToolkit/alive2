@@ -492,19 +492,20 @@ StateValue BinOp::toSMT(State &s) const {
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addQuantVar(ndet);
-      auto nondet_zero = expr::mkIf(ndet, expr::mkNumber("0", a),
-                                    expr::mkNumber("-0", a));
-
-      expr z = a.isFPZero() && b.isFPZero();
-      // (+, -) or (-, +)
-      expr s = (a.isFPNeg() && !b.isFPNeg()) || (!a.isFPNeg() && b.isFPNeg());
-      expr cmp = (op == FMinNum) ? a.fole(b) : a.foge(b);      
+      auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
+                            expr::mkNumber("-0", a));
       
-      expr v = expr::mkIf(a.isNaN(), b,
+      auto v = [&](expr &a, expr &b) {
+        expr z = a.isFPZero() && b.isFPZero();
+        // (+, -) or (-, +)
+        expr s = (a.isFPNeg() && !b.isFPNeg()) || (!a.isFPNeg() && b.isFPNeg());
+        expr cmp = (op == FMinNum) ? a.fole(b) : a.foge(b);
+        return expr::mkIf(a.isNaN(), b,
                           expr::mkIf(b.isNaN(), a,
-                                     expr::mkIf(z && s, nondet_zero,
+                                     expr::mkIf(z && s, ndz,
                                                 expr::mkIf(cmp, a, b))));
-      return { move(v), true };
+      };
+      return fm_poison(s, a, b, v, fmath, false);
     };
     break;
   }

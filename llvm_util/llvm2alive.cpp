@@ -593,8 +593,6 @@ public:
     case llvm::Intrinsic::usub_sat:
     case llvm::Intrinsic::cttz:
     case llvm::Intrinsic::ctlz:
-    case llvm::Intrinsic::minnum:
-    case llvm::Intrinsic::maxnum:
     {
       PARSE_BINOP();
       BinOp::Op op;
@@ -611,8 +609,6 @@ public:
       case llvm::Intrinsic::usub_sat: op = BinOp::USub_Sat; break;
       case llvm::Intrinsic::cttz:     op = BinOp::Cttz; break;
       case llvm::Intrinsic::ctlz:     op = BinOp::Ctlz; break;
-      case llvm::Intrinsic::minnum:   op = BinOp::FMinNum; break;
-      case llvm::Intrinsic::maxnum:   op = BinOp::FMaxNum; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op));
@@ -649,6 +645,19 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
                                                op, parse_fmath(i)));
+    }
+    case llvm::Intrinsic::minnum:
+    case llvm::Intrinsic::maxnum:
+    {
+      PARSE_BINOP();
+      BinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::minnum:   op = BinOp::FMinNum; break;
+      case llvm::Intrinsic::maxnum:   op = BinOp::FMaxNum; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           op, BinOp::None, parse_fmath(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     {
