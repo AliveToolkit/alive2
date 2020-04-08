@@ -53,6 +53,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 16. Invalid undef splat in instcombine
 (https://bugs.llvm.org/show_bug.cgi?id=45455)
 
+17. Incorrect transformation of minnum with nnan
+(https://bugs.llvm.org/show_bug.cgi?id=45478)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
