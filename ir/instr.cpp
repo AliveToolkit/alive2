@@ -497,12 +497,10 @@ StateValue BinOp::toSMT(State &s) const {
       
       auto v = [&](expr &a, expr &b) {
         expr z = a.isFPZero() && b.isFPZero();
-        // (+, -) or (-, +)
-        expr s = (a.isFPNeg() && !b.isFPNeg()) || (!a.isFPNeg() && b.isFPNeg());
         expr cmp = (op == FMin) ? a.fole(b) : a.foge(b);
         return expr::mkIf(a.isNaN(), b,
                           expr::mkIf(b.isNaN(), a,
-                                     expr::mkIf(z && s, ndz,
+                                     expr::mkIf(z, ndz,
                                                 expr::mkIf(cmp, a, b))));
       };
       return fm_poison(s, a, b, v, fmath, false);
