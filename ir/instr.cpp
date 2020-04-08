@@ -94,6 +94,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case FMul:
   case FDiv:
   case FRem:
+  case FMin:
+  case FMax:
     assert(flags == None);
     break;
   case SRem:
@@ -161,6 +163,8 @@ void BinOp::print(ostream &os) const {
   case FMul:          str = "fmul "; break;
   case FDiv:          str = "fdiv "; break;
   case FRem:          str = "frem "; break;
+  case FMax:          str = "fmax "; break;
+  case FMin:          str = "fmin "; break;
   }
 
   os << getName() << " = " << str;
@@ -482,6 +486,26 @@ StateValue BinOp::toSMT(State &s) const {
                        false);
     };
     break;
+
+  case FMin:
+  case FMax:
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      expr ndet = expr::mkFreshVar("maxminnondet", true);
+      s.addQuantVar(ndet);
+      auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
+                            expr::mkNumber("-0", a));
+      
+      auto v = [&](expr &a, expr &b) {
+        expr z = a.isFPZero() && b.isFPZero();
+        expr cmp = (op == FMin) ? a.fole(b) : a.foge(b);
+        return expr::mkIf(a.isNaN(), b,
+                          expr::mkIf(b.isNaN(), a,
+                                     expr::mkIf(z, ndz,
+                                                expr::mkIf(cmp, a, b))));
+      };
+      return fm_poison(s, a, b, v, fmath, false);
+    };
+    break;
   }
 
   function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
@@ -584,6 +608,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case FMul:
   case FDiv:
   case FRem:
+  case FMax:
+  case FMin:
     instrconstr = getType().enforceFloatOrVectorType() &&
                   getType() == lhs->getType() &&
                   getType() == rhs->getType();

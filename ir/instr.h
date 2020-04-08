@@ -46,7 +46,7 @@ public:
             SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat,
             SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
             SMul_Overflow, UMul_Overflow,
-            FAdd, FSub, FMul, FDiv, FRem,
+            FAdd, FSub, FMul, FDiv, FRem, FMax, FMin,
             And, Or, Xor, Cttz, Ctlz  };
   enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2 };
 
