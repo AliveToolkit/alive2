@@ -1337,7 +1337,7 @@ StateValue FnCall::toSMT(State &s) const {
   if (flags & NoReturn) {
     // TODO: Even if a function call doesn't have noreturn, it can possibly
     // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
-    s.addNoReturn(expr(false));
+    s.addNoReturn();
   }
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }

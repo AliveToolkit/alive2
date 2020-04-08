@@ -25,8 +25,6 @@ public:
   void add(const AndExpr &other);
   void del(const AndExpr &other);
   void reset();
-  const auto begin() const { return exprs.begin(); }
-  const auto end() const { return exprs.end(); }
   bool contains(const expr &e) const;
   expr operator()() const;
   operator bool() const;

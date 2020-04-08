@@ -263,8 +263,8 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 static void
 check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
                  const Value *var, const Type &type,
-                 const expr &dom_a, const expr &ub_a, const State::ValTy &ap,
-                 const expr &dom_b, const expr &ub_b, const State::ValTy &bp,
+                 const expr &dom_a, const expr &fndom_a, const State::ValTy &ap,
+                 const expr &dom_b, const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
   auto &a = ap.first;
   auto &b = bp.first;
@@ -358,12 +358,12 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   };
 
   Solver::check({
-    { mk_fml(ub_a.notImplies(ub_b)),
+    { mk_fml(fndom_a.notImplies(fndom_b)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source is more defined than target");
       }},
-    { mk_fml(ub_a && ((!dom_a && dom_b) || (dom_a && !dom_b))),
+    { mk_fml(fndom_a && ((!dom_a && dom_b) || (dom_a && !dom_b))),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Target or source may never return");
@@ -959,9 +959,11 @@ Errors TransformVerify::verify() const {
   }
 
   check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-      src_state.returnDomain()(), src_state.returnUB()(), src_state.returnVal(),
-      tgt_state.returnDomain()(), tgt_state.returnUB()(), tgt_state.returnVal(),
-      check_each_var);
+                   src_state.returnDomain()(), src_state.functionDomain()(),
+                   src_state.returnVal(),
+                   tgt_state.returnDomain()(), tgt_state.functionDomain()(),
+                   tgt_state.returnVal(),
+                   check_each_var);
 
   return errs;
 }

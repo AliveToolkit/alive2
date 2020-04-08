@@ -14,18 +14,17 @@ using namespace std;
 
 namespace IR {
 
-expr State::CurrentDomain::operator()(bool noret) const {
-  return path && UB() && (noret ? noreturn() : expr(true));
+expr State::CurrentDomain::operator()() const {
+  return path && UB();
 }
 
 State::CurrentDomain::operator bool() const {
-  return !path.isFalse() && UB && noreturn;
+  return !path.isFalse() && UB;
 }
 
 void State::CurrentDomain::reset() {
   path = true;
   UB.reset();
-  noreturn.reset();
   undef_vars.clear();
 }
 
@@ -157,7 +156,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   auto &data = predecessor_data[dst][current_bb];
   data.second.add(memory, cond);
   data.first.UB.add(domain.UB(), cond);
-  data.first.path.add(move(cond) && domain.noreturn());
+  data.first.path.add(move(cond));
   data.first.undef_vars.insert(undef_vars.begin(), undef_vars.end());
   data.first.undef_vars.insert(domain.undef_vars.begin(),
                                domain.undef_vars.end());
@@ -182,8 +181,8 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 void State::addReturn(const StateValue &val) {
   return_val.add(val, domain.path);
   return_memory.add(memory, domain.path);
-  return_domain.add(domain(true));
-  return_ub.add(domain(false));
+  return_domain.add(domain());
+  function_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
@@ -191,27 +190,25 @@ void State::addReturn(const StateValue &val) {
 }
 
 void State::addUB(expr &&ub) {
-  domain.UB.add(domain.noreturn().implies(move(ub)));
+  domain.UB.add(move(ub));
   if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addUB(const expr &ub) {
-  domain.UB.add(domain.noreturn().implies(ub));
+  domain.UB.add(ub);
   if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addUB(AndExpr &&ubs) {
-  auto noret = domain.noreturn();
-  for (auto &ub : ubs)
-    domain.UB.add(noret.implies(ub));
+  domain.UB.add(ubs);
   domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
-void State::addNoReturn(expr &&noreturn) {
-  domain.noreturn.add(move(noreturn));
-  domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+void State::addNoReturn() {
+  function_domain.add(domain());
+  addUB(expr(false));
 }
 
 const vector<StateValue>

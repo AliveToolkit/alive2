@@ -6,8 +6,7 @@ define void @src() {
 }
 
 define void @tgt() {
-  udiv i32 1, 0 ; cannot use unreachable due to a bug; it does not call addReturn
-  ret void
+  unreachable
 }
 
 ; ERROR: Source is more defined than target
