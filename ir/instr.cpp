@@ -94,8 +94,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case FMul:
   case FDiv:
   case FRem:
-  case FMinNum:
-  case FMaxNum:
+  case FMin:
+  case FMax:
     assert(flags == None);
     break;
   case SRem:
@@ -163,8 +163,8 @@ void BinOp::print(ostream &os) const {
   case FMul:          str = "fmul "; break;
   case FDiv:          str = "fdiv "; break;
   case FRem:          str = "frem "; break;
-  case FMaxNum:       str = "fmaxnum "; break;
-  case FMinNum:       str = "fminnum "; break;
+  case FMax:          str = "fmax "; break;
+  case FMin:          str = "fmin "; break;
   }
 
   os << getName() << " = " << str;
@@ -487,8 +487,8 @@ StateValue BinOp::toSMT(State &s) const {
     };
     break;
 
-  case FMinNum:
-  case FMaxNum:
+  case FMin:
+  case FMax:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addQuantVar(ndet);
@@ -499,7 +499,7 @@ StateValue BinOp::toSMT(State &s) const {
         expr z = a.isFPZero() && b.isFPZero();
         // (+, -) or (-, +)
         expr s = (a.isFPNeg() && !b.isFPNeg()) || (!a.isFPNeg() && b.isFPNeg());
-        expr cmp = (op == FMinNum) ? a.fole(b) : a.foge(b);
+        expr cmp = (op == FMin) ? a.fole(b) : a.foge(b);
         return expr::mkIf(a.isNaN(), b,
                           expr::mkIf(b.isNaN(), a,
                                      expr::mkIf(z && s, ndz,
@@ -610,8 +610,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case FMul:
   case FDiv:
   case FRem:
-  case FMaxNum:
-  case FMinNum:
+  case FMax:
+  case FMin:
     instrconstr = getType().enforceFloatOrVectorType() &&
                   getType() == lhs->getType() &&
                   getType() == rhs->getType();

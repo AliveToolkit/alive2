@@ -652,8 +652,8 @@ public:
       PARSE_BINOP();
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::minnum:   op = BinOp::FMinNum; break;
-      case llvm::Intrinsic::maxnum:   op = BinOp::FMaxNum; break;
+      case llvm::Intrinsic::minnum:   op = BinOp::FMin; break;
+      case llvm::Intrinsic::maxnum:   op = BinOp::FMax; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
