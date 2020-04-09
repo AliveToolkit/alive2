@@ -264,6 +264,7 @@ protected:
 
 public:
   smt::expr numElements() const;
+  smt::expr numElementsExcludingPadding() const;
   unsigned numElementsConst() const { return elements; }
   unsigned numPaddingsConst() const;
 

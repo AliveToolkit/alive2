@@ -567,8 +567,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
                   lhs->getType() == rhs->getType();
 
     if (auto ty = getType().getAsStructType()) {
-      auto cnt = ty->numElements();
-      instrconstr &= cnt - expr::mkInt(ty->numPaddingsConst(), cnt) == 2 &&
+      instrconstr &= ty->numElementsExcludingPadding() == 2 &&
                      ty->getChild(0) == lhs->getType() &&
                      ty->getChild(1).enforceIntOrVectorType(1) &&
                      ty->getChild(1).enforceVectorTypeEquiv(lhs->getType());

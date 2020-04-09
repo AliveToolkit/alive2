@@ -708,6 +708,11 @@ unsigned AggregateType::numPaddingsConst() const {
   return count;
 }
 
+expr AggregateType::numElementsExcludingPadding() const {
+  auto elems = numElements();
+  return numElements() - expr::mkInt(numPaddingsConst(), elems);
+}
+
 StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
                                         bool needsPadding) const {
   assert(vals.size() + (needsPadding ? numPaddingsConst() : 0) == elements);
