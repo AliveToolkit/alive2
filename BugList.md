@@ -56,6 +56,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 17. Incorrect transformation of minnum with nnan
 (https://bugs.llvm.org/show_bug.cgi?id=45478)
 
+18. Can't remove insertelement undef
+(https://bugs.llvm.org/show_bug.cgi?id=45481)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
