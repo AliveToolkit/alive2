@@ -264,9 +264,12 @@ protected:
 
 public:
   smt::expr numElements() const;
+  smt::expr numElementsExcludingPadding() const;
   unsigned numElementsConst() const { return elements; }
+  unsigned numPaddingsConst() const;
 
-  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
+  StateValue aggregateVals(const std::vector<StateValue> &vals,
+                           bool needsPadding = false) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index,
                          bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }
