@@ -1,3 +1,5 @@
+; TEST-ARGS: -smt-to=10000
+
 declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32) nounwind readnone
 
 define { i32, i1 } @src(i8 %a, i8 %b) {
