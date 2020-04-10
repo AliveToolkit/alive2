@@ -528,12 +528,14 @@ StateValue BinOp::toSMT(State &s) const {
   auto &b = s[*rhs];
 
   if (lhs->getType().isVectorType()) {
-    auto ty = getType().getAsAggregateType();
+    auto retty = getType().getAsAggregateType();
     vector<StateValue> vals;
 
     if (vertical_zip) {
       auto ty = lhs->getType().getAsAggregateType();
       vector<StateValue> vals1, vals2;
+      auto val1ty = retty->getChild(0).getAsAggregateType();
+      auto val2ty = retty->getChild(1).getAsAggregateType();
 
       for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
         auto ai = ty->extract(a, i);
@@ -543,12 +545,12 @@ StateValue BinOp::toSMT(State &s) const {
         vals1.emplace_back(move(v1));
         vals2.emplace_back(move(v2));
       }
-      vals.emplace_back(ty->aggregateVals(vals1));
-      vals.emplace_back(ty->aggregateVals(vals2));
+      vals.emplace_back(val1ty->aggregateVals(vals1));
+      vals.emplace_back(val2ty->aggregateVals(vals2));
     } else {
       StateValue tmp;
-      for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-        auto ai = ty->extract(a, i);
+      for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
+        auto ai = retty->extract(a, i);
         const StateValue *bi;
         switch (op) {
         case Cttz:
@@ -556,7 +558,7 @@ StateValue BinOp::toSMT(State &s) const {
           bi = &b;
           break;
         default:
-          tmp = ty->extract(b, i);
+          tmp = retty->extract(b, i);
           bi = &tmp;
           break;
         }
@@ -564,7 +566,7 @@ StateValue BinOp::toSMT(State &s) const {
                                     bi->non_poison));
       }
     }
-    return ty->aggregateVals(vals, true);
+    return retty->aggregateVals(vals, true);
   }
 
   if (vertical_zip) {
