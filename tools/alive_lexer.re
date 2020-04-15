@@ -271,6 +271,11 @@ space+ {
 "frem" { return FREM; }
 "fcmp" { return FCMP; }
 "fneg" { return FNEG; }
+"umin" { return UMIN; }
+"umax" { return UMAX; }
+"smin" { return SMIN; }
+"smax" { return SMAX; }
+"abs" { return ABS; }
 "oeq" { return OEQ; }
 "ogt" { return OGT; }
 "oge" { return OGE; }

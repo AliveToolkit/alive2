@@ -1,0 +1,14 @@
+Name: t0
+%t = smax i8 127, i8 %a
+  =>
+%t = i8 127
+
+Name: t1
+%t = smax i8 -128, i8 %a
+  =>
+%t = i8 %a
+
+Name: t1
+%t = smax i8 %a, i8 %a
+  =>
+%t = i8 %a

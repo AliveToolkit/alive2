@@ -1,0 +1,8 @@
+Name: t0
+%t = smax i8 %a, i8 %b
+  =>
+%frozen_a = freeze i8 %a
+%cond = icmp sgt i8 %frozen_a, %b
+%t = select i1 %cond, i8 %frozen_a, i8 %b
+
+; ERROR: Value mismatch for i8 %t

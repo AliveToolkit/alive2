@@ -663,6 +663,11 @@ static unsigned parse_binop_flags(token op_token) {
   case USUB_OVERFLOW:
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
+  case UMIN:
+  case UMAX:
+  case SMIN:
+  case SMAX:
+  case ABS:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -731,6 +736,13 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case FREM: op = BinOp::FRem; break;
   case FMAX: op = BinOp::FMax; break;
   case FMIN: op = BinOp::FMin; break;
+  case UMIN: op = BinOp::UMin; break;
+  case UMAX: op = BinOp::UMax; break;
+  case SMIN: op = BinOp::SMin; break;
+  case SMAX: op = BinOp::SMax; break;
+  case ABS:
+    op = BinOp::Abs;
+    break;
   default:
     UNREACHABLE();
   }
@@ -1082,6 +1094,11 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FREM:
   case FMAX:
   case FMIN:
+  case UMIN:
+  case UMAX:
+  case SMIN:
+  case SMAX:
+  case ABS:
     return parse_binop(name, t);
   case BITREVERSE:
   case BSWAP:

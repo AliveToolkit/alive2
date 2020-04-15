@@ -1,0 +1,30 @@
+Name: t2
+%t = abs i8 poison, i1 0
+  =>
+%t = undef
+
+Name: t3
+%t = abs i8 poison, i1 0
+  =>
+%t = poison
+
+
+Name: t4
+%t = abs i8 undef, i1 1
+  =>
+%t = undef
+
+Name: t5
+%t = abs i8 undef, i1 1
+  =>
+%t = poison
+
+Name: t6
+%t = abs i8 poison, i1 1
+  =>
+%t = undef
+
+Name: t7
+%t = abs i8 poison, i1 1
+  =>
+%t = poison

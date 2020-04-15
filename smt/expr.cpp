@@ -858,6 +858,16 @@ expr expr::smax(const expr &rhs) const {
   return mkIf(sge(rhs), *this, rhs);
 }
 
+expr expr::abs() const {
+  C();
+  return mkIf(isNegative(), mkInt(0, *this) - *this, *this);
+}
+
+expr expr::isNegative() const {
+  C();
+  return this->slt(mkInt(0, *this));
+}
+
 expr expr::isNaN() const {
   return unop_fold(Z3_mk_fpa_is_nan);
 }

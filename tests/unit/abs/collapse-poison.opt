@@ -1,0 +1,8 @@
+Name: t3
+%is_neg = icmp slt i8 %a, 0
+%neg_a = sub i8 0, %a
+%t = select i1 %is_neg, i8 %neg_a, i8 %a
+  =>
+%t = abs i8 %a, i1 1
+
+; ERROR: Target is more poisonous than source for i8 %t

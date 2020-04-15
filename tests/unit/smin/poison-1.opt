@@ -1,0 +1,6 @@
+Name: t0
+%t = smin i8 %a, i8 undef
+  =>
+%t = poison
+
+; ERROR: Target is more poisonous than source for i8 %t

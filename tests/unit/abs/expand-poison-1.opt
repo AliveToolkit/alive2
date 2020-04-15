@@ -1,0 +1,9 @@
+Name: t2
+%t = abs i8 %a, i1 0
+  =>
+%frozen_a = freeze i8 %a
+%is_neg = icmp slt i8 %frozen_a, 0
+%neg_a = sub nsw i8 0, %frozen_a
+%t = select i1 %is_neg, i8 %neg_a, i8 %frozen_a
+
+; ERROR: Target is more poisonous than source for i8 %t

@@ -1,0 +1,44 @@
+Name: t0
+%t = umin i8 0, i8 127
+  =>
+%t = 0
+
+Name: t1
+%t = umin i8 127, i8 0
+  =>
+%t = 0
+
+Name: t2
+%t = umin i8 -128, i8 0
+  =>
+%t = 0
+
+Name: t3
+%t = umin i8 0, i8 -128
+  =>
+%t = 0
+
+Name: t4
+%t = umin i8 64, i8 127
+  =>
+%t = 64
+
+Name: t5
+%t = umin i8 -128, i8 -96
+  =>
+%t = -128
+
+Name: t6
+%t = umin i8 -128, i8 127
+  =>
+%t = 127
+
+Name: t7
+%t = umin i8 127, i8 127
+  =>
+%t = 127
+
+Name: t7
+%t = umin i8 -128, i8 -128
+  =>
+%t = -128

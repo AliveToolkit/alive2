@@ -1,0 +1,5 @@
+Name: t0
+%cond = icmp sgt i8 %a, %b
+%t = select i1 %cond, i8 %a, i8 %b
+  =>
+%t = smax i8 %a, i8 %b

@@ -1,0 +1,4 @@
+Name: t0
+%t = smax i8 undef, i8 undef
+  =>
+%t = undef

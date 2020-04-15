@@ -1,0 +1,6 @@
+Name: t0
+%t = abs i8 %a, i1 1
+  =>
+%t = undef
+
+; ERROR: Value mismatch for i8 %t

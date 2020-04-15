@@ -1,0 +1,9 @@
+Name: t0
+%t = smax i8 %a, i8 undef
+  =>
+%t = %a
+
+Name: t0
+%t = smax i8 %a, i8 poison
+  =>
+%t = %a

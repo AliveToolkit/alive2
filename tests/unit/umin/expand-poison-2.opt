@@ -1,0 +1,8 @@
+Name: t0
+%t = umin i8 %a, i8 %b
+  =>
+%frozen_b = freeze i8 %b
+%cond = icmp ult i8 %a, %frozen_b
+%t = select i1 %cond, i8 %a, i8 %frozen_b
+
+; ERROR: Value mismatch for i8 %t

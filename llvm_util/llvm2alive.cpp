@@ -671,6 +671,11 @@ end:
     case llvm::Intrinsic::usub_sat:
     case llvm::Intrinsic::cttz:
     case llvm::Intrinsic::ctlz:
+    case llvm::Intrinsic::umin:
+    case llvm::Intrinsic::umax:
+    case llvm::Intrinsic::smin:
+    case llvm::Intrinsic::smax:
+    case llvm::Intrinsic::abs:
     {
       PARSE_BINOP();
       BinOp::Op op;
@@ -687,7 +692,13 @@ end:
       case llvm::Intrinsic::usub_sat: op = BinOp::USub_Sat; break;
       case llvm::Intrinsic::cttz:     op = BinOp::Cttz; break;
       case llvm::Intrinsic::ctlz:     op = BinOp::Ctlz; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::umin:     op = BinOp::UMin; break;
+      case llvm::Intrinsic::umax:     op = BinOp::UMax; break;
+      case llvm::Intrinsic::smin:     op = BinOp::SMin; break;
+      case llvm::Intrinsic::smax:     op = BinOp::SMax; break;
+      case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
+      default:
+        UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op));
     }
