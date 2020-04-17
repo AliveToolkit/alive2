@@ -53,9 +53,7 @@ if ($hash && $test) {
 <form action="index.php" method="post">
 <input type="hidden" name="hash" value="$hash">
 <input type="hidden" name="test" value="$name_html">
-<textarea rows="2" cols = "80" name= "comment">
-$c
-</textarea>
+<textarea rows="2" cols = "80" name= "comment">$c</textarea>
 <br>
 <input type="submit" value="Save">
 </form>
@@ -137,7 +135,7 @@ html_footer();
 
 
 function format_date($ts) {
-  return date('d/M/Y H:i', $ts);
+  return date('d/M/Y', $ts);
 }
 
 function get_all_runs($data, $hash) {
@@ -194,7 +192,7 @@ function do_plot($data) {
   $bugs_wo_undef = array();
 
   foreach ($data as $t) {
-    $labels[]        = format_date($t[6]) . " - $t[5]";
+    $labels[]        = format_date($t[6]);
     $bugs[]          = $t[1];
     $bugs_wo_undef[] = $t[2];
   }
