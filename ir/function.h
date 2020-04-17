@@ -41,7 +41,7 @@ public:
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;
   }
-  Instr& back() { return *m_instrs.back(); }
+  Instr& back() const { return *m_instrs.back(); }
 
   bool empty() const { return m_instrs.empty(); }
 

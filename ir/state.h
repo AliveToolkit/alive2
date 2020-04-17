@@ -23,11 +23,12 @@ namespace IR {
 class Value;
 class BasicBlock;
 class Function;
+class CFG;
+class DomTree;
 
 class State {
 public:
   using ValTy = std::pair<StateValue, std::set<smt::expr>>;
-
 private:
   struct CurrentDomain {
     smt::expr path; // path from fn entry
@@ -63,11 +64,12 @@ private:
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::tuple<const Value*, ValTy, bool>> values;
 
-  // dst BB -> src BB -> (domain data, memory)
+  // dst BB -> src BB -> (domain data, memory, jump_cond)
   std::unordered_map<const BasicBlock*,
                      std::unordered_map<const BasicBlock*,
-                                        std::pair<DomainPreds,
-                                                  smt::DisjointExpr<Memory>>>>
+                                        std::tuple<DomainPreds,
+                                                   smt::DisjointExpr<Memory>,
+                                                   std::optional<smt::expr>>>>
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
@@ -75,7 +77,7 @@ private:
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
 
   // temp state
-  CurrentDomain domain;
+  CurrentDomain domain; // TODO UB in this domain is the ub before ite changes
   Memory memory;
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 32> tmp_values;
@@ -83,6 +85,8 @@ private:
 
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
+    // boolean expression describing all possible return paths only
+  smt::OrExpr return_path;
   // function_domain: a condition for function having well-defined behavior
   smt::OrExpr function_domain;
   smt::DisjointExpr<StateValue> return_val;
@@ -108,6 +112,16 @@ private:
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
 
+  // src -> <(dst, cond), isolated ub>
+  struct TargetData {
+    std::vector<std::pair<const BasicBlock*, smt::expr>> dsts;
+    std::optional<smt::expr> ub;
+  };
+  std::unordered_map<const BasicBlock*, TargetData> target_data;
+
+  // dominator tree
+  std::unique_ptr<DomTree> dom_tree;
+  std::unique_ptr<CFG> cfg;
 public:
   State(Function &f, bool source);
 
@@ -121,6 +135,10 @@ public:
   bool isUndef(const smt::expr &e) const;
 
   bool startBB(const BasicBlock &bb);
+  bool canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom);
+  void buildUB();
+  bool foundReturn() const { return !return_val.empty(); }
+  
   void addJump(const BasicBlock &dst);
   // boolean cond
   void addJump(smt::expr &&cond, const BasicBlock &dst);

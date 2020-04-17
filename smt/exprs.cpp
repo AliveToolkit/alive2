@@ -70,6 +70,11 @@ void OrExpr::add(expr &&e) {
     exprs.insert(move(e));
 }
 
+void OrExpr::add(const expr &e) {
+  if (!e.isFalse())
+    exprs.insert(e);
+}
+
 void OrExpr::add(const OrExpr &other) {
   exprs.insert(other.exprs.begin(), other.exprs.end());
 }

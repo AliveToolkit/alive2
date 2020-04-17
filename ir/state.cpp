@@ -7,6 +7,8 @@
 #include "smt/smt.h"
 #include "util/errors.h"
 #include <cassert>
+#include <stack>
+#include <iostream>
 
 using namespace smt;
 using namespace util;
@@ -101,7 +103,7 @@ const State::ValTy& State::at(const Value &val) const {
 const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   auto &pres = predecessor_data.at(current_bb);
   auto I = pres.find(&bb);
-  return I == pres.end() ? nullptr : &I->second.first.path;
+  return I == pres.end() ? nullptr : &std::get<0>(I->second).path;
 }
 
 bool State::isUndef(const expr &e) const {
@@ -128,11 +130,12 @@ bool State::startBB(const BasicBlock &bb) {
 
   for (auto &[src, data] : I->second) {
     (void)src;
-    auto &[dom, mem] = data;
+    auto &[dom, mem, cond] = data;
+    (void)cond;
     path.add(dom.path);
     expr p = dom.path();
     UB.add_disj(dom.UB, p);
-    in_memory.add_disj(mem, move(p));
+    in_memory.add_disj(mem, dom.path());
     domain.undef_vars.insert(dom.undef_vars.begin(), dom.undef_vars.end());
   }
 
@@ -141,6 +144,116 @@ bool State::startBB(const BasicBlock &bb) {
   memory = *in_memory();
 
   return domain;
+}
+
+bool State::canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom) {
+  unordered_map<const BasicBlock*, unordered_set<const BasicBlock*>> 
+    bb_seen_targets;
+  unordered_map<const BasicBlock*, bool> v;
+  stack<const BasicBlock*> S;
+  S.push(&merge);
+  auto cur_bb = &merge;
+
+  while(!S.empty()) {
+    cur_bb = S.top();
+    S.pop();
+    auto &visited = v[cur_bb];
+    
+    if (!visited) {
+      visited = true;
+
+      for (auto const &pred : predecessor_data[cur_bb]) {
+        bb_seen_targets[pred.first].insert(cur_bb);
+        S.push(pred.first);
+      }
+    }
+  }
+
+  bool can_move = true;
+  JumpInstr *jmp_instr;
+  for (auto &[bb, seen_targets] : bb_seen_targets) {
+    jmp_instr = static_cast<JumpInstr*>(&(bb->back()));
+    auto tgt_count = jmp_instr->getTargetCount();
+    if (auto sw = dynamic_cast<Switch*>(&(bb->back()))) {
+      (void)sw;
+      --tgt_count;
+    }
+    can_move &= tgt_count == seen_targets.size();
+  }
+  return can_move;
+}
+
+// Traverse the program graph similar to DFS to build UB as an ite expr tree
+void State::buildUB() {
+  // bb -> <visited, ub, carry_ub> 
+  unordered_map<const BasicBlock*, tuple<bool, optional<expr>,
+                                         optional<expr>>> build_data;
+  stack<const BasicBlock*> S;
+  S.push(&f.getFirstBB());
+
+  // 2 phases:
+  // 1º - visit and push tgts of this bb to ensure each target ub is built 1st
+  // 2º - second visit, build the ub as ite's by looping the targets
+  while (!S.empty()) {
+    auto cur_bb = S.top();
+    S.pop();
+
+    auto &[visited, ub, carry_ub] = build_data[cur_bb];
+    if (!visited) {
+      visited = true;
+      S.push(cur_bb);
+
+      // targets in target_data do not include back-edges or jmps to #sink
+      auto &cur_data = target_data[cur_bb];
+      for (auto &[tgt_bb, cond] : cur_data.dsts) {
+        (void)cond;
+        S.push(tgt_bb);
+      }
+    } else {
+      if (!ub) {
+        auto &cur_data = target_data[cur_bb];
+
+        // skip bb's that do not have set ub (ex: bb only has back-edges)
+        if (!cur_data.ub)
+          continue;
+        
+        // build ub for targets
+        for (auto &[tgt_bb, cond] : cur_data.dsts) {
+          auto &tgt_ub = get<1>(build_data[tgt_bb]);
+          if (tgt_ub)
+            ub = ub ? expr::mkIf(cond, *tgt_ub, *ub) : tgt_ub;
+        }
+        
+        // only add current ub if at least one target has set ub
+        if (ub || cur_data.dsts.empty()) {
+          // 'and' the isolated ub of cur_bb with the (if built) targets ub
+          auto &cur_ub = cur_data.ub;
+          ub = ub ? *ub && *cur_ub : cur_ub;
+          if (carry_ub)
+            ub = *ub && *carry_ub;
+
+          auto pred_data = predecessor_data[cur_bb];
+          if (pred_data.size() > 1) {
+            if (!dom_tree) {
+              cfg = make_unique<CFG>(f);
+              dom_tree = make_unique<DomTree>(f, *cfg);
+            }
+
+            auto &dom = *dom_tree->getIDominator(*cur_bb);
+            if (canMoveExprsToDom(*cur_bb, dom)) {
+              cout << "moving " << *ub << " from bb " << cur_bb->getName()
+                   << " to bb " << dom.getName() << endl;
+              get<2>(build_data[&dom]) = move(ub);
+              ub = true;
+            }
+          }
+        }
+      }
+    }
+  }
+  // replace return domain with return_path && better ub
+  return_domain.reset();
+  return_domain.add(return_path() && *build_data[&f.getFirstBB()].second);
 }
 
 void State::addJump(const BasicBlock &dst0, expr &&cond) {
@@ -152,14 +265,26 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
     dst = &f.getBB("#sink");
   }
 
-  cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
-  data.second.add(memory, cond);
-  data.first.UB.add(domain.UB(), cond);
-  data.first.path.add(move(cond));
-  data.first.undef_vars.insert(undef_vars.begin(), undef_vars.end());
-  data.first.undef_vars.insert(domain.undef_vars.begin(),
-                               domain.undef_vars.end());
+  auto &domain_preds = get<0>(data);
+  auto &mem = get<1>(data);
+  auto &c = get<2>(data);
+  c = c ? *c || cond : cond; // when switch default and case have same target
+
+  // ignore #sink or back edges when building UB
+  if (dst == &dst0) {
+    auto &[tgt_data, ub] = target_data[current_bb];
+    tgt_data.emplace_back(dst, *c);
+    ub = domain.UB(); 
+  }
+
+  cond &= domain.path;
+  mem.add(memory, cond);
+  domain_preds.UB.add(domain.UB(), cond);
+  domain_preds.path.add(move(cond));
+  domain_preds.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain_preds.undef_vars.insert(domain.undef_vars.begin(),
+                                 domain.undef_vars.end());
 }
 
 void State::addJump(const BasicBlock &dst) {
@@ -179,9 +304,12 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
+  target_data[current_bb].ub = domain.UB(); // store isolated UB
+  
   return_val.add(val, domain.path);
   return_memory.add(memory, domain.path);
   return_domain.add(domain());
+  return_path.add(domain.path);
   function_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
@@ -324,7 +452,7 @@ expr State::sinkDomain() const {
   OrExpr ret;
   for (auto &[src, data] : I->second) {
     (void)src;
-    ret.add(data.first.path());
+    ret.add(std::get<0>(data).path());
   }
   return ret();
 }
