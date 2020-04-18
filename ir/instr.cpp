@@ -1327,7 +1327,7 @@ static StateValue pack_return(Type &ty, vector<StateValue> &vals,
     return agg->aggregateVals(vs);
   }
 
-  auto ret = vals[idx++];
+  auto &ret = vals[idx++];
   if (ty.isFloatType() && (flags & FnCall::NNaN))
     ret.non_poison &= !ret.value.isNaN();
   return ret;
@@ -1349,7 +1349,7 @@ StateValue FnCall::toSMT(State &s) const {
   for (auto &[arg, flags] : args) {
     unpack_inputs(s, arg->getType(), flags, s[*arg], inputs, ptr_inputs,
                   returned_val);
-    fnName_mangled << "#" << arg->getType().toString();
+    fnName_mangled << '#' << arg->getType().toString();
   }
   fnName_mangled << '!' << getType();
   if (!isVoid())
