@@ -1285,17 +1285,13 @@ void FnCall::print(ostream &os) const {
 
 static void unpack_inputs(State&s, Type &ty, unsigned argflag,
                           const StateValue &value, vector<StateValue> &inputs,
-                          vector<pair<StateValue, bool>> &ptr_inputs,
-                          vector<StateValue> &returned_val) {
+                          vector<pair<StateValue, bool>> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       unpack_inputs(s, agg->getChild(i), argflag, agg->extract(value, i),
-                    inputs, ptr_inputs, returned_val);
+                    inputs, ptr_inputs);
     }
   } else {
-    if (argflag & FnCall::ArgReturned)
-      returned_val.emplace_back(value);
-
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), value.value);
       p.strip_attrs();
@@ -1342,13 +1338,11 @@ StateValue FnCall::toSMT(State &s) const {
   vector<StateValue> inputs;
   vector<pair<StateValue, bool>> ptr_inputs;
   vector<Type*> out_types;
-  vector<StateValue> returned_val;
 
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
   for (auto &[arg, flags] : args) {
-    unpack_inputs(s, arg->getType(), flags, s[*arg], inputs, ptr_inputs,
-                  returned_val);
+    unpack_inputs(s, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
     fnName_mangled << '#' << arg->getType().toString();
   }
   fnName_mangled << '!' << getType();
@@ -1358,7 +1352,7 @@ StateValue FnCall::toSMT(State &s) const {
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
                          out_types, !(flags & NoRead), !(flags & NoWrite),
-                         flags & ArgMemOnly, move(returned_val));
+                         flags & ArgMemOnly);
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 

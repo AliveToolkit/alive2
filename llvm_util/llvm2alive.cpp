@@ -266,6 +266,7 @@ public:
     string fn_name = '@' + fn->getName().str();
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
                                     !known);
+    unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
       unsigned attr = FnCall::ArgNone;
@@ -273,11 +274,32 @@ public:
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
           attr |= FnCall::ArgByVal;
-        else if (argI->hasReturnedAttr())
-          attr |= FnCall::ArgReturned;
+        else if (argI->hasReturnedAttr()) {
+          auto call2
+            = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
+                                  flags, !known);
+          for (auto &[arg, flags] : call->getArgs()) {
+            call2->addArg(*arg, flags);
+          }
+          call = move(call2);
+
+          // fn may have different type than argument. LLVM assumes there's
+          // an implicit bitcast
+          assert(!ret_val);
+          if (argI->getType() == i.getType())
+            ret_val = make_unique<UnaryOp>(*ty, value_name(i), *arg,
+                                           UnaryOp::Copy);
+          else
+            ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
+                                                ConversionOp::BitCast);
+        }
         ++argI;
       }
       call->addArg(*arg, attr);
+    }
+    if (ret_val) {
+      BB->addInstr(move(call));
+      RETURN_IDENTIFIER(move(ret_val));
     }
     RETURN_IDENTIFIER(move(call));
   }

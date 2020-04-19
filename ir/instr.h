@@ -191,7 +191,7 @@ class FnCall final : public Instr {
 public:
   enum Flags { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1, ArgMemOnly = 1 << 2,
                NNaN = 1 << 3 };
-  enum ArgFlags { ArgNone = 0, ArgByVal = 1 << 0, ArgReturned = 1 << 1 };
+  enum ArgFlags { ArgNone = 0, ArgByVal = 1 << 0 };
 private:
   std::string fnName;
   std::vector<std::pair<Value*, unsigned>> args;
@@ -203,6 +203,8 @@ public:
     : Instr(type, std::move(name)), fnName(std::move(fnName)), flags(flags),
       valid(valid) {}
   void addArg(Value &arg, unsigned flags);
+  const auto& getFnName() const { return fnName; }
+  const auto& getArgs() const { return args; }
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
