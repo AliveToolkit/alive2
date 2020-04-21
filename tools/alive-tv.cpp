@@ -88,6 +88,12 @@ static llvm::cl::opt<bool> opt_succinct(
     "succinct", llvm::cl::desc("Make the output succinct"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<unsigned> opt_omit_array_size(
+    "omit-array-size",
+    llvm::cl::desc("Omit an array initializer if it has elements more than "
+                   "this number"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(-1));
+
 static llvm::cl::opt<unsigned> opt_max_mem(
      "max-mem", llvm::cl::desc("Max memory (approx)"),
      llvm::cl::cat(opt_alive), llvm::cl::init(1024), llvm::cl::value_desc("MB"));
@@ -233,6 +239,8 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   TransformPrintOpts print_opts;
+
+  omit_array_size = opt_omit_array_size;
 
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F1));
