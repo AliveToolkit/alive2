@@ -702,9 +702,13 @@ expr AggregateType::numElements() const {
 }
 
 unsigned AggregateType::numPaddingsConst() const {
+  return is_padding.empty() ? 0 : countPaddings(is_padding.size() - 1);
+}
+
+unsigned AggregateType::countPaddings(unsigned to_idx) const {
   unsigned count = 0;
-  for (bool b : is_padding)
-    count += b;
+  for (unsigned i = 0; i <= to_idx; ++i)
+    count += is_padding[i];
   return count;
 }
 

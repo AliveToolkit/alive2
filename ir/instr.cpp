@@ -494,7 +494,7 @@ StateValue BinOp::toSMT(State &s) const {
       s.addQuantVar(ndet);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
                             expr::mkNumber("-0", a));
-      
+
       auto v = [&](expr &a, expr &b) {
         expr z = a.isFPZero() && b.isFPZero();
         expr cmp = (op == FMin) ? a.fole(b) : a.foge(b);
@@ -534,8 +534,9 @@ StateValue BinOp::toSMT(State &s) const {
     if (vertical_zip) {
       auto ty = lhs->getType().getAsAggregateType();
       vector<StateValue> vals1, vals2;
+      unsigned val2idx = 1 + retty->isPadding(1);
       auto val1ty = retty->getChild(0).getAsAggregateType();
-      auto val2ty = retty->getChild(1).getAsAggregateType();
+      auto val2ty = retty->getChild(val2idx).getAsAggregateType();
 
       for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
         auto ai = ty->extract(a, i);
@@ -593,10 +594,11 @@ expr BinOp::getTypeConstraints(const Function &f) const {
                   lhs->getType() == rhs->getType();
 
     if (auto ty = getType().getAsStructType()) {
+      unsigned v2idx = 1 + ty->isPadding(1);
       instrconstr &= ty->numElementsExcludingPadding() == 2 &&
                      ty->getChild(0) == lhs->getType() &&
-                     ty->getChild(1).enforceIntOrVectorType(1) &&
-                     ty->getChild(1).enforceVectorTypeEquiv(lhs->getType());
+                     ty->getChild(v2idx).enforceIntOrVectorType(1) &&
+                     ty->getChild(v2idx).enforceVectorTypeEquiv(lhs->getType());
     }
     break;
   case Cttz:
