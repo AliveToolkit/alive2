@@ -1082,7 +1082,6 @@ expr Select::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          cond->getType().enforceIntOrVectorType(1) &&
          getType().enforceVectorTypeIff(cond->getType()) &&
-         getType().enforceIntOrFloatOrPtrOrVectorType() &&
          getType() == a->getType() &&
          getType() == b->getType();
 }
