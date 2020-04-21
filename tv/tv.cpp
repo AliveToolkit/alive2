@@ -93,6 +93,12 @@ llvm::cl::opt<bool> opt_debug(
   llvm::cl::desc("Alive: Show debug data"),
   llvm::cl::init(false), llvm::cl::Hidden);
 
+llvm::cl::opt<unsigned> opt_omit_array_size(
+  "tv-omit-array-size",
+  llvm::cl::desc("Omit an array initializer if it has elements more than "
+                  "this number"),
+  llvm::cl::init(-1));
+
 ostream *out;
 ofstream out_file;
 string report_filename;
@@ -234,6 +240,7 @@ struct TVPass final : public llvm::FunctionPass {
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
     config::debug = opt_debug;
+    llvm_util::omit_array_size = opt_omit_array_size;
 
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();

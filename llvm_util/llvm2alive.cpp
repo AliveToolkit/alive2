@@ -971,6 +971,11 @@ public:
       if (!gv->isConstant() || !gv->hasDefinitiveInitializer())
         continue;
 
+      auto *init_ty = gv->getInitializer()->getType();
+      if (init_ty->isArrayTy() &&
+          init_ty->getArrayNumElements() > omit_array_size)
+        continue;
+
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
         *out << "ERROR: Unsupported constant: " << *gv->getInitializer()
@@ -997,6 +1002,9 @@ public:
 }
 
 namespace llvm_util {
+
+unsigned omit_array_size = -1;
+
 
 initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
   out = &os;
