@@ -418,7 +418,7 @@ void State::mkAxioms(State &tgt) {
             break;
           }
           expr eq_val = Pointer(mem, ptr_in.value)
-                      .fninput_refined(Pointer(mem2, ptr_in2.value), is_byval2);
+                      .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
           is_val_eq &= eq_val;
           refines &= ptr_in.non_poison
                        .implies(eq_val && ptr_in2.non_poison);
