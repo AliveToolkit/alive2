@@ -398,12 +398,12 @@ public:
 
     auto inst = make_unique<ExtractValue>(*ty, value_name(i), *val);
 
-    auto &valty = val->getType();
+    auto *valty = &val->getType();
     for (auto idx : i.indices()) {
-      auto *aty = valty.getAsAggregateType();
+      auto *aty = valty->getAsAggregateType();
       unsigned idx_with_paddings = aty->countPaddings(idx) + idx;
       inst->addIdx(idx_with_paddings);
-      valty = aty->getChild(idx_with_paddings);
+      valty = &aty->getChild(idx_with_paddings);
     }
 
     RETURN_IDENTIFIER(move(inst));
