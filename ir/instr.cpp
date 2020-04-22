@@ -1295,7 +1295,7 @@ static void unpack_inputs(State&s, Type &ty, unsigned argflag,
   } else {
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), value.value);
-      p.strip_attrs();
+      p.stripAttrs();
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
                               argflag & FnCall::ArgByVal);
     } else {
@@ -1868,7 +1868,7 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
                                  const Type &t) {
   auto &[vret, npret] = svret;
   if (t.isPtrType()) {
-    s.addUB(npret.implies(!Pointer(s.getMemory(), vret).is_nocapture()));
+    s.addUB(npret.implies(!Pointer(s.getMemory(), vret).isNocapture()));
     return;
   }
 
@@ -1882,7 +1882,7 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
 StateValue Return::toSMT(State &s) const {
   // Encode nocapture semantics.
   auto &retval = s[*val];
-  s.addUB(s.getMemory().check_nocapture());
+  s.addUB(s.getMemory().checkNocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
   s.addReturn(retval);
   return {};
@@ -2019,7 +2019,7 @@ StateValue Malloc::toSMT(State &s) const {
     s.addUB(np_ptr);
 
     Pointer ptr(s.getMemory(), p);
-    expr p_sz = ptr.block_size();
+    expr p_sz = ptr.blockSize();
     expr sz_zext = sz.zextOrTrunc(p_sz.bits());
 
     expr memcpy_size = expr::mkIf(allocated,
@@ -2109,7 +2109,7 @@ void StartLifetime::print(std::ostream &os) const {
 StateValue StartLifetime::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
-  s.getMemory().start_lifetime(p);
+  s.getMemory().startLifetime(p);
   return {};
 }
 
@@ -2202,7 +2202,7 @@ StateValue GEP::toSMT(State &s) const {
         if (sz != 0)
           non_poison.add(val.sextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_soverflow(val));
-        non_poison.add(ptr.add_no_overflow(inc));
+        non_poison.add(ptr.addNoOverflow(inc));
       }
 
 #ifndef NDEBUG

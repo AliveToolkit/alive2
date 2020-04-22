@@ -584,7 +584,7 @@ expr PtrType::ASVar() const {
 }
 
 unsigned PtrType::bits() const {
-  return Pointer::total_bits();
+  return Pointer::totalBits();
 }
 
 unsigned PtrType::np_bits() const {
