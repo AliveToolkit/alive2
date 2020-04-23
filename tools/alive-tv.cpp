@@ -213,7 +213,7 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
       return cmpNumbers(STyL->getNumElements(), STyR->getNumElements());
     return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
   }
-  case llvm::Type::VectorTyID: {
+  case llvm::Type::FixedVectorTyID: {
     auto *STyL = llvm::cast<llvm::VectorType>(TyL);
     auto *STyR = llvm::cast<llvm::VectorType>(TyR);
     if (STyL->getElementCount().Scalable != STyR->getElementCount().Scalable)

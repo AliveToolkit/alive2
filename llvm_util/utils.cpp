@@ -152,14 +152,11 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
-  case llvm::Type::VectorTyID: {
+  // TODO: non-fixed sized vectors
+  case llvm::Type::FixedVectorTyID: {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
-      // TODO: non-fixed sized vectors
-      if (vty->isScalable())
-        goto err;
-
       auto elems = vty->getElementCount().Min;
       auto ety = llvm_type2alive(vty->getElementType());
       if (!ety || elems > 128)
@@ -192,7 +189,6 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return cache.get();
   }
   default:
-err:
     *out << "ERROR: Unsupported type: " << *ty << '\n';
     return nullptr;
   }
