@@ -345,7 +345,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
 }
 
 static bool observes_addresses() {
-  return IR::has_ptr2int || IR::has_int2ptr;
+  return IR::has_ptr2int || IR::has_int2ptr || IR::has_ptrcmp;
 }
 
 static bool ptr_has_local_bit() {
@@ -532,13 +532,20 @@ expr Pointer::operator!=(const Pointer &rhs) const {
   return !operator==(rhs);
 }
 
+StateValue Pointer::eq(const Pointer &rhs) const {
+  assert(observes_addresses());
+  return { getAddress() == rhs.getAddress(), true };
+}
+
+StateValue Pointer::ne(const Pointer &rhs) const {
+  auto [v, np] = eq(rhs);
+  return { !move(v), move(np) };
+}
+
 #define DEFINE_CMP(op)                                                      \
 StateValue Pointer::op(const Pointer &rhs) const {                          \
-  /* Note that attrs are not compared. */                                   \
-  expr nondet = expr::mkFreshVar("nondet", true);                           \
-  m.state->addQuantVar(nondet);                                             \
-  return { expr::mkIf(getBid() == rhs.getBid(),                             \
-                      getOffset().op(rhs.getOffset()), nondet), true };     \
+  assert(observes_addresses());                                             \
+  return { getAddress().op(rhs.getAddress()), true };                       \
 }
 
 DEFINE_CMP(sle)
@@ -912,6 +919,12 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
+expr Pointer::isNullBlock() const {
+  if (!has_null_block)
+    return false;
+  return getBid() == mkNullPointer(m).getBid();
+}
+
 expr Pointer::isNonZero() const {
   if (observes_addresses())
     return getAddress() != 0;
@@ -1095,9 +1108,12 @@ Memory::Memory(State &state) : state(&state) {
   // the block) should not overflow.
 
   // Initialize a memory block for null pointer.
-  if (has_null_block)
-    alloc(expr::mkUInt(0, bits_size_t), bits_program_pointer, GLOBAL, false,
-          false, 0);
+  if (has_null_block) {
+    uint64_t align = bits_program_pointer;
+    if (bits_size_t < bits_program_pointer)
+      align = min(align, (uint64_t)1 << bits_size_t);
+    alloc(expr::mkUInt(0, bits_size_t), align, GLOBAL, false, false, 0);
+  }
 
   escaped_local_blks.resize(num_locals, false);
 

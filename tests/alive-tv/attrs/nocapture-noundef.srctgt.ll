@@ -1,4 +1,4 @@
-; this is needed for correctness, since the cmn+branch needs to be strong
+; This test should fail because % and %b may point to different blocks
 ; TEST-ARGS: -disable-undef-input
 
 define i8* @src(i8* %a, i8* nocapture %b) {
@@ -25,5 +25,6 @@ f:
   ret i8* null
 }
 
+; ERROR: Source is more defined than target
 
 declare i8* @g(i8*)

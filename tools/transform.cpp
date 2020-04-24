@@ -573,6 +573,12 @@ static void calculateAndInitConstants(Transform &t) {
           auto &t = bc->getType();
           does_sub_byte_access |= hasSubByte(t);
           min_access_size = gcd(min_access_size, getCommonAccessSize(t));
+
+        } else if (auto *ic = dynamic_cast<const ICmp *>(&i)) {
+          if (hasPtr(ic->getOperandType())) {
+            has_ptrcmp = true;
+            cur_max_gep = UINT64_MAX;
+          }
         }
       }
     }

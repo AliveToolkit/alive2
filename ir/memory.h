@@ -137,6 +137,8 @@ public:
   smt::expr operator==(const Pointer &rhs) const;
   smt::expr operator!=(const Pointer &rhs) const;
 
+  StateValue eq(const Pointer &rhs) const;
+  StateValue ne(const Pointer &rhs) const;
   StateValue sle(const Pointer &rhs) const;
   StateValue slt(const Pointer &rhs) const;
   StateValue sge(const Pointer &rhs) const;
@@ -182,6 +184,7 @@ public:
 
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
+  smt::expr isNullBlock() const;
   smt::expr isNonZero() const;
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);

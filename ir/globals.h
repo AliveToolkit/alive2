@@ -46,6 +46,9 @@ extern bool little_endian;
 extern bool has_int2ptr;
 extern bool has_ptr2int;
 
+/// Whether an icmp with pointers is used in either function
+extern bool has_ptrcmp;
+
 /// Whether malloc or free/delete is used in either function
 extern bool has_malloc;
 extern bool has_free;

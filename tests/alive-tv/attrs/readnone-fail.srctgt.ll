@@ -1,3 +1,4 @@
+; TEST-ARGS: -disable-undef-input
 ; This test checks LangRef's following statement:
 ; """
 ; this attribute indicates that the function does not dereference that pointer

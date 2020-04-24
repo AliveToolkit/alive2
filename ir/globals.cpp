@@ -25,6 +25,7 @@ unsigned memcmp_unroll_cnt;
 bool little_endian;
 bool has_int2ptr;
 bool has_ptr2int;
+bool has_ptrcmp;
 bool has_malloc;
 bool has_free;
 bool has_fncall;

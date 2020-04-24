@@ -1482,8 +1482,8 @@ StateValue ICmp::toSMT(State &s) const {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
       switch (cond) {
-      case EQ:  return StateValue(lhs == rhs, true);
-      case NE:  return StateValue(lhs != rhs, true);
+      case EQ:  return lhs.eq(rhs);
+      case NE:  return lhs.ne(rhs);
       case SLE: return lhs.sle(rhs);
       case SLT: return lhs.slt(rhs);
       case SGE: return lhs.sge(rhs);

@@ -227,6 +227,7 @@ private:
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
 
+  Type &getOperandType() const { return a->getType(); }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
