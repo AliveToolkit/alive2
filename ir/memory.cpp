@@ -1552,10 +1552,10 @@ Byte Memory::load(const Pointer &p) const {
 static expr ptr_deref_within(const Pointer &idx, const Pointer &ptr,
                              const expr &size) {
   expr ret = idx.getShortBid() == ptr.getShortBid();
-  ret &= idx.uge(ptr).value;
+  ret &= idx.getOffset().uge(ptr.getOffset());
 
   if (!size.zextOrTrunc(bits_size_t).uge(ptr.blockSize()).isTrue())
-    ret &= idx.ult(ptr + size).value;
+    ret &= idx.getOffset().ult((ptr + size).getOffset());
 
   return ret;
 }
