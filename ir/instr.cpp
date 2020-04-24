@@ -1527,8 +1527,8 @@ void FCmp::print(ostream &os) const {
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
   }
-  os << getName() << " = fcmp " << fmath << condtxt << print_type(getType())
-     << a->getName() << ", " << b->getName();
+  os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
+     << b->getName();
 }
 
 StateValue FCmp::toSMT(State &s) const {
