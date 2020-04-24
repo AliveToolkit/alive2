@@ -489,7 +489,7 @@ public:
         auto ofs_ty = llvm::IntegerType::get(i.getContext(), 64);
 
         if (auto opvty = dyn_cast<llvm::VectorType>(opty)) {
-          assert(!opvty->isScalable());
+          assert(!isa<llvm::ScalableVectorType>(opvty));
           vector<llvm::Constant *> offsets;
 
           for (unsigned i = 0; i < opvty->getElementCount().Min; ++i) {
