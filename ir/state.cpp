@@ -38,7 +38,7 @@ State::State(Function &f, bool source)
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {
-  Memory::resetBids(1);
+  Memory::resetBids(has_null_block);
 }
 
 const StateValue& State::exec(const Value &v) {

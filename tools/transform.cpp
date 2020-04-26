@@ -720,6 +720,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_malloc       = false;
   has_free         = false;
   has_fncall       = false;
+  has_null_block   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
@@ -767,11 +768,13 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals_src > 0 || num_globals > 0 ||
-      nullptr_is_used || has_malloc || has_ptr_load || has_fncall)
-    ++num_nonlocals_src;
+  // Global variables cannot be null pointers
+  has_null_block = num_ptrinputs > 0 || nullptr_is_used || has_malloc ||
+                  has_ptr_load || has_fncall;
+
+  num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst +
+                      has_null_block;
 
   // Allow at least one non-const global for calls to change
   num_nonlocals_src += has_fncall;
@@ -859,6 +862,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nhas_ptr2int: " << has_ptr2int
                   << "\nhas_malloc: " << has_malloc
                   << "\nhas_free: " << has_free
+                  << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
