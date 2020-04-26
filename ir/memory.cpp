@@ -763,7 +763,11 @@ expr Pointer::refined(const Pointer &other) const {
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  return isBlockAlive().implies(
+  // In twin memory model, null refines any other pointer with address 0.
+  expr null_refines(false);
+  if (observes_addresses())
+    null_refines = other.isNull() && getAddress() == 0;
+  return null_refines || isBlockAlive().implies(
            other.isBlockAlive() &&
              expr::mkIf(isLocal(), isHeapAllocated().implies(local),
                         *this == other));
@@ -792,8 +796,11 @@ expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
 
   // TODO: this induces an infinite loop
   // block_refined(other);
-
-  return isBlockAlive().implies(
+  // In twin memory model, null refines any other pointer with address 0.
+  expr null_refines(false);
+  if (observes_addresses())
+    null_refines = other.isNull() && getAddress() == 0;
+  return null_refines || isBlockAlive().implies(
            other.isBlockAlive() &&
              expr::mkIf(isLocal(), local, *this == other));
 }
