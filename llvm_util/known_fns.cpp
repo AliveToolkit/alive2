@@ -60,6 +60,12 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       }
     }
     RETURN_KNOWN(make_unique<Strlen>(*ty, value_name(i), *args[0]));
+  case llvm::LibFunc_memcmp:
+  case llvm::LibFunc_bcmp: {
+    RETURN_KNOWN(
+      make_unique<Memcmp>(*ty, value_name(i), *args[0], *args[1], *args[2],
+                          libfn == llvm::LibFunc_bcmp));
+  }
   default:
     RETURN_FAIL_KNOWN();
   }

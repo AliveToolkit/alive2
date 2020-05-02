@@ -2403,6 +2403,110 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
 }
 
 
+
+static pair<expr,expr>
+encode_memcmp(State &s, const Pointer &p1, const Pointer &p2, AndExpr &prefix,
+              const expr &max_num, bool is_bcmp, unsigned i) {
+  expr ei = expr::mkUInt(i, max_num.bits());
+  expr zero = expr::mkUInt(0, 32);
+  if (ei.uge(max_num).isTrue())
+    return { move(zero), true };
+
+  // TODO: Pointers?
+  auto [val1, ub1] = s.getMemory().load((p1 + i)(), IntType("i8", 8), 1);
+  auto [val2, ub2] = s.getMemory().load((p2 + i)(), IntType("i8", 8), 1);
+  AndExpr ub_and;
+  ub_and.add(val1.non_poison);
+  ub_and.add(val2.non_poison);
+  ub_and.add(move(ub1));
+  ub_and.add(move(ub2));
+
+  expr val_eq = val1.value == val2.value;
+
+  expr result_neq;
+  if (is_bcmp) {
+    result_neq = expr::mkFreshVar("bcmp_nonzero", zero);
+    s.addQuantVar(result_neq);
+    s.addPre(result_neq != zero);
+  } else {
+    expr pos = expr::mkFreshVar("memcmp_pos", expr::mkUInt(0, 31));
+    expr neg = expr::mkFreshVar("memcmp_neg", expr::mkUInt(0, 31));
+    s.addQuantVar(pos);
+    s.addQuantVar(neg);
+    s.addPre(pos != expr::mkUInt(0u, 31));
+    pos = expr::mkUInt(0, 1).concat(pos);
+    neg = expr::mkUInt(1, 1).concat(neg);
+    result_neq = expr::mkIf(val1.value.ugt(val2.value), move(pos), move(neg));
+  }
+
+  expr ub = ub_and();
+  if (val_eq.isFalse())
+    return { move(result_neq), move(ub) };
+  else if (ub.isFalse())
+    return { zero, false };
+  else if (i == memcmp_unroll_cnt - 1) {
+    // Approximation: assume that the two bytes aren't the same unless they are
+    // same pointers.
+    auto ptr_eq = p1 == p2;
+    s.addPre((ei.ult(max_num) && prefix() && !ptr_eq).implies(!val_eq), true);
+    return { expr::mkIf(move(ptr_eq), move(zero), move(result_neq)), move(ub) };
+  }
+
+  prefix.add(ub_and);
+  prefix.add(val_eq);
+  auto [val_next, ub_next]
+    = encode_memcmp(s, p1, p2, prefix, max_num, is_bcmp, i + 1);
+  return
+    { expr::mkIf(ei.uge(max_num), zero,
+                 expr::mkIf(val_eq, val_next, move(result_neq))),
+      ub && (ei.ult(max_num) && val_eq).implies(ub_next) };
+}
+
+StateValue Memcmp::toSMT(State &s) const {
+  auto &[vptr1, np1] = s[*ptr1];
+  auto &[vptr2, np2] = s[*ptr2];
+  auto &[vnum, npn] = s[*num];
+  s.addUB(vnum.ugt(0).implies(np1 && np2));
+  s.addUB(npn);
+
+  AndExpr prefix;
+  Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
+  // memcmp can be optimized to load & icmps, and it requires this
+  // dereferenceability check of vnum.
+  s.addUB(p1.isDereferenceable(vnum, 1, false));
+  s.addUB(p2.isDereferenceable(vnum, 1, false));
+  auto [val, ub] = encode_memcmp(s, p1, p2, prefix, vnum, is_bcmp, 0);
+  s.addUB(move(ub));
+  return { move(val), true };
+}
+
+expr Memcmp::getTypeConstraints(const Function &f) const {
+  return ptr1->getType().enforcePtrType() &&
+        ptr2->getType().enforcePtrType() &&
+        num->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
+  return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
+                             is_bcmp);
+}
+
+vector<Value*> Memcmp::operands() const {
+  return { ptr1, ptr2, num };
+}
+
+void Memcmp::rauw(const Value &what, Value &with) {
+  RAUW(ptr1);
+  RAUW(ptr2);
+  RAUW(num);
+}
+
+void Memcmp::print(ostream &os) const {
+  os << getName() << " = " << (is_bcmp ? "bcmp " : "memcmp ") << *ptr1
+    << ", " << *ptr2 << ", " << *num;
+}
+
+
 vector<Value*> Strlen::operands() const {
   return { ptr };
 }
