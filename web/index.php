@@ -115,7 +115,7 @@ else {
 <p>Last 5 runs:</p>
 <table>
 <tr>
-<th>LLVM commit</th><th>Date/Time</th><th>Failures</th>
+<th>LLVM commit</th><th>Date/Time</th><th>Failures</th><th>Changes</th>
 </tr>
 
 HTML;
@@ -125,8 +125,14 @@ HTML;
   for ($i = sizeof($data)-1; $i >= max($n_runs-5, 0); --$i) {
     $t = $data[$i];
     $date = format_date($t[6]);
+    $diff = '';
+    foreach (diff_runs($data[$i-1][0], $t[0]) as $e) {
+      if ($diff) $diff .= "<br>\n";
+      $diff .= '<span style="color:' . ($e[0] == '-' ? 'green' : 'red');
+      $diff .= "\">$e[0] $e[1]</span>";
+    }
     echo "<tr><td><a href=\"index.php?hash=$t[0]\">$t[5]</a></td>".
-         "<td>$date</td><td>$t[1]</td></tr>\n";
+         "<td>$date</td><td>$t[1]</td><td>$diff</td></tr>\n";
   }
   echo "</table>\n";
 }
@@ -161,6 +167,27 @@ function get_run_tests($hash) {
     $data[] = explode(',', trim($entry));
   }
   return $data;
+}
+
+function diff_runs($hash1, $hash2) {
+  $a = array();
+  foreach (get_run_tests($hash1) as $e) {
+    $a[] = $e[0];
+  }
+
+  $b = array();
+  foreach (get_run_tests($hash2) as $e) {
+    $b[] = $e[0];
+  }
+
+  $diff = array();
+  foreach (array_diff($a, $b) as $e) {
+    $diff[] = array('-', $e);
+  }
+  foreach (array_diff($b, $a) as $e) {
+    $diff[] = array('+', $e);
+  }
+  return $diff;
 }
 
 function get_comments() {
