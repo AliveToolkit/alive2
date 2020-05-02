@@ -59,6 +59,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 18. Can't remove insertelement undef
 (https://bugs.llvm.org/show_bug.cgi?id=45481)
 
+19. InstSimplify: fadd (nsz op), +0 incorrectly removed
+(https://bugs.llvm.org/show_bug.cgi?id=45778)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
