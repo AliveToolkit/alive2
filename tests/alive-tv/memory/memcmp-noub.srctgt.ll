@@ -7,7 +7,7 @@ define i32 @src() {
   %p8_3 = getelementptr i8, i8* %p8, i64 3
   store i8 1, i8* %p8_3
   %q = getelementptr i8, i8* %p8, i64 1
-  %res = call i32 @memcmp(i8* %p8, i8* %q, i64 4) ; noub
+  %res = call i32 @memcmp(i8* %p8, i8* %q, i64 3) ; noub
 	ret i32 %res
 }
 
