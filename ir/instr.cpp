@@ -50,7 +50,8 @@ struct LoopLikeFunctionApproximator {
     auto [res_i, ub_i, continue_i] = ith_exec(i, is_last);
 
     if (is_last) {
-      s.addPre(prefix().implies(!continue_i));
+      prefix.add(ub_i);
+      s.addPre(prefix().implies(!continue_i), true);
       return { move(res_i), ub_i() };
     }
 
