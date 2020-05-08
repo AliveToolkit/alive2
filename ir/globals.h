@@ -38,6 +38,7 @@ extern unsigned bits_size_t;
 extern unsigned bits_byte;
 
 extern unsigned strlen_unroll_cnt;
+extern unsigned memcmp_unroll_cnt;
 
 extern bool little_endian;
 

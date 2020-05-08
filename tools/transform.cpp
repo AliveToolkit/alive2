@@ -525,6 +525,13 @@ static uint64_t max_gep(const Instr &inst) {
       max_mem_access = UINT64_MAX;
     return 0;
   }
+  if (auto memcmp = dynamic_cast<const Memcmp *>(&inst)) {
+    if (auto bytes = get_int(memcmp->getBytes()))
+      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
+    else
+      max_mem_access = UINT64_MAX;
+    return 0;
+  }
   if (auto slen = dynamic_cast<const Strlen *>(&inst)) {
     max_mem_access = max(max_mem_access,
                          get_globalvar_size(slen->getPointer()));
@@ -603,6 +610,9 @@ static uint64_t get_access_size(const Instr &inst) {
   }
 
   if (dynamic_cast<const Strlen*>(&inst))
+    return 1;
+
+  if (dynamic_cast<const Memcmp*>(&inst))
     return 1;
 
   if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
@@ -839,6 +849,7 @@ static void calculateAndInitConstants(Transform &t) {
                      ? (unsigned)min_access_size : 1);
 
   strlen_unroll_cnt = 10;
+  memcmp_unroll_cnt = 10;
 
   little_endian = t.src.isLittleEndian();
 
@@ -856,6 +867,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmax_mem_access: " << max_mem_access
                   << "\nbits_byte: " << bits_byte
                   << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
+                  << "\nmemcmp_unroll_cnt: " << memcmp_unroll_cnt
                   << "\nlittle_endian: " << little_endian
                   << "\nnullptr_is_used: " << nullptr_is_used
                   << "\nhas_int2ptr: " << has_int2ptr

@@ -33,6 +33,38 @@ struct print_type {
     return str.empty() ? os : (os << s.pre << str << s.post);
   }
 };
+
+struct LoopLikeFunctionApproximator {
+  // input: (i, is the last iter?)
+  // output: (value, UB, continue?)
+  function<tuple<expr, AndExpr, expr>(unsigned, bool)> ith_exec;
+
+  pair<expr, expr> encode(IR::State &s, unsigned unroll_cnt) {
+    AndExpr prefix;
+    return _loop(s, prefix, 0, unroll_cnt);
+  }
+
+  pair<expr, expr> _loop(IR::State &s, AndExpr &prefix, unsigned i,
+                        unsigned unroll_cnt) {
+    bool is_last = i == unroll_cnt - 1;
+    auto [res_i, ub_i, continue_i] = ith_exec(i, is_last);
+
+    if (is_last) {
+      prefix.add(ub_i);
+      s.addPre(prefix().implies(!continue_i), true);
+      return { move(res_i), ub_i() };
+    }
+
+    if (continue_i.isFalse() || ub_i().isFalse())
+      return { move(res_i), ub_i() };
+
+    prefix.add(ub_i);
+    prefix.add(continue_i);
+    auto [val_next, ub_next] = _loop(s, prefix, i + 1, unroll_cnt);
+    return { expr::mkIf(continue_i, move(val_next), move(res_i)),
+              ub_i() && continue_i.implies(ub_next) };
+  }
+};
 }
 
 
@@ -2403,6 +2435,92 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
 }
 
 
+StateValue Memcmp::toSMT(State &s) const {
+  auto &[vptr1, np1] = s[*ptr1];
+  auto &[vptr2, np2] = s[*ptr2];
+  auto &[vnum, npn] = s[*num];
+  s.addUB(vnum.ugt(0).implies(np1 && np2));
+  s.addUB(npn);
+
+  AndExpr prefix;
+  Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
+  // memcmp can be optimized to load & icmps, and it requires this
+  // dereferenceability check of vnum.
+  s.addUB(p1.isDereferenceable(vnum, 1, false));
+  s.addUB(p2.isDereferenceable(vnum, 1, false));
+
+  expr vn = vnum;
+  auto ith_exec =
+      [&, this](unsigned i, bool is_last) -> tuple<expr, AndExpr, expr> {
+    AndExpr ub_and;
+    auto [val1, ub1] = s.getMemory().load((p1 + i)(), IntType("i8", 8), 1);
+    auto [val2, ub2] = s.getMemory().load((p2 + i)(), IntType("i8", 8), 1);
+
+    ub_and.add(val1.non_poison);
+    ub_and.add(val2.non_poison);
+    ub_and.add(move(ub1));
+    ub_and.add(move(ub2));
+
+    expr ei = expr::mkUInt(i, vn.bits());
+    auto val_eq = val1.value == val2.value;
+    expr continue_cond = val_eq && ei.ult(vn);
+    if (is_last)
+      continue_cond &= (p1 != p2);
+
+    expr zero = expr::mkUInt(0, 32);
+    expr result_neq;
+    if (is_bcmp) {
+      result_neq = expr::mkFreshVar("bcmp_nonzero", zero);
+      s.addQuantVar(result_neq);
+      s.addPre(result_neq != zero);
+    } else {
+      expr pos = expr::mkFreshVar("memcmp_pos", expr::mkUInt(0, 31));
+      expr neg = expr::mkFreshVar("memcmp_neg", expr::mkUInt(0, 31));
+      s.addQuantVar(pos);
+      s.addQuantVar(neg);
+      s.addPre(pos != expr::mkUInt(0u, 31));
+      pos = expr::mkUInt(0, 1).concat(pos);
+      neg = expr::mkUInt(1, 1).concat(neg);
+      result_neq = expr::mkIf(val1.value.ugt(val2.value), move(pos), move(neg));
+    }
+    auto result = expr::mkIf(val_eq, zero, result_neq);
+
+    return { move(result), move(ub_and), move(continue_cond) };
+  };
+  LoopLikeFunctionApproximator apprx;
+  apprx.ith_exec = ith_exec;
+  auto [val, ub] = apprx.encode(s, memcmp_unroll_cnt);
+  s.addUB(move(ub));
+  return { move(val), true };
+}
+
+expr Memcmp::getTypeConstraints(const Function &f) const {
+  return ptr1->getType().enforcePtrType() &&
+        ptr2->getType().enforcePtrType() &&
+        num->getType().enforceIntType();
+}
+
+unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
+  return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
+                             is_bcmp);
+}
+
+vector<Value*> Memcmp::operands() const {
+  return { ptr1, ptr2, num };
+}
+
+void Memcmp::rauw(const Value &what, Value &with) {
+  RAUW(ptr1);
+  RAUW(ptr2);
+  RAUW(num);
+}
+
+void Memcmp::print(ostream &os) const {
+  os << getName() << " = " << (is_bcmp ? "bcmp " : "memcmp ") << *ptr1
+    << ", " << *ptr2 << ", " << *num;
+}
+
+
 vector<Value*> Strlen::operands() const {
   return { ptr };
 }
@@ -2415,36 +2533,26 @@ void Strlen::print(ostream &os) const {
   os << getName() << " = strlen " << *ptr;
 }
 
-static pair<expr,expr>
-find_null(State &s, Type &ty, const Pointer &ptr, AndExpr &prefix, unsigned i) {
-  auto [val, ub0] = s.getMemory().load((ptr + i)(), IntType("i8", 8), 1);
-  auto ub = ub0() && val.non_poison;
-
-  auto is_zero = val.value == 0;
-  auto result = expr::mkUInt(i, ty.bits());
-
-  if (i == strlen_unroll_cnt - 1) {
-    s.addPre(prefix().implies(is_zero), true);
-    return { move(result), move(ub) };
-  }
-
-  if (is_zero.isTrue() || ub.isFalse())
-    return { move(result), move(ub) };
-
-  prefix.add(ub0);
-  prefix.add(val.non_poison);
-  prefix.add(!is_zero);
-  auto [val2, ub2] = find_null(s, ty, ptr, prefix, i + 1);
-  return { expr::mkIf(is_zero, result, val2),
-           ub && (is_zero || ub2) };
-}
-
 StateValue Strlen::toSMT(State &s) const {
   auto &[eptr, np_ptr] = s[*ptr];
   s.addUB(np_ptr);
-  AndExpr prefix;
-  auto [val, ub]
-    = find_null(s, getType(), Pointer(s.getMemory(), eptr), prefix, 0);
+
+  LoopLikeFunctionApproximator apprx;
+  Pointer p(s.getMemory(), eptr);
+  Type &ty = getType();
+
+  auto ith_exec =
+      [&s, &p, &ty](unsigned i, bool _) -> tuple<expr, AndExpr, expr> {
+    AndExpr ub;
+    auto [val, ub_load] = s.getMemory().load((p + i)(), IntType("i8", 8), 1);
+    ub.add(ub_load);
+    ub.add(val.non_poison);
+    auto nonnull = val.value != 0;
+    auto result = expr::mkUInt(i, ty.bits());
+    return { move(result), move(ub), move(nonnull) };
+  };
+  apprx.ith_exec = ith_exec;
+  auto [val, ub] = apprx.encode(s, strlen_unroll_cnt);
   s.addUB(move(ub));
   return { move(val), true };
 }
