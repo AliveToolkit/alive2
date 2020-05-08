@@ -590,13 +590,15 @@ public:
 };
 
 
-class Strlen final : public Instr {
-  Value *ptr;
+class Memcmp final : public Instr {
+  Value *ptr1, *ptr2, *num;
+  bool is_bcmp;
 public:
-  Strlen(Type &type, std::string &&name, Value &ptr)
-    : Instr(type, std::move(name)), ptr(&ptr) {}
+  Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
+         bool is_bcmp): Instr(type, std::move(name)), ptr1(&ptr1), ptr2(&ptr2),
+                        num(&num), is_bcmp(is_bcmp) {}
 
-  Value *getPointer() const { return ptr; }
+  Value &getBytes() const { return *num; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -606,15 +608,13 @@ public:
 };
 
 
-class Memcmp final : public Instr {
-  Value *ptr1, *ptr2, *num;
-  bool is_bcmp;
+class Strlen final : public Instr {
+  Value *ptr;
 public:
-  Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
-        bool is_bcmp): Instr(type, std::move(name)), ptr1(&ptr1), ptr2(&ptr2),
-                        num(&num), is_bcmp(is_bcmp) {}
+  Strlen(Type &type, std::string &&name, Value &ptr)
+    : Instr(type, std::move(name)), ptr(&ptr) {}
 
-  Value &getBytes() const { return *num; }
+  Value *getPointer() const { return ptr; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
