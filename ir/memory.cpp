@@ -1461,7 +1461,7 @@ unsigned Memory::getStoreByteSize(const Type &ty) {
   auto aty = ty.getAsAggregateType();
   if (aty && !isNonPtrVector(ty)) {
     unsigned sz = 0;
-    for (unsigned i = 0; i < aty->numElementsConst(); ++i)
+    for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i)
       sz += getStoreByteSize(aty->getChild(i));
     return sz;
   }

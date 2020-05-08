@@ -1395,10 +1395,7 @@ bool hasPtr(const Type &t) {
 
 bool isNonPtrVector(const Type &t) {
   auto vty = dynamic_cast<const VectorType *>(&t);
-  if (!vty || vty->numElementsConst() == 0)
-    return false;
-  auto &child = vty->getChild(0);
-  return !child.isPtrType();
+  return vty && !vty->getChild(0).isPtrType();
 }
 
 }
