@@ -2498,12 +2498,12 @@ StateValue Memcmp::toSMT(State &s) const {
     auto val_eq = val1.value == val2.value;
     return { expr::mkIf(val_eq, zero, result_neq),
              move(ub_and),
-             val_eq && expr::mkUInt(i + 1, vn.bits()).ult(vn) };
+             val_eq && expr::mkUInt(i, vn.bits()).ule(vn) };
   };
   auto [val, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, memcmp_unroll_cnt);
   s.addUB(vnum.ugt(0).implies(move(ub)));
-  return { expr::mkIf(vnum == zero, zero, move(val)), true };
+  return { expr::mkIf(vnum == 0, zero, move(val)), true };
 }
 
 expr Memcmp::getTypeConstraints(const Function &f) const {
