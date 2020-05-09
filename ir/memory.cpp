@@ -1411,7 +1411,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
     if (blockKind == CONSTGLOBAL)
-      non_local_blk_nonwritable.emplace_back(bid);
+      non_local_blk_nonwritable.emplace(bid);
   }
 
   store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
@@ -1715,8 +1715,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.local_blk_size.add(els.local_blk_size);
   ret.local_blk_align.add(els.local_blk_align);
   ret.local_blk_kind.add(els.local_blk_kind);
-  ret.non_local_blk_nonwritable.insert(ret.non_local_blk_nonwritable.end(),
-                                       els.non_local_blk_nonwritable.begin(),
+  ret.non_local_blk_nonwritable.insert(els.non_local_blk_nonwritable.begin(),
                                        els.non_local_blk_nonwritable.end());
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
