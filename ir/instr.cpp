@@ -2498,7 +2498,7 @@ StateValue Memcmp::toSMT(State &s) const {
     auto val_eq = val1.value == val2.value;
     return { expr::mkIf(val_eq, zero, result_neq),
              move(ub_and),
-             val_eq && vn.uge(i) };
+             val_eq && vn.uge(i + 2) };
   };
   auto [val, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, memcmp_unroll_cnt);
