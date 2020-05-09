@@ -203,7 +203,7 @@ class Memory {
   smt::FunctionExpr local_blk_align;
   smt::FunctionExpr local_blk_kind;
 
-  std::vector<unsigned> non_local_blk_nonwritable;
+  std::set<unsigned> non_local_blk_nonwritable;
   smt::FunctionExpr non_local_blk_size;
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
