@@ -476,8 +476,6 @@ static optional<int64_t> get_int(const Value &val) {
   return {};
 }
 
-static uint64_t max_mem_access, max_alloc_size;
-
 static uint64_t get_globalvar_size(const Value *V) {
   if (auto cast = is_bitcast(*V))
     return get_globalvar_size(&cast->getValue());
@@ -486,12 +484,18 @@ static uint64_t get_globalvar_size(const Value *V) {
   return UINT64_MAX;
 }
 
-static uint64_t max_gep(const Instr &inst) {
+struct MemoryAccessInfo {
+  uint64_t max_alloc_size;
+  uint64_t max_access_size;
+  uint64_t max_gep_size;
+};
+
+static MemoryAccessInfo get_access_info(const Instr &inst) {
   if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
     // if addresses are observed, then expose full ptr range
     if (conv->getOp() == ConversionOp::Int2Ptr ||
         conv->getOp() == ConversionOp::Ptr2Int)
-      return max_mem_access = max_alloc_size = UINT64_MAX;
+      return { UINT64_MAX, UINT64_MAX, UINT64_MAX };
   }
 
   if (auto gep = dynamic_cast<const GEP*>(&inst)) {
@@ -501,57 +505,52 @@ static uint64_t max_gep(const Instr &inst) {
         off += mul * *n;
         continue;
       }
-      return UINT64_MAX;
+      return { 0, 0, UINT64_MAX };
     }
-    return abs(off);
+    return { 0, 0, (uint64_t)abs(off) };
   }
-  if (auto load = dynamic_cast<const Load*>(&inst)) {
-    max_mem_access = max(max_mem_access,
-                         (uint64_t)Memory::getStoreByteSize(load->getType()));
-    return 0;
-  }
-  if (auto store = dynamic_cast<const Store*>(&inst)) {
-    max_mem_access
-      = max(max_mem_access,
-            (uint64_t)Memory::getStoreByteSize(store->getValue().getType()));
-    return 0;
-  }
+
+  if (auto load = dynamic_cast<const Load*>(&inst))
+    return { 0, (uint64_t)Memory::getStoreByteSize(load->getType()), 0 };
+
+  if (auto store = dynamic_cast<const Store*>(&inst))
+    return
+      { 0, (uint64_t)Memory::getStoreByteSize(store->getValue().getType()), 0 };
+
   if (auto cpy = dynamic_cast<const Memcpy*>(&inst)) {
+    uint64_t acc = UINT64_MAX;
     if (auto bytes = get_int(cpy->getBytes()))
-      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
-    else
-      max_mem_access = UINT64_MAX;
-    return 0;
+      acc = (uint64_t)abs(*bytes);
+    return { 0, acc, 0 };
   }
+
   if (auto memset = dynamic_cast<const Memset *>(&inst)) {
+    uint64_t acc = UINT64_MAX;
     if (auto bytes = get_int(memset->getBytes()))
-      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
-    else
-      max_mem_access = UINT64_MAX;
-    return 0;
+      acc = (uint64_t)abs(*bytes);
+    return { 0, acc, 0 };
   }
+
   if (auto memcmp = dynamic_cast<const Memcmp *>(&inst)) {
+    uint64_t acc = UINT64_MAX;
     if (auto bytes = get_int(memcmp->getBytes()))
-      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
-    else
-      max_mem_access = UINT64_MAX;
-    return 0;
+      acc = (uint64_t)abs(*bytes);
+    return { 0, acc, 0 };
   }
-  if (auto slen = dynamic_cast<const Strlen *>(&inst)) {
-    max_mem_access = max(max_mem_access,
-                         get_globalvar_size(slen->getPointer()));
-    return 0;
-  }
+
+  if (auto slen = dynamic_cast<const Strlen *>(&inst))
+    return { 0, get_globalvar_size(slen->getPointer()), 0 };
 
   Value *size;
   uint64_t mul = 1;
+  uint64_t allocsz = 0;
   if (auto alloc = dynamic_cast<const Alloc*>(&inst)) {
     size = &alloc->getSize();
     if (alloc->getMul()) {
       if (auto n = get_int(*alloc->getMul())) {
         mul = *n;
       } else {
-        max_alloc_size = UINT64_MAX;
+        allocsz = UINT64_MAX;
       }
     }
   } else if (auto alloc = dynamic_cast<const Malloc*>(&inst)) {
@@ -561,18 +560,18 @@ static uint64_t max_gep(const Instr &inst) {
     if (auto n = get_int(alloc->getNum())) {
       mul = *n;
     } else {
-      max_alloc_size = UINT64_MAX;
+      allocsz = UINT64_MAX;
     }
   } else {
-    return 0;
+    return { 0, 0, 0 };
   }
 
   if (auto bytes = get_int(*size)) {
-    max_alloc_size = max(max_alloc_size, mul * abs(*bytes));
+    allocsz = max(allocsz, mul * abs(*bytes));
   } else {
-    max_alloc_size = UINT64_MAX;
+    allocsz = UINT64_MAX;
   }
-  return 0;
+  return { allocsz, 0, 0 };
 }
 
 static bool has_sub_byte(const Type &t) {
@@ -694,8 +693,8 @@ static void calculateAndInitConstants(Transform &t) {
   // The number of local blocks.
   unsigned num_locals_src = 0, num_locals_tgt = 0;
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
-  max_alloc_size = 0;
-  max_mem_access = 0;
+  uint64_t max_alloc_size = 0;
+  uint64_t max_access_size = 0;
 
   for (auto BB : t.src.getBBs()) {
     for (auto &i : BB->instrs()) {
@@ -703,7 +702,11 @@ static void calculateAndInitConstants(Transform &t) {
         ++num_locals_src;
       else
         num_max_nonlocals_inst += returns_nonlocal(i);
-      max_gep_src = add_saturate(max_gep_src, max_gep(i));
+
+      auto info = get_access_info(i);
+      max_alloc_size = max(max_alloc_size, info.max_alloc_size);
+      max_access_size = max(max_access_size, info.max_access_size);
+      max_gep_src = add_saturate(max_gep_src, info.max_gep_size);
     }
   }
   for (auto BB : t.tgt.getBBs()) {
@@ -712,7 +715,11 @@ static void calculateAndInitConstants(Transform &t) {
         ++num_locals_tgt;
       else
         num_max_nonlocals_inst += returns_nonlocal(i);
-      max_gep_tgt = add_saturate(max_gep_tgt, max_gep(i));
+
+      auto info = get_access_info(i);
+      max_alloc_size = max(max_alloc_size, info.max_alloc_size);
+      max_access_size = max(max_access_size, info.max_access_size);
+      max_gep_tgt = add_saturate(max_gep_tgt, info.max_gep_size);
     }
   }
   num_locals = max(num_locals_src, num_locals_tgt);
@@ -721,7 +728,7 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto glbs : { &globals_src, &globals_tgt}) {
     for (auto &glb : *glbs) {
       auto sz = max(glb->size(), (uint64_t)1u);
-      max_mem_access = max(sz, max_mem_access);
+      max_access_size = max(sz, max_access_size);
       min_global_size = min_global_size != UINT64_MAX
                           ? gcd(sz, min_global_size)
                           : sz;
@@ -825,7 +832,7 @@ static void calculateAndInitConstants(Transform &t) {
   // counterexamples more readable
   // Allow an extra bit for the sign
   auto max_geps
-    = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_mem_access),
+    = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_access_size),
                  true) + 1;
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
 
@@ -869,7 +876,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nbits_program_pointer: " << bits_program_pointer
                   << "\nmax_alloc_size: " << max_alloc_size
                   << "\nmin_access_size: " << min_access_size
-                  << "\nmax_mem_access: " << max_mem_access
+                  << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte
                   << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
                   << "\nmemcmp_unroll_cnt: " << memcmp_unroll_cnt

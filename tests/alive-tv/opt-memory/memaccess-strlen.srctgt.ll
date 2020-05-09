@@ -15,5 +15,5 @@ define i64 @tgt() {
   ret i64 %l
 }
 
-; CHECK: max_mem_access: 8
+; CHECK: max_access_size: 8
 declare i64 @strlen(i8*)
