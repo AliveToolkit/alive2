@@ -1390,7 +1390,7 @@ StateValue FnCall::toSMT(State &s) const {
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
                          out_types, !(flags & NoRead), !(flags & NoWrite),
-                         flags & ArgMemOnly, move(returned_val));
+                         flags & ArgMemOnly);
 
   if (flags & NoReturn) {
     // TODO: Even if a function call doesn't have noreturn, it can possibly
