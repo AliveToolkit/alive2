@@ -363,10 +363,10 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
         err(r, [](ostream&, const Model&){},
             "Source is more defined than target");
       }},
-    { mk_fml(fndom_a && ((!dom_a && dom_b) || (dom_a && !dom_b))),
+    { mk_fml((fndom_a && fndom_b) && dom_a != dom_b),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
-            "Target or source may never return");
+            "Source and target don't have the same return domain");
       }},
     { mk_fml(dom && !poison_cnstr),
       [&](const Result &r) {

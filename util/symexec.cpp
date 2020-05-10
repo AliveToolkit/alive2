@@ -50,7 +50,8 @@ void sym_exec(State &s) {
   }
 
   if (config::symexec_print_each_value) {
-    cout << "domain = " << s.returnDomain()
+    cout << "domain = " << s.functionDomain()
+         << "\nreturn domain = " << s.returnDomain()
          << "\nreturn = " << s.returnVal().first
          << s.returnMemory() << "\n\n";
   }
