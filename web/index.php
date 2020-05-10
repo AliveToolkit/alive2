@@ -53,9 +53,7 @@ if ($hash && $test) {
 <form action="index.php" method="post">
 <input type="hidden" name="hash" value="$hash">
 <input type="hidden" name="test" value="$name_html">
-<textarea rows="2" cols = "80" name= "comment">
-$c
-</textarea>
+<textarea rows="2" cols = "80" name= "comment">$c</textarea>
 <br>
 <input type="submit" value="Save">
 </form>
@@ -117,7 +115,7 @@ else {
 <p>Last 5 runs:</p>
 <table>
 <tr>
-<th>LLVM commit</th><th>Date/Time</th><th>Failures</th>
+<th>LLVM commit</th><th>Date/Time</th><th>Failures</th><th>Changes</th>
 </tr>
 
 HTML;
@@ -127,8 +125,14 @@ HTML;
   for ($i = sizeof($data)-1; $i >= max($n_runs-5, 0); --$i) {
     $t = $data[$i];
     $date = format_date($t[6]);
+    $diff = '';
+    foreach (diff_runs($data[$i-1][0], $t[0]) as $e) {
+      if ($diff) $diff .= "<br>\n";
+      $diff .= '<span style="color:' . ($e[0] == '-' ? 'green' : 'red');
+      $diff .= "\">$e[0] $e[1]</span>";
+    }
     echo "<tr><td><a href=\"index.php?hash=$t[0]\">$t[5]</a></td>".
-         "<td>$date</td><td>$t[1]</td></tr>\n";
+         "<td>$date</td><td>$t[1]</td><td>$diff</td></tr>\n";
   }
   echo "</table>\n";
 }
@@ -137,7 +141,7 @@ html_footer();
 
 
 function format_date($ts) {
-  return date('d/M/Y H:i', $ts);
+  return date('d/M/Y', $ts);
 }
 
 function get_all_runs($data, $hash) {
@@ -163,6 +167,27 @@ function get_run_tests($hash) {
     $data[] = explode(',', trim($entry));
   }
   return $data;
+}
+
+function diff_runs($hash1, $hash2) {
+  $a = array();
+  foreach (get_run_tests($hash1) as $e) {
+    $a[] = $e[0];
+  }
+
+  $b = array();
+  foreach (get_run_tests($hash2) as $e) {
+    $b[] = $e[0];
+  }
+
+  $diff = array();
+  foreach (array_diff($a, $b) as $e) {
+    $diff[] = array('-', $e);
+  }
+  foreach (array_diff($b, $a) as $e) {
+    $diff[] = array('+', $e);
+  }
+  return $diff;
 }
 
 function get_comments() {
@@ -194,7 +219,7 @@ function do_plot($data) {
   $bugs_wo_undef = array();
 
   foreach ($data as $t) {
-    $labels[]        = format_date($t[6]) . " - $t[5]";
+    $labels[]        = format_date($t[6]);
     $bugs[]          = $t[1];
     $bugs_wo_undef[] = $t[2];
   }

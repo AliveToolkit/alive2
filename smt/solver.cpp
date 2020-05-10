@@ -293,7 +293,7 @@ Result Solver::check() const {
 
   ++num_queries;
   if (print_queries)
-    cout << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s);
+    cout << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s) << endl;
 
   tactic->check();
 

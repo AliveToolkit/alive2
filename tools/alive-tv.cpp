@@ -88,6 +88,12 @@ static llvm::cl::opt<bool> opt_succinct(
     "succinct", llvm::cl::desc("Make the output succinct"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<unsigned> opt_omit_array_size(
+    "omit-array-size",
+    llvm::cl::desc("Omit an array initializer if it has elements more than "
+                   "this number"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(-1));
+
 static llvm::cl::opt<unsigned> opt_max_mem(
      "max-mem", llvm::cl::desc("Max memory (approx)"),
      llvm::cl::cat(opt_alive), llvm::cl::init(1024), llvm::cl::value_desc("MB"));
@@ -200,12 +206,22 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
     return 0;
   }
 
-  case llvm::Type::ArrayTyID:
-  case llvm::Type::VectorTyID: {
-    auto *STyL = llvm::cast<llvm::SequentialType>(TyL);
-    auto *STyR = llvm::cast<llvm::SequentialType>(TyR);
+  case llvm::Type::ArrayTyID: {
+    auto *STyL = llvm::cast<llvm::ArrayType>(TyL);
+    auto *STyR = llvm::cast<llvm::ArrayType>(TyR);
     if (STyL->getNumElements() != STyR->getNumElements())
       return cmpNumbers(STyL->getNumElements(), STyR->getNumElements());
+    return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
+  }
+  case llvm::Type::FixedVectorTyID: {
+    auto *STyL = llvm::cast<llvm::VectorType>(TyL);
+    auto *STyR = llvm::cast<llvm::VectorType>(TyR);
+    if (STyL->getElementCount().Scalable != STyR->getElementCount().Scalable)
+      return cmpNumbers(STyL->getElementCount().Scalable,
+                        STyR->getElementCount().Scalable);
+    if (STyL->getElementCount().Min != STyR->getElementCount().Min)
+      return cmpNumbers(STyL->getElementCount().Min,
+                        STyR->getElementCount().Min);
     return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
   }
   }
@@ -223,6 +239,8 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   TransformPrintOpts print_opts;
+
+  omit_array_size = opt_omit_array_size;
 
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F1));

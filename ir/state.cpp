@@ -38,7 +38,7 @@ State::State(Function &f, bool source)
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {
-  Memory::resetBids(1);
+  Memory::resetBids(has_null_block);
 }
 
 const StateValue& State::exec(const Value &v) {
@@ -215,8 +215,7 @@ const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<pair<StateValue, bool>> &&ptr_inputs,
                  const vector<Type*> &out_types, bool reads_memory,
-                 bool writes_memory, bool argmemonly,
-                 vector<StateValue> &&returned_val) {
+                 bool writes_memory, bool argmemonly) {
   // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
 
@@ -253,15 +252,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   if (inserted) {
     vector<StateValue> values;
-    if (!returned_val.empty())
-      values = move(returned_val);
-    else {
-      string valname = name + "#val";
-      string npname = name + "#np";
-      for (auto t : out_types) {
-        values.emplace_back(mk_val(*t, valname).first,
-                            expr::mkFreshVar(npname.c_str(), false));
-      }
+    string valname = name + "#val";
+    string npname = name + "#np";
+    for (auto t : out_types) {
+      values.emplace_back(mk_val(*t, valname).first,
+                          expr::mkFreshVar(npname.c_str(), false));
     }
 
     string ub_name = string(name) + "#ub";
@@ -429,7 +424,7 @@ void State::mkAxioms(State &tgt) {
             break;
           }
           expr eq_val = Pointer(mem, ptr_in.value)
-                      .fninput_refined(Pointer(mem2, ptr_in2.value), is_byval2);
+                      .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
           is_val_eq &= eq_val;
           refines &= ptr_in.non_poison
                        .implies(eq_val && ptr_in2.non_poison);

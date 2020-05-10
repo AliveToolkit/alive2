@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=10000
+; TEST-ARGS: -smt-to=20000
 
 define i16 @f1(half %x) {
   %a = alloca half

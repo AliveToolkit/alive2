@@ -50,6 +50,18 @@ Please contact us or submit a PR if something is missing or inaccurate.
 15. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
 (https://bugs.llvm.org/show_bug.cgi?id=45447)
 
+16. Invalid undef splat in instcombine
+(https://bugs.llvm.org/show_bug.cgi?id=45455)
+
+17. Incorrect transformation of minnum with nnan
+(https://bugs.llvm.org/show_bug.cgi?id=45478)
+
+18. Can't remove insertelement undef
+(https://bugs.llvm.org/show_bug.cgi?id=45481)
+
+19. InstSimplify: fadd (nsz op), +0 incorrectly removed
+(https://bugs.llvm.org/show_bug.cgi?id=45778)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 

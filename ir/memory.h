@@ -51,15 +51,15 @@ public:
   // data and non_poison should have bits_byte bits.
   Byte(const Memory &m, const smt::expr &data, const smt::expr &non_poison);
 
-  smt::expr is_ptr() const;
-  smt::expr ptr_nonpoison() const;
+  smt::expr isPtr() const;
+  smt::expr ptrNonpoison() const;
   Pointer ptr() const;
-  smt::expr ptr_value() const;
-  smt::expr ptr_byteoffset() const;
-  smt::expr nonptr_nonpoison() const;
-  smt::expr nonptr_value() const;
-  smt::expr is_poison(bool fullbit = true) const;
-  smt::expr is_zero() const; // zero or null
+  smt::expr ptrValue() const;
+  smt::expr ptrByteoffset() const;
+  smt::expr nonptrNonpoison() const;
+  smt::expr nonptrValue() const;
+  smt::expr isPoison(bool fullbit = true) const;
+  smt::expr isZero() const; // zero or null
 
   const smt::expr& operator()() const { return p; }
 
@@ -93,7 +93,7 @@ class Pointer {
   // TODO: missing support for address space
   smt::expr p;
 
-  smt::expr get_value(const char *name, const smt::FunctionExpr &local_fn,
+  smt::expr getValue(const char *name, const smt::FunctionExpr &local_fn,
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
@@ -106,25 +106,25 @@ public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attrs = smt::expr());
 
-  static unsigned total_bits();
-  static unsigned total_bits_short();
+  static unsigned totalBits();
+  static unsigned totalBitsShort();
 
-  smt::expr is_local() const;
+  smt::expr isLocal() const;
 
-  smt::expr get_bid() const;
-  smt::expr get_short_bid() const; // same as get_bid but ignoring is_local bit
-  smt::expr get_offset() const;
-  smt::expr get_offset_sizet() const;
-  smt::expr get_attrs() const;
-  smt::expr get_address(bool simplify = true) const;
+  smt::expr getBid() const;
+  smt::expr getShortBid() const; // same as getBid but ignoring is_local bit
+  smt::expr getOffset() const;
+  smt::expr getOffsetSizet() const;
+  smt::expr getAttrs() const;
+  smt::expr getAddress(bool simplify = true) const;
 
-  smt::expr block_size() const;
+  smt::expr blockSize() const;
 
   const smt::expr& operator()() const { return p; }
   // Returns expr with short_bid+offset. It strips attrs away.
   // If this pointer is constructed with var_name (has_attr with false),
   // the returned expr is the variable.
-  smt::expr short_ptr() const;
+  smt::expr shortPtr() const;
   smt::expr release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
@@ -132,7 +132,7 @@ public:
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);
 
-  smt::expr add_no_overflow(const smt::expr &offset) const;
+  smt::expr addNoOverflow(const smt::expr &offset) const;
 
   smt::expr operator==(const Pointer &rhs) const;
   smt::expr operator!=(const Pointer &rhs) const;
@@ -147,17 +147,17 @@ public:
   StateValue ugt(const Pointer &rhs) const;
 
   smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
-  smt::expr block_alignment() const; // log(bits)
-  smt::expr is_block_aligned(unsigned align, bool exact = false) const;
-  smt::expr is_aligned(unsigned align) const;
-  smt::AndExpr is_dereferenceable(unsigned bytes, unsigned align, bool iswrite);
-  smt::AndExpr is_dereferenceable(const smt::expr &bytes, unsigned align,
+  smt::expr blockAlignment() const; // log(bits)
+  smt::expr isBlockAligned(unsigned align, bool exact = false) const;
+  smt::expr isAligned(unsigned align) const;
+  smt::AndExpr isDereferenceable(unsigned bytes, unsigned align, bool iswrite);
+  smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
                                   bool iswrite);
-  void is_disjoint(const smt::expr &len1, const Pointer &ptr2,
+  void isDisjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
-  smt::expr is_block_alive() const;
-  smt::expr is_writable() const;
-  smt::expr is_byval() const;
+  smt::expr isBlockAlive() const;
+  smt::expr isWritable() const;
+  smt::expr isByval() const;
 
   enum AllocType {
     GLOBAL,
@@ -165,18 +165,18 @@ public:
     MALLOC,
     CXX_NEW,
   };
-  smt::expr get_alloc_type() const;
-  smt::expr is_heap_allocated() const;
-  smt::expr is_nocapture() const;
-  smt::expr is_readonly() const;
-  smt::expr is_readnone() const;
+  smt::expr getAllocType() const;
+  smt::expr isHeapAllocated() const;
+  smt::expr isNocapture() const;
+  smt::expr isReadonly() const;
+  smt::expr isReadnone() const;
 
-  void strip_attrs();
+  void stripAttrs();
 
   smt::expr refined(const Pointer &other) const;
-  smt::expr fninput_refined(const Pointer &other, bool is_byval_arg) const;
-  smt::expr block_val_refined(const Pointer &other) const;
-  smt::expr block_refined(const Pointer &other) const;
+  smt::expr fninputRefined(const Pointer &other, bool is_byval_arg) const;
+  smt::expr blockValRefined(const Pointer &other) const;
+  smt::expr blockRefined(const Pointer &other) const;
 
   const Memory& getMemory() const { return m; }
 
@@ -203,7 +203,7 @@ class Memory {
   smt::FunctionExpr local_blk_align;
   smt::FunctionExpr local_blk_kind;
 
-  std::vector<unsigned> non_local_blk_nonwritable;
+  std::set<unsigned> non_local_blk_nonwritable;
   smt::FunctionExpr non_local_blk_size;
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
@@ -265,7 +265,7 @@ public:
       std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);
 
   // Start lifetime of a local block.
-  void start_lifetime(const smt::expr &ptr_local);
+  void startLifetime(const smt::expr &ptr_local);
 
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
@@ -298,9 +298,9 @@ public:
       const;
 
   // Returns true if a nocapture pointer byte is not in the memory.
-  smt::expr check_nocapture() const;
+  smt::expr checkNocapture() const;
 
-  unsigned num_nonlocals() const;
+  unsigned numNonlocals() const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

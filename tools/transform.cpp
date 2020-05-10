@@ -530,6 +530,13 @@ static uint64_t max_gep(const Instr &inst) {
       max_mem_access = UINT64_MAX;
     return 0;
   }
+  if (auto memcmp = dynamic_cast<const Memcmp *>(&inst)) {
+    if (auto bytes = get_int(memcmp->getBytes()))
+      max_mem_access = max(max_mem_access, (uint64_t)abs(*bytes));
+    else
+      max_mem_access = UINT64_MAX;
+    return 0;
+  }
   if (auto slen = dynamic_cast<const Strlen *>(&inst)) {
     max_mem_access = max(max_mem_access,
                          get_globalvar_size(slen->getPointer()));
@@ -608,6 +615,9 @@ static uint64_t get_access_size(const Instr &inst) {
   }
 
   if (dynamic_cast<const Strlen*>(&inst))
+    return 1;
+
+  if (dynamic_cast<const Memcmp*>(&inst))
     return 1;
 
   if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
@@ -725,6 +735,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_malloc       = false;
   has_free         = false;
   has_fncall       = false;
+  has_null_block   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
@@ -772,11 +783,13 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst;
   // check if null block is needed
-  if (num_nonlocals_src > 0 || num_globals > 0 ||
-      nullptr_is_used || has_malloc || has_ptr_load || has_fncall)
-    ++num_nonlocals_src;
+  // Global variables cannot be null pointers
+  has_null_block = num_ptrinputs > 0 || nullptr_is_used || has_malloc ||
+                  has_ptr_load || has_fncall;
+
+  num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst +
+                      has_null_block;
 
   // Allow at least one non-const global for calls to change
   num_nonlocals_src += has_fncall;
@@ -814,7 +827,7 @@ static void calculateAndInitConstants(Transform &t) {
   auto max_geps
     = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_mem_access),
                  true) + 1;
-  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)bits_program_pointer);
+  bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
 
   // we need an extra bit because 1st bit of size is always 0
   bits_size_t = ilog2_ceil(max_alloc_size, true);
@@ -841,6 +854,7 @@ static void calculateAndInitConstants(Transform &t) {
                      ? (unsigned)min_access_size : 1);
 
   strlen_unroll_cnt = 10;
+  memcmp_unroll_cnt = 10;
 
   little_endian = t.src.isLittleEndian();
 
@@ -858,12 +872,14 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmax_mem_access: " << max_mem_access
                   << "\nbits_byte: " << bits_byte
                   << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
+                  << "\nmemcmp_unroll_cnt: " << memcmp_unroll_cnt
                   << "\nlittle_endian: " << little_endian
                   << "\nnullptr_is_used: " << nullptr_is_used
                   << "\nhas_int2ptr: " << has_int2ptr
                   << "\nhas_ptr2int: " << has_ptr2int
                   << "\nhas_malloc: " << has_malloc
                   << "\nhas_free: " << has_free
+                  << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access

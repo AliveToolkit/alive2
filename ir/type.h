@@ -264,13 +264,17 @@ protected:
 
 public:
   smt::expr numElements() const;
+  smt::expr numElementsExcludingPadding() const;
   unsigned numElementsConst() const { return elements; }
+  unsigned numPaddingsConst() const;
 
-  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
+  StateValue aggregateVals(const std::vector<StateValue> &vals,
+                           bool needsPadding = false) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index,
                          bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }
   bool isPadding(unsigned i) const { return is_padding[i]; }
+  unsigned countPaddings(unsigned to_idx) const;
 
   unsigned bits() const override;
   unsigned np_bits() const override;

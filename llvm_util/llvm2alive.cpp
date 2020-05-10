@@ -268,6 +268,7 @@ public:
     string fn_name = '@' + fn->getName().str();
     auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
                                     !known);
+    unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
       unsigned attr = FnCall::ArgNone;
@@ -275,11 +276,32 @@ public:
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
           attr |= FnCall::ArgByVal;
-        else if (argI->hasReturnedAttr())
-          attr |= FnCall::ArgReturned;
+        else if (argI->hasReturnedAttr()) {
+          auto call2
+            = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
+                                  flags, !known);
+          for (auto &[arg, flags] : call->getArgs()) {
+            call2->addArg(*arg, flags);
+          }
+          call = move(call2);
+
+          // fn may have different type than argument. LLVM assumes there's
+          // an implicit bitcast
+          assert(!ret_val);
+          if (argI->getType() == i.getType())
+            ret_val = make_unique<UnaryOp>(*ty, value_name(i), *arg,
+                                           UnaryOp::Copy);
+          else
+            ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
+                                                ConversionOp::BitCast);
+        }
         ++argI;
       }
       call->addArg(*arg, attr);
+    }
+    if (ret_val) {
+      BB->addInstr(move(call));
+      RETURN_IDENTIFIER(move(ret_val));
     }
     RETURN_IDENTIFIER(move(call));
   }
@@ -378,8 +400,12 @@ public:
 
     auto inst = make_unique<ExtractValue>(*ty, value_name(i), *val);
 
+    auto *valty = &val->getType();
     for (auto idx : i.indices()) {
-      inst->addIdx(idx);
+      auto *aty = valty->getAsAggregateType();
+      unsigned idx_with_paddings = aty->countPaddings(idx) + idx;
+      inst->addIdx(idx_with_paddings);
+      valty = &aty->getChild(idx_with_paddings);
     }
 
     RETURN_IDENTIFIER(move(inst));
@@ -395,7 +421,10 @@ public:
     auto inst = make_unique<InsertValue>(*ty, value_name(i), *val, *elt);
 
     for (auto idx : i.indices()) {
-      inst->addIdx(idx);
+      auto *aty = ty->getAsAggregateType();
+      unsigned idx_with_paddings = aty->countPaddings(idx) + idx;
+      inst->addIdx(idx_with_paddings);
+      ty = &aty->getChild(idx_with_paddings);
     }
 
     RETURN_IDENTIFIER(move(inst));
@@ -462,7 +491,7 @@ public:
         auto ofs_ty = llvm::IntegerType::get(i.getContext(), 64);
 
         if (auto opvty = dyn_cast<llvm::VectorType>(opty)) {
-          assert(!opvty->isScalable());
+          assert(!isa<llvm::ScalableVectorType>(opvty));
           vector<llvm::Constant *> offsets;
 
           for (unsigned i = 0; i < opvty->getElementCount().Min; ++i) {
@@ -648,6 +677,19 @@ public:
       RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
                                                op, parse_fmath(i)));
     }
+    case llvm::Intrinsic::minnum:
+    case llvm::Intrinsic::maxnum:
+    {
+      PARSE_BINOP();
+      BinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::minnum:   op = BinOp::FMin; break;
+      case llvm::Intrinsic::maxnum:   op = BinOp::FMax; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
+                                           op, BinOp::None, parse_fmath(i)));
+    }
     case llvm::Intrinsic::lifetime_start:
     {
       PARSE_BINOP();
@@ -822,7 +864,7 @@ public:
       return {};
 
     Function Fn(*type, f.getName().str(), 8 * DL().getPointerSize(),
-                DL().isLittleEndian());
+                DL().getIndexSizeInBits(0), DL().isLittleEndian());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {
@@ -938,6 +980,11 @@ public:
       if (!gv->isConstant() || !gv->hasDefinitiveInitializer())
         continue;
 
+      auto *init_ty = gv->getInitializer()->getType();
+      if (init_ty->isArrayTy() &&
+          init_ty->getArrayNumElements() > omit_array_size)
+        continue;
+
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
         *out << "ERROR: Unsupported constant: " << *gv->getInitializer()
@@ -964,6 +1011,9 @@ public:
 }
 
 namespace llvm_util {
+
+unsigned omit_array_size = -1;
+
 
 initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
   out = &os;

@@ -49,8 +49,10 @@ bool hasOpaqueType(llvm::Type *ty) {
     for (auto elemty : aty->elements())
       if (hasOpaqueType(elemty))
         return true;
-  } else if (auto sty = llvm::dyn_cast<llvm::SequentialType>(ty))
-    return hasOpaqueType(sty->getElementType());
+  } else if (auto aty = llvm::dyn_cast<llvm::ArrayType>(ty))
+    return hasOpaqueType(aty->getElementType());
+  else if (auto vty = llvm::dyn_cast<llvm::VectorType>(ty))
+    return hasOpaqueType(vty->getElementType());
 
   return false;
 }
@@ -150,14 +152,11 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
-  case llvm::Type::VectorTyID: {
+  // TODO: non-fixed sized vectors
+  case llvm::Type::FixedVectorTyID: {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
-      // TODO: non-fixed sized vectors
-      if (vty->isScalable())
-        goto err;
-
       auto elems = vty->getElementCount().Min;
       auto ety = llvm_type2alive(vty->getElementType());
       if (!ety || elems > 128)
@@ -190,7 +189,6 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return cache.get();
   }
   default:
-err:
     *out << "ERROR: Unsupported type: " << *ty << '\n';
     return nullptr;
   }

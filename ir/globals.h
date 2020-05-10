@@ -38,6 +38,7 @@ extern unsigned bits_size_t;
 extern unsigned bits_byte;
 
 extern unsigned strlen_unroll_cnt;
+extern unsigned memcmp_unroll_cnt;
 
 extern bool little_endian;
 
@@ -58,6 +59,10 @@ extern bool has_readnone;
 
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;
+
+/// Whether there is a pointer that can point to the null block
+/// ex) undef ptr constant, fn arg
+extern bool has_null_block;
 
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;

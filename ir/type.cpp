@@ -15,7 +15,7 @@ using namespace util;
 using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
-static constexpr unsigned var_bw_bits = 8;
+static constexpr unsigned var_bw_bits = 11;
 static constexpr unsigned var_vector_elements = 10;
 
 
@@ -584,7 +584,7 @@ expr PtrType::ASVar() const {
 }
 
 unsigned PtrType::bits() const {
-  return Pointer::total_bits();
+  return Pointer::totalBits();
 }
 
 unsigned PtrType::np_bits() const {
@@ -701,19 +701,45 @@ expr AggregateType::numElements() const {
                    var("elements", var_vector_elements);
 }
 
-StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
-  assert(vals.size() == elements);
+unsigned AggregateType::numPaddingsConst() const {
+  return is_padding.empty() ? 0 : countPaddings(is_padding.size() - 1);
+}
+
+unsigned AggregateType::countPaddings(unsigned to_idx) const {
+  unsigned count = 0;
+  for (unsigned i = 0; i <= to_idx; ++i)
+    count += is_padding[i];
+  return count;
+}
+
+expr AggregateType::numElementsExcludingPadding() const {
+  auto elems = numElements();
+  return numElements() - expr::mkInt(numPaddingsConst(), elems);
+}
+
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
+                                        bool needsPadding) const {
+  assert(vals.size() + (needsPadding ? numPaddingsConst() : 0) == elements);
   // structs can be empty
-  if (vals.empty())
+  if (vals.empty() && !needsPadding)
     return { expr::mkUInt(0, 1), true };
 
   StateValue v;
   bool first = true;
+  unsigned val_idx = 0;
   for (unsigned idx = 0; idx < elements; ++idx) {
-    if (children[idx]->bits() == 0)
+    if (children[idx]->bits() == 0) {
+      assert(!isPadding(idx));
+      val_idx++;
       continue;
+    }
 
-    auto vv = children[idx]->toBV(vals[idx]);
+    StateValue vv;
+    if (needsPadding && isPadding(idx))
+      vv = children[idx]->getDummyValue(false);
+    else
+      vv = vals[val_idx++];
+    vv = children[idx]->toBV(move(vv));
     v = first ? move(vv) : v.concat(vv);
     first = false;
   }
@@ -1369,10 +1395,7 @@ bool hasPtr(const Type &t) {
 
 bool isNonPtrVector(const Type &t) {
   auto vty = dynamic_cast<const VectorType *>(&t);
-  if (!vty || vty->numElementsConst() == 0)
-    return false;
-  auto &child = vty->getChild(0);
-  return !child.isPtrType();
+  return vty && !vty->getChild(0).isPtrType();
 }
 
 }
