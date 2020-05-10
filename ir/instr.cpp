@@ -1314,6 +1314,8 @@ void FnCall::print(ostream &os) const {
     os << " argmemonly";
   if (flags & NNaN)
     os << " NNaN";
+  if (flags & NoReturn)
+    os << " noreturn";
 
   if (!valid)
     os << "\t; WARNING: unknown known function";
@@ -1389,6 +1391,12 @@ StateValue FnCall::toSMT(State &s) const {
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
                          out_types, !(flags & NoRead), !(flags & NoWrite),
                          flags & ArgMemOnly);
+
+  if (flags & NoReturn) {
+    // TODO: Even if a function call doesn't have noreturn, it can possibly
+    // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
+    s.addNoReturn();
+  }
   return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
 }
 

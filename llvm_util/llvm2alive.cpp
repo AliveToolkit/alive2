@@ -258,6 +258,8 @@ public:
       flags |= FnCall::NoRead;
     if (i.hasFnAttr(llvm::Attribute::ArgMemOnly))
       flags |= FnCall::ArgMemOnly;
+    if (i.hasFnAttr(llvm::Attribute::NoReturn))
+      flags |= FnCall::NoReturn;
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         flags |= FnCall::NNaN;

@@ -182,6 +182,7 @@ void State::addReturn(const StateValue &val) {
   return_val.add(val, domain.path);
   return_memory.add(memory, domain.path);
   return_domain.add(domain());
+  function_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
@@ -203,6 +204,11 @@ void State::addUB(const expr &ub) {
 void State::addUB(AndExpr &&ubs) {
   domain.UB.add(ubs);
   domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+}
+
+void State::addNoReturn() {
+  function_domain.add(domain());
+  addUB(expr(false));
 }
 
 const vector<StateValue>
