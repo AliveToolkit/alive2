@@ -1107,17 +1107,12 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
   {
     expr c, t, e;
     if (isIf(c, t, e)) {
-#if 0
-      // TODO: benchmark
-      // (= (ite c t e) (ite c x y)) -> (ite c (= t x) (= e y))
-      if (auto rhs_app = rhs.isAppOf(Z3_OP_ITE)) {
-        expr c2 = Z3_get_app_arg(ctx(), rhs_app, 0);
-        if (c.eq(c2))
-          return mkIf(c,
-                      t == Z3_get_app_arg(ctx(), rhs_app, 1),
-                      e == Z3_get_app_arg(ctx(), rhs_app, 2));
-      }
-#endif
+      // (= (ite c t e) (ite c2 t e)) -> c == c2
+      expr c2, t2, e2;
+      if (rhs.isIf(c2, t2, e2) && t.eq(t2) && e.eq(e2) && !t.eq(e) &&
+          t.isConst() && e.isConst())
+        return c == c2;
+
       // (= (ite c t e) x) -> (ite c (= t x) (= e x))
       if (rhs.isConst() || (t.isConst() && e.isConst()))
         return mkIf(c, t == rhs, e == rhs);
