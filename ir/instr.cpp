@@ -1804,7 +1804,7 @@ StateValue Branch::toSMT(State &s) const {
     auto &c = s[*cond];
     auto [cond_val, not_undef] = jump_undef_condition(s, *cond, c.value);
     s.addUB(c.non_poison);
-    s.addUB(not_undef);
+    s.addUB(move(not_undef));
     s.addCondJump(cond_val, dst_true, *dst_false);
   } else {
     s.addJump(dst_true);
@@ -1860,7 +1860,7 @@ StateValue Switch::toSMT(State &s) const {
 
   auto [cond_val, not_undef] = jump_undef_condition(s, *value, val.value);
   s.addUB(val.non_poison);
-  s.addUB(not_undef);
+  s.addUB(move(not_undef));
 
   for (auto &[value_cond, bb] : targets) {
     auto &target = s[*value_cond];
@@ -2424,7 +2424,7 @@ StateValue Memcpy::toSMT(State &s) const {
   auto &[vdst, np_dst] = s[*dst];
   auto &[vsrc, np_src] = s[*src];
   auto &[vbytes, np_bytes] = s[*bytes];
-  s.addUB(vbytes.ugt(0).implies(np_dst && np_src));
+  s.addUB((vbytes != 0).implies(np_dst && np_src));
   s.addUB(np_bytes);
 
   if (vbytes.bits() > bits_size_t)
@@ -2466,7 +2466,7 @@ StateValue Memcmp::toSMT(State &s) const {
   auto &[vptr1, np1] = s[*ptr1];
   auto &[vptr2, np2] = s[*ptr2];
   auto &[vnum, npn] = s[*num];
-  s.addUB(vnum.ugt(0).implies(np1 && np2));
+  s.addUB((vnum != 0).implies(np1 && np2));
   s.addUB(npn);
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
@@ -2510,7 +2510,7 @@ StateValue Memcmp::toSMT(State &s) const {
   };
   auto [val, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, memcmp_unroll_cnt);
-  s.addUB(vnum.ugt(0).implies(move(ub)));
+  s.addUB((vnum != 0).implies(move(ub)));
   return { expr::mkIf(vnum == 0, zero, move(val)), true };
 }
 
