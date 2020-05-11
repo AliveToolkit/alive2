@@ -59,7 +59,7 @@ public:
   smt::expr nonptrNonpoison() const;
   smt::expr nonptrValue() const;
   smt::expr isPoison(bool fullbit = true) const;
-  smt::expr isZero() const; // zero or null
+  bool isValid() const { return p.isValid(); }
 
   const smt::expr& operator()() const { return p; }
 

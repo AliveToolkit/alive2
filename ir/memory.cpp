@@ -201,10 +201,6 @@ expr Byte::isPoison(bool fullbit) const {
                               fullbit ? np == -1ull : np != 0);
 }
 
-expr Byte::isZero() const {
-  return expr::mkIf(isPtr(), ptr().isNull(), nonptrValue() == 0);
-}
-
 unsigned Byte::bitsByte() {
   unsigned ptr_bits = does_ptr_mem_access *
                         (1 + Pointer::totalBits() + bits_ptr_byte_offset());
@@ -820,23 +816,24 @@ expr Pointer::blockValRefined(const Pointer &other) const {
   // Relevant transformations:
   //   store ty* null  <-> memset i8 0
   //   store ty* undef  -> memset i8 undef
-  expr val_i8 =
-    expr::mkIf(is_ptr,
-      (val.ptr().getOffset().lshr(val.ptrByteoffset() * bits_byte))
-          .zextOrTrunc(bits_byte),
-      val.nonptrValue());
-  expr val2_i8 =
-    expr::mkIf(is_ptr2,
-      (val2.ptr().getOffset().lshr(val.ptrByteoffset() * bits_byte))
-          .zextOrTrunc(bits_byte),
-      val2.nonptrValue());
-  expr null_punning = (!is_ptr2 || val2.ptr().isNull(false)) &&
-                      (!is_ptr || val.ptr().isNull(false)) &&
-                      !val2.isPoison() && val_i8 == val2_i8;
+  expr intval;
+  if (val.isValid()) {
+    expr ofs = val.ptr().getOffset();
+    expr shift_amount = val.ptrByteoffset() *
+                        expr::mkUInt(bits_byte, val.ptrByteoffset().bits());
+    intval = ofs.lshr(shift_amount.zextOrTrunc(ofs.bits()))
+                .zextOrTrunc(bits_byte);
+  }
+  // val is (null, ofs), val2 is ofs
+  expr refine_ptrint = val.ptr().isNull(false) && !val2.isPoison(false) &&
+                       intval == val2.nonptrValue();
+  // val is 0, val2 is nullptr
+  expr refine_intptr =
+    !val2.isPoison(false) && val.nonptrValue() == 0 && val2.ptr().isNull();
   return val.isPoison() ||
-         expr::mkIf(is_ptr == is_ptr2,
-                    expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
-                    move(null_punning));
+         expr::mkIf(is_ptr,
+            expr::mkIf(is_ptr2, ptr_cnstr, refine_ptrint),
+            expr::mkIf(is_ptr2, refine_intptr, int_cnstr));
 }
 
 expr Pointer::blockRefined(const Pointer &other) const {
