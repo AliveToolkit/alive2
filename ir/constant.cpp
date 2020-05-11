@@ -193,4 +193,17 @@ expr ConstantFn::getTypeConstraints() const {
   return r;
 }
 
+optional<int64_t> getInt(const Value &val) {
+  if (auto i = dynamic_cast<const IntConst*>(&val)) {
+    if (auto n = i->getInt())
+      return *n;
+  }
+  return {};
+}
+
+uint64_t getIntOr(const Value &val, uint64_t default_value) {
+  if (auto n = getInt(val))
+    return *n;
+  return default_value;
+}
 }

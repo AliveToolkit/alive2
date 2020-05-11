@@ -81,4 +81,6 @@ struct ConstantFnException {
   ConstantFnException(std::string &&str) : str(std::move(str)) {}
 };
 
+std::optional<int64_t> getInt(const IR::Value &val);
+uint64_t getIntOr(const IR::Value &val, uint64_t default_value);
 }

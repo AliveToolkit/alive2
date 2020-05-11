@@ -68,6 +68,15 @@ struct LoopLikeFunctionApproximator {
              ub && continue_i.implies(ub_next) };
   }
 };
+
+uint64_t getGlobalVarSize(const IR::Value *V) {
+  if (auto *V2 = isNoOp(*V))
+    return getGlobalVarSize(V2);
+  if (auto glb = dynamic_cast<const IR::GlobalVariable *>(V))
+    return glb->size();
+  return UINT64_MAX;
+}
+
 }
 
 
@@ -1958,6 +1967,48 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
 }
 
 
+MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::empty() {
+  return { false, false, false, false, 0, false };
+}
+
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
+  auto info = empty();
+  info.byteSize = bytesz;
+  info.hasIntByteAccess = true;
+  return info;
+}
+
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
+  ByteAccessInfo info = empty();
+  info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
+  info.hasPtrByteAccess = hasPtr(t);
+  info.doesPtrStore = info.hasPtrByteAccess && store;
+  info.doesPtrLoad = info.hasPtrByteAccess && !store;
+  info.byteSize = gcd(align, getCommonAccessSize(t));
+  info.hasSubByteAccess = hasSubByte(t);
+  return info;
+}
+
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::full(unsigned byteSize, bool subByte) {
+  return { true, true, true, true, byteSize, subByte };
+}
+
+
+uint64_t Alloc::getMaxAllocSize() const {
+  if (auto bytes = getInt(*size)) {
+    if (mul) {
+      if (auto n = getInt(*mul))
+        return *n * abs(*bytes);
+      return UINT64_MAX;
+    }
+    return *bytes;
+  }
+  return UINT64_MAX;
+}
+
 vector<Value*> Alloc::operands() const {
   if (mul)
     return { size, mul };
@@ -2079,6 +2130,32 @@ unique_ptr<Instr> Malloc::dup(const string &suffix) const {
 }
 
 
+uint64_t Calloc::getMaxAllocSize() const {
+  if (auto sz = getInt(*size)) {
+    if (auto n = getInt(*num)) {
+      if (*n == 0 || *sz == 0 || UINT64_MAX / (uint64_t)*n < (uint64_t)*sz)
+        // Calloc does not allocate a new block
+        return 0;
+      return *sz * *n;
+    }
+  }
+  return UINT64_MAX;
+}
+
+Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
+  auto info = ByteAccessInfo::intOnly(1);
+  if (auto n = getInt(*num))
+    if (auto sz = getInt(*size)) {
+      if (*n == 0 || *sz == 0 || UINT64_MAX / (uint64_t)*n < (uint64_t)*sz) {
+        // Calloc does not allocate a new block
+        return ByteAccessInfo::empty();
+      } else
+        // assume calloc is 8 bytes aligned
+        info.byteSize = gcd(8, *n * *sz);
+    }
+  return info;
+}
+
 vector<Value*> Calloc::operands() const {
   return { num, size };
 }
@@ -2182,6 +2259,18 @@ unique_ptr<Instr> Free::dup(const string &suffix) const {
 
 void GEP::addIdx(unsigned obj_size, Value &idx) {
   idxs.emplace_back(obj_size, &idx);
+}
+
+uint64_t GEP::getMaxGEPOffset() const {
+  int64_t off = 0;
+  for (auto &[mul, v] : getIdxs()) {
+    if (auto n = getInt(*v)) {
+      off += mul * *n;
+      continue;
+    }
+    return UINT64_MAX;
+  }
+  return abs(off);
 }
 
 vector<Value*> GEP::operands() const {
@@ -2295,6 +2384,14 @@ unique_ptr<Instr> GEP::dup(const string &suffix) const {
 }
 
 
+uint64_t Load::getMaxAccessSize() const {
+  return Memory::getStoreByteSize(getType());
+}
+
+Load::ByteAccessInfo Load::getByteAccessInfo() const {
+  return ByteAccessInfo::get(getType(), false, align);
+}
+
 vector<Value*> Load::operands() const {
   return { ptr };
 }
@@ -2326,6 +2423,14 @@ unique_ptr<Instr> Load::dup(const string &suffix) const {
 }
 
 
+uint64_t Store::getMaxAccessSize() const {
+  return Memory::getStoreByteSize(val->getType());
+}
+
+Store::ByteAccessInfo Store::getByteAccessInfo() const {
+  return ByteAccessInfo::get(val->getType(), true, align);
+}
+
 vector<Value*> Store::operands() const {
   return { val, ptr };
 }
@@ -2354,6 +2459,17 @@ unique_ptr<Instr> Store::dup(const string &suffix) const {
   return make_unique<Store>(*ptr, *val, align);
 }
 
+
+uint64_t Memset::getMaxAccessSize() const {
+  return getIntOr(*bytes, UINT64_MAX);
+}
+
+Memset::ByteAccessInfo Memset::getByteAccessInfo() const {
+  unsigned byteSize = 1;
+  if (auto bs = getInt(*bytes))
+    byteSize = gcd(align, *bs);
+  return ByteAccessInfo::intOnly(byteSize);
+}
 
 vector<Value*> Memset::operands() const {
   return { ptr, val, bytes };
@@ -2390,6 +2506,18 @@ unique_ptr<Instr> Memset::dup(const string &suffix) const {
   return make_unique<Memset>(*ptr, *val, *bytes, align);
 }
 
+
+Memcpy::ByteAccessInfo Memcpy::getByteAccessInfo() const {
+  unsigned byteSize = 1;
+#if 0
+  if (auto bytes = get_int(i->getBytes()))
+    byteSize = gcd(gcd(i->getSrcAlign(), i->getDstAlign()), *bytes);
+#endif
+  // FIXME: memcpy doesn't have multi-byte support
+  // Memcpy does not have sub-byte access, unless the sub-byte type appears
+  // at other instructions
+  return ByteAccessInfo::full(byteSize, false);
+}
 
 vector<Value*> Memcpy::operands() const {
   return { dst, src, bytes };
@@ -2511,6 +2639,10 @@ unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
                              is_bcmp);
 }
 
+
+uint64_t Strlen::getMaxAccessSize() const {
+  return getGlobalVarSize(ptr);
+}
 
 vector<Value*> Strlen::operands() const {
   return { ptr };
@@ -2674,4 +2806,17 @@ unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
                                     *v1, *v2, mask);
 }
 
+
+const ConversionOp *isCast(ConversionOp::Op op, const Value &v) {
+  auto c = dynamic_cast<const ConversionOp*>(&v);
+  return (c && c->getOp() == op) ? c : nullptr;
+}
+
+Value *isNoOp(const Value &v) {
+  if (isCast(ConversionOp::BitCast, v))
+    return &dynamic_cast<const ConversionOp *>(&v)->getValue();
+
+  // TODO: gep ptr, 0
+  return nullptr;
+}
 }

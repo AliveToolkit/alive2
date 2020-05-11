@@ -383,13 +383,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   });
 }
 
-static const ConversionOp* is_bitcast(const Value &v) {
-  if (auto c = dynamic_cast<const ConversionOp*>(&v))
-    if (c->getOp() == ConversionOp::BitCast)
-      return c;
-  return nullptr;
-}
-
 static bool has_nullptr(const Value *v) {
   if (dynamic_cast<const NullPointerValue*>(v) ||
       (dynamic_cast<const UndefValue*>(v) && hasPtr(v->getType())))
@@ -436,8 +429,8 @@ static bool may_be_nonlocal(Value *ptr) {
       continue;
     }
 
-    if (auto c = is_bitcast(*ptr)) {
-      todo.emplace_back(&c->getValue());
+    if (auto c = isNoOp(*ptr)) {
+      todo.emplace_back(c);
       continue;
     }
 
@@ -468,201 +461,6 @@ static unsigned returns_nonlocal(const Instr &inst) {
   return rets_nonloc ? num_ptrs(inst.getType()) : 0;
 }
 
-static optional<int64_t> get_int(const Value &val) {
-  if (auto i = dynamic_cast<const IntConst*>(&val)) {
-    if (auto n = i->getInt())
-      return *n;
-  }
-  return {};
-}
-
-static uint64_t get_globalvar_size(const Value *V) {
-  if (auto cast = is_bitcast(*V))
-    return get_globalvar_size(&cast->getValue());
-  if (auto glb = dynamic_cast<const GlobalVariable *>(V))
-    return glb->size();
-  return UINT64_MAX;
-}
-
-struct MemoryAccessInfo {
-  uint64_t max_alloc_size;
-  uint64_t max_access_size;
-  uint64_t max_gep_size;
-};
-
-static MemoryAccessInfo get_access_info(const Instr &inst) {
-  if (auto conv = dynamic_cast<const ConversionOp*>(&inst)) {
-    // if addresses are observed, then expose full ptr range
-    if (conv->getOp() == ConversionOp::Int2Ptr ||
-        conv->getOp() == ConversionOp::Ptr2Int)
-      return { UINT64_MAX, UINT64_MAX, UINT64_MAX };
-  }
-
-  if (auto gep = dynamic_cast<const GEP*>(&inst)) {
-    int64_t off = 0;
-    for (auto &[mul, v] : gep->getIdxs()) {
-      if (auto n = get_int(*v)) {
-        off += mul * *n;
-        continue;
-      }
-      return { 0, 0, UINT64_MAX };
-    }
-    return { 0, 0, (uint64_t)abs(off) };
-  }
-
-  if (auto load = dynamic_cast<const Load*>(&inst))
-    return { 0, (uint64_t)Memory::getStoreByteSize(load->getType()), 0 };
-
-  if (auto store = dynamic_cast<const Store*>(&inst))
-    return
-      { 0, (uint64_t)Memory::getStoreByteSize(store->getValue().getType()), 0 };
-
-  if (auto cpy = dynamic_cast<const Memcpy*>(&inst)) {
-    uint64_t acc = UINT64_MAX;
-    if (auto bytes = get_int(cpy->getBytes()))
-      acc = (uint64_t)abs(*bytes);
-    return { 0, acc, 0 };
-  }
-
-  if (auto memset = dynamic_cast<const Memset *>(&inst)) {
-    uint64_t acc = UINT64_MAX;
-    if (auto bytes = get_int(memset->getBytes()))
-      acc = (uint64_t)abs(*bytes);
-    return { 0, acc, 0 };
-  }
-
-  if (auto memcmp = dynamic_cast<const Memcmp *>(&inst)) {
-    uint64_t acc = UINT64_MAX;
-    if (auto bytes = get_int(memcmp->getBytes()))
-      acc = (uint64_t)abs(*bytes);
-    return { 0, acc, 0 };
-  }
-
-  if (auto slen = dynamic_cast<const Strlen *>(&inst))
-    return { 0, get_globalvar_size(slen->getPointer()), 0 };
-
-  Value *size;
-  uint64_t mul = 1;
-  uint64_t allocsz = 0;
-  if (auto alloc = dynamic_cast<const Alloc*>(&inst)) {
-    size = &alloc->getSize();
-    if (alloc->getMul()) {
-      if (auto n = get_int(*alloc->getMul())) {
-        mul = *n;
-      } else {
-        allocsz = UINT64_MAX;
-      }
-    }
-  } else if (auto alloc = dynamic_cast<const Malloc*>(&inst)) {
-    size = &alloc->getSize();
-  } else if (auto alloc = dynamic_cast<const Calloc*>(&inst)) {
-    size = &alloc->getSize();
-    if (auto n = get_int(alloc->getNum())) {
-      mul = *n;
-    } else {
-      allocsz = UINT64_MAX;
-    }
-  } else {
-    return { 0, 0, 0 };
-  }
-
-  if (auto bytes = get_int(*size)) {
-    allocsz = max(allocsz, mul * abs(*bytes));
-  } else {
-    allocsz = UINT64_MAX;
-  }
-  return { allocsz, 0, 0 };
-}
-
-static bool has_sub_byte(const Type &t) {
-  if (auto agg = t.getAsAggregateType()) {
-    if (t.isVectorType()) {
-      auto &elemTy = agg->getChild(0);
-      return elemTy.isPtrType() ? false : (elemTy.bits() % 8);
-    }
-
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
-      if (has_sub_byte(agg->getChild(i)))
-        return true;
-    }
-  }
-  return false;
-}
-
-static uint64_t get_access_size(const Type &ty) {
-  if (auto agg = ty.getAsAggregateType()) {
-    uint64_t sz = 1;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      auto n = get_access_size(agg->getChild(i));
-      sz = i == 0 ? n : gcd(sz, n);
-    }
-    return sz;
-  }
-  if (ty.isPtrType())
-    return bits_program_pointer / 8;
-  return divide_up(ty.bits(), 8);
-}
-
-static uint64_t get_access_size(const Instr &inst) {
-  if (auto i = dynamic_cast<const Calloc*>(&inst)) {
-    does_int_mem_access = true;
-    if (auto n = get_int(i->getNum()))
-      if (auto sz = get_int(i->getSize()))
-        // assume calloc is 8 bytes aligned
-        return gcd(8, *n * *sz);
-    return 1;
-  }
-
-  if (dynamic_cast<const Strlen*>(&inst))
-    return 1;
-
-  if (dynamic_cast<const Memcmp*>(&inst))
-    return 1;
-
-  if (auto i = dynamic_cast<const Memcpy*>(&inst)) {
-#if 0
-    if (auto bytes = get_int(i->getBytes()))
-      return gcd(gcd(i->getSrcAlign(), i->getDstAlign()), *bytes);
-#endif
-    // FIXME: memcpy doesn't have multi-byte support
-    (void)i;
-    does_ptr_mem_access = true;
-    return 1;
-  }
-
-  if (auto i = dynamic_cast<const Malloc*>(&inst)) {
-    // FIXME: memcpy doesn't have multi-byte support
-    if (i->isRealloc())
-      return 1;
-  }
-
-  if (auto i = dynamic_cast<const Memset*>(&inst)) {
-    does_int_mem_access = true;
-    if (auto bytes = get_int(i->getBytes()))
-      return gcd(i->getAlign(), *bytes);
-    return 1;
-  }
-
-  Type *value_ty;
-  unsigned align;
-  if (auto st = dynamic_cast<const Store*>(&inst)) {
-    value_ty = &st->getValue().getType();
-    align = st->getAlign();
-    does_ptr_store |= hasPtr(*value_ty);
-  } else if (auto ld = dynamic_cast<const Load*>(&inst)) {
-    value_ty = &ld->getType();
-    align = ld->getAlign();
-  } else if (auto cast = is_bitcast(inst)) {
-    value_ty = &cast->getType();
-    align = 64; // just some high value
-  } else
-    return 0;
-
-  does_ptr_mem_access |= hasPtr(*value_ty);
-  does_int_mem_access |= value_ty->enforcePtrOrVectorType().isFalse();
-
-  return gcd(align, get_access_size(*value_ty));
-}
 
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
@@ -696,46 +494,6 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t max_alloc_size = 0;
   uint64_t max_access_size = 0;
 
-  for (auto BB : t.src.getBBs()) {
-    for (auto &i : BB->instrs()) {
-      if (returns_local(i))
-        ++num_locals_src;
-      else
-        num_max_nonlocals_inst += returns_nonlocal(i);
-
-      auto info = get_access_info(i);
-      max_alloc_size = max(max_alloc_size, info.max_alloc_size);
-      max_access_size = max(max_access_size, info.max_access_size);
-      max_gep_src = add_saturate(max_gep_src, info.max_gep_size);
-    }
-  }
-  for (auto BB : t.tgt.getBBs()) {
-    for (auto &i : BB->instrs()) {
-      if (returns_local(i))
-        ++num_locals_tgt;
-      else
-        num_max_nonlocals_inst += returns_nonlocal(i);
-
-      auto info = get_access_info(i);
-      max_alloc_size = max(max_alloc_size, info.max_alloc_size);
-      max_access_size = max(max_access_size, info.max_access_size);
-      max_gep_tgt = add_saturate(max_gep_tgt, info.max_gep_size);
-    }
-  }
-  num_locals = max(num_locals_src, num_locals_tgt);
-
-  uint64_t min_global_size = UINT64_MAX;
-  for (auto glbs : { &globals_src, &globals_tgt}) {
-    for (auto &glb : *glbs) {
-      auto sz = max(glb->size(), (uint64_t)1u);
-      max_access_size = max(sz, max_access_size);
-      min_global_size = min_global_size != UINT64_MAX
-                          ? gcd(sz, min_global_size)
-                          : sz;
-      min_global_size = gcd(min_global_size, glb->getAlignment());
-    }
-  }
-
   bool nullptr_is_used = false;
   has_int2ptr      = false;
   has_ptr2int      = false;
@@ -753,12 +511,63 @@ static void calculateAndInitConstants(Transform &t) {
   bool has_ptr_load = false;
   does_sub_byte_access = false;
 
+
+  for (auto fn : { &t.src, &t.tgt }) {
+    unsigned &num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
+    uint64_t &max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
+
+    for (auto BB : fn->getBBs()) {
+      for (auto &i : BB->instrs()) {
+        if (returns_local(i))
+          ++num_locals;
+        else
+          num_max_nonlocals_inst += returns_nonlocal(i);
+
+        if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
+          max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
+          max_access_size = max(max_access_size, mi->getMaxAccessSize());
+          max_gep         = add_saturate(max_gep, mi->getMaxGEPOffset());
+
+          auto info = mi->getByteAccessInfo();
+          has_ptr_load         |= info.doesPtrLoad;
+          does_ptr_store       |= info.doesPtrStore;
+          does_int_mem_access  |= info.hasIntByteAccess;
+          does_ptr_mem_access  |= info.hasPtrByteAccess;
+          does_sub_byte_access |= info.hasSubByteAccess;
+          does_mem_access      |= info.doesMemAccess();
+          min_access_size       = gcd(min_access_size, info.byteSize);
+
+        } else if (isCast(ConversionOp::Int2Ptr, i) ||
+                   isCast(ConversionOp::Ptr2Int, i)) {
+          max_alloc_size = max_access_size = max_gep = UINT64_MAX;
+
+        } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
+          auto &t = bc->getType();
+          does_sub_byte_access |= hasSubByte(t);
+          min_access_size = gcd(min_access_size, getCommonAccessSize(t));
+        }
+      }
+    }
+  }
+  num_locals = max(num_locals_src, num_locals_tgt);
+
+  uint64_t min_global_size = UINT64_MAX;
+  for (auto glbs : { &globals_src, &globals_tgt }) {
+    for (auto &glb : *glbs) {
+      auto sz = max(glb->size(), (uint64_t)1u);
+      max_access_size = max(sz, max_access_size);
+      min_global_size = min_global_size != UINT64_MAX
+                          ? gcd(sz, min_global_size)
+                          : sz;
+      min_global_size = gcd(min_global_size, glb->getAlignment());
+    }
+  }
+
   for (auto fn : { &t.src, &t.tgt }) {
     for (auto BB : fn->getBBs()) {
       for (auto &I : BB->instrs()) {
         for (auto op : I.operands()) {
           nullptr_is_used |= has_nullptr(op);
-          does_sub_byte_access |= has_sub_byte(op->getType());
         }
 
         if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
@@ -777,15 +586,6 @@ static void calculateAndInitConstants(Transform &t) {
         has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
         has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
         has_fncall |= dynamic_cast<const FnCall*>(&I) != nullptr;
-        if (auto *load = dynamic_cast<const Load*>(&I))
-          has_ptr_load |= hasPtr(load->getType());
-
-        does_sub_byte_access |= has_sub_byte(I.getType());
-
-        if (auto accsz = get_access_size(I)) {
-          min_access_size = gcd(min_access_size, accsz);
-          does_mem_access = true;
-        }
       }
     }
   }

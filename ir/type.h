@@ -416,5 +416,6 @@ public:
 
 bool hasPtr(const Type &t);
 bool isNonPtrVector(const Type &t);
-
+bool hasSubByte(const Type &t);
+uint64_t getCommonAccessSize(const Type &ty);
 }

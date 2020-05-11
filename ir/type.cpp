@@ -1406,4 +1406,32 @@ bool isNonPtrVector(const Type &t) {
   return vty && !vty->getChild(0).isPtrType();
 }
 
+bool hasSubByte(const Type &t) {
+  if (auto agg = t.getAsAggregateType()) {
+    if (t.isVectorType()) {
+      auto &elemTy = agg->getChild(0);
+      return elemTy.isPtrType() ? false : (elemTy.bits() % 8);
+    }
+
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
+      if (hasSubByte(agg->getChild(i)))
+        return true;
+    }
+  }
+  return false;
+}
+
+uint64_t getCommonAccessSize(const IR::Type &ty) {
+  if (auto agg = ty.getAsAggregateType()) {
+    uint64_t sz = 1;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      auto n = getCommonAccessSize(agg->getChild(i));
+      sz = i == 0 ? n : gcd(sz, n);
+    }
+    return sz;
+  }
+  if (ty.isPtrType())
+    return IR::bits_program_pointer / 8;
+  return divide_up(ty.bits(), 8);
+}
 }
