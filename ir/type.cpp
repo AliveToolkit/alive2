@@ -248,7 +248,8 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
     expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
 }
 
-pair<expr, vector<expr>> Type::mkUndefInput(State &s, unsigned attrs) const {
+pair<expr, vector<expr>>
+Type::mkUndefInput(State &s, const Attributes &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
   return { var, { var } };
 }
@@ -289,7 +290,8 @@ VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { true, true };
 }
 
-expr VoidType::mkInput(State &s, const char *name, unsigned attributes) const {
+expr VoidType::mkInput(State &s, const char *name,
+                       const Attributes &attrs) const {
   UNREACHABLE();
 }
 
@@ -347,7 +349,8 @@ IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
-expr IntType::mkInput(State &s, const char *name, unsigned attributes) const {
+expr IntType::mkInput(State &s, const char *name,
+                      const Attributes &attrs) const {
   return expr::mkVar(name, bits());
 }
 
@@ -531,7 +534,8 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
 }
 
-expr FloatType::mkInput(State &s, const char *name, unsigned attrs) const {
+expr FloatType::mkInput(State &s, const char *name,
+                        const Attributes &attrs) const {
   switch (fpType) {
   case Half:    return expr::mkHalfVar(name);
   case Float:   return expr::mkFloatVar(name);
@@ -647,11 +651,13 @@ PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
 }
 
-expr PtrType::mkInput(State &s, const char *name, unsigned attrs) const {
+expr PtrType::mkInput(State &s, const char *name,
+                      const Attributes &attrs) const {
   return s.getMemory().mkInput(name, attrs);
 }
 
-pair<expr, vector<expr>> PtrType::mkUndefInput(State &s, unsigned attrs) const {
+pair<expr, vector<expr>>
+PtrType::mkUndefInput(State &s, const Attributes &attrs) const {
   auto [val, var] = s.getMemory().mkUndefInput(attrs);
   return { move(val), { move(var) } };
 }
@@ -918,7 +924,8 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
   return { expr::mk_and(poison), expr::mk_and(value) };
 }
 
-expr AggregateType::mkInput(State &s, const char *name, unsigned attrs) const {
+expr AggregateType::mkInput(State &s, const char *name,
+                            const Attributes &attrs) const {
   expr val;
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
@@ -930,7 +937,7 @@ expr AggregateType::mkInput(State &s, const char *name, unsigned attrs) const {
 }
 
 pair<expr, vector<expr>>
-AggregateType::mkUndefInput(State &s, unsigned attrs) const {
+AggregateType::mkUndefInput(State &s, const Attributes &attrs) const {
   expr val;
   vector<expr> vars;
 
@@ -1362,12 +1369,13 @@ SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
   DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
 }
 
-expr SymbolicType::mkInput(State &st, const char *name, unsigned attrs) const {
+expr SymbolicType::mkInput(State &st, const char *name,
+                           const Attributes &attrs) const {
   DISPATCH(mkInput(st, name, attrs), UNREACHABLE());
 }
 
 pair<expr, vector<expr>>
-SymbolicType::mkUndefInput(State &st, unsigned attrs) const {
+SymbolicType::mkUndefInput(State &st, const Attributes &attrs) const {
   DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }
 

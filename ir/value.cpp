@@ -156,23 +156,8 @@ void AggregateValue::print(std::ostream &os) const {
 }
 
 
-static string attr_str(unsigned attributes) {
-  string ret;
-  if (attributes & Input::NonNull)
-    ret += "nonnull ";
-  if (attributes & Input::ByVal)
-    ret += "byval ";
-  if (attributes & Input::NoCapture)
-    ret += "nocapture ";
-  if (attributes & Input::ReadOnly)
-    ret += "readonly ";
-  if (attributes & Input::ReadNone)
-    ret += "readnone ";
-  return ret;
-}
-
-Input::Input(Type &type, string &&name, unsigned attributes)
-  : Value(type, attr_str(attributes) + name), smt_name(move(name)),
+Input::Input(Type &type, string &&name, const Attributes &attributes)
+  : Value(type, attributes.str() + name), smt_name(move(name)),
     attributes(attributes) {}
 
 void Input::copySMTName(const Input &other) {
@@ -188,7 +173,7 @@ StateValue Input::toSMT(State &s) const {
   expr type = getTyVar();
 
   expr val;
-  if (attributes & ByVal) {
+  if (hasAttribute(Attributes::ByVal)) {
     unsigned bid;
     string sz_name = getName() + "#size";
     expr size = expr::mkVar(sz_name.c_str(), bits_size_t-1).zext(1);
@@ -200,10 +185,12 @@ StateValue Input::toSMT(State &s) const {
 
   if (!config::disable_undef_input) {
     auto [undef, vars] = getType().mkUndefInput(s, attributes);
-    for (auto &v : vars) {
-      s.addUndefVar(move(v));
+    if (undef.isValid()) {
+      for (auto &v : vars) {
+        s.addUndefVar(move(v));
+      }
+      val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
     }
-    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
   expr poison = getType().getDummyValue(false).non_poison;

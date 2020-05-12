@@ -271,11 +271,11 @@ public:
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
-      unsigned attr = FnCall::ArgNone;
+      Attributes attr = Attributes::None;
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
-          attr |= FnCall::ArgByVal;
+          attr.set(Attributes::ByVal);
         else if (argI->hasReturnedAttr()) {
           auto call2
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
@@ -815,8 +815,8 @@ public:
     return true;
   }
 
-  optional<unsigned> handleAttributes(llvm::Argument &arg) {
-    unsigned attrs = 0;
+  optional<Attributes> handleAttributes(llvm::Argument &arg) {
+    Attributes attrs = Attributes::None;
     for (auto &attr : arg.getParent()->getAttributes()
                          .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
@@ -828,23 +828,23 @@ public:
         continue;
 
       case llvm::Attribute::ByVal:
-        attrs |= Input::ByVal;
+        attrs.set(Attributes::ByVal);
         continue;
 
       case llvm::Attribute::NonNull:
-        attrs |= Input::NonNull;
+        attrs.set(Attributes::NonNull);
         continue;
 
       case llvm::Attribute::NoCapture:
-        attrs |= Input::NoCapture;
+        attrs.set(Attributes::NoCapture);
         continue;
 
       case llvm::Attribute::ReadOnly:
-        attrs |= Input::ReadOnly;
+        attrs.set(Attributes::ReadOnly);
         continue;
 
       case llvm::Attribute::ReadNone:
-        attrs |= Input::ReadNone;
+        attrs.set(Attributes::ReadNone);
         continue;
 
       default:

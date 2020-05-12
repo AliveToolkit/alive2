@@ -799,7 +799,7 @@ static void calculateAndInitConstants(Transform &t) {
   if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
     does_int_mem_access = true;
 
-  auto has_attr = [&](Input::Attribute a) -> bool {
+  auto has_attr = [&](Attributes::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
       for (auto &v : fn->getInputs()) {
         auto i = dynamic_cast<const Input*>(&v);
@@ -811,10 +811,10 @@ static void calculateAndInitConstants(Transform &t) {
   };
   // The number of bits needed to encode pointer attributes
   // nonnull and byval isn't encoded in ptr attribute bits
-  bool has_byval = has_attr(Input::ByVal);
-  has_nocapture = has_attr(Input::NoCapture);
-  has_readonly = has_attr(Input::ReadOnly);
-  has_readnone = has_attr(Input::ReadNone);
+  bool has_byval = has_attr(Attributes::ByVal);
+  has_nocapture = has_attr(Attributes::NoCapture);
+  has_readonly = has_attr(Attributes::ReadOnly);
+  has_readnone = has_attr(Attributes::ReadNone);
   bits_for_ptrattrs = has_nocapture + has_readonly + has_readnone;
 
   // ceil(log2(maxblks)) + 1 for local bit

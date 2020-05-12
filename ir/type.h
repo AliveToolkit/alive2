@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "smt/expr.h"
 
 #include <functional>
@@ -109,9 +110,9 @@ public:
             const StateValue &tgt) const = 0;
 
   virtual smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const = 0;
+    mkInput(State &s, const char *name, const Attributes &attrs) const = 0;
   virtual std::pair<smt::expr, std::vector<smt::expr>>
-    mkUndefInput(State &s, unsigned attributes) const;
+    mkUndefInput(State &s, const Attributes &attrs) const;
 
   virtual void printVal(std::ostream &os, State &s,
                         const smt::expr &e) const = 0;
@@ -137,7 +138,7 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -164,7 +165,7 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -209,7 +210,7 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -241,9 +242,9 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkUndefInput(State &s, unsigned attributes) const override;
+    mkUndefInput(State &s, const Attributes &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
@@ -297,9 +298,9 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs) const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkUndefInput(State &s, unsigned attributes) const override;
+    mkUndefInput(State &s, const Attributes &attrs) const override;
   unsigned numPointerElements() const;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   const AggregateType* getAsAggregateType() const override;
@@ -404,9 +405,10 @@ public:
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
-    mkInput(State &s, const char *name, unsigned attributes) const override;
+    mkInput(State &s, const char *name, const Attributes &attrs)
+    const override;
   std::pair<smt::expr, std::vector<smt::expr>>
-    mkUndefInput(State &s, unsigned attributes) const override;
+    mkUndefInput(State &s, const Attributes &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
 };
