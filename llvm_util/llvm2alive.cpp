@@ -872,7 +872,7 @@ public:
       auto attrs = handleAttributes(arg);
       if (!ty || !attrs)
         return {};
-      auto val = make_unique<Input>(*ty, value_name(arg), *attrs);
+      auto val = make_unique<Input>(*ty, value_name(arg), move(*attrs));
       add_identifier(arg, *val.get());
       Fn.addInput(move(val));
     }

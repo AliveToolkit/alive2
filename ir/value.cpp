@@ -156,9 +156,9 @@ void AggregateValue::print(std::ostream &os) const {
 }
 
 
-Input::Input(Type &type, string &&name, const ParamAttrs &attributes)
+Input::Input(Type &type, string &&name, ParamAttrs &&attributes)
   : Value(type, attributes.str() + name), smt_name(move(name)),
-    attrs(attributes) {}
+    attrs(move(attributes)) {}
 
 void Input::copySMTName(const Input &other) {
   smt_name = other.smt_name;

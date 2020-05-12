@@ -113,7 +113,7 @@ class Input final : public Value {
   ParamAttrs attrs;
 public:
   Input(Type &type, std::string &&name,
-        const ParamAttrs &attrs = ParamAttrs::None);
+        ParamAttrs &&attrs = ParamAttrs::None);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
   bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
