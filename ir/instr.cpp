@@ -1271,8 +1271,8 @@ unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
 }
 
 
-void FnCall::addArg(Value &arg, unsigned flags) {
-  args.emplace_back(&arg, flags);
+void FnCall::addArg(Value &arg, ParamAttrs &&attrs) {
+  args.emplace_back(&arg, move(attrs));
 }
 
 vector<Value*> FnCall::operands() const {
@@ -1295,13 +1295,11 @@ void FnCall::print(ostream &os) const {
   os << "call " << print_type(getType()) << fnName << '(';
 
   bool first = true;
-  for (auto &[arg, flags] : args) {
+  for (auto &[arg, attrs] : args) {
     if (!first)
       os << ", ";
 
-    if (flags & ArgByVal)
-      os << "byval ";
-    os << *arg;
+    os << attrs.str() << *arg;
     first = false;
   }
   os << ')';
@@ -1321,7 +1319,7 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static void unpack_inputs(State&s, Type &ty, unsigned argflag,
+static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
                           const StateValue &value, vector<StateValue> &inputs,
                           vector<pair<StateValue, bool>> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
@@ -1334,7 +1332,7 @@ static void unpack_inputs(State&s, Type &ty, unsigned argflag,
       Pointer p(s.getMemory(), value.value);
       p.stripAttrs();
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
-                              argflag & FnCall::ArgByVal);
+                              argflag.has(ParamAttrs::ByVal));
     } else {
       inputs.emplace_back(value);
     }

@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "ir/state.h"
 #include "ir/type.h"
 #include "smt/expr.h"
@@ -108,17 +109,14 @@ public:
 
 
 class Input final : public Value {
-public:
-  enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
-                   ReadOnly = 1 << 3, ReadNone = 1 << 4 };
-private:
   std::string smt_name;
-  unsigned attributes;
+  ParamAttrs attrs;
 public:
-  Input(Type &type, std::string &&name, unsigned attributes = 0);
+  Input(Type &type, std::string &&name,
+        const ParamAttrs &attrs = ParamAttrs::None);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
-  bool hasAttribute(Attribute a) const { return (attributes & a) != 0; }
+  bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
   StateValue toSMT(State &s) const override;
   smt::expr getTyVar() const;
 };

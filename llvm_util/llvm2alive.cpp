@@ -271,17 +271,17 @@ public:
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
-      unsigned attr = FnCall::ArgNone;
+      ParamAttrs attr;
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
-          attr |= FnCall::ArgByVal;
+          attr.set(ParamAttrs::ByVal);
         else if (argI->hasReturnedAttr()) {
           auto call2
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
                                   flags, !known);
           for (auto &[arg, flags] : call->getArgs()) {
-            call2->addArg(*arg, flags);
+            call2->addArg(*arg, ParamAttrs(flags));
           }
           call = move(call2);
 
@@ -297,7 +297,7 @@ public:
         }
         ++argI;
       }
-      call->addArg(*arg, attr);
+      call->addArg(*arg, move(attr));
     }
     if (ret_val) {
       BB->addInstr(move(call));
@@ -815,8 +815,8 @@ public:
     return true;
   }
 
-  optional<unsigned> handleAttributes(llvm::Argument &arg) {
-    unsigned attrs = 0;
+  optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
+    ParamAttrs attrs;
     for (auto &attr : arg.getParent()->getAttributes()
                          .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
@@ -828,28 +828,28 @@ public:
         continue;
 
       case llvm::Attribute::ByVal:
-        attrs |= Input::ByVal;
+        attrs.set(ParamAttrs::ByVal);
         continue;
 
       case llvm::Attribute::NonNull:
-        attrs |= Input::NonNull;
+        attrs.set(ParamAttrs::NonNull);
         continue;
 
       case llvm::Attribute::NoCapture:
-        attrs |= Input::NoCapture;
+        attrs.set(ParamAttrs::NoCapture);
         continue;
 
       case llvm::Attribute::ReadOnly:
-        attrs |= Input::ReadOnly;
+        attrs.set(ParamAttrs::ReadOnly);
         continue;
 
       case llvm::Attribute::ReadNone:
-        attrs |= Input::ReadNone;
+        attrs.set(ParamAttrs::ReadNone);
         continue;
 
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
-        return {};
+        return nullopt;
       }
     }
     return attrs;
