@@ -242,8 +242,8 @@ public:
   static void resetBids(unsigned last_nonlocal);
 
   void markByVal(unsigned bid);
-  smt::expr mkInput(const char *name, const Attributes &attrs) const;
-  std::pair<smt::expr, smt::expr> mkUndefInput(const Attributes &attrs) const;
+  smt::expr mkInput(const char *name, const ParamAttrs &attrs) const;
+  std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name,

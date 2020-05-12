@@ -356,18 +356,18 @@ static unsigned bits_shortbid() {
   return bits_for_bid - ptr_has_local_bit();
 }
 
-static expr attr_to_bitvec(const Attributes &attrs) {
+static expr attr_to_bitvec(const ParamAttrs &attrs) {
   if (!bits_for_ptrattrs)
     return expr();
 
   uint64_t bits = 0;
   auto idx = 0;
-  auto to_bit = [&](bool b, Attributes::Attribute a) -> uint64_t {
+  auto to_bit = [&](bool b, ParamAttrs::Attribute a) -> uint64_t {
     return b ? ((attrs.has(a) ? 1 : 0) << idx++) : 0;
   };
-  bits |= to_bit(has_nocapture, Attributes::NoCapture);
-  bits |= to_bit(has_readonly, Attributes::ReadOnly);
-  bits |= to_bit(has_readnone, Attributes::ReadNone);
+  bits |= to_bit(has_nocapture, ParamAttrs::NoCapture);
+  bits |= to_bit(has_readonly, ParamAttrs::ReadOnly);
+  bits |= to_bit(has_readnone, ParamAttrs::ReadNone);
   return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
@@ -1180,17 +1180,17 @@ void Memory::markByVal(unsigned bid) {
   byval_blks.emplace_back(bid);
 }
 
-expr Memory::mkInput(const char *name, const Attributes &attrs) const {
+expr Memory::mkInput(const char *name, const ParamAttrs &attrs) const {
   Pointer p(*this, name, false, false, false, attr_to_bitvec(attrs));
-  if (attrs.has(Attributes::NonNull))
+  if (attrs.has(ParamAttrs::NonNull))
     state->addAxiom(p.isNonZero());
   state->addAxiom(p.getShortBid().ule(numNonlocals() - 1));
 
   return p.release();
 }
 
-pair<expr, expr> Memory::mkUndefInput(const Attributes &attrs) const {
-  bool nonnull = attrs.has(Attributes::NonNull);
+pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
+  bool nonnull = attrs.has(ParamAttrs::NonNull);
   unsigned log_offset = ilog2_ceil(bits_for_offset, false);
   unsigned bits_undef = bits_for_offset + nonnull * log_offset;
   expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));

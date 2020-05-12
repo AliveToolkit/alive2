@@ -7,26 +7,26 @@
 
 namespace IR {
 
-class Attributes final {
+class ParamAttrs final {
 public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
                    ReadOnly = 1<<3, ReadNone = 1<<4 };
 
   unsigned bits = None;
 
-  Attributes(unsigned bits) : bits(bits) {}
+  ParamAttrs(unsigned bits) : bits(bits) {}
 
   std::string str() const {
     std::string ret;
-    if (has(Attributes::NonNull))
+    if (has(ParamAttrs::NonNull))
       ret += "nonnull ";
-    if (has(Attributes::ByVal))
+    if (has(ParamAttrs::ByVal))
       ret += "byval ";
-    if (has(Attributes::NoCapture))
+    if (has(ParamAttrs::NoCapture))
       ret += "nocapture ";
-    if (has(Attributes::ReadOnly))
+    if (has(ParamAttrs::ReadOnly))
       ret += "readonly ";
-    if (has(Attributes::ReadNone))
+    if (has(ParamAttrs::ReadNone))
       ret += "readnone ";
     return ret;
   }

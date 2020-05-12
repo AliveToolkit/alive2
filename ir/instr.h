@@ -193,7 +193,7 @@ public:
                NNaN = 1 << 3, NoReturn = 1 << 4 };
 private:
   std::string fnName;
-  std::vector<std::pair<Value*, Attributes>> args;
+  std::vector<std::pair<Value*, ParamAttrs>> args;
   unsigned flags;
   bool valid;
 public:
@@ -201,7 +201,7 @@ public:
          unsigned flags = None, bool valid = true)
     : Instr(type, std::move(name)), fnName(std::move(fnName)), flags(flags),
       valid(valid) {}
-  void addArg(Value &arg, const Attributes &attrs);
+  void addArg(Value &arg, const ParamAttrs &attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }
 

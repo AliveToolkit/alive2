@@ -271,11 +271,11 @@ public:
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
-      Attributes attr = Attributes::None;
+      ParamAttrs attr = ParamAttrs::None;
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
-          attr.set(Attributes::ByVal);
+          attr.set(ParamAttrs::ByVal);
         else if (argI->hasReturnedAttr()) {
           auto call2
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
@@ -815,8 +815,8 @@ public:
     return true;
   }
 
-  optional<Attributes> handleAttributes(llvm::Argument &arg) {
-    Attributes attrs = Attributes::None;
+  optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
+    ParamAttrs attrs = ParamAttrs::None;
     for (auto &attr : arg.getParent()->getAttributes()
                          .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
@@ -828,28 +828,28 @@ public:
         continue;
 
       case llvm::Attribute::ByVal:
-        attrs.set(Attributes::ByVal);
+        attrs.set(ParamAttrs::ByVal);
         continue;
 
       case llvm::Attribute::NonNull:
-        attrs.set(Attributes::NonNull);
+        attrs.set(ParamAttrs::NonNull);
         continue;
 
       case llvm::Attribute::NoCapture:
-        attrs.set(Attributes::NoCapture);
+        attrs.set(ParamAttrs::NoCapture);
         continue;
 
       case llvm::Attribute::ReadOnly:
-        attrs.set(Attributes::ReadOnly);
+        attrs.set(ParamAttrs::ReadOnly);
         continue;
 
       case llvm::Attribute::ReadNone:
-        attrs.set(Attributes::ReadNone);
+        attrs.set(ParamAttrs::ReadNone);
         continue;
 
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
-        return {};
+        return nullopt;
       }
     }
     return attrs;

@@ -1271,7 +1271,7 @@ unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
 }
 
 
-void FnCall::addArg(Value &arg, const Attributes &attrs) {
+void FnCall::addArg(Value &arg, const ParamAttrs &attrs) {
   args.emplace_back(&arg, attrs);
 }
 
@@ -1319,7 +1319,7 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static void unpack_inputs(State&s, Type &ty, const Attributes &argflag,
+static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
                           const StateValue &value, vector<StateValue> &inputs,
                           vector<pair<StateValue, bool>> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
@@ -1332,7 +1332,7 @@ static void unpack_inputs(State&s, Type &ty, const Attributes &argflag,
       Pointer p(s.getMemory(), value.value);
       p.stripAttrs();
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
-                              argflag.has(Attributes::ByVal));
+                              argflag.has(ParamAttrs::ByVal));
     } else {
       inputs.emplace_back(value);
     }

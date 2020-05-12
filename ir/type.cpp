@@ -249,7 +249,7 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
 }
 
 pair<expr, vector<expr>>
-Type::mkUndefInput(State &s, const Attributes &attrs) const {
+Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
   return { var, { var } };
 }
@@ -291,7 +291,7 @@ VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr VoidType::mkInput(State &s, const char *name,
-                       const Attributes &attrs) const {
+                       const ParamAttrs &attrs) const {
   UNREACHABLE();
 }
 
@@ -350,7 +350,7 @@ IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr IntType::mkInput(State &s, const char *name,
-                      const Attributes &attrs) const {
+                      const ParamAttrs &attrs) const {
   return expr::mkVar(name, bits());
 }
 
@@ -535,7 +535,7 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr FloatType::mkInput(State &s, const char *name,
-                        const Attributes &attrs) const {
+                        const ParamAttrs &attrs) const {
   switch (fpType) {
   case Half:    return expr::mkHalfVar(name);
   case Float:   return expr::mkFloatVar(name);
@@ -652,12 +652,12 @@ PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr PtrType::mkInput(State &s, const char *name,
-                      const Attributes &attrs) const {
+                      const ParamAttrs &attrs) const {
   return s.getMemory().mkInput(name, attrs);
 }
 
 pair<expr, vector<expr>>
-PtrType::mkUndefInput(State &s, const Attributes &attrs) const {
+PtrType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto [val, var] = s.getMemory().mkUndefInput(attrs);
   return { move(val), { move(var) } };
 }
@@ -925,7 +925,7 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr AggregateType::mkInput(State &s, const char *name,
-                            const Attributes &attrs) const {
+                            const ParamAttrs &attrs) const {
   expr val;
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
@@ -937,7 +937,7 @@ expr AggregateType::mkInput(State &s, const char *name,
 }
 
 pair<expr, vector<expr>>
-AggregateType::mkUndefInput(State &s, const Attributes &attrs) const {
+AggregateType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   expr val;
   vector<expr> vars;
 
@@ -1370,12 +1370,12 @@ SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 expr SymbolicType::mkInput(State &st, const char *name,
-                           const Attributes &attrs) const {
+                           const ParamAttrs &attrs) const {
   DISPATCH(mkInput(st, name, attrs), UNREACHABLE());
 }
 
 pair<expr, vector<expr>>
-SymbolicType::mkUndefInput(State &st, const Attributes &attrs) const {
+SymbolicType::mkUndefInput(State &st, const ParamAttrs &attrs) const {
   DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }
 

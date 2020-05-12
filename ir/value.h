@@ -110,13 +110,13 @@ public:
 
 class Input final : public Value {
   std::string smt_name;
-  Attributes attributes;
+  ParamAttrs attrs;
 public:
   Input(Type &type, std::string &&name,
-        const Attributes &attributes = Attributes::None);
+        const ParamAttrs &attrs = ParamAttrs::None);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
-  bool hasAttribute(Attributes::Attribute a) const { return attributes.has(a); }
+  bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
   StateValue toSMT(State &s) const override;
   smt::expr getTyVar() const;
 };
