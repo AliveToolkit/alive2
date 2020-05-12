@@ -201,7 +201,7 @@ public:
          unsigned flags = None, bool valid = true)
     : Instr(type, std::move(name)), fnName(std::move(fnName)), flags(flags),
       valid(valid) {}
-  void addArg(Value &arg, const ParamAttrs &attrs);
+  void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }
 

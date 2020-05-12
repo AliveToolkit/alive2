@@ -362,7 +362,7 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
 
   uint64_t bits = 0;
   auto idx = 0;
-  auto to_bit = [&](bool b, ParamAttrs::Attribute a) -> uint64_t {
+  auto to_bit = [&](bool b, const ParamAttrs::Attribute &a) -> uint64_t {
     return b ? ((attrs.has(a) ? 1 : 0) << idx++) : 0;
   };
   bits |= to_bit(has_nocapture, ParamAttrs::NoCapture);

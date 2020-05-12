@@ -185,12 +185,10 @@ StateValue Input::toSMT(State &s) const {
 
   if (!config::disable_undef_input) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
-    if (undef.isValid()) {
-      for (auto &v : vars) {
-        s.addUndefVar(move(v));
-      }
-      val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
+    for (auto &v : vars) {
+      s.addUndefVar(move(v));
     }
+    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
   expr poison = getType().getDummyValue(false).non_poison;

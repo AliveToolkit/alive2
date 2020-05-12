@@ -1271,8 +1271,8 @@ unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
 }
 
 
-void FnCall::addArg(Value &arg, const ParamAttrs &attrs) {
-  args.emplace_back(&arg, attrs);
+void FnCall::addArg(Value &arg, ParamAttrs &&attrs) {
+  args.emplace_back(&arg, move(attrs));
 }
 
 vector<Value*> FnCall::operands() const {

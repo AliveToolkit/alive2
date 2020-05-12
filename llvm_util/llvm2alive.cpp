@@ -271,7 +271,7 @@ public:
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
-      ParamAttrs attr = ParamAttrs::None;
+      ParamAttrs attr;
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
@@ -281,7 +281,7 @@ public:
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
                                   flags, !known);
           for (auto &[arg, flags] : call->getArgs()) {
-            call2->addArg(*arg, flags);
+            call2->addArg(*arg, ParamAttrs(flags));
           }
           call = move(call2);
 
@@ -297,7 +297,7 @@ public:
         }
         ++argI;
       }
-      call->addArg(*arg, attr);
+      call->addArg(*arg, move(attr));
     }
     if (ret_val) {
       BB->addInstr(move(call));
@@ -816,7 +816,7 @@ public:
   }
 
   optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
-    ParamAttrs attrs = ParamAttrs::None;
+    ParamAttrs attrs;
     for (auto &attr : arg.getParent()->getAttributes()
                          .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
