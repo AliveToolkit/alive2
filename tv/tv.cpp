@@ -99,6 +99,11 @@ llvm::cl::opt<unsigned> opt_omit_array_size(
                   "this number"),
   llvm::cl::init(-1));
 
+llvm::cl::opt<bool> opt_io_nobuiltin(
+    "tv-io-nobuiltin",
+    llvm::cl::desc("Encode standard I/O functions as an unknown function"),
+    llvm::cl::init(false));
+
 ostream *out;
 ofstream out_file;
 string report_filename;
@@ -236,6 +241,7 @@ struct TVPass final : public llvm::FunctionPass {
     smt::set_query_timeout(to_string(opt_smt_to));
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
+    config::io_nobuiltin = opt_io_nobuiltin;
     config::symexec_print_each_value = opt_se_verbose;
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
