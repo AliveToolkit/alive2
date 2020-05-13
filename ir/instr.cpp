@@ -1302,18 +1302,7 @@ void FnCall::print(ostream &os) const {
     os << attrs.str() << *arg;
     first = false;
   }
-  os << ')';
-
-  if (flags & NoRead)
-    os << " noread";
-  if (flags & NoWrite)
-    os << " nowrite";
-  if (flags & ArgMemOnly)
-    os << " argmemonly";
-  if (flags & NNaN)
-    os << " NNaN";
-  if (flags & NoReturn)
-    os << " noreturn";
+  os << ')' << attrs.str();
 
   if (!valid)
     os << "\t; WARNING: unknown known function";
@@ -1350,17 +1339,17 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
 }
 
 static StateValue pack_return(Type &ty, vector<StateValue> &vals,
-                              unsigned flags, unsigned &idx) {
+                              const FnAttrs &attrs, unsigned &idx) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vs.emplace_back(pack_return(agg->getChild(i), vals, flags, idx));
+      vs.emplace_back(pack_return(agg->getChild(i), vals, attrs, idx));
     }
     return agg->aggregateVals(vs);
   }
 
   auto &ret = vals[idx++];
-  if (ty.isFloatType() && (flags & FnCall::NNaN))
+  if (ty.isFloatType() && attrs.has(FnAttrs::NNaN))
     ret.non_poison &= !ret.value.isNaN();
   return ret;
 }
@@ -1387,15 +1376,14 @@ StateValue FnCall::toSMT(State &s) const {
 
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
-                         out_types, !(flags & NoRead), !(flags & NoWrite),
-                         flags & ArgMemOnly);
+                         out_types, attrs);
 
-  if (flags & NoReturn) {
+  if (attrs.has(FnAttrs::NoReturn)) {
     // TODO: Even if a function call doesn't have noreturn, it can possibly
     // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
     s.addNoReturn();
   }
-  return isVoid() ? StateValue() : pack_return(getType(), ret, flags, idx);
+  return isVoid() ? StateValue() : pack_return(getType(), ret, attrs, idx);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
@@ -1405,7 +1393,7 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               flags, valid);
+                               FnAttrs(attrs), valid);
   r->args = args;
   return r;
 }

@@ -249,25 +249,28 @@ public:
     if (!ty)
       return error(i);
 
-    unsigned flags = 0;
+    FnAttrs attrs;
     if (i.hasFnAttr(llvm::Attribute::ReadOnly))
-      flags |= FnCall::NoWrite;
-    if (i.hasFnAttr(llvm::Attribute::ReadNone))
-      flags |= FnCall::NoRead | FnCall::NoWrite;
+      attrs.set(FnAttrs::NoWrite);
+    if (i.hasFnAttr(llvm::Attribute::ReadNone)) {
+      attrs.set(FnAttrs::NoRead);
+      attrs.set(FnAttrs::NoWrite);
+    }
     if (i.hasFnAttr(llvm::Attribute::WriteOnly))
-      flags |= FnCall::NoRead;
+      attrs.set(FnAttrs::NoRead);
     if (i.hasFnAttr(llvm::Attribute::ArgMemOnly))
-      flags |= FnCall::ArgMemOnly;
+      attrs.set(FnAttrs::ArgMemOnly);
     if (i.hasFnAttr(llvm::Attribute::NoReturn))
-      flags |= FnCall::NoReturn;
+      attrs.set(FnAttrs::NoReturn);
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
-        flags |= FnCall::NNaN;
+        attrs.set(FnAttrs::NNaN);
     }
 
     string fn_name = '@' + fn->getName().str();
-    auto call = make_unique<FnCall>(*ty, value_name(i), move(fn_name), flags,
-                                    !known);
+    auto call =
+      make_unique<FnCall>(*ty, value_name(i), move(fn_name), move(attrs),
+                          !known);
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
     for (auto &arg : args) {
@@ -279,7 +282,7 @@ public:
         else if (argI->hasReturnedAttr()) {
           auto call2
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                  flags, !known);
+                                  FnAttrs(call->getAttributes()), !known);
           for (auto &[arg, flags] : call->getArgs()) {
             call2->addArg(*arg, ParamAttrs(flags));
           }

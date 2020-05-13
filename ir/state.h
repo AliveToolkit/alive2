@@ -142,8 +142,7 @@ public:
   const std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<std::pair<StateValue, bool>> &&ptr_inputs,
-              const std::vector<Type*> &out_types, bool reads_memory,
-              bool writes_memory, bool argmemonly);
+              const std::vector<Type*> &out_types, const FnAttrs &attrs);
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
