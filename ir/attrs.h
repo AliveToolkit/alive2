@@ -9,15 +9,18 @@ namespace IR {
 
 class ParamAttrs final {
   unsigned bits;
+  uint64_t derefBytes;
 
 public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
-                   ReadOnly = 1<<3, ReadNone = 1<<4 };
+                   ReadOnly = 1<<3, ReadNone = 1<<4, Dereferenceable = 1<<5 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
+  uint64_t getDerefBytes() const { return derefBytes; }
+  void setDerefBytes(uint64_t bytes) { derefBytes = bytes; }
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 };

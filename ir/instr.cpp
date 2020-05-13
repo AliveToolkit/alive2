@@ -1334,6 +1334,11 @@ static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), value.value);
       p.stripAttrs();
+      if (argflag.has(ParamAttrs::Dereferenceable)) {
+        s.addUB(value.non_poison);
+        s.addUB(
+          p.isDereferenceable(argflag.getDerefBytes(), bits_byte / 8, false));
+      }
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal));
     } else {

@@ -511,10 +511,18 @@ static void calculateAndInitConstants(Transform &t) {
   bool has_ptr_load = false;
   does_sub_byte_access = false;
 
-
   for (auto fn : { &t.src, &t.tgt }) {
     unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
     uint64_t &cur_max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
+
+    for (auto &v : fn->getInputs()) {
+      auto *i = dynamic_cast<const Input *>(&v);
+      if (i && i->hasAttribute(ParamAttrs::Dereferenceable)) {
+        does_mem_access = true;
+        min_access_size = gcd(min_access_size,
+                              i->getAttributes().getDerefBytes());
+      }
+    }
 
     for (auto BB : fn->getBBs()) {
       for (auto &i : BB->instrs()) {

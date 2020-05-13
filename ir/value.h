@@ -117,6 +117,7 @@ public:
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
   bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
+  const ParamAttrs &getAttributes() const { return attrs; }
   StateValue toSMT(State &s) const override;
   smt::expr getTyVar() const;
 };

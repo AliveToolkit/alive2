@@ -273,13 +273,32 @@ public:
                           !known);
     unique_ptr<Instr> ret_val;
     auto argI = fn->arg_begin(), argE = fn->arg_end();
+    const auto &alist = i.getAttributes();
+    uint64_t argidx = 0;
+
     for (auto &arg : args) {
       ParamAttrs attr;
+      // TODO: Once attributes at a call site are fully supported, we should
+      // call handleAttributes().
+
+      if (uint64_t derefb = alist.getParamDereferenceableBytes(argidx)) {
+        attr.set(ParamAttrs::Dereferenceable);
+        attr.setDerefBytes(derefb);
+      }
+
       if (argI != argE) {
         // Check whether arg itr finished early because it was var arg
         if (argI->hasByValAttr())
           attr.set(ParamAttrs::ByVal);
-        else if (argI->hasReturnedAttr()) {
+
+        uint64_t derefb = argI->getType()->isPointerTy() ?
+                          argI->getDereferenceableBytes() : 0;
+        if (derefb) {
+          attr.set(ParamAttrs::Dereferenceable);
+          attr.setDerefBytes(derefb);
+        }
+
+        if (argI->hasReturnedAttr()) {
           auto call2
             = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
                                   FnAttrs(call->getAttributes()), !known);
@@ -301,6 +320,7 @@ public:
         ++argI;
       }
       call->addArg(*arg, move(attr));
+      ++argidx;
     }
     if (ret_val) {
       BB->addInstr(move(call));
@@ -818,10 +838,9 @@ public:
     return true;
   }
 
-  optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
+  optional<ParamAttrs> handleAttributes(const llvm::AttributeSet &aset) {
     ParamAttrs attrs;
-    for (auto &attr : arg.getParent()->getAttributes()
-                         .getParamAttributes(arg.getArgNo())) {
+    for (auto &attr : aset) {
       switch (attr.getKindAsEnum()) {
       case llvm::Attribute::InReg:
       case llvm::Attribute::SExt:
@@ -850,6 +869,11 @@ public:
         attrs.set(ParamAttrs::ReadNone);
         continue;
 
+      case llvm::Attribute::Dereferenceable:
+        attrs.set(ParamAttrs::Dereferenceable);
+        attrs.setDerefBytes(aset.getDereferenceableBytes());
+        continue;
+
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return nullopt;
@@ -872,7 +896,8 @@ public:
 
     for (auto &arg : f.args()) {
       auto ty = llvm_type2alive(arg.getType());
-      auto attrs = handleAttributes(arg);
+      auto attrs = handleAttributes(arg.getParent()->getAttributes()
+                                       .getParamAttributes(arg.getArgNo()));
       if (!ty || !attrs)
         return {};
       auto val = make_unique<Input>(*ty, value_name(arg), move(*attrs));

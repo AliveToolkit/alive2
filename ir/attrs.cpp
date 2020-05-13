@@ -17,6 +17,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "readonly ";
   if (attr.has(ParamAttrs::ReadNone))
     os << "readnone ";
+  if (attr.has(ParamAttrs::Dereferenceable))
+    os << "dereferenceable(" + to_string(attr.derefBytes) + ") ";
   return os;
 }
 
