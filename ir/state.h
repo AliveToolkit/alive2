@@ -56,7 +56,7 @@ private:
   smt::AndExpr axioms;
   smt::AndExpr ooms;
 
-  const BasicBlock *current_bb = nullptr;
+  const BasicBlock *current_bb;
   std::set<smt::expr> quantified_vars;
 
   // var -> ((value, not_poison), undef_vars, already_used?)
