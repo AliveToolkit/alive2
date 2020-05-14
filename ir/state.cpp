@@ -217,10 +217,13 @@ void State::addNoReturn() {
 const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<pair<StateValue, bool>> &&ptr_inputs,
-                 const vector<Type*> &out_types, bool reads_memory,
-                 bool writes_memory, bool argmemonly) {
+                 const vector<Type*> &out_types, const FnAttrs &attrs) {
   // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
+
+  bool reads_memory = !attrs.has(FnAttrs::NoRead);
+  bool writes_memory = !attrs.has(FnAttrs::NoWrite);
+  bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
 
   expr all_args_np(true);
   bool all_valid = true;
