@@ -75,6 +75,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 
 set(IR_SRCS
+  ir/attrs.cpp
   ir/constant.cpp
   ir/function.cpp
   ir/globals.cpp

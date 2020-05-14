@@ -7,6 +7,7 @@
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <sstream>
 
 using namespace smt;
 using namespace std;
@@ -156,8 +157,14 @@ void AggregateValue::print(std::ostream &os) const {
 }
 
 
+static string attr_str(const ParamAttrs &attr) {
+  stringstream ss;
+  ss << attr;
+  return ss.str();
+}
+
 Input::Input(Type &type, string &&name, ParamAttrs &&attributes)
-  : Value(type, attributes.str() + name), smt_name(move(name)),
+  : Value(type, attr_str(attributes) + name), smt_name(move(name)),
     attrs(move(attributes)) {}
 
 void Input::copySMTName(const Input &other) {

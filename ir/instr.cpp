@@ -1299,10 +1299,10 @@ void FnCall::print(ostream &os) const {
     if (!first)
       os << ", ";
 
-    os << attrs.str() << *arg;
+    os << attrs << *arg;
     first = false;
   }
-  os << ')' << attrs.str();
+  os << ')' << attrs;
 
   if (!valid)
     os << "\t; WARNING: unknown known function";
