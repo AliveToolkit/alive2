@@ -465,10 +465,9 @@ public:
   bool initDead() const { return initially_dead; }
 
   uint64_t getMaxAllocSize() const override;
-  uint64_t getMaxAccessSize() const override { return 0; }
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::empty(); }
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -495,12 +494,10 @@ public:
   Value& getSize() const { return *size; }
   bool isRealloc() const { return ptr != nullptr; }
 
-  uint64_t getMaxAllocSize() const override
-  { return getIntOr(*size, UINT64_MAX); }
-  uint64_t getMaxAccessSize() const override { return 0; }
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::empty(); }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -521,8 +518,8 @@ public:
   Value& getSize() const { return *size; }
 
   uint64_t getMaxAllocSize() const override;
-  uint64_t getMaxAccessSize() const override { return 0; }
-  uint64_t getMaxGEPOffset() const override { return 0; }
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -540,11 +537,10 @@ public:
   StartLifetime(Value &ptr) : MemInstr(Type::voidTy, "start_lifetime"),
       ptr(&ptr) {}
 
-  uint64_t getMaxAllocSize() const override { return 0; }
-  uint64_t getMaxAccessSize() const override { return 0; }
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::empty(); }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -562,11 +558,10 @@ public:
   Free(Value &ptr, bool heaponly = true) : MemInstr(Type::voidTy, "free"),
       ptr(&ptr), heaponly(heaponly) {}
 
-  uint64_t getMaxAllocSize() const override { return 0; }
-  uint64_t getMaxAccessSize() const override { return 0; }
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::empty(); }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -589,11 +584,10 @@ public:
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
-  uint64_t getMaxAccessSize() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::empty(); }
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -614,9 +608,9 @@ public:
   Value& getPtr() const { return *ptr; }
   unsigned getAlign() const { return align; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
-  uint64_t getMaxGEPOffset() const override { return 0; }
+  uint64_t getMaxGEPOffset() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -639,10 +633,10 @@ public:
   Value& getPtr() const { return *ptr; }
   unsigned getAlign() const { return align; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxAccessStride() const;
-  uint64_t getMaxGEPOffset() const override { return 0; }
+  uint64_t getMaxGEPOffset() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -665,9 +659,9 @@ public:
   Value& getBytes() const { return *bytes; }
   unsigned getAlign() const { return align; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
-  uint64_t getMaxGEPOffset() const override { return 0; }
+  uint64_t getMaxGEPOffset() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -693,10 +687,9 @@ public:
   unsigned getSrcAlign() const { return align_src; }
   unsigned getDstAlign() const { return align_dst; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
-  uint64_t getMaxAccessSize() const override
-  { return getIntOr(*bytes, UINT64_MAX); }
-  uint64_t getMaxGEPOffset() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -718,12 +711,10 @@ public:
 
   Value &getBytes() const { return *num; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
-  uint64_t getMaxAccessSize() const override
-  { return getIntOr(*num, UINT64_MAX); }
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::intOnly(1); /* memcmp raises UB on ptr bytes */ }
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
