@@ -279,21 +279,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   if (writes_memory)
     memory.setState(I->second.callstate);
 
-  if (all_args_np.isTrue())
-    return I->second.retvals;
-
-  // if any of the arguments is poison, yield an arbitrary value, such that
-  // f(poison) -> f(42) works
-  vector<StateValue> ret;
-  auto T = out_types.begin();
-  auto var_name = name + "#pval";
-  for (auto &[v, np] : I->second.retvals) {
-    auto [val_poison, var] = mk_val(**T, var_name);
-    ret.emplace_back(expr::mkIf(all_args_np, v, val_poison), expr(np));
-    addQuantVar(move(var));
-    ++T;
-  }
-  return ret;
+  return I->second.retvals;
 }
 
 void State::addQuantVar(const expr &var) {
@@ -409,14 +395,13 @@ void State::mkAxioms(State &tgt) {
         if (!used2 || reads != reads2 || argmem != argmem2)
           continue;
 
-        expr refines(true), is_val_eq(true);
+        expr refines(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
-          expr eq_val = ins[i].value == ins2[i].value;
-          is_val_eq &= eq_val;
-          refines &= ins[i].non_poison.implies(eq_val && ins2[i].non_poison);
+          refines &= ins[i].non_poison.implies(ins[i].value == ins2[i].value &&
+                                               ins2[i].non_poison);
         }
 
-        if (is_val_eq.isFalse() && refines.isFalse())
+        if (refines.isFalse())
           continue;
 
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
@@ -431,24 +416,22 @@ void State::mkAxioms(State &tgt) {
           }
           expr eq_val = Pointer(mem, ptr_in.value)
                       .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
-          is_val_eq &= eq_val;
           refines &= ptr_in.non_poison
-                       .implies(eq_val && ptr_in2.non_poison);
+                       .implies(move(eq_val) && ptr_in2.non_poison);
         }
 
         if (reads2) {
           auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
           expr mem_refined = mem.refined(mem2, true, restrict_ptrs).first;
-          is_val_eq &= mem_refined;
           refines &= mem_refined;
         }
 
-        expr ref_expr(true), eq_expr(true);
+        expr ref_expr(true);
         for (unsigned i = 0, e = rets.size(); i != e; ++i) {
-          eq_expr &= rets[i].value == rets2[i].value;
-          ref_expr &= rets[i].non_poison.implies(rets2[i].non_poison);
+          ref_expr &=
+            rets[i].non_poison.implies(rets2[i].non_poison &&
+                                       rets[i].value == rets2[i].value);
         }
-        tgt.addPre(is_val_eq.implies(eq_expr));
         tgt.addPre(refines.implies(ref_expr &&
                                    ub.implies(ub2) &&
                                    mem_state.implies(mem_state2)));
