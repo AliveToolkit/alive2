@@ -835,9 +835,10 @@ public:
     return true;
   }
 
-  optional<ParamAttrs> handleAttributes(const llvm::AttributeSet &aset) {
+  optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
     ParamAttrs attrs;
-    for (auto &attr : aset) {
+    for (auto &attr : arg.getParent()->getAttributes()
+                         .getParamAttributes(arg.getArgNo())) {
       switch (attr.getKindAsEnum()) {
       case llvm::Attribute::InReg:
       case llvm::Attribute::SExt:
@@ -893,8 +894,7 @@ public:
 
     for (auto &arg : f.args()) {
       auto ty = llvm_type2alive(arg.getType());
-      auto attrs = handleAttributes(arg.getParent()->getAttributes()
-                                       .getParamAttributes(arg.getArgNo()));
+      auto attrs = handleAttributes(arg);
       if (!ty || !attrs)
         return {};
       auto val = make_unique<Input>(*ty, value_name(arg), move(*attrs));
