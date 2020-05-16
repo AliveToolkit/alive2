@@ -523,6 +523,12 @@ static void calculateAndInitConstants(Transform &t) {
         else
           num_max_nonlocals_inst += returns_nonlocal(i);
 
+        for (auto op : i.operands()) {
+          nullptr_is_used |= has_nullptr(op);
+        }
+
+        has_fncall |= dynamic_cast<const FnCall*>(&i) != nullptr;
+
         if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
           max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
           max_access_size = max(max_access_size, mi->getMaxAccessSize());
@@ -537,9 +543,22 @@ static void calculateAndInitConstants(Transform &t) {
           does_mem_access      |= info.doesMemAccess();
           min_access_size       = gcd(min_access_size, info.byteSize);
 
+          if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
+            has_dead_allocas |= alloc->initDead();
+          }
+          else if (auto alloc = dynamic_cast<const Malloc*>(&i)) {
+            has_malloc |= true;
+            has_free   |= alloc->isRealloc();
+          } else {
+            has_malloc |= dynamic_cast<const Calloc*>(&i) != nullptr;
+            has_free   |= dynamic_cast<const Free*>(&i) != nullptr;
+          }
+
         } else if (isCast(ConversionOp::Int2Ptr, i) ||
                    isCast(ConversionOp::Ptr2Int, i)) {
           max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
+          has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
+          has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
 
         } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
           auto &t = bc->getType();
@@ -560,33 +579,6 @@ static void calculateAndInitConstants(Transform &t) {
                           ? gcd(sz, min_global_size)
                           : sz;
       min_global_size = gcd(min_global_size, glb->getAlignment());
-    }
-  }
-
-  for (auto fn : { &t.src, &t.tgt }) {
-    for (auto BB : fn->getBBs()) {
-      for (auto &I : BB->instrs()) {
-        for (auto op : I.operands()) {
-          nullptr_is_used |= has_nullptr(op);
-        }
-
-        if (auto conv = dynamic_cast<const ConversionOp*>(&I)) {
-          has_int2ptr |= conv->getOp() == ConversionOp::Int2Ptr;
-          has_ptr2int |= conv->getOp() == ConversionOp::Ptr2Int;
-        }
-
-        if (auto alloc = dynamic_cast<const Alloc*>(&I))
-          has_dead_allocas |= alloc->initDead();
-
-        if (auto alloc = dynamic_cast<const Malloc*>(&I)) {
-          has_malloc |= true;
-          has_free |= alloc->isRealloc();
-        }
-
-        has_malloc |= dynamic_cast<const Calloc*>(&I) != nullptr;
-        has_free   |= dynamic_cast<const Free*>(&I) != nullptr;
-        has_fncall |= dynamic_cast<const FnCall*>(&I) != nullptr;
-      }
     }
   }
 
