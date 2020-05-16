@@ -2158,12 +2158,8 @@ Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
   auto info = ByteAccessInfo::intOnly(1);
   if (auto n = getInt(*num))
     if (auto sz = getInt(*size)) {
-      if (*n == 0 || *sz == 0 || UINT64_MAX / (uint64_t)*n < (uint64_t)*sz) {
-        // Calloc does not allocate a new block
-        return {};
-      } else
-        // assume calloc is 8 bytes aligned
-        info.byteSize = gcd(8, *n * *sz);
+      // assume calloc is 8 bytes aligned
+      info.byteSize = gcd(8, *n * *sz);
     }
   return info;
 }
