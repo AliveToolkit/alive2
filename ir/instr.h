@@ -4,7 +4,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/value.h"
-#include "ir/constant.h"
 #include <string>
 #include <utility>
 #include <vector>
