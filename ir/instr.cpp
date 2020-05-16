@@ -2148,12 +2148,8 @@ DEFINE_AS_RETZERO(Calloc, getMaxGEPOffset);
 
 uint64_t Calloc::getMaxAllocSize() const {
   if (auto sz = getInt(*size)) {
-    if (auto n = getInt(*num)) {
-      if (*n == 0 || *sz == 0 || UINT64_MAX / (uint64_t)*n < (uint64_t)*sz)
-        // Calloc does not allocate a new block
-        return 0;
+    if (auto n = getInt(*num))
       return *sz * *n;
-    }
   }
   return UINT64_MAX;
 }
