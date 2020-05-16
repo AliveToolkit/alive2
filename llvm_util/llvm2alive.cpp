@@ -273,7 +273,7 @@ public:
                           !known);
     unique_ptr<Instr> ret_val;
 
-    for (uint64_t argidx = 0; argidx < i.arg_size(); ++argidx) {
+    for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto *arg = args[argidx];
       ParamAttrs attr;
       // TODO: Once attributes at a call site are fully supported, we should
