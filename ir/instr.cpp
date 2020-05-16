@@ -22,8 +22,8 @@ using namespace std;
 #define DEFINE_AS_RETZERO(cls, method) \
   uint64_t cls::method() const { return 0; }
 #define DEFINE_AS_EMPTYACCESS(cls) \
-  cls::ByteAccessInfo cls::getByteAccessInfo() const \
-  { return ByteAccessInfo::empty(); }
+  MemInstr::ByteAccessInfo cls::getByteAccessInfo() const \
+  { return {}; }
 
 namespace {
 struct print_type {
@@ -1972,13 +1972,9 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
 }
 
 
-MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::empty() {
-  return { false, false, false, false, 0, false };
-}
-
 MemInstr::ByteAccessInfo
 MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
-  auto info = empty();
+  ByteAccessInfo info;
   info.byteSize = bytesz;
   info.hasIntByteAccess = true;
   return info;
@@ -1986,7 +1982,7 @@ MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
 
 MemInstr::ByteAccessInfo
 MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
-  ByteAccessInfo info = empty();
+  ByteAccessInfo info;
   info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
   info.hasPtrByteAccess = hasPtr(t);
   info.doesPtrStore = info.hasPtrByteAccess && store;
