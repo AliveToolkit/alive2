@@ -130,6 +130,7 @@ public:
                    const BasicBlock &dst_false);
   void addReturn(const StateValue &val);
 
+  void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
   void addPre(smt::expr &&cond, bool forApprox = false)
   { (forApprox ? preconditionForApprox : precondition).add(std::move(cond)); }
