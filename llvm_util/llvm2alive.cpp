@@ -272,55 +272,52 @@ public:
       make_unique<FnCall>(*ty, value_name(i), move(fn_name), move(attrs),
                           !known);
     unique_ptr<Instr> ret_val;
-    auto argI = fn->arg_begin(), argE = fn->arg_end();
-    const auto &alist = i.getAttributes();
-    uint64_t argidx = 0;
 
-    for (auto &arg : args) {
+    for (uint64_t argidx = 0; argidx < i.arg_size(); ++argidx) {
+      auto *arg = args[argidx];
       ParamAttrs attr;
       // TODO: Once attributes at a call site are fully supported, we should
       // call handleAttributes().
 
-      if (uint64_t derefb = alist.getParamDereferenceableBytes(argidx)) {
+      if (i.paramHasAttr(argidx, llvm::Attribute::Dereferenceable)) {
         attr.set(ParamAttrs::Dereferenceable);
+
+        uint64_t derefb = 0;
+        // dereferenceable at caller
+        if (i.getAttributes()
+             .hasParamAttr(argidx, llvm::Attribute::Dereferenceable))
+          derefb = i.getParamAttr(argidx, llvm::Attribute::Dereferenceable)
+                    .getDereferenceableBytes();
+        if (argidx < i.getCalledFunction()->arg_size())
+          derefb = max(derefb,
+              i.getCalledFunction()->getParamDereferenceableBytes(argidx));
+        assert(derefb);
         attr.setDerefBytes(derefb);
       }
 
-      if (argI != argE) {
-        // Check whether arg itr finished early because it was var arg
-        if (argI->hasByValAttr())
-          attr.set(ParamAttrs::ByVal);
+      if (i.paramHasAttr(argidx, llvm::Attribute::ByVal))
+        attr.set(ParamAttrs::ByVal);
 
-        uint64_t derefb = argI->getType()->isPointerTy() ?
-                          argI->getDereferenceableBytes() : 0;
-        if (derefb) {
-          attr.set(ParamAttrs::Dereferenceable);
-          attr.setDerefBytes(derefb);
+      if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
+        auto call2
+          = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
+                                FnAttrs(call->getAttributes()), !known);
+        for (auto &[arg, flags] : call->getArgs()) {
+          call2->addArg(*arg, ParamAttrs(flags));
         }
+        call = move(call2);
 
-        if (argI->hasReturnedAttr()) {
-          auto call2
-            = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                  FnAttrs(call->getAttributes()), !known);
-          for (auto &[arg, flags] : call->getArgs()) {
-            call2->addArg(*arg, ParamAttrs(flags));
-          }
-          call = move(call2);
-
-          // fn may have different type than argument. LLVM assumes there's
-          // an implicit bitcast
-          assert(!ret_val);
-          if (argI->getType() == i.getType())
-            ret_val = make_unique<UnaryOp>(*ty, value_name(i), *arg,
-                                           UnaryOp::Copy);
-          else
-            ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
-                                                ConversionOp::BitCast);
-        }
-        ++argI;
+        // fn may have different type than argument. LLVM assumes there's
+        // an implicit bitcast
+        assert(!ret_val);
+        if (i.getArgOperand(argidx)->getType() == i.getType())
+          ret_val = make_unique<UnaryOp>(*ty, value_name(i), *arg,
+                                          UnaryOp::Copy);
+        else
+          ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
+                                              ConversionOp::BitCast);
       }
       call->addArg(*arg, move(attr));
-      ++argidx;
     }
     if (ret_val) {
       BB->addInstr(move(call));
