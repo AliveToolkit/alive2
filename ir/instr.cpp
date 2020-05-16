@@ -2689,8 +2689,15 @@ unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(Strlen, getMaxAllocSize);
+DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset);
+
 uint64_t Strlen::getMaxAccessSize() const {
   return getGlobalVarSize(ptr);
+}
+
+MemInstr::ByteAccessInfo Strlen::getByteAccessInfo() const {
+  return ByteAccessInfo::intOnly(1); /* strlen raises UB on ptr bytes */
 }
 
 vector<Value*> Strlen::operands() const {

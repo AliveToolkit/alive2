@@ -513,20 +513,20 @@ static void calculateAndInitConstants(Transform &t) {
 
 
   for (auto fn : { &t.src, &t.tgt }) {
-    unsigned &num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
-    uint64_t &max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
+    unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
+    uint64_t &cur_max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
 
     for (auto BB : fn->getBBs()) {
       for (auto &i : BB->instrs()) {
         if (returns_local(i))
-          ++num_locals;
+          ++cur_num_locals;
         else
           num_max_nonlocals_inst += returns_nonlocal(i);
 
         if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
           max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
           max_access_size = max(max_access_size, mi->getMaxAccessSize());
-          max_gep         = add_saturate(max_gep, mi->getMaxGEPOffset());
+          cur_max_gep     = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
 
           auto info = mi->getByteAccessInfo();
           has_ptr_load         |= info.doesPtrLoad;
@@ -539,7 +539,7 @@ static void calculateAndInitConstants(Transform &t) {
 
         } else if (isCast(ConversionOp::Int2Ptr, i) ||
                    isCast(ConversionOp::Ptr2Int, i)) {
-          max_alloc_size = max_access_size = max_gep = UINT64_MAX;
+          max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
 
         } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
           auto &t = bc->getType();

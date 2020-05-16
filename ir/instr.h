@@ -724,11 +724,10 @@ public:
 
   Value *getPointer() const { return ptr; }
 
-  uint64_t getMaxAllocSize() const override { return 0; }
+  uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
-  uint64_t getMaxGEPOffset() const override { return 0; }
-  ByteAccessInfo getByteAccessInfo() const override
-  { return ByteAccessInfo::intOnly(1); /* strlen raises UB on ptr bytes */ }
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
