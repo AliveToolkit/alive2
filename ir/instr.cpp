@@ -19,6 +19,11 @@ using namespace std;
 #define RAUW(val)    \
   if (val == &what)  \
     val = &with
+#define DEFINE_AS_RETZERO(cls, method) \
+  uint64_t cls::method() const { return 0; }
+#define DEFINE_AS_EMPTYACCESS(cls) \
+  MemInstr::ByteAccessInfo cls::getByteAccessInfo() const \
+  { return {}; }
 
 namespace {
 struct print_type {
@@ -68,6 +73,15 @@ struct LoopLikeFunctionApproximator {
              ub && continue_i.implies(ub_next) };
   }
 };
+
+uint64_t getGlobalVarSize(const IR::Value *V) {
+  if (auto *V2 = isNoOp(*V))
+    return getGlobalVarSize(V2);
+  if (auto glb = dynamic_cast<const IR::GlobalVariable *>(V))
+    return glb->size();
+  return UINT64_MAX;
+}
+
 }
 
 
@@ -1958,6 +1972,48 @@ unique_ptr<Instr> Assume::dup(const string &suffix) const {
 }
 
 
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
+  ByteAccessInfo info;
+  info.byteSize = bytesz;
+  info.hasIntByteAccess = true;
+  return info;
+}
+
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
+  ByteAccessInfo info;
+  info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
+  info.hasPtrByteAccess = hasPtr(t);
+  info.doesPtrStore = info.hasPtrByteAccess && store;
+  info.doesPtrLoad = info.hasPtrByteAccess && !store;
+  info.byteSize = gcd(align, getCommonAccessSize(t));
+  info.hasSubByteAccess = hasSubByte(t);
+  return info;
+}
+
+MemInstr::ByteAccessInfo
+MemInstr::ByteAccessInfo::full(unsigned byteSize, bool subByte) {
+  return { true, true, true, true, byteSize, subByte };
+}
+
+
+DEFINE_AS_RETZERO(Alloc, getMaxAccessSize);
+DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
+DEFINE_AS_EMPTYACCESS(Alloc);
+
+uint64_t Alloc::getMaxAllocSize() const {
+  if (auto bytes = getInt(*size)) {
+    if (mul) {
+      if (auto n = getInt(*mul))
+        return *n * abs(*bytes);
+      return UINT64_MAX;
+    }
+    return *bytes;
+  }
+  return UINT64_MAX;
+}
+
 vector<Value*> Alloc::operands() const {
   if (mul)
     return { size, mul };
@@ -2008,6 +2064,14 @@ unique_ptr<Instr> Alloc::dup(const string &suffix) const {
                             initially_dead);
 }
 
+
+DEFINE_AS_RETZERO(Malloc, getMaxAccessSize);
+DEFINE_AS_RETZERO(Malloc, getMaxGEPOffset);
+DEFINE_AS_EMPTYACCESS(Malloc);
+
+uint64_t Malloc::getMaxAllocSize() const {
+  return getIntOr(*size, UINT64_MAX);
+}
 
 vector<Value*> Malloc::operands() const {
   if (!ptr)
@@ -2079,6 +2143,27 @@ unique_ptr<Instr> Malloc::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(Calloc, getMaxAccessSize);
+DEFINE_AS_RETZERO(Calloc, getMaxGEPOffset);
+
+uint64_t Calloc::getMaxAllocSize() const {
+  if (auto sz = getInt(*size)) {
+    if (auto n = getInt(*num))
+      return *sz * *n;
+  }
+  return UINT64_MAX;
+}
+
+Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
+  auto info = ByteAccessInfo::intOnly(1);
+  if (auto n = getInt(*num))
+    if (auto sz = getInt(*size)) {
+      // assume calloc is 8 bytes aligned
+      info.byteSize = gcd(8, *n * *sz);
+    }
+  return info;
+}
+
 vector<Value*> Calloc::operands() const {
   return { num, size };
 }
@@ -2123,6 +2208,11 @@ unique_ptr<Instr> Calloc::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(StartLifetime, getMaxAllocSize);
+DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize);
+DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset);
+DEFINE_AS_EMPTYACCESS(StartLifetime);
+
 vector<Value*> StartLifetime::operands() const {
   return { ptr };
 }
@@ -2150,6 +2240,11 @@ unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
   return make_unique<StartLifetime>(*ptr);
 }
 
+
+DEFINE_AS_RETZERO(Free, getMaxAllocSize);
+DEFINE_AS_RETZERO(Free, getMaxAccessSize);
+DEFINE_AS_RETZERO(Free, getMaxGEPOffset);
+DEFINE_AS_EMPTYACCESS(Free);
 
 vector<Value*> Free::operands() const {
   return { ptr };
@@ -2182,6 +2277,22 @@ unique_ptr<Instr> Free::dup(const string &suffix) const {
 
 void GEP::addIdx(unsigned obj_size, Value &idx) {
   idxs.emplace_back(obj_size, &idx);
+}
+
+DEFINE_AS_RETZERO(GEP, getMaxAllocSize);
+DEFINE_AS_RETZERO(GEP, getMaxAccessSize);
+DEFINE_AS_EMPTYACCESS(GEP);
+
+uint64_t GEP::getMaxGEPOffset() const {
+  int64_t off = 0;
+  for (auto &[mul, v] : getIdxs()) {
+    if (auto n = getInt(*v)) {
+      off += mul * *n;
+      continue;
+    }
+    return UINT64_MAX;
+  }
+  return abs(off);
 }
 
 vector<Value*> GEP::operands() const {
@@ -2295,6 +2406,17 @@ unique_ptr<Instr> GEP::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(Load, getMaxAllocSize);
+DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
+
+uint64_t Load::getMaxAccessSize() const {
+  return Memory::getStoreByteSize(getType());
+}
+
+Load::ByteAccessInfo Load::getByteAccessInfo() const {
+  return ByteAccessInfo::get(getType(), false, align);
+}
+
 vector<Value*> Load::operands() const {
   return { ptr };
 }
@@ -2326,6 +2448,17 @@ unique_ptr<Instr> Load::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(Store, getMaxAllocSize);
+DEFINE_AS_RETZERO(Store, getMaxGEPOffset);
+
+uint64_t Store::getMaxAccessSize() const {
+  return Memory::getStoreByteSize(val->getType());
+}
+
+Store::ByteAccessInfo Store::getByteAccessInfo() const {
+  return ByteAccessInfo::get(val->getType(), true, align);
+}
+
 vector<Value*> Store::operands() const {
   return { val, ptr };
 }
@@ -2354,6 +2487,20 @@ unique_ptr<Instr> Store::dup(const string &suffix) const {
   return make_unique<Store>(*ptr, *val, align);
 }
 
+
+DEFINE_AS_RETZERO(Memset, getMaxAllocSize);
+DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
+
+uint64_t Memset::getMaxAccessSize() const {
+  return getIntOr(*bytes, UINT64_MAX);
+}
+
+Memset::ByteAccessInfo Memset::getByteAccessInfo() const {
+  unsigned byteSize = 1;
+  if (auto bs = getInt(*bytes))
+    byteSize = gcd(align, *bs);
+  return ByteAccessInfo::intOnly(byteSize);
+}
 
 vector<Value*> Memset::operands() const {
   return { ptr, val, bytes };
@@ -2390,6 +2537,25 @@ unique_ptr<Instr> Memset::dup(const string &suffix) const {
   return make_unique<Memset>(*ptr, *val, *bytes, align);
 }
 
+
+DEFINE_AS_RETZERO(Memcpy, getMaxAllocSize);
+DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
+
+uint64_t Memcpy::getMaxAccessSize() const {
+  return getIntOr(*bytes, UINT64_MAX);
+}
+
+Memcpy::ByteAccessInfo Memcpy::getByteAccessInfo() const {
+  unsigned byteSize = 1;
+#if 0
+  if (auto bytes = get_int(i->getBytes()))
+    byteSize = gcd(gcd(i->getSrcAlign(), i->getDstAlign()), *bytes);
+#endif
+  // FIXME: memcpy doesn't have multi-byte support
+  // Memcpy does not have sub-byte access, unless the sub-byte type appears
+  // at other instructions
+  return ByteAccessInfo::full(byteSize, false);
+}
 
 vector<Value*> Memcpy::operands() const {
   return { dst, src, bytes };
@@ -2432,6 +2598,17 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
 }
 
 
+
+DEFINE_AS_RETZERO(Memcmp, getMaxAllocSize);
+DEFINE_AS_RETZERO(Memcmp, getMaxGEPOffset);
+
+uint64_t Memcmp::getMaxAccessSize() const {
+  return getIntOr(*num, UINT64_MAX);
+}
+
+Memcmp::ByteAccessInfo Memcmp::getByteAccessInfo() const {
+  return ByteAccessInfo::intOnly(1); /* memcmp raises UB on ptr bytes */
+}
 
 vector<Value*> Memcmp::operands() const {
   return { ptr1, ptr2, num };
@@ -2511,6 +2688,17 @@ unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
                              is_bcmp);
 }
 
+
+DEFINE_AS_RETZERO(Strlen, getMaxAllocSize);
+DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset);
+
+uint64_t Strlen::getMaxAccessSize() const {
+  return getGlobalVarSize(ptr);
+}
+
+MemInstr::ByteAccessInfo Strlen::getByteAccessInfo() const {
+  return ByteAccessInfo::intOnly(1); /* strlen raises UB on ptr bytes */
+}
 
 vector<Value*> Strlen::operands() const {
   return { ptr };
@@ -2674,4 +2862,17 @@ unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
                                     *v1, *v2, mask);
 }
 
+
+const ConversionOp *isCast(ConversionOp::Op op, const Value &v) {
+  auto c = dynamic_cast<const ConversionOp*>(&v);
+  return (c && c->getOp() == op) ? c : nullptr;
+}
+
+Value *isNoOp(const Value &v) {
+  if (isCast(ConversionOp::BitCast, v))
+    return &dynamic_cast<const ConversionOp *>(&v)->getValue();
+
+  // TODO: gep ptr, 0
+  return nullptr;
+}
 }
