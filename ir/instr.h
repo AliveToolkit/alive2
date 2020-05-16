@@ -396,7 +396,6 @@ public:
 };
 
 
-
 class MemInstr : public Instr {
 public:
   MemInstr(Type &type, std::string &&name) : Instr(type, move(name)) {}
@@ -419,29 +418,21 @@ public:
     // Does this instruction use integer (pointer) value of a byte?
     // If it stores poison value (e.g. uninitialized bytes of alloca), it is
     // okay for both variables to be false.
-    bool hasIntByteAccess;
-    bool hasPtrByteAccess;
+    bool hasIntByteAccess = false;
+    bool hasPtrByteAccess = false;
     // Does this intruction load / store pointers?
     // If hasPtrByteAccess is false, these cannot be true.
-    bool doesPtrLoad;
-    bool doesPtrStore;
+    bool doesPtrLoad = false;
+    bool doesPtrStore = false;
     // The maximum size of a byte that this instruction can support.
     // If zero, this instruction does not read/write bytes.
     // Otherwise, bytes of a memory can be widened to this size.
-    unsigned byteSize;
+    unsigned byteSize = 0;
     // Does this instruction have sub-byte access (less than 8 bits)?
-    bool hasSubByteAccess;
-
-    ByteAccessInfo(
-      bool hasIntByteAccess, bool hasPtrByteAccess, bool doesPtrLoad,
-      bool doesPtrStore, unsigned byteSize, bool hasSubByteAccess) :
-      hasIntByteAccess(hasIntByteAccess), hasPtrByteAccess(hasPtrByteAccess),
-      doesPtrLoad(doesPtrLoad), doesPtrStore(doesPtrStore),
-      byteSize(byteSize), hasSubByteAccess(hasSubByteAccess) {}
+    bool hasSubByteAccess = false;
 
     bool doesMemAccess() const { return byteSize; }
 
-    static ByteAccessInfo empty();
     static ByteAccessInfo intOnly(unsigned byteSize);
     static ByteAccessInfo get(const Type &t, bool store, unsigned align);
     static ByteAccessInfo full(unsigned byteSize, bool subByte = false);
@@ -450,6 +441,7 @@ public:
   virtual ByteAccessInfo getByteAccessInfo() const = 0;
 };
 
+ 
 class Alloc final : public MemInstr {
   Value *size, *mul;
   unsigned align;
