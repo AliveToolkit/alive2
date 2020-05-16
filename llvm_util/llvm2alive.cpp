@@ -869,7 +869,7 @@ public:
 
       case llvm::Attribute::Dereferenceable:
         attrs.set(ParamAttrs::Dereferenceable);
-        attrs.setDerefBytes(aset.getDereferenceableBytes());
+        attrs.setDerefBytes(attr.getDereferenceableBytes());
         continue;
 
       default:
