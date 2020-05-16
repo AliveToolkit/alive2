@@ -4,7 +4,7 @@ This document lists the bugs found so far by Alive2 in LLVM & Z3.
 Please contact us or submit a PR if something is missing or inaccurate.
 
 
-### Integer operations
+### Integer/Float operations
 1. Incorrect fold of 'x & (-1 >> y) s>= x'
 (https://bugs.llvm.org/show_bug.cgi?id=39861)
 
@@ -61,6 +61,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 
 19. InstSimplify: fadd (nsz op), +0 incorrectly removed
 (https://bugs.llvm.org/show_bug.cgi?id=45778)
+
+20. Incorrect instcombine fold of control-flow to umul.with.overflow
+(https://bugs.llvm.org/show_bug.cgi?id=45952)
 
 
 ### Memory Operations (Load/Store/GEP/...)
