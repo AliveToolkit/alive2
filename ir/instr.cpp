@@ -2838,15 +2838,17 @@ StateValue ShuffleVector::toSMT(State &s) const {
   auto sz = vty->numElementsConst();
   vector<StateValue> vals;
 
-  auto &vect1 = s[*v1];
-  auto &vect2 = s[*v2];
+  const StateValue *vect1 = nullptr;
+  const StateValue *vect2 = nullptr;
 
   for (auto m : mask) {
     if (m >= 2 * sz) {
       vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s).value, true);
     } else {
-      vals.emplace_back(m < sz ? vty->extract(vect1, m)
-                               : vty->extract(vect2, m - sz));
+      auto &vect = m < sz ? vect1 : vect2;
+      if (!vect)
+        vect = &s[m < sz ? *v1 : *v2];
+      vals.emplace_back(vty->extract(*vect, m % sz));
     }
   }
 
