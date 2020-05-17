@@ -201,8 +201,8 @@ StateValue Input::toSMT(State &s) const {
 
   if (has_deref) {
     Pointer p(s.getMemory(), val);
-    s.addAxiom(
-      p.isDereferenceable(attrs.getDerefBytes(), bits_byte / 8, false));
+    s.addAxiom(p.isDereferenceable(attrs.getDerefBytes(), bits_byte/8, false));
+    s.addAxiom(type == 0);
   }
 
   expr poison = getType().getDummyValue(false).non_poison;
