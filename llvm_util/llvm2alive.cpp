@@ -775,6 +775,7 @@ public:
       case LLVMContext::MD_range:
       {
         Value *range = nullptr;
+        auto &boolTy = get_int_type(1);
         for (unsigned op = 0, e = Node->getNumOperands(); op < e; ++op) {
           auto *low =
             llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(op));
@@ -782,17 +783,19 @@ public:
             llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op));
 
           auto op_name = to_string(op / 2);
-          auto l = make_unique<ICmp>(get_int_type(1),
+          auto l = make_unique<ICmp>(boolTy,
                                      "%range_l#" + op_name + value_name(llvm_i),
                                      ICmp::SGE, i, *get_operand(low));
 
-          auto h = make_unique<ICmp>(get_int_type(1),
+          auto h = make_unique<ICmp>(boolTy,
                                      "%range_h#" + op_name + value_name(llvm_i),
                                      ICmp::SLT, i, *get_operand(high));
 
-          auto r = make_unique<BinOp>(get_int_type(1),
+          bool wrap = low->getValue().sgt(high->getValue());
+          auto r = make_unique<BinOp>(boolTy,
                                       "%range#" + op_name + value_name(llvm_i),
-                                      *l.get(), *h.get(), BinOp::And);
+                                      *l.get(), *h.get(),
+                                      wrap ? BinOp::Or : BinOp::And);
 
           auto r_ptr = r.get();
           BB->addInstr(move(l));
@@ -800,7 +803,7 @@ public:
           BB->addInstr(move(r));
 
           if (range) {
-            auto range_or = make_unique<BinOp>(get_int_type(1),
+            auto range_or = make_unique<BinOp>(boolTy,
                                                "$rangeOR$" + op_name +
                                                  value_name(llvm_i),
                                                *range, *r_ptr, BinOp::Or);
