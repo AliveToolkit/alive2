@@ -74,6 +74,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 23. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
+24. X86InterleavedAccess introduces misaligned loads
+(https://bugs.llvm.org/show_bug.cgi?id=45957)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
