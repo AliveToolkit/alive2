@@ -1,0 +1,21 @@
+%f3 = call i8 @f(i8 3) nowrite noread
+%f4 = call i8 @f(i8 4) nowrite noread
+%eq1 = icmp eq i8 %f3, 3
+%eq2 = icmp eq i8 %f4, 4
+assume(%eq1)
+assume(%eq2)
+%c1 = call i8 @f(i8 poison) nowrite noread
+%c2 = call i8 @f(i8 poison) nowrite noread
+
+%eq3 = icmp ule i8 %c1, 9
+%eq4 = icmp ule i8 %c2, 9
+assume_non_poison(%eq3)
+assume_non_poison(%eq4)
+
+%d = add i8 %c1, %c2
+ret i8 %d
+  =>
+assume(false)
+ret i8 0
+
+; FIXME: this test should fail!

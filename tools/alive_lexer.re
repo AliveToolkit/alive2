@@ -228,6 +228,8 @@ space+ {
 "uge" { return UGE; }
 "ugt" { return UGT; }
 "call" { return CALL; }
+"noread" { return NOREAD; }
+"nowrite" { return NOWRITE; }
 "freeze" { return FREEZE; }
 "malloc" { return MALLOC; }
 "free" { return FREE; }
@@ -283,6 +285,8 @@ space+ {
 "nnan" { return NNAN; }
 "ninf" { return NINF; }
 "nsz" { return NSZ; }
+"assume" { return ASSUME; }
+"assume_non_poison" { return ASSUME_NON_POISON; }
 "unreachable" { return UNREACH; }
 
 [a-zA-Z][a-zA-Z0-9]* {

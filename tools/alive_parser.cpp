@@ -937,7 +937,7 @@ static unique_ptr<Instr> parse_call(string_view name) {
   auto fn_name = parse_global_name();
   tokenizer.ensure(LPAREN);
 
-  auto call = make_unique<FnCall>(ret_ty, string(name), move(fn_name));
+  vector<Value*> args;
   bool first = true;
 
   while (tokenizer.peek() != RPAREN) {
@@ -945,9 +945,27 @@ static unique_ptr<Instr> parse_call(string_view name) {
       tokenizer.ensure(COMMA);
     first = false;
     auto &ty = parse_type();
-    call->addArg(parse_operand(ty), ParamAttrs::None);
+    args.emplace_back(&parse_operand(ty));
   }
   tokenizer.ensure(RPAREN);
+
+  FnAttrs attrs;
+  while (true) {
+    switch (auto t = *tokenizer) {
+    case NOREAD:  attrs.set(FnAttrs::NoRead); break;
+    case NOWRITE: attrs.set(FnAttrs::NoWrite); break;
+    default:
+      tokenizer.unget(t);
+      goto exit;
+    }
+  }
+exit:
+  auto call = make_unique<FnCall>(ret_ty, string(name), move(fn_name),
+                                  move(attrs));
+
+  for (auto arg : args) {
+    call->addArg(*arg, ParamAttrs::None);
+  }
   return call;
 }
 
@@ -1107,6 +1125,13 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   UNREACHABLE();
 }
 
+static unique_ptr<Instr> parse_assume(bool if_non_poison) {
+  tokenizer.ensure(LPAREN);
+  auto &val = parse_operand(*int_types[1].get());
+  tokenizer.ensure(RPAREN);
+  return make_unique<Assume>(val, if_non_poison);
+}
+
 static unique_ptr<Instr> parse_return() {
   auto &type = parse_type();
   auto &val = parse_operand(type);
@@ -1120,6 +1145,12 @@ static void parse_fn(Function &f) {
 
   while (true) {
     switch (auto t = *tokenizer) {
+    case ASSUME:
+      bb->addInstr(parse_assume(true));
+      break;
+    case ASSUME_NON_POISON:
+      bb->addInstr(parse_assume(false));
+      break;
     case LABEL:
       bb = &f.getBB(yylval.str);
       break;

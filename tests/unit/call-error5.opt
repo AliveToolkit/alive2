@@ -1,0 +1,8 @@
+%c1 = call i8 @f(i8 poison) nowrite noread
+%c2 = call i8 @f(i8 poison) nowrite noread
+%d = add i8 %c1, %c2
+ret i8 %d
+  =>
+ret i8 1
+
+; FIXME: this test should fail!

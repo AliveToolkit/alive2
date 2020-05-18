@@ -28,6 +28,6 @@ struct ParseException {
     : str(std::move(str)), lineno(lineno) {}
 };
 
-constexpr unsigned PARSER_READ_AHEAD = 16;
+constexpr unsigned PARSER_READ_AHEAD = 20;
 
 }

@@ -39,6 +39,6 @@ struct LexException {
 };
 
 
-constexpr unsigned LEXER_READ_AHEAD = 16;
+constexpr unsigned LEXER_READ_AHEAD = 20;
 
 }
