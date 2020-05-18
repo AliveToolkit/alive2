@@ -34,6 +34,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " NNaN";
   if (attr.has(FnAttrs::NoReturn))
     os << " noreturn";
+  if (attr.has(FnAttrs::Dereferenceable))
+    os << " dereferenceable(" << attr.derefBytes << ")";
   return os;
 }
 
