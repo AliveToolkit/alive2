@@ -68,13 +68,10 @@ Please contact us or submit a PR if something is missing or inaccurate.
 21. Incorrect instcombine fold of vector ult -> sgt
 (https://bugs.llvm.org/show_bug.cgi?id=45954)
 
-22. Incorrect instcombine fold of vector bitwise of ((x ^ y) & const) ^ y
-(https://bugs.llvm.org/show_bug.cgi?id=45955)
-
-23. Jumpthreading introduces jump on poison
+22. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
-24. X86InterleavedAccess introduces misaligned loads
+23. X86InterleavedAccess introduces misaligned loads
 (https://bugs.llvm.org/show_bug.cgi?id=45957)
 
 
