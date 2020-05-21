@@ -1158,7 +1158,8 @@ void Memory::mkAxioms(const Memory &other) const {
       Pointer p(m, bid, true);
       if (auto sz = m.local_blk_size.lookup(p.getShortBid())) {
         auto size = sz->extract(bits_size_t - 2, 0);
-        auto align = expr::mkUInt(1, bits_size_t - 1) << p.blockAlignment();
+        auto align = expr::mkUInt(1, bits_size_t - 1) <<
+                       p.blockAlignment().zextOrTrunc(bits_size_t - 1);
         align = align - expr::mkUInt(1, align.bits());
         m.state->addOOM(size.add_no_uoverflow(align));
         m.state->addOOM(sum.add_no_uoverflow(size + align));
