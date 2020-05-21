@@ -927,12 +927,6 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
-expr Pointer::isNullBlock() const {
-  if (!has_null_block)
-    return false;
-  return getBid() == mkNullPointer(m).getBid();
-}
-
 expr Pointer::isNonZero() const {
   if (observes_addresses())
     return getAddress() != 0;
