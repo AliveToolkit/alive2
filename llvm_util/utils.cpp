@@ -274,7 +274,7 @@ Value* get_operand(llvm::Value *v,
       return nullptr;
 
     unsigned size = DL->getTypeAllocSize(gv->getValueType());
-    unsigned align = gv->getPointerAlignment(*DL).valueOrOne().value();
+    unsigned align = gv->getPointerAlignment(*DL).value();
     string name;
     if (!gv->hasName()) {
       unsigned id = 0;
