@@ -266,6 +266,12 @@ public:
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
     }
+    const auto &ret = llvm::AttributeList::ReturnIndex;
+    if (uint64_t b = max(i.getDereferenceableBytes(ret),
+                         i.getCalledFunction()->getDereferenceableBytes(ret))) {
+      attrs.set(FnAttrs::Dereferenceable);
+      attrs.setDerefBytes(b);
+    }
 
     string fn_name = '@' + fn->getName().str();
     auto call =

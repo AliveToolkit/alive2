@@ -1360,12 +1360,13 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
   }
 }
 
-static StateValue pack_return(Type &ty, vector<StateValue> &vals,
-                              const FnAttrs &attrs, unsigned &idx) {
+static StateValue
+pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
+            unsigned &idx) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vs.emplace_back(pack_return(agg->getChild(i), vals, attrs, idx));
+      vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
     }
     return agg->aggregateVals(vs);
   }
@@ -1373,6 +1374,11 @@ static StateValue pack_return(Type &ty, vector<StateValue> &vals,
   auto &ret = vals[idx++];
   if (ty.isFloatType() && attrs.has(FnAttrs::NNaN))
     ret.non_poison &= !ret.value.isNaN();
+  if (ty.isPtrType() && attrs.has(FnAttrs::Dereferenceable)) {
+    Pointer p(s.getMemory(), ret.value);
+    s.addUB(ret.non_poison);
+    s.addUB(p.isDereferenceable(attrs.getDerefBytes(), bits_byte / 8, false));
+  }
   return ret;
 }
 
@@ -1405,7 +1411,7 @@ StateValue FnCall::toSMT(State &s) const {
     // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
     s.addNoReturn();
   }
-  return isVoid() ? StateValue() : pack_return(getType(), ret, attrs, idx);
+  return isVoid() ? StateValue() : pack_return(s, getType(), ret, attrs, idx);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {

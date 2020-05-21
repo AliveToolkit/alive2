@@ -28,15 +28,19 @@ public:
 
 class FnAttrs final {
   unsigned bits;
+  uint64_t derefBytes;
 
 public:
   enum Attribute { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1,
-                   ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4 };
+                   ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4,
+                   Dereferenceable = 1 << 5 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
+  uint64_t getDerefBytes() const { return derefBytes; }
+  void setDerefBytes(uint64_t bytes) { derefBytes = bytes; }
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };
