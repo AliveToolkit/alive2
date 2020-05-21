@@ -41,35 +41,38 @@ struct print_type {
 
 struct LoopLikeFunctionApproximator {
   // input: (i, is the last iter?)
-  // output: (value, UB, continue?)
-  using fn_t = function<tuple<expr, AndExpr, expr>(unsigned, bool)>;
+  // output: (value, nonpoison, UB, continue?)
+  using fn_t = function<tuple<expr, expr, AndExpr, expr>(unsigned, bool)>;
   fn_t ith_exec;
 
   LoopLikeFunctionApproximator(fn_t ith_exec) : ith_exec(move(ith_exec)) {}
 
-  pair<expr, expr> encode(IR::State &s, unsigned unroll_cnt) {
+  // (value, nonpoison, UB)
+  tuple<expr, expr, expr> encode(IR::State &s, unsigned unroll_cnt) {
     AndExpr prefix;
     return _loop(s, prefix, 0, unroll_cnt);
   }
 
-  pair<expr, expr> _loop(IR::State &s, AndExpr &prefix, unsigned i,
-                         unsigned unroll_cnt) {
+  // (value, nonpoison, UB)
+  tuple<expr, expr, expr> _loop(IR::State &s, AndExpr &prefix, unsigned i,
+                                unsigned unroll_cnt) {
     bool is_last = i == unroll_cnt - 1;
-    auto [res_i, ub_i, continue_i] = ith_exec(i, is_last);
+    auto [res_i, np_i, ub_i, continue_i] = ith_exec(i, is_last);
     auto ub = ub_i();
     prefix.add(ub_i);
 
     if (is_last) {
       s.addPre(prefix().implies(!continue_i), true);
-      return { move(res_i), move(ub) };
+      return { move(res_i), move(np_i), move(ub) };
     }
 
     if (continue_i.isFalse() || ub.isFalse())
-      return { move(res_i), move(ub) };
+      return { move(res_i), move(np_i), move(ub) };
 
     prefix.add(continue_i);
-    auto [val_next, ub_next] = _loop(s, prefix, i + 1, unroll_cnt);
+    auto [val_next, np_next, ub_next] = _loop(s, prefix, i + 1, unroll_cnt);
     return { expr::mkIf(continue_i, move(val_next), move(res_i)),
+             expr::mkIf(continue_i, move(np_next), move(np_i)),
              ub && continue_i.implies(ub_next) };
   }
 };
@@ -2646,13 +2649,11 @@ StateValue Memcmp::toSMT(State &s) const {
   auto &vn = vnum;
 
   auto ith_exec =
-      [&, this](unsigned i, bool is_last) -> tuple<expr, AndExpr, expr> {
+      [&, this](unsigned i, bool is_last) -> tuple<expr, expr, AndExpr, expr> {
     auto [val1, ub1] = s.getMemory().load((p1 + i)(), IntType("i8", 8), 1);
     auto [val2, ub2] = s.getMemory().load((p2 + i)(), IntType("i8", 8), 1);
 
     AndExpr ub_and;
-    ub_and.add(move(val1.non_poison));
-    ub_and.add(move(val2.non_poison));
     ub_and.add(move(ub1));
     ub_and.add(move(ub2));
 
@@ -2672,13 +2673,14 @@ StateValue Memcmp::toSMT(State &s) const {
 
     auto val_eq = val1.value == val2.value;
     return { expr::mkIf(val_eq, zero, result_neq),
+             val1.non_poison && val2.non_poison,
              move(ub_and),
              val_eq && vn.uge(i + 2) };
   };
-  auto [val, ub]
+  auto [val, np, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, memcmp_unroll_cnt);
   s.addUB((vnum != 0).implies(move(ub)));
-  return { expr::mkIf(vnum == 0, zero, move(val)), true };
+  return { expr::mkIf(vnum == 0, zero, move(val)), (vnum != 0).implies(np) };
 }
 
 expr Memcmp::getTypeConstraints(const Function &f) const {
@@ -2724,14 +2726,14 @@ StateValue Strlen::toSMT(State &s) const {
   Type &ty = getType();
 
   auto ith_exec =
-      [&s, &p, &ty](unsigned i, bool _) -> tuple<expr, AndExpr, expr> {
+      [&s, &p, &ty](unsigned i, bool _) -> tuple<expr, expr, AndExpr, expr> {
     AndExpr ub;
     auto [val, ub_load] = s.getMemory().load((p + i)(), IntType("i8", 8), 1);
     ub.add(move(ub_load));
     ub.add(move(val.non_poison));
-    return { expr::mkUInt(i, ty.bits()), move(ub), val.value != 0 };
+    return { expr::mkUInt(i, ty.bits()), true, move(ub), val.value != 0 };
   };
-  auto [val, ub]
+  auto [val, _, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, strlen_unroll_cnt);
   s.addUB(move(ub));
   return { move(val), true };
