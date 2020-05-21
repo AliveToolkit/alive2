@@ -76,7 +76,8 @@ static expr load_bv(const expr &var, const expr &idx0) {
 }
 
 static void store_bv(Pointer &p, const expr &val, expr &local,
-                     expr &non_local, bool assume_local = false) {
+                     expr &non_local, bool assume_local = false,
+                     const expr &cond = true) {
   auto bid0 = p.getShortBid();
 
   auto set = [&](const expr &var) {
@@ -92,8 +93,8 @@ static void store_bv(Pointer &p, const expr &val, expr &local,
   };
 
   auto is_local = p.isLocal() || assume_local;
-  local = expr::mkIf(is_local, set(local), local);
-  non_local = expr::mkIf(!is_local, set(non_local), non_local);
+  local = expr::mkIf(is_local && cond, set(local), local);
+  non_local = expr::mkIf(!is_local && cond, set(non_local), non_local);
 }
 
 namespace IR {
@@ -1472,10 +1473,11 @@ void Memory::free(const expr &ptr, bool unconstrained) {
   assert(!memory_unused() && (has_free || has_dead_allocas));
   Pointer p(*this, ptr);
   if (!unconstrained)
-    state->addUB(p.isNull() || (p.getOffset() == 0 &&
-                                p.isBlockAlive() &&
-                                p.getAllocType() == Pointer::MALLOC));
-  store_bv(p, false, local_block_liveness, non_local_block_liveness);
+    state->addUB(p.isNonZero().implies(p.getOffset() == 0 &&
+                                       p.isBlockAlive() &&
+                                       p.getAllocType() == Pointer::MALLOC));
+  store_bv(p, false, local_block_liveness, non_local_block_liveness,
+           false, p.isNonZero());
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
