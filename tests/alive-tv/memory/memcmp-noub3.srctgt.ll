@@ -4,7 +4,7 @@ define i32 @src() {
   %p = alloca i32
   %p8 = bitcast i32* %p to i8*
   store i8 0, i8* %p8
-  %res = call i32 @memcmp(i8* %p8, i8* %p8, i64 4) ; ub
+  %res = call i32 @memcmp(i8* %p8, i8* %p8, i64 4) ; poison
   ret i32 %res
 }
 
