@@ -139,3 +139,5 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 9. https://github.com/Z3Prover/z3/issues/2879 - crash in SMT eq propagation assertion
 10. https://github.com/Z3Prover/z3/commit/bb5edb7c653f9351fe674630d63cdd2b10338277 - assertion violation in qe_lite
 11. https://github.com/Z3Prover/z3/issues/4192 - SMT internalize doesn't respect timeout
+12. https://github.com/Z3Prover/z3/issues/2761 - crash in printing multi precision integer
+13. https://github.com/Z3Prover/z3/issues/2652 - crash in partial model mode
