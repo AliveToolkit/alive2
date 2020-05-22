@@ -1394,7 +1394,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
       // addr + size does not overflow
       if (!size.uge(align).isFalse())
-        state->addPre(full_addr.add_no_uoverflow(size_zext));
+        state->addPre(allocated.implies(full_addr.add_no_uoverflow(size_zext)));
 
       // Disjointness of block's address range with other local blocks
       state->addPre(
