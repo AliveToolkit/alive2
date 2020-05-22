@@ -71,9 +71,6 @@ Please contact us or submit a PR if something is missing or inaccurate.
 22. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
-23. X86InterleavedAccess introduces misaligned loads
-(https://bugs.llvm.org/show_bug.cgi?id=45957)
-
 
 ### Memory Operations (Load/Store/GEP/...)
 
@@ -125,6 +122,9 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 
 16. gep(ptr, undef) isn't undef
 (https://bugs.llvm.org/show_bug.cgi?id=45445)
+
+17. X86InterleavedAccess introduces misaligned loads
+(https://bugs.llvm.org/show_bug.cgi?id=45957)
 
 
 ### Bugs found in Z3
