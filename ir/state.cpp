@@ -8,7 +8,6 @@
 #include "util/errors.h"
 #include <cassert>
 #include <stack>
-#include <iostream>
 
 using namespace smt;
 using namespace util;
@@ -159,7 +158,7 @@ bool State::canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom) {
     S.pop();
     auto &visited = v[cur_bb];
     
-    if (!visited) {
+    if (!visited && cur_bb != &dom) {
       visited = true;
 
       for (auto const &pred : predecessor_data[cur_bb]) {
@@ -169,18 +168,25 @@ bool State::canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom) {
     }
   }
 
-  bool can_move = true;
-  JumpInstr *jmp_instr;
   for (auto &[bb, seen_targets] : bb_seen_targets) {
-    jmp_instr = static_cast<JumpInstr*>(&(bb->back()));
+    auto jmp_instr = static_cast<JumpInstr*>(bb->back());
     auto tgt_count = jmp_instr->getTargetCount();
-    if (auto sw = dynamic_cast<Switch*>(&(bb->back()))) {
-      (void)sw;
+    if (dynamic_cast<Switch*>(bb->back())) 
       --tgt_count;
+    
+    if (seen_targets.size() != tgt_count) {
+      // If condition fails double check to exclude bb's with unreachable
+      // from counting
+      auto tgts = jmp_instr->targets();
+      for (auto I = tgts.begin(), E = tgts.end(); I != E; ++I) {
+        if (no_ret_bbs.find(&(*I)) != no_ret_bbs.end())
+          --tgt_count;
+      }
+      if (seen_targets.size() != tgt_count)
+        return false;
     }
-    can_move &= tgt_count == seen_targets.size();
   }
-  return can_move;
+  return true;
 }
 
 // Traverse the program graph similar to DFS to build UB as an ite expr tree
@@ -241,8 +247,6 @@ void State::buildUB() {
 
             auto &dom = *dom_tree->getIDominator(*cur_bb);
             if (canMoveExprsToDom(*cur_bb, dom)) {
-              cout << "moving " << *ub << " from bb " << cur_bb->getName()
-                   << " to bb " << dom.getName() << endl;
               get<2>(build_data[&dom]) = move(ub);
               ub = true;
             }
@@ -253,7 +257,45 @@ void State::buildUB() {
   }
   // replace return domain with return_path && better ub
   return_domain.reset();
-  return_domain.add(return_path() && *build_data[&f.getFirstBB()].second);
+  return_domain.add(return_path() && *get<1>(build_data[&f.getFirstBB()]));
+}
+
+// walk up the CFG to add bb's to no_ret_bbs which when reached will always
+// lead execution to an unreachable or a back-edge
+// this is useful for ignoring unecessary paths quickly by checking no_ret_bbs
+void State::propagateNoRetBB(const BasicBlock &bb) {
+  stack<const BasicBlock*> S;
+
+  no_ret_bbs.insert(&bb);
+  for (auto &[pred, data] : predecessor_data[&bb])
+    S.push(pred);
+
+  while (!S.empty()) {
+    auto cur_bb = S.top();
+    S.pop();
+
+    // TODO when coming from assume 0, last instr is not a jump, but an assume
+    // which means this code is wrong and may not add the bb to no_ret_bbs properly
+    // maybe add a flag to the parameters or dynamic cast to assume first before trying jump
+    auto jmp_instr = static_cast<JumpInstr*>(cur_bb->back());
+    if (jmp_instr->getTargetCount() == 1) {
+      no_ret_bbs.insert(cur_bb);
+      for (auto &[pred, data] : predecessor_data[cur_bb])
+        S.push(pred);
+    } else {
+      unsigned no_ret_cnt = 0;
+      auto jmp_tgts = jmp_instr->targets();
+      for (auto I = jmp_tgts.begin(), E = jmp_tgts.end(); I != E; ++I) {
+        if (no_ret_bbs.find(&(*I)) != no_ret_bbs.end())
+          ++no_ret_cnt;
+      }
+      if (no_ret_cnt == jmp_instr->getTargetCount()) {
+        no_ret_bbs.insert(cur_bb);
+        for (auto &[pred, data] : predecessor_data[cur_bb])
+          S.push(pred);
+      }
+    }
+  }
 }
 
 void State::addJump(const BasicBlock &dst0, expr &&cond) {
@@ -263,6 +305,12 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   auto dst = &dst0;
   if (seen_bbs.count(dst)) {
     dst = &f.getBB("#sink");
+    auto &cnt = back_edge_counter[current_bb];
+    ++cnt;
+    if (cnt == static_cast<JumpInstr*>(current_bb->back())->getTargetCount()) {
+      propagateNoRetBB(*current_bb);
+      back_edge_counter.erase(current_bb);
+    }
   }
 
   auto &data = predecessor_data[dst][current_bb];
@@ -273,9 +321,9 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
 
   // ignore #sink or back edges when building UB
   if (dst == &dst0) {
-    auto &[tgt_data, ub] = target_data[current_bb];
-    tgt_data.emplace_back(dst, *c);
-    ub = domain.UB(); 
+    auto &tgt_data = target_data[current_bb];
+    tgt_data.dsts.emplace_back(dst, *c);
+    tgt_data.ub = domain.UB();
   }
 
   cond &= domain.path;
@@ -304,7 +352,7 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
-  target_data[current_bb].ub = domain.UB(); // store isolated UB
+  target_data[current_bb].ub = domain.UB();
   
   return_val.add(val, domain.path);
   return_memory.add(memory, domain.path);

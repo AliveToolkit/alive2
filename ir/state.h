@@ -85,10 +85,10 @@ private:
 
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
-    // boolean expression describing all possible return paths only
+  // boolean expression describing all possible return paths only
   smt::OrExpr return_path;
   // function_domain: a condition for function having well-defined behavior
-  smt::OrExpr function_domain;
+  smt::OrExpr function_domain; 
   smt::DisjointExpr<StateValue> return_val;
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -122,6 +122,11 @@ private:
   // dominator tree
   std::unique_ptr<DomTree> dom_tree;
   std::unique_ptr<CFG> cfg;
+
+  // a set to hold bb's during SE that do not lead to a return
+  // either they reach unreachable or a jump instruction with only back-edges
+  std::unordered_set<const BasicBlock*> no_ret_bbs;
+  std::unordered_map<const BasicBlock*,unsigned> back_edge_counter;
 public:
   State(Function &f, bool source);
 
@@ -138,6 +143,9 @@ public:
   bool canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom);
   void buildUB();
   bool foundReturn() const { return !return_val.empty(); }
+
+  void propagateNoRetBB(const BasicBlock &bb);
+  const BasicBlock& getCurrentBB() const { return *current_bb; }
   
   void addJump(const BasicBlock &dst);
   // boolean cond

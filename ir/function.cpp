@@ -30,9 +30,7 @@ void BasicBlock::addInstr(unique_ptr<Instr> &&i) {
 }
 
 Instr* BasicBlock::back() const {
-  if (!m_instrs.empty()) 
-    return &(*m_instrs.back());
-  return nullptr;
+  return !empty() ? &(*m_instrs.back()) : nullptr;
 }
 
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
