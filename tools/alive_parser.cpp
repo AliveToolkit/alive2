@@ -1194,9 +1194,9 @@ exit:
     if (bb->empty())
       error("Block cannot be empty");
 
-    auto &val = bb->back();
-    bb->addInstr(make_unique<Return>(val.getType(), val));
-    f.setType(val.getType());
+    auto val = bb->back();
+    bb->addInstr(make_unique<Return>(val->getType(), *val));
+    f.setType(val->getType());
   }
 }
 

@@ -29,6 +29,12 @@ void BasicBlock::addInstr(unique_ptr<Instr> &&i) {
   m_instrs.push_back(move(i));
 }
 
+Instr* BasicBlock::back() const {
+  if (!m_instrs.empty()) 
+    return &(*m_instrs.back());
+  return nullptr;
+}
+
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
@@ -239,7 +245,7 @@ void CFG::edge_iterator::next() {
     if (bbi == bbe)
       return;
 
-    if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
+    if (auto instr = dynamic_cast<JumpInstr*>((*bbi)->back())) {
       ti = instr->targets().begin();
       te = instr->targets().end();
       return;
@@ -257,7 +263,7 @@ CFG::edge_iterator::edge_iterator(vector<BasicBlock*>::iterator &&it,
 
 tuple<const BasicBlock&, const BasicBlock&, const Instr&>
   CFG::edge_iterator::operator*() const {
-  return { **bbi, *ti, (*bbi)->back() };
+  return { **bbi, *ti, *(*bbi)->back() };
 }
 
 void CFG::edge_iterator::operator++(void) {
