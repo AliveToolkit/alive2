@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "ir/instr.h"
 #include "ir/precondition.h"
 #include "ir/value.h"
@@ -67,6 +68,8 @@ class Function final {
   std::vector<std::unique_ptr<AggregateValue>> aggregates;
   std::vector<std::unique_ptr<Value>> inputs;
 
+  FnAttrs attrs;
+
 public:
   Function() {}
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
@@ -78,6 +81,8 @@ public:
   void setType(IR::Type &t) { type = &t; }
 
   const std::string& getName() const { return name; }
+
+  auto& getFnAttrs() { return attrs; }
 
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);

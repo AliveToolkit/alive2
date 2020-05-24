@@ -553,6 +553,7 @@ static void calculateAndInitConstants(Transform &t) {
           min_access_size       = gcd(min_access_size, info.byteSize);
 
           if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
+            has_alloca |= true;
             has_dead_allocas |= alloc->initDead();
           }
           else if (auto alloc = dynamic_cast<const Malloc*>(&i)) {

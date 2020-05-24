@@ -911,6 +911,13 @@ public:
       Fn.addInput(move(val));
     }
 
+    auto &attrs = Fn.getFnAttrs();
+    const auto &ridx = llvm::AttributeList::ReturnIndex;
+    if (uint64_t b = f.getDereferenceableBytes(ridx)) {
+      attrs.set(FnAttrs::Dereferenceable);
+      attrs.setDerefBytes(b);
+    }
+
     // create all BBs upfront in topological order
     vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;
     {

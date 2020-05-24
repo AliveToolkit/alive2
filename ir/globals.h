@@ -49,6 +49,8 @@ extern bool has_ptr2int;
 /// Whether malloc or free/delete is used in either function
 extern bool has_malloc;
 extern bool has_free;
+/// Whether there is an alloca
+extern bool has_alloca;
 
 extern bool has_fncall;
 
