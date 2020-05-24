@@ -510,7 +510,7 @@ static void calculateAndInitConstants(Transform &t) {
   bool does_mem_access = false;
   bool has_ptr_load = false;
   does_sub_byte_access = false;
-
+  bool has_vector_bitcast = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
@@ -572,6 +572,7 @@ static void calculateAndInitConstants(Transform &t) {
 
         } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
           auto &t = bc->getType();
+          has_vector_bitcast |= t.isVectorType();
           does_sub_byte_access |= hasSubByte(t);
           min_access_size = gcd(min_access_size, getCommonAccessSize(t));
         }
@@ -644,7 +645,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   // size of byte
   if (num_globals != 0) {
-    if (does_mem_access)
+    if (does_mem_access || has_vector_bitcast)
       min_access_size = gcd(min_global_size, min_access_size);
     else {
       min_access_size = min_global_size;
@@ -690,10 +691,11 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nhas_free: " << has_free
                   << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
+                  << "\ndoes_mem_access: " << does_mem_access
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
                   << "\ndoes_sub_byte_access: " << does_sub_byte_access
-                  << "\n";
+                  << '\n';
 }
 
 
