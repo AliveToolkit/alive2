@@ -2887,16 +2887,18 @@ unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
 }
 
 
-const ConversionOp *isCast(ConversionOp::Op op, const Value &v) {
+const ConversionOp* isCast(ConversionOp::Op op, const Value &v) {
   auto c = dynamic_cast<const ConversionOp*>(&v);
   return (c && c->getOp() == op) ? c : nullptr;
 }
 
-Value *isNoOp(const Value &v) {
+Value* isNoOp(const Value &v) {
   if (isCast(ConversionOp::BitCast, v))
-    return &dynamic_cast<const ConversionOp *>(&v)->getValue();
+    return &static_cast<const ConversionOp*>(&v)->getValue();
 
-  // TODO: gep ptr, 0
+  if (auto gep = dynamic_cast<const GEP*>(&v))
+    return gep->getMaxGEPOffset() == 0 ? &gep->getPtr() : nullptr;
+
   return nullptr;
 }
 }
