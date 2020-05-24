@@ -204,7 +204,7 @@ void Function::print(ostream &os, bool print_header) const {
   }
 
   if (print_header) {
-    os << "define" << attrs << " " << getType() << " @" << name << '(';
+    os << "define" << attrs << ' ' << getType() << " @" << name << '(';
     bool first = true;
     for (auto &input : getInputs()) {
       if (!first)
