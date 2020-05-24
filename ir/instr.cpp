@@ -1377,7 +1377,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   if (ty.isPtrType() && attrs.has(FnAttrs::Dereferenceable)) {
     Pointer p(s.getMemory(), ret.value);
     s.addUB(ret.non_poison);
-    s.addUB(p.isDereferenceable(attrs.getDerefBytes(), bits_byte / 8, false));
+    s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
   }
   return ret;
 }
@@ -1941,6 +1941,16 @@ StateValue Return::toSMT(State &s) const {
   auto &retval = s[*val];
   s.addUB(s.getMemory().checkNocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
+
+  auto &attrs = s.getFn().getFnAttrs();
+  if (attrs.has(FnAttrs::Dereferenceable)) {
+    assert(val->getType().isPtrType());
+    Pointer p(s.getMemory(), retval.value);
+    s.addUB(retval.non_poison);
+    s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+    s.addUB(p.getAllocType() != Pointer::STACK || !has_alloca);
+  }
+
   s.addReturn(retval);
   return {};
 }

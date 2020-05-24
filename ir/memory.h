@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/globals.h"
 #include "ir/state_value.h"
 #include "ir/type.h"
 #include "smt/expr.h"
@@ -150,7 +151,8 @@ public:
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(unsigned align, bool exact = false) const;
   smt::expr isAligned(unsigned align) const;
-  smt::AndExpr isDereferenceable(unsigned bytes, unsigned align, bool iswrite);
+  smt::AndExpr isDereferenceable(unsigned bytes, unsigned align = bits_byte / 8,
+                                 bool iswrite = false);
   smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
                                   bool iswrite);
   void isDisjoint(const smt::expr &len1, const Pointer &ptr2,

@@ -727,7 +727,7 @@ expr Pointer::getAllocType() const {
   // If programs have no malloc & free, we don't need to store this information
   // since it is only used to check if free/delete is ok and
   // for memory refinement of local malloc'ed blocks
-  if (!has_malloc && !has_free && !has_fncall)
+  if (!has_malloc && !has_free && !has_fncall && !has_alloca)
     return expr::mkUInt(GLOBAL, 2);
 
   // if malloc is used, but no free, we can still ignore info for non-locals
