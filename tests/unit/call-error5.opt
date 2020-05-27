@@ -5,4 +5,4 @@ ret i8 %d
   =>
 ret i8 1
 
-; FIXME: this test should fail!
+; ERROR: Source is more defined than target

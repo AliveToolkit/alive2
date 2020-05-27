@@ -18,4 +18,4 @@ ret i8 %d
 assume(false)
 ret i8 0
 
-; FIXME: this test should fail!
+; ERROR: Source is more defined than target

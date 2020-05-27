@@ -397,8 +397,11 @@ void State::mkAxioms(State &tgt) {
 
         expr refines(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
-          refines &= ins[i].non_poison.implies(ins[i].value == ins2[i].value &&
-                                               ins2[i].non_poison);
+          string used = fn + "#arg" + to_string(i) + "used";
+          refines &=
+            expr::mkBoolVar(used.c_str()).implies(
+              ins[i].non_poison.implies(ins[i].value == ins2[i].value &&
+                                        ins2[i].non_poison));
         }
 
         if (refines.isFalse())
