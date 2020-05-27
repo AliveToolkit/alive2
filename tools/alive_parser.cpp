@@ -1146,10 +1146,10 @@ static void parse_fn(Function &f) {
   while (true) {
     switch (auto t = *tokenizer) {
     case ASSUME:
-      bb->addInstr(parse_assume(true));
+      bb->addInstr(parse_assume(false));
       break;
     case ASSUME_NON_POISON:
-      bb->addInstr(parse_assume(false));
+      bb->addInstr(parse_assume(true));
       break;
     case LABEL:
       bb = &f.getBB(yylval.str);
