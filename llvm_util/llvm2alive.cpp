@@ -272,6 +272,8 @@ public:
       attrs.set(FnAttrs::Dereferenceable);
       attrs.setDerefBytes(b);
     }
+    if (i.hasRetAttr(llvm::Attribute::NonNull))
+      attrs.set(FnAttrs::NonNull);
 
     string fn_name = '@' + fn->getName().str();
     auto call =
@@ -303,6 +305,9 @@ public:
 
       if (i.paramHasAttr(argidx, llvm::Attribute::ByVal))
         attr.set(ParamAttrs::ByVal);
+
+      if (i.paramHasAttr(argidx, llvm::Attribute::NonNull))
+        attr.set(ParamAttrs::NonNull);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
@@ -917,6 +922,8 @@ public:
       attrs.set(FnAttrs::Dereferenceable);
       attrs.setDerefBytes(b);
     }
+    if (f.hasAttribute(ridx, llvm::Attribute::NonNull))
+      attrs.set(FnAttrs::NonNull);
 
     // create all BBs upfront in topological order
     vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;

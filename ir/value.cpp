@@ -190,7 +190,9 @@ StateValue Input::toSMT(State &s) const {
     val = getType().mkInput(s, smt_name.c_str(), attrs);
   }
 
-  const bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
+  bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
+  bool has_nonnull = hasAttribute(ParamAttrs::NonNull);
+
   if (!config::disable_undef_input && !has_deref) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
     for (auto &v : vars) {
@@ -199,10 +201,15 @@ StateValue Input::toSMT(State &s) const {
     val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
-  if (has_deref) {
+  if (has_deref || has_nonnull) {
     Pointer p(s.getMemory(), val);
-    s.addAxiom(p.isDereferenceable(attrs.getDerefBytes(), bits_byte/8, false));
-    s.addAxiom(type == 0);
+    if (has_deref) {
+      s.addAxiom(type == 0);
+      s.addAxiom(p.isDereferenceable(attrs.getDerefBytes(), bits_byte/8, false));
+    }
+    if (has_nonnull && !has_deref) {
+      s.addAxiom(type.extract(1, 1) == 0);
+    }
   }
 
   expr poison = getType().getDummyValue(false).non_poison;

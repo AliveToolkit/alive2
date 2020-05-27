@@ -33,7 +33,7 @@ class FnAttrs final {
 public:
   enum Attribute { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1,
                    ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4,
-                   Dereferenceable = 1 << 5 };
+                   Dereferenceable = 1 << 5, NonNull = 1 << 6 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 

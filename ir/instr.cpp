@@ -1342,6 +1342,10 @@ static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
         s.addUB(
           p.isDereferenceable(argflag.getDerefBytes(), bits_byte / 8, false));
       }
+      if (argflag.has(ParamAttrs::NonNull)) {
+        s.addUB(value.non_poison);
+        s.addUB(p.isNonZero());
+      }
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal));
     } else {
@@ -1374,11 +1378,18 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   auto &ret = vals[idx++];
   if (ty.isFloatType() && attrs.has(FnAttrs::NNaN))
     ret.non_poison &= !ret.value.isNaN();
-  if (ty.isPtrType() && attrs.has(FnAttrs::Dereferenceable)) {
+
+  bool isDeref = attrs.has(FnAttrs::Dereferenceable);
+  bool isNonNull = attrs.has(FnAttrs::NonNull);
+  if (ty.isPtrType() && (isDeref || isNonNull)) {
     Pointer p(s.getMemory(), ret.value);
     s.addUB(ret.non_poison);
-    s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+    if (isDeref)
+      s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+    if (isNonNull)
+      s.addUB(p.isNonZero());
   }
+
   return ret;
 }
 
@@ -1943,12 +1954,20 @@ StateValue Return::toSMT(State &s) const {
   addUBForNoCaptureRet(s, retval, val->getType());
 
   auto &attrs = s.getFn().getFnAttrs();
-  if (attrs.has(FnAttrs::Dereferenceable)) {
+  bool isDeref = attrs.has(FnAttrs::Dereferenceable);
+  bool isNonNull = attrs.has(FnAttrs::NonNull);
+  if (isDeref || isNonNull) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);
     s.addUB(retval.non_poison);
-    s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
-    s.addUB(p.getAllocType() != Pointer::STACK || !has_alloca);
+
+    if (isDeref) {
+      s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+      s.addUB(p.getAllocType() != Pointer::STACK || !has_alloca);
+    }
+    if (isNonNull) {
+      s.addUB(p.isNonZero());
+    }
   }
 
   s.addReturn(retval);
