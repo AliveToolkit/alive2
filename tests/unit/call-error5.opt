@@ -5,4 +5,4 @@ ret i8 %d
   =>
 ret i8 1
 
-; ERROR: Source is more defined than target
+; ERROR: Value mismatch
