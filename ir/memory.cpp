@@ -1212,7 +1212,7 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
 
 pair<expr,expr>
 Memory::mkFnRet(const char *name,
-                const vector<pair<StateValue, bool>> &ptr_inputs) const {
+                const vector<PtrInput> &ptr_inputs) const {
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
@@ -1220,9 +1220,9 @@ Memory::mkFnRet(const char *name,
   set<expr> local;
   for (auto &in : ptr_inputs) {
     // TODO: callee cannot observe the bid if this is byval.
-    Pointer inp(*this, in.first.value);
+    Pointer inp(*this, in.val.value);
     if (!inp.isLocal().isFalse())
-      local.emplace(in.first.non_poison && p.getBid() == inp.getBid());
+      local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
   }
   for (unsigned i = 0; i < num_locals; ++i) {
     if (escaped_local_blks[i])
@@ -1249,7 +1249,7 @@ expr Memory::CallState::implies(const CallState &st) const {
 }
 
 Memory::CallState
-Memory::mkCallState(const vector<pair<StateValue, bool>> *ptr_inputs) const {
+Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
   Memory::CallState st;
   st.empty = false;
 
@@ -1637,7 +1637,7 @@ expr Memory::int2ptr(const expr &val) const {
 
 pair<expr,Pointer>
 Memory::refined(const Memory &other, bool skip_constants,
-                const vector<pair<StateValue, bool>> *set_ptrs) const {
+                const vector<PtrInput> *set_ptrs) const {
   if (num_nonlocals <= has_null_block)
     return { true, Pointer(*this, expr()) };
 
@@ -1672,7 +1672,7 @@ Memory::refined(const Memory &other, bool skip_constants,
     expr c(false);
     for (auto &itm: *set_ptrs) {
       // TODO: deal with the byval arg case (itm.second)
-      auto &ptr = itm.first;
+      auto &ptr = itm.val;
       c |= ptr.non_poison && Pointer(*this, ptr.value).getBid() == ptr_bid;
     }
     ret = c.implies(ret);

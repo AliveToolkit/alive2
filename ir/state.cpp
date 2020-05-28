@@ -179,6 +179,7 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(const StateValue &val) {
+  assert(current_bb);
   return_val.add(val, domain.path);
   return_memory.add(memory, domain.path);
   return_domain.add(domain());
@@ -190,23 +191,27 @@ void State::addReturn(const StateValue &val) {
 }
 
 void State::addUB(expr &&ub) {
+  assert(current_bb);
   domain.UB.add(move(ub));
   if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addUB(const expr &ub) {
+  assert(current_bb);
   domain.UB.add(ub);
   if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addUB(AndExpr &&ubs) {
+  assert(current_bb);
   domain.UB.add(ubs);
   domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addNoReturn() {
+  assert(current_bb);
   function_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
@@ -216,7 +221,7 @@ void State::addNoReturn() {
 
 const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
-                 vector<pair<StateValue, bool>> &&ptr_inputs,
+                 vector<Memory::PtrInput> &&ptr_inputs,
                  const vector<Type*> &out_types, const FnAttrs &attrs) {
   // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
@@ -232,8 +237,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     all_valid &= v.isValid();
   }
   for (auto &v : ptr_inputs) {
-    all_args_np &= v.first.non_poison;
-    all_valid &= v.first.isValid();
+    all_args_np &= v.val.non_poison;
+    all_valid &= v.val.isValid();
   }
 
   if (!all_valid) {

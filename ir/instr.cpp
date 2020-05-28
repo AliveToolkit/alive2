@@ -1327,7 +1327,7 @@ void FnCall::print(ostream &os) const {
 
 static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
                           const StateValue &value, vector<StateValue> &inputs,
-                          vector<pair<StateValue, bool>> &ptr_inputs) {
+                          vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       unpack_inputs(s, agg->getChild(i), argflag, agg->extract(value, i),
@@ -1400,7 +1400,7 @@ StateValue FnCall::toSMT(State &s) const {
   }
 
   vector<StateValue> inputs;
-  vector<pair<StateValue, bool>> ptr_inputs;
+  vector<Memory::PtrInput> ptr_inputs;
   vector<Type*> out_types;
 
   ostringstream fnName_mangled;
