@@ -293,6 +293,8 @@ void CFG::printDot(ostream &os) const {
 // Relies on Alive's top_sort run during llvm2alive conversion in order to
 // traverse the cfg in reverse postorder to build dominators.
 void DomTree::buildDominators() {
+  unordered_set<const BasicBlock*> visited_src;
+
   // initialization
   unsigned i = f.getBBs().size();
   for (auto &b : f.getBBs()) {
@@ -302,12 +304,20 @@ void DomTree::buildDominators() {
   // build predecessors relationship
   for (const auto &[src, tgt, instr] : cfg) {
     (void)instr;
-    doms.at(&tgt).preds.push_back(&doms.at(&src));
+    // skip back-edges
+    visited_src.insert(&src);
+    if (visited_src.find(&tgt) == visited_src.end())
+      doms.at(&tgt).preds.push_back(&doms.at(&src));
   }
 
-  auto &entry = doms.at(&f.getFirstBB());
-  entry.dominator = &entry;
+  // make sure all tree roots have themselves as dominator
+  for (auto &[b, b_dom] : doms) {
+    (void)b;
+    if (b_dom.preds.empty())
+      b_dom.dominator = &b_dom;
+  }
 
+  // Adaptation of the algorithm in the article
   // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
   // A Simple, Fast Dominance Algorithm
   // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
@@ -337,10 +347,18 @@ void DomTree::buildDominators() {
 }
 
 DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
+  auto f1_start = f1, f2_start = f2;
+
   while (f1->order != f2->order) {
-    while (f1->order < f2->order)
+    // if f1 and f2 reached diferent tree roots, then no common parent exists
+    // therefore no "dominator" exists
+    // as a convention, return the node of the tree with root at entry in these
+    // cases, dom trees for subtrees not rooted at entry will be wrong
+    if (f1 == f1->dominator && f2 == f2->dominator)
+      return &f1->bb == &f.getFirstBB() ? f1_start : f2_start;
+    while (f1->order < f2->order && f1 != f1->dominator)
       f1 = f1->dominator;
-    while (f2->order < f1->order)
+    while (f2->order < f1->order && f2 != f2->dominator)
       f2 = f2->dominator;
   }
   return f1;
