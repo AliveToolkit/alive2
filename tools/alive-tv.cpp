@@ -66,6 +66,10 @@ static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_smt_skip(
+    "skip-smt", llvm::cl::desc("Skip all SMT queries"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::cl::list<std::string> opt_funcs(
     "func",
     llvm::cl::desc("Specify the name of a function to verify (without @)"),
@@ -388,7 +392,7 @@ convenient way to demonstrate an existing optimizer bug.
   smt::solver_tactic_verbose(opt_tactic_verbose);
   smt::set_query_timeout(to_string(opt_smt_to));
   smt::set_memory_limit((uint64_t)opt_max_mem * 1024 * 1024);
-  //config::skip_smt = opt_smt_skip;
+  config::skip_smt = opt_smt_skip;
   config::symexec_print_each_value = opt_se_verbose;
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
