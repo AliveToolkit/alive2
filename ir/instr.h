@@ -358,6 +358,7 @@ public:
   void addTarget(Value &val, const BasicBlock &target);
 
   auto getNumTargets() const { return targets.size(); }
+  unsigned getNumUniqueTargets() const;
   auto& getTarget(unsigned i) const { return targets[i]; }
   auto& getDefault() const { return default_target; }
 

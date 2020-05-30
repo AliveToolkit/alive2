@@ -77,7 +77,8 @@ private:
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
 
   // temp state
-  CurrentDomain domain; // TODO UB in this domain is the ub before ite changes
+  CurrentDomain domain;
+  smt::AndExpr isolated_ub;
   Memory memory;
   std::set<smt::expr> undef_vars;
   std::array<StateValue, 32> tmp_values;
@@ -118,15 +119,15 @@ private:
     std::optional<smt::expr> ub;
   };
   std::unordered_map<const BasicBlock*, TargetData> target_data;
-
+  // data structure to hold temporary UB when constructing it in buildUB()
+  // bb -> <visited, ub, carry_ub> 
+  std::unordered_map<const BasicBlock*, std::tuple<bool, 
+                                                   std::optional<smt::expr>,
+                                                   std::optional<smt::expr>>> 
+    build_UB_data;
   // dominator tree
   std::unique_ptr<DomTree> dom_tree;
   std::unique_ptr<CFG> cfg;
-
-  // a set to hold bb's during SE that do not lead to a return
-  // either they reach unreachable or a jump instruction with only back-edges
-  std::unordered_set<const BasicBlock*> no_ret_bbs;
-  std::unordered_map<const BasicBlock*,unsigned> back_edge_counter;
 public:
   State(Function &f, bool source);
 
@@ -144,9 +145,6 @@ public:
   void buildUB();
   bool foundReturn() const { return !return_val.empty(); }
 
-  void propagateNoRetBB(const BasicBlock &bb);
-  const BasicBlock& getCurrentBB() const { return *current_bb; }
-  
   void addJump(const BasicBlock &dst);
   // boolean cond
   void addJump(smt::expr &&cond, const BasicBlock &dst);
