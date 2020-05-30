@@ -216,7 +216,7 @@ void State::addNoReturn() {
 
 const vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
-                 vector<pair<StateValue, bool>> &&ptr_inputs,
+                 vector<Memory::PtrInput> &&ptr_inputs,
                  const vector<Type*> &out_types, const FnAttrs &attrs) {
   // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
@@ -232,8 +232,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     all_valid &= v.isValid();
   }
   for (auto &v : ptr_inputs) {
-    all_args_np &= v.first.non_poison;
-    all_valid &= v.first.isValid();
+    all_args_np &= v.val.non_poison;
+    all_valid &= v.val.isValid();
   }
 
   if (!all_valid) {

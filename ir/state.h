@@ -56,7 +56,7 @@ private:
   smt::AndExpr axioms;
   smt::AndExpr ooms;
 
-  const BasicBlock *current_bb;
+  const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
 
   // var -> ((value, not_poison), undef_vars, already_used?)
@@ -91,8 +91,7 @@ private:
 
   struct FnCallInput {
     std::vector<StateValue> args_nonptr;
-    // (ptr arguments, is by_val arg?)
-    std::vector<std::pair<StateValue, bool>> args_ptr;
+    std::vector<Memory::PtrInput> args_ptr;
     Memory m;
     bool readsmem, argmemonly;
     bool operator<(const FnCallInput &rhs) const {
@@ -142,7 +141,7 @@ public:
 
   const std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
-              std::vector<std::pair<StateValue, bool>> &&ptr_inputs,
+              std::vector<Memory::PtrInput> &&ptr_inputs,
               const std::vector<Type*> &out_types, const FnAttrs &attrs);
 
   void addQuantVar(const smt::expr &var);

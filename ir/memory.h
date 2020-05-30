@@ -247,11 +247,21 @@ public:
   smt::expr mkInput(const char *name, const ParamAttrs &attrs) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 
+  struct PtrInput {
+    StateValue val;
+    bool byval;
+
+    PtrInput(StateValue &&v, bool byval) : val(std::move(v)), byval(byval) {}
+    bool operator<(const PtrInput &rhs) const {
+      return std::tie(val, byval) < std::tie(rhs.val, rhs.byval);
+    }
+  };
+
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name,
-            const std::vector<std::pair<StateValue, bool>> &ptr_inputs) const;
+            const std::vector<PtrInput> &ptr_inputs) const;
   CallState
-    mkCallState(const std::vector<std::pair<StateValue, bool>> *ptr_inputs)
+    mkCallState(const std::vector<PtrInput> *ptr_inputs)
       const;
   void setState(const CallState &st);
 
@@ -296,7 +306,7 @@ public:
   std::pair<smt::expr,Pointer>
     refined(const Memory &other,
             bool skip_constants,
-            const std::vector<std::pair<StateValue, bool>> *set_ptrs = nullptr)
+            const std::vector<PtrInput> *set_ptrs = nullptr)
       const;
 
   // Returns true if a nocapture pointer byte is not in the memory.
