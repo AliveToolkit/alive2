@@ -49,8 +49,12 @@ void sym_exec(State &s) {
     first = false;
   }
   
-  if (s.foundReturn())
-    s.buildUB();
+  if (s.foundReturn()) {
+    auto ret_dom = s.returnPath()() && s.buildUB();
+    if (!s.foundNoReturnAttr())
+      s.setFunctionDomain(ret_dom);
+    s.setReturnDomain(move(ret_dom));
+  }
 
   if (config::symexec_print_each_value) {
     cout << "domain = " << s.functionDomain()

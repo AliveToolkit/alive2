@@ -118,16 +118,24 @@ private:
     std::vector<std::pair<const BasicBlock*, smt::expr>> dsts;
     std::optional<smt::expr> ub;
   };
-  std::unordered_map<const BasicBlock*, TargetData> target_data;
+  std::unordered_map<const BasicBlock*, TargetData> global_target_data;
+  
   // data structure to hold temporary UB when constructing it in buildUB()
-  // bb -> <visited, ub, carry_ub> 
-  std::unordered_map<const BasicBlock*, std::tuple<bool, 
-                                                   std::optional<smt::expr>,
-                                                   std::optional<smt::expr>>> 
-    build_UB_data;
+  struct BuildUBData {
+    bool visited;
+    std::optional<smt::expr> ub;
+    std::optional<smt::expr> carry_ub;
+  };
   // dominator tree
   std::unique_ptr<DomTree> dom_tree;
   std::unique_ptr<CFG> cfg;
+
+  // if false after SE, buildUB sets function_domain to return_domain
+  bool has_noreturn = false;
+  // a set to hold bb's during SE that do not lead to a return	
+  // either they reach unreachable or a jump instruction with only back-edges	
+  std::unordered_set<const BasicBlock*> no_ret_bbs;	
+  std::unordered_map<const BasicBlock*,unsigned> back_edge_counter;
 public:
   State(Function &f, bool source);
 
@@ -142,8 +150,20 @@ public:
 
   bool startBB(const BasicBlock &bb);
   bool canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom);
-  void buildUB();
+  
+  void buildTargetData(std::unordered_map<const BasicBlock*, State::TargetData> 
+                       *tdata, const BasicBlock &end);
+  smt::expr buildUB();
+  smt::expr buildUB(std::unordered_map<const BasicBlock*, TargetData> *tdata);
+  auto* targetData() { return &global_target_data; }
+  auto& returnPath() { return return_path; }
+  void setReturnDomain(smt::expr &&ret_dom);
+  void setFunctionDomain(const smt::expr &f_dom);
   bool foundReturn() const { return !return_val.empty(); }
+  bool foundNoReturnAttr() const { return has_noreturn; }
+
+  void propagateNoRetBB(const BasicBlock &bb);	
+  const BasicBlock& getCurrentBB() const { return *current_bb; }
 
   void addJump(const BasicBlock &dst);
   // boolean cond
