@@ -527,9 +527,9 @@ static Value& parse_operand(Type &type) {
   case LSQBRACKET:
     return parse_aggregate_constant(type, RSQBRACKET);
   case TRUE:
-    return get_constant(1, type);
+    return get_constant(1, *int_types[1]);
   case FALSE:
-    return get_constant(0, type);
+    return get_constant(0, *int_types[1]);
   case UNDEF: {
     auto val = make_unique<UndefValue>(type);
     auto ret = val.get();
