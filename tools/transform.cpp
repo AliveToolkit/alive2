@@ -439,6 +439,12 @@ static bool may_be_nonlocal(Value *ptr) {
         todo.emplace_back(op);
       continue;
     }
+
+    if (auto s = dynamic_cast<Select*>(ptr)) {
+      todo.emplace_back(s->getTrueValue());
+      todo.emplace_back(s->getFalseValue());
+      continue;
+    }
     return true;
 
   } while (!todo.empty());
@@ -497,6 +503,8 @@ static void calculateAndInitConstants(Transform &t) {
   bool nullptr_is_used = false;
   has_int2ptr      = false;
   has_ptr2int      = false;
+  has_alloca       = false;
+  has_dead_allocas = false;
   has_malloc       = false;
   has_free         = false;
   has_fncall       = false;

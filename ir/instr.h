@@ -144,6 +144,9 @@ public:
   Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
     : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b) {}
 
+  Value *getTrueValue() const { return a; }
+  Value *getFalseValue() const { return b; }
+
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
