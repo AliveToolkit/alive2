@@ -5,4 +5,4 @@ ret i4 0
 assume(false)
 ret i4 1
 
-; FIXME: this test should fail
+; ERROR: Source is more defined than target

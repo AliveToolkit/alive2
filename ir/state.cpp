@@ -225,14 +225,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool writes_memory = !attrs.has(FnAttrs::NoWrite);
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
 
-  expr all_args_np(true);
   bool all_valid = true;
   for (auto &v : inputs) {
-    all_args_np &= v.non_poison;
     all_valid &= v.isValid();
   }
   for (auto &v : ptr_inputs) {
-    all_args_np &= v.val.non_poison;
     all_valid &= v.val.isValid();
   }
 
@@ -397,11 +394,8 @@ void State::mkAxioms(State &tgt) {
 
         expr refines(true);
         for (unsigned i = 0, e = ins.size(); i != e; ++i) {
-          string used = fn + "#arg" + to_string(i) + "used";
-          refines &=
-            expr::mkBoolVar(used.c_str()).implies(
-              ins[i].non_poison.implies(ins[i].value == ins2[i].value &&
-                                        ins2[i].non_poison));
+          refines &= ins[i].non_poison.implies(ins[i].value == ins2[i].value &&
+                                               ins2[i].non_poison);
         }
 
         if (refines.isFalse())
