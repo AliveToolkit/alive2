@@ -26,6 +26,7 @@ public:
   void del(const AndExpr &other);
   void reset();
   bool contains(const expr &e) const;
+  unsigned size() const { return exprs.size(); }
   expr operator()() const;
   operator bool() const;
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);

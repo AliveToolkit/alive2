@@ -89,7 +89,7 @@ private:
   // boolean expression describing all possible return paths only
   smt::OrExpr return_path;
   // function_domain: a condition for function having well-defined behavior
-  smt::OrExpr function_domain; 
+  smt::OrExpr function_domain;
   smt::DisjointExpr<StateValue> return_val;
   smt::DisjointExpr<Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -117,6 +117,9 @@ private:
   struct TargetData {
     std::vector<std::pair<const BasicBlock*, smt::expr>> dsts;
     std::optional<smt::expr> ub;
+    bool has_return;
+    unsigned ub_estimated_size;
+    unsigned path_estimated_size;
   };
   std::unordered_map<const BasicBlock*, TargetData> global_target_data;
   
@@ -125,6 +128,7 @@ private:
     bool visited;
     std::optional<smt::expr> ub;
     std::optional<smt::expr> carry_ub;
+    unsigned ub_estimated_size = 0;
   };
   // dominator tree
   std::unique_ptr<DomTree> dom_tree;
@@ -132,10 +136,12 @@ private:
 
   // if false after SE, buildUB sets function_domain to return_domain
   bool has_noreturn = false;
-  // a set to hold bb's during SE that do not lead to a return	
-  // either they reach unreachable or a jump instruction with only back-edges	
+  // a set to hold bb's during SE that do not lead to a return
+  // either they reach unreachable or a jump instruction with only back-edges
   std::unordered_set<const BasicBlock*> no_ret_bbs;	
   std::unordered_map<const BasicBlock*,unsigned> back_edge_counter;
+
+  unsigned num_returns = 0;
 public:
   State(Function &f, bool source);
 
@@ -149,10 +155,12 @@ public:
   bool isUndef(const smt::expr &e) const;
 
   bool startBB(const BasicBlock &bb);
-  bool canMoveExprsToDom(const BasicBlock &merge, const BasicBlock &dom);
-  
-  void buildTargetData(std::unordered_map<const BasicBlock*, State::TargetData> 
-                       *tdata, const BasicBlock &end);
+  smt::expr buildPathFromDomForBBs(const BasicBlock &merge, const BasicBlock
+                                   &dom, std::unordered_set<const BasicBlock*>
+                                   *bbs);
+  void buildPostdomBreakingBBs(const BasicBlock &merge,
+                               const BasicBlock &dom,
+                               std::unordered_set<const BasicBlock*> *pb_bbs);
   smt::expr buildUB();
   smt::expr buildUB(std::unordered_map<const BasicBlock*, TargetData> *tdata);
   auto* targetData() { return &global_target_data; }
@@ -162,7 +170,7 @@ public:
   bool foundReturn() const { return !return_val.empty(); }
   bool foundNoReturnAttr() const { return has_noreturn; }
 
-  void propagateNoRetBB(const BasicBlock &bb);	
+  void propagateNoRetBB(const BasicBlock &bb);
   const BasicBlock& getCurrentBB() const { return *current_bb; }
 
   void addJump(const BasicBlock &dst);

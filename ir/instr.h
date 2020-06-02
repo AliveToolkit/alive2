@@ -309,7 +309,6 @@ public:
     bool operator!=(target_iterator &rhs) const { return idx != rhs.idx; }
     bool operator==(target_iterator &rhs) const { return !(*this != rhs); }
     const unsigned getIdx() const { return idx; }
-
   };
 
   class it_helper {
