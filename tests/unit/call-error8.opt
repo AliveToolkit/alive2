@@ -1,0 +1,10 @@
+%a = call i4 @f(i4 poison) noread nowrite
+%b = call i4 @f(i4 poison) noread nowrite
+%add = add i4 %a, %b
+%eq = icmp eq %add, 1
+assume(%eq)
+ret true
+  =>
+ret false
+
+; FIXME: this test should fail
