@@ -68,9 +68,17 @@ define void @f8() {
   ret void
 }
 
+define void @f9() {
+  %poison = sub nuw i32 0, 1
+  call void @j(i32 %poison)
+  call void @j(i32 %poison)
+  ret void
+}
+
 declare i8 @g(i8*)
 declare i8 @g2(i8* byval)
 declare i8 @h(i8*) readnone
+declare void @j(i32)
 declare i8* @k()
 
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
