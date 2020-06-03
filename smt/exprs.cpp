@@ -110,8 +110,14 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
         if (auto rhs_val = rhs.lookup(lhs_domain)) {
           add(lhs_v.concat(*rhs_val), c && lhs_domain);
         } else {
+          expr from, to(false);
+          if (!lhs_domain.isNot(from)) {
+            from = lhs_domain;
+            to = true;
+          }
+
           for (auto &[rhs_v, rhs_domain] : rhs) {
-            add(lhs_v.concat(rhs_v.subst(lhs_domain, true).simplify()),
+            add(lhs_v.concat(rhs_v.subst(from, to).simplify()),
                 c && lhs_domain && rhs_domain);
           }
         }
