@@ -379,12 +379,13 @@ void State::mkAxioms(State &tgt) {
   // doesn't seem to be needed in practice for optimizations
   // since there's no introduction of calls in tgt
   for (auto &[fn, data] : fn_call_data) {
+    auto &data2 = tgt.fn_call_data.at(fn);
+
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
       auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
       auto &[rets, ub, mem_state, used] = I->second;
       assert(used); (void)used;
 
-      auto &data2 = tgt.fn_call_data.at(fn);
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
         auto &[rets2, ub2, mem_state2, used2] = I2->second;
@@ -415,7 +416,13 @@ void State::mkAxioms(State &tgt) {
                       .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
           refines &= ptr_in.non_poison
                        .implies(eq_val && ptr_in2.non_poison);
+
+          if (refines.isFalse())
+            break;
         }
+
+        if (refines.isFalse())
+          continue;
 
         if (reads2) {
           auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
