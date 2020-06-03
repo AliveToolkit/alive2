@@ -1427,7 +1427,8 @@ static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
         s.addUB(p.isNonZero());
       }
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
-                              argflag.has(ParamAttrs::ByVal));
+                              argflag.has(ParamAttrs::ByVal),
+                              argflag.has(ParamAttrs::NoCapture));
     } else {
       inputs.emplace_back(value);
     }

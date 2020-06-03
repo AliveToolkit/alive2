@@ -186,6 +186,10 @@ public:
   smt::expr isNull() const;
   smt::expr isNonZero() const;
 
+  // Extract local bids from ptr syntactically
+  static std::vector<smt::expr> extractPossibleLocalBids(
+      Memory &m, const smt::expr &ptr);
+
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
 
@@ -223,17 +227,22 @@ public:
     MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
   };
 
-  // TODO: missing local_* equivalents
+  // The state after function call.
+  // TODO: missing local_liveness
   class CallState {
-    smt::expr non_local_block_val;
-    smt::expr block_val_var;
-    smt::expr non_local_block_liveness;
-    smt::expr liveness_var;
+    smt::expr nonlocal_val;
+    smt::expr nonlocal_val_var;
+    smt::expr nonlocal_liveness;
+    smt::expr nonlocal_liveness_var;
+    smt::expr local_val;
+    smt::expr local_val_var;
     bool empty = true;
 
   public:
     smt::expr implies(const CallState &st) const;
     friend class Memory;
+
+    friend std::ostream &operator<<(std::ostream &os, const CallState &cstate);
   };
 
   Memory(State &state);
@@ -250,10 +259,13 @@ public:
   struct PtrInput {
     StateValue val;
     bool byval;
+    bool nocapture;
 
-    PtrInput(StateValue &&v, bool byval) : val(std::move(v)), byval(byval) {}
+    PtrInput(StateValue &&v, bool byval, bool nocapture) :
+      val(std::move(v)), byval(byval), nocapture(nocapture) {}
     bool operator<(const PtrInput &rhs) const {
-      return std::tie(val, byval) < std::tie(rhs.val, rhs.byval);
+      return std::tie(val, byval, nocapture) <
+             std::tie(rhs.val, rhs.byval, nocapture);
     }
   };
 
@@ -310,6 +322,8 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
+  smt::expr isEscapedLocal(const smt::expr &short_bid) const;
+  void escapeLocals(std::vector<smt::expr> &&local_bids);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
