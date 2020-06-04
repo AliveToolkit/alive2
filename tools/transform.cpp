@@ -358,13 +358,25 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
       << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p)()]);
   };
 
+  expr dom_constr;
+  if (dom_a.eq(fndom_a)) {
+    if (dom_b.eq(fndom_b)) // A /\ B /\ A != B
+       dom_constr = false;
+    else // A /\ B /\ A != C
+      dom_constr = fndom_a && fndom_b && !dom_b;
+  } else if (dom_b.eq(fndom_b)) { // A /\ B /\ C != B
+    dom_constr = fndom_a && fndom_b && !dom_a;
+  } else {
+    dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
+  }
+
   Solver::check({
     { mk_fml(fndom_a.notImplies(fndom_b)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source is more defined than target");
       }},
-    { mk_fml((fndom_a && fndom_b) && dom_a != dom_b),
+    { mk_fml(move(dom_constr)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source and target don't have the same return domain");
