@@ -529,8 +529,9 @@ static void calculateAndInitConstants(Transform &t) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (i && i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
-        min_access_size = gcd(min_access_size,
-                              i->getAttributes().getDerefBytes());
+        uint64_t deref_bytes = i->getAttributes().getDerefBytes();
+        min_access_size = gcd(min_access_size, deref_bytes);
+        max_access_size = max(max_access_size, deref_bytes);
       }
     }
 
