@@ -147,6 +147,7 @@ public:
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
+  const std::set<smt::expr>& getUndefVars(const Value &val) const;
   void resetUndefVars();
 
   StateValue rewriteUndef(StateValue &&val,

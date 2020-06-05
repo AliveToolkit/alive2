@@ -287,6 +287,10 @@ void State::addUndefVar(expr &&var) {
   undef_vars.emplace(move(var));
 }
 
+const std::set<smt::expr>& State::getUndefVars(const Value &val) const {
+  return std::get<1>(values[values_map.at(&val)]).second;
+}
+
 void State::resetUndefVars() {
   quantified_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
