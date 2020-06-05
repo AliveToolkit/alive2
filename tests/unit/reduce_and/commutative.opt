@@ -1,0 +1,27 @@
+Name: t0
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = and i8 %v0, i8 %v1
+  =>
+%r = reduce_and <2 x i8> %x
+
+Name: t1
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = and i8 %v1, i8 %v0
+  =>
+%r = reduce_and <2 x i8> %x
+
+Name: t2
+%r = reduce_and <2 x i8> %x
+  =>
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = and i8 %v0, i8 %v1
+
+Name: t3
+%r = reduce_and <2 x i8> %x
+  =>
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = and i8 %v1, i8 %v0

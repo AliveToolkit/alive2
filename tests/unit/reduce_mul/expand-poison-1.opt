@@ -1,0 +1,8 @@
+Name: t0
+%r = reduce_mul <2 x i8> %x
+  =>
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = mul nsw i8 %v0, i8 %v1
+
+; ERROR: Target is more poisonous than source for i8 %r

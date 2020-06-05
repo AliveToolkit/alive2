@@ -71,7 +71,9 @@ public:
 
 class UnaryOp final : public Instr {
 public:
-  enum Op { Copy, BitReverse, BSwap, Ctpop, IsConstant, FNeg };
+  enum Op {
+    Copy, BitReverse, BSwap, Ctpop, IsConstant, FNeg
+  };
 
 private:
   Value *val;
@@ -82,6 +84,29 @@ public:
   UnaryOp(Type &type, std::string &&name, Value &val, Op op,
           FastMathFlags fmath = {})
     : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath) {}
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class UnaryReductionOp final : public Instr {
+public:
+  enum Op {
+    Add, Mul, And, Or, Xor
+  };
+
+private:
+  Value *val;
+  Op op;
+
+public:
+  UnaryReductionOp(Type &type, std::string &&name, Value &val, Op op)
+    : Instr(type, std::move(name)), val(&val), op(op) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

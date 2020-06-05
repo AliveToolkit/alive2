@@ -1,0 +1,11 @@
+Name: t0
+%t0 = insertelement <2 x i8> %x, i8 poison, i8 1
+%r = reduce_or <2 x i8> %t0
+  =>
+%r = poison
+
+Name: t0
+%t0 = insertelement <2 x i8> %x, i8 poison, i8 1
+%r = reduce_or <2 x i8> %t0
+  =>
+%r = undef

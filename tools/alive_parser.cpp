@@ -753,6 +753,26 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   return make_unique<UnaryOp>(ty, string(name), a, op);
 }
 
+static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
+                                                  token op_token) {
+  UnaryReductionOp::Op op;
+  switch (op_token) {
+  case REDUCE_ADD: op = UnaryReductionOp::Add; break;
+  case REDUCE_MUL: op = UnaryReductionOp::Mul; break;
+  case REDUCE_AND: op = UnaryReductionOp::And; break;
+  case REDUCE_OR:  op = UnaryReductionOp::Or;  break;
+  case REDUCE_XOR: op = UnaryReductionOp::Xor; break;
+  default: UNREACHABLE();
+  }
+
+  auto &op_ty = parse_type();
+  auto &ty =
+      op_ty.isVectorType() ? op_ty.getAsAggregateType()->getChild(0) : op_ty;
+
+  auto &a = parse_operand(op_ty);
+  return make_unique<UnaryReductionOp>(ty, string(name), a, op);
+}
+
 static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
   auto fmath = parse_fast_math(op_token);
 
@@ -1064,6 +1084,12 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case CTPOP:
   case FNEG:
     return parse_unaryop(name, t);
+  case REDUCE_ADD:
+  case REDUCE_MUL:
+  case REDUCE_AND:
+  case REDUCE_OR:
+  case REDUCE_XOR:
+    return parse_unary_reduction_op(name, t);
   case FSHL:
   case FSHR:
   case FMA:

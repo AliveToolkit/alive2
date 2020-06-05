@@ -1,0 +1,13 @@
+Name: t0
+%r = reduce_mul <2 x i8> %x
+  =>
+%v0 = extractelement <2 x i8> %x, i8 0
+%v1 = extractelement <2 x i8> %x, i8 1
+%r = mul i8 %v0, i8 %v1
+
+Name: t1
+%t0 = insertelement <2 x i8> undef, i8 %v0, i8 0
+%t1 = insertelement <2 x i8> %t0, i8 %v1, i8 1
+%r = reduce_mul <2 x i8> %t1
+  =>
+%r = mul i8 %v0, i8 %v1

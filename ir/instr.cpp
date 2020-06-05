@@ -789,6 +789,75 @@ unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
 }
 
 
+vector<Value*> UnaryReductionOp::operands() const {
+  return { val };
+}
+
+void UnaryReductionOp::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
+
+void UnaryReductionOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case Add:  str = "reduce_add "; break;
+  case Mul:  str = "reduce_mul "; break;
+  case And:  str = "reduce_and "; break;
+  case Or:   str = "reduce_or "; break;
+  case Xor:  str = "reduce_xor "; break;
+  }
+
+  os << getName() << " = " << str << print_type(val->getType())
+     << val->getName();
+}
+
+StateValue UnaryReductionOp::toSMT(State &s) const {
+  auto &v = s[*val];
+  auto vty =
+      static_cast<const VectorType *>(val->getType().getAsAggregateType());
+  StateValue res;
+  for (unsigned i = 0, e = vty->numElementsConst(); i != e; ++i) {
+    auto ith = vty->extract(v, expr::mkUInt(i, 32));
+    if (i == 0) {
+      res = ith;
+      continue;
+    }
+    switch (op) {
+    case Add: res.value = res.value + ith.value; break;
+    case Mul: res.value = res.value * ith.value; break;
+    case And: res.value = res.value & ith.value; break;
+    case Or:  res.value = res.value | ith.value; break;
+    case Xor: res.value = res.value ^ ith.value; break;
+    default:  UNREACHABLE();
+    }
+    // The result is non-poisonous if all lanes are non-poisonous.
+    res.non_poison &= ith.non_poison;
+  }
+  return res;
+}
+
+expr UnaryReductionOp::getTypeConstraints(const Function &f) const {
+  expr instrconstr = getType() == val->getType();
+  switch(op) {
+  case Add:
+  case Mul:
+  case And:
+  case Or:
+  case Xor:
+    instrconstr = getType().enforceIntType();
+    instrconstr &= val->getType().enforceVectorType(
+        [this](auto &scalar) { return scalar == getType(); });
+    break;
+  }
+
+  return Value::getTypeConstraints() && move(instrconstr);
+}
+
+unique_ptr<Instr> UnaryReductionOp::dup(const string &suffix) const {
+  return make_unique<UnaryReductionOp>(getType(), getName() + suffix, *val, op);
+}
+
+
 TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c,
                      Op op, FastMathFlags fmath)
     : Instr(type, move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath) {

@@ -1,0 +1,7 @@
+Name: t0
+%t0 = insertelement <2 x i8> %x, i8 undef, i8 1
+%r = reduce_add <2 x i8> %t0
+  =>
+%r = poison
+
+; ERROR: Target is more poisonous than source for i8 %r
