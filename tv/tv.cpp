@@ -8,6 +8,7 @@
 #include "util/config.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
