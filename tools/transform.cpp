@@ -330,7 +330,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto tgt_mem = tgt_state.returnMemory();
   auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, false);
   auto &ptr_refinement = ptr_refinement0;
-  auto memory_cnstr = value_cnstr && memory_cnstr0;
+  auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
+                                             : value_cnstr && memory_cnstr0;
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);

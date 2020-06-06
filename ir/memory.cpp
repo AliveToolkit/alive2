@@ -797,10 +797,12 @@ expr Pointer::blockValRefined(const Pointer &other) const {
 
   // refinement if offset had non-ptr value
   expr np1 = val.nonptrNonpoison();
+  expr np2 = val2.nonptrNonpoison();
+  bool np_eqs = np1.eq(np2);
   expr int_cnstr = does_sub_byte_access
-                     ? (val2.nonptrNonpoison() | np1) == np1 &&
+                     ? (np2 | np1) == np1 &&
                        (val.nonptrValue() | np1) == (val2.nonptrValue() | np1)
-                     : val2.nonptrNonpoison() == 0 &&
+                     : (np_eqs ? true : np2 == 0) &&
                        val.nonptrValue() == val2.nonptrValue();
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
