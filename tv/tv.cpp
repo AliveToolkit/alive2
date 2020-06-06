@@ -353,9 +353,10 @@ llvmGetPassPluginInfo() {
         [](llvm::ModulePassManager &MPM) { MPM.addPass(TVInitPass()); }
       );
       PB.registerOptimizerLastEPCallback(
-        [](llvm::FunctionPassManager &FPM, llvm::PassBuilder::OptimizationLevel)
-        { FPM.addPass(TVFinalizePass()); }
-      );
+          [](llvm::ModulePassManager &MPM,
+             llvm::PassBuilder::OptimizationLevel) {
+            MPM.addPass(createModuleToFunctionPassAdaptor(TVFinalizePass()));
+          });
       auto f = [](llvm::StringRef P, llvm::Any IR) {
         static int count = 0;
         if (!out) {
