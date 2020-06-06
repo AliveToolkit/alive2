@@ -1,0 +1,9 @@
+Name: t0
+%t0 = insertelement <2 x i8> undef, i8 %v0, i8 0
+%t1 = insertelement <2 x i8> %t0, i8 %v1, i8 1
+%r = reduce_umin <2 x i8> %t1
+  =>
+%cmp = icmp ult i8 %v0, %v1
+%r = select i1 %cmp, i8 %v0, i8 %v1
+
+; ERROR: Value mismatch for i8 %r

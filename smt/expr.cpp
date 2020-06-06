@@ -825,6 +825,26 @@ expr expr::ctpop() const {
   return res;
 }
 
+expr expr::umin(const expr &rhs) const {
+  C();
+  return mkIf(this->ult(rhs), *this, rhs);
+}
+
+expr expr::umax(const expr &rhs) const {
+  C();
+  return mkIf(this->ugt(rhs), *this, rhs);
+}
+
+expr expr::smin(const expr &rhs) const {
+  C();
+  return mkIf(this->slt(rhs), *this, rhs);
+}
+
+expr expr::smax(const expr &rhs) const {
+  C();
+  return mkIf(this->sgt(rhs), *this, rhs);
+}
+
 expr expr::isNaN() const {
   return unop_fold(Z3_mk_fpa_is_nan);
 }

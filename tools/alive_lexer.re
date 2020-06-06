@@ -260,6 +260,10 @@ space+ {
 "reduce_and" { return REDUCE_AND; }
 "reduce_or" { return REDUCE_OR; }
 "reduce_xor" { return REDUCE_XOR; }
+"reduce_smax" { return REDUCE_SMAX; }
+"reduce_smin" { return REDUCE_SMIN; }
+"reduce_umax" { return REDUCE_UMAX; }
+"reduce_umin" { return REDUCE_UMIN; }
 "fadd" { return FADD; }
 "fsub" { return FSUB; }
 "fmul" { return FMUL; }

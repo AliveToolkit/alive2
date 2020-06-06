@@ -805,6 +805,10 @@ void UnaryReductionOp::print(ostream &os) const {
   case And:  str = "reduce_and "; break;
   case Or:   str = "reduce_or "; break;
   case Xor:  str = "reduce_xor "; break;
+  case SMax:  str = "reduce_smax "; break;
+  case SMin:  str = "reduce_smin "; break;
+  case UMax:  str = "reduce_umax "; break;
+  case UMin:  str = "reduce_umin "; break;
   }
 
   os << getName() << " = " << str << print_type(val->getType())
@@ -827,6 +831,10 @@ StateValue UnaryReductionOp::toSMT(State &s) const {
     case And: res.value = res.value & ith.value; break;
     case Or:  res.value = res.value | ith.value; break;
     case Xor: res.value = res.value ^ ith.value; break;
+    case SMax: res.value = res.value.smax(ith.value); break;
+    case SMin: res.value = res.value.smin(ith.value); break;
+    case UMax: res.value = res.value.umax(ith.value); break;
+    case UMin: res.value = res.value.umin(ith.value); break;
     default:  UNREACHABLE();
     }
     // The result is non-poisonous if all lanes are non-poisonous.
@@ -843,6 +851,10 @@ expr UnaryReductionOp::getTypeConstraints(const Function &f) const {
   case And:
   case Or:
   case Xor:
+  case SMax:
+  case SMin:
+  case UMax:
+  case UMin:
     instrconstr = getType().enforceIntType();
     instrconstr &= val->getType().enforceVectorType(
         [this](auto &scalar) { return scalar == getType(); });

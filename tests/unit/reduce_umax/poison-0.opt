@@ -1,0 +1,6 @@
+Name: t0
+%r = reduce_umax <2 x i8> %x
+  =>
+%r = poison
+
+; ERROR: Target is more poisonous than source for i8 %r

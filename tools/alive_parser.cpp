@@ -762,6 +762,10 @@ static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
   case REDUCE_AND: op = UnaryReductionOp::And; break;
   case REDUCE_OR:  op = UnaryReductionOp::Or;  break;
   case REDUCE_XOR: op = UnaryReductionOp::Xor; break;
+  case REDUCE_SMAX: op = UnaryReductionOp::SMax; break;
+  case REDUCE_SMIN: op = UnaryReductionOp::SMin; break;
+  case REDUCE_UMAX: op = UnaryReductionOp::UMax; break;
+  case REDUCE_UMIN: op = UnaryReductionOp::UMin; break;
   default: UNREACHABLE();
   }
 
@@ -1089,6 +1093,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case REDUCE_AND:
   case REDUCE_OR:
   case REDUCE_XOR:
+  case REDUCE_SMAX:
+  case REDUCE_SMIN:
+  case REDUCE_UMAX:
+  case REDUCE_UMIN:
     return parse_unary_reduction_op(name, t);
   case FSHL:
   case FSHR:
