@@ -94,6 +94,7 @@ private:
     std::vector<Memory::PtrInput> args_ptr;
     Memory m;
     bool readsmem, argmemonly;
+
     bool operator<(const FnCallInput &rhs) const {
       return std::tie(args_nonptr, args_ptr, m, readsmem, argmemonly) <
              std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.m, rhs.readsmem,
@@ -139,7 +140,7 @@ public:
   void addNoReturn();
   void addOOM(smt::expr &&oom) { ooms.add(std::move(oom)); }
 
-  const std::vector<StateValue>
+  std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
               const std::vector<Type*> &out_types, const FnAttrs &attrs);

@@ -260,9 +260,7 @@ public:
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name,
             const std::vector<PtrInput> &ptr_inputs) const;
-  CallState
-    mkCallState(const std::vector<PtrInput> *ptr_inputs)
-      const;
+  CallState mkCallState(const std::vector<PtrInput> *ptr_inputs) const;
   void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).

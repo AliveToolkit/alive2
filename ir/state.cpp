@@ -214,7 +214,7 @@ void State::addNoReturn() {
   addUB(expr(false));
 }
 
-const vector<StateValue>
+vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
                  const vector<Type*> &out_types, const FnAttrs &attrs) {
@@ -262,7 +262,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                           expr::mkFreshVar(npname.c_str(), false));
     }
 
-    string ub_name = string(name) + "#ub";
+    string ub_name = name + "#ub";
     I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
                   writes_memory
                   ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr)

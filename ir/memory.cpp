@@ -1252,7 +1252,7 @@ expr Memory::CallState::implies(const CallState &st) const {
 
 Memory::CallState
 Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
-  Memory::CallState st;
+  CallState st;
   st.empty = false;
 
   // TODO: handle havoc of local blocks
