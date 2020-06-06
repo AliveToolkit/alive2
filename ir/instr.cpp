@@ -813,13 +813,12 @@ void UnaryReductionOp::print(ostream &os) const {
 
 StateValue UnaryReductionOp::toSMT(State &s) const {
   auto &v = s[*val];
-  auto vty =
-      static_cast<const VectorType *>(val->getType().getAsAggregateType());
+  auto vty = val->getType().getAsAggregateType();
   StateValue res;
   for (unsigned i = 0, e = vty->numElementsConst(); i != e; ++i) {
-    auto ith = vty->extract(v, expr::mkUInt(i, 32));
+    auto ith = vty->extract(v, i);
     if (i == 0) {
-      res = ith;
+      res = move(ith);
       continue;
     }
     switch (op) {
