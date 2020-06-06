@@ -1,0 +1,6 @@
+Name: t0
+%r = reduce_smin <2 x i8> undef
+  =>
+%r = poison
+
+; ERROR: Target is more poisonous than source for i8 %r

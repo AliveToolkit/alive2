@@ -1,0 +1,4 @@
+Name: t0
+%r = reduce_smax <2 x i8> undef
+  =>
+%r = undef

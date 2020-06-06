@@ -1,0 +1,7 @@
+Name: t0
+%t0 = insertelement <2 x i8> %x, i8 undef, i8 1
+%r = reduce_smax <2 x i8> %t0
+  =>
+%r = undef
+
+; ERROR: Value mismatch for i8 %r

@@ -184,6 +184,11 @@ public:
   expr ctlz() const;
   expr ctpop() const;
 
+  expr umin(const expr &rhs) const;
+  expr umax(const expr &rhs) const;
+  expr smin(const expr &rhs) const;
+  expr smax(const expr &rhs) const;
+
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

@@ -97,7 +97,8 @@ public:
 class UnaryReductionOp final : public Instr {
 public:
   enum Op {
-    Add, Mul, And, Or, Xor
+    Add, Mul, And, Or, Xor,
+    SMax, SMin, UMax, UMin
   };
 
 private:

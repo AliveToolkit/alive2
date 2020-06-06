@@ -696,7 +696,11 @@ public:
     case llvm::Intrinsic::experimental_vector_reduce_mul:
     case llvm::Intrinsic::experimental_vector_reduce_and:
     case llvm::Intrinsic::experimental_vector_reduce_or:
-    case llvm::Intrinsic::experimental_vector_reduce_xor: {
+    case llvm::Intrinsic::experimental_vector_reduce_xor:
+    case llvm::Intrinsic::experimental_vector_reduce_smax:
+    case llvm::Intrinsic::experimental_vector_reduce_smin:
+    case llvm::Intrinsic::experimental_vector_reduce_umax:
+    case llvm::Intrinsic::experimental_vector_reduce_umin: {
       PARSE_UNOP();
       UnaryReductionOp::Op op;
       switch (i.getIntrinsicID()) {
@@ -705,6 +709,10 @@ public:
       case llvm::Intrinsic::experimental_vector_reduce_and: op = UnaryReductionOp::And; break;
       case llvm::Intrinsic::experimental_vector_reduce_or:  op = UnaryReductionOp::Or;  break;
       case llvm::Intrinsic::experimental_vector_reduce_xor: op = UnaryReductionOp::Xor; break;
+      case llvm::Intrinsic::experimental_vector_reduce_smax: op = UnaryReductionOp::SMax; break;
+      case llvm::Intrinsic::experimental_vector_reduce_smin: op = UnaryReductionOp::SMin; break;
+      case llvm::Intrinsic::experimental_vector_reduce_umax: op = UnaryReductionOp::UMax; break;
+      case llvm::Intrinsic::experimental_vector_reduce_umin: op = UnaryReductionOp::UMin; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));

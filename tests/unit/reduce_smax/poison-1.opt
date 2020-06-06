@@ -1,0 +1,9 @@
+Name: t0
+%r = reduce_smax <2 x i8> poison
+  =>
+%r = poison
+
+Name: t1
+%r = reduce_smax <2 x i8> poison
+  =>
+%r = undef

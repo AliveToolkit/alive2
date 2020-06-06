@@ -1,0 +1,9 @@
+Name: t0
+%r = extractelement <1 x i8> %x, i8 0
+  =>
+%r = reduce_umin <1 x i8> %x
+
+Name: t1
+%r = reduce_umin <1 x i8> %x
+  =>
+%r = extractelement <1 x i8> %x, i8 0
