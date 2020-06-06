@@ -43,7 +43,7 @@ ninja
 ```
 
 If CMake cannot find the Z3 include directory (or finds the wrong one) pass
-the ``-DZ3_INCLUDE_DIR=/path/to/z3/include`` argument to CMake
+the ``-DZ3_INCLUDE_DIR=/path/to/z3/include`` and ``-DZ3_LIBRARIES=/path/to/z3/lib/libz3.so`` arguments to CMake.
 
 
 Building and Running Translation Validation
