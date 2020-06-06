@@ -255,6 +255,11 @@ space+ {
 "usub_overflow" { return USUB_OVERFLOW; }
 "smul_overflow" { return SMUL_OVERFLOW; }
 "umul_overflow" { return UMUL_OVERFLOW; }
+"reduce_add" { return REDUCE_ADD; }
+"reduce_mul" { return REDUCE_MUL; }
+"reduce_and" { return REDUCE_AND; }
+"reduce_or" { return REDUCE_OR; }
+"reduce_xor" { return REDUCE_XOR; }
 "fadd" { return FADD; }
 "fsub" { return FSUB; }
 "fmul" { return FMUL; }

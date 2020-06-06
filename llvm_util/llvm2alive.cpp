@@ -679,8 +679,7 @@ public:
     case llvm::Intrinsic::bswap:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
-    case llvm::Intrinsic::is_constant:
-    {
+    case llvm::Intrinsic::is_constant: {
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
@@ -692,6 +691,23 @@ public:
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+    }
+    case llvm::Intrinsic::experimental_vector_reduce_add:
+    case llvm::Intrinsic::experimental_vector_reduce_mul:
+    case llvm::Intrinsic::experimental_vector_reduce_and:
+    case llvm::Intrinsic::experimental_vector_reduce_or:
+    case llvm::Intrinsic::experimental_vector_reduce_xor: {
+      PARSE_UNOP();
+      UnaryReductionOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::experimental_vector_reduce_add: op = UnaryReductionOp::Add; break;
+      case llvm::Intrinsic::experimental_vector_reduce_mul: op = UnaryReductionOp::Mul; break;
+      case llvm::Intrinsic::experimental_vector_reduce_and: op = UnaryReductionOp::And; break;
+      case llvm::Intrinsic::experimental_vector_reduce_or:  op = UnaryReductionOp::Or;  break;
+      case llvm::Intrinsic::experimental_vector_reduce_xor: op = UnaryReductionOp::Xor; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:

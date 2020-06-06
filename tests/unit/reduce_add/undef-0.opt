@@ -1,0 +1,6 @@
+Name: t0
+%r = reduce_add <2 x i8> %x
+  =>
+%r = undef
+
+; ERROR: Value mismatch for i8 %r

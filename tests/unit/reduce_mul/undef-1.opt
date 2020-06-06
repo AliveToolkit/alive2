@@ -1,0 +1,4 @@
+Name: t0
+%r = reduce_mul <2 x i8> undef
+  =>
+%r = undef
