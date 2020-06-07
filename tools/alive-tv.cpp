@@ -449,9 +449,7 @@ convenient way to demonstrate an existing optimizer bug.
   }
 
   {
-  set<string> funcNames;
-  for (const string &fnname: opt_funcs)
-    funcNames.insert(fnname);
+  set<string> funcNames(opt_funcs.begin(), opt_funcs.end());
 
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
   // FIXME: quadratic, may not be suitable for very large modules

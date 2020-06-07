@@ -89,6 +89,11 @@ llvm::cl::opt<bool> opt_disable_undef_input(
   llvm::cl::desc("Alive: Assume function input cannot be undef"),
   llvm::cl::init(false));
 
+llvm::cl::list<std::string> opt_funcs(
+  "tv-func",
+  llvm::cl::desc("Name of functions to verify (without @)"),
+  llvm::cl::ZeroOrMore, llvm::cl::value_desc("function name"));
+
 llvm::cl::opt<bool> opt_debug(
   "tv-dbg",
   llvm::cl::desc("Alive: Show debug data"),
@@ -107,6 +112,7 @@ optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, pair<Function, unsigned>> fns;
+set<string> fnsToVerify;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
@@ -122,6 +128,9 @@ struct TVPass final : public llvm::FunctionPass {
   bool runOnFunction(llvm::Function &F) override {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
+      return false;
+
+    if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
       return false;
 
     llvm::TargetLibraryInfo *TLI = nullptr;
@@ -194,6 +203,8 @@ struct TVPass final : public llvm::FunctionPass {
   bool doInitialization(llvm::Module &module) override {
     if (initialized++)
       return false;
+
+    fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
       static default_random_engine re;
