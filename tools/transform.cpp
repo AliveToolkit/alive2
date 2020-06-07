@@ -509,7 +509,8 @@ static void calculateAndInitConstants(Transform &t) {
   // The number of instructions that can return a pointer to a non-local block.
   num_max_nonlocals_inst = 0;
   // The number of local blocks.
-  unsigned num_locals_src = 0, num_locals_tgt = 0;
+  num_locals_src = 0;
+  num_locals_tgt = 0;
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
   uint64_t max_alloc_size = 0;
   uint64_t max_access_size = 0;
@@ -602,7 +603,7 @@ static void calculateAndInitConstants(Transform &t) {
       }
     }
   }
-  num_locals = max(num_locals_src, num_locals_tgt);
+  unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
   uint64_t min_global_size = UINT64_MAX;
   for (auto glbs : { &globals_src, &globals_tgt }) {
@@ -693,7 +694,8 @@ static void calculateAndInitConstants(Transform &t) {
 
   if (config::debug)
     config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst
-                  << "\nnum_locals: " << num_locals
+                  << "\nnum_locals_src: " << num_locals_src
+                  << "\nnum_locals_tgt: " << num_locals_tgt
                   << "\nnum_nonlocals_src: " << num_nonlocals_src
                   << "\nnum_nonlocals: " << num_nonlocals
                   << "\nbits_for_bid: " << bits_for_bid

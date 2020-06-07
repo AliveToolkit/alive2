@@ -11,7 +11,8 @@ using namespace std;
 namespace IR {
 
 unsigned num_max_nonlocals_inst;
-unsigned num_locals;
+unsigned num_locals_src;
+unsigned num_locals_tgt;
 unsigned num_nonlocals;
 unsigned num_nonlocals_src;
 unsigned bits_for_ptrattrs;

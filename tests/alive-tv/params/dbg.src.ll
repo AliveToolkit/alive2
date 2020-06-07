@@ -5,4 +5,4 @@ define i16 @test(i16) {
   ret i16 %v
 }
 
-; CHECK: num_locals: 0
+; CHECK: num_locals_src: 0

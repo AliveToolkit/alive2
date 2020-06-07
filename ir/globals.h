@@ -10,8 +10,8 @@ namespace IR {
 /// Upperbound of the number of non-local pointers returned by instructions
 extern unsigned num_max_nonlocals_inst;
 
-/// Upperbound of the number of local blocks (max(src, tgt))
-extern unsigned num_locals;
+/// Upperbound of the number of local blocks
+extern unsigned num_locals_src, num_locals_tgt;
 
 // Upperbound of the number of nonlocal blocks
 extern unsigned num_nonlocals;

@@ -349,7 +349,7 @@ static bool observes_addresses() {
 }
 
 static bool ptr_has_local_bit() {
-  return num_locals && num_nonlocals;
+  return (num_locals_src || num_locals_tgt) && num_nonlocals;
 }
 
 static unsigned bits_shortbid() {
@@ -399,7 +399,7 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
                expr::mkUInt(bid, bits_shortbid())
                  .concat_zeros(bits_for_offset + bits_for_ptrattrs),
                ptr_has_local_bit())) {
-  assert((local && bid < num_locals) || (!local && bid < num_nonlocals));
+  assert((local && bid < m.numLocals()) || (!local && bid < num_nonlocals));
   assert(p.bits() == totalBits());
 }
 
@@ -419,7 +419,7 @@ unsigned Pointer::totalBitsShort() {
 }
 
 expr Pointer::isLocal() const {
-  if (num_locals == 0)
+  if (m.numLocals() == 0)
     return false;
   if (m.numNonlocals() == 0)
     return true;
@@ -963,24 +963,28 @@ static vector<expr> extract_possible_local_bids(Memory &m, const Byte &b) {
   return ret;
 }
 
+unsigned Memory::numLocals() const {
+  return state->isSource() ? num_locals_src : num_locals_tgt;
+}
+
 unsigned Memory::numNonlocals() const {
   return state->isSource() ? num_nonlocals_src : num_nonlocals;
 }
 
 void Memory::store(const Pointer &p, const expr &val, expr &local,
                    expr &non_local) {
-  if (num_locals > 0) {
+  if (numLocals() > 0) {
     Byte byte(*this, expr(val));
     if (byte.isPtr().isTrue()) {
       uint64_t bid;
       for (const auto &bid_expr : extract_possible_local_bids(*this, byte)) {
         if (bid_expr.isUInt(bid)) {
-          if (bid < num_locals)
+          if (bid < numLocals())
             escaped_local_blks[bid] = true;
         } else {
           // may escape a local ptr, but we don't know which one
           escaped_local_blks.clear();
-          escaped_local_blks.resize(num_locals, true);
+          escaped_local_blks.resize(numLocals(), true);
         }
       }
     }
@@ -1016,7 +1020,7 @@ static unsigned last_local_bid = 0;
 static unsigned last_nonlocal_bid = 0;
 
 static bool memory_unused() {
-  return num_locals == 0 && num_nonlocals == 0;
+  return num_locals_src == 0 && num_locals_tgt == 0 && num_nonlocals == 0;
 }
 
 static expr mk_block_val_array() {
@@ -1089,7 +1093,7 @@ Memory::Memory(State &state) : state(&state) {
                          Byte::mkPoisonByte(*this)());
 
   // all local blocks are dead in the beginning
-  local_block_liveness = expr::mkUInt(0, num_locals);
+  local_block_liveness = expr::mkUInt(0, numLocals());
 
   // A memory space is separated into non-local area / local area.
   // Non-local area is the lower half of memory (to include null pointer),
@@ -1105,7 +1109,7 @@ Memory::Memory(State &state) : state(&state) {
     alloc(expr::mkUInt(0, bits_size_t), bits_program_pointer, GLOBAL, false,
           false, 0);
 
-  escaped_local_blks.resize(num_locals, false);
+  escaped_local_blks.resize(numLocals(), false);
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -1163,7 +1167,7 @@ void Memory::mkAxioms(const Memory &other) const {
   expr one = expr::mkUInt(1, bits_size_t - 1);
   auto locals_fit = [&one](const Memory &m) {
     auto sum = expr::mkUInt(0, bits_size_t - 1);
-    for (unsigned bid = 0; bid < num_locals; ++bid) {
+    for (unsigned bid = 0, nlocals = m.numLocals(); bid < nlocals; ++bid) {
       Pointer p(m, bid, true);
       if (auto sz = m.local_blk_size.lookup(p.getShortBid())) {
         auto size = sz->extract(bits_size_t - 2, 0);
@@ -1233,7 +1237,7 @@ Memory::mkFnRet(const char *name,
     if (!inp.isLocal().isFalse())
       local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
   }
-  for (unsigned i = 0; i < num_locals; ++i) {
+  for (unsigned i = 0; i < numLocals(); ++i) {
     if (escaped_local_blks[i])
       local.emplace(p.getShortBid() == i);
   }
@@ -1356,7 +1360,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   auto &last_bid = is_local ? last_local_bid : last_nonlocal_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
-  assert((is_local && bid < num_locals) ||
+  assert((is_local && bid < numLocals()) ||
          (!is_local && bid < numNonlocals()));
   if (!bidopt)
     ++last_bid;
@@ -1732,7 +1736,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.byval_blks.insert(ret.byval_blks.end(), els.byval_blks.begin(),
                         els.byval_blks.end());
-  for (unsigned i = 0; i < num_locals; ++i) {
+  for (unsigned i = 0, nlocals = then.numLocals(); i < nlocals; ++i) {
     if (els.escaped_local_blks[i])
       ret.escaped_local_blks[i] = true;
   }
@@ -1805,16 +1809,16 @@ void Memory::print(ostream &os, const Model &m) const {
     print(false, num_nonlocals);
   }
 
-  if (num_locals) {
+  if (numLocals()) {
     header("LOCAL BLOCKS:\n");
-    print(true, num_locals);
+    print(true, numLocals());
   }
 }
 #undef P
 
 #define P(msg, local, nonlocal)                                                \
   os << msg "\n";                                                              \
-  if (num_locals > 0) os << "Local: " << m.local.simplify() << '\n';           \
+  if (m.numLocals() > 0) os << "Local: " << m.local.simplify() << '\n';        \
   if (num_nonlocals > 0) os << "Non-local: " << m.nonlocal.simplify() << "\n\n"
 
 ostream& operator<<(ostream &os, const Memory &m) {
@@ -1826,9 +1830,9 @@ ostream& operator<<(ostream &os, const Memory &m) {
   P("BLOCK SIZE:", local_blk_size, non_local_blk_size);
   P("BLOCK ALIGN:", local_blk_align, non_local_blk_align);
   P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
-  if (num_locals > 0) {
+  if (m.numLocals() > 0) {
     os << "ESCAPED LOCAL BLOCKS: ";
-    for (unsigned i = 0; i < num_locals; ++i) {
+    for (unsigned i = 0, nlocals = m.numLocals(); i < nlocals; ++i) {
       os << m.escaped_local_blks[i];
     }
     os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';

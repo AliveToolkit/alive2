@@ -310,6 +310,7 @@ public:
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
 
+  unsigned numLocals() const;
   unsigned numNonlocals() const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
