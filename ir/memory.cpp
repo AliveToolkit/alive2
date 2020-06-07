@@ -711,7 +711,8 @@ expr Pointer::isBlockAlive() const {
     return true;
 
   // globals are always live
-  if ((getAllocType() == GLOBAL).isTrue())
+  static_assert(GLOBAL == 0);
+  if (getAllocType().isZero())
     return true;
 
   // NULL block is dead
