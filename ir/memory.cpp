@@ -715,7 +715,7 @@ expr Pointer::isBlockAlive() const {
     return true;
 
   // NULL block is dead
-  if (num_nonlocals && getBid().isZero())
+  if (has_null_block && getBid().isZero())
     return false;
 
   auto bid = getShortBid();
