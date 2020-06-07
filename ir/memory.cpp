@@ -792,6 +792,9 @@ expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
 }
 
 expr Pointer::blockValRefined(const Pointer &other) const {
+  if (m.non_local_block_val.eq(other.m.non_local_block_val))
+    return true;
+
   Byte val(m, m.non_local_block_val.load(shortPtr()));
   Byte val2(other.m, other.m.non_local_block_val.load(other.shortPtr()));
 
