@@ -263,15 +263,22 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     string ub_name = name + "#ub";
-    I->second = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
-                  writes_memory
-                  ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr)
-                  : Memory::CallState(), true };
+    I->second
+      = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
+          writes_memory
+            ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr,
+                               attrs.has(FnAttrs::NoFree))
+            : Memory::CallState(),
+          true };
   } else {
     I->second.used = true;
   }
 
   addUB(I->second.ub);
+
+  // Caller has nofree attribute; callee should guarantee that it didn't free
+  if (getFn().getFnAttrs().has(FnAttrs::NoFree))
+    addUB(memory.checkNoFree(I->second.callstate));
 
   if (writes_memory)
     memory.setState(I->second.callstate);

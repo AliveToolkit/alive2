@@ -1262,7 +1262,7 @@ expr Memory::CallState::implies(const CallState &st) const {
 }
 
 Memory::CallState
-Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
+Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
   CallState st;
   st.empty = false;
 
@@ -1295,10 +1295,11 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
                                   non_local_block_val.load(idx)));
   }
 
-  if (num_nonlocals_src) {
+  st.non_local_block_liveness = non_local_block_liveness;
+  if (num_nonlocals_src && !nofree) {
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
-    expr mask = one;
+    expr mask = has_null_block ? one : zero;
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
       expr ok_arg = true;
       if (ptr_inputs) {
@@ -1315,9 +1316,7 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
                                one << expr::mkUInt(bid, num_nonlocals));
     }
 
-    if (mask.isAllOnes()) {
-      st.non_local_block_liveness = non_local_block_liveness;
-    } else {
+    if (!mask.isAllOnes()) {
       st.liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
       // functions can free an object, but cannot bring a dead one back to live
       st.non_local_block_liveness
@@ -1712,6 +1711,11 @@ expr Memory::checkNocapture() const {
   if (!res.isTrue())
     state->addQuantVar(ofs);
   return res;
+}
+
+expr Memory::checkNoFree(const CallState &state_after) const {
+  // TODO: encode local block's liveness
+  return state_after.non_local_block_liveness == non_local_block_liveness;
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

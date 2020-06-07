@@ -2385,6 +2385,10 @@ StateValue Free::toSMT(State &s) const {
   s.addUB(np);
   // If not heaponly, don't encode constraints
   s.getMemory().free(p, !heaponly);
+
+  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly)
+    s.addUB(expr(false));
+
   return {};
 }
 
