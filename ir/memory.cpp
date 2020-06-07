@@ -1141,35 +1141,38 @@ void Memory::mkAxioms(const Memory &other) const {
   // Ignore null pointer block
   for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
     Pointer p1(*this, bid, false);
-    expr disj = p1.getAddress() != 0;
+    auto addr = p1.getAddress();
+    auto sz = p1.blockSize();
+
+    expr disj = addr != 0;
 
     // Ensure block doesn't spill to local memory
     auto bit = bits_size_t - 1;
-    disj &= (p1.getAddress() + p1.blockSize()).extract(bit, bit) == 0;
+    disj &= (addr + sz).extract(bit, bit) == 0;
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
       Pointer p2(*this, bid2, false);
       disj &= p2.isBlockAlive()
-                .implies(disjoint(p1.getAddress(), p1.blockSize(),
-                                  p2.getAddress(), p2.blockSize()));
+                .implies(disjoint(addr, sz, p2.getAddress(), p2.blockSize()));
     }
     state->addAxiom(p1.isBlockAlive().implies(disj));
   }
 
   // ensure locals fit in their reserved space
-  auto locals_fit = [](const Memory &m) {
+  expr one = expr::mkUInt(1, bits_size_t - 1);
+  auto locals_fit = [&one](const Memory &m) {
     auto sum = expr::mkUInt(0, bits_size_t - 1);
     for (unsigned bid = 0; bid < num_locals; ++bid) {
       Pointer p(m, bid, true);
       if (auto sz = m.local_blk_size.lookup(p.getShortBid())) {
         auto size = sz->extract(bits_size_t - 2, 0);
-        auto align = expr::mkUInt(1, bits_size_t - 1) <<
-                       p.blockAlignment().zextOrTrunc(bits_size_t - 1);
-        align = align - expr::mkUInt(1, align.bits());
+        auto align = one << p.blockAlignment().zextOrTrunc(bits_size_t - 1);
+        align = align - one;
+        auto sz_align = size + align;
         m.state->addOOM(size.add_no_uoverflow(align));
-        m.state->addOOM(sum.add_no_uoverflow(size + align));
-        sum = sum + size + align;
+        m.state->addOOM(sum.add_no_uoverflow(sz_align));
+        sum = sum + sz_align;
       }
     }
   };
