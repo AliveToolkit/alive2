@@ -10,6 +10,7 @@ use Getopt::Long;
 my $ALIVETV = $ENV{"HOME"}."/alive2/build/alive-tv";
 my $MINW = 4;
 my $MAXW = 256;
+my $SMT_TO = 5000; # milliseconds
 
 #####################################################################
 
@@ -40,12 +41,12 @@ sub check($$$) {
     system "m4 --define=iX=i${x} --define=X=${x} ${f} > ${tmpll}";
     system "cat ${tmpll}" if $DEBUG;
     my $tmpout = File::Temp->new();
-    system "${ALIVETV} ${tmpll} > $tmpout 2>&1";
+    system "${ALIVETV} --smt-to=${SMT_TO} ${tmpll} > $tmpout 2>&1";
     system "cat ${tmpout}" if $DEBUG;
     open my $INF, "<$tmpout" or die;
     while (my $line = <$INF>) {
         return 1 if $positive && $line =~ /Transformation seems to be correct/;
-        return 1 if !$positive && $line =~ /Value mismatch/;
+        return 1 if !$positive && $line =~ /Transformation doesn't verify/;
     }
     close $INF;
     return 0;
@@ -80,6 +81,7 @@ if (scalar(@ARGV) > 0) {
         } elsif ($f =~ /^negative/) {
             test_file($f, 0);
         } else {
+            die;
         }
     }
 } else {
