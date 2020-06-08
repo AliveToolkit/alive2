@@ -707,7 +707,7 @@ expr Pointer::isBlockAlive() const {
   // If programs have no free(), we assume all blocks are always live.
   // For non-local blocks, there's enough non-determinism through block size,
   // that can be 0 or non-0
-  if (!has_free && !has_fncall && !has_dead_allocas)
+  if (!has_free && !has_dead_allocas)
     return true;
 
   // globals are always live
@@ -728,7 +728,7 @@ expr Pointer::getAllocType() const {
   // If programs have no malloc & free, we don't need to store this information
   // since it is only used to check if free/delete is ok and
   // for memory refinement of local malloc'ed blocks
-  if (!has_malloc && !has_free && !has_fncall && !has_alloca)
+  if (!has_malloc && !has_free && !has_alloca)
     return expr::mkUInt(GLOBAL, 2);
 
   // if malloc is used, but no free, we can still ignore info for non-locals
