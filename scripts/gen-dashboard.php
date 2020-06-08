@@ -9,7 +9,7 @@ if (!$dump || !$logsdir || !is_file($dump) || !is_dir($logsdir))
   die("usage: php gen-dashboard.php <dump.txt> <logs>\n");
 
 $dump = file_get_contents($dump);
-preg_match('/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\nFailing Tests \((\d+)\):\n(.*)/Ss', $dump, $m);
+preg_match('/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\nFailed Tests \((\d+)\):\n(.*)/Ss', $dump, $m);
 
 $num_failures = (int)$m[1];
 echo "Failures:\t\t$num_failures\n";
