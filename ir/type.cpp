@@ -644,8 +644,9 @@ StateValue PtrType::fromInt(StateValue v) const {
 pair<expr, expr>
 PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
                  const StateValue &tgt) const {
-  Pointer p(src_s.getMemory(), src.value);
-  Pointer q(tgt_s.getMemory(), tgt.value);
+  auto sm = src_s.returnMemory(), tm = tgt_s.returnMemory();
+  Pointer p(sm, src.value);
+  Pointer q(tm, tgt.value);
 
   return { src.non_poison.implies(tgt.non_poison),
            (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
