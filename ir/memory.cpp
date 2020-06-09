@@ -1744,14 +1744,25 @@ expr Memory::isEscapedLocal(const smt::expr &short_bid) const {
 
 void Memory::escapeLocals(vector<expr> &&local_bids) {
   uint64_t bid;
+  bool has_escaped_local =
+    find(escaped_local_blks.begin(), escaped_local_blks.end(), true)
+    != escaped_local_blks.end();
+
   for (const auto &bid_expr : local_bids) {
     if (bid_expr.isUInt(bid)) {
-      if (bid < numLocals())
+      if (bid < numLocals()) {
         escaped_local_blks[bid] = true;
+        has_escaped_local = true;
+      }
     } else {
       // may escape a local ptr, but we don't know which one
-      escaped_local_blks.clear();
-      escaped_local_blks.resize(numLocals(), true);
+      // propagate escaped local bid to all
+      // TODO: check whether bid_expr cannot be some bids better
+      if (has_escaped_local) {
+        escaped_local_blks.clear();
+        escaped_local_blks.resize(numLocals(), true);
+        break;
+      }
     }
   }
 }
