@@ -1714,11 +1714,6 @@ expr Memory::checkNocapture() const {
   return res;
 }
 
-expr Memory::checkNoFree(const CallState &state_after) const {
-  // TODO: encode local block's liveness
-  return state_after.non_local_block_liveness == non_local_block_liveness;
-}
-
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);

@@ -276,10 +276,6 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   addUB(I->second.ub);
 
-  // Caller has nofree attribute; callee should guarantee that it didn't free
-  if (getFn().getFnAttrs().has(FnAttrs::NoFree))
-    addUB(memory.checkNoFree(I->second.callstate));
-
   if (writes_memory)
     memory.setState(I->second.callstate);
 

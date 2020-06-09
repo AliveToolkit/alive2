@@ -1497,6 +1497,11 @@ StateValue FnCall::toSMT(State &s) const {
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
                          out_types, attrs);
 
+  // Caller has nofree attribute, so callee must have it as well
+  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) &&
+      !attrs.has(FnAttrs::NoFree))
+    s.addUB(expr(false));
+
   if (attrs.has(FnAttrs::NoReturn)) {
     // TODO: Even if a function call doesn't have noreturn, it can possibly
     // exit. Relevant bug: https://bugs.llvm.org/show_bug.cgi?id=27953
