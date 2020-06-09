@@ -1249,6 +1249,8 @@ expr Memory::CallState::implies(const CallState &st) const {
     ret &= nonlocal_liveness_var == st.nonlocal_liveness_var;
 
   // TODO: This should align local block ids
+  // TOOD 2: This should compare local blocks that are escaped only.
+  // Relevant test: alive-tv/bugs/pr10067.srctgt.ll
   ret &= local_val_var == st.local_val_var;
   return ret;
 }
