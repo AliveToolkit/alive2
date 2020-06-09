@@ -15,10 +15,23 @@ namespace util {
 void sym_exec(State &s) {
   Function &f = const_cast<Function&>(s.getFn());
 
+  // global constants need to be created in the right order so they get the
+  // first bids in source, and the last in target
+  set<const Value*> seen_inits;
+  for (const auto &v : f.getConstants()) {
+    if (auto gv = dynamic_cast<const GlobalVariable*>(&v)) {
+      if (gv->isConst() == s.isSource()) {
+        s.exec(v);
+        seen_inits.emplace(&v);
+      }
+    }
+  }
+
   // add constants & inputs to State table first of all
   for (auto &l : { f.getConstants(), f.getInputs(), f.getUndefs() }) {
     for (const auto &v : l) {
-      s.exec(v);
+      if (!seen_inits.count(&v))
+        s.exec(v);
     }
   }
 

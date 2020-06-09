@@ -122,7 +122,7 @@ vector<string_view> Function::getGlobalVarNames() const {
   vector<string_view> gvnames;
   auto gvs = getGlobalVars();
   transform(gvs.begin(), gvs.end(), back_inserter(gvnames),
-            [](auto itm) { return string_view(itm->getName()).substr(1); });
+            [](auto &itm) { return string_view(itm->getName()).substr(1); });
   return gvnames;
 }
 

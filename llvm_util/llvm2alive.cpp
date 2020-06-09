@@ -1068,7 +1068,7 @@ public:
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
         *out << "ERROR: Unsupported constant: " << *gv->getInitializer()
-             << "\n";
+             << '\n';
         return {};
       }
 

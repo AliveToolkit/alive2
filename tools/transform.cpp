@@ -494,11 +494,22 @@ static void calculateAndInitConstants(Transform &t) {
   assert(bits_program_pointer == t.tgt.bitsPointers());
   heap_block_alignment = 8;
 
+  num_consts_src = 0;
+  num_extra_nonconst_tgt = 0;
+
+  for (auto GV : globals_src) {
+    if (GV->isConst())
+      ++num_consts_src;
+  }
+
   for (auto GVT : globals_tgt) {
     auto I = find_if(globals_src.begin(), globals_src.end(),
       [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
-    if (I == globals_src.end())
+    if (I == globals_src.end()) {
       ++num_globals;
+      if (!GVT->isConst())
+        ++num_extra_nonconst_tgt;
+    }
   }
 
   unsigned num_ptrinputs = 0;
@@ -507,7 +518,7 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   // The number of instructions that can return a pointer to a non-local block.
-  num_max_nonlocals_inst = 0;
+  unsigned num_max_nonlocals_inst = 0;
   // The number of local blocks.
   num_locals_src = 0;
   num_locals_tgt = 0;

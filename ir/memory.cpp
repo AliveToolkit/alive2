@@ -859,11 +859,12 @@ expr Pointer::blockRefined(const Pointer &other) const {
 }
 
 expr Pointer::isWritable() const {
-  auto this_bid = getShortBid();
-  expr non_local(true);
-  for (auto bid : m.non_local_blk_nonwritable) {
-    non_local &= this_bid != bid;
-  }
+  auto bid = getShortBid();
+  expr non_local
+    = num_consts_src == 1 ? bid != has_null_block :
+        (num_consts_src ? bid.ugt(has_null_block + num_consts_src - 1) : true);
+  if (m.numNonlocals() > num_nonlocals_src + num_extra_nonconst_tgt)
+    non_local &= bid.ult(num_nonlocals_src + num_extra_nonconst_tgt);
   return isLocal() || non_local;
 }
 
@@ -1424,8 +1425,11 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     if (align_bits && observes_addresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
-    if (blockKind == CONSTGLOBAL)
-      non_local_blk_nonwritable.emplace(bid);
+    bool cond = (has_null_block && bid == 0) ||
+                (bid >= has_null_block + num_consts_src &&
+                 bid < num_nonlocals_src + num_extra_nonconst_tgt);
+    if (blockKind == CONSTGLOBAL) assert(!cond); else assert(cond);
+    (void)cond;
   }
 
   store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
@@ -1660,18 +1664,8 @@ Memory::refined(const Memory &other, bool skip_constants,
   expr offset = ptr.getOffset();
   expr ret(true);
 
-  auto is_constglb = [](const Memory &m, unsigned bid) {
-    return
-      find(m.non_local_blk_nonwritable.begin(),
-           m.non_local_blk_nonwritable.end(), bid) !=
-        m.non_local_blk_nonwritable.end();
-  };
-
-  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
-    if (skip_constants && is_constglb(*this, bid)) {
-      assert(is_constglb(other, bid));
-      continue;
-    }
+  unsigned bid = has_null_block + skip_constants * num_consts_src;
+  for (; bid < num_nonlocals_src; ++bid) {
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
@@ -1729,8 +1723,6 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.local_blk_size.add(els.local_blk_size);
   ret.local_blk_align.add(els.local_blk_align);
   ret.local_blk_kind.add(els.local_blk_kind);
-  ret.non_local_blk_nonwritable.insert(els.non_local_blk_nonwritable.begin(),
-                                       els.non_local_blk_nonwritable.end());
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
@@ -1752,13 +1744,13 @@ bool Memory::operator<(const Memory &rhs) const {
     tie(non_local_block_val, local_block_val, initial_non_local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
         local_blk_size, local_blk_align, local_blk_kind,
-        non_local_blk_nonwritable, non_local_blk_size, non_local_blk_align,
+        non_local_blk_size, non_local_blk_align,
         non_local_blk_kind, byval_blks, escaped_local_blks, undef_vars) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.initial_non_local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
-        rhs.local_blk_kind, rhs.non_local_blk_nonwritable,
+        rhs.local_blk_kind,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
         rhs.undef_vars);
@@ -1836,13 +1828,6 @@ ostream& operator<<(ostream &os, const Memory &m) {
       os << m.escaped_local_blks[i];
     }
     os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
-  }
-  if (!m.non_local_blk_nonwritable.empty()) {
-    os << "CONST NON-LOCALS:";
-    for (auto bid : m.non_local_blk_nonwritable) {
-      os << ' ' << bid;
-    }
-    os << '\n';
   }
   return os;
 }

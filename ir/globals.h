@@ -7,11 +7,14 @@ namespace smt { class expr; }
 
 namespace IR {
 
-/// Upperbound of the number of non-local pointers returned by instructions
-extern unsigned num_max_nonlocals_inst;
-
 /// Upperbound of the number of local blocks
 extern unsigned num_locals_src, num_locals_tgt;
+
+/// Number of constant global variables in src
+extern unsigned num_consts_src;
+
+/// Number of non-constant globals introduced in tgt
+extern unsigned num_extra_nonconst_tgt;
 
 // Upperbound of the number of nonlocal blocks
 extern unsigned num_nonlocals;
