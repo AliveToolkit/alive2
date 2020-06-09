@@ -707,7 +707,7 @@ expr Pointer::isBlockAlive() const {
   // If programs have no free(), we assume all blocks are always live.
   // For non-local blocks, there's enough non-determinism through block size,
   // that can be 0 or non-0
-  if (!has_free && !has_fncall && !has_dead_allocas)
+  if (!has_free && !has_dead_allocas)
     return true;
 
   // globals are always live
@@ -728,7 +728,7 @@ expr Pointer::getAllocType() const {
   // If programs have no malloc & free, we don't need to store this information
   // since it is only used to check if free/delete is ok and
   // for memory refinement of local malloc'ed blocks
-  if (!has_malloc && !has_free && !has_fncall && !has_alloca)
+  if (!has_malloc && !has_free && !has_alloca)
     return expr::mkUInt(GLOBAL, 2);
 
   // if malloc is used, but no free, we can still ignore info for non-locals
@@ -1262,7 +1262,7 @@ expr Memory::CallState::implies(const CallState &st) const {
 }
 
 Memory::CallState
-Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
+Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
   CallState st;
   st.empty = false;
 
@@ -1295,10 +1295,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs) const {
                                   non_local_block_val.load(idx)));
   }
 
-  if (num_nonlocals_src) {
+  if (num_nonlocals_src && !nofree) {
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
-    expr mask = one;
+    expr mask = has_null_block ? one : zero;
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
       expr ok_arg = true;
       if (ptr_inputs) {
@@ -1712,6 +1712,11 @@ expr Memory::checkNocapture() const {
   if (!res.isTrue())
     state->addQuantVar(ofs);
   return res;
+}
+
+expr Memory::checkNoFree(const CallState &state_after) const {
+  // TODO: encode local block's liveness
+  return state_after.non_local_block_liveness == non_local_block_liveness;
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

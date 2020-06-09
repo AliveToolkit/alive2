@@ -560,7 +560,10 @@ static void calculateAndInitConstants(Transform &t) {
           nullptr_is_used |= has_nullptr(op);
         }
 
-        has_fncall |= dynamic_cast<const FnCall*>(&i) != nullptr;
+        if (auto *fc = dynamic_cast<const FnCall*>(&i)) {
+          has_fncall |= true;
+          has_free   |= !fc->getAttributes().has(FnAttrs::NoFree);
+        }
 
         if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
           max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());

@@ -260,7 +260,8 @@ public:
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name,
             const std::vector<PtrInput> &ptr_inputs) const;
-  CallState mkCallState(const std::vector<PtrInput> *ptr_inputs) const;
+  CallState mkCallState(const std::vector<PtrInput> *ptr_inputs, bool nofree)
+      const;
   void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
@@ -309,6 +310,7 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
+  smt::expr checkNoFree(const CallState &state_after) const;
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;

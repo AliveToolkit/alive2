@@ -38,6 +38,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " dereferenceable(" << attr.derefBytes << ")";
   if (attr.has(FnAttrs::NonNull))
     os << " nonnull";
+  if (attr.has(FnAttrs::NoFree))
+    os << " nofree";
   return os;
 }
 

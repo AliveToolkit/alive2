@@ -250,11 +250,14 @@ public:
       return error(i);
 
     FnAttrs attrs;
-    if (i.hasFnAttr(llvm::Attribute::ReadOnly))
+    if (i.hasFnAttr(llvm::Attribute::ReadOnly)) {
       attrs.set(FnAttrs::NoWrite);
+      attrs.set(FnAttrs::NoFree);
+    }
     if (i.hasFnAttr(llvm::Attribute::ReadNone)) {
       attrs.set(FnAttrs::NoRead);
       attrs.set(FnAttrs::NoWrite);
+      attrs.set(FnAttrs::NoFree);
     }
     if (i.hasFnAttr(llvm::Attribute::WriteOnly))
       attrs.set(FnAttrs::NoRead);
@@ -262,6 +265,8 @@ public:
       attrs.set(FnAttrs::ArgMemOnly);
     if (i.hasFnAttr(llvm::Attribute::NoReturn))
       attrs.set(FnAttrs::NoReturn);
+    if (i.hasFnAttr(llvm::Attribute::NoFree))
+      attrs.set(FnAttrs::NoFree);
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
@@ -941,6 +946,9 @@ public:
     }
 
     auto &attrs = Fn.getFnAttrs();
+    if (f.hasFnAttribute(llvm::Attribute::NoFree))
+      attrs.set(FnAttrs::NoFree);
+
     const auto &ridx = llvm::AttributeList::ReturnIndex;
     if (uint64_t b = f.getDereferenceableBytes(ridx)) {
       attrs.set(FnAttrs::Dereferenceable);
