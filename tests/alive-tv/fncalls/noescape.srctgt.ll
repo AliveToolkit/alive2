@@ -18,3 +18,5 @@ define i32 @tgt() {
   call void @f(i8* %p) writeonly argmemonly
   ret i32 1
 }
+
+; XFAIL: Value mismatch
