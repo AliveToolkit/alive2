@@ -601,17 +601,19 @@ expr Pointer::isAligned(unsigned align) const {
   if (align == 1)
     return true;
 
-  if (isUndef(getOffset()))
+  auto offset = getOffset();
+  if (isUndef(offset))
     return false;
 
   auto bits = min(ilog2(align), bits_for_offset);
 
-  if (!observes_addresses())
+  expr blk_align = isBlockAligned(align);
+
+  if (!observes_addresses() || blk_align.isConst())
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
-    return isBlockAligned(align, false) &&
-           getOffset().extract(bits - 1, 0) == 0;
+    return blk_align && offset.extract(bits - 1, 0) == 0;
 
   return getAddress().extract(bits - 1, 0) == 0;
 }

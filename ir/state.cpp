@@ -202,7 +202,7 @@ void State::addUB(const expr &ub) {
 }
 
 void State::addUB(AndExpr &&ubs) {
-  domain.UB.add(ubs);
+  domain.UB.add(move(ubs));
   domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
