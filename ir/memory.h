@@ -307,6 +307,8 @@ public:
             const std::vector<PtrInput> *set_ptrs = nullptr)
       const;
 
+  auto& getUndefVars() const { return undef_vars; }
+
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
 

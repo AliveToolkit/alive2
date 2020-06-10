@@ -1497,9 +1497,9 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 
   undef_vars.insert(undef_vars0.begin(), undef_vars0.end());
 
-  if (deref_check)
-    state->addUB(ptr.isDereferenceable(getStoreByteSize(type), align,
-                                       !state->isInitializationPhase()));
+  // initializer stores are ok by construction
+  if (deref_check && !state->isInitializationPhase())
+    state->addUB(ptr.isDereferenceable(getStoreByteSize(type), align, true));
 
   auto aty = type.getAsAggregateType();
   if (aty && !isNonPtrVector(type)) {

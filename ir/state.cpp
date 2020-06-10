@@ -190,8 +190,9 @@ void State::addReturn(const StateValue &val) {
 }
 
 void State::addUB(expr &&ub) {
+  bool isconst = ub.isConst();
   domain.UB.add(move(ub));
-  if (!ub.isConst())
+  if (!isconst)
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
@@ -202,8 +203,10 @@ void State::addUB(const expr &ub) {
 }
 
 void State::addUB(AndExpr &&ubs) {
+  bool isconst = ubs.isTrue();
   domain.UB.add(move(ubs));
-  domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  if (!isconst)
+    domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
 void State::addNoReturn() {

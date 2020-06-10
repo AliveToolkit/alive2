@@ -2606,7 +2606,8 @@ void Store::print(std::ostream &os) const {
 StateValue Store::toSMT(State &s) const {
   auto &[p, np] = s[*ptr];
   s.addUB(np);
-  s.getMemory().store(p, s[*val], val->getType(), align, s.getUndefVars());
+  auto &v = s[*val];
+  s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
 }
 

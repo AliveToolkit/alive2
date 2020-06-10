@@ -333,6 +333,11 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;
 
+  if (!memory_cnstr.isConst()) {
+    auto &undef = src_mem.getUndefVars();
+    qvars.insert(undef.begin(), undef.end());
+  }
+
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
     return;

@@ -28,6 +28,7 @@ public:
   bool contains(const expr &e) const;
   expr operator()() const;
   operator bool() const;
+  bool isTrue() const { return exprs.empty(); }
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
 };
 
