@@ -306,7 +306,7 @@ void DomTree::buildDominators() {
     (void)instr;
     // skip back-edges
     visited_src.insert(&src);
-    if (visited_src.find(&tgt) == visited_src.end())
+    if (!visited_src.count(&tgt))
       doms.at(&tgt).preds.push_back(&doms.at(&src));
   }
 
