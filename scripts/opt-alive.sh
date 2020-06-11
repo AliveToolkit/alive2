@@ -10,7 +10,7 @@ set -e
 # attributor, functionattrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
 PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor functionattrs metarenamer lowertypetests extract-blocks openmpopt prune-eh -Os -Oz -O1 -O2 -O3"
-PASSES_SIMPLIFYLIB="-instcombine -Os -Oz -O1 -O2 -O3"
+PASSES_SIMPLIFYLIB="-instcombine"
 
 TV="-tv"
 IO_NOBUILTIN="-tv-io-nobuiltin"
