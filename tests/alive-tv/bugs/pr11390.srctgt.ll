@@ -1,4 +1,4 @@
-; TEST-ARGS: -disable-undef-input -disable-poison-input -smt-to=10000
+; TEST-ARGS: -disable-undef-input -disable-poison-input -smt-to=20000
 ; https://bugs.llvm.org/show_bug.cgi?id=11390
 ; To detect this bug, escaped local blocks' bytes should be checked
 

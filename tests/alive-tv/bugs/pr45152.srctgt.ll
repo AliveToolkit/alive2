@@ -1,5 +1,5 @@
 ; Found by Alive
-; TEST-ARGS: -disable-undef-input -smt-to=10000
+; TEST-ARGS: -disable-undef-input -smt-to=20000
 
 @Q = internal unnamed_addr global double 1.000000e+00, align 8
 
