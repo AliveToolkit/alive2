@@ -241,6 +241,20 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
+  for (auto &v : ptr_inputs) {
+    if (!v.nocapture && v.val.non_poison.isTrue()) {
+      Pointer p(memory, v.val.value);
+      if (!p.isLocal().isTrue())
+        continue;
+      // TODO: this should support more complex cases, such as (c ? bid1: bid2).
+      // Current implementation of extract_possible_local_bids cannot be used
+      // because it causes false positive for an input in gzip.
+      uint64_t short_bid;
+      if (p.getShortBid().isUInt(short_bid))
+        memory.escapeLocal(short_bid);
+    }
+  }
+
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
@@ -411,8 +425,10 @@ void State::mkAxioms(State &tgt) {
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
-          auto &[ptr_in, is_byval] = ptr_ins[i];
-          auto &[ptr_in2, is_byval2] = ptr_ins2[i];
+          auto &[ptr_in, is_byval, is_nocapture] = ptr_ins[i];
+          auto &[ptr_in2, is_byval2, is_nocapture2] = ptr_ins2[i];
+          (void)is_nocapture;
+          (void)is_nocapture2;
           if (!is_byval && is_byval2) {
             // byval is added at target; this is not supported yet.
             refines = false;

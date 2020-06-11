@@ -1280,9 +1280,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
 
     if (ptr_inputs) {
       modifies = false;
-      for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+      for (auto &[arg, is_byval_arg, is_nocapture_arg] : *ptr_inputs) {
         // TODO: byval's value cannot be modified.
         (void)is_byval_arg;
+        (void)is_nocapture_arg;
         Pointer argp(*this, arg.value);
         modifies |= arg.non_poison && argp.getBid() == p.getBid();
       }
@@ -1307,9 +1308,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
       expr ok_arg = true;
       if (ptr_inputs) {
-        for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+        for (auto &[arg, is_byval_arg, is_nocapture_arg] : *ptr_inputs) {
           // TODO: liveness of a pointer given as byval doesn't change
           (void)is_byval_arg;
+          (void)is_nocapture_arg;
           ok_arg &= !arg.non_poison ||
                     Pointer(*this, arg.value).getBid() != bid;
         }
@@ -1712,6 +1714,11 @@ expr Memory::checkNocapture() const {
   if (!res.isTrue())
     state->addQuantVar(ofs);
   return res;
+}
+
+void Memory::escapeLocal(unsigned short_bid) {
+  assert(short_bid < numLocals());
+  escaped_local_blks[short_bid] = true;
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

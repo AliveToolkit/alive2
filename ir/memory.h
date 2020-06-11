@@ -249,10 +249,13 @@ public:
   struct PtrInput {
     StateValue val;
     bool byval;
+    bool nocapture;
 
-    PtrInput(StateValue &&v, bool byval) : val(std::move(v)), byval(byval) {}
+    PtrInput(StateValue &&v, bool byval, bool nocapture) :
+      val(std::move(v)), byval(byval), nocapture(nocapture) {}
     bool operator<(const PtrInput &rhs) const {
-      return std::tie(val, byval) < std::tie(rhs.val, rhs.byval);
+      return std::tie(val, byval, nocapture) <
+             std::tie(rhs.val, rhs.byval, rhs.nocapture);
     }
   };
 
@@ -311,6 +314,7 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
+  void escapeLocal(unsigned short_bid);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
