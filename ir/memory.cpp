@@ -1326,6 +1326,8 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
       st.non_local_block_liveness
         = non_local_block_liveness & (st.liveness_var | mask);
     }
+  } else {
+    st.non_local_block_liveness = non_local_block_liveness;
   }
   return st;
 }
