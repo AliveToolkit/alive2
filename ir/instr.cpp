@@ -2244,7 +2244,7 @@ StateValue Malloc::toSMT(State &s) const {
     expr sz_zext = sz.zextOrTrunc(p_sz.bits());
 
     expr memcpy_size = expr::mkIf(allocated,
-                                  expr::mkIf(p_sz.ule(sz_zext), p_sz, sz_zext),
+                                  p_sz.umin(sz_zext),
                                   expr::mkUInt(0, p_sz.bits()));
 
     s.getMemory().memcpy(p_new, p, memcpy_size, align, align, true);

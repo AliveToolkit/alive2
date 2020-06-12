@@ -310,13 +310,13 @@ bool expr::isFalse() const {
 }
 
 bool expr::isZero() const {
-  C();
-  return eq(mkUInt(0, sort()));
+  uint64_t n;
+  return isUInt(n) && n == 0;
 }
 
 bool expr::isOne() const {
-  C();
-  return eq(mkUInt(1, sort()));
+  uint64_t n;
+  return isUInt(n) && n == 1;
 }
 
 bool expr::isAllOnes() const {
@@ -333,9 +333,8 @@ bool expr::isSMax() const {
 }
 
 bool expr::isSigned() const {
-  C();
   auto bit = bits() - 1;
-  return extract(bit, bit).eq(mkUInt(1, 1));
+  return extract(bit, bit).isOne();
 }
 
 unsigned expr::bits() const {
@@ -721,14 +720,14 @@ expr expr::lshr(const expr &rhs) const {
 
 expr expr::fshl(const expr &a, const expr &b, const expr &c) {
   C2(a);
-  auto width = mkUInt(a.bits(), a.bits());
+  auto width = mkUInt(a.bits(), a.sort());
   expr c_mod_width = c.urem(width);
   return a << c_mod_width | b.lshr(width - c_mod_width);
 }
 
 expr expr::fshr(const expr &a, const expr &b, const expr &c) {
   C2(a);
-  auto width = mkUInt(a.bits(), a.bits());
+  auto width = mkUInt(a.bits(), a.sort());
   expr c_mod_width = c.urem(width);
   return a << (width - c_mod_width) | b.lshr(c_mod_width);
 }
@@ -792,10 +791,11 @@ expr expr::bitreverse() const {
 expr expr::cttz() const {
   C();
   auto nbits = bits();
+  auto srt = sort();
 
-  auto cond = mkUInt(nbits, nbits);
+  auto cond = mkUInt(nbits, srt);
   for (int i = nbits - 1; i >= 0; --i) {
-    cond = mkIf(extract(i, i) == 1u, mkUInt(i, nbits), cond);
+    cond = mkIf(extract(i, i) == 1u, mkUInt(i, srt), cond);
   }
 
   return cond;
@@ -804,10 +804,11 @@ expr expr::cttz() const {
 expr expr::ctlz() const {
   C();
   auto nbits = bits();
+  auto srt = sort();
 
-  auto cond = mkUInt(nbits, nbits);
+  auto cond = mkUInt(nbits, srt);
   for (unsigned i = 0; i < nbits; ++i) {
-    cond = mkIf(extract(i, i) == 1u, mkUInt(nbits - 1 - i, nbits), cond);
+    cond = mkIf(extract(i, i) == 1u, mkUInt(nbits - 1 - i, srt), cond);
   }
 
   return cond;
@@ -817,7 +818,7 @@ expr expr::ctpop() const {
   C();
   auto nbits = bits();
 
-  auto res = mkUInt(0, nbits);
+  auto res = mkUInt(0, sort());
   for (unsigned i = 0; i < nbits; ++i) {
     res = res + extract(i, i).zext(nbits - 1);
   }
@@ -826,23 +827,19 @@ expr expr::ctpop() const {
 }
 
 expr expr::umin(const expr &rhs) const {
-  C();
-  return mkIf(this->ult(rhs), *this, rhs);
+  return mkIf(ule(rhs), *this, rhs);
 }
 
 expr expr::umax(const expr &rhs) const {
-  C();
-  return mkIf(this->ugt(rhs), *this, rhs);
+  return mkIf(uge(rhs), *this, rhs);
 }
 
 expr expr::smin(const expr &rhs) const {
-  C();
-  return mkIf(this->slt(rhs), *this, rhs);
+  return mkIf(sle(rhs), *this, rhs);
 }
 
 expr expr::smax(const expr &rhs) const {
-  C();
-  return mkIf(this->sgt(rhs), *this, rhs);
+  return mkIf(sge(rhs), *this, rhs);
 }
 
 expr expr::isNaN() const {
