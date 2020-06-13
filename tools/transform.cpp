@@ -978,7 +978,7 @@ void Transform::preprocess() {
         to_remove.clear();
       }
 
-      changed |= fn->removeUnusedAggs(users);
+      changed |= fn->removeUnusedAggsAndGVars(users);
     } while (changed);
   }
 }

@@ -120,8 +120,7 @@ void Function::addConstant(unique_ptr<Value> &&c) {
 vector<GlobalVariable *> Function::getGlobalVars() const {
   vector<GlobalVariable *> gvs;
   for (auto I = constants.begin(), E = constants.end(); I != E; ++I) {
-    const unique_ptr<Value> &c = *I;
-    if (auto *gv = dynamic_cast<GlobalVariable *>(c.get()))
+    if (auto *gv = dynamic_cast<GlobalVariable*>(I->get()))
       gvs.push_back(gv);
   }
   return gvs;
@@ -215,7 +214,7 @@ multimap<Value*, Value*> Function::getUsers() const {
   return users;
 }
 
-bool Function::removeUnusedAggs(const multimap<Value*, Value*> &users) {
+bool Function::removeUnusedAggsAndGVars(const multimap<Value*, Value*> &users) {
   bool changed = false;
   for (auto I = aggregates.begin(); I != aggregates.end(); ) {
     if (users.count(I->get())) {
@@ -225,6 +224,16 @@ bool Function::removeUnusedAggs(const multimap<Value*, Value*> &users) {
       changed = true;
     }
   }
+
+  for (auto I = constants.begin(); I != constants.end(); ) {
+    if (dynamic_cast<GlobalVariable*>(I->get()) && !users.count(I->get())) {
+      I = constants.erase(I);
+      changed = true;
+    } else {
+      ++I;
+    }
+  }
+
   return changed;
 }
 

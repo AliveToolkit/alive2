@@ -153,7 +153,7 @@ public:
   instr_helper instrs() const { return *this; }
 
   std::multimap<Value*, Value*> getUsers() const;
-  bool removeUnusedAggs(const std::multimap<Value*, Value*> &users);
+  bool removeUnusedAggsAndGVars(const std::multimap<Value*, Value*> &users);
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
