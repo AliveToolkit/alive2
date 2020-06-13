@@ -286,6 +286,10 @@ public:
                           !known);
     unique_ptr<Instr> ret_val;
 
+    // avoid parsing arguments altogether for "unknown known" functions
+    if (known)
+      goto end;
+
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto *arg = args[argidx];
       ParamAttrs attr;
@@ -339,6 +343,7 @@ public:
       BB->addInstr(move(call));
       RETURN_IDENTIFIER(move(ret_val));
     }
+end:
     RETURN_IDENTIFIER(move(call));
   }
 

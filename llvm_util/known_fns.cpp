@@ -25,7 +25,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            BasicBlock &BB, const vector<Value*> &args) {
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
-    RETURN_FAIL_KNOWN();
+    RETURN_FAIL_UNKNOWN();
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocLikeFn(&i, &TLI, false)) {
