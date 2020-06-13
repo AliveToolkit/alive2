@@ -771,35 +771,36 @@ expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
   expr size2 = other.blockSize();
   expr off2 = other.getOffsetSizet();
 
-  expr local
-    = expr::mkIf(isHeapAllocated(),
-                 other.isHeapAllocated() && off == off2 && size2.uge(size),
+  expr local =
+      (other.isLocal() || other.isByval() || is_byval_arg) &&
+      isHeapAllocated().implies(other.isHeapAllocated() && off == off2);
+  bool iswrite = !is_byval_arg;
 
-                 // must maintain same dereferenceability before & after
-                 expr::mkIf(off.sle(-1),
-                            off == off2 && size2.uge(size),
-                            off2.sge(0) &&
-                              expr::mkIf(off.sle(size),
-                                         off2.sle(size2) && off2.uge(off) &&
-                                           (size2 - off2).uge(size - off),
-                                         off2.sgt(size2) && off == off2 &&
-                                           size2.uge(size))));
-  local = (other.isLocal() || other.isByval() || is_byval_arg) && local;
+  expr ofs = expr::mkFreshVar("fninput_ofs", expr::mkUInt(0, bits_for_offset));
+  Pointer this_ofs = *this + ofs;
+  Pointer other_ofs = other + ofs;
 
-  // TODO: this induces an infinite loop
-  // block_refined(other);
+  auto this_ofs_deref =
+      this_ofs.isDereferenceable(bits_byte / 8, bits_byte / 8, iswrite);
+  auto other_ofs_deref =
+      other_ofs.isDereferenceable(bits_byte / 8, bits_byte / 8, iswrite);
+
+  local &= this_ofs_deref().implies(
+        other_ofs_deref() && this_ofs.blockValRefined(other_ofs, true));
 
   return isBlockAlive().implies(
            other.isBlockAlive() &&
              expr::mkIf(isLocal(), local, *this == other));
 }
 
-expr Pointer::blockValRefined(const Pointer &other) const {
-  if (m.non_local_block_val.eq(other.m.non_local_block_val))
+expr Pointer::blockValRefined(const Pointer &other, bool encode_local) const {
+  if (!encode_local && m.non_local_block_val.eq(other.m.non_local_block_val))
     return true;
 
-  Byte val(m, m.non_local_block_val.load(shortPtr()));
-  Byte val2(other.m, other.m.non_local_block_val.load(other.shortPtr()));
+  Byte val = encode_local ? m.load(*this) :
+             Byte(m, m.non_local_block_val.load(shortPtr()));
+  Byte val2 = encode_local ? other.m.load(other) :
+              Byte(other.m, other.m.non_local_block_val.load(other.shortPtr()));
 
   // refinement if offset had non-ptr value
   expr np1 = val.nonptrNonpoison();
@@ -816,7 +817,11 @@ expr Pointer::blockValRefined(const Pointer &other) const {
   expr is_ptr = val.isPtr();
   expr is_ptr2 = val2.isPtr();
   expr ptr_cnstr;
-  if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
+  if (encode_local) {
+    // TODO: we cannot simply call val.ptr().refined(val2.ptr()).
+    // This should align src / tgt
+    ptr_cnstr = true;
+  } else if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
     ptr_cnstr = val == val2;
   } else {
     ptr_cnstr = val2.ptrNonpoison() &&

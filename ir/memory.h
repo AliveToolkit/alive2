@@ -177,7 +177,10 @@ public:
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, bool is_byval_arg) const;
-  smt::expr blockValRefined(const Pointer &other) const;
+  // If encode_local is true, assume that this and other can point to local
+  // blocks as well
+  smt::expr blockValRefined(const Pointer &other,
+                            bool encode_local = false) const;
   smt::expr blockRefined(const Pointer &other) const;
 
   const Memory& getMemory() const { return m; }
