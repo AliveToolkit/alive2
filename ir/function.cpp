@@ -356,9 +356,9 @@ DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
     // cases, dom trees for subtrees not rooted at entry will be wrong
     if (f1 == f1->dominator && f2 == f2->dominator)
       return &f1->bb == &f.getFirstBB() ? f1_start : f2_start;
-    while (f1->order < f2->order && f1 != f1->dominator)
+    if (f1->order < f2->order || f2 == f2->dominator)
       f1 = f1->dominator;
-    while (f2->order < f1->order && f2 != f2->dominator)
+    if (f2->order < f1->order || f1 == f1->dominator)
       f2 = f2->dominator;
   }
   return f1;
