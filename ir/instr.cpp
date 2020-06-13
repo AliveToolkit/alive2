@@ -3008,6 +3008,11 @@ Value* isNoOp(const Value &v) {
   if (auto gep = dynamic_cast<const GEP*>(&v))
     return gep->getMaxGEPOffset() == 0 ? &gep->getPtr() : nullptr;
 
+  if (auto unop = dynamic_cast<const UnaryOp*>(&v)) {
+    if (unop->getOp() == UnaryOp::Copy)
+      return &unop->getValue();
+  }
+
   return nullptr;
 }
 }

@@ -179,6 +179,7 @@ struct TVPass final : public llvm::FunctionPass {
     Transform t;
     t.src = move(old_fn);
     t.tgt = move(I->second.first);
+    t.preprocess();
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 

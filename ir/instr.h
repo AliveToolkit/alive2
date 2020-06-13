@@ -85,6 +85,8 @@ public:
           FastMathFlags fmath = {})
     : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath) {}
 
+  Op getOp() const { return op; }
+  Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

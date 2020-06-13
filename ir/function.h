@@ -37,6 +37,7 @@ public:
   void fixupTypes(const smt::Model &m);
 
   void addInstr(std::unique_ptr<Instr> &&i);
+  void delInstr(Instr *i);
 
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;
@@ -88,6 +89,7 @@ public:
   void fixupTypes(const smt::Model &m);
 
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
+  BasicBlock& getFirstBB() { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
@@ -149,6 +151,8 @@ public:
   };
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
+
+  std::multimap<Value*, Value*> getUsers() const;
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);

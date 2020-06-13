@@ -273,6 +273,7 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   Transform t;
   t.src = move(*Func1);
   t.tgt = move(*Func2);
+  t.preprocess();
   TransformVerify verifier(t, false);
   if (!opt_succinct)
     t.print(cout, print_opts);

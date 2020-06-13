@@ -331,7 +331,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, false);
+  // TODO: checking of constant global vars disabled
+  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, true);
   auto &ptr_refinement = ptr_refinement0;
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;
@@ -894,6 +895,69 @@ void TransformVerify::fixupTypes(const TypingAssignments &ty) {
     t.precondition->fixupTypes(ty.r.getModel());
   t.src.fixupTypes(ty.r.getModel());
   t.tgt.fixupTypes(ty.r.getModel());
+}
+
+void Transform::preprocess() {
+  // remove store of initializers to global variables that aren't needed to
+  // verify the transformation
+  vector<Value*> worklist;
+  set<const Value*> seen;
+
+  for (auto fn : { &src, &tgt }) {
+    auto &bb = fn->getFirstBB();
+    if (bb.getName() != "#init")
+      continue;
+
+    vector<Instr*> to_remove;
+    auto users = fn->getUsers();
+
+    for (auto &i : bb.instrs()) {
+      if (!dynamic_cast<const Store*>(&i))
+        continue;
+      auto ops  = i.operands();
+      auto val  = ops[0];
+      auto gvar = ops[1];
+      worklist.emplace_back(gvar);
+      seen.emplace(&i);
+
+      bool needed = false;
+      while (!worklist.empty()) {
+        auto user = worklist.back();
+        worklist.pop_back();
+        if (!seen.emplace(user).second)
+          continue;
+
+        if (user == gvar ||
+            isNoOp(*user) ||
+            dynamic_cast<Phi*>(user) ||
+            dynamic_cast<Return*>(user) ||
+            dynamic_cast<Select*>(user)) {
+          for (auto p = users.equal_range(user); p.first != p.second;
+               ++p.first)
+            worklist.emplace_back(p.first->second);
+        }
+        else if (dynamic_cast<FnCall*>(user)) {
+          // OK
+        } else {
+          needed = true;
+          break;
+        }
+      }
+
+      worklist.clear();
+      seen.clear();
+
+      if (!needed) {
+        to_remove.emplace_back(const_cast<Instr*>(&i));
+        //TODO: check src & target have same initializer
+        (void)val;
+      }
+    }
+
+    for (auto i : to_remove) {
+      bb.delInstr(i);
+    }
+  }
 }
 
 void Transform::print(ostream &os, const TransformPrintOpts &opt) const {

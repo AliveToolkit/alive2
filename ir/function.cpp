@@ -29,6 +29,15 @@ void BasicBlock::addInstr(unique_ptr<Instr> &&i) {
   m_instrs.push_back(move(i));
 }
 
+void BasicBlock::delInstr(Instr *i) {
+  for (auto I = m_instrs.begin(), E = m_instrs.end(); I != E; ++I) {
+    if (I->get() == i) {
+      m_instrs.erase(I);
+      return;
+    }
+  }
+}
+
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
@@ -189,6 +198,17 @@ void Function::instr_iterator::operator++(void) {
     return;
   ++BBI;
   next_bb();
+}
+
+multimap<Value*, Value*> Function::getUsers() const {
+  multimap<Value*, Value*> users;
+  for (auto &i : instrs()) {
+    for (auto op : i.operands()) {
+      users.emplace(op, const_cast<Instr*>(&i));
+    }
+  }
+  // TODO: missing, e.g., global var users
+  return users;
 }
 
 void Function::print(ostream &os, bool print_header) const {
