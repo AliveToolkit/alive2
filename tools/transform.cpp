@@ -200,12 +200,12 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
   for (auto &var : qvars0) {
     if (!var.isBool())
       continue;
+    if (hit_half_memory_limit())
+      break;
+
     e = e.subst(var, true).simplify() &&
         e.subst(var, false).simplify();
     qvars.erase(var);
-
-    if (hit_half_memory_limit())
-      break;
   }
 
   // TODO: maybe try to instantiate undet_xx vars?
