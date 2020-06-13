@@ -207,8 +207,25 @@ multimap<Value*, Value*> Function::getUsers() const {
       users.emplace(op, const_cast<Instr*>(&i));
     }
   }
-  // TODO: missing, e.g., global var users
+  for (auto &agg : aggregates) {
+    for (auto val : agg->getVals()) {
+      users.emplace(val, agg.get());
+    }
+  }
   return users;
+}
+
+bool Function::removeUnusedAggs(const multimap<Value*, Value*> &users) {
+  bool changed = false;
+  for (auto I = aggregates.begin(); I != aggregates.end(); ) {
+    if (users.count(I->get())) {
+      ++I;
+    } else {
+      I = aggregates.erase(I);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 void Function::print(ostream &os, bool print_header) const {

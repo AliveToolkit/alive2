@@ -814,5 +814,6 @@ public:
 
 
 const ConversionOp *isCast(ConversionOp::Op op, const Value &v);
+bool hasNoSideEffects(const Instr &i);
 Value *isNoOp(const Value &v);
 }

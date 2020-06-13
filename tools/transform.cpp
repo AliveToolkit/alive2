@@ -901,6 +901,7 @@ void Transform::preprocess() {
   // remove store of initializers to global variables that aren't needed to
   // verify the transformation
   vector<Value*> worklist;
+  vector<Instr*> to_remove;
   set<const Value*> seen;
 
   for (auto fn : { &src, &tgt }) {
@@ -908,7 +909,6 @@ void Transform::preprocess() {
     if (bb.getName() != "#init")
       continue;
 
-    vector<Instr*> to_remove;
     auto users = fn->getUsers();
 
     for (auto &i : bb.instrs()) {
@@ -930,13 +930,13 @@ void Transform::preprocess() {
         if (user == gvar ||
             isNoOp(*user) ||
             dynamic_cast<Phi*>(user) ||
-            dynamic_cast<Return*>(user) ||
             dynamic_cast<Select*>(user)) {
           for (auto p = users.equal_range(user); p.first != p.second;
                ++p.first)
             worklist.emplace_back(p.first->second);
         }
-        else if (dynamic_cast<FnCall*>(user)) {
+        else if (dynamic_cast<FnCall*>(user) ||
+                 dynamic_cast<Return*>(user)) {
           // OK
         } else {
           needed = true;
@@ -957,6 +957,29 @@ void Transform::preprocess() {
     for (auto i : to_remove) {
       bb.delInstr(i);
     }
+    to_remove.clear();
+
+    bool changed;
+    do {
+      users = fn->getUsers();
+      changed = false;
+
+      for (auto bb : fn->getBBs()) {
+        for (auto &i : bb->instrs()) {
+          auto i_ptr = const_cast<Instr*>(&i);
+          if (hasNoSideEffects(i) && !users.count(i_ptr))
+            to_remove.emplace_back(i_ptr);
+        }
+
+        for (auto i : to_remove) {
+          bb->delInstr(i);
+          changed = true;
+        }
+        to_remove.clear();
+      }
+
+      changed |= fn->removeUnusedAggs(users);
+    } while (changed);
   }
 }
 

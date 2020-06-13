@@ -3001,6 +3001,12 @@ const ConversionOp* isCast(ConversionOp::Op op, const Value &v) {
   return (c && c->getOp() == op) ? c : nullptr;
 }
 
+bool hasNoSideEffects(const Instr &i) {
+  return isNoOp(i) ||
+         dynamic_cast<const GEP*>(&i) ||
+         dynamic_cast<const ShuffleVector*>(&i);
+}
+
 Value* isNoOp(const Value &v) {
   if (isCast(ConversionOp::BitCast, v))
     return &static_cast<const ConversionOp*>(&v)->getValue();
