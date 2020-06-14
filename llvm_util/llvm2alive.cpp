@@ -312,8 +312,14 @@ public:
         attr.setDerefBytes(derefb);
       }
 
-      if (i.paramHasAttr(argidx, llvm::Attribute::ByVal))
+      if (i.paramHasAttr(argidx, llvm::Attribute::ByVal)) {
+        // A byval parameter cannot be captured.
+        attr.set(ParamAttrs::NoCapture);
         attr.set(ParamAttrs::ByVal);
+      }
+
+      if (i.paramHasAttr(argidx, llvm::Attribute::NoCapture))
+        attr.set(ParamAttrs::NoCapture);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NonNull))
         attr.set(ParamAttrs::NonNull);

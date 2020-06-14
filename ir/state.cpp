@@ -241,6 +241,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
+  for (auto &v : ptr_inputs) {
+    if (!v.nocapture && !v.val.non_poison.isFalse())
+      memory.escapeLocalPtr(v.val.value);
+  }
+
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
@@ -411,8 +416,10 @@ void State::mkAxioms(State &tgt) {
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
-          auto &[ptr_in, is_byval] = ptr_ins[i];
-          auto &[ptr_in2, is_byval2] = ptr_ins2[i];
+          auto &[ptr_in, is_byval, is_nocapture] = ptr_ins[i];
+          auto &[ptr_in2, is_byval2, is_nocapture2] = ptr_ins2[i];
+          (void)is_nocapture;
+          (void)is_nocapture2;
           if (!is_byval && is_byval2) {
             // byval is added at target; this is not supported yet.
             refines = false;

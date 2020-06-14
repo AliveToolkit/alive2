@@ -953,10 +953,10 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
-static vector<expr> extract_possible_local_bids(Memory &m, const Byte &b) {
+static vector<expr> extract_possible_local_bids(Memory &m, const expr &ptr) {
   vector<expr> ret;
   expr zero = expr::mkUInt(0, bits_for_offset);
-  for (auto ptr_val : expr::allLeafs(b.ptrValue())) {
+  for (auto ptr_val : expr::allLeafs(ptr)) {
     for (auto bid : expr::allLeafs(Pointer(m, move(ptr_val)).getBid())) {
       Pointer ptr(m, bid, zero);
       if (!ptr.isLocal().isFalse())
@@ -978,19 +978,8 @@ void Memory::store(const Pointer &p, const expr &val, expr &local,
                    expr &non_local) {
   if (numLocals() > 0) {
     Byte byte(*this, expr(val));
-    if (byte.isPtr().isTrue()) {
-      uint64_t bid;
-      for (const auto &bid_expr : extract_possible_local_bids(*this, byte)) {
-        if (bid_expr.isUInt(bid)) {
-          if (bid < numLocals())
-            escaped_local_blks[bid] = true;
-        } else {
-          // may escape a local ptr, but we don't know which one
-          escaped_local_blks.clear();
-          escaped_local_blks.resize(numLocals(), true);
-        }
-      }
-    }
+    if (byte.isPtr().isTrue())
+      escapeLocalPtr(byte.ptrValue());
   }
   auto is_local = p.isLocal();
   auto idx = p.shortPtr();
@@ -1280,9 +1269,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
 
     if (ptr_inputs) {
       modifies = false;
-      for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+      for (auto &[arg, is_byval_arg, is_nocapture_arg] : *ptr_inputs) {
         // TODO: byval's value cannot be modified.
         (void)is_byval_arg;
+        (void)is_nocapture_arg;
         Pointer argp(*this, arg.value);
         modifies |= arg.non_poison && argp.getBid() == p.getBid();
       }
@@ -1307,9 +1297,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
       expr ok_arg = true;
       if (ptr_inputs) {
-        for (auto &[arg, is_byval_arg] : *ptr_inputs) {
+        for (auto &[arg, is_byval_arg, is_nocapture_arg] : *ptr_inputs) {
           // TODO: liveness of a pointer given as byval doesn't change
           (void)is_byval_arg;
+          (void)is_nocapture_arg;
           ok_arg &= !arg.non_poison ||
                     Pointer(*this, arg.value).getBid() != bid;
         }
@@ -1712,6 +1703,20 @@ expr Memory::checkNocapture() const {
   if (!res.isTrue())
     state->addQuantVar(ofs);
   return res;
+}
+
+void Memory::escapeLocalPtr(const expr &ptr) {
+  uint64_t bid;
+  for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
+    if (bid_expr.isUInt(bid)) {
+      if (bid < numLocals())
+        escaped_local_blks[bid] = true;
+    } else {
+      // may escape a local ptr, but we don't know which one
+      escaped_local_blks.clear();
+      escaped_local_blks.resize(numLocals(), true);
+    }
+  }
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
