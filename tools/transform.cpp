@@ -922,6 +922,7 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
 
       if (user == gvar ||
           isNoOp(*user) ||
+          dynamic_cast<GEP*>(user) ||
           dynamic_cast<Phi*>(user) ||
           dynamic_cast<Select*>(user)) {
         for (auto p = users.equal_range(user); p.first != p.second; ++p.first)
