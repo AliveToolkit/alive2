@@ -107,7 +107,6 @@ int main(int argc, char **argv) {
           continue;
         }
 
-        t.preprocess();
         t.print(cout, print_opts);
         cout << '\n';
 

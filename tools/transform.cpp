@@ -331,8 +331,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
-  // TODO: checking of constant global vars disabled
-  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, true);
+  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, false);
   auto &ptr_refinement = ptr_refinement0;
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;
@@ -897,71 +896,76 @@ void TransformVerify::fixupTypes(const TypingAssignments &ty) {
   t.tgt.fixupTypes(ty.r.getModel());
 }
 
+static map<string_view, Instr*> can_remove_init(Function &fn) {
+  map<string_view, Instr*> to_remove;
+  auto &bb = fn.getFirstBB();
+  if (bb.getName() != "#init")
+    return to_remove;
+
+  vector<Value*> worklist;
+  set<const Value*> seen;
+  auto users = fn.getUsers();
+
+  for (auto &i : bb.instrs()) {
+    if (!dynamic_cast<const Store*>(&i))
+      continue;
+    auto gvar = i.operands()[1];
+    worklist.emplace_back(gvar);
+    seen.emplace(&i);
+
+    bool needed = false;
+    do {
+      auto user = worklist.back();
+      worklist.pop_back();
+      if (!seen.emplace(user).second)
+        continue;
+
+      if (user == gvar ||
+          isNoOp(*user) ||
+          dynamic_cast<Phi*>(user) ||
+          dynamic_cast<Select*>(user)) {
+        for (auto p = users.equal_range(user); p.first != p.second; ++p.first)
+          worklist.emplace_back(p.first->second);
+      }
+      else if (dynamic_cast<FnCall*>(user) ||
+               dynamic_cast<Return*>(user)) {
+        // OK
+      } else {
+        needed = true;
+        break;
+      }
+    } while (!worklist.empty());
+
+    worklist.clear();
+    seen.clear();
+
+    if (!needed)
+      to_remove.emplace(gvar->getName(), const_cast<Instr*>(&i));
+  }
+  return to_remove;
+}
+
 void Transform::preprocess() {
   // remove store of initializers to global variables that aren't needed to
   // verify the transformation
-  vector<Value*> worklist;
-  vector<Instr*> to_remove;
-  set<const Value*> seen;
-
-  for (auto fn : { &src, &tgt }) {
-    auto &bb = fn->getFirstBB();
-    if (bb.getName() != "#init")
+  // We only remove inits if it's possible to remove from both programs to keep
+  // memories syntactically equal
+  auto remove_init_tgt = can_remove_init(tgt);
+  for (auto &[name, isrc] : can_remove_init(src)) {
+    auto Itgt = remove_init_tgt.find(name);
+    if (Itgt == remove_init_tgt.end())
       continue;
+    src.getFirstBB().delInstr(isrc);
+    tgt.getFirstBB().delInstr(Itgt->second);
+    // TODO: check that tgt init refines that of src
+  }
 
-    auto users = fn->getUsers();
-
-    for (auto &i : bb.instrs()) {
-      if (!dynamic_cast<const Store*>(&i))
-        continue;
-      auto ops  = i.operands();
-      auto val  = ops[0];
-      auto gvar = ops[1];
-      worklist.emplace_back(gvar);
-      seen.emplace(&i);
-
-      bool needed = false;
-      while (!worklist.empty()) {
-        auto user = worklist.back();
-        worklist.pop_back();
-        if (!seen.emplace(user).second)
-          continue;
-
-        if (user == gvar ||
-            isNoOp(*user) ||
-            dynamic_cast<Phi*>(user) ||
-            dynamic_cast<Select*>(user)) {
-          for (auto p = users.equal_range(user); p.first != p.second;
-               ++p.first)
-            worklist.emplace_back(p.first->second);
-        }
-        else if (dynamic_cast<FnCall*>(user) ||
-                 dynamic_cast<Return*>(user)) {
-          // OK
-        } else {
-          needed = true;
-          break;
-        }
-      }
-
-      worklist.clear();
-      seen.clear();
-
-      if (!needed) {
-        to_remove.emplace_back(const_cast<Instr*>(&i));
-        //TODO: check src & target have same initializer
-        (void)val;
-      }
-    }
-
-    for (auto i : to_remove) {
-      bb.delInstr(i);
-    }
-    to_remove.clear();
-
+  // remove side-effect free instructions without users
+  vector<Instr*> to_remove;
+  for (auto fn : { &src, &tgt }) {
     bool changed;
     do {
-      users = fn->getUsers();
+      auto users = fn->getUsers();
       changed = false;
 
       for (auto bb : fn->getBBs()) {
