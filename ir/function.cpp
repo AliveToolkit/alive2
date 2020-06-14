@@ -211,29 +211,33 @@ multimap<Value*, Value*> Function::getUsers() const {
       users.emplace(val, agg.get());
     }
   }
+  for (auto &c : constants) {
+    if (auto agg = dynamic_cast<AggregateValue*>(c.get())) {
+      for (auto val : agg->getVals()) {
+        users.emplace(val, agg);
+      }
+    }
+  }
   return users;
 }
 
-bool Function::removeUnusedAggsAndGVars(const multimap<Value*, Value*> &users) {
+template <typename T>
+static bool removeUnused(T &data, const multimap<Value*, Value*> &users) {
   bool changed = false;
-  for (auto I = aggregates.begin(); I != aggregates.end(); ) {
+  for (auto I = data.begin(); I != data.end(); ) {
     if (users.count(I->get())) {
       ++I;
     } else {
-      I = aggregates.erase(I);
+      I = data.erase(I);
       changed = true;
     }
   }
+  return changed;
+}
 
-  for (auto I = constants.begin(); I != constants.end(); ) {
-    if (dynamic_cast<GlobalVariable*>(I->get()) && !users.count(I->get())) {
-      I = constants.erase(I);
-      changed = true;
-    } else {
-      ++I;
-    }
-  }
-
+bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users) {
+  bool changed = removeUnused(aggregates, users);
+  changed |= removeUnused(constants, users);
   return changed;
 }
 
