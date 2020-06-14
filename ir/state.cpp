@@ -84,6 +84,7 @@ const StateValue& State::operator[](const Value &val) {
     undef_vars.emplace(move(p.second));
   }
 
+  assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = move(sval_new);
 }
 
