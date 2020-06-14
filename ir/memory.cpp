@@ -1291,11 +1291,13 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     st.non_local_block_val
       = initial_non_local_block_val.subst(blk_val, st.block_val_var);
 
-    auto idx = p.shortPtr();
-    st.non_local_block_val
-      = expr::mkLambda({ idx },
-                       expr::mkIf(modifies, st.non_local_block_val.load(idx),
-                                  non_local_block_val.load(idx)));
+    if (!modifies.isTrue()) {
+      auto idx = p.shortPtr();
+      st.non_local_block_val
+        = expr::mkLambda({ idx },
+                         expr::mkIf(modifies, st.non_local_block_val.load(idx),
+                                    non_local_block_val.load(idx)));
+    }
   }
 
   if (num_nonlocals_src && !nofree) {
