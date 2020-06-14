@@ -1,3 +1,5 @@
+; TEST-ARGS: -smt-to:40000
+
 Name: fma, passthrough 
 %t = fma float 0.0, float 0.0, float 0.0
   =>
