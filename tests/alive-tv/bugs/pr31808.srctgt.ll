@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=10000
-
 ; https://bugs.llvm.org/show_bug.cgi?id=31808 , with minor fixes
 %struct.SomeStruct = type { %struct.Array }
 %struct.Array = type { i8*, i32, i32 }

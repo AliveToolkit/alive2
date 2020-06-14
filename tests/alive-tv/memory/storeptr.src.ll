@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=20000 -disable-undef-input
-
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
 define i64 @f(i64** %pptr) {

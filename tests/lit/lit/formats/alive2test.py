@@ -62,18 +62,18 @@ class Alive2Test(TestFormat):
 
     alive_tv_1 = test.endswith('.srctgt.ll')
     if alive_tv_1:
-      cmd = ['./alive-tv']
+      cmd = ['./alive-tv', '-smt-to=20000']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     alive_tv_2 = test.endswith('.src.ll')
     if alive_tv_2:
-      cmd = ['./alive-tv']
+      cmd = ['./alive-tv', '-smt-to=20000']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     if not alive_tv_1 and not alive_tv_2:
-      cmd = ['./alive']
+      cmd = ['./alive', '-smt-to:20000']
 
     input = readFile(test)
 

@@ -1,4 +1,3 @@
-; TEST-ARGS: -smt-to=2000
 ; Found by Alive2
 declare void @g(i8*)
 

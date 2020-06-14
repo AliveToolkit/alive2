@@ -1,4 +1,3 @@
-; TEST-ARGS: -disable-undef-input
 target datalayout = "e-m:m-p:40:64:64:32-i32:32-i16:16-i8:8-n32"
 
 define <2 x i8*> @f(<2 x i8*> %x) {

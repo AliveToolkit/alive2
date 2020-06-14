@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=10000
-
 @glb = global i8* null
 
 define i8 @foo(i1 %cmp) {

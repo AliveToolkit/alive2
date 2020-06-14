@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=20000
-
 ; https://bugs.llvm.org/show_bug.cgi?id=43948
 @arr = local_unnamed_addr global [32 x i32] zeroinitializer, align 16
 @var = global i32 zeroinitializer, align 8

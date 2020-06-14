@@ -1,4 +1,4 @@
-; TEST-ARGS: -smt-to=10000
+; TEST-ARGS: -disable-undef-input
 
 declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32) nounwind readnone
 

@@ -1,4 +1,3 @@
-; TEST-ARGS: -smt-to=10000
 ; https://bugs.llvm.org/show_bug.cgi?id=31243
 target datalayout = "e-m:o-p:32:32-f64:32:64-f80:128-n8:16:32-S128"
 target triple = "i386-apple-macosx10.11.0"

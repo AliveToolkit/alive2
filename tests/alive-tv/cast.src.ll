@@ -1,5 +1,3 @@
-; TEST-ARGS: -smt-to=20000
-
 define i16 @f1(half %x) {
   %a = alloca half
   store half %x, half* %a
