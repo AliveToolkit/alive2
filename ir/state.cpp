@@ -241,6 +241,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
+  if (reads_memory) {
+    auto &uvs = memory.getUndefVars();
+    undef_vars.insert(uvs.begin(), uvs.end());
+  }
+
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
