@@ -314,7 +314,7 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
-  void escapeLocal(unsigned short_bid);
+  void escapeLocalPtr(const smt::expr &ptr);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;

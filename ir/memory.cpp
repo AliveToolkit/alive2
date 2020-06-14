@@ -953,10 +953,10 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
-static vector<expr> extract_possible_local_bids(Memory &m, const Byte &b) {
+static vector<expr> extract_possible_local_bids(Memory &m, const expr &ptr) {
   vector<expr> ret;
   expr zero = expr::mkUInt(0, bits_for_offset);
-  for (auto ptr_val : expr::allLeafs(b.ptrValue())) {
+  for (auto ptr_val : expr::allLeafs(ptr)) {
     for (auto bid : expr::allLeafs(Pointer(m, move(ptr_val)).getBid())) {
       Pointer ptr(m, bid, zero);
       if (!ptr.isLocal().isFalse())
@@ -978,19 +978,8 @@ void Memory::store(const Pointer &p, const expr &val, expr &local,
                    expr &non_local) {
   if (numLocals() > 0) {
     Byte byte(*this, expr(val));
-    if (byte.isPtr().isTrue()) {
-      uint64_t bid;
-      for (const auto &bid_expr : extract_possible_local_bids(*this, byte)) {
-        if (bid_expr.isUInt(bid)) {
-          if (bid < numLocals())
-            escaped_local_blks[bid] = true;
-        } else {
-          // may escape a local ptr, but we don't know which one
-          escaped_local_blks.clear();
-          escaped_local_blks.resize(numLocals(), true);
-        }
-      }
-    }
+    if (byte.isPtr().isTrue())
+      escapeLocalPtr(byte.ptrValue());
   }
   auto is_local = p.isLocal();
   auto idx = p.shortPtr();
@@ -1716,9 +1705,18 @@ expr Memory::checkNocapture() const {
   return res;
 }
 
-void Memory::escapeLocal(unsigned short_bid) {
-  assert(short_bid < numLocals());
-  escaped_local_blks[short_bid] = true;
+void Memory::escapeLocalPtr(const expr &ptr) {
+  uint64_t bid;
+  for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
+    if (bid_expr.isUInt(bid)) {
+      if (bid < numLocals())
+        escaped_local_blks[bid] = true;
+    } else {
+      // may escape a local ptr, but we don't know which one
+      escaped_local_blks.clear();
+      escaped_local_blks.resize(numLocals(), true);
+    }
+  }
 }
 
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {

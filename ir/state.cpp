@@ -242,17 +242,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   for (auto &v : ptr_inputs) {
-    if (!v.nocapture && v.val.non_poison.isTrue()) {
-      Pointer p(memory, v.val.value);
-      if (!p.isLocal().isTrue())
-        continue;
-      // TODO: this should support more complex cases, such as (c ? bid1: bid2).
-      // Current implementation of extract_possible_local_bids cannot be used
-      // because it causes false positive for an input in gzip.
-      uint64_t short_bid;
-      if (p.getShortBid().isUInt(short_bid))
-        memory.escapeLocal(short_bid);
-    }
+    if (!v.nocapture && !v.val.non_poison.isFalse())
+      memory.escapeLocalPtr(v.val.value);
   }
 
   // TODO: this doesn't need to compare the full memory, just a subset of fields
