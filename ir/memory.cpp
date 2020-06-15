@@ -1706,13 +1706,11 @@ expr Memory::checkNocapture() const {
 }
 
 void Memory::escapeLocalPtr(const expr &ptr) {
-  auto bids = extract_possible_local_bids(*this, ptr);
   uint64_t bid;
   unsigned hi, lo;
   expr sel, blk, idx;
 
-  bool has_unknown_bid = false;
-  for (const auto &bid_expr : bids) {
+  for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
       if (bid < numLocals())
         escaped_local_blks[bid] = true;
@@ -1721,15 +1719,11 @@ void Memory::escapeLocalPtr(const expr &ptr) {
       // initial non local block bytes don't contain local pointers.
       continue;
     } else {
-      has_unknown_bid = true;
+      // may escape a local ptr, but we don't know which one
+      escaped_local_blks.clear();
+      escaped_local_blks.resize(numLocals(), true);
       break;
     }
-  }
-  if (has_unknown_bid) {
-    // may escape a local ptr, but we don't know which one
-    escaped_local_blks.clear();
-    escaped_local_blks.resize(numLocals(), true);
-
   }
 }
 
