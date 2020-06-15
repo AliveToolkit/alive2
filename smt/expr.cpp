@@ -448,6 +448,15 @@ bool expr::isStore(expr &array, expr &idx, expr &val) const {
   return false;
 }
 
+bool expr::isSelect(expr &array, expr &idx) const {
+  if (auto app = isAppOf(Z3_OP_SELECT)) {
+    array = Z3_get_app_arg(ctx(), app, 0);
+    idx = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
 bool expr::isNaNCheck(expr &fp) const {
   if (auto app = isAppOf(Z3_OP_FPA_IS_NAN)) {
     fp = Z3_get_app_arg(ctx(), app, 0);
