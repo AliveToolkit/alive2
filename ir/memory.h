@@ -194,6 +194,7 @@ class Memory {
   State *state;
 
   smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
+  smt::expr non_local_block_val_var;
   smt::expr local_block_val;
   smt::expr initial_non_local_block_val;
 
@@ -226,6 +227,7 @@ public:
   class CallState {
     smt::expr non_local_block_val;
     smt::expr block_val_var;
+    smt::expr initial_non_local_block_val;
     smt::expr non_local_block_liveness;
     smt::expr liveness_var;
     bool empty = true;

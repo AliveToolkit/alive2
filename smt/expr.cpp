@@ -1488,8 +1488,11 @@ expr expr::store(const expr &idx, const expr &val) const {
   return Z3_mk_store(ctx(), ast(), idx(), val());
 }
 
-expr expr::load(const expr &idx) const {
+expr expr::load(const expr &idx, const expr *stop_simplifying_if) const {
   C(idx);
+
+  if (stop_simplifying_if && stop_simplifying_if->eq(*this))
+    return Z3_mk_select(ctx(), ast(), idx());
 
   // TODO: add support for alias analysis plugin
   expr array, str_idx, val;
@@ -1498,7 +1501,7 @@ expr expr::load(const expr &idx) const {
     if (cmp.isTrue())
       return val;
     if (cmp.isFalse())
-      return array.load(idx);
+      return array.load(idx, stop_simplifying_if);
 
   } else if (isConstArray(val)) {
     return val;
