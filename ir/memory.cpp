@@ -1710,20 +1710,26 @@ void Memory::escapeLocalPtr(const expr &ptr) {
   uint64_t bid;
   unsigned hi, lo;
   expr sel, blk, idx;
-  if (bids.size() == 1 && bids[0].isExtract(sel, hi, lo) &&
-      sel.isSelect(blk, idx) && blk.eq(mk_block_val_array()))
-    // initial non local block bytes don't contain local pointers.
-    return;
 
+  bool has_unknown_bid = false;
   for (const auto &bid_expr : bids) {
     if (bid_expr.isUInt(bid)) {
       if (bid < numLocals())
         escaped_local_blks[bid] = true;
+    } else if (bids[0].isExtract(sel, hi, lo) &&
+               sel.isSelect(blk, idx) && blk.eq(mk_block_val_array())) {
+      // initial non local block bytes don't contain local pointers.
+      continue;
     } else {
-      // may escape a local ptr, but we don't know which one
-      escaped_local_blks.clear();
-      escaped_local_blks.resize(numLocals(), true);
+      has_unknown_bid = true;
+      break;
     }
+  }
+  if (has_unknown_bid) {
+    // may escape a local ptr, but we don't know which one
+    escaped_local_blks.clear();
+    escaped_local_blks.resize(numLocals(), true);
+
   }
 }
 
