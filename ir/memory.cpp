@@ -1716,7 +1716,7 @@ void Memory::escapeLocalPtr(const expr &ptr) {
     if (bid_expr.isUInt(bid)) {
       if (bid < numLocals())
         escaped_local_blks[bid] = true;
-    } else if (bids[0].isExtract(sel, hi, lo) &&
+    } else if (bid_expr.isExtract(sel, hi, lo) &&
                sel.isSelect(blk, idx) && blk.eq(mk_block_val_array())) {
       // initial non local block bytes don't contain local pointers.
       continue;
