@@ -902,6 +902,14 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
   if (bb.getName() != "#init")
     return to_remove;
 
+  bool has_int2ptr = false;
+  for (auto &i : fn.instrs()) {
+    if (isCast(ConversionOp::Int2Ptr, i)) {
+      has_int2ptr = true;
+      break;
+    }
+  }
+
   vector<Value*> worklist;
   set<const Value*> seen;
   auto users = fn.getUsers();
@@ -920,20 +928,31 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
       if (!seen.emplace(user).second)
         continue;
 
-      if (user == gvar ||
-          isNoOp(*user) ||
-          dynamic_cast<GEP*>(user) ||
-          dynamic_cast<Phi*>(user) ||
-          dynamic_cast<Select*>(user)) {
-        for (auto p = users.equal_range(user); p.first != p.second; ++p.first)
-          worklist.emplace_back(p.first->second);
+      // OK, we can't observe which memory it reads
+      if (dynamic_cast<FnCall*>(user))
+        continue;
+
+      if (isCast(ConversionOp::Ptr2Int, *user)) {
+        // int2ptr can potentially alias with anything, so play on the safe side
+        if (has_int2ptr) {
+          needed = true;
+          break;
+        }
+        continue;
       }
-      else if (dynamic_cast<FnCall*>(user) ||
-               dynamic_cast<Return*>(user)) {
-        // OK
-      } else {
+
+      // no useful users
+      if (dynamic_cast<ICmp*>(user) ||
+          dynamic_cast<Return*>(user))
+        continue;
+
+      if (dynamic_cast<MemInstr*>(user) && !dynamic_cast<GEP*>(user)) {
         needed = true;
         break;
+      }
+
+      for (auto p = users.equal_range(user); p.first != p.second; ++p.first) {
+        worklist.emplace_back(p.first->second);
       }
     } while (!worklist.empty());
 
