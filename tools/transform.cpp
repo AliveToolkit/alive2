@@ -547,7 +547,7 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   // The number of instructions that can return a pointer to a non-local block.
-  unsigned num_max_nonlocals_inst = 0;
+  unsigned num_nonlocals_inst_src = 0, num_nonlocals_inst_tgt = 0;
   // The number of local blocks.
   num_locals_src = 0;
   num_locals_tgt = 0;
@@ -578,6 +578,8 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto fn : { &t.src, &t.tgt }) {
     unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
     uint64_t &cur_max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
+    auto &num_nonlocals_inst = fn == &t.src ? num_nonlocals_inst_src
+                                            : num_nonlocals_inst_tgt;
 
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
@@ -595,7 +597,7 @@ static void calculateAndInitConstants(Transform &t) {
         if (returns_local(i))
           ++cur_num_locals;
         else
-          num_max_nonlocals_inst += returns_nonlocal(i, nonlocal_cache);
+          num_nonlocals_inst += returns_nonlocal(i, nonlocal_cache);
 
         for (auto op : i.operands()) {
           nullptr_is_used |= has_nullptr(op);
@@ -621,11 +623,11 @@ static void calculateAndInitConstants(Transform &t) {
           min_access_size       = gcd(min_access_size, info.byteSize);
 
           if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
-            has_alloca |= true;
+            has_alloca = true;
             has_dead_allocas |= alloc->initDead();
           }
           else if (auto alloc = dynamic_cast<const Malloc*>(&i)) {
-            has_malloc |= true;
+            has_malloc  = true;
             has_free   |= alloc->isRealloc();
           } else {
             has_malloc |= dynamic_cast<const Calloc*>(&i) != nullptr;
@@ -665,6 +667,13 @@ static void calculateAndInitConstants(Transform &t) {
   // Global variables cannot be null pointers
   has_null_block = num_ptrinputs > 0 || nullptr_is_used || has_malloc ||
                   has_ptr_load || has_fncall;
+
+  // + 1 is sufficient to give 1 degree of freedom for the target to trigger UB
+  // in case a different pointer from source is produced.
+  auto num_max_nonlocals_inst
+    = min(num_nonlocals_inst_src, num_nonlocals_inst_tgt);
+  if (num_nonlocals_inst_src || num_nonlocals_inst_tgt)
+    ++num_max_nonlocals_inst;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst +
                       has_null_block;
