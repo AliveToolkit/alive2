@@ -14,18 +14,6 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
-#define mkIf_fold(c, a, b) \
-  mkIf_fold_fn(c, [&]() { return a; }, [&]() { return b; })
-
-template <typename T1, typename T2>
-static expr mkIf_fold_fn(const expr &cond, T1 &&a, T2 &&b) {
-  if (cond.isTrue())
-    return a();
-  if (cond.isFalse())
-    return b();
-  return expr::mkIf(cond, a(), b());
-}
-
 static unsigned ptr_next_idx = 0;
 
 static unsigned zero_bits_offset() {

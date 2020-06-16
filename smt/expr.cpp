@@ -1519,15 +1519,14 @@ expr expr::load(const expr &idx) const {
     if (body.isConst())
       return body;
 
-    auto extract_load = [&idx](expr &e, const expr &var) {
+    auto subst = [&idx](const expr &e, const expr &var) {
       if (auto app = e.isAppOf(Z3_OP_SELECT)) { // load(array, idx)
         expr lambda_idx = Z3_get_app_arg(ctx(), app, 1);
         expr new_idx = lambda_idx.subst(var, idx).simplify();
         assert(!idx.isValid() || !lambda_idx.eq(new_idx));
-        e = expr(Z3_get_app_arg(ctx(), app, 0)).load(new_idx);
-        return true;
+        return expr(Z3_get_app_arg(ctx(), app, 0)).load(new_idx);
       }
-      return false;
+      return e.subst(var, idx);
     };
 
     expr cond, then, els;
@@ -1535,18 +1534,7 @@ expr expr::load(const expr &idx) const {
       auto sort = Z3_get_quantifier_bound_sort(ctx(), ast(), 0);
       expr var = expr::mkQuantVar(0, sort);
       cond = cond.subst(var, idx).simplify();
-      if (cond.isTrue()) {
-        if (then.isConst())
-          return then;
-        if (extract_load(then, var))
-          return then;
-      }
-      if (cond.isFalse()) {
-        if (els.isConst())
-          return els;
-        if (extract_load(els, var))
-          return els;
-      }
+      return mkIf_fold(cond, subst(then, var), subst(els, var));
     }
   }
 
