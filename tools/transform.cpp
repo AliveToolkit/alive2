@@ -474,17 +474,38 @@ static bool may_be_nonlocal(Value *ptr) {
   return false;
 }
 
-static unsigned returns_nonlocal(const Instr &inst) {
+static pair<Value*, uint64_t> collect_gep_offsets(Value &v) {
+  Value *ptr = &v;
+  uint64_t offset = 0;
+
+  while (true) {
+    if (auto gep = dynamic_cast<GEP*>(ptr)) {
+      uint64_t off = gep->getMaxGEPOffset();
+      if (off != UINT64_MAX) {
+        ptr = &gep->getPtr();
+        offset += off;
+        continue;
+      }
+    }
+    break;
+  }
+
+  return { ptr, offset };
+}
+
+static unsigned returns_nonlocal(const Instr &inst,
+                                 set<pair<Value*, uint64_t>> &cache) {
   bool rets_nonloc = false;
 
-  if (dynamic_cast<const FnCall *>(&inst)) {
+  if (dynamic_cast<const FnCall*>(&inst) ||
+      isCast(ConversionOp::Int2Ptr, inst)) {
     rets_nonloc = true;
   }
   else if (auto load = dynamic_cast<const Load *>(&inst)) {
-    rets_nonloc = may_be_nonlocal(&load->getPtr());
-  }
-  else if (auto conv = dynamic_cast<const ConversionOp *>(&inst)) {
-    rets_nonloc = conv->getOp() == ConversionOp::Int2Ptr;
+    if (may_be_nonlocal(&load->getPtr())) {
+      auto [ptr, offset] = collect_gep_offsets(load->getPtr());
+      rets_nonloc = cache.emplace(ptr, offset).second;
+    }
   }
   return rets_nonloc ? num_ptrs(inst.getType()) : 0;
 }
@@ -568,12 +589,13 @@ static void calculateAndInitConstants(Transform &t) {
       }
     }
 
+    set<pair<Value*, uint64_t>> nonlocal_cache;
     for (auto BB : fn->getBBs()) {
       for (auto &i : BB->instrs()) {
         if (returns_local(i))
           ++cur_num_locals;
         else
-          num_max_nonlocals_inst += returns_nonlocal(i);
+          num_max_nonlocals_inst += returns_nonlocal(i, nonlocal_cache);
 
         for (auto op : i.operands()) {
           nullptr_is_used |= has_nullptr(op);
