@@ -2044,6 +2044,7 @@ StateValue Return::toSMT(State &s) const {
   auto &retval = s[*val];
   s.addUB(s.getMemory().checkNocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
+  s.getMemory().markAllocasAsDead();
 
   auto &attrs = s.getFn().getFnAttrs();
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);

@@ -331,7 +331,9 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, false);
+  // TODO: all local block's values are simply ignored, but we should check heap
+  auto [memory_cnstr0, ptr_refinement0] =
+      src_mem.refined(tgt_mem, false, false);
   auto &ptr_refinement = ptr_refinement0;
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;

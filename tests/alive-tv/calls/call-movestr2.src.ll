@@ -1,6 +1,3 @@
-; TODO: needs refinement of local blocks working
-; XPASS: Transformation seems to be correct
-
 define i8 @f() {
   %a = alloca i8
   store i8 3, i8* %a
@@ -9,3 +6,5 @@ define i8 @f() {
 }
 
 declare i8 @g(i8*)
+
+; ERROR: Source is more defined than target

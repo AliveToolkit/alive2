@@ -44,3 +44,5 @@ define i32 @tgt() noinline {
 }
 
 declare void @bar(%struct1* sret)
+
+; ERROR: Source is more defined than target

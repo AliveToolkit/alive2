@@ -7,7 +7,7 @@
 #include "smt/smt.h"
 #include "util/errors.h"
 #include <cassert>
-
+#include <iostream>
 using namespace smt;
 using namespace util;
 using namespace std;
@@ -249,7 +249,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
-    = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
+    = fn_call_data[name].try_emplace({ move(inputs), ptr_inputs,
                                        memory, reads_memory, argmemonly });
   auto &I = call_data_pair.first;
   bool inserted = call_data_pair.second;
@@ -273,14 +273,27 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
     string ub_name = name + "#ub";
     I->second
-      = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
+      = { move(values), out_types, expr::mkFreshVar(ub_name.c_str(), false),
           writes_memory
-            ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr,
-                               attrs.has(FnAttrs::NoFree))
+            ? memory.mkCallState(I->first.args_ptr, argmemonly,
+                                 attrs.has(FnAttrs::NoFree))
             : Memory::CallState(),
           true };
   } else {
-    I->second.used = true;
+    if (!I->second.used) {
+      // Reuse (FnCallInput, FnCallOutput) pair that is created from source
+      // LocalBlkMap should be updated to use target memory
+      auto fc_input = I->first;
+      auto fc_output = I->second;
+      fc_input.m.local_blk_map = memory.local_blk_map;
+      auto lbmap_out = Memory::LocalBlkMap::create(*this, ptr_inputs);
+
+      fc_output.callstate.setLocalBlkMap(move(lbmap_out));
+      fc_output.used = true;
+
+      fn_call_data[name].erase(I);
+      I = fn_call_data[name].emplace(move(fc_input), move(fc_output)).first;
+    }
   }
 
   addUB(I->second.ub);
@@ -395,12 +408,12 @@ void State::mkAxioms(State &tgt) {
 
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
       auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
-      auto &[rets, ub, mem_state, used] = I->second;
-      assert(used); (void)used;
+      auto &[rets, rets_ty, ub, mem_state, used] = I->second;
+      assert(used); (void)used; (void)rets_ty;
 
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
         auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
-        auto &[rets2, ub2, mem_state2, used2] = I2->second;
+        auto &[rets2, rets_ty2, ub2, mem_state2, used2] = I2->second;
 
         if (!used2 || reads != reads2 || argmem != argmem2)
           continue;
@@ -414,6 +427,9 @@ void State::mkAxioms(State &tgt) {
         if (refines.isFalse())
           continue;
 
+        // (is local, ptrinput src, ptrinput tgt)
+        vector<tuple<expr, expr, expr>> ptrinputs;
+
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
@@ -426,13 +442,23 @@ void State::mkAxioms(State &tgt) {
             refines = false;
             break;
           }
-          expr eq_val = Pointer(mem, ptr_in.value)
-                      .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
+          Pointer p_src(mem, ptr_in.value), p_tgt(mem2, ptr_in2.value);
+          expr eq_val = p_src.fninputRefined(p_tgt, is_byval2);
           refines &= ptr_in.non_poison
                        .implies(eq_val && ptr_in2.non_poison);
 
           if (refines.isFalse())
             break;
+
+          // byval implies nocapture (by llvm2alive); no need to check byval
+          if (!is_nocapture && !p_tgt.isLocal().isFalse() &&
+              !p_src.isLocal().isFalse()) {
+            // p_tgt.isLocal() and p_src.isLocal() should be equivalent.
+            // This is enforced by p_src.fninputRefined.
+            ptrinputs.emplace_back(
+              make_tuple(p_tgt.isLocal(), p_src.getShortBid(),
+                         p_tgt.getShortBid()));
+          }
         }
 
         if (refines.isFalse())
@@ -440,7 +466,7 @@ void State::mkAxioms(State &tgt) {
 
         if (reads2) {
           auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
-          expr mem_refined = mem.refined(mem2, true, restrict_ptrs).first;
+          expr mem_refined = mem.refined(mem2, true, true, restrict_ptrs).first;
           refines &= mem_refined;
           if (!mem_refined.isConst()) {
             auto &u = mem.getUndefVars();
@@ -450,13 +476,38 @@ void State::mkAxioms(State &tgt) {
 
         expr ref_expr(true);
         for (unsigned i = 0, e = rets.size(); i != e; ++i) {
+          // We cannot use Type::refines here because it uses final memory
+          expr val_refines;
+          if (rets_ty[i]->isPtrType()) {
+            Pointer p(mem, rets[i].value), q(mem2, rets2[i].value);
+            // We can't use Pointer::refined because we don't have post-call
+            // memory yet (we can construct it, but it is expensive for vcgen).
+            // Let's do what Pointer::refined does using input
+            // memory and mem_state only.
+            const auto &lbm = mem_state2.getLocalBlkMap();
+            auto qbid = q.getShortBid(), pbid = p.getShortBid();
+            // If there is no mapping block of qbid: in theory, this case should not
+            // happen, but may happen in practice due to imcompleteness of
+            // mapping. It is incomplete because we don't track mapping of local
+            // blocks escaped by storing to nonlocal blocks.
+            expr local_chk =
+              expr::mkIf(lbm.has(qbid), lbm.get(qbid), qbid) == pbid;
+            expr nonlocal_chk =
+              pbid == qbid && p.isBlockAlive().implies(q.isBlockAlive());
+
+            val_refines = p.isLocal() == q.isLocal() &&
+                p.getOffset() == q.getOffset() &&
+                expr::mkIf(p.isLocal(), local_chk, nonlocal_chk);
+          } else
+            val_refines = rets[i].value == rets2[i].value;
           ref_expr &=
-            rets[i].non_poison.implies(rets2[i].non_poison &&
-                                       rets[i].value == rets2[i].value);
+            rets[i].non_poison.implies(rets2[i].non_poison && move(val_refines));
         }
-        tgt.addPre(refines.implies(ref_expr &&
+        expr memstate_implies = mem_state.implies(mem_state2, ptrinputs);
+        expr pre = refines.implies(ref_expr &&
                                    ub.implies(ub2) &&
-                                   mem_state.implies(mem_state2)));
+                                   move(memstate_implies));
+        tgt.addPre(move(pre));
       }
     }
   }

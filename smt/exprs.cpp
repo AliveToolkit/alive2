@@ -4,7 +4,7 @@
 #include "smt/exprs.h"
 #include "util/compiler.h"
 #include <vector>
-
+#include <iostream>
 using namespace std;
 
 namespace smt {

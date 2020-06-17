@@ -99,6 +99,10 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
+  smt::expr encodeLocalPtrRefinement(const Pointer &other,
+                                     bool use_local_mapping) const;
+  smt::expr encodeByValArgRefinement(const Pointer &otherByval) const;
+
 public:
   Pointer(const Memory &m, const char *var_name,
           const smt::expr &local = false, bool unique_name = true,
@@ -176,10 +180,12 @@ public:
 
   void stripAttrs();
 
-  smt::expr refined(const Pointer &other) const;
+  // If local_use_mapping is set, don't look into its bytes further
+  smt::expr refined(const Pointer &other, bool local_use_mapping = false) const;
   smt::expr fninputRefined(const Pointer &other, bool is_byval_arg) const;
+  // If check_local is false, investigate nonlocal blocks only
   smt::expr blockValRefined(const Pointer &other) const;
-  smt::expr blockRefined(const Pointer &other) const;
+  smt::expr blockRefined(const Pointer &other, bool is_sameblk) const;
 
   const Memory& getMemory() const { return m; }
 
@@ -192,6 +198,44 @@ public:
 
 
 class Memory {
+public:
+  struct PtrInput {
+    StateValue val;
+    bool byval;
+    bool nocapture;
+
+    PtrInput(StateValue &&v, bool byval, bool nocapture) :
+      val(std::move(v)), byval(byval), nocapture(nocapture) {}
+    bool operator<(const PtrInput &rhs) const {
+      return std::tie(val, byval, nocapture) <
+             std::tie(rhs.val, rhs.byval, rhs.nocapture);
+    }
+  };
+
+  class LocalBlkMap {
+    smt::expr mapped; // BV with 1 bit per tgt bid (bitwidth: num_locals_tgt)
+    smt::expr mp; // shortbid(tgt) -> shortbid(src)
+
+  public:
+    smt::expr has(const smt::expr &local_bid_tgt) const;
+    smt::expr get(const smt::expr &local_bid_tgt) const;
+    void updateIf(const smt::expr &cond, const smt::expr &local_bid_tgt,
+                  smt::expr &&local_bid_src);
+
+    static LocalBlkMap empty();
+    // Create an instance by getting the LocalBlkMap of memory and applying
+    // ptr_inputs_tgt which are pointer arguments given to tgt's function call
+    static LocalBlkMap create(State &s,
+                              const std::vector<PtrInput> &ptr_inputs_tgt);
+
+    friend std::ostream &operator<<(std::ostream &os, const LocalBlkMap &m) {
+        os << "- mapped: " << m.mapped << '\n'
+           << "- map: " << m.mp;
+        return os;
+    }
+  };
+
+private:
   State *state;
 
   smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
@@ -200,6 +244,7 @@ class Memory {
 
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
+  bool allocasAreDead;
 
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
@@ -219,6 +264,10 @@ class Memory {
              smt::expr &non_local);
 
 public:
+  // Mapping escaped local blocks in src and tgt
+  // Note that using this makes sense only when it is in tgt
+  LocalBlkMap local_blk_map;
+
   enum BlockKind {
     MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
   };
@@ -229,11 +278,29 @@ public:
     smt::expr block_val_var;
     smt::expr non_local_block_liveness;
     smt::expr liveness_var;
+    LocalBlkMap local_blk_map;
     bool empty = true;
 
   public:
-    smt::expr implies(const CallState &st) const;
+    void setLocalBlkMap(LocalBlkMap &&lbm) { local_blk_map = std::move(lbm); }
+    void setLocalBlkMap(const Memory &m) { local_blk_map = m.local_blk_map; }
+    const LocalBlkMap &getLocalBlkMap() const { return local_blk_map; }
+
+    // Check whether src's call state(this) implies tgt's call state(st).
+    // ptrinputs: (is local, src's input bids, tgt's input bids)
+    smt::expr implies(const CallState &st,
+      const std::vector<std::tuple<smt::expr, smt::expr, smt::expr>> &ptrinputs)
+      const;
     friend class Memory;
+
+    friend std::ostream &operator<<(std::ostream &os, const CallState &m) {
+      os << "non_local_block_val: " << m.non_local_block_val << '\n'
+         << "block_val_var: " << m.block_val_var << '\n'
+         << "non_local_block_liveness: " << m.non_local_block_liveness << '\n'
+         << "liveness_var: " << m.liveness_var << '\n'
+         << "local_blk_map:\n" << m.local_blk_map << '\n';
+      return os;
+    }
   };
 
   Memory(State &state);
@@ -247,23 +314,11 @@ public:
   smt::expr mkInput(const char *name, const ParamAttrs &attrs) const;
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 
-  struct PtrInput {
-    StateValue val;
-    bool byval;
-    bool nocapture;
-
-    PtrInput(StateValue &&v, bool byval, bool nocapture) :
-      val(std::move(v)), byval(byval), nocapture(nocapture) {}
-    bool operator<(const PtrInput &rhs) const {
-      return std::tie(val, byval, nocapture) <
-             std::tie(rhs.val, rhs.byval, rhs.nocapture);
-    }
-  };
-
   std::pair<smt::expr, smt::expr>
     mkFnRet(const char *name,
             const std::vector<PtrInput> &ptr_inputs) const;
-  CallState mkCallState(const std::vector<PtrInput> *ptr_inputs, bool nofree)
+  CallState mkCallState(const std::vector<PtrInput> &ptr_inputs,
+                        bool argmemonly, bool nofree)
       const;
   void setState(const CallState &st);
 
@@ -285,6 +340,9 @@ public:
   // are not checked.
   void free(const smt::expr &ptr, bool unconstrained);
 
+  // Free all allocas.
+  void markAllocasAsDead();
+
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align, const std::set<smt::expr> &undef_vars,
@@ -305,9 +363,10 @@ public:
   smt::expr ptr2int(const smt::expr &ptr) const;
   smt::expr int2ptr(const smt::expr &val) const;
 
+  // If check_local is false, investigate nonlocal blocks only
   std::pair<smt::expr,Pointer>
     refined(const Memory &other,
-            bool skip_constants,
+            bool skip_constants, bool check_locals,
             const std::vector<PtrInput> *set_ptrs = nullptr)
       const;
 
