@@ -838,11 +838,12 @@ expr Pointer::blockRefined(const Pointer &other) const {
     val_refines = blockValRefined(other);
   }
 
+  assert(isWritable().eq(other.isWritable()));
+
   expr alive = isBlockAlive();
   return alive == other.isBlockAlive() &&
          blk_size == other.blockSize() &&
          getAllocType() == other.getAllocType() &&
-         isWritable() == other.isWritable() &&
          m.state->simplifyWithAxioms(
            blockAlignment().ule(other.blockAlignment())) &&
          (alive && getOffsetSizet().ult(blk_size)).implies(val_refines);
@@ -1541,8 +1542,7 @@ Memory::load(const expr &p, const Type &type, unsigned align) {
     for (unsigned i = 0; i < bytecount; ++i) {
       auto ptr_i = ptr + (little_endian ? i * bytesz
                                         : (bytecount - i - 1) * bytesz);
-      loadedBytes.emplace_back(*this, ::load(ptr_i, local_block_val,
-                                             non_local_block_val));
+      loadedBytes.emplace_back(load(ptr_i));
     }
     ret = bytesToValue(*this, loadedBytes, type);
   }
@@ -1621,7 +1621,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     Pointer dst_idx(*this, "#idx", dst.isLocal());
     Pointer src_idx = src + (dst_idx.getOffset() - dst.getOffset());
     store_lambda(dst_idx, ptr_deref_within(dst_idx, dst, bytesize),
-                 ::load(src_idx, local_block_val, non_local_block_val),
+                 load(src_idx).release(),
                  local_block_val, non_local_block_val);
   }
 }

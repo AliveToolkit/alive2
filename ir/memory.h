@@ -63,6 +63,7 @@ public:
   smt::expr isZero() const; // zero or null
 
   const smt::expr& operator()() const { return p; }
+  smt::expr release() { return std::move(p); }
 
   smt::expr operator==(const Byte &rhs) const {
     return p == rhs.p;
