@@ -671,8 +671,8 @@ static void calculateAndInitConstants(Transform &t) {
   // + 1 is sufficient to give 1 degree of freedom for the target to trigger UB
   // in case a different pointer from source is produced.
   auto num_max_nonlocals_inst
-    = min(num_nonlocals_inst_src, num_nonlocals_inst_tgt);
-  if (num_nonlocals_inst_src || num_nonlocals_inst_tgt)
+    = max(num_nonlocals_inst_src, num_nonlocals_inst_tgt);
+  if (num_nonlocals_inst_src && num_nonlocals_inst_tgt)
     ++num_max_nonlocals_inst;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_max_nonlocals_inst +
