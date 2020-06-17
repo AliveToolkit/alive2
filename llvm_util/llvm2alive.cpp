@@ -938,6 +938,13 @@ end:
     constexpr_idx = 0;
     copy_idx = 0;
 
+    // don't even bother if number of BBs or instructions is huge..
+    if (distance(f.begin(), f.end()) > 5000 ||
+        f.getInstructionCount() > 10000) {
+      *out << "ERROR: Function is too large\n";
+      return {};
+    }
+
     auto type = llvm_type2alive(f.getReturnType());
     if (!type)
       return {};
