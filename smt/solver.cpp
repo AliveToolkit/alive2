@@ -115,6 +115,8 @@ public:
       cout << "\nApplying " << t.name << endl;
 
       Tactic to(Z3_tactic_try_for(ctx(), t.t, 5000));
+      Tactic skip(Z3_tactic_skip(ctx()));
+      to = Tactic(Z3_tactic_or_else(ctx(), to.t, skip.t));
       auto r = Z3_tactic_apply(ctx(), to.t, goal);
       Z3_apply_result_inc_ref(ctx(), r);
       reset_solver();
@@ -130,7 +132,7 @@ public:
 
       string new_r = Z3_goal_to_string(ctx(), goal);
       if (new_r != last_result) {
-        cout << Z3_goal_to_string(ctx(), goal) << '\n';
+        cout << new_r << '\n';
         last_result = move(new_r);
       } else {
         cout << "(no change)\n";
