@@ -1519,12 +1519,11 @@ expr expr::load(const expr &idx) const {
     if (body.isConst())
       return body;
 
-    auto subst = [&idx](const expr &e, const expr &var) {
-      if (auto app = e.isAppOf(Z3_OP_SELECT)) { // load(array, idx)
-        expr lambda_idx = Z3_get_app_arg(ctx(), app, 1);
-        expr new_idx = lambda_idx.subst(var, idx).simplify();
-        assert(!idx.isValid() || !lambda_idx.eq(new_idx));
-        return expr(Z3_get_app_arg(ctx(), app, 0)).load(new_idx);
+    auto subst = [&](const expr &e, const expr &var) {
+      if (isLoad(array, str_idx)) {
+        expr new_idx = str_idx.subst(var, idx).simplify();
+        assert(!idx.isValid() || !str_idx.eq(new_idx));
+        return array.load(new_idx);
       }
       return e.subst(var, idx);
     };
