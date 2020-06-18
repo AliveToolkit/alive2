@@ -1681,7 +1681,8 @@ expr Memory::checkNocapture() const {
   auto ofs = expr::mkVar(name.c_str(), bits_for_offset);
   expr res(true);
 
-  for (unsigned bid = has_null_block; bid < numNonlocals(); ++bid) {
+  for (unsigned bid = has_null_block + num_consts_src; bid < numNonlocals();
+       ++bid) {
     Pointer p(*this, expr::mkUInt(bid, bits_for_bid), ofs);
     Byte b(*this, non_local_block_val.load(p.shortPtr()));
     Pointer loadp(*this, b.ptrValue());
@@ -1703,7 +1704,7 @@ void Memory::escapeLocalPtr(const expr &ptr) {
       if (bid < numLocals())
         escaped_local_blks[bid] = true;
     } else if (bid_expr.isExtract(sel, hi, lo) &&
-               sel.isSelect(blk, idx) && blk.eq(mk_block_val_array())) {
+               sel.isLoad(blk, idx) && blk.eq(mk_block_val_array())) {
       // initial non local block bytes don't contain local pointers.
       continue;
     } else {

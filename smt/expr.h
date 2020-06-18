@@ -134,7 +134,7 @@ public:
   bool isBasePlusOffset(expr &base, uint64_t &offset) const;
   bool isConstArray(expr &val) const;
   bool isStore(expr &array, expr &idx, expr &val) const;
-  bool isSelect(expr &array, expr &idx) const;
+  bool isLoad(expr &array, expr &idx) const;
 
   bool isNaNCheck(expr &fp) const;
   bool isfloat2BV(expr &fp) const;

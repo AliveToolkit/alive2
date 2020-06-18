@@ -700,7 +700,7 @@ void UnaryOp::print(ostream &os) const {
   case BitReverse:  str = "bitreverse "; break;
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
-  case IsConstant:  str = "is.constant"; break;
+  case IsConstant:  str = "is.constant "; break;
   case FNeg:        str = "fneg "; break;
   }
 
