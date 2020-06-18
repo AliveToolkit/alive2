@@ -866,7 +866,7 @@ end:
         }
 
         if (range)
-          BB->addInstr(make_unique<Assume>(*range, true));
+          BB->addInstr(make_unique<Assume>(*range, false));
         break;
       }
 
