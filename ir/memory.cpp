@@ -1674,7 +1674,7 @@ Memory::refined(const Memory &other, bool skip_constants,
 }
 
 expr Memory::checkNocapture() const {
-  if (!does_ptr_store)
+  if (!does_ptr_store || !has_nocapture)
     return true;
 
   auto name = local_name(state, "#offset_nocapture");
@@ -1686,8 +1686,8 @@ expr Memory::checkNocapture() const {
     Pointer p(*this, expr::mkUInt(bid, bits_for_bid), ofs);
     Byte b(*this, non_local_block_val.load(p.shortPtr()));
     Pointer loadp(*this, b.ptrValue());
-    res &= p.isBlockAlive().implies(
-             (b.isPtr() && b.ptrNonpoison()).implies(!loadp.isNocapture()));
+    res &= (p.isBlockAlive() && b.isPtr() && b.ptrNonpoison())
+             .implies(!loadp.isNocapture());
   }
   if (!res.isTrue())
     state->addQuantVar(ofs);
