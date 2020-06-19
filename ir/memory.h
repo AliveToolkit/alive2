@@ -59,6 +59,7 @@ public:
   smt::expr ptrByteoffset() const;
   smt::expr nonptrNonpoison() const;
   smt::expr nonptrValue() const;
+  smt::expr isNonptrNonpoison() const;
   smt::expr isPoison(bool fullbit = true) const;
   smt::expr isZero() const; // zero or null
 

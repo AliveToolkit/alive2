@@ -179,6 +179,10 @@ expr Byte::nonptrValue() const {
   return p.extract(start + bits_byte - 1, start);
 }
 
+expr Byte::isNonptrNonpoison() const {
+  return p.extract(bitsByte() - 1, padding_nonptr_byte() + bits_byte) == 0;
+}
+
 expr Byte::isPoison(bool fullbit) const {
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_int_poison() == 1) {
@@ -278,6 +282,16 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
   return bytes;
 }
 
+static expr get_nonptr_poison(const Byte &b) {
+  if (bits_int_poison() == 1)
+    return (!b.isNonptrNonpoison()).toBVBool();
+  auto np = b.nonptrNonpoison();
+  return
+    expr::mkIf(b.isPtr(), expr::mkInt(-1, np), expr::mkInt(0, np)) | np;
+}
+
+
+
 static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
                                const Type &toType) {
   assert(!bytes.empty());
@@ -323,8 +337,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     IntType ibyteTy("", bits_byte);
 
     for (auto &b: bytes) {
-      StateValue v(b.nonptrValue(),
-                   ibyteTy.combine_poison(!b.isPtr(), b.nonptrNonpoison()));
+      StateValue v(b.nonptrValue(), get_nonptr_poison(b));
       val = first ? move(v) : v.concat(val);
       first = false;
     }

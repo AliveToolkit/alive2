@@ -243,11 +243,6 @@ StateValue Type::fromInt(StateValue v) const {
   return { fromInt(move(v.value)), v.non_poison == 0 };
 }
 
-expr Type::combine_poison(const expr &boolean, const expr &orig) const {
-  return
-    expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
-}
-
 pair<expr, vector<expr>>
 Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
