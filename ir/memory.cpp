@@ -16,9 +16,15 @@ using namespace util;
 
 static unsigned ptr_next_idx = 0;
 
+static bool observes_addresses() {
+  return IR::has_ptr2int || IR::has_int2ptr;
+}
+
 static unsigned zero_bits_offset() {
   assert(is_power2(bits_byte));
-  return ilog2(bits_byte / 8);
+  // If an address is observed, bits_bytes is not necessarily related with
+  // offsets.
+  return observes_addresses() ? 0 : ilog2(bits_byte / 8);
 }
 
 static bool byte_has_ptr_bit() {
@@ -330,10 +336,6 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     }
     return toType.fromInt(val.trunc(bitsize));
   }
-}
-
-static bool observes_addresses() {
-  return IR::has_ptr2int || IR::has_int2ptr;
 }
 
 static bool ptr_has_local_bit() {
