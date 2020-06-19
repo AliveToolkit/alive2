@@ -151,7 +151,7 @@ public:
   smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(unsigned align, bool exact = false) const;
-  smt::expr isAligned(unsigned align) const;
+  smt::expr isAligned(unsigned align);
   smt::AndExpr isDereferenceable(unsigned bytes, unsigned align = bits_byte / 8,
                                  bool iswrite = false);
   smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,

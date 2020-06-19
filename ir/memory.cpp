@@ -584,7 +584,7 @@ expr Pointer::isBlockAligned(unsigned align, bool exact) const {
   return exact ? blk_align == bits : blk_align.uge(bits);
 }
 
-expr Pointer::isAligned(unsigned align) const {
+expr Pointer::isAligned(unsigned align) {
   assert(align >= bits_byte / 8);
   if (align == 1)
     return true;
@@ -597,16 +597,24 @@ expr Pointer::isAligned(unsigned align) const {
 
   expr blk_align = isBlockAligned(align);
 
-  if (!observes_addresses() || blk_align.isConst())
+  if (!observes_addresses() || blk_align.isConst()) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
-    return blk_align && offset.extract(bits - 1, 0) == 0;
+    auto zero = expr::mkUInt(0, bits);
+    auto newp = p.extract(totalBits() - 1, bits_for_ptrattrs + bits)
+                 .concat(zero);
+    if (bits_for_ptrattrs)
+      newp = newp.concat(getAttrs());
+    p = move(newp);
+    assert(!p.isValid() || p.bits() == totalBits());
+    return { blk_align && offset.extract(bits - 1, 0) == zero };
+  }
 
   return getAddress().extract(bits - 1, 0) == 0;
 }
 
-static pair<expr, expr> is_dereferenceable(const Pointer &p,
+static pair<expr, expr> is_dereferenceable(Pointer &p,
                                            const expr &bytes_off,
                                            const expr &bytes,
                                            unsigned align, bool iswrite) {
@@ -646,7 +654,7 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, unsigned align,
 
     // record pointer if not definitely unfeasible
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.blockSize().isZero())
-      all_ptrs.add(ptr_expr, domain);
+      all_ptrs.add(ptr.release(), domain);
 
     UB.add(move(ub), domain);
     is_aligned.add(move(aligned), domain);

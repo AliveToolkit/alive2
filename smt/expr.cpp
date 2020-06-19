@@ -539,6 +539,14 @@ expr expr::unop_fold(Z3_ast(*op)(Z3_context, Z3_ast)) const {
                     z3app)
 
 expr expr::operator+(const expr &rhs) const {
+  expr a, b;
+  // (concat x const) + rhs -> (concat const+rhs) if no overflow happens
+  if (rhs.isConst() && isConcat(a, b) && b.isConst()) {
+    auto rhs2 = rhs.trunc(b.bits());
+    if (rhs2.zextOrTrunc(rhs.bits()).eq(rhs) &&
+        b.add_no_uoverflow(rhs2).isTrue())
+      return a.concat(b + rhs2);
+  }
   return binopc(Z3_mk_bvadd, operator+, Z3_OP_BADD, isZero, alwaysFalse);
 }
 
@@ -1343,11 +1351,16 @@ expr expr::zextOrTrunc(unsigned tobw) const {
 }
 
 expr expr::concat(const expr &rhs) const {
-  expr a, b;
+  expr a, b, c, d;
   unsigned h, l, h2, l2;
-  if (isExtract(a, h, l) && rhs.isExtract(b, h2, l2) && a.eq(b) && l == h2+1)
-    return a.extract(h, l2);
+  if (isExtract(a, h, l)) {
+    if (rhs.isExtract(b, h2, l2) && l == h2+1 && a.eq(b))
+      return a.extract(h, l2);
 
+    //  extract_l concat (concat extract_r foo)
+    if (rhs.isConcat(b, c) && b.isExtract(d, h2, l2) && l == h2+1 && a.eq(d))
+      return a.extract(h, l2).concat(c);
+  }
   return binop_fold(rhs, Z3_mk_concat);
 }
 
