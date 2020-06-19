@@ -1533,7 +1533,7 @@ expr expr::load(const expr &idx) const {
       return body;
 
     auto subst = [&](const expr &e, const expr &var) {
-      if (isLoad(array, str_idx)) {
+      if (e.isLoad(array, str_idx)) {
         expr new_idx = str_idx.subst(var, idx).simplify();
         assert(!idx.isValid() || !str_idx.eq(new_idx));
         return array.load(new_idx);
