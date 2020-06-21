@@ -82,6 +82,26 @@ ostream &operator<<(ostream &os, const OrExpr &e) {
   return os << e();
 }
 
+static expr subst_for_ptr(const expr &e, const expr &from, const expr &to) {
+  // If a pointer p is `gep p0, i`:
+  //  p = (extract-bid ptr0) ++ (bvadd (extract-offset ptr0) i)
+  //
+  // p0 again may be loaded from the byte b:
+  //   p = (extract-bid (ite b.isPtr b.ptrvalue null))
+  //       ++ (bvadd (extract-offset (ite b.isPtr b.ptrvalue null)) i)
+  expr a, b, cond, then, els;
+  unsigned hi, lo;
+
+  if (e.isAdd(a, b))
+    return subst_for_ptr(a, from, to) + subst_for_ptr(b, from, to);
+  else if (e.isIf(cond, then, els) && cond.eq(from))
+    // Don't look further
+    return expr::mkIf(to, then, els);
+  else if (e.isExtract(a, hi, lo))
+    return subst_for_ptr(a, from, to).extract(hi, lo);
+
+ return e;
+}
 
 template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
                                             bool unpack_concat) {
@@ -117,7 +137,7 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
           }
 
           for (auto &[rhs_v, rhs_domain] : rhs) {
-            add(lhs_v.concat(rhs_v.subst(from, to).simplify()),
+            add(lhs_v.concat(subst_for_ptr(rhs_v, from, to).simplify()),
                 c && lhs_domain && rhs_domain);
           }
         }
