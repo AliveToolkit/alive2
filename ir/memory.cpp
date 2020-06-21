@@ -1021,11 +1021,15 @@ static expr mk_block_val_array() {
 }
 
 static expr mk_liveness_array() {
+  if (!num_nonlocals)
+    return {};
+
   // consider all non_locals are initially alive
   // block size can still be 0 to invalidate accesses
-  return num_nonlocals
-           ? (expr::mkInt(-1, num_nonlocals) << expr::mkUInt(1, num_nonlocals))
-           : expr();
+  expr l = expr::mkInt(-1, num_nonlocals);
+  if (has_null_block)
+    l = l << expr::mkUInt(1, num_nonlocals);
+  return l;
 }
 
 static void mk_nonlocal_val_axioms(State &s, Memory &m, expr &val) {
