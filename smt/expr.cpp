@@ -657,11 +657,10 @@ expr expr::add_no_uoverflow(const expr &rhs) const {
   if (min_leading_zeros() >= 1 && rhs.min_leading_zeros() >= 1)
     return true;
 
-  int64_t n;
-  if (isInt(n))
-    return rhs.ule(-n - 1);
-  if (rhs.isInt(n))
-    return ule(-n - 1);
+  if (rhs.isConst())
+    return ule(mkInt(-1, rhs.sort()) - rhs);
+  if (isConst())
+    return rhs.add_no_uoverflow(*this);
 
   auto bw = bits();
   return (zext(1) + rhs.zext(1)).extract(bw, bw) == 0;
