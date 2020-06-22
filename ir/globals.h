@@ -78,7 +78,9 @@ extern bool has_null_block;
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;
+
 extern bool does_ptr_store;
+extern bool does_ptr_store_constantsonly; // stores non-constant ptrs only?
 
 extern unsigned heap_block_alignment;
 

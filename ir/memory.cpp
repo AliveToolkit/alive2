@@ -2263,7 +2263,7 @@ Memory::refined(const Memory &other, bool skip_constants,
 }
 
 expr Memory::checkNocapture() const {
-  if (!does_ptr_store || !has_nocapture)
+  if (!does_ptr_store || does_ptr_store_constantsonly || !has_nocapture)
     return true;
 
   auto name = local_name(state, "#offset_nocapture");

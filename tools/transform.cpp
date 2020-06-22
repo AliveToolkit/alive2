@@ -589,6 +589,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_fncall       = false;
   has_null_block   = false;
   does_ptr_store   = false;
+  does_ptr_store_constantsonly = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
   bool does_any_byte_access = false;
@@ -659,12 +660,13 @@ static void calculateAndInitConstants(Transform &t) {
 
           auto info = mi->getByteAccessInfo();
           has_ptr_load         |= info.doesPtrLoad;
-          does_ptr_store       |= info.doesPtrStore;
+          does_ptr_store       |= info.doesPtrStore.has_store;
+          does_ptr_store_constantsonly |= info.doesPtrStore.constant_ptrs_only;
           does_int_mem_access  |= info.hasIntByteAccess;
           does_mem_access      |= info.doesMemAccess();
           min_access_size       = gcd(min_access_size, info.byteSize);
           if (info.doesMemAccess() && !info.hasIntByteAccess &&
-              !info.doesPtrLoad && !info.doesPtrStore)
+              !info.doesPtrLoad && !info.doesPtrStore.has_store)
             does_any_byte_access = true;
 
           if (auto alloc = dynamic_cast<const Alloc*>(&i)) {

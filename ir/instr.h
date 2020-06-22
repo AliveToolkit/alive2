@@ -430,9 +430,14 @@ public:
   virtual bool canFree() const = 0;
 
   struct ByteAccessInfo {
+    struct PtrStoreInfo {
+      bool has_store;
+      bool constant_ptrs_only;
+    };
+
     bool hasIntByteAccess = false;
     bool doesPtrLoad = false;
-    bool doesPtrStore = false;
+    PtrStoreInfo doesPtrStore = { false, false };
 
     // The maximum size of a byte that this instruction can support.
     // If zero, this instruction does not read/write bytes.
@@ -443,7 +448,8 @@ public:
 
     static ByteAccessInfo intOnly(unsigned byteSize);
     static ByteAccessInfo anyType(unsigned byteSize);
-    static ByteAccessInfo get(const Type &t, bool store, unsigned align);
+    static ByteAccessInfo get(const Type &t, const Value *storeval,
+                              unsigned align);
     static ByteAccessInfo full(unsigned byteSize);
   };
 
