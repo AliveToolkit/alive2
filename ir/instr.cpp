@@ -2322,6 +2322,8 @@ StateValue Alloc::toSMT(State &s) const {
     sz = sz * m;
   }
 
+  s.addUB(sz.zextOrTrunc(bits_size_t).extract(bits_size_t - 1, bits_size_t - 1)
+          == 0);
   expr ptr = s.getMemory().alloc(sz, align, Memory::STACK, true, true).first;
   if (initially_dead)
     s.getMemory().free(ptr, true);

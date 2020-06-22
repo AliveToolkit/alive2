@@ -1784,9 +1784,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   assert(bits_byte == 8 || is_local ||
          size_zext.urem(expr::mkUInt(bits_byte/8, bits_size_t)).isZero());
 
-  expr allocated = precond && nooverflow;
-  state->addPre(nonnull.implies(allocated));
-  allocated |= nonnull;
+  expr allocated = (precond && nooverflow) || nonnull;
 
   Pointer p(*this, bid, is_local);
   auto short_bid = p.getShortBid();
