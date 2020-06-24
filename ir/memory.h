@@ -99,6 +99,9 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
+  smt::expr refinedLocal(const Pointer &other) const;
+  smt::expr refinedByVal(const Pointer &other) const;
+
 public:
   Pointer(const Memory &m, const char *var_name,
           const smt::expr &local = false, bool unique_name = true,
@@ -200,6 +203,7 @@ class Memory {
 
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
+  bool allocasAreDead; // A fast switch for treating all allocas as dead
 
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
@@ -284,6 +288,9 @@ public:
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
   void free(const smt::expr &ptr, bool unconstrained);
+
+  // Free all allocas.
+  void markAllocasAsDead();
 
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,

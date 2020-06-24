@@ -34,13 +34,6 @@ define i8 @f5() {
   ret i8 %b
 }
 
-define i8 @f6(i8* byval %p) {
-  %a = alloca i8
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* %p, i64 1, i1 false)
-  %b = call i8 @g(i8* %a)
-  ret i8 %b
-}
-
 define i8 @f6_2(i8* %p) {
   %a = alloca i8
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* %p, i64 1, i1 false)

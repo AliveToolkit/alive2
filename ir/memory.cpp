@@ -704,6 +704,10 @@ void Pointer::isDisjoint(const expr &len1, const Pointer &ptr2,
 }
 
 expr Pointer::isBlockAlive() const {
+  static_assert(STACK == 1);
+  if (m.allocasAreDead && getAllocType().isOne())
+    return false;
+
   // If programs have no free(), we assume all blocks are always live.
   // For non-local blocks, there's enough non-determinism through block size,
   // that can be 0 or non-0
@@ -747,8 +751,7 @@ expr Pointer::isHeapAllocated() const {
   return getAllocType().extract(1, 1) == 1;
 }
 
-expr Pointer::refined(const Pointer &other) const {
-  // This refers to a block that was malloc'ed within the function
+expr Pointer::refinedLocal(const Pointer &other) const {
   expr local = getAllocType() == other.getAllocType();
   local &= blockSize() == other.blockSize();
   local &= getOffset() == other.getOffset();
@@ -756,40 +759,42 @@ expr Pointer::refined(const Pointer &other) const {
 
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
-
-  return isBlockAlive().implies(
-           other.isBlockAlive() &&
-             expr::mkIf(isLocal(), isHeapAllocated().implies(local),
-                        *this == other));
+  return local;
 }
 
-expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
-  expr size = blockSize();
-  expr off = getOffsetSizet();
-  expr size2 = other.blockSize();
-  expr off2 = other.getOffsetSizet();
+expr Pointer::refinedByVal(const Pointer &other) const {
+  expr ofs = expr::mkFreshVar("localblk_ofs", expr::mkUInt(0, bits_for_offset));
+  Pointer this_ofs = *this + ofs;
+  Pointer other_ofs = other + ofs;
 
-  expr local
-    = expr::mkIf(isHeapAllocated(),
-                 other.isHeapAllocated() && off == off2 && size2.uge(size),
-
-                 // must maintain same dereferenceability before & after
-                 expr::mkIf(off.sle(-1),
-                            off == off2 && size2.uge(size),
-                            off2.sge(0) &&
-                              expr::mkIf(off.sle(size),
-                                         off2.sle(size2) && off2.uge(off) &&
-                                           (size2 - off2).uge(size - off),
-                                         off2.sgt(size2) && off == off2 &&
-                                           size2.uge(size))));
-  local = (other.isLocal() || other.isByval() || is_byval_arg) && local;
+  auto this_ofs_deref =
+      this_ofs.isDereferenceable(bits_byte / 8, bits_byte / 8, false);
+  auto other_ofs_deref =
+      other_ofs.isDereferenceable(bits_byte / 8, bits_byte / 8, false);
 
   // TODO: this induces an infinite loop
   // block_refined(other);
+   return this_ofs_deref().implies(other_ofs_deref());
+}
 
+expr Pointer::refined(const Pointer &other) const {
+  // This refers to a block that was malloc'ed within the function
+  expr local = refinedLocal(other);
+
+  // Allocas are dead at the end of function, so returning alloca is okay
   return isBlockAlive().implies(
            other.isBlockAlive() &&
              expr::mkIf(isLocal(), local, *this == other));
+}
+
+expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
+  expr local = is_byval_arg ? expr(false) : refinedLocal(other);
+  expr byval = is_byval_arg ? refinedByVal(other) : expr(false);
+
+  return isBlockAlive().implies(
+           other.isBlockAlive() &&
+             expr::mkIf(isLocal(), expr::mkIf(is_byval_arg, byval, local),
+                        *this == other));
 }
 
 expr Pointer::blockValRefined(const Pointer &other) const {
@@ -1089,6 +1094,7 @@ Memory::Memory(State &state) : state(&state) {
 
   // all local blocks are dead in the beginning
   local_block_liveness = expr::mkUInt(0, numLocals());
+  allocasAreDead = false; // When this becomes true, the function has returned
 
   // A memory space is separated into non-local area / local area.
   // Non-local area is the lower half of memory (to include null pointer),
@@ -1470,6 +1476,24 @@ void Memory::free(const expr &ptr, bool unconstrained) {
                                 p.isBlockAlive() &&
                                 p.getAllocType() == Pointer::MALLOC));
   store_bv(p, false, local_block_liveness, non_local_block_liveness);
+}
+
+void Memory::markAllocasAsDead() {
+  if (numLocals() == 0 || !has_alloca)
+    return;
+
+  unsigned n = numLocals();
+  assert(local_block_liveness.bits() == n);
+  expr mask = expr::mkUInt(0, n);
+  expr one = expr::mkUInt(1, n);
+
+  for (unsigned i = 0; i < n; ++i) {
+    Pointer p(*this, i, true);
+    expr isHeap = p.isHeapAllocated().toBVBool().zextOrTrunc(n);
+    mask = mask | (isHeap << expr::mkUInt(i, n));
+  }
+  local_block_liveness = mask & local_block_liveness;
+  allocasAreDead = true;
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
