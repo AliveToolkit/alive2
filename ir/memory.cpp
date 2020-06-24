@@ -810,9 +810,11 @@ expr Pointer::fninputRefined(const Pointer &other, bool is_byval_arg) const {
   else
     local = encodeLocalPtrRefinement(other, false);
 
-  return expr::mkIf(isLocal(),
+  return isBlockAlive().implies(
+            other.isBlockAlive() &&
+            expr::mkIf(isLocal(),
                expr::mkIf(is_byval_arg, move(byval_cond), move(local)),
-               *this == other);
+               *this == other));
 }
 
 expr Pointer::blockValRefined(const Pointer &other) const {
