@@ -217,7 +217,7 @@ expr expr::mkQuantVar(unsigned i, Z3_sort sort) {
 
 bool expr::isBinOp(expr &a, expr &b, int z3op) const {
   if (auto app = isAppOf(z3op)) {
-    if (Z3_get_app_num_args(ctx(), decl()) != 2)
+    if (Z3_get_app_num_args(ctx(), app) != 2)
       return false;
     a = Z3_get_app_arg(ctx(), app, 0);
     b = Z3_get_app_arg(ctx(), app, 1);
