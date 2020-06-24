@@ -95,8 +95,8 @@ static expr subst_for_ptr(const expr &e, const expr &from, const expr &to) {
   if (e.isAdd(a, b))
     return subst_for_ptr(a, from, to) + subst_for_ptr(b, from, to);
   else if (e.isIf(cond, then, els) && cond.eq(from))
-    // Don't look further
-    return expr::mkIf(to, then, els);
+    return expr::mkIf(to, subst_for_ptr(then, from, to),
+                          subst_for_ptr(els, from, to));
   else if (e.isExtract(a, hi, lo))
     return subst_for_ptr(a, from, to).extract(hi, lo);
 
