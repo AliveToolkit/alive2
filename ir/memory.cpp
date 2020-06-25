@@ -1580,12 +1580,14 @@ static expr ptr_deref_within(const Pointer &idx, const Pointer &ptr,
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
-                    unsigned align, const set<expr> &undef_vars0) {
+                    unsigned align, const set<expr> &undef_vars0,
+                    bool deref_check) {
   assert(!memory_unused());
   assert(!val.isValid() || val.bits() == 8);
   unsigned bytesz = bits_byte / 8;
   Pointer ptr(*this, p);
-  state->addUB(ptr.isDereferenceable(bytesize, align, true));
+  if (deref_check)
+    state->addUB(ptr.isDereferenceable(bytesize, align, true));
   undef_vars.insert(undef_vars0.begin(), undef_vars0.end());
 
   auto wval = val;

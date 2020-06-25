@@ -297,7 +297,7 @@ public:
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align,
-              const std::set<smt::expr> &undef_vars);
+              const std::set<smt::expr> &undef_vars, bool deref_check = true);
   void memcpy(const smt::expr &dst, const smt::expr &src,
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);

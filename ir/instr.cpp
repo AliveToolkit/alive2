@@ -2322,9 +2322,9 @@ StateValue Calloc::toSMT(State &s) const {
   auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
                                             np && nm.mul_no_uoverflow(sz),
                                             nonnull);
+  p = p.subst(allocated, true).simplify();
 
-  expr calloc_sz = expr::mkIf(allocated, size, expr::mkUInt(0, sz.bits()));
-  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, calloc_sz, align, {});
+  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
 
   return { move(p), move(np) };
 }
