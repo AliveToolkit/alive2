@@ -599,7 +599,7 @@ expr Pointer::isAligned(unsigned align) {
 
   expr blk_align = isBlockAligned(align);
 
-  if (!observes_addresses() || blk_align.isConst()) {
+  if (!observes_addresses() || (blk_align.isConst() && offset.isConst())) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
