@@ -331,15 +331,12 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr0, ptr_refinement0] = src_mem.refined(tgt_mem, false);
+  auto [memory_cnstr0, ptr_refinement0, mem_undef]
+    = src_mem.refined(tgt_mem, false);
   auto &ptr_refinement = ptr_refinement0;
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;
-
-  if (!memory_cnstr.isConst()) {
-    auto &undef = src_mem.getUndefVars();
-    qvars.insert(undef.begin(), undef.end());
-  }
+  qvars.insert(mem_undef.begin(), mem_undef.end());
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
@@ -361,10 +358,12 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   };
 
   auto print_ptr_load = [&](ostream &s, const Model &m) {
+    set<expr> undef;
     Pointer p(src_mem, m[ptr_refinement()]);
+    unsigned align = bits_byte / 8;
     s << "\nMismatch in " << p
-      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p)()]);
+      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p, undef, align)()])
+      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef, align)()]);
   };
 
   expr dom_constr;

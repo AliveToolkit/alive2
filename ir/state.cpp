@@ -321,7 +321,6 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
 
 void State::finishInitializer() {
   is_initialization_phase = false;
-  memory.finishInitialization();
 }
 
 expr State::sinkDomain() const {
@@ -414,6 +413,7 @@ void State::mkAxioms(State &tgt) {
         if (refines.isFalse())
           continue;
 
+        set<expr> undef_vars;
         for (unsigned i = 0, e = ptr_ins.size(); i != e; ++i) {
           // TODO: needs to take read/read2 as input to control if mem blocks
           // need to be compared
@@ -427,7 +427,8 @@ void State::mkAxioms(State &tgt) {
             break;
           }
           expr eq_val = Pointer(mem, ptr_in.value)
-                      .fninputRefined(Pointer(mem2, ptr_in2.value), is_byval2);
+                          .fninputRefined(Pointer(mem2, ptr_in2.value),
+                                          undef_vars, is_byval2);
           refines &= ptr_in.non_poison
                        .implies(eq_val && ptr_in2.non_poison);
 
@@ -438,14 +439,13 @@ void State::mkAxioms(State &tgt) {
         if (refines.isFalse())
           continue;
 
+        quantified_vars.insert(undef_vars.begin(), undef_vars.end());
+
         if (reads2) {
           auto restrict_ptrs = argmem2 ? &ptr_ins2 : nullptr;
-          expr mem_refined = mem.refined(mem2, true, restrict_ptrs).first;
-          refines &= mem_refined;
-          if (!mem_refined.isConst()) {
-            auto &u = mem.getUndefVars();
-            quantified_vars.insert(u.begin(), u.end());
-          }
+          auto data = mem.refined(mem2, true, restrict_ptrs);
+          refines &= get<0>(data);
+          quantified_vars.insert(get<2>(data).begin(), get<2>(data).end());
         }
 
         expr ref_expr(true);

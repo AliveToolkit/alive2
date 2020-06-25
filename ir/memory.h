@@ -63,10 +63,13 @@ public:
   smt::expr isZero() const; // zero or null
 
   const smt::expr& operator()() const { return p; }
-  smt::expr release() { return std::move(p); }
 
   smt::expr operator==(const Byte &rhs) const {
     return p == rhs.p;
+  }
+
+  bool eq(const Byte &rhs) const {
+    return p.eq(rhs.p);
   }
 
   static unsigned bitsByte();
@@ -105,11 +108,13 @@ public:
           bool align = true, const smt::expr &attr = smt::expr());
   Pointer(const Memory &m, smt::expr p);
   Pointer(const Memory &m, unsigned bid, bool local);
+  Pointer(const Memory &m, unsigned bid, bool local, const smt::expr &offset);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attrs = smt::expr());
 
   static unsigned totalBits();
   static unsigned totalBitsShort();
+  static unsigned bitsShortOffset();
 
   smt::expr isLocal() const;
 
@@ -117,6 +122,7 @@ public:
   smt::expr getShortBid() const; // same as getBid but ignoring is_local bit
   smt::expr getOffset() const;
   smt::expr getOffsetSizet() const;
+  smt::expr getShortOffset() const; // same as getOffset but skips aligned bits
   smt::expr getAttrs() const;
   smt::expr getAddress(bool simplify = true) const;
 
@@ -177,9 +183,12 @@ public:
   void stripAttrs();
 
   smt::expr refined(const Pointer &other) const;
-  smt::expr fninputRefined(const Pointer &other, bool is_byval_arg) const;
-  smt::expr blockValRefined(const Pointer &other) const;
-  smt::expr blockRefined(const Pointer &other) const;
+  smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
+                           bool is_byval_arg) const;
+  smt::expr blockValRefined(const Pointer &other,
+                            std::set<smt::expr> &undef) const;
+  smt::expr blockRefined(const Pointer &other,
+                         std::set<smt::expr> &undef) const;
 
   const Memory& getMemory() const { return m; }
 
@@ -194,9 +203,10 @@ public:
 class Memory {
   State *state;
 
-  smt::expr non_local_block_val;  // array: (bid, offset) -> Byte
-  smt::expr local_block_val;
-  smt::expr initial_non_local_block_val;
+  // bid -> (array: offset -> Byte, undef vars)
+  using MemVal = std::vector<std::pair<smt::expr, std::set<smt::expr>>>;
+  MemVal non_local_block_val;
+  MemVal local_block_val;
 
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
@@ -213,10 +223,25 @@ class Memory {
   std::vector<unsigned> byval_blks;
   std::vector<bool> escaped_local_blks;
 
-  std::set<smt::expr> undef_vars;
+  void mk_nonlocal_val_axioms(bool skip_consts);
 
-  void store(const Pointer &p, const smt::expr &val, smt::expr &local,
-             smt::expr &non_local);
+  static smt::expr load(const Pointer &p, const MemVal &blks,
+                        std::set<smt::expr> &undef, bool local, unsigned align);
+  static smt::expr load(const Pointer &p, const MemVal &local,
+                        const MemVal &non_local, std::set<smt::expr> &undef,
+                        unsigned align);
+  StateValue load(const Pointer &ptr, const Type &type,
+                  std::set<smt::expr> &undef, unsigned align) const;
+
+  void store(const Pointer &p, const smt::expr &val, MemVal &blks,
+             const smt::expr &cond, const std::set<smt::expr> &undef,
+             bool local, unsigned align) const;
+  void store(const Pointer &p, const smt::expr &val, MemVal &local,
+             MemVal &non_local, const std::set<smt::expr> &undef,
+             unsigned align);
+  void storeLambda(const Pointer &p, const smt::expr &offset,
+                   const smt::expr &size, const smt::expr &val,
+                   const std::set<smt::expr> &undef);
 
 public:
   enum BlockKind {
@@ -225,8 +250,7 @@ public:
 
   // TODO: missing local_* equivalents
   class CallState {
-    smt::expr non_local_block_val;
-    smt::expr block_val_var;
+    std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_block_liveness;
     smt::expr liveness_var;
     bool empty = true;
@@ -238,7 +262,6 @@ public:
 
   Memory(State &state);
 
-  void finishInitialization();
   void mkAxioms(const Memory &other) const;
 
   static void resetBids(unsigned last_nonlocal);
@@ -290,10 +313,11 @@ public:
              unsigned align, const std::set<smt::expr> &undef_vars,
              bool deref_check = true);
   std::pair<StateValue, smt::AndExpr> load(const smt::expr &ptr,
-      const Type &type, unsigned align);
+      const Type &type, unsigned align) const;
 
   // raw load
-  Byte load(const Pointer &p) const;
+  Byte load(const Pointer &p, std::set<smt::expr> &undef_vars,
+            unsigned align) const;
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align,
@@ -305,13 +329,11 @@ public:
   smt::expr ptr2int(const smt::expr &ptr) const;
   smt::expr int2ptr(const smt::expr &val) const;
 
-  std::pair<smt::expr,Pointer>
+  std::tuple<smt::expr, Pointer, std::set<smt::expr>>
     refined(const Memory &other,
             bool skip_constants,
             const std::vector<PtrInput> *set_ptrs = nullptr)
       const;
-
-  auto& getUndefVars() const { return undef_vars; }
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
