@@ -1077,8 +1077,8 @@ void Memory::store(const Pointer &p, const expr &val, MemVal &blks,
   }
 }
 
-void Memory::store(const Pointer &p, const expr &val, MemVal &local,
-                   MemVal &non_local, const set<expr> &undef, unsigned align) {
+void Memory::store(const Pointer &p, const expr &val, const set<expr> &undef,
+                   unsigned align) {
   if (numLocals() > 0) {
     Byte byte(*this, expr(val));
     if (byte.isPtr().isTrue())
@@ -1086,9 +1086,9 @@ void Memory::store(const Pointer &p, const expr &val, MemVal &local,
   }
   auto is_local = p.isLocal();
   if (!is_local.isFalse())
-    store(p, val, local, is_local, undef, true, align);
+    store(p, val, local_block_val, is_local, undef, true, align);
   if (!is_local.isTrue())
-    store(p, val, non_local, !is_local, undef, false, align);
+    store(p, val, non_local_block_val, !is_local, undef, false, align);
 }
 
 void Memory::storeLambda(const Pointer &p, const expr &offset, const expr &size,
@@ -1648,8 +1648,7 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
       unsigned offset = little_endian ? i * bytesz : (e - i - 1) * bytesz;
       auto ptr_i = ptr + offset;
       auto align_i = gcd(align, offset % align);
-      store(ptr_i, bytes[i](), local_block_val, non_local_block_val, undef_vars,
-            align_i);
+      store(ptr_i, bytes[i](), undef_vars, align_i);
     }
   }
 }
@@ -1722,8 +1721,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   uint64_t n;
   if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
     for (unsigned i = 0; i < n; i += bytesz) {
-      store(ptr + i, bytes[0](), local_block_val, non_local_block_val,
-            undef_vars, bytesz);
+      store(ptr + i, bytes[0](), undef_vars, bytesz);
     }
   } else {
     expr offset
@@ -1753,7 +1751,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     for (unsigned i = 0; i < n; i += bytesz) {
       set<expr> undef;
       auto val = load(src + i, old_local, old_nonlocal, undef, bytesz);
-      store(dst + i, val, local_block_val, non_local_block_val, undef, bytesz);
+      store(dst + i, val, undef, bytesz);
     }
   } else {
     expr offset

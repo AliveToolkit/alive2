@@ -236,9 +236,8 @@ class Memory {
   void store(const Pointer &p, const smt::expr &val, MemVal &blks,
              const smt::expr &cond, const std::set<smt::expr> &undef,
              bool local, unsigned align) const;
-  void store(const Pointer &p, const smt::expr &val, MemVal &local,
-             MemVal &non_local, const std::set<smt::expr> &undef,
-             unsigned align);
+  void store(const Pointer &p, const smt::expr &val,
+             const std::set<smt::expr> &undef, unsigned align);
   void storeLambda(const Pointer &p, const smt::expr &offset,
                    const smt::expr &size, const smt::expr &val,
                    const std::set<smt::expr> &undef);
