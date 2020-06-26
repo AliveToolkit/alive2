@@ -1138,7 +1138,7 @@ void Memory::storeLambda(const Pointer &p, const expr &offset, const expr &size,
     Pointer q(*this, i, local);
     if (q.isDereferenceable(bytes, bits_byte / 8, true)) {
       auto &arr = mem[i].first;
-      if (is_local.isTrue() && size.eq(q.blockSize())) {
+      if (is_local.isTrue() && val.isConst() && size.eq(q.blockSize())) {
         arr = expr::mkConstArray(offset, val);
       } else {
         arr = expr::mkLambda({ offset }, expr::mkIf(is_local && cond, val,
@@ -1973,8 +1973,7 @@ void Memory::print(ostream &os, const Model &m) const {
   bool did_header = false;
   auto header = [&](const char *msg) {
     if (!did_header) {
-      os << '\n'
-         << (state->isSource() ? "SOURCE" : "TARGET")
+      os << (state->isSource() ? "\nSOURCE" : "\nTARGET")
          << " MEMORY STATE\n===================\n";
     } else
       os << '\n';
