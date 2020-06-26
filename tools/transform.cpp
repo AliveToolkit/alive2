@@ -827,6 +827,7 @@ Errors TransformVerify::verify() const {
   StopWatch symexec_watch;
   calculateAndInitConstants(t);
   State::resetGlobals();
+  State::cleanup_state cleanup;
   State src_state(t.src, true), tgt_state(t.tgt, false);
 
   try {

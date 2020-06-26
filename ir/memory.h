@@ -342,6 +342,8 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
+  static void resetState();
+
   // for container use only
   bool operator<(const Memory &rhs) const;
 

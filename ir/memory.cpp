@@ -1939,6 +1939,10 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   return ret;
 }
 
+void Memory::resetState() {
+  max_nonlocal_bid.clear();
+}
+
 bool Memory::operator<(const Memory &rhs) const {
   // FIXME: remove this once we move to C++20
   // NOTE: we don't compare field state so that memories from src/tgt can
