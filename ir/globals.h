@@ -13,6 +13,8 @@ extern unsigned num_locals_src, num_locals_tgt;
 /// Number of constant global variables in src
 extern unsigned num_consts_src;
 
+extern unsigned num_globals_src;
+
 /// Number of non-constant globals introduced in tgt
 extern unsigned num_extra_nonconst_tgt;
 

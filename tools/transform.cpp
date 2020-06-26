@@ -513,7 +513,7 @@ static unsigned returns_nonlocal(const Instr &inst,
 static void calculateAndInitConstants(Transform &t) {
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
-  unsigned num_globals_src = globals_src.size();
+  num_globals_src = globals_src.size();
   unsigned num_globals = num_globals_src;
 
   // FIXME: varies among address spaces

@@ -7,6 +7,7 @@
 #include "ir/value.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include <map>
 #include <string>
 
 using namespace IR;
@@ -14,9 +15,11 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
-static unsigned ptr_next_idx = 0;
-static unsigned next_local_bid = 0;
-static unsigned next_nonlocal_bid = 0;
+static unsigned ptr_next_idx;
+static unsigned next_local_bid;
+static unsigned next_nonlocal_bid;
+static unsigned next_ptr_input;
+static map<expr, unsigned> max_nonlocal_bid;
 
 static bool observes_addresses() {
   return IR::has_ptr2int || IR::has_int2ptr;
@@ -1078,7 +1081,15 @@ void Memory::store(const Pointer &ptr,
                make_pair(&write_nonlocal, false) }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
         continue;
-      for (unsigned i = 0, e = write->size(); i < e; ++i) {
+
+      size_t max_bid = -1u;
+      if (!local) {
+        auto I = max_nonlocal_bid.find(ptr_val);
+        if (I != max_nonlocal_bid.end())
+          max_bid = I->second + 1;
+      }
+
+      for (unsigned i = 0, e = min(write->size(), max_bid); i < e; ++i) {
         Pointer q(*this, i, local, long_off);
         if (q.isDereferenceable(size, align, !init))
           (*write)[i] = true;
@@ -1333,6 +1344,7 @@ void Memory::resetBids(unsigned last_nonlocal) {
   next_nonlocal_bid = last_nonlocal;
   next_local_bid = 0;
   ptr_next_idx = 0;
+  next_ptr_input = 0;
 }
 
 void Memory::markByVal(unsigned bid) {
@@ -1340,11 +1352,14 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, const ParamAttrs &attrs) const {
+  unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
+  assert(max_bid < num_nonlocals_src);
   Pointer p(*this, name, false, false, false, attr_to_bitvec(attrs));
   if (attrs.has(ParamAttrs::NonNull))
     state->addAxiom(p.isNonZero());
-  state->addAxiom(p.getShortBid().ule(numNonlocals() - 1));
+  state->addAxiom(p.getShortBid().ule(max_bid));
 
+  max_nonlocal_bid.try_emplace(p(), max_bid);
   return p.release();
 }
 
