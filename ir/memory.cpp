@@ -15,6 +15,8 @@ using namespace std;
 using namespace util;
 
 static unsigned ptr_next_idx = 0;
+static unsigned next_local_bid = 0;
+static unsigned next_nonlocal_bid = 0;
 
 static bool observes_addresses() {
   return IR::has_ptr2int || IR::has_int2ptr;
@@ -700,7 +702,7 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, unsigned align,
   return exprs;
 }
 
-AndExpr Pointer::isDereferenceable(unsigned bytes, unsigned align,
+AndExpr Pointer::isDereferenceable(uint64_t bytes, unsigned align,
                                    bool iswrite) {
   return isDereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite);
 }
@@ -815,9 +817,10 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
 expr Pointer::blockValRefined(const Pointer &other, set<expr> &undef) const {
   unsigned bytesz = bits_byte / 8;
   set<expr> undef_vars;
-  Byte val(m, m.load(*this, m.non_local_block_val, undef_vars, false, bytesz));
-  Byte val2(other.m,
-   other.m.load(other, other.m.non_local_block_val, undef_vars, false, bytesz));
+  Byte val(m, m.load(*this, m.non_local_block_val, undef_vars, false, bytesz,
+                     num_nonlocals_src));
+  Byte val2(other.m, other.m.load(other, other.m.non_local_block_val,
+                                  undef_vars, false, bytesz, num_nonlocals_src));
 
   if (val.eq(val2))
     return true;
@@ -1000,7 +1003,7 @@ unsigned Memory::numNonlocals() const {
 }
 
 expr Memory::load(const Pointer &p, const MemVal &blks, set<expr> &undef,
-                  bool local, unsigned align) {
+                  bool local, unsigned align, unsigned limit) {
   expr bid = p.getShortBid();
   expr off = p.getShortOffset();
   expr long_off = p.getOffset();
@@ -1015,80 +1018,109 @@ expr Memory::load(const Pointer &p, const MemVal &blks, set<expr> &undef,
     }
   };
 
+  assert(limit <= blks.size());
   uint64_t n;
   if (bid.isUInt(n)) {
-    assert(n < blks.size());
+    assert(n < limit);
     ll((unsigned)n);
   } else {
-    for (unsigned i = 0, e = blks.size(); i != e; ++i) {
+    for (unsigned i = 0; i < limit; ++i) {
       ll(i);
     }
   }
   return *ret();
 }
 
-expr Memory::load(const Pointer &p, const MemVal &local,
-                  const MemVal &non_local, set<expr> &undef, unsigned align) {
-  return mkIf_fold(p.isLocal(), load(p, local, undef, true, align),
-                   load(p, non_local, undef, false, align));
+Byte Memory::load(const Pointer &p, set<expr> &undef, unsigned align) const {
+  return
+    { *this,
+       mkIf_fold(p.isLocal(),
+                 load(p, local_block_val, undef, true, align, next_local_bid),
+                 load(p, non_local_block_val, undef, false, align,
+                      // TODO: use a counter for this as well
+                      numNonlocals())) };
 }
 
-void Memory::store(const Pointer &p, const expr &val, MemVal &blks,
-                   const expr &cond, const set<expr> &undef, bool local,
-                   unsigned align) const {
-  expr bid = p.getShortBid();
-  expr off = p.getShortOffset();
-  expr long_off = p.getOffset();
-
-  auto st = [&](unsigned i, const expr &cond) {
-    Pointer q(p.getMemory(), i, local, long_off);
-    blks[i].first
-      = expr::mkIf(cond, blks[i].first.store(off, val), blks[i].first);
-    blks[i].second.insert(undef.begin(), undef.end());
-  };
-
-  vector<unsigned> bids;
-
-  uint64_t n;
-  if (bid.isUInt(n)) {
-    assert(n < blks.size());
-    Pointer q(p.getMemory(), (unsigned)n, local, long_off);
-    if (q.isDereferenceable(bits_byte/8, align,
-                            !state->isInitializationPhase()))
-      bids.emplace_back((unsigned)n);
-  } else {
-    assert(!state->isInitializationPhase());
-    unsigned i = local ? 0 : has_null_block + num_consts_src;
-    unsigned e = local ? blks.size() : num_nonlocals_src;
-    for (; i != e; ++i) {
-      Pointer q(p.getMemory(), i, local, long_off);
-      if (q.isDereferenceable(bits_byte/8, align, true))
-        bids.emplace_back(i);
+void Memory::store(const Pointer &ptr,
+                   const vector<pair<unsigned, expr>> &data,
+                   const set<expr> &undef, unsigned align) {
+  if (next_local_bid > 0) {
+    for (auto &[offset, val] : data) {
+      Byte byte(*this, expr(val));
+      if (byte.isPtr().isTrue())
+        escapeLocalPtr(byte.ptrValue());
     }
   }
 
-  if (bids.size() == 1) {
-    st(bids[0], cond);
-    return;
+  auto size = data.size() * (bits_byte/8);
+  bool init = state->isInitializationPhase();
+  expr long_off = ptr.getOffset();
+
+  vector<bool> write_local, write_nonlocal;
+  write_local.resize(next_local_bid);
+  write_nonlocal.resize(init ? numNonlocals() : num_nonlocals_src);
+
+  // collect over-approximation of possible touched bids
+  for (auto &ptr_val : expr::allLeafs(ptr())) {
+    Pointer q(*this, expr(ptr_val));
+    auto is_local = q.isLocal();
+    uint64_t bid;
+    if (q.getShortBid().isUInt(bid)) {
+      if (!is_local.isFalse() && bid < write_local.size())
+        write_local[bid] = true;
+      if (!is_local.isTrue() && bid < write_nonlocal.size())
+        write_nonlocal[bid] = true;
+      continue;
+    }
+
+    for (auto [write, local]
+           : { make_pair(&write_local, true),
+               make_pair(&write_nonlocal, false) }) {
+      if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
+        continue;
+      for (unsigned i = 0, e = write->size(); i < e; ++i) {
+        Pointer q(*this, i, local, long_off);
+        if (q.isDereferenceable(size, align, !init))
+          (*write)[i] = true;
+      }
+    }
   }
 
-  for (auto i : bids) {
-    st(i, cond && bid == i);
-  }
-}
+  unsigned has_local = 0, has_nonlocal = 0;
+  for (auto bit : write_local)
+    has_local += bit;
+  for (auto bit : write_nonlocal)
+    has_nonlocal += bit;
 
-void Memory::store(const Pointer &p, const expr &val, const set<expr> &undef,
-                   unsigned align) {
-  if (numLocals() > 0) {
-    Byte byte(*this, expr(val));
-    if (byte.isPtr().isTrue())
-      escapeLocalPtr(byte.ptrValue());
+  expr is_local = ptr.isLocal();
+  expr offset = ptr.getShortOffset();
+  unsigned off_bits = Pointer::bitsShortOffset();
+
+  auto st = [&](MemVal &blks, unsigned i, const expr &cond) {
+    auto mem = blks[i].first;
+    for (auto &[idx, val] : data) {
+      expr off = offset + expr::mkUInt(idx >> zero_bits_offset(), off_bits);
+      mem = mem.store(off, val);
+    }
+    blks[i].first = expr::mkIf(cond, mem, blks[i].first);
+    blks[i].second.insert(undef.begin(), undef.end());
+  };
+
+  expr bid = ptr.getShortBid();
+  for (unsigned i = 0, e = write_local.size(); i < e; ++i) {
+    if (write_local[i])
+      st(local_block_val, i,
+         (has_nonlocal ? is_local : true) &&
+         (has_local == 1 ? true : bid == i));
   }
-  auto is_local = p.isLocal();
-  if (!is_local.isFalse())
-    store(p, val, local_block_val, is_local, undef, true, align);
-  if (!is_local.isTrue())
-    store(p, val, non_local_block_val, !is_local, undef, false, align);
+
+  for (unsigned i = has_null_block + !init * num_consts_src,
+       e = write_nonlocal.size(); i < e; ++i) {
+    if (write_nonlocal[i])
+      st(non_local_block_val, i,
+         (has_local ? !is_local : true) &&
+         (has_nonlocal == 1 ? true : bid == i));
+  }
 }
 
 void Memory::storeLambda(const Pointer &p, const expr &offset, const expr &size,
@@ -1106,8 +1138,12 @@ void Memory::storeLambda(const Pointer &p, const expr &offset, const expr &size,
     Pointer q(*this, i, local);
     if (q.isDereferenceable(bytes, bits_byte / 8, true)) {
       auto &arr = mem[i].first;
-      arr = expr::mkLambda({ offset }, expr::mkIf(is_local && cond, val,
-                                                  arr.load(offset)));
+      if (is_local.isTrue() && size.eq(q.blockSize())) {
+        arr = expr::mkConstArray(offset, val);
+      } else {
+        arr = expr::mkLambda({ offset }, expr::mkIf(is_local && cond, val,
+                                                    arr.load(offset)));
+      }
       mem[i].second.insert(undef.begin(), undef.end());
     }
   };
@@ -1129,11 +1165,6 @@ void Memory::storeLambda(const Pointer &p, const expr &offset, const expr &size,
     st(non_local_block_val, false, has_null_block + num_consts_src,
        num_nonlocals_src);
 }
-
-static unsigned last_local_bid = 0;
-// Global block id 0 is reserved for a null block if has_null_block is true.
-// State::resetGlobals() sets last_nonlocal_bid to has_null_block.
-static unsigned last_nonlocal_bid = 0;
 
 static bool memory_unused() {
   return num_locals_src == 0 && num_locals_tgt == 0 && num_nonlocals == 0;
@@ -1299,8 +1330,8 @@ void Memory::mkAxioms(const Memory &other) const {
 }
 
 void Memory::resetBids(unsigned last_nonlocal) {
-  last_nonlocal_bid = last_nonlocal;
-  last_local_bid = 0;
+  next_nonlocal_bid = last_nonlocal;
+  next_local_bid = 0;
   ptr_next_idx = 0;
 }
 
@@ -1487,7 +1518,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 
-  auto &last_bid = is_local ? last_local_bid : last_nonlocal_bid;
+  auto &last_bid = is_local ? next_local_bid : next_nonlocal_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
   assert((is_local && bid < numLocals()) ||
          (!is_local && bid < numNonlocals()));
@@ -1614,27 +1645,18 @@ unsigned Memory::getStoreByteSize(const Type &ty) {
   return divide_up(ty.bits(), 8);
 }
 
-void Memory::store(const expr &p, const StateValue &v, const Type &type,
-                   unsigned align, const set<expr> &undef_vars,
-                   bool deref_check) {
-  assert(!memory_unused());
-  Pointer ptr(*this, p);
+void Memory::store(const StateValue &v, const Type &type, unsigned offset0,
+                   vector<pair<unsigned, expr>> &data) {
   unsigned bytesz = bits_byte / 8;
-
-  // initializer stores are ok by construction
-  if (deref_check && !state->isInitializationPhase())
-    state->addUB(ptr.isDereferenceable(getStoreByteSize(type), align, true));
 
   auto aty = type.getAsAggregateType();
   if (aty && !isNonPtrVector(type)) {
-    unsigned byteofs = 0;
+    unsigned byteofs = offset0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto &child = aty->getChild(i);
       if (child.bits() == 0)
         continue;
-      auto ptr_i = ptr + byteofs;
-      auto align_i = gcd(align, byteofs % align);
-      store(ptr_i(), aty->extract(v, i), child, align_i, undef_vars, false);
+      store(aty->extract(v, i), child, byteofs, data);
       byteofs += getStoreByteSize(child);
     }
     assert(byteofs == getStoreByteSize(type));
@@ -1642,15 +1664,27 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
   } else {
     vector<Byte> bytes = valueToBytes(v, type, *this, state);
     assert(!v.isValid() || bytes.size() * bytesz == getStoreByteSize(type));
-    assert(align % bytesz == 0);
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       unsigned offset = little_endian ? i * bytesz : (e - i - 1) * bytesz;
-      auto ptr_i = ptr + offset;
-      auto align_i = gcd(align, offset % align);
-      store(ptr_i, bytes[i](), undef_vars, align_i);
+      data.emplace_back(offset0 + offset, bytes[i]());
     }
   }
+}
+
+void Memory::store(const expr &p, const StateValue &v, const Type &type,
+                   unsigned align, const set<expr> &undef_vars) {
+  assert(!memory_unused());
+  assert(align % (bits_byte / 8) == 0);
+  Pointer ptr(*this, p);
+
+  // initializer stores are ok by construction
+  if (!state->isInitializationPhase())
+    state->addUB(ptr.isDereferenceable(getStoreByteSize(type), align, true));
+
+  vector<pair<unsigned, expr>> to_store;
+  store(v, type, 0, to_store);
+  store(ptr, to_store, undef_vars, align);
 }
 
 StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
@@ -1695,10 +1729,6 @@ Memory::load(const expr &p, const Type &type, unsigned align) const {
   return { state->rewriteUndef(move(ret), undef_vars), move(ubs) };
 }
 
-Byte Memory::load(const Pointer &p, set<expr> &undef, unsigned align) const {
-  return { *this, load(p, local_block_val, non_local_block_val, undef, align) };
-}
-
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     unsigned align, const set<expr> &undef_vars,
                     bool deref_check) {
@@ -1720,9 +1750,11 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 
   uint64_t n;
   if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
+    vector<pair<unsigned, expr>> to_store;
     for (unsigned i = 0; i < n; i += bytesz) {
-      store(ptr + i, bytes[0](), undef_vars, bytesz);
+      to_store.emplace_back(i, bytes[0]());
     }
+    store(ptr, to_store, undef_vars, align);
   } else {
     expr offset
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
@@ -1747,12 +1779,12 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
 
   uint64_t n;
   if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
-    auto old_local = local_block_val, old_nonlocal = non_local_block_val;
+    vector<pair<unsigned, expr>> to_store;
+    set<expr> undef;
     for (unsigned i = 0; i < n; i += bytesz) {
-      set<expr> undef;
-      auto val = load(src + i, old_local, old_nonlocal, undef, bytesz);
-      store(dst + i, val, undef, bytesz);
+      to_store.emplace_back(i, load(src + i, undef, bytesz)());
     }
+    store(dst, to_store, undef, align_dst);
   } else {
     expr offset
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));

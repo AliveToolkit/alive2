@@ -158,10 +158,10 @@ public:
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(unsigned align, bool exact = false) const;
   smt::expr isAligned(unsigned align);
-  smt::AndExpr isDereferenceable(unsigned bytes, unsigned align = bits_byte / 8,
+  smt::AndExpr isDereferenceable(uint64_t bytes, unsigned align = bits_byte / 8,
                                  bool iswrite = false);
   smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
-                                  bool iswrite);
+                                 bool iswrite);
   void isDisjoint(const smt::expr &len1, const Pointer &ptr2,
                    const smt::expr &len2) const;
   smt::expr isBlockAlive() const;
@@ -226,18 +226,17 @@ class Memory {
   void mk_nonlocal_val_axioms(bool skip_consts);
 
   static smt::expr load(const Pointer &p, const MemVal &blks,
-                        std::set<smt::expr> &undef, bool local, unsigned align);
-  static smt::expr load(const Pointer &p, const MemVal &local,
-                        const MemVal &non_local, std::set<smt::expr> &undef,
-                        unsigned align);
+                        std::set<smt::expr> &undef, bool local,
+                        unsigned align, unsigned limit);
   StateValue load(const Pointer &ptr, const Type &type,
                   std::set<smt::expr> &undef, unsigned align) const;
 
-  void store(const Pointer &p, const smt::expr &val, MemVal &blks,
-             const smt::expr &cond, const std::set<smt::expr> &undef,
-             bool local, unsigned align) const;
-  void store(const Pointer &p, const smt::expr &val,
+  void store(const Pointer &ptr,
+             const std::vector<std::pair<unsigned, smt::expr>> &data,
              const std::set<smt::expr> &undef, unsigned align);
+  void store(const StateValue &val, const Type &type, unsigned offset,
+             std::vector<std::pair<unsigned, smt::expr>> &data);
+
   void storeLambda(const Pointer &p, const smt::expr &offset,
                    const smt::expr &size, const smt::expr &val,
                    const std::set<smt::expr> &undef);
@@ -309,8 +308,7 @@ public:
 
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
-             unsigned align, const std::set<smt::expr> &undef_vars,
-             bool deref_check = true);
+             unsigned align, const std::set<smt::expr> &undef_vars);
   std::pair<StateValue, smt::AndExpr> load(const smt::expr &ptr,
       const Type &type, unsigned align) const;
 
