@@ -1353,8 +1353,16 @@ expr expr::concat(const expr &rhs) const {
   expr a, b, c, d;
   unsigned h, l, h2, l2;
   if (isExtract(a, h, l)) {
-    if (rhs.isExtract(b, h2, l2) && l == h2+1 && a.eq(b))
-      return a.extract(h, l2);
+    if (rhs.isExtract(b, h2, l2) && l == h2+1) {
+      if (a.eq(b))
+        return a.extract(h, l2);
+
+      // (concat (extract (concat const X)) (extract X))
+      expr aa, ab;
+      if (l2 == 0 && a.isConcat(aa, ab) && ab.eq(b) &&
+          (h - aa.bits()) == b.bits())
+        return aa.concat(b);
+    }
 
     //  extract_l concat (concat extract_r foo)
     if (rhs.isConcat(b, c) && b.isExtract(d, h2, l2) && l == h2+1 && a.eq(d))
