@@ -225,9 +225,16 @@ class Memory {
 
   void mk_nonlocal_val_axioms(bool skip_consts);
 
-  static smt::expr load(const Pointer &p, const MemVal &blks,
-                        std::set<smt::expr> &undef, bool local,
-                        unsigned align, unsigned limit);
+  enum loadType { LOAD_ANY, LOAD_INT, LOAD_PTR };
+
+  template <typename Fn>
+  void access(const Pointer &ptr, unsigned btyes, unsigned align, bool write,
+              Fn &fn) const;
+
+  std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
+                         std::set<smt::expr> &undef, unsigned align,
+                         bool left2right = true,
+                         loadType type = LOAD_ANY) const;
   StateValue load(const Pointer &ptr, const Type &type,
                   std::set<smt::expr> &undef, unsigned align) const;
 
