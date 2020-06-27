@@ -1700,12 +1700,12 @@ void Memory::store(const StateValue &v, const Type &type, unsigned offset0,
 
   auto aty = type.getAsAggregateType();
   if (aty && !isNonPtrVector(type)) {
-    unsigned byteofs = offset0;
+    unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
       auto &child = aty->getChild(i);
       if (child.bits() == 0)
         continue;
-      store(aty->extract(v, i), child, byteofs, data);
+      store(aty->extract(v, i), child, offset0 + byteofs, data);
       byteofs += getStoreByteSize(child);
     }
     assert(byteofs == getStoreByteSize(type));
