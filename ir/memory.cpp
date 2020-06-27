@@ -1086,8 +1086,9 @@ void Memory::store(const Pointer &ptr,
   for (auto &ptr_val : expr::allLeafs(ptr())) {
     Pointer q(*this, expr(ptr_val));
     auto is_local = q.isLocal();
+    auto shortbid = q.getShortBid();
     uint64_t bid;
-    if (q.getShortBid().isUInt(bid)) {
+    if (shortbid.isUInt(bid)) {
       if (!is_local.isFalse() && bid < write_local.size())
         write_local[bid] = true;
       if (!is_local.isTrue() && bid < write_nonlocal.size())
@@ -1103,7 +1104,7 @@ void Memory::store(const Pointer &ptr,
 
       size_t max_bid = -1u;
       if (!local) {
-        auto I = max_nonlocal_bid.find(ptr_val);
+        auto I = max_nonlocal_bid.find(shortbid);
         if (I != max_nonlocal_bid.end())
           max_bid = I->second + 1;
       }
@@ -1369,11 +1370,12 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) const {
   unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
   Pointer p(*this, name, false, false, false, attr_to_bitvec(attrs));
+  auto bid = p.getShortBid();
   if (attrs.has(ParamAttrs::NonNull))
     state->addAxiom(p.isNonZero());
-  state->addAxiom(p.getShortBid().ule(max_bid));
+  state->addAxiom(bid.ule(max_bid));
 
-  max_nonlocal_bid.try_emplace(p(), max_bid);
+  max_nonlocal_bid.try_emplace(bid, max_bid);
   return p.release();
 }
 
