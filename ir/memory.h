@@ -116,7 +116,7 @@ public:
   static unsigned totalBitsShort();
   static unsigned bitsShortOffset();
 
-  smt::expr isLocal() const;
+  smt::expr isLocal(bool simplify = true) const;
 
   smt::expr getBid() const;
   smt::expr getShortBid() const; // same as getBid but ignoring is_local bit
@@ -176,7 +176,7 @@ public:
   };
   smt::expr getAllocType() const;
   smt::expr isHeapAllocated() const;
-  smt::expr isNocapture() const;
+  smt::expr isNocapture(bool simplify = true) const;
   smt::expr isReadonly() const;
   smt::expr isReadnone() const;
 

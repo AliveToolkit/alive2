@@ -66,6 +66,19 @@ static string local_name(const State *s, const char *name) {
   return string(name) + (s->isSource() ? "_src" : "_tgt");
 }
 
+static bool is_initial_memblock(const expr &e, bool match_any_init = false) {
+  expr load, blk, idx;
+  unsigned hi, lo;
+  if (e.isExtract(load, hi, lo) && load.isLoad(blk, idx))
+    return is_initial_memblock(blk, match_any_init);
+
+  auto name = e.fn_name();
+  if (string_view(name).substr(0, 9) == "init_mem_")
+    return true;
+
+  return match_any_init && string_view(name).substr(0, 8) == "blk_val!";
+}
+
 static expr load_bv(const expr &var, const expr &idx0) {
   auto bw = var.bits();
   if (!bw)
@@ -427,13 +440,19 @@ unsigned Pointer::bitsShortOffset() {
   return bits_for_offset - zero_bits_offset();
 }
 
-expr Pointer::isLocal() const {
+expr Pointer::isLocal(bool simplify) const {
   if (m.numLocals() == 0)
     return false;
   if (m.numNonlocals() == 0)
     return true;
+
   auto bit = totalBits() - 1;
-  return p.extract(bit, bit) == 1;
+  expr local = p.extract(bit, bit);
+
+  if (simplify && is_initial_memblock(local))
+    return false;
+
+  return local == 1;
 }
 
 expr Pointer::getBid() const {
@@ -910,12 +929,12 @@ expr Pointer::isByval() const {
   return !isLocal() && non_local;
 }
 
-expr Pointer::isNocapture() const {
+expr Pointer::isNocapture(bool simplify) const {
   if (!has_nocapture)
     return false;
 
   // local pointers can't be no-capture
-  if (isLocal().isTrue())
+  if (isLocal(simplify).isTrue())
     return false;
 
   return p.extract(0, 0) == 1;
@@ -1182,15 +1201,10 @@ static bool memory_unused() {
 }
 
 static expr mk_block_val_array(unsigned bid) {
-  auto str = "blk_val_" + to_string(bid);
+  auto str = "init_mem_" + to_string(bid);
   return expr::mkArray(str.c_str(),
                        expr::mkUInt(0, Pointer::bitsShortOffset()),
                        expr::mkUInt(0, Byte::bitsByte()));
-}
-
-static bool is_initial_memblock(const expr &e) {
-  auto name = e.fn_name();
-  return string_view(name).substr(0, 7) == "blk_val";
 }
 
 static expr mk_liveness_array() {
@@ -1219,8 +1233,8 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     expr bid = loadedptr.getShortBid();
     state->addAxiom(
       expr::mkForAll({ offset },
-        byte.isPtr().implies(!loadedptr.isLocal() &&
-                             !loadedptr.isNocapture() &&
+        byte.isPtr().implies(!loadedptr.isLocal(false) &&
+                             !loadedptr.isNocapture(false) &&
                              bid.ule(numNonlocals() - 1))));
   }
 }
@@ -1501,7 +1515,7 @@ void Memory::setState(const Memory::CallState &st) {
   auto consts = has_null_block + num_consts_src;
   for (unsigned i = consts; i < num_nonlocals_src; ++i) {
     non_local_block_val[i].first = st.non_local_block_val[i - consts];
-    if (is_initial_memblock(non_local_block_val[i].first))
+    if (is_initial_memblock(non_local_block_val[i].first, true))
       non_local_block_val[i].second.clear();
   }
   non_local_block_liveness = st.non_local_block_liveness;
@@ -1881,15 +1895,11 @@ expr Memory::checkNocapture() const {
 
 void Memory::escapeLocalPtr(const expr &ptr) {
   uint64_t bid;
-  unsigned hi, lo;
-  expr sel, blk, idx;
-
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
       if (bid < numLocals())
         escaped_local_blks[bid] = true;
-    } else if (bid_expr.isExtract(sel, hi, lo) &&
-               sel.isLoad(blk, idx) && is_initial_memblock(blk)) {
+    } else if (is_initial_memblock(bid_expr)) {
       // initial non local block bytes don't contain local pointers.
       continue;
     } else {
