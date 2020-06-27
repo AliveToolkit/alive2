@@ -1143,6 +1143,9 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
 
+  if (bytes == 0)
+    return;
+
   auto fn = [&](MemVal &blks, unsigned i, bool local, const expr &cond) {
     auto mem = blks[i].first;
 
