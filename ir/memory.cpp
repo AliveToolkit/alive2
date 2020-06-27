@@ -1031,16 +1031,24 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   access_local.resize(next_local_bid);
   access_nonlocal.resize(write ? num_nonlocals_src : numNonlocals());
 
+  auto is_deref = [&](bool local, unsigned bid, const expr &offset) -> bool {
+    return
+      Pointer(*this, bid, local, offset).isDereferenceable(bytes, align, write);
+  };
+
   // collect over-approximation of possible touched bids
   for (auto &ptr_val : expr::allLeafs(ptr())) {
     Pointer q(*this, expr(ptr_val));
     auto is_local = q.isLocal();
     auto shortbid = q.getShortBid();
+    expr offset = q.getOffset();
     uint64_t bid;
     if (shortbid.isUInt(bid)) {
-      if (!is_local.isFalse() && bid < access_local.size())
+      if (!is_local.isFalse() && bid < access_local.size() &&
+          is_deref(true, bid, offset))
         access_local[bid] = true;
-      if (!is_local.isTrue() && bid < access_nonlocal.size())
+      if (!is_local.isTrue() && bid < access_nonlocal.size() &&
+          is_deref(false, bid, offset))
         access_nonlocal[bid] = true;
       continue;
     }
@@ -1058,10 +1066,8 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
           max_bid = I->second + 1;
       }
 
-      expr offset = q.getOffset();
       for (unsigned i = 0, e = min(access->size(), max_bid); i < e; ++i) {
-        Pointer q(*this, i, local, offset);
-        if (q.isDereferenceable(bytes, align, write))
+        if (is_deref(local, i, offset))
           (*access)[i] = true;
       }
     }
@@ -1078,14 +1084,16 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   expr bid = ptr.getShortBid();
   for (unsigned i = 0, e = access_local.size(); i < e; ++i) {
     if (access_local[i])
-      fn(const_cast<MemVal&>(local_block_val), i, true, (has_nonlocal ? is_local : true) &&
-                                   (has_local == 1 ? true : bid == i));
+      fn(const_cast<MemVal&>(local_block_val), i, true,
+         (has_nonlocal ? is_local : true) &&
+         (has_local == 1 ? true : bid == i));
   }
 
   for (unsigned i = 0, e = access_nonlocal.size(); i < e; ++i) {
     if (access_nonlocal[i])
-      fn(const_cast<MemVal&>(non_local_block_val), i, false, (has_local ? !is_local : true) &&
-                                        (has_nonlocal == 1 ? true : bid == i));
+      fn(const_cast<MemVal&>(non_local_block_val), i, false,
+         (has_local ? !is_local : true) &&
+         (has_nonlocal == 1 ? true : bid == i));
   }
 }
 
