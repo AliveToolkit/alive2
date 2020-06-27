@@ -1111,8 +1111,8 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   auto fn = [&](MemVal &blks, unsigned bid, bool local, const expr &cond) {
     // TODO: optimize using loaded type to produce poison
     for (unsigned i = 0; i < loaded_bytes; ++i) {
-      unsigned idx = left2right ? i : (loaded_bytes - i - 1);
-      expr off = offset + expr::mkUInt(idx, off_bits);
+      unsigned idx = (left2right ? i : (loaded_bytes - i - 1)) * bytesz;
+      expr off = offset + expr::mkUInt(idx >> zero_bits_offset(), off_bits);
       loaded[i].add(blks[bid].first.load(off), cond);
       undef.insert(blks[bid].second.begin(), blks[bid].second.end());
     }
