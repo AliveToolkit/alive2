@@ -1033,7 +1033,9 @@ void Transform::preprocess() {
         to_remove.clear();
       }
 
-      changed |= fn->removeUnusedStuff(users);
+      changed |=
+        fn->removeUnusedStuff(users, fn == &src ? vector<string_view>()
+                                                : src.getGlobalVarNames());
     } while (changed);
   }
 }

@@ -153,7 +153,8 @@ public:
   instr_helper instrs() const { return *this; }
 
   std::multimap<Value*, Value*> getUsers() const;
-  bool removeUnusedStuff(const std::multimap<Value*, Value*> &users);
+  bool removeUnusedStuff(const std::multimap<Value*, Value*> &users,
+                         const std::vector<std::string_view> &src_glbs);
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
