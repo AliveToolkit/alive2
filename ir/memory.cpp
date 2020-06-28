@@ -965,7 +965,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   access_nonlocal.resize(write ? num_nonlocals_src : numNonlocals());
 
   auto is_deref = [&](bool local, unsigned bid, const expr &offset) -> bool {
-    return
+    return !(local ? access_local : access_nonlocal)[bid] &&
       Pointer(*this, bid, local, offset).isDereferenceable(bytes, align, write);
   };
 
