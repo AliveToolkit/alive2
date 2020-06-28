@@ -1847,7 +1847,7 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
   uint64_t bytes;
   if (blk_size.isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
     val_refines = true;
-    for (unsigned off = 0; off < bytes; off += bytes_per_byte) {
+    for (unsigned off = 0; off < (bytes / bytes_per_byte); ++off) {
       expr off_expr = expr::mkUInt(off, Pointer::bitsShortOffset());
       val_refines
         &= (ptr_offset == off_expr).implies(
