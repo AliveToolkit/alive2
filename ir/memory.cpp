@@ -20,6 +20,7 @@ static unsigned next_local_bid;
 static unsigned next_nonlocal_bid;
 static unsigned next_ptr_input;
 static map<expr, unsigned> max_nonlocal_bid;
+static set<expr> guaranteed_nonlocal;
 
 static bool observes_addresses() {
   return IR::has_ptr2int || IR::has_int2ptr;
@@ -67,12 +68,14 @@ static string local_name(const State *s, const char *name) {
 }
 
 static bool is_initial_memblock(const expr &e, bool match_any_init = false) {
+  auto name = e.fn_name();
+  {
   expr load, blk, idx;
   unsigned hi, lo;
   if (e.isExtract(load, hi, lo) && load.isLoad(blk, idx))
-    return is_initial_memblock(blk, match_any_init);
+    name = blk.fn_name();
+  }
 
-  auto name = e.fn_name();
   if (string_view(name).substr(0, 9) == "init_mem_")
     return true;
 
@@ -449,7 +452,8 @@ expr Pointer::isLocal(bool simplify) const {
   auto bit = totalBits() - 1;
   expr local = p.extract(bit, bit);
 
-  if (simplify && is_initial_memblock(local))
+  if (simplify &&
+      (is_initial_memblock(local) || guaranteed_nonlocal.count(getShortBid())))
     return false;
 
   return local == 1;
@@ -1412,22 +1416,28 @@ Memory::mkFnRet(const char *name,
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_for_bid + bits_for_offset));
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
+  auto bid = p.getShortBid();
+
+  // TODO: must escape local ptr_inputs
 
   set<expr> local;
   for (auto &in : ptr_inputs) {
     // TODO: callee cannot observe the bid if this is byval.
     Pointer inp(*this, in.val.value);
-    if (!inp.isLocal().isFalse())
+    if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse())
       local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
   }
   for (unsigned i = 0; i < numLocals(); ++i) {
     if (escaped_local_blks[i])
-      local.emplace(p.getShortBid() == i);
+      local.emplace(bid == i);
   }
+
+  if (local.empty())
+    guaranteed_nonlocal.emplace(bid);
 
   state->addAxiom(expr::mkIf(p.isLocal(),
                              expr::mk_or(local),
-                             p.getShortBid().ule(numNonlocals() - 1)));
+                             bid.ule(numNonlocals() - 1)));
   return { p.release(), move(var) };
 }
 
@@ -1957,6 +1967,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
 
 void Memory::resetState() {
   max_nonlocal_bid.clear();
+  guaranteed_nonlocal.clear();
 }
 
 bool Memory::operator<(const Memory &rhs) const {
