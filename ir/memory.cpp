@@ -68,13 +68,13 @@ static string local_name(const State *s, const char *name) {
 }
 
 static bool is_initial_memblock(const expr &e, bool match_any_init = false) {
-  auto name = e.fn_name();
-  {
+  string name;
   expr load, blk, idx;
   unsigned hi, lo;
   if (e.isExtract(load, hi, lo) && load.isLoad(blk, idx))
     name = blk.fn_name();
-  }
+  else
+    name = e.fn_name();
 
   if (string_view(name).substr(0, 9) == "init_mem_")
     return true;
