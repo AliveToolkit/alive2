@@ -19,6 +19,7 @@ static unsigned ptr_next_idx;
 static unsigned next_local_bid;
 static unsigned next_nonlocal_bid;
 static unsigned next_ptr_input;
+static unsigned next_nonlocal_ptr;
 static map<expr, unsigned> max_nonlocal_bid;
 static set<expr> guaranteed_nonlocal;
 
@@ -1366,11 +1367,13 @@ void Memory::mkAxioms(const Memory &other) const {
   locals_fit(other);
 }
 
-void Memory::resetBids(unsigned last_nonlocal) {
+void Memory::resetBids(unsigned last_nonlocal, bool is_source) {
   next_nonlocal_bid = last_nonlocal;
   next_local_bid = 0;
   ptr_next_idx = 0;
   next_ptr_input = 0;
+  if (is_source)
+    next_nonlocal_ptr = 0;
 }
 
 void Memory::markByVal(unsigned bid) {
@@ -1435,9 +1438,17 @@ Memory::mkFnRet(const char *name,
   if (local.empty())
     guaranteed_nonlocal.emplace(bid);
 
-  state->addAxiom(expr::mkIf(p.isLocal(),
-                             expr::mk_or(local),
-                             bid.ule(numNonlocals() - 1)));
+  unsigned max_bid
+    = has_null_block + num_globals_src + next_ptr_input + next_nonlocal_ptr++;
+
+  expr nonlocal = bid.ule(min(max_bid, num_nonlocals_src-1));
+  if (num_nonlocals_src == numNonlocals()) {
+    if (max_bid < num_nonlocals_src)
+      max_nonlocal_bid.emplace(bid, max_bid);
+  } else
+    nonlocal |= bid.uge(num_nonlocals_src);
+
+  state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
   return { p.release(), move(var) };
 }
 

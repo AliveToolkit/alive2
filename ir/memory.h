@@ -269,7 +269,7 @@ public:
 
   void mkAxioms(const Memory &other) const;
 
-  static void resetBids(unsigned last_nonlocal);
+  static void resetBids(unsigned last_nonlocal, bool is_source);
 
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs) const;
