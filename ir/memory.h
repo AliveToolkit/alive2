@@ -185,10 +185,6 @@ public:
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
                            bool is_byval_arg) const;
-  smt::expr blockValRefined(const Pointer &other,
-                            std::set<smt::expr> &undef) const;
-  smt::expr blockRefined(const Pointer &other,
-                         std::set<smt::expr> &undef) const;
 
   const Memory& getMemory() const { return m; }
 
@@ -247,6 +243,12 @@ class Memory {
   void storeLambda(const Pointer &ptr, const smt::expr &offset,
                    const smt::expr &bytes, const smt::expr &val,
                    const std::set<smt::expr> &undef, unsigned align);
+
+  smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
+                            const smt::expr &offset,
+                            std::set<smt::expr> &undef) const;
+  smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
+                         std::set<smt::expr> &undef) const;
 
 public:
   enum BlockKind {

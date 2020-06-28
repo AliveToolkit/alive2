@@ -841,78 +841,6 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
              expr::mkIf(isLocal(), local, *this == other));
 }
 
-expr Pointer::blockValRefined(const Pointer &other, set<expr> &undef) const {
-  unsigned bytesz = bits_byte / 8;
-  set<expr> undef_vars;
-  Byte val = m.load(*this, undef_vars, bytesz);
-  Byte val2 = other.m.load(other, undef_vars, bytesz);
-
-  if (val.eq(val2))
-    return true;
-
-  undef.insert(undef_vars.begin(), undef_vars.end());
-
-  // refinement if offset had non-ptr value
-  expr np1 = val.nonptrNonpoison();
-  expr np2 = val2.nonptrNonpoison();
-  bool np_eqs = np1.eq(np2);
-  expr int_cnstr = does_sub_byte_access
-                     ? (np2 | np1) == np1 &&
-                       (val.nonptrValue() | np1) == (val2.nonptrValue() | np1)
-                     : (np_eqs ? true : np2 == 0) &&
-                       val.nonptrValue() == val2.nonptrValue();
-
-  // fast path: if we didn't do any ptr store, then all ptrs in memory were
-  // already there and don't need checking
-  expr is_ptr = val.isPtr();
-  expr is_ptr2 = val2.isPtr();
-  expr ptr_cnstr;
-  if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
-    ptr_cnstr = val == val2;
-  } else {
-    ptr_cnstr = val2.ptrNonpoison() &&
-                val.ptrByteoffset() == val2.ptrByteoffset() &&
-                val.ptr().refined(val2.ptr());
-  }
-  return val.isPoison() ||
-         expr::mkIf(is_ptr == is_ptr2,
-                    expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
-                    // allow null ptr <-> zero
-                    val.isZero() && !val2.isPoison() && val2.isZero());
-}
-
-expr Pointer::blockRefined(const Pointer &other, set<expr> &undef) const {
-  expr blk_size = blockSize();
-  expr val_refines(true);
-  uint64_t bytes;
-  auto bytes_per_byte = bits_byte / 8;
-
-  if (blk_size.isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
-    expr bid = getBid();
-    expr ptr_offset = getOffset();
-
-    for (unsigned off = 0; off < bytes; off += bytes_per_byte) {
-      expr off_expr = expr::mkUInt(off, bits_for_offset);
-      Pointer p(m, bid, off_expr);
-      Pointer q(other.m, p());
-      val_refines
-        &= (ptr_offset == off_expr).implies(p.blockValRefined(q, undef));
-    }
-  } else {
-    val_refines = blockValRefined(other, undef);
-  }
-
-  assert(isWritable().eq(other.isWritable()));
-
-  expr alive = isBlockAlive();
-  return alive == other.isBlockAlive() &&
-         blk_size == other.blockSize() &&
-         getAllocType() == other.getAllocType() &&
-         m.state->simplifyWithAxioms(
-           blockAlignment().ule(other.blockAlignment())) &&
-         (alive && getOffsetSizet().ult(blk_size)).implies(val_refines);
-}
-
 expr Pointer::isWritable() const {
   auto bid = getShortBid();
   expr non_local
@@ -1421,8 +1349,6 @@ Memory::mkFnRet(const char *name,
   Pointer p(*this, var.concat_zeros(bits_for_ptrattrs));
   auto bid = p.getShortBid();
 
-  // TODO: must escape local ptr_inputs
-
   set<expr> local;
   for (auto &in : ptr_inputs) {
     // TODO: callee cannot observe the bid if this is byval.
@@ -1862,6 +1788,87 @@ expr Memory::int2ptr(const expr &val) const {
   return {};
 }
 
+expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
+                             const expr &offset, set<expr> &undef) const {
+  assert(!local);
+  auto &[mem1, undef1] = non_local_block_val[bid];
+  auto &[mem2, undef2] = other.non_local_block_val[bid];
+
+  if (mem1.eq(mem2))
+    return true;
+
+  set<expr> undef_vars;
+  Byte val(*this, mem1.load(offset));
+  Byte val2(other, mem2.load(offset));
+
+  if (val.eq(val2))
+    return true;
+
+  undef.insert(undef1.begin(), undef1.end());
+  undef.insert(undef2.begin(), undef2.end());
+
+  // refinement if offset had non-ptr value
+  expr np1 = val.nonptrNonpoison();
+  expr np2 = val2.nonptrNonpoison();
+  bool np_eqs = np1.eq(np2);
+  expr int_cnstr = does_sub_byte_access
+                     ? (np2 | np1) == np1 &&
+                       (val.nonptrValue() | np1) == (val2.nonptrValue() | np1)
+                     : (np_eqs ? true : np2 == 0) &&
+                       val.nonptrValue() == val2.nonptrValue();
+
+  // fast path: if we didn't do any ptr store, then all ptrs in memory were
+  // already there and don't need checking
+  expr is_ptr = val.isPtr();
+  expr is_ptr2 = val2.isPtr();
+  expr ptr_cnstr;
+  if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
+    ptr_cnstr = val == val2;
+  } else {
+    ptr_cnstr = val2.ptrNonpoison() &&
+                val.ptrByteoffset() == val2.ptrByteoffset() &&
+                val.ptr().refined(val2.ptr());
+  }
+  return val.isPoison() ||
+         expr::mkIf(is_ptr == is_ptr2,
+                    expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
+                    // allow null ptr <-> zero
+                    val.isZero() && !val2.isPoison() && val2.isZero());
+}
+
+expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
+                          set<expr> &undef) const {
+  unsigned bytes_per_byte = bits_byte / 8;
+
+  expr blk_size = src.blockSize();
+  expr ptr_offset = src.getShortOffset();
+  expr val_refines;
+
+  uint64_t bytes;
+  if (blk_size.isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
+    val_refines = true;
+    for (unsigned off = 0; off < bytes; off += bytes_per_byte) {
+      expr off_expr = expr::mkUInt(off, bits_for_offset);
+      val_refines
+        &= (ptr_offset == off_expr).implies(
+             blockValRefined(tgt.getMemory(), bid, false, off_expr, undef));
+    }
+  } else {
+    val_refines
+      = blockValRefined(tgt.getMemory(), bid, false, ptr_offset, undef);
+  }
+
+  assert(src.isWritable().eq(tgt.isWritable()));
+
+  expr alive = src.isBlockAlive();
+  return alive == tgt.isBlockAlive() &&
+         blk_size == tgt.blockSize() &&
+         src.getAllocType() == tgt.getAllocType() &&
+         state->simplifyWithAxioms(
+           src.blockAlignment().ule(tgt.blockAlignment())) &&
+         (alive && src.getOffsetSizet().ult(blk_size)).implies(val_refines);
+}
+
 tuple<expr, Pointer, set<expr>>
 Memory::refined(const Memory &other, bool skip_constants,
                 const vector<PtrInput> *set_ptrs) const {
@@ -1880,9 +1887,9 @@ Memory::refined(const Memory &other, bool skip_constants,
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
     Pointer p(*this, bid_expr, offset);
     Pointer q(other, p());
-    if ((p.isByval() && q.isByval()).isTrue())
+    if (p.isByval().isTrue() && q.isByval().isTrue())
       continue;
-    ret &= (ptr_bid == bid_expr).implies(p.blockRefined(q, undef_vars));
+    ret &= (ptr_bid == bid_expr).implies(blockRefined(p, q, bid, undef_vars));
   }
 
   // restrict refinement check to set of request blocks
