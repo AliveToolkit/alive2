@@ -244,9 +244,9 @@ class Memory {
   void store(const StateValue &val, const Type &type, unsigned offset,
              std::vector<std::pair<unsigned, smt::expr>> &data);
 
-  void storeLambda(const Pointer &p, const smt::expr &offset,
-                   const smt::expr &size, const smt::expr &val,
-                   const std::set<smt::expr> &undef);
+  void storeLambda(const Pointer &ptr, const smt::expr &offset,
+                   const smt::expr &bytes, const smt::expr &val,
+                   const std::set<smt::expr> &undef, unsigned align);
 
 public:
   enum BlockKind {
