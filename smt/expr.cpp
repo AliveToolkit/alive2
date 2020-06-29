@@ -1168,23 +1168,23 @@ expr expr::operator!=(const expr &rhs) const {
 }
 
 expr expr::operator&&(const expr &rhs) const {
-  C(rhs);
   if (eq(rhs) || isFalse() || rhs.isTrue())
     return *this;
   if (isTrue() || rhs.isFalse())
     return rhs;
 
+  C(rhs);
   Z3_ast args[] = { ast(), rhs() };
   return Z3_mk_and(ctx(), 2, args);
 }
 
 expr expr::operator||(const expr &rhs) const {
-  C(rhs);
   if (eq(rhs) || rhs.isFalse() || isTrue())
     return *this;
   if (rhs.isTrue() || isFalse())
     return rhs;
 
+  C(rhs);
   Z3_ast args[] = { ast(), rhs() };
   return Z3_mk_or(ctx(), 2, args);
 }

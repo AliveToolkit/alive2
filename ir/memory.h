@@ -221,11 +221,14 @@ class Memory {
 
   void mk_nonlocal_val_axioms(bool skip_consts);
 
-  enum loadType { LOAD_ANY, LOAD_INT, LOAD_PTR };
+  bool mayalias(bool local, unsigned bid, const smt::expr &offset,
+                unsigned bytes, unsigned align, bool write) const;
 
   template <typename Fn>
   void access(const Pointer &ptr, unsigned btyes, unsigned align, bool write,
               Fn &fn) const;
+
+  enum loadType { LOAD_ANY, LOAD_INT, LOAD_PTR };
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
                          std::set<smt::expr> &undef, unsigned align,

@@ -10,6 +10,9 @@
 #include <map>
 #include <string>
 
+// FIXME: REMOVE
+#include <iostream>
+
 using namespace IR;
 using namespace smt;
 using namespace std;
@@ -752,17 +755,6 @@ void Pointer::isDisjoint(const expr &len1, const Pointer &ptr2,
 }
 
 expr Pointer::isBlockAlive() const {
-  // If programs have no free(), we assume all blocks are always live.
-  // For non-local blocks, there's enough non-determinism through block size,
-  // that can be 0 or non-0
-  if (!has_free && !has_dead_allocas)
-    return true;
-
-  // globals are always live
-  static_assert(GLOBAL == 0);
-  if (getAllocType().isZero())
-    return true;
-
   // NULL block is dead
   if (has_null_block && getBid().isZero())
     return false;
@@ -773,19 +765,6 @@ expr Pointer::isBlockAlive() const {
 }
 
 expr Pointer::getAllocType() const {
-  // If programs have no malloc & free, we don't need to store this information
-  // since it is only used to check if free/delete is ok and
-  // for memory refinement of local malloc'ed blocks
-  if (!has_malloc && !has_free && !has_alloca)
-    return expr::mkUInt(GLOBAL, 2);
-
-  // if malloc is used, but no free, we can still ignore info for non-locals
-  if (!has_free) {
-    FunctionExpr non_local;
-    non_local.add(getShortBid(), expr::mkUInt(GLOBAL, 2));
-    return getValue("blk_kind", m.local_blk_kind, non_local, expr());
-
-  }
   return getValue("blk_kind", m.local_blk_kind, m.non_local_blk_kind,
                    expr::mkUInt(0, 2));
 }
@@ -955,6 +934,48 @@ unsigned Memory::numNonlocals() const {
   return state->isSource() ? num_nonlocals_src : num_nonlocals;
 }
 
+bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
+                      unsigned bytes, unsigned align, bool write) const {
+  if (local && bid0 >= next_local_bid)
+    return false;
+  if (!local && (bid0 >= (write ? num_nonlocals_src : numNonlocals()) ||
+                 bid0 < has_null_block + write * num_consts_src))
+    return false;
+
+  int64_t offset = 0;
+  bool const_offset = offset0.isInt(offset);
+
+  if (offset < 0)
+    return false;
+
+  assert(!isUndef(offset0));
+
+  expr bid = expr::mkUInt(bid0, bits_shortbid());
+  if (auto algn = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
+    uint64_t blk_align;
+    ENSURE(algn->isUInt(blk_align));
+    if (align > (1ull << blk_align) && (!observes_addresses() || const_offset))
+      return false;
+  }
+
+  if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
+    uint64_t blk_size;
+    if (sz->isUInt(blk_size)) {
+      if ((uint64_t)offset >= blk_size || bytes > (blk_size - offset))
+        return false;
+    }
+  }
+
+  // globals are always live
+  if (local || (bid0 >= num_globals_src && bid0 < num_nonlocals_src)) {
+    if ((local ? local_block_liveness : non_local_block_liveness)
+          .extract(bid0, bid0).isZero())
+      return false;
+  }
+
+  return true;
+}
+
 template <typename Fn>
 void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
                     bool write, Fn &fn) const {
@@ -965,13 +986,27 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   access_nonlocal.resize(write ? num_nonlocals_src : numNonlocals());
 
   auto is_deref = [&](bool local, unsigned bid, const expr &offset) -> bool {
+// FIXME: DEBUGGING...
+bool old = Pointer(*this, bid, local, offset).isDereferenceable(bytes, align, write);
+bool n = mayalias(local, bid, offset, bytes, align, write);
+if (old != n && offset.isValid()) {
+cout << "old: " << old<< " LOCAL: " << local << " BID=" <<bid << endl;
+cout << "BYTES=" << bytes << endl;
+  assert(0);
+}
     return !(local ? access_local : access_nonlocal)[bid] &&
-      Pointer(*this, bid, local, offset).isDereferenceable(bytes, align, write);
+           mayalias(local, bid, offset, bytes, align, write);
   };
 
   // collect over-approximation of possible touched bids
   for (auto &ptr_val : expr::allLeafs(ptr())) {
     Pointer q(*this, expr(ptr_val));
+
+    if (has_readnone && q.isReadnone().isTrue())
+      continue;
+    if (has_readonly && write && q.isReadonly().isTrue())
+      continue;
+
     auto is_local = q.isLocal();
     auto shortbid = q.getShortBid();
     expr offset = q.getOffset();
@@ -1037,6 +1072,9 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
 vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
                           unsigned align, bool left2right,
                           loadType type) const {
+  if (bytes == 0)
+    return {};
+
   unsigned bytesz = (bits_byte / 8);
   unsigned loaded_bytes = bytes / bytesz;
   vector<DisjointExpr<expr>> loaded;
@@ -1094,6 +1132,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
         blk_size == bytes) {
       mem = expr::mkConstArray(offset, data[0].second);
       full_write = true;
+      blks[i].second.clear();
     }
 
     for (auto &[idx, val] : data) {
@@ -1124,6 +1163,8 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
     // optimization: full rewrite
     if (val_no_offset && bytes.eq(Pointer(*this, i, local).blockSize())) {
       mem = expr::mkIf(cond, expr::mkConstArray(offset, val), mem);
+      if (cond.isTrue())
+        blks[i].second.clear();
     } else {
       mem = expr::mkLambda({ offset }, expr::mkIf(cond && offset_cond, val,
                                                   mem.load(offset)));
