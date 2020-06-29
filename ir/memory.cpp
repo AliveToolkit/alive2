@@ -1043,17 +1043,21 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
 
   expr bid = ptr.getShortBid();
   for (unsigned i = 0, e = access_local.size(); i < e; ++i) {
-    if (access_local[i])
-      fn(const_cast<MemVal&>(local_block_val), i, true,
+    if (access_local[i]) {
+      auto &[mem, undef] = local_block_val[i];
+      fn(const_cast<expr&>(mem), const_cast<set<expr>&>(undef), i, true,
          (has_nonlocal ? is_local : true) &&
          (has_local == 1 ? true : bid == i));
+    }
   }
 
   for (unsigned i = 0, e = access_nonlocal.size(); i < e; ++i) {
-    if (access_nonlocal[i])
-      fn(const_cast<MemVal&>(non_local_block_val), i, false,
+    if (access_nonlocal[i]) {
+      auto &[mem, undef] = non_local_block_val[i];
+      fn(const_cast<expr&>(mem), const_cast<set<expr>&>(undef), i, false,
          (has_local ? !is_local : true) &&
          (has_nonlocal == 1 ? true : bid == i));
+    }
   }
 }
 
@@ -1071,13 +1075,14 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
 
-  auto fn = [&](MemVal &blks, unsigned bid, bool local, const expr &cond) {
+  auto fn = [&](expr &mem, set<expr> &mem_undef, unsigned bid, bool local,
+                expr &&cond) {
     // TODO: optimize using loaded type to produce poison
     for (unsigned i = 0; i < loaded_bytes; ++i) {
-      unsigned idx = (left2right ? i : (loaded_bytes - i - 1)) * bytesz;
-      expr off = offset + expr::mkUInt(idx >> zero_bits_offset(), off_bits);
-      loaded[i].add(blks[bid].first.load(off), cond);
-      undef.insert(blks[bid].second.begin(), blks[bid].second.end());
+      unsigned idx = left2right ? i : (loaded_bytes - i - 1);
+      expr off = offset + expr::mkUInt(idx, off_bits);
+      loaded[i].add(mem.load(off), move(cond));
+      undef.insert(mem_undef.begin(), mem_undef.end());
     }
   };
 
@@ -1109,18 +1114,19 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
 
-  auto fn = [&](MemVal &blks, unsigned i, bool local, const expr &cond) {
-    auto mem = blks[i].first;
+  auto fn = [&](expr &mem0, set<expr> &mem_undef, unsigned bid, bool local,
+                expr &&cond) {
+    auto mem = mem0;
 
     uint64_t blk_size;
     bool full_write = false;
     // optimization: if fully rewriting the block, don't bother with the old
     // contents. Pick a value as the default one.
-    if (Pointer(*this, i, local).blockSize().isUInt(blk_size) &&
+    if (Pointer(*this, bid, local).blockSize().isUInt(blk_size) &&
         blk_size == bytes) {
       mem = expr::mkConstArray(offset, data[0].second);
       full_write = true;
-      blks[i].second.clear();
+      mem_undef.clear();
     }
 
     for (auto &[idx, val] : data) {
@@ -1129,8 +1135,8 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
       expr off = offset + expr::mkUInt(idx >> zero_bits_offset(), off_bits);
       mem = mem.store(off, val);
     }
-    blks[i].first = expr::mkIf(cond, mem, blks[i].first);
-    blks[i].second.insert(undef.begin(), undef.end());
+    mem0 = expr::mkIf(cond, mem, mem0);
+    mem_undef.insert(undef.begin(), undef.end());
   };
 
   access(ptr, bytes, align, !state->isInitializationPhase(), fn);
@@ -1146,18 +1152,18 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
 
   bool val_no_offset = !val.vars().count(offset);
 
-  auto fn = [&](MemVal &blks, unsigned i, bool local, const expr &cond) {
-    auto &mem = blks[i].first;
+  auto fn = [&](expr &mem, set<expr> &mem_undef, unsigned bid, bool local,
+                expr &&cond) {
     // optimization: full rewrite
-    if (val_no_offset && bytes.eq(Pointer(*this, i, local).blockSize())) {
+    if (val_no_offset && bytes.eq(Pointer(*this, bid, local).blockSize())) {
       mem = expr::mkIf(cond, expr::mkConstArray(offset, val), mem);
       if (cond.isTrue())
-        blks[i].second.clear();
+        mem_undef.clear();
     } else {
       mem = expr::mkLambda({ offset }, expr::mkIf(cond && offset_cond, val,
                                                   mem.load(offset)));
     }
-    blks[i].second.insert(undef.begin(), undef.end());
+    mem_undef.insert(undef.begin(), undef.end());
   };
 
   uint64_t size = bits_byte / 8;
@@ -1804,6 +1810,25 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     auto val = load(ptr_src, undef, bytesz);
     storeLambda(dst, offset, bytesize, val(), undef, align_dst);
   }
+}
+
+void Memory::copy(const Pointer &src, const Pointer &dst) {
+  auto local = dst.isLocal();
+  assert(local.isConst());
+  uint64_t bid;
+  ENSURE(dst.getShortBid().isUInt(bid));
+  auto &p = (local.isTrue() ? local_block_val : non_local_block_val)[bid];
+  auto &undef = p.second;
+  undef.clear();
+
+  DisjointExpr val(expr::mkUInt(0, Byte::bitsByte()));
+  auto fn = [&](expr &mem, set<expr> &mem_undef, unsigned bid, bool local,
+                expr &&cond) {
+    val.add(mem, move(cond));
+    undef.insert(mem_undef.begin(), mem_undef.end());
+  };
+  access(src, bits_byte/8, bits_byte/8, false, fn);
+  p.first = *val();
 }
 
 expr Memory::ptr2int(const expr &ptr) const {

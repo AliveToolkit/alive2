@@ -335,6 +335,9 @@ public:
               const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
               bool move);
 
+  // full copy of memory blocks
+  void copy(const Pointer &src, const Pointer &dst);
+
   smt::expr ptr2int(const smt::expr &ptr) const;
   smt::expr int2ptr(const smt::expr &val) const;
 
