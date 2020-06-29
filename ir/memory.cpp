@@ -1070,7 +1070,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   unsigned bytesz = (bits_byte / 8);
   unsigned loaded_bytes = bytes / bytesz;
   vector<DisjointExpr<expr>> loaded;
-  loaded.resize(loaded_bytes, expr::mkUInt(0, Byte::bitsByte()));
+  loaded.resize(loaded_bytes, Byte::mkPoisonByte(*this)());
 
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
@@ -1821,7 +1821,9 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   auto &undef = p.second;
   undef.clear();
 
-  DisjointExpr val(expr::mkUInt(0, Byte::bitsByte()));
+  auto offset = expr::mkUInt(0, Pointer::bitsShortOffset());
+  DisjointExpr val(expr::mkConstArray(offset, Byte::mkPoisonByte(*this)()));
+
   auto fn = [&](expr &mem, set<expr> &mem_undef, unsigned bid, bool local,
                 expr &&cond) {
     val.add(mem, move(cond));
