@@ -29,9 +29,7 @@ static bool observes_addresses() {
 
 static unsigned zero_bits_offset() {
   assert(is_power2(bits_byte));
-  // If an address is observed, bits_bytes is not necessarily related with
-  // offsets.
-  return observes_addresses() ? 0 : ilog2(bits_byte / 8);
+  return ilog2(bits_byte / 8);
 }
 
 static bool byte_has_ptr_bit() {
