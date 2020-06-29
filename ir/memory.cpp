@@ -1826,7 +1826,6 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
   if (mem1.eq(mem2))
     return true;
 
-  set<expr> undef_vars;
   Byte val(*this, mem1.load(offset));
   Byte val2(other, mem2.load(offset));
 
