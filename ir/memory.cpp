@@ -10,9 +10,6 @@
 #include <map>
 #include <string>
 
-// FIXME: REMOVE
-#include <iostream>
-
 using namespace IR;
 using namespace smt;
 using namespace std;
@@ -964,7 +961,8 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
       if ((uint64_t)offset >= blk_size || bytes > (blk_size - offset))
         return false;
     }
-  }
+  } else if (local) // allocated in another branch
+    return false;
 
   // globals are always live
   if (local || (bid0 >= num_globals_src && bid0 < num_nonlocals_src)) {
@@ -986,14 +984,6 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   access_nonlocal.resize(write ? num_nonlocals_src : numNonlocals());
 
   auto is_deref = [&](bool local, unsigned bid, const expr &offset) -> bool {
-// FIXME: DEBUGGING...
-bool old = Pointer(*this, bid, local, offset).isDereferenceable(bytes, align, write);
-bool n = mayalias(local, bid, offset, bytes, align, write);
-if (old != n && offset.isValid()) {
-cout << "old: " << old<< " LOCAL: " << local << " BID=" <<bid << endl;
-cout << "BYTES=" << bytes << endl;
-  assert(0);
-}
     return !(local ? access_local : access_nonlocal)[bid] &&
            mayalias(local, bid, offset, bytes, align, write);
   };
