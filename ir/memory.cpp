@@ -1104,8 +1104,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   return ret;
 }
 
-
- void Memory::store(const Pointer &ptr,
+void Memory::store(const Pointer &ptr,
                    const vector<pair<unsigned, expr>> &data,
                    const set<expr> &undef, unsigned align) {
   if (data.empty())
@@ -1781,7 +1780,7 @@ Memory::load(const expr &p, const Type &type, unsigned align) const {
 }
 
 Byte Memory::load(const Pointer &p, set<expr> &undef, unsigned align) const {
-  return load(p, bits_byte / 8, undef, align)[0];
+  return move(load(p, bits_byte / 8, undef, align)[0]);
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
@@ -1837,7 +1836,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     vector<pair<unsigned, expr>> to_store;
     set<expr> undef;
     unsigned i = 0;
-    for (auto byte : load(src, n, undef, align_src)) {
+    for (auto &byte : load(src, n, undef, align_src)) {
       to_store.emplace_back(i++ * bytesz, byte());
     }
     store(dst, to_store, undef, align_dst);
