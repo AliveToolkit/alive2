@@ -1414,7 +1414,7 @@ Memory::mkFnRet(const char *name,
   expr var
     = expr::mkFreshVar(name, expr::mkUInt(0, bits_bid + bits_for_offset));
   auto p_bid = var.extract(bits_bid + bits_for_offset - 1, bits_for_offset);
-  if (!has_local)
+  if (!has_local && ptr_has_local_bit())
     p_bid = expr::mkUInt(0, 1).concat(p_bid);
   Pointer p(*this, p_bid, var.extract(bits_for_offset-1, 0));
   auto bid = p.getShortBid();
