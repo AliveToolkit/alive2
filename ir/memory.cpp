@@ -21,6 +21,7 @@ static unsigned next_nonlocal_bid;
 static unsigned next_ptr_input;
 static unsigned next_nonlocal_ptr;
 static map<expr, unsigned> max_nonlocal_bid;
+static map<expr, vector<bool>> local_bid_alias;
 
 static bool observes_addresses() {
   return IR::has_ptr2int || IR::has_int2ptr;
@@ -1020,11 +1021,21 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
           max_bid = I->second + 1;
       }
 
+      vector<bool> *alias_bids = nullptr;
+      if (local) {
+        auto I = local_bid_alias.find(shortbid);
+        if (I != local_bid_alias.end())
+          alias_bids = &I->second;
+      }
+
       unsigned i = 0;
       if (!local)
         i = has_null_block + write * num_consts_src;
 
       for (unsigned e = min(access->size(), max_bid); i < e; ++i) {
+        if (alias_bids && !(*alias_bids)[i])
+          continue;
+
         if (is_deref(local, i, offset))
           (*access)[i] = true;
       }
@@ -1377,13 +1388,24 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
 pair<expr,expr>
 Memory::mkFnRet(const char *name,
                 const vector<PtrInput> &ptr_inputs) const {
-  set<expr> local;
   bool has_local = false;
+  auto escaped = escaped_local_blks;
+
   for (auto &in : ptr_inputs) {
     // TODO: callee cannot observe the bid if this is byval.
     Pointer inp(*this, in.val.value);
-    if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse())
+    if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse()) {
+      uint64_t bid;
+      if (inp.getShortBid().isUInt(bid)) {
+        escaped[bid] = true;
+      } else {
+        // may alias anything
+        escaped.clear();
+        escaped.resize(numLocals(), true);
+        break;
+      }
       has_local = true;
+    }
   }
   for (unsigned i = 0; !has_local && i < numLocals(); ++i) {
     has_local = escaped_local_blks[i];
@@ -1398,15 +1420,25 @@ Memory::mkFnRet(const char *name,
   Pointer p(*this, p_bid, var.extract(bits_for_offset-1, 0));
   auto bid = p.getShortBid();
 
+  set<expr> local;
   if (has_local) {
-    for (auto &in : ptr_inputs) {
-      Pointer inp(*this, in.val.value);
-      if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse())
-        local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
+    // alias everything
+    if (find(escaped_local_blks.begin(), escaped_local_blks.end(), false)
+          == escaped_local_blks.end()) {
+      local.emplace(bid.ule(numLocals() - 1));
     }
-    for (unsigned i = 0; i < numLocals(); ++i) {
-      if (escaped_local_blks[i])
-        local.emplace(bid == i);
+    else {
+      for (auto &in : ptr_inputs) {
+        Pointer inp(*this, in.val.value);
+        if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse())
+          local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
+      }
+      for (unsigned i = 0; i < numLocals(); ++i) {
+        if (escaped_local_blks[i])
+          local.emplace(bid == i);
+      }
+
+      local_bid_alias.emplace(bid, move(escaped));
     }
   }
 
@@ -2047,6 +2079,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
 
 void Memory::resetState() {
   max_nonlocal_bid.clear();
+  local_bid_alias.clear();
 }
 
 bool Memory::operator<(const Memory &rhs) const {
