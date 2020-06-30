@@ -1134,7 +1134,8 @@ void Memory::store(const Pointer &ptr,
         blk_size == bytes) {
       mem = expr::mkConstArray(offset, data[0].second);
       full_write = true;
-      mem_undef.clear();
+      if (cond.isTrue())
+        mem_undef.clear();
     }
 
     for (auto &[idx, val] : data) {
