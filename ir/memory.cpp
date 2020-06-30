@@ -1090,7 +1090,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
     for (unsigned i = 0; i < loaded_bytes; ++i) {
       unsigned idx = left2right ? i : (loaded_bytes - i - 1);
       expr off = offset + expr::mkUInt(idx, off_bits);
-      loaded[i].add(mem.load(off), move(cond));
+      loaded[i].add(mem.load(off), cond);
       undef.insert(mem_undef.begin(), mem_undef.end());
     }
   };
