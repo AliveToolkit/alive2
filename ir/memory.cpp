@@ -1853,6 +1853,14 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
 
 void Memory::copy(const Pointer &src, const Pointer &dst) {
   auto local = dst.isLocal();
+  if (!local.isValid()) {
+    local_block_val.clear();
+    non_local_block_val.clear();
+    local_block_val.resize(numLocals());
+    non_local_block_val.resize(numNonlocals());
+    return;
+  }
+
   assert(local.isConst());
   uint64_t bid;
   ENSURE(dst.getShortBid().isUInt(bid));
