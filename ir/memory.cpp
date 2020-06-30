@@ -1895,7 +1895,7 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
                              const expr &offset, set<expr> &undef) const {
   assert(!local);
   auto &[mem1, undef1] = non_local_block_val[bid];
-  auto &[mem2, undef2] = other.non_local_block_val[bid];
+  auto &mem2 = other.non_local_block_val[bid].first;
 
   if (mem1.eq(mem2))
     return true;
@@ -1907,7 +1907,6 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
     return true;
 
   undef.insert(undef1.begin(), undef1.end());
-  undef.insert(undef2.begin(), undef2.end());
 
   // refinement if offset had non-ptr value
   expr np1 = val.nonptrNonpoison();
