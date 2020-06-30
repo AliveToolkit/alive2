@@ -1957,7 +1957,8 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
     }
   } else {
     val_refines
-      = blockValRefined(tgt.getMemory(), bid, false, ptr_offset, undef);
+      = src.getOffsetSizet().ult(blk_size).implies(
+          blockValRefined(tgt.getMemory(), bid, false, ptr_offset, undef));
   }
 
   assert(src.isWritable().eq(tgt.isWritable()));
@@ -1968,7 +1969,7 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
          src.getAllocType() == tgt.getAllocType() &&
          state->simplifyWithAxioms(
            src.blockAlignment().ule(tgt.blockAlignment())) &&
-         (alive && src.getOffsetSizet().ult(blk_size)).implies(val_refines);
+         alive.implies(val_refines);
 }
 
 tuple<expr, Pointer, set<expr>>
