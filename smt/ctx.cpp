@@ -3,7 +3,23 @@
 
 #include "smt/ctx.h"
 #include "smt/smt.h"
+#include <cstdlib>
+#include <iostream>
+#include <string_view>
 #include <z3.h>
+
+using namespace std;
+
+static void z3_error_handler(Z3_context ctx, Z3_error_code err) {
+  string_view str = Z3_get_error_msg(ctx, err);
+
+  // harmless timeout
+  if (str == "canceled")
+    return;
+
+  cerr << "Severe Z3 error: " << str << " [code=" << err << "]\n";
+  exit(-1);
+}
 
 namespace smt {
 
@@ -19,6 +35,7 @@ void context::init() {
   // They generate incorrect formulas when quantifiers are involved
   Z3_global_param_set("rewriter.hi_fp_unspecified", "true");
   ctx = Z3_mk_context_rc(nullptr);
+  Z3_set_error_handler(ctx, z3_error_handler);
 }
 
 void context::destroy() {

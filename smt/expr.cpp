@@ -1626,7 +1626,9 @@ expr expr::mkLambda(const set<expr> &vars, const expr &val) {
 
 expr expr::simplify() const {
   C();
-  return Z3_simplify(ctx(), ast());
+  auto e = Z3_simplify(ctx(), ast());
+  // Z3_simplify returns null on timeout
+  return e ? e : *this;
 }
 
 expr expr::subst(const vector<pair<expr, expr>> &repls) const {
