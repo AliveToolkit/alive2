@@ -1368,6 +1368,12 @@ expr expr::concat(const expr &rhs) const {
     if (rhs.isConcat(b, c) && b.isExtract(d, h2, l2) && l == h2+1 && a.eq(d))
       return a.extract(h, l2).concat(c);
   }
+
+  // (concat (concat x extract) extract)
+  if (isConcat(a, b) && b.isExtract(c, h, l) && rhs.isExtract(d, h2, l2) &&
+      l == h2+1 && c.eq(d))
+    return a.concat(c.extract(h, l2));
+
   return binop_fold(rhs, Z3_mk_concat);
 }
 
