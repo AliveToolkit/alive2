@@ -1168,23 +1168,23 @@ expr expr::operator!=(const expr &rhs) const {
 }
 
 expr expr::operator&&(const expr &rhs) const {
-  C(rhs);
   if (eq(rhs) || isFalse() || rhs.isTrue())
     return *this;
   if (isTrue() || rhs.isFalse())
     return rhs;
 
+  C(rhs);
   Z3_ast args[] = { ast(), rhs() };
   return Z3_mk_and(ctx(), 2, args);
 }
 
 expr expr::operator||(const expr &rhs) const {
-  C(rhs);
   if (eq(rhs) || rhs.isFalse() || isTrue())
     return *this;
   if (rhs.isTrue() || isFalse())
     return rhs;
 
+  C(rhs);
   Z3_ast args[] = { ast(), rhs() };
   return Z3_mk_or(ctx(), 2, args);
 }
@@ -1368,6 +1368,12 @@ expr expr::concat(const expr &rhs) const {
     if (rhs.isConcat(b, c) && b.isExtract(d, h2, l2) && l == h2+1 && a.eq(d))
       return a.extract(h, l2).concat(c);
   }
+
+  // (concat (concat x extract) extract)
+  if (isConcat(a, b) && b.isExtract(c, h, l) && rhs.isExtract(d, h2, l2) &&
+      l == h2+1 && c.eq(d))
+    return a.concat(c.extract(h, l2));
+
   return binop_fold(rhs, Z3_mk_concat);
 }
 
@@ -1620,7 +1626,9 @@ expr expr::mkLambda(const set<expr> &vars, const expr &val) {
 
 expr expr::simplify() const {
   C();
-  return Z3_simplify(ctx(), ast());
+  auto e = Z3_simplify(ctx(), ast());
+  // Z3_simplify returns null on timeout
+  return e ? e : *this;
 }
 
 expr expr::subst(const vector<pair<expr, expr>> &repls) const {

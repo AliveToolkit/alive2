@@ -222,22 +222,34 @@ multimap<Value*, Value*> Function::getUsers() const {
 }
 
 template <typename T>
-static bool removeUnused(T &data, const multimap<Value*, Value*> &users) {
+static bool removeUnused(T &data, const multimap<Value*, Value*> &users,
+                         const vector<string_view> &src_glbs) {
   bool changed = false;
   for (auto I = data.begin(); I != data.end(); ) {
     if (users.count(I->get())) {
       ++I;
-    } else {
-      I = data.erase(I);
-      changed = true;
+      continue;
     }
+
+    // don't delete glbs in target that are used in src
+    if (auto gv = dynamic_cast<GlobalVariable*>(I->get())) {
+      auto name = string_view(gv->getName()).substr(1);
+      if (find(src_glbs.begin(), src_glbs.end(), name) != src_glbs.end()) {
+        ++I;
+        continue;
+      }
+    }
+
+    I = data.erase(I);
+    changed = true;
   }
   return changed;
 }
 
-bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users) {
-  bool changed = removeUnused(aggregates, users);
-  changed |= removeUnused(constants, users);
+bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users,
+                                 const vector<string_view> &src_glbs) {
+  bool changed = removeUnused(aggregates, users, src_glbs);
+  changed |= removeUnused(constants, users, src_glbs);
   return changed;
 }
 

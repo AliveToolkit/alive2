@@ -2230,11 +2230,12 @@ void Malloc::print(std::ostream &os) const {
 }
 
 StateValue Malloc::toSMT(State &s) const {
+  auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
   unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p_new, allocated] = s.getMemory().alloc(sz, align, Memory::MALLOC,
-                                                np_size, nonnull);
+  auto [p_new, allocated]
+    = m.alloc(sz, align, Memory::MALLOC, np_size, nonnull);
 
   if (!ptr) {
     if (isNonNull) {
@@ -2246,20 +2247,12 @@ StateValue Malloc::toSMT(State &s) const {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
 
-    Pointer ptr(s.getMemory(), p);
-    expr p_sz = ptr.blockSize();
-    expr sz_zext = sz.zextOrTrunc(p_sz.bits());
-
-    expr memcpy_size = expr::mkIf(allocated,
-                                  p_sz.umin(sz_zext),
-                                  expr::mkUInt(0, p_sz.bits()));
-
-    s.getMemory().memcpy(p_new, p, memcpy_size, align, align, true);
+    m.copy(Pointer(m, p), Pointer(m, p_new.subst(allocated, true).simplify()));
 
     // 1) realloc(ptr, 0) always free the ptr.
     // 2) If allocation failed, we should not free previous ptr.
-    expr nullp = Pointer::mkNullPointer(s.getMemory())();
-    s.getMemory().free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
+    expr nullp = Pointer::mkNullPointer(m)();
+    m.free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
   }
   return { move(p_new), expr(np_size) };
 }
