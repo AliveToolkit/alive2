@@ -1866,9 +1866,10 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   }
 
   assert(local.isConst());
-  uint64_t bid;
-  ENSURE(dst.getShortBid().isUInt(bid));
-  auto &p = (local.isTrue() ? local_block_val : non_local_block_val)[bid];
+  bool dst_local = local.isTrue();
+  uint64_t dst_bid;
+  ENSURE(dst.getShortBid().isUInt(dst_bid));
+  auto &p = (dst_local ? local_block_val : non_local_block_val)[dst_bid];
   auto &undef = p.second;
   undef.clear();
 
@@ -1877,6 +1878,9 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
 
   auto fn = [&](expr &mem, set<expr> &mem_undef, unsigned bid, bool local,
                 expr &&cond) {
+    // we assume src != dst
+    if (local == dst_local && bid == dst_bid)
+      return;
     val.add(mem, move(cond));
     undef.insert(mem_undef.begin(), mem_undef.end());
   };
