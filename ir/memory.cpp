@@ -1053,15 +1053,17 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   bool has_both = has_local && has_nonlocal;
   bool is_singleton = has_local + has_nonlocal == 1;
   expr bid = has_both ? ptr.getBid() : ptr.getShortBid();
-  unsigned bits_bid = bits_shortbid();
   expr one = expr::mkUInt(1, 1);
 
   for (unsigned i = 0, e = access_local.size(); i < e; ++i) {
     if (access_local[i]) {
       auto &[mem, undef] = local_block_val[i];
-      auto n = expr::mkUInt(i, bits_bid);
+      auto n = expr::mkUInt(i, bits_shortbid());
       fn(const_cast<expr&>(mem), const_cast<set<expr>&>(undef), i, true,
-         is_singleton ? true : bid == (has_both ? one.concat(n) : n));
+         is_singleton ? true
+                      : (has_local == 1
+                           ? is_local
+                           : bid == (has_both ? one.concat(n) : n)));
     }
   }
 
@@ -1069,7 +1071,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
     if (access_nonlocal[i]) {
       auto &[mem, undef] = non_local_block_val[i];
       fn(const_cast<expr&>(mem), const_cast<set<expr>&>(undef), i, false,
-         is_singleton ? true : bid == i);
+         is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
     }
   }
 }
