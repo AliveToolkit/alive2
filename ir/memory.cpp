@@ -1309,11 +1309,11 @@ void Memory::mkAxioms(const Memory &other) const {
     auto addr = p1.getAddress();
     auto sz = p1.blockSize();
 
-    expr disj = addr != 0;
+    state->addAxiom(addr != 0);
 
     // Ensure block doesn't spill to local memory
     auto bit = bits_size_t - 1;
-    disj &= (addr + sz).extract(bit, bit) == 0;
+    expr disj = (addr + sz).extract(bit, bit) == 0;
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
