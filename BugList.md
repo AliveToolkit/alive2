@@ -102,7 +102,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 (https://bugs.llvm.org/show_bug.cgi?id=44543)
 
 10. DSE not checking decl of libcalls
-(https://github.com/llvm/llvm-project/commit/87407fc03c82d880cc42330a8e230e7a48174e3c)
+(https://github.com/llvm/llvm-project/commit/87407fc03c82d880cc42330a8e230e7a48174e3c
+& https://github.com/llvm/llvm-project/commit/7f903873b8a937acec2e2cc232e70cba53061352)
 
 11. [globalopt] optimization leaves store to a constant global
 (https://bugs.llvm.org/show_bug.cgi?id=43616)
