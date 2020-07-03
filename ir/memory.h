@@ -199,10 +199,27 @@ public:
 class Memory {
   State *state;
 
-  // bid -> (array: offset -> Byte, undef vars)
-  using MemVal = std::vector<std::pair<smt::expr, std::set<smt::expr>>>;
-  MemVal non_local_block_val;
-  MemVal local_block_val;
+  enum DataType { DATA_NONE = 0, DATA_INT = 1, DATA_PTR = 2,
+                  DATA_ANY = DATA_INT | DATA_PTR };
+
+  struct MemBlock {
+    smt::expr val; // array: short offset -> Byte
+    std::set<smt::expr> undef;
+    unsigned char type = DATA_ANY;
+
+    MemBlock() {}
+    MemBlock(smt::expr &&val) : val(std::move(val)) {}
+    MemBlock(smt::expr &&val, DataType type)
+      : val(std::move(val)), type(type) {}
+
+    bool operator<(const MemBlock &other) const {
+      return std::tie(val, undef, type) <
+             std::tie(other.val, other.undef, other.type);
+    }
+  };
+
+  std::vector<MemBlock> non_local_block_val;
+  std::vector<MemBlock> local_block_val;
 
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
@@ -228,14 +245,15 @@ class Memory {
   void access(const Pointer &ptr, unsigned btyes, unsigned align, bool write,
               Fn &fn) const;
 
-  enum loadType { LOAD_ANY, LOAD_INT, LOAD_PTR };
-
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
                          std::set<smt::expr> &undef, unsigned align,
                          bool left2right = true,
-                         loadType type = LOAD_ANY) const;
+                         DataType type = DATA_ANY) const;
   StateValue load(const Pointer &ptr, const Type &type,
                   std::set<smt::expr> &undef, unsigned align) const;
+
+  DataType data_type(const std::vector<std::pair<unsigned, smt::expr>> &data,
+                     bool full_store) const;
 
   void store(const Pointer &ptr,
              const std::vector<std::pair<unsigned, smt::expr>> &data,
