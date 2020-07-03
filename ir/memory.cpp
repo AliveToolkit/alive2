@@ -1210,8 +1210,8 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
         blk.type = stored_ty;
       }
     } else {
-      blk.val = expr::mkLambda({ offset }, expr::mkIf(cond && offset_cond, val,
-                                                      blk.val.load(offset)));
+      blk.val = expr::mkLambda(offset, expr::mkIf(cond && offset_cond, val,
+                                                  blk.val.load(offset)));
     }
     blk.type |= stored_ty;
     blk.undef.insert(undef.begin(), undef.end());
@@ -1530,23 +1530,9 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
         modifies |= ptr_in.val.non_poison && argp.getBid() == bid;
       }
 
-      if (modifies.isTrue())
-        continue;
-
       auto &new_val = st.non_local_block_val[bid - num_consts];
       auto &old_val = non_local_block_val[bid].val;
-
-      if (modifies.isFalse()) {
-        new_val = old_val;
-        continue;
-      }
-
-      expr offset
-        = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
-      new_val
-        = expr::mkLambda({ offset },
-                         expr::mkIf(modifies, new_val.load(offset),
-                                    old_val.load(offset)));
+      new_val = expr::mkIf(modifies, new_val, old_val);
     }
   }
 
