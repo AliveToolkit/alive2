@@ -579,6 +579,7 @@ static void calculateAndInitConstants(Transform &t) {
   does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
+  bool does_any_byte_access = false;
 
   // Mininum access size (in bytes)
   uint64_t min_access_size = 8;
@@ -635,15 +636,14 @@ static void calculateAndInitConstants(Transform &t) {
 
         update_min_vect_sz(i.getType());
 
-        if (auto *fc = dynamic_cast<const FnCall*>(&i)) {
+        if (dynamic_cast<const FnCall*>(&i))
           has_fncall |= true;
-          has_free   |= !fc->getAttributes().has(FnAttrs::NoFree);
-        }
 
         if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
           max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
           max_access_size = max(max_access_size, mi->getMaxAccessSize());
           cur_max_gep     = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
+          has_free       |= mi->canFree();
 
           auto info = mi->getByteAccessInfo();
           has_ptr_load         |= info.doesPtrLoad;
@@ -651,17 +651,16 @@ static void calculateAndInitConstants(Transform &t) {
           does_int_mem_access  |= info.hasIntByteAccess;
           does_mem_access      |= info.doesMemAccess();
           min_access_size       = gcd(min_access_size, info.byteSize);
+          if (info.doesMemAccess() && !info.hasIntByteAccess &&
+              !info.doesPtrLoad && !info.doesPtrStore)
+            does_any_byte_access = true;
 
           if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
             has_alloca = true;
             has_dead_allocas |= alloc->initDead();
-          }
-          else if (auto alloc = dynamic_cast<const Malloc*>(&i)) {
-            has_malloc  = true;
-            has_free   |= alloc->isRealloc();
           } else {
-            has_malloc |= dynamic_cast<const Calloc*>(&i) != nullptr;
-            has_free   |= dynamic_cast<const Free*>(&i) != nullptr;
+            has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
+                          dynamic_cast<const Calloc*>(&i) != nullptr;
           }
 
         } else if (isCast(ConversionOp::Int2Ptr, i) ||
@@ -680,6 +679,9 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   does_ptr_mem_access = has_ptr_load || does_ptr_store;
+  if (does_any_byte_access && !does_int_mem_access && !does_ptr_mem_access)
+    // Use int bytes only
+    does_int_mem_access = true;
 
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
