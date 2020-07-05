@@ -127,6 +127,8 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 17. X86InterleavedAccess introduces misaligned loads
 (https://bugs.llvm.org/show_bug.cgi?id=45957)
 
+18. load-store-vectorizer cannot assume that an offset calculated from add nuw is fine in general
+(https://bugs.llvm.org/show_bug.cgi?id=46591)
 
 ### Bugs found in Z3
 1. https://github.com/Z3Prover/z3/issues/2369 - bug in bitblast for FPA
