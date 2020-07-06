@@ -781,7 +781,7 @@ expr Pointer::refined(const Pointer &other) const {
   return expr::mkIf(isLocal(),
       (isBlockAlive() && isHeapAllocated()).implies(
           other.isBlockAlive() && local),
-      *this == other);
+      *this == other && isBlockAlive() == other.isBlockAlive());
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
@@ -811,7 +811,7 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
 
   return expr::mkIf(isLocal(),
       isBlockAlive().implies(other.isBlockAlive() && local),
-      *this == other);
+      *this == other && isBlockAlive() == other.isBlockAlive());
 }
 
 expr Pointer::isWritable() const {
