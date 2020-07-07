@@ -2773,6 +2773,23 @@ StateValue Memcmp::toSMT(State &s) const {
   expr zero = expr::mkUInt(0, 32);
   auto &vn = vnum;
 
+  expr result_var, result_var_neg;
+  if (is_bcmp) {
+    result_var = expr::mkFreshVar("bcmp_nonzero", zero);
+    s.addPre(result_var != zero);
+    s.addQuantVar(result_var);
+  } else {
+    auto z31 = expr::mkUInt(0, 31);
+    result_var = expr::mkFreshVar("memcmp_nonzero", z31);
+    s.addPre(result_var != z31);
+    s.addQuantVar(result_var);
+    result_var = expr::mkUInt(0, 1).concat(result_var);
+
+    result_var_neg = expr::mkFreshVar("memcmp", z31);
+    s.addQuantVar(result_var_neg);
+    result_var_neg = expr::mkUInt(1, 1).concat(result_var_neg);
+  }
+
   auto ith_exec =
       [&, this](unsigned i, bool is_last) -> tuple<expr, expr, AndExpr, expr> {
     auto [val1, ub1] = s.getMemory().load((p1 + i)(), IntType("i8", 8), 1);
@@ -2784,16 +2801,10 @@ StateValue Memcmp::toSMT(State &s) const {
 
     expr result_neq;
     if (is_bcmp) {
-      result_neq = expr::mkFreshVar("bcmp_nonzero", zero);
-      s.addQuantVar(result_neq);
-      s.addPre(result_neq != zero);
+      result_neq = result_var;
     } else {
-      expr var = expr::mkFreshVar("memcmp", expr::mkUInt(0, 31));
-      s.addQuantVar(var);
       auto pos = val1.value.uge(val2.value);
-      s.addPre(pos.implies(var != 0));
-      result_neq = expr::mkIf(pos, expr::mkUInt(0, 1), expr::mkUInt(1, 1))
-                     .concat(var);
+      result_neq = expr::mkIf(pos, result_var, result_var_neg);
     }
 
     auto val_eq = val1.value == val2.value;
