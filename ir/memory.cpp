@@ -778,10 +778,8 @@ expr Pointer::refined(const Pointer &other) const {
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  return expr::mkIf(isLocal(),
-      (isBlockAlive() && isHeapAllocated()).implies(
-          other.isBlockAlive() && local),
-      *this == other && isBlockAlive() == other.isBlockAlive());
+  return expr::mkIf(isLocal(), isHeapAllocated().implies(local), *this == other)
+      && isBlockAlive().implies(other.isBlockAlive());
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
@@ -809,9 +807,8 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   // TODO: this induces an infinite loop
   // block_refined(other);
 
-  return expr::mkIf(isLocal(),
-      isBlockAlive().implies(other.isBlockAlive() && local),
-      *this == other && isBlockAlive() == other.isBlockAlive());
+  return expr::mkIf(isLocal(), local, *this == other)
+      && isBlockAlive().implies(other.isBlockAlive());
 }
 
 expr Pointer::isWritable() const {
