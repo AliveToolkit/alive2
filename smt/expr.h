@@ -192,8 +192,6 @@ public:
 
   expr abs() const;
 
-  expr isNegative() const;
-
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

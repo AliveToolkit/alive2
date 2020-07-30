@@ -860,12 +860,8 @@ expr expr::smax(const expr &rhs) const {
 
 expr expr::abs() const {
   C();
-  return mkIf(isNegative(), mkInt(0, *this) - *this, *this);
-}
-
-expr expr::isNegative() const {
-  C();
-  return this->slt(mkInt(0, *this));
+  auto s = sort();
+  return mkIf(sge(mkUInt(0, s)), *this, mkInt(-1, s) * *this);
 }
 
 expr expr::isNaN() const {

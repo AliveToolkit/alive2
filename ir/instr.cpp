@@ -593,14 +593,13 @@ StateValue BinOp::toSMT(State &s) const {
       default:
         UNREACHABLE();
       }
-      return {std::move(v), ap && bp};
+      return { move(v), ap && bp };
     };
     break;
 
   case Abs:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      auto AbsA = a.abs();
-      return {expr(AbsA), ap && (b == 0 || !AbsA.isNegative())};
+      return { a.abs(), ap && bp && (b == 0 || a != expr::IntSMin(a.bits())) };
     };
     break;
   }
