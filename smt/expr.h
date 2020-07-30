@@ -190,6 +190,10 @@ public:
   expr smin(const expr &rhs) const;
   expr smax(const expr &rhs) const;
 
+  expr abs() const;
+
+  expr isNegative() const;
+
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

@@ -1,0 +1,20 @@
+Name: t0
+%is_neg = icmp slt i8 %a, 0
+%neg_a = sub i8 0, %a
+%t = select i1 %is_neg, i8 %neg_a, i8 %a
+  =>
+%t = abs i8 %a, i1 0
+
+Name: t1
+%is_neg = icmp slt i8 %a, 0
+%neg_a = sub nsw i8 0, %a
+%t = select i1 %is_neg, i8 %neg_a, i8 %a
+  =>
+%t = abs i8 %a, i1 0
+
+Name: t2
+%is_neg = icmp slt i8 %a, 0
+%neg_a = sub nsw i8 0, %a
+%t = select i1 %is_neg, i8 %neg_a, i8 %a
+  =>
+%t = abs i8 %a, i1 1

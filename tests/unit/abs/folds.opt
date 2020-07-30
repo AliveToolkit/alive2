@@ -1,0 +1,11 @@
+Name: t0
+%t0 = abs i8 %a, i1 0
+%r = abs i8 %t0, i1 0
+  =>
+%r = %t0
+
+Name: t0
+%t0 = abs i8 %a, i1 1
+%r = sadd_sat i8 %t0, i8 127
+  =>
+%r = 127

@@ -1,0 +1,24 @@
+Name: t0
+%t = abs i8 0, i1 0
+  =>
+%t = i8 0
+
+Name: t1
+%t = abs i8 127, i1 0
+  =>
+%t = i8 127
+
+Name: t2
+%t = abs i8 -128, i1 0
+  =>
+%t = i8 -128
+
+Name: t3
+%t = abs i8 -128, i1 1
+  =>
+%t = i8 undef
+
+Name: t4
+%t = abs i8 -64, i1 0
+  =>
+%t = i8 64

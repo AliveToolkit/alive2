@@ -167,6 +167,11 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case USub_Overflow:
   case SMul_Overflow:
   case UMul_Overflow:
+  case UMin:
+  case UMax:
+  case SMin:
+  case SMax:
+  case Abs:
     assert(flags == None);
     assert(fmath.isNone());
     break;
@@ -217,6 +222,13 @@ void BinOp::print(ostream &os) const {
   case FRem:          str = "frem "; break;
   case FMax:          str = "fmax "; break;
   case FMin:          str = "fmin "; break;
+  case UMin:          str = "umin "; break;
+  case UMax:          str = "umax "; break;
+  case SMin:          str = "smin "; break;
+  case SMax:          str = "smax "; break;
+  case Abs:
+    str = "abs ";
+    break;
   }
 
   os << getName() << " = " << str;
@@ -558,6 +570,39 @@ StateValue BinOp::toSMT(State &s) const {
       return fm_poison(s, a, b, v, fmath, false);
     };
     break;
+
+  case UMin:
+  case UMax:
+  case SMin:
+  case SMax:
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      expr v;
+      switch (op) {
+      case UMin:
+        v = a.umin(b);
+        break;
+      case UMax:
+        v = a.umax(b);
+        break;
+      case SMin:
+        v = a.smin(b);
+        break;
+      case SMax:
+        v = a.smax(b);
+        break;
+      default:
+        UNREACHABLE();
+      }
+      return {std::move(v), ap && bp};
+    };
+    break;
+
+  case Abs:
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      auto AbsA = a.abs();
+      return {expr(AbsA), ap && (b == 0 || !AbsA.isNegative())};
+    };
+    break;
   }
 
   function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
@@ -655,6 +700,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     break;
   case Cttz:
   case Ctlz:
+  case Abs:
     instrconstr = getType().enforceIntOrVectorType() &&
                   getType() == lhs->getType() &&
                   rhs->getType().enforceIntType(1);

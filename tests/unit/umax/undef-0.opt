@@ -1,0 +1,6 @@
+Name: t0
+%t = umax i8 %a, i8 %b
+  =>
+%t = undef
+
+; ERROR: Value mismatch for i8 %t
