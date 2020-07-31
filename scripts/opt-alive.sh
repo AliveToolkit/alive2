@@ -7,9 +7,9 @@ set -e
 # place-safepoints: places new function calls (@do_safepoint)
 # loop-extract: extracts a top-level loop into a distinct function
 # extract-blocks: extract specified blocks into a distinct function
-# attributor, functionattrs: inter procedural pass that deduces and/or propagates attributes
+# attributor, function-attrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
-PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor functionattrs metarenamer lowertypetests extract-blocks openmpopt prune-eh -Os -Oz -O1 -O2 -O3"
+PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer lowertypetests extract-blocks openmpopt prune-eh -Os -Oz -O1 -O2 -O3"
 PASSES_SIMPLIFYLIB="-instcombine"
 
 TV="-tv"
