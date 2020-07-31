@@ -775,16 +775,16 @@ end:
     case llvm::Intrinsic::lifetime_start:
     {
       PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
-          i.getOperand(1), DL())))
+      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
+          i.getOperand(1))))
         return error(i);
       RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
     }
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::GetUnderlyingObject(
-          i.getOperand(1), DL())))
+      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
+          i.getOperand(1))))
         return error(i);
       RETURN_IDENTIFIER(make_unique<Free>(*b, false));
     }
