@@ -907,8 +907,8 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 static vector<expr> extract_possible_local_bids(Memory &m, const expr &ptr) {
   vector<expr> ret;
   expr zero = expr::mkUInt(0, bits_for_offset);
-  for (auto ptr_val : expr::allLeafs(ptr)) {
-    for (auto bid : expr::allLeafs(Pointer(m, move(ptr_val)).getBid())) {
+  for (auto &ptr_val : allExprLeafs(ptr)) {
+    for (auto &bid : allExprLeafs(Pointer(m, ptr_val).getBid())) {
       Pointer ptr(m, bid, zero);
       if (!ptr.isLocal().isFalse())
         ret.emplace_back(ptr.getShortBid());
@@ -983,7 +983,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   };
 
   // collect over-approximation of possible touched bids
-  for (auto &ptr_val : expr::allLeafs(ptr())) {
+  for (auto &ptr_val : allExprLeafs(ptr())) {
     Pointer q(*this, expr(ptr_val));
 
     if (has_readnone && q.isReadnone().isTrue())

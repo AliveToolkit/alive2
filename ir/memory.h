@@ -236,6 +236,9 @@ class Memory {
   std::vector<unsigned> byval_blks;
   std::vector<bool> escaped_local_blks;
 
+  unsigned numLocals() const;
+  unsigned numNonlocals() const;
+
   void mk_nonlocal_val_axioms(bool skip_consts);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
@@ -368,9 +371,6 @@ public:
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
   void escapeLocalPtr(const smt::expr &ptr);
-
-  unsigned numLocals() const;
-  unsigned numNonlocals() const;
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);

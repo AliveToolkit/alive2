@@ -9,7 +9,6 @@
 #include <limits>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
@@ -1720,27 +1719,6 @@ set<expr> expr::vars(const vector<const expr*> &exprs) {
   return result;
 }
 
-vector<expr> expr::allLeafs(const expr &e) {
-  vector<expr> ret;
-  vector<expr> worklist = { e };
-  unordered_set<Z3_ast> seen;
-  do {
-    expr v = worklist.back();
-    worklist.pop_back();
-    if (!seen.insert(v.isValid() ? v() : nullptr).second)
-      continue;
-
-    expr cond, then, els;
-    if (v.isIf(cond, then, els)) {
-      worklist.emplace_back(move(then));
-      worklist.emplace_back(move(els));
-    } else {
-      ret.emplace_back(move(v));
-    }
-  } while (!worklist.empty());
-  return ret;
-}
-
 void expr::printUnsigned(ostream &os) const {
   os << numeral_string();
 }
@@ -1790,6 +1768,31 @@ unsigned expr::id() const {
 
 unsigned expr::hash() const {
   return Z3_get_ast_hash(ctx(), ast());
+}
+
+
+ExprLeafIterator::ExprLeafIterator(const expr &init)
+  : worklist({init}), end(false) {
+  ++*this;
+}
+
+void ExprLeafIterator::operator++(void) {
+  assert(!end);
+  while (!worklist.empty()) {
+    val = move(worklist.back());
+    worklist.pop_back();
+    if (!val.isValid() || !seen.insert(val()).second)
+      continue;
+
+    expr cond, then, els;
+    if (val.isIf(cond, then, els)) {
+      worklist.emplace_back(move(then));
+      worklist.emplace_back(move(els));
+    } else {
+      return;
+    }
+  }
+  end = true;
 }
 
 }

@@ -7,6 +7,7 @@
 #include <ostream>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -309,9 +310,6 @@ public:
   std::set<expr> vars() const;
   static std::set<expr> vars(const std::vector<const expr*> &exprs);
 
-  // returns set of all possible leaf expressions (best-effort simplification)
-  static std::vector<expr> allLeafs(const expr &e);
-
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
@@ -334,7 +332,36 @@ public:
 
   friend class Solver;
   friend class Model;
+  friend class ExprLeafIterator;
 };
+
+
+class ExprLeafIterator {
+  std::vector<expr> worklist;
+  std::unordered_set<Z3_ast> seen;
+  expr val;
+  bool end;
+  ExprLeafIterator() : end(true) {}
+  ExprLeafIterator(const expr &init);
+public:
+  const expr& operator*() const { return val; }
+  void operator++(void);
+  bool operator!=(ExprLeafIterator &rhs) const { return end != rhs.end; }
+  friend class ExprLeafIteratorHelper;
+};
+
+class ExprLeafIteratorHelper {
+  const expr &init;
+public:
+  ExprLeafIteratorHelper(const expr &init ) : init(init) {}
+  ExprLeafIterator begin() const { return { init }; }
+  ExprLeafIterator end() const   { return {}; }
+};
+
+// returns set of all possible leaf expressions (best-effort simplification)
+static inline ExprLeafIteratorHelper allExprLeafs(const expr &e) {
+  return { e };
+}
 
 
 #define mkIf_fold(c, a, b) \
