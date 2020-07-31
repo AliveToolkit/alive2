@@ -738,8 +738,7 @@ static void calculateAndInitConstants(Transform &t) {
   little_endian = t.src.isLittleEndian();
 
   if (config::debug)
-    config::dbg() << "num_max_nonlocals_inst: " << num_max_nonlocals_inst
-                  << "\nnum_locals_src: " << num_locals_src
+    config::dbg() << "\nnum_locals_src: " << num_locals_src
                   << "\nnum_locals_tgt: " << num_locals_tgt
                   << "\nnum_nonlocals_src: " << num_nonlocals_src
                   << "\nnum_nonlocals: " << num_nonlocals
