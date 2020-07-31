@@ -1620,6 +1620,14 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
 
 expr expr::mkLambda(const expr &var, const expr &val) {
   C2(var, val);
+
+  if (!val.vars().count(var))
+    return val;
+
+  expr array, idx;
+  if (val.isLoad(array, idx) && idx.eq(var))
+    return array;
+
   auto ast = (Z3_app)var();
   return Z3_mk_lambda_const(ctx(), 1, &ast, val());
 }
