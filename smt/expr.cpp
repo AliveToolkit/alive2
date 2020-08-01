@@ -1621,7 +1621,7 @@ expr expr::mkLambda(const expr &var, const expr &val) {
   C2(var, val);
 
   if (!val.vars().count(var))
-    return val;
+    return mkConstArray(var, val);
 
   expr array, idx;
   if (val.isLoad(array, idx) && idx.eq(var))
