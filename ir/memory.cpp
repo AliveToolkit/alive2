@@ -332,8 +332,20 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
                    b.nonptrValue() == 0);
       non_poison &= !b.isPoison(false);
     }
-    return { expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)()),
-             move(non_poison) };
+
+    // if bits of loaded ptr are a subset of the non-ptr value,
+    // we know they must be zero otherwise the value is poison.
+    // Therefore we obtain a null pointer for free.
+    expr _, value;
+    unsigned low, high, low2, high2;
+    if (loaded_ptr.isExtract(_, high, low) &&
+        bytes[0].nonptrValue().isExtract(_, high2, low2) &&
+        high2 >= high && low2 <= low) {
+      value = move(loaded_ptr);
+    } else {
+      value = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
+    }
+    return { move(value), move(non_poison) };
 
   } else {
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
@@ -874,6 +886,10 @@ expr Pointer::isNonZero() const {
   return !isNull();
 }
 
+bool Pointer::operator<(const Pointer &rhs) const {
+  return p < rhs.p;
+}
+
 ostream& operator<<(ostream &os, const Pointer &p) {
   if (p.isNull().isTrue())
     return os << "null";
@@ -900,15 +916,23 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
-static vector<expr> extract_possible_local_bids(Memory &m, const expr &ptr) {
-  vector<expr> ret;
-  expr zero = expr::mkUInt(0, bits_for_offset);
+static set<Pointer> all_leaf_ptrs(Memory &m, const expr &ptr) {
+  set<Pointer> ptrs;
   for (auto &ptr_val : allExprLeafs(ptr)) {
-    for (auto &bid : allExprLeafs(Pointer(m, ptr_val).getBid())) {
-      Pointer ptr(m, bid, zero);
-      if (!ptr.isLocal().isFalse())
-        ret.emplace_back(ptr.getShortBid());
+    Pointer p(m, ptr_val);
+    auto offset = p.getOffset();
+    for (auto &bid : allExprLeafs(p.getBid())) {
+      ptrs.emplace(m, bid, offset);
     }
+  }
+  return ptrs;
+}
+
+static vector<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
+  vector<expr> ret;
+  for (auto &ptr : all_leaf_ptrs(m, eptr)) {
+    if (!ptr.isLocal().isFalse())
+      ret.emplace_back(ptr.getShortBid());
   }
   return ret;
 }
@@ -983,9 +1007,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
   };
 
   // collect over-approximation of possible touched bids
-  for (auto &ptr_val : allExprLeafs(ptr())) {
-    Pointer q(*this, expr(ptr_val));
-
+  for (auto &q : all_leaf_ptrs(*this, ptr())) {
     if (has_readnone && q.isReadnone().isTrue())
       continue;
     if (has_readonly && write && q.isReadonly().isTrue())
@@ -1812,16 +1834,25 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
                           is_ptr ? DATA_PTR : DATA_INT);
   auto val = bytesToValue(*this, loadedBytes, type);
 
+  // partial order reduction for fresh pointers
+  // can alias [0, next_ptr++] U extra_tgt_consts
   if (is_ptr && !val.non_poison.isFalse()) {
-    Pointer p(*this, val.value);
-    auto islocal = p.isLocal();
-    if (!islocal.isTrue()) {
+    optional<unsigned> max_bid;
+    for (auto &p : all_leaf_ptrs(*this, val.value)) {
+      auto islocal = p.isLocal();
       auto bid = p.getShortBid();
-      auto [I, inserted] = max_nonlocal_bid.try_emplace(bid, 0);
-      if (inserted) {
-        unsigned max_bid = nextNonlocalPtr();
-        I->second = max_bid;
-        state->addAxiom(islocal || bid.ule(max_bid));
+      if (!islocal.isTrue() && !bid.isConst()) {
+        auto bid = p.getShortBid();
+        auto [I, inserted] = max_nonlocal_bid.try_emplace(bid, 0);
+        if (inserted) {
+          if (!max_bid)
+            max_bid = nextNonlocalPtr();
+          // TODO: need a OR constraint for alias sets
+          I->second = num_extra_nonconst_tgt ? numNonlocals() : *max_bid;
+          state->addAxiom(islocal || bid.ule(*max_bid) ||
+                          (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
+                                                  : false));
+        }
       }
     }
   }

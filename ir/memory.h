@@ -193,6 +193,9 @@ public:
   smt::expr isNull() const;
   smt::expr isNonZero() const;
 
+  // for container use only
+  bool operator<(const Pointer &rhs) const;
+
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
 
