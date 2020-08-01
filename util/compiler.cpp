@@ -6,6 +6,8 @@
 # include <intrin.h>
 #endif
 
+using namespace std;
+
 namespace util {
 
 unsigned ilog2(uint64_t n) {
@@ -81,6 +83,13 @@ uint64_t gcd(uint64_t n, uint64_t m) {
   else if (m == 0) return n;
   else if (n % m == 0) return m;
   return gcd(m, n % m);
+}
+
+void merge_bool_vects(vector<bool> &tgt, const vector<bool> &src) {
+  for (unsigned i = 0, e = tgt.size(); i != e; ++i) {
+    if (src[i])
+      tgt[i] = true;
+  }
 }
 
 }

@@ -540,7 +540,7 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
-  unsigned num_ptrinputs = 0;
+  num_ptrinputs = 0;
   for (auto &arg : t.src.getInputs()) {
     num_ptrinputs += num_ptrs(arg.getType());
   }
@@ -819,7 +819,6 @@ Errors TransformVerify::verify() const {
   StopWatch symexec_watch;
   calculateAndInitConstants(t);
   State::resetGlobals();
-  State::cleanup_state cleanup;
   State src_state(t.src, true), tgt_state(t.tgt, false);
 
   try {

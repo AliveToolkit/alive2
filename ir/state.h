@@ -191,10 +191,6 @@ public:
   void mkAxioms(State &tgt);
   smt::expr simplifyWithAxioms(smt::expr &&e) const;
 
-  struct cleanup_state {
-    ~cleanup_state() { Memory::resetState(); }
-  };
-
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);
 };
