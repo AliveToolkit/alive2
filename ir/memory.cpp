@@ -916,6 +916,88 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 }
 
 
+Memory::AliasSet::AliasSet(const Memory &m)
+  : local(m.numLocals(), false), non_local(m.numNonlocals(), false) {}
+
+size_t Memory::AliasSet::size(bool islocal) const {
+  return (islocal ? local : non_local).size();
+}
+
+bool Memory::AliasSet::isFullAlias(bool islocal) const {
+  auto &v = islocal ? local : non_local;
+  return find(v.begin(), v.end(), false) == v.end();
+}
+
+bool Memory::AliasSet::mayAlias(bool islocal, unsigned bid) const {
+  return (islocal ? local : non_local)[bid];
+}
+
+unsigned Memory::AliasSet::numMayAlias(bool islocal) const {
+  auto &v = islocal ? local : non_local;
+  return count(v.begin(), v.end(), true);
+}
+
+void Memory::AliasSet::setMayAlias(bool islocal, unsigned bid) {
+  (islocal ? local : non_local)[bid] = true;
+}
+
+void Memory::AliasSet::setFullAlias(bool islocal) {
+  auto &v = islocal ? local : non_local;
+  auto sz = v.size();
+  v.clear();
+  v.resize(sz, true);
+}
+
+void Memory::AliasSet::setMayAliasUpTo(bool local, unsigned limit) {
+  for (unsigned i = 0; i <= limit; ++i) {
+    setMayAlias(local, i);
+  }
+}
+
+void Memory::AliasSet::intersectWith(const AliasSet &other) {
+  auto intersect = [](auto &a, const auto &b) {
+    for (auto I = a.begin(), E = a.end(), I2 = b.begin(); I != E; ++I, ++I2) {
+      *I = *I && *I2;
+    }
+  };
+  intersect(local, other.local);
+  intersect(non_local, other.non_local);
+}
+
+void Memory::AliasSet::unionWith(const AliasSet &other) {
+  auto unionfn = [](auto &a, const auto &b) {
+    for (auto I = a.begin(), E = a.end(), I2 = b.begin(); I != E; ++I, ++I2) {
+      *I = *I || *I2;
+    }
+  };
+  unionfn(local, other.local);
+  unionfn(non_local, other.non_local);
+}
+
+bool Memory::AliasSet::operator<(const AliasSet &rhs) const {
+  return tie(local, non_local) < tie(rhs.local, rhs.non_local);
+}
+
+void Memory::AliasSet::print(ostream &os) const {
+  auto print = [&](const char *str, const auto &v) {
+    os << str;
+    for (auto bit : v) {
+      os << bit;
+    }
+  };
+
+  bool has_local = false;
+  if (numMayAlias(true) > 0) {
+    print("local: ", local);
+    has_local = true;
+  }
+  if (numMayAlias(false) > 0) {
+    if (has_local) os << " / ";
+    print("non-local: ", non_local);
+  }
+}
+
+
 static set<Pointer> all_leaf_ptrs(Memory &m, const expr &ptr) {
   set<Pointer> ptrs;
   for (auto &ptr_val : allExprLeafs(ptr)) {
@@ -997,87 +1079,78 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
                     bool write, Fn &fn) {
   assert(bytes % (bits_byte/8) == 0);
 
-  vector<bool> access_local, access_nonlocal;
-  access_local.resize(next_local_bid);
-  access_nonlocal.resize(write ? num_nonlocals_src : numNonlocals());
+  AliasSet aliasing(*this);
+  auto sz_local = aliasing.size(true);
+  auto sz_nonlocal = aliasing.size(false);
 
-  auto is_deref = [&](bool local, unsigned bid, const expr &offset) -> bool {
-    return !(local ? access_local : access_nonlocal)[bid] &&
-           mayalias(local, bid, offset, bytes, align, write);
+  auto check_alias = [&](AliasSet &alias, bool local, unsigned bid,
+                         const expr &offset) {
+    if (!alias.mayAlias(local, bid) &&
+        mayalias(local, bid, offset, bytes, align, write))
+      alias.setMayAlias(local, bid);
   };
 
   // collect over-approximation of possible touched bids
-  for (auto &q : all_leaf_ptrs(*this, ptr())) {
-    if (has_readnone && q.isReadnone().isTrue())
+  for (auto &p : all_leaf_ptrs(*this, ptr())) {
+    if (has_readnone && p.isReadnone().isTrue())
       continue;
-    if (has_readonly && write && q.isReadonly().isTrue())
+    if (has_readonly && write && p.isReadonly().isTrue())
       continue;
 
-    auto is_local = q.isLocal();
-    auto shortbid = q.getShortBid();
-    expr offset = q.getOffset();
+    AliasSet this_alias(*this);
+    auto is_local = p.isLocal();
+    auto shortbid = p.getShortBid();
+    expr offset = p.getOffset();
     uint64_t bid;
     if (shortbid.isUInt(bid)) {
-      if (!is_local.isFalse() && bid < access_local.size() &&
-          is_deref(true, bid, offset))
-        access_local[bid] = true;
-      if (!is_local.isTrue() && bid < access_nonlocal.size() &&
-          is_deref(false, bid, offset))
-        access_nonlocal[bid] = true;
-      continue;
+      if (!is_local.isFalse() && bid < sz_local)
+        check_alias(this_alias, true, bid, offset);
+      if (!is_local.isTrue() && bid < sz_nonlocal)
+        check_alias(this_alias, false, bid, offset);
+      goto end;
     }
 
-    for (auto [access, local]
-           : { make_pair(&access_local, true),
-               make_pair(&access_nonlocal, false) }) {
+    for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
         continue;
-
-      size_t max_bid = -1u;
-      if (!local) {
-        auto I = max_nonlocal_bid.find(shortbid);
-        if (I != max_nonlocal_bid.end())
-          max_bid = I->second + 1;
-      }
-
-      vector<bool> *alias_bids = nullptr;
-      if (local) {
-        auto I = local_bid_alias.find(shortbid);
-        if (I != local_bid_alias.end())
-          alias_bids = &I->second;
-      }
 
       unsigned i = 0;
       if (!local)
         i = has_null_block + write * num_consts_src;
 
-      for (unsigned e = min(access->size(), max_bid); i < e; ++i) {
-        if (alias_bids && !(*alias_bids)[i])
-          continue;
-
-        if (is_deref(local, i, offset))
-          (*access)[i] = true;
+      for (unsigned e = local ? sz_local : sz_nonlocal; i < e; ++i) {
+        check_alias(this_alias, local, i, offset);
       }
     }
+
+end:
+    // intersect computed aliasing with known aliasing
+    auto I = ptr_alias.find(ptr.getBid());
+    if (I != ptr_alias.end())
+      this_alias.intersectWith(I->second);
+    aliasing.unionWith(this_alias);
   }
 
-  unsigned has_local = 0, has_nonlocal = 0;
-  for (auto bit : access_local)
-    has_local += bit;
-  for (auto bit : access_nonlocal)
-    has_nonlocal += bit;
+  // intersect computed aliasing with known aliasing
+  auto [I, inserted] = ptr_alias.try_emplace(ptr.getBid(), move(aliasing));
+  auto &alias_info = I->second;
+  if (!inserted) {
+    alias_info.intersectWith(aliasing);
+  }
 
-  expr is_local = ptr.isLocal();
-
+  unsigned has_local = alias_info.numMayAlias(true);
+  unsigned has_nonlocal = alias_info.numMayAlias(false);
   bool has_both = has_local && has_nonlocal;
   bool is_singleton = has_local + has_nonlocal == 1;
+
+  expr is_local = ptr.isLocal();
   expr bid = has_both ? ptr.getBid() : ptr.getShortBid();
   expr one = expr::mkUInt(1, 1);
 
-  for (unsigned i = 0, e = access_local.size(); i < e; ++i) {
-    if (access_local[i]) {
+  for (unsigned i = 0; i < sz_local; ++i) {
+    if (alias_info.mayAlias(true, i)) {
       auto n = expr::mkUInt(i, bits_shortbid());
-      fn(const_cast<MemBlock&>(local_block_val[i]),i, true,
+      fn(local_block_val[i], i, true,
          is_singleton ? true
                       : (has_local == 1
                            ? is_local
@@ -1085,9 +1158,9 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
     }
   }
 
-  for (unsigned i = 0, e = access_nonlocal.size(); i < e; ++i) {
-    if (access_nonlocal[i]) {
-      fn(const_cast<MemBlock&>(non_local_block_val[i]), i, false,
+  for (unsigned i = 0; i < sz_nonlocal; ++i) {
+    if (alias_info.mayAlias(false, i)) {
+      fn(non_local_block_val[i], i, false,
          is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
     }
   }
@@ -1285,7 +1358,7 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
   }
 }
 
-Memory::Memory(State &state) : state(&state) {
+Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   if (memory_unused())
     return;
 
@@ -1316,8 +1389,6 @@ Memory::Memory(State &state) : state(&state) {
 
     // all local blocks are dead in the beginning
     local_block_liveness = expr::mkUInt(0, numLocals());
-
-    escaped_local_blks.resize(numLocals(), false);
   }
 
   // A memory space is separated into non-local area / local area.
@@ -1425,8 +1496,8 @@ void Memory::syncWithSrc(const Memory &src) {
   resetGlobals();
   // The bid of tgt global starts with num_nonlocals_src
   next_nonlocal_bid = num_nonlocals_src;
-  max_nonlocal_bid  = src.max_nonlocal_bid;
   next_nonlocal_ptr = src.next_nonlocal_ptr;
+  // TODO: copy alias info for fn return ptrs from src?
 }
 
 void Memory::markByVal(unsigned bid) {
@@ -1442,7 +1513,10 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
     state->addAxiom(p.isNonZero());
   state->addAxiom(bid.ule(max_bid));
 
-  max_nonlocal_bid.try_emplace(bid, max_bid);
+  AliasSet alias(*this);
+  alias.setMayAliasUpTo(false, max_bid);
+  ptr_alias.emplace(p.getBid(), move(alias));
+
   return p.release();
 }
 
@@ -1468,28 +1542,14 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
 
 pair<expr,expr>
 Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
-  bool has_local = false;
-  auto escaped = escaped_local_blks;
-
   for (auto &in : ptr_inputs) {
+    if (in.val.non_poison.isFalse())
+      continue;
+
     // TODO: callee cannot observe the bid if this is byval.
-    Pointer inp(*this, in.val.value);
-    if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse()) {
-      uint64_t bid;
-      if (inp.getShortBid().isUInt(bid)) {
-        escaped[bid] = true;
-      } else {
-        // may alias anything
-        escaped.clear();
-        escaped.resize(numLocals(), true);
-        break;
-      }
-      has_local = true;
-    }
+    escapeLocalPtr(in.val.value);
   }
-  for (unsigned i = 0; !has_local && i < numLocals(); ++i) {
-    has_local = escaped_local_blks[i];
-  }
+  bool has_local = escaped_local_blks.numMayAlias(true);
 
   unsigned bits_bid = has_local ? bits_for_bid : bits_shortbid();
   expr var
@@ -1502,30 +1562,23 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
 
   set<expr> local;
   if (has_local) {
-    // alias everything
-    if (find(escaped_local_blks.begin(), escaped_local_blks.end(), false)
-          == escaped_local_blks.end()) {
+    if (escaped_local_blks.isFullAlias(true)) {
       local.emplace(bid.ule(numLocals() - 1));
     }
     else {
-      for (auto &in : ptr_inputs) {
-        Pointer inp(*this, in.val.value);
-        if (!inp.isLocal().isFalse() && !in.val.non_poison.isFalse())
-          local.emplace(in.val.non_poison && p.getBid() == inp.getBid());
-      }
-      for (unsigned i = 0; i < numLocals(); ++i) {
-        if (escaped_local_blks[i])
+      for (unsigned i = 0, e = escaped_local_blks.size(true); i < e; ++i) {
+        if (escaped_local_blks.mayAlias(true, i))
           local.emplace(bid == i);
       }
-
-      local_bid_alias.emplace(bid, move(escaped));
     }
   }
 
-  unsigned max_bid = nextNonlocalPtr();
-  expr nonlocal = bid.ule(max_bid);
-  max_nonlocal_bid.emplace(bid, max_bid);
+  unsigned max_nonlocal_bid = nextNonlocalPtr();
+  auto alias = escaped_local_blks;
+  alias.setMayAliasUpTo(false, max_nonlocal_bid);
+  ptr_alias.emplace(p.getBid(), move(alias));
 
+  expr nonlocal = bid.ule(max_nonlocal_bid);
   state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
   return { p.release(), move(var) };
 }
@@ -1842,13 +1895,14 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
       auto islocal = p.isLocal();
       auto bid = p.getShortBid();
       if (!islocal.isTrue() && !bid.isConst()) {
-        auto bid = p.getShortBid();
-        auto [I, inserted] = max_nonlocal_bid.try_emplace(bid, 0);
+        auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
         if (inserted) {
           if (!max_bid)
             max_bid = nextNonlocalPtr();
-          // TODO: need a OR constraint for alias sets
-          I->second = num_extra_nonconst_tgt ? numNonlocals() : *max_bid;
+          I->second.setMayAliasUpTo(false, *max_bid);
+          for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
+            I->second.setMayAlias(false, i);
+          }
           state->addAxiom(islocal || bid.ule(*max_bid) ||
                           (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
                                                   : false));
@@ -2135,15 +2189,14 @@ void Memory::escapeLocalPtr(const expr &ptr) {
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
-      if (bid < numLocals())
-        escaped_local_blks[bid] = true;
+      if (bid < escaped_local_blks.size(true))
+        escaped_local_blks.setMayAlias(true, bid);
     } else if (is_initial_memblock(bid_expr)) {
       // initial non local block bytes don't contain local pointers.
       continue;
     } else {
       // may escape a local ptr, but we don't know which one
-      escaped_local_blks.clear();
-      escaped_local_blks.resize(numLocals(), true);
+      escaped_local_blks.setFullAlias(true);
       break;
     }
   }
@@ -2180,22 +2233,14 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.byval_blks.insert(ret.byval_blks.end(), els.byval_blks.begin(),
                         els.byval_blks.end());
-  for (unsigned i = 0, nlocals = then.numLocals(); i < nlocals; ++i) {
-    if (els.escaped_local_blks[i])
-      ret.escaped_local_blks[i] = true;
-  }
+  ret.escaped_local_blks.unionWith(els.escaped_local_blks);
 
-  for (const auto &[expr, vect] : els.local_bid_alias) {
-    auto [I, inserted] = ret.local_bid_alias.try_emplace(expr, vect);
+  for (const auto &[expr, alias] : els.ptr_alias) {
+    auto [I, inserted] = ret.ptr_alias.try_emplace(expr, alias);
     if (!inserted)
-      merge_bool_vects(I->second, vect);
+      I->second.unionWith(alias);
   }
 
-  for (const auto &[expr, bid] : els.max_nonlocal_bid) {
-    auto [I, inserted] = ret.max_nonlocal_bid.try_emplace(expr, bid);
-    if (!inserted && bid > I->second)
-      I->second = bid;
-  }
   ret.next_nonlocal_ptr = max(then.next_nonlocal_ptr, els.next_nonlocal_ptr);
   return ret;
 }
@@ -2210,14 +2255,14 @@ bool Memory::operator<(const Memory &rhs) const {
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_size, non_local_blk_align,
         non_local_blk_kind, byval_blks, escaped_local_blks,
-        local_bid_alias, max_nonlocal_bid, next_nonlocal_ptr) <
+        ptr_alias, next_nonlocal_ptr) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
-        rhs.local_bid_alias, rhs.max_nonlocal_bid, rhs.next_nonlocal_ptr);
+        rhs.ptr_alias, rhs.next_nonlocal_ptr);
 }
 
 #define P(name, expr) do {      \
@@ -2294,10 +2339,14 @@ ostream& operator<<(ostream &os, const Memory &m) {
   P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
   if (m.numLocals() > 0) {
     os << "ESCAPED LOCAL BLOCKS: ";
-    for (unsigned i = 0, nlocals = m.numLocals(); i < nlocals; ++i) {
-      os << m.escaped_local_blks[i];
-    }
+    m.escaped_local_blks.print(os);
     os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
+  }
+  os << "\nALIAS SETS:\n";
+  for (auto &[bid, alias] : m.ptr_alias) {
+    os << bid << ": ";
+    alias.print(os);
+    os << '\n';
   }
   return os;
 }

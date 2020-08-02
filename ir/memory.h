@@ -203,6 +203,30 @@ public:
 class Memory {
   State *state;
 
+  class AliasSet {
+    std::vector<bool> local, non_local;
+
+  public:
+    AliasSet(const Memory &m); // no alias
+    size_t size(bool local) const;
+
+    bool isFullAlias(bool local) const;
+    bool mayAlias(bool local, unsigned bid) const;
+    unsigned numMayAlias(bool local) const;
+
+    void setMayAlias(bool local, unsigned bid);
+    void setFullAlias(bool local);
+    void setMayAliasUpTo(bool local, unsigned limit); // [0, limit]
+
+    void intersectWith(const AliasSet &other);
+    void unionWith(const AliasSet &other);
+
+    // for container use only
+    bool operator<(const AliasSet &rhs) const;
+
+    void print(std::ostream &os) const;
+  };
+
   enum DataType { DATA_NONE = 0, DATA_INT = 1, DATA_PTR = 2,
                   DATA_ANY = DATA_INT | DATA_PTR };
 
@@ -238,11 +262,9 @@ class Memory {
   smt::FunctionExpr non_local_blk_kind;
 
   std::vector<unsigned> byval_blks;
-  std::vector<bool> escaped_local_blks;
+  AliasSet escaped_local_blks;
 
-  std::map<smt::expr, std::vector<bool>> local_bid_alias;
-
-  std::map<smt::expr, unsigned> max_nonlocal_bid;
+  std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
   unsigned next_nonlocal_ptr;
   unsigned nextNonlocalPtr();
 
@@ -388,7 +410,7 @@ public:
   bool operator<(const Memory &rhs) const;
 
   void print(std::ostream &os, const smt::Model &m) const;
-  friend std::ostream &operator<<(std::ostream &os, const Memory &m);
+  friend std::ostream& operator<<(std::ostream &os, const Memory &m);
 
   friend class Pointer;
 };

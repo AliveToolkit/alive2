@@ -5,7 +5,6 @@
 
 #include <cassert>
 #include <cstdint>
-#include <vector>
 
 #ifdef _MSC_VER
 # define UNREACHABLE() __assume(0)
@@ -58,5 +57,4 @@ uint64_t divide_up(uint64_t n, uint64_t amount); // division with ceiling
 uint64_t round_up(uint64_t n, uint64_t amount);
 uint64_t gcd(uint64_t a, uint64_t b);
 
-void merge_bool_vects(std::vector<bool> &tgt, const std::vector<bool> &src);
 }

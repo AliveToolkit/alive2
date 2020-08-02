@@ -85,11 +85,4 @@ uint64_t gcd(uint64_t n, uint64_t m) {
   return gcd(m, n % m);
 }
 
-void merge_bool_vects(vector<bool> &tgt, const vector<bool> &src) {
-  for (unsigned i = 0, e = tgt.size(); i != e; ++i) {
-    if (src[i])
-      tgt[i] = true;
-  }
-}
-
 }
