@@ -215,7 +215,6 @@ class Memory {
     unsigned numMayAlias(bool local) const;
 
     void setMayAlias(bool local, unsigned bid);
-    void setFullAlias(bool local);
     void setMayAliasUpTo(bool local, unsigned limit); // [0, limit]
 
     void intersectWith(const AliasSet &other);

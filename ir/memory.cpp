@@ -941,13 +941,6 @@ void Memory::AliasSet::setMayAlias(bool islocal, unsigned bid) {
   (islocal ? local : non_local)[bid] = true;
 }
 
-void Memory::AliasSet::setFullAlias(bool islocal) {
-  auto &v = islocal ? local : non_local;
-  auto sz = v.size();
-  v.clear();
-  v.resize(sz, true);
-}
-
 void Memory::AliasSet::setMayAliasUpTo(bool local, unsigned limit) {
   for (unsigned i = 0; i <= limit; ++i) {
     setMayAlias(local, i);
@@ -956,7 +949,8 @@ void Memory::AliasSet::setMayAliasUpTo(bool local, unsigned limit) {
 
 void Memory::AliasSet::intersectWith(const AliasSet &other) {
   auto intersect = [](auto &a, const auto &b) {
-    for (auto I = a.begin(), E = a.end(), I2 = b.begin(); I != E; ++I, ++I2) {
+    auto I2 = b.begin();
+    for (auto I = a.begin(), E = a.end(); I != E; ++I, ++I2) {
       *I = *I && *I2;
     }
   };
@@ -966,7 +960,8 @@ void Memory::AliasSet::intersectWith(const AliasSet &other) {
 
 void Memory::AliasSet::unionWith(const AliasSet &other) {
   auto unionfn = [](auto &a, const auto &b) {
-    for (auto I = a.begin(), E = a.end(), I2 = b.begin(); I != E; ++I, ++I2) {
+    auto I2 = b.begin();
+    for (auto I = a.begin(), E = a.end(); I != E; ++I, ++I2) {
       *I = *I || *I2;
     }
   };
@@ -1167,8 +1162,7 @@ end:
 }
 
 vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
-                          unsigned align, bool left2right,
-                          DataType type) {
+                          unsigned align, bool left2right, DataType type) {
   if (bytes == 0)
     return {};
 
@@ -1233,12 +1227,11 @@ void Memory::store(const Pointer &ptr,
   if (data.empty())
     return;
 
-  if (next_local_bid > 0) {
-    for (auto &[offset, val] : data) {
-      Byte byte(*this, expr(val));
-      if (byte.isPtr().isTrue())
-        escapeLocalPtr(byte.ptrValue());
-    }
+  for (auto &[offset, val] : data) {
+    Byte byte(*this, expr(val));
+    // TODO: check impact of !byte.isPtr().isFalse()
+    if (byte.isPtr().isTrue())
+      escapeLocalPtr(byte.ptrValue());
   }
 
   unsigned bytes = data.size() * (bits_byte/8);
@@ -2186,17 +2179,20 @@ expr Memory::checkNocapture() const {
 }
 
 void Memory::escapeLocalPtr(const expr &ptr) {
+  if (next_local_bid == 0)
+    return;
+
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
-      if (bid < escaped_local_blks.size(true))
+      if (bid < next_local_bid)
         escaped_local_blks.setMayAlias(true, bid);
     } else if (is_initial_memblock(bid_expr)) {
       // initial non local block bytes don't contain local pointers.
       continue;
     } else {
       // may escape a local ptr, but we don't know which one
-      escaped_local_blks.setFullAlias(true);
+      escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
       break;
     }
   }
