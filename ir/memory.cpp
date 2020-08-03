@@ -1288,8 +1288,10 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
 
   auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
     // optimization: full rewrite
-    if (val_no_offset && bytes.eq(Pointer(*this, bid, local).blockSize())) {
-      blk.val = expr::mkIf(cond, expr::mkConstArray(offset, val), blk.val);
+    if (bytes.eq(Pointer(*this, bid, local).blockSize())) {
+      blk.val = val_no_offset
+        ? expr::mkIf(cond, expr::mkConstArray(offset, val), blk.val)
+        : expr::mkLambda(offset, expr::mkIf(cond, val, blk.val.load(offset)));
       if (cond.isTrue()) {
         blk.undef.clear();
         blk.type = stored_ty;
