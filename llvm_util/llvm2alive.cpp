@@ -1054,7 +1054,7 @@ end:
 
       for (auto &bb : f) {
         auto n = bb_num(&bb);
-        for (const auto &dst : llvm::successors(&bb)) {
+        for (auto *dst : llvm::successors(&bb)) {
           auto n_dst = bb_num(dst);
           edges[n].emplace(n_dst);
         }
