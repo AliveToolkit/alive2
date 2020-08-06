@@ -1424,6 +1424,13 @@ bool hasSubByte(const Type &t) {
 
 uint64_t getCommonAccessSize(const IR::Type &ty) {
   if (auto agg = ty.getAsAggregateType()) {
+    // non-pointer vectors are store/loaded all at once
+    if (agg->isVectorType()) {
+      auto &elemTy = agg->getChild(0);
+      if (!elemTy.isPtrType())
+        return divide_up(agg->numElementsConst() * elemTy.bits(), 8);
+    }
+
     uint64_t sz = 1;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       auto n = getCommonAccessSize(agg->getChild(i));
