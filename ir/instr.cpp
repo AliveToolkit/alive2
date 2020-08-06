@@ -650,6 +650,7 @@ StateValue BinOp::toSMT(State &s) const {
         auto ai = retty->extract(a, i);
         const StateValue *bi;
         switch (op) {
+        case Abs:
         case Cttz:
         case Ctlz:
           bi = &b;
