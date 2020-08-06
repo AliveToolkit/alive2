@@ -987,7 +987,34 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
   return to_remove;
 }
 
+static void remove_unreachable_bbs(Function &f) {
+  vector<BasicBlock*> wl = { &f.getFirstBB() };
+  set<BasicBlock*> reachable;
+
+  do {
+    auto bb = wl.back();
+    wl.pop_back();
+    if (!reachable.emplace(bb).second)
+      continue;
+
+    if (auto instr = dynamic_cast<JumpInstr*>(&bb->back())) {
+      for (auto &target : instr->targets()) {
+        wl.emplace_back(const_cast<BasicBlock*>(&target));
+      }
+    }
+  } while (!wl.empty());
+
+  auto all_bbs = f.getBBs(); // copy intended
+  for (auto bb : all_bbs) {
+    if (!reachable.count(bb))
+      f.removeBB(*bb);
+  }
+}
+
 void Transform::preprocess() {
+  remove_unreachable_bbs(src);
+  remove_unreachable_bbs(tgt);
+
   // remove store of initializers to global variables that aren't needed to
   // verify the transformation
   // We only remove inits if it's possible to remove from both programs to keep
