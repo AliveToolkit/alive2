@@ -690,7 +690,6 @@ static void calculateAndInitConstants(Transform &t) {
   };
   // The number of bits needed to encode pointer attributes
   // nonnull and byval isn't encoded in ptr attribute bits
-  bool has_byval = has_attr(ParamAttrs::ByVal);
   has_nocapture = has_attr(ParamAttrs::NoCapture);
   has_readonly = has_attr(ParamAttrs::ReadOnly);
   has_readnone = has_attr(ParamAttrs::ReadNone);
@@ -727,8 +726,6 @@ static void calculateAndInitConstants(Transform &t) {
       }
     }
   }
-  if (has_byval)
-    min_access_size = 1;
   bits_byte = 8 * ((does_mem_access || num_globals != 0)
                      ? (unsigned)min_access_size : 1);
 

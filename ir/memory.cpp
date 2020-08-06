@@ -1547,11 +1547,8 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
 pair<expr,expr>
 Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   for (auto &in : ptr_inputs) {
-    if (in.val.non_poison.isFalse())
-      continue;
-
-    // TODO: callee cannot observe the bid if this is byval.
-    escapeLocalPtr(in.val.value);
+    if (!in.byval && !in.nocapture && !in.val.non_poison.isFalse())
+      escapeLocalPtr(in.val.value);
   }
   bool has_local = escaped_local_blks.numMayAlias(true);
 
@@ -1619,9 +1616,9 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     for (unsigned bid = num_consts; bid < num_nonlocals_src; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
-        // TODO: byval's value cannot be modified.
-        Pointer argp(*this, ptr_in.val.value);
-        modifies |= ptr_in.val.non_poison && argp.getBid() == bid;
+        if (!ptr_in.byval) {
+          modifies |= Pointer(*this, ptr_in.val.value).getBid() == bid;
+        }
       }
 
       auto &new_val = st.non_local_block_val[bid - num_consts];
@@ -1635,16 +1632,16 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = has_null_block ? one : zero;
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-      expr ok_arg = true;
+      expr may_free = true;
       if (ptr_inputs) {
+        may_free = false;
         for (auto &ptr_in : *ptr_inputs) {
-          // TODO: liveness of a pointer given as byval doesn't change
-          ok_arg &= !ptr_in.val.non_poison ||
-                    Pointer(*this, ptr_in.val.value).getBid() != bid;
+          if (!ptr_in.byval)
+            may_free |= Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
       expr heap = Pointer(*this, bid, false).isHeapAllocated();
-      mask = mask | expr::mkIf(heap && ok_arg,
+      mask = mask | expr::mkIf(heap && may_free,
                                zero,
                                one << expr::mkUInt(bid, num_nonlocals));
     }
