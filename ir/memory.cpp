@@ -923,9 +923,18 @@ size_t Memory::AliasSet::size(bool islocal) const {
   return (islocal ? local : non_local).size();
 }
 
-bool Memory::AliasSet::isFullAlias(bool islocal) const {
+int Memory::AliasSet::isFullUpToAlias(bool islocal) const {
   auto &v = islocal ? local : non_local;
-  return find(v.begin(), v.end(), false) == v.end();
+  unsigned i = 0;
+  for (unsigned e = v.size(); i != e; ++i) {
+    if (!v[i])
+      break;
+  }
+  for (unsigned i2 = i, e = v.size(); i2 != e; ++i2) {
+    if (v[i])
+      return -1;
+  }
+  return i - 1;
 }
 
 bool Memory::AliasSet::mayAlias(bool islocal, unsigned bid) const {
@@ -1557,8 +1566,9 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
 
   set<expr> local;
   if (has_local) {
-    if (escaped_local_blks.isFullAlias(true)) {
-      local.emplace(bid.ule(numLocals() - 1));
+    int upto = escaped_local_blks.isFullUpToAlias(true);
+    if (upto >= 0) {
+      local.emplace(bid.ule(upto));
     }
     else {
       for (unsigned i = 0, e = escaped_local_blks.size(true); i < e; ++i) {

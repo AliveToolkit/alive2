@@ -210,7 +210,7 @@ class Memory {
     AliasSet(const Memory &m); // no alias
     size_t size(bool local) const;
 
-    bool isFullAlias(bool local) const;
+    int isFullUpToAlias(bool local) const; // >= 0 if up to
     bool mayAlias(bool local, unsigned bid) const;
     unsigned numMayAlias(bool local) const;
 
