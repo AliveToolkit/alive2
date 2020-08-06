@@ -6,6 +6,7 @@ import lit.util
 from .base import TestFormat
 import os, re, signal, string, subprocess
 
+ok_string = 'Transformation seems to be correct!'
 
 def executeCommand(command):
   p = subprocess.Popen(command,
@@ -28,6 +29,12 @@ def executeCommand(command):
   except:
     err = str(err)
   return out, err, exitCode
+
+
+def id_check(fn, cmd, args):
+  out, err, exitCode = executeCommand(cmd + args)
+  if exitCode != 0 or (out + err).find(ok_string) < 0:
+    raise Exception(fn + ' identity check fail: ' + out + err)
 
 
 def readFile(path):
@@ -58,7 +65,6 @@ class Alive2Test(TestFormat):
 
   def execute(self, test, litConfig):
     test = test.getSourcePath()
-    ok_string = 'Transformation seems to be correct!'
 
     alive_tv_1 = test.endswith('.srctgt.ll')
     if alive_tv_1:
@@ -82,23 +88,21 @@ class Alive2Test(TestFormat):
     if m != None:
       cmd += m.group(1).split()
 
+    # Run identity check first
+    if alive_tv_1:
+      try:
+        id_check('src', cmd, [test, '-src-fn=src', '-tgt-fn=src'])
+        id_check('tgt', cmd, [test, '-src-fn=tgt', '-tgt-fn=tgt'])
+      except Exception as e:
+        return lit.Test.FAIL, e
+
     if alive_tv_2:
-       # Run identity check first
-       srcpath = test
-       invalid_expr = 'Invalid expr'
-       resultchk = lambda msg, exitCode: \
-           (exitCode == 0 and msg.find(ok_string) != -1) or \
-           (exitCode != 0 and msg.find(invalid_expr) != -1)
-
-       out, err, exitCode = executeCommand(cmd + [srcpath, srcpath])
-       if not resultchk(out + err, exitCode):
-         return lit.Test.FAIL, 'src identity check fail: ' + out + err
-
-       tgtpath = test.replace('.src.ll', '.tgt.ll')
-       out, err, exitCode = executeCommand(cmd + [tgtpath, tgtpath])
-       if not resultchk(out + err, exitCode):
-         return lit.Test.FAIL, 'tgt identity check fail: ' + out + err
-
+      try:
+        id_check('src', cmd, [test, test])
+        tgtpath = test.replace('.src.ll', '.tgt.ll')
+        id_check('tgt', cmd, [tgtpath, tgtpath])
+      except Exception as e:
+        return lit.Test.FAIL, e
 
     cmd.append(test)
     if alive_tv_2:
