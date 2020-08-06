@@ -211,6 +211,7 @@ void State::addUB(AndExpr &&ubs) {
 }
 
 void State::addNoReturn() {
+  return_memory.add(memory, domain.path);
   function_domain.add(domain());
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
