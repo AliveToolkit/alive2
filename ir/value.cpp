@@ -192,8 +192,10 @@ StateValue Input::toSMT(State &s) const {
 
   bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
   bool has_nonnull = hasAttribute(ParamAttrs::NonNull);
+  bool has_noundef = hasAttribute(ParamAttrs::NoUndef);
 
-  if (!config::disable_undef_input && !has_deref) {
+  bool never_undef = config::disable_undef_input || has_deref || has_noundef;
+  if (!never_undef) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
     for (auto &v : vars) {
       s.addUndefVar(move(v));
@@ -214,9 +216,10 @@ StateValue Input::toSMT(State &s) const {
 
   expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;
+  bool never_poison = config::disable_poison_input || has_deref || has_noundef;
 
   return { move(val),
-           config::disable_poison_input || has_deref
+             never_poison
              ? move(non_poison)
              : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
 }

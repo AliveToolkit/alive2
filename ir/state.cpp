@@ -229,6 +229,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
   bool writes_memory = !attrs.has(FnAttrs::NoWrite);
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
+  bool noundef = attrs.has(FnAttrs::NoUndef);
 
   bool all_valid = true;
   for (auto &v : inputs) {
@@ -257,10 +258,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   auto mk_val = [&](const Type &t, const string &name) {
     if (t.isPtrType())
-      return memory.mkFnRet(name.c_str(), I->first.args_ptr);
+      return memory.mkFnRet(name.c_str(), I->first.args_ptr).first;
 
-    auto v = expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
-    return make_pair(v, v);
+    return expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
   };
 
   if (inserted) {
@@ -268,8 +268,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     string valname = name + "#val";
     string npname = name + "#np";
     for (auto t : out_types) {
-      values.emplace_back(mk_val(*t, valname).first,
-                          expr::mkFreshVar(npname.c_str(), false));
+      expr np = noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false);
+      values.emplace_back(mk_val(*t, valname), move(np));
     }
 
     string ub_name = name + "#ub";

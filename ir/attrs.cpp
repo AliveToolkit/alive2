@@ -19,6 +19,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "readnone ";
   if (attr.has(ParamAttrs::Dereferenceable))
     os << "dereferenceable(" << attr.derefBytes << ") ";
+  if (attr.has(ParamAttrs::NoUndef))
+    os << "noundef ";
   return os;
 }
 
@@ -40,6 +42,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " nonnull";
   if (attr.has(FnAttrs::NoFree))
     os << " nofree";
+  if (attr.has(FnAttrs::NoUndef))
+    os << " noundef";
   return os;
 }
 
