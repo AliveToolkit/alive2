@@ -1473,7 +1473,7 @@ strip_undef(State &s, const Value &val, const expr &e) {
   return { e, e == s[val].value };
 }
 
-static void unpack_inputs(State&s, Value *argv, Type &ty,
+static void unpack_inputs(State &s, Value *argv, Type &ty,
                           const ParamAttrs &argflag,
                           const StateValue &value, vector<StateValue> &inputs,
                           vector<Memory::PtrInput> &ptr_inputs) {
