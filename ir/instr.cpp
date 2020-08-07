@@ -1466,7 +1466,7 @@ strip_undef(State &s, const Value &val, const expr &e) {
 
     if (rhs.isZero() &&
         lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
-      return { move(a), c };
+      return { move(a), move(c) };
   }
 
   return { e, e == s[val].value };
