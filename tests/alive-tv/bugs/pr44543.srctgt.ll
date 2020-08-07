@@ -1,4 +1,6 @@
 ; Found by Alive2
+; SKIP-IDENTITY
+
 target datalayout = "p:64:64:64-i64:32:32"
 
 define i64* @src(i8* %x) {

@@ -1,4 +1,5 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=46591
+; TEST-ARGS: -disable-undef-input
 
 target triple = "x86_64--"
 

@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+
 target datalayout = "e-p:64:64:64"
 
 ; ex) %x = 0x1020, %y = 0x30

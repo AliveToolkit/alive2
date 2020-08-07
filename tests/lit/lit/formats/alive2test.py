@@ -49,6 +49,7 @@ class Alive2Test(TestFormat):
     self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
     self.regex_check = re.compile(r";\s*CHECK:(.*)")
     self.regex_check_not = re.compile(r";\s*CHECK-NOT:(.*)")
+    self.regex_skip_identity = re.compile(r";\s*SKIP-IDENTITY")
     self.regex_errs_out = re.compile("ERROR:.*")
 
   def getTestsInDirectory(self, testSuite, path_in_suite,
@@ -88,15 +89,17 @@ class Alive2Test(TestFormat):
     if m != None:
       cmd += m.group(1).split()
 
+    do_identity = self.regex_skip_identity.search(input) is None
+
     # Run identity check first
-    if alive_tv_1:
+    if alive_tv_1 and do_identity:
       try:
         id_check('src', cmd, [test, '-src-fn=src', '-tgt-fn=src'])
         id_check('tgt', cmd, [test, '-src-fn=tgt', '-tgt-fn=tgt'])
       except Exception as e:
         return lit.Test.FAIL, e
 
-    if alive_tv_2:
+    if alive_tv_2 and do_identity:
       try:
         id_check('src', cmd, [test, test])
         tgtpath = test.replace('.src.ll', '.tgt.ll')

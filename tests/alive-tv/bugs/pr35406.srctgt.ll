@@ -86,3 +86,4 @@ exit:                                             ; preds = %loop2.exit, %loop1
 }
 
 ; XFAIL: Precondition is always false
+; SKIP-IDENTITY

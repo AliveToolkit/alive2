@@ -28,3 +28,4 @@ bb2:                                              ; preds = %0
 }
 
 ; XFAIL: Unsupported metadata: 11
+; SKIP-IDENTITY

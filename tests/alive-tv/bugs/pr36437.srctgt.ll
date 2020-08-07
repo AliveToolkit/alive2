@@ -53,6 +53,7 @@ for.end:                                          ; preds = %for.body
 }
 
 ; XFAIL: Precondition is always false
+; SKIP-IDENTITY
 
 @b = global i32 2, align 4
 @c = global i32* @b, align 8
