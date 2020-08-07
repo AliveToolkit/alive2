@@ -1,0 +1,6 @@
+Name: t0
+%r = ushl_sat i8 %x, %y
+  =>
+%r = undef
+
+; ERROR: Value mismatch for i8 %r

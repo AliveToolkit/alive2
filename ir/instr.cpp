@@ -156,6 +156,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case UAdd_Sat:
   case SSub_Sat:
   case USub_Sat:
+  case SShl_Sat:
+  case UShl_Sat:
   case And:
   case Or:
   case Xor:
@@ -204,6 +206,8 @@ void BinOp::print(ostream &os) const {
   case UAdd_Sat:      str = "uadd_sat "; break;
   case SSub_Sat:      str = "ssub_sat "; break;
   case USub_Sat:      str = "usub_sat "; break;
+  case SShl_Sat:      str = "sshl_sat "; break;
+  case UShl_Sat:      str = "ushl_sat "; break;
   case And:           str = "and "; break;
   case Or:            str = "or "; break;
   case Xor:           str = "xor "; break;
@@ -438,6 +442,18 @@ StateValue BinOp::toSMT(State &s) const {
   case USub_Sat:
     fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
       return { a.usub_sat(b), true };
+    };
+    break;
+
+  case SShl_Sat:
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return {a.sshl_sat(b), b.ult(b.bits())};
+    };
+    break;
+
+  case UShl_Sat:
+    fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
+      return {a.ushl_sat(b), b.ult(b.bits())};
     };
     break;
 

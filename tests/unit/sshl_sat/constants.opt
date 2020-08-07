@@ -1,0 +1,50 @@
+Name: t1
+%r = sshl_sat i8 32, 0
+  =>
+%r = 32
+
+Name: t1
+%r = sshl_sat i8 32, 1
+  =>
+%r = 64
+
+Name: t1
+%r = sshl_sat i8 32, 2
+  =>
+%r = 127
+
+Name: t1
+%r = sshl_sat i8 32, 3
+  =>
+%r = 127
+
+Name: t1
+%r = sshl_sat i8 32, 7
+  =>
+%r = 127
+
+
+Name: t1
+%r = sshl_sat i8 -32, 0
+  =>
+%r = -32
+
+Name: t1
+%r = sshl_sat i8 -32, 1
+  =>
+%r = -64
+
+Name: t1
+%r = sshl_sat i8 -32, 2
+  =>
+%r = -128
+
+Name: t1
+%r = sshl_sat i8 -32, 3
+  =>
+%r = -128
+
+Name: t1
+%r = sshl_sat i8 -32, 7
+  =>
+%r = -128

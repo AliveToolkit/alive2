@@ -204,6 +204,8 @@ space+ {
 "uadd_sat" { return UADD_SAT; }
 "ssub_sat" { return SSUB_SAT; }
 "usub_sat" { return USUB_SAT; }
+"sshl_sat" { return SSHL_SAT; }
+"ushl_sat" { return USHL_SAT; }
 "and" { return AND; }
 "or" { return OR; }
 "xor" { return XOR; }

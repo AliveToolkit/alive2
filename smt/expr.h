@@ -157,6 +157,8 @@ public:
   expr uadd_sat(const expr &rhs) const;
   expr ssub_sat(const expr &rhs) const;
   expr usub_sat(const expr &rhs) const;
+  expr sshl_sat(const expr &rhs) const;
+  expr ushl_sat(const expr &rhs) const;
 
   expr add_no_soverflow(const expr &rhs) const;
   expr add_no_uoverflow(const expr &rhs) const;
@@ -194,6 +196,7 @@ public:
 
   expr abs() const;
 
+  expr isNegative() const;
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

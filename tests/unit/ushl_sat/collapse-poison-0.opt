@@ -1,0 +1,9 @@
+Name: t1
+%t0 = shl i8 %x, %y
+%t1 = ctlz i8 %x, i8 false
+%t2 = icmp ule i8 %y, %t1
+%r = select i1 %t2, i8 %t0, i8 -1
+  =>
+%r = ushl_sat i8 %x, %y
+
+; ERROR: Target is more poisonous than source for i8 %r

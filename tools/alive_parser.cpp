@@ -652,6 +652,8 @@ static unsigned parse_binop_flags(token op_token) {
   case SADD_SAT:
   case USUB_SAT:
   case SSUB_SAT:
+  case USHL_SAT:
+  case SSHL_SAT:
   case AND:
   case OR:
   case XOR:
@@ -705,6 +707,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case UADD_SAT: op = BinOp::UAdd_Sat; break;
   case SSUB_SAT: op = BinOp::SSub_Sat; break;
   case USUB_SAT: op = BinOp::USub_Sat; break;
+  case SSHL_SAT: op = BinOp::SShl_Sat; break;
+  case USHL_SAT: op = BinOp::UShl_Sat; break;
   case SADD_OVERFLOW:
     op = BinOp::SAdd_Overflow;
     rettype = &get_overflow_type(type);
@@ -1076,6 +1080,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case UADD_SAT:
   case SSUB_SAT:
   case USUB_SAT:
+  case SSHL_SAT:
+  case USHL_SAT:
   case AND:
   case OR:
   case XOR:

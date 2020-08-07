@@ -1,0 +1,9 @@
+Name: t0
+%r = sshl_sat i8 %x, %y
+  =>
+%t0 = shl i8 %x, %y
+%t1 = ashr i8 %t0, %y
+%t2 = icmp eq i8 %t1, %x
+%t3 = icmp slt i8 %x, 0
+%t4 = select i1 %t3, i8 -128, i8 127
+%r = select i1 %t2, i8 %t0, i8 %t4

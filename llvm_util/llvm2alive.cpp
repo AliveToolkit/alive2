@@ -710,6 +710,8 @@ end:
     case llvm::Intrinsic::uadd_sat:
     case llvm::Intrinsic::ssub_sat:
     case llvm::Intrinsic::usub_sat:
+    case llvm::Intrinsic::sshl_sat:
+    case llvm::Intrinsic::ushl_sat:
     case llvm::Intrinsic::cttz:
     case llvm::Intrinsic::ctlz:
     case llvm::Intrinsic::umin:
@@ -731,6 +733,8 @@ end:
       case llvm::Intrinsic::uadd_sat: op = BinOp::UAdd_Sat; break;
       case llvm::Intrinsic::ssub_sat: op = BinOp::SSub_Sat; break;
       case llvm::Intrinsic::usub_sat: op = BinOp::USub_Sat; break;
+      case llvm::Intrinsic::sshl_sat: op = BinOp::SShl_Sat; break;
+      case llvm::Intrinsic::ushl_sat: op = BinOp::UShl_Sat; break;
       case llvm::Intrinsic::cttz:     op = BinOp::Cttz; break;
       case llvm::Intrinsic::ctlz:     op = BinOp::Ctlz; break;
       case llvm::Intrinsic::umin:     op = BinOp::UMin; break;
