@@ -32,10 +32,6 @@ static bool byte_has_ptr_bit() {
   return does_int_mem_access && does_ptr_mem_access;
 }
 
-static unsigned bits_int_poison() {
-  return does_sub_byte_access ? bits_byte : 1;
-}
-
 static unsigned bits_ptr_byte_offset() {
   assert(!does_ptr_mem_access || bits_byte <= bits_program_pointer);
   return bits_byte < bits_program_pointer ? 3 : 0;
@@ -47,7 +43,8 @@ static unsigned padding_ptr_byte() {
 }
 
 static unsigned padding_nonptr_byte() {
-  return Byte::bitsByte() - does_ptr_mem_access - bits_byte - bits_int_poison();
+  return
+    Byte::bitsByte() - does_ptr_mem_access - bits_byte - bits_poison_per_byte;
 }
 
 static expr concat_if(const expr &ifvalid, expr &&e) {
@@ -136,7 +133,7 @@ Byte::Byte(const Pointer &ptr, unsigned i, const expr &non_poison)
 
 Byte::Byte(const Memory &m, const expr &data, const expr &non_poison) : m(m) {
   assert(!data.isValid() || data.bits() == bits_byte);
-  assert(!non_poison.isValid() || non_poison.bits() == bits_int_poison());
+  assert(!non_poison.isValid() || non_poison.bits() == bits_poison_per_byte);
 
   if (!does_int_mem_access) {
     p = expr::mkUInt(0, bitsByte());
@@ -189,9 +186,9 @@ expr Byte::ptrByteoffset() const {
 
 expr Byte::nonptrNonpoison() const {
   if (!does_int_mem_access)
-    return expr::mkUInt(0, bits_int_poison());
+    return expr::mkUInt(0, bits_poison_per_byte);
   unsigned start = padding_nonptr_byte() + bits_byte;
-  return p.extract(start + bits_int_poison() - 1, start);
+  return p.extract(start + bits_poison_per_byte - 1, start);
 }
 
 expr Byte::nonptrValue() const {
@@ -203,7 +200,7 @@ expr Byte::nonptrValue() const {
 
 expr Byte::isPoison(bool fullbit) const {
   expr np = nonptrNonpoison();
-  if (byte_has_ptr_bit() && bits_int_poison() == 1) {
+  if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
     assert(!np.isValid() || ptrNonpoison().eq(np == 0));
     return np == 1;
   }
@@ -218,7 +215,7 @@ expr Byte::isZero() const {
 unsigned Byte::bitsByte() {
   unsigned ptr_bits = does_ptr_mem_access *
                         (1 + Pointer::totalBits() + bits_ptr_byte_offset());
-  unsigned int_bits = does_int_mem_access * (bits_byte + bits_int_poison());
+  unsigned int_bits = does_int_mem_access * (bits_byte + bits_poison_per_byte);
   // allow at least 1 bit if there's no memory access
   return max(1u, byte_has_ptr_bit() + max(ptr_bits, int_bits));
 }
@@ -261,8 +258,8 @@ ostream& operator<<(ostream &os, const Byte &byte) {
       val.printHexadecimal(os);
     } else {
       os << "#b";
-      for (unsigned i = 0; i < bits_int_poison(); ++i) {
-        unsigned idx = bits_int_poison() - i - 1;
+      for (unsigned i = 0; i < bits_poison_per_byte; ++i) {
+        unsigned idx = bits_poison_per_byte - i - 1;
         auto is_poison = (np.extract(idx, idx) == 1).isTrue();
         auto v = (val.extract(idx, idx) == 1).isTrue();
         os << (is_poison ? 'p' : (v ? '1' : '0'));
@@ -289,7 +286,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     unsigned bytesize = divide_up(bitsize, bits_byte);
 
     bvval = bvval.zext(bytesize * bits_byte - bitsize);
-    unsigned np_mul = does_sub_byte_access ? bits_byte : 1;
+    unsigned np_mul = bits_poison_per_byte;
 
     for (unsigned i = 0; i < bytesize; ++i) {
       expr data = bvval.value.extract((i + 1) * bits_byte - 1, i * bits_byte);
@@ -362,7 +359,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromInt(val.trunc(bitsize));
+    return toType.fromInt(val.trunc(bitsize, toType.np_bits()));
   }
 }
 
@@ -2062,11 +2059,10 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
   // refinement if offset had non-ptr value
   expr np1 = val.nonptrNonpoison();
   expr np2 = val2.nonptrNonpoison();
-  bool np_eqs = np1.eq(np2);
-  expr int_cnstr = does_sub_byte_access
+  expr int_cnstr = bits_poison_per_byte > 1
                      ? (np2 | np1) == np1 &&
                        (val.nonptrValue() | np1) == (val2.nonptrValue() | np1)
-                     : (np_eqs ? true : np2 == 0) &&
+                     : (np1.eq(np2) ? true : np2 == 0) &&
                        val.nonptrValue() == val2.nonptrValue();
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were

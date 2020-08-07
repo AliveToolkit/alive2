@@ -2205,19 +2205,18 @@ MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
 
 MemInstr::ByteAccessInfo
 MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
+  bool ptr_access = hasPtr(t);
   ByteAccessInfo info;
   info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
-  info.hasPtrByteAccess = hasPtr(t);
-  info.doesPtrStore = info.hasPtrByteAccess && store;
-  info.doesPtrLoad = info.hasPtrByteAccess && !store;
-  info.byteSize = gcd(align, getCommonAccessSize(t));
-  info.hasSubByteAccess = hasSubByte(t);
+  info.doesPtrStore     = ptr_access && store;
+  info.doesPtrLoad      = ptr_access && !store;
+  info.byteSize         = gcd(align, getCommonAccessSize(t));
   return info;
 }
 
 MemInstr::ByteAccessInfo
-MemInstr::ByteAccessInfo::full(unsigned byteSize, bool subByte) {
-  return { true, true, true, true, byteSize, subByte };
+MemInstr::ByteAccessInfo::full(unsigned byteSize) {
+  return { true, true, true, byteSize };
 }
 
 
@@ -2774,7 +2773,7 @@ Memcpy::ByteAccessInfo Memcpy::getByteAccessInfo() const {
   // FIXME: memcpy doesn't have multi-byte support
   // Memcpy does not have sub-byte access, unless the sub-byte type appears
   // at other instructions
-  return ByteAccessInfo::full(byteSize, false);
+  return ByteAccessInfo::full(byteSize);
 }
 
 vector<Value*> Memcpy::operands() const {

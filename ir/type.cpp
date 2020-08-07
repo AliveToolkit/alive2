@@ -25,7 +25,7 @@ VoidType Type::voidTy;
 
 unsigned Type::np_bits() const {
   auto bw = bits();
-  return does_sub_byte_access ? bw : (unsigned)divide_up(bw, bits_byte);
+  return min(bw, (unsigned)divide_up(bw * bits_poison_per_byte, bits_byte));
 }
 
 expr Type::var(const char *var, unsigned bits) const {
@@ -1064,6 +1064,12 @@ StateValue VectorType::update(const StateValue &vector,
                   (vector.non_poison & mask_np) | np_shifted});
 }
 
+unsigned VectorType::np_bits() const {
+  if (getChild(0).isPtrType())
+    return elements;
+  return Type::np_bits();
+}
+
 expr VectorType::getTypeConstraints() const {
   auto &elementTy = *children[0];
   expr r = AggregateType::getTypeConstraints() &&
@@ -1407,24 +1413,27 @@ bool isNonPtrVector(const Type &t) {
   return vty && !vty->getChild(0).isPtrType();
 }
 
-bool hasSubByte(const Type &t) {
+unsigned minVectorElemSize(const Type &t) {
   if (auto agg = t.getAsAggregateType()) {
     if (t.isVectorType()) {
       auto &elemTy = agg->getChild(0);
-      return elemTy.isPtrType() ? false : (elemTy.bits() % 8);
+      return elemTy.isPtrType() ? IR::bits_program_pointer : elemTy.bits();
     }
 
+    unsigned val = 0;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
-      if (hasSubByte(agg->getChild(i)))
-        return true;
+      if (auto ch = minVectorElemSize(agg->getChild(i))) {
+        val = val ? gcd(val, ch) : ch;
+      }
     }
+    return val;
   }
-  return false;
+  return 0;
 }
 
 uint64_t getCommonAccessSize(const IR::Type &ty) {
   if (auto agg = ty.getAsAggregateType()) {
-    // non-pointer vectors are store/loaded all at once
+    // non-pointer vectors are stored/loaded all at once
     if (agg->isVectorType()) {
       auto &elemTy = agg->getChild(0);
       if (!elemTy.isPtrType())

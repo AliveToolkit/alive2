@@ -19,20 +19,18 @@ StateValue StateValue::mkIf(const expr &cond, const StateValue &then,
 
 StateValue StateValue::zext(unsigned amount) const {
   return { value.zext(amount),
-           (!does_sub_byte_access || non_poison.isBool())
+           (bits_poison_per_byte == 1 || non_poison.isBool())
              ? expr(non_poison) : non_poison.zext(amount) };
 }
 
-StateValue StateValue::trunc(unsigned amount) const {
-  return { value.trunc(amount),
-           (!does_sub_byte_access || non_poison.isBool())
-             ? expr(non_poison) : non_poison.trunc(amount) };
+StateValue StateValue::trunc(unsigned bw_val, unsigned bw_np) const {
+  return { value.trunc(bw_val), non_poison.trunc(bw_np) };
 }
 
 StateValue StateValue::zextOrTrunc(unsigned tobw) const {
   return
     { value.zextOrTrunc(tobw),
-      (!does_sub_byte_access || non_poison.isBool())
+      (bits_poison_per_byte == 1 || non_poison.isBool())
         ? expr(non_poison) : non_poison.zextOrTrunc(tobw) };
 }
 

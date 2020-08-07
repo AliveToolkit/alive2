@@ -445,27 +445,20 @@ public:
   virtual uint64_t getMaxGEPOffset() const = 0;
 
   struct ByteAccessInfo {
-    // Does this instruction use integer (pointer) value of a byte?
-    // If it stores poison value (e.g. uninitialized bytes of alloca), it is
-    // okay for both variables to be false.
     bool hasIntByteAccess = false;
-    bool hasPtrByteAccess = false;
-    // Does this intruction load / store pointers?
-    // If hasPtrByteAccess is false, these cannot be true.
     bool doesPtrLoad = false;
     bool doesPtrStore = false;
+
     // The maximum size of a byte that this instruction can support.
     // If zero, this instruction does not read/write bytes.
     // Otherwise, bytes of a memory can be widened to this size.
     unsigned byteSize = 0;
-    // Does this instruction have sub-byte access (less than 8 bits)?
-    bool hasSubByteAccess = false;
 
     bool doesMemAccess() const { return byteSize; }
 
     static ByteAccessInfo intOnly(unsigned byteSize);
     static ByteAccessInfo get(const Type &t, bool store, unsigned align);
-    static ByteAccessInfo full(unsigned byteSize, bool subByte = false);
+    static ByteAccessInfo full(unsigned byteSize);
   };
 
   virtual ByteAccessInfo getByteAccessInfo() const = 0;

@@ -18,6 +18,7 @@ unsigned num_ptrinputs;
 unsigned num_extra_nonconst_tgt;
 unsigned num_nonlocals;
 unsigned num_nonlocals_src;
+unsigned bits_poison_per_byte;
 unsigned bits_for_ptrattrs;
 unsigned bits_for_bid;
 unsigned bits_for_offset;
@@ -41,7 +42,6 @@ bool has_null_block;
 bool does_int_mem_access;
 bool does_ptr_mem_access;
 bool does_ptr_store;
-bool does_sub_byte_access;
 unsigned heap_block_alignment;
 
 

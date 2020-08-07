@@ -569,9 +569,9 @@ static void calculateAndInitConstants(Transform &t) {
 
   // Mininum access size (in bytes)
   uint64_t min_access_size = 8;
+  unsigned min_vect_elem_sz = 0;
   bool does_mem_access = false;
   bool has_ptr_load = false;
-  does_sub_byte_access = false;
   bool has_vector_bitcast = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
@@ -590,6 +590,14 @@ static void calculateAndInitConstants(Transform &t) {
       }
     }
 
+    auto update_min_vect_sz = [&](const Type &ty) {
+      auto elemsz = minVectorElemSize(ty);
+      if (min_vect_elem_sz && elemsz)
+        min_vect_elem_sz = gcd(min_vect_elem_sz, elemsz);
+      else if (elemsz)
+        min_vect_elem_sz = elemsz;
+    };
+
     set<pair<Value*, uint64_t>> nonlocal_cache;
     for (auto BB : fn->getBBs()) {
       for (auto &i : BB->instrs()) {
@@ -600,7 +608,10 @@ static void calculateAndInitConstants(Transform &t) {
 
         for (auto op : i.operands()) {
           nullptr_is_used |= has_nullptr(op);
+          update_min_vect_sz(op->getType());
         }
+
+        update_min_vect_sz(i.getType());
 
         if (auto *fc = dynamic_cast<const FnCall*>(&i)) {
           has_fncall |= true;
@@ -616,8 +627,6 @@ static void calculateAndInitConstants(Transform &t) {
           has_ptr_load         |= info.doesPtrLoad;
           does_ptr_store       |= info.doesPtrStore;
           does_int_mem_access  |= info.hasIntByteAccess;
-          does_ptr_mem_access  |= info.hasPtrByteAccess;
-          does_sub_byte_access |= info.hasSubByteAccess;
           does_mem_access      |= info.doesMemAccess();
           min_access_size       = gcd(min_access_size, info.byteSize);
 
@@ -642,12 +651,14 @@ static void calculateAndInitConstants(Transform &t) {
         } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
           auto &t = bc->getType();
           has_vector_bitcast |= t.isVectorType();
-          does_sub_byte_access |= hasSubByte(t);
           min_access_size = gcd(min_access_size, getCommonAccessSize(t));
         }
       }
     }
   }
+
+  does_ptr_mem_access = has_ptr_load || does_ptr_store;
+
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
   uint64_t min_global_size = UINT64_MAX;
@@ -729,6 +740,11 @@ static void calculateAndInitConstants(Transform &t) {
   bits_byte = 8 * ((does_mem_access || num_globals != 0)
                      ? (unsigned)min_access_size : 1);
 
+  bits_poison_per_byte = 1;
+  if (min_vect_elem_sz > 0)
+    bits_poison_per_byte = (min_vect_elem_sz % 8) ? bits_byte :
+                             bits_byte / gcd(bits_byte, min_vect_elem_sz);
+
   strlen_unroll_cnt = 10;
   memcmp_unroll_cnt = 10;
 
@@ -747,6 +763,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmin_access_size: " << min_access_size
                   << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte
+                  << "\nbits_poison_per_byte: " << bits_poison_per_byte
                   << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
                   << "\nmemcmp_unroll_cnt: " << memcmp_unroll_cnt
                   << "\nlittle_endian: " << little_endian
@@ -760,7 +777,6 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\ndoes_mem_access: " << does_mem_access
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
-                  << "\ndoes_sub_byte_access: " << does_sub_byte_access
                   << '\n';
 }
 
