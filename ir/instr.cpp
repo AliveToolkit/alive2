@@ -1458,14 +1458,13 @@ strip_undef(State &s, const Value &val, const expr &e) {
 
   expr c, a, b, lhs, rhs, ty;
   unsigned h, l;
-  uint64_t n;
 
   // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
   if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
-    if (lhs.isUInt(n))
+    if (lhs.isZero())
       swap(lhs, rhs);
 
-    if (rhs.isUInt(n) && n == 0 &&
+    if (rhs.isZero() &&
         lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
       return { move(a), c };
   }
