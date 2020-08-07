@@ -86,6 +86,34 @@ FastMathFlags parse_fmath(llvm::Instruction &i) {
 }
 
 
+template <typename Fn>
+void parse_fnattrs(FnAttrs &attrs, Fn &&hasAttr) {
+  if (hasAttr(llvm::Attribute::ReadOnly)) {
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::NoFree);
+  }
+  if (hasAttr(llvm::Attribute::ReadNone)) {
+    attrs.set(FnAttrs::NoRead);
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::NoFree);
+  }
+  if (hasAttr(llvm::Attribute::WriteOnly))
+    attrs.set(FnAttrs::NoRead);
+
+  if (hasAttr(llvm::Attribute::ArgMemOnly))
+    attrs.set(FnAttrs::ArgMemOnly);
+
+  if (hasAttr(llvm::Attribute::NoFree))
+    attrs.set(FnAttrs::NoFree);
+
+  if (hasAttr(llvm::Attribute::NoReturn))
+    attrs.set(FnAttrs::NoReturn);
+
+  if (hasAttr(llvm::Attribute::NoUndef))
+    attrs.set(FnAttrs::NoUndef);
+}
+
+
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   llvm::Function &f;
@@ -250,23 +278,8 @@ public:
       return error(i);
 
     FnAttrs attrs;
-    if (i.hasFnAttr(llvm::Attribute::ReadOnly)) {
-      attrs.set(FnAttrs::NoWrite);
-      attrs.set(FnAttrs::NoFree);
-    }
-    if (i.hasFnAttr(llvm::Attribute::ReadNone)) {
-      attrs.set(FnAttrs::NoRead);
-      attrs.set(FnAttrs::NoWrite);
-      attrs.set(FnAttrs::NoFree);
-    }
-    if (i.hasFnAttr(llvm::Attribute::WriteOnly))
-      attrs.set(FnAttrs::NoRead);
-    if (i.hasFnAttr(llvm::Attribute::ArgMemOnly))
-      attrs.set(FnAttrs::ArgMemOnly);
-    if (i.hasFnAttr(llvm::Attribute::NoReturn))
-      attrs.set(FnAttrs::NoReturn);
-    if (i.hasFnAttr(llvm::Attribute::NoFree))
-      attrs.set(FnAttrs::NoFree);
+    parse_fnattrs(attrs, [&i](auto attr) { return i.hasFnAttr(attr); });
+
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
@@ -937,6 +950,10 @@ end:
         attrs.setDerefBytes(attr.getDereferenceableBytes());
         continue;
 
+      case llvm::Attribute::NoUndef:
+        attrs.set(ParamAttrs::NoUndef);
+        continue;
+
       default:
         *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
         return nullopt;
@@ -975,8 +992,7 @@ end:
     }
 
     auto &attrs = Fn.getFnAttrs();
-    if (f.hasFnAttribute(llvm::Attribute::NoFree))
-      attrs.set(FnAttrs::NoFree);
+    parse_fnattrs(attrs, [&](auto attr) { return f.hasFnAttribute(attr); });
 
     const auto &ridx = llvm::AttributeList::ReturnIndex;
     if (uint64_t b = f.getDereferenceableBytes(ridx)) {
