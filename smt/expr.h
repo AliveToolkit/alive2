@@ -120,7 +120,7 @@ public:
   bool isAllOnes() const;
   bool isSMin() const;
   bool isSMax() const;
-  bool isSigned() const;
+  expr isNegative() const;
 
   unsigned bits() const;
   bool isUInt(uint64_t &n) const;
@@ -196,7 +196,6 @@ public:
 
   expr abs() const;
 
-  expr isNegative() const;
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

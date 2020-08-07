@@ -358,7 +358,7 @@ void IntType::printVal(ostream &os, State &s, const expr &e) const {
   e.printHexadecimal(os);
   os << " (";
   e.printUnsigned(os);
-  if (e.bits() > 1 && e.isSigned()) {
+  if (e.bits() > 1 && e.isNegative().isTrue()) {
     os << ", ";
     e.printSigned(os);
   }

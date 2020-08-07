@@ -336,9 +336,10 @@ bool expr::isSMax() const {
   return eq(IntSMax(bits()));
 }
 
-bool expr::isSigned() const {
+expr expr::isNegative() const {
+  C();
   auto bit = bits() - 1;
-  return extract(bit, bit).isOne();
+  return extract(bit, bit) == 1;
 }
 
 unsigned expr::bits() const {
@@ -877,11 +878,6 @@ expr expr::abs() const {
   C();
   auto s = sort();
   return mkIf(sge(mkUInt(0, s)), *this, mkInt(-1, s) * *this);
-}
-
-expr expr::isNegative() const {
-  C();
-  return this->slt(mkInt(0, *this));
 }
 
 expr expr::isNaN() const {
@@ -1745,7 +1741,7 @@ void expr::printUnsigned(ostream &os) const {
 }
 
 void expr::printSigned(ostream &os) const {
-  if (isSigned()) {
+  if (isNegative().isTrue()) {
     os << '-';
     (~*this + mkUInt(1, sort())).printUnsigned(os);
   } else {
