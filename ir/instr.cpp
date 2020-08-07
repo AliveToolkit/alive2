@@ -1451,27 +1451,60 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static void unpack_inputs(State&s, Type &ty, const ParamAttrs &argflag,
+static pair<expr,expr> // <extracted value, not_undef>
+strip_undef(State &s, const Value &val, const expr &e) {
+  if (s.isUndef(e))
+    return { expr::mkUInt(0, e.bits()), false };
+
+  expr c, a, b, lhs, rhs, ty;
+  unsigned h, l;
+
+  // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
+  if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
+    if (lhs.isZero())
+      swap(lhs, rhs);
+
+    if (rhs.isZero() &&
+        lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
+      return { move(a), move(c) };
+  }
+
+  return { e, e == s[val].value };
+}
+
+static void unpack_inputs(State &s, Value *argv, Type &ty,
+                          const ParamAttrs &argflag,
                           const StateValue &value, vector<StateValue> &inputs,
                           vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      unpack_inputs(s, agg->getChild(i), argflag, agg->extract(value, i),
+      unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
                     inputs, ptr_inputs);
     }
   } else {
+    bool is_deref = argflag.has(ParamAttrs::Dereferenceable);
+    bool is_nonnull = argflag.has(ParamAttrs::NonNull);
+    bool is_noundef = argflag.has(ParamAttrs::NoUndef);
+
+    if (is_deref || is_nonnull || is_noundef)
+      s.addUB(value.non_poison);
+
+    if (is_noundef) {
+      // TODO: noundef for aggregate should be supported.
+      assert(!argv->getType().isAggregateType());
+      s.addUB(strip_undef(s, *argv, value.value).second);
+    }
+
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), value.value);
       p.stripAttrs();
-      if (argflag.has(ParamAttrs::Dereferenceable)) {
-        s.addUB(value.non_poison);
+      if (is_deref)
         s.addUB(
           p.isDereferenceable(argflag.getDerefBytes(), bits_byte / 8, false));
-      }
-      if (argflag.has(ParamAttrs::NonNull)) {
-        s.addUB(value.non_poison);
+
+      if (is_nonnull)
         s.addUB(p.isNonZero());
-      }
+
       ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
@@ -1533,7 +1566,7 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
   for (auto &[arg, flags] : args) {
-    unpack_inputs(s, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
+    unpack_inputs(s, arg, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
@@ -1940,32 +1973,10 @@ void Branch::print(ostream &os) const {
     os << ", label " << dst_false->getName();
 }
 
-static pair<expr,expr> // <condition, not_undef>
-jump_undef_condition(State &s, const Value &val, const expr &e) {
-  if (s.isUndef(e))
-    return { expr::mkUInt(0, 1), false };
-
-  expr c, a, b, lhs, rhs, ty;
-  unsigned h, l;
-  uint64_t n;
-
-  // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
-  if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
-    if (lhs.isUInt(n))
-      swap(lhs, rhs);
-
-    if (rhs.isUInt(n) && n == 0 &&
-        lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
-      return { move(a), c };
-  }
-
-  return { e, e == s[val].value };
-}
-
 StateValue Branch::toSMT(State &s) const {
   if (cond) {
     auto &c = s[*cond];
-    auto [cond_val, not_undef] = jump_undef_condition(s, *cond, c.value);
+    auto [cond_val, not_undef] = strip_undef(s, *cond, c.value);
     s.addUB(c.non_poison);
     s.addUB(move(not_undef));
     s.addCondJump(cond_val, dst_true, *dst_false);
@@ -2021,7 +2032,7 @@ StateValue Switch::toSMT(State &s) const {
   auto &val = s[*value];
   expr default_cond(true);
 
-  auto [cond_val, not_undef] = jump_undef_condition(s, *value, val.value);
+  auto [cond_val, not_undef] = strip_undef(s, *value, val.value);
   s.addUB(val.non_poison);
   s.addUB(move(not_undef));
 
@@ -2094,10 +2105,11 @@ StateValue Return::toSMT(State &s) const {
   auto &attrs = s.getFn().getFnAttrs();
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
+  bool isNoUndef = attrs.has(FnAttrs::NoUndef);
+
   if (isDeref || isNonNull) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);
-    s.addUB(retval.non_poison);
 
     if (isDeref) {
       s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
@@ -2106,6 +2118,14 @@ StateValue Return::toSMT(State &s) const {
     if (isNonNull) {
       s.addUB(p.isNonZero());
     }
+  }
+
+  if (isDeref || isNonNull || isNoUndef)
+    s.addUB(retval.non_poison);
+  if (isNoUndef) {
+    // TODO: noundef for aggregates should be supported.
+    assert(!val->getType().isAggregateType());
+    s.addUB(strip_undef(s, *val, retval.value).second);
   }
 
   s.addReturn(retval);
