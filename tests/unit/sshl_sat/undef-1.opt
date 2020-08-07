@@ -1,0 +1,9 @@
+Name: t0
+%r = sshl_sat i8 %x, undef
+  =>
+%r = poison
+
+Name: t0
+%r = sshl_sat i8 %x, undef
+  =>
+%r = undef

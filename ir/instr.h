@@ -43,7 +43,7 @@ struct FastMathFlags final {
 class BinOp final : public Instr {
 public:
   enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
-            SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat,
+            SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat, SShl_Sat, UShl_Sat,
             SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
             SMul_Overflow, UMul_Overflow,
             FAdd, FSub, FMul, FDiv, FRem, FMax, FMin,

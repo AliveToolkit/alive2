@@ -1,0 +1,4 @@
+Name: t0
+%r = ushl_sat i8 undef, %y
+  =>
+%r = 0

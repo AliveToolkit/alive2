@@ -1,0 +1,6 @@
+Name: t0
+%r = ushl_sat i8 %x, %y
+  =>
+%r = poison
+
+; ERROR: Target is more poisonous than source for i8 %r

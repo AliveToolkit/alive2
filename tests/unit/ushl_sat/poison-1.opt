@@ -1,0 +1,19 @@
+Name: t0
+%r = ushl_sat i8 %x, poison
+  =>
+%r = poison
+
+Name: t0
+%r = ushl_sat i8 %x, poison
+  =>
+%r = undef
+
+Name: t0
+%r = ushl_sat i8 poison, %y
+  =>
+%r = poison
+
+Name: t0
+%r = ushl_sat i8 poison, %y
+  =>
+%r = undef

@@ -651,6 +651,17 @@ expr expr::usub_sat(const expr &rhs) const {
               *this - rhs);
 }
 
+expr expr::sshl_sat(const expr &rhs) const {
+  C();
+  return mkIf(shl_no_soverflow(rhs), *this << rhs,
+              mkIf(isNegative(), IntSMin(bits()), IntSMax(bits())));
+}
+
+expr expr::ushl_sat(const expr &rhs) const {
+  C();
+  return mkIf(shl_no_uoverflow(rhs), *this << rhs, IntUMax(bits()));
+}
+
 expr expr::add_no_soverflow(const expr &rhs) const {
   if (min_leading_zeros() >= 2 && rhs.min_leading_zeros() >= 2)
     return true;
@@ -866,6 +877,11 @@ expr expr::abs() const {
   C();
   auto s = sort();
   return mkIf(sge(mkUInt(0, s)), *this, mkInt(-1, s) * *this);
+}
+
+expr expr::isNegative() const {
+  C();
+  return this->slt(mkInt(0, *this));
 }
 
 expr expr::isNaN() const {
