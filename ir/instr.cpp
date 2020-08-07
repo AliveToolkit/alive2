@@ -1492,7 +1492,6 @@ static void unpack_inputs(State &s, Value *argv, Type &ty,
     if (is_noundef) {
       // TODO: noundef for aggregate should be supported.
       assert(!argv->getType().isAggregateType());
-      s.addUB(value.non_poison);
       s.addUB(strip_undef(s, *argv, value.value).second);
     }
 
