@@ -179,8 +179,8 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
   addUB(expr(false));
 }
 
-void State::addReturn(const StateValue &val) {
-  return_val.add(val, domain.path);
+void State::addReturn(StateValue &&val) {
+  return_val.add(move(val), domain.path);
   return_memory.add(memory, domain.path);
   return_domain.add(domain());
   function_domain.add(domain());

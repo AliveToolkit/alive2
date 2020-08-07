@@ -83,6 +83,7 @@ public:
   void operator=(const expr &other);
 
   static expr mkUInt(uint64_t n, unsigned bits);
+  static expr mkUInt(uint64_t n, const expr &type);
   static expr mkInt(int64_t n, unsigned bits);
   static expr mkInt(int64_t n, const expr &type);
   static expr mkInt(const char *n, unsigned bits);

@@ -162,6 +162,11 @@ expr expr::mkUInt(uint64_t n, unsigned bits) {
   return bits ? mkUInt(n, mkBVSort(bits)) : expr();
 }
 
+expr expr::mkUInt(uint64_t n, const expr &type) {
+  C2(type);
+  return mkUInt(n, type.sort());
+}
+
 expr expr::mkInt(int64_t n, Z3_sort sort) {
   return Z3_mk_int64(ctx(), n, sort);
 }

@@ -1454,7 +1454,7 @@ void FnCall::print(ostream &os) const {
 static pair<expr,expr> // <extracted value, not_undef>
 strip_undef(State &s, const Value &val, const expr &e) {
   if (s.isUndef(e))
-    return { expr::mkUInt(0, e.bits()), false };
+    return { expr::mkUInt(0, e), false };
 
   expr c, a, b, lhs, rhs, ty;
   unsigned h, l;
@@ -1472,9 +1472,9 @@ strip_undef(State &s, const Value &val, const expr &e) {
   return { e, e == s[val].value };
 }
 
-static void unpack_inputs(State &s, Value *argv, Type &ty,
+static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag,
-                          const StateValue &value, vector<StateValue> &inputs,
+                          StateValue value, vector<StateValue> &inputs,
                           vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
@@ -1491,12 +1491,14 @@ static void unpack_inputs(State &s, Value *argv, Type &ty,
 
     if (is_noundef) {
       // TODO: noundef for aggregate should be supported.
-      assert(!argv->getType().isAggregateType());
-      s.addUB(strip_undef(s, *argv, value.value).second);
+      assert(!argv.getType().isAggregateType());
+      auto [val, not_undef] = strip_undef(s, argv, value.value);
+      value.value = move(val);
+      s.addUB(move(not_undef));
     }
 
     if (ty.isPtrType()) {
-      Pointer p(s.getMemory(), value.value);
+      Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
       if (is_deref)
         s.addUB(
@@ -1505,11 +1507,11 @@ static void unpack_inputs(State &s, Value *argv, Type &ty,
       if (is_nonnull)
         s.addUB(p.isNonZero());
 
-      ptr_inputs.emplace_back(StateValue(p.release(), expr(value.non_poison)),
+      ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
-      inputs.emplace_back(value);
+      inputs.emplace_back(move(value));
     }
   }
 }
@@ -1566,7 +1568,7 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
   for (auto &[arg, flags] : args) {
-    unpack_inputs(s, arg, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
+    unpack_inputs(s, *arg, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
@@ -2098,7 +2100,7 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
 
 StateValue Return::toSMT(State &s) const {
   // Encode nocapture semantics.
-  auto &retval = s[*val];
+  auto retval = s[*val];
   s.addUB(s.getMemory().checkNocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
 
@@ -2107,13 +2109,22 @@ StateValue Return::toSMT(State &s) const {
   bool isNonNull = attrs.has(FnAttrs::NonNull);
   bool isNoUndef = attrs.has(FnAttrs::NoUndef);
 
+  if (isNoUndef) {
+    // TODO: noundef for aggregates should be supported.
+    assert(!val->getType().isAggregateType());
+    auto [value, not_undef] = strip_undef(s, *val, retval.value);
+    retval.value = move(value);
+    s.addUB(move(not_undef));
+  }
+
   if (isDeref || isNonNull) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);
 
     if (isDeref) {
       s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
-      s.addUB(p.getAllocType() != Pointer::STACK || !has_alloca);
+      if (has_alloca)
+        s.addUB(p.getAllocType() != Pointer::STACK);
     }
     if (isNonNull) {
       s.addUB(p.isNonZero());
@@ -2122,13 +2133,8 @@ StateValue Return::toSMT(State &s) const {
 
   if (isDeref || isNonNull || isNoUndef)
     s.addUB(retval.non_poison);
-  if (isNoUndef) {
-    // TODO: noundef for aggregates should be supported.
-    assert(!val->getType().isAggregateType());
-    s.addUB(strip_undef(s, *val, retval.value).second);
-  }
 
-  s.addReturn(retval);
+  s.addReturn(move(retval));
   return {};
 }
 

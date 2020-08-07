@@ -128,7 +128,7 @@ public:
   // i1 cond
   void addCondJump(const smt::expr &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
-  void addReturn(const StateValue &val);
+  void addReturn(StateValue &&val);
 
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
