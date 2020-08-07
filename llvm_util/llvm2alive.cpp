@@ -86,8 +86,11 @@ FastMathFlags parse_fmath(llvm::Instruction &i) {
 }
 
 
-template <typename Fn>
-void parse_fnattrs(FnAttrs &attrs, Fn &&hasAttr) {
+// Returns unsupported attribute if exists
+template <typename Fn, typename RetFn>
+optional<llvm::Attribute::AttrKind>
+parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
+              RetFn &&hasRetAttr) {
   if (hasAttr(llvm::Attribute::ReadOnly)) {
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
@@ -109,8 +112,18 @@ void parse_fnattrs(FnAttrs &attrs, Fn &&hasAttr) {
   if (hasAttr(llvm::Attribute::NoReturn))
     attrs.set(FnAttrs::NoReturn);
 
-  if (hasAttr(llvm::Attribute::NoUndef))
+  if (hasRetAttr(llvm::Attribute::NonNull))
+    attrs.set(FnAttrs::NonNull);
+
+  if (hasRetAttr(llvm::Attribute::NoUndef)) {
+    if (retTy->isAggregateType())
+      // TODO: noundef aggregate should be supported; it can have undef padding
+      return llvm::Attribute::NoUndef;
+
     attrs.set(FnAttrs::NoUndef);
+  }
+
+  return {};
 }
 
 
@@ -278,20 +291,25 @@ public:
       return error(i);
 
     FnAttrs attrs;
-    parse_fnattrs(attrs, [&i](auto attr) { return i.hasFnAttr(attr); });
+    auto unsupported_attr =
+        parse_fnattrs(attrs, i.getType(),
+                      [&i](auto attr) { return i.hasFnAttr(attr); },
+                      [&i](auto attr) { return i.hasRetAttr(attr); });
+
+    const auto &ret = llvm::AttributeList::ReturnIndex;
+    if (unsupported_attr)
+      return errorAttr(i.getAttribute(ret, *unsupported_attr));
 
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
     }
-    const auto &ret = llvm::AttributeList::ReturnIndex;
+
     if (uint64_t b = max(i.getDereferenceableBytes(ret),
                          i.getCalledFunction()->getDereferenceableBytes(ret))) {
       attrs.set(FnAttrs::Dereferenceable);
       attrs.setDerefBytes(b);
     }
-    if (i.hasRetAttr(llvm::Attribute::NonNull))
-      attrs.set(FnAttrs::NonNull);
 
     string fn_name = '@' + fn->getName().str();
     auto call =
@@ -337,6 +355,15 @@ public:
       if (i.paramHasAttr(argidx, llvm::Attribute::NonNull))
         attr.set(ParamAttrs::NonNull);
 
+      if (i.paramHasAttr(argidx, llvm::Attribute::NoUndef)) {
+        if (i.getArgOperand(argidx)->getType()->isAggregateType())
+          // TODO: noundef aggregate should be supported; it can have undef
+          // padding
+          return errorAttr(i.getAttribute(argidx, llvm::Attribute::NoUndef));
+
+        attr.set(ParamAttrs::NoUndef);
+      }
+
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
           = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
@@ -356,6 +383,7 @@ public:
           ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
                                               ConversionOp::BitCast);
       }
+
       call->addArg(*arg, move(attr));
     }
     if (ret_val) {
@@ -840,6 +868,10 @@ end:
     *out << "ERROR: Unsupported instruction: " << i << '\n';
     return {};
   }
+  RetTy errorAttr(const llvm::Attribute &attr) {
+    *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
+    return {};
+  }
 
   bool handleMetadata(llvm::Instruction &llvm_i, Instr &i) {
     llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
@@ -951,11 +983,17 @@ end:
         continue;
 
       case llvm::Attribute::NoUndef:
+        if (arg.getType()->isAggregateType()) {
+          // TODO: noundef aggregate should be supported; it can have undef
+          // padding
+          errorAttr(attr);
+          return nullopt;
+        }
         attrs.set(ParamAttrs::NoUndef);
         continue;
 
       default:
-        *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
+        errorAttr(attr);
         return nullopt;
       }
     }
@@ -992,15 +1030,21 @@ end:
     }
 
     auto &attrs = Fn.getFnAttrs();
-    parse_fnattrs(attrs, [&](auto attr) { return f.hasFnAttribute(attr); });
-
     const auto &ridx = llvm::AttributeList::ReturnIndex;
+    auto unsupported_attr =
+        parse_fnattrs(attrs, f.getReturnType(),
+                      [&](auto attr) { return f.hasFnAttribute(attr); },
+                      [&](auto attr) { return f.hasAttribute(ridx, attr); });
+
+    if (unsupported_attr) {
+      errorAttr(f.getAttribute(ridx, *unsupported_attr));
+      return nullopt;
+    }
+
     if (uint64_t b = f.getDereferenceableBytes(ridx)) {
       attrs.set(FnAttrs::Dereferenceable);
       attrs.setDerefBytes(b);
     }
-    if (f.hasAttribute(ridx, llvm::Attribute::NonNull))
-      attrs.set(FnAttrs::NonNull);
 
     // create all BBs upfront in topological order
     vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;
