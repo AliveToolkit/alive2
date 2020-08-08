@@ -2057,13 +2057,30 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
   undef.insert(mem1.undef.begin(), mem1.undef.end());
 
   // refinement if offset had non-ptr value
+  expr v1 = val.nonptrValue();
+  expr v2 = val2.nonptrValue();
   expr np1 = val.nonptrNonpoison();
   expr np2 = val2.nonptrNonpoison();
-  expr int_cnstr = bits_poison_per_byte > 1
-                     ? (np2 | np1) == np1 &&
-                       (val.nonptrValue() | np1) == (val2.nonptrValue() | np1)
-                     : (np1.eq(np2) ? true : np2 == 0) &&
-                       val.nonptrValue() == val2.nonptrValue();
+
+  expr int_cnstr;
+  if (bits_poison_per_byte == bits_byte) {
+    int_cnstr = (np2 | np1) == np1 && (v1 | np1) == (v2 | np1);
+  }
+  else if (bits_poison_per_byte > 1) {
+    assert((bits_byte % bits_poison_per_byte) == 0);
+    unsigned bits_val = bits_byte / bits_poison_per_byte;
+    int_cnstr = true;
+    for (unsigned i = 0; i < bits_poison_per_byte; ++i) {
+      expr ev1 = v1.extract((i+1) * bits_val - 1, i * bits_val);
+      expr ev2 = v2.extract((i+1) * bits_val - 1, i * bits_val);
+      expr enp1 = np1.extract(i, i);
+      expr enp2 = np2.extract(i, i);
+      int_cnstr
+        &= enp1 == 1 || ((enp1.eq(enp2) ? true : enp2 == 0) && ev1 == ev2);
+    }
+  } else {
+    int_cnstr = np1 == 1 || ((np1.eq(np2) ? true : np2 == 0) && v1 == v2);
+  }
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
   // already there and don't need checking
@@ -2073,15 +2090,16 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
   if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
     ptr_cnstr = val == val2;
   } else {
-    ptr_cnstr = val2.ptrNonpoison() &&
-                val.ptrByteoffset() == val2.ptrByteoffset() &&
-                val.ptr().refined(val2.ptr());
+    ptr_cnstr = !val.ptrNonpoison() ||
+                  (val2.ptrNonpoison() &&
+                   val.ptrByteoffset() == val2.ptrByteoffset() &&
+                   val.ptr().refined(val2.ptr()));
   }
-  return val.isPoison() ||
-         expr::mkIf(is_ptr == is_ptr2,
+  return expr::mkIf(is_ptr == is_ptr2,
                     expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
                     // allow null ptr <-> zero
-                    val.isZero() && !val2.isPoison() && val2.isZero());
+                    val.isPoison() ||
+                      (val.isZero() && !val2.isPoison() && val2.isZero()));
 }
 
 expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
