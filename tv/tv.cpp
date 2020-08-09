@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "ir/memory.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
@@ -57,6 +58,10 @@ llvm::cl::opt<bool> opt_se_verbose(
 
 llvm::cl::opt<bool> opt_smt_stats(
   "tv-smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
+  llvm::cl::init(false));
+
+llvm::cl::opt<bool> opt_alias_stats(
+  "tv-alias-stats", llvm::cl::desc("Alive: show alias sets statistics"),
   llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_smt_skip(
@@ -271,6 +276,8 @@ struct TVPass final : public llvm::FunctionPass {
       showed_stats = true;
       if (opt_smt_stats)
         smt::solver_print_stats(*out);
+      if (opt_alias_stats)
+        IR::Memory::printAliasStats(cout);
       if (has_failure && !report_filename.empty())
         cerr << "Report written to " << report_filename << endl;
     }

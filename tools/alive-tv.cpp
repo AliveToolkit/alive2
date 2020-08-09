@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "ir/memory.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/config.h"
@@ -94,6 +95,10 @@ static llvm::cl::opt<bool> opt_debug(
 
 static llvm::cl::opt<bool> opt_smt_stats(
     "smt-stats", llvm::cl::desc("Show SMT statistics"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
+static llvm::cl::opt<bool> opt_alias_stats(
+    "alias-stats", llvm::cl::desc("Show alias sets statistics"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_succinct(
@@ -494,6 +499,9 @@ end:
     smt::solver_print_stats(cout);
 
   smt_init.reset();
+
+  if (opt_alias_stats)
+    IR::Memory::printAliasStats(cout);
 
   return errorCount > 0;
 }

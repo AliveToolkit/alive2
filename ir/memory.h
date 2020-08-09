@@ -220,6 +220,9 @@ class Memory {
     void intersectWith(const AliasSet &other);
     void unionWith(const AliasSet &other);
 
+    void computeAccessStats() const;
+    static void printStats(std::ostream &os);
+
     // for container use only
     bool operator<(const AliasSet &rhs) const;
 
@@ -407,6 +410,10 @@ public:
 
   // for container use only
   bool operator<(const Memory &rhs) const;
+
+  static void printAliasStats(std::ostream &os) {
+    AliasSet::printStats(os);
+  }
 
   void print(std::ostream &os, const smt::Model &m) const;
   friend std::ostream& operator<<(std::ostream &os, const Memory &m);

@@ -7,6 +7,8 @@
 #include "ir/value.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include <array>
+#include <numeric>
 #include <string>
 
 using namespace IR;
@@ -975,6 +977,54 @@ void Memory::AliasSet::unionWith(const AliasSet &other) {
   unionfn(non_local, other.non_local);
 }
 
+static const array<uint64_t, 5> alias_buckets_vals = { 1, 2, 3, 5, 10 };
+static array<uint64_t, 6> alias_buckets_hits = { 0 };
+static uint64_t only_local = 0, only_nonlocal = 0;
+
+
+void Memory::AliasSet::computeAccessStats() const {
+  auto nlocal = numMayAlias(true);
+  auto nnonlocal = numMayAlias(false);
+
+  if (nlocal > 0 && nnonlocal == 0)
+    ++only_local;
+  else if (nlocal == 0 && nnonlocal > 0)
+    ++only_nonlocal;
+
+  auto alias = nlocal + nnonlocal;
+  for (unsigned i = 0; i < alias_buckets_vals.size(); ++i) {
+    if (alias <= alias_buckets_vals[i]) {
+      ++alias_buckets_hits[i];
+      return;
+    }
+  }
+  ++alias_buckets_hits.back();
+}
+
+void Memory::AliasSet::printStats(ostream &os) {
+  double total
+    = accumulate(alias_buckets_hits.begin(), alias_buckets_hits.end(), 0);
+
+  if (!total)
+    return;
+
+  total /= 100.0;
+  os.precision(1);
+  os << fixed;
+
+  os << "\n\nAlias sets statistics\n=====================\n"
+        "Only local:     " << (only_local / total)
+     << "%\nOnly non-local: " << (only_nonlocal / total)
+     << "%\n\nBuckets:\n";
+
+  for (unsigned i = 0; i < alias_buckets_vals.size(); ++i) {
+    os << "\u2264 " << alias_buckets_vals[i] << ": "
+       << (alias_buckets_hits[i] / total) << "%\n";
+  }
+  os << "> " << alias_buckets_vals.back() << ": "
+     << (alias_buckets_hits.back() / total) << "%\n";
+}
+
 bool Memory::AliasSet::operator<(const AliasSet &rhs) const {
   return tie(local, non_local) < tie(rhs.local, rhs.non_local);
 }
@@ -1138,6 +1188,8 @@ end:
   if (!inserted) {
     alias_info.intersectWith(aliasing);
   }
+
+  alias_info.computeAccessStats();
 
   unsigned has_local = alias_info.numMayAlias(true);
   unsigned has_nonlocal = alias_info.numMayAlias(false);
