@@ -1595,10 +1595,6 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
 
 pair<expr,expr>
 Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
-  for (auto &in : ptr_inputs) {
-    if (!in.byval && !in.nocapture && !in.val.non_poison.isFalse())
-      escapeLocalPtr(in.val.value);
-  }
   bool has_local = escaped_local_blks.numMayAlias(true);
 
   unsigned bits_bid = has_local ? bits_for_bid : bits_shortbid();
