@@ -223,7 +223,6 @@ vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
                  const vector<Type*> &out_types, const FnAttrs &attrs) {
-  // TODO: handle changes to memory due to fn call
   // TODO: can read/write=false fn calls be removed?
 
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
@@ -231,13 +230,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
   bool noundef = attrs.has(FnAttrs::NoUndef);
 
-  bool all_valid = true;
-  for (auto &v : inputs) {
-    all_valid &= v.isValid();
-  }
-  for (auto &v : ptr_inputs) {
-    all_valid &= v.val.isValid();
-  }
+  bool all_valid = std::all_of(inputs.begin(), inputs.end(),
+                                [](auto &v) { return v.isValid(); }) &&
+                   std::all_of(ptr_inputs.begin(), ptr_inputs.end(),
+                                [](auto &v) { return v.val.isValid(); });
 
   if (!all_valid) {
     addUB(expr());
@@ -245,7 +241,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   for (auto &v : ptr_inputs) {
-    if (!v.nocapture && !v.val.non_poison.isFalse())
+    if (!v.byval && !v.nocapture && !v.val.non_poison.isFalse())
       memory.escapeLocalPtr(v.val.value);
   }
 
@@ -256,14 +252,14 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   auto &I = call_data_pair.first;
   bool inserted = call_data_pair.second;
 
-  auto mk_val = [&](const Type &t, const string &name) {
-    if (t.isPtrType())
-      return memory.mkFnRet(name.c_str(), I->first.args_ptr).first;
-
-    return expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
-  };
-
   if (inserted) {
+    auto mk_val = [&](const Type &t, const string &name) {
+      if (t.isPtrType())
+        return memory.mkFnRet(name.c_str(), I->first.args_ptr).first;
+
+      return expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
+    };
+
     vector<StateValue> values;
     string valname = name + "#val";
     string npname = name + "#np";
