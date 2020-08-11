@@ -981,7 +981,6 @@ static const array<uint64_t, 5> alias_buckets_vals = { 1, 2, 3, 5, 10 };
 static array<uint64_t, 6> alias_buckets_hits = { 0 };
 static uint64_t only_local = 0, only_nonlocal = 0;
 
-
 void Memory::AliasSet::computeAccessStats() const {
   auto nlocal = numMayAlias(true);
   auto nnonlocal = numMayAlias(false);
@@ -1045,7 +1044,8 @@ void Memory::AliasSet::print(ostream &os) const {
   if (numMayAlias(false) > 0) {
     if (has_local) os << " / ";
     print("non-local: ", non_local);
-  }
+  } else if (!has_local)
+    os << "(empty)";
 }
 
 
@@ -1554,6 +1554,7 @@ void Memory::syncWithSrc(const Memory &src) {
 }
 
 void Memory::markByVal(unsigned bid) {
+  assert(bid < has_null_block + num_globals_src);
   byval_blks.emplace_back(bid);
 }
 

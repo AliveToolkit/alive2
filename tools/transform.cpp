@@ -542,7 +542,12 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_ptrinputs = 0;
   for (auto &arg : t.src.getInputs()) {
-    num_ptrinputs += num_ptrs(arg.getType());
+    auto n = num_ptrs(arg.getType());
+    if (dynamic_cast<const Input*>(&arg)->hasAttribute(ParamAttrs::ByVal)) {
+      num_globals_src += n;
+      num_globals += n;
+    } else
+      num_ptrinputs += n;
   }
 
   // The number of instructions that can return a pointer to a non-local block.
@@ -584,9 +589,13 @@ static void calculateAndInitConstants(Transform &t) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (i && i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
-        uint64_t deref_bytes = i->getAttributes().getDerefBytes();
+        uint64_t deref_bytes = i->getAttributes().derefBytes;
         min_access_size = gcd(min_access_size, deref_bytes);
         max_access_size = max(max_access_size, deref_bytes);
+      }
+      if (i && i->hasAttribute(ParamAttrs::ByVal)) {
+        does_mem_access = true;
+        max_access_size = max(max_access_size, i->getAttributes().blockSize);
       }
     }
 

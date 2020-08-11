@@ -1518,7 +1518,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       p.stripAttrs();
       if (is_deref)
         s.addUB(
-          p.isDereferenceable(argflag.getDerefBytes(), bits_byte / 8, false));
+          p.isDereferenceable(argflag.derefBytes, bits_byte / 8, false));
 
       if (is_nonnull)
         s.addUB(p.isNonZero());
