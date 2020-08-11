@@ -16,9 +16,21 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
+  // Non-local block ids (assuming that no block is optimized out):
+  // 1. null block: 0
+  // 2. global vars in source: 1 ~ num_globals_src
+  // 3. pointer argument inputs:
+  //      num_globals_src + 1 ~ num_globals_src + num_ptrinputs
+  // 4. a block reserved for encoding the memory touched by calls:
+  //      num_globals_src + num_ptrinputs + 1
+  // 5. nonlocal blocks returned by loads/calls:
+  //      num_globals_src + num_ptrinputs + 2 ~ num_nonlocals_src - 1:
+  // 6. global vars in target only:
+  //      num_nonlocals_src ~ num_nonlocals - 1
+
 static unsigned ptr_next_idx;
 static unsigned next_local_bid;
-static unsigned next_nonlocal_bid;
+static unsigned next_global_bid;
 static unsigned next_ptr_input;
 
 static bool observes_addresses() {
@@ -1070,8 +1082,8 @@ static vector<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
   return ret;
 }
 
-unsigned Memory::nextNonlocalPtr() {
-  return min(next_nonlocal_ptr++, num_nonlocals_src-1);
+unsigned Memory::nextNonlocalBid() {
+  return min(next_nonlocal_bid++, num_nonlocals_src-1);
 }
 
 unsigned Memory::numLocals() const {
@@ -1415,7 +1427,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   if (memory_unused())
     return;
 
-  next_nonlocal_ptr
+  next_nonlocal_bid
     = has_null_block + num_globals_src + num_ptrinputs + has_fncall;
 
   if (has_null_block)
@@ -1466,7 +1478,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     return;
 
   auto nonlocal_used = [&](unsigned bid) {
-    return bid < tgt.next_nonlocal_ptr || bid >= num_nonlocals_src;
+    return bid < tgt.next_nonlocal_bid || bid >= num_nonlocals_src;
   };
 
   // transformation can increase alignment
@@ -1538,7 +1550,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
 }
 
 void Memory::resetGlobals() {
-  next_nonlocal_bid = has_null_block;
+  next_global_bid = has_null_block;
   next_local_bid = 0;
   ptr_next_idx = 0;
   next_ptr_input = 0;
@@ -1548,8 +1560,8 @@ void Memory::syncWithSrc(const Memory &src) {
   assert(src.state->isSource() && !state->isSource());
   resetGlobals();
   // The bid of tgt global starts with num_nonlocals_src
-  next_nonlocal_bid = num_nonlocals_src;
-  next_nonlocal_ptr = src.next_nonlocal_ptr;
+  next_global_bid = num_nonlocals_src;
+  next_nonlocal_bid = src.next_nonlocal_bid;
   // TODO: copy alias info for fn return ptrs from src?
 }
 
@@ -1620,7 +1632,7 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
     }
   }
 
-  unsigned max_nonlocal_bid = nextNonlocalPtr();
+  unsigned max_nonlocal_bid = nextNonlocalBid();
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
   ptr_alias.emplace(p.getBid(), move(alias));
@@ -1661,7 +1673,7 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     for (unsigned bid = num_consts; bid < num_nonlocals_src; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
-        if (!ptr_in.byval && bid < next_nonlocal_ptr) {
+        if (!ptr_in.byval && bid < next_nonlocal_bid) {
           modifies |= Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -1681,7 +1693,7 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
       if (ptr_inputs) {
         may_free = false;
         for (auto &ptr_in : *ptr_inputs) {
-          if (!ptr_in.byval && bid < next_nonlocal_ptr)
+          if (!ptr_in.byval && bid < next_nonlocal_bid)
             may_free |= Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -1741,7 +1753,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
 
-  auto &last_bid = is_local ? next_local_bid : next_nonlocal_bid;
+  auto &last_bid = is_local ? next_local_bid : next_global_bid;
   unsigned bid = bidopt ? *bidopt : last_bid;
   assert((is_local && bid < numLocals()) ||
          (!is_local && bid < numNonlocals()));
@@ -1945,7 +1957,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
         auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
         if (inserted) {
           if (!max_bid)
-            max_bid = nextNonlocalPtr();
+            max_bid = nextNonlocalBid();
           I->second.setMayAliasUpTo(false, *max_bid);
           for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
             I->second.setMayAlias(false, i);
@@ -2198,7 +2210,7 @@ Memory::refined(const Memory &other, bool skip_constants,
   set<expr> undef_vars;
 
   auto nonlocal_used = [](const Memory &m, unsigned bid) {
-    return bid < m.next_nonlocal_ptr;
+    return bid < m.next_nonlocal_bid;
   };
 
   unsigned bid = has_null_block + skip_constants * num_consts_src;
@@ -2308,7 +2320,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
       I->second.unionWith(alias);
   }
 
-  ret.next_nonlocal_ptr = max(then.next_nonlocal_ptr, els.next_nonlocal_ptr);
+  ret.next_nonlocal_bid = max(then.next_nonlocal_bid, els.next_nonlocal_bid);
   return ret;
 }
 
@@ -2322,14 +2334,14 @@ bool Memory::operator<(const Memory &rhs) const {
         local_blk_size, local_blk_align, local_blk_kind,
         non_local_blk_size, non_local_blk_align,
         non_local_blk_kind, byval_blks, escaped_local_blks,
-        ptr_alias, next_nonlocal_ptr) <
+        ptr_alias, next_nonlocal_bid) <
     tie(rhs.non_local_block_val, rhs.local_block_val,
         rhs.non_local_block_liveness, rhs.local_block_liveness,
         rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
         rhs.local_blk_kind,
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
-        rhs.ptr_alias, rhs.next_nonlocal_ptr);
+        rhs.ptr_alias, rhs.next_nonlocal_bid);
 }
 
 #define P(name, expr) do {      \

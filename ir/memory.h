@@ -267,8 +267,8 @@ class Memory {
   AliasSet escaped_local_blks;
 
   std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
-  unsigned next_nonlocal_ptr;
-  unsigned nextNonlocalPtr();
+  unsigned next_nonlocal_bid;
+  unsigned nextNonlocalBid();
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
