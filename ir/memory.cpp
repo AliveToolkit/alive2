@@ -1661,7 +1661,7 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     for (unsigned bid = num_consts; bid < num_nonlocals_src; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
-        if (!ptr_in.byval) {
+        if (!ptr_in.byval && bid < next_nonlocal_ptr) {
           modifies |= Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -1681,7 +1681,7 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
       if (ptr_inputs) {
         may_free = false;
         for (auto &ptr_in : *ptr_inputs) {
-          if (!ptr_in.byval)
+          if (!ptr_in.byval && bid < next_nonlocal_ptr)
             may_free |= Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
