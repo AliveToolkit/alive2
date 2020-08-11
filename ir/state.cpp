@@ -374,7 +374,7 @@ void State::syncSEdataWithSrc(const State &src) {
     }
   }
 
-  memory.syncWithSrc(src.memory);
+  memory.syncWithSrc(src.returnMemory());
 }
 
 void State::mkAxioms(State &tgt) {
