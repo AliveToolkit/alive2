@@ -1887,6 +1887,15 @@ void Phi::addValue(Value &val, string &&BB_name) {
   values.emplace_back(&val, move(BB_name));
 }
 
+void Phi::removeValue(const string &BB_name) {
+  for (auto I = values.begin(), E = values.end(); I != E; ++I) {
+    if (I->second == BB_name) {
+      values.erase(I);
+      break;
+    }
+  }
+}
+
 vector<Value*> Phi::operands() const {
   vector<Value*> v;
   for (auto &[val, bb] : values) {
