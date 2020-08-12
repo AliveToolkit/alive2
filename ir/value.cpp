@@ -237,7 +237,7 @@ StateValue Input::toSMT(State &s) const {
                       has_noundef;
 
   // TODO:
-  // (1) element-wise poison
+  // (1) element-wise poison/undef control
   // (2) noundef does not restrict padding from being poison
   return { move(val),
              never_poison
