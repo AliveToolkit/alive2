@@ -943,10 +943,18 @@ AggregateType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   vector<expr> vars;
 
   for (unsigned i = 0; i < elements; ++i) {
-    auto [v, vs] = children[i]->mkUndefInput(s, attrs);
-    v = children[i]->toBV(move(v));
-    val = i == 0 ? move(v) : val.concat(v);
-    vars.insert(vars.end(), vs.begin(), vs.end());
+    auto *aty = dynamic_cast<AggregateType *>(children[i]);
+    if (!attrs.has(ParamAttrs::NoUndef) || isPadding(i) || aty){
+      // If it has a nested aggregate, the child deals with noundef
+      auto [v, vs] = children[i]->mkUndefInput(s, attrs);
+      v = children[i]->toBV(move(v));
+      val = i == 0 ? move(v) : val.concat(v);
+      vars.insert(vars.end(), vs.begin(), vs.end());
+    } else {
+      auto v = children[i]->getDummyValue(true).value;
+      v = children[i]->toBV(move(v));
+      val = i == 0 ? move(v) : val.concat(v);
+    }
   }
   return { move(val), move(vars) };
 }
