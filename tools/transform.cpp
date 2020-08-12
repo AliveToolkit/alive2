@@ -558,6 +558,7 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
   uint64_t max_alloc_size = 0;
   uint64_t max_access_size = 0;
+  uint64_t min_global_size = UINT64_MAX;
 
   bool nullptr_is_used = false;
   has_int2ptr      = false;
@@ -595,7 +596,12 @@ static void calculateAndInitConstants(Transform &t) {
       }
       if (i && i->hasAttribute(ParamAttrs::ByVal)) {
         does_mem_access = true;
-        max_access_size = max(max_access_size, i->getAttributes().blockSize);
+        auto sz = i->getAttributes().blockSize;
+        max_access_size = max(max_access_size, sz);
+        min_global_size = min_global_size != UINT64_MAX
+                            ? gcd(sz, min_global_size)
+                            : sz;
+        min_global_size = gcd(min_global_size, i->getAttributes().align);
       }
     }
 
@@ -670,7 +676,6 @@ static void calculateAndInitConstants(Transform &t) {
 
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
-  uint64_t min_global_size = UINT64_MAX;
   for (auto glbs : { &globals_src, &globals_tgt }) {
     for (auto &glb : *glbs) {
       auto sz = max(glb->size(), (uint64_t)1u);

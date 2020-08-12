@@ -955,6 +955,10 @@ void Memory::AliasSet::setMayAliasUpTo(bool local, unsigned limit) {
   }
 }
 
+void Memory::AliasSet::setNoAlias(bool islocal, unsigned bid) {
+  (islocal ? local : non_local)[bid] = false;
+}
+
 void Memory::AliasSet::intersectWith(const AliasSet &other) {
   auto intersect = [](auto &a, const auto &b) {
     auto I2 = b.begin();
@@ -1569,6 +1573,11 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
 
   AliasSet alias(*this);
   alias.setMayAliasUpTo(false, max_bid);
+
+  for (auto byval_bid : byval_blks) {
+    state->addAxiom(bid != byval_bid);
+    alias.setNoAlias(false, byval_bid);
+  }
   ptr_alias.emplace(p.getBid(), move(alias));
 
   return p.release();
@@ -1622,11 +1631,16 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   }
 
   unsigned max_nonlocal_bid = nextNonlocalPtr();
+  expr nonlocal = bid.ule(max_nonlocal_bid);
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
+
+  for (auto byval_bid : byval_blks) {
+    nonlocal &= bid != byval_bid;
+    alias.setNoAlias(false, byval_bid);
+  }
   ptr_alias.emplace(p.getBid(), move(alias));
 
-  expr nonlocal = bid.ule(max_nonlocal_bid);
   state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
   return { p.release(), move(var) };
 }
