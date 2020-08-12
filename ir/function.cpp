@@ -362,7 +362,7 @@ void DomTree::buildDominators() {
   }
 
   // build predecessors relationship
-  for (const auto &[src, tgt, instr] : cfg) {
+  for (auto [src, tgt, instr] : cfg) {
     (void)instr;
     doms.at(&tgt).preds.push_back(&doms.at(&src));
   }
