@@ -86,11 +86,9 @@ FastMathFlags parse_fmath(llvm::Instruction &i) {
 }
 
 
-// Returns unsupported attribute if exists
 template <typename Fn, typename RetFn>
-void
-parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
-              RetFn &&hasRetAttr) {
+void parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
+                   RetFn &&hasRetAttr) {
   if (hasAttr(llvm::Attribute::ReadOnly)) {
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
