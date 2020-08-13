@@ -967,6 +967,10 @@ void Memory::AliasSet::setMayAliasUpTo(bool local, unsigned limit) {
   }
 }
 
+void Memory::AliasSet::setNoAlias(bool islocal, unsigned bid) {
+  (islocal ? local : non_local)[bid] = false;
+}
+
 void Memory::AliasSet::intersectWith(const AliasSet &other) {
   auto intersect = [](auto &a, const auto &b) {
     auto I2 = b.begin();
@@ -992,7 +996,6 @@ void Memory::AliasSet::unionWith(const AliasSet &other) {
 static const array<uint64_t, 5> alias_buckets_vals = { 1, 2, 3, 5, 10 };
 static array<uint64_t, 6> alias_buckets_hits = { 0 };
 static uint64_t only_local = 0, only_nonlocal = 0;
-
 
 void Memory::AliasSet::computeAccessStats() const {
   auto nlocal = numMayAlias(true);
@@ -1057,7 +1060,8 @@ void Memory::AliasSet::print(ostream &os) const {
   if (numMayAlias(false) > 0) {
     if (has_local) os << " / ";
     print("non-local: ", non_local);
-  }
+  } else if (!has_local)
+    os << "(empty)";
 }
 
 
@@ -1566,6 +1570,7 @@ void Memory::syncWithSrc(const Memory &src) {
 }
 
 void Memory::markByVal(unsigned bid) {
+  assert(bid < has_null_block + num_globals_src);
   byval_blks.emplace_back(bid);
 }
 
@@ -1580,6 +1585,11 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
 
   AliasSet alias(*this);
   alias.setMayAliasUpTo(false, max_bid);
+
+  for (auto byval_bid : byval_blks) {
+    state->addAxiom(bid != byval_bid);
+    alias.setNoAlias(false, byval_bid);
+  }
   ptr_alias.emplace(p.getBid(), move(alias));
 
   return p.release();
@@ -1633,11 +1643,16 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   }
 
   unsigned max_nonlocal_bid = nextNonlocalBid();
+  expr nonlocal = bid.ule(max_nonlocal_bid);
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
+
+  for (auto byval_bid : byval_blks) {
+    nonlocal &= bid != byval_bid;
+    alias.setNoAlias(false, byval_bid);
+  }
   ptr_alias.emplace(p.getBid(), move(alias));
 
-  expr nonlocal = bid.ule(max_nonlocal_bid);
   state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
   return { p.release(), move(var) };
 }

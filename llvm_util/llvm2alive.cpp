@@ -340,13 +340,17 @@ public:
           derefb = max(derefb,
               i.getCalledFunction()->getParamDereferenceableBytes(argidx));
         assert(derefb);
-        attr.setDerefBytes(derefb);
+        attr.derefBytes = derefb;
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::ByVal)) {
-        // A byval parameter cannot be captured.
-        attr.set(ParamAttrs::NoCapture);
         attr.set(ParamAttrs::ByVal);
+        auto ty = i.getParamByValType(argidx);
+        attr.blockSize = DL().getTypeAllocSize(ty);
+        if (!attr.has(ParamAttrs::Align)) {
+          attr.set(ParamAttrs::Align);
+          attr.align = DL().getABITypeAlignment(ty);
+        }
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NoCapture))
@@ -961,9 +965,16 @@ end:
         // they don't change
         continue;
 
-      case llvm::Attribute::ByVal:
+      case llvm::Attribute::ByVal: {
         attrs.set(ParamAttrs::ByVal);
+        auto ty = arg.getParamByValType();
+        attrs.blockSize = DL().getTypeAllocSize(ty);
+        if (!attrs.has(ParamAttrs::Align)) {
+          attrs.set(ParamAttrs::Align);
+          attrs.align = DL().getABITypeAlignment(ty);
+        }
         continue;
+      }
 
       case llvm::Attribute::NonNull:
         attrs.set(ParamAttrs::NonNull);
@@ -983,7 +994,7 @@ end:
 
       case llvm::Attribute::Dereferenceable:
         attrs.set(ParamAttrs::Dereferenceable);
-        attrs.setDerefBytes(attr.getDereferenceableBytes());
+        attrs.derefBytes = attr.getDereferenceableBytes();
         continue;
 
       case llvm::Attribute::NoUndef:

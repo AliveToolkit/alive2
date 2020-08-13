@@ -1518,7 +1518,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       p.stripAttrs();
       if (is_deref)
         s.addUB(
-          p.isDereferenceable(argflag.getDerefBytes(), bits_byte / 8, false));
+          p.isDereferenceable(argflag.derefBytes, bits_byte / 8, false));
 
       if (is_nonnull)
         s.addUB(p.isNonZero());
@@ -1885,6 +1885,15 @@ unique_ptr<Instr> Freeze::dup(const string &suffix) const {
 
 void Phi::addValue(Value &val, string &&BB_name) {
   values.emplace_back(&val, move(BB_name));
+}
+
+void Phi::removeValue(const string &BB_name) {
+  for (auto I = values.begin(), E = values.end(); I != E; ++I) {
+    if (I->second == BB_name) {
+      values.erase(I);
+      break;
+    }
+  }
 }
 
 vector<Value*> Phi::operands() const {

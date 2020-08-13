@@ -542,7 +542,12 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_ptrinputs = 0;
   for (auto &arg : t.src.getInputs()) {
-    num_ptrinputs += num_ptrs(arg.getType());
+    auto n = num_ptrs(arg.getType());
+    if (dynamic_cast<const Input*>(&arg)->hasAttribute(ParamAttrs::ByVal)) {
+      num_globals_src += n;
+      num_globals += n;
+    } else
+      num_ptrinputs += n;
   }
 
   // The number of instructions that can return a pointer to a non-local block.
@@ -553,6 +558,7 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
   uint64_t max_alloc_size = 0;
   uint64_t max_access_size = 0;
+  uint64_t min_global_size = UINT64_MAX;
 
   bool nullptr_is_used = false;
   has_int2ptr      = false;
@@ -584,9 +590,18 @@ static void calculateAndInitConstants(Transform &t) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (i && i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
-        uint64_t deref_bytes = i->getAttributes().getDerefBytes();
+        uint64_t deref_bytes = i->getAttributes().derefBytes;
         min_access_size = gcd(min_access_size, deref_bytes);
         max_access_size = max(max_access_size, deref_bytes);
+      }
+      if (i && i->hasAttribute(ParamAttrs::ByVal)) {
+        does_mem_access = true;
+        auto sz = i->getAttributes().blockSize;
+        max_access_size = max(max_access_size, sz);
+        min_global_size = min_global_size != UINT64_MAX
+                            ? gcd(sz, min_global_size)
+                            : sz;
+        min_global_size = gcd(min_global_size, i->getAttributes().align);
       }
     }
 
@@ -661,7 +676,6 @@ static void calculateAndInitConstants(Transform &t) {
 
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
-  uint64_t min_global_size = UINT64_MAX;
   for (auto glbs : { &globals_src, &globals_tgt }) {
     for (auto &glb : *glbs) {
       auto sz = max(glb->size(), (uint64_t)1u);
@@ -1018,9 +1032,20 @@ static void remove_unreachable_bbs(Function &f) {
   } while (!wl.empty());
 
   auto all_bbs = f.getBBs(); // copy intended
+  vector<string> unreachable;
   for (auto bb : all_bbs) {
-    if (!reachable.count(bb))
+    if (!reachable.count(bb)) {
+      unreachable.emplace_back(bb->getName());
       f.removeBB(*bb);
+    }
+  }
+
+  for (auto &i : f.instrs()) {
+    if (auto phi = dynamic_cast<const Phi*>(&i)) {
+      for (auto &bb : unreachable) {
+        const_cast<Phi*>(phi)->removeValue(bb);
+      }
+    }
   }
 }
 

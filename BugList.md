@@ -71,6 +71,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 22. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
+23. Incorrect transformation> mul foo, undef -> shl foo, undef
+(https://bugs.llvm.org/show_bug.cgi?id=47133)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 

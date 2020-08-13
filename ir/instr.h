@@ -312,6 +312,7 @@ public:
   Phi(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
 
   void addValue(Value &val, std::string &&BB_name);
+  void removeValue(const std::string &BB_name);
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

@@ -216,6 +216,7 @@ class Memory {
 
     void setMayAlias(bool local, unsigned bid);
     void setMayAliasUpTo(bool local, unsigned limit); // [0, limit]
+    void setNoAlias(bool local, unsigned bid);
 
     void intersectWith(const AliasSet &other);
     void unionWith(const AliasSet &other);

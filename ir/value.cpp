@@ -179,22 +179,23 @@ StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
 
+  bool has_byval = hasAttribute(ParamAttrs::ByVal);
+  bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
+  bool has_nonnull = hasAttribute(ParamAttrs::NonNull);
+  bool has_noundef = hasAttribute(ParamAttrs::NoUndef);
+
   expr val;
-  if (hasAttribute(ParamAttrs::ByVal)) {
+  if (has_byval) {
     unsigned bid;
-    string sz_name = getName() + "#size";
-    expr size = expr::mkVar(sz_name.c_str(), bits_size_t-1).zext(1);
-    val = get_global(s, getName(), size, 1, false, bid);
+    expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
+    val = get_global(s, getName(), size, attrs.align, false, bid);
     s.getMemory().markByVal(bid);
   } else {
     val = getType().mkInput(s, smt_name.c_str(), attrs);
   }
 
-  bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
-  bool has_nonnull = hasAttribute(ParamAttrs::NonNull);
-  bool has_noundef = hasAttribute(ParamAttrs::NoUndef);
-
-  bool never_undef = config::disable_undef_input || has_deref || has_noundef;
+  bool never_undef = config::disable_undef_input || has_byval || has_deref ||
+                     has_noundef;
   if (!never_undef) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
     for (auto &v : vars) {
@@ -207,7 +208,7 @@ StateValue Input::toSMT(State &s) const {
     Pointer p(s.getMemory(), val);
     if (has_deref) {
       s.addAxiom(type == 0);
-      s.addAxiom(p.isDereferenceable(attrs.getDerefBytes(), bits_byte/8, false));
+      s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
     }
     if (has_nonnull && !has_deref) {
       s.addAxiom(type.extract(1, 1) == 0);
@@ -216,7 +217,8 @@ StateValue Input::toSMT(State &s) const {
 
   expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;
-  bool never_poison = config::disable_poison_input || has_deref || has_noundef;
+  bool never_poison = config::disable_poison_input || has_byval || has_deref ||
+                      has_noundef;
 
   return { move(val),
              never_poison
