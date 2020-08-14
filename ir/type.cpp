@@ -805,12 +805,18 @@ unsigned AggregateType::np_bits() const {
 }
 
 StateValue AggregateType::getDummyValue(bool non_poison) const {
+  return getDummyValue(non_poison, non_poison);
+}
+
+StateValue AggregateType::getDummyValue(bool non_poison,
+                                        bool non_poison_padding) const {
   if (elements == 0)
     return { expr::mkUInt(0, 1), expr::mkUInt(non_poison, 1) };
 
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
-    vals.emplace_back(children[i]->getDummyValue(non_poison));
+    bool np = isPadding(i) ? non_poison_padding : non_poison;
+    vals.emplace_back(children[i]->getDummyValue(np));
   }
   return aggregateVals(vals);
 }
@@ -1412,6 +1418,20 @@ bool hasPtr(const Type &t) {
       if (hasPtr(agg->getChild(i)))
         return true;
     }
+  }
+  return false;
+}
+
+bool hasPadding(const Type &ty) {
+  const auto *aggr_ty = dynamic_cast<const AggregateType *>(&ty);
+  if (!aggr_ty)
+    return false;
+
+  for (unsigned i = 0; i < aggr_ty->numElementsConst(); ++i) {
+    if (aggr_ty->isPadding(i))
+      return true;
+    else if (hasPadding(aggr_ty->getChild(i)))
+      return true;
   }
   return false;
 }

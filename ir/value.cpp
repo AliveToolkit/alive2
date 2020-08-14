@@ -175,19 +175,6 @@ void Input::print(ostream &os) const {
   UNREACHABLE();
 }
 
-static bool has_padding(const AggregateType *aggr_ty) {
-  for (unsigned i = 0; i < aggr_ty->numElementsConst(); ++i) {
-    if (aggr_ty->isPadding(i))
-      return true;
-    else if (const auto *achild = dynamic_cast<const AggregateType *>(
-                                                      &aggr_ty->getChild(i))) {
-      if (has_padding(achild))
-        return true;
-    }
-  }
-  return false;
-}
-
 StateValue Input::toSMT(State &s) const {
   // 00: normal, 01: undef, else: poison
   expr type = getTyVar();
@@ -207,10 +194,9 @@ StateValue Input::toSMT(State &s) const {
     val = getType().mkInput(s, smt_name.c_str(), attrs);
   }
 
-  auto *aggr_ty = dynamic_cast<const AggregateType *>(&getType());
-  // Aggregate's paddings can be undef even if it is noundef
+  bool has_padding = hasPadding(getType());
   bool never_undef = config::disable_undef_input || has_byval || has_deref ||
-                     (has_noundef && (!aggr_ty || !has_padding(aggr_ty)));
+                     (has_noundef && !has_padding);
 
   if (!never_undef) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
@@ -220,25 +206,22 @@ StateValue Input::toSMT(State &s) const {
     val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
-  if (has_deref || has_nonnull) {
+  if (has_deref) {
     Pointer p(s.getMemory(), val);
-    if (has_deref) {
-      s.addAxiom(type == 0);
-      s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
-    }
-    if (has_nonnull && !has_deref) {
-      s.addAxiom(type.extract(1, 1) == 0);
-    }
+    s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
   }
 
-  expr poison = getType().getDummyValue(false).non_poison;
+  Type &inputty = getType();
   expr non_poison = getType().getDummyValue(true).non_poison;
+  expr poison;
+  if (auto *aty = dynamic_cast<AggregateType *>(&inputty))
+    poison = aty->getDummyValue(has_noundef, false).non_poison;
+  else
+    poison = inputty.getDummyValue(false).non_poison;
   bool never_poison = config::disable_poison_input || has_byval || has_deref ||
-                      has_noundef;
+                      has_nonnull || (has_noundef && !has_padding);
 
-  // TODO:
-  // (1) element-wise poison/undef control
-  // (2) noundef does not restrict padding from being poison
+  // TODO: element-wise poison/undef control
   return { move(val),
              never_poison
              ? move(non_poison)

@@ -1,7 +1,6 @@
-; TEST-ARGS: -disable-undef-input
+; TEST-ARGS: -disable-undef-input -disable-poison-input
 @g = global {i8, i32} undef
 
-; Padding may be poison
 define i32 @src({i8, i32} noundef %cond) {
   store {i8, i32} %cond, {i8, i32}* @g
   %p = bitcast {i8, i32}* @g to i8*
@@ -28,5 +27,3 @@ A:
 B:
   ret i32 1
 }
-
-; ERROR: Source is more defined than target

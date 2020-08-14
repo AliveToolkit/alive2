@@ -222,7 +222,8 @@ void State::addNoReturn() {
 vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
-                 const vector<Type*> &out_types, const FnAttrs &attrs) {
+                 const vector<pair<Type*, bool>> &out_types,
+                 const FnAttrs &attrs) {
   // TODO: can read/write=false fn calls be removed?
 
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
@@ -264,8 +265,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     string valname = name + "#val";
     string npname = name + "#np";
     for (auto t : out_types) {
-      expr np = noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false);
-      values.emplace_back(mk_val(*t, valname), move(np));
+      // Aggregate's padding is not constrained by noundef
+      expr np = noundef && !t.second ?
+                expr(true) : expr::mkFreshVar(npname.c_str(), false);
+      values.emplace_back(mk_val(*t.first, valname), move(np));
     }
 
     string ub_name = name + "#ub";
