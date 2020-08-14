@@ -1,3 +1,4 @@
+; Disabling undef/poison-input don't apply to padding
 ; TEST-ARGS: -disable-undef-input -disable-poison-input
 @g = global {i8, i32} undef
 
@@ -27,3 +28,5 @@ A:
 B:
   ret i32 1
 }
+
+; ERROR: Source is more defined than target

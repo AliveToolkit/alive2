@@ -1,7 +1,7 @@
 ; TEST-ARGS: -disable-undef-input
+; The option is not applied to padding
 @g = global {i8, i32} undef
 
-; Padding may be poison
 define i32 @src({i8, i32} noundef %cond) {
   store {i8, i32} %cond, {i8, i32}* @g
   %p = bitcast {i8, i32}* @g to i8*

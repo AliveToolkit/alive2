@@ -142,9 +142,8 @@ public:
 
   std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
-        std::vector<Memory::PtrInput> &&ptr_inputs,
-        const std::vector<std::pair<Type*, bool>> &out_types, // (ty, padding?)
-        const FnAttrs &attrs);
+              std::vector<Memory::PtrInput> &&ptr_inputs,
+              const std::vector<Type*> &out_types, const FnAttrs &attrs);
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);

@@ -1571,14 +1571,16 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   }
 }
 
-static void unpack_ret_ty (vector<pair<Type*, bool>> &out_types, Type &ty,
-                           bool padding = false) {
+static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      unpack_ret_ty(out_types, agg->getChild(i), agg->isPadding(i));
+      // Padding is automatically filled with poison
+      if (agg->isPadding(i))
+        continue;
+      unpack_ret_ty(out_types, agg->getChild(i));
     }
   } else {
-    out_types.emplace_back(&ty, padding);
+    out_types.emplace_back(&ty);
   }
 }
 
@@ -1588,9 +1590,12 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      // Padding is automatically filled with poison
+      if (agg->isPadding(i))
+        continue;
       vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
     }
-    return agg->aggregateVals(vs);
+    return agg->aggregateVals(vs, true);
   }
 
   auto &ret = vals[idx++];
@@ -1619,7 +1624,7 @@ StateValue FnCall::toSMT(State &s) const {
 
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
-  vector<pair<Type*, bool>> out_types; // (type, padding?)
+  vector<Type*> out_types;
 
   ostringstream fnName_mangled;
   fnName_mangled << fnName;

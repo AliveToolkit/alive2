@@ -805,20 +805,16 @@ unsigned AggregateType::np_bits() const {
 }
 
 StateValue AggregateType::getDummyValue(bool non_poison) const {
-  return getDummyValue(non_poison, non_poison);
-}
-
-StateValue AggregateType::getDummyValue(bool non_poison,
-                                        bool non_poison_padding) const {
   if (elements == 0)
     return { expr::mkUInt(0, 1), expr::mkUInt(non_poison, 1) };
 
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
-    bool np = isPadding(i) ? non_poison_padding : non_poison;
-    vals.emplace_back(children[i]->getDummyValue(np));
+    if (isPadding(i))
+      continue;
+    vals.emplace_back(children[i]->getDummyValue(non_poison));
   }
-  return aggregateVals(vals);
+  return aggregateVals(vals, true);
 }
 
 expr AggregateType::getTypeConstraints() const {
@@ -949,18 +945,10 @@ AggregateType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   vector<expr> vars;
 
   for (unsigned i = 0; i < elements; ++i) {
-    auto *aty = dynamic_cast<AggregateType *>(children[i]);
-    if (!attrs.has(ParamAttrs::NoUndef) || isPadding(i) || aty){
-      // If it has a nested aggregate, the child deals with noundef
-      auto [v, vs] = children[i]->mkUndefInput(s, attrs);
-      v = children[i]->toBV(move(v));
-      val = i == 0 ? move(v) : val.concat(v);
-      vars.insert(vars.end(), vs.begin(), vs.end());
-    } else {
-      auto v = children[i]->getDummyValue(true).value;
-      v = children[i]->toBV(move(v));
-      val = i == 0 ? move(v) : val.concat(v);
-    }
+    auto [v, vs] = children[i]->mkUndefInput(s, attrs);
+    v = children[i]->toBV(move(v));
+    val = i == 0 ? move(v) : val.concat(v);
+    vars.insert(vars.end(), vs.begin(), vs.end());
   }
   return { move(val), move(vars) };
 }
@@ -1418,20 +1406,6 @@ bool hasPtr(const Type &t) {
       if (hasPtr(agg->getChild(i)))
         return true;
     }
-  }
-  return false;
-}
-
-bool hasPadding(const Type &ty) {
-  const auto *aggr_ty = dynamic_cast<const AggregateType *>(&ty);
-  if (!aggr_ty)
-    return false;
-
-  for (unsigned i = 0; i < aggr_ty->numElementsConst(); ++i) {
-    if (aggr_ty->isPadding(i))
-      return true;
-    else if (hasPadding(aggr_ty->getChild(i)))
-      return true;
   }
   return false;
 }

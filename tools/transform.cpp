@@ -54,6 +54,9 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
     if (n == 1) {
       os << "undef";
       return;
+    } else if (n == 2) {
+      os << "poison";
+      return;
     }
     assert(n == 0);
   }
@@ -94,7 +97,7 @@ static void print_varval(ostream &os, State &st, const Model &m,
   for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
     if (i != 0)
       os << ", ";
-    print_varval(os, st, m, nullptr, agg->getChild(i), agg->extract(val, i));
+    print_varval(os, st, m, var, agg->getChild(i), agg->extract(val, i));
   }
   os << (type.isStructType() ? " }" : " >");
 }

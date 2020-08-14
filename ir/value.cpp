@@ -194,9 +194,8 @@ StateValue Input::toSMT(State &s) const {
     val = getType().mkInput(s, smt_name.c_str(), attrs);
   }
 
-  bool has_padding = hasPadding(getType());
   bool never_undef = config::disable_undef_input || has_byval || has_deref ||
-                     (has_noundef && !has_padding);
+                     has_noundef;
 
   if (!never_undef) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
@@ -211,15 +210,10 @@ StateValue Input::toSMT(State &s) const {
     s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
   }
 
-  Type &inputty = getType();
+  expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;
-  expr poison;
-  if (auto *aty = dynamic_cast<AggregateType *>(&inputty))
-    poison = aty->getDummyValue(has_noundef, false).non_poison;
-  else
-    poison = inputty.getDummyValue(false).non_poison;
   bool never_poison = config::disable_poison_input || has_byval || has_deref ||
-                      has_nonnull || (has_noundef && !has_padding);
+                      has_nonnull || has_noundef;
 
   // TODO: element-wise poison/undef control
   return { move(val),

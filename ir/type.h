@@ -279,8 +279,8 @@ public:
 
   unsigned bits() const override;
   unsigned np_bits() const override;
+  // Padding is filled with poison regardless of non_poison.
   IR::StateValue getDummyValue(bool non_poison) const override;
-  IR::StateValue getDummyValue(bool non_poison, bool non_poison_padding) const;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const AggregateType &rhs) const;
@@ -417,7 +417,6 @@ public:
 
 
 bool hasPtr(const Type &t);
-bool hasPadding(const Type &t);
 bool isNonPtrVector(const Type &t);
 unsigned minVectorElemSize(const Type &t);
 uint64_t getCommonAccessSize(const Type &ty);
