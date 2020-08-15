@@ -1472,8 +1472,8 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   if (!aty)
     return e1 == e2;
 
-  StateValue sv1(expr(e1), expr());
-  StateValue sv2(expr(e2), expr());
+  StateValue sv1{expr(e1), expr()};
+  StateValue sv2{expr(e2), expr()};
   expr result = true;
 
   for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
