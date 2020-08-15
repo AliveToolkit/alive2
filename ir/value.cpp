@@ -215,6 +215,12 @@ StateValue Input::toSMT(State &s) const {
   bool never_poison = config::disable_poison_input || has_byval || has_deref ||
                       has_nonnull || has_noundef;
 
+  if (never_undef) {
+    s.addAxiom(never_poison ? type == 0 : type.extract(0, 0) == 0);
+  } else if (never_poison) {
+    s.addAxiom(type.extract(1, 1) == 0);
+  }
+
   // TODO: element-wise poison/undef control
   return { move(val),
              never_poison

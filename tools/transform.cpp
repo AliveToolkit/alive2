@@ -54,9 +54,6 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
     if (n == 1) {
       os << "undef";
       return;
-    } else if (n == 2) {
-      os << "poison";
-      return;
     }
     assert(n == 0);
   }
@@ -292,22 +289,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   AndExpr axioms = src_state.getAxioms();
   axioms.add(tgt_state.getAxioms());
-
-  // restrict type variable from taking disabled values
-  if (config::disable_undef_input || config::disable_poison_input) {
-    for (auto &i : t.src.getInputs()) {
-      if (auto in = dynamic_cast<const Input*>(&i)) {
-        auto var = in->getTyVar();
-        if (config::disable_undef_input) {
-          if (config::disable_poison_input)
-            axioms.add(var == 0);
-          else
-            axioms.add(var != 1);
-        } else if (config::disable_poison_input)
-          axioms.add(var.extract(1, 1) == 0);
-      }
-    }
-  }
 
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
