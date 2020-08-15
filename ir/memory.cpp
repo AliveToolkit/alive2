@@ -797,7 +797,7 @@ expr Pointer::refined(const Pointer &other) const {
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  return expr::mkIf(isLocal(), isHeapAllocated().implies(local), *this == other)
+  return expr::mkIf(isLocal(), move(local), *this == other)
       && isBlockAlive().implies(other.isBlockAlive());
 }
 
