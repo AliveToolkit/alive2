@@ -1468,7 +1468,7 @@ void FnCall::print(ostream &os) const {
 }
 
 static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
-  const auto *aty = dynamic_cast<const AggregateType *>(&ty);
+  const auto *aty = ty.getAsAggregateType();
   if (!aty)
     return e1 == e2;
 
