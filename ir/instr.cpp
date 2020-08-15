@@ -1472,9 +1472,8 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   if (!aty)
     return e1 == e2;
 
-  expr np = ty.getDummyValue(false).non_poison;
-  StateValue sv1{expr(e1), expr(np)};
-  StateValue sv2{expr(e2), expr(np)};
+  StateValue sv1(expr(e1), expr());
+  StateValue sv2(expr(e2), expr());
   expr result = true;
 
   for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
@@ -1488,14 +1487,13 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
 }
 
 static expr not_poison_except_padding(const Type &ty, const expr &np) {
-  const auto *aty = dynamic_cast<const AggregateType *>(&ty);
+  const auto *aty = ty.getAsAggregateType();
   if (!aty) {
     assert(np.isBool() && "non-aggregates should have boolean poison");
     return np;
   }
 
-  auto sv = ty.getDummyValue(true);
-  sv.non_poison = np;
+  StateValue sv(expr(), expr(np));
   expr result = true;
 
   for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
