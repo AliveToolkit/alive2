@@ -1493,7 +1493,7 @@ static expr not_poison_except_padding(const Type &ty, const expr &np) {
     return np;
   }
 
-  StateValue sv(expr(), expr(np));
+  StateValue sv{expr(), expr(np)};
   expr result = true;
 
   for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
