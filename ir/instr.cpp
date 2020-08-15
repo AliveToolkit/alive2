@@ -1467,6 +1467,45 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
+static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty)
+    return e1 == e2;
+
+  StateValue sv1{expr(e1), expr()};
+  StateValue sv2{expr(e2), expr()};
+  expr result = true;
+
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    if (aty->isPadding(i))
+      continue;
+
+    result &= eq_except_padding(aty->getChild(i), aty->extract(sv1, i).value,
+                                aty->extract(sv2, i).value);
+  }
+  return result;
+}
+
+static expr not_poison_except_padding(const Type &ty, const expr &np) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty) {
+    assert(np.isBool() && "non-aggregates should have boolean poison");
+    return np;
+  }
+
+  StateValue sv{expr(), expr(np)};
+  expr result = true;
+
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    if (aty->isPadding(i))
+      continue;
+
+    result &= not_poison_except_padding(aty->getChild(i),
+                                        aty->extract(sv, i).non_poison);
+  }
+  return result;
+}
+
 static pair<expr,expr> // <extracted value, not_undef>
 strip_undef(State &s, const Value &val, const expr &e) {
   if (s.isUndef(e))
@@ -1485,7 +1524,7 @@ strip_undef(State &s, const Value &val, const expr &e) {
       return { move(a), move(c) };
   }
 
-  return { e, e == s[val].value };
+  return { e, eq_except_padding(val.getType(), e, s[val].value) };
 }
 
 static void unpack_inputs(State &s, Value &argv, Type &ty,
@@ -1503,11 +1542,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     bool is_noundef = argflag.has(ParamAttrs::NoUndef);
 
     if (is_deref || is_nonnull || is_noundef)
-      s.addUB(value.non_poison);
+      s.addUB(not_poison_except_padding(ty, value.non_poison));
 
     if (is_noundef) {
-      // TODO: noundef for aggregate should be supported.
-      assert(!argv.getType().isAggregateType());
       auto [val, not_undef] = strip_undef(s, argv, value.value);
       value.value = move(val);
       s.addUB(move(not_undef));
@@ -1535,6 +1572,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      // Padding is automatically filled with poison
+      if (agg->isPadding(i))
+        continue;
       unpack_ret_ty(out_types, agg->getChild(i));
     }
   } else {
@@ -1548,9 +1588,12 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      // Padding is automatically filled with poison
+      if (agg->isPadding(i))
+        continue;
       vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
     }
-    return agg->aggregateVals(vs);
+    return agg->aggregateVals(vs, true);
   }
 
   auto &ret = vals[idx++];
@@ -2135,8 +2178,6 @@ StateValue Return::toSMT(State &s) const {
   bool isNoUndef = attrs.has(FnAttrs::NoUndef);
 
   if (isNoUndef) {
-    // TODO: noundef for aggregates should be supported.
-    assert(!val->getType().isAggregateType());
     auto [value, not_undef] = strip_undef(s, *val, retval.value);
     retval.value = move(value);
     s.addUB(move(not_undef));
@@ -2156,8 +2197,9 @@ StateValue Return::toSMT(State &s) const {
     }
   }
 
-  if (isDeref || isNonNull || isNoUndef)
-    s.addUB(retval.non_poison);
+  if (isDeref || isNonNull || isNoUndef) {
+    s.addUB(not_poison_except_padding(val->getType(), retval.non_poison));
+  }
 
   s.addReturn(move(retval));
   return {};

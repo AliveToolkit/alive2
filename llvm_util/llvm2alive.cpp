@@ -86,11 +86,9 @@ FastMathFlags parse_fmath(llvm::Instruction &i) {
 }
 
 
-// Returns unsupported attribute if exists
 template <typename Fn, typename RetFn>
-optional<llvm::Attribute::AttrKind>
-parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
-              RetFn &&hasRetAttr) {
+void parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
+                   RetFn &&hasRetAttr) {
   if (hasAttr(llvm::Attribute::ReadOnly)) {
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
@@ -115,15 +113,8 @@ parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
   if (hasRetAttr(llvm::Attribute::NonNull))
     attrs.set(FnAttrs::NonNull);
 
-  if (hasRetAttr(llvm::Attribute::NoUndef)) {
-    if (retTy->isAggregateType())
-      // TODO: noundef aggregate should be supported; it can have undef padding
-      return llvm::Attribute::NoUndef;
-
+  if (hasRetAttr(llvm::Attribute::NoUndef))
     attrs.set(FnAttrs::NoUndef);
-  }
-
-  return {};
 }
 
 
@@ -291,20 +282,16 @@ public:
       return error(i);
 
     FnAttrs attrs;
-    auto unsupported_attr =
-        parse_fnattrs(attrs, i.getType(),
-                      [&i](auto attr) { return i.hasFnAttr(attr); },
-                      [&i](auto attr) { return i.hasRetAttr(attr); });
-
-    const auto &ret = llvm::AttributeList::ReturnIndex;
-    if (unsupported_attr)
-      return errorAttr(i.getAttribute(ret, *unsupported_attr));
+    parse_fnattrs(attrs, i.getType(),
+                  [&i](auto attr) { return i.hasFnAttr(attr); },
+                  [&i](auto attr) { return i.hasRetAttr(attr); });
 
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
     }
 
+    const auto &ret = llvm::AttributeList::ReturnIndex;
     if (uint64_t b = max(i.getDereferenceableBytes(ret),
                          i.getCalledFunction()->getDereferenceableBytes(ret))) {
       attrs.set(FnAttrs::Dereferenceable);
@@ -998,12 +985,6 @@ end:
         continue;
 
       case llvm::Attribute::NoUndef:
-        if (arg.getType()->isAggregateType()) {
-          // TODO: noundef aggregate should be supported; it can have undef
-          // padding
-          errorAttr(attr);
-          return nullopt;
-        }
         attrs.set(ParamAttrs::NoUndef);
         continue;
 
@@ -1046,15 +1027,9 @@ end:
 
     auto &attrs = Fn.getFnAttrs();
     const auto &ridx = llvm::AttributeList::ReturnIndex;
-    auto unsupported_attr =
-        parse_fnattrs(attrs, f.getReturnType(),
-                      [&](auto attr) { return f.hasFnAttribute(attr); },
-                      [&](auto attr) { return f.hasAttribute(ridx, attr); });
-
-    if (unsupported_attr) {
-      errorAttr(f.getAttribute(ridx, *unsupported_attr));
-      return nullopt;
-    }
+    parse_fnattrs(attrs, f.getReturnType(),
+                  [&](auto attr) { return f.hasFnAttribute(attr); },
+                  [&](auto attr) { return f.hasAttribute(ridx, attr); });
 
     if (uint64_t b = f.getDereferenceableBytes(ridx)) {
       attrs.set(FnAttrs::Dereferenceable);

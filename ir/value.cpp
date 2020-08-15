@@ -196,6 +196,7 @@ StateValue Input::toSMT(State &s) const {
 
   bool never_undef = config::disable_undef_input || has_byval || has_deref ||
                      has_noundef;
+
   if (!never_undef) {
     auto [undef, vars] = getType().mkUndefInput(s, attrs);
     for (auto &v : vars) {
@@ -204,22 +205,17 @@ StateValue Input::toSMT(State &s) const {
     val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
   }
 
-  if (has_deref || has_nonnull) {
+  if (has_deref) {
     Pointer p(s.getMemory(), val);
-    if (has_deref) {
-      s.addAxiom(type == 0);
-      s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
-    }
-    if (has_nonnull && !has_deref) {
-      s.addAxiom(type.extract(1, 1) == 0);
-    }
+    s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
   }
 
   expr poison = getType().getDummyValue(false).non_poison;
   expr non_poison = getType().getDummyValue(true).non_poison;
   bool never_poison = config::disable_poison_input || has_byval || has_deref ||
-                      has_noundef;
+                      has_nonnull || has_noundef;
 
+  // TODO: element-wise poison/undef control
   return { move(val),
              never_poison
              ? move(non_poison)

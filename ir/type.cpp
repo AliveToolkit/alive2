@@ -810,9 +810,11 @@ StateValue AggregateType::getDummyValue(bool non_poison) const {
 
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
+    if (isPadding(i))
+      continue;
     vals.emplace_back(children[i]->getDummyValue(non_poison));
   }
-  return aggregateVals(vals);
+  return aggregateVals(vals, true);
 }
 
 expr AggregateType::getTypeConstraints() const {

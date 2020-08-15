@@ -54,6 +54,9 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
     if (n == 1) {
       os << "undef";
       return;
+    } else if (n == 2) {
+      os << "poison";
+      return;
     }
     assert(n == 0);
   }
