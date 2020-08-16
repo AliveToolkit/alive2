@@ -1,4 +1,3 @@
-; FIXME: Empty aggregate should be well-supported
 @g = global {{}, i32} undef
 
 ; Does not touch padding
@@ -28,6 +27,3 @@ A:
 B:
   ret i32 1
 }
-
-; FIXME: This should be correct
-; XFAIL: Source is more defined than target
