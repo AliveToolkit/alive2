@@ -1908,10 +1908,12 @@ StateValue Freeze::toSMT(State &s) const {
     vector<StateValue> vals;
     auto ty = getType().getAsAggregateType();
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+      if (ty->isPadding(i))
+        continue;
       auto vi = ty->extract(v, i);
       vals.emplace_back(scalar(vi.value, vi.non_poison, ty->getChild(i)));
     }
-    return ty->aggregateVals(vals);
+    return ty->aggregateVals(vals, true);
   }
   return scalar(v.value, v.non_poison, getType());
 }
