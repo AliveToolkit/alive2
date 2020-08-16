@@ -1947,13 +1947,19 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
     for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
+      // Padding is filled with poison.
+      if (aty->isPadding(i)) {
+        byteofs += getStoreByteSize(aty->getChild(i));
+        continue;
+      }
+
       auto ptr_i = ptr + byteofs;
       auto align_i = gcd(align, byteofs % align);
       member_vals.emplace_back(load(ptr_i, aty->getChild(i), undef, align_i));
       byteofs += getStoreByteSize(aty->getChild(i));
     }
     assert(byteofs == bytecount);
-    return aty->aggregateVals(member_vals);
+    return aty->aggregateVals(member_vals, true);
   }
 
   bool is_ptr = type.isPtrType();
