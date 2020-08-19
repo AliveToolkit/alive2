@@ -728,8 +728,8 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
                                         bool needsPadding) const {
   assert(vals.size() + (needsPadding ? numPaddingsConst() : 0) == elements);
   // structs can be empty
-  if (vals.empty() && !needsPadding)
-    return { expr::mkUInt(0, 1), true };
+  if (elements == 0)
+    return { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
 
   StateValue v;
   bool first = true;
@@ -756,9 +756,6 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
 StateValue
 AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
     const {
-  if (children[index]->bits() == 0)
-    return { expr::mkUInt(0, 1), true };
-
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_value += children[i]->bits();
@@ -789,6 +786,10 @@ AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
 }
 
 unsigned AggregateType::bits() const {
+  if (elements == 0)
+    // It is set as 1 because zero-width bitvector is invalid.
+    return 1;
+
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
     bw += children[i]->bits();
@@ -797,6 +798,10 @@ unsigned AggregateType::bits() const {
 }
 
 unsigned AggregateType::np_bits() const {
+  if (elements == 0)
+    // It is set as 1 because zero-width bitvector is invalid.
+    return 1;
+
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
     bw += children[i]->np_bits();
@@ -805,9 +810,6 @@ unsigned AggregateType::np_bits() const {
 }
 
 StateValue AggregateType::getDummyValue(bool non_poison) const {
-  if (elements == 0)
-    return { expr::mkUInt(0, 1), expr::mkUInt(non_poison, 1) };
-
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
     if (isPadding(i))
@@ -893,7 +895,7 @@ expr AggregateType::toInt(State &s, expr v) const {
 StateValue AggregateType::toInt(State &s, StateValue v) const {
   // structs can be empty
   if (elements == 0)
-    return { expr::mkUInt(0, 1), true };
+    return { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
 
   StateValue ret;
   for (unsigned i = 0; i < elements; ++i) {
@@ -929,6 +931,9 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
 
 expr AggregateType::mkInput(State &s, const char *name,
                             const ParamAttrs &attrs) const {
+  if (elements == 0)
+    return expr::mkUInt(0, 1);
+
   expr val;
   for (unsigned i = 0; i < elements; ++i) {
     string c_name = string(name) + "#" + to_string(i);
@@ -941,6 +946,9 @@ expr AggregateType::mkInput(State &s, const char *name,
 
 pair<expr, vector<expr>>
 AggregateType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
+  if (elements == 0)
+    return { expr::mkUInt(0, 1), {} };
+
   expr val;
   vector<expr> vars;
 
@@ -1127,9 +1135,6 @@ const StructType* StructType::getAsStructType() const {
 }
 
 void StructType::print(ostream &os) const {
-  if (!elements)
-    return;
-
   os << '{';
   for (unsigned i = 0; i < elements; ++i) {
     if (i != 0)
