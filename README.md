@@ -13,8 +13,7 @@ Alive2 includes the following libraries:
 Included tools:
 * Alive drop-in replacement
 * Translation validation plugins for clang and LLVM's `opt`
-* Standalone translation validation tool: `alive-tv`
-
+* Standalone translation validation tool: `alive-tv` ([online](https://alive2.llvm.org))
 
 WARNING
 -------
