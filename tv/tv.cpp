@@ -382,7 +382,8 @@ llvmGetPassPluginInfo() {
              llvm::PassBuilder::OptimizationLevel) {
             MPM.addPass(createModuleToFunctionPassAdaptor(TVFinalizePass()));
           });
-      auto f = [](llvm::StringRef P, llvm::Any IR) {
+      auto f = [](llvm::StringRef P, llvm::Any IR,
+                  const llvm::PreservedAnalyses &PA) {
         static int count = 0;
         if (!out) {
           // TVInitPass is not called yet.
