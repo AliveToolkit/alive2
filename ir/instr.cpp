@@ -2372,6 +2372,8 @@ void Malloc::print(std::ostream &os) const {
 StateValue Malloc::toSMT(State &s) const {
   auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
+  s.addUB(np_size);
+
   unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p_new, allocated]
@@ -2448,6 +2450,7 @@ StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s.getAndAddUndefs(*num);
   auto &[sz, np_sz] = s.getAndAddUndefs(*size);
   auto np = np_num && np_sz;
+  s.addUB(np);
 
   unsigned align = heap_block_alignment;
   expr size = nm * sz;
