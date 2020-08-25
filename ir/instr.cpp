@@ -2396,7 +2396,7 @@ StateValue Malloc::toSMT(State &s) const {
     expr nullp = Pointer::mkNullPointer(m)();
     m.free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
   }
-  return { move(p_new), expr(np_size) };
+  return { move(p_new), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -2462,7 +2462,7 @@ StateValue Calloc::toSMT(State &s) const {
 
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
 
-  return { move(p), move(np) };
+  return { move(p), true };
 }
 
 expr Calloc::getTypeConstraints(const Function &f) const {
