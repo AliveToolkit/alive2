@@ -1,7 +1,6 @@
 target datalayout = "e-p:32:32:32"
 
 declare i8* @memset(i8*, i32, i32)
-declare void @llvm.memset.p0i8.i32(i8* nocapture writeonly, i8, i32, i32, i1)
 declare i8* @malloc(i32)
 declare i8* @calloc(i32, i32)
 
