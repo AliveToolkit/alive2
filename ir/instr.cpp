@@ -2453,10 +2453,11 @@ StateValue Calloc::toSMT(State &s) const {
   s.addUB(np_sz);
 
   unsigned align = heap_block_alignment;
+  auto np = np_num && np_sz;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
-                                            nm.mul_no_uoverflow(sz),
+                                            np && nm.mul_no_uoverflow(sz),
                                             nonnull);
   p = p.subst(allocated, true).simplify();
 
