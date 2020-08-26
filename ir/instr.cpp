@@ -2372,6 +2372,8 @@ void Malloc::print(std::ostream &os) const {
 StateValue Malloc::toSMT(State &s) const {
   auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
+  s.addUB(np_size);
+
   unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p_new, allocated]
@@ -2394,7 +2396,7 @@ StateValue Malloc::toSMT(State &s) const {
     expr nullp = Pointer::mkNullPointer(m)();
     m.free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
   }
-  return { move(p_new), expr(np_size) };
+  return { move(p_new), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -2447,19 +2449,20 @@ void Calloc::print(std::ostream &os) const {
 StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s.getAndAddUndefs(*num);
   auto &[sz, np_sz] = s.getAndAddUndefs(*size);
-  auto np = np_num && np_sz;
+  s.addUB(np_num);
+  s.addUB(np_sz);
 
   unsigned align = heap_block_alignment;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
-                                            np && nm.mul_no_uoverflow(sz),
+                                            nm.mul_no_uoverflow(sz),
                                             nonnull);
   p = p.subst(allocated, true).simplify();
 
   s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
 
-  return { move(p), move(np) };
+  return { move(p), true };
 }
 
 expr Calloc::getTypeConstraints(const Function &f) const {
