@@ -2311,19 +2311,18 @@ void Alloc::print(std::ostream &os) const {
 
 StateValue Alloc::toSMT(State &s) const {
   auto [sz, np] = s[*size];
+  sz = sz.zextOrTrunc(bits_size_t);
   s.addUB(move(np));
 
   if (mul) {
     auto &[mul_e, mul_np] = s[*mul];
     s.addUB(mul_np);
-    sz = sz.zextOrTrunc(bits_size_t);
     auto m = mul_e.zextOrTrunc(bits_size_t);
     s.addUB(sz.mul_no_uoverflow(m));
     sz = sz * m;
   }
 
-  s.addUB(sz.zextOrTrunc(bits_size_t).extract(bits_size_t - 1, bits_size_t - 1)
-          == 0);
+  s.addUB(sz.extract(bits_size_t - 1, bits_size_t - 1) == 0);
   expr ptr = s.getMemory().alloc(sz, align, Memory::STACK, true, true).first;
   if (initially_dead)
     s.getMemory().free(ptr, true);
