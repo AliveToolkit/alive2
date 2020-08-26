@@ -2449,14 +2449,14 @@ void Calloc::print(std::ostream &os) const {
 StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s.getAndAddUndefs(*num);
   auto &[sz, np_sz] = s.getAndAddUndefs(*size);
-  auto np = np_num && np_sz;
-  s.addUB(np);
+  s.addUB(np_num);
+  s.addUB(np_sz);
 
   unsigned align = heap_block_alignment;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
-                                            np && nm.mul_no_uoverflow(sz),
+                                            nm.mul_no_uoverflow(sz),
                                             nonnull);
   p = p.subst(allocated, true).simplify();
 
