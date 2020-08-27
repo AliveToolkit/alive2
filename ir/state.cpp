@@ -124,11 +124,16 @@ const StateValue& State::getAndAddUndefs(const Value &val) {
 }
 
 const StateValue& State::getAndAddPoisonUB(const Value &val) {
-  analysis.non_poison_vals.insert(&val);
-  auto &np = get<1>(values[values_map.at(&val)]).first.non_poison;
+  auto &v = (*this)[val];
+  auto inserted = analysis.non_poison_vals.insert(&val);
+  if (!inserted.second)
+    return v;
+
   // If val is an aggregate, all elements should be non-poison
-  addUB(np.isBool() ? np : np == 0);
-  return (*this)[val];
+  addUB(v.non_poison.isBool() ? v.non_poison : v.non_poison == 0);
+  assert(i_tmp_values < tmp_values.size());
+  return tmp_values[i_tmp_values++] = { expr(v.value),
+        v.non_poison.isBool() ? true : expr::mkUInt(0, v.non_poison.bits()) };
 }
 
 const State::ValTy& State::at(const Value &val) const {
