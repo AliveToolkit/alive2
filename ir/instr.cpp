@@ -2542,9 +2542,9 @@ void Free::print(std::ostream &os) const {
 }
 
 StateValue Free::toSMT(State &s) const {
-  auto p = s.getAndAddPoisonUB(*ptr).value;
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   // If not heaponly, don't encode constraints
-  s.getMemory().free(move(p), !heaponly);
+  s.getMemory().free(p, !heaponly);
 
   if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly)
     s.addUB(expr(false));
@@ -2717,8 +2717,8 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto p = s.getAndAddPoisonUB(*ptr).value;
-  auto [sv, ub] = s.getMemory().load(move(p), getType(), align);
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
+  auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
   return sv;
 }
