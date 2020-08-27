@@ -32,6 +32,18 @@ expr State::DomainPreds::operator()() const {
   return path() && *UB();
 }
 
+void State::ValueAnalysis::intersect(const State::ValueAnalysis &other) {
+  set<const Value*> results;
+  set_intersection(non_poison_vals.begin(), non_poison_vals.end(),
+      other.non_poison_vals.begin(), other.non_poison_vals.end(),
+      inserter(results, results.begin()));
+  non_poison_vals = move(results);
+}
+
+void State::ValueAnalysis::reset() {
+  non_poison_vals.clear();
+}
+
 
 State::State(Function &f, bool source)
   : f(f), source(source), memory(*this),
@@ -60,10 +72,28 @@ const StateValue& State::operator[](const Value &val) {
   auto &[sval, uvars] = val_uvars;
   (void)var;
 
+  auto simplify = [&](StateValue& sv, bool use_new_slot) -> StateValue& {
+    if (analysis.non_poison_vals.count(&val)) {
+      // Store a simplified state value into tmp_values
+      if (use_new_slot) {
+        assert(i_tmp_values < tmp_values.size());
+        tmp_values[i_tmp_values++] = sv;
+      } else {
+        assert(i_tmp_values > 0);
+        tmp_values[i_tmp_values - 1] = sv;
+      }
+      StateValue &sv_new = tmp_values[i_tmp_values - 1];
+      expr np = sv_new.non_poison;
+      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(-1, np.bits());
+      return sv_new;
+    }
+    return sv;
+  };
+
   if (uvars.empty() || !used || disable_undef_rewrite) {
     used = true;
     undef_vars.insert(uvars.begin(), uvars.end());
-    return sval;
+    return simplify(sval, true);
   }
 
   vector<pair<expr, expr>> repls;
@@ -85,13 +115,27 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   assert(i_tmp_values < tmp_values.size());
-  return tmp_values[i_tmp_values++] = move(sval_new);
+  tmp_values[i_tmp_values++] = move(sval_new);
+  return simplify(tmp_values[i_tmp_values - 1], false);
 }
 
 const StateValue& State::getAndAddUndefs(const Value &val) {
   auto &v = (*this)[val];
   for (auto uvar: at(val).second)
     addQuantVar(move(uvar));
+  return v;
+}
+
+const StateValue& State::getAndAddPoisonUB(const Value &val) {
+  auto &v = (*this)[val];
+  if (!v.non_poison.isTrue()) {
+    analysis.non_poison_vals.insert(&val);
+    if (v.non_poison.isBool())
+      addUB(v.non_poison);
+    else
+      // UB if any element is poison
+      addUB(v.non_poison != expr::mkUInt(-1, v.non_poison.bits()));
+  }
   return v;
 }
 
@@ -102,7 +146,7 @@ const State::ValTy& State::at(const Value &val) const {
 const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   auto &pres = predecessor_data.at(current_bb);
   auto I = pres.find(&bb);
-  return I == pres.end() ? nullptr : &I->second.first.path;
+  return I == pres.end() ? nullptr : &I->second.domain.path;
 }
 
 bool State::isUndef(const expr &e) const {
@@ -115,6 +159,7 @@ bool State::startBB(const BasicBlock &bb) {
   current_bb = &bb;
 
   domain.reset();
+  analysis.reset();
 
   if (&f.getFirstBB() == &bb)
     return true;
@@ -127,14 +172,21 @@ bool State::startBB(const BasicBlock &bb) {
   DisjointExpr<expr> UB;
   OrExpr path;
 
+  bool isFirst = true;
   for (auto &[src, data] : I->second) {
     (void)src;
-    auto &[dom, mem] = data;
+    auto &[dom, anlys, mem] = data;
     path.add(dom.path);
     expr p = dom.path();
     UB.add_disj(dom.UB, p);
     in_memory.add_disj(mem, move(p));
     domain.undef_vars.insert(dom.undef_vars.begin(), dom.undef_vars.end());
+
+    if (isFirst)
+      analysis = anlys;
+    else
+      analysis.intersect(anlys);
+    isFirst = false;
   }
 
   domain.path = path();
@@ -155,12 +207,13 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
 
   cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
-  data.second.add(memory, cond);
-  data.first.UB.add(domain.UB(), cond);
-  data.first.path.add(move(cond));
-  data.first.undef_vars.insert(undef_vars.begin(), undef_vars.end());
-  data.first.undef_vars.insert(domain.undef_vars.begin(),
-                               domain.undef_vars.end());
+  data.mem.add(memory, cond);
+  data.domain.UB.add(domain.UB(), cond);
+  data.domain.path.add(move(cond));
+  data.domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  data.domain.undef_vars.insert(domain.undef_vars.begin(),
+                                domain.undef_vars.end());
+  data.analysis = analysis;
 }
 
 void State::addJump(const BasicBlock &dst) {
@@ -332,7 +385,7 @@ expr State::sinkDomain() const {
   OrExpr ret;
   for (auto &[src, data] : I->second) {
     (void)src;
-    ret.add(data.first.path());
+    ret.add(data.domain.path());
   }
   return ret();
 }
