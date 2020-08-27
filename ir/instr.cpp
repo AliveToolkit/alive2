@@ -3008,7 +3008,7 @@ void Strlen::print(ostream &os) const {
 }
 
 StateValue Strlen::toSMT(State &s) const {
-  auto eptr = s.getAndAddPoisonUB(*ptr).value;
+  auto &eptr = s.getAndAddPoisonUB(*ptr).value;
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();
