@@ -2758,9 +2758,9 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  auto p = s.getAndAddPoisonUB(*ptr).value;
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto &v = s[*val];
-  s.getMemory().store(move(p), v, val->getType(), align, s.getUndefVars());
+  s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
 }
 
