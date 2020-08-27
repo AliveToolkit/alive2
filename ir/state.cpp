@@ -127,9 +127,7 @@ const StateValue& State::getAndAddPoisonUB(const Value &val) {
   auto &v = (*this)[val];
   if (v.isValid()) {
     // If val is an aggregate, all elements should be non-poison
-    expr is_np = v.non_poison.isBool() ?
-                  v.non_poison :
-                  v.non_poison == expr::mkUInt(0, v.non_poison.bits());
+    expr is_np = v.non_poison.isBool() ? v.non_poison : v.non_poison == 0;
     if (!is_np.isTrue()) {
       analysis.non_poison_vals.insert(&val);
       addUB(move(is_np));
