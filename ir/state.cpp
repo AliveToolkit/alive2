@@ -74,17 +74,14 @@ const StateValue& State::operator[](const Value &val) {
 
   auto simplify = [&](StateValue& sv, bool use_new_slot) -> StateValue& {
     if (analysis.non_poison_vals.count(&val)) {
-      // Store a simplified state value into tmp_values
       if (use_new_slot) {
         assert(i_tmp_values < tmp_values.size());
         tmp_values[i_tmp_values++] = sv;
-      } else {
-        assert(i_tmp_values > 0);
-        tmp_values[i_tmp_values - 1] = sv;
       }
+      assert(i_tmp_values > 0);
       StateValue &sv_new = tmp_values[i_tmp_values - 1];
-      expr np = sv_new.non_poison;
-      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(-1, np.bits());
+      const expr &np = sv_new.non_poison;
+      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np.bits());
       return sv_new;
     }
     return sv;
@@ -128,13 +125,15 @@ const StateValue& State::getAndAddUndefs(const Value &val) {
 
 const StateValue& State::getAndAddPoisonUB(const Value &val) {
   auto &v = (*this)[val];
-  if (!v.non_poison.isTrue()) {
-    analysis.non_poison_vals.insert(&val);
-    if (v.non_poison.isBool())
-      addUB(v.non_poison);
-    else
-      // UB if any element is poison
-      addUB(v.non_poison != expr::mkUInt(-1, v.non_poison.bits()));
+  if (v.isValid()) {
+    // If val is an aggregate, all elements should be non-poison
+    expr is_np = v.non_poison.isBool() ?
+                  v.non_poison :
+                  v.non_poison == expr::mkUInt(0, v.non_poison.bits());
+    if (!is_np.isTrue()) {
+      analysis.non_poison_vals.insert(&val);
+      addUB(move(is_np));
+    }
   }
   return v;
 }
