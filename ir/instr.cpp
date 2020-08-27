@@ -1489,7 +1489,7 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
 static expr not_poison_except_padding(const Type &ty, const expr &np) {
   const auto *aty = ty.getAsAggregateType();
   if (!aty) {
-    assert(np.isBool() && "non-aggregates should have boolean poison");
+    assert(!np.isValid() || np.isBool());
     return np;
   }
 
