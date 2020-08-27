@@ -125,8 +125,7 @@ const StateValue& State::getAndAddUndefs(const Value &val) {
 
 const StateValue& State::getAndAddPoisonUB(const Value &val) {
   auto &v = (*this)[val];
-  auto inserted = analysis.non_poison_vals.insert(&val);
-  if (!inserted.second)
+  if (!analysis.non_poison_vals.insert(&val).second)
     return v;
 
   // If val is an aggregate, all elements should be non-poison
