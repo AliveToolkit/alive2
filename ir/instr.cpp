@@ -632,7 +632,7 @@ StateValue BinOp::toSMT(State &s) const {
   } else {
     scalar_op = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto [v, np] = fn(a, ap, b, bp);
-      return { move(v), ap && (BinOp::isDivOrRem(op) ? true : bp) && np };
+      return { move(v), ap && bp && np };
     };
   }
 
