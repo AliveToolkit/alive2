@@ -72,7 +72,7 @@ const StateValue& State::operator[](const Value &val) {
   auto &[sval, uvars] = val_uvars;
   (void)var;
 
-  auto simplify = [&](StateValue& sv, bool use_new_slot) -> StateValue& {
+  auto simplify = [&](StateValue &sv, bool use_new_slot) -> StateValue& {
     if (analysis.non_poison_vals.count(&val)) {
       if (use_new_slot) {
         assert(i_tmp_values < tmp_values.size());
