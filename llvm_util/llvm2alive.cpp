@@ -573,7 +573,8 @@ end:
           assert(!isa<llvm::ScalableVectorType>(opvty));
           vector<llvm::Constant *> offsets;
 
-          for (unsigned i = 0; i < opvty->getElementCount().Min; ++i) {
+          for (unsigned i = 0; i < opvty->getElementCount().getKnownMinValue();
+               ++i) {
             llvm::Constant *constofs = nullptr;
             if (auto cdv = dyn_cast<llvm::ConstantDataVector>(I.getOperand())) {
               constofs = cdv->getElementAsConstant(i);

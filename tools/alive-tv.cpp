@@ -238,12 +238,14 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
   case llvm::Type::FixedVectorTyID: {
     auto *STyL = llvm::cast<llvm::VectorType>(TyL);
     auto *STyR = llvm::cast<llvm::VectorType>(TyR);
-    if (STyL->getElementCount().Scalable != STyR->getElementCount().Scalable)
-      return cmpNumbers(STyL->getElementCount().Scalable,
-                        STyR->getElementCount().Scalable);
-    if (STyL->getElementCount().Min != STyR->getElementCount().Min)
-      return cmpNumbers(STyL->getElementCount().Min,
-                        STyR->getElementCount().Min);
+    if (STyL->getElementCount().isScalable() !=
+        STyR->getElementCount().isScalable())
+      return cmpNumbers(STyL->getElementCount().isScalable(),
+                        STyR->getElementCount().isScalable());
+    if (STyL->getElementCount().getKnownMinValue() !=
+        STyR->getElementCount().getKnownMinValue())
+      return cmpNumbers(STyL->getElementCount().getKnownMinValue(),
+                        STyR->getElementCount().getKnownMinValue());
     return cmpTypes(STyL->getElementType(), STyR->getElementType(), FnL, FnR);
   }
   }
