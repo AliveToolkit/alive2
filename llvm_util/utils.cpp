@@ -157,7 +157,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
-      auto elems = vty->getElementCount().Min;
+      auto elems = vty->getElementCount().getKnownMinValue();
       auto ety = llvm_type2alive(vty->getElementType());
       if (!ety || elems > 128)
         return nullptr;
