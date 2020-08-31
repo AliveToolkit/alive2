@@ -1650,6 +1650,9 @@ expr expr::simplify() const {
 
 expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   C();
+  if (repls.empty())
+    return *this;
+
   unique_ptr<Z3_ast[]> from(new Z3_ast[repls.size()]);
   unique_ptr<Z3_ast[]> to(new Z3_ast[repls.size()]);
 

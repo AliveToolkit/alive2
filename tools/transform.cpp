@@ -183,7 +183,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
 
 static expr preprocess(Transform &t, const set<expr> &qvars0,
-                       const set<expr> &undef_qvars, expr && e) {
+                       const set<expr> &undef_qvars, expr &&e) {
   if (hit_half_memory_limit())
     return expr::mkForAll(qvars0, move(e));
 
@@ -208,7 +208,6 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
     qvars.erase(var);
   }
 
-  // TODO: maybe try to instantiate undet_xx vars?
   if (undef_qvars.empty() || hit_half_memory_limit())
     return expr::mkForAll(qvars, move(e));
 
@@ -256,9 +255,6 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
   for (auto &[e, v] : instances) {
     insts |= expr::mkForAll(qvars, move(const_cast<expr&>(e))) && v;
   }
-
-  // TODO: try out instantiating the undefs in forall quantifier
-
   return insts;
 }
 
@@ -308,8 +304,22 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
 
   pre_tgt &= src_state.getOOM()();
   pre_tgt &= !tgt_state.sinkDomain();
-  pre_tgt &= src_state.getPre(true)();
-  pre_tgt &= tgt_state.getPre(true)();
+
+  expr pre_src_exists = pre_src, pre_src_forall = true;
+  {
+    vector<pair<expr,expr>> repls;
+    auto vars_pre = pre_src.vars();
+    for (auto &v : qvars) {
+      if (vars_pre.count(v))
+        repls.emplace_back(v, expr::mkFreshVar("#exists", v));
+    }
+    auto new_pre = pre_src.subst(repls);
+    if (!new_pre.eq(pre_src)) {
+      pre_src_exists = move(new_pre);
+      pre_src_forall = pre_src;
+    }
+  }
+  expr pre = pre_src_exists && pre_tgt;
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
 
@@ -337,8 +347,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     if (refines.isFalse())
       return move(refines);
 
-    auto fml = pre_tgt && pre_src.implies(refines);
-    return axioms_expr && preprocess(t, qvars, uvars, move(fml));
+    return axioms_expr &&
+            preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
   };
 
   auto print_ptr_load = [&](ostream &s, const Model &m) {

@@ -62,7 +62,7 @@ struct LoopLikeFunctionApproximator {
     prefix.add(ub_i);
 
     if (is_last) {
-      s.addPre(prefix().implies(!continue_i), true);
+      s.addPre(prefix().implies(!continue_i));
       return { move(res_i), move(np_i), move(ub) };
     }
 
