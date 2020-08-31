@@ -174,8 +174,9 @@ void State::addJump(expr &&cond, const BasicBlock &dst) {
 
 void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
-  addJump(dst_true,  cond == 1);
-  addJump(dst_false, cond == 0);
+  expr cond_false = cond == 0;
+  addJump(dst_true,  !cond_false);
+  addJump(dst_false, move(cond_false));
   addUB(expr(false));
 }
 
