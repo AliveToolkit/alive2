@@ -54,7 +54,6 @@ private:
   bool is_initialization_phase = true;
   smt::AndExpr precondition;
   smt::AndExpr axioms;
-  smt::AndExpr ooms;
 
   const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
@@ -137,7 +136,6 @@ public:
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
   void addNoReturn();
-  void addOOM(smt::expr &&oom) { ooms.add(std::move(oom)); }
 
   std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
@@ -159,7 +157,6 @@ public:
   auto& getMemory() { return memory; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
-  auto& getOOM() const { return ooms; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
 

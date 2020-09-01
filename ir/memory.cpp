@@ -1543,8 +1543,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
         auto align = one << p.blockAlignment().zextOrTrunc(bits_size_t - 1);
         align = align - one;
         auto sz_align = size + align;
-        m.state->addOOM(size.add_no_uoverflow(align));
-        m.state->addOOM(sum.add_no_uoverflow(sz_align));
+        m.state->addPre(size.add_no_uoverflow(align));
+        m.state->addPre(sum.add_no_uoverflow(sz_align));
         sum = sum + sz_align;
       }
     }

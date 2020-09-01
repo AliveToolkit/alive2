@@ -316,7 +316,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr axioms_expr = axioms();
   expr dom = dom_a && dom_b;
 
-  pre_tgt &= src_state.getOOM()();
   pre_tgt &= !tgt_state.sinkDomain();
 
   expr pre_src_exists = pre_src, pre_src_forall = true;
