@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+
 define i8* @src(i32 %size) {
   %call1 = call i8* @malloc(i32 %size)
   ret i8* %call1

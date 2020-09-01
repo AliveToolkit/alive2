@@ -1,5 +1,5 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=32078
-; To detect this, an input vector should be element-wise poison
+; ERROR: Target is more poisonous than source
 
 define i1 @src(<2 x i32> %x, <2 x i32> %y) {
 entry:
@@ -26,4 +26,3 @@ define i1 @tgt(<2 x i32> %x, <2 x i32> %y) {
   %and_of_cmps = and i1 %cmp0, %cmp1
   ret i1 %and_of_cmps
 }
-

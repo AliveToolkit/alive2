@@ -248,10 +248,9 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
     expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
 }
 
-pair<expr, vector<expr>>
-Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
+pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
-  return { var, { var } };
+  return { var, var };
 }
 
 ostream& operator<<(ostream &os, const Type &t) {
@@ -657,10 +656,9 @@ expr PtrType::mkInput(State &s, const char *name,
   return s.getMemory().mkInput(name, attrs);
 }
 
-pair<expr, vector<expr>>
+pair<expr, expr>
 PtrType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
-  auto [val, var] = s.getMemory().mkUndefInput(attrs);
-  return { move(val), { move(var) } };
+  return s.getMemory().mkUndefInput(attrs);
 }
 
 void PtrType::printVal(ostream &os, State &s, const expr &e) const {
@@ -931,34 +929,7 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
 
 expr AggregateType::mkInput(State &s, const char *name,
                             const ParamAttrs &attrs) const {
-  if (elements == 0)
-    return expr::mkUInt(0, 1);
-
-  expr val;
-  for (unsigned i = 0; i < elements; ++i) {
-    string c_name = string(name) + "#" + to_string(i);
-    auto v = children[i]->mkInput(s, c_name.c_str(), attrs);
-    v = children[i]->toBV(move(v));
-    val = i == 0 ? move(v) : val.concat(v);
-  }
-  return val;
-}
-
-pair<expr, vector<expr>>
-AggregateType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
-  if (elements == 0)
-    return { expr::mkUInt(0, 1), {} };
-
-  expr val;
-  vector<expr> vars;
-
-  for (unsigned i = 0; i < elements; ++i) {
-    auto [v, vs] = children[i]->mkUndefInput(s, attrs);
-    v = children[i]->toBV(move(v));
-    val = i == 0 ? move(v) : val.concat(v);
-    vars.insert(vars.end(), vs.begin(), vs.end());
-  }
-  return { move(val), move(vars) };
+  UNREACHABLE();
 }
 
 unsigned AggregateType::numPointerElements() const {
@@ -1388,7 +1359,7 @@ expr SymbolicType::mkInput(State &st, const char *name,
   DISPATCH(mkInput(st, name, attrs), UNREACHABLE());
 }
 
-pair<expr, vector<expr>>
+pair<expr, expr>
 SymbolicType::mkUndefInput(State &st, const ParamAttrs &attrs) const {
   DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }

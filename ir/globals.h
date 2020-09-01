@@ -84,6 +84,5 @@ extern unsigned heap_block_alignment;
 
 
 bool isUndef(const smt::expr &e);
-bool isTyVar(const smt::expr &ty, const smt::expr &var);
 
 }

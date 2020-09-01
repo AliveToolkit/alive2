@@ -1,5 +1,4 @@
 ; Found by Alive2
-; TEST-ARGS: -disable-undef-input
 target datalayout = "e-i64:64-v16:16-v32:32-n16:32:64-p:64:64:64-p1:32:32:32"
 
 define void @src([10 x [5 x i32]]* %input, i64 %s, i64 %t) {

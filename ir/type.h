@@ -111,7 +111,7 @@ public:
 
   virtual smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const = 0;
-  virtual std::pair<smt::expr, std::vector<smt::expr>>
+  virtual std::pair<smt::expr, smt::expr>
     mkUndefInput(State &s, const ParamAttrs &attrs) const;
 
   virtual void printVal(std::ostream &os, State &s,
@@ -243,7 +243,7 @@ public:
             const StateValue &tgt) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
+  std::pair<smt::expr, smt::expr>
     mkUndefInput(State &s, const ParamAttrs &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;
@@ -300,8 +300,6 @@ public:
             const StateValue &tgt) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
-    mkUndefInput(State &s, const ParamAttrs &attrs) const override;
   unsigned numPointerElements() const;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   const AggregateType* getAsAggregateType() const override;
@@ -409,7 +407,7 @@ public:
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs)
     const override;
-  std::pair<smt::expr, std::vector<smt::expr>>
+  std::pair<smt::expr, smt::expr>
     mkUndefInput(State &s, const ParamAttrs &attrs) const override;
   void printVal(std::ostream &os, State &s, const smt::expr &e) const override;
   void print(std::ostream &os) const override;

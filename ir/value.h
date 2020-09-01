@@ -111,6 +111,8 @@ public:
 class Input final : public Value {
   std::string smt_name;
   ParamAttrs attrs;
+  std::string getSMTName(unsigned child) const;
+  StateValue mkInput(State &s, const Type &ty, unsigned child) const;
 public:
   Input(Type &type, std::string &&name,
         ParamAttrs &&attrs = ParamAttrs::None);
@@ -119,7 +121,7 @@ public:
   bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
   const ParamAttrs &getAttributes() const { return attrs; }
   StateValue toSMT(State &s) const override;
-  smt::expr getTyVar() const;
+  smt::expr getUndefVar(const Type &ty, unsigned child) const;
 };
 
 }

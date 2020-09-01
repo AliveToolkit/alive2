@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+
 define i8* @f(i64 %size) {
 entry:
   %items.addr = alloca i32, align 4

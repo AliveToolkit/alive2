@@ -175,9 +175,24 @@ void Input::print(ostream &os) const {
   UNREACHABLE();
 }
 
-StateValue Input::toSMT(State &s) const {
-  // 00: normal, 01: undef, else: poison
-  expr type = getTyVar();
+string Input::getSMTName(unsigned child) const {
+  if (getType().isAggregateType())
+    return smt_name + '#' + to_string(child);
+  assert(child == 0);
+  return smt_name;
+}
+
+StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
+  if (auto agg = ty.getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
+      if (agg->isPadding(i))
+        continue;
+      auto name = getSMTName(child + i);
+      vals.emplace_back(mkInput(s, agg->getChild(i), child + i));
+    }
+    return agg->aggregateVals(vals, true);
+  }
 
   bool has_byval = hasAttribute(ParamAttrs::ByVal);
   bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
@@ -191,18 +206,18 @@ StateValue Input::toSMT(State &s) const {
     val = get_global(s, getName(), size, attrs.align, false, bid);
     s.getMemory().markByVal(bid);
   } else {
-    val = getType().mkInput(s, smt_name.c_str(), attrs);
+    auto name = getSMTName(child);
+    val = ty.mkInput(s, name.c_str(), attrs);
   }
 
-  bool never_undef = config::disable_undef_input || has_byval || has_deref ||
-                     has_noundef;
-
-  if (!never_undef) {
-    auto [undef, vars] = getType().mkUndefInput(s, attrs);
-    for (auto &v : vars) {
-      s.addUndefVar(move(v));
-    }
-    val = expr::mkIf(type.extract(0, 0) == 0, val, undef);
+  auto undef_mask = getUndefVar(ty, child);
+  if (undef_mask.isValid()) {
+    auto [undef, var] = ty.mkUndefInput(s, attrs);
+    if (undef_mask.bits() == 1)
+      val = expr::mkIf(undef_mask == 0, val, undef);
+    else
+      val = (~undef_mask & val) | (undef_mask & undef);
+    s.addUndefVar(move(var));
   }
 
   if (has_deref) {
@@ -210,27 +225,28 @@ StateValue Input::toSMT(State &s) const {
     s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
   }
 
-  expr poison = getType().getDummyValue(false).non_poison;
-  expr non_poison = getType().getDummyValue(true).non_poison;
   bool never_poison = config::disable_poison_input || has_byval || has_deref ||
                       has_nonnull || has_noundef;
+  string np_name = "np_" + getSMTName(child);
 
-  if (never_undef) {
-    s.addAxiom(never_poison ? type == 0 : type.extract(0, 0) == 0);
-  } else if (never_poison) {
-    s.addAxiom(type.extract(1, 1) == 0);
-  }
-
-  // TODO: element-wise poison/undef control
-  return { move(val),
-             never_poison
-             ? move(non_poison)
-             : expr::mkIf(type.extract(1, 1) == 0, non_poison, poison) };
+  return { move(val), never_poison ? true : expr::mkBoolVar(np_name.c_str()) };
 }
 
-expr Input::getTyVar() const {
-  string tyname = "ty_" + smt_name;
-  return expr::mkVar(tyname.c_str(), 2);
+StateValue Input::toSMT(State &s) const {
+  return mkInput(s, getType(), 0);
+}
+
+expr Input::getUndefVar(const Type &ty, unsigned child) const {
+  if (config::disable_undef_input ||
+      hasAttribute(ParamAttrs::ByVal) ||
+      hasAttribute(ParamAttrs::Dereferenceable) ||
+      hasAttribute(ParamAttrs::NoUndef))
+    return {};
+
+  string tyname = "isundef_" + getSMTName(child);
+  //return expr::mkVar(tyname.c_str(), ty.getDummyValue(false).value);
+  // FIXME: only whole value undef or non-undef for now
+  return expr::mkVar(tyname.c_str(), expr::mkUInt(0, 1));
 }
 
 }

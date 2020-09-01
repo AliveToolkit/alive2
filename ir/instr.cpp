@@ -1506,23 +1506,32 @@ static expr not_poison_except_padding(const Type &ty, const expr &np) {
   return result;
 }
 
+static bool isUndefMask(const expr &e, const expr &var) {
+  auto ty_name = e.fn_name();
+  auto var_name = var.fn_name();
+  return string_view(ty_name).substr(0, 8) == "isundef_" &&
+         string_view(ty_name).substr(8, var_name.size()) == var_name;
+}
+
 static pair<expr,expr> // <extracted value, not_undef>
 strip_undef(State &s, const Value &val, const expr &e) {
   if (s.isUndef(e))
     return { expr::mkUInt(0, e), false };
 
-  expr c, a, b, lhs, rhs, ty;
-  unsigned h, l;
+  expr c, a, b, lhs, rhs;
 
-  // (ite (= ((_ extract 0 0) ty_%var) #b0) %var undef!0)
+  // two variants
+  // 1) boolean: (ite (= isundef_%var #b0) %var undef)
   if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
     if (lhs.isZero())
       swap(lhs, rhs);
 
-    if (rhs.isZero() &&
-        lhs.isExtract(ty, h, l) && h == 0 && l == 0 && isTyVar(ty, a))
+    if (rhs.isZero() && isUndefMask(lhs, a))
       return { move(a), move(c) };
   }
+
+  // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
+  // TODO
 
   return { e, eq_except_padding(val.getType(), e, s[val].value) };
 }

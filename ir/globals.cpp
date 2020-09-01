@@ -50,11 +50,4 @@ bool isUndef(const expr &e) {
   return string_view(name).substr(0, 6) == "undef!";
 }
 
-bool isTyVar(const expr &ty, const expr &var) {
-  auto ty_name = ty.fn_name();
-  auto var_name = var.fn_name();
-  return string_view(ty_name).substr(0, 3) == "ty_" &&
-         string_view(ty_name).substr(3) == var_name;
-}
-
 }

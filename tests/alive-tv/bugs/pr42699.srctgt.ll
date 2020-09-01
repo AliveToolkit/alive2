@@ -1,5 +1,4 @@
 ; Reported by Alive2
-; TEST-ARGS: -disable-undef-input
 
 define i64 @src(i8* %foo, i64 %i, i64 %j) {
   %bit = bitcast i8* %foo to i32*
