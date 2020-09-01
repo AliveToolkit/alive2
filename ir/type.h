@@ -269,8 +269,7 @@ public:
   unsigned numElementsConst() const { return elements; }
   unsigned numPaddingsConst() const;
 
-  StateValue aggregateVals(const std::vector<StateValue> &vals,
-                           bool needsPadding = false) const;
+  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
   IR::StateValue extract(const IR::StateValue &val, unsigned index,
                          bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }

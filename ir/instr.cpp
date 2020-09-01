@@ -680,7 +680,7 @@ StateValue BinOp::toSMT(State &s) const {
                                     bi->non_poison));
       }
     }
-    return retty->aggregateVals(vals, true);
+    return retty->aggregateVals(vals);
   }
 
   if (vertical_zip) {
@@ -688,7 +688,7 @@ StateValue BinOp::toSMT(State &s) const {
     auto [v1, v2] = zip_op(a.value, a.non_poison, b.value, b.non_poison);
     vals.emplace_back(move(v1));
     vals.emplace_back(move(v2));
-    return getType().getAsAggregateType()->aggregateVals(vals, true);
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
   return scalar_op(a.value, a.non_poison, b.value, b.non_poison);
 }
@@ -1377,6 +1377,9 @@ static StateValue update_repack(Type *type,
   indices.pop_back();
   vector<StateValue> vals;
   for (unsigned i = 0, e = ty->numElementsConst(); i < e; ++i) {
+    if (ty->isPadding(i))
+      continue;
+
     auto v = ty->extract(val, i);
     if (i == cur_idx) {
       vals.emplace_back(indices.empty() ?
@@ -1602,7 +1605,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
         continue;
       vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
     }
-    return agg->aggregateVals(vs, true);
+    return agg->aggregateVals(vs);
   }
 
   auto &ret = vals[idx++];
@@ -1922,7 +1925,7 @@ StateValue Freeze::toSMT(State &s) const {
       auto vi = ty->extract(v, i);
       vals.emplace_back(scalar(vi.value, vi.non_poison, ty->getChild(i)));
     }
-    return ty->aggregateVals(vals, true);
+    return ty->aggregateVals(vals);
   }
   return scalar(v.value, v.non_poison, getType());
 }

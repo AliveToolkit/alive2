@@ -132,8 +132,10 @@ AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
 
 StateValue AggregateValue::toSMT(State &s) const {
   vector<StateValue> state_vals;
-  for (auto val : vals) {
-    state_vals.emplace_back(val->toSMT(s));
+  auto agg = getType().getAsAggregateType();
+  for (unsigned i = 0, e = vals.size(); i < e; ++i) {
+    if (!agg->isPadding(i))
+      state_vals.emplace_back(vals[i]->toSMT(s));
   }
   return getType().getAsAggregateType()->aggregateVals(state_vals);
 }
@@ -191,7 +193,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
       auto name = getSMTName(child + i);
       vals.emplace_back(mkInput(s, agg->getChild(i), child + i));
     }
-    return agg->aggregateVals(vals, true);
+    return agg->aggregateVals(vals);
   }
 
   bool has_byval = hasAttribute(ParamAttrs::ByVal);

@@ -1959,7 +1959,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
       byteofs += getStoreByteSize(aty->getChild(i));
     }
     assert(byteofs == bytecount);
-    return aty->aggregateVals(member_vals, true);
+    return aty->aggregateVals(member_vals);
   }
 
   bool is_ptr = type.isPtrType();

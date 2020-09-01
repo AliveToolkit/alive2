@@ -722,9 +722,8 @@ expr AggregateType::numElementsExcludingPadding() const {
   return numElements() - expr::mkInt(numPaddingsConst(), elems);
 }
 
-StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
-                                        bool needsPadding) const {
-  assert(vals.size() + (needsPadding ? numPaddingsConst() : 0) == elements);
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
+  assert(vals.size() + numPaddingsConst() == elements);
   // structs can be empty
   if (elements == 0)
     return { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
@@ -740,7 +739,7 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
     }
 
     StateValue vv;
-    if (needsPadding && isPadding(idx))
+    if (isPadding(idx))
       vv = children[idx]->getDummyValue(false);
     else
       vv = vals[val_idx++];
@@ -810,11 +809,10 @@ unsigned AggregateType::np_bits() const {
 StateValue AggregateType::getDummyValue(bool non_poison) const {
   vector<StateValue> vals;
   for (unsigned i = 0; i < elements; ++i) {
-    if (isPadding(i))
-      continue;
-    vals.emplace_back(children[i]->getDummyValue(non_poison));
+    if (!isPadding(i))
+      vals.emplace_back(children[i]->getDummyValue(non_poison));
   }
-  return aggregateVals(vals, true);
+  return aggregateVals(vals);
 }
 
 expr AggregateType::getTypeConstraints() const {
