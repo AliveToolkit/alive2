@@ -1266,8 +1266,9 @@ StateValue Select::toSMT(State &s) const {
     auto cond_agg = cond->getType().getAsAggregateType();
 
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(agg->extract(av, i), agg->extract(bv, i),
-                               cond_agg ? cond_agg->extract(cv, i) : cv));
+      if (!agg->isPadding(i))
+        vals.emplace_back(scalar(agg->extract(av, i), agg->extract(bv, i),
+                                 cond_agg ? cond_agg->extract(cv, i) : cv));
     }
     return agg->aggregateVals(vals);
   }
