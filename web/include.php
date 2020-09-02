@@ -3,6 +3,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 ini_set('arg_separator.output', '&amp;');
+ini_set('url_rewriter.tags', 'a=href,form=');
 
 define('IS_ADMIN',
        isset($_REQUEST['key']) &&
