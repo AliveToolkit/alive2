@@ -937,7 +937,7 @@ TypingAssignments TransformVerify::getTypings() const {
   if (check_each_var) {
     for (auto &i : t.src.instrs()) {
       if (!i.isVoid())
-        c &= i.eqType(*tgt_instrs.at(i.getName()));
+        c &= i.getType() == tgt_instrs.at(i.getName())->getType();
     }
   }
   return { move(c) };

@@ -90,8 +90,9 @@ uint64_t getGlobalVarSize(const IR::Value *V) {
 
 namespace IR {
 
-expr Instr::eqType(const Instr &i) const {
-  return getType() == i.getType();
+bool Instr::propagatesPoison() const {
+  // be on the safe side
+  return false;
 }
 
 expr Instr::getTypeConstraints() const {
@@ -182,6 +183,10 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
 
 vector<Value*> BinOp::operands() const {
   return { lhs, rhs };
+}
+
+bool BinOp::propagatesPoison() const {
+  return true;
 }
 
 void BinOp::rauw(const Value &what, Value &with) {
@@ -763,6 +768,10 @@ vector<Value*> UnaryOp::operands() const {
   return { val };
 }
 
+bool UnaryOp::propagatesPoison() const {
+  return true;
+}
+
 void UnaryOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
@@ -867,6 +876,10 @@ vector<Value*> UnaryReductionOp::operands() const {
   return { val };
 }
 
+bool UnaryReductionOp::propagatesPoison() const {
+  return true;
+}
+
 void UnaryReductionOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
@@ -958,6 +971,10 @@ TernaryOp::TernaryOp(Type &type, string &&name, Value &a, Value &b, Value &c,
 
 vector<Value*> TernaryOp::operands() const {
   return { a, b, c };
+}
+
+bool TernaryOp::propagatesPoison() const {
+  return true;
 }
 
 void TernaryOp::rauw(const Value &what, Value &with) {
@@ -1052,6 +1069,10 @@ unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {
 
 vector<Value*> ConversionOp::operands() const {
   return { val };
+}
+
+bool ConversionOp::propagatesPoison() const {
+  return true;
 }
 
 void ConversionOp::rauw(const Value &what, Value &with) {
@@ -1703,6 +1724,10 @@ vector<Value*> ICmp::operands() const {
   return { a, b };
 }
 
+bool ICmp::propagatesPoison() const {
+  return true;
+}
+
 void ICmp::rauw(const Value &what, Value &with) {
   RAUW(a);
   RAUW(b);
@@ -2072,9 +2097,8 @@ void Branch::print(ostream &os) const {
 
 StateValue Branch::toSMT(State &s) const {
   if (cond) {
-    auto &c = s[*cond];
+    auto &c = s.getAndAddPoisonUB(*cond);
     auto [cond_val, not_undef] = strip_undef(s, *cond, c.value);
-    s.addUB(c.non_poison);
     s.addUB(move(not_undef));
     s.addCondJump(cond_val, dst_true, *dst_false);
   } else {
@@ -2126,11 +2150,10 @@ void Switch::print(ostream &os) const {
 }
 
 StateValue Switch::toSMT(State &s) const {
-  auto &val = s[*value];
+  auto &val = s.getAndAddPoisonUB(*value);
   expr default_cond(true);
 
   auto [cond_val, not_undef] = strip_undef(s, *value, val.value);
-  s.addUB(val.non_poison);
   s.addUB(move(not_undef));
 
   for (auto &[value_cond, bb] : targets) {
@@ -2522,8 +2545,7 @@ void StartLifetime::print(std::ostream &os) const {
 }
 
 StateValue StartLifetime::toSMT(State &s) const {
-  auto &[p, np] = s[*ptr];
-  s.addUB(np);
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   s.getMemory().startLifetime(p);
   return {};
 }
@@ -2873,9 +2895,8 @@ void Memcpy::print(ostream &os) const {
 StateValue Memcpy::toSMT(State &s) const {
   auto &[vdst, np_dst] = s[*dst];
   auto &[vsrc, np_src] = s[*src];
-  auto &[vbytes, np_bytes] = s[*bytes];
+  auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
   s.addUB((vbytes != 0).implies(np_dst && np_src));
-  s.addUB(np_bytes);
 
   if (vbytes.bits() > bits_size_t)
     s.addUB(
@@ -2926,9 +2947,8 @@ void Memcmp::print(ostream &os) const {
 StateValue Memcmp::toSMT(State &s) const {
   auto &[vptr1, np1] = s[*ptr1];
   auto &[vptr2, np2] = s[*ptr2];
-  auto &[vnum, npn] = s[*num];
+  auto &vnum = s.getAndAddPoisonUB(*num).value;
   s.addUB((vnum != 0).implies(np1 && np2));
-  s.addUB(npn);
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
   // memcmp can be optimized to load & icmps, and it requires this

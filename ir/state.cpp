@@ -128,6 +128,25 @@ const StateValue& State::getAndAddPoisonUB(const Value &val) {
   if (!analysis.non_poison_vals.insert(&val).second)
     return v;
 
+  // mark all operands of val as non-poison if they propagate poison
+  vector<Value*> todo;
+  if (auto i = dynamic_cast<const Instr*>(&val)) {
+    if (i->propagatesPoison())
+      todo = i->operands();
+  }
+  while (!todo.empty()) {
+    auto v = todo.back();
+    todo.pop_back();
+    if (!analysis.non_poison_vals.insert(v).second)
+      continue;
+    if (auto i = dynamic_cast<const Instr*>(v)) {
+      if (i->propagatesPoison()) {
+        auto ops = i->operands();
+        todo.insert(todo.end(), ops.begin(), ops.end());
+      }
+    }
+  }
+
   // If val is an aggregate, all elements should be non-poison
   addUB(v.non_poison.isBool() ? v.non_poison : v.non_poison == 0);
   assert(i_tmp_values < tmp_values.size());
