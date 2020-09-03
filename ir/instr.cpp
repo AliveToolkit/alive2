@@ -632,12 +632,12 @@ StateValue BinOp::toSMT(State &s) const {
   } else {
     scalar_op = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       auto [v, np] = fn(a, ap, b, bp);
-      return { move(v), ap && bp && np };
+      return { move(v), ap && (isDivOrRem() ? expr(true) : bp) && np };
     };
   }
 
   auto &a = s[*lhs];
-  auto &b = isDivOrRem(op) ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
+  auto &b = isDivOrRem() ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
@@ -746,7 +746,7 @@ unique_ptr<Instr> BinOp::dup(const string &suffix) const {
                             fmath);
 }
 
-bool BinOp::isDivOrRem(const Op op) {
+bool BinOp::isDivOrRem() const {
   switch (op) {
   case Op::SDiv:
   case Op::SRem:

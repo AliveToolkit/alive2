@@ -55,6 +55,7 @@ private:
   Op op;
   unsigned flags;
   FastMathFlags fmath;
+  bool isDivOrRem() const;
 
 public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
@@ -66,8 +67,6 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
-
-  static bool isDivOrRem(const Op op);
 };
 
 
