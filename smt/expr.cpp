@@ -1275,6 +1275,13 @@ expr expr::uge(const expr &rhs) const {
 }
 
 expr expr::ugt(const expr &rhs) const {
+  if (rhs.isAllOnes())
+    return false;
+
+  uint64_t n;
+  if (rhs.isUInt(n))
+    return uge(mkUInt(n + 1, sort()));
+
   return !ule(rhs);
 }
 
