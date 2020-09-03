@@ -47,6 +47,19 @@ private:
     smt::expr operator()() const;
   };
 
+  struct ValueAnalysis {
+    std::set<const Value *> non_poison_vals; // vars that are not poison
+
+    void intersect(const ValueAnalysis &other);
+    void reset();
+  };
+
+  struct BasicBlockInfo {
+    DomainPreds domain;
+    ValueAnalysis analysis;
+    smt::DisjointExpr<Memory> mem;
+  };
+
   // TODO: make this const again
   Function &f;
   bool source;
@@ -62,11 +75,9 @@ private:
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::tuple<const Value*, ValTy, bool>> values;
 
-  // dst BB -> src BB -> (domain data, memory)
+  // dst BB -> src BB -> BasicBlockInfo
   std::unordered_map<const BasicBlock*,
-                     std::unordered_map<const BasicBlock*,
-                                        std::pair<DomainPreds,
-                                                  smt::DisjointExpr<Memory>>>>
+                     std::unordered_map<const BasicBlock*, BasicBlockInfo>>
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
 
@@ -77,6 +88,7 @@ private:
   CurrentDomain domain;
   Memory memory;
   std::set<smt::expr> undef_vars;
+  ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
@@ -116,6 +128,7 @@ public:
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
+  const StateValue& getAndAddPoisonUB(const Value &val);
   const ValTy& at(const Value &val) const;
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
   bool isUndef(const smt::expr &e) const;

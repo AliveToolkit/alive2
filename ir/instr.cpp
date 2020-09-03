@@ -249,7 +249,7 @@ void BinOp::print(ostream &os) const {
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
-  s.addUB(bp);
+  // addUB(bp) is not needed because it is registered by getAndAddPoisonUB.
   s.addUB(b != 0);
   if (sign)
     s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
@@ -637,7 +637,7 @@ StateValue BinOp::toSMT(State &s) const {
   }
 
   auto &a = s[*lhs];
-  auto &b = s[*rhs];
+  auto &b = isDivOrRem(op) ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
@@ -744,6 +744,18 @@ expr BinOp::getTypeConstraints(const Function &f) const {
 unique_ptr<Instr> BinOp::dup(const string &suffix) const {
   return make_unique<BinOp>(getType(), getName()+suffix, *lhs, *rhs, op, flags,
                             fmath);
+}
+
+bool BinOp::isDivOrRem(const Op op) {
+  switch (op) {
+  case Op::SDiv:
+  case Op::SRem:
+  case Op::UDiv:
+  case Op::URem:
+    return true;
+  default:
+    return false;
+  }
 }
 
 
@@ -2543,8 +2555,7 @@ void Free::print(std::ostream &os) const {
 }
 
 StateValue Free::toSMT(State &s) const {
-  auto &[p, np] = s[*ptr];
-  s.addUB(np);
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   // If not heaponly, don't encode constraints
   s.getMemory().free(p, !heaponly);
 
@@ -2719,8 +2730,7 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto &[p, np] = s[*ptr];
-  s.addUB(np);
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
   return sv;
@@ -2761,8 +2771,7 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  auto &[p, np] = s[*ptr];
-  s.addUB(np);
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
@@ -3012,8 +3021,7 @@ void Strlen::print(ostream &os) const {
 }
 
 StateValue Strlen::toSMT(State &s) const {
-  auto &[eptr, np_ptr] = s[*ptr];
-  s.addUB(np_ptr);
+  auto &eptr = s.getAndAddPoisonUB(*ptr).value;
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();
