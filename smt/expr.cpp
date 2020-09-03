@@ -1275,6 +1275,7 @@ expr expr::uge(const expr &rhs) const {
 }
 
 expr expr::ugt(const expr &rhs) const {
+  C();
   if (rhs.isAllOnes())
     return false;
 
