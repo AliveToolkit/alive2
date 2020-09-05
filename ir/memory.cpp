@@ -758,13 +758,14 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
 }
 
 // This function assumes that both begin + len don't overflow
-void Pointer::isDisjoint(const expr &len1, const Pointer &ptr2,
-                           const expr &len2) const {
+void Pointer::isDisjointOrEqual(const expr &len1, const Pointer &ptr2,
+                                const expr &len2) const {
+  auto off = getOffsetSizet();
+  auto off2 = ptr2.getOffsetSizet();
   m.state->addUB(getBid() != ptr2.getBid() ||
-                  disjoint(getOffsetSizet(),
-                           len1.zextOrTrunc(bits_size_t),
-                           ptr2.getOffsetSizet(),
-                           len2.zextOrTrunc(bits_size_t)));
+                 off == off2 ||
+                 disjoint(off, len1.zextOrTrunc(bits_size_t), off2,
+                          len2.zextOrTrunc(bits_size_t)));
 }
 
 expr Pointer::isBlockAlive() const {
@@ -2051,7 +2052,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   state->addUB(dst.isDereferenceable(bytesize, align_dst, true));
   state->addUB(src.isDereferenceable(bytesize, align_src, false));
   if (!is_move)
-    src.isDisjoint(bytesize, dst, bytesize);
+    src.isDisjointOrEqual(bytesize, dst, bytesize);
 
   // copy to itself
   if ((src == dst).isTrue())

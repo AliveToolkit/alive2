@@ -163,8 +163,8 @@ public:
                                  bool iswrite = false);
   smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
                                  bool iswrite);
-  void isDisjoint(const smt::expr &len1, const Pointer &ptr2,
-                   const smt::expr &len2) const;
+  void isDisjointOrEqual(const smt::expr &len1, const Pointer &ptr2,
+                         const smt::expr &len2) const;
   smt::expr isBlockAlive() const;
   smt::expr isWritable() const;
   smt::expr isByval() const;
