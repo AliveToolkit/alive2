@@ -997,9 +997,14 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
         continue;
       }
 
+      // if (p == @const) read(load p) ; this should read @const (or raise UB)
+      if (dynamic_cast<ICmp*>(user)) {
+        needed = true;
+        break;
+      }
+
       // no useful users
-      if (dynamic_cast<ICmp*>(user) ||
-          dynamic_cast<Return*>(user))
+      if (dynamic_cast<Return*>(user))
         continue;
 
       if (dynamic_cast<MemInstr*>(user) && !dynamic_cast<GEP*>(user)) {
