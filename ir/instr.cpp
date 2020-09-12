@@ -1589,16 +1589,40 @@ strip_undef(State &s, const Value &val, const expr &e) {
   if (s.isUndef(e))
     return { expr::mkUInt(0, e), false };
 
+  auto is_undef_cond = [](const expr &e, const expr &var) {
+    expr lhs, rhs;
+    // (= #b0 isundef_%var)
+    if (e.isEq(lhs, rhs)) {
+      return (lhs.isZero() && isUndefMask(rhs, var)) ||
+             (rhs.isZero() && isUndefMask(lhs, var));
+    }
+    return false;
+  };
+
+  auto is_if_undef = [&](const expr &e, expr &val, expr &not_undef) {
+    expr undef;
+    // (ite (= #b0 isundef_%var) %var undef)
+    return e.isIf(not_undef, val, undef) && s.isUndef(undef) &&
+           is_undef_cond(not_undef, val);
+  };
+
   expr c, a, b, lhs, rhs;
 
   // two variants
-  // 1) boolean: (ite (= isundef_%var #b0) %var undef)
-  if (e.isIf(c, a, b) && s.isUndef(b) && c.isEq(lhs, rhs)) {
-    if (lhs.isZero())
-      swap(lhs, rhs);
+  // 1) boolean
+  if (is_if_undef(e, a, b))
+    return { move(a), move(b) };
 
-    if (rhs.isZero() && isUndefMask(lhs, a))
-      return { move(a), move(c) };
+  // (ite (= const (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+  // TODO: generalize to other undef-generating functions other than ==
+  if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
+    if (c.isEq(lhs, rhs)) {
+      expr val, not_undef;
+      if (is_if_undef(lhs, val, not_undef))
+        return { expr::mkIf(val == rhs, a, b), move(not_undef) };
+      if (is_if_undef(rhs, val, not_undef))
+        return { expr::mkIf(lhs == val, a, b), move(not_undef) };
+    }
   }
 
   // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
