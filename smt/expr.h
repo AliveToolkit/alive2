@@ -111,6 +111,7 @@ public:
   bool isValid() const { return ptr != 0; }
 
   bool isConst() const;
+  bool isVar() const;
   bool isBV() const;
   bool isBool() const;
   bool isTrue() const;

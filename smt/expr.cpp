@@ -293,6 +293,13 @@ bool expr::isConst() const {
          Z3_get_bool_value(ctx(), ast()) != Z3_L_UNDEF;
 }
 
+bool expr::isVar() const {
+  C();
+  if (auto app = isApp())
+    return !isConst() && Z3_get_app_num_args(ctx(), app) == 0;
+  return false;
+}
+
 bool expr::isBV() const {
   C();
   return Z3_get_sort_kind(ctx(), sort()) == Z3_BV_SORT;
@@ -1169,7 +1176,8 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
         return c == c2;
 
       // (= (ite c t e) x) -> (ite c (= t x) (= e x))
-      if (rhs.isConst() || (t.isConst() && e.isConst()))
+      if ((rhs.isConst() && (!t.isVar() || !e.isVar())) ||
+          (t.isConst() && e.isConst() && !rhs.isVar()))
         return mkIf(c, t == rhs, e == rhs);
     }
     else if (rhs.isAppOf(Z3_OP_ITE)) {
