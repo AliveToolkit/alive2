@@ -19,6 +19,9 @@ jobs:
         language: ['cpp']
 
     steps:
+    - name: Install dependencies
+      run: sudo apt-get install z3
+
     - name: Checkout repository
       uses: actions/checkout@v2
       with:
@@ -34,10 +37,6 @@ jobs:
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v1
-
-    #- run: |
-    #   make bootstrap
-    #   make release
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
