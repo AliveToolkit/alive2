@@ -240,6 +240,8 @@ space+ {
 "fma" { return FMA; }
 "fmax" { return FMAX; }
 "fmin" { return FMIN; }
+"fmaximum" { return FMAXIMUM; }
+"fminimum" { return FMINIMUM; }
 "extractelement" { return EXTRACTELEMENT; }
 "insertelement" { return INSERTELEMENT; }
 "shufflevector" { return SHUFFLEVECTOR; }

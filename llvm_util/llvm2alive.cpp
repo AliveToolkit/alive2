@@ -798,12 +798,16 @@ end:
     }
     case llvm::Intrinsic::minnum:
     case llvm::Intrinsic::maxnum:
+    case llvm::Intrinsic::minimum:
+    case llvm::Intrinsic::maximum:
     {
       PARSE_BINOP();
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::minnum:   op = BinOp::FMin; break;
       case llvm::Intrinsic::maxnum:   op = BinOp::FMax; break;
+      case llvm::Intrinsic::minimum:  op = BinOp::FMinimum; break;
+      case llvm::Intrinsic::maximum:  op = BinOp::FMaximum; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
