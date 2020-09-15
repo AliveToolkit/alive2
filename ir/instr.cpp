@@ -151,6 +151,8 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case FRem:
   case FMin:
   case FMax:
+  case FMinimum:
+  case FMaximum:
     assert(flags == None);
     break;
   case SRem:
@@ -233,6 +235,8 @@ void BinOp::print(ostream &os) const {
   case FRem:          str = "frem "; break;
   case FMax:          str = "fmax "; break;
   case FMin:          str = "fmin "; break;
+  case FMaximum:      str = "fmaximum "; break;
+  case FMinimum:      str = "fminimum "; break;
   case UMin:          str = "umin "; break;
   case UMax:          str = "umax "; break;
   case SMin:          str = "smin "; break;
@@ -594,6 +598,24 @@ StateValue BinOp::toSMT(State &s) const {
     };
     break;
 
+  case FMinimum:
+  case FMaximum:
+    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+      auto v = [&](expr &a, expr &b) {
+        expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+        expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
+        expr neg_cond = (op == FMinimum) ? a.isFPNeg() || b.isFPNeg()
+                                         : a.isFPNeg() && b.isFPNeg();
+        expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
+                            expr::mkIf(neg_cond, zneg, zpos),
+                            expr::mkIf(cmp, a, b));
+
+        return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+      };
+      return fm_poison(s, a, b, v, fmath, false);
+    };
+    break;
+
   case UMin:
   case UMax:
   case SMin:
@@ -735,6 +757,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case FRem:
   case FMax:
   case FMin:
+  case FMaximum:
+  case FMinimum:
     instrconstr = getType().enforceFloatOrVectorType() &&
                   getType() == lhs->getType() &&
                   getType() == rhs->getType();

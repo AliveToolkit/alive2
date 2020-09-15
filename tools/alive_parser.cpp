@@ -618,6 +618,8 @@ static FastMathFlags parse_fast_math(token op_token) {
   case FMA:
   case FMAX:
   case FMIN:
+  case FMAXIMUM:
+  case FMINIMUM:
     break;
   default:
     if (!fmath.isNone())
@@ -646,6 +648,8 @@ static unsigned parse_binop_flags(token op_token) {
   case FREM:
   case FMAX:
   case FMIN:
+  case FMAXIMUM:
+  case FMINIMUM:
   case SREM:
   case UREM:
   case UADD_SAT:
@@ -740,6 +744,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case FREM: op = BinOp::FRem; break;
   case FMAX: op = BinOp::FMax; break;
   case FMIN: op = BinOp::FMin; break;
+  case FMAXIMUM: op = BinOp::FMaximum; break;
+  case FMINIMUM: op = BinOp::FMinimum; break;
   case UMIN: op = BinOp::UMin; break;
   case UMAX: op = BinOp::UMax; break;
   case SMIN: op = BinOp::SMin; break;
@@ -1100,6 +1106,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FREM:
   case FMAX:
   case FMIN:
+  case FMAXIMUM:
+  case FMINIMUM:
   case UMIN:
   case UMAX:
   case SMIN:
