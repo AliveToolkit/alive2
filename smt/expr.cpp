@@ -943,23 +943,23 @@ expr expr::fneg() const {
 }
 
 expr expr::foeq(const expr &rhs) const {
-  return ford(rhs) && binop_commutative(rhs, Z3_mk_fpa_eq);
+  return binop_commutative(rhs, Z3_mk_fpa_eq);
 }
 
 expr expr::fogt(const expr &rhs) const {
-  return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_gt);
+  return binop_fold(rhs, Z3_mk_fpa_gt);
 }
 
 expr expr::foge(const expr &rhs) const {
-  return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_geq);
+  return binop_fold(rhs, Z3_mk_fpa_geq);
 }
 
 expr expr::folt(const expr &rhs) const {
-  return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_lt);
+  return binop_fold(rhs, Z3_mk_fpa_lt);
 }
 
 expr expr::fole(const expr &rhs) const {
-  return ford(rhs) && binop_fold(rhs, Z3_mk_fpa_leq);
+  return binop_fold(rhs, Z3_mk_fpa_leq);
 }
 
 expr expr::fone(const expr &rhs) const {
@@ -995,7 +995,7 @@ expr expr::fune(const expr &rhs) const {
 }
 
 expr expr::funo(const expr &rhs) const {
-  return !ford(rhs());
+  return isNaN() || rhs.isNaN();
 }
 
 static expr get_bool(const expr &e) {
