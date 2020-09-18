@@ -829,11 +829,9 @@ expr expr::bitreverse() const {
 
 expr expr::cttz(const expr &val_zero) const {
   C();
-  auto nbits = bits();
   auto srt = sort();
-
   auto cond = val_zero;
-  for (int i = nbits - 1; i >= 0; --i) {
+  for (int i = bits() - 1; i >= 0; --i) {
     cond = mkIf(extract(i, i) == 1u, mkUInt(i, srt), cond);
   }
 
