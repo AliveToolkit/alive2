@@ -827,12 +827,12 @@ expr expr::bitreverse() const {
   return res;
 }
 
-expr expr::cttz() const {
+expr expr::cttz(const expr &val_zero) const {
   C();
   auto nbits = bits();
   auto srt = sort();
 
-  auto cond = mkUInt(nbits, srt);
+  auto cond = val_zero;
   for (int i = nbits - 1; i >= 0; --i) {
     cond = mkIf(extract(i, i) == 1u, mkUInt(i, srt), cond);
   }

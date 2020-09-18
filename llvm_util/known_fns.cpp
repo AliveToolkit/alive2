@@ -94,6 +94,18 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       make_unique<Memcmp>(*ty, value_name(i), *args[0], *args[1], *args[2],
                           libfn == llvm::LibFunc_bcmp));
   }
+  case llvm::LibFunc_ffs:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(args[0]->getType(), value_name(i), *args[0],
+                           UnaryOp::FFS));
+  case llvm::LibFunc_ffsl:
+  case llvm::LibFunc_ffsll: {
+    auto *Op = new UnaryOp(args[0]->getType(), value_name(i) + "#beftrunc",
+                           *args[0], UnaryOp::FFS);
+    BB.addInstr(unique_ptr<UnaryOp>(Op));
+    RETURN_KNOWN(
+      make_unique<ConversionOp>(*ty, value_name(i), *Op, ConversionOp::Trunc));
+  }
   default:
     RETURN_FAIL_KNOWN();
   }

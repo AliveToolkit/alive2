@@ -1,0 +1,15 @@
+Name: constant
+%r = ffs i32 32
+  =>
+%r = 6
+
+Name: zero
+%r = ffs i32 0
+  =>
+%r = 0
+
+Name: var
+%k = shl i32 1, %x
+%r = ffs i32 %k
+  =>
+%r = add i32 1, %x
