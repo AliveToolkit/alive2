@@ -490,7 +490,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case Cttz:
     fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return { a.cttz(expr::mkUInt(a.bits(), a.bits())),
+      return { a.cttz(expr::mkUInt(a.bits(), a)),
                b == 0u || a != 0u };
     };
     break;
@@ -860,7 +860,7 @@ StateValue UnaryOp::toSMT(State &s) const {
     break;
   case FFS:
     fn = [](auto v) {
-      return v.cttz(expr::mkInt(-1, v.bits())) + expr::mkUInt(1, v.bits());
+      return v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v);
     };
     break;
   }
