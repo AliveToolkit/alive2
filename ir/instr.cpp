@@ -279,7 +279,8 @@ static expr any_fp_zero(State &s, expr v) {
                     v);
 }
 
-static StateValue fm_poison(State &s, expr a, expr b, expr c,
+static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
+                            const expr &bp, expr c,
                             function<expr(expr&,expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input,
                             bool is_ternary = true) {
@@ -318,13 +319,14 @@ static StateValue fm_poison(State &s, expr a, expr b, expr c,
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
 
-  return { move(val), move(non_poison) };
+  return { move(val), ap && bp && non_poison };
 }
 
-static StateValue fm_poison(State &s, expr a, expr b,
+static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
+                            const expr &bp,
                             function<expr(expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input) {
-  return fm_poison(s, move(a), move(b), expr(),
+  return fm_poison(s, move(a), ap, move(b), bp, expr(),
                    [&](expr &a, expr &b, expr &c) { return fn(a, b); },
                    fmath, only_input, false);
 }
@@ -544,28 +546,32 @@ StateValue BinOp::toSMT(State &s) const {
 
   case FAdd:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fadd(b); },
+      return fm_poison(s, a, ap, b, bp,
+                       [](expr &a, expr &b) { return a.fadd(b); },
                        fmath, false);
     };
     break;
 
   case FSub:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fsub(b); },
+      return fm_poison(s, a, ap, b, bp,
+                       [](expr &a, expr &b) { return a.fsub(b); },
                        fmath, false);
     };
     break;
 
   case FMul:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fmul(b); },
+      return fm_poison(s, a, ap, b, bp,
+                       [](expr &a, expr &b) { return a.fmul(b); },
                        fmath, false);
     };
     break;
 
   case FDiv:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return a.fdiv(b); },
+      return fm_poison(s, a, ap, b, bp,
+                       [](expr &a, expr &b) { return a.fdiv(b); },
                        fmath, false);
     };
     break;
@@ -573,8 +579,8 @@ StateValue BinOp::toSMT(State &s) const {
   case FRem:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      return fm_poison(s, a, b, [](expr &a, expr &b) { return expr(); }, fmath,
-                       false);
+      return fm_poison(s, a, ap, b, bp, [](expr &a, expr &b) { return expr(); },
+                       fmath, false);
     };
     break;
 
@@ -594,7 +600,7 @@ StateValue BinOp::toSMT(State &s) const {
                                      expr::mkIf(z, ndz,
                                                 expr::mkIf(cmp, a, b))));
       };
-      return fm_poison(s, a, b, v, fmath, false);
+      return fm_poison(s, a, ap, b, bp, v, fmath, false);
     };
     break;
 
@@ -612,7 +618,7 @@ StateValue BinOp::toSMT(State &s) const {
 
         return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
       };
-      return fm_poison(s, a, b, v, fmath, false);
+      return fm_poison(s, a, ap, b, bp, v, fmath, false);
     };
     break;
 
@@ -1047,7 +1053,7 @@ StateValue TernaryOp::toSMT(State &s) const {
 
   case FMA:
     fn = [&](auto a, auto b, auto c) -> StateValue {
-      return fm_poison(s, a, b, c, [](expr &a, expr &b, expr &c) {
+      return fm_poison(s, a, true, b, true, c, [](expr &a, expr &b, expr &c) {
                                    return expr::fma(a, b, c); }, fmath, false);
     };
     break;
@@ -1981,8 +1987,9 @@ StateValue FCmp::toSMT(State &s) const {
       }
       UNREACHABLE();
     };
-    auto [val, np] = fm_poison(s, a.value, b.value, cmp, fmath, true);
-    return { val.toBVBool(), a.non_poison && b.non_poison && np };
+    auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                               cmp, fmath, true);
+    return { val.toBVBool(), move(np) };
   };
 
   if (auto agg = a->getType().getAsAggregateType()) {
