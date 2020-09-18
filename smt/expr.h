@@ -186,7 +186,7 @@ public:
   expr log2(unsigned bw_output) const;
   expr bswap() const;
   expr bitreverse() const;
-  expr cttz() const;
+  expr cttz(const expr &val_zero) const;
   expr ctlz() const;
   expr ctpop() const;
 

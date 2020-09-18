@@ -490,7 +490,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case Cttz:
     fn = [](auto a, auto ap, auto b, auto bp) -> StateValue {
-      return { a.cttz(),
+      return { a.cttz(expr::mkUInt(a.bits(), a)),
                b == 0u || a != 0u };
     };
     break;
@@ -817,6 +817,7 @@ void UnaryOp::print(ostream &os) const {
   case Ctpop:       str = "ctpop "; break;
   case IsConstant:  str = "is.constant "; break;
   case FNeg:        str = "fneg "; break;
+  case FFS:         str = "ffs "; break;
   }
 
   os << getName() << " = " << str << fmath << print_type(getType())
@@ -857,6 +858,11 @@ StateValue UnaryOp::toSMT(State &s) const {
       return {};
     fn = [](auto v) { return v.fneg(); };
     break;
+  case FFS:
+    fn = [](auto v) {
+      return v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v);
+    };
+    break;
   }
 
   auto &v = s[*val];
@@ -893,6 +899,9 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     break;
   case FNeg:
     instrconstr &= getType().enforceFloatOrVectorType();
+    break;
+  case FFS:
+    instrconstr &= getType().enforceIntType();
     break;
   }
 

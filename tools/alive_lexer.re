@@ -251,6 +251,7 @@ space+ {
 "cttz" { return CTTZ; }
 "ctlz" { return CTLZ; }
 "ctpop" { return CTPOP; }
+"ffs" { return FFS; }
 "extractvalue" { return EXTRACTVALUE; }
 "insertvalue" { return INSERTVALUE; }
 "sadd_overflow" { return SADD_OVERFLOW; }

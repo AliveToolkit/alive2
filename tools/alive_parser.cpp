@@ -766,6 +766,7 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   case BSWAP:      op = UnaryOp::BSwap; break;
   case CTPOP:      op = UnaryOp::Ctpop; break;
   case FNEG:       op = UnaryOp::FNeg; break;
+  case FFS:        op = UnaryOp::FFS; break;
   default:
     UNREACHABLE();
   }
@@ -1117,6 +1118,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case BITREVERSE:
   case BSWAP:
   case CTPOP:
+  case FFS:
   case FNEG:
     return parse_unaryop(name, t);
   case REDUCE_ADD:

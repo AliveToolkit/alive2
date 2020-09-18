@@ -74,7 +74,7 @@ public:
 class UnaryOp final : public Instr {
 public:
   enum Op {
-    Copy, BitReverse, BSwap, Ctpop, IsConstant, FNeg
+    Copy, BitReverse, BSwap, Ctpop, IsConstant, FNeg, FFS
   };
 
 private:
