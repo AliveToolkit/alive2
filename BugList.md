@@ -74,6 +74,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 23. Incorrect transformation> mul foo, undef -> shl foo, undef
 (https://bugs.llvm.org/show_bug.cgi?id=47133)
 
+24. Incorrect transformation: (llvm.maximum undef, %x) -> undef
+(https://bugs.llvm.org/show_bug.cgi?id=47567)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
