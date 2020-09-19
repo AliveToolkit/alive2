@@ -109,6 +109,18 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
+    auto &unsupported = src_state.getUnsupported();
+    if (!unsupported.empty()) {
+      string str = "The program uses the following unsupported features: ";
+      bool first = true;
+      for (auto name : unsupported) {
+        if (!first)
+          str += ", ";
+        str += name;
+        first = false;
+      }
+      errs.add(move(str), false);
+    }
     return;
   }
 

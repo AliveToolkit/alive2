@@ -357,6 +357,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   return I->second.retvals;
 }
 
+void State::useUnsupported(const char *name) {
+  used_unsupported.emplace(name);
+}
+
 void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }

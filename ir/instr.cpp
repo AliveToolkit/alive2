@@ -308,14 +308,22 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     if (!only_input)
       non_poison &= !val.isInf();
   }
-  if (fmath.flags & FastMathFlags::ARCP)
+  if (fmath.flags & FastMathFlags::ARCP) {
+    s.useUnsupported("arcp");
     non_poison &= expr(); // TODO
-  if (fmath.flags & FastMathFlags::Contract)
+  }
+  if (fmath.flags & FastMathFlags::Contract) {
+    s.useUnsupported("contract");
     non_poison &= expr(); // TODO
-  if (fmath.flags & FastMathFlags::Reassoc)
+  }
+  if (fmath.flags & FastMathFlags::Reassoc) {
+    s.useUnsupported("reassoc");
     non_poison &= expr(); // TODO
-  if (fmath.flags & FastMathFlags::AFN)
+  }
+  if (fmath.flags & FastMathFlags::AFN) {
+    s.useUnsupported("afn");
     non_poison &= expr(); // TODO
+  }
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
 
@@ -579,6 +587,7 @@ StateValue BinOp::toSMT(State &s) const {
   case FRem:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
+      s.useUnsupported("frem");
       return fm_poison(s, a, ap, b, bp, [](expr &a, expr &b) { return expr(); },
                        fmath, false);
     };
@@ -1204,6 +1213,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case Int2Ptr:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
+      s.useUnsupported("inttoptr");
       return { s.getMemory().int2ptr(val), true };
     };
     break;

@@ -68,6 +68,8 @@ private:
   smt::AndExpr precondition;
   smt::AndExpr axioms;
 
+  std::set<const char*> used_unsupported;
+
   const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
 
@@ -154,6 +156,9 @@ public:
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
               const std::vector<Type*> &out_types, const FnAttrs &attrs);
+
+  void useUnsupported(const char *name);
+  auto& getUnsupported() const { return used_unsupported; }
 
   void addQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
