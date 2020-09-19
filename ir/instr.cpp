@@ -1587,79 +1587,6 @@ void FnCall::print(ostream &os) const {
     os << "\t; WARNING: unknown known function";
 }
 
-static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
-  const auto *aty = ty.getAsAggregateType();
-  if (!aty)
-    return e1 == e2;
-
-  StateValue sv1{expr(e1), expr()};
-  StateValue sv2{expr(e2), expr()};
-  expr result = true;
-
-  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
-    if (aty->isPadding(i))
-      continue;
-
-    result &= eq_except_padding(aty->getChild(i), aty->extract(sv1, i).value,
-                                aty->extract(sv2, i).value);
-  }
-  return result;
-}
-
-static bool isUndefMask(const expr &e, const expr &var) {
-  auto ty_name = e.fn_name();
-  auto var_name = var.fn_name();
-  return string_view(ty_name).substr(0, 8) == "isundef_" &&
-         string_view(ty_name).substr(8, var_name.size()) == var_name;
-}
-
-static pair<expr,expr> // <extracted value, not_undef>
-strip_undef(State &s, const Value &val, const expr &e) {
-  if (s.isUndef(e))
-    return { expr::mkUInt(0, e), false };
-
-  auto is_undef_cond = [](const expr &e, const expr &var) {
-    expr lhs, rhs;
-    // (= #b0 isundef_%var)
-    if (e.isEq(lhs, rhs)) {
-      return (lhs.isZero() && isUndefMask(rhs, var)) ||
-             (rhs.isZero() && isUndefMask(lhs, var));
-    }
-    return false;
-  };
-
-  auto is_if_undef = [&](const expr &e, expr &val, expr &not_undef) {
-    expr undef;
-    // (ite (= #b0 isundef_%var) %var undef)
-    return e.isIf(not_undef, val, undef) && s.isUndef(undef) &&
-           is_undef_cond(not_undef, val);
-  };
-
-  expr c, a, b, lhs, rhs;
-
-  // two variants
-  // 1) boolean
-  if (is_if_undef(e, a, b))
-    return { move(a), move(b) };
-
-  // (ite (= const (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-  // TODO: generalize to other undef-generating functions other than ==
-  if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
-    if (c.isEq(lhs, rhs)) {
-      expr val, not_undef;
-      if (is_if_undef(lhs, val, not_undef))
-        return { expr::mkIf(val == rhs, a, b), move(not_undef) };
-      if (is_if_undef(rhs, val, not_undef))
-        return { expr::mkIf(lhs == val, a, b), move(not_undef) };
-    }
-  }
-
-  // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
-  // TODO
-
-  return { e, eq_except_padding(val.getType(), e, s[val].value) };
-}
-
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag,
                           StateValue value, vector<StateValue> &inputs,
@@ -1670,12 +1597,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
                     inputs, ptr_inputs);
     }
   } else {
-    if (argflag.undefImpliesUB()) {
-      auto [val, not_undef] = strip_undef(s, argv, value.value);
-      value.value = move(val);
-      s.addUB(move(not_undef));
-    }
-
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
@@ -1755,7 +1676,7 @@ StateValue FnCall::toSMT(State &s) const {
   for (auto &[arg, flags] : args) {
     StateValue sv;
     if (flags.poisonImpliesUB())
-      sv = s.getAndAddPoisonUB(*arg);
+      sv = s.getAndAddPoisonUB(*arg, flags.undefImpliesUB());
     else
       sv = s[*arg];
 
@@ -2184,10 +2105,8 @@ void Branch::print(ostream &os) const {
 
 StateValue Branch::toSMT(State &s) const {
   if (cond) {
-    auto &c = s.getAndAddPoisonUB(*cond);
-    auto [cond_val, not_undef] = strip_undef(s, *cond, c.value);
-    s.addUB(move(not_undef));
-    s.addCondJump(cond_val, dst_true, *dst_false);
+    auto &c = s.getAndAddPoisonUB(*cond, true);
+    s.addCondJump(c.value, dst_true, *dst_false);
   } else {
     s.addJump(dst_true);
   }
@@ -2237,16 +2156,13 @@ void Switch::print(ostream &os) const {
 }
 
 StateValue Switch::toSMT(State &s) const {
-  auto &val = s.getAndAddPoisonUB(*value);
+  auto &val = s.getAndAddPoisonUB(*value, true);
   expr default_cond(true);
-
-  auto [cond_val, not_undef] = strip_undef(s, *value, val.value);
-  s.addUB(move(not_undef));
 
   for (auto &[value_cond, bb] : targets) {
     auto &target = s[*value_cond];
     assert(target.non_poison.isTrue());
-    expr cmp = cond_val == target.value;
+    expr cmp = val.value == target.value;
     default_cond &= !cmp;
     s.addJump(move(cmp), bb);
   }
@@ -2309,7 +2225,7 @@ StateValue Return::toSMT(State &s) const {
 
   auto &attrs = s.getFn().getFnAttrs();
   if (attrs.poisonImpliesUB())
-    retval = s.getAndAddPoisonUB(*val);
+    retval = s.getAndAddPoisonUB(*val, attrs.undefImpliesUB());
   else
     retval = s[*val];
 
@@ -2318,13 +2234,6 @@ StateValue Return::toSMT(State &s) const {
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
-
-  if (attrs.undefImpliesUB()) {
-    auto [value, not_undef] = strip_undef(s, *val, retval.value);
-    retval.value = move(value);
-    s.addUB(move(not_undef));
-  }
-
   if (isDeref || isNonNull) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);

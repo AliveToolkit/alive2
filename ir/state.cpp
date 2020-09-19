@@ -32,16 +32,22 @@ expr State::DomainPreds::operator()() const {
   return path() && *UB();
 }
 
+template<class T>
+static T intersect_set(const T &a, const T &b) {
+  T results;
+  set_intersection(a.begin(), a.end(), b.begin(), b.end(),
+                   inserter(results, results.begin()));
+  return results;
+}
+
 void State::ValueAnalysis::intersect(const State::ValueAnalysis &other) {
-  set<const Value*> results;
-  set_intersection(non_poison_vals.begin(), non_poison_vals.end(),
-      other.non_poison_vals.begin(), other.non_poison_vals.end(),
-      inserter(results, results.begin()));
-  non_poison_vals = move(results);
+  non_poison_vals = intersect_set(non_poison_vals, other.non_poison_vals);
+  non_undef_vals = intersect_set(non_undef_vals, other.non_undef_vals);
 }
 
 void State::ValueAnalysis::reset() {
   non_poison_vals.clear();
+  non_undef_vals.clear();
 }
 
 
@@ -67,24 +73,113 @@ const StateValue& State::exec(const Value &v) {
   return get<1>(values.back()).first;
 }
 
+static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty)
+    return e1 == e2;
+
+  StateValue sv1{expr(e1), expr()};
+  StateValue sv2{expr(e2), expr()};
+  expr result = true;
+
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    if (aty->isPadding(i))
+      continue;
+
+    result &= eq_except_padding(aty->getChild(i), aty->extract(sv1, i).value,
+                                aty->extract(sv2, i).value);
+  }
+  return result;
+}
+
+static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e) {
+  if (s.isUndef(e, &val)) {
+    s.addUB(expr(false));
+    return expr::mkUInt(0, e);
+  }
+
+  auto is_undef_cond = [](const expr &e, const expr &var) {
+    expr lhs, rhs;
+    // (= #b0 isundef_%var)
+    if (e.isEq(lhs, rhs)) {
+      return (lhs.isZero() && Input::isUndefMask(rhs, var)) ||
+             (rhs.isZero() && Input::isUndefMask(lhs, var));
+    }
+    return false;
+  };
+
+  auto is_if_undef = [&](const expr &e, expr &var, expr &not_undef) {
+    expr undef;
+    // (ite (= #b0 isundef_%var) %var undef)
+    return e.isIf(not_undef, var, undef) &&
+           s.isUndef(undef) &&
+           is_undef_cond(not_undef, var);
+  };
+
+  expr c, a, b, lhs, rhs;
+
+  // two variants
+  // 1) boolean
+  if (is_if_undef(e, a, b)) {
+    s.addUB(move(b));
+    return a;
+  }
+
+  // (ite (= const (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+  // TODO: generalize to other undef-generating functions other than ==
+  if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
+    if (c.isEq(lhs, rhs)) {
+      expr val, not_undef;
+      if (is_if_undef(lhs, val, not_undef)) {
+        s.addUB(move(not_undef));
+        return expr::mkIf(val == rhs, a, b);
+      }
+      if (is_if_undef(rhs, val, not_undef)) {
+        s.addUB(move(not_undef));
+        return expr::mkIf(lhs == val, a, b);
+      }
+    }
+  }
+
+  // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
+  // TODO
+
+  s.addUB(eq_except_padding(val.getType(), e, s[val].value));
+  return e;
+}
+
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars, used] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
   (void)var;
 
-  auto simplify = [&](StateValue &sv, bool use_new_slot) -> StateValue& {
+  auto simplify = [&](StateValue &sv0, bool use_new_slot) -> StateValue&{
+    StateValue *sv = &sv0;
     if (analysis.non_poison_vals.count(&val)) {
       if (use_new_slot) {
         assert(i_tmp_values < tmp_values.size());
-        tmp_values[i_tmp_values++] = sv;
+        tmp_values[i_tmp_values++] = *sv;
+        use_new_slot = false;
       }
       assert(i_tmp_values > 0);
       StateValue &sv_new = tmp_values[i_tmp_values - 1];
       const expr &np = sv_new.non_poison;
       sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np.bits());
-      return sv_new;
+      sv = &sv_new;
     }
-    return sv;
+
+    auto undef_itr = analysis.non_undef_vals.find(&val);
+    if (undef_itr != analysis.non_undef_vals.end()) {
+      if (use_new_slot) {
+        assert(i_tmp_values < tmp_values.size());
+        tmp_values[i_tmp_values++] = *sv;
+      }
+      assert(i_tmp_values > 0);
+      StateValue &sv_new = tmp_values[i_tmp_values - 1];
+      sv_new.value = undef_itr->second;
+      sv = &sv_new;
+    }
+    return *sv;
   };
 
   if (uvars.empty() || !used || disable_undef_rewrite) {
@@ -143,10 +238,24 @@ static expr not_poison_except_padding(const Type &ty, const expr &np) {
   return result;
 }
 
-const StateValue& State::getAndAddPoisonUB(const Value &val) {
-  auto &v = (*this)[val];
-  if (!analysis.non_poison_vals.insert(&val).second)
-    return v;
+const StateValue&
+State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
+  auto &sv = (*this)[val];
+
+  if (!analysis.non_poison_vals.insert(&val).second && !undef_ub_too)
+    return sv;
+
+  expr v = sv.value;
+
+  if (undef_ub_too) {
+    auto inserted = analysis.non_undef_vals.find(&val);
+    if (inserted != analysis.non_undef_vals.end()) {
+      v = inserted->second;
+    } else {
+      v = strip_undef_and_add_ub(*this, val, v);
+      analysis.non_undef_vals[&val] = v;
+    }
+  }
 
   // mark all operands of val as non-poison if they propagate poison
   vector<Value*> todo;
@@ -168,10 +277,10 @@ const StateValue& State::getAndAddPoisonUB(const Value &val) {
   }
 
   // If val is an aggregate, all elements should be non-poison
-  addUB(not_poison_except_padding(val.getType(), v.non_poison));
+  addUB(not_poison_except_padding(val.getType(), sv.non_poison));
   assert(i_tmp_values < tmp_values.size());
-  return tmp_values[i_tmp_values++] = { expr(v.value),
-        v.non_poison.isBool() ? true : expr::mkUInt(0, v.non_poison.bits()) };
+  return tmp_values[i_tmp_values++] = { move(v),
+        sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison.bits()) };
 }
 
 const State::ValTy& State::at(const Value &val) const {
@@ -184,7 +293,9 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   return I == pres.end() ? nullptr : &I->second.domain.path;
 }
 
-bool State::isUndef(const expr &e) const {
+bool State::isUndef(const expr &e, const Value *used_by) const {
+  if (used_by)
+    return at(*used_by).second.count(e) != 0;
   return undef_vars.count(e) != 0;
 }
 
