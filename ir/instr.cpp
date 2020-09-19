@@ -1606,26 +1606,6 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   return result;
 }
 
-static expr not_poison_except_padding(const Type &ty, const expr &np) {
-  const auto *aty = ty.getAsAggregateType();
-  if (!aty) {
-    assert(!np.isValid() || np.isBool());
-    return np;
-  }
-
-  StateValue sv{expr(), expr(np)};
-  expr result = true;
-
-  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
-    if (aty->isPadding(i))
-      continue;
-
-    result &= not_poison_except_padding(aty->getChild(i),
-                                        aty->extract(sv, i).non_poison);
-  }
-  return result;
-}
-
 static bool isUndefMask(const expr &e, const expr &var) {
   auto ty_name = e.fn_name();
   auto var_name = var.fn_name();
@@ -1690,14 +1670,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
                     inputs, ptr_inputs);
     }
   } else {
-    bool is_deref = argflag.has(ParamAttrs::Dereferenceable);
-    bool is_nonnull = argflag.has(ParamAttrs::NonNull);
-    bool is_noundef = argflag.has(ParamAttrs::NoUndef);
-
-    if (is_deref || is_nonnull || is_noundef)
-      s.addUB(not_poison_except_padding(ty, value.non_poison));
-
-    if (is_noundef) {
+    if (argflag.undefImpliesUB()) {
       auto [val, not_undef] = strip_undef(s, argv, value.value);
       value.value = move(val);
       s.addUB(move(not_undef));
@@ -1706,11 +1679,11 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
-      if (is_deref)
+      if (argflag.has(ParamAttrs::Dereferenceable))
         s.addUB(
           p.isDereferenceable(argflag.derefBytes, bits_byte / 8, false));
 
-      if (is_nonnull)
+      if (argflag.has(ParamAttrs::NonNull))
         s.addUB(p.isNonZero());
 
       ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
@@ -1780,7 +1753,13 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
   for (auto &[arg, flags] : args) {
-    unpack_inputs(s, *arg, arg->getType(), flags, s[*arg], inputs, ptr_inputs);
+    StateValue sv;
+    if (flags.poisonImpliesUB())
+      sv = s.getAndAddPoisonUB(*arg);
+    else
+      sv = s[*arg];
+
+    unpack_inputs(s, *arg, arg->getType(), flags, sv, inputs, ptr_inputs);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
@@ -2326,16 +2305,21 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
 
 StateValue Return::toSMT(State &s) const {
   // Encode nocapture semantics.
-  auto retval = s[*val];
+  StateValue retval;
+
+  auto &attrs = s.getFn().getFnAttrs();
+  if (attrs.poisonImpliesUB())
+    retval = s.getAndAddPoisonUB(*val);
+  else
+    retval = s[*val];
+
   s.addUB(s.getMemory().checkNocapture());
   addUBForNoCaptureRet(s, retval, val->getType());
 
-  auto &attrs = s.getFn().getFnAttrs();
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
-  bool isNoUndef = attrs.has(FnAttrs::NoUndef);
 
-  if (isNoUndef) {
+  if (attrs.undefImpliesUB()) {
     auto [value, not_undef] = strip_undef(s, *val, retval.value);
     retval.value = move(value);
     s.addUB(move(not_undef));
@@ -2353,10 +2337,6 @@ StateValue Return::toSMT(State &s) const {
     if (isNonNull) {
       s.addUB(p.isNonZero());
     }
-  }
-
-  if (isDeref || isNonNull || isNoUndef) {
-    s.addUB(not_poison_except_padding(val->getType(), retval.non_poison));
   }
 
   s.addReturn(move(retval));
