@@ -123,6 +123,26 @@ const StateValue& State::getAndAddUndefs(const Value &val) {
   return v;
 }
 
+static expr not_poison_except_padding(const Type &ty, const expr &np) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty) {
+    assert(!np.isValid() || np.isBool());
+    return np;
+  }
+
+  StateValue sv{expr(), expr(np)};
+  expr result = true;
+
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    if (aty->isPadding(i))
+      continue;
+
+    result &= not_poison_except_padding(aty->getChild(i),
+                                        aty->extract(sv, i).non_poison);
+  }
+  return result;
+}
+
 const StateValue& State::getAndAddPoisonUB(const Value &val) {
   auto &v = (*this)[val];
   if (!analysis.non_poison_vals.insert(&val).second)
@@ -148,7 +168,7 @@ const StateValue& State::getAndAddPoisonUB(const Value &val) {
   }
 
   // If val is an aggregate, all elements should be non-poison
-  addUB(v.non_poison.isBool() ? v.non_poison : v.non_poison == 0);
+  addUB(not_poison_except_padding(val.getType(), v.non_poison));
   assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { expr(v.value),
         v.non_poison.isBool() ? true : expr::mkUInt(0, v.non_poison.bits()) };

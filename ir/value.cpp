@@ -198,8 +198,6 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
 
   bool has_byval = hasAttribute(ParamAttrs::ByVal);
   bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
-  bool has_nonnull = hasAttribute(ParamAttrs::NonNull);
-  bool has_noundef = hasAttribute(ParamAttrs::NoUndef);
 
   expr val;
   if (has_byval) {
@@ -227,8 +225,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
   }
 
-  bool never_poison = config::disable_poison_input || has_byval || has_deref ||
-                      has_nonnull || has_noundef;
+  bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
   return { move(val), never_poison ? true : expr::mkBoolVar(np_name.c_str()) };
@@ -239,10 +236,12 @@ StateValue Input::toSMT(State &s) const {
 }
 
 expr Input::getUndefVar(const Type &ty, unsigned child) const {
+  // TODO: Clarify whether byval/dereferenceable accept partially undefined
+  // pointers
   if (config::disable_undef_input ||
       hasAttribute(ParamAttrs::ByVal) ||
       hasAttribute(ParamAttrs::Dereferenceable) ||
-      hasAttribute(ParamAttrs::NoUndef))
+      attrs.undefImpliesUB())
     return {};
 
   string tyname = "isundef_" + getSMTName(child);
