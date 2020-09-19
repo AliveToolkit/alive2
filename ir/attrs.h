@@ -24,7 +24,7 @@ public:
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
 
-  // Returns true if it is UB for the argument to be poison / have poison elems.
+  // Returns true if it's UB for the argument to be poison / have a poison elem.
   bool poisonImpliesUB() const
   { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(ByVal); }
 
@@ -53,7 +53,7 @@ public:
   uint64_t getDerefBytes() const { return derefBytes; }
   void setDerefBytes(uint64_t bytes) { derefBytes = bytes; }
 
-  // Returns true if returning poison is UB
+  // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const
   { return has(NonNull) || has(Dereferenceable) || has(NoUndef); }
 
