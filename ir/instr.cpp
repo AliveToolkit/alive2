@@ -2363,12 +2363,10 @@ void Alloc::print(std::ostream &os) const {
 }
 
 StateValue Alloc::toSMT(State &s) const {
-  auto [sz, np] = s[*size];
-  s.addUB(move(np));
+  auto sz = s.getAndAddPoisonUB(*size, true).value;
 
   if (mul) {
-    auto &[mul_e, mul_np] = s[*mul];
-    s.addUB(mul_np);
+    auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
     sz = sz.zextOrTrunc(bits_size_t);
     auto m = mul_e.zextOrTrunc(bits_size_t);
     s.addUB(sz.mul_no_uoverflow(m));
@@ -2769,9 +2767,6 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  // NOTE: We neeed clarification whether loading a partially undefined pointer
-  // is UB. Memory sanitizer has an option (detecting a partially undef pointer)
-  // for this, so worth discussing it.
   auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
@@ -2814,9 +2809,6 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  // NOTE: We neeed clarification whether store to a partially undefined pointer
-  // is UB. Memory sanitizer has an option (detecting a partially undef pointer)
-  // for this, so worth discussing it.
   auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
@@ -2864,9 +2856,8 @@ void Memset::print(ostream &os) const {
 
 StateValue Memset::toSMT(State &s) const {
   auto &[vptr, np_ptr] = s[*ptr];
-  auto &[vbytes, np_bytes] = s[*bytes];
+  auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
   s.addUB((vbytes != 0).implies(np_ptr));
-  s.addUB(np_bytes);
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
   return {};
@@ -2921,7 +2912,7 @@ void Memcpy::print(ostream &os) const {
 StateValue Memcpy::toSMT(State &s) const {
   auto &[vdst, np_dst] = s[*dst];
   auto &[vsrc, np_src] = s[*src];
-  auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
+  auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
   s.addUB((vbytes != 0).implies(np_dst && np_src));
 
   if (vbytes.bits() > bits_size_t)

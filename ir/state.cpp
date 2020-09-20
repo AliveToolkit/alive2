@@ -163,11 +163,11 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e) {
   if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
     if (c.isEq(lhs, rhs)) {
       expr val, not_undef;
-      if (is_if_undef(lhs, val, not_undef)) {
+      if (rhs.isConst() && is_if_undef(lhs, val, not_undef)) {
         s.addUB(move(not_undef));
         return expr::mkIf(val == rhs, a, b);
       }
-      if (is_if_undef(rhs, val, not_undef)) {
+      if (lhs.isConst() && is_if_undef(rhs, val, not_undef)) {
         s.addUB(move(not_undef));
         return expr::mkIf(lhs == val, a, b);
       }
@@ -483,7 +483,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                       analysis.ranges_fn_calls, memory,
+                                       analysis.ranges_fn_calls,
+                                       reads_memory ? memory : Memory(*this),
                                        reads_memory, argmemonly });
   auto &I = call_data_pair.first;
   bool inserted = call_data_pair.second;
@@ -664,13 +665,11 @@ void State::mkAxioms(State &tgt) {
           // need to be compared
           auto &[ptr_in, is_byval, is_nocapture] = ptr_ins[i];
           auto &[ptr_in2, is_byval2, is_nocapture2] = ptr_ins2[i];
-          (void)is_nocapture;
-          (void)is_nocapture2;
-          if (!is_byval && is_byval2) {
-            // byval is added at target; this is not supported yet.
+          if (is_byval != is_byval2 || is_nocapture != is_nocapture2) {
             refines = false;
             break;
           }
+
           expr eq_val = Pointer(mem, ptr_in.value)
                           .fninputRefined(Pointer(mem2, ptr_in2.value),
                                           undef_vars, is_byval2);
