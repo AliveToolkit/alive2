@@ -2769,7 +2769,10 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr).value;
+  // NOTE: We neeed clarification whether loading a partially undefined pointer
+  // is UB. Memory sanitizer has an option (detecting a partially undef pointer)
+  // for this, so worth discussing it.
+  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
   return sv;
@@ -2811,7 +2814,10 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr).value;
+  // NOTE: We neeed clarification whether store to a partially undefined pointer
+  // is UB. Memory sanitizer has an option (detecting a partially undef pointer)
+  // for this, so worth discussing it.
+  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
@@ -2915,7 +2921,7 @@ void Memcpy::print(ostream &os) const {
 StateValue Memcpy::toSMT(State &s) const {
   auto &[vdst, np_dst] = s[*dst];
   auto &[vsrc, np_src] = s[*src];
-  auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
+  auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
   s.addUB((vbytes != 0).implies(np_dst && np_src));
 
   if (vbytes.bits() > bits_size_t)
