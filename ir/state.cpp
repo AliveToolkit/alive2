@@ -254,7 +254,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
       v = I->second;
     } else {
       v = strip_undef_and_add_ub(*this, val, v);
-      analysis.non_undef_vals[&val] = v;
+      analysis.non_undef_vals.emplace(&val, v);
     }
   }
 
