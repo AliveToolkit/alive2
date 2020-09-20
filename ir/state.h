@@ -49,6 +49,8 @@ private:
 
   struct ValueAnalysis {
     std::set<const Value *> non_poison_vals; // vars that are not poison
+    // vars that are not undef (partially undefs are not allowed too)
+    std::map<const Value *, smt::expr> non_undef_vals;
 
     void intersect(const ValueAnalysis &other);
     void reset();
@@ -130,10 +132,12 @@ public:
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
-  const StateValue& getAndAddPoisonUB(const Value &val);
+  // If undef_ub is true, UB is also added when val was undef
+  const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false);
+
   const ValTy& at(const Value &val) const;
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
-  bool isUndef(const smt::expr &e) const;
+  bool isUndef(const smt::expr &e, const Value *used_by = nullptr) const;
 
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);

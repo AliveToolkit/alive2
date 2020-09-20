@@ -231,6 +231,13 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   return { move(val), never_poison ? true : expr::mkBoolVar(np_name.c_str()) };
 }
 
+bool Input::isUndefMask(const expr &e, const expr &var) {
+  auto ty_name = e.fn_name();
+  auto var_name = var.fn_name();
+  return string_view(ty_name).substr(0, 8) == "isundef_" &&
+         string_view(ty_name).substr(8, var_name.size()) == var_name;
+}
+
 StateValue Input::toSMT(State &s) const {
   return mkInput(s, getType(), 0);
 }

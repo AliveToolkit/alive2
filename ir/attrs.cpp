@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include <cassert>
 
 using namespace std;
 
@@ -47,6 +48,18 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   if (attr.has(FnAttrs::NoUndef))
     os << " noundef";
   return os;
+}
+
+bool ParamAttrs::undefImpliesUB() const {
+  bool ub = has(NoUndef);
+  assert(!ub || poisonImpliesUB());
+  return ub;
+}
+
+bool FnAttrs::undefImpliesUB() const {
+  bool ub = has(NoUndef);
+  assert(!ub || poisonImpliesUB());
+  return ub;
 }
 
 }
