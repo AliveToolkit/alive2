@@ -29,8 +29,7 @@ public:
   { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(ByVal); }
 
    // Returns true if it is UB for the argument to be (partially) undef.
-  bool undefImpliesUB() const
-  { return has(NoUndef); }
+  bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 };
@@ -58,8 +57,7 @@ public:
   { return has(NonNull) || has(Dereferenceable) || has(NoUndef); }
 
   // Returns true if returning (partially) undef is UB
-  bool undefImpliesUB() const
-  { return has(NoUndef); }
+  bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };

@@ -242,42 +242,45 @@ const StateValue&
 State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
   auto &sv = (*this)[val];
 
-  if (!analysis.non_poison_vals.insert(&val).second && !undef_ub_too)
+  bool poison_already_added = !analysis.non_poison_vals.insert(&val).second;
+  if (poison_already_added && !undef_ub_too)
     return sv;
 
   expr v = sv.value;
 
   if (undef_ub_too) {
-    auto inserted = analysis.non_undef_vals.find(&val);
-    if (inserted != analysis.non_undef_vals.end()) {
-      v = inserted->second;
+    auto I = analysis.non_undef_vals.find(&val);
+    if (I != analysis.non_undef_vals.end()) {
+      v = I->second;
     } else {
       v = strip_undef_and_add_ub(*this, val, v);
       analysis.non_undef_vals[&val] = v;
     }
   }
 
-  // mark all operands of val as non-poison if they propagate poison
-  vector<Value*> todo;
-  if (auto i = dynamic_cast<const Instr*>(&val)) {
-    if (i->propagatesPoison())
-      todo = i->operands();
-  }
-  while (!todo.empty()) {
-    auto v = todo.back();
-    todo.pop_back();
-    if (!analysis.non_poison_vals.insert(v).second)
-      continue;
-    if (auto i = dynamic_cast<const Instr*>(v)) {
-      if (i->propagatesPoison()) {
-        auto ops = i->operands();
-        todo.insert(todo.end(), ops.begin(), ops.end());
+  if (!poison_already_added) {
+    // mark all operands of val as non-poison if they propagate poison
+    vector<Value*> todo;
+    if (auto i = dynamic_cast<const Instr*>(&val)) {
+      if (i->propagatesPoison())
+        todo = i->operands();
+    }
+    while (!todo.empty()) {
+      auto v = todo.back();
+      todo.pop_back();
+      if (!analysis.non_poison_vals.insert(v).second)
+        continue;
+      if (auto i = dynamic_cast<const Instr*>(v)) {
+        if (i->propagatesPoison()) {
+          auto ops = i->operands();
+          todo.insert(todo.end(), ops.begin(), ops.end());
+        }
       }
     }
-  }
 
-  // If val is an aggregate, all elements should be non-poison
-  addUB(not_poison_except_padding(val.getType(), sv.non_poison));
+    // If val is an aggregate, all elements should be non-poison
+    addUB(not_poison_except_padding(val.getType(), sv.non_poison));
+  }
   assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { move(v),
         sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison.bits()) };

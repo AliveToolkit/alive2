@@ -49,4 +49,16 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   return os;
 }
 
+bool ParamAttrs::undefImpliesUB() const {
+  bool ub = has(NoUndef);
+  assert(!ub || poisonImpliesUB());
+  return ub;
+}
+
+bool FnAttrs::undefImpliesUB() const {
+  bool ub = has(NoUndef);
+  assert(!ub || poisonImpliesUB());
+  return ub;
+}
+
 }
