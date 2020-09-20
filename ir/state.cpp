@@ -67,14 +67,17 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
 
   for (auto &[fn, interval] : *this) {
     auto I = other.find(fn);
-    if (I == other.end())
+    if (I == other.end()) {
+      if (interval.first == 0)
+        continue;
       return false;
+    }
     if (!overlaps(interval, I->second))
       return false;
   }
 
   for (auto &[fn, interval] : other) {
-    if (!count(fn))
+    if (interval.first != 0 && !count(fn))
       return false;
   }
 
