@@ -52,8 +52,13 @@ private:
     // vars that are not undef (partially undefs are not allowed too)
     std::map<const Value *, smt::expr> non_undef_vals;
 
+    struct FnCallRanges
+      : public std::map<std::string, std::pair<unsigned, unsigned>> {
+      bool overlaps(const FnCallRanges &other) const;
+    };
+    FnCallRanges ranges_fn_calls;
+
     void intersect(const ValueAnalysis &other);
-    void reset();
   };
 
   struct BasicBlockInfo {
@@ -107,13 +112,15 @@ private:
   struct FnCallInput {
     std::vector<StateValue> args_nonptr;
     std::vector<Memory::PtrInput> args_ptr;
+    ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
     bool readsmem, argmemonly;
 
     bool operator<(const FnCallInput &rhs) const {
-      return std::tie(args_nonptr, args_ptr, m, readsmem, argmemonly) <
-             std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.m, rhs.readsmem,
-                      rhs.argmemonly);
+      return std::tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem,
+                      argmemonly) <
+             std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
+                      rhs.readsmem, rhs.argmemonly);
     }
   };
   struct FnCallOutput {

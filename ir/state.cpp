@@ -43,13 +43,43 @@ static T intersect_set(const T &a, const T &b) {
 void State::ValueAnalysis::intersect(const State::ValueAnalysis &other) {
   non_poison_vals = intersect_set(non_poison_vals, other.non_poison_vals);
   non_undef_vals = intersect_set(non_undef_vals, other.non_undef_vals);
+
+  for (auto &[fn, interval] : other.ranges_fn_calls) {
+    auto [I, inserted] = ranges_fn_calls.try_emplace(fn, 0, interval.second);
+    if (!inserted) {
+      I->second.first  = min(I->second.first, interval.first);
+      I->second.second = max(I->second.second, interval.second);
+    }
+  }
+
+  for (auto &[fn, interval] : ranges_fn_calls) {
+    if (!other.ranges_fn_calls.count(fn))
+      interval.first = 0;
+  }
 }
 
-void State::ValueAnalysis::reset() {
-  non_poison_vals.clear();
-  non_undef_vals.clear();
-}
+bool
+State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
+  auto overlaps = [](auto &a, auto &b) {
+    return (a.first <= b.first && a.second >= b.first) ||
+           (b.first <= a.first && b.second >= a.first);
+  };
 
+  for (auto &[fn, interval] : *this) {
+    auto I = other.find(fn);
+    if (I == other.end())
+      return false;
+    if (!overlaps(interval, I->second))
+      return false;
+  }
+
+  for (auto &[fn, interval] : other) {
+    if (!count(fn))
+      return false;
+  }
+
+  return true;
+}
 
 State::State(Function &f, bool source)
   : f(f), source(source), memory(*this),
@@ -308,7 +338,6 @@ bool State::startBB(const BasicBlock &bb) {
   current_bb = &bb;
 
   domain.reset();
-  analysis.reset();
 
   if (&f.getFirstBB() == &bb)
     return true;
@@ -451,7 +480,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   // TODO: this doesn't need to compare the full memory, just a subset of fields
   auto call_data_pair
     = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                       memory, reads_memory, argmemonly });
+                                       analysis.ranges_fn_calls, memory,
+                                       reads_memory, argmemonly });
   auto &I = call_data_pair.first;
   bool inserted = call_data_pair.second;
 
@@ -481,6 +511,14 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
           true };
   } else {
     I->second.used = true;
+  }
+
+  if (writes_memory) {
+    auto [I, inserted] = analysis.ranges_fn_calls.try_emplace(name, 1, 1);
+    if (!inserted) {
+      ++I->second.first;
+      ++I->second.second;
+    }
   }
 
   addUB(I->second.ub);
@@ -596,15 +634,16 @@ void State::mkAxioms(State &tgt) {
     auto &data2 = tgt.fn_call_data.at(fn);
 
     for (auto I = data.begin(), E = data.end(); I != E; ++I) {
-      auto &[ins, ptr_ins, mem, reads, argmem] = I->first;
+      auto &[ins, ptr_ins, fn_ranges, mem, reads, argmem] = I->first;
       auto &[rets, ub, mem_state, used] = I->second;
       assert(used); (void)used;
 
       for (auto I2 = data2.begin(), E2 = data2.end(); I2 != E2; ++I2) {
-        auto &[ins2, ptr_ins2, mem2, reads2, argmem2] = I2->first;
+        auto &[ins2, ptr_ins2, fn_ranges2, mem2, reads2, argmem2] = I2->first;
         auto &[rets2, ub2, mem_state2, used2] = I2->second;
 
-        if (!used2 || reads != reads2 || argmem != argmem2 || ub.eq(ub2))
+        if (!used2 || reads != reads2 || argmem != argmem2 ||
+            !fn_ranges.overlaps(fn_ranges2) || ub.eq(ub2))
           continue;
 
         expr refines(true);
