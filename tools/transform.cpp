@@ -287,13 +287,13 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 
 static expr
 encode_undef_refinement_per_elem(
-    const Type &ty, const expr &a, const expr &a2, const expr &a_np,
+    const Type &ty, const StateValue &sva, const expr &a2,
     const expr &b, const expr &b2) {
   const auto *aty = ty.getAsAggregateType();
   if (!aty)
-    return (a_np && a == a2).implies(b == b2);
+    return (sva.non_poison && sva.value == a2).implies(b == b2);
 
-  StateValue sva{expr(a), expr(a_np)}, sva2{expr(a2), expr()};
+  StateValue sva2{expr(a2), expr()};
   StateValue svb{expr(b), expr()}, svb2{expr(b2), expr()};
   expr result = true;
 
@@ -302,9 +302,8 @@ encode_undef_refinement_per_elem(
       continue;
 
     result &= encode_undef_refinement_per_elem(aty->getChild(i),
-        aty->extract(sva, i).value, aty->extract(sva2, i).value,
-        aty->extract(sva, i).non_poison, aty->extract(svb, i).value,
-        aty->extract(svb2, i).value);
+        aty->extract(sva, i), aty->extract(sva2, i).value,
+        aty->extract(svb, i).value, aty->extract(svb2, i).value);
   }
   return result;
 }
@@ -348,7 +347,7 @@ encode_undef_refinement(const Type &type, const State::ValTy &ap,
   expr b2 = b.subst(repls_tgt);
 
   return
-    encode_undef_refinement_per_elem(type, a, a2, ap.first.non_poison, b, b2);
+    encode_undef_refinement_per_elem(type, ap.first, a2, b, b2);
 }
 
 static void
