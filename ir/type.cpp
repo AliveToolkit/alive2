@@ -1377,9 +1377,6 @@ bool hasPtr(const Type &t) {
 
   if (auto agg = t.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (agg->isPadding(i))
-        continue;
-
       if (hasPtr(agg->getChild(i)))
         return true;
     }
