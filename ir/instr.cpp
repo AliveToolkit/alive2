@@ -2767,7 +2767,7 @@ void Load::print(std::ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
   return sv;
@@ -2809,7 +2809,7 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
@@ -2855,9 +2855,17 @@ void Memset::print(ostream &os) const {
 }
 
 StateValue Memset::toSMT(State &s) const {
-  auto &[vptr, np_ptr] = s[*ptr];
   auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
-  s.addUB((vbytes != 0).implies(np_ptr));
+
+  uint64_t n;
+  expr vptr;
+  if (vbytes.isUInt(n) && n > 0) {
+    vptr = s.getAndAddPoisonUB(*ptr).value;
+  } else {
+    auto &sv_ptr = s[*ptr];
+    s.addUB((vbytes != 0).implies(sv_ptr.non_poison));
+    vptr = sv_ptr.value;
+  }
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
   return {};
@@ -2910,10 +2918,20 @@ void Memcpy::print(ostream &os) const {
 }
 
 StateValue Memcpy::toSMT(State &s) const {
-  auto &[vdst, np_dst] = s[*dst];
-  auto &[vsrc, np_src] = s[*src];
   auto &vbytes = s.getAndAddPoisonUB(*bytes).value;
-  s.addUB((vbytes != 0).implies(np_dst && np_src));
+
+  uint64_t n;
+  expr vsrc, vdst;
+  if (vbytes.isUInt(n) && n > 0) {
+    vdst = s.getAndAddPoisonUB(*dst).value;
+    vsrc = s.getAndAddPoisonUB(*src).value;
+  } else {
+    auto &sv_dst = s[*dst];
+    auto &sv_src = s[*src];
+    s.addUB((vbytes != 0).implies(sv_dst.non_poison && sv_src.non_poison));
+    vdst = sv_dst.value;
+    vsrc = sv_src.value;
+  }
 
   if (vbytes.bits() > bits_size_t)
     s.addUB(
