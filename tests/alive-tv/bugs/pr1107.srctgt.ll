@@ -12,4 +12,4 @@ define i1 @tgt(i8 %A, i8 %B) {
         ret i1 %c
 }
 
-; ERROR: Value mismatch
+; ERROR: Target's return value is more undefined

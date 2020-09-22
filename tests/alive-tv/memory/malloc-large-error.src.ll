@@ -5,6 +5,6 @@ define i8* @malloc_large() {
   ret i8* %ret
 }
 
-; ERROR: Value mismatch
+; ERROR: Target's return value is more undefined
 
 declare i8* @malloc(i64)

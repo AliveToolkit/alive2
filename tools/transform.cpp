@@ -285,6 +285,73 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 }
 
 
+static expr
+encode_undef_refinement_per_elem(
+    const Type &ty, const expr &a, const expr &a2, const expr &a_np,
+    const expr &b, const expr &b2) {
+  const auto *aty = ty.getAsAggregateType();
+  if (!aty)
+    return (a_np && a == a2).implies(b == b2);
+
+  StateValue sva{expr(a), expr(a_np)}, sva2{expr(a2), expr()};
+  StateValue svb{expr(b), expr()}, svb2{expr(b2), expr()};
+  expr result = true;
+
+  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    if (aty->isPadding(i))
+      continue;
+
+    result &= encode_undef_refinement_per_elem(aty->getChild(i),
+        aty->extract(sva, i).value, aty->extract(sva2, i).value,
+        aty->extract(sva, i).non_poison, aty->extract(svb, i).value,
+        aty->extract(svb2, i).value);
+  }
+  return result;
+}
+
+static expr
+encode_undef_refinement(const Type &type, const State::ValTy &ap,
+                        const State::ValTy &bp, set<expr> &qvars) {
+  // Undef refinement: (src-nonpoison /\ src-nonundef) -> tgt-nonundef
+  //
+  // Full refinement formula:
+  //   forall N_tgt, exists N_src,
+  //      (src_nonpoison /\
+  //       forall N_src', retval_src(N_src) == retval_src(N_src')) ->
+  //      forall N_tgt', retval_tgt(N_tgt) == retval_tgt(N_tgt')
+  //
+  // Since retval_tgt is the return value of the target program, it never uses
+  // N_src. Therefore, N_tgt' can be moved to the outer forall quantifier.
+  // Also, since bitvector isnt an empty set, N_src' can move to the
+  // existential quantifier too.
+  //
+  //   forall N_tgt, N_tgt', exists N_src, N_src',
+  //      (src_nonpoison /\ retval_src(N_src) == retval_src(N_src')) ->
+  //      retval_tgt(N_tgt) == retval_tgt(N_tgt')
+
+  if (dynamic_cast<const VoidType *>(&type))
+    return expr(true);
+
+  vector<pair<expr, expr>> repls_src, repls_tgt;
+  for (auto &u : ap.second) {
+    expr newvar = expr::mkFreshVar("undef", u);
+    repls_src.emplace_back(u, expr::mkFreshVar("undef", u));
+    qvars.insert(newvar);
+  }
+
+  const expr &a = ap.first.value;
+  expr a2 = a.subst(repls_src);
+
+  for (auto &u : bp.second)
+    repls_tgt.emplace_back(u, expr::mkFreshVar("undef", u));
+
+  const expr &b = bp.first.value;
+  expr b2 = b.subst(repls_tgt);
+
+  return
+    encode_undef_refinement_per_elem(type, a, a2, ap.first.non_poison, b, b2);
+}
+
 static void
 check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
                  const Value *var, const Type &type,
@@ -347,6 +414,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr pre = pre_src_exists && pre_tgt;
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
+  expr undef_cnstr = encode_undef_refinement(type, ap, bp, qvars);
 
   auto src_mem = src_state.returnMemory();
   auto tgt_mem = tgt_state.returnMemory();
@@ -411,6 +479,10 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     { mk_fml(dom && !poison_cnstr),
       [&](const Result &r) {
         err(r, print_value, "Target is more poisonous than source");
+      }},
+    { mk_fml(dom && !undef_cnstr),
+      [&](const Result &r) {
+        err(r, print_value, "Target's return value is more undefined");
       }},
     { mk_fml(dom && !value_cnstr),
       [&](const Result &r) {

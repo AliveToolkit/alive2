@@ -1,0 +1,5 @@
+%x = freeze i4 undef
+  =>
+%x = undef
+
+; ERROR: Target's return value is more undefined for i4 %x
