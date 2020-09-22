@@ -316,9 +316,8 @@ encode_undef_refinement(const Type &type, const State::ValTy &ap,
   //
   // Full refinement formula:
   //   forall N_tgt, exists N_src,
-  //      (src_nonpoison /\
-  //       forall N_src', retval_src(N_src) == retval_src(N_src')) ->
-  //      forall N_tgt', retval_tgt(N_tgt) == retval_tgt(N_tgt')
+  //    (src_nonpoison /\ forall N_src', retval_src(N_src)==retval_src(N_src'))
+  //      -> forall N_tgt', retval_tgt(N_tgt) == retval_tgt(N_tgt')
   //
   // Since retval_tgt is the return value of the target program, it never uses
   // N_src. Therefore, N_tgt' can be moved to the outer forall quantifier.
