@@ -832,8 +832,19 @@ end:
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_addr:
+    case llvm::Intrinsic::dbg_declare:
+    case llvm::Intrinsic::dbg_label:
+    case llvm::Intrinsic::dbg_value:
     case llvm::Intrinsic::donothing:
-      return {};
+    case llvm::Intrinsic::instrprof_increment:
+    case llvm::Intrinsic::instrprof_increment_step:
+    case llvm::Intrinsic::instrprof_value_profile:
+      // some NOP instruction
+      assert(i.getType()->isVoidTy());
+      return
+        make_unique<Assume>(
+          *get_operand(llvm::ConstantInt::getTrue(i.getContext())),
+          /*if_non_poison=*/false);
 
     default:
       break;
@@ -861,7 +872,6 @@ end:
                                                  move(mask)));
   }
 
-  RetTy visitDbgInfoIntrinsic(llvm::DbgInfoIntrinsic&) { return {}; }
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
   RetTy error(llvm::Instruction &i) {
