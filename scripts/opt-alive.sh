@@ -9,7 +9,8 @@ set -e
 # extract-blocks: extract specified blocks into a distinct function
 # attributor, function-attrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
-PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer lowertypetests extract-blocks openmpopt prune-eh -Os -Oz -O1 -O2 -O3"
+# sample-profile: inlines functions
+PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmpopt prune-eh -Os -Oz -O1 -O2 -O3"
 PASSES_SIMPLIFYLIB="-instcombine"
 
 TV="-tv"
