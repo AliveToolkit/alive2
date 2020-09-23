@@ -333,8 +333,8 @@ encode_undef_refinement(const Type &type, const State::ValTy &ap,
   vector<pair<expr, expr>> repls_src, repls_tgt;
   for (auto &u : ap.second) {
     expr newvar = expr::mkFreshVar("undef", u);
-    repls_src.emplace_back(u, expr::mkFreshVar("undef", u));
-    qvars.insert(newvar);
+    repls_src.emplace_back(u, newvar);
+    qvars.insert(move(newvar));
   }
 
   const expr &a = ap.first.value;
