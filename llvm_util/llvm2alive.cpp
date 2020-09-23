@@ -171,6 +171,13 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
         [&](auto ag) { return copy_inserter(ag); });
   }
 
+  RetTy NOP(llvm::Instruction &i) {
+    // some NOP instruction
+    assert(i.getType()->isVoidTy());
+    auto true_val = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
+    return make_unique<Assume>(*true_val, false);
+  }
+
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
               const vector<string_view> &gvnamesInSrc)
@@ -280,6 +287,9 @@ public:
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
       return error(i);
+
+    if (fn->getName().substr(0, 15) == "__llvm_profile_")
+      return NOP(i);
 
     FnAttrs attrs;
     parse_fnattrs(attrs, i.getType(),
@@ -839,12 +849,7 @@ end:
     case llvm::Intrinsic::instrprof_increment:
     case llvm::Intrinsic::instrprof_increment_step:
     case llvm::Intrinsic::instrprof_value_profile:
-      // some NOP instruction
-      assert(i.getType()->isVoidTy());
-      return
-        make_unique<Assume>(
-          *get_operand(llvm::ConstantInt::getTrue(i.getContext())),
-          /*if_non_poison=*/false);
+      return NOP(i);
 
     default:
       break;
