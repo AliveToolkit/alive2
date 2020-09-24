@@ -589,7 +589,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_fncall       = false;
   has_null_block   = false;
   does_ptr_store   = false;
-  does_ptr_store_constantsonly = false;
+  does_ptr_store_constantsonly = true;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
   bool does_any_byte_access = false;
@@ -661,7 +661,7 @@ static void calculateAndInitConstants(Transform &t) {
           auto info = mi->getByteAccessInfo();
           has_ptr_load         |= info.doesPtrLoad;
           does_ptr_store       |= info.doesPtrStore.has_store;
-          does_ptr_store_constantsonly |= info.doesPtrStore.constant_ptrs_only;
+          does_ptr_store_constantsonly &= info.doesPtrStore.constant_ptrs_only;
           does_int_mem_access  |= info.hasIntByteAccess;
           does_mem_access      |= info.doesMemAccess();
           min_access_size       = gcd(min_access_size, info.byteSize);
@@ -692,6 +692,7 @@ static void calculateAndInitConstants(Transform &t) {
     }
   }
 
+  does_ptr_store_constantsonly &= does_ptr_store;
   does_ptr_mem_access = has_ptr_load || does_ptr_store;
   if (does_any_byte_access && !does_int_mem_access && !does_ptr_mem_access)
     // Use int bytes only
@@ -811,6 +812,8 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nhas_free: " << has_free
                   << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
+                  << "\ndoes_ptr_store_constantsonly: "
+                  << does_ptr_store_constantsonly
                   << "\ndoes_mem_access: " << does_mem_access
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
