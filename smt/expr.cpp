@@ -260,6 +260,10 @@ expr expr::mkFreshVar(const char *prefix, const expr &type) {
   return Z3_mk_fresh_const(ctx(), prefix, type.sort());
 }
 
+expr expr::some(const expr &type) {
+  return type.isBool() ? expr(false) : mkNumber("0", type);
+}
+
 expr expr::IntSMin(unsigned bits) {
   if (bits == 0)
     return {};

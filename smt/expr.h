@@ -101,6 +101,9 @@ public:
   static expr mkDoubleVar(const char *name);
   static expr mkFreshVar(const char *prefix, const expr &type);
 
+  // return a constant value of the given type
+  static expr some(const expr &type);
+
   static expr IntSMin(unsigned bits);
   static expr IntSMax(unsigned bits);
   static expr IntUMax(unsigned bits);
