@@ -14,5 +14,5 @@ define void @tgt(i8* %a) {
   ret void
 }
 
-; CHECK: does_ptr_store_constantsonly: 0
+; CHECK: does_ptr_store_nonconstant: 1
 

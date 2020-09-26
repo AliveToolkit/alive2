@@ -432,7 +432,7 @@ public:
   struct ByteAccessInfo {
     struct PtrStoreInfo {
       bool has_store;
-      bool constant_ptrs_only;
+      bool may_store_nonconstptr;
     };
 
     bool hasIntByteAccess = false;

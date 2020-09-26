@@ -11,5 +11,5 @@ define void @tgt() {
   ret void
 }
 
-; CHECK: does_ptr_store_constantsonly: 1
+; CHECK: does_ptr_store_nonconstant: 0
 

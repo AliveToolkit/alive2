@@ -80,7 +80,7 @@ extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;
 
 extern bool does_ptr_store;
-extern bool does_ptr_store_constantsonly; // stores non-constant ptrs only?
+extern bool does_ptr_store_nonconstant; // may store non-constant ptrs?
 
 extern unsigned heap_block_alignment;
 

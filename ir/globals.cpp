@@ -42,7 +42,7 @@ bool has_null_block;
 bool does_int_mem_access;
 bool does_ptr_mem_access;
 bool does_ptr_store;
-bool does_ptr_store_constantsonly;
+bool does_ptr_store_nonconstant;
 unsigned heap_block_alignment;
 
 

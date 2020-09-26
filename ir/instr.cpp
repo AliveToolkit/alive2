@@ -2314,11 +2314,11 @@ MemInstr::ByteAccessInfo::get(const Type &t, const Value *storeval,
   bool ptr_access = hasPtr(t);
   ByteAccessInfo info;
   info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
-  info.doesPtrStore = { ptr_access && storeval, false };
+  info.doesPtrStore = { ptr_access && storeval, true };
   if (dynamic_cast<const GlobalVariable *>(storeval) ||
       dynamic_cast<const NullPointerValue *>(storeval) ||
       dynamic_cast<const UndefValue *>(storeval))
-    info.doesPtrStore.constant_ptrs_only = true;
+    info.doesPtrStore.may_store_nonconstptr = false;
   info.doesPtrLoad = ptr_access && !storeval;
   info.byteSize = gcd(align, getCommonAccessSize(t));
   return info;
