@@ -136,6 +136,7 @@ public:
 
   static void resetGlobals();
 
+  /*--- Get values or update registers ---*/
   const StateValue& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
@@ -143,9 +144,10 @@ public:
   const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false);
 
   const ValTy& at(const Value &val) const;
-  const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
   bool isUndef(const smt::expr &e, const Value *used_by = nullptr) const;
 
+  /*--- Control flow ---*/
+  const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);
   // boolean cond
@@ -155,6 +157,7 @@ public:
                    const BasicBlock &dst_false);
   void addReturn(StateValue &&val);
 
+  /*--- Axioms, preconditions, domains ---*/
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
   void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }

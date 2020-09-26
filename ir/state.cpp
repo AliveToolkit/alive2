@@ -186,6 +186,9 @@ const StateValue& State::operator[](const Value &val) {
   auto &[sval, uvars] = val_uvars;
   (void)var;
 
+  auto undef_itr = analysis.non_undef_vals.find(&val);
+  bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
+
   auto simplify = [&](StateValue &sv0, bool use_new_slot) -> StateValue&{
     StateValue *sv = &sv0;
     if (analysis.non_poison_vals.count(&val)) {
@@ -201,8 +204,7 @@ const StateValue& State::operator[](const Value &val) {
       sv = &sv_new;
     }
 
-    auto undef_itr = analysis.non_undef_vals.find(&val);
-    if (undef_itr != analysis.non_undef_vals.end()) {
+    if (is_non_undef) {
       if (use_new_slot) {
         assert(i_tmp_values < tmp_values.size());
         tmp_values[i_tmp_values++] = *sv;
@@ -214,6 +216,11 @@ const StateValue& State::operator[](const Value &val) {
     }
     return *sv;
   };
+
+  if (is_non_undef) {
+    // We don't need to add uvar to undef_vars
+    return simplify(sval, true);
+  }
 
   if (uvars.empty() || !used || disable_undef_rewrite) {
     used = true;
