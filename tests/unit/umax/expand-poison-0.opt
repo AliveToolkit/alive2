@@ -4,4 +4,4 @@ Name: t0
 %cond = icmp ugt i8 %a, %b
 %t = select i1 %cond, i8 %a, i8 %b
 
-; ERROR: Value mismatch for i8 %t
+; ERROR: Target's return value is more undefined for i8 %t

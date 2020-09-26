@@ -6,4 +6,4 @@ Name: t0
 %cmp = icmp sgt i8 %v0, %v1
 %r = select i1 %cmp, i8 %v0, i8 %v1
 
-; ERROR: Value mismatch for i8 %r
+; ERROR: Target's return value is more undefined for i8 %r

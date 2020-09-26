@@ -1,4 +1,4 @@
-; ERROR: Value mismatch
+; ERROR: Target's return value is more undefined for i1 %r
 %r = 0
   =>
 %r = undef
