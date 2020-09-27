@@ -73,7 +73,7 @@ static string local_name(const State *s, const char *name) {
   return string(name) + (s->isSource() ? "_src" : "_tgt");
 }
 
-static bool is_initial_memblock(const expr &e, bool match_any_init = false) {
+static int is_initial_memblock(const expr &e, bool match_any_init = false) {
   string name;
   expr load, blk, idx;
   unsigned hi, lo;
@@ -83,9 +83,9 @@ static bool is_initial_memblock(const expr &e, bool match_any_init = false) {
     name = e.fn_name();
 
   if (string_view(name).substr(0, 9) == "init_mem_")
-    return true;
+    return 1;
 
-  return match_any_init && string_view(name).substr(0, 8) == "blk_val!";
+  return match_any_init && string_view(name).substr(0, 8) == "blk_val!" ? 2 : 0;
 }
 
 static expr load_bv(const expr &var, const expr &idx0) {
@@ -2129,6 +2129,21 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
 
   if (mem1.val.eq(mem2))
     return true;
+
+  int is_fn1 = is_initial_memblock(mem1.val, true);
+  int is_fn2 = is_initial_memblock(mem2, true);
+  if (is_fn1 && is_fn2) {
+    // if both memories are the result of a function call, then refinement
+    // holds iif they are equal, otherwise we can always force a behavior
+    // of the function such that it will store a different value to memory
+    if (is_fn1 == 2 && is_fn2 == 2)
+      return mem1.val == mem2;
+
+    // an inital memory (m0) vs a function call is always false, as a function
+    // may always store something to memory
+    assert((is_fn1 == 1 && is_fn2 == 2) || (is_fn1 == 2 && is_fn2 == 1));
+    return false;
+  }
 
   Byte val(*this, mem1.val.load(offset));
   Byte val2(other, mem2.load(offset));
