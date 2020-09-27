@@ -71,7 +71,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 22. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
-23. Incorrect transformation> mul foo, undef -> shl foo, undef
+23. Incorrect transformation: mul foo, undef -> shl foo, undef
 (https://bugs.llvm.org/show_bug.cgi?id=47133)
 
 24. Incorrect transformation: (llvm.maximum undef, %x) -> undef
@@ -135,6 +135,10 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 
 18. load-store-vectorizer cannot assume that an offset calculated from add nuw is fine in general
 (https://bugs.llvm.org/show_bug.cgi?id=46591)
+
+19. LoopReroll incorrectly reorders stores across loads when they may alias
+(https://bugs.llvm.org/show_bug.cgi?id=47658)
+
 
 ### Bugs found in Z3
 1. https://github.com/Z3Prover/z3/issues/2369 - bug in bitblast for FPA
