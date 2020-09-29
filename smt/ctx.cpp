@@ -39,6 +39,7 @@ void context::init() {
 }
 
 void context::destroy() {
+  Z3_close_log();
   Z3_del_context(ctx);
 }
 

@@ -67,6 +67,10 @@ static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_smt_log(
+    "smt-log", llvm::cl::desc("Log interactions with the SMT solver"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::cl::opt<bool> opt_smt_skip(
     "skip-smt", llvm::cl::desc("Skip all SMT queries"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -419,6 +423,9 @@ convenient way to demonstrate an existing optimizer bug.
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
   config::debug = opt_debug;
+
+  if (opt_smt_log)
+    smt::start_logging();
 
   // optionally, redirect cout and cerr to user-specified file
   if (!opt_outputfile.empty()) {

@@ -31,10 +31,12 @@ static void show_help() {
           " -smt-to:x\t\tTimeout for SMT queries in ms\n"
           " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
           " -smt-verbose\t\tPrint all SMT queries\n"
+          " -tactic-verbose\tDebug SMT tactics\n"
+          " -smt-log\t\tLog interactions with the SMT solver\n"
           " -skip-smt\t\tSkip all SMT queries\n"
           " -disable-poison-input\tAssume input variables can never be poison\n"
           " -disable-undef-input\tAssume input variables can never be undef\n"
-          " -h / --help / -v / --version\t\tShow this help\n";
+          " -h / --help / -v / --version\tShow this help\n";
 }
 
 
@@ -64,6 +66,8 @@ int main(int argc, char **argv) {
       smt::solver_print_queries(true);
     else if (arg == "-tactic-verbose")
       smt::solver_tactic_verbose(true);
+    else if (arg == "-smt-log")
+      smt::start_logging();
     else if (arg == "-skip-smt")
       config::skip_smt = true;
     else if (arg == "-disable-undef-input")

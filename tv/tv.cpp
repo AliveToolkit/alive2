@@ -80,6 +80,10 @@ llvm::cl::opt<bool> opt_tactic_verbose(
   "tv-tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
   llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_smt_log(
+  "tv-smt-log", llvm::cl::desc("Alive: log interactions with the SMT solver"),
+  llvm::cl::init(false));
+
 llvm::cl::opt<bool> opt_print_dot(
   "tv-dot", llvm::cl::desc("Alive: print .dot file with CFG of each function"),
   llvm::cl::init(false));
@@ -265,6 +269,9 @@ struct TVPass final : public llvm::FunctionPass {
     config::disable_poison_input = opt_disable_poison_input;
     config::debug = opt_debug;
     llvm_util::omit_array_size = opt_omit_array_size;
+
+    if (opt_smt_log)
+      smt::start_logging();
 
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();

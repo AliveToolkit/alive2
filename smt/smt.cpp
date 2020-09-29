@@ -4,9 +4,12 @@
 #include "smt/smt.h"
 #include "smt/ctx.h"
 #include "smt/solver.h"
+#include "util/version.h"
 #include <cstdint>
+#include <string>
 #include <z3.h>
 
+using namespace util;
 using namespace std;
 
 namespace smt {
@@ -60,6 +63,12 @@ bool hit_memory_limit() {
 
 bool hit_half_memory_limit() {
   return Z3_get_estimated_alloc_size() >= (z3_memory_limit / 2);
+}
+
+void start_logging() {
+  Z3_open_log("z3_log.txt");
+  string str = string("Alive2 ") + alive_version;
+  Z3_append_log(str.c_str());
 }
 
 }
