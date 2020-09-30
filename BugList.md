@@ -77,6 +77,9 @@ Please contact us or submit a PR if something is missing or inaccurate.
 24. Incorrect transformation: (llvm.maximum undef, %x) -> undef
 (https://bugs.llvm.org/show_bug.cgi?id=47567)
 
+25. InstCombine: incorrect select operand simplification with undef
+(https://bugs.llvm.org/show_bug.cgi?id=47696)
+
 
 ### Memory Operations (Load/Store/GEP/...)
 
