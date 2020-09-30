@@ -2248,6 +2248,9 @@ StateValue Return::toSMT(State &s) const {
     }
   }
 
+  if (attrs.has(FnAttrs::NoReturn))
+    s.addUB(expr(false));
+
   s.addReturn(move(retval));
   return {};
 }
