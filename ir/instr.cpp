@@ -2220,7 +2220,6 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
 }
 
 StateValue Return::toSMT(State &s) const {
-  // Encode nocapture semantics.
   StateValue retval;
 
   auto &attrs = s.getFn().getFnAttrs();
@@ -2247,6 +2246,9 @@ StateValue Return::toSMT(State &s) const {
       s.addUB(p.isNonZero());
     }
   }
+
+  if (attrs.has(FnAttrs::NoReturn))
+    s.addUB(expr(false));
 
   s.addReturn(move(retval));
   return {};
