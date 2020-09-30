@@ -2220,6 +2220,7 @@ static void addUBForNoCaptureRet(State &s, const StateValue &svret,
 }
 
 StateValue Return::toSMT(State &s) const {
+  // Encode nocapture semantics.
   StateValue retval;
 
   auto &attrs = s.getFn().getFnAttrs();
