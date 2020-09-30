@@ -142,6 +142,9 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 19. LoopReroll incorrectly reorders stores across loads when they may alias
 (https://bugs.llvm.org/show_bug.cgi?id=47658)
 
+20. MemCpyOpt: uses sext instead of zext for memcpy/memset size subtraction
+(https://bugs.llvm.org/show_bug.cgi?id=47697)
+
 
 ### Bugs found in Z3
 1. https://github.com/Z3Prover/z3/issues/2369 - bug in bitblast for FPA
