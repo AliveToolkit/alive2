@@ -219,6 +219,10 @@ const StateValue& State::operator[](const Value &val) {
 
   if (is_non_undef) {
     // We don't need to add uvar to undef_vars
+    // We add it to quantified_vars as a safety net because the current
+    // encoding of function call may lose uvars to be quantified, currently.
+    // They should be optimized ideally if never used.
+    quantified_vars.insert(uvars.begin(), uvars.end());
     return simplify(sval, true);
   }
 
