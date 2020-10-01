@@ -29,6 +29,7 @@ void context::init() {
   Z3_global_param_set("model.partial", "true");
   Z3_global_param_set("smt.ematching", "false");
   Z3_global_param_set("smt.mbqi.max_iterations", "1000000");
+  Z3_global_param_set("smt.random_seed", get_random_seed());
   Z3_global_param_set("timeout", get_query_timeout());
   Z3_global_param_set("memory_high_watermark", "2147483648"); // 2 GBs
   // Disable Z3's use of UFs for NaNs when converting FPs to BVs

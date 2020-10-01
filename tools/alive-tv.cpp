@@ -63,6 +63,11 @@ static llvm::cl::opt<unsigned> opt_smt_to(
     "smt-to", llvm::cl::desc("Timeout for SMT queries (default=1000)"),
     llvm::cl::init(1000), llvm::cl::value_desc("ms"), llvm::cl::cat(opt_alive));
 
+static llvm::cl::opt<unsigned> opt_smt_random_seed(
+    "smt-random-seed",
+    llvm::cl::desc("Random seed for the SMT solver (default=0)"),
+    llvm::cl::init(0), llvm::cl::cat(opt_alive));
+
 static llvm::cl::opt<bool> opt_smt_verbose(
     "smt-verbose", llvm::cl::desc("SMT verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -416,6 +421,7 @@ convenient way to demonstrate an existing optimizer bug.
   smt::solver_print_queries(opt_smt_verbose);
   smt::solver_tactic_verbose(opt_tactic_verbose);
   smt::set_query_timeout(to_string(opt_smt_to));
+  smt::set_random_seed(to_string(opt_smt_random_seed));
   smt::set_memory_limit((uint64_t)opt_max_mem * 1024 * 1024);
   config::skip_smt = opt_smt_skip;
   config::io_nobuiltin = opt_io_nobuiltin;
