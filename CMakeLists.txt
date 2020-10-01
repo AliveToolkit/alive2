@@ -119,6 +119,7 @@ set(UTIL_SRCS
   util/sort.cpp
   util/stopwatch.cpp
   util/symexec.cpp
+  util/unionfind.cpp
 )
 
 add_library(util STATIC ${UTIL_SRCS})

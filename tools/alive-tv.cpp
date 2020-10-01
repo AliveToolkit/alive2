@@ -94,6 +94,16 @@ static llvm::cl::opt<std::string> opt_tgt_fn(
     "tgt-fn", llvm::cl::desc("Name of tgt function (without @)"),
     llvm::cl::cat(opt_alive), llvm::cl::init("tgt"));
 
+static llvm::cl::opt<unsigned> opt_src_unrolling_factor(
+    "src-unroll",
+    llvm::cl::desc("Unrolling factor for src function (default=0)"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(0));
+
+static llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
+    "tgt-unroll",
+    llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(0));
+
 static llvm::cl::opt<bool> opt_tactic_verbose(
     "tactic-verbose", llvm::cl::desc("SMT Tactic verbose mode"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -283,6 +293,7 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     ++errorCount;
     return;
   }
+  Func1->unroll(opt_src_unrolling_factor);
 
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F2), Func1->getGlobalVarNames());
@@ -292,6 +303,7 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     ++errorCount;
     return;
   }
+  Func2->unroll(opt_tgt_unrolling_factor);
 
   smt_init->reset();
   Transform t;

@@ -4,6 +4,8 @@
 #include "ir/function.h"
 #include "ir/instr.h"
 #include "util/errors.h"
+#include "util/unionfind.h"
+#include <fstream>
 
 using namespace smt;
 using namespace util;
@@ -289,6 +291,14 @@ void Function::print(ostream &os, bool print_header) const {
     os << "}\n";
 }
 
+void Function::unroll(unsigned k) {
+  if (k == 0)
+    return;
+  LoopAnalysis la(*this);
+  ofstream out("a.gv");
+  la.printDot(out);
+}
+
 ostream& operator<<(ostream &os, const Function &f) {
   f.print(os);
   return os;
@@ -425,6 +435,122 @@ void DomTree::printDot(std::ostream &os) const {
     }
   }
 
+  os << "}\n";
+}
+
+
+void LoopAnalysis::getDepthFirstSpanningTree() {
+  unsigned bb_count = f.getBBs().size();
+  node.resize(bb_count, nullptr);
+  last.resize(bb_count, -1u);
+
+  map<const BasicBlock*, vector<const BasicBlock*>> edges;
+  for (auto [src, dst, instr] : cfg) {
+    edges[&src].push_back(&dst);
+  }
+
+  unsigned current = 0;
+  std::vector<std::pair<const BasicBlock*,bool>> s;
+  s.emplace_back(&f.getFirstBB(), false);
+  while(!s.empty()) {
+    auto &[bb, flag] = s.back();
+    s.pop_back();
+
+    if (flag) {
+      last[number[bb]] = current - 1;
+    } else {
+      node[current] = bb;
+      number[bb] = current++;
+
+      s.emplace_back(bb, true);
+      for (auto tgt : edges[bb])
+        if (!number.count(tgt))
+          s.emplace_back(tgt, false);
+    }
+  }
+}
+
+// Implemention of Tarjan-Havlak algorithm.
+//
+// Irreducible loops are partially supported.
+//
+// Tarjan, R. (1974). Testing Flow Graph Reducibility.
+// Havlak, P. (1997). Nesting of reducible and irreducible loops.
+void LoopAnalysis::analysis() {
+  getDepthFirstSpanningTree();
+  unsigned bb_count = f.getBBs().size();
+
+  auto isAncestor = [this](unsigned w, unsigned v) -> bool {
+    return w <= v && v <= last.at(w);
+  };
+
+  vector<set<unsigned>> nonBackPreds(bb_count), backPreds(bb_count);
+  header.resize(bb_count, 0);
+  type.resize(bb_count, NodeType::nonheader);
+
+  for (auto [src, dst, instr] : cfg) {
+    unsigned v = number.at(&src), w = number.at(&dst);
+    if (isAncestor(w, v))
+      backPreds[w].insert(v);
+    else
+      nonBackPreds[w].insert(v);
+  }
+
+  UnionFind uf(bb_count);
+
+  for (unsigned w = bb_count - 1; w != -1u; --w) {
+    set<unsigned> P;
+    for (unsigned v : backPreds[w])
+      if (v != w)
+        P.insert(uf.find(v));
+      else
+        type[w] = NodeType::self;
+
+    if (!P.empty())
+      type[w] = NodeType::reducible;
+
+    set<unsigned> workList(P);
+    while (!workList.empty()) {
+      unsigned x = *workList.begin();
+      workList.erase(x);
+
+      for (unsigned y : nonBackPreds[x]) {
+        unsigned yy = uf.find(y);
+        if (!isAncestor(w, yy)) {
+          type[w] = NodeType::irreducible;
+          nonBackPreds[w].insert(yy);
+        } else if (yy != w && !P.count(yy)) {
+          P.insert(yy);
+          workList.insert(yy);
+        }
+      }
+    }
+
+    for (unsigned x : P) {
+      header[x] = w;
+      uf.merge(x, w);
+    }
+  }
+}
+
+void LoopAnalysis::printDot(ostream &os) const {
+  os << "digraph {\n";
+  for (unsigned i = 0, e = f.getBBs().size(); i != e; ++i) {
+    if (type[i] == NodeType::nonheader)
+      continue;
+    os << '"' << bb_dot_name(node[i]->getName())
+       << "\" [shape=circle]\n";
+  }
+  for (unsigned i = 0, e = f.getBBs().size(); i != e; ++i) {
+    // do not draw self loop for root
+    if (header[i] == i)
+      continue;
+    if (type[i] == NodeType::nonheader ||
+        type[header[i]] == NodeType::nonheader)
+      continue;
+    os << '"' << bb_dot_name(node[header[i]]->getName()) << "\" -> \""
+       << bb_dot_name(node[i]->getName()) << "\";\n";
+  }
   os << "}\n";
 }
 
