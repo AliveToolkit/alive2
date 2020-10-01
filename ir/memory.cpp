@@ -1495,9 +1495,10 @@ void Memory::mkAxioms(const Memory &tgt) const {
     Pointer q(tgt, bid, false);
     auto p_align = p.blockAlignment();
     auto q_align = q.blockAlignment();
-    state->addAxiom(expr::mkIf(p.isHeapAllocated(),
-                               p_align == align && q_align == align,
-                               p_align.ule(q_align)));
+    state->addAxiom(
+      p.isHeapAllocated().implies(p_align == align && q_align == align));
+    if (!p_align.isConst() || !q_align.isConst())
+      state->addAxiom(p_align.ule(q_align));
   }
 
   if (!observes_addresses())
