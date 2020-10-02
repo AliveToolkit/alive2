@@ -29,6 +29,7 @@ static void show_help() {
           " -v\t\t\tVerbose mode\n"
           " -smt-stats\t\tShow SMT statistics\n"
           " -smt-to:x\t\tTimeout for SMT queries in ms\n"
+          " -smt-random-seed:x\tRandom seed for the SMT solver\n"
           " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
           " -smt-verbose\t\tPrint all SMT queries\n"
           " -tactic-verbose\tDebug SMT tactics\n"
