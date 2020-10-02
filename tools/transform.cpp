@@ -305,6 +305,7 @@ encode_undef_refinement_per_elem(const Type &ty, const StateValue &sva,
   return result;
 }
 
+// Returns negation of refinement
 static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
                                     const State::ValTy &b) {
   // Undef refinement: (src-nonpoison /\ src-nonundef) -> tgt-nonundef
@@ -315,6 +316,9 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
   //      -> (forall N . retval_tgt(I, N) == retval_tgt(I, 0)
 
   if (dynamic_cast<const VoidType *>(&type))
+    return false;
+  if (b.second.empty())
+    // target is never undef
     return false;
 
   auto subst = [](const auto &val) {
