@@ -48,6 +48,11 @@ llvm::cl::opt<unsigned> opt_smt_to(
   "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
   llvm::cl::init(1000), llvm::cl::value_desc("ms"));
 
+llvm::cl::opt<unsigned> opt_smt_random_seed(
+  "tv-smt-random-seed",
+  llvm::cl::desc("Alive: Random seed for the SMT solver (default=0)"),
+  llvm::cl::init(0));
+
 llvm::cl::opt<unsigned> opt_max_mem(
   "tv-max-mem", llvm::cl::desc("Alive: max memory (aprox)"),
   llvm::cl::init(1024), llvm::cl::value_desc("MB"));
@@ -261,6 +266,7 @@ struct TVPass final : public llvm::FunctionPass {
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
     smt::set_query_timeout(to_string(opt_smt_to));
+    smt::set_random_seed(to_string(opt_smt_random_seed));
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
     config::io_nobuiltin = opt_io_nobuiltin;

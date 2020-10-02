@@ -29,6 +29,7 @@ static void show_help() {
           " -v\t\t\tVerbose mode\n"
           " -smt-stats\t\tShow SMT statistics\n"
           " -smt-to:x\t\tTimeout for SMT queries in ms\n"
+          " -smt-random-seed:x\tRandom seed for the SMT solver\n"
           " -max-mem:x\t\tMax memory consumption in MB (aprox)\n"
           " -smt-verbose\t\tPrint all SMT queries\n"
           " -tactic-verbose\tDebug SMT tactics\n"
@@ -59,6 +60,8 @@ int main(int argc, char **argv) {
       show_smt_stats = true;
     else if (arg.compare(0, 8, "-smt-to:") == 0 && arg.size() > 8)
       smt::set_query_timeout(arg.substr(8).data());
+    else if (arg.compare(0, 17, "-smt-random-seed:") == 0 && arg.size() > 17)
+      smt::set_random_seed(arg.substr(17).data());
     else if (arg.compare(0, 9, "-max-mem:") == 0 && arg.size() > 9)
       smt::set_memory_limit(strtoul(arg.substr(9).data(), nullptr, 10) *
                             1024 * 1024);
