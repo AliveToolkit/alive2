@@ -259,8 +259,18 @@ struct TVPass final : public llvm::FunctionPass {
       report_filename = path;
       *out << "Source: " << source_file << endl;
       report_dir_created = true;
-    } else if (opt_report_dir.empty())
+
+      if (opt_smt_log) {
+        fs::path path_z3log = path;
+        path_z3log.replace_extension("z3_log.txt");
+        smt::start_logging(path_z3log);
+      }
+    } else if (opt_report_dir.empty()) {
       out = &cerr;
+      if (opt_smt_log) {
+        smt::start_logging();
+      }
+    }
 
     showed_stats = false;
     smt::solver_print_queries(opt_smt_verbose);
@@ -275,9 +285,6 @@ struct TVPass final : public llvm::FunctionPass {
     config::disable_poison_input = opt_disable_poison_input;
     config::debug = opt_debug;
     llvm_util::omit_array_size = opt_omit_array_size;
-
-    if (opt_smt_log)
-      smt::start_logging();
 
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();
