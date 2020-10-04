@@ -116,18 +116,24 @@ private:
     Memory m;
     bool readsmem, argmemonly;
 
-    bool operator<(const FnCallInput &rhs) const {
-      return std::tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem,
-                      argmemonly) <
-             std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
-                      rhs.readsmem, rhs.argmemonly);
-    }
+    smt::expr refinedBy(State &s, const std::vector<StateValue> &args_nonptr,
+                        const std::vector<Memory::PtrInput> &args_ptr,
+                        const ValueAnalysis::FnCallRanges &fncall_ranges,
+                        const Memory &m,
+                        bool readsmem, bool argmemonly) const;
+
+   bool operator<(const FnCallInput &rhs) const {
+     return std::tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem,
+                     argmemonly) <
+            std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
+                     rhs.readsmem, rhs.argmemonly);
+   }
+//    bool operator<(const FnCallInput &rhs) const;
   };
   struct FnCallOutput {
     std::vector<StateValue> retvals;
     smt::expr ub;
     Memory::CallState callstate;
-    bool used;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
 

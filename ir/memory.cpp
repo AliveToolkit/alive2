@@ -1659,24 +1659,29 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   return { p.release(), move(var) };
 }
 
-expr Memory::CallState::implies(const CallState &st) const {
-  if (empty || st.empty)
-    return true;
-  // NOTE: using equality here is an approximation.
-  // TODO: benchmark using quantifiers to state implication
-  expr ret(true);
-  for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
-    ret &= non_local_block_val[i] == st.non_local_block_val[i];
+Memory::CallState Memory::CallState::mkIf(const expr &cond,
+                                          const CallState &then,
+                                          const CallState &els) {
+  CallState ret;
+  for (unsigned i = 0, e = then.non_local_block_val.size(); i != e; ++i) {
+    ret.non_local_block_val.emplace_back(
+      expr::mkIf(cond, then.non_local_block_val[i],
+                 els.non_local_block_val[i]));
   }
-  if (liveness_var.isValid() && st.liveness_var.isValid())
-    ret &= liveness_var == st.liveness_var;
+  ret.non_local_block_liveness
+    = expr::mkIf(cond, then.non_local_block_liveness,
+                 els.non_local_block_liveness);
   return ret;
+}
+
+bool Memory::CallState::operator<(const CallState &rhs) const {
+  return tie(non_local_block_val, non_local_block_liveness) <
+         tie(rhs.non_local_block_val, rhs.non_local_block_liveness);
 }
 
 Memory::CallState
 Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
   CallState st;
-  st.empty = false;
 
   // TODO: handle havoc of local blocks
 
@@ -1723,10 +1728,10 @@ Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
     if (mask.isAllOnes()) {
       st.non_local_block_liveness = non_local_block_liveness;
     } else {
-      st.liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
+      auto liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
       // functions can free an object, but cannot bring a dead one back to live
       st.non_local_block_liveness
-        = non_local_block_liveness & (st.liveness_var | mask);
+        = non_local_block_liveness & (liveness_var | mask);
     }
   } else {
     st.non_local_block_liveness = non_local_block_liveness;
@@ -2364,8 +2369,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
 
 bool Memory::operator<(const Memory &rhs) const {
   // FIXME: remove this once we move to C++20
-  // NOTE: we don't compare field state so that memories from src/tgt can
-  // compare equal
+  assert(state == rhs.state);
   return
     tie(non_local_block_val, local_block_val,
         non_local_block_liveness, local_block_liveness, local_blk_addr,
@@ -2380,6 +2384,32 @@ bool Memory::operator<(const Memory &rhs) const {
         rhs.non_local_blk_size, rhs.non_local_blk_align,
         rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
         rhs.ptr_alias, rhs.next_nonlocal_bid);
+}
+
+bool Memory::cmpFnCallInput(const Memory &rhs) const {
+  assert(state == rhs.state && state->isSource());
+  // first compare non-local memory only
+  auto nla = tie(non_local_block_val, non_local_block_liveness,
+                 non_local_blk_size, non_local_blk_align, non_local_blk_kind,
+                 byval_blks, escaped_local_blks);
+  auto nlb = tie(rhs.non_local_block_val, rhs.non_local_block_liveness,
+                 rhs.non_local_blk_size, rhs.non_local_blk_align,
+                 rhs.non_local_blk_kind, rhs.byval_blks,
+                 rhs.escaped_local_blks);
+  if (nla < nlb)
+    return true;
+  if (nla > nlb)
+    return false;
+
+  // if nothing local escaped, then memories are equivalent for the callee
+  if (escaped_local_blks.numMayAlias(true) == 0)
+    return false;
+
+  return
+    tie(local_block_val, local_block_liveness, local_blk_addr, local_blk_size,
+        local_blk_align, local_blk_kind) <
+    tie(rhs.local_block_val, rhs.local_block_liveness, rhs.local_blk_addr,
+        rhs.local_blk_size, rhs.local_blk_align, rhs.local_blk_kind);
 }
 
 #define P(name, expr) do {      \
