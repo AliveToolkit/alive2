@@ -1,4 +1,4 @@
-, ERROR: Source is more defined than target
+; ERROR: Value mismatch
 
 declare i8 @foo_i8(i8) readonly
 
