@@ -1136,14 +1136,21 @@ void Transform::preprocess() {
   // verify the transformation
   // We only remove inits if it's possible to remove from both programs to keep
   // memories syntactically equal
+  auto remove_init_src = can_remove_init(src);
   auto remove_init_tgt = can_remove_init(tgt);
-  for (auto &[name, isrc] : can_remove_init(src)) {
+  for (auto &[name, isrc] : remove_init_src) {
     auto Itgt = remove_init_tgt.find(name);
     if (Itgt == remove_init_tgt.end())
       continue;
     src.getFirstBB().delInstr(isrc);
     tgt.getFirstBB().delInstr(Itgt->second);
     // TODO: check that tgt init refines that of src
+  }
+
+  // remove constants introduced in target
+  for (auto &[name, itgt] : remove_init_tgt) {
+    if (!remove_init_src.count(name))
+      tgt.getFirstBB().delInstr(itgt);
   }
 
   // remove side-effect free instructions without users
