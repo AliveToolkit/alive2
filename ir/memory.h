@@ -318,11 +318,12 @@ public:
   class CallState {
     std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_block_liveness;
-    smt::expr liveness_var;
-    bool empty = true;
 
   public:
-    smt::expr implies(const CallState &st) const;
+    static CallState mkIf(const smt::expr &cond, const CallState &then,
+                          const CallState &els);
+    // for container use only
+    bool operator<(const CallState &rhs) const;
     friend class Memory;
   };
 
@@ -411,6 +412,7 @@ public:
 
   // for container use only
   bool operator<(const Memory &rhs) const;
+  bool cmpFnCallInput(const Memory &rhs) const;
 
   static void printAliasStats(std::ostream &os) {
     AliasSet::printStats(os);

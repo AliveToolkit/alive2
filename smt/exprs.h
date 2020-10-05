@@ -4,10 +4,12 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include "util/compiler.h"
 #include <cassert>
 #include <map>
 #include <ostream>
 #include <set>
+#include <tuple>
 #include <utility>
 
 namespace smt {
@@ -103,6 +105,62 @@ public:
   auto begin() const { return vals.begin(); }
   auto end() const   { return vals.end(); }
   auto size() const  { return vals.size(); }
+};
+
+
+// non-deterministic choice of one of the options with potentially overlapping
+// domains
+template <typename T>
+class ChoiceExpr {
+  std::map<T, expr> vals; // val -> domain
+
+public:
+  template <typename V, typename D>
+  void add(V &&val, D &&domain) {
+    if (domain.isFalse())
+      return;
+    auto [I, inserted] = vals.try_emplace(std::forward<V>(val),
+                                          std::forward<D>(domain));
+    if (!inserted)
+      I->second |= std::forward<D>(domain);
+  }
+
+  operator bool() const {
+    return !vals.empty();
+  }
+
+  expr domain() const {
+    OrExpr ret;
+    for (auto &p : vals) {
+      ret.add(expr(p.second));
+    }
+    return ret();
+  }
+
+  // returns: data, domain, quant var, precondition
+  std::tuple<T,expr,expr,expr> operator()() const {
+    expr dom = domain();
+    if (vals.size() == 1)
+      return { vals.begin()->first, vals.begin()->second, expr(), true };
+
+    unsigned bits = util::ilog2_ceil(vals.size()+1, false);
+    expr qvar = expr::mkFreshVar("choice", expr::mkUInt(0, bits));
+
+    T ret;
+    expr pre = !dom;
+    auto I = vals.begin();
+    bool first = true;
+
+    for (unsigned i = vals.size(); i > 0; --i) {
+      auto cmp = qvar == (i-1);
+      pre = expr::mkIf(cmp, I->second, pre);
+      ret = first ? I->first : T::mkIf(cmp, I->first, ret);
+      first = false;
+      ++I;
+    }
+
+    return { std::move(ret), std::move(dom), std::move(qvar), std::move(pre) };
+  }
 };
 
 
