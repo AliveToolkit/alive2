@@ -119,23 +119,23 @@ private:
     smt::expr refinedBy(State &s, const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
-                        const Memory &m,
-                        bool readsmem, bool argmemonly) const;
+                        const Memory &m, bool readsmem, bool argmemonly) const;
 
-   bool operator<(const FnCallInput &rhs) const {
-     return std::tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem,
-                     argmemonly) <
-            std::tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
-                     rhs.readsmem, rhs.argmemonly);
-   }
-//    bool operator<(const FnCallInput &rhs) const;
+    bool operator<(const FnCallInput &rhs) const;
   };
+
   struct FnCallOutput {
     std::vector<StateValue> retvals;
     smt::expr ub;
     Memory::CallState callstate;
+
+    static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
+                             const FnCallOutput &els);
+    bool operator<(const FnCallOutput &rhs) const;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
+  smt::expr fn_call_pre = true;
+  std::set<smt::expr> fn_call_qvars;
 
 public:
   State(Function &f, bool source);
@@ -181,6 +181,7 @@ public:
   auto& getUnsupported() const { return used_unsupported; }
 
   void addQuantVar(const smt::expr &var);
+  void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
   void resetUndefVars();
@@ -195,8 +196,10 @@ public:
   auto& getMemory() { return memory; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
+  auto& getFnPre() const { return fn_call_pre; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
+  const auto& getFnQuantVars() const { return fn_call_qvars; }
 
   auto& functionDomain() const { return function_domain; }
   auto& returnDomain() const { return return_domain; }
@@ -221,7 +224,6 @@ public:
   void syncSEdataWithSrc(const State &src);
 
   void mkAxioms(State &tgt);
-  smt::expr simplifyWithAxioms(smt::expr &&e) const;
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

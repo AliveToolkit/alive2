@@ -2230,12 +2230,18 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
 
   assert(src.isWritable().eq(tgt.isWritable()));
 
+  expr aligned(true);
+  expr src_align = src.blockAlignment();
+  expr tgt_align = tgt.blockAlignment();
+  // if they are both non-const, then the condition holds per the precondition
+  if (src_align.isConst() || tgt_align.isConst())
+    aligned = src_align.ule(tgt_align);
+
   expr alive = src.isBlockAlive();
   return alive == tgt.isBlockAlive() &&
          blk_size == tgt.blockSize() &&
          src.getAllocType() == tgt.getAllocType() &&
-         state->simplifyWithAxioms(
-           src.blockAlignment().ule(tgt.blockAlignment())) &&
+         aligned &&
          alive.implies(val_refines);
 }
 

@@ -345,6 +345,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto &uvars = ap.second;
   auto qvars = src_state.getQuantVars();
   qvars.insert(ap.second.begin(), ap.second.end());
+  auto &fn_qvars = tgt_state.getFnQuantVars();
+  qvars.insert(fn_qvars.begin(), fn_qvars.end());
 
   auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
     error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
@@ -393,6 +395,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     }
   }
   expr pre = pre_src_exists && pre_tgt;
+  pre_src_forall &= tgt_state.getFnPre();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr undef_cnstr = encode_undef_refinement(type, ap, bp);

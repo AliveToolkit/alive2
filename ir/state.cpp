@@ -219,9 +219,6 @@ const StateValue& State::operator[](const Value &val) {
 
   if (is_non_undef) {
     // We don't need to add uvar to undef_vars
-    // We add it to quantified_vars as a safety net because the current
-    // encoding of function call may lose uvars to be quantified, currently.
-    // They should be optimized ideally if never used.
     quantified_vars.insert(uvars.begin(), uvars.end());
     return simplify(sval, true);
   }
@@ -504,21 +501,24 @@ expr State::FnCallInput::refinedBy(
   }
 
   for (auto &v : undef_vars)
-    s.addQuantVar(v);
+    s.addFnQuantVar(v);
 
   if (readsmem) {
     auto restrict_ptrs = argmemonly2 ? &args_ptr2 : nullptr;
     auto data = m.refined(m2, true, restrict_ptrs);
     refines &= get<0>(data);
     for (auto &v : get<2>(data))
-      s.addQuantVar(v);
+      s.addFnQuantVar(v);
   }
 
   return refines;
 }
 
-#if 0
 bool State::FnCallInput::operator<(const FnCallInput &rhs) const {
+  return tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem, argmemonly) <
+         tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
+             rhs.readsmem, rhs.argmemonly);
+#if 0
   auto a = tie(args_nonptr, args_ptr, fncall_ranges, readsmem, argmemonly);
   auto b = tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.readsmem,
                rhs.argmemonly);
@@ -527,8 +527,26 @@ bool State::FnCallInput::operator<(const FnCallInput &rhs) const {
   if (a > b)
     return false;
   return m.cmpFnCallInput(rhs.m);
-}
 #endif
+}
+
+State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
+                                              const FnCallOutput &a,
+                                              const FnCallOutput &b) {
+  FnCallOutput ret;
+  ret.ub = expr::mkIf(cond, a.ub, b.ub);
+  ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
+  assert(a.retvals.size() == b.retvals.size());
+  for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
+    ret.retvals.emplace_back(
+      StateValue::mkIf(cond, a.retvals[i], b.retvals[i]));
+  }
+  return ret;
+}
+
+bool State::FnCallOutput::operator<(const FnCallOutput &rhs) const {
+  return tie(retvals, ub, callstate) < tie(rhs.retvals, rhs.ub, rhs.callstate);
+}
 
 vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
@@ -562,9 +580,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   if (isSource()) {
     auto call_data_pair
       = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                        analysis.ranges_fn_calls,
-                                        reads_memory ? memory : Memory(*this),
-                                        reads_memory, argmemonly });
+                                         analysis.ranges_fn_calls,
+                                         reads_memory ? memory : Memory(*this),
+                                         reads_memory, argmemonly });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
 
@@ -595,42 +613,37 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     addUB(I->second.ub);
-
+    retval = I->second.retvals;
     if (writes_memory)
       memory.setState(I->second.callstate);
-
-    retval = I->second.retvals;
-  } else {
-    // target: this fn call must match one in the source, otherwise it's UB
-    OrExpr allcalls;
-    DisjointExpr<expr> ub(expr(false));
-    DisjointExpr<Memory::CallState> mem;
-    vector<DisjointExpr<StateValue>> retvals(out_types.size());
+  }
+  else {
+    // target: this fn call must match one from the source, otherwise it's UB
+    ChoiceExpr<FnCallOutput> data;
 
     for (auto &[in, out] : fn_call_data[name]) {
       auto refined = in.refinedBy(*this, inputs, ptr_inputs,
                                   analysis.ranges_fn_calls, memory,
                                   reads_memory, argmemonly);
-      ub.add(out.ub, refined);
-      mem.add(out.callstate, refined);
-      for (unsigned i = 0, e = retvals.size(); i != e; ++i) {
-        retvals[i].add(out.retvals[i], refined);
+      data.add(out, move(refined));
+    }
+
+    if (data) {
+      auto [d, domain, qvar, pre] = data();
+      addUB(move(domain));
+      addUB(move(d.ub));
+      retval = move(d.retvals);
+      if (writes_memory)
+        memory.setState(d.callstate);
+
+      fn_call_pre &= pre;
+      if (qvar.isValid())
+        fn_call_qvars.emplace(move(qvar));
+    } else {
+      addUB(expr(false));
+      for (auto *t : out_types) {
+        retval.emplace_back(t->getDummyValue(false));
       }
-      allcalls.add(move(refined));
-    }
-
-    addUB(allcalls());
-    addUB(*ub());
-
-    if (writes_memory) {
-      if (auto m = mem())
-        memory.setState(*m);
-    }
-
-    for (unsigned i = 0, e = retvals.size(); i != e; ++i) {
-      auto ret = retvals[i]();
-      retval.emplace_back(ret ? move(*ret)
-                              : out_types[i]->getDummyValue(false));
     }
   }
 
@@ -651,6 +664,10 @@ void State::useUnsupported(const char *name) {
 
 void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
+}
+
+void State::addFnQuantVar(const expr &var) {
+  fn_call_qvars.emplace(var);
 }
 
 void State::addUndefVar(expr &&var) {
@@ -733,10 +750,6 @@ void State::syncSEdataWithSrc(const State &src) {
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
   returnMemory().mkAxioms(tgt.returnMemory());
-}
-
-expr State::simplifyWithAxioms(expr &&e) const {
-  return axioms.contains(e) ? expr(true) : move(e);
 }
 
 }
