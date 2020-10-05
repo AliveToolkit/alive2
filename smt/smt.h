@@ -27,6 +27,6 @@ void set_memory_limit(uint64_t limit);
 bool hit_memory_limit();
 bool hit_half_memory_limit();
 
-void start_logging();
+void start_logging(const char *path = "z3_log.txt");
 
 }

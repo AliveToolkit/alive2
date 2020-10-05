@@ -74,8 +74,8 @@ bool hit_half_memory_limit() {
   return Z3_get_estimated_alloc_size() >= (z3_memory_limit / 2);
 }
 
-void start_logging() {
-  Z3_open_log("z3_log.txt");
+void start_logging(const char *path) {
+  Z3_open_log(path);
   string str = string("Alive2 ") + alive_version;
   Z3_append_log(str.c_str());
 }
