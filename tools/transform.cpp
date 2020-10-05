@@ -1139,9 +1139,8 @@ void Transform::preprocess() {
   // verify the transformation
   // We only remove inits if it's possible to remove from both programs to keep
   // memories syntactically equal
-  auto remove_init_src = can_remove_init(src);
   auto remove_init_tgt = can_remove_init(tgt);
-  for (auto &[name, isrc] : remove_init_src) {
+  for (auto &[name, isrc] : can_remove_init(src)) {
     auto Itgt = remove_init_tgt.find(name);
     if (Itgt == remove_init_tgt.end())
       continue;
@@ -1151,8 +1150,9 @@ void Transform::preprocess() {
   }
 
   // remove constants introduced in target
+  auto src_gvs = src.getGlobalVarNames();
   for (auto &[name, itgt] : remove_init_tgt) {
-    if (!remove_init_src.count(name))
+    if (find(src_gvs.begin(), src_gvs.end(), name.substr(1)) == src_gvs.end())
       tgt.getFirstBB().delInstr(itgt);
   }
 
