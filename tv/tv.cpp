@@ -263,7 +263,7 @@ struct TVPass final : public llvm::FunctionPass {
       if (opt_smt_log) {
         fs::path path_z3log = path;
         path_z3log.replace_extension("z3_log.txt");
-        smt::start_logging(path_z3log);
+        smt::start_logging(path_z3log.c_str());
       }
     } else if (opt_report_dir.empty()) {
       out = &cerr;
