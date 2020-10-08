@@ -2028,19 +2028,7 @@ void Phi::print(ostream &os) const {
 }
 
 StateValue Phi::toSMT(State &s) const {
-  DisjointExpr<StateValue> ret;
-  map<Value*, StateValue> cache;
-
-  for (auto &[val, bb] : values) {
-    // check if this was a jump from unreachable BB
-    if (auto pre = s.jumpCondFrom(s.getFn().getBB(bb))) {
-      auto [I, inserted] = cache.try_emplace(val);
-      if (inserted)
-        I->second = s[*val];
-      ret.add(I->second, (*pre)());
-    }
-  }
-  return *ret();
+  return s.buildPhi(*s.currentBB(), values);
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {

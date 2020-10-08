@@ -17,12 +17,15 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <stack>
 
 namespace IR {
 
 class Value;
 class BasicBlock;
 class Function;
+class CFG;
+class DomTree;
 
 class State {
 public:
@@ -89,6 +92,9 @@ private:
                      std::unordered_map<const BasicBlock*, BasicBlockInfo>>
     predecessor_data;
   std::unordered_set<const BasicBlock*> seen_bbs;
+  // jump condition from src BB -> dst BB
+  std::unordered_map<const BasicBlock*,
+    std::unordered_map<const BasicBlock*, smt::expr>> jump_conds;
 
   // Global variables' memory block ids & Memory::alloc has been called?
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
@@ -137,6 +143,8 @@ private:
   smt::expr fn_call_pre = true;
   std::set<smt::expr> fn_call_qvars;
 
+  std::unique_ptr<DomTree> dom_tree;
+  std::unique_ptr<CFG> cfg;
 public:
   State(Function &f, bool source);
 
@@ -162,6 +170,8 @@ public:
   void addCondJump(const smt::expr &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
   void addReturn(StateValue &&val);
+  StateValue buildPhi(const BasicBlock &phi_bb,
+                      const std::vector<std::pair<Value*, std::string>> &values);
 
   /*--- Axioms, preconditions, domains ---*/
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
@@ -224,6 +234,10 @@ public:
   void syncSEdataWithSrc(const State &src);
 
   void mkAxioms(State &tgt);
+
+  auto currentBB() { return current_bb; }
+
+  void initDomTree();
 
 private:
   void addJump(const BasicBlock &dst, smt::expr &&domain);

@@ -357,6 +357,9 @@ bool State::startBB(const BasicBlock &bb) {
   if (I == predecessor_data.end())
     return false;
 
+  if (!dom_tree)
+    initDomTree();
+
   DisjointExpr<Memory> in_memory;
   DisjointExpr<expr> UB;
   OrExpr path;
@@ -393,6 +396,9 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   if (seen_bbs.count(dst)) {
     dst = &f.getBB("#sink");
   }
+
+  auto &c = jump_conds[current_bb][dst];
+  c = c || cond;
 
   cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
@@ -431,6 +437,76 @@ void State::addReturn(StateValue &&val) {
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
   addUB(expr(false));
+}
+
+StateValue State::buildPhi(const BasicBlock &phi_bb,
+                           const vector<pair<Value*, string>> &values) {
+  unordered_set<const BasicBlock*> needed_bbs;
+  unordered_map<const BasicBlock*, optional<StateValue>> vals;
+  unordered_map<const BasicBlock*, bool> visited;
+  vector<BasicBlock*> wl;
+
+  // assign values to the bb's labelled in phi
+  for (auto &[val, bbname] : values) {
+    auto bb = &getFn().getBB(bbname);
+    vals[bb] = (*this)[*val];
+    needed_bbs.insert(bb);
+    wl.emplace_back(bb);
+  }
+
+  // identify only bbs between idom and phi_bb
+  auto idom = dom_tree->getIDominator(phi_bb);
+  while (!wl.empty()) {
+    auto cur_bb = wl.back();
+    wl.pop_back();
+
+    auto &vis = visited[cur_bb];
+    if (vis || cur_bb == idom)
+      continue;
+    vis = true;
+
+    for (auto &pred : predecessor_data[cur_bb]) {
+      needed_bbs.insert(pred.first);
+      wl.emplace_back(const_cast<BasicBlock*>(pred.first));
+    }
+  }
+
+  // build the ite expression for the phi
+  visited.clear();
+  wl.emplace_back(const_cast<BasicBlock*>(idom));
+  while (!wl.empty()) {
+    auto cur_bb = wl.back();
+    wl.pop_back();
+
+    auto &vis = visited[cur_bb];
+    if (!vis) {
+      wl.emplace_back(cur_bb);
+      vis = true;
+
+      // add needed successors to worklist
+      if (auto jmp = dynamic_cast<JumpInstr*>(&cur_bb->back())) {
+        for (auto &target : jmp->targets()) {
+          if (needed_bbs.count(&target))
+            wl.emplace_back(const_cast<BasicBlock*>(&target));
+        }
+      }
+
+    } else {
+      // build the ite
+      if (auto jmp = dynamic_cast<JumpInstr*>(&cur_bb->back())) {
+        auto &cur_val = vals[cur_bb];
+        for (auto &target : jmp->targets()) {
+          if (!cur_val) {
+            cur_val = *vals[&target];
+          } else {
+            auto &cond = jump_conds[cur_bb][&target];
+            cur_val = StateValue::mkIf(cond, *vals[&target], *cur_val);
+          }
+        }
+      }
+    }
+  }
+  return *vals[idom];
 }
 
 void State::addUB(expr &&ub) {
@@ -750,6 +826,12 @@ void State::syncSEdataWithSrc(const State &src) {
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
   returnMemory().mkAxioms(tgt.returnMemory());
+}
+
+void State::initDomTree() {
+  if (!cfg)
+    cfg = make_unique<CFG>(f);
+  dom_tree = make_unique<DomTree>(f, *cfg);
 }
 
 }
