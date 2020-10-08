@@ -80,8 +80,11 @@ Please contact us or submit a PR if something is missing or inaccurate.
 25. InstCombine: incorrect select operand simplification with undef
 (https://bugs.llvm.org/show_bug.cgi?id=47696)
 
+26. SCEVExpander introduces branch on poison
+(https://bugs.llvm.org/show_bug.cgi?id=47769)
 
-### Memory Operations (Load/Store/GEP/...)
+
+### Memory Operations
 
 1. EmitGEPOffset() incorrectly adds NUW to multiplications
 (https://bugs.llvm.org/show_bug.cgi?id=42699)
