@@ -450,7 +450,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   }
 
   unsigned current = 0;
-  std::vector<std::pair<const BasicBlock*,bool>> s;
+  vector<pair<const BasicBlock*,bool>> s;
   s.emplace_back(&f.getFirstBB(), false);
   while(!s.empty()) {
     auto &[bb, flag] = s.back();
