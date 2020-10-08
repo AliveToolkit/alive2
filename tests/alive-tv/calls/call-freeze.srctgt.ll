@@ -1,3 +1,5 @@
+; ERROR: Source is more defined than target
+
 define i8 @src(i8 %x) {
   %freeze = freeze i8 undef
   %r = call i8 @f(i8 %freeze)
