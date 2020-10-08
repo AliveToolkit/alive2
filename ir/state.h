@@ -17,7 +17,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <stack>
 
 namespace IR {
 
@@ -170,8 +169,8 @@ public:
   void addCondJump(const smt::expr &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
   void addReturn(StateValue &&val);
-  StateValue buildPhi(const BasicBlock &phi_bb,
-                      const std::vector<std::pair<Value*, std::string>> &values);
+  StateValue buildPhi(const BasicBlock &phi_bb, const
+                      std::vector<std::pair<Value*, std::string>> &values);
 
   /*--- Axioms, preconditions, domains ---*/
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
