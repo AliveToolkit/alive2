@@ -472,15 +472,15 @@ expr State::FnCallInput::refinedBy(
       !fncall_ranges.overlaps(fncall_ranges2))
     return false;
 
-  expr refines(true);
+  AndExpr refines;
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
-    refines &= args_nonptr[i].non_poison.implies(
+    refines.add(args_nonptr[i].non_poison.implies(
       args_nonptr[i].value == args_nonptr2[i].value &&
-      args_nonptr2[i].non_poison);
+      args_nonptr2[i].non_poison));
   }
 
-  if (refines.isFalse())
-    return refines;
+  if (!refines)
+    return false;
 
   set<expr> undef_vars;
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
@@ -494,10 +494,10 @@ expr State::FnCallInput::refinedBy(
     expr eq_val = Pointer(m, ptr_in.value)
                     .fninputRefined(Pointer(m2, ptr_in2.value),
                                     undef_vars, is_byval2);
-    refines &= ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison);
+    refines.add(ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison));
 
-    if (refines.isFalse())
-      return refines;
+    if (!refines)
+      return false;
   }
 
   for (auto &v : undef_vars)
@@ -506,12 +506,12 @@ expr State::FnCallInput::refinedBy(
   if (readsmem) {
     auto restrict_ptrs = argmemonly2 ? &args_ptr2 : nullptr;
     auto data = m.refined(m2, true, restrict_ptrs);
-    refines &= get<0>(data);
+    refines.add(get<0>(data));
     for (auto &v : get<2>(data))
       s.addFnQuantVar(v);
   }
 
-  return refines;
+  return refines();
 }
 
 bool State::FnCallInput::operator<(const FnCallInput &rhs) const {
