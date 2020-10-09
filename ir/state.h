@@ -84,7 +84,7 @@ private:
   // var -> ((value, not_poison), undef_vars, already_used?)
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::tuple<const Value*, ValTy, bool>> values;
-  // undef_var_pool[i]: the real undef var corresponding to "undef_i"
+  // undef_var_pool[i]: the SMT undef var corresponding to "undef_i"
   // This is for reusing undef variables.
   std::vector<smt::expr> undef_var_pool;
 
