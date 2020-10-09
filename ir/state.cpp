@@ -364,7 +364,7 @@ smt::expr State::mkFreshUndef(const smt::expr &e_ty, bool do_register) {
   }
 
   if (latest_unused_undef_id == undef_var_pool.size()) {
-    string_view name = "undef_" + to_string(latest_unused_undef_id);
+    string name = "undef_" + to_string(latest_unused_undef_id);
     newv = expr::mkFreshVar(name.data(), e_ty);
     undef_var_pool.emplace_back(newv);
   } else {
