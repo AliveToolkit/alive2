@@ -255,6 +255,14 @@ bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users,
   return changed;
 }
 
+void Function::unroll(unsigned k) {
+  if (k == 0)
+    return;
+  LoopAnalysis la(*this);
+  ofstream out("a.gv");
+  la.printDot(out);
+}
+
 void Function::print(ostream &os, bool print_header) const {
   {
     const auto &gvars = getGlobalVars();
@@ -289,14 +297,6 @@ void Function::print(ostream &os, bool print_header) const {
 
   if (print_header)
     os << "}\n";
-}
-
-void Function::unroll(unsigned k) {
-  if (k == 0)
-    return;
-  LoopAnalysis la(*this);
-  ofstream out("a.gv");
-  la.printDot(out);
 }
 
 ostream& operator<<(ostream &os, const Function &f) {
