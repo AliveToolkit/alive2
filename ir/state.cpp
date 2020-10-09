@@ -496,6 +496,8 @@ StateValue State::buildPhi(const BasicBlock &phi_bb,
       if (auto jmp = dynamic_cast<JumpInstr*>(&cur_bb->back())) {
         auto &cur_val = vals[cur_bb];
         for (auto &target : jmp->targets()) {
+          if (!needed_bbs.count(&target))
+            continue;
           if (!cur_val) {
             cur_val = *vals[&target];
           } else {
