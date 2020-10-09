@@ -117,6 +117,7 @@ public:
   bool isVar() const;
   bool isBV() const;
   bool isBool() const;
+  bool hasSameSort(const expr &rhs) const;
   bool isTrue() const;
   bool isFalse() const;
   bool isZero() const;

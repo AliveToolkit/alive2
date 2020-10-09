@@ -324,6 +324,11 @@ bool expr::isFalse() const {
   return Z3_get_bool_value(ctx(), ast()) == Z3_L_FALSE;
 }
 
+bool expr::hasSameSort(const expr &e) const {
+  C();
+  return sort() == e.sort();
+}
+
 bool expr::isZero() const {
   uint64_t n;
   return isUInt(n) && n == 0;

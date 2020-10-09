@@ -345,20 +345,11 @@ bool State::isUndef(const expr &e, const Value *used_by) const {
 smt::expr State::mkFreshUndef(const smt::expr &e_ty, bool do_register) {
   expr newv;
 
-  auto same_type = [](const expr &e1, const expr &e2) {
-    if (e1.isBV())
-      return e2.isBV() && e1.bits() == e2.bits();
-    else if (e1.isBool())
-      return e2.isBool();
-    // TODO: float type comparison
-    return false;
-  };
-
   // Try to reuse undef variable
   assert(latest_unused_undef_id <= undef_var_pool.size());
 
   while (latest_unused_undef_id < undef_var_pool.size()) {
-    if (same_type(e_ty, undef_var_pool[latest_unused_undef_id]))
+    if (e_ty.hasSameSort(undef_var_pool[latest_unused_undef_id]))
       break;
     latest_unused_undef_id++;
   }
