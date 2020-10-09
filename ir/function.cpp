@@ -481,7 +481,7 @@ void LoopAnalysis::analysis() {
   unsigned bb_count = f.getBBs().size();
 
   auto isAncestor = [this](unsigned w, unsigned v) -> bool {
-    return w <= v && v <= last.at(w);
+    return w <= v && v <= last[w];
   };
 
   vector<set<unsigned>> nonBackPreds(bb_count), backPreds(bb_count);
