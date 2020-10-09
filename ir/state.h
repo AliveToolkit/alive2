@@ -93,7 +93,7 @@ private:
   std::unordered_set<const BasicBlock*> seen_bbs;
   // jump condition from src BB -> dst BB
   std::unordered_map<const BasicBlock*,
-    std::unordered_map<const BasicBlock*, smt::expr>> jump_conds;
+    std::unordered_map<const BasicBlock*, std::optional<smt::expr>>> jump_conds;
 
   // Global variables' memory block ids & Memory::alloc has been called?
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;

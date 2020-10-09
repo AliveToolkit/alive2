@@ -398,7 +398,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   }
 
   auto &c = jump_conds[current_bb][dst];
-  c = c || cond;
+  c = c ? *c || cond : cond;
 
   cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
@@ -502,7 +502,7 @@ StateValue State::buildPhi(const BasicBlock &phi_bb,
             cur_val = *vals[&target];
           } else {
             auto &cond = jump_conds[cur_bb][&target];
-            cur_val = StateValue::mkIf(cond, *vals[&target], *cur_val);
+            cur_val = StateValue::mkIf(*cond, *vals[&target], *cur_val);
           }
         }
       }
