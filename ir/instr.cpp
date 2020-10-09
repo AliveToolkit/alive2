@@ -2086,7 +2086,9 @@ const BasicBlock& JumpInstr::target_iterator::operator*() const {
 
 JumpInstr::target_iterator JumpInstr::it_helper::end() const {
   unsigned idx;
-  if (auto br = dynamic_cast<Branch*>(instr)) {
+  if (!instr) {
+    idx = 0;
+  } else if (auto br = dynamic_cast<Branch*>(instr)) {
     idx = br->getFalse() ? 2 : 1;
   } else if (auto sw = dynamic_cast<Switch*>(instr)) {
     idx = sw->getNumTargets() + 1;

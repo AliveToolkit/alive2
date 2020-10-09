@@ -40,6 +40,14 @@ void BasicBlock::delInstr(Instr *i) {
   }
 }
 
+JumpInstr::it_helper BasicBlock::targets() const {
+  if (empty())
+    return {};
+  if (auto jump = dynamic_cast<JumpInstr*>(m_instrs.back().get()))
+    return jump->targets();
+  return {};
+}
+
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
@@ -444,28 +452,21 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   node.resize(bb_count, nullptr);
   last.resize(bb_count, -1u);
 
-  map<const BasicBlock*, vector<const BasicBlock*>> edges;
-  for (auto [src, dst, instr] : cfg) {
-    edges[&src].push_back(&dst);
-  }
-
   unsigned current = 0;
-  vector<pair<const BasicBlock*,bool>> s;
-  s.emplace_back(&f.getFirstBB(), false);
-  while(!s.empty()) {
-    auto &[bb, flag] = s.back();
-    s.pop_back();
-
+  vector<pair<const BasicBlock*, bool>> worklist = { {&f.getFirstBB(), false} };
+  while(!worklist.empty()) {
+    auto &[bb, flag] = worklist.back();
     if (flag) {
+      worklist.pop_back();
       last[number[bb]] = current - 1;
     } else {
       node[current] = bb;
       number[bb] = current++;
+      flag = true;
 
-      s.emplace_back(bb, true);
-      for (auto tgt : edges[bb])
-        if (!number.count(tgt))
-          s.emplace_back(tgt, false);
+      for (auto &tgt : bb->targets())
+        if (!number.count(&tgt))
+          worklist.emplace_back(&tgt, false);
     }
   }
 }

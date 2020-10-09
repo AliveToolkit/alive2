@@ -323,7 +323,7 @@ public:
   class it_helper {
     JumpInstr *instr;
   public:
-    it_helper(JumpInstr *instr) : instr(instr) {}
+    it_helper(JumpInstr *instr = nullptr) : instr(instr) {}
     target_iterator begin() const { return { instr, 0 }; }
     target_iterator end() const;
   };

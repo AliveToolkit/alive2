@@ -45,6 +45,7 @@ public:
   Instr& back() { return *m_instrs.back(); }
 
   bool empty() const { return m_instrs.empty(); }
+  JumpInstr::it_helper targets() const;
 
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
 
