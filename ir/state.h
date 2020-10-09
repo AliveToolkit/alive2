@@ -43,6 +43,7 @@ private:
     smt::OrExpr path;
     smt::DisjointExpr<smt::expr> UB;
     std::set<smt::expr> undef_vars;
+    unsigned unused_undef_id = 0; // latest unused undef var id
 
     smt::expr operator()() const;
   };
@@ -83,6 +84,9 @@ private:
   // var -> ((value, not_poison), undef_vars, already_used?)
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::tuple<const Value*, ValTy, bool>> values;
+  // undef_var_pool[i]: the real undef var corresponding to "undef_i"
+  // This is for reusing undef variables.
+  std::vector<smt::expr> undef_var_pool;
 
   // dst BB -> src BB -> BasicBlockInfo
   std::unordered_map<const BasicBlock*,
@@ -100,6 +104,8 @@ private:
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
+  bool first_bb_visited = false;
+  unsigned latest_unused_undef_id = 0;
 
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
@@ -182,6 +188,7 @@ public:
 
   void addQuantVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
+  smt::expr mkFreshUndef(const smt::expr &e, bool do_register = false);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
   void resetUndefVars();

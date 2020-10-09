@@ -249,7 +249,7 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
 }
 
 pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
-  auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
+  auto var = s.mkFreshUndef(mkInput(s, "", attrs));
   return { var, var };
 }
 

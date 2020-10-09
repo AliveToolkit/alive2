@@ -230,9 +230,8 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   vector<pair<expr, expr>> repls;
-  for (auto &u : uvars) {
-    repls.emplace_back(u, expr::mkFreshVar("undef", u));
-  }
+  for (auto &u : uvars)
+    repls.emplace_back(u, mkFreshUndef(u));
 
   if (hit_half_memory_limit())
     throw AliveException("Out of memory; skipping function.", false);
@@ -343,12 +342,48 @@ bool State::isUndef(const expr &e, const Value *used_by) const {
   return undef_vars.count(e) != 0;
 }
 
+smt::expr State::mkFreshUndef(const smt::expr &e_ty, bool do_register) {
+  expr newv;
+
+  auto same_type = [](const expr &e1, const expr &e2) {
+    if (e1.isBV())
+      return e2.isBV() && e1.bits() == e2.bits();
+    else if (e1.isBool())
+      return e2.isBool();
+    // TODO: float type comparison
+    return false;
+  };
+
+  // Try to reuse undef variable
+  assert(latest_unused_undef_id <= undef_var_pool.size());
+
+  while (latest_unused_undef_id < undef_var_pool.size()) {
+    if (same_type(e_ty, undef_var_pool[latest_unused_undef_id]))
+      break;
+    latest_unused_undef_id++;
+  }
+
+  if (latest_unused_undef_id == undef_var_pool.size()) {
+    string_view name = "undef_" + to_string(latest_unused_undef_id);
+    newv = expr::mkFreshVar(name.data(), e_ty);
+    undef_var_pool.emplace_back(newv);
+  } else {
+    newv = undef_var_pool[latest_unused_undef_id];
+  }
+  latest_unused_undef_id++;
+
+  if (do_register)
+    undef_vars.insert(newv);
+  return newv;
+}
+
 bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
 
   domain.reset();
+  first_bb_visited = true;
 
   if (&f.getFirstBB() == &bb)
     return true;
@@ -371,10 +406,14 @@ bool State::startBB(const BasicBlock &bb) {
     in_memory.add_disj(mem, move(p));
     domain.undef_vars.insert(dom.undef_vars.begin(), dom.undef_vars.end());
 
-    if (isFirst)
+    if (isFirst) {
       analysis = anlys;
-    else
+      latest_unused_undef_id = data.domain.unused_undef_id;
+    } else {
       analysis.intersect(anlys);
+      latest_unused_undef_id =
+        max(latest_unused_undef_id, data.domain.unused_undef_id);
+    }
     isFirst = false;
   }
 
@@ -402,6 +441,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   data.domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
   data.domain.undef_vars.insert(domain.undef_vars.begin(),
                                 domain.undef_vars.end());
+  data.domain.unused_undef_id = latest_unused_undef_id;
   data.analysis = analysis;
 }
 
@@ -687,9 +727,8 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
 
   vector<pair<expr, expr>> repls;
   for (auto &var : undef_vars) {
-    auto newvar = expr::mkFreshVar("undef", var);
+    auto newvar = mkFreshUndef(var, true);
     repls.emplace_back(var, newvar);
-    addUndefVar(move(newvar));
   }
   return val.subst(repls);
 }
@@ -739,6 +778,11 @@ void State::markGlobalAsAllocated(const string &glbvar) {
 void State::syncSEdataWithSrc(const State &src) {
   assert(glbvar_bids.empty());
   assert(src.isSource() && !isSource());
+
+  // undef cannot be reused between src and tgt
+  latest_unused_undef_id = src.latest_unused_undef_id;
+  undef_var_pool.resize(latest_unused_undef_id);
+
   glbvar_bids = src.glbvar_bids;
   for (auto &itm : glbvar_bids)
     itm.second.second = false;

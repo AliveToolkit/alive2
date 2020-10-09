@@ -1601,7 +1601,7 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
   bool nonnull = attrs.has(ParamAttrs::NonNull);
   unsigned log_offset = ilog2_ceil(bits_for_offset, false);
   unsigned bits_undef = bits_for_offset + nonnull * log_offset;
-  expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));
+  expr undef = state->mkFreshUndef(expr::mkUInt(0, bits_undef));
   expr offset = undef;
 
   if (nonnull) {
