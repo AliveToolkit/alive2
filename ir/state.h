@@ -93,7 +93,8 @@ private:
   std::unordered_set<const BasicBlock*> seen_bbs;
   // jump condition from src BB -> dst BB
   std::unordered_map<const BasicBlock*,
-    std::unordered_map<const BasicBlock*, std::optional<smt::expr>>> jump_conds;
+                     std::unordered_map<const BasicBlock*,
+                                        std::optional<smt::expr>>> jump_conds;
 
   // Global variables' memory block ids & Memory::alloc has been called?
   std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
@@ -170,7 +171,7 @@ public:
                    const BasicBlock &dst_false);
   void addReturn(StateValue &&val);
   StateValue buildPhi(const BasicBlock &phi_bb, const
-                      std::vector<std::pair<Value*, std::string>> &values);
+                      std::vector<std::pair<Value*, BasicBlock*>> &values);
 
   /*--- Axioms, preconditions, domains ---*/
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }

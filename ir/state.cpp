@@ -440,75 +440,70 @@ void State::addReturn(StateValue &&val) {
 }
 
 StateValue State::buildPhi(const BasicBlock &phi_bb,
-                           const vector<pair<Value*, string>> &values) {
-  unordered_set<const BasicBlock*> needed_bbs;
-  unordered_map<const BasicBlock*, optional<StateValue>> vals;
-  unordered_map<const BasicBlock*, bool> visited;
-  vector<BasicBlock*> wl;
+                           const vector<pair<Value*, BasicBlock*>>
+                           &values) {
+  struct Target {
+    const BasicBlock *bb;
+    unordered_map<Target*, expr*> dsts;
+    optional<StateValue> val;
+    bool visited = false;
+  };
+  unordered_map<const BasicBlock*, Target> tdata;
+  unordered_map<const BasicBlock*, bool> v;
+  vector<const BasicBlock*> wl;
 
-  // assign values to the bb's labelled in phi
-  for (auto &[val, bbname] : values) {
-    auto bb = &getFn().getBB(bbname);
-    vals[bb] = (*this)[*val];
-    needed_bbs.insert(bb);
+  // Assign values to the bb's labelled in phi
+  for (auto &[val, bb] : values) {
+    auto &tgt = tdata[bb];
+    tgt.val = (*this)[*val];
+    tgt.bb = bb;
     wl.emplace_back(bb);
   }
 
-  // identify only bbs between idom and phi_bb
-  auto idom = dom_tree->getIDominator(phi_bb);
+  // Identify only the bb's that are relevant for construction by walking up the
+  // CFG from the phi preds and building dsts
+  auto dom = dom_tree->getIDominator(phi_bb);
   while (!wl.empty()) {
     auto cur_bb = wl.back();
     wl.pop_back();
 
-    auto &vis = visited[cur_bb];
-    if (vis || cur_bb == idom)
+    auto &visited = v[cur_bb];
+    if (visited || cur_bb == dom)
       continue;
-    vis = true;
+    visited = true;
 
-    for (auto &pred : predecessor_data[cur_bb]) {
-      needed_bbs.insert(pred.first);
-      wl.emplace_back(const_cast<BasicBlock*>(pred.first));
+    auto &cur_tgt = tdata[cur_bb];
+    for (auto &[pred, pred_data] : predecessor_data[cur_bb]) {
+      auto &tpred = tdata[pred];
+      tpred.bb = pred;
+      tpred.dsts[&cur_tgt] = &(*jump_conds[pred][cur_bb]);
+      wl.emplace_back(pred);
     }
   }
 
-  // build the ite expression for the phi
-  visited.clear();
-  wl.emplace_back(const_cast<BasicBlock*>(idom));
-  while (!wl.empty()) {
-    auto cur_bb = wl.back();
-    wl.pop_back();
+  // build smallest ite that distinguishes the values for phi
+  vector<Target*> target_wl;
+  auto &tdom = tdata[dom];
+  target_wl.emplace_back(&tdom);
+  while (!target_wl.empty()) {
+    auto cur = target_wl.back();
+    target_wl.pop_back();
 
-    auto &vis = visited[cur_bb];
-    if (!vis) {
-      wl.emplace_back(cur_bb);
-      vis = true;
+    if (!cur->visited) {
+      cur->visited = true;
+      target_wl.emplace_back(cur);
 
-      // add needed successors to worklist
-      if (auto jmp = dynamic_cast<JumpInstr*>(&cur_bb->back())) {
-        for (auto &target : jmp->targets()) {
-          if (needed_bbs.count(&target))
-            wl.emplace_back(const_cast<BasicBlock*>(&target));
-        }
-      }
-
+      for (auto &dst : cur->dsts)
+        target_wl.emplace_back(dst.first);
     } else {
-      // build the ite
-      if (auto jmp = dynamic_cast<JumpInstr*>(&cur_bb->back())) {
-        auto &cur_val = vals[cur_bb];
-        for (auto &target : jmp->targets()) {
-          if (!needed_bbs.count(&target))
-            continue;
-          if (!cur_val) {
-            cur_val = *vals[&target];
-          } else {
-            auto &cond = jump_conds[cur_bb][&target];
-            cur_val = StateValue::mkIf(*cond, *vals[&target], *cur_val);
-          }
-        }
+      for (auto &[tgt, cond] : cur->dsts) {
+        if (tgt->val)
+          cur->val = cur->val ? StateValue::mkIf(*cond, *tgt->val, *cur->val)
+                              : tgt->val;
       }
     }
   }
-  return *vals[idom];
+  return *tdata[dom].val;
 }
 
 void State::addUB(expr &&ub) {
