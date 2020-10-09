@@ -156,6 +156,8 @@ public:
   bool removeUnusedStuff(const std::multimap<Value*, Value*> &users,
                          const std::vector<std::string_view> &src_glbs);
 
+  void unroll(unsigned k);
+  
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
 };
@@ -210,6 +212,24 @@ class DomTree final {
     DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
     const BasicBlock* getIDominator(const BasicBlock &bb) const;
     void printDot(std::ostream &os) const;
+};
+
+class LoopAnalysis final {
+  Function &f;
+  CFG cfg;
+
+  std::map<const BasicBlock*, unsigned> number;
+  std::vector<const BasicBlock*> node;
+  std::vector<unsigned> last;
+  void getDepthFirstSpanningTree();
+
+  std::vector<unsigned> header;
+  enum NodeType { nonheader, self, reducible, irreducible };
+  std::vector<NodeType> type;
+  void analysis();
+public:
+  LoopAnalysis(Function &f) : f(f), cfg(f) { analysis(); }
+  void printDot(std::ostream &os) const;
 };
 
 }
