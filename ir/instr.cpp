@@ -2029,15 +2029,12 @@ void Phi::print(ostream &os) const {
 
 StateValue Phi::toSMT(State &s) const {
   vector<pair<Value*, BasicBlock*>> pred_values;
-  unordered_set<Value*> cache;
 
  for (auto &[val, bb_name] : values) {
     auto bb = &s.getFn().getBB(bb_name);
     // check if this was a jump from unreachable BB
     if (s.jumpCondFrom(*bb)) {
-      auto [I, inserted] = cache.insert(val);
-      if (inserted)
-        pred_values.emplace_back(val, bb);
+      pred_values.emplace_back(val, bb);
     }
   }
 
