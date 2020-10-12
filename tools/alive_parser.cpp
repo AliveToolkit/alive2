@@ -1231,7 +1231,7 @@ static void parse_fn(Function &f) {
     }
     case UNREACH:
       bb->addInstr(make_unique<Assume>(get_constant(0, *int_types[1].get()),
-                                       Assume::IfNonPoison));
+                                       Assume::AndNonPoison));
       break;
     default:
       string_view name;
