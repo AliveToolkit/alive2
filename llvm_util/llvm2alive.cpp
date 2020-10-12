@@ -175,7 +175,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     // some NOP instruction
     assert(i.getType()->isVoidTy());
     auto true_val = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
-    return make_unique<Assume>(*true_val, false);
+    return make_unique<Assume>(*true_val, Assume::AndNonPoison);
   }
 
 public:
@@ -692,15 +692,29 @@ end:
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
     auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
-    return make_unique<Assume>(*fals, /*if_non_poison=*/false);
+    return make_unique<Assume>(*fals, Assume::IfNonPoison);
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
     switch (i.getIntrinsicID()) {
     case llvm::Intrinsic::assume:
     {
+      unsigned n = i.getNumOperandBundles();
+      for (unsigned j = 0; j < n; ++j) {
+        auto bundle = i.getOperandBundleAt(j);
+        llvm::StringRef name = bundle.getTagName();
+        if (name == "noundef") {
+          // Currently it is unclear whether noundef bundle takes single op.
+          // Be conservative & simply assume it can take arbitrary num of ops.
+          for (unsigned j = 0; j < bundle.Inputs.size(); ++j) {
+            llvm::Value *v = bundle.Inputs[j].get();
+            BB->addInstr(
+              make_unique<Assume>(*get_operand(v), Assume::WellDefined));
+          }
+        }
+      }
       PARSE_UNOP();
-      return make_unique<Assume>(*val, false);
+      return make_unique<Assume>(*val, Assume::AndNonPoison);
     }
     case llvm::Intrinsic::sadd_with_overflow:
     case llvm::Intrinsic::uadd_with_overflow:
@@ -937,7 +951,7 @@ end:
         }
 
         if (range)
-          BB->addInstr(make_unique<Assume>(*range, true));
+          BB->addInstr(make_unique<Assume>(*range, Assume::IfNonPoison));
         break;
       }
 

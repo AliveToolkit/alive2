@@ -1196,7 +1196,8 @@ static unique_ptr<Instr> parse_assume(bool if_non_poison) {
   tokenizer.ensure(LPAREN);
   auto &val = parse_operand(*int_types[1].get());
   tokenizer.ensure(RPAREN);
-  return make_unique<Assume>(val, if_non_poison);
+  return make_unique<Assume>(val, if_non_poison ? Assume::IfNonPoison :
+                                                  Assume::AndNonPoison);
 }
 
 static unique_ptr<Instr> parse_return() {
@@ -1230,7 +1231,7 @@ static void parse_fn(Function &f) {
     }
     case UNREACH:
       bb->addInstr(make_unique<Assume>(get_constant(0, *int_types[1].get()),
-                                       /*if_non_poison=*/false));
+                                       Assume::IfNonPoison));
       break;
     default:
       string_view name;

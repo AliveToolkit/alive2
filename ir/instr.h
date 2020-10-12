@@ -392,12 +392,20 @@ public:
 
 
 class Assume final : public Instr {
-  Value *cond;
-  bool if_non_poison; /// cond only needs to hold if non-poison
 public:
-  Assume(Value &cond, bool if_non_poison)
-    : Instr(Type::voidTy, "assume"), cond(&cond),
-      if_non_poison(if_non_poison) {}
+  enum Kind {
+    AndNonPoison, /// cond should be non-poison and hold
+    IfNonPoison, /// cond only needs to hold if non-poison
+    WellDefined /// cond only needs to be well defined (can be false)
+  };
+
+private:
+  Value *cond;
+  Kind kind;
+
+public:
+  Assume(Value &cond, Kind kind)
+    : Instr(Type::voidTy, "assume"), cond(&cond), kind(kind) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
