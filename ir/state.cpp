@@ -125,7 +125,8 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   return result;
 }
 
-static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e) {
+static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
+                                   const set<expr> &undef_vars) {
   if (s.isUndef(e, &val)) {
     s.addUB(expr(false));
     return expr::mkUInt(0, e);
@@ -177,7 +178,13 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e) {
   // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
   // TODO
 
-  s.addUB(eq_except_padding(val.getType(), e, s[val].value));
+  // check if original expression is equal to an expression where undefs are
+  // fixed to a const value
+  vector<pair<expr,expr>> repls;
+  for (auto &undef : undef_vars) {
+    repls.emplace_back(undef, expr::some(undef));
+  }
+  s.addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
   return e;
 }
 
@@ -200,7 +207,7 @@ const StateValue& State::operator[](const Value &val) {
       assert(i_tmp_values > 0);
       StateValue &sv_new = tmp_values[i_tmp_values - 1];
       const expr &np = sv_new.non_poison;
-      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np.bits());
+      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np);
       sv = &sv_new;
     }
 
@@ -294,7 +301,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     if (I != analysis.non_undef_vals.end()) {
       v = I->second;
     } else {
-      v = strip_undef_and_add_ub(*this, val, v);
+      v = strip_undef_and_add_ub(*this, val, v, undef_vars);
       analysis.non_undef_vals.emplace(&val, v);
     }
   }
@@ -324,7 +331,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
   }
   assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { move(v),
-        sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison.bits()) };
+           sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison) };
 }
 
 const State::ValTy& State::at(const Value &val) const {
