@@ -2310,10 +2310,9 @@ StateValue Assume::toSMT(State &s) const {
     s.addUB(np.implies(v != 0));
     break;
   }
-  case WellDefined: {
+  case WellDefined:
     (void)s.getAndAddPoisonUB(*cond, true);
     break;
-  }
   }
   return {};
 }
