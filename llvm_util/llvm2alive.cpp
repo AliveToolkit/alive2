@@ -692,7 +692,7 @@ end:
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
     auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
-    return make_unique<Assume>(*fals, Assume::IfNonPoison);
+    return make_unique<Assume>(*fals, Assume::AndNonPoison);
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
