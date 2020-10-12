@@ -162,6 +162,36 @@ void Function::addInput(unique_ptr<Value> &&i) {
   inputs.emplace_back(move(i));
 }
 
+bool Function::hasSameInputs(const Function &rhs) const {
+  auto litr = inputs.begin(), lend = inputs.end();
+  auto ritr = rhs.inputs.begin(), rend = rhs.inputs.end();
+
+  auto skip_constinputs = [&]() {
+    while (litr != lend && dynamic_cast<ConstantInput *>((*litr).get()))
+      litr++;
+    while (ritr != rend && dynamic_cast<ConstantInput *>((*ritr).get()))
+      ritr++;
+  };
+
+  skip_constinputs();
+
+  while (litr != lend && ritr != rend) {
+    auto *lv = dynamic_cast<Input *>((*litr).get());
+    auto *rv = dynamic_cast<Input *>((*ritr).get());
+    // TODO: &lv->getType() != &rv->getType() doesn't work when
+    // two struct types that are structurally equivalent don't compare equal
+    if (lv->getAttributes() != rv->getAttributes()) {
+      return false;
+    }
+
+    litr++;
+    ritr++;
+    skip_constinputs();
+  }
+
+  return litr == lend && ritr == rend;
+}
+
 bool Function::hasReturn() const {
   for (auto &i : instrs()) {
     if (dynamic_cast<const Return *>(&i))

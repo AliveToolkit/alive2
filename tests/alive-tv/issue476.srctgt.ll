@@ -6,4 +6,4 @@ define i32 @tgt(i8* dereferenceable(8) %p) {
   ret i32 0
 }
 
-; ERROR: Only functions with identical signatures can be checked
+; ERROR: Unsupported interprocedural transformation: signature mismatch between src and tgt

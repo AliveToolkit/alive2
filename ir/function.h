@@ -119,6 +119,7 @@ public:
   util::const_strip_unique_ptr<decltype(inputs)> getInputs() const {
     return inputs;
   }
+  bool hasSameInputs(const Function &rhs) const;
 
   bool hasReturn() const;
   unsigned bitsPointers() const { return bits_pointers; }

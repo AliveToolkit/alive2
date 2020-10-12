@@ -884,6 +884,12 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 }
 
 Errors TransformVerify::verify() const {
+  if (t.src.getFnAttrs() != t.tgt.getFnAttrs() ||
+      !t.src.hasSameInputs(t.tgt)) {
+    return { "Unsupported interprocedural transformation: signature mismatch "
+             "between src and tgt", false };
+  }
+
   try {
     t.tgt.syncDataWithSrc(t.src);
   } catch (AliveException &ae) {

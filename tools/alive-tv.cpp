@@ -184,8 +184,7 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
   if (PTyR && PTyR->getAddressSpace() == 0)
     TyR = DL.getIntPtrType(TyR);
 
-  // If it is a function type, attributes should be compared
-  if (TyL == TyR && !TyL->isFunctionTy())
+  if (TyL == TyR)
     return 0;
 
   if (int Res = cmpNumbers(TyL->getTypeID(), TyR->getTypeID()))
@@ -242,14 +241,6 @@ static int cmpTypes(llvm::Type *TyL, llvm::Type *TyR,
       return Res;
 
     for (unsigned i = 0, e = FTyL->getNumParams(); i != e; ++i) {
-      for (unsigned a = llvm::Attribute::AttrKind::None + 1;
-           a != llvm::Attribute::AttrKind::EndAttrKinds; ++a) {
-        auto ak = (llvm::Attribute::AttrKind)a;
-        auto al = FnL->getParamAttribute(i, ak),
-             ar = FnR->getParamAttribute(i, ak);
-        if (al != ar)
-          return al < ar ? -1 : 1;
-      }
       if (int Res = cmpTypes(FTyL->getParamType(i), FTyR->getParamType(i), FnL, FnR))
         return Res;
     }
