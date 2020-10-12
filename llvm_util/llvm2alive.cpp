@@ -711,6 +711,8 @@ end:
             BB->addInstr(
               make_unique<Assume>(*get_operand(v), Assume::WellDefined));
           }
+        } else {
+          return error(i);
         }
       }
       PARSE_UNOP();
