@@ -32,6 +32,9 @@ public:
   bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
+
+  bool operator==(const ParamAttrs &rhs) const;
+  bool operator!=(const ParamAttrs &rhs) const { return !(*this == rhs); };
 };
 
 
@@ -60,6 +63,9 @@ public:
   bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
+
+  bool operator==(const FnAttrs &rhs) const;
+  bool operator!=(const FnAttrs &rhs) const { return !(*this == rhs); };
 };
 
 }

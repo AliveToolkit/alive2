@@ -56,10 +56,33 @@ bool ParamAttrs::undefImpliesUB() const {
   return ub;
 }
 
+bool ParamAttrs::operator==(const ParamAttrs &rhs) const {
+  if (bits != rhs.bits)
+    return false;
+
+  if (has(Dereferenceable) && derefBytes != rhs.derefBytes)
+    return false;
+  if (has(ByVal) && blockSize != rhs.blockSize)
+    return false;
+  if (has(Align) && align != rhs.align)
+    return false;
+
+  return true;
+}
+
 bool FnAttrs::undefImpliesUB() const {
   bool ub = has(NoUndef);
   assert(!ub || poisonImpliesUB());
   return ub;
 }
 
+bool FnAttrs::operator==(const FnAttrs &rhs) const {
+  if (bits != rhs.bits)
+    return false;
+
+  if (has(Dereferenceable) && getDerefBytes() != rhs.getDerefBytes())
+    return false;
+
+  return true;
+}
 }
