@@ -125,10 +125,9 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   return result;
 }
 
-static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
-                                   const set<expr> &undef_vars) {
-  if (s.isUndef(e, &val)) {
-    s.addUB(expr(false));
+expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
+  if (isUndef(e, &val)) {
+    addUB(expr(false));
     return expr::mkUInt(0, e);
   }
 
@@ -146,7 +145,7 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
     expr undef;
     // (ite (= #b0 isundef_%var) %var undef)
     return e.isIf(not_undef, var, undef) &&
-           s.isUndef(undef) &&
+           isUndef(undef) &&
            is_undef_cond(not_undef, var);
   };
 
@@ -155,48 +154,78 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
   // two variants
   // 1) boolean
   if (is_if_undef(e, a, b)) {
-    s.addUB(move(b));
+    addUB(move(b));
     return a;
   }
 
+  auto has_undef = [&](const expr &e) {
+    auto vars = e.vars();
+    return any_of(vars.begin(), vars.end(),
+                  [&](auto &v) { return isUndef(v, &val); });
+  };
+
+  auto mark_notundef = [&](const expr &var) {
+    auto name = var.fn_name();
+    for (auto &v : values_map) {
+      if (v.first->getName() == name) {
+        analysis.non_undef_vals.emplace(v.first, var);
+        return;
+      }
+    }
+  };
+
   if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
-    expr val, not_undef;
+    expr val, val2, not_undef, not_undef2;
     // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
-      if (is_if_undef(lhs, val, not_undef)) {
-        s.addUB(move(not_undef));
+      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+        addUB(move(not_undef));
+        mark_notundef(val);
         return expr::mkIf(val == rhs, a, b);
       }
-      if (is_if_undef(rhs, val, not_undef)) {
-        s.addUB(move(not_undef));
+      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+        addUB(move(not_undef));
+        mark_notundef(val);
         return expr::mkIf(lhs == val, a, b);
+      }
+      if (is_if_undef(lhs, val, not_undef) &&
+          is_if_undef(rhs, val2, not_undef2)) {
+        addUB(move(not_undef));
+        addUB(move(not_undef2));
+        mark_notundef(val);
+        mark_notundef(val2);
+        return expr::mkIf(val == val2, a, b);
       }
     }
 
     if (c.isSLE(lhs, rhs)) {
       // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef(rhs, val, not_undef)) {
-        s.addUB(not_undef || lhs == expr::IntSMin(lhs.bits()));
+      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+        addUB(not_undef || lhs == expr::IntSMin(lhs.bits()));
+        mark_notundef(val);
         return expr::mkIf(lhs.sle(val), a, b);
       }
 
       // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef(lhs, val, not_undef)) {
-        s.addUB(not_undef || rhs == expr::IntSMax(rhs.bits()));
+      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+        addUB(not_undef || rhs == expr::IntSMax(rhs.bits()));
+        mark_notundef(val);
         return expr::mkIf(val.sle(rhs), a, b);
       }
     }
 
     if (c.isULE(lhs, rhs)) {
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef(rhs, val, not_undef)) {
-        s.addUB(not_undef || lhs == 0);
+      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+        addUB(not_undef || lhs == 0);
+        mark_notundef(val);
         return expr::mkIf(lhs.ule(val), a, b);
       }
 
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef(lhs, val, not_undef)) {
-        s.addUB(not_undef || rhs == expr::mkInt(-1, rhs));
+      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+        addUB(not_undef || rhs == expr::mkInt(-1, rhs));
+        mark_notundef(val);
         return expr::mkIf(val.ule(rhs), a, b);
       }
     }
@@ -211,7 +240,7 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
   for (auto &undef : undef_vars) {
     repls.emplace_back(undef, expr::some(undef));
   }
-  s.addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
+  addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
   return e;
 }
 
@@ -328,7 +357,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     if (I != analysis.non_undef_vals.end()) {
       v = I->second;
     } else {
-      v = strip_undef_and_add_ub(*this, val, v, undef_vars);
+      v = strip_undef_and_add_ub(val, v);
       analysis.non_undef_vals.emplace(&val, v);
     }
   }
