@@ -378,6 +378,14 @@ bool expr::isEq(expr &lhs, expr &rhs) const {
   return isBinOp(lhs, rhs, Z3_OP_EQ);
 }
 
+bool expr::isSLE(expr &lhs, expr &rhs) const {
+  return isBinOp(lhs, rhs, Z3_OP_SLEQ);
+}
+
+bool expr::isULE(expr &lhs, expr &rhs) const {
+  return isBinOp(lhs, rhs, Z3_OP_ULEQ);
+}
+
 bool expr::isIf(expr &cond, expr &then, expr &els) const {
   if (auto app = isAppOf(Z3_OP_ITE)) {
     cond = Z3_get_app_arg(ctx(), app, 0);

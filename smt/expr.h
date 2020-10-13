@@ -131,6 +131,8 @@ public:
   bool isInt(int64_t &n) const;
 
   bool isEq(expr &lhs, expr &rhs) const;
+  bool isSLE(expr &lhs, expr &rhs) const;
+  bool isULE(expr &lhs, expr &rhs) const;
   bool isIf(expr &cond, expr &then, expr &els) const;
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;

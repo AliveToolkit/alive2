@@ -159,18 +159,45 @@ static expr strip_undef_and_add_ub(State &s, const Value &val, const expr &e,
     return a;
   }
 
-  // (ite (= const (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-  // TODO: generalize to other undef-generating functions other than ==
   if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
+    expr val, not_undef;
+    // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
-      expr val, not_undef;
-      if (rhs.isConst() && is_if_undef(lhs, val, not_undef)) {
+      if (is_if_undef(lhs, val, not_undef)) {
         s.addUB(move(not_undef));
         return expr::mkIf(val == rhs, a, b);
       }
-      if (lhs.isConst() && is_if_undef(rhs, val, not_undef)) {
+      if (is_if_undef(rhs, val, not_undef)) {
         s.addUB(move(not_undef));
         return expr::mkIf(lhs == val, a, b);
+      }
+    }
+
+    if (c.isSLE(lhs, rhs)) {
+      // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+      if (is_if_undef(rhs, val, not_undef)) {
+        s.addUB(not_undef || lhs == expr::IntSMin(lhs.bits()));
+        return expr::mkIf(lhs.sle(val), a, b);
+      }
+
+      // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
+      if (is_if_undef(lhs, val, not_undef)) {
+        s.addUB(not_undef || rhs == expr::IntSMax(rhs.bits()));
+        return expr::mkIf(val.sle(rhs), a, b);
+      }
+    }
+
+    if (c.isULE(lhs, rhs)) {
+      // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+      if (is_if_undef(rhs, val, not_undef)) {
+        s.addUB(not_undef || lhs == 0);
+        return expr::mkIf(lhs.ule(val), a, b);
+      }
+
+      // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
+      if (is_if_undef(lhs, val, not_undef)) {
+        s.addUB(not_undef || rhs == expr::mkInt(-1, rhs));
+        return expr::mkIf(val.ule(rhs), a, b);
       }
     }
   }
