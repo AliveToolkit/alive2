@@ -2290,15 +2290,30 @@ void Assume::rauw(const Value &what, Value &with) {
 }
 
 void Assume::print(ostream &os) const {
-  os << (if_non_poison ? "assume_non_poison " : "assume ") << *cond;
+  switch (kind) {
+  case AndNonPoison: os << "assume "; break;
+  case IfNonPoison: os << "assume_non_poison "; break;
+  case WellDefined: os << "assume_welldefined "; break;
+  }
+  os << *cond;
 }
 
 StateValue Assume::toSMT(State &s) const {
-  auto &[v, np] = s[*cond];
-  if (if_non_poison)
+  switch (kind) {
+  case AndNonPoison: {
+    auto &v = s.getAndAddPoisonUB(*cond);
+    s.addUB(v.value != 0);
+    break;
+  }
+  case IfNonPoison: {
+    auto &[v, np] = s[*cond];
     s.addUB(np.implies(v != 0));
-  else
-    s.addUB(np && v != 0);
+    break;
+  }
+  case WellDefined:
+    (void)s.getAndAddPoisonUB(*cond, true);
+    break;
+  }
   return {};
 }
 
@@ -2307,7 +2322,7 @@ expr Assume::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Assume::dup(const string &suffix) const {
-  return make_unique<Assume>(*cond, if_non_poison);
+  return make_unique<Assume>(*cond, kind);
 }
 
 
