@@ -197,6 +197,15 @@ Summary:
   0 errors
 ```
 
+Running the Standalone LLVM Execution Tool (alive-exec)
+--------
+
+This tool uses Alive2 as an interpreter for an LLVM function. It is
+currently highly experimental and has many restrictions. For example,
+the function cannot take inputs, cannot use memory, cannot depend on
+undefined behaviors, and cannot include loops that execute too many
+iterations.
+
 LLVM Bugs Found by Alive2
 --------
 
