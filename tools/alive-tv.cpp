@@ -291,7 +291,6 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     ++errorCount;
     return;
   }
-  Func1->unroll(opt_src_unrolling_factor);
 
   auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F2), Func1->getGlobalVarNames());
@@ -301,7 +300,6 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     ++errorCount;
     return;
   }
-  Func2->unroll(opt_tgt_unrolling_factor);
 
   smt_init->reset();
   Transform t;
@@ -439,6 +437,8 @@ convenient way to demonstrate an existing optimizer bug.
   config::disable_undef_input = opt_disable_undef;
   config::disable_poison_input = opt_disable_poison;
   config::debug = opt_debug;
+  config::src_unroll_cnt = opt_src_unrolling_factor;
+  config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
 
   if (opt_smt_log)
     smt::start_logging();

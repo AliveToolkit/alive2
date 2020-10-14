@@ -1185,6 +1185,9 @@ void Transform::preprocess() {
                                                 : src.getGlobalVarNames());
     } while (changed);
   }
+
+  src.unroll(config::src_unroll_cnt);
+  tgt.unroll(config::tgt_unroll_cnt);
 }
 
 void Transform::print(ostream &os, const TransformPrintOpts &opt) const {

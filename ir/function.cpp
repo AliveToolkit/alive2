@@ -5,7 +5,6 @@
 #include "ir/instr.h"
 #include "util/errors.h"
 #include "util/unionfind.h"
-#include <fstream>
 
 using namespace smt;
 using namespace util;
@@ -46,6 +45,40 @@ JumpInstr::it_helper BasicBlock::targets() const {
   if (auto jump = dynamic_cast<JumpInstr*>(m_instrs.back().get()))
     return jump->targets();
   return {};
+}
+
+void BasicBlock::replaceTargetWith(const BasicBlock *from,
+                                   const BasicBlock *to) {
+  Instr &j = this->back();
+  if (auto br = dynamic_cast<Branch*>(&j)) {
+    const BasicBlock* tt = &br->getTrue(), *ff = br->getFalse();
+    if (tt == from)
+      tt = to;
+    if (ff && ff == from)
+      ff = to;
+    if (ff)
+      addInstr(make_unique<Branch>(*(br->operands()[0]), *tt, *ff));
+    else
+      addInstr(make_unique<Branch>(*tt));
+    delInstr(br);
+  } else if (auto sw = dynamic_cast<Switch*>(&j)) {
+    auto tt = &sw->getDefault();
+    if (tt == from)
+      tt = to;
+    auto new_sw = make_unique<Switch>(*(sw->operands()[0]), *tt);
+
+    for (unsigned i = 0, e = sw->getNumTargets(); i != e; ++i) {
+      auto &[v, bb] = sw->getTarget(i);
+      const BasicBlock *tt = &bb;
+      if (tt == from)
+        tt = to;
+      new_sw->addTarget(*v, *tt);
+    }
+    addInstr(move(new_sw));
+    delInstr(sw);
+  } else {
+    UNREACHABLE();
+  }
 }
 
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
@@ -90,6 +123,29 @@ void Function::fixupTypes(const Model &m) {
       const_cast<Value&>(v).fixupTypes(m);
     }
   }
+}
+
+BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
+                              unordered_map<Value*, Value*> &vmap) {
+  string bb_name = BB.getName() + suffix;
+  if (bb_name[0] != '#')
+    bb_name = "#" + bb_name;
+  auto p = BBs.emplace(bb_name, bb_name);
+  auto &newBB = p.first->second;
+  BB_order.push_back(&newBB);
+
+  for (auto &i : BB.instrs()) {
+    auto d = i.dup(suffix);
+    for (auto &op : d->operands()) {
+      auto it = vmap.find(op);
+      if (it != vmap.end()) {
+        d->rauw(*op, *it->second);
+      }
+    }
+    vmap[const_cast<Instr*>(&i)] = d.get();
+    newBB.addInstr(move(d));
+  }
+  return newBB;
 }
 
 BasicBlock& Function::getBB(string_view name, bool push_front) {
@@ -236,6 +292,9 @@ void Function::instr_iterator::operator++(void) {
   if (++II != IE)
     return;
   ++BBI;
+  while (BBI != BBE && (*BBI)->empty()) {
+    ++BBI;
+  }
   next_bb();
 }
 
@@ -297,8 +356,97 @@ void Function::unroll(unsigned k) {
   if (k == 0)
     return;
   LoopAnalysis la(*this);
-  ofstream out("a.gv");
-  la.printDot(out);
+
+  auto &roots = la.getRoots();
+  if (roots.empty())
+    return;
+
+  auto &nodes = la.getHeaderNodes();
+
+  BasicBlock &sink = getBB("#sink");
+
+  vector<pair<const BasicBlock*, bool>> worklist;
+
+  for (auto &root : roots) {
+    worklist.emplace_back(root, false);
+  }
+
+  while (!worklist.empty()) {
+    auto &[H, flag]  = worklist.back();
+    if (!flag) {
+      flag = true;
+      auto tgts = la.getChildren(H);
+      for (; tgts.first != tgts.second; ++tgts.first)
+        worklist.emplace_back(tgts.first->second, false);
+      continue;
+    }
+
+    worklist.pop_back();
+
+    auto header = const_cast<BasicBlock*>(H);
+    auto &bb_nodes = nodes[header];
+    map<const BasicBlock*, vector<const BasicBlock*>> bbmap;
+    for (auto &&bb_i : bb_nodes) {
+      bbmap[bb_i].push_back(bb_i);
+    }
+
+    // clone bbs
+    unordered_map<Value*, Value*> vmap;
+    for (unsigned unroll = 1; unroll <= k; ++unroll) {
+      for (auto &&bb_i : bb_nodes) {
+        string twine = "_" + header->getName() + "@" + to_string(unroll);
+        bbmap[bb_i].push_back(&cloneBB(*bb_i, twine, vmap));
+      }
+    }
+
+    unordered_set<const BasicBlock*> exit_tgts;
+    unordered_set nodes_set(bb_nodes.begin(), bb_nodes.end());
+
+    for (auto &&bb_i : bb_nodes) {
+      // rewire jumps
+      for (unsigned unroll = 0; unroll <= k; ++unroll) {
+        auto cloned = const_cast<BasicBlock*>(bbmap[bb_i][unroll]);
+        map<const BasicBlock*, const BasicBlock*> replacement;
+        for (auto &tgt : cloned->targets()) {
+
+          // do not touch exit point
+          if (!nodes_set.count(&tgt)) {
+            exit_tgts.insert(&tgt);
+            continue;
+          }
+
+          const BasicBlock *to = nullptr;
+          // handle backedge
+          if (&tgt == header) {
+            if (unroll == k)
+              to = &sink;
+            else
+              to = bbmap[&tgt][unroll + 1];
+          }
+          // handle targets inside loop
+          else
+            to = bbmap[&tgt][unroll];
+
+          replacement[&tgt] = to;
+        }
+        for (auto &[from, to] : replacement)
+          cloned->replaceTargetWith(from, to);
+      }
+    }
+
+    // TODO: handle phis
+
+    // add cloned BBs to each ancestors of loop H
+    const BasicBlock *root = H;
+    while (la.hasParent(root)) {
+      auto next = la.getParent(root);
+      auto &ancestor_nodes = nodes[next];
+      for (auto &[_, v] : bbmap)
+        ancestor_nodes.insert(ancestor_nodes.end(), v.begin() + 1, v.end());
+      root = next;
+    }
+  }
+  // TODO: topsort the function
 }
 
 void Function::print(ostream &os, bool print_header) const {
@@ -562,6 +710,46 @@ void LoopAnalysis::analysis() {
       header[x] = w;
       uf.merge(x, w);
     }
+  }
+
+  if (type[0] != NodeType::nonheader)
+    tree_roots.push_back(node[0]);
+
+  for (unsigned i = 0; i < bb_count; ++i) {
+    if (type[i] != NodeType::nonheader)
+      header_nodes[node[i]].push_back(node[i]);
+  }
+
+  for (unsigned i = 0; i < bb_count; ++i) {
+    node_type[node[i]] = type[i];
+
+    if (type[0] == NodeType::nonheader && header[i] == 0 &&
+        type[i] != NodeType::nonheader)
+      tree_roots.push_back(node[i]);
+
+    // populate header_nodes
+    unsigned root = i;
+    while (header[root] != 0) {
+      header_nodes[node[header[root]]].push_back(node[i]);
+      root = header[root];
+    }
+
+    // populate edges in nested tree
+    if (type[i] != NodeType::nonheader &&
+        type[header[i]] != NodeType::nonheader) {
+      tree_topdown.emplace(node[header[i]], node[i]);
+      tree_bottomup.emplace(node[i], node[header[i]]);
+    }
+  }
+
+  // sort nodes with DFST pre-order so that BB cloning won't break dominance
+  for (auto &[bb, nodes] : header_nodes) {
+    (void) bb;
+    sort(nodes.begin(), nodes.end(),
+      [&](const BasicBlock *a, const BasicBlock *b) -> bool {
+        return number[a] < number[b];
+      }
+    );
   }
 }
 

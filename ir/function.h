@@ -47,6 +47,8 @@ public:
   bool empty() const { return m_instrs.empty(); }
   JumpInstr::it_helper targets() const;
 
+  void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
+
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
@@ -100,6 +102,8 @@ public:
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getFirstBB() { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
+  BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
+                      std::unordered_map<Value*, Value*> &vmap);
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
   void removeBB(BasicBlock &BB);
@@ -238,9 +242,39 @@ class LoopAnalysis final {
   std::vector<unsigned> header;
   enum NodeType { nonheader, self, reducible, irreducible };
   std::vector<NodeType> type;
+
+  std::map<const BasicBlock*, NodeType> node_type;
+
+  std::map<const BasicBlock*, std::vector<const BasicBlock*>> header_nodes;
+  std::multimap<const BasicBlock*, const BasicBlock*> tree_topdown;
+  std::map<const BasicBlock*, const BasicBlock*> tree_bottomup;
+  std::vector<const BasicBlock*> tree_roots;
   void analysis();
 public:
   LoopAnalysis(Function &f) : f(f), cfg(f) { analysis(); }
+  const std::map<const BasicBlock*, NodeType>& getNodeType() const {
+    return node_type;
+  }
+
+  std::map<const BasicBlock*, std::vector<const BasicBlock*>>&
+    getHeaderNodes() { return header_nodes; }
+
+  const std::vector<const BasicBlock*>& getRoots() const {
+    return std::move(tree_roots);
+  }
+
+  auto getChildren(const BasicBlock *bb) const {
+    return tree_topdown.equal_range(bb);
+  }
+
+  bool hasParent(const BasicBlock *bb) const {
+    return tree_bottomup.count(bb);
+  }
+
+  const BasicBlock* getParent(const BasicBlock *bb) const {
+    return tree_bottomup.at(bb);
+  }
+
   void printDot(std::ostream &os) const;
 };
 
