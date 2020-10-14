@@ -161,6 +161,10 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
     "tools/alive-tv.cpp"
   )
 
+  add_llvm_executable(alive-exec
+    "tools/alive-exec.cpp"
+  )
+
 else()
   set(LLVM_UTIL_SRCS "")
 endif()
@@ -188,6 +192,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils)
   target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
+  target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
 endif()
 
 if (CYGWIN)
@@ -201,6 +206,7 @@ else()
   target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
   if (BUILD_LLVM_UTILS OR BUILD_TV)
     target_link_libraries(alive-tv PRIVATE ${Z3_LIBRARIES})
+    target_link_libraries(alive-exec PRIVATE ${Z3_LIBRARIES})
   endif()
 endif()
 
@@ -221,5 +227,5 @@ add_custom_target("check"
                  )
 
 if (BUILD_TV)
-  add_dependencies("check" "alive-tv")
+  add_dependencies("check" "alive-tv" "alive-exec")
 endif()
