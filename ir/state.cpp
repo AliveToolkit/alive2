@@ -126,7 +126,7 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
 }
 
 expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
-  if (isUndef(e, &val)) {
+  if (isUndef(e)) {
     addUB(expr(false));
     return expr::mkUInt(0, e);
   }
@@ -161,7 +161,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   auto has_undef = [&](const expr &e) {
     auto vars = e.vars();
     return any_of(vars.begin(), vars.end(),
-                  [&](auto &v) { return isUndef(v, &val); });
+                  [&](auto &v) { return isUndef(v); });
   };
 
   auto mark_notundef = [&](const expr &var) {
@@ -212,6 +212,15 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
         mark_notundef(val);
         return expr::mkIf(val.sle(rhs), a, b);
       }
+
+      // undef <= undef
+      if (is_if_undef(lhs, val, not_undef) &&
+          is_if_undef(rhs, val2, not_undef2)) {
+        addUB((not_undef && not_undef2) ||
+              (not_undef && val == expr::IntSMin(lhs.bits())) ||
+              (not_undef2 && val2 == expr::IntSMax(rhs.bits())));
+        return expr::mkIf(val.sle(val2), a, b);
+      }
     }
 
     if (c.isULE(lhs, rhs)) {
@@ -227,6 +236,15 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
         addUB(not_undef || rhs == expr::mkInt(-1, rhs));
         mark_notundef(val);
         return expr::mkIf(val.ule(rhs), a, b);
+      }
+
+      // undef <= undef
+      if (is_if_undef(lhs, val, not_undef) &&
+          is_if_undef(rhs, val2, not_undef2)) {
+        addUB((not_undef && not_undef2) ||
+              (not_undef && val == 0) ||
+              (not_undef2 && val2 == expr::mkInt(-1, rhs)));
+        return expr::mkIf(val.ule(val2), a, b);
       }
     }
   }
@@ -400,9 +418,7 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   return I == pres.end() ? nullptr : &I->second.domain.path;
 }
 
-bool State::isUndef(const expr &e, const Value *used_by) const {
-  if (used_by)
-    return at(*used_by).second.count(e) != 0;
+bool State::isUndef(const expr &e) const {
   return undef_vars.count(e) != 0;
 }
 

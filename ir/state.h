@@ -150,7 +150,7 @@ public:
   const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false);
 
   const ValTy& at(const Value &val) const;
-  bool isUndef(const smt::expr &e, const Value *used_by = nullptr) const;
+  bool isUndef(const smt::expr &e) const;
 
   /*--- Control flow ---*/
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
