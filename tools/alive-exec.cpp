@@ -230,6 +230,11 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
         t.src.getType().printVal(cout, state, m[ret]);
         cout << "\n\n";
       }
+
+      s.block(m);
+      if (s.check().isSat()) {
+        cout << "WARNING: There are multiple return values\n\n";
+      }
       ++successCount;
       return;
     }
