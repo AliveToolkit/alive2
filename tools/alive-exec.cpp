@@ -152,8 +152,6 @@ static optional<smt::smt_initializer> smt_init;
 
 static void execFunction(llvm::Function &F, llvm::Triple &targetTriple,
 			 unsigned &successCount, unsigned &errorCount) {
-  TransformPrintOpts print_opts;
-
   omit_array_size = opt_omit_array_size;
 
   auto Func = llvm2alive(F, llvm::TargetLibraryInfoWrapperPass(targetTriple)

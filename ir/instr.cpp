@@ -2623,7 +2623,7 @@ void Free::print(std::ostream &os) const {
 }
 
 StateValue Free::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr).value;
+  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   // If not heaponly, don't encode constraints
   s.getMemory().free(p, !heaponly);
 
