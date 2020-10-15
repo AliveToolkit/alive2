@@ -192,8 +192,6 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
 
     Solver s;
     s.add(ret_domain);
-    s.add(ret == ret_val.value);
-    s.add(ret_np == ret_val.non_poison);
     auto r = s.check();
     if (r.isUnsat()) {
       cout << "ERROR: Function doesn't reach a return statement\n";
@@ -224,16 +222,16 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
       auto &m = r.getModel();
       cout << "Return value: ";
       // TODO: add support for aggregates
-      if (m[ret_np].isFalse()) {
+      if (m.eval(ret_val.non_poison, true).isFalse()) {
         cout << "poison\n\n";
       } else {
-        t.src.getType().printVal(cout, state, m[ret]);
-        cout << "\n\n";
-      }
+        t.src.getType().printVal(cout, state, m.eval(ret_val.value, true));
 
-      s.block(m);
-      if (s.check().isSat()) {
-        cout << "WARNING: There are multiple return values\n\n";
+        s.block(m);
+        if (s.check().isSat()) {
+          cout << "\n\nWARNING: There are multiple return values";
+        }
+        cout << "\n\n";
       }
       ++successCount;
       return;
