@@ -183,7 +183,7 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
   smt_init->reset();
   try {
     auto p = verifier.exec();
-    auto &state = p.first;
+    auto &state = *p.first;
 
     auto ret_domain = state.returnDomain()();
     auto [ret_val, ret_undefs] = state.returnVal();

@@ -883,17 +883,18 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
   }
 }
 
-pair<State, State> TransformVerify::exec() const {
+pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
   StopWatch symexec_watch;
   t.tgt.syncDataWithSrc(t.src);
   calculateAndInitConstants(t);
   State::resetGlobals();
 
-  State src_state(t.src, true), tgt_state(t.tgt, false);
-  sym_exec(src_state);
-  tgt_state.syncSEdataWithSrc(src_state);
-  sym_exec(tgt_state);
-  src_state.mkAxioms(tgt_state);
+  auto src_state = make_unique<State>(t.src, true);
+  auto tgt_state = make_unique<State>(t.tgt, false);
+  sym_exec(*src_state);
+  tgt_state->syncSEdataWithSrc(*src_state);
+  sym_exec(*tgt_state);
+  src_state->mkAxioms(*tgt_state);
 
   symexec_watch.stop();
   if (symexec_watch.seconds() > 5) {
@@ -922,19 +923,19 @@ Errors TransformVerify::verify() const {
     if (GVS->size() != GVT->size()) {
       stringstream ss;
       ss << "Unsupported interprocedural transformation: global variable "
-        << GVS->getName() << " has different size in source and target ("
-        << GVS->size() << " vs " << GVT->size()
-        << " bytes)";
+         << GVS->getName() << " has different size in source and target ("
+         << GVS->size() << " vs " << GVT->size()
+         << " bytes)";
       return { ss.str(), false };
     } else if (GVS->isConst() && !GVT->isConst()) {
       stringstream ss;
       ss << "Transformation is incorrect because global variable "
-        << GVS->getName() << " is const in source but not in target";
+         << GVS->getName() << " is const in source but not in target";
       return { ss.str(), true };
     } else if (!GVS->isConst() && GVT->isConst()) {
       stringstream ss;
       ss << "Unsupported interprocedural transformation: global variable "
-        << GVS->getName() << " is const in target but not in source";
+         << GVS->getName() << " is const in target but not in source";
       return { ss.str(), false };
     }
   }
@@ -944,28 +945,27 @@ Errors TransformVerify::verify() const {
     auto [src_state, tgt_state] = exec();
 
     if (check_each_var) {
-      for (auto &[var, val, used] : src_state.getValues()) {
-        (void)used;
+      for (auto &[var, val, used] : src_state->getValues()) {
         auto &name = var->getName();
         if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
           continue;
 
         // TODO: add data-flow domain tracking for Alive, but not for TV
-        check_refinement(errs, t, src_state, tgt_state, var, var->getType(),
-                        true, true, val,
-                        true, true, tgt_state.at(*tgt_instrs.at(name)),
-                        check_each_var);
+        check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
+                         true, true, val,
+                         true, true, tgt_state->at(*tgt_instrs.at(name)),
+                         check_each_var);
         if (errs)
           return errs;
       }
     }
 
-    check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-                    src_state.returnDomain()(), src_state.functionDomain()(),
-                    src_state.returnVal(),
-                    tgt_state.returnDomain()(), tgt_state.functionDomain()(),
-                    tgt_state.returnVal(),
-                    check_each_var);
+    check_refinement(errs, t, *src_state, *tgt_state, nullptr, t.src.getType(),
+                     src_state->returnDomain()(), src_state->functionDomain()(),
+                     src_state->returnVal(),
+                     tgt_state->returnDomain()(), tgt_state->functionDomain()(),
+                     tgt_state->returnVal(),
+                     check_each_var);
   } catch (AliveException e) {
     return move(e);
   }
