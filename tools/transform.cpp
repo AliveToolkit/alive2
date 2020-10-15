@@ -883,17 +883,30 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
   }
 }
 
+pair<State, State> TransformVerify::exec() const {
+  StopWatch symexec_watch;
+  t.tgt.syncDataWithSrc(t.src);
+  calculateAndInitConstants(t);
+  State::resetGlobals();
+
+  State src_state(t.src, true), tgt_state(t.tgt, false);
+  sym_exec(src_state);
+  tgt_state.syncSEdataWithSrc(src_state);
+  sym_exec(tgt_state);
+  src_state.mkAxioms(tgt_state);
+
+  symexec_watch.stop();
+  if (symexec_watch.seconds() > 5) {
+    cerr << "WARNING: slow vcgen! Took " << symexec_watch << '\n';
+  }
+  return { move(src_state), move(tgt_state) };
+}
+
 Errors TransformVerify::verify() const {
   if (t.src.getFnAttrs() != t.tgt.getFnAttrs() ||
       !t.src.hasSameInputs(t.tgt)) {
     return { "Unsupported interprocedural transformation: signature mismatch "
              "between src and tgt", false };
-  }
-
-  try {
-    t.tgt.syncDataWithSrc(t.src);
-  } catch (AliveException &ae) {
-    return Errors(move(ae));
   }
 
   // Check sizes of global variables
@@ -926,51 +939,36 @@ Errors TransformVerify::verify() const {
     }
   }
 
-  StopWatch symexec_watch;
-  calculateAndInitConstants(t);
-  State::resetGlobals();
-  State src_state(t.src, true), tgt_state(t.tgt, false);
-
+  Errors errs;
   try {
-    sym_exec(src_state);
-    tgt_state.syncSEdataWithSrc(src_state);
-    sym_exec(tgt_state);
-    src_state.mkAxioms(tgt_state);
+    auto [src_state, tgt_state] = exec();
+
+    if (check_each_var) {
+      for (auto &[var, val, used] : src_state.getValues()) {
+        (void)used;
+        auto &name = var->getName();
+        if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
+          continue;
+
+        // TODO: add data-flow domain tracking for Alive, but not for TV
+        check_refinement(errs, t, src_state, tgt_state, var, var->getType(),
+                        true, true, val,
+                        true, true, tgt_state.at(*tgt_instrs.at(name)),
+                        check_each_var);
+        if (errs)
+          return errs;
+      }
+    }
+
+    check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
+                    src_state.returnDomain()(), src_state.functionDomain()(),
+                    src_state.returnVal(),
+                    tgt_state.returnDomain()(), tgt_state.functionDomain()(),
+                    tgt_state.returnVal(),
+                    check_each_var);
   } catch (AliveException e) {
     return move(e);
   }
-
-  symexec_watch.stop();
-  if (symexec_watch.seconds() > 5) {
-    cerr << "WARNING: slow vcgen! Took " << symexec_watch << '\n';
-  }
-
-  Errors errs;
-
-  if (check_each_var) {
-    for (auto &[var, val, used] : src_state.getValues()) {
-      (void)used;
-      auto &name = var->getName();
-      if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
-        continue;
-
-      // TODO: add data-flow domain tracking for Alive, but not for TV
-      check_refinement(errs, t, src_state, tgt_state, var, var->getType(),
-                       true, true, val,
-                       true, true, tgt_state.at(*tgt_instrs.at(name)),
-                       check_each_var);
-      if (errs)
-        return errs;
-    }
-  }
-
-  check_refinement(errs, t, src_state, tgt_state, nullptr, t.src.getType(),
-                   src_state.returnDomain()(), src_state.functionDomain()(),
-                   src_state.returnVal(),
-                   tgt_state.returnDomain()(), tgt_state.functionDomain()(),
-                   tgt_state.returnVal(),
-                   check_each_var);
-
   return errs;
 }
 

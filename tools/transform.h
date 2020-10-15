@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/function.h"
+#include "ir/state.h"
 #include "smt/solver.h"
 #include "util/errors.h"
 #include <string>
@@ -52,6 +53,7 @@ class TransformVerify {
 
 public:
   TransformVerify(Transform &t, bool check_each_var);
+  std::pair<IR::State, IR::State> exec() const;
   util::Errors verify() const;
   TypingAssignments getTypings() const;
   void fixupTypes(const TypingAssignments &ty);

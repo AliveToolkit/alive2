@@ -283,8 +283,6 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   TransformPrintOpts print_opts;
 
-  omit_array_size = opt_omit_array_size;
-
   auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
                                     .getTLI(F1));
   if (!Func1) {
@@ -461,6 +459,7 @@ convenient way to demonstrate an existing optimizer bug.
   auto targetTriple = llvm::Triple(M1.get()->getTargetTriple());
 
   llvm_util::initializer llvm_util_init(cerr, DL);
+  omit_array_size = opt_omit_array_size;
   smt_init.emplace();
 
   unsigned goodCount = 0, badCount = 0, errorCount = 0;

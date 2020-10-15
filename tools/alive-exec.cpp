@@ -3,7 +3,9 @@
 
 #include "llvm_util/llvm2alive.h"
 #include "ir/memory.h"
+#include "smt/expr.h"
 #include "smt/smt.h"
+#include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
 #include "util/version.h"
@@ -30,10 +32,11 @@
 #include <iostream>
 #include <utility>
 
+using namespace llvm_util;
+using namespace smt;
 using namespace tools;
 using namespace util;
 using namespace std;
-using namespace llvm_util;
 
 static llvm::cl::OptionCategory opt_alive("Alive options");
 
@@ -81,14 +84,9 @@ static llvm::cl::list<std::string> opt_funcs(
     llvm::cl::ZeroOrMore, llvm::cl::value_desc("function name"),
     llvm::cl::CommaSeparated, llvm::cl::cat(opt_alive));
 
-static llvm::cl::opt<unsigned> opt_src_unrolling_factor(
-    "src-unroll",
-    llvm::cl::desc("Unrolling factor for src function (default=0)"),
-    llvm::cl::cat(opt_alive), llvm::cl::init(0));
-
-static llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
-    "tgt-unroll",
-    llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
+static llvm::cl::opt<unsigned> opt_unrolling_factor(
+    "unroll",
+    llvm::cl::desc("Unrolling factor (default=0)"),
     llvm::cl::cat(opt_alive), llvm::cl::init(0));
 
 static llvm::cl::opt<bool> opt_tactic_verbose(
@@ -150,25 +148,98 @@ static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
 
 static optional<smt::smt_initializer> smt_init;
 
-static void execFunction(llvm::Function &F, llvm::Triple &targetTriple,
-			 unsigned &successCount, unsigned &errorCount) {
-  omit_array_size = opt_omit_array_size;
-
-  auto Func = llvm2alive(F, llvm::TargetLibraryInfoWrapperPass(targetTriple)
-                                   .getTLI(F));
+static void execFunction(llvm::Function &F, llvm::Triple &triple,
+                         unsigned &successCount, unsigned &errorCount) {
+  auto Func = llvm2alive(F,
+                         llvm::TargetLibraryInfoWrapperPass(triple).getTLI(F));
   if (!Func) {
     cerr << "ERROR: Could not translate '" << F.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
     return;
   }
-  Func->unroll(opt_src_unrolling_factor);
+  Func->unroll(opt_unrolling_factor);
+
+  Transform t;
+  t.src = move(*Func);
+  t.tgt = *llvm2alive(F,
+                      llvm::TargetLibraryInfoWrapperPass(triple).getTLI(F));
+  t.preprocess();
+  TransformVerify verifier(t, false);
+  if (!opt_succinct)
+    t.src.print(cout << "\n----------------------------------------\n");
+
+  {
+    auto types = verifier.getTypings();
+    if (!types) {
+      cerr << "Transformation doesn't verify!\n"
+              "ERROR: program doesn't type check!\n\n";
+      ++errorCount;
+      return;
+    }
+    assert(types.hasSingleTyping());
+  }
 
   smt_init->reset();
+  try {
+    auto p = verifier.exec();
+    auto &state = p.first;
 
-  // FIXME Nuno add execution logic here
-  cout << "executing: " << F.getName().str() << "\n";
-  ++successCount;
+    auto ret_domain = state.returnDomain()();
+    auto [ret_val, ret_undefs] = state.returnVal();
+    auto ret = expr::mkVar("ret_val", ret_val.value);
+    auto ret_np = expr::mkVar("ret_np", ret_val.non_poison);
+
+    Solver s;
+    s.add(ret_domain);
+    s.add(ret == ret_val.value);
+    s.add(ret_np == ret_val.non_poison);
+    auto r = s.check();
+    if (r.isUnsat()) {
+      cout << "ERROR: Function doesn't reach a return statement\n";
+      ++errorCount;
+      return;
+    }
+    if (r.isInvalid()) {
+      cout << "ERROR: invalid expression\n";
+      ++errorCount;
+      return;
+    }
+    if (r.isError()) {
+      cout << "ERROR: Error in SMT solver: " << r.getReason() << '\n';
+      ++errorCount;
+      return;
+    }
+    if (r.isTimeout()) {
+      cout << "ERROR: SMT solver timedout\n";
+      ++errorCount;
+      return;
+    }
+    if (r.isSkip()) {
+      cout << "ERROR: SMT queries disabled";
+      ++errorCount;
+      return;
+    }
+    if (r.isSat()) {
+      auto &m = r.getModel();
+      cout << "Return value: ";
+      // TODO: add support for aggregates
+      if (m[ret_np].isFalse()) {
+        cout << "poison\n\n";
+      } else {
+        t.src.getType().printVal(cout, state, m[ret]);
+        cout << "\n\n";
+      }
+      ++successCount;
+      return;
+    }
+    UNREACHABLE();
+
+  } catch (const AliveException &e) {
+    cout << "ERROR: " << e.msg << '\n';
+    ++errorCount;
+    return;
+  }
 }
 
 static ofstream OutFile;
@@ -235,6 +306,7 @@ will attempt to execute every function in the bitcode file.
   auto targetTriple = llvm::Triple(M.get()->getTargetTriple());
 
   llvm_util::initializer llvm_util_init(cerr, DL);
+  omit_array_size = opt_omit_array_size;
   smt_init.emplace();
 
   unsigned successCount = 0, errorCount = 0;
