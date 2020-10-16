@@ -139,10 +139,10 @@ public:
 
   // returns: data, domain, quant var, precondition
   std::tuple<T,expr,expr,expr> operator()() const {
-    expr dom = domain();
     if (vals.size() == 1)
       return { vals.begin()->first, vals.begin()->second, expr(), true };
 
+    expr dom = domain();
     unsigned bits = util::ilog2_ceil(vals.size()+1, false);
     expr qvar = expr::mkFreshVar("choice", expr::mkUInt(0, bits));
 
