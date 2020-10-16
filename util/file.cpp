@@ -4,6 +4,7 @@
 #include "util/file.h"
 #include <cstring>
 #include <fstream>
+#include <random>
 
 using namespace std;
 
@@ -25,5 +26,31 @@ file_reader::file_reader(const char *filename, unsigned padding) {
 file_reader::~file_reader() {
   delete[] buf;
 }
+
+fs::path
+makeUniqueFilePath(const std::string &dirname, const fs::path &fname) {
+  fs::path path = fs::path(dirname) / fname;
+  if (!fs::exists(path))
+    return path;
+
+  static default_random_engine re;
+  static uniform_int_distribution<unsigned> rand;
+  static bool seeded = false;
+
+  if (!seeded) {
+    random_device rd;
+    re.seed(rd());
+    seeded = true;
+  }
+
+  do {
+    auto newname = fname.stem();
+    newname += "_" + to_string(rand(re)) + ".txt";
+    path.replace_filename(newname);
+  } while (fs::exists(path));
+
+  return path;
+}
+
 
 }

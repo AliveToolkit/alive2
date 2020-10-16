@@ -2,11 +2,13 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "llvm_util/utils.h"
 #include "ir/memory.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/file.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
@@ -24,14 +26,6 @@
 #include <sstream>
 #include <unordered_map>
 #include <utility>
-
-#if (__GNUC__ < 8) && (!__APPLE__)
-# include <experimental/filesystem>
-  namespace fs = std::experimental::filesystem;
-#else
-# include <filesystem>
-  namespace fs = std::filesystem;
-#endif
 
 using namespace IR;
 using namespace llvm_util;
@@ -239,6 +233,30 @@ struct TVPass final : public llvm::FunctionPass {
     return false;
   }
 
+  void openOutputFileStream(const std::string &fname0) {
+    fs::create_directories(opt_report_dir.getValue());
+
+    fs::path fname(fname0);
+    fname.replace_extension(".txt");
+    fs::path path = makeUniqueFilePath(opt_report_dir.getValue(), fname);
+
+    out_file = ofstream(path);
+    out = &out_file;
+    if (!out_file.is_open()) {
+      cerr << "Alive2: Couldn't open report file!" << endl;
+      exit(1);
+    }
+
+    report_filename = path;
+    report_dir_created = true;
+
+    if (opt_smt_log) {
+      fs::path path_z3log = path;
+      path_z3log.replace_extension("z3_log.txt");
+      smt::start_logging(path_z3log.c_str());
+    }
+  }
+
   bool doInitialization(llvm::Module &module) override {
     if (initialized++)
       return false;
@@ -246,44 +264,9 @@ struct TVPass final : public llvm::FunctionPass {
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
-      static default_random_engine re;
-      static uniform_int_distribution<unsigned> rand;
-      static bool seeded = false;
-
-      if (!seeded) {
-        random_device rd;
-        re.seed(rd());
-        seeded = true;
-      }
-
-      fs::create_directories(opt_report_dir.getValue());
       auto &source_file = module.getSourceFileName();
-      fs::path fname = source_file.empty() ? "alive.txt" : source_file;
-      fname.replace_extension(".txt");
-      fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
-
-      do {
-        auto newname = fname.stem();
-        newname += "_" + to_string(rand(re)) + ".txt";
-        path.replace_filename(newname);
-      } while (fs::exists(path));
-
-      out_file = ofstream(path);
-      out = &out_file;
-      if (!out_file.is_open()) {
-        cerr << "Alive2: Couldn't open report file!" << endl;
-        exit(1);
-      }
-
-      report_filename = path;
+      openOutputFileStream(source_file.empty() ? "alive.txt" : source_file);
       *out << "Source: " << source_file << endl;
-      report_dir_created = true;
-
-      if (opt_smt_log) {
-        fs::path path_z3log = path;
-        path_z3log.replace_extension("z3_log.txt");
-        smt::start_logging(path_z3log.c_str());
-      }
     } else if (opt_report_dir.empty()) {
       out = &cerr;
       if (opt_smt_log) {
@@ -429,7 +412,7 @@ llvmGetPassPluginInfo() {
       auto f = [](llvm::StringRef P, llvm::Any IR,
                   const llvm::PreservedAnalyses &PA) {
         static int count = 0;
-        if (!out) {
+        if (!initialized) {
           // TVInitPass is not called yet.
           // This can happen at very early passes, such as
           // ForceFunctionAttrsPass.
@@ -437,13 +420,13 @@ llvmGetPassPluginInfo() {
         }
 
         if (do_skip(P)) {
-          *out << "-- " << ++count << ". " << P.str() << " : Skipping\n";
           return;
         } else if (TVFinalizePass::finalized)
           return;
 
-        *out << "-- " << ++count << ". " << P.str() << "\n";
         TVPass tv;
+        tv.openOutputFileStream(to_string(++count) + ". " + P.str() + ".txt");
+        set_outs(*out);
         auto M = const_cast<llvm::Module *>(unwrapModule(IR));
         for (auto &F: *M)
           tv.runOnFunction(F);

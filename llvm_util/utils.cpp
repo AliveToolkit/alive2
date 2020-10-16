@@ -404,6 +404,10 @@ std::ostream& get_outs() {
   return *out;
 }
 
+void set_outs(std::ostream &os) {
+  out = &os;
+}
+
 void reset_state(Function &f) {
   current_fn = &f;
   value_cache.clear();

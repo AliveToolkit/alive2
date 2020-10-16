@@ -4,7 +4,16 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include <memory>
+#include <string>
 #include <string_view>
+
+#if (__GNUC__ < 8) && (!__APPLE__)
+# include <experimental/filesystem>
+  namespace fs = std::experimental::filesystem;
+#else
+# include <filesystem>
+  namespace fs = std::filesystem;
+#endif
 
 namespace util {
 
@@ -22,5 +31,8 @@ public:
 };
 
 struct FileIOException {};
+
+fs::path
+makeUniqueFilePath(const std::string &dirname, const fs::path &fname);
 
 }
