@@ -419,13 +419,14 @@ llvmGetPassPluginInfo() {
           return;
         }
 
+        count++;
         if (do_skip(P)) {
           return;
         } else if (TVFinalizePass::finalized)
           return;
 
         TVPass tv;
-        tv.openOutputFileStream(to_string(++count) + ". " + P.str() + ".txt");
+        tv.openOutputFileStream(to_string(count) + ". " + P.str() + ".txt");
         set_outs(*out);
         auto M = const_cast<llvm::Module *>(unwrapModule(IR));
         for (auto &F: *M)
