@@ -46,5 +46,8 @@ PRINT(llvm::Value)
 #undef PRINT
 
 void init_llvm_utils(std::ostream &os, const llvm::DataLayout &DL);
+
+std::ostream& get_outs();
+
 void reset_state(IR::Function &f);
 }

@@ -400,6 +400,10 @@ void init_llvm_utils(ostream &os, const llvm::DataLayout &dataLayout) {
   DL = &dataLayout;
 }
 
+std::ostream& get_outs() {
+  return *out;
+}
+
 void reset_state(Function &f) {
   current_fn = &f;
   value_cache.clear();
