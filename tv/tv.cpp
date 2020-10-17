@@ -374,7 +374,12 @@ bool do_skip(const llvm::StringRef &ref) {
     "::TVInitPass", "::TVFinalizePass",
     "ArgumentPromotionPass", "DeadArgumentEliminationPass",
     "HotColdSplittingPass", "InlinerPass",
-    "GlobalOptPass", "IPSCCPPass"
+    "GlobalOptPass", "IPSCCPPass",
+    "ModuleInlinerWrapperPass", // inliner pass wrapper
+    "OpenMPOptPass", // open mp optimization (concurrency)
+    "PostOrderFunctionAttrsPass", // changes fn signatures
+    "EntryExitInstrumenterPass", // instruments profiler-related fn calls
+    "EliminateAvailableExternallyPass", // Del. available_externally linkage fns
   };
   auto sref = ref.str();
   auto ends_with = [](const string_view &a, const string_view &suffix) {
