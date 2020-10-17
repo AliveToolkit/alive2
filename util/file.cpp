@@ -28,9 +28,10 @@ file_reader::~file_reader() {
 }
 
 fs::path
-makeUniqueFilePath(const std::string &dirname, const fs::path &fname) {
+makeUniqueFilePath(const std::string &dirname, const fs::path &fname,
+                   bool always_add_suffix) {
   fs::path path = fs::path(dirname) / fname;
-  if (!fs::exists(path))
+  if (!always_add_suffix && !fs::exists(path))
     return path;
 
   static default_random_engine re;

@@ -238,7 +238,8 @@ struct TVPass final : public llvm::FunctionPass {
 
     fs::path fname(fname0);
     fname.replace_extension(".txt");
-    fs::path path = makeUniqueFilePath(opt_report_dir.getValue(), fname);
+    fs::path path = makeUniqueFilePath(opt_report_dir.getValue(), fname,
+                                       !is_clangtv);
 
     out_file = ofstream(path);
     out = &out_file;

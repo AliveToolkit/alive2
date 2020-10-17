@@ -9,10 +9,8 @@
 
 #if (__GNUC__ < 8) && (!__APPLE__)
 # include <experimental/filesystem>
-  namespace fs = std::experimental::filesystem;
 #else
 # include <filesystem>
-  namespace fs = std::filesystem;
 #endif
 
 namespace util {
@@ -32,7 +30,14 @@ public:
 
 struct FileIOException {};
 
+#if (__GNUC__ < 8) && (!__APPLE__)
+  namespace fs = std::experimental::filesystem;
+#else
+  namespace fs = std::filesystem;
+#endif
+
 fs::path
-makeUniqueFilePath(const std::string &dirname, const fs::path &fname);
+makeUniqueFilePath(const std::string &dirname, const fs::path &fname,
+                   bool always_add_suffix);
 
 }
