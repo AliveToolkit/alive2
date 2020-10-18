@@ -394,7 +394,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
       pre_src_forall = pre_src;
     }
   }
-  expr pre = pre_src_exists && pre_tgt;
+  expr pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   pre_src_forall &= tgt_state.getFnPre();
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);

@@ -116,6 +116,7 @@ private:
     Memory m;
     bool readsmem, argmemonly;
 
+    smt::expr operator==(const FnCallInput &rhs) const;
     smt::expr refinedBy(State &s, const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
@@ -131,6 +132,7 @@ private:
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);
+    smt::expr operator==(const FnCallOutput &rhs) const;
     bool operator<(const FnCallOutput &rhs) const;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;

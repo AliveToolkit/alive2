@@ -29,6 +29,7 @@ struct StateValue {
 
   bool isValid() const;
 
+  smt::expr operator==(const StateValue &other) const;
   bool eq(const StateValue &other) const;
 
   std::set<smt::expr> vars() const;

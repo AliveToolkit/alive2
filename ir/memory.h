@@ -318,10 +318,12 @@ public:
   class CallState {
     std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_block_liveness;
+    bool empty = true;
 
   public:
     static CallState mkIf(const smt::expr &cond, const CallState &then,
                           const CallState &els);
+    smt::expr operator==(const CallState &rhs) const;
     // for container use only
     bool operator<(const CallState &rhs) const;
     friend class Memory;
@@ -345,6 +347,7 @@ public:
 
     PtrInput(StateValue &&v, bool byval, bool nocapture) :
       val(std::move(v)), byval(byval), nocapture(nocapture) {}
+    smt::expr operator==(const PtrInput &rhs) const;
     bool operator<(const PtrInput &rhs) const {
       return std::tie(val, byval, nocapture) <
              std::tie(rhs.val, rhs.byval, rhs.nocapture);

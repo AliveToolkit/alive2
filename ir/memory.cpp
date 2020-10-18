@@ -1617,6 +1617,12 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
   return { p.release(), move(undef) };
 }
 
+expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
+  if (byval != rhs.byval || nocapture != rhs.nocapture)
+    return false;
+  return val == rhs.val;
+}
+
 pair<expr,expr>
 Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   bool has_local = escaped_local_blks.numMayAlias(true);
@@ -1674,6 +1680,19 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
   return ret;
 }
 
+expr Memory::CallState::operator==(const CallState &rhs) const {
+  if (empty != rhs.empty)
+    return false;
+  if (empty)
+    return true;
+
+  expr ret = non_local_block_liveness == rhs.non_local_block_liveness;
+  for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
+    ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
+  }
+  return ret;
+}
+
 bool Memory::CallState::operator<(const CallState &rhs) const {
   return tie(non_local_block_val, non_local_block_liveness) <
          tie(rhs.non_local_block_val, rhs.non_local_block_liveness);
@@ -1682,6 +1701,7 @@ bool Memory::CallState::operator<(const CallState &rhs) const {
 Memory::CallState
 Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
   CallState st;
+  st.empty = false;
 
   // TODO: handle havoc of local blocks
 

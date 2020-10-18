@@ -541,6 +541,24 @@ void State::addNoReturn() {
   addUB(expr(false));
 }
 
+expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
+  if (readsmem != rhs.readsmem ||
+      argmemonly != rhs.argmemonly ||
+      fncall_ranges != rhs.fncall_ranges ||
+      m < rhs.m || rhs.m < m)
+    return false;
+
+  AndExpr eq;
+  for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
+    eq.add(args_nonptr[i] == rhs.args_nonptr[i]);
+  }
+
+  for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
+    eq.add(args_ptr[i] == rhs.args_ptr[i]);
+  }
+  return eq();
+}
+
 expr State::FnCallInput::refinedBy(
   State &s, const vector<StateValue> &args_nonptr2,
   const vector<Memory::PtrInput> &args_ptr2,
@@ -623,6 +641,15 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   return ret;
 }
 
+expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
+  expr ret = ub == rhs.ub;
+  for (unsigned i = 0, e = retvals.size(); i != e; ++i) {
+    ret &= retvals[i] == rhs.retvals[i];
+  }
+  ret &= callstate == rhs.callstate;
+  return ret;
+}
+
 bool State::FnCallOutput::operator<(const FnCallOutput &rhs) const {
   return tie(retvals, ub, callstate) < tie(rhs.retvals, rhs.ub, rhs.callstate);
 }
@@ -657,11 +684,12 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   // source may create new fn symbols, target just references src symbols
   if (isSource()) {
+    auto &calls_fn = fn_call_data[name];
     auto call_data_pair
-      = fn_call_data[name].try_emplace({ move(inputs), move(ptr_inputs),
-                                         analysis.ranges_fn_calls,
-                                         reads_memory ? memory : Memory(*this),
-                                         reads_memory, argmemonly });
+      = calls_fn.try_emplace({ move(inputs), move(ptr_inputs),
+                               analysis.ranges_fn_calls,
+                               reads_memory ? memory : Memory(*this),
+                               reads_memory, argmemonly });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
 
@@ -689,6 +717,13 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
               ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr,
                                    attrs.has(FnAttrs::NoFree))
               : Memory::CallState() };
+
+      // add equality constraints between source's function calls
+      for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
+        if (II == I)
+          continue;
+        fn_call_pre &= (I->first == II->first).implies(I->second == II->second);
+      }
     }
 
     addUB(I->second.ub);
