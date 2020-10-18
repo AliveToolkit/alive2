@@ -184,7 +184,7 @@ struct TVPass final : public llvm::FunctionPass {
       // Compare Alive2 IR and skip if syntactically equal
       stringstream ss;
       fn->print(ss);
-      // FIXME: stringstream::str() causes copy of its internal buffer.
+
       string str2 = ss.str();
       if (I->second.fn_tostr == str2)
         return false;
