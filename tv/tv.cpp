@@ -72,6 +72,12 @@ llvm::cl::opt<string> opt_report_dir(
   "tv-report-dir", llvm::cl::desc("Alive: save report to disk"),
   llvm::cl::value_desc("directory"));
 
+llvm::cl::opt<bool> opt_report_per_pass(
+  "tv-report-per-pass",
+  llvm::cl::desc("Alive: save report per pass and function"
+                 " (for clang plugin only)"),
+  llvm::cl::init(false));
+
 llvm::cl::opt<bool> opt_smt_verbose(
   "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
   llvm::cl::init(false));
@@ -118,6 +124,11 @@ llvm::cl::opt<bool> opt_io_nobuiltin(
     "tv-io-nobuiltin",
     llvm::cl::desc("Encode standard I/O functions as an unknown function"),
     llvm::cl::init(false));
+
+
+static bool reportPerPass() {
+  return !opt_report_dir.empty() && opt_report_per_pass;
+}
 
 struct FnInfo {
   Function fn;
@@ -236,7 +247,7 @@ struct TVPass final : public llvm::FunctionPass {
   void openOutputFileStream(const std::string &fname0) {
     fs::create_directories(opt_report_dir.getValue());
 
-    fs::path fname(fname0);
+    fs::path fname = fs::path(fname0).filename();
     fname.replace_extension(".txt");
     fs::path path = makeUniqueFilePath(opt_report_dir.getValue(), fname,
                                        !is_clangtv);
@@ -264,7 +275,7 @@ struct TVPass final : public llvm::FunctionPass {
 
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
-    if (!report_dir_created && !opt_report_dir.empty()) {
+    if (!report_dir_created && !opt_report_dir.empty() && !reportPerPass()) {
       auto &source_file = module.getSourceFileName();
       openOutputFileStream(source_file.empty() ? "alive.txt" : source_file);
       *out << "Source: " << source_file << endl;
@@ -413,6 +424,7 @@ llvmGetPassPluginInfo() {
       auto f = [](llvm::StringRef P, llvm::Any IR,
                   const llvm::PreservedAnalyses &PA) {
         static int count = 0;
+        static int fncount = 0;
         if (!initialized) {
           // TVInitPass is not called yet.
           // This can happen at very early passes, such as
@@ -421,9 +433,14 @@ llvmGetPassPluginInfo() {
         }
 
         if (do_skip(P)) {
+          if (!reportPerPass())
+            *out << "-- " << ++count << ". " << P.str() << " : Skipping\n";
           return;
         } else if (TVFinalizePass::finalized)
           return;
+
+        if (!reportPerPass())
+          *out << "-- " << ++count << ". " << P.str() << "\n";
 
         TVPass tv;
         auto M = const_cast<llvm::Module *>(unwrapModule(IR));
@@ -431,11 +448,13 @@ llvmGetPassPluginInfo() {
           if (F.isDeclaration())
             continue;
 
-          count++;
-          tv.openOutputFileStream(
-            to_string(count) + ". " + P.str() + "-" + F.getName().str() +
-            ".txt");
-          set_outs(*out);
+          if (reportPerPass()) {
+            fncount++;
+            tv.openOutputFileStream(
+              to_string(fncount) + ". " + P.str() + "-" + F.getName().str() +
+              ".txt");
+            set_outs(*out);
+          }
           tv.runOnFunction(F);
         }
       };
