@@ -8,7 +8,6 @@
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
-#include "util/file.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
@@ -27,6 +26,14 @@
 #include <unordered_map>
 #include <utility>
 
+#if (__GNUC__ < 8) && (!__APPLE__)
+# include <experimental/filesystem>
+  namespace fs = std::experimental::filesystem;
+#else
+# include <filesystem>
+  namespace fs = std::filesystem;
+#endif
+
 using namespace IR;
 using namespace llvm_util;
 using namespace tools;
@@ -34,6 +41,33 @@ using namespace util;
 using namespace std;
 
 namespace {
+
+static fs::path
+makeUniqueFilePath(const std::string &dirname, const fs::path &fname,
+                   bool always_add_suffix) {
+  fs::path path = fs::path(dirname) / fname;
+  if (!always_add_suffix && !fs::exists(path))
+    return path;
+
+  static default_random_engine re;
+  static uniform_int_distribution<unsigned> rand;
+  static bool seeded = false;
+
+  if (!seeded) {
+    random_device rd;
+    re.seed(rd());
+    seeded = true;
+  }
+
+  do {
+    auto newname = fname.stem();
+    newname += "_" + to_string(rand(re)) + ".txt";
+    path.replace_filename(newname);
+  } while (fs::exists(path));
+
+  return path;
+}
+
 
 llvm::cl::opt<bool> opt_error_fatal(
   "tv-exit-on-error", llvm::cl::desc("Alive: exit on error"),

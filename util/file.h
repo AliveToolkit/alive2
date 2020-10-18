@@ -7,12 +7,6 @@
 #include <string>
 #include <string_view>
 
-#if (__GNUC__ < 8) && (!__APPLE__)
-# include <experimental/filesystem>
-#else
-# include <filesystem>
-#endif
-
 namespace util {
 
 class file_reader {
@@ -29,15 +23,5 @@ public:
 };
 
 struct FileIOException {};
-
-#if (__GNUC__ < 8) && (!__APPLE__)
-  namespace fs = std::experimental::filesystem;
-#else
-  namespace fs = std::filesystem;
-#endif
-
-fs::path
-makeUniqueFilePath(const std::string &dirname, const fs::path &fname,
-                   bool always_add_suffix);
 
 }

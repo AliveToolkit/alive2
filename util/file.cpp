@@ -27,31 +27,4 @@ file_reader::~file_reader() {
   delete[] buf;
 }
 
-fs::path
-makeUniqueFilePath(const std::string &dirname, const fs::path &fname,
-                   bool always_add_suffix) {
-  fs::path path = fs::path(dirname) / fname;
-  if (!always_add_suffix && !fs::exists(path))
-    return path;
-
-  static default_random_engine re;
-  static uniform_int_distribution<unsigned> rand;
-  static bool seeded = false;
-
-  if (!seeded) {
-    random_device rd;
-    re.seed(rd());
-    seeded = true;
-  }
-
-  do {
-    auto newname = fname.stem();
-    newname += "_" + to_string(rand(re)) + ".txt";
-    path.replace_filename(newname);
-  } while (fs::exists(path));
-
-  return path;
-}
-
-
 }
