@@ -148,6 +148,7 @@ bool is_clangtv = false;
 
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
+  bool skip_verify = false;
 
   TVPass() : FunctionPass(ID) {}
 
@@ -186,7 +187,11 @@ struct TVPass final : public llvm::FunctionPass {
       fn->print(ss);
 
       string str2 = ss.str();
-      if (I->second.fn_tostr == str2)
+      // Optimization: since string comparison can be expensive for big
+      // functions, skip it if skip_verify is true.
+      // verifier.verify() will never happen if skip_verify is true, so
+      // there is nothing to prune early.
+      if (!skip_verify && I->second.fn_tostr == str2)
         return false;
 
       I->second.fn_tostr = move(str2);
@@ -205,7 +210,7 @@ struct TVPass final : public llvm::FunctionPass {
       DomTree(f, cfg).printDot(fileDom);
     }
 
-    if (first)
+    if (first || skip_verify)
       return false;
 
     smt_init->reset();
@@ -436,16 +441,18 @@ llvmGetPassPluginInfo() {
           return;
         }
 
-        if (do_skip(P)) {
-          *out << "-- " << ++count << ". " << P.str() << " : Skipping\n";
-          return;
-        } else if (TVFinalizePass::finalized)
+        if (TVFinalizePass::finalized)
           return;
 
-        *out << "-- " << ++count << ". " << P.str() << "\n";
+        bool skip_pass = do_skip(P);
+        *out << "-- " << ++count << ". " << P.str()
+             << (skip_pass ? " : Skipping\n" : "\n");
+
         TVPass tv;
+        tv.skip_verify = skip_pass;
         auto M = const_cast<llvm::Module *>(unwrapModule(IR));
         for (auto &F: *M)
+          // If skip_pass is true, this updates fns map only.
           tv.runOnFunction(F);
       };
       PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(move(f));
