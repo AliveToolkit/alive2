@@ -216,23 +216,27 @@ struct TVPass final : public llvm::FunctionPass {
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
 
+    bool has_typing_err = false;
     {
       auto types = verifier.getTypings();
       if (!types) {
         *out << "Transformation doesn't verify!\n"
                 "ERROR: program doesn't type check!\n\n";
-        return false;
+        has_typing_err = true;
+      } else {
+        assert(types.hasSingleTyping());
       }
-      assert(types.hasSingleTyping());
     }
 
-    if (Errors errs = verifier.verify()) {
-      *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
-      if (opt_error_fatal && has_failure)
-        doFinalization(*F.getParent());
-    } else {
-      *out << "Transformation seems to be correct!\n\n";
+    if (!has_typing_err) {
+      if (Errors errs = verifier.verify()) {
+        *out << "Transformation doesn't verify!\n" << errs << endl;
+        has_failure |= errs.isUnsound();
+        if (opt_error_fatal && has_failure)
+          doFinalization(*F.getParent());
+      } else {
+        *out << "Transformation seems to be correct!\n\n";
+      }
     }
 
     I->second.fn = move(t.tgt);
