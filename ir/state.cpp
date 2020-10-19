@@ -746,7 +746,14 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto [d, domain, qvar, pre] = data();
       addUB(move(domain));
       addUB(move(d.ub));
-      retval = move(d.retvals);
+
+      // It is possible that tgt's fn call returns nothingt whereas src's
+      // fn call returns something.
+      if (!out_types.empty()) {
+        assert(out_types.size() == d.retvals.size());
+        retval = move(d.retvals);
+      }
+
       if (writes_memory)
         memory.setState(d.callstate);
 
