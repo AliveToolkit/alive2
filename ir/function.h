@@ -62,6 +62,8 @@ class Function final {
   unsigned bits_pointers = 64;
   unsigned bits_ptr_offset = 64;
   bool little_endian = true;
+  // If this is true, FnCalls having DependsOnFlag become valid unknown fn calls
+  bool fncall_valid_flag = true;
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
@@ -85,6 +87,9 @@ public:
   const std::string& getName() const { return name; }
 
   auto& getFnAttrs() { return attrs; }
+
+  bool getFnCallValidFlag() const { return fncall_valid_flag; }
+  void setFnCallValidFlag(bool f) { fncall_valid_flag = f; }
 
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);

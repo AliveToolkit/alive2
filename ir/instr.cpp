@@ -1583,7 +1583,9 @@ void FnCall::print(ostream &os) const {
   }
   os << ')' << attrs;
 
-  if (!valid)
+  // To print this when valid == DependsOnFlag, FnCall::print should know
+  // Function::fncall_valid_flag
+  if (valid == Invalid)
     os << "\t; WARNING: unknown known function";
 }
 
@@ -1666,7 +1668,9 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
 }
 
 StateValue FnCall::toSMT(State &s) const {
-  if (!valid) {
+  bool is_valid = valid == Valid ||
+                  (valid == DependsOnFlag && s.getFn().getFnCallValidFlag());
+  if (!is_valid) {
     s.addUB(expr());
     return {};
   }

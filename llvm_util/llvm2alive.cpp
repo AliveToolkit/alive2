@@ -275,7 +275,7 @@ public:
       args.emplace_back(a);
     }
 
-    auto [call_val, known] = known_call(i, TLI, *BB, args);
+    auto [call_val, known_kind] = known_call(i, TLI, *BB, args);
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 
@@ -309,13 +309,19 @@ public:
     }
 
     string fn_name = '@' + fn->getName().str();
+    FnCall::ValidKind valid = FnCall::Invalid;
+    if (known_kind == FnUnknown)
+      valid = FnCall::Valid;
+    else if (known_kind == FnDependsOnOpt)
+      valid = FnCall::DependsOnFlag;
+
     auto call =
       make_unique<FnCall>(*ty, value_name(i), move(fn_name), move(attrs),
-                          !known);
+                          valid);
     unique_ptr<Instr> ret_val;
 
     // avoid parsing arguments altogether for "unknown known" functions
-    if (known)
+    if (known_kind == FnKnown)
       goto end;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
@@ -368,7 +374,7 @@ public:
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
           = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                FnAttrs(call->getAttributes()), !known);
+                                FnAttrs(call->getAttributes()), valid);
         for (auto &[arg, flags] : call->getArgs()) {
           call2->addArg(*arg, ParamAttrs(flags));
         }
