@@ -402,6 +402,7 @@ bool do_skip(const llvm::StringRef &ref) {
     "ModuleInlinerWrapperPass", // inliner pass wrapper
     "OpenMPOptPass", // open mp optimization (concurrency)
     "PostOrderFunctionAttrsPass", // changes fn signatures
+    "InferFunctionAttrsPass", // changes fn signatures
     "EntryExitInstrumenterPass", // instruments profiler-related fn calls
     "EliminateAvailableExternallyPass", // Del. available_externally linkage fns
   };
