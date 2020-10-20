@@ -151,6 +151,16 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
            is_undef_cond(not_undef, var);
   };
 
+  auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef) {
+    // (ite (= #b0 isundef_%var) %var undef)
+    // (bvadd const (ite (= #b0 isundef_%var) %var undef))
+    expr a, b;
+    return is_if_undef(e, var, not_undef) ||
+           (e.isAdd(a, b) &&
+            ((b.isConst() && is_if_undef(a, var, not_undef)) ||
+             (a.isConst() && is_if_undef(b, var, not_undef))));
+  };
+
   expr c, a, b, lhs, rhs;
 
   // two variants
@@ -180,18 +190,18 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     expr val, val2, not_undef, not_undef2;
     // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
-      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
         addUB(move(not_undef));
         mark_notundef(val);
         return expr::mkIf(val == rhs, a, b);
       }
-      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
         addUB(move(not_undef));
         mark_notundef(val);
         return expr::mkIf(lhs == val, a, b);
       }
-      if (is_if_undef(lhs, val, not_undef) &&
-          is_if_undef(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) &&
+          is_if_undef_or_add(rhs, val2, not_undef2)) {
         addUB(move(not_undef));
         addUB(move(not_undef2));
         mark_notundef(val);
@@ -202,22 +212,22 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 
     if (c.isSLE(lhs, rhs)) {
       // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
         addUB(not_undef || lhs == expr::IntSMin(lhs.bits()));
         mark_notundef(val);
         return expr::mkIf(lhs.sle(val), a, b);
       }
 
       // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
         addUB(not_undef || rhs == expr::IntSMax(rhs.bits()));
         mark_notundef(val);
         return expr::mkIf(val.sle(rhs), a, b);
       }
 
       // undef <= undef
-      if (is_if_undef(lhs, val, not_undef) &&
-          is_if_undef(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) &&
+          is_if_undef_or_add(rhs, val2, not_undef2)) {
         addUB((not_undef && not_undef2) ||
               (not_undef && val == expr::IntSMin(lhs.bits())) ||
               (not_undef2 && val2 == expr::IntSMax(rhs.bits())));
@@ -227,22 +237,22 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 
     if (c.isULE(lhs, rhs)) {
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef(rhs, val, not_undef) && !has_undef(lhs)) {
+      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
         addUB(not_undef || lhs == 0);
         mark_notundef(val);
         return expr::mkIf(lhs.ule(val), a, b);
       }
 
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef(lhs, val, not_undef) && !has_undef(rhs)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
         addUB(not_undef || rhs == expr::mkInt(-1, rhs));
         mark_notundef(val);
         return expr::mkIf(val.ule(rhs), a, b);
       }
 
       // undef <= undef
-      if (is_if_undef(lhs, val, not_undef) &&
-          is_if_undef(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef) &&
+          is_if_undef_or_add(rhs, val2, not_undef2)) {
         addUB((not_undef && not_undef2) ||
               (not_undef && val == 0) ||
               (not_undef2 && val2 == expr::mkInt(-1, rhs)));
