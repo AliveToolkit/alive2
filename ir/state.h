@@ -51,6 +51,8 @@ private:
     std::set<const Value *> non_poison_vals; // vars that are not poison
     // vars that are not undef (partially undefs are not allowed too)
     std::map<const Value *, smt::expr> non_undef_vals;
+    // vars that have never been used
+    std::set<const Value *> unused_vars;
 
     struct FnCallRanges
       : public std::map<std::string, std::pair<unsigned, unsigned>> {
@@ -80,9 +82,9 @@ private:
   const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
 
-  // var -> ((value, not_poison), undef_vars, already_used?)
+  // var -> ((value, not_poison), undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
-  std::vector<std::tuple<const Value*, ValTy, bool>> values;
+  std::vector<std::tuple<const Value*, ValTy>> values;
 
   // dst BB -> src BB -> BasicBlockInfo
   std::unordered_map<const BasicBlock*,
