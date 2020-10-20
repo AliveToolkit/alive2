@@ -84,7 +84,7 @@ private:
 
   // var -> ((value, not_poison), undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
-  std::vector<std::tuple<const Value*, ValTy>> values;
+  std::vector<std::pair<const Value*, ValTy>> values;
 
   // dst BB -> src BB -> BasicBlockInfo
   std::unordered_map<const BasicBlock*,
