@@ -43,6 +43,7 @@ static T intersect_set(const T &a, const T &b) {
 void State::ValueAnalysis::intersect(const State::ValueAnalysis &other) {
   non_poison_vals = intersect_set(non_poison_vals, other.non_poison_vals);
   non_undef_vals = intersect_set(non_undef_vals, other.non_undef_vals);
+  unused_vars = intersect_set(unused_vars, other.unused_vars);
 
   for (auto &[fn, interval] : other.ranges_fn_calls) {
     auto [I, inserted] = ranges_fn_calls.try_emplace(fn, 0, interval.second);
@@ -96,7 +97,8 @@ const StateValue& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy(move(val), move(undef_vars)), false);
+  values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
+  analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
   while (i_tmp_values > 0) {
@@ -263,7 +265,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 }
 
 const StateValue& State::operator[](const Value &val) {
-  auto &[var, val_uvars, used] = values[values_map.at(&val)];
+  auto &[var, val_uvars] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
   (void)var;
 
@@ -304,8 +306,11 @@ const StateValue& State::operator[](const Value &val) {
     return simplify(sval, true);
   }
 
-  if (uvars.empty() || !used || disable_undef_rewrite) {
-    used = true;
+  auto unused_itr = analysis.unused_vars.find(&val);
+  bool unused = unused_itr != analysis.unused_vars.end();
+  if (uvars.empty() || unused || disable_undef_rewrite) {
+    if (unused)
+      analysis.unused_vars.erase(unused_itr);
     undef_vars.insert(uvars.begin(), uvars.end());
     return simplify(sval, true);
   }
