@@ -335,7 +335,9 @@ struct TVPass final : public llvm::FunctionPass {
         cerr << "Alive2: Transform doesn't verify; aborting!" << endl;
       else
         cerr << "Alive2: Transform doesn't verify!" << endl;
-      exit(1);
+
+      if (!is_clangtv)
+        exit(1);
     }
     return false;
   }
