@@ -53,14 +53,22 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     case llvm::LibFunc_scanf:
     case llvm::LibFunc_fclose:
     case llvm::LibFunc_ferror:
+    case llvm::LibFunc_feof:
+    case llvm::LibFunc_fflush:
     case llvm::LibFunc_fgetc:
+    case llvm::LibFunc_fopen:
+    case llvm::LibFunc_fopen64:
     case llvm::LibFunc_fprintf:
     case llvm::LibFunc_fputc:
     case llvm::LibFunc_fputs:
     case llvm::LibFunc_fread:
     case llvm::LibFunc_fscanf:
+    case llvm::LibFunc_fseek:
     case llvm::LibFunc_fwrite:
+    case llvm::LibFunc_getc:
     case llvm::LibFunc_lstat:
+    case llvm::LibFunc_open:
+    case llvm::LibFunc_open64:
     case llvm::LibFunc_perror:
     case llvm::LibFunc_read:
     case llvm::LibFunc_write:
