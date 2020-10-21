@@ -259,12 +259,12 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     }
 
     if (c.isULE(lhs, rhs)) {
-      uint64_t n;
+      int64_t n;
 
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
         addUB(not_undef || lhs == 0);
-        if (lhs.isUInt(n) && n != 0)
+        if (lhs.isInt(n) && n != 0)
           mark_notundef(val);
         return expr::mkIf(lhs.ule(newe), a, b);
       }
@@ -272,7 +272,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
         addUB(not_undef || rhs == expr::mkInt(-1, rhs));
-        if (rhs.isUInt(n) && n != -1)
+        if (rhs.isInt(n) && n != -1)
           mark_notundef(val);
         return expr::mkIf(newe.ule(rhs), a, b);
       }
