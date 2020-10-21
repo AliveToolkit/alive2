@@ -122,7 +122,8 @@ llvm::cl::opt<unsigned> opt_omit_array_size(
 
 llvm::cl::opt<bool> opt_io_nobuiltin(
     "tv-io-nobuiltin",
-    llvm::cl::desc("Encode standard I/O functions as an unknown function"),
+    llvm::cl::desc("Encode standard I/O functions as an unknown function "
+                   "(unused by clang plugin)"),
     llvm::cl::init(false));
 
 struct FnInfo {
@@ -149,6 +150,7 @@ bool is_clangtv = false;
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
   bool skip_verify = false;
+  bool encode_io_fns_as_unknown = false;
 
   TVPass() : FunctionPass(ID) {}
 
@@ -213,6 +215,9 @@ struct TVPass final : public llvm::FunctionPass {
     if (first || skip_verify)
       return false;
 
+    if (is_clangtv)
+      I->second.fn.setFnCallValidFlag(encode_io_fns_as_unknown);
+
     smt_init->reset();
     Transform t;
     t.src = move(old_fn);
@@ -220,6 +225,9 @@ struct TVPass final : public llvm::FunctionPass {
     t.preprocess();
     TransformVerify verifier(t, false);
     t.print(*out, print_opts);
+
+    if (is_clangtv)
+      I->second.fn.setFnCallValidFlag(false);
 
     {
       auto types = verifier.getTypings();
@@ -303,7 +311,17 @@ struct TVPass final : public llvm::FunctionPass {
     smt::set_random_seed(to_string(opt_smt_random_seed));
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
-    config::io_nobuiltin = opt_io_nobuiltin;
+
+    if (!is_clangtv)
+      config::io_nobuiltin = opt_io_nobuiltin;
+    else {
+      config::io_nobuiltin = true;
+      if (opt_io_nobuiltin)
+        cerr << "Warning: -tv-io-nobuiltin isn't used by clang plugin. I/O"
+                " function calls will be always regarded as unknown fn calls"
+                " except InstCombine.\n";
+    }
+
     config::symexec_print_each_value = opt_se_verbose;
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
@@ -456,6 +474,11 @@ llvmGetPassPluginInfo() {
 
         TVPass tv;
         tv.skip_verify = skip_pass;
+        // For I/O known calls like printf, it is fine to regard them as valid
+        // 'unknown calls' except when it is InstCombine.
+        tv.encode_io_fns_as_unknown = P != "InstCombinePass" &&
+                                      P != "AggressiveInstCombinePass";
+
         auto M = const_cast<llvm::Module *>(unwrapModule(IR));
         for (auto &F: *M)
           // If skip_pass is true, this updates fns map only.

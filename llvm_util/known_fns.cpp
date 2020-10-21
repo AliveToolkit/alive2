@@ -14,13 +14,14 @@
 using namespace IR;
 using namespace std;
 
-#define RETURN_KNOWN(op)    return { op, true }
-#define RETURN_FAIL_KNOWN() return { nullptr, true }
-#define RETURN_FAIL_UNKNOWN() return { nullptr, false }
+#define RETURN_KNOWN(op)    return { op, FnKnown }
+#define RETURN_FAIL_KNOWN() return { nullptr, FnKnown }
+#define RETURN_FAIL_DEPENDS() return { nullptr, FnDependsOnOpt }
+#define RETURN_FAIL_UNKNOWN() return { nullptr, FnUnknown }
 
 namespace llvm_util {
 
-pair<unique_ptr<Instr>, bool>
+pair<unique_ptr<Instr>, KnownFnKind>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            BasicBlock &BB, const vector<Value*> &args) {
   auto ty = llvm_type2alive(i.getType());
@@ -72,7 +73,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     case llvm::LibFunc_perror:
     case llvm::LibFunc_read:
     case llvm::LibFunc_write:
-      RETURN_FAIL_UNKNOWN();
+      RETURN_FAIL_DEPENDS();
     default:
       break;
     }

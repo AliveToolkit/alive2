@@ -21,8 +21,14 @@ class Value;
 
 namespace llvm_util {
 
+enum KnownFnKind {
+  FnUnknown,
+  FnDependsOnOpt, // some optimizations know this fn, some opts don't
+  FnKnown
+};
+
 // returned bool indicates whether it's a known function call
-std::pair<std::unique_ptr<IR::Instr>, bool>
+std::pair<std::unique_ptr<IR::Instr>, KnownFnKind>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            IR::BasicBlock &BB, const std::vector<IR::Value*> &args);
 
