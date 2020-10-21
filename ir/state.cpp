@@ -151,14 +151,26 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
            is_undef_cond(not_undef, var);
   };
 
-  auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef) {
+  // e2: stripped expression
+  auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef,
+                                expr &e2) {
     // (ite (= #b0 isundef_%var) %var undef)
     // (bvadd const (ite (= #b0 isundef_%var) %var undef))
     expr a, b;
-    return is_if_undef(e, var, not_undef) ||
-           (e.isAdd(a, b) &&
-            ((b.isConst() && is_if_undef(a, var, not_undef)) ||
-             (a.isConst() && is_if_undef(b, var, not_undef))));
+    if (is_if_undef(e, var, not_undef)) {
+      e2 = var;
+      return true;
+    }
+    if (e.isAdd(a, b)) {
+      if (b.isConst() && is_if_undef(a, var, not_undef)) {
+        e2 = b + var;
+        return true;
+      } else if (a.isConst() && is_if_undef(b, var, not_undef)) {
+        e2 = a + var;
+        return true;
+      }
+    }
+    return false;
   };
 
   expr c, a, b, lhs, rhs;
@@ -187,76 +199,91 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   };
 
   if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
-    expr val, val2, not_undef, not_undef2;
+    expr val, val2, newe, newe2, not_undef, not_undef2;
     // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+    // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
-      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
+        // newe = (bvadd c %var)
         addUB(move(not_undef));
         mark_notundef(val);
-        return expr::mkIf(val == rhs, a, b);
+        return expr::mkIf(newe == rhs, a, b);
       }
-      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
+      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
         addUB(move(not_undef));
         mark_notundef(val);
-        return expr::mkIf(lhs == val, a, b);
+        return expr::mkIf(lhs == newe, a, b);
       }
-      if (is_if_undef_or_add(lhs, val, not_undef) &&
-          is_if_undef_or_add(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
+          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
         addUB(move(not_undef));
         addUB(move(not_undef2));
         mark_notundef(val);
         mark_notundef(val2);
-        return expr::mkIf(val == val2, a, b);
+        return expr::mkIf(newe == newe2, a, b);
       }
     }
 
     if (c.isSLE(lhs, rhs)) {
       // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
-        addUB(not_undef || lhs == expr::IntSMin(lhs.bits()));
-        mark_notundef(val);
-        return expr::mkIf(lhs.sle(val), a, b);
+      // (ite (bvsle val (bvadd c (ite (= #b0 isundef_%var) %var undef))
+      //       #b1 #b0)
+      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
+        // newe = (bvadd c %var)
+        expr cond = lhs == expr::IntSMin(lhs.bits());
+        addUB(not_undef || cond);
+        if (cond.isFalse())
+          mark_notundef(val);
+        return expr::mkIf(lhs.sle(newe), a, b);
       }
 
       // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
-        addUB(not_undef || rhs == expr::IntSMax(rhs.bits()));
-        mark_notundef(val);
-        return expr::mkIf(val.sle(rhs), a, b);
+      // (ite (bvsle (bvadd c (ite (= #b0 isundef_%var) %var undef)) val)
+      //       #b1 #b0)
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
+        expr cond = rhs == expr::IntSMax(rhs.bits());
+        addUB(not_undef || cond);
+        if (cond.isFalse())
+          mark_notundef(val);
+        return expr::mkIf(newe.sle(rhs), a, b);
       }
 
       // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef) &&
-          is_if_undef_or_add(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
+          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
         addUB((not_undef && not_undef2) ||
-              (not_undef && val == expr::IntSMin(lhs.bits())) ||
-              (not_undef2 && val2 == expr::IntSMax(rhs.bits())));
-        return expr::mkIf(val.sle(val2), a, b);
+              (not_undef && newe == expr::IntSMin(lhs.bits())) ||
+              (not_undef2 && newe2 == expr::IntSMax(rhs.bits())));
+        return expr::mkIf(newe.sle(newe2), a, b);
       }
     }
 
     if (c.isULE(lhs, rhs)) {
+      uint64_t n;
+
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef) && !has_undef(lhs)) {
+      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
         addUB(not_undef || lhs == 0);
-        mark_notundef(val);
-        return expr::mkIf(lhs.ule(val), a, b);
+        if (lhs.isUInt(n) && n != 0)
+          mark_notundef(val);
+        return expr::mkIf(lhs.ule(newe), a, b);
       }
 
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef) && !has_undef(rhs)) {
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
         addUB(not_undef || rhs == expr::mkInt(-1, rhs));
-        mark_notundef(val);
-        return expr::mkIf(val.ule(rhs), a, b);
+        if (rhs.isUInt(n) && n != -1)
+          mark_notundef(val);
+        return expr::mkIf(newe.ule(rhs), a, b);
       }
 
       // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef) &&
-          is_if_undef_or_add(rhs, val2, not_undef2)) {
+      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
+          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
         addUB((not_undef && not_undef2) ||
-              (not_undef && val == 0) ||
-              (not_undef2 && val2 == expr::mkInt(-1, rhs)));
-        return expr::mkIf(val.ule(val2), a, b);
+              (not_undef && newe == 0) ||
+              (not_undef2 && newe2 == expr::mkInt(-1, rhs)));
+        return expr::mkIf(newe.ule(newe2), a, b);
       }
     }
   }
