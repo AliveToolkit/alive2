@@ -283,28 +283,36 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             const expr &bp, expr c,
                             function<expr(expr&,expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input,
-                            bool is_ternary = true) {
+                            int nary = 2) {
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
-    b = any_fp_zero(s, move(b));
-    if (is_ternary)
-      c = any_fp_zero(s, move(c));
+    if (nary >= 2) {
+      b = any_fp_zero(s, move(b));
+      if (nary == 3)
+        c = any_fp_zero(s, move(c));
+    }
   }
 
   expr val = fn(a, b, c);
   expr non_poison(true);
 
   if (fmath.flags & FastMathFlags::NNaN) {
-    non_poison &= !a.isNaN() && !b.isNaN();
-    if (is_ternary)
-      non_poison &= !c.isNaN();
+    non_poison &= !a.isNaN();
+    if (nary >= 2) {
+      non_poison &= !b.isNaN();
+      if (nary == 3)
+        non_poison &= !c.isNaN();
+    }
     if (!only_input)
       non_poison &= !val.isNaN();
   }
   if (fmath.flags & FastMathFlags::NInf) {
-    non_poison &= !a.isInf() && !b.isInf();
-    if (is_ternary)
-      non_poison &= !c.isInf();
+    non_poison &= !a.isInf();
+    if (nary >= 2) {
+      non_poison &= !b.isInf();
+      if (nary == 3)
+        non_poison &= !c.isInf();
+    }
     if (!only_input)
       non_poison &= !val.isInf();
   }
@@ -327,7 +335,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
 
-  return { move(val), ap && bp && non_poison };
+  return { move(val), (nary >= 2 ? ap && bp : ap) && non_poison };
 }
 
 static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
@@ -336,7 +344,15 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             FastMathFlags fmath, bool only_input) {
   return fm_poison(s, move(a), ap, move(b), bp, expr(),
                    [&](expr &a, expr &b, expr &c) { return fn(a, b); },
-                   fmath, only_input, false);
+                   fmath, only_input, 2);
+}
+
+static StateValue fm_poison(State &s, expr a, const expr &ap,
+                            function<expr(expr&)> fn,
+                            FastMathFlags fmath, bool only_input) {
+  return fm_poison(s, move(a), ap, expr(), expr(), expr(),
+                   [&](expr &a, expr &b, expr &c) { return fn(a); },
+                   fmath, only_input, 1);
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -835,7 +851,7 @@ void UnaryOp::print(ostream &os) const {
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
-  function<expr(const expr&)> fn;
+  function<StateValue(const expr&, const expr&)> fn;
 
   switch (op) {
   case Copy:
@@ -844,13 +860,19 @@ StateValue UnaryOp::toSMT(State &s) const {
       return val->toSMT(s);
     return s[*val];
   case BitReverse:
-    fn = [](auto v) { return v.bitreverse(); };
+    fn = [](auto v, auto np) -> StateValue {
+      return { expr(v.bitreverse()), expr(np) };
+    };
     break;
   case BSwap:
-    fn = [](auto v) { return v.bswap(); };
+    fn = [](auto v, auto np) -> StateValue {
+      return { expr(v.bswap()), expr(np) };
+    };
     break;
   case Ctpop:
-    fn = [](auto v) { return v.ctpop(); };
+    fn = [](auto v, auto np) -> StateValue {
+      return { expr(v.ctpop()), expr(np) };
+    };
     break;
   case IsConstant: {
     expr one = expr::mkUInt(1, 1);
@@ -866,19 +888,19 @@ StateValue UnaryOp::toSMT(State &s) const {
     // TODO
     if (!fmath.isNone())
       return {};
-    fn = [](auto v) { return v.fneg(); };
+    fn = [](auto v, auto np) -> StateValue {
+      return { expr(v.fneg()), expr(np) };
+    };
     break;
   case FFS:
-    fn = [](auto v) {
-      return v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v);
+    fn = [](auto v, auto np) -> StateValue {
+      return { v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v), expr(np) };
     };
     break;
   case FAbs:
-    // TODO
-    if (!fmath.isNone())
-      return {};
-    fn = [](auto v) {
-       return expr::mkIf(v.isFPNeg(), v.fneg(), v);
+    fn = [&](auto v, auto np) -> StateValue {
+      auto f = [&](expr &e) { return expr::mkIf(v.isFPNeg(), v.fneg(), v); };
+      return fm_poison(s, v, np, f, fmath, true);
     };
     break;
   }
@@ -890,11 +912,11 @@ StateValue UnaryOp::toSMT(State &s) const {
     auto ty = getType().getAsAggregateType();
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
       auto vi = ty->extract(v, i);
-      vals.emplace_back(fn(vi.value), move(vi.non_poison));
+      vals.emplace_back(fn(vi.value, vi.non_poison));
     }
     return ty->aggregateVals(vals);
   }
-  return { fn(v.value), expr(v.non_poison) };
+  return fn(v.value, v.non_poison);
 }
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
