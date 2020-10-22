@@ -861,17 +861,17 @@ StateValue UnaryOp::toSMT(State &s) const {
     return s[*val];
   case BitReverse:
     fn = [](auto v, auto np) -> StateValue {
-      return { expr(v.bitreverse()), expr(np) };
+      return { v.bitreverse(), expr(np) };
     };
     break;
   case BSwap:
     fn = [](auto v, auto np) -> StateValue {
-      return { expr(v.bswap()), expr(np) };
+      return { v.bswap(), expr(np) };
     };
     break;
   case Ctpop:
     fn = [](auto v, auto np) -> StateValue {
-      return { expr(v.ctpop()), expr(np) };
+      return { v.ctpop(), expr(np) };
     };
     break;
   case IsConstant: {
@@ -889,7 +889,7 @@ StateValue UnaryOp::toSMT(State &s) const {
     if (!fmath.isNone())
       return {};
     fn = [](auto v, auto np) -> StateValue {
-      return { expr(v.fneg()), expr(np) };
+      return { v.fneg(), expr(np) };
     };
     break;
   case FFS:
@@ -899,7 +899,7 @@ StateValue UnaryOp::toSMT(State &s) const {
     break;
   case FAbs:
     fn = [&](auto v, auto np) -> StateValue {
-      auto f = [&](expr &e) { return expr::mkIf(v.isFPNeg(), v.fneg(), v); };
+      auto f = [](expr &v) { return expr::mkIf(v.isFPNeg(), v.fneg(), v); };
       return fm_poison(s, v, np, f, fmath, true);
     };
     break;
