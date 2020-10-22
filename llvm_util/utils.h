@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/instr.h"
 #include <ostream>
 #include <string>
 #include <functional>
@@ -11,6 +12,7 @@ namespace llvm {
 class BasicBlock;
 class ConstantExpr;
 class DataLayout;
+class Instruction;
 class Type;
 class Value;
 }
@@ -24,6 +26,8 @@ class Value;
 }
 
 namespace llvm_util {
+
+IR::FastMathFlags parse_fmath(llvm::Instruction &i);
 
 IR::BasicBlock& getBB(const llvm::BasicBlock *bb);
 

@@ -874,6 +874,9 @@ StateValue UnaryOp::toSMT(State &s) const {
     };
     break;
   case FAbs:
+    // TODO
+    if (!fmath.isNone())
+      return {};
     fn = [](auto v) {
        return expr::mkIf(v.isFPNeg(), v.fneg(), v);
     };
