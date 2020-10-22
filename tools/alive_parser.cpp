@@ -609,6 +609,7 @@ static FastMathFlags parse_fast_math(token op_token) {
   }
 
   switch (op_token) {
+  case FABS:
   case FADD:
   case FSUB:
   case FMUL:
@@ -760,6 +761,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
+  auto fmath = parse_fast_math(op_token);
+
   UnaryOp::Op op;
   switch (op_token) {
   case BITREVERSE: op = UnaryOp::BitReverse; break;
@@ -774,7 +777,7 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
 
   auto &ty = parse_type();
   auto &a = parse_operand(ty);
-  return make_unique<UnaryOp>(ty, string(name), a, op);
+  return make_unique<UnaryOp>(ty, string(name), a, op, fmath);
 }
 
 static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
