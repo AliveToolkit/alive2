@@ -1030,6 +1030,10 @@ end:
         attrs.set(ParamAttrs::NoUndef);
         continue;
 
+      case llvm::Attribute::Returned:
+        attrs.set(ParamAttrs::Returned);
+        continue;
+
       default:
         errorAttr(attr);
         return nullopt;
@@ -1064,6 +1068,12 @@ end:
         return {};
       auto val = make_unique<Input>(*ty, value_name(arg), move(*attrs));
       add_identifier(arg, *val.get());
+
+      if (arg.hasReturnedAttr()) {
+        // Cache this to avoid linear lookup at return
+        assert(Fn.getReturnedInput() == nullptr);
+        Fn.setReturnedInput(val.get());
+      }
       Fn.addInput(move(val));
     }
 

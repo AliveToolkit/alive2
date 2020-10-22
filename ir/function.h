@@ -72,6 +72,9 @@ class Function final {
   std::vector<std::unique_ptr<AggregateValue>> aggregates;
   std::vector<std::unique_ptr<Value>> inputs;
 
+  // an input that has 'returned' attribute
+  Value *returned_input = nullptr;
+
   FnAttrs attrs;
 
 public:
@@ -125,6 +128,8 @@ public:
     return inputs;
   }
   bool hasSameInputs(const Function &rhs) const;
+  Value *getReturnedInput() const { return returned_input; }
+  void setReturnedInput(Value *v) { returned_input = v; }
 
   bool hasReturn() const;
   unsigned bitsPointers() const { return bits_pointers; }

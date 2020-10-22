@@ -13,7 +13,7 @@ class ParamAttrs final {
 public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
                    ReadOnly = 1<<3, ReadNone = 1<<4, Dereferenceable = 1<<5,
-                   NoUndef = 1<<6, Align = 1<<7 };
+                   NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 

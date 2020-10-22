@@ -24,6 +24,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "noundef ";
   if (attr.has(ParamAttrs::Align))
     os << "align(" << attr.align << ") ";
+  if (attr.has(ParamAttrs::Returned))
+    os << "returned ";
   return os;
 }
 
