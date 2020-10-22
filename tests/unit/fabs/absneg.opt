@@ -1,0 +1,4 @@
+%a = fneg float %x
+%b = fabs float %a
+  =>
+%b = fabs float %x
