@@ -283,7 +283,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             const expr &bp, expr c,
                             function<expr(expr&,expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input,
-                            int nary = 2) {
+                            int nary = 3) {
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, move(a));
     if (nary >= 2) {
