@@ -827,6 +827,7 @@ void UnaryOp::print(ostream &os) const {
   case IsConstant:  str = "is.constant "; break;
   case FNeg:        str = "fneg "; break;
   case FFS:         str = "ffs "; break;
+  case FAbs:        str = "fabs "; break;
   }
 
   os << getName() << " = " << str << fmath << print_type(getType())
@@ -872,6 +873,11 @@ StateValue UnaryOp::toSMT(State &s) const {
       return v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v);
     };
     break;
+  case FAbs:
+    fn = [](auto v) {
+       return expr::mkIf(v.isFPNeg(), v.fneg(), v);
+    };
+    break;
   }
 
   auto &v = s[*val];
@@ -911,6 +917,9 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     break;
   case FFS:
     instrconstr &= getType().enforceIntType();
+    break;
+  case FAbs:
+    instrconstr &= getType().enforceFloatOrVectorType();
     break;
   }
 

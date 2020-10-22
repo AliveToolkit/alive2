@@ -117,6 +117,11 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_KNOWN(
       make_unique<ConversionOp>(*ty, value_name(i), *Op, ConversionOp::Trunc));
   }
+  case llvm::LibFunc_fabs:
+  case llvm::LibFunc_fabsf: {
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs));
+  }
   default:
     RETURN_FAIL_KNOWN();
   }
