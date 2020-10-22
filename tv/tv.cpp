@@ -66,6 +66,10 @@ llvm::cl::opt<bool> opt_smt_stats(
   "tv-smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
   llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_succinct(
+  "tv-succinct", llvm::cl::desc("Alive2: make the output succinct"),
+  llvm::cl::init(false));
+
 llvm::cl::opt<bool> opt_alias_stats(
   "tv-alias-stats", llvm::cl::desc("Alive: show alias sets statistics"),
   llvm::cl::init(false));
@@ -224,7 +228,8 @@ struct TVPass final : public llvm::FunctionPass {
     t.tgt = move(I->second.fn);
     t.preprocess();
     TransformVerify verifier(t, false);
-    t.print(*out, print_opts);
+    if (!opt_succinct)
+      t.print(*out, print_opts);
 
     if (is_clangtv)
       I->second.fn.setFnCallValidFlag(false);
