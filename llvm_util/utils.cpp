@@ -9,6 +9,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_map>
 #include <utility>
@@ -60,6 +61,27 @@ bool hasOpaqueType(llvm::Type *ty) {
 }
 
 namespace llvm_util {
+
+FastMathFlags parse_fmath(llvm::Instruction &i) {
+  FastMathFlags fmath;
+  if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
+    if (op->hasNoNaNs())
+      fmath.flags |= FastMathFlags::NNaN;
+    if (op->hasNoInfs())
+      fmath.flags |= FastMathFlags::NInf;
+    if (op->hasNoSignedZeros())
+      fmath.flags |= FastMathFlags::NSZ;
+    if (op->hasAllowReciprocal())
+      fmath.flags |= FastMathFlags::ARCP;
+    if (op->hasAllowContract())
+      fmath.flags |= FastMathFlags::Contract;
+    if (op->hasAllowReassoc())
+      fmath.flags |= FastMathFlags::Reassoc;
+    if (op->hasApproxFunc())
+      fmath.flags |= FastMathFlags::AFN;
+  }
+  return fmath;
+}
 
 BasicBlock& getBB(const llvm::BasicBlock *bb) {
   return current_fn->getBB(value_name(*bb));

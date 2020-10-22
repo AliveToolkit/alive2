@@ -1,0 +1,5 @@
+%b = fabs float 1.0
+  =>
+%b = -1.0
+
+; ERROR: Value mismatch for float %b

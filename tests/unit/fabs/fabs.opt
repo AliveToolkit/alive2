@@ -1,0 +1,21 @@
+Name: constant
+%r = fabs float -1.0
+  =>
+%r = 1.0
+
+Name: constant2
+%r = fabs double 2.0
+  =>
+%r = 2.0
+
+Name: nnan
+%negnan = fdiv float 0.0, -0.0
+%r = fabs float %negnan
+  =>
+%r = %negnan
+
+Name: fabs-twice
+%k = fabs float %x
+%r = fabs float %k
+  =>
+%r = %k

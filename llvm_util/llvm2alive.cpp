@@ -64,28 +64,6 @@ string_view s(llvm::StringRef str) {
   } while (0)
 
 
-FastMathFlags parse_fmath(llvm::Instruction &i) {
-  FastMathFlags fmath;
-  if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
-    if (op->hasNoNaNs())
-      fmath.flags |= FastMathFlags::NNaN;
-    if (op->hasNoInfs())
-      fmath.flags |= FastMathFlags::NInf;
-    if (op->hasNoSignedZeros())
-      fmath.flags |= FastMathFlags::NSZ;
-    if (op->hasAllowReciprocal())
-      fmath.flags |= FastMathFlags::ARCP;
-    if (op->hasAllowContract())
-      fmath.flags |= FastMathFlags::Contract;
-    if (op->hasAllowReassoc())
-      fmath.flags |= FastMathFlags::Reassoc;
-    if (op->hasApproxFunc())
-      fmath.flags |= FastMathFlags::AFN;
-  }
-  return fmath;
-}
-
-
 template <typename Fn, typename RetFn>
 void parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
                    RetFn &&hasRetAttr) {
@@ -775,7 +753,8 @@ end:
     case llvm::Intrinsic::bswap:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
-    case llvm::Intrinsic::is_constant: {
+    case llvm::Intrinsic::is_constant:
+    case llvm::Intrinsic::fabs: {
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
@@ -784,9 +763,11 @@ end:
       case llvm::Intrinsic::ctpop:      op = UnaryOp::Ctpop; break;
       case llvm::Intrinsic::expect:     op = UnaryOp::Copy; break;
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
+      case llvm::Intrinsic::fabs:        op = UnaryOp::FAbs; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,
+                                             parse_fmath(i)));
     }
     case llvm::Intrinsic::vector_reduce_add:
     case llvm::Intrinsic::vector_reduce_mul:
