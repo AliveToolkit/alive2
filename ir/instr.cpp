@@ -2274,10 +2274,7 @@ StateValue Return::toSMT(State &s) const {
     // LangRef states that return type must be valid operands for bitcasts,
     // which cannot be aggregate type.
     assert(!dynamic_cast<AggregateType *>(&val->getType()));
-    auto &[v_returned, np_returned] = s[*val_returned];
-
-    s.addUB(retval.non_poison == np_returned &&
-            retval.non_poison.implies(retval.value == v_returned));
+    s.addUB(retval == s[*val_returned]);
   }
 
   s.addReturn(move(retval));
