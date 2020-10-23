@@ -18,6 +18,7 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -146,6 +147,11 @@ llvm::cl::opt<bool> opt_io_nobuiltin(
                    "(unused by clang plugin)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_elapsed_time(
+    "tv-elapsed-time",
+    llvm::cl::desc("Print the elapsed time"),
+    llvm::cl::init(false));
+
 struct FnInfo {
   Function fn;
   unsigned order;
@@ -160,6 +166,7 @@ optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
 set<string> fnsToVerify;
+chrono::steady_clock::time_point time_beg;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
@@ -277,6 +284,9 @@ struct TVPass final : public llvm::FunctionPass {
     if (initialized++)
       return false;
 
+    if (opt_elapsed_time)
+      time_beg = chrono::steady_clock::now();
+
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
@@ -370,6 +380,13 @@ struct TVPass final : public llvm::FunctionPass {
     llvm_util_init.reset();
     smt_init.reset();
     --initialized;
+
+    if (opt_elapsed_time) {
+      auto time_end = chrono::steady_clock::now();
+      auto msec = chrono::duration_cast<std::chrono::milliseconds>(
+          time_end - time_beg).count();
+      *out << "Elapsed time: " << msec << " ms\n";
+    }
 
     if (has_failure) {
       if (opt_error_fatal)
