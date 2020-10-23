@@ -18,6 +18,7 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -25,19 +26,12 @@
 #include <unordered_map>
 #include <utility>
 
-#if (__GNUC__ < 8) && (!__APPLE__)
-# include <experimental/filesystem>
-  namespace fs = std::experimental::filesystem;
-#else
-# include <filesystem>
-  namespace fs = std::filesystem;
-#endif
-
 using namespace IR;
 using namespace llvm_util;
 using namespace tools;
 using namespace util;
 using namespace std;
+namespace fs = std::filesystem;
 
 namespace {
 
