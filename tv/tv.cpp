@@ -76,6 +76,10 @@ llvm::cl::opt<string> opt_report_dir(
   "tv-report-dir", llvm::cl::desc("Alive: save report to disk"),
   llvm::cl::value_desc("directory"));
 
+llvm::cl::opt<bool> opt_overwrite_reports(
+  "tv-overwrite-reports", llvm::cl::desc("Alive: don't try to avoid overwriting existing report files"),
+  llvm::cl::init(false));
+
 llvm::cl::opt<bool> opt_smt_verbose(
   "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
   llvm::cl::init(false));
@@ -274,11 +278,13 @@ struct TVPass final : public llvm::FunctionPass {
       fname.replace_extension(".txt");
       fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
 
-      do {
-        auto newname = fname.stem();
-        newname += "_" + to_string(rand(re)) + ".txt";
-        path.replace_filename(newname);
-      } while (fs::exists(path));
+      if (!opt_overwrite_reports) {
+        do {
+          auto newname = fname.stem();
+          newname += "_" + to_string(rand(re)) + ".txt";
+          path.replace_filename(newname);
+        } while (fs::exists(path));
+      }
 
       out_file = ofstream(path);
       out = &out_file;
