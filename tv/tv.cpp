@@ -166,7 +166,7 @@ optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
 set<string> fnsToVerify;
-chrono::steady_clock::time_point time_beg;
+uint64_t elapsed_time_ms;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
@@ -201,6 +201,8 @@ struct TVPass final : public llvm::FunctionPass {
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
+
+    auto time_beg = chrono::steady_clock::now();
 
     auto [I, first] = fns.try_emplace(F.getName().str());
     auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
@@ -277,15 +279,15 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     I->second.fn = move(t.tgt);
+    elapsed_time_ms +=
+        chrono::duration_cast<chrono::milliseconds>(
+          chrono::steady_clock::now() - time_beg).count();
     return false;
   }
 
   bool doInitialization(llvm::Module &module) override {
     if (initialized++)
       return false;
-
-    if (opt_elapsed_time)
-      time_beg = chrono::steady_clock::now();
 
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
@@ -381,12 +383,8 @@ struct TVPass final : public llvm::FunctionPass {
     smt_init.reset();
     --initialized;
 
-    if (opt_elapsed_time) {
-      auto time_end = chrono::steady_clock::now();
-      auto msec = chrono::duration_cast<std::chrono::milliseconds>(
-          time_end - time_beg).count();
-      *out << "Elapsed time: " << msec << " ms\n";
-    }
+    if (opt_elapsed_time)
+      *out << "Elapsed time: " << elapsed_time_ms << " ms\n";
 
     if (has_failure) {
       if (opt_error_fatal)
