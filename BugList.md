@@ -83,6 +83,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 26. SCEVExpander introduces branch on poison
 (https://bugs.llvm.org/show_bug.cgi?id=47769)
 
+27. Incorrect transformation of fabs with nnan flag
+(https://bugs.llvm.org/show_bug.cgi?id=47960)
 
 ### Memory Operations
 
