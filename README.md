@@ -69,11 +69,11 @@ cmake command.
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
 On a Mac:
 ```
-~/llvm/build/bin/opt -load /home/user/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -82,7 +82,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=/home/user/alive2/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -96,7 +96,7 @@ Testing Time: 0.11s
 Translation validation of the LLVM unit tests:
 
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=/home/user/alive2/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms
+~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
 
 Running Alive2 as a Clang plugin:
@@ -105,6 +105,13 @@ Running Alive2 as a Clang plugin:
 $ clang -O3 <src.c> -S -emit-llvm \
   -fpass-plugin=$HOME/alive2/build/tv/tv.so -fexperimental-new-pass-manager \
   -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
+```
+
+Or, more conveniently:
+
+```
+$ $HOME/alive2/build/scripts/alivecc -O3 -c <src.c>
+$ $HOME/alive2/build/scripts/alive++ -O3 -c <src.cpp>
 ```
 
 

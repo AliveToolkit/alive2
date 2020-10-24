@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -e
+
+COMPILER=`basename "$0"`
+
+if [ $COMPILER = "alivecc" ]; then
+  EXE=clang
+elif [ $COMPILER = "alive++" ]; then
+  EXE=clang++
+else
+  echo "Unexpected invocation as $COMPILER";
+  exit -1
+fi
+
+@LLVM_BINARY_DIR@/bin/$EXE \
+  -fpass-plugin=@CMAKE_BINARY_DIR@/tv/tv.so -fexperimental-new-pass-manager \
+  -Xclang -load -Xclang @CMAKE_BINARY_DIR@/tv/tv.so $*
