@@ -2,10 +2,13 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/exprs.h"
+#include "smt/smt.h"
 #include "util/compiler.h"
+#include "util/errors.h"
 #include <vector>
 
 using namespace std;
+using namespace util;
 
 namespace smt {
 
@@ -121,6 +124,9 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
                 c && lhs_domain && rhs_domain);
           }
         }
+
+        if (hit_half_memory_limit())
+          throw AliveException("Out of memory; skipping function.", false);
       }
     }
     else if (unpack_concat && v.isExtract(a, high, low)) {
