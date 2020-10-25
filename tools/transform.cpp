@@ -1105,7 +1105,7 @@ static void remove_unreachable_bbs(Function &f) {
   do {
     auto bb = wl.back();
     wl.pop_back();
-    if (!reachable.emplace(bb).second)
+    if (!reachable.emplace(bb).second || bb->empty())
       continue;
 
     if (auto instr = dynamic_cast<JumpInstr*>(&bb->back())) {
