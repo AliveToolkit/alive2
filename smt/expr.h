@@ -64,7 +64,6 @@ class expr {
   static expr mkUInt(uint64_t n, Z3_sort sort);
   static expr mkInt(int64_t n, Z3_sort sort);
   static expr mkConst(Z3_func_decl decl);
-  static expr mkQuantVar(unsigned i, Z3_sort sort);
 
   bool isBinOp(expr &a, expr &b, int z3op) const;
 
@@ -315,6 +314,9 @@ public:
   // replace v1 -> v2
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
+
+  // replace quantified variables in increasing index order
+  expr subst(const std::vector<expr> &repls) const;
 
   std::set<expr> vars() const;
   static std::set<expr> vars(const std::vector<const expr*> &exprs);
