@@ -77,7 +77,8 @@ llvm::cl::opt<string> opt_report_dir(
   llvm::cl::value_desc("directory"));
 
 llvm::cl::opt<bool> opt_overwrite_reports(
-  "tv-overwrite-reports", llvm::cl::desc("Alive: don't try to avoid overwriting existing report files"),
+  "tv-overwrite-reports",
+  llvm::cl::desc("Alive: overwrite existing report files"),
   llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_smt_verbose(
