@@ -7,6 +7,7 @@
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/stopwatch.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
@@ -18,7 +19,6 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -166,7 +166,7 @@ optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
 set<string> fnsToVerify;
-uint64_t elapsed_time_ms;
+float elapsed_time;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool report_dir_created = false;
@@ -202,7 +202,7 @@ struct TVPass final : public llvm::FunctionPass {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
 
-    auto time_beg = chrono::steady_clock::now();
+    StopWatch timer;
 
     auto [I, first] = fns.try_emplace(F.getName().str());
     auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
@@ -279,9 +279,8 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     I->second.fn = move(t.tgt);
-    elapsed_time_ms +=
-        chrono::duration_cast<chrono::milliseconds>(
-          chrono::steady_clock::now() - time_beg).count();
+    timer.stop();
+    elapsed_time += timer.seconds();
     return false;
   }
 
@@ -384,7 +383,7 @@ struct TVPass final : public llvm::FunctionPass {
     --initialized;
 
     if (opt_elapsed_time)
-      *out << "Elapsed time: " << elapsed_time_ms << " ms\n";
+      *out << "Elapsed time: " << elapsed_time << " s\n";
 
     if (has_failure) {
       if (opt_error_fatal)
