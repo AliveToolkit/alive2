@@ -91,6 +91,14 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
   unsigned high, low;
 
   do {
+    // Limit exponential growth
+    if ((worklist.size() + vals.size()) >= 32) {
+      for (auto &[v, c] : worklist) {
+        add(move(v), move(c));
+      }
+      break;
+    }
+
     auto [v, c] = worklist.back();
     worklist.pop_back();
 
