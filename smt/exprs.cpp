@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/exprs.h"
+#include "smt/smt.h"
 #include "util/compiler.h"
 #include <vector>
 
@@ -92,7 +93,8 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
 
   do {
     // Limit exponential growth
-    if ((worklist.size() + vals.size()) >= 32) {
+    if ((worklist.size() + vals.size()) >= 32 ||
+        hit_half_memory_limit()) {
       for (auto &[v, c] : worklist) {
         add(move(v), move(c));
       }
