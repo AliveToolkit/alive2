@@ -52,7 +52,8 @@ expr::expr(Z3_ast ast) : ptr((uintptr_t)ast) {
 }
 
 bool expr::isZ3Ast() const {
-  return (ptr & 1) == 0;
+  return true;
+  //return (ptr & 1) == 0;
 }
 
 Z3_ast expr::ast() const {
