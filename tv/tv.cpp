@@ -35,99 +35,116 @@ namespace fs = std::filesystem;
 
 namespace {
 
-llvm::cl::opt<bool> opt_error_fatal(
-  "tv-exit-on-error", llvm::cl::desc("Alive: exit on error"),
-  llvm::cl::init(false));
+static llvm::cl::OptionCategory TVOptions("Alive translation verifier options");
 
-llvm::cl::opt<unsigned> opt_smt_to(
-  "tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
-  llvm::cl::init(1000), llvm::cl::value_desc("ms"));
+llvm::cl::opt<bool> opt_error_fatal("tv-exit-on-error",
+                                    llvm::cl::desc("Alive: exit on error"),
+                                    llvm::cl::cat(TVOptions),
+                                    llvm::cl::init(false));
+
+llvm::cl::opt<unsigned>
+    opt_smt_to("tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
+               llvm::cl::cat(TVOptions), llvm::cl::init(1000),
+               llvm::cl::value_desc("ms"));
 
 llvm::cl::opt<unsigned> opt_smt_random_seed(
-  "tv-smt-random-seed",
-  llvm::cl::desc("Alive: Random seed for the SMT solver (default=0)"),
-  llvm::cl::init(0));
+    "tv-smt-random-seed",
+    llvm::cl::desc("Alive: Random seed for the SMT solver (default=0)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
-llvm::cl::opt<unsigned> opt_max_mem(
-  "tv-max-mem", llvm::cl::desc("Alive: max memory (aprox)"),
-  llvm::cl::init(1024), llvm::cl::value_desc("MB"));
+llvm::cl::opt<unsigned> opt_max_mem("tv-max-mem",
+                                    llvm::cl::desc("Alive: max memory (aprox)"),
+                                    llvm::cl::cat(TVOptions),
+                                    llvm::cl::init(1024),
+                                    llvm::cl::value_desc("MB"));
 
-llvm::cl::opt<bool> opt_se_verbose(
-  "tv-se-verbose", llvm::cl::desc("Alive: symbolic execution verbose mode"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool>
+    opt_se_verbose("tv-se-verbose",
+                   llvm::cl::desc("Alive: symbolic execution verbose mode"),
+                   llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_smt_stats(
-  "tv-smt-stats", llvm::cl::desc("Alive: show SMT statistics"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool> opt_smt_stats("tv-smt-stats",
+                                  llvm::cl::desc("Alive: show SMT statistics"),
+                                  llvm::cl::cat(TVOptions),
+                                  llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_succinct(
-  "tv-succinct", llvm::cl::desc("Alive2: make the output succinct"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool>
+    opt_succinct("tv-succinct",
+                 llvm::cl::desc("Alive2: make the output succinct"),
+                 llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_alias_stats(
-  "tv-alias-stats", llvm::cl::desc("Alive: show alias sets statistics"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool>
+    opt_alias_stats("tv-alias-stats",
+                    llvm::cl::desc("Alive: show alias sets statistics"),
+                    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_smt_skip(
-  "tv-smt-skip", llvm::cl::desc("Alive: skip SMT queries"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool> opt_smt_skip("tv-smt-skip",
+                                 llvm::cl::desc("Alive: skip SMT queries"),
+                                 llvm::cl::cat(TVOptions),
+                                 llvm::cl::init(false));
 
-llvm::cl::opt<string> opt_report_dir(
-  "tv-report-dir", llvm::cl::desc("Alive: save report to disk"),
-  llvm::cl::value_desc("directory"));
+llvm::cl::opt<string>
+    opt_report_dir("tv-report-dir",
+                   llvm::cl::desc("Alive: save report to disk"),
+                   llvm::cl::cat(TVOptions), llvm::cl::value_desc("directory"));
 
 llvm::cl::opt<bool> opt_overwrite_reports(
-  "tv-overwrite-reports",
-  llvm::cl::desc("Alive: overwrite existing report files"),
-  llvm::cl::init(false));
+    "tv-overwrite-reports",
+    llvm::cl::desc("Alive: overwrite existing report files"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_smt_verbose(
-  "tv-smt-verbose", llvm::cl::desc("Alive: SMT verbose mode"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool> opt_smt_verbose("tv-smt-verbose",
+                                    llvm::cl::desc("Alive: SMT verbose mode"),
+                                    llvm::cl::cat(TVOptions),
+                                    llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_tactic_verbose(
-  "tv-tactic-verbose", llvm::cl::desc("Alive: SMT Tactic verbose mode"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool>
+    opt_tactic_verbose("tv-tactic-verbose",
+                       llvm::cl::desc("Alive: SMT Tactic verbose mode"),
+                       llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::opt<bool> opt_smt_log(
-  "tv-smt-log", llvm::cl::desc("Alive: log interactions with the SMT solver"),
-  llvm::cl::init(false));
+llvm::cl::opt<bool>
+    opt_smt_log("tv-smt-log",
+                llvm::cl::desc("Alive: log interactions with the SMT solver"),
+                llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_print_dot(
-  "tv-dot", llvm::cl::desc("Alive: print .dot file with CFG of each function"),
-  llvm::cl::init(false));
+    "tv-dot",
+    llvm::cl::desc("Alive: print .dot file with CFG of each function"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_disable_poison_input(
-  "tv-disable-poison-input",
-  llvm::cl::desc("Alive: Assume function input cannot be poison"),
-  llvm::cl::init(false));
+    "tv-disable-poison-input",
+    llvm::cl::desc("Alive: Assume function input cannot be poison"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_disable_undef_input(
-  "tv-disable-undef-input",
-  llvm::cl::desc("Alive: Assume function input cannot be undef"),
-  llvm::cl::init(false));
+    "tv-disable-undef-input",
+    llvm::cl::desc("Alive: Assume function input cannot be undef"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::list<std::string> opt_funcs(
-  "tv-func",
-  llvm::cl::desc("Name of functions to verify (without @)"),
-  llvm::cl::ZeroOrMore, llvm::cl::value_desc("function name"));
+llvm::cl::list<std::string>
+    opt_funcs("tv-func",
+              llvm::cl::desc("Name of functions to verify (without @)"),
+              llvm::cl::cat(TVOptions), llvm::cl::ZeroOrMore,
+              llvm::cl::value_desc("function name"));
 
-llvm::cl::opt<bool> opt_debug(
-  "tv-dbg",
-  llvm::cl::desc("Alive: Show debug data"),
-  llvm::cl::init(false), llvm::cl::Hidden);
+llvm::cl::opt<bool> opt_debug("tv-dbg",
+                              llvm::cl::desc("Alive: Show debug data"),
+                              llvm::cl::cat(TVOptions), llvm::cl::init(false),
+                              llvm::cl::Hidden);
 
 llvm::cl::opt<unsigned> opt_omit_array_size(
-  "tv-omit-array-size",
-  llvm::cl::desc("Omit an array initializer if it has elements more than "
-                  "this number"),
-  llvm::cl::init(-1));
+    "tv-omit-array-size",
+    llvm::cl::desc("Omit an array initializer if it has elements more than "
+                   "this number"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(-1));
 
 llvm::cl::opt<bool> opt_io_nobuiltin(
     "tv-io-nobuiltin",
     llvm::cl::desc("Encode standard I/O functions as an unknown function "
                    "(unused by clang plugin)"),
-    llvm::cl::init(false));
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 struct FnInfo {
   Function fn;
