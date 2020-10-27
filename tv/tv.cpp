@@ -7,6 +7,7 @@
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/stopwatch.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
@@ -146,6 +147,11 @@ llvm::cl::opt<bool> opt_io_nobuiltin(
                    "(unused by clang plugin)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
+llvm::cl::opt<bool> opt_elapsed_time(
+    "tv-elapsed-time",
+    llvm::cl::desc("Print the elapsed time"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
 struct FnInfo {
   Function fn;
   unsigned order;
@@ -159,6 +165,7 @@ optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
+unordered_map<string, float> fns_elapsed_time;
 set<string> fnsToVerify;
 unsigned initialized = 0;
 bool showed_stats = false;
@@ -181,6 +188,10 @@ struct TVPass final : public llvm::FunctionPass {
 
     if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
       return false;
+
+    ScopedWatch timer([&] (const StopWatch &sw) {
+      fns_elapsed_time[F.getName().str()] += sw.seconds();
+    });
 
     llvm::TargetLibraryInfo *TLI = nullptr;
     unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
@@ -370,6 +381,16 @@ struct TVPass final : public llvm::FunctionPass {
     llvm_util_init.reset();
     smt_init.reset();
     --initialized;
+
+    if (opt_elapsed_time) {
+      *out << "\n----------------- ELAPSED TIME ------------------\n";
+      float total = 0;
+      for (auto &[name, t]: fns_elapsed_time) {
+        *out << "  " << name << ": " << t << " s\n";
+        total += t;
+      }
+      *out << "  <TOTAL>: " << total << " s\n";
+    }
 
     if (has_failure) {
       if (opt_error_fatal)

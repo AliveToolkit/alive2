@@ -37,4 +37,9 @@ ostream& operator<<(ostream &os, const StopWatch &w) {
   return os << seconds << " s";
 }
 
+ScopedWatch::~ScopedWatch() {
+  sw.stop();
+  callback(sw);
+}
+
 }

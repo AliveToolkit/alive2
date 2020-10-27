@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <ostream>
+#include <functional>
 
 namespace util {
 
@@ -20,6 +21,16 @@ public:
   float seconds() const;
 
   friend std::ostream& operator<<(std::ostream &os, const StopWatch &w);
+};
+
+class ScopedWatch {
+  StopWatch sw;
+  std::function<void(const StopWatch &)> callback;
+
+public:
+  ScopedWatch(std::function<void(const StopWatch &)> &&callback)
+      : callback(move(callback)) {}
+  ~ScopedWatch();
 };
 
 }
