@@ -128,6 +128,10 @@ static llvm::cl::opt<string> opt_outputfile("o",
     llvm::cl::init(""), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Specify output filename"));
 
+static llvm::cl::opt<bool> opt_print_dot(
+    "dot", llvm::cl::desc("Print .dot file with CFG of each function"),
+    llvm::cl::init(false));
+
 static llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
@@ -157,6 +161,14 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
          << "' to Alive IR\n";
     ++errorCount;
     return;
+  }
+  if (opt_print_dot) {
+    auto &f = *Func;
+    ofstream file(f.getName() + ".dot");
+    IR::CFG cfg(f);
+    cfg.printDot(file);
+    ofstream fileDom(f.getName() + ".dom.dot");
+    IR::DomTree(f, cfg).printDot(fileDom);
   }
   Func->unroll(opt_unrolling_factor);
 
