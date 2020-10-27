@@ -128,10 +128,9 @@ static llvm::cl::opt<string> opt_outputfile("o",
     llvm::cl::init(""), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Specify output filename"));
 
-static llvm::cl::opt<bool> opt_print_cfg(
-    "print-cfg",
-    llvm::cl::desc("Print CFG dot source to stdout"),
-    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+static llvm::cl::opt<bool> opt_print_dot(
+    "dot", llvm::cl::desc("Print .dot file with CFG of each function"),
+    llvm::cl::init(false));
 
 static llvm::ExitOnError ExitOnErr;
 
@@ -163,9 +162,13 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
     ++errorCount;
     return;
   }
-  if (opt_print_cfg) {
-    IR::CFG cfg(*Func);
-    cfg.printDot(cout);
+  if (opt_print_dot) {
+    auto &f = *Func;
+    ofstream file(f.getName() + ".dot");
+    IR::CFG cfg(f);
+    cfg.printDot(file);
+    ofstream fileDom(f.getName() + ".dom.dot");
+    IR::DomTree(f, cfg).printDot(fileDom);
   }
   Func->unroll(opt_unrolling_factor);
 
