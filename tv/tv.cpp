@@ -156,7 +156,6 @@ struct FnInfo {
   Function fn;
   unsigned order;
   std::string fn_tostr;
-  float elapsed_time = 0;
 };
 
 ostream *out;
@@ -166,6 +165,7 @@ optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
+unordered_map<string, float> fns_elapsed_time;
 set<string> fnsToVerify;
 unsigned initialized = 0;
 bool showed_stats = false;
@@ -189,6 +189,10 @@ struct TVPass final : public llvm::FunctionPass {
     if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
       return false;
 
+    ScopedWatch timer([&] (const StopWatch &sw) {
+      fns_elapsed_time[F.getName().str()] += sw.seconds();
+    });
+
     llvm::TargetLibraryInfo *TLI = nullptr;
     unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
     if (is_clangtv) {
@@ -201,8 +205,6 @@ struct TVPass final : public llvm::FunctionPass {
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
-
-    StopWatch timer;
 
     auto [I, first] = fns.try_emplace(F.getName().str());
     auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
@@ -279,8 +281,6 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     I->second.fn = move(t.tgt);
-    timer.stop();
-    I->second.elapsed_time += timer.seconds();
     return false;
   }
 
@@ -385,9 +385,9 @@ struct TVPass final : public llvm::FunctionPass {
     if (opt_elapsed_time) {
       *out << "\n----------------- ELAPSED TIME ------------------\n";
       float total = 0;
-      for (auto &[name, t]: fns) {
-        *out << "  " << name << ": " << t.elapsed_time << " s\n";
-        total += t.elapsed_time;
+      for (auto &[name, t]: fns_elapsed_time) {
+        *out << "  " << name << ": " << t << " s\n";
+        total += t;
       }
       *out << "  <TOTAL>: " << total << " s\n";
     }

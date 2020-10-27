@@ -22,4 +22,14 @@ public:
   friend std::ostream& operator<<(std::ostream &os, const StopWatch &w);
 };
 
+class ScopedWatch {
+  StopWatch sw;
+  function<void(const StopWatch &)> callback;
+
+public:
+  ScopedWatch(function<void(const StopWatch &)> &&callback)
+      : callback(move(callback)) {}
+  ~ScopedWatch() { sw.stop(); callback(sw); }
+}
+
 }
