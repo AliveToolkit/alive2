@@ -24,12 +24,12 @@ public:
 
 class ScopedWatch {
   StopWatch sw;
-  function<void(const StopWatch &)> callback;
+  std::function<void(const StopWatch &)> callback;
 
 public:
-  ScopedWatch(function<void(const StopWatch &)> &&callback)
+  ScopedWatch(std::function<void(const StopWatch &)> &&callback)
       : callback(move(callback)) {}
-  ~ScopedWatch() { sw.stop(); callback(sw); }
-}
+  ~ScopedWatch();
+};
 
 }
