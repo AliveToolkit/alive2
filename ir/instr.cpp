@@ -885,11 +885,8 @@ StateValue UnaryOp::toSMT(State &s) const {
     return { move(var), true };
   }
   case FNeg:
-    // TODO
-    if (!fmath.isNone())
-      return {};
-    fn = [](auto v, auto np) -> StateValue {
-      return { v.fneg(), expr(np) };
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, fmath, false);
     };
     break;
   case FFS:
