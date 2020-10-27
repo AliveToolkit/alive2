@@ -35,7 +35,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-static llvm::cl::OptionCategory TVOptions("Alive translation verifier options");
+llvm::cl::OptionCategory TVOptions("Alive translation verifier options");
 
 llvm::cl::opt<bool> opt_error_fatal("tv-exit-on-error",
                                     llvm::cl::desc("Alive: exit on error"),
