@@ -484,6 +484,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
 
   unsigned current = 0;
   vector<pair<const BasicBlock*, bool>> worklist = { {&f.getFirstBB(), false} };
+  set<const BasicBlock *> visited;
   while(!worklist.empty()) {
     auto &[bb, flag] = worklist.back();
     if (flag) {
@@ -495,7 +496,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
       flag = true;
 
       for (auto &tgt : bb->targets())
-        if (!number.count(&tgt))
+        if (visited.insert(&tgt).second)
           worklist.emplace_back(&tgt, false);
     }
   }
