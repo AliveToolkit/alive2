@@ -150,7 +150,7 @@ llvm::cl::opt<bool> opt_io_nobuiltin(
 llvm::cl::opt<bool> opt_elapsed_time(
     "tv-elapsed-time",
     llvm::cl::desc("Print the elapsed time"),
-    llvm::cl::init(false));
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 struct FnInfo {
   Function fn;
