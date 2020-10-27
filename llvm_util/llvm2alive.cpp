@@ -488,7 +488,7 @@ end:
     auto ty = llvm_type2alive(i.getType());
     auto val = get_operand(i.getAggregateOperand());
     auto elt = get_operand(i.getInsertedValueOperand());
-    if (!ty || !val)
+    if (!ty || !val || !elt)
       return error(i);
 
     auto inst = make_unique<InsertValue>(*ty, value_name(i), *val, *elt);
