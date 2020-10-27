@@ -128,6 +128,11 @@ static llvm::cl::opt<string> opt_outputfile("o",
     llvm::cl::init(""), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Specify output filename"));
 
+static llvm::cl::opt<bool> opt_print_cfg(
+    "print-cfg",
+    llvm::cl::desc("Print CFG dot source to stdout"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
@@ -157,6 +162,10 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
          << "' to Alive IR\n";
     ++errorCount;
     return;
+  }
+  if (opt_print_cfg) {
+    IR::CFG cfg(*Func);
+    cfg.printDot(cout);
   }
   Func->unroll(opt_unrolling_factor);
 
