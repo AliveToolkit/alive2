@@ -264,10 +264,8 @@ void Function::instr_iterator::next_bb() {
 void Function::instr_iterator::operator++(void) {
   if (++II != IE)
     return;
-  ++BBI;
-  while (BBI != BBE && (*BBI)->empty()) {
-    ++BBI;
-  }
+  while (++BBI != BBE && (*BBI)->empty())
+    ;
   next_bb();
 }
 
