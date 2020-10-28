@@ -128,12 +128,7 @@ void Function::fixupTypes(const Model &m) {
 BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
                               unordered_map<Value*, Value*> &vmap) {
   string bb_name = BB.getName() + suffix;
-  if (bb_name[0] != '#')
-    bb_name = "#" + bb_name;
-  auto p = BBs.emplace(bb_name, bb_name);
-  auto &newBB = p.first->second;
-  BB_order.push_back(&newBB);
-
+  auto &newbb = getBB(bb_name, false);
   for (auto &i : BB.instrs()) {
     auto d = i.dup(suffix);
     for (auto &op : d->operands()) {
@@ -143,9 +138,9 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
       }
     }
     vmap[const_cast<Instr*>(&i)] = d.get();
-    newBB.addInstr(move(d));
+    newbb.addInstr(move(d));
   }
-  return newBB;
+  return newbb;
 }
 
 BasicBlock& Function::getBB(string_view name, bool push_front) {
