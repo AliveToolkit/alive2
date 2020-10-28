@@ -185,6 +185,11 @@ bool has_failure = false;
 bool is_clangtv = false;
 
 
+static bool isFnToVerify(llvm::Function &F) {
+  return fnsToVerify.empty() || // all functions are target
+         fnsToVerify.count(F.getName().str());
+}
+
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
   bool skip_verify = false;
@@ -199,7 +204,7 @@ struct TVPass final : public llvm::FunctionPass {
       // This can happen at EntryExitInstrumenter pass.
       return false;
 
-    if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
+    if (!isFnToVerify(F))
       return false;
 
     ScopedWatch timer([&] (const StopWatch &sw) {
@@ -472,8 +477,15 @@ struct TVFinalizePass : public llvm::PassInfoMixin<TVFinalizePass> {
                               llvm::ModuleAnalysisManager &FAM) {
     if (opt_batch) {
       // Verify all pending function pairs
-      for (auto &F: M)
+      for (auto &F: M) {
+        if (!isFnToVerify(F))
+          continue;
+
+        ScopedWatch timer([&] (const StopWatch &sw) {
+          fns_elapsed_time[F.getName().str()] += sw.seconds();
+        });
         TVPass().verify(F);
+      }
     }
 
     if (!finalized) {
@@ -564,8 +576,15 @@ llvmGetPassPluginInfo() {
         if (unsupported_pass && opt_batch) {
           // Verify all pending function pairs
           TVPass tv;
-          for (auto &F: *M)
+          for (auto &F: *M) {
+            if (!isFnToVerify(F))
+              continue;
+
+            ScopedWatch timer([&] (const StopWatch &sw) {
+              fns_elapsed_time[F.getName().str()] += sw.seconds();
+            });
             tv.verify(F);
+          }
         }
         *out << "-- " << ++count << ". " << P.str()
              << (unsupported_pass ? " : Skipping\n" : "\n");
