@@ -46,7 +46,6 @@ public:
 
   bool empty() const { return m_instrs.empty(); }
   JumpInstr::it_helper targets() const;
-
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
 
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
