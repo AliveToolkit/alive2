@@ -721,8 +721,6 @@ void LoopAnalysis::analysis() {
   }
 
   for (unsigned i = 0; i < bb_count; ++i) {
-    node_type[node[i]] = type[i];
-
     if (type[0] == NodeType::nonheader && header[i] == 0 &&
         type[i] != NodeType::nonheader)
       tree_roots.push_back(node[i]);

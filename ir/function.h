@@ -242,9 +242,6 @@ class LoopAnalysis final {
   std::vector<unsigned> header;
   enum NodeType { nonheader, self, reducible, irreducible };
   std::vector<NodeType> type;
-
-  std::map<const BasicBlock*, NodeType> node_type;
-
   std::map<const BasicBlock*, std::vector<const BasicBlock*>> header_nodes;
   std::multimap<const BasicBlock*, const BasicBlock*> tree_topdown;
   std::map<const BasicBlock*, const BasicBlock*> tree_bottomup;
@@ -252,25 +249,17 @@ class LoopAnalysis final {
   void analysis();
 public:
   LoopAnalysis(Function &f) : f(f), cfg(f) { analysis(); }
-  const std::map<const BasicBlock*, NodeType>& getNodeType() const {
-    return node_type;
-  }
-
   std::map<const BasicBlock*, std::vector<const BasicBlock*>>&
     getHeaderNodes() { return header_nodes; }
-
   const std::vector<const BasicBlock*>& getRoots() const {
     return std::move(tree_roots);
   }
-
   auto getChildren(const BasicBlock *bb) const {
     return tree_topdown.equal_range(bb);
   }
-
   bool hasParent(const BasicBlock *bb) const {
     return tree_bottomup.count(bb);
   }
-
   const BasicBlock* getParent(const BasicBlock *bb) const {
     return tree_bottomup.at(bb);
   }
