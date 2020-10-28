@@ -102,7 +102,7 @@ public:
   BasicBlock& getFirstBB() { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
-                      std::unordered_map<Value*, Value*> &vmap);
+                      std::unordered_map<const Value*, Value*> &vmap);
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
 

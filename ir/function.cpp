@@ -126,7 +126,7 @@ void Function::fixupTypes(const Model &m) {
 }
 
 BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
-                              unordered_map<Value*, Value*> &vmap) {
+                              unordered_map<const Value*, Value*> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = getBB(bb_name, false);
   for (auto &i : BB.instrs()) {
@@ -137,7 +137,7 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
         d->rauw(*op, *it->second);
       }
     }
-    vmap[const_cast<Instr*>(&i)] = d.get();
+    vmap[&i] = d.get();
     newbb.addInstr(move(d));
   }
   return newbb;
@@ -391,7 +391,7 @@ void Function::unroll(unsigned k) {
     }
 
     // clone bbs
-    unordered_map<Value*, Value*> vmap;
+    unordered_map<const Value*, Value*> vmap;
     for (unsigned unroll = 1; unroll <= k; ++unroll) {
       for (auto &&bb_i : bb_nodes) {
         string twine = "_" + header->getName() + "@" + to_string(unroll);
