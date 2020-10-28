@@ -49,35 +49,8 @@ JumpInstr::it_helper BasicBlock::targets() const {
 
 void BasicBlock::replaceTargetWith(const BasicBlock *from,
                                    const BasicBlock *to) {
-  Instr &j = this->back();
-  if (auto br = dynamic_cast<Branch*>(&j)) {
-    const BasicBlock* tt = &br->getTrue(), *ff = br->getFalse();
-    if (tt == from)
-      tt = to;
-    if (ff && ff == from)
-      ff = to;
-    if (ff)
-      addInstr(make_unique<Branch>(*(br->operands()[0]), *tt, *ff));
-    else
-      addInstr(make_unique<Branch>(*tt));
-    delInstr(br);
-  } else if (auto sw = dynamic_cast<Switch*>(&j)) {
-    auto tt = &sw->getDefault();
-    if (tt == from)
-      tt = to;
-    auto new_sw = make_unique<Switch>(*(sw->operands()[0]), *tt);
-
-    for (unsigned i = 0, e = sw->getNumTargets(); i != e; ++i) {
-      auto &[v, bb] = sw->getTarget(i);
-      const BasicBlock *tt = &bb;
-      if (tt == from)
-        tt = to;
-      new_sw->addTarget(*v, *tt);
-    }
-    addInstr(move(new_sw));
-    delInstr(sw);
-  } else {
-    UNREACHABLE();
+  if (auto jump = dynamic_cast<JumpInstr*>(&this->back())) {
+    jump->replaceTargetWith(from, to);
   }
 }
 

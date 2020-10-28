@@ -328,21 +328,26 @@ public:
     target_iterator end() const;
   };
   it_helper targets() { return this; }
+  virtual void replaceTargetWith(const BasicBlock *From,
+                                 const BasicBlock *To) = 0;
 };
 
 
 class Branch final : public JumpInstr {
   Value *cond = nullptr;
-  const BasicBlock &dst_true, *dst_false = nullptr;
+  const BasicBlock *dst_true, *dst_false = nullptr;
 public:
-  Branch(const BasicBlock &dst) : JumpInstr(Type::voidTy, "br"), dst_true(dst) {}
+  Branch(const BasicBlock &dst)
+    : JumpInstr(Type::voidTy, "br"), dst_true(&dst) {}
 
   Branch(Value &cond, const BasicBlock &dst_true, const BasicBlock &dst_false)
-    : JumpInstr(Type::voidTy, "br"), cond(&cond), dst_true(dst_true),
+    : JumpInstr(Type::voidTy, "br"), cond(&cond), dst_true(&dst_true),
     dst_false(&dst_false) {}
 
-  auto& getTrue() const { return dst_true; }
+  auto& getTrue() const { return *dst_true; }
   auto getFalse() const { return dst_false; }
+
+  void replaceTargetWith(const BasicBlock *F, const BasicBlock *T) override;
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -354,13 +359,13 @@ public:
 
 class Switch final : public JumpInstr {
   Value *value;
-  const BasicBlock &default_target;
-  std::vector<std::pair<Value*, const BasicBlock&>> targets;
+  const BasicBlock *default_target;
+  std::vector<std::pair<Value*, const BasicBlock*>> targets;
 
 public:
   Switch(Value &value, const BasicBlock &default_target)
     : JumpInstr(Type::voidTy, "switch"), value(&value),
-      default_target(default_target) {}
+      default_target(&default_target) {}
 
   void addTarget(Value &val, const BasicBlock &target);
 
@@ -368,6 +373,7 @@ public:
   auto& getTarget(unsigned i) const { return targets[i]; }
   auto& getDefault() const { return default_target; }
 
+  void replaceTargetWith(const BasicBlock *F, const BasicBlock *T) override;
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
