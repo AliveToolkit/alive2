@@ -9,6 +9,7 @@
 #include "smt/solver.h"
 #include "util/config.h"
 #include "util/errors.h"
+#include "util/sort.h"
 #include "util/stopwatch.h"
 #include "util/symexec.h"
 #include <algorithm>
@@ -16,6 +17,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <unordered_map>
 
 using namespace IR;
 using namespace smt;
@@ -1133,6 +1135,32 @@ static void remove_unreachable_bbs(Function &f) {
   }
 }
 
+static void top_sort(Function &f) {
+  auto &bbs = f.getBBs();
+  edgesTy edges(bbs.size());
+  unordered_map<const BasicBlock*, unsigned> bb_map;
+
+  unsigned i = 0;
+  for (auto bb : bbs) {
+    bb_map.emplace(bb, i++);
+  }
+
+  i = 0;
+  for (auto bb : bbs) {
+    for (auto &dst : bb->targets()) {
+      edges[i].emplace(bb_map.at(&dst));
+    }
+    ++i;
+  }
+
+  vector<BasicBlock*> sorted_bbs;
+  sorted_bbs.reserve(bbs.size());
+  for (auto v : util::top_sort(edges)) {
+    sorted_bbs.emplace_back(bbs[v]);
+  }
+  f.setBBOrder(move(sorted_bbs));
+}
+
 void Transform::preprocess() {
   remove_unreachable_bbs(src);
   remove_unreachable_bbs(tgt);
@@ -1184,6 +1212,11 @@ void Transform::preprocess() {
         fn->removeUnusedStuff(users, fn == &src ? vector<string_view>()
                                                 : src.getGlobalVarNames());
     } while (changed);
+  }
+
+  if (0) {
+    top_sort(src);
+    top_sort(tgt);
   }
 }
 

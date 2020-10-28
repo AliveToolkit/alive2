@@ -112,6 +112,11 @@ const BasicBlock* Function::getBBIfExists(std::string_view name) const {
   return I != BBs.end() ? &I->second : nullptr;
 }
 
+void Function::setBBOrder(vector<BasicBlock*> &&BBs) {
+  assert(BBs.size() == BB_order.size());
+  BB_order = move(BBs);
+}
+
 void Function::removeBB(BasicBlock &BB) {
   BBs.erase(BB.getName());
 
