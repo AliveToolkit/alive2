@@ -1667,6 +1667,18 @@ expr expr::simplify() const {
   return e ? e : *this;
 }
 
+expr expr::simplify(unsigned timeout) const {
+  C();
+  Z3_params params = Z3_mk_params(ctx());
+  Z3_params_inc_ref(ctx(), params);
+  Z3_params_set_uint(ctx(), params, Z3_mk_string_symbol(ctx(), "timeout"),
+                     timeout);
+  auto e = Z3_simplify_ex(ctx(), ast(), params);
+  Z3_params_dec_ref(ctx(), params);
+  // Z3_simplify returns null on timeout
+  return e ? e : *this;
+}
+
 expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   C();
   if (repls.empty())

@@ -310,6 +310,7 @@ public:
   static expr mkLambda(const expr &var, const expr &val);
 
   expr simplify() const;
+  expr simplify(unsigned timeout_ms) const;
 
   // replace v1 -> v2
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
