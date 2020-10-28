@@ -399,7 +399,6 @@ void Function::unroll(unsigned k) {
       }
     }
 
-    unordered_set<const BasicBlock*> exit_tgts;
     unordered_set nodes_set(bb_nodes.begin(), bb_nodes.end());
 
     for (auto &&bb_i : bb_nodes) {
@@ -410,10 +409,8 @@ void Function::unroll(unsigned k) {
         for (auto &tgt : cloned->targets()) {
 
           // do not touch exit point
-          if (!nodes_set.count(&tgt)) {
-            exit_tgts.insert(&tgt);
+          if (!nodes_set.count(&tgt))
             continue;
-          }
 
           const BasicBlock *to = nullptr;
           // handle backedge
