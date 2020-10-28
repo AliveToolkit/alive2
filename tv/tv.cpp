@@ -84,6 +84,12 @@ llvm::cl::opt<bool> opt_smt_skip("tv-smt-skip",
                                  llvm::cl::cat(TVOptions),
                                  llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+  opt_batch("tv-batch",
+            llvm::cl::desc("Alive: batch supported optimizations and "
+                           "verify them at once (clang plugin only)"),
+            llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
 llvm::cl::opt<string>
     opt_report_dir("tv-report-dir",
                    llvm::cl::desc("Alive: save report to disk"),
@@ -152,10 +158,15 @@ llvm::cl::opt<bool> opt_elapsed_time(
     llvm::cl::desc("Print the elapsed time"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-struct FnInfo {
-  Function fn;
+struct ValidationUnit {
+  Function src;
+  Function tgt;
+  // Field src should be always filled, tgt may not be filled
+  bool tgt_filled = false;
+  bool tgt_encode_io_fns_as_unknown = true; // InstCombine sets this to false
   unsigned order;
-  std::string fn_tostr;
+  std::string src_tostr;
+  std::string tgt_tostr;
 };
 
 ostream *out;
@@ -164,7 +175,7 @@ string report_filename;
 optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
-unordered_map<string, FnInfo> fns;
+unordered_map<string, ValidationUnit> fns;
 unordered_map<string, float> fns_elapsed_time;
 set<string> fnsToVerify;
 unsigned initialized = 0;
@@ -177,9 +188,11 @@ bool is_clangtv = false;
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
   bool skip_verify = false;
+  bool update_fn_src = false;
   bool encode_io_fns_as_unknown = false;
 
   TVPass() : FunctionPass(ID) {}
+
 
   bool runOnFunction(llvm::Function &F) override {
     if (F.isDeclaration())
@@ -207,8 +220,10 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     auto [I, first] = fns.try_emplace(F.getName().str());
-    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
-                                        : I->second.fn.getGlobalVarNames());
+    bool fill_src = first | update_fn_src;
+    auto fn =
+        llvm2alive(F, *TLI, fill_src ? vector<string_view>()
+                                     : I->second.src.getGlobalVarNames());
     if (!fn) {
       fns.erase(I);
       return false;
@@ -219,22 +234,19 @@ struct TVPass final : public llvm::FunctionPass {
       stringstream ss;
       fn->print(ss);
 
-      string str2 = ss.str();
-      // Optimization: since string comparison can be expensive for big
-      // functions, skip it if skip_verify is true.
-      // verifier.verify() will never happen if skip_verify is true, so
-      // there is nothing to prune early.
-      if (!skip_verify && I->second.fn_tostr == str2)
-        return false;
+      string fn_tostr = ss.str();
+      if (fill_src) {
+        I->second.src_tostr = move(fn_tostr);
+      } else {
+        if (I->second.src_tostr == fn_tostr)
+          return false;
 
-      I->second.fn_tostr = move(str2);
+        I->second.tgt_tostr = move(fn_tostr);
+      }
     }
 
-    auto old_fn = move(I->second.fn);
-    I->second.fn = move(*fn);
-
     if (opt_print_dot) {
-      auto &f = I->second.fn;
+      auto &f = *fn;
       ofstream file(f.getName() + '.' + to_string(I->second.order) + ".dot");
       CFG cfg(f);
       cfg.printDot(file);
@@ -243,23 +255,39 @@ struct TVPass final : public llvm::FunctionPass {
       DomTree(f, cfg).printDot(fileDom);
     }
 
-    if (first || skip_verify)
+    if (fill_src) {
+      I->second.src = move(*fn);
+      I->second.tgt = Function();
+      I->second.tgt_tostr = "";
+      I->second.tgt_filled = false;
+      I->second.tgt_encode_io_fns_as_unknown = true;
+    } else {
+      I->second.tgt = move(*fn);
+      I->second.tgt_filled = true;
+      I->second.tgt_encode_io_fns_as_unknown &= encode_io_fns_as_unknown;
+    }
+
+    if (fill_src || skip_verify)
+      return false;
+
+    return verify(F, I->second);
+  }
+
+  bool verify(llvm::Function &F, ValidationUnit &unit) {
+    if (!unit.tgt_filled)
       return false;
 
     if (is_clangtv)
-      I->second.fn.setFnCallValidFlag(encode_io_fns_as_unknown);
+      unit.tgt.setFnCallValidFlag(unit.tgt_encode_io_fns_as_unknown);
 
     smt_init->reset();
     Transform t;
-    t.src = move(old_fn);
-    t.tgt = move(I->second.fn);
+    t.src = move(unit.src);
+    t.tgt = move(unit.tgt);
     t.preprocess();
     TransformVerify verifier(t, false);
     if (!opt_succinct)
       t.print(*out, print_opts);
-
-    if (is_clangtv)
-      I->second.fn.setFnCallValidFlag(false);
 
     {
       auto types = verifier.getTypings();
@@ -280,8 +308,19 @@ struct TVPass final : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    I->second.fn = move(t.tgt);
+    if (is_clangtv)
+      t.tgt.setFnCallValidFlag(false);
+
+    // Put tgt to src
+    unit.src = move(t.tgt);
+    unit.src_tostr = move(unit.tgt_tostr);
+    unit.tgt_filled = false;
+    unit.tgt_encode_io_fns_as_unknown = true;
     return false;
+  }
+
+  bool verify(llvm::Function &F) {
+    return verify(F, fns[F.getName().str()]);
   }
 
   bool doInitialization(llvm::Module &module) override {
@@ -429,11 +468,17 @@ struct TVInitPass : public llvm::PassInfoMixin<TVInitPass> {
 
 struct TVFinalizePass : public llvm::PassInfoMixin<TVFinalizePass> {
   static bool finalized;
-  llvm::PreservedAnalyses run(llvm::Function &F,
-                              llvm::FunctionAnalysisManager &FAM) {
+  llvm::PreservedAnalyses run(llvm::Module &M,
+                              llvm::ModuleAnalysisManager &FAM) {
+    if (opt_batch) {
+      // Verify all pending function pairs
+      for (auto &F: M)
+        TVPass().verify(F);
+    }
+
     if (!finalized) {
       finalized = true;
-      TVPass().doFinalization(*F.getParent());
+      TVPass().doFinalization(M);
     }
     return llvm::PreservedAnalyses::all();
   }
@@ -497,7 +542,7 @@ llvmGetPassPluginInfo() {
       PB.registerOptimizerLastEPCallback(
           [](llvm::ModulePassManager &MPM,
              llvm::PassBuilder::OptimizationLevel) {
-            MPM.addPass(createModuleToFunctionPassAdaptor(TVFinalizePass()));
+            MPM.addPass(TVFinalizePass());
           });
       auto f = [](llvm::StringRef P, llvm::Any IR,
                   const llvm::PreservedAnalyses &PA) {
@@ -509,23 +554,36 @@ llvmGetPassPluginInfo() {
           return;
         }
 
+        auto M = const_cast<llvm::Module *>(unwrapModule(IR));
+
         if (TVFinalizePass::finalized)
           return;
 
-        bool skip_pass = do_skip(P);
+        bool unsupported_pass = do_skip(P);
+
+        if (unsupported_pass && opt_batch) {
+          // Verify all pending function pairs
+          TVPass tv;
+          for (auto &F: *M)
+            tv.verify(F);
+        }
         *out << "-- " << ++count << ". " << P.str()
-             << (skip_pass ? " : Skipping\n" : "\n");
+             << (unsupported_pass ? " : Skipping\n" : "\n");
 
         TVPass tv;
-        tv.skip_verify = skip_pass;
+        // If opt_batch, verify() will be lazily called when an unsupported
+        // pass is met
+        tv.skip_verify = unsupported_pass || opt_batch;
+        // When the pass is unsupported, src should be filled
+        tv.update_fn_src = unsupported_pass;
         // For I/O known calls like printf, it is fine to regard them as valid
         // 'unknown calls' except when it is InstCombine.
         tv.encode_io_fns_as_unknown = P != "InstCombinePass" &&
                                       P != "AggressiveInstCombinePass";
 
-        auto M = const_cast<llvm::Module *>(unwrapModule(IR));
         for (auto &F: *M)
-          // If skip_pass is true, this updates fns map only.
+          // If unsupported_pass or opt_batch is true, this updates fns map
+          // only.
           tv.runOnFunction(F);
       };
       PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(move(f));
