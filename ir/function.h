@@ -105,6 +105,8 @@ public:
                       std::unordered_map<Value*, Value*> &vmap);
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
+
+  void setBBOrder(std::vector<BasicBlock*> &&BB_order);
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);
