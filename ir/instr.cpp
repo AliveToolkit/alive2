@@ -2137,7 +2137,7 @@ JumpInstr::target_iterator JumpInstr::it_helper::end() const {
 void Branch::replaceTargetWith(const BasicBlock *from, const BasicBlock *to) {
   if (dst_true == from)
     dst_true = to;
-  if (dst_false && dst_false == from)
+  if (dst_false == from)
     dst_false = to;
 }
 
