@@ -1472,7 +1472,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   // Initialize a memory block for null pointer.
   if (has_null_block)
-    alloc(expr::mkUInt(0, bits_size_t), 1, GLOBAL, false, false, 0);
+    alloc(expr::mkUInt(0, bits_size_t), bits_byte / 8, GLOBAL, false, false, 0);
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -1855,8 +1855,8 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     }
   } else {
     state->addAxiom(p.blockSize() == size_zext);
+    state->addAxiom(p.isBlockAligned(align, true));
     if (!has_null_block || bid != 0) {
-      state->addAxiom(p.isBlockAligned(align, true));
       state->addAxiom(p.getAllocType() == alloc_ty);
     }
 
