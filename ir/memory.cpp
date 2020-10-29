@@ -1856,7 +1856,9 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   } else {
     state->addAxiom(p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));
-    state->addAxiom(p.getAllocType() == alloc_ty);
+    if (!has_null_block || bid != 0) {
+      state->addAxiom(p.getAllocType() == alloc_ty);
+    }
 
     if (align_bits && observes_addresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
