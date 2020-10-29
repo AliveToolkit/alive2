@@ -258,7 +258,7 @@ expr expr::mkFreshVar(const char *prefix, const expr &type) {
 }
 
 expr expr::some(const expr &type) {
-  return type.isBool() ? expr(false) : mkNumber("0", type);
+  return type.isBool() ? expr(false) : mkNumber("3", type);
 }
 
 expr expr::IntSMin(unsigned bits) {
