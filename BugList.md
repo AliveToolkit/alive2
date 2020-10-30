@@ -5,86 +5,91 @@ Please contact us or submit a PR if something is missing or inaccurate.
 
 
 ### Integer/Float operations
+
 1. Incorrect fold of 'x & (-1 >> y) s>= x'
 (https://bugs.llvm.org/show_bug.cgi?id=39861)
 
 2. Incorrect instcombine fold for icmp sgt
 (https://bugs.llvm.org/show_bug.cgi?id=42198)
 
-3. Instsimplify: uadd_overflow(X, undef) is not undef
-(https://bugs.llvm.org/show_bug.cgi?id=42209)
-
-4. SimplifyCFG's -switch-to-lookup is incorrect w.r.t undef
-(https://bugs.llvm.org/show_bug.cgi?id=42617)
-
-5. CVP: adding nuw flags not correct in the presence of undef
-(https://bugs.llvm.org/show_bug.cgi?id=42618)
-
-6. DivRemPairs is incorrect in the presence of undef
-(https://bugs.llvm.org/show_bug.cgi?id=42619)
-
-7. EmitGEPOffset() incorrectly adds NUW to multiplications
+3. EmitGEPOffset() incorrectly adds NUW to multiplications
 (https://bugs.llvm.org/show_bug.cgi?id=42699)
 
-8. Incorrect fold of uadd.with.overflow with undef
-(https://bugs.llvm.org/show_bug.cgi?id=43188)
-
-9. Incorrect fold of ashr+xor -> lshr w/ vectors
-(https://bugs.llvm.org/show_bug.cgi?id=43665)
-
-10. Incorrect 'icmp sle' -> 'icmp slt' w/ vectors
-(https://bugs.llvm.org/show_bug.cgi?id=43730)
-
-11. shuffle undef mask on vectors with poison elements
-(https://bugs.llvm.org/show_bug.cgi?id=43958)
-
-12. Can't remove shufflevector if input might be poison
-(https://bugs.llvm.org/show_bug.cgi?id=44185)
-
-13. Incorrect instcombine transform urem -> icmp+zext with vectors
-(https://bugs.llvm.org/show_bug.cgi?id=44186)
-
-14. Instcombine: incorrect transformation 'x > (x & undef)' -> 'x > undef'
-(https://bugs.llvm.org/show_bug.cgi?id=44383)
-
-15. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
-(https://bugs.llvm.org/show_bug.cgi?id=45447)
-
-16. Invalid undef splat in instcombine
-(https://bugs.llvm.org/show_bug.cgi?id=45455)
-
-17. Incorrect transformation of minnum with nnan
+4. Incorrect transformation of minnum with nnan
 (https://bugs.llvm.org/show_bug.cgi?id=45478)
 
-18. Can't remove insertelement undef
-(https://bugs.llvm.org/show_bug.cgi?id=45481)
-
-19. InstSimplify: fadd (nsz op), +0 incorrectly removed
+5. InstSimplify: fadd (nsz op), +0 incorrectly removed
 (https://bugs.llvm.org/show_bug.cgi?id=45778)
 
-20. Incorrect instcombine fold of control-flow to umul.with.overflow
+6. Incorrect instcombine fold of control-flow to umul.with.overflow
 (https://bugs.llvm.org/show_bug.cgi?id=45952)
 
-21. Incorrect instcombine fold of vector ult -> sgt
-(https://bugs.llvm.org/show_bug.cgi?id=45954)
-
-22. Jumpthreading introduces jump on poison
+7. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
-23. Incorrect transformation: mul foo, undef -> shl foo, undef
-(https://bugs.llvm.org/show_bug.cgi?id=47133)
-
-24. Incorrect transformation: (llvm.maximum undef, %x) -> undef
-(https://bugs.llvm.org/show_bug.cgi?id=47567)
-
-25. InstCombine: incorrect select operand simplification with undef
-(https://bugs.llvm.org/show_bug.cgi?id=47696)
-
-26. SCEVExpander introduces branch on poison
+8. SCEVExpander introduces branch on poison
 (https://bugs.llvm.org/show_bug.cgi?id=47769)
 
-27. Incorrect transformation of fabs with nnan flag
+9. Incorrect transformation of fabs with nnan flag
 (https://bugs.llvm.org/show_bug.cgi?id=47960)
+
+### Miscompilations with Undef Value
+
+These are miscompilations that will disappear when undef value disappears.
+
+1. Instsimplify: uadd_overflow(X, undef) is not undef
+(https://bugs.llvm.org/show_bug.cgi?id=42209)
+
+2. SimplifyCFG's -switch-to-lookup is incorrect w.r.t undef
+(https://bugs.llvm.org/show_bug.cgi?id=42617)
+
+3. CVP: adding nuw flags not correct in the presence of undef
+(https://bugs.llvm.org/show_bug.cgi?id=42618)
+
+4. DivRemPairs is incorrect in the presence of undef
+(https://bugs.llvm.org/show_bug.cgi?id=42619)
+
+5. Incorrect fold of uadd.with.overflow with undef
+(https://bugs.llvm.org/show_bug.cgi?id=43188)
+
+6. Incorrect fold of ashr+xor -> lshr w/ vectors
+(https://bugs.llvm.org/show_bug.cgi?id=43665)
+
+7. Incorrect 'icmp sle' -> 'icmp slt' w/ vectors
+(https://bugs.llvm.org/show_bug.cgi?id=43730)
+
+8. shuffle undef mask on vectors with poison elements
+(https://bugs.llvm.org/show_bug.cgi?id=43958)
+
+9. Can't remove shufflevector if input might be poison
+(https://bugs.llvm.org/show_bug.cgi?id=44185)
+
+10. Incorrect instcombine transform urem -> icmp+zext with vectors
+(https://bugs.llvm.org/show_bug.cgi?id=44186)
+
+11. Instcombine: incorrect transformation 'x > (x & undef)' -> 'x > undef'
+(https://bugs.llvm.org/show_bug.cgi?id=44383)
+
+12. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
+(https://bugs.llvm.org/show_bug.cgi?id=45447)
+
+13. Invalid undef splat in instcombine
+(https://bugs.llvm.org/show_bug.cgi?id=45455)
+
+14. Can't remove insertelement undef
+(https://bugs.llvm.org/show_bug.cgi?id=45481)
+
+15. Incorrect instcombine fold of vector ult -> sgt
+(https://bugs.llvm.org/show_bug.cgi?id=45954)
+
+16. Incorrect transformation: mul foo, undef -> shl foo, undef
+(https://bugs.llvm.org/show_bug.cgi?id=47133)
+
+17. Incorrect transformation: (llvm.maximum undef, %x) -> undef
+(https://bugs.llvm.org/show_bug.cgi?id=47567)
+
+18. InstCombine: incorrect select operand simplification with undef
+(https://bugs.llvm.org/show_bug.cgi?id=47696)
 
 ### Memory Operations
 
