@@ -4,6 +4,7 @@
 #include "ir/function.h"
 #include "ir/instr.h"
 #include "util/errors.h"
+#include "util/sort.h"
 #include "util/unionfind.h"
 #include <fstream>
 #include <set>
@@ -137,11 +138,6 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
     newbb.addInstr(move(d));
   }
   return newbb;
-}
-
-void Function::setBBOrder(vector<BasicBlock*> &&BBs) {
-  assert(BBs.size() == BB_order.size());
-  BB_order = move(BBs);
 }
 
 void Function::removeBB(BasicBlock &BB) {
@@ -326,6 +322,34 @@ bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users,
   return changed;
 }
 
+void Function::topSort() {
+  auto &bbs = getBBs();
+  edgesTy edges(bbs.size());
+  unordered_map<const BasicBlock*, unsigned> bb_map;
+
+  unsigned i = 0;
+  for (auto bb : bbs) {
+    bb_map.emplace(bb, i++);
+  }
+
+  i = 0;
+  for (auto bb : bbs) {
+    for (auto &dst : bb->targets()) {
+      edges[i].emplace(bb_map.at(&dst));
+    }
+    ++i;
+  }
+
+  vector<BasicBlock*> sorted_bbs;
+  sorted_bbs.reserve(bbs.size());
+  for (auto v : util::top_sort(edges)) {
+    sorted_bbs.emplace_back(bbs[v]);
+  }
+
+  assert(sorted_bbs.size() == BB_order.size());
+  BB_order = move(sorted_bbs);
+}
+
 void Function::unroll(unsigned k) {
   if (k == 0)
     return;
@@ -423,7 +447,8 @@ void Function::unroll(unsigned k) {
 
     // TODO: handle phis
   }
-  // TODO: topsort the function
+
+  topSort();
 }
 
 void Function::print(ostream &os, bool print_header) const {

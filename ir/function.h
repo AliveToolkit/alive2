@@ -106,7 +106,6 @@ public:
 
   BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
                       std::unordered_map<const Value*, Value*> &vmap);
-  void setBBOrder(std::vector<BasicBlock*> &&BB_order);
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);
@@ -173,6 +172,7 @@ public:
   bool removeUnusedStuff(const std::multimap<Value*, Value*> &users,
                          const std::vector<std::string_view> &src_glbs);
 
+  void topSort();
   void unroll(unsigned k);
 
   void print(std::ostream &os, bool print_header = true) const;
