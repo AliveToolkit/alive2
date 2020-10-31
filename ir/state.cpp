@@ -691,10 +691,12 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   if (isSource()) {
     auto &calls_fn = fn_call_data[name];
     auto call_data_pair
-      = calls_fn.try_emplace({ move(inputs), move(ptr_inputs),
-                               analysis.ranges_fn_calls,
-                               reads_memory ? memory : Memory(*this),
-                               reads_memory, argmemonly });
+      = calls_fn.try_emplace(
+          { move(inputs), move(ptr_inputs),
+            reads_memory ? analysis.ranges_fn_calls :
+                           State::ValueAnalysis::FnCallRanges(),
+            reads_memory ? memory : Memory(*this),
+            reads_memory, argmemonly });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
 
@@ -741,9 +743,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     ChoiceExpr<FnCallOutput> data;
 
     for (auto &[in, out] : fn_call_data[name]) {
-      auto refined = in.refinedBy(*this, inputs, ptr_inputs,
-                                  analysis.ranges_fn_calls, memory,
-                                  reads_memory, argmemonly);
+      auto refined
+        = in.refinedBy(*this, inputs, ptr_inputs,
+                        reads_memory ? analysis.ranges_fn_calls :
+                                       State::ValueAnalysis::FnCallRanges(),
+                        memory, reads_memory, argmemonly);
       data.add(out, move(refined));
     }
 
