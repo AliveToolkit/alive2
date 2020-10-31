@@ -1,7 +1,6 @@
 declare void @g()
 
-define void @src(i1 %cmp) {
-entry:
+define void @src() {
   %call = call i32* @__errno_location()
   call void @g()
   %call2 = call i32* @__errno_location()
@@ -9,8 +8,7 @@ entry:
   ret void
 }
 
-define void @tgt(i1 %cmp) {
-entry:
+define void @tgt() {
   %call = call i32* @__errno_location()
   call void @g()
   store i32 0, i32* %call, align 4
