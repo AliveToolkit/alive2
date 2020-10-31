@@ -387,17 +387,17 @@ void Function::unroll(unsigned k) {
     }
     worklist.pop_back();
 
-    auto &loop_bbs = loop_nodes[header];
-    loop_bbs.emplace_back(header);
+    vector<BasicBlock*> loop_bbs = { header };
     auto I = forest.find(header);
     if (I != forest.end()) {
-      loop_bbs.insert(loop_bbs.end(), I->second.begin(), I->second.end());
-    }
-
-    auto *parent = la.getParent(header);
-    auto *vparent = parent ? &loop_nodes[parent] : nullptr;
-    if (vparent) {
-      vparent->insert(vparent->end(), loop_bbs.begin(), loop_bbs.end());
+      for (auto *bb : I->second) {
+        auto II = loop_nodes.find(bb);
+        if (II != loop_nodes.end()) {
+          loop_bbs.insert(loop_bbs.end(), II->second.begin(), II->second.end());
+        } else {
+          loop_bbs.emplace_back(bb);
+        }
+      }
     }
 
     // map: original BB -> {BB} U copies-of-BB
@@ -409,6 +409,7 @@ void Function::unroll(unsigned k) {
     // Clone BBs
     // Note that the BBs list must be iterated in top-sort order so that
     // values from previous BBs are available in vmap
+    auto &unrolled_bbs = loop_nodes.emplace(header, loop_bbs).first->second;
     unordered_map<const Value*, Value*> vmap;
     string name_prefix;
     for (unsigned i = 0; i < height; ++i) {
@@ -419,8 +420,7 @@ void Function::unroll(unsigned k) {
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*bb, suffix, vmap));
-        if (vparent)
-          vparent->emplace_back(copies.back());
+        unrolled_bbs.emplace_back(copies.back());
       }
     }
 
