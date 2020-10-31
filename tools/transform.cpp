@@ -242,25 +242,19 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
   if (hit_half_memory_limit())
     return expr::mkForAll(qvars0, move(e));
 
-  // TODO: benchmark
-  if (0) {
-    expr var = expr::mkBoolVar("malloc_never_fails");
-    e = expr::mkIf(var,
-                   e.subst(var, true).simplify(),
-                   e.subst(var, false).simplify());
-  }
-
   // eliminate all quantified boolean vars; Z3 gets too slow with those
   auto qvars = qvars0;
-  for (auto &var : qvars0) {
-    if (!var.isBool())
+  for (auto I = qvars.begin(); I != qvars.end(); ) {
+    auto &var = *I;
+    if (!var.isBool()) {
+      ++I;
       continue;
+    }
     if (hit_half_memory_limit())
       break;
 
-    e = e.subst(var, true).simplify() &&
-        e.subst(var, false).simplify();
-    qvars.erase(var);
+    e = (e.subst(var, true) && e.subst(var, false)).simplify();
+    I = qvars.erase(I);
   }
 
   if (config::disable_undef_input || undef_qvars.empty() ||
