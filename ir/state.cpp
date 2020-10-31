@@ -743,11 +743,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     ChoiceExpr<FnCallOutput> data;
 
     for (auto &[in, out] : fn_call_data[name]) {
-      auto refined
-        = in.refinedBy(*this, inputs, ptr_inputs,
-                        reads_memory ? analysis.ranges_fn_calls :
-                                       State::ValueAnalysis::FnCallRanges(),
-                        memory, reads_memory, argmemonly);
+      auto refined = in.refinedBy(*this, inputs, ptr_inputs,
+                                  analysis.ranges_fn_calls, memory,
+                                  reads_memory, argmemonly);
       data.add(out, move(refined));
     }
 
