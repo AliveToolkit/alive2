@@ -152,6 +152,16 @@ llvm::cl::opt<bool> opt_elapsed_time(
     llvm::cl::desc("Print the elapsed time"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
+llvm::cl::opt<unsigned> opt_src_unrolling_factor(
+    "tv-src-unroll",
+    llvm::cl::desc("Unrolling factor for src function (default=0)"),
+    llvm::cl::init(0));
+
+llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
+    "tv-tgt-unroll",
+    llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
+    llvm::cl::init(0));
+
 struct FnInfo {
   Function fn;
   unsigned order;
@@ -360,6 +370,8 @@ struct TVPass final : public llvm::FunctionPass {
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
     config::debug = opt_debug;
+    config::src_unroll_cnt = opt_src_unrolling_factor;
+    config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
     llvm_util::omit_array_size = opt_omit_array_size;
 
     llvm_util_init.emplace(*out, module.getDataLayout());

@@ -16,6 +16,8 @@ bool io_nobuiltin = false;
 bool disable_poison_input = false;
 bool disable_undef_input = false;
 bool debug = false;
+unsigned src_unroll_cnt = 0;
+unsigned tgt_unroll_cnt = 0;
 
 ostream &dbg() {
   return *debug_os;

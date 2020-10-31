@@ -19,6 +19,10 @@ extern bool disable_undef_input;
 
 extern bool debug;
 
+extern unsigned src_unroll_cnt;
+
+extern unsigned tgt_unroll_cnt;
+
 std::ostream &dbg();
 void set_debug(std::ostream &os);
 

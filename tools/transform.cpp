@@ -1214,6 +1214,9 @@ void Transform::preprocess() {
     } while (changed);
   }
 
+  src.unroll(config::src_unroll_cnt);
+  tgt.unroll(config::tgt_unroll_cnt);
+
   if (0) {
     top_sort(src);
     top_sort(tgt);

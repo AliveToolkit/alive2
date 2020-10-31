@@ -170,7 +170,7 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
     ofstream fileDom(f.getName() + ".dom.dot");
     IR::DomTree(f, cfg).printDot(fileDom);
   }
-  Func->unroll(opt_unrolling_factor);
+  config::src_unroll_cnt = opt_unrolling_factor;
 
   Transform t;
   t.src = move(*Func);
