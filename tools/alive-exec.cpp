@@ -163,7 +163,7 @@ static void execFunction(llvm::Function &F, llvm::Triple &triple,
     return;
   }
   if (opt_print_dot) {
-    Func->writeDot();
+    Func->writeDot("");
   }
   config::src_unroll_cnt = opt_unrolling_factor;
 
