@@ -134,7 +134,7 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
         d->rauw(*op, *it->second);
       }
     }
-    vmap.emplace(&i, d.get());
+    vmap[&i] = d.get();
     newbb.addInstr(move(d));
   }
   return newbb;
@@ -362,9 +362,9 @@ void Function::unroll(unsigned k) {
   auto &forest = la.getLoopForest();
   BasicBlock &sink = getBB("#sink");
 
-  vector<pair<BasicBlock*, bool>> worklist;
+  vector<tuple<BasicBlock*, unsigned, bool>> worklist;
   for (auto &root : roots) {
-    worklist.emplace_back(root, false);
+    worklist.emplace_back(root, 0, false);
   }
 
   // computed bottom-up during the post-order traversal below
@@ -372,7 +372,7 @@ void Function::unroll(unsigned k) {
 
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
-    auto &[header, flag] = worklist.back();
+    auto &[header, height, flag] = worklist.back();
     if (!flag) {
       flag = true;
       auto I = forest.find(header);
@@ -380,7 +380,7 @@ void Function::unroll(unsigned k) {
         // process all non-leaf children first
         for (auto *child : I->second) {
           if (forest.count(child))
-            worklist.emplace_back(child, false);
+            worklist.emplace_back(child, height+1, false);
         }
         continue;
       }
@@ -410,9 +410,14 @@ void Function::unroll(unsigned k) {
     // Note that the BBs list must be iterated in top-sort order so that
     // values from previous BBs are available in vmap
     unordered_map<const Value*, Value*> vmap;
+    string name_prefix;
+    for (unsigned i = 0; i < height; ++i) {
+      name_prefix += "#1";
+    }
     for (unsigned unroll = 2; unroll <= k; ++unroll) {
-      string suffix = '_' + header->getName() + '#' + to_string(unroll);
-      for (auto &[bb, copies] : bbmap) {
+      string suffix = name_prefix + '#' + to_string(unroll);
+      for (auto *bb : loop_bbs) {
+        auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*bb, suffix, vmap));
         if (vparent)
           vparent->emplace_back(copies.back());
