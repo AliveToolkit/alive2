@@ -5,6 +5,9 @@
 #include "ir/instr.h"
 #include "util/errors.h"
 #include "util/unionfind.h"
+#include <fstream>
+#include <set>
+#include <unordered_set>
 
 using namespace smt;
 using namespace util;
@@ -98,24 +101,6 @@ void Function::fixupTypes(const Model &m) {
   }
 }
 
-BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
-                              unordered_map<const Value*, Value*> &vmap) {
-  string bb_name = BB.getName() + suffix;
-  auto &newbb = getBB(bb_name, false);
-  for (auto &i : BB.instrs()) {
-    auto d = i.dup(suffix);
-    for (auto &op : d->operands()) {
-      auto it = vmap.find(op);
-      if (it != vmap.end()) {
-        d->rauw(*op, *it->second);
-      }
-    }
-    vmap[&i] = d.get();
-    newbb.addInstr(move(d));
-  }
-  return newbb;
-}
-
 BasicBlock& Function::getBB(string_view name, bool push_front) {
   auto p = BBs.try_emplace(string(name), name);
   if (p.second) {
@@ -134,6 +119,24 @@ const BasicBlock& Function::getBB(string_view name) const {
 const BasicBlock* Function::getBBIfExists(std::string_view name) const {
   auto I = BBs.find(string(name));
   return I != BBs.end() ? &I->second : nullptr;
+}
+
+BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
+                              unordered_map<const Value*, Value*> &vmap) {
+  string bb_name = BB.getName() + suffix;
+  auto &newbb = getBB(bb_name);
+  for (auto &i : BB.instrs()) {
+    auto d = i.dup(suffix);
+    for (auto &op : d->operands()) {
+      auto it = vmap.find(op);
+      if (it != vmap.end()) {
+        d->rauw(*op, *it->second);
+      }
+    }
+    vmap.emplace(&i, d.get());
+    newbb.addInstr(move(d));
+  }
+  return newbb;
 }
 
 void Function::setBBOrder(vector<BasicBlock*> &&BBs) {
@@ -326,93 +329,99 @@ bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users,
 void Function::unroll(unsigned k) {
   if (k == 0)
     return;
-  LoopAnalysis la(*this);
 
+  LoopAnalysis la(*this);
   auto &roots = la.getRoots();
   if (roots.empty())
     return;
 
-  auto &nodes = la.getHeaderNodes();
-
+  auto &forest = la.getLoopForest();
   BasicBlock &sink = getBB("#sink");
 
-  vector<pair<const BasicBlock*, bool>> worklist;
-
+  vector<pair<BasicBlock*, bool>> worklist;
   for (auto &root : roots) {
     worklist.emplace_back(root, false);
   }
 
+  // computed bottom-up during the post-order traversal below
+  unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
+
+  // traverse each loop tree in post-order
   while (!worklist.empty()) {
-    auto &[H, flag]  = worklist.back();
+    auto &[header, flag] = worklist.back();
     if (!flag) {
       flag = true;
-      auto tgts = la.getChildren(H);
-      for (; tgts.first != tgts.second; ++tgts.first)
-        worklist.emplace_back(tgts.first->second, false);
-      continue;
+      auto I = forest.find(header);
+      if (I != forest.end()) {
+        // process all non-leaf children first
+        for (auto *child : I->second) {
+          if (forest.count(child))
+            worklist.emplace_back(child, false);
+        }
+        continue;
+      }
     }
-
     worklist.pop_back();
 
-    auto header = const_cast<BasicBlock*>(H);
-    auto &bb_nodes = nodes[header];
-    map<const BasicBlock*, vector<const BasicBlock*>> bbmap;
-    for (auto &&bb_i : bb_nodes) {
-      bbmap[bb_i].push_back(bb_i);
+    auto &loop_bbs = loop_nodes[header];
+    loop_bbs.emplace_back(header);
+    auto I = forest.find(header);
+    if (I != forest.end()) {
+      loop_bbs.insert(loop_bbs.end(), I->second.begin(), I->second.end());
     }
 
-    // clone bbs
+    auto *parent = la.getParent(header);
+    auto *vparent = parent ? &loop_nodes[parent] : nullptr;
+    if (vparent) {
+      vparent->insert(vparent->end(), loop_bbs.begin(), loop_bbs.end());
+    }
+
+    // map: original BB -> {BB} U copies-of-BB
+    unordered_map<const BasicBlock*, vector<BasicBlock*>> bbmap;
+    for (auto *bb : loop_bbs) {
+      bbmap[bb].emplace_back(bb);
+    }
+
+    // Clone BBs
+    // Note that the BBs list must be iterated in top-sort order so that
+    // values from previous BBs are available in vmap
     unordered_map<const Value*, Value*> vmap;
-    for (unsigned unroll = 1; unroll <= k; ++unroll) {
-      for (auto &&bb_i : bb_nodes) {
-        string twine = "_" + header->getName() + "@" + to_string(unroll);
-        bbmap[bb_i].push_back(&cloneBB(*bb_i, twine, vmap));
+    for (unsigned unroll = 2; unroll <= k; ++unroll) {
+      string suffix = '_' + header->getName() + '#' + to_string(unroll);
+      for (auto &[bb, copies] : bbmap) {
+        copies.emplace_back(&cloneBB(*bb, suffix, vmap));
+        if (vparent)
+          vparent->emplace_back(copies.back());
       }
     }
 
-    unordered_set nodes_set(bb_nodes.begin(), bb_nodes.end());
-
-    for (auto &&bb_i : bb_nodes) {
-      // rewire jumps
-      for (unsigned unroll = 0; unroll <= k; ++unroll) {
-        auto cloned = const_cast<BasicBlock*>(bbmap[bb_i][unroll]);
-        map<const BasicBlock*, const BasicBlock*> replacement;
+    // Patch jump targets
+    for (auto &[bb, copies] : bbmap) {
+      for (unsigned unroll = 0; unroll < k; ++unroll) {
+        auto *cloned = copies[unroll];
         for (auto &tgt : cloned->targets()) {
-
-          // do not touch exit point
-          if (!nodes_set.count(&tgt))
+          // Loop exit; no patching needed
+          if (!bbmap.count(&tgt))
             continue;
 
           const BasicBlock *to = nullptr;
           // handle backedge
           if (&tgt == header) {
-            if (unroll == k)
+            if (unroll == k-1)
               to = &sink;
             else
               to = bbmap[&tgt][unroll + 1];
           }
           // handle targets inside loop
-          else
+          else {
             to = bbmap[&tgt][unroll];
-
-          replacement[&tgt] = to;
+          }
+          cloned->replaceTargetWith(&tgt, to);
         }
-        for (auto &[from, to] : replacement)
-          cloned->replaceTargetWith(from, to);
       }
     }
 
     // TODO: handle phis
-
-    // add cloned BBs to each ancestors of loop H
-    const BasicBlock *root = H;
-    while (la.hasParent(root)) {
-      auto next = la.getParent(root);
-      auto &ancestor_nodes = nodes[next];
-      for (auto &[_, v] : bbmap)
-        ancestor_nodes.insert(ancestor_nodes.end(), v.begin() + 1, v.end());
-      root = next;
-    }
   }
   // TODO: topsort the function
 }
@@ -456,6 +465,26 @@ void Function::print(ostream &os, bool print_header) const {
 ostream& operator<<(ostream &os, const Function &f) {
   f.print(os);
   return os;
+}
+
+void Function::writeDot(const char *filename_prefix) const {
+  string fname = getName();
+  if (filename_prefix)
+    fname += string(".") + filename_prefix;
+
+  CFG cfg(*const_cast<Function*>(this));
+  {
+    ofstream file(fname + ".cfg.dot");
+    cfg.printDot(file);
+  }
+  {
+    ofstream file(fname + ".dom.dot");
+    DomTree(*const_cast<Function*>(this), cfg).printDot(file);
+  }
+  {
+    ofstream file(fname + ".looptree.dot");
+    LoopAnalysis(*const_cast<Function*>(this)).printDot(file);
+  }
 }
 
 
@@ -599,8 +628,8 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   last.resize(bb_count, -1u);
 
   unsigned current = 0;
-  vector<pair<const BasicBlock*, bool>> worklist = { {&f.getFirstBB(), false} };
-  set<const BasicBlock *> visited;
+  vector<pair<BasicBlock*, bool>> worklist = { {&f.getFirstBB(), false} };
+  unordered_set<const BasicBlock *> visited;
   while(!worklist.empty()) {
     auto &[bb, flag] = worklist.back();
     if (flag) {
@@ -613,7 +642,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
 
       for (auto &tgt : bb->targets())
         if (visited.insert(&tgt).second)
-          worklist.emplace_back(&tgt, false);
+          worklist.emplace_back(const_cast<BasicBlock*>(&tgt), false);
     }
   }
 }
@@ -624,7 +653,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
 //
 // Tarjan, R. (1974). Testing Flow Graph Reducibility.
 // Havlak, P. (1997). Nesting of reducible and irreducible loops.
-void LoopAnalysis::analysis() {
+void LoopAnalysis::run() {
   getDepthFirstSpanningTree();
   unsigned bb_count = f.getBBs().size();
 
@@ -659,8 +688,9 @@ void LoopAnalysis::analysis() {
 
     set<unsigned> workList(P);
     while (!workList.empty()) {
-      unsigned x = *workList.begin();
-      workList.erase(x);
+      auto I = workList.begin();
+      unsigned x = *I;
+      workList.erase(I);
 
       for (unsigned y : nonBackPreds[x]) {
         unsigned yy = uf.find(y);
@@ -680,62 +710,51 @@ void LoopAnalysis::analysis() {
     }
   }
 
-  if (type[0] != NodeType::nonheader)
-    tree_roots.push_back(node[0]);
-
+  // Construct the loop forest (0 or more loop trees)
   for (unsigned i = 0; i < bb_count; ++i) {
-    if (type[i] != NodeType::nonheader)
-      header_nodes[node[i]].push_back(node[i]);
-  }
-
-  for (unsigned i = 0; i < bb_count; ++i) {
-    if (type[0] == NodeType::nonheader && header[i] == 0 &&
-        type[i] != NodeType::nonheader)
-      tree_roots.push_back(node[i]);
-
-    // populate header_nodes
-    unsigned root = i;
-    while (header[root] != 0) {
-      header_nodes[node[header[root]]].push_back(node[i]);
-      root = header[root];
+    auto h = header[i];
+    if (h == 0 && type[i] != nonheader) {
+      roots.emplace_back(node[i]);
+      (void)forest[node[i]];
     }
-
-    // populate edges in nested tree
-    if (type[i] != NodeType::nonheader &&
-        type[header[i]] != NodeType::nonheader) {
-      tree_topdown.emplace(node[header[i]], node[i]);
-      tree_bottomup.emplace(node[i], node[header[i]]);
+    else if (h != 0 || type[i] != nonheader) {
+      parent.emplace(node[i], node[h]);
+      forest[node[h]].emplace_back(node[i]);
     }
   }
 
   // sort nodes with DFST pre-order so that BB cloning won't break dominance
-  for (auto &[bb, nodes] : header_nodes) {
-    (void) bb;
+  for (auto &[_, nodes] : forest) {
     sort(nodes.begin(), nodes.end(),
       [&](const BasicBlock *a, const BasicBlock *b) -> bool {
-        return number[a] < number[b];
+        return number.at(a) < number.at(b);
       }
     );
   }
 }
 
+BasicBlock* LoopAnalysis::getParent(BasicBlock *bb) const {
+  auto I = parent.find(bb);
+  return I != parent.end() ? I->second : nullptr;
+}
+
 void LoopAnalysis::printDot(ostream &os) const {
   os << "digraph {\n";
-  for (unsigned i = 0, e = f.getBBs().size(); i != e; ++i) {
-    if (type[i] == NodeType::nonheader)
-      continue;
-    os << '"' << bb_dot_name(node[i]->getName())
-       << "\" [shape=circle]\n";
-  }
-  for (unsigned i = 0, e = f.getBBs().size(); i != e; ++i) {
-    // do not draw self loop for root
-    if (header[i] == i)
-      continue;
-    if (type[i] == NodeType::nonheader ||
-        type[header[i]] == NodeType::nonheader)
-      continue;
-    os << '"' << bb_dot_name(node[header[i]]->getName()) << "\" -> \""
-       << bb_dot_name(node[i]->getName()) << "\";\n";
+
+  unordered_set<const BasicBlock*> seen_roots;
+  auto decl_root = [&](const BasicBlock *root) {
+    auto name = bb_dot_name(root->getName());
+    if (seen_roots.insert(root).second)
+      os << '"' << name << "\" [shape=square];\n";
+    return name;
+  };
+
+  for (auto &[root, nodes] : forest) {
+    auto root_name = decl_root(root);
+    for (auto *node : nodes) {
+      os << '"' << root_name << "\" -> \""
+         << bb_dot_name(node->getName()) << "\";\n";
+    }
   }
   os << "}\n";
 }

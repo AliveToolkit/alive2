@@ -112,6 +112,11 @@ static llvm::cl::opt<bool> opt_debug(
     "dbg", llvm::cl::desc("Print debugging info"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
+static llvm::cl::opt<bool> opt_print_dot(
+    "dot",
+    llvm::cl::desc("Alive: print .dot files of each function"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
 static llvm::cl::opt<bool> opt_smt_stats(
     "smt-stats", llvm::cl::desc("Show SMT statistics"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -299,6 +304,11 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
          << "' to Alive IR\n";
     ++errorCount;
     return;
+  }
+
+  if (opt_print_dot) {
+    Func1->writeDot("src");
+    Func2->writeDot("tgt");
   }
 
   smt_init->reset();

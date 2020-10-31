@@ -101,11 +101,11 @@ public:
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getFirstBB() { return *BB_order[0]; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
-  BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
-                      std::unordered_map<const Value*, Value*> &vmap);
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
 
+  BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
+                      std::unordered_map<const Value*, Value*> &vmap);
   void setBBOrder(std::vector<BasicBlock*> &&BB_order);
   void removeBB(BasicBlock &BB);
 
@@ -177,6 +177,7 @@ public:
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);
+  void writeDot(const char *filename_prefix) const;
 };
 
 
@@ -207,6 +208,7 @@ public:
   void printDot(std::ostream &os) const;
 };
 
+
 class DomTree final {
     Function &f;
     CFG &cfg;
@@ -231,39 +233,29 @@ class DomTree final {
     void printDot(std::ostream &os) const;
 };
 
+
 class LoopAnalysis final {
   Function &f;
   CFG cfg;
 
-  std::map<const BasicBlock*, unsigned> number;
-  std::vector<const BasicBlock*> node;
+  std::unordered_map<const BasicBlock*, unsigned> number;
+  std::vector<BasicBlock*> node;
   std::vector<unsigned> last;
   void getDepthFirstSpanningTree();
 
   std::vector<unsigned> header;
   enum NodeType { nonheader, self, reducible, irreducible };
   std::vector<NodeType> type;
-  std::map<const BasicBlock*, std::vector<const BasicBlock*>> header_nodes;
-  std::multimap<const BasicBlock*, const BasicBlock*> tree_topdown;
-  std::map<const BasicBlock*, const BasicBlock*> tree_bottomup;
-  std::vector<const BasicBlock*> tree_roots;
-  void analysis();
+  std::unordered_map<BasicBlock*, std::vector<BasicBlock*>> forest;
+  std::unordered_map<BasicBlock*, BasicBlock*> parent;
+  std::vector<BasicBlock*> roots;
+  void run();
 public:
-  LoopAnalysis(Function &f) : f(f), cfg(f) { analysis(); }
-  std::map<const BasicBlock*, std::vector<const BasicBlock*>>&
-    getHeaderNodes() { return header_nodes; }
-  const std::vector<const BasicBlock*>& getRoots() const {
-    return std::move(tree_roots);
-  }
-  auto getChildren(const BasicBlock *bb) const {
-    return tree_topdown.equal_range(bb);
-  }
-  bool hasParent(const BasicBlock *bb) const {
-    return tree_bottomup.count(bb);
-  }
-  const BasicBlock* getParent(const BasicBlock *bb) const {
-    return tree_bottomup.at(bb);
-  }
+  LoopAnalysis(Function &f) : f(f), cfg(f) { run(); }
+
+  auto& getRoots() const { return roots; }
+  auto& getLoopForest() const { return forest; }
+  BasicBlock* getParent(BasicBlock *bb) const;
 
   void printDot(std::ostream &os) const;
 };

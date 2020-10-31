@@ -111,7 +111,7 @@ llvm::cl::opt<bool>
 
 llvm::cl::opt<bool> opt_print_dot(
     "tv-dot",
-    llvm::cl::desc("Alive: print .dot file with CFG of each function"),
+    llvm::cl::desc("Alive: print .dot files of each function"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 llvm::cl::opt<bool> opt_disable_poison_input(
@@ -244,13 +244,8 @@ struct TVPass final : public llvm::FunctionPass {
     I->second.fn = move(*fn);
 
     if (opt_print_dot) {
-      auto &f = I->second.fn;
-      ofstream file(f.getName() + '.' + to_string(I->second.order) + ".dot");
-      CFG cfg(f);
-      cfg.printDot(file);
-      ofstream fileDom(f.getName() + '.' + to_string(I->second.order++) +
-                       ".dom.dot");
-      DomTree(f, cfg).printDot(fileDom);
+      string prefix = to_string(I->second.order);
+      I->second.fn.writeDot(prefix.c_str());
     }
 
     if (first || skip_verify)
