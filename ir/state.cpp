@@ -549,8 +549,10 @@ void State::addNoReturn() {
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
   if (readsmem != rhs.readsmem ||
       argmemonly != rhs.argmemonly ||
-      fncall_ranges != rhs.fncall_ranges ||
-      m < rhs.m || rhs.m < m)
+      (readsmem && (
+        fncall_ranges != rhs.fncall_ranges ||
+        m < rhs.m || rhs.m < m
+      )))
     return false;
 
   AndExpr eq;
@@ -571,7 +573,7 @@ expr State::FnCallInput::refinedBy(
   const Memory &m2, bool readsmem2, bool argmemonly2) const {
 
   if (readsmem != readsmem2 || argmemonly != argmemonly2 ||
-      !fncall_ranges.overlaps(fncall_ranges2))
+      (readsmem && !fncall_ranges.overlaps(fncall_ranges2)))
     return false;
 
   AndExpr refines;
