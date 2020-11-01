@@ -154,8 +154,10 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   // e2: stripped expression
   auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef,
                                 expr &e2) {
-    // (ite (= #b0 isundef_%var) %var undef)
-    // (bvadd const (ite (= #b0 isundef_%var) %var undef))
+    // when e = (ite (= #b0 isundef_%var) %var undef):
+    //   var = %var, e2 = %var
+    // when e = (bvadd const (ite (= #b0 isundef_%var) %var undef))
+    //   var = %var, e2 = const + %var
     expr a, b;
     if (is_if_undef(e, var, not_undef)) {
       e2 = var;
@@ -204,7 +206,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        // newe = (bvadd c %var)
+        // val == %var
+        // val == (bvadd c %var)
         addUB(move(not_undef));
         mark_notundef(val);
         return expr::mkIf(newe == rhs, a, b);
@@ -229,10 +232,13 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvsle val (bvadd c (ite (= #b0 isundef_%var) %var undef))
       //       #b1 #b0)
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        // newe = (bvadd c %var)
+        // val <=s %var
+        // val <=s (bvadd c %var)
         expr cond = lhs == expr::IntSMin(lhs.bits());
         addUB(not_undef || cond);
         if (cond.isFalse())
+          // It is guaranteed that lhs isn't INT_MIN, so INT_MIN <= rhs
+          // never happens
           mark_notundef(val);
         return expr::mkIf(lhs.sle(newe), a, b);
       }
@@ -262,7 +268,11 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       int64_t n;
 
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
+      // (ite (bvule val (bvadd c (ite (= #b0 isundef_%var) %var undef)))
+      //       #b1 #b0)
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
+        // val <=u %var
+        // val <=u (bvadd c %var)
         addUB(not_undef || lhs == 0);
         if (lhs.isInt(n) && n != 0)
           mark_notundef(val);
@@ -270,6 +280,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       }
 
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
+      // (ite (bvule (bvadd c (ite (= #b0 isundef_%var) %var undef)) %val)
+      //       #b1 #b0)
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
         addUB(not_undef || rhs == expr::mkInt(-1, rhs));
         if (rhs.isInt(n) && n != -1)
