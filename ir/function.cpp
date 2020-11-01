@@ -426,26 +426,13 @@ void Function::unroll(unsigned k) {
       }
     }
 
-    // Clone exit blocks once more so that the last iteration of the loop can
-    // exit from the loop. Otherwise the last iteration would be wasted.
-    // TODO: skip BBs that are dominated by all other non-exit BBs. Those
-    // don't need to be duplicated as they are already at the end of the
-    // loop iteration
-    // FIXME: if we duplicate a BB other than the header, we many need to
-    // duplicate the prefix leading to it. See multiexit.srctgt.ll test.
-    for (auto *bb : own_loop_bbs) {
-      bool is_exit = false;
-      for (auto &tgt : bb->targets()) {
-        if (!bbmap.count(&tgt)) {
-          is_exit = true;
-          break;
-        }
-      }
-      if (!is_exit)
-        continue;
-
-      auto &copies = bbmap.at(bb);
-      copies.emplace_back(&cloneBB(*bb, "#exit", vmap));
+    // Clone the header once more so that the last iteration of the loop can
+    // exit. Otherwise the last iteration would be wasted.
+    // Here we assume the header is an exit, as that's the common case.
+    // If not, this extra duplication is wasteful.
+    {
+      auto &copies = bbmap.at(header);
+      copies.emplace_back(&cloneBB(*header, "#exit", vmap));
       unrolled_bbs.emplace_back(copies.back());
     }
 
