@@ -206,10 +206,10 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        // val == %var
-        // val == (bvadd c %var)
         addUB(move(not_undef));
         mark_notundef(val);
+        // %var == rhs
+        // (bvadd c %var) == rhs
         return expr::mkIf(newe == rhs, a, b);
       }
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
@@ -232,14 +232,14 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvsle val (bvadd c (ite (= #b0 isundef_%var) %var undef))
       //       #b1 #b0)
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        // val <=s %var
-        // val <=s (bvadd c %var)
         expr cond = lhs == expr::IntSMin(lhs.bits());
         addUB(not_undef || cond);
         if (cond.isFalse())
           // It is guaranteed that lhs isn't INT_MIN, so INT_MIN <= rhs
           // never happens
           mark_notundef(val);
+        // lhs <=s %var
+        // lhs <=s (bvadd c %var)
         return expr::mkIf(lhs.sle(newe), a, b);
       }
 
@@ -271,11 +271,11 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvule val (bvadd c (ite (= #b0 isundef_%var) %var undef)))
       //       #b1 #b0)
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        // val <=u %var
-        // val <=u (bvadd c %var)
         addUB(not_undef || lhs == 0);
         if (lhs.isInt(n) && n != 0)
           mark_notundef(val);
+        // lhs <=u %var
+        // lhs <=u (bvadd c %var)
         return expr::mkIf(lhs.ule(newe), a, b);
       }
 
