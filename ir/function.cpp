@@ -122,7 +122,7 @@ const BasicBlock* Function::getBBIfExists(std::string_view name) const {
   return I != BBs.end() ? &I->second : nullptr;
 }
 
-BasicBlock& Function::cloneBB(const BasicBlock &BB, const string &suffix,
+BasicBlock& Function::cloneBB(const BasicBlock &BB, const char *suffix,
                               unordered_map<const Value*, Value*> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = getBB(bb_name);
@@ -388,6 +388,7 @@ void Function::unroll(unsigned k) {
     worklist.pop_back();
 
     vector<BasicBlock*> loop_bbs = { header };
+    vector<BasicBlock*> own_loop_bbs = loop_bbs;
     auto I = forest.find(header);
     if (I != forest.end()) {
       for (auto *bb : I->second) {
@@ -397,6 +398,7 @@ void Function::unroll(unsigned k) {
         } else {
           loop_bbs.emplace_back(bb);
         }
+        own_loop_bbs.emplace_back(bb);
       }
     }
 
@@ -419,14 +421,37 @@ void Function::unroll(unsigned k) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
-        copies.emplace_back(&cloneBB(*bb, suffix, vmap));
+        copies.emplace_back(&cloneBB(*bb, suffix.c_str(), vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
     }
 
+    // Clone exit blocks once more so that the last iteration of the loop can
+    // exit from the loop. Otherwise the last iteration would be wasted.
+    // TODO: skip BBs that are dominated by all other non-exit BBs. Those
+    // don't need to be duplicated as they are already at the end of the
+    // loop iteration
+    // FIXME: if we duplicate a BB other than the header, we many need to
+    // duplicate the prefix leading to it. See multiexit.srctgt.ll test.
+    for (auto *bb : own_loop_bbs) {
+      bool is_exit = false;
+      for (auto &tgt : bb->targets()) {
+        if (!bbmap.count(&tgt)) {
+          is_exit = true;
+          break;
+        }
+      }
+      if (!is_exit)
+        continue;
+
+      auto &copies = bbmap.at(bb);
+      copies.emplace_back(&cloneBB(*bb, "#exit", vmap));
+      unrolled_bbs.emplace_back(copies.back());
+    }
+
     // Patch jump targets
     for (auto &[bb, copies] : bbmap) {
-      for (unsigned unroll = 0; unroll < k; ++unroll) {
+      for (unsigned unroll = 0, e = copies.size(); unroll < e; ++unroll) {
         auto *cloned = copies[unroll];
         for (auto &tgt : cloned->targets()) {
           // Loop exit; no patching needed
@@ -434,16 +459,16 @@ void Function::unroll(unsigned k) {
             continue;
 
           const BasicBlock *to = nullptr;
+          auto &dst_vect = bbmap[&tgt];
+          auto dst_unroll = dst_vect.size();
+
           // handle backedge
           if (&tgt == header) {
-            if (unroll == k-1)
-              to = &sink;
-            else
-              to = bbmap[&tgt][unroll + 1];
+            to = unroll+1 < dst_unroll ? dst_vect[unroll + 1] : &sink;
           }
           // handle targets inside loop
           else {
-            to = bbmap[&tgt][unroll];
+            to = unroll < dst_unroll ? dst_vect[unroll] : &sink;
           }
           cloned->replaceTargetWith(&tgt, to);
         }

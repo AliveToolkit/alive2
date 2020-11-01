@@ -1,5 +1,4 @@
-; FIXME: we should find the bug with unroll=2
-; TEST-ARGS: -src-unroll=3 -tgt-unroll=3
+; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
 ; ERROR: Value mismatch
 
 define i32 @src() {

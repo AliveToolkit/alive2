@@ -104,7 +104,7 @@ public:
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
 
-  BasicBlock& cloneBB(const BasicBlock &BB, const std::string &suffix,
+  BasicBlock& cloneBB(const BasicBlock &BB, const char *suffix,
                       std::unordered_map<const Value*, Value*> &vmap);
   void removeBB(BasicBlock &BB);
 
