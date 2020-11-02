@@ -66,20 +66,10 @@ void BasicBlock::replacePhiSrcWith(const string &from,
   }
 }
 
-void BasicBlock::removePhiSrc(const BasicBlock *bb) {
+void BasicBlock::removePhiSrc(const string &bb) {
   for (auto &i : instrs()) {
     if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i))) {
-      phi->removeValue(bb->getName());
-    }
-  }
-}
-
-void BasicBlock::removePhiSrcsExcept(const BasicBlock *bb) {
-  for (auto &i : instrs()) {
-    if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i))) {
-      for (auto &src : phi->sources())
-        if (bb->getName() != src)
-          phi->removeValue(src);
+      phi->removeValue(bb);
     }
   }
 }
@@ -162,6 +152,8 @@ const BasicBlock* Function::getBBIfExists(std::string_view name) const {
 }
 
 BasicBlock& Function::cloneBB(const BasicBlock &BB, const char *suffix,
+                              const unordered_map<const BasicBlock*,
+                                                  vector<BasicBlock*>> &bbmap,
                               unordered_map<const Value*, Value*> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = getBB(bb_name);
@@ -176,6 +168,21 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const char *suffix,
     vmap[&i] = d.get();
     newbb.addInstr(move(d));
   }
+
+  for (auto &src : newbb.phiSources()) {
+    bool replaced = false;
+    for (auto &[bb, copies] : bbmap) {
+      if (src == bb->getName()) {
+        newbb.replacePhiSrcWith(src, copies.back()->getName());
+        replaced = true;
+        break;
+      }
+    }
+
+    if (!replaced)
+      newbb.removePhiSrc(src);
+  }
+
   return newbb;
 }
 
@@ -447,19 +454,6 @@ void Function::unroll(unsigned k) {
       bbmap[bb].emplace_back(bb);
     }
 
-    // find latch block
-    // TODO: handle the case where multiple loops share one header
-    const BasicBlock *latch = nullptr;
-    for (auto &[bb, _] : bbmap) {
-      for (auto &tgt : bb->targets()) {
-        if (header == &tgt) {
-          latch = bb;
-          break;
-        }
-      }
-      if (latch) break;
-    }
-
     // Clone BBs
     // Note that the BBs list must be iterated in top-sort order so that
     // values from previous BBs are available in vmap
@@ -473,7 +467,7 @@ void Function::unroll(unsigned k) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
-        copies.emplace_back(&cloneBB(*bb, suffix.c_str(), vmap));
+        copies.emplace_back(&cloneBB(*bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
     }
@@ -484,7 +478,7 @@ void Function::unroll(unsigned k) {
     // If not, this extra duplication is wasteful.
     {
       auto &copies = bbmap.at(header);
-      copies.emplace_back(&cloneBB(*header, "#exit", vmap));
+      copies.emplace_back(&cloneBB(*header, "#exit", bbmap, vmap));
       unrolled_bbs.emplace_back(copies.back());
     }
 
@@ -510,34 +504,6 @@ void Function::unroll(unsigned k) {
             to = unroll < dst_unroll ? dst_vect[unroll] : &sink;
           }
           cloned->replaceTargetWith(&tgt, to);
-        }
-      }
-    }
-
-    // Patch phi sources
-    // for header, remove the phi source that comes from backedge
-    header->removePhiSrc(latch);
-    // for the copies of header
-    auto header_copies = bbmap[header];
-    for (unsigned unroll = 1, e = header_copies.size(); unroll < e; ++unroll) {
-      auto *cloned_header = header_copies[unroll];
-      // preserve only latch as source
-      cloned_header->removePhiSrcsExcept(latch);
-      // rewrite incoming phi source in Kth copy's header to (K-1)th copy's latch
-      auto to = bbmap[latch][unroll-1]->getName();
-      cloned_header->replacePhiSrcWith(latch->getName(), to);
-    }
-
-    // for non-headers, update phi sources that is coming from inside loop
-    for (auto &[bb, copies] : bbmap) {
-      if (bb == header)
-        continue;
-      for (unsigned unroll = 1, e = copies.size(); unroll < e; ++unroll) {
-        auto *cloned = copies[unroll];
-        auto srcs = bb->phiSources();
-        for (auto from : srcs) {
-          auto to = bbmap[&getBB(from)][unroll]->getName();
-          cloned->replacePhiSrcWith(from, to);
         }
       }
     }

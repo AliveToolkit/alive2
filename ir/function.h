@@ -48,8 +48,7 @@ public:
   JumpInstr::it_helper targets() const;
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
   void replacePhiSrcWith(const std::string &from, const std::string &to);
-  void removePhiSrc(const BasicBlock *bb);
-  void removePhiSrcsExcept(const BasicBlock *bb);
+  void removePhiSrc(const std::string &bb);
   std::vector<std::string> phiSources() const;
 
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
@@ -109,6 +108,8 @@ public:
   const BasicBlock* getBBIfExists(std::string_view name) const;
 
   BasicBlock& cloneBB(const BasicBlock &BB, const char *suffix,
+                      const std::unordered_map<const BasicBlock*,
+                                               std::vector<BasicBlock*>> &bbmap,
                       std::unordered_map<const Value*, Value*> &vmap);
   void removeBB(BasicBlock &BB);
 
