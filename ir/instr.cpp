@@ -2047,6 +2047,23 @@ void Phi::removeValue(const string &BB_name) {
   }
 }
 
+vector<string> Phi::sources() const {
+  vector<string> s;
+  for (auto &[_, bb] : values) {
+    s.emplace_back(bb);
+  }
+  return s;
+}
+
+void Phi::replaceSourceWith(const string &from, const string &to) {
+  for (auto &[_, bb] : values) {
+    if (bb == from) {
+      bb = to;
+      break;
+    }
+  }
+}
+
 vector<Value*> Phi::operands() const {
   vector<Value*> v;
   for (auto &[val, bb] : values) {
