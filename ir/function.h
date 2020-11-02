@@ -47,6 +47,10 @@ public:
   bool empty() const { return m_instrs.empty(); }
   JumpInstr::it_helper targets() const;
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
+  void replacePhiSrcWith(const std::string &from, const std::string &to);
+  void removePhiSrc(const BasicBlock *bb);
+  void removePhiSrcsExcept(const BasicBlock *bb);
+  std::vector<std::string> phiSources() const;
 
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
 
