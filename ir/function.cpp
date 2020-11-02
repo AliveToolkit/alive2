@@ -151,10 +151,12 @@ const BasicBlock* Function::getBBIfExists(std::string_view name) const {
   return I != BBs.end() ? &I->second : nullptr;
 }
 
-BasicBlock& Function::cloneBB(const BasicBlock &BB, const char *suffix,
-                              const unordered_map<const BasicBlock*,
-                                                  vector<BasicBlock*>> &bbmap,
-                              unordered_map<const Value*, Value*> &vmap) {
+BasicBlock&
+Function::cloneBB(const BasicBlock &BB, const char *suffix,
+                  const unordered_map<const BasicBlock*,
+                                      vector<BasicBlock*>> &bbmap,
+                  unordered_map<const Value*,
+                                vector<pair<BasicBlock*, Value*>>> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = getBB(bb_name);
   for (auto &i : BB.instrs()) {
@@ -162,10 +164,10 @@ BasicBlock& Function::cloneBB(const BasicBlock &BB, const char *suffix,
     for (auto &op : d->operands()) {
       auto it = vmap.find(op);
       if (it != vmap.end()) {
-        d->rauw(*op, *it->second);
+        d->rauw(*op, *it->second.back().second);
       }
     }
-    vmap[&i] = d.get();
+    vmap[&i].emplace_back(&newbb, d.get());
     newbb.addInstr(move(d));
   }
 
@@ -416,6 +418,9 @@ void Function::unroll(unsigned k) {
   // computed bottom-up during the post-order traversal below
   unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
 
+  // grab all value users before duplication so the list is shorter
+  auto users = getUsers();
+
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
     auto &[header, height, flag] = worklist.back();
@@ -458,7 +463,7 @@ void Function::unroll(unsigned k) {
     // Note that the BBs list must be iterated in top-sort order so that
     // values from previous BBs are available in vmap
     auto &unrolled_bbs = loop_nodes.emplace(header, loop_bbs).first->second;
-    unordered_map<const Value*, Value*> vmap;
+    unordered_map<const Value*, vector<pair<BasicBlock*, Value*>>> vmap;
     string name_prefix;
     for (unsigned i = 0; i < height; ++i) {
       name_prefix += "#1";
@@ -504,6 +509,25 @@ void Function::unroll(unsigned k) {
             to = unroll < dst_unroll ? dst_vect[unroll] : &sink;
           }
           cloned->replaceTargetWith(&tgt, to);
+        }
+      }
+    }
+
+    // patch users outside of the loop
+    for (auto &[val, copies] : vmap) {
+      for (auto I = users.equal_range(const_cast<Value*>(val));
+           I.first != I.second; ++I.first) {
+        auto *user = I.first->second;
+        // users inside the loop have been patched already
+        if (vmap.count(user))
+          continue;
+
+        if (auto phi = dynamic_cast<Phi*>(user)) {
+          for (auto &[bb, val] : copies) {
+            phi->addValue(*val, string(bb->getName()));
+          }
+        } else {
+          // TODO : needs to insert a new phi
         }
       }
     }

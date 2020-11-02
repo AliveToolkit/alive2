@@ -107,10 +107,12 @@ public:
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
 
-  BasicBlock& cloneBB(const BasicBlock &BB, const char *suffix,
-                      const std::unordered_map<const BasicBlock*,
-                                               std::vector<BasicBlock*>> &bbmap,
-                      std::unordered_map<const Value*, Value*> &vmap);
+  BasicBlock&
+  cloneBB(const BasicBlock &BB, const char *suffix,
+          const std::unordered_map<const BasicBlock*,
+                                   std::vector<BasicBlock*>> &bbmap,
+          std::unordered_map<const Value*,
+                            std::vector<std::pair<BasicBlock*, Value*>>> &vmap);
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);
