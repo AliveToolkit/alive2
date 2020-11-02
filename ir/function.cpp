@@ -370,8 +370,7 @@ bool Function::removeUnusedStuff(const multimap<Value*, Value*> &users,
   return changed;
 }
 
-void Function::topSort() {
-  auto &bbs = getBBs();
+static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
   edgesTy edges(bbs.size());
   unordered_map<const BasicBlock*, unsigned> bb_map;
 
@@ -383,7 +382,9 @@ void Function::topSort() {
   i = 0;
   for (auto bb : bbs) {
     for (auto &dst : bb->targets()) {
-      edges[i].emplace(bb_map.at(&dst));
+      auto dst_I = bb_map.find(&dst);
+      if (dst_I != bb_map.end())
+        edges[i].emplace(dst_I->second);
     }
     ++i;
   }
@@ -394,8 +395,12 @@ void Function::topSort() {
     sorted_bbs.emplace_back(bbs[v]);
   }
 
-  assert(sorted_bbs.size() == BB_order.size());
-  BB_order = move(sorted_bbs);
+  assert(sorted_bbs.size() == bbs.size());
+  return sorted_bbs;
+}
+
+void Function::topSort() {
+  BB_order = top_sort(BB_order);
 }
 
 void Function::unroll(unsigned k) {
@@ -442,7 +447,7 @@ void Function::unroll(unsigned k) {
     vector<BasicBlock*> own_loop_bbs = loop_bbs;
     auto I = forest.find(header);
     if (I != forest.end()) {
-      for (auto *bb : I->second) {
+      for (auto *bb : top_sort(I->second)) {
         auto II = loop_nodes.find(bb);
         if (II != loop_nodes.end()) {
           loop_bbs.insert(loop_bbs.end(), II->second.begin(), II->second.end());
@@ -831,15 +836,6 @@ void LoopAnalysis::run() {
       parent.emplace(node[i], node[h]);
       forest[node[h]].emplace_back(node[i]);
     }
-  }
-
-  // sort nodes with DFST pre-order so that BB cloning won't break dominance
-  for (auto &[_, nodes] : forest) {
-    sort(nodes.begin(), nodes.end(),
-      [&](const BasicBlock *a, const BasicBlock *b) -> bool {
-        return number.at(a) < number.at(b);
-      }
-    );
   }
 }
 
