@@ -2057,8 +2057,10 @@ vector<string> Phi::sources() const {
 
 void Phi::replaceSourceWith(const string &from, const string &to) {
   for (auto &[_, bb] : values) {
-    if (bb == from)
+    if (bb == from) {
       bb = to;
+      break;
+    }
   }
 }
 
