@@ -23,68 +23,66 @@ Please contact us or submit a PR if something is missing or inaccurate.
 6. DivRemPairs is incorrect in the presence of undef
 (https://bugs.llvm.org/show_bug.cgi?id=42619)
 
-7. EmitGEPOffset() incorrectly adds NUW to multiplications
-(https://bugs.llvm.org/show_bug.cgi?id=42699)
-
-8. Incorrect fold of uadd.with.overflow with undef
+7. Incorrect fold of uadd.with.overflow with undef
 (https://bugs.llvm.org/show_bug.cgi?id=43188)
 
-9. Incorrect fold of ashr+xor -> lshr w/ vectors
+8. Incorrect fold of ashr+xor -> lshr w/ vectors
 (https://bugs.llvm.org/show_bug.cgi?id=43665)
 
-10. Incorrect 'icmp sle' -> 'icmp slt' w/ vectors
+9. Incorrect 'icmp sle' -> 'icmp slt' w/ vectors
 (https://bugs.llvm.org/show_bug.cgi?id=43730)
 
-11. shuffle undef mask on vectors with poison elements
+10. shuffle undef mask on vectors with poison elements
 (https://bugs.llvm.org/show_bug.cgi?id=43958)
 
-12. Can't remove shufflevector if input might be poison
+11. Can't remove shufflevector if input might be poison
 (https://bugs.llvm.org/show_bug.cgi?id=44185)
 
-13. Incorrect instcombine transform urem -> icmp+zext with vectors
+12. Incorrect instcombine transform urem -> icmp+zext with vectors
 (https://bugs.llvm.org/show_bug.cgi?id=44186)
 
-14. Instcombine: incorrect transformation 'x > (x & undef)' -> 'x > undef'
+13. Instcombine: incorrect transformation 'x > (x & undef)' -> 'x > undef'
 (https://bugs.llvm.org/show_bug.cgi?id=44383)
 
-15. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
+14. Incorrect transformation: (undef u>> a) ^ -1 -> undef >> a, when a != 0
 (https://bugs.llvm.org/show_bug.cgi?id=45447)
 
-16. Invalid undef splat in instcombine
+15. Invalid undef splat in instcombine
 (https://bugs.llvm.org/show_bug.cgi?id=45455)
 
-17. Incorrect transformation of minnum with nnan
+16. Incorrect transformation of minnum with nnan
 (https://bugs.llvm.org/show_bug.cgi?id=45478)
 
-18. Can't remove insertelement undef
+17. Can't remove insertelement undef
 (https://bugs.llvm.org/show_bug.cgi?id=45481)
 
-19. InstSimplify: fadd (nsz op), +0 incorrectly removed
+18. InstSimplify: fadd (nsz op), +0 incorrectly removed
 (https://bugs.llvm.org/show_bug.cgi?id=45778)
 
-20. Incorrect instcombine fold of control-flow to umul.with.overflow
+19. Incorrect instcombine fold of control-flow to umul.with.overflow
 (https://bugs.llvm.org/show_bug.cgi?id=45952)
 
-21. Incorrect instcombine fold of vector ult -> sgt
+20. Incorrect instcombine fold of vector ult -> sgt
 (https://bugs.llvm.org/show_bug.cgi?id=45954)
 
-22. Jumpthreading introduces jump on poison
+21. Jumpthreading introduces jump on poison
 (https://bugs.llvm.org/show_bug.cgi?id=45956)
 
-23. Incorrect transformation: mul foo, undef -> shl foo, undef
+22. Incorrect transformation: mul foo, undef -> shl foo, undef
 (https://bugs.llvm.org/show_bug.cgi?id=47133)
 
-24. Incorrect transformation: (llvm.maximum undef, %x) -> undef
+23. Incorrect transformation: (llvm.maximum undef, %x) -> undef
 (https://bugs.llvm.org/show_bug.cgi?id=47567)
 
-25. InstCombine: incorrect select operand simplification with undef
+24. InstCombine: incorrect select operand simplification with undef
 (https://bugs.llvm.org/show_bug.cgi?id=47696)
 
-26. SCEVExpander introduces branch on poison
+25. SCEVExpander introduces branch on poison
 (https://bugs.llvm.org/show_bug.cgi?id=47769)
 
-27. Incorrect transformation of fabs with nnan flag
+26. Incorrect transformation of fabs with nnan flag
 (https://bugs.llvm.org/show_bug.cgi?id=47960)
+
 
 ### Memory Operations
 
@@ -155,13 +153,13 @@ NOTE: Alive2 can't find this bug anymore due to changes to reduce false-positive
 1. https://github.com/Z3Prover/z3/issues/2369 - bug in bitblast for FPA
 2. https://github.com/Z3Prover/z3/issues/2596 - bug in FPA w/ quantifiers
 3. https://github.com/Z3Prover/z3/issues/2631 - bug in FPA w/ quantifiers
-4. https://github.com/Z3Prover/z3/issues/2792 - Lambdas don't like quantified variables in body
-5. https://github.com/Z3Prover/z3/issues/2822 - bug in MBQI
-6. https://github.com/Z3Prover/z3/commit/0b14f1b6f6bb33b555bace93d644163987b0c54f - equality of arrays w/ lambdas
-7. https://github.com/Z3Prover/z3/issues/2865 - crash in FPA model construction
-8. https://github.com/Z3Prover/z3/issues/2878 - crash in BV theory assertion
-9. https://github.com/Z3Prover/z3/issues/2879 - crash in SMT eq propagation assertion
-10. https://github.com/Z3Prover/z3/commit/bb5edb7c653f9351fe674630d63cdd2b10338277 - assertion violation in qe_lite
-11. https://github.com/Z3Prover/z3/issues/4192 - SMT internalize doesn't respect timeout
-12. https://github.com/Z3Prover/z3/issues/2761 - crash in printing multi precision integer
-13. https://github.com/Z3Prover/z3/issues/2652 - crash in partial model mode
+4. https://github.com/Z3Prover/z3/issues/2652 - crash in partial model mode
+5. https://github.com/Z3Prover/z3/issues/2761 - crash in printing multi precision integer
+6. https://github.com/Z3Prover/z3/issues/2792 - Lambdas don't like quantified variables in body
+7. https://github.com/Z3Prover/z3/issues/2822 - bug in MBQI
+8. https://github.com/Z3Prover/z3/commit/0b14f1b6f6bb33b555bace93d644163987b0c54f - equality of arrays w/ lambdas
+9. https://github.com/Z3Prover/z3/issues/2865 - crash in FPA model construction
+10. https://github.com/Z3Prover/z3/issues/2878 - crash in BV theory assertion
+11. https://github.com/Z3Prover/z3/issues/2879 - crash in SMT eq propagation assertion
+12. https://github.com/Z3Prover/z3/commit/bb5edb7c653f9351fe674630d63cdd2b10338277 - assertion violation in qe_lite
+13. https://github.com/Z3Prover/z3/issues/4192 - SMT internalize doesn't respect the timeout
