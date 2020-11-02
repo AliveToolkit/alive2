@@ -89,7 +89,7 @@ vector<string> BasicBlock::phiSources() const {
 
   for (auto &i : instrs()) {
     if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i))) {
-      auto &&v = phi->sources();
+      auto v = phi->sources();
       s.insert(s.end(), v.begin(), v.end());
     }
   }
