@@ -1,4 +1,5 @@
 ; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
+; ERROR: Value mismatch
 
 define i32 @src() {
 entry:
@@ -24,5 +25,5 @@ for.end:
 }
 
 define i32 @tgt() {
-  ret i32 2
+  ret i32 0
 }
