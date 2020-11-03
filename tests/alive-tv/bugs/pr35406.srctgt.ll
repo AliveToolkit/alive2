@@ -1,8 +1,8 @@
-; https://bugs.llvm.org/show_bug.cgi?id=35406
-; Currently Alive2 simply rejects this example. After loop support, this should
-; be verified (as an incorrect transformation)
+; TEST-ARGS: -src-unroll=7 -tgt-unroll=7
+; ERROR: Source is more defined than target
 
-; ModuleID = 'repro.ll'
+; https://bugs.llvm.org/show_bug.cgi?id=35406
+
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128:1"
 target triple = "x86_64-unknown-linux-gnu"
 
@@ -84,6 +84,3 @@ loop2.exit:                                       ; preds = %loop2.exit.loopexit
 exit:                                             ; preds = %loop2.exit, %loop1
   ret i32 0
 }
-
-; XFAIL: Precondition is always false
-; SKIP-IDENTITY
