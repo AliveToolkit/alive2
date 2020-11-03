@@ -36,7 +36,7 @@ public:
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 
-  void addInstr(std::unique_ptr<Instr> &&i);
+  void addInstr(std::unique_ptr<Instr> &&i, bool push_front = false);
   void delInstr(Instr *i);
 
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
@@ -169,8 +169,9 @@ public:
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
 
-  std::multimap<Value*, Value*> getUsers() const;
-  bool removeUnusedStuff(const std::multimap<Value*, Value*> &users,
+  using UsersTy = std::map<Value*, std::vector<std::pair<Value*, BasicBlock*>>>;
+  UsersTy getUsers() const;
+  bool removeUnusedStuff(const UsersTy &users,
                          const std::vector<std::string_view> &src_glbs);
 
   void topSort();
@@ -212,27 +213,27 @@ public:
 
 
 class DomTree final {
-    Function &f;
-    CFG &cfg;
+  const Function &f;
 
-    struct DomTreeNode {
-      const BasicBlock &bb;
-      std::vector<DomTreeNode*> preds;
-      DomTreeNode *dominator = nullptr;
-      unsigned order;
+  struct DomTreeNode {
+    const BasicBlock &bb;
+    std::vector<DomTreeNode*> preds;
+    DomTreeNode *dominator = nullptr;
+    unsigned order;
 
-      DomTreeNode(const BasicBlock &bb) : bb(bb) {}
-    };
+    DomTreeNode(const BasicBlock &bb) : bb(bb) {}
+  };
 
-    std::unordered_map<const BasicBlock*, DomTreeNode> doms;
+  std::unordered_map<const BasicBlock*, DomTreeNode> doms;
 
-    void buildDominators();
-    static DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
+  void buildDominators(const CFG &cfg);
+  static DomTreeNode* intersect(DomTreeNode *b1, DomTreeNode *b2);
 
-  public:
-    DomTree(Function &f, CFG &cfg) : f(f), cfg(cfg) { buildDominators(); }
-    const BasicBlock* getIDominator(const BasicBlock &bb) const;
-    void printDot(std::ostream &os) const;
+public:
+  DomTree(const Function &f, const CFG &cfg) : f(f) { buildDominators(cfg); }
+  const BasicBlock* getIDominator(const BasicBlock &bb) const;
+  bool dominates(const BasicBlock *a, const BasicBlock *b) const;
+  void printDot(std::ostream &os) const;
 };
 
 

@@ -1,5 +1,5 @@
 ; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
-; ERROR: Value mismatch
+; ERROR: Target is more poisonous than source
 
 define i8 @src(i1 %c, i8 %a, i8 %b) {
 entry:
