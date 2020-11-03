@@ -567,7 +567,7 @@ void Function::unroll(unsigned k) {
 
       for (auto &[user, user_bb] : I->second) {
         // users inside the loop have been patched already
-        if (vmap.count(user))
+        if (bbmap.count(user_bb))
           continue;
 
         if (auto phi = dynamic_cast<Phi*>(user)) {
