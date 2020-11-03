@@ -1,4 +1,4 @@
-; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
+; TEST-ARGS: -src-unroll=3 -tgt-unroll=3
 ; ERROR: Value mismatch
 
 define i32 @src(i1 %bool) {

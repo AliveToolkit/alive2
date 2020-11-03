@@ -486,7 +486,7 @@ void Function::unroll(unsigned k) {
     // exit. Otherwise the last iteration would be wasted.
     // Here we assume the header is an exit, as that's the common case.
     // If not, this extra duplication is wasteful.
-    {
+    if (bbmap.size() > 1) {
       auto &copies = bbmap.at(header);
       copies.emplace_back(&cloneBB(*header, "#exit", bbmap, vmap));
       unrolled_bbs.emplace_back(copies.back());
