@@ -151,43 +151,6 @@ const BasicBlock* Function::getBBIfExists(std::string_view name) const {
   return I != BBs.end() ? &I->second : nullptr;
 }
 
-BasicBlock&
-Function::cloneBB(const BasicBlock &BB, const char *suffix,
-                  const unordered_map<const BasicBlock*,
-                                      vector<BasicBlock*>> &bbmap,
-                  unordered_map<const Value*,
-                                vector<pair<BasicBlock*, Value*>>> &vmap) {
-  string bb_name = BB.getName() + suffix;
-  auto &newbb = getBB(bb_name);
-  for (auto &i : BB.instrs()) {
-    auto d = i.dup(suffix);
-    for (auto &op : d->operands()) {
-      auto it = vmap.find(op);
-      if (it != vmap.end()) {
-        d->rauw(*op, *it->second.back().second);
-      }
-    }
-    vmap[&i].emplace_back(&newbb, d.get());
-    newbb.addInstr(move(d));
-  }
-
-  for (auto &src : newbb.phiSources()) {
-    bool replaced = false;
-    for (auto &[bb, copies] : bbmap) {
-      if (src == bb->getName()) {
-        newbb.replacePhiSrcWith(src, copies.back()->getName());
-        replaced = true;
-        break;
-      }
-    }
-
-    if (!replaced)
-      newbb.removePhiSrc(src);
-  }
-
-  return newbb;
-}
-
 void Function::removeBB(BasicBlock &BB) {
   BBs.erase(BB.getName());
 
@@ -403,6 +366,53 @@ void Function::topSort() {
   BB_order = top_sort(BB_order);
 }
 
+static BasicBlock&
+cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
+        const unordered_map<const BasicBlock*, vector<BasicBlock*>> &bbmap,
+        unordered_map<const Value*, vector<pair<BasicBlock*, Value*>>> &vmap) {
+  string bb_name = BB.getName() + suffix;
+  auto &newbb = F.getBB(bb_name);
+  for (auto &i : BB.instrs()) {
+    auto d = i.dup(suffix);
+    for (auto &op : d->operands()) {
+      auto it = vmap.find(op);
+      if (it != vmap.end()) {
+        d->rauw(*op, *it->second.back().second);
+      }
+    }
+    vmap[&i].emplace_back(&newbb, d.get());
+    newbb.addInstr(move(d));
+  }
+
+  for (auto &src : newbb.phiSources()) {
+    bool replaced = false;
+    for (auto &[bb, copies] : bbmap) {
+      if (src == bb->getName()) {
+        newbb.replacePhiSrcWith(src, copies.back()->getName());
+        replaced = true;
+        break;
+      }
+    }
+
+    if (!replaced)
+      newbb.removePhiSrc(src);
+  }
+
+  return newbb;
+}
+
+static auto getPhiPredecessors(const Function &F) {
+  unordered_map<string, vector<pair<Phi*, Value*>>> map;
+  for (auto &i : F.instrs()) {
+    if (auto phi = dynamic_cast<const Phi*>(&i)) {
+      for (auto &[val, pred] : phi->getValues()) {
+        map[pred].emplace_back(const_cast<Phi*>(phi), const_cast<Value*>(val));
+      }
+    }
+  }
+  return map;
+}
+
 void Function::unroll(unsigned k) {
   if (k == 0)
     return;
@@ -425,6 +435,7 @@ void Function::unroll(unsigned k) {
 
   // grab all value users before duplication so the list is shorter
   auto users = getUsers();
+  auto phi_preds = getPhiPredecessors(*this);
 
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
@@ -477,7 +488,7 @@ void Function::unroll(unsigned k) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
-        copies.emplace_back(&cloneBB(*bb, suffix.c_str(), bbmap, vmap));
+        copies.emplace_back(&cloneBB(*this, *bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
     }
@@ -488,7 +499,7 @@ void Function::unroll(unsigned k) {
     // If not, this extra duplication is wasteful.
     if (bbmap.size() > 1) {
       auto &copies = bbmap.at(header);
-      copies.emplace_back(&cloneBB(*header, "#exit", bbmap, vmap));
+      copies.emplace_back(&cloneBB(*this, *header, "#exit", bbmap, vmap));
       unrolled_bbs.emplace_back(copies.back());
     }
 
@@ -533,6 +544,24 @@ void Function::unroll(unsigned k) {
           }
         } else {
           // TODO : needs to insert a new phi
+        }
+      }
+    }
+
+    // patch phis outside the loop with constant values
+    for (auto *bb : own_loop_bbs) {
+      auto I = phi_preds.find(bb->getName());
+      if (I == phi_preds.end())
+        continue;
+
+      for (auto &[phi, val] : I->second) {
+        if (!vmap.count(val)) {
+          for (auto *dup : bbmap.at(bb)) {
+            // already in the phi
+            if (dup == bb)
+              continue;
+            phi->addValue(*val, string(dup->getName()));
+          }
         }
       }
     }

@@ -107,12 +107,6 @@ public:
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock* getBBIfExists(std::string_view name) const;
 
-  BasicBlock&
-  cloneBB(const BasicBlock &BB, const char *suffix,
-          const std::unordered_map<const BasicBlock*,
-                                   std::vector<BasicBlock*>> &bbmap,
-          std::unordered_map<const Value*,
-                            std::vector<std::pair<BasicBlock*, Value*>>> &vmap);
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);
@@ -198,6 +192,7 @@ public:
     std::vector<BasicBlock*>::iterator bbi, bbe;
     JumpInstr::target_iterator ti, te;
     void next();
+
   public:
     edge_iterator(std::vector<BasicBlock*>::iterator &&it,
                   std::vector<BasicBlock*>::iterator &&end);
@@ -257,6 +252,7 @@ class LoopAnalysis final {
   std::unordered_map<BasicBlock*, BasicBlock*> parent;
   std::vector<BasicBlock*> roots;
   void run();
+
 public:
   LoopAnalysis(Function &f) : f(f), cfg(f) { run(); }
 

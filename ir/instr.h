@@ -295,6 +295,8 @@ public:
   void addValue(Value &val, std::string &&BB_name);
   void removeValue(const std::string &BB_name);
   void replaceSourceWith(const std::string &from, const std::string &to);
+
+  const auto& getValues() const { return values; }
   std::vector<std::string> sources() const;
 
   std::vector<Value*> operands() const override;
