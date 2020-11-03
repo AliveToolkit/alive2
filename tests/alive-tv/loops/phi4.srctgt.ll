@@ -1,5 +1,4 @@
-; TEST-ARGS: -src-unroll=1 -tgt-unroll=1
-; SKIP-IDENTITY (fixme)
+; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
 
 define i32 @src(i1 %bool) {
 entry:
@@ -26,5 +25,5 @@ exit:
 }
 
 define i32 @tgt(i1 %bool) {
-  ret i32 2
+  ret i32 3
 }
