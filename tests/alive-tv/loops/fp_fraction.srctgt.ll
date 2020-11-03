@@ -4,8 +4,7 @@
 
 ; https://godbolt.org/z/dKxzKx
 
-; Function Attrs: norecurse nounwind readnone uwtable
-define dso_local i32 @src(i32 %0) local_unnamed_addr #0 {
+define i32 @src(i32 %0) {
   br label %2
 
 2:                                                ; preds = %2, %1
@@ -19,8 +18,7 @@ define dso_local i32 @src(i32 %0) local_unnamed_addr #0 {
   ret i32 %3
 }
 
-; Function Attrs: nounwind readnone uwtable
-define dso_local i32 @tgt(i32 %0) local_unnamed_addr #1 {
+define i32 @tgt(i32 %0) {
   %2 = and i32 %0, 8388608
   %3 = icmp eq i32 %2, 0
   br i1 %3, label %4, label %9
@@ -37,5 +35,4 @@ define dso_local i32 @tgt(i32 %0) local_unnamed_addr #1 {
   ret i32 %10
 }
 
-; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
-declare i32 @llvm.ctlz.i32(i32, i1 immarg) #2
+declare i32 @llvm.ctlz.i32(i32, i1 immarg)
