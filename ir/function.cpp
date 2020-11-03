@@ -589,12 +589,24 @@ void Function::unroll(unsigned k) {
           if (!newphi) {
             auto phi = make_unique<Phi>(val->getType(),
                                         val->getName() + "#phi");
-            phi->addValue(*const_cast<Value*>(val), string(exit->getName()));
-            for (auto &[bb, val] : copies) {
-              phi->addValue(*val, string(bb->getName()));
-            }
             newphi = phi.get();
             dst->addInstr(move(phi), true);
+          }
+
+          // we may have multiple edges from the loop into this BB
+          // we need to duplicate the predecessor list for each of the
+          // original incoming BB
+          auto all_preds = newphi->sources();
+          if (find(all_preds.begin(), all_preds.end(), exit->getName()) ==
+                all_preds.end()) {
+            newphi->addValue(*const_cast<Value*>(val), string(exit->getName()));
+            auto &bb_dups = bbmap.at(exit);
+            auto bb_I = bb_dups.begin(), bb_E = bb_dups.end();
+            for (auto &[_, val] : copies) {
+              if (++bb_I == bb_E)
+                break;
+              newphi->addValue(*val, string((*bb_I)->getName()));
+            }
           }
 
           auto *i = dynamic_cast<Instr*>(user);
