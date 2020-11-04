@@ -829,9 +829,11 @@ bool DomTree::dominates(const BasicBlock *a, const BasicBlock *b) const {
   auto *dom_a = &doms.at(a);
   auto *dom_b = &doms.at(b);
   // walk up the dominator tree of 'b' until we find 'a' or the function's entry
-  while (dom_b) {
+  while (true) {
     if (dom_b == dom_a)
       return true;
+    if (dom_b == dom_b->dominator)
+      break;
     dom_b = dom_b->dominator;
   }
   return false;
