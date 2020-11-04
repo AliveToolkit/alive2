@@ -2067,7 +2067,6 @@ void Phi::replaceSourceWith(const string &from, const string &to) {
 vector<Value*> Phi::operands() const {
   vector<Value*> v;
   for (auto &[val, bb] : values) {
-    (void)bb;
     v.emplace_back(val);
   }
   return v;
@@ -2075,8 +2074,16 @@ vector<Value*> Phi::operands() const {
 
 void Phi::rauw(const Value &what, Value &with) {
   for (auto &[val, bb] : values) {
-    (void)bb;
     RAUW(val);
+  }
+}
+
+void Phi::replace(const string &predecessor, Value &newval) {
+  for (auto &[val, bb] : values) {
+    if (bb == predecessor) {
+      val = &newval;
+      break;
+    }
   }
 }
 
@@ -2111,7 +2118,6 @@ StateValue Phi::toSMT(State &s) const {
 expr Phi::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints();
   for (auto &[val, bb] : values) {
-    (void)bb;
     c &= val->getType() == getType();
   }
   return c;
@@ -2217,7 +2223,6 @@ void Switch::replaceTargetWith(const BasicBlock *from, const BasicBlock *to) {
 vector<Value*> Switch::operands() const {
   vector<Value*> ret = { value };
   for (auto &[val, target] : targets) {
-    (void)target;
     ret.emplace_back(val);
   }
   return ret;
@@ -2226,7 +2231,6 @@ vector<Value*> Switch::operands() const {
 void Switch::rauw(const Value &what, Value &with) {
   RAUW(value);
   for (auto &[val, target] : targets) {
-    (void)target;
     RAUW(val);
   }
 }
@@ -2742,7 +2746,6 @@ uint64_t GEP::getMaxGEPOffset() const {
 vector<Value*> GEP::operands() const {
   vector<Value*> v = { ptr };
   for (auto &[sz, idx] : idxs) {
-    (void)sz;
     v.emplace_back(idx);
   }
   return v;
@@ -2751,7 +2754,6 @@ vector<Value*> GEP::operands() const {
 void GEP::rauw(const Value &what, Value &with) {
   RAUW(ptr);
   for (auto &[sz, idx] : idxs) {
-    (void)sz;
     RAUW(idx);
   }
 }
@@ -2833,7 +2835,6 @@ expr GEP::getTypeConstraints(const Function &f) const {
            getType().enforceVectorTypeIff(ptr->getType()) &&
            getType().enforcePtrOrVectorType();
   for (auto &[sz, idx] : idxs) {
-    (void)sz;
     // It is allowed to have non-vector idx with vector pointer operand
     c &= idx->getType().enforceIntOrVectorType() &&
           getType().enforceVectorTypeIff(idx->getType());

@@ -301,6 +301,7 @@ public:
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
+  void replace(const std::string &predecessor, Value &newval);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;

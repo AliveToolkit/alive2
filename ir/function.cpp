@@ -548,6 +548,7 @@ void Function::unroll(unsigned k) {
 
     // cache of introduced phis
     map<pair<const BasicBlock*, const Value*>, Phi*> new_phis;
+    unsigned phi_counter = 0;
 
     auto bb_of = [&](const Value *val) {
       for (auto *bb : loop_bbs) {
@@ -570,25 +571,26 @@ void Function::unroll(unsigned k) {
         if (bbmap.count(user_bb))
           continue;
 
-        if (auto phi = dynamic_cast<Phi*>(user)) {
-          for (auto &[bb, val] : copies) {
-            phi->addValue(*val, string(bb->getName()));
-          }
-          continue;
-        }
-
         // insert a new phi on each dominator exit
         vector<pair<BasicBlock*, Phi*>> added_phis;
 
         for (auto &[exit, dst] : exit_edges) {
-          if (!dom_tree.dominates(dst, user_bb) ||
-              !dom_tree.dominates(bb_of(val), exit))
+          if (!dom_tree.dominates(bb_of(val), exit))
             continue;
+
+          if (auto phi = dynamic_cast<Phi*>(user)) {
+            if (user_bb == dst) {
+              for (auto &[bb, val] : copies) {
+                phi->addValue(*val, string(bb->getName()));
+              }
+              continue;
+            }
+          }
 
           auto &newphi = new_phis[make_pair(dst, val)];
           if (!newphi) {
-            auto phi = make_unique<Phi>(val->getType(),
-                                        val->getName() + "#phi");
+            auto name = val->getName() + "#phi#" + to_string(phi_counter++);
+            auto phi = make_unique<Phi>(val->getType(), move(name));
             newphi = phi.get();
             dst->addInstr(move(phi), true);
           }
@@ -611,13 +613,21 @@ void Function::unroll(unsigned k) {
 
           auto *i = dynamic_cast<Instr*>(user);
           assert(i);
-          i->rauw(*val, *newphi);
+          if (auto phi = dynamic_cast<Phi*>(i)) {
+            for (auto &pred : phi->sources()) {
+              if (dom_tree.dominates(dst, &getBB(pred)))
+                phi->replace(pred, *newphi);
+            }
+          } else {
+            i->rauw(*val, *newphi);
+          }
           added_phis.emplace_back(dst, newphi);
         }
 
         // We have more than 1 dominating exit
         if (added_phis.size() > 1) {
           // TODO
+          // insert load/stores: dom_tree.dominates(dst, user_bb)
         }
       }
     }
