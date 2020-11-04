@@ -37,6 +37,7 @@ public:
   void fixupTypes(const smt::Model &m);
 
   void addInstr(std::unique_ptr<Instr> &&i, bool push_front = false);
+  void addInstrAt(std::unique_ptr<Instr> &&i, const Instr *other, bool before);
   void delInstr(Instr *i);
 
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
@@ -169,7 +170,7 @@ public:
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
 
-  using UsersTy = std::map<Value*, std::vector<std::pair<Value*, BasicBlock*>>>;
+  using UsersTy = std::multimap<Value*, std::pair<Value*, BasicBlock*>>;
   UsersTy getUsers() const;
   bool removeUnusedStuff(const UsersTy &users,
                          const std::vector<std::string_view> &src_glbs);

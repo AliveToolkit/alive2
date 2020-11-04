@@ -37,6 +37,19 @@ void BasicBlock::addInstr(unique_ptr<Instr> &&i, bool push_front) {
     m_instrs.emplace_back(move(i));
 }
 
+void BasicBlock::addInstrAt(unique_ptr<Instr> &&i, const Instr *other,
+                            bool before) {
+  for (auto I = m_instrs.begin(); true; ++I) {
+    assert(I != m_instrs.end());
+    if (I->get() == other) {
+      if (!before)
+        ++I;
+      m_instrs.emplace(I, move(i));
+      break;
+    }
+  }
+}
+
 void BasicBlock::delInstr(Instr *i) {
   for (auto I = m_instrs.begin(), E = m_instrs.end(); I != E; ++I) {
     if (I->get() == i) {
@@ -287,19 +300,19 @@ Function::UsersTy Function::getUsers() const {
   for (auto *bb : getBBs()) {
     for (auto &i : bb->instrs()) {
       for (auto op : i.operands()) {
-        users[op].emplace_back(const_cast<Instr*>(&i), bb);
+        users.emplace(op, make_pair(const_cast<Instr*>(&i), bb));
       }
     }
   }
   for (auto &agg : aggregates) {
     for (auto val : agg->getVals()) {
-      users[val].emplace_back(agg.get(), nullptr);
+      users.emplace(val, make_pair(agg.get(), nullptr));
     }
   }
   for (auto &c : constants) {
     if (auto agg = dynamic_cast<AggregateValue*>(c.get())) {
       for (auto val : agg->getVals()) {
-        users[val].emplace_back(agg, nullptr);
+        users.emplace(val, make_pair(agg, nullptr));
       }
     }
   }
@@ -562,11 +575,10 @@ void Function::unroll(unsigned k) {
 
     // patch users outside of the loop
     for (auto &[val, copies] : vmap) {
-      auto I = users.find(const_cast<Value*>(val));
-      if (I == users.end())
-        continue;
+      for (auto p = users.equal_range(const_cast<Value*>(val));
+           p.first != p.second; ++p.first) {
+        auto &[user, user_bb] = p.first->second;
 
-      for (auto &[user, user_bb] : I->second) {
         // users inside the loop have been patched already
         if (bbmap.count(user_bb))
           continue;
@@ -632,14 +644,38 @@ void Function::unroll(unsigned k) {
             }
           } else {
             i->rauw(*val, *newphi);
+            added_phis.emplace_back(dst, newphi);
           }
-          added_phis.emplace_back(dst, newphi);
         }
 
         // We have more than 1 dominating exit
+        // add load/stores to avoid complex SSA building algorithms
         if (added_phis.size() > 1) {
-          // TODO
-          // insert load/stores: dom_tree.dominates(dst, user_bb)
+          static PtrType ptr_type(0);
+          static IntType i32(string("i32"), 32);
+          auto &type = val->getType();
+          auto size_alloc
+            = make_unique<IntConst>(i32, Memory::getStoreByteSize(type));
+          auto *size = size_alloc.get();
+          addConstant(move(size_alloc));
+
+          unsigned align = 16;
+          auto name = val->getName() + "#ptr#" + to_string(phi_counter++);
+          auto alloca = make_unique<Alloc>(ptr_type, string(name), *size,
+                                           nullptr, align, false);
+
+          for (auto &[bb, phi] : added_phis) {
+            bb->addInstrAt(
+              make_unique<Store>(*alloca.get(), *phi, align), phi, false);
+          }
+
+          auto load
+            = make_unique<Load>(type, name + "#load", *alloca.get(), align);
+          auto *i = static_cast<Instr*>(user);
+          i->rauw(*added_phis.front().second, *load.get());
+          user_bb->addInstrAt(move(load), i, true);
+
+          getFirstBB().addInstr(move(alloca), true);
         }
       }
     }
