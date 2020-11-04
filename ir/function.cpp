@@ -779,7 +779,7 @@ void DomTree::buildDominators(const CFG &cfg) {
   }
 
   auto &entry = doms.at(&f.getFirstBB());
-  entry.dominator = &entry;
+  entry.dominator = nullptr;
 
   // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
   // A Simple, Fast Dominance Algorithm
