@@ -832,6 +832,8 @@ bool DomTree::dominates(const BasicBlock *a, const BasicBlock *b) const {
   while (dom_b) {
     if (dom_b == dom_a)
       return true;
+    if (dom_b == dom_b->dominator)
+      break;
     dom_b = dom_b->dominator;
   }
   return false;
