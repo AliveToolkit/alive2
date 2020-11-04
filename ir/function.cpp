@@ -579,6 +579,18 @@ void Function::unroll(unsigned k) {
             continue;
 
           if (auto phi = dynamic_cast<Phi*>(user)) {
+            // Check if the phi uses this value through a path that is reachable
+            // from this exit, as it may only be reachable from another exit.
+            bool has_valid_pred = false;
+            for (auto &[entry, pred] : phi->getValues()) {
+              if (entry == val) {
+                if ((has_valid_pred = dom_tree.dominates(exit, &getBB(pred))))
+                  break;
+              }
+            }
+            if (!has_valid_pred)
+              continue;
+
             if (user_bb == dst) {
               for (auto &[bb, val] : copies) {
                 phi->addValue(*val, string(bb->getName()));
