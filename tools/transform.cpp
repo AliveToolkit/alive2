@@ -371,7 +371,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr axioms_expr = axioms();
   expr dom = dom_a && dom_b;
 
-  pre_tgt &= !tgt_state.sinkDomain();
+  auto sink_tgt = tgt_state.sinkDomain();
+  pre_tgt &= !sink_tgt;
 
   expr pre_src_exists = pre_src, pre_src_forall = true;
   {
@@ -401,6 +402,18 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
                                              : value_cnstr && memory_cnstr0;
   qvars.insert(mem_undef.begin(), mem_undef.end());
+
+  if (dom_a.isFalse()) {
+    errs.add("The source program doesn't reach a return instruction.\n"
+             "Consider increasing the unroll factor if it has loops", false);
+    return;
+  }
+
+  if (sink_tgt.isTrue()) {
+    errs.add("The target program doesn't reach a return instruction.\n"
+             "Consider increasing the unroll factor if it has loops", false);
+    return;
+  }
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
