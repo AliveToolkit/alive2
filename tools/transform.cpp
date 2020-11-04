@@ -403,7 +403,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
                                              : value_cnstr && memory_cnstr0;
   qvars.insert(mem_undef.begin(), mem_undef.end());
 
-  if (dom_a.isFalse()) {
+  if (src_state.sinkDomain().isTrue()) {
     errs.add("The source program doesn't reach a return instruction.\n"
              "Consider increasing the unroll factor if it has loops", false);
     return;
