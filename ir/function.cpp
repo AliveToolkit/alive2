@@ -472,8 +472,6 @@ void Function::unroll(unsigned k) {
     }
     worklist.pop_back();
 
-    DomTree dom_tree(*this, CFG(*this));
-
     vector<BasicBlock*> loop_bbs = { header };
     vector<BasicBlock*> own_loop_bbs = loop_bbs;
     auto I = forest.find(header);
@@ -562,6 +560,7 @@ void Function::unroll(unsigned k) {
     // cache of introduced phis
     map<pair<const BasicBlock*, const Value*>, Phi*> new_phis;
     unsigned phi_counter = 0;
+    DomTree dom_tree(*this, CFG(*this));
 
     auto bb_of = [&](const Value *val) {
       for (auto *bb : loop_bbs) {
