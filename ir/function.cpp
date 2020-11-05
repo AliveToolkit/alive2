@@ -440,8 +440,6 @@ void Function::unroll(unsigned k) {
   if (roots.empty())
     return;
 
-  DomTree dom_tree(*this, CFG(*this));
-
   auto &forest = la.getLoopForest();
   BasicBlock &sink = getBB("#sink");
 
@@ -473,6 +471,8 @@ void Function::unroll(unsigned k) {
       }
     }
     worklist.pop_back();
+
+    DomTree dom_tree(*this, CFG(*this));
 
     vector<BasicBlock*> loop_bbs = { header };
     vector<BasicBlock*> own_loop_bbs = loop_bbs;
@@ -769,13 +769,12 @@ void CFG::edge_iterator::next() {
   while (true) {
     if (bbi == bbe)
       return;
-
-    if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
-      ti = instr->targets().begin();
-      te = instr->targets().end();
-      return;
-    }
-
+    if (!(*bbi)->empty())
+      if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
+        ti = instr->targets().begin();
+        te = instr->targets().end();
+        return;
+      }
     ++bbi;
   }
 }
