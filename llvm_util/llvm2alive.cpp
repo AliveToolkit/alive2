@@ -281,9 +281,26 @@ public:
 
     const auto &ret = llvm::AttributeList::ReturnIndex;
     if (uint64_t b = max(i.getDereferenceableBytes(ret),
-                         i.getCalledFunction()->getDereferenceableBytes(ret))) {
+                         fn->getDereferenceableBytes(ret))) {
       attrs.set(FnAttrs::Dereferenceable);
-      attrs.setDerefBytes(b);
+      attrs.derefBytes = b;
+    }
+
+    {
+      uint64_t align = 0;
+      llvm::MaybeAlign ra = i.getRetAlign();
+      if (ra)
+        align = ra->value();
+
+      if (fn->hasAttribute(ret, llvm::Attribute::Alignment))
+        align = max(align,
+            fn->getAttribute(ret, llvm::Attribute::Alignment)
+                .getAlignment()->value());
+
+      if (align) {
+        attrs.set(FnAttrs::Align);
+        attrs.align = ilog2(align);
+      }
     }
 
     string fn_name = '@' + fn->getName().str();
@@ -309,19 +326,34 @@ public:
       // call handleAttributes().
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Dereferenceable)) {
-        attr.set(ParamAttrs::Dereferenceable);
-
         uint64_t derefb = 0;
         // dereferenceable at caller
         if (i.getAttributes()
              .hasParamAttr(argidx, llvm::Attribute::Dereferenceable))
           derefb = i.getParamAttr(argidx, llvm::Attribute::Dereferenceable)
                     .getDereferenceableBytes();
-        if (argidx < i.getCalledFunction()->arg_size())
+        if (argidx < fn->arg_size())
           derefb = max(derefb,
-              i.getCalledFunction()->getParamDereferenceableBytes(argidx));
+                       fn->getParamDereferenceableBytes(argidx));
         assert(derefb);
+        attr.set(ParamAttrs::Dereferenceable);
         attr.derefBytes = derefb;
+      }
+
+      if (i.paramHasAttr(argidx, llvm::Attribute::Alignment)) {
+        uint64_t a = 0;
+        // alignment at caller
+        if (i.getAttributes()
+             .hasParamAttr(argidx, llvm::Attribute::Alignment))
+          a = i.getParamAttr(argidx, llvm::Attribute::Alignment)
+               .getAlignment()->value();
+        if (argidx < fn->arg_size() &&
+            fn->hasParamAttribute(argidx, llvm::Attribute::Alignment))
+          a = max(a, fn->getParamAlign(argidx)->value());
+
+        assert(a);
+        attr.set(ParamAttrs::Align);
+        attr.align = ilog2(a);
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::ByVal)) {
@@ -330,7 +362,7 @@ public:
         attr.blockSize = DL().getTypeAllocSize(ty);
         if (!attr.has(ParamAttrs::Align)) {
           attr.set(ParamAttrs::Align);
-          attr.align = DL().getABITypeAlignment(ty);
+          attr.align = ilog2(DL().getABITypeAlignment(ty));
         }
       }
 
@@ -1007,6 +1039,11 @@ end:
         attrs.derefBytes = attr.getDereferenceableBytes();
         continue;
 
+      case llvm::Attribute::Alignment:
+        attrs.set(ParamAttrs::Align);
+        attrs.align = ilog2(attr.getAlignment()->value());
+        continue;
+
       case llvm::Attribute::NoUndef:
         attrs.set(ParamAttrs::NoUndef);
         continue;
@@ -1066,7 +1103,14 @@ end:
 
     if (uint64_t b = f.getDereferenceableBytes(ridx)) {
       attrs.set(FnAttrs::Dereferenceable);
-      attrs.setDerefBytes(b);
+      attrs.derefBytes = b;
+    }
+
+    if (f.hasAttribute(ridx, llvm::Attribute::Alignment)) {
+      unsigned a = f.getAttribute(ridx, llvm::Attribute::Alignment)
+                    .getAlignment()->value();
+      attrs.set(FnAttrs::Align);
+      attrs.align = ilog2(a);
     }
 
     // create all BBs upfront in topological order

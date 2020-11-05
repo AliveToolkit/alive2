@@ -1556,7 +1556,7 @@ bool FnCall::canFree() const {
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
-  uint64_t sz = attrs.has(FnAttrs::Dereferenceable) ? attrs.getDerefBytes() : 0;
+  uint64_t sz = attrs.has(FnAttrs::Dereferenceable) ? attrs.derefBytes : 0;
   for (auto &arg : args) {
     if (arg.second.has(ParamAttrs::Dereferenceable))
       sz = max(sz, arg.second.derefBytes);
@@ -1642,6 +1642,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       if (argflag.has(ParamAttrs::NonNull))
         s.addUB(p.isNonZero());
 
+      if (argflag.has(ParamAttrs::Align))
+        s.addUB(p.isAligned(1ull << argflag.align));
+
       ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
@@ -1686,13 +1689,17 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
-  if (ty.isPtrType() && (isDeref || isNonNull)) {
+  bool isAlign = attrs.has(FnAttrs::Align);
+
+  if (ty.isPtrType() && (isDeref || isNonNull || isAlign)) {
     Pointer p(s.getMemory(), ret.value);
     s.addUB(ret.non_poison);
     if (isDeref)
-      s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+      s.addUB(p.isDereferenceable(attrs.derefBytes));
     if (isNonNull)
       s.addUB(p.isNonZero());
+    if (isAlign)
+      s.addUB(p.isAligned(1ull << attrs.align));
   }
 
   return ret;
@@ -2322,17 +2329,22 @@ StateValue Return::toSMT(State &s) const {
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
-  if (isDeref || isNonNull) {
+  bool isAlign = attrs.has(FnAttrs::Align);
+
+  if (isDeref || isNonNull || isAlign) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);
 
     if (isDeref) {
-      s.addUB(p.isDereferenceable(attrs.getDerefBytes()));
+      s.addUB(p.isDereferenceable(attrs.derefBytes));
       if (has_alloca)
         s.addUB(p.getAllocType() != Pointer::STACK);
     }
     if (isNonNull) {
       s.addUB(p.isNonZero());
+    }
+    if (isAlign) {
+      s.addUB(p.isAligned(1ull << attrs.align));
     }
   }
 
