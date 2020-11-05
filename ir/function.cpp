@@ -769,6 +769,7 @@ void CFG::edge_iterator::next() {
   while (true) {
     if (bbi == bbe)
       return;
+
     if (!(*bbi)->empty()) {
       if (auto instr = dynamic_cast<JumpInstr*>(&(*bbi)->back())) {
         ti = instr->targets().begin();
