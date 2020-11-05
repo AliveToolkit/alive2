@@ -4,8 +4,7 @@ target triple = "powerpc64-unknown-linux-gnu"
 
 %struct.S0.0.1.2.3.4.13.22.31.44.48.53.54.55.56.58.59.60.66.68.70.74.77.106.107.108.109.110.113.117.118.128.129 = type <{ i64 }>
 
-; Function Attrs: nounwind
-define void @src() #0 {
+define void @src() {
 entry:
   %l_819.i.i = alloca %struct.S0.0.1.2.3.4.13.22.31.44.48.53.54.55.56.58.59.60.66.68.70.74.77.106.107.108.109.110.113.117.118.128.129, align 8
   br i1 undef, label %land.lhs.true, label %for.cond.i
@@ -98,9 +97,7 @@ for.end45:                                        ; preds = %for.cond15
   unreachable
 }
 
-attributes #0 = { nounwind "less-precise-fpmad"="false" "frame-pointer"="all" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "unsafe-fp-math"="false" "use-soft-float"="false" }
-
-define void @tgt() #0 {
+define void @tgt() {
 entry:
   %l_819.i.i = alloca %struct.S0.0.1.2.3.4.13.22.31.44.48.53.54.55.56.58.59.60.66.68.70.74.77.106.107.108.109.110.113.117.118.128.129, align 8
   br i1 undef, label %land.lhs.true, label %for.cond.i
@@ -192,5 +189,3 @@ for.cond19:                                       ; preds = %for.cond15
 for.end45:                                        ; preds = %for.cond15
   unreachable
 }
-
-attributes #0 = { nounwind "less-precise-fpmad"="false" "frame-pointer"="all" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "unsafe-fp-math"="false" "use-soft-float"="false" }
