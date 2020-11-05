@@ -326,8 +326,6 @@ public:
       // call handleAttributes().
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Dereferenceable)) {
-        attr.set(ParamAttrs::Dereferenceable);
-
         uint64_t derefb = 0;
         // dereferenceable at caller
         if (i.getAttributes()
@@ -338,14 +336,13 @@ public:
           derefb = max(derefb,
                        fn->getParamDereferenceableBytes(argidx));
         assert(derefb);
+        attr.set(ParamAttrs::Dereferenceable);
         attr.derefBytes = derefb;
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Alignment)) {
-        attr.set(ParamAttrs::Align);
-
         uint64_t a = 0;
-        // dereferenceable at caller
+        // alignment at caller
         if (i.getAttributes()
              .hasParamAttr(argidx, llvm::Attribute::Alignment))
           a = i.getParamAttr(argidx, llvm::Attribute::Alignment)
@@ -355,6 +352,7 @@ public:
           a = max(a, fn->getParamAlign(argidx)->value());
 
         assert(a);
+        attr.set(ParamAttrs::Align);
         attr.align = ilog2(a);
       }
 
