@@ -23,7 +23,7 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
   if (attr.has(ParamAttrs::NoUndef))
     os << "noundef ";
   if (attr.has(ParamAttrs::Align))
-    os << "align(" << attr.align << ") ";
+    os << "align(" << (1ull << attr.align) << ") ";
   if (attr.has(ParamAttrs::Returned))
     os << "returned ";
   return os;
@@ -49,6 +49,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " nofree";
   if (attr.has(FnAttrs::NoUndef))
     os << " noundef";
+  if (attr.has(FnAttrs::Align))
+    os << " align(" << (1ull << attr.align) << ")";
   return os;
 }
 
@@ -82,7 +84,9 @@ bool FnAttrs::operator==(const FnAttrs &rhs) const {
   if (bits != rhs.bits)
     return false;
 
-  if (has(Dereferenceable) && getDerefBytes() != rhs.getDerefBytes())
+  if (has(Dereferenceable) && derefBytes != rhs.derefBytes)
+    return false;
+  if (has(Align) && align != rhs.align)
     return false;
 
   return true;

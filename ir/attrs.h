@@ -26,7 +26,8 @@ public:
 
   // Returns true if it's UB for the argument to be poison / have a poison elem.
   bool poisonImpliesUB() const
-  { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(ByVal); }
+  { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
+           has(Align); }
 
    // Returns true if it is UB for the argument to be (partially) undef.
   bool undefImpliesUB() const;
@@ -40,24 +41,24 @@ public:
 
 class FnAttrs final {
   unsigned bits;
-  uint64_t derefBytes;
 
 public:
   enum Attribute { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1,
                    ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4,
                    Dereferenceable = 1 << 5, NonNull = 1 << 6,
-                   NoFree = 1 << 7, NoUndef = 1 << 8 };
+                   NoFree = 1 << 7, NoUndef = 1 << 8, Align = 1 << 9 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
-  uint64_t getDerefBytes() const { return derefBytes; }
-  void setDerefBytes(uint64_t bytes) { derefBytes = bytes; }
+
+  uint64_t derefBytes; // Dereferenceable
+  uint64_t align;      // power-of-2 in bytes
 
   // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const
-  { return has(NonNull) || has(Dereferenceable) || has(NoUndef); }
+  { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(Align); }
 
   // Returns true if returning (partially) undef is UB
   bool undefImpliesUB() const;
