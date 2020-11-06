@@ -1098,8 +1098,11 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
         break;
       }
 
-      for (auto p = users.equal_range(user); p.first != p.second; ++p.first) {
-        worklist.emplace_back(p.first->second.first);
+      if (auto I = users.find(user);
+          I != users.end()) {
+        for (auto &[user, _] : I->second) {
+          worklist.emplace_back(user);
+        }
       }
     } while (!worklist.empty());
 

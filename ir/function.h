@@ -170,7 +170,8 @@ public:
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
 
-  using UsersTy = std::multimap<Value*, std::pair<Value*, BasicBlock*>>;
+  using UsersTy = std::unordered_map<const Value*,
+                                     std::set<std::pair<Value*, BasicBlock*>>>;
   UsersTy getUsers() const;
   bool removeUnusedStuff(const UsersTy &users,
                          const std::vector<std::string_view> &src_glbs);

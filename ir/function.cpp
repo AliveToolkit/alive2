@@ -300,19 +300,19 @@ Function::UsersTy Function::getUsers() const {
   for (auto *bb : getBBs()) {
     for (auto &i : bb->instrs()) {
       for (auto op : i.operands()) {
-        users.emplace(op, make_pair(const_cast<Instr*>(&i), bb));
+        users[op].emplace(const_cast<Instr*>(&i), bb);
       }
     }
   }
   for (auto &agg : aggregates) {
     for (auto val : agg->getVals()) {
-      users.emplace(val, make_pair(agg.get(), nullptr));
+      users[val].emplace(agg.get(), nullptr);
     }
   }
   for (auto &c : constants) {
     if (auto agg = dynamic_cast<AggregateValue*>(c.get())) {
       for (auto val : agg->getVals()) {
-        users.emplace(val, make_pair(agg, nullptr));
+        users[val].emplace(agg, nullptr);
       }
     }
   }
@@ -398,7 +398,8 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         d->rauw(*op, *it->second.back().second);
       }
     }
-    vmap[&i].emplace_back(&newbb, d.get());
+    if (!i.isVoid())
+      vmap[&i].emplace_back(&newbb, d.get());
     newbb.addInstr(move(d));
   }
 
@@ -574,16 +575,18 @@ void Function::unroll(unsigned k) {
 
     // patch users outside of the loop
     for (auto &[val, copies] : vmap) {
-      for (auto p = users.equal_range(const_cast<Value*>(val));
-           p.first != p.second; ++p.first) {
-        auto &[user, user_bb] = p.first->second;
+      auto I = users.find(val);
+      if (I == users.end())
+        continue;
 
+      for (auto &[user, user_bb] : I->second) {
         // users inside the loop have been patched already
         if (bbmap.count(user_bb))
           continue;
 
         // insert a new phi on each dominator exit
-        vector<pair<BasicBlock*, Phi*>> added_phis;
+        set<pair<BasicBlock*, Phi*>> added_phis;
+        Phi *first_added_phi = nullptr;
 
         for (auto &[exit, dst] : exit_edges) {
           if (!dom_tree.dominates(bb_of(val), exit))
@@ -603,8 +606,14 @@ void Function::unroll(unsigned k) {
               continue;
 
             if (user_bb == dst) {
+              auto &exit_copies = bbmap.at(exit);
+              auto exit_I = exit_copies.begin(), exit_E = exit_copies.end();
               for (auto &[bb, val] : copies) {
-                phi->addValue(*val, string(bb->getName()));
+                if (++exit_I == exit_E)
+                  break;
+                if (dom_tree.dominates(bb, *exit_I)) {
+                  phi->addValue(*val, string((*exit_I)->getName()));
+                }
               }
               continue;
             }
@@ -638,15 +647,15 @@ void Function::unroll(unsigned k) {
           assert(i);
           if (auto phi = dynamic_cast<Phi*>(i)) {
             for (auto &[pv, pred] : phi->getValues()) {
-              if (pv != val)
-                continue;
-              if (dom_tree.dominates(dst, &getBB(pred))){
+              if (pv == val && dom_tree.dominates(dst, &getBB(pred))){
                 phi->replace(pred, *newphi);
               }
             }
           } else {
             i->rauw(*val, *newphi);
-            added_phis.emplace_back(dst, newphi);
+            added_phis.emplace(dst, newphi);
+            if (!first_added_phi)
+              first_added_phi = newphi;
           }
         }
 
@@ -674,7 +683,7 @@ void Function::unroll(unsigned k) {
           auto load
             = make_unique<Load>(type, name + "#load", *alloca.get(), align);
           auto *i = static_cast<Instr*>(user);
-          i->rauw(*added_phis.front().second, *load.get());
+          i->rauw(*first_added_phi, *load.get());
           user_bb->addInstrAt(move(load), i, true);
 
           getFirstBB().addInstr(move(alloca), true);
@@ -689,7 +698,7 @@ void Function::unroll(unsigned k) {
         continue;
 
       for (auto &[phi, val] : I->second) {
-        if (!vmap.count(val)) {
+        if (!vmap.count(phi) && !vmap.count(val)) {
           for (auto *dup : bbmap.at(bb)) {
             // already in the phi
             if (dup == bb)
