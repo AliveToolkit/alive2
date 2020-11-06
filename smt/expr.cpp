@@ -1211,8 +1211,11 @@ expr expr::operator&&(const expr &rhs) const {
     return rhs;
 
   C(rhs);
-  Z3_ast args[] = { ast(), rhs() };
-  return Z3_mk_and(ctx(), 2, args);
+  return binop_commutative(rhs,
+    [](auto ctx, auto a, auto b) {
+      Z3_ast args[] = { a, b };
+      return Z3_mk_and(ctx, 2, args);
+    });
 }
 
 expr expr::operator||(const expr &rhs) const {
@@ -1227,8 +1230,11 @@ expr expr::operator||(const expr &rhs) const {
     return true;
 
   C(rhs);
-  Z3_ast args[] = { ast(), rhs() };
-  return Z3_mk_or(ctx(), 2, args);
+  return binop_commutative(rhs,
+    [](auto ctx, auto a, auto b) {
+      Z3_ast args[] = { a, b };
+      return Z3_mk_or(ctx, 2, args);
+    });
 }
 
 void expr::operator&=(const expr &rhs) {
