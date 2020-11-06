@@ -19,7 +19,6 @@ BBif:
   br i1 true, label %BB2, label %loop
 }
 
-
 define i64 @tgt(i32 %x) {
 entry:
   br label %loop
@@ -39,5 +38,3 @@ loop:
 BBif:
   br i1 true, label %BB2, label %loop
 }
-
-
