@@ -863,8 +863,8 @@ void DomTree::buildDominators(const CFG &cfg) {
       auto &b_node = doms.at(b);
       if (b_node.preds.empty())
         continue;
-      
-      auto new_idom = b_node.preds.front();
+
+      DomTreeNode *new_idom = nullptr;
       for (auto p : b_node.preds) {
         if (p->dominator != nullptr) {
           new_idom = intersect(p, new_idom);
@@ -880,6 +880,8 @@ void DomTree::buildDominators(const CFG &cfg) {
 }
 
 DomTree::DomTreeNode* DomTree::intersect(DomTreeNode *f1, DomTreeNode *f2) {
+  if (f2 == nullptr)
+    return f1;
   while (f1->order != f2->order) {
     while (f1->order < f2->order)
       f1 = f1->dominator;
