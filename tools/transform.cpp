@@ -597,10 +597,6 @@ static void calculateAndInitConstants(Transform &t) {
   num_globals_src = globals_src.size();
   unsigned num_globals = num_globals_src;
 
-  // FIXME: varies among address spaces
-  bits_program_pointer = t.src.bitsPointers();
-  assert(bits_program_pointer > 0 && bits_program_pointer <= 64);
-  assert(bits_program_pointer == t.tgt.bitsPointers());
   heap_block_alignment = 8;
 
   num_consts_src = 0;
@@ -1193,6 +1189,12 @@ void Transform::preprocess() {
                                                 : src.getGlobalVarNames());
     } while (changed);
   }
+
+  // bits_program_pointer is used by unroll. Initialize it in advance
+  // FIXME: varies among address spaces
+  bits_program_pointer = src.bitsPointers();
+  assert(bits_program_pointer > 0 && bits_program_pointer <= 64);
+  assert(bits_program_pointer == tgt.bitsPointers());
 
   src.unroll(config::src_unroll_cnt);
   tgt.unroll(config::tgt_unroll_cnt);

@@ -1915,6 +1915,8 @@ void Memory::free(const expr &ptr, bool unconstrained) {
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
+  assert(bits_program_pointer != 0);
+
   if (ty.isPtrType())
     return divide_up(bits_program_pointer, 8);
 
