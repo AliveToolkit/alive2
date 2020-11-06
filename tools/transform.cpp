@@ -591,7 +591,17 @@ static unsigned returns_nonlocal(const Instr &inst,
 }
 
 
+static void initBitsProgramPointer(Transform &t) {
+  // FIXME: varies among address spaces
+  bits_program_pointer = t.src.bitsPointers();
+  assert(bits_program_pointer > 0 && bits_program_pointer <= 64);
+  assert(bits_program_pointer == t.tgt.bitsPointers());
+}
+
 static void calculateAndInitConstants(Transform &t) {
+  if (!bits_program_pointer)
+    initBitsProgramPointer(t);
+
   const auto &globals_tgt = t.tgt.getGlobalVars();
   const auto &globals_src = t.src.getGlobalVars();
   num_globals_src = globals_src.size();
@@ -1191,10 +1201,7 @@ void Transform::preprocess() {
   }
 
   // bits_program_pointer is used by unroll. Initialize it in advance
-  // FIXME: varies among address spaces
-  bits_program_pointer = src.bitsPointers();
-  assert(bits_program_pointer > 0 && bits_program_pointer <= 64);
-  assert(bits_program_pointer == tgt.bitsPointers());
+  initBitsProgramPointer(*this);
 
   src.unroll(config::src_unroll_cnt);
   tgt.unroll(config::tgt_unroll_cnt);
