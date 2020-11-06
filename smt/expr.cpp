@@ -1667,6 +1667,11 @@ expr expr::simplify() const {
   return e ? e : *this;
 }
 
+expr expr::simplifyNoTimeout() const {
+  C();
+  return Z3_simplify_ex(ctx(), ast(), ctx.getNoTimeoutParam());
+}
+
 expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   C();
   if (repls.empty())

@@ -55,7 +55,7 @@ class expr {
       return simplify_const(std::move(e), inputs...);
     return std::move(e);
   }
-  static expr simplify_const(expr &&e) { return e.simplify(); }
+  static expr simplify_const(expr &&e) { return e.simplifyNoTimeout(); }
 
   bool alwaysFalse() const { return false; }
 
@@ -310,6 +310,7 @@ public:
   static expr mkLambda(const expr &var, const expr &val);
 
   expr simplify() const;
+  expr simplifyNoTimeout() const;
 
   // replace v1 -> v2
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;

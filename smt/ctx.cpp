@@ -37,9 +37,15 @@ void context::init() {
   Z3_global_param_set("rewriter.hi_fp_unspecified", "true");
   ctx = Z3_mk_context_rc(nullptr);
   Z3_set_error_handler(ctx, z3_error_handler);
+
+  no_timeout_param = Z3_mk_params(ctx);
+  Z3_params_inc_ref(ctx, no_timeout_param);
+  Z3_params_set_uint(ctx, no_timeout_param,
+                     Z3_mk_string_symbol(ctx, "timeout"), 0);
 }
 
 void context::destroy() {
+  Z3_params_dec_ref(ctx, no_timeout_param);
   Z3_close_log();
   Z3_del_context(ctx);
 }
