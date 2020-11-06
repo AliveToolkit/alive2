@@ -637,9 +637,12 @@ void Function::unroll(unsigned k) {
           auto *i = dynamic_cast<Instr*>(user);
           assert(i);
           if (auto phi = dynamic_cast<Phi*>(i)) {
-            for (auto &pred : phi->sources()) {
-              if (dom_tree.dominates(dst, &getBB(pred)))
+            for (auto &[pv, pred] : phi->getValues()) {
+              if (pv != val)
+                continue;
+              if (dom_tree.dominates(dst, &getBB(pred))){
                 phi->replace(pred, *newphi);
+              }
             }
           } else {
             i->rauw(*val, *newphi);
