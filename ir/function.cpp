@@ -162,7 +162,7 @@ const BasicBlock& Function::getBB(string_view name) const {
   return BBs.at(string(name));
 }
 
-const BasicBlock* Function::getBBIfExists(std::string_view name) const {
+const BasicBlock* Function::getBBIfExists(string_view name) const {
   auto I = BBs.find(string(name));
   return I != BBs.end() ? &I->second : nullptr;
 }
@@ -561,6 +561,8 @@ void Function::unroll(unsigned k) {
     // cache of introduced phis
     map<pair<const BasicBlock*, const Value*>, Phi*> new_phis;
     unsigned phi_counter = 0;
+
+    topSort();
     DomTree dom_tree(*this, CFG(*this));
 
     auto bb_of = [&](const Value *val) {
@@ -709,8 +711,6 @@ void Function::unroll(unsigned k) {
       }
     }
   }
-
-  topSort();
 }
 
 void Function::print(ostream &os, bool print_header) const {
@@ -825,7 +825,6 @@ void CFG::printDot(ostream &os) const {
         "\"" << bb_dot_name(f.getBBs()[0]->getName()) << "\" [shape=box];\n";
 
   for (auto [src, dst, instr] : *this) {
-    (void)instr;
     os << '"' << bb_dot_name(src.getName()) << "\" -> \""
        << bb_dot_name(dst.getName()) << "\";\n";
   }
@@ -844,7 +843,6 @@ void DomTree::buildDominators(const CFG &cfg) {
 
   // build predecessors relationship
   for (auto [src, tgt, instr] : cfg) {
-    (void)instr;
     doms.at(&tgt).preds.push_back(&doms.at(&src));
   }
 
@@ -863,7 +861,7 @@ void DomTree::buildDominators(const CFG &cfg) {
       auto &b_node = doms.at(b);
       if (b_node.preds.empty())
         continue;
-      
+
       auto new_idom = b_node.preds.front();
       for (auto p : b_node.preds) {
         if (p->dominator != nullptr) {
@@ -909,7 +907,7 @@ bool DomTree::dominates(const BasicBlock *a, const BasicBlock *b) const {
   return false;
 }
 
-void DomTree::printDot(std::ostream &os) const {
+void DomTree::printDot(ostream &os) const {
   os << "digraph {\n"
         "\"" << bb_dot_name(f.getFirstBB().getName()) << "\" [shape=box];\n";
 
