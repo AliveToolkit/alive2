@@ -452,8 +452,6 @@ void Function::unroll(unsigned k) {
   // computed bottom-up during the post-order traversal below
   unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
 
-  // grab all value users before duplication so the list is shorter
-  auto users = getUsers();
   auto phi_preds = getPhiPredecessors(*this);
 
   // traverse each loop tree in post-order
@@ -521,6 +519,8 @@ void Function::unroll(unsigned k) {
         unrolled_bbs.emplace_back(copies.back());
       }
     }
+
+    auto users = getUsers();
 
     // Clone the header once more so that the last iteration of the loop can
     // exit. Otherwise the last iteration would be wasted.
