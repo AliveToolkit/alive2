@@ -445,8 +445,9 @@ void Function::unroll(unsigned k) {
   BasicBlock &sink = getBB("#sink");
 
   vector<tuple<BasicBlock*, unsigned, bool>> worklist;
-  for (auto &root : roots) {
-    worklist.emplace_back(root, 0, false);
+  // insert in reverse order because the worklist is iterated in LIFO
+  for (auto I = roots.rbegin(), E = roots.rend(); I != E; ++I) {
+    worklist.emplace_back(*I, 0, false);
   }
 
   // computed bottom-up during the post-order traversal below
