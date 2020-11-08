@@ -1,57 +1,54 @@
 ; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
-target datalayout = "e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64"
 
-define void @src(i8* %a) {
+declare i1 @cond()
+
+define i8* @src(i8* %a) {
 entry:
-  br label %while.cond
+  br label %while1
 
-while.cond:
-  %p.0 = phi i8* [ %a, %entry ], [ %incdec.ptr, %while.cond ]
-  %incdec.ptr = getelementptr i8, i8* %p.0, i32 1
-  %0 = load i8, i8* %p.0, align 1
-  %cmp = icmp eq i8 %0, 0
-  br i1 %cmp, label %while.cond2, label %while.cond
+while1:
+  %p.0 = phi i8* [ %a, %entry ], [ %p.0.next, %while1 ]
+  %p.0.next = getelementptr i8, i8* %p.0, i32 1
+  %cmp = call i1 @cond()
+  br i1 %cmp, label %while2, label %while1
 
-while.cond2:
-  %i = phi i32 [ %i.next, %while.body5 ], [ 0, %while.cond ]
-  %p.1 = phi i8* [ %p.1.next, %while.body5 ], [ %p.0, %while.cond ]
-  %cmp3 = icmp eq i32 2, %i
-  br i1 %cmp3, label %while.end8, label %while.body5
-
-while.body5:
+while2:
+  %i = phi i32 [ %i.next, %while2.body ], [ 0, %while1 ]
+  %p.1 = phi i8* [ %p.1.next, %while2.body ], [ %p.0, %while1 ]
   %i.next = add i32 %i, 1
-  store i8 1, i8* %p.1, align 1
   %p.1.next = getelementptr i8, i8* %p.1, i32 1
-  br label %while.cond2
+  %cmp3 = icmp eq i32 2, %i
+  br i1 %cmp3, label %return, label %while2.body
 
-while.end8:
-  ret void
+while2.body:
+  br label %while2
+
+return:
+  ret i8* %p.1
 }
 
-define void @tgt(i8* %a) {
+define i8* @tgt(i8* %a) {
 entry:
-  br label %while.cond
+  br label %while1
 
-while.cond:
-  %p.0 = phi i8* [ %a, %entry ], [ %incdec.ptr, %while.cond ]
-  %incdec.ptr = getelementptr i8, i8* %p.0, i32 1
-  %0 = load i8, i8* %p.0, align 1
-  %cmp = icmp eq i8 %0, 0
-  br i1 %cmp, label %while.cond2, label %while.cond
+while1:
+  %p.0 = phi i8* [ %a, %entry ], [ %p.0.next, %while1 ]
+  %p.0.next = getelementptr i8, i8* %p.0, i32 1
+  %cmp = call i1 @cond()
+  br i1 %cmp, label %while2, label %while1
 
-while.cond2:
-  %i = phi i32 [ %i.next, %while.body5 ], [ 0, %while.cond ]
+while2:
+  %i = phi i32 [ %i.next, %while2.body ], [ 0, %while1 ]
   %p.1 = getelementptr i8, i8* %p.0, i32 %i
-  %cmp3 = icmp eq i32 2, %i
-  br i1 %cmp3, label %while.end8, label %while.body5
-
-while.body5:
   %i.next = add i32 %i, 1
-  store i8 1, i8* %p.1, align 1
-  br label %while.cond2
+  %cmp3 = icmp eq i32 2, %i
+  br i1 %cmp3, label %return, label %while2.body
 
-while.end8:
-  ret void
+while2.body:
+  br label %while2
+
+return:
+  ret i8* %p.1
 }
 
 
