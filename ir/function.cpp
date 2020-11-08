@@ -390,17 +390,16 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         unordered_map<const Value*, vector<pair<BasicBlock*, Value*>>> &vmap) {
   string bb_name = BB.getName() + suffix;
   auto &newbb = F.getBB(bb_name);
-  set<const Value *> phis_from_org_bb; // phi nodes from the original BB
+  unordered_set<const Value *> phis_from_orig_bb;
 
   for (auto &i : BB.instrs()) {
     if (dynamic_cast<const Phi *>(&i))
-      phis_from_org_bb.insert(&i);
+      phis_from_orig_bb.insert(&i);
 
     auto d = i.dup(suffix);
     for (auto &op : d->operands()) {
       auto it = vmap.find(op);
       if (it != vmap.end()) {
-        auto &new_val = *it->second.back().second;
         // consider this case:
         //   loop:
         //     %op = phi ...
@@ -411,9 +410,9 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         // %op.
         // If is_phi_to_phi is true, %op is the phi in this block.
         bool is_phi_to_phi = dynamic_cast<const Phi *>(&i) &&
-                             phis_from_org_bb.count(op);
+                             phis_from_orig_bb.count(op);
         if (!is_phi_to_phi) {
-          d->rauw(*op, new_val);
+          d->rauw(*op, *it->second.back().second);
         }
       }
     }
