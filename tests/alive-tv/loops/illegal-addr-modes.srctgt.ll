@@ -50,5 +50,3 @@ while2.latch:
 return:
   ret i8* %p.1
 }
-
-
