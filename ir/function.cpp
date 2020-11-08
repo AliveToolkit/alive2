@@ -583,7 +583,8 @@ void Function::unroll(unsigned k) {
 
       for (auto &[user, user_bb] : I->second) {
         // users inside the loop have been patched already
-        if (bbmap.count(user_bb))
+        if (find(unrolled_bbs.begin(), unrolled_bbs.end(), user_bb) !=
+            unrolled_bbs.end())
           continue;
 
         // insert a new phi on each dominator exit
