@@ -410,7 +410,7 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         bool is_phi_to_phi = dynamic_cast<const Phi *>(&i) &&
                              phis_from_orig_bb.count(op);
         if (is_phi_to_phi) {
-          if (it->second.size() > 2) {
+          if (it->second.size() >= 2) {
             d->rauw(*op, *it->second[it->second.size()-2].second);
           }
         } else {
