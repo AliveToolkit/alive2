@@ -44,15 +44,14 @@ public:
     return m_instrs;
   }
   Instr& back() { return *m_instrs.back(); }
+  std::vector<Phi*> phis() const;
 
   bool empty() const { return m_instrs.empty(); }
   JumpInstr::it_helper targets() const;
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
-  void replacePhiSrcWith(const std::string &from, const std::string &to);
-  void removePhiSrc(const std::string &bb);
-  std::vector<std::string> phiSources() const;
 
   std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
+  void rauw(const Value &what, Value &with);
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
 };

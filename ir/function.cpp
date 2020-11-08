@@ -59,6 +59,15 @@ void BasicBlock::delInstr(Instr *i) {
   }
 }
 
+vector<Phi*> BasicBlock::phis() const {
+  vector<Phi*> phis;
+  for (auto &i : m_instrs) {
+    if (auto phi = dynamic_cast<Phi*>(i.get()))
+      phis.emplace_back(phi);
+  }
+  return phis;
+}
+
 JumpInstr::it_helper BasicBlock::targets() const {
   if (empty())
     return {};
@@ -74,41 +83,18 @@ void BasicBlock::replaceTargetWith(const BasicBlock *from,
   }
 }
 
-void BasicBlock::replacePhiSrcWith(const string &from,
-                                   const string &to) {
-  for (auto &i : instrs()) {
-    if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i)))
-      phi->replaceSourceWith(from, to);
-  }
-}
-
-void BasicBlock::removePhiSrc(const string &bb) {
-  for (auto &i : instrs()) {
-    if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i))) {
-      phi->removeValue(bb);
-    }
-  }
-}
-
-vector<string> BasicBlock::phiSources() const {
-  vector<string> s;
-
-  for (auto &i : instrs()) {
-    if (Phi *phi = dynamic_cast<Phi*>(const_cast<Instr*>(&i))) {
-      auto v = phi->sources();
-      s.insert(s.end(), v.begin(), v.end());
-    }
-  }
-
-  return s;
-}
-
 unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
     newbb->addInstr(i.dup(suffix));
   }
   return newbb;
+}
+
+void BasicBlock::rauw(const Value &what, Value &with) {
+  for (auto &i : m_instrs) {
+    i->rauw(what, with);
+  }
 }
 
 ostream& operator<<(ostream &os, const BasicBlock &bb) {
@@ -423,18 +409,37 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
     newbb.addInstr(move(d));
   }
 
-  for (auto &src : newbb.phiSources()) {
-    bool replaced = false;
-    for (auto &[bb, copies] : bbmap) {
-      if (src == bb->getName()) {
-        newbb.replacePhiSrcWith(src, copies.back()->getName());
-        replaced = true;
-        break;
+  for (auto *phi : newbb.phis()) {
+    for (auto &src : phi->sources()) {
+      bool replaced = false;
+      for (auto &[bb, copies] : bbmap) {
+        if (src == bb->getName()) {
+          phi->replaceSourceWith(src, copies.back()->getName());
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) {
+        phi->removeValue(src);
       }
     }
 
-    if (!replaced)
-      newbb.removePhiSrc(src);
+    // If a phi becomes empty this can be a multi-entry loop without
+    // loop-carried dependencies like:
+    // loop:
+    //   phi [x, entry1], [y, entry2]
+    //   ...
+    //   br loop
+    if (phi->getValues().empty()) {
+      for (auto &[val, copies] : vmap) {
+        if (copies.back().second == phi) {
+          newbb.rauw(*phi, *const_cast<Value*>(val));
+          copies.pop_back();
+          break;
+        }
+      }
+      newbb.delInstr(phi);
+    }
   }
 
   return newbb;
