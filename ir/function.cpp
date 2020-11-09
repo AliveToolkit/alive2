@@ -521,11 +521,11 @@ void Function::unroll(unsigned k) {
     }
 
     // loop exit BB -> landing outside-loop BB
-    vector<pair<BasicBlock*, BasicBlock*>> exit_edges;
+    set<pair<BasicBlock*, BasicBlock*>> exit_edges;
     for (auto *bb : loop_bbs) {
       for (auto &dst : bb->targets()) {
         if (!bbmap.count(&dst)) {
-          exit_edges.emplace_back(bb, const_cast<BasicBlock*>(&dst));
+          exit_edges.emplace(bb, const_cast<BasicBlock*>(&dst));
         }
       }
     }
@@ -607,6 +607,8 @@ void Function::unroll(unsigned k) {
       if (I == users.end())
         continue;
 
+      BasicBlock *bb_val = bb_of(val);
+
       for (auto &[user, user_bb] : I->second) {
         // users inside the loop have been patched already
         if (bbmap.count(user_bb))
@@ -617,20 +619,18 @@ void Function::unroll(unsigned k) {
         Phi *first_added_phi = nullptr;
 
         for (auto &[exit, dst] : exit_edges) {
-          if (!dom_tree.dominates(bb_of(val), exit))
+          if (!dom_tree.dominates(bb_val, exit))
             continue;
 
           if (auto phi = dynamic_cast<Phi*>(user)) {
             // Check if the phi uses this value through a path that is reachable
             // from this exit, as it may only be reachable from another exit.
-            bool has_valid_pred = false;
-            for (auto &[entry, pred] : phi->getValues()) {
-              if (entry == val) {
-                if ((has_valid_pred = dom_tree.dominates(exit, &getBB(pred))))
-                  break;
-              }
-            }
-            if (!has_valid_pred)
+            auto &vals = phi->getValues();
+            if (!any_of(vals.begin(), vals.end(),
+                        [&](const auto &p) {
+                          return p.first == val &&
+                                 dom_tree.dominates(exit, &getBB(p.second));
+                        }))
               continue;
 
             if (user_bb == dst) {
@@ -703,9 +703,15 @@ void Function::unroll(unsigned k) {
           auto alloca = make_unique<Alloc>(ptr_type, string(name), *size,
                                            nullptr, align, false);
 
-          for (auto &[bb, phi] : added_phis) {
-            bb->addInstrAt(
-              make_unique<Store>(*alloca.get(), *phi, align), phi, false);
+          auto store = [&](auto *bb, const auto *val) {
+            bb->addInstrAt(make_unique<Store>(*alloca.get(),
+                                              *const_cast<Value*>(val), align),
+                           static_cast<const Instr*>(val), false);
+          };
+
+          store(bb_val, val);
+          for (auto &[bb, val] : copies) {
+            store(bb, val);
           }
 
           auto load
@@ -713,6 +719,10 @@ void Function::unroll(unsigned k) {
           auto *i = static_cast<Instr*>(user);
           i->rauw(*first_added_phi, *load.get());
           user_bb->addInstrAt(move(load), i, true);
+
+          for (auto &[bb, phi] : added_phis) {
+            bb->delInstr(phi);
+          }
 
           getFirstBB().addInstr(move(alloca), true);
         }
