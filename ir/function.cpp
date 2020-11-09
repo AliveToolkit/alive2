@@ -622,29 +622,24 @@ void Function::unroll(unsigned k) {
           if (!dom_tree.dominates(bb_val, exit))
             continue;
 
-          if (auto phi = dynamic_cast<Phi*>(user)) {
-            // Check if the phi uses this value through a path that is reachable
-            // from this exit, as it may only be reachable from another exit.
+          if (auto phi = dynamic_cast<Phi*>(user);
+              phi && user_bb == dst) {
+            // Check if the phi uses this value through this predecessor
             auto &vals = phi->getValues();
             if (!any_of(vals.begin(), vals.end(),
                         [&](const auto &p) {
-                          return p.first == val &&
-                                 dom_tree.dominates(exit, &getBB(p.second));
+                          return p.first == val && &getBB(p.second) == exit;
                         }))
               continue;
 
-            if (user_bb == dst) {
-              auto &exit_copies = bbmap.at(exit);
-              auto exit_I = exit_copies.begin(), exit_E = exit_copies.end();
-              for (auto &[bb, val] : copies) {
-                if (++exit_I == exit_E)
-                  break;
-                if (dom_tree.dominates(bb, *exit_I)) {
-                  phi->addValue(*val, string((*exit_I)->getName()));
-                }
-              }
-              continue;
+            auto &exit_copies = bbmap.at(exit);
+            auto exit_I = exit_copies.begin(), exit_E = exit_copies.end();
+            for (auto &[bb, val] : copies) {
+              if (++exit_I == exit_E)
+                break;
+              phi->addValue(*val, string((*exit_I)->getName()));
             }
+            continue;
           }
 
           auto &newphi = new_phis[make_pair(dst, val)];
