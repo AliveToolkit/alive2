@@ -1,5 +1,4 @@
-; TEST-ARGS: -src-unroll=2
-; SKIP-IDENTITY
+; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
 
 define i32 @src() {
 entry:
