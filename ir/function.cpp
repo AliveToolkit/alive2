@@ -626,9 +626,11 @@ void Function::unroll(unsigned k) {
               phi && user_bb == dst) {
             // Check if the phi uses this value through this predecessor
             auto &vals = phi->getValues();
+            auto *used_val = val;
+            auto *ex = exit;
             if (!any_of(vals.begin(), vals.end(),
                         [&](const auto &p) {
-                          return p.first == val && &getBB(p.second) == exit;
+                          return p.first == used_val && &getBB(p.second) == ex;
                         }))
               continue;
 
@@ -714,10 +716,6 @@ void Function::unroll(unsigned k) {
           auto *i = static_cast<Instr*>(user);
           i->rauw(*first_added_phi, *load.get());
           user_bb->addInstrAt(move(load), i, true);
-
-          for (auto &[bb, phi] : added_phis) {
-            bb->delInstr(phi);
-          }
 
           getFirstBB().addInstr(move(alloca), true);
         }
