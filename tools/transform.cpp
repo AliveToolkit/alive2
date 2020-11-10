@@ -374,7 +374,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto sink_tgt = tgt_state.sinkDomain();
   pre_tgt &= !sink_tgt;
 
-  expr pre_src_exists = pre_src, pre_src_forall = true;
+  expr pre_src_exists, pre_src_forall;
   {
     vector<pair<expr,expr>> repls;
     auto vars_pre = pre_src.vars();
@@ -382,11 +382,8 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
       if (vars_pre.count(v))
         repls.emplace_back(v, expr::mkFreshVar("#exists", v));
     }
-    auto new_pre = pre_src.subst(repls);
-    if (!new_pre.eq(pre_src)) {
-      pre_src_exists = move(new_pre);
-      pre_src_forall = pre_src;
-    }
+    pre_src_exists = pre_src.subst(repls);
+    pre_src_forall = pre_src_exists.eq(pre_src) ? true : pre_src;
   }
   expr pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   pre_src_forall &= tgt_state.getFnPre();
