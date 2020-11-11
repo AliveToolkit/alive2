@@ -1112,7 +1112,7 @@ static map<string_view, Instr*> can_remove_init(Function &fn) {
   return to_remove;
 }
 
-static void remove_unreachable_bbs(Function &f) {
+static bool remove_unreachable_bbs(Function &f) {
   vector<BasicBlock*> wl = { &f.getFirstBB() };
   set<BasicBlock*> reachable;
 
@@ -1145,11 +1145,13 @@ static void remove_unreachable_bbs(Function &f) {
       }
     }
   }
+
+  return unreachable.size() != 0;
 }
 
-void Transform::preprocess() {
+bool Transform::preprocess() {
   remove_unreachable_bbs(src);
-  remove_unreachable_bbs(tgt);
+  bool changed_tgt = remove_unreachable_bbs(tgt);
 
   // remove store of initializers to global variables that aren't needed to
   // verify the transformation
@@ -1162,23 +1164,26 @@ void Transform::preprocess() {
       continue;
     src.getFirstBB().delInstr(isrc);
     tgt.getFirstBB().delInstr(Itgt->second);
+    changed_tgt = true;
     // TODO: check that tgt init refines that of src
   }
 
   // remove constants introduced in target
   auto src_gvs = src.getGlobalVarNames();
   for (auto &[name, itgt] : remove_init_tgt) {
-    if (find(src_gvs.begin(), src_gvs.end(), name.substr(1)) == src_gvs.end())
+    if (find(src_gvs.begin(), src_gvs.end(), name.substr(1)) == src_gvs.end()) {
       tgt.getFirstBB().delInstr(itgt);
+      changed_tgt = true;
+    }
   }
 
   // remove side-effect free instructions without users
   vector<Instr*> to_remove;
   for (auto fn : { &src, &tgt }) {
-    bool changed;
+    bool changed_i;
     do {
       auto users = fn->getUsers();
-      changed = false;
+      changed_i = false;
 
       for (auto bb : fn->getBBs()) {
         for (auto &i : bb->instrs()) {
@@ -1189,22 +1194,26 @@ void Transform::preprocess() {
 
         for (auto i : to_remove) {
           bb->delInstr(i);
-          changed = true;
+          changed_i = true;
         }
         to_remove.clear();
       }
 
-      changed |=
+      changed_i |=
         fn->removeUnusedStuff(users, fn == &src ? vector<string_view>()
                                                 : src.getGlobalVarNames());
-    } while (changed);
+      if (fn == &tgt)
+        changed_tgt |= changed_i;
+    } while (changed_i);
   }
 
   // bits_program_pointer is used by unroll. Initialize it in advance
   initBitsProgramPointer(*this);
 
   src.unroll(config::src_unroll_cnt);
-  tgt.unroll(config::tgt_unroll_cnt);
+  changed_tgt |= tgt.unroll(config::tgt_unroll_cnt);
+
+  return changed_tgt;
 }
 
 void Transform::print(ostream &os, const TransformPrintOpts &opt) const {

@@ -217,8 +217,11 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     auto [I, first] = fns.try_emplace(F.getName().str());
-    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
-                                        : I->second.fn.getGlobalVarNames());
+
+    vector<string_view> src_global_vars;
+    if (!first)
+      src_global_vars = I->second.fn.getGlobalVarNames();
+    auto fn = llvm2alive(F, *TLI, src_global_vars);
     if (!fn) {
       fns.erase(I);
       return false;
@@ -258,7 +261,7 @@ struct TVPass final : public llvm::FunctionPass {
     Transform t;
     t.src = move(old_fn);
     t.tgt = move(I->second.fn);
-    t.preprocess();
+    bool tgt_changed = t.preprocess();
     TransformVerify verifier(t, false);
     if (!opt_succinct)
       t.print(*out, print_opts);
@@ -285,7 +288,11 @@ struct TVPass final : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    I->second.fn = move(t.tgt);
+    if (tgt_changed)
+      // Regenerate tgt because preprocessing may have changed it
+      I->second.fn = *llvm2alive(F, *TLI, move(src_global_vars));
+    else
+      I->second.fn = move(t.tgt);
     return false;
   }
 

@@ -457,14 +457,14 @@ static auto getPhiPredecessors(const Function &F) {
   return map;
 }
 
-void Function::unroll(unsigned k) {
+bool Function::unroll(unsigned k) {
   if (k == 0)
-    return;
+    return false;
 
   LoopAnalysis la(*this);
   auto &roots = la.getRoots();
   if (roots.empty())
-    return;
+    return false;
 
   auto &forest = la.getLoopForest();
   BasicBlock &sink = getBB("#sink");
@@ -483,6 +483,7 @@ void Function::unroll(unsigned k) {
   auto phi_preds = getPhiPredecessors(*this);
 
   // traverse each loop tree in post-order
+  bool changed = false;
   while (!worklist.empty()) {
     auto &[header, height, flag] = worklist.back();
     if (!flag) {
@@ -545,6 +546,7 @@ void Function::unroll(unsigned k) {
         auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*this, *bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
+        changed = true;
       }
     }
 
@@ -556,6 +558,7 @@ void Function::unroll(unsigned k) {
       auto &copies = bbmap.at(header);
       copies.emplace_back(&cloneBB(*this, *header, "#exit", bbmap, vmap));
       unrolled_bbs.emplace_back(copies.back());
+      changed = true;
     }
 
     // Patch jump targets
@@ -740,6 +743,7 @@ void Function::unroll(unsigned k) {
       }
     }
   }
+  return changed;
 }
 
 void Function::print(ostream &os, bool print_header) const {
