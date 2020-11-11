@@ -1,5 +1,6 @@
 ; TEST-ARGS: -io-nobuiltin
-; In order to detect a bug, a function call should be able to update escaped local blocks
+; FIXME: In order to detect this bug, a function call should be able to update escaped local blocks
+
 target datalayout = "e-p:32:32"
 @str = constant [3 x i8] undef
 @str2 = constant [4 x i8] undef
@@ -40,4 +41,3 @@ return:
 
 declare void @scanf(i8*, ...)
 declare void @printf(i8*, ...)
-
