@@ -176,7 +176,7 @@ public:
                          const std::vector<std::string_view> &src_glbs);
 
   void topSort();
-  bool unroll(unsigned k); // return true if changed
+  void unroll(unsigned k);
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);

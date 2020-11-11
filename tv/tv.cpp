@@ -261,7 +261,7 @@ struct TVPass final : public llvm::FunctionPass {
     Transform t;
     t.src = move(old_fn);
     t.tgt = move(I->second.fn);
-    bool tgt_changed = t.preprocess();
+    t.preprocess();
     TransformVerify verifier(t, false);
     if (!opt_succinct)
       t.print(*out, print_opts);
@@ -288,11 +288,8 @@ struct TVPass final : public llvm::FunctionPass {
       *out << "Transformation seems to be correct!\n\n";
     }
 
-    if (tgt_changed)
-      // Regenerate tgt because preprocessing may have changed it
-      I->second.fn = *llvm2alive(F, *TLI, move(src_global_vars));
-    else
-      I->second.fn = move(t.tgt);
+    // Regenerate tgt because preprocessing may have changed it
+    I->second.fn = *llvm2alive(F, *TLI, move(src_global_vars));
     return false;
   }
 
