@@ -3,8 +3,7 @@
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
-; Function Attrs: nounwind uwtable
-define i32 @src(i32* %bp) #0 {
+define i32 @src(i32* %bp) {
 entry:
   %bp.addr = alloca i32*, align 8
   %lbp = alloca i32*, align 8
@@ -28,7 +27,7 @@ if.then:                                          ; preds = %entry
 
 delete.notnull:                                   ; preds = %if.then
   %5 = bitcast i32* %4 to i8*
-  call void @_ZdaPv(i8* %5) #2
+  call void @_ZdaPv(i8* %5)
   br label %delete.end
 
 delete.end:                                       ; preds = %delete.notnull, %if.then
@@ -38,22 +37,12 @@ if.end:                                           ; preds = %delete.end, %entry
   ret i32 0
 }
 
-define i32 @tgt(i32* %bp) #0 {
+define i32 @tgt(i32* %bp) {
 entry:
   %add.ptr = getelementptr inbounds i32, i32* %bp, i64 1
   %0 = bitcast i32* %add.ptr to i8*
-  tail call void @_ZdaPv(i8* %0) #2
+  tail call void @_ZdaPv(i8* %0)
   ret i32 0
 }
 
-
-; Function Attrs: nobuiltin nounwind
-declare void @_ZdaPv(i8*) #1
-
-attributes #0 = { nounwind uwtable "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "stack-protector-buffer-size"="8" "unsafe-fp-math"="false" "use-soft-float"="false" }
-attributes #1 = { nobuiltin nounwind "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "stack-protector-buffer-size"="8" "unsafe-fp-math"="false" "use-soft-float"="false" }
-attributes #2 = { builtin nounwind }
-
-!llvm.ident = !{!0}
-
-!0 = !{!"clang version 3.7.0 (git@idcvgits01.amd.com:llvm/cpu/clang.git 15ee028e66c804d4828f031b51794675117a5bf3) (llvm/cpu/llvm.git 662ad67fab3049591e2259fa02f8786a29478466)"}
+declare void @_ZdaPv(i8*)
