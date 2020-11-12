@@ -3,7 +3,7 @@
 ; Bound the # of iterations to 2, because the problematic execution
 ; happens at the second iteration.
 
-define i32 @src() local_unnamed_addr {
+define i32 @src() {
 entry:
   store i32 3, i32* @a, align 4
   br label %for.body
@@ -28,7 +28,7 @@ for.end:                                          ; preds = %for.body
   ret i32 0
 }
 
-define i32 @tgt() local_unnamed_addr {
+define i32 @tgt() {
 entry:
   store i32 3, i32* @a, align 4
   br label %for.body
