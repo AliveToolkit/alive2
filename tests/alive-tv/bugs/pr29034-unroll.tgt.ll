@@ -1,8 +1,4 @@
-; https://bugs.llvm.org/show_bug.cgi?id=29034
-; To detect this bug,
-; 1. infinite loops should be supported
-; 2. function calls should be able to update escaped local blocks
-; ModuleID = 'music_task.bc'
+; ModuleID = 'music_task_gvn.bc'
 source_filename = "music.i"
 target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
 target triple = "aarch64"
@@ -31,13 +27,13 @@ target triple = "aarch64"
 
 @.str = external hidden unnamed_addr constant [10 x i8], align 1
 
-; Function Attrs: minsize noreturn nounwind optsize
-define void @music_task(i8* nocapture readnone %p) local_unnamed_addr #0 {
+; Function Attrs: minsize nounwind optsize
+define void @music_task(i8* nocapture readnone %p, %struct._MUSIC_OP_API_* %mapi_init) local_unnamed_addr #0 {
 entry:
   %mapi = alloca %struct._MUSIC_OP_API_*, align 8
   %0 = bitcast %struct._MUSIC_OP_API_** %mapi to i8*
   call void @llvm.lifetime.start(i64 8, i8* %0) #4
-  store %struct._MUSIC_OP_API_* null, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  store %struct._MUSIC_OP_API_* %mapi_init, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
   %call = call i32 @music_decoder_init(%struct._MUSIC_OP_API_** nonnull %mapi) #5
   br label %while.cond
 
@@ -55,50 +51,43 @@ while.cond:                                       ; preds = %while.cond.loopexit
 
 while.cond2:                                      ; preds = %while.cond2.backedge, %while.cond
   %err.0 = phi i32 [ %call1, %while.cond ], [ %err.0.be, %while.cond2.backedge ]
+  %4 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  %dop_api8 = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %4, i64 0, i32 1
+  %5 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api8, align 8, !tbaa !5
+  %file_num9 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %5, i64 0, i32 2
+  %6 = bitcast i32* %file_num9 to i8*
+  store i32 1, i32* %file_num9, align 1, !tbaa !7
   switch i32 %err.0, label %sw.default [
     i32 0, label %while.cond.loopexit
     i32 35, label %sw.bb
     i32 11, label %sw.bb7
     i32 12, label %sw.bb13
+    i32 255, label %return
   ]
 
 sw.bb:                                            ; preds = %while.cond2
-  %4 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
-  %dop_api4 = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %4, i64 0, i32 1
-  %5 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api4, align 8, !tbaa !5
-  %file_num5 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %5, i64 0, i32 2
-  %6 = load i32, i32* %file_num5, align 1, !tbaa !7
-  %call6 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %6) #6
+  %7 = load i32, i32* %file_num9, align 1, !tbaa !7
+  %call6 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %7) #6
   br label %while.cond2.backedge
 
 sw.bb7:                                           ; preds = %while.cond2
-  %7 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
-  %dop_api8 = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %7, i64 0, i32 1
-  %8 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api8, align 8, !tbaa !5
-  %file_num9 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %8, i64 0, i32 2
-  store i32 1, i32* %file_num9, align 1, !tbaa !7
-  %9 = bitcast i32* %file_num9 to i8*
-  %call12 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %7, i32 34, i32 0, i32 24, i8* %9) #5
+  %call12 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %4, i32 34, i32 0, i32 24, i8* %6) #5
   br label %while.cond2.backedge
 
 sw.bb13:                                          ; preds = %while.cond2
-  %10 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
-  %dop_api14 = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %10, i64 0, i32 1
-  %11 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api14, align 8, !tbaa !5
-  %file_num15 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %11, i64 0, i32 2
-  store i32 1, i32* %file_num15, align 1, !tbaa !7
-  %12 = bitcast i32* %file_num15 to i8*
-  %call18 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %10, i32 35, i32 0, i32 26, i8* %12) #5
+  %call18 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %4, i32 35, i32 0, i32 26, i8* %6) #5
   br label %while.cond2.backedge
 
 sw.default:                                       ; preds = %while.cond2
-  %13 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
-  %call19 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %13, i32 33, i32 0, i32 22, i8* null) #5
+  %call19 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %4, i32 33, i32 0, i32 22, i8* null) #5
   br label %while.cond2.backedge
 
 while.cond2.backedge:                             ; preds = %sw.default, %sw.bb13, %sw.bb7, %sw.bb
   %err.0.be = phi i32 [ %call19, %sw.default ], [ %call18, %sw.bb13 ], [ %call12, %sw.bb7 ], [ 0, %sw.bb ]
   br label %while.cond2
+
+return:
+  ret void
 }
 
 ; Function Attrs: argmemonly nounwind
@@ -113,7 +102,7 @@ declare i32 @music_play_api(%struct._MUSIC_OP_API_*, i32, i32, i32, i8*) local_u
 ; Function Attrs: minsize nounwind optsize
 declare i32 @printf(i8* nocapture readonly, ...) local_unnamed_addr #3
 
-attributes #0 = { minsize noreturn nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #0 = { minsize nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }
 attributes #2 = { minsize optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #3 = { minsize nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }

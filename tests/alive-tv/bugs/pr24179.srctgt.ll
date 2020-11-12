@@ -1,4 +1,4 @@
-; To detect a bug from this, infinite loop should be supported
+; TEST-ARGS: -src-unroll=2 -tgt-unroll=2
 
 declare i1 @use(i32)
 
@@ -29,3 +29,5 @@ loop:                                             ; preds = %loop, %entry
 exit:                                             ; preds = %loop
   ret void
 }
+
+; ERROR: Source is more defined than target

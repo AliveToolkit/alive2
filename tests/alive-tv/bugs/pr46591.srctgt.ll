@@ -1,3 +1,4 @@
+; Found by Alive2
 ; https://bugs.llvm.org/show_bug.cgi?id=46591
 
 target triple = "x86_64--"

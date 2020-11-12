@@ -1,7 +1,4 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=29034
-; To detect this bug,
-; 1. infinite loops should be supported
-; 2. function calls should be able to update escaped local blocks
 ; ModuleID = 'music_task.bc'
 source_filename = "music.i"
 target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
@@ -31,13 +28,13 @@ target triple = "aarch64"
 
 @.str = external hidden unnamed_addr constant [10 x i8], align 1
 
-; Function Attrs: minsize noreturn nounwind optsize
-define void @music_task(i8* nocapture readnone %p) local_unnamed_addr #0 {
+; Function Attrs: minsize nounwind optsize
+define void @music_task(i8* nocapture readnone %p, %struct._MUSIC_OP_API_* %mapi_init) local_unnamed_addr #0 {
 entry:
   %mapi = alloca %struct._MUSIC_OP_API_*, align 8
   %0 = bitcast %struct._MUSIC_OP_API_** %mapi to i8*
   call void @llvm.lifetime.start(i64 8, i8* %0) #4
-  store %struct._MUSIC_OP_API_* null, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  store %struct._MUSIC_OP_API_* %mapi_init, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
   %call = call i32 @music_decoder_init(%struct._MUSIC_OP_API_** nonnull %mapi) #5
   br label %while.cond
 
@@ -60,6 +57,7 @@ while.cond2:                                      ; preds = %while.cond2.backedg
     i32 35, label %sw.bb
     i32 11, label %sw.bb7
     i32 12, label %sw.bb13
+    i32 255, label %return
   ]
 
 sw.bb:                                            ; preds = %while.cond2
@@ -99,6 +97,9 @@ sw.default:                                       ; preds = %while.cond2
 while.cond2.backedge:                             ; preds = %sw.default, %sw.bb13, %sw.bb7, %sw.bb
   %err.0.be = phi i32 [ %call19, %sw.default ], [ %call18, %sw.bb13 ], [ %call12, %sw.bb7 ], [ 0, %sw.bb ]
   br label %while.cond2
+
+return:
+  ret void
 }
 
 ; Function Attrs: argmemonly nounwind
@@ -113,7 +114,7 @@ declare i32 @music_play_api(%struct._MUSIC_OP_API_*, i32, i32, i32, i8*) local_u
 ; Function Attrs: minsize nounwind optsize
 declare i32 @printf(i8* nocapture readonly, ...) local_unnamed_addr #3
 
-attributes #0 = { minsize noreturn nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #0 = { minsize nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { argmemonly nounwind }
 attributes #2 = { minsize optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #3 = { minsize nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
@@ -135,3 +136,5 @@ attributes #6 = { minsize optsize }
 !9 = !{!"int", !3, i64 0}
 !10 = !{!"_DEC_API", !2, i64 0, !2, i64 8, !2, i64 16, !2, i64 24, !2, i64 32, !2, i64 40, !11, i64 48, !9, i64 60, !9, i64 64, !2, i64 72, !2, i64 80, !9, i64 88, !3, i64 92, !2, i64 96, !3, i64 104, !2, i64 112}
 !11 = !{!"_AAC_DEFAULT_SETTING", !9, i64 0, !9, i64 4, !9, i64 8}
+
+; ERROR: Source is more defined than target

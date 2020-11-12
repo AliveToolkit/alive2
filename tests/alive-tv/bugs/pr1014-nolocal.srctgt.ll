@@ -3,10 +3,11 @@ target datalayout = "e-p:32:32"
 @str = constant [3 x i8] undef
 @str2 = constant [4 x i8] undef
 
-define i32 @src(i32* %v0) {
+define i32 @src(i32 %v0_init) {
 entry:
+  %v0 = alloca i32, align 4
   %tmp = getelementptr [3 x i8], [3 x i8]* @str, i32 0, i32 0
-  call void (i8*, ...) @scanf(i8* %tmp, i32* %v0)
+  store i32 %v0_init, i32* %v0
   %tmp1 = load i32, i32* %v0
   %ovm = and i32 %tmp1, 32
   %ov3 = add i32 %ovm, 145
@@ -19,10 +20,11 @@ return:
   ret i32 0
 }
 
-define i32 @tgt(i32* %v0) {
+define i32 @tgt(i32 %v0_init) {
 entry:
+  %v0 = alloca i32, align 4
   %tmp = getelementptr [3 x i8], [3 x i8]* @str, i32 0, i32 0
-  call void (i8*, ...) @scanf(i8* %tmp, i32* %v0)
+  store i32 %v0_init, i32* %v0
   %tmp1 = load i32, i32* %v0
   %ovm = and i32 %tmp1, 32
   %ov110 = or i32 %ovm, 9
@@ -35,7 +37,6 @@ return:
 
 }
 
-declare void @scanf(i8*, ...)
 declare void @printf(i8*, ...)
 
 ; ERROR: Source is more defined than target
