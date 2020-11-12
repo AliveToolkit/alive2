@@ -218,10 +218,8 @@ struct TVPass final : public llvm::FunctionPass {
 
     auto [I, first] = fns.try_emplace(F.getName().str());
 
-    vector<string_view> src_global_vars;
-    if (!first)
-      src_global_vars = I->second.fn.getGlobalVarNames();
-    auto fn = llvm2alive(F, *TLI, src_global_vars);
+    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
+                                        : I->second.fn.getGlobalVarNames());
     if (!fn) {
       fns.erase(I);
       return false;
@@ -289,7 +287,7 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     // Regenerate tgt because preprocessing may have changed it
-    I->second.fn = *llvm2alive(F, *TLI, move(src_global_vars));
+    I->second.fn = *llvm2alive(F, *TLI);
     return false;
   }
 
