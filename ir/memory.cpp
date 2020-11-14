@@ -2368,9 +2368,16 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
                         els.byval_blks.end());
   ret.escaped_local_blks.unionWith(els.escaped_local_blks);
 
-  for (const auto &[expr, alias] : els.ptr_alias) {
-    auto [I, inserted] = ret.ptr_alias.try_emplace(expr, alias);
-    if (!inserted)
+  // intersect ptr_alias.
+  for (auto i = ret.ptr_alias.begin(); i != ret.ptr_alias.end();) {
+    if (els.ptr_alias.find(i->first) == els.ptr_alias.end())
+      i = ret.ptr_alias.erase(i);
+    else
+      ++i;
+  }
+  for (const auto &[bid, alias] : els.ptr_alias) {
+    auto I = ret.ptr_alias.find(bid);
+    if (I != ret.ptr_alias.end())
       I->second.unionWith(alias);
   }
 
