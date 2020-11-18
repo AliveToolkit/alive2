@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 ; https://bugs.llvm.org/show_bug.cgi?id=1261
 ; This shows that pr1261 was not a bug. :) (which matches with the final conclusion)
 

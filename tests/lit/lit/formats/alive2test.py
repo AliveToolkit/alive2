@@ -30,11 +30,14 @@ def executeCommand(command):
     err = str(err)
   return out, err, exitCode
 
+def is_timeout(str):
+  return str.find('ERROR: Timeout') > 0
 
 def id_check(fn, cmd, args):
   out, err, exitCode = executeCommand(cmd + args)
-  if exitCode != 0 or (out + err).find(ok_string) < 0:
-    raise Exception(fn + ' identity check fail: ' + out + err)
+  str = out + err
+  if not is_timeout(str) and (exitCode != 0 or str.find(ok_string) < 0):
+    raise Exception(fn + ' identity check fail: ' + str)
 
 
 def readFile(path):
@@ -69,18 +72,18 @@ class Alive2Test(TestFormat):
 
     alive_tv_1 = test.endswith('.srctgt.ll')
     if alive_tv_1:
-      cmd = ['./alive-tv', '-smt-to=20000']
+      cmd = ['./alive-tv', '-smt-to=30000']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     alive_tv_2 = test.endswith('.src.ll')
     if alive_tv_2:
-      cmd = ['./alive-tv', '-smt-to=20000']
+      cmd = ['./alive-tv', '-smt-to=30000']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     if not alive_tv_1 and not alive_tv_2:
-      cmd = ['./alive', '-smt-to:20000']
+      cmd = ['./alive', '-smt-to:30000']
 
     input = readFile(test)
 
@@ -111,31 +114,33 @@ class Alive2Test(TestFormat):
     if alive_tv_2:
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
     out, err, exitCode = executeCommand(cmd)
+    output = out + err
 
-    expect_err = self.regex_errs.search(input)
     xfail = self.regex_xfail.search(input)
-    chk = self.regex_check.search(input)
-    chk_not = self.regex_check_not.search(input)
-
-    # Check XFAIL early.
-    if xfail != None and (out + err).find(xfail.group(1)) != -1:
+    if xfail != None and output.find(xfail.group(1)) != -1:
       return lit.Test.XFAIL, ''
 
-    if chk != None and (out + err).find(chk.group(1).strip()) == -1:
-      return lit.Test.FAIL, out + err
+    if is_timeout(output):
+      return lit.Test.PASS, ''
 
-    if chk_not != None and (out + err).find(chk_not.group(1).strip()) != -1:
-      return lit.Test.FAIL, out + err
+    chk = self.regex_check.search(input)
+    if chk != None and output.find(chk.group(1).strip()) == -1:
+      return lit.Test.FAIL, output
 
+    chk_not = self.regex_check_not.search(input)
+    if chk_not != None and output.find(chk_not.group(1).strip()) != -1:
+      return lit.Test.FAIL, output
+
+    expect_err = self.regex_errs.search(input)
     if expect_err is None and xfail is None and chk is None and chk_not is None:
       # If there's no other test, correctness of the transformation should be
       # checked.
-      if exitCode == 0 and (out + err).find(ok_string) != -1 and \
-          self.regex_errs_out.search(out + err) is None:
+      if exitCode == 0 and output.find(ok_string) != -1 and \
+          self.regex_errs_out.search(output) is None:
         return lit.Test.PASS, ''
-      return lit.Test.FAIL, out + err
+      return lit.Test.FAIL, output
 
-    if expect_err != None and (out + err).find(expect_err.group(1)) == -1:
-      return lit.Test.FAIL, out + err
+    if expect_err != None and output.find(expect_err.group(1)) == -1:
+      return lit.Test.FAIL, output
 
     return lit.Test.PASS, ''

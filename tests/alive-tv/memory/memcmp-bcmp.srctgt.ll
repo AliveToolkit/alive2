@@ -1,6 +1,5 @@
 target datalayout = "e-p:64:64:64"
 target triple = "x86_64-unknown-linux-gnu"
-; TEST-ARGS: -disable-undef-input
 
 define i1 @src(i64 %x, i64 %y, i64 %n) {
   %p = alloca i64

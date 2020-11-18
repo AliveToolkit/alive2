@@ -1,5 +1,3 @@
-; SKIP-IDENTITY
-
 define {} @src({} %v, {} %w) {
   ret {} %v
 }

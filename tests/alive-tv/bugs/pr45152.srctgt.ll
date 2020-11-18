@@ -1,5 +1,4 @@
 ; Found by Alive
-; SKIP-IDENTITY
 
 @Q = internal unnamed_addr global double 1.000000e+00, align 8
 

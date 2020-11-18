@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 define float @src(i26 %x, i26 %y) {
   %xx = or i26 %x, 42074059
   %yy = and i26 %y, 14942208

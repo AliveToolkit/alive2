@@ -1,5 +1,4 @@
 ; Found by Alive2
-; TEST-ARGS: -disable-undef-input
 declare void @g(i8*)
 
 define void @src(i8* %ptr, i1 %cc1, i1 %cc2, i1 %cc3, i32 %arg) {

@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 define i8* @f(i1 %cond, i64 %a, i64 %b) {
   br i1 %cond, label %A, label %B
 A:

@@ -1,6 +1,7 @@
+; TEST-ARGS: -src-unroll=16 -tgt-unroll=16
+; ERROR: Source is more defined than target
+
 ; https://bugs.llvm.org/show_bug.cgi?id=36437
-; Currently Alive2 simply rejects this example. After loop support, this should
-; be verified (as an incorrect transformation)
 
 define i32 @src() local_unnamed_addr {
 entry:
@@ -51,9 +52,6 @@ for.end:                                          ; preds = %for.body
   %call = tail call i32 (i8*, ...) @print(i8* nonnull dereferenceable(1) getelementptr inbounds ([15 x i8], [15 x i8]* @.str, i64 0, i64 0), i32 %3)
   ret i32 0
 }
-
-; XFAIL: Precondition is always false
-; SKIP-IDENTITY
 
 @b = global i32 2, align 4
 @c = global i32* @b, align 8

@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 Name: single shift by masked value
 %c_mod_width = urem i32 %c, i32 32
 %t = shl i32 %a, i32 %c_mod_width

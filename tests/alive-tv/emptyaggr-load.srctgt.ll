@@ -1,5 +1,3 @@
-; SKIP-IDENTITY
-
 define {} @src({}* %p, {}* %q) {
   %v = load {}, {}* %p
   %w = load {}, {}* %q

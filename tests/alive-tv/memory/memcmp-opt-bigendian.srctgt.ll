@@ -1,10 +1,9 @@
 target datalayout = "E-p:64:64:64"
-; TEST-ARGS: -disable-undef-input
 ; This optimization is incorrect if x == 0 and y == undef!
 ; In src, %res cannot be 1 because y cannot be smaller than 0.
 ; In tgt, %lt and %eq can both be false because y is undef, so %res can be 1.
 
-define i32 @src(i16 %x, i16 %y) {
+define i32 @src(i16 noundef %x, i16 noundef %y) {
   %p = alloca i16
   %q = alloca i16
   store i16 %x, i16* %p, align 1
@@ -15,7 +14,7 @@ define i32 @src(i16 %x, i16 %y) {
   ret i32 %res
 }
 
-define i32 @tgt(i16 %x, i16 %y) {
+define i32 @tgt(i16 noundef %x, i16 noundef %y) {
   %lt = icmp ult i16 %x, %y
   %eq = icmp eq i16 %x, %y
   %r = select i1 %eq, i32 0, i32 1
@@ -23,4 +22,4 @@ define i32 @tgt(i16 %x, i16 %y) {
   ret i32 %res
 }
 
-declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)	
+declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)
