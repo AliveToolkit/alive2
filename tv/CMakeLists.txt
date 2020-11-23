@@ -10,6 +10,18 @@ if (CLANG_PLUGIN)
   set_target_properties(tv PROPERTIES
       COMPILE_FLAGS "-DCLANG_PLUGIN"
   )
+  configure_file(
+    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
+    ${CMAKE_BINARY_DIR}/scripts/alivecc
+    @ONLY
+  )
+  configure_file(
+    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
+    ${CMAKE_BINARY_DIR}/scripts/alive++
+    @ONLY
+  )
+else()
+  message(STATUS "Skipping Clang plugin")
 endif()
 
 target_link_libraries(tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES}
