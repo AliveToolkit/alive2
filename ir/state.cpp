@@ -281,7 +281,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvule (bvadd c (ite (= #b0 isundef_%var) %var undef)) %val)
       //       #b1 #b0)
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        expr cond = rhs == expr::mkInt(-1, rhs)
+        expr cond = rhs == expr::mkInt(-1, rhs);
         addUB(not_undef || cond);
         if (cond.isFalse())
           mark_notundef(val);
