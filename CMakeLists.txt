@@ -180,18 +180,8 @@ if (BUILD_TV)
     ${CMAKE_BINARY_DIR}/scripts/opt-alive.sh
     @ONLY
   )
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/scripts/alivecc
-    @ONLY
-  )
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/scripts/alive++
-    @ONLY
-  )
 else()
-  message(STATUS "Skiping translation validation plugin")
+  message(STATUS "Skipping translation validation plugin")
 endif()
 
 add_executable(alive
