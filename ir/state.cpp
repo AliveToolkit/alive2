@@ -236,8 +236,6 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
         expr cond = lhs == expr::IntSMin(lhs.bits());
         addUB(not_undef || cond);
         if (cond.isFalse())
-          // It is guaranteed that lhs isn't INT_MIN, so INT_MIN <= rhs
-          // never happens
           mark_notundef(val);
         // lhs <=s %var
         // lhs <=s (bvadd c %var)
