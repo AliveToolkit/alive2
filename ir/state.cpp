@@ -158,11 +158,12 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     //   var = %var, e2 = %var
     // when e = (bvadd const (ite (= #b0 isundef_%var) %var undef))
     //   var = %var, e2 = const + %var
-    expr a, b;
     if (is_if_undef(e, var, not_undef)) {
       e2 = var;
       return true;
     }
+
+    expr a, b;
     if (e.isAdd(a, b)) {
       if (b.isConst() && is_if_undef(a, var, not_undef)) {
         e2 = b + var;
