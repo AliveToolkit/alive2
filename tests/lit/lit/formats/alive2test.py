@@ -49,9 +49,9 @@ class Alive2Test(TestFormat):
   def __init__(self):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
-    self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
-    self.regex_check = re.compile(r";\s*CHECK:(.*)")
-    self.regex_check_not = re.compile(r";\s*CHECK-NOT:(.*)")
+    self.regex_args = re.compile(r"(?:;|//)\s*TEST-ARGS:(.*)")
+    self.regex_check = re.compile(r"(?:;|//)\s*CHECK:(.*)")
+    self.regex_check_not = re.compile(r"(?:;|//)\s*CHECK-NOT:(.*)")
     self.regex_skip_identity = re.compile(r";\s*SKIP-IDENTITY")
     self.regex_errs_out = re.compile("ERROR:.*")
 
@@ -63,7 +63,8 @@ class Alive2Test(TestFormat):
       if not filename.startswith('.') and \
           not os.path.isdir(filepath) and \
           (filename.endswith('.opt') or filename.endswith('.src.ll') or
-           filename.endswith('.srctgt.ll')):
+           filename.endswith('.srctgt.ll') or filename.endswith('.c') or
+           filename.endswith('.cpp')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
 
 
@@ -82,7 +83,16 @@ class Alive2Test(TestFormat):
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
-    if not alive_tv_1 and not alive_tv_2:
+    clang_tv = test.endswith('.c') or test.endswith('.cpp')
+    if clang_tv:
+      execpath = './scripts/%s' % ("alivecc" if test.endswith('.c')
+                                             else "alive++")
+      # 30 seconds is too long to apply to all passes, just use the default to
+      cmd = [execpath, "-c", "-o", "/dev/null"]
+      if not os.path.isfile(execpath):
+        return lit.Test.UNSUPPORTED, ''
+
+    if not alive_tv_1 and not alive_tv_2 and not clang_tv:
       cmd = ['./alive', '-smt-to:30000']
 
     input = readFile(test)
@@ -129,6 +139,11 @@ class Alive2Test(TestFormat):
 
     chk_not = self.regex_check_not.search(input)
     if chk_not != None and output.find(chk_not.group(1).strip()) != -1:
+      return lit.Test.FAIL, output
+
+    if clang_tv and exitCode != 0:
+      # clang tv should not exit with non-zero even if validation fails.
+      # Otherwise it will stop a build system such as `make`.
       return lit.Test.FAIL, output
 
     expect_err = self.regex_errs.search(input)

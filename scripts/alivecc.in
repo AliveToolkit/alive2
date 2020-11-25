@@ -13,6 +13,13 @@ else
   exit -1
 fi
 
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # Mac
+  TV_SHAREDLIB=tv.dylib
+else
+  # Linux, Cygwin/Msys, or Win32?
+  TV_SHAREDLIB=tv.so
+fi
 @LLVM_BINARY_DIR@/bin/$EXE \
-  -fpass-plugin=@CMAKE_BINARY_DIR@/tv/tv.so -fexperimental-new-pass-manager \
-  -Xclang -load -Xclang @CMAKE_BINARY_DIR@/tv/tv.so $*
+  -fpass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -fexperimental-new-pass-manager \
+  -Xclang -load -Xclang @CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB $*
