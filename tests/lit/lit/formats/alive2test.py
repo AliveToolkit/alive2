@@ -49,9 +49,9 @@ class Alive2Test(TestFormat):
   def __init__(self):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
-    self.regex_args = re.compile(r"(;|//)\s*TEST-ARGS:(.*)")
-    self.regex_check = re.compile(r"(;|//)\s*CHECK:(.*)")
-    self.regex_check_not = re.compile(r"(;|//)\s*CHECK-NOT:(.*)")
+    self.regex_args = re.compile(r"(?:;|//)\s*TEST-ARGS:(.*)")
+    self.regex_check = re.compile(r"(?:;|//)\s*CHECK:(.*)")
+    self.regex_check_not = re.compile(r"(?:;|//)\s*CHECK-NOT:(.*)")
     self.regex_skip_identity = re.compile(r";\s*SKIP-IDENTITY")
     self.regex_errs_out = re.compile("ERROR:.*")
 
@@ -100,7 +100,7 @@ class Alive2Test(TestFormat):
     # add test-specific args
     m = self.regex_args.search(input)
     if m != None:
-      cmd += m.group(2).split()
+      cmd += m.group(1).split()
 
     do_identity = self.regex_skip_identity.search(input) is None
 
@@ -134,11 +134,11 @@ class Alive2Test(TestFormat):
       return lit.Test.PASS, ''
 
     chk = self.regex_check.search(input)
-    if chk != None and output.find(chk.group(2).strip()) == -1:
+    if chk != None and output.find(chk.group(1).strip()) == -1:
       return lit.Test.FAIL, output
 
     chk_not = self.regex_check_not.search(input)
-    if chk_not != None and output.find(chk_not.group(2).strip()) != -1:
+    if chk_not != None and output.find(chk_not.group(1).strip()) != -1:
       return lit.Test.FAIL, output
 
     if clang_tv and exitCode != 0:
