@@ -49,9 +49,9 @@ class Alive2Test(TestFormat):
   def __init__(self):
     self.regex_errs = re.compile(r";\s*(ERROR:.*)")
     self.regex_xfail = re.compile(r";\s*XFAIL:\s*(.*)")
-    self.regex_args = re.compile(r";\s*TEST-ARGS:(.*)")
-    self.regex_check = re.compile(r";\s*CHECK:(.*)")
-    self.regex_check_not = re.compile(r";\s*CHECK-NOT:(.*)")
+    self.regex_args = re.compile(r"(;|//)\s*TEST-ARGS:(.*)")
+    self.regex_check = re.compile(r"(;|//)\s*CHECK:(.*)")
+    self.regex_check_not = re.compile(r"(;|//)\s*CHECK-NOT:(.*)")
     self.regex_skip_identity = re.compile(r";\s*SKIP-IDENTITY")
     self.regex_errs_out = re.compile("ERROR:.*")
 
@@ -63,7 +63,8 @@ class Alive2Test(TestFormat):
       if not filename.startswith('.') and \
           not os.path.isdir(filepath) and \
           (filename.endswith('.opt') or filename.endswith('.src.ll') or
-           filename.endswith('.srctgt.ll')):
+           filename.endswith('.srctgt.ll') or filename.endswith('.c') or
+           filename.endswith('.cpp')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
 
 
@@ -82,7 +83,16 @@ class Alive2Test(TestFormat):
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
-    if not alive_tv_1 and not alive_tv_2:
+    clang_tv = test.endswith('.c') or test.endswith('.cpp')
+    if clang_tv:
+      execpath = './scripts/%s' % ("alivecc" if test.endswith('.c')
+                                             else "alive++")
+      # 30 seconds is too long to apply to all passes, just use the default to
+      cmd = [execpath, "-c", "-o", "/dev/null"]
+      if not os.path.isfile(execpath):
+        return lit.Test.UNSUPPORTED, ''
+
+    if not alive_tv_1 and not alive_tv_2 and not clang_tv:
       cmd = ['./alive', '-smt-to:30000']
 
     input = readFile(test)
@@ -90,7 +100,7 @@ class Alive2Test(TestFormat):
     # add test-specific args
     m = self.regex_args.search(input)
     if m != None:
-      cmd += m.group(1).split()
+      cmd += m.group(2).split()
 
     do_identity = self.regex_skip_identity.search(input) is None
 
@@ -124,19 +134,26 @@ class Alive2Test(TestFormat):
       return lit.Test.PASS, ''
 
     chk = self.regex_check.search(input)
-    if chk != None and output.find(chk.group(1).strip()) == -1:
+    if chk != None and output.find(chk.group(2).strip()) == -1:
       return lit.Test.FAIL, output
 
     chk_not = self.regex_check_not.search(input)
-    if chk_not != None and output.find(chk_not.group(1).strip()) != -1:
+    if chk_not != None and output.find(chk_not.group(2).strip()) != -1:
+      return lit.Test.FAIL, output
+
+    if clang_tv and exitCode != 0:
+      # clang tv should not exit with non-zero even if validation fails.
+      # Otherwise it will stop a build system such as `make`.
       return lit.Test.FAIL, output
 
     expect_err = self.regex_errs.search(input)
     if expect_err is None and xfail is None and chk is None and chk_not is None:
       # If there's no other test, correctness of the transformation should be
       # checked.
+      # In case of clang tv, it may have multiple results, so ignore validation
+      # fail if at least one ok_string match exists
       if exitCode == 0 and output.find(ok_string) != -1 and \
-          self.regex_errs_out.search(output) is None:
+          (clang_tv or self.regex_errs_out.search(output) is None):
         return lit.Test.PASS, ''
       return lit.Test.FAIL, output
 
