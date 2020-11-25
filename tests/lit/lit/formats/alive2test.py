@@ -150,10 +150,8 @@ class Alive2Test(TestFormat):
     if expect_err is None and xfail is None and chk is None and chk_not is None:
       # If there's no other test, correctness of the transformation should be
       # checked.
-      # In case of clang tv, it may have multiple results, so ignore validation
-      # fail if at least one ok_string match exists
       if exitCode == 0 and output.find(ok_string) != -1 and \
-          (clang_tv or self.regex_errs_out.search(output) is None):
+          self.regex_errs_out.search(output) is None:
         return lit.Test.PASS, ''
       return lit.Test.FAIL, output
 
