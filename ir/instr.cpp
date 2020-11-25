@@ -1565,19 +1565,28 @@ uint64_t FnCall::getMaxAccessSize() const {
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
-  bool has_deref = getAttributes().has(FnAttrs::Dereferenceable);
-  if (!has_deref) {
-    for (auto &arg : args)
-      if (arg.second.has(ParamAttrs::Dereferenceable)) {
-        has_deref = true;
-        break;
-      }
+  auto &retattr = getAttributes();
+  bool has_deref = retattr.has(FnAttrs::Dereferenceable);
+  uint64_t bytesize = has_deref ? gcd(retattr.derefBytes, retattr.align) : 0;
+
+  for (auto &arg : args) {
+    if (!arg.first->getType().isPtrType())
+      continue;
+
+    if (arg.second.has(ParamAttrs::Dereferenceable)) {
+      has_deref = true;
+      // Without align, nothing is guaranteed about the bytesize
+      uint64_t b = gcd(arg.second.derefBytes, arg.second.align);
+      bytesize = bytesize ? gcd(bytesize, b) : b;
+    }
   }
-  if (!has_deref)
+  if (!has_deref) {
     // No dereferenceable attribute
+    assert(bytesize == 0);
     return {};
-  // dereferenceable(n) does not guarantee that the pointer is n-byte aligned
-  return ByteAccessInfo::anyType(1);
+  }
+
+  return ByteAccessInfo::anyType(bytesize);
 }
 
 
