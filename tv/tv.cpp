@@ -155,12 +155,12 @@ llvm::cl::opt<bool> opt_elapsed_time(
 llvm::cl::opt<unsigned> opt_src_unrolling_factor(
     "tv-src-unroll",
     llvm::cl::desc("Unrolling factor for src function (default=0)"),
-    llvm::cl::init(0));
+    llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
 llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     "tv-tgt-unroll",
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
-    llvm::cl::init(0));
+    llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
 struct FnInfo {
   Function fn;
