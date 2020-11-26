@@ -276,6 +276,13 @@ Value* get_operand(llvm::Value *v,
     RETURN_CACHE(ret);
   }
 
+  if (isa<llvm::PoisonValue>(v)) {
+    auto val = make_unique<PoisonValue>(*ty);
+    auto ret = val.get();
+    current_fn->addConstant(move(val));
+    RETURN_CACHE(ret);
+  }
+
   if (isa<llvm::UndefValue>(v)) {
     auto val = make_unique<UndefValue>(*ty);
     auto ret = val.get();
