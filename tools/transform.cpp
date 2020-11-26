@@ -673,20 +673,24 @@ static void calculateAndInitConstants(Transform &t) {
 
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
-      if (i && i->hasAttribute(ParamAttrs::Dereferenceable)) {
+      if (!i) continue;
+
+      uint64_t align = i->hasAttribute(ParamAttrs::Align) ?
+          1ull << i->getAttributes().align : 1;
+      if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
         uint64_t deref_bytes = i->getAttributes().derefBytes;
-        min_access_size = gcd(min_access_size, deref_bytes);
+        min_access_size = gcd(min_access_size, gcd(deref_bytes, align));
         max_access_size = max(max_access_size, deref_bytes);
       }
-      if (i && i->hasAttribute(ParamAttrs::ByVal)) {
+      if (i->hasAttribute(ParamAttrs::ByVal)) {
         does_mem_access = true;
         auto sz = i->getAttributes().blockSize;
         max_access_size = max(max_access_size, sz);
         min_global_size = min_global_size != UINT64_MAX
                             ? gcd(sz, min_global_size)
                             : sz;
-        min_global_size = gcd(min_global_size, i->getAttributes().align);
+        min_global_size = gcd(min_global_size, align);
       }
     }
 
