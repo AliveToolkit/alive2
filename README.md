@@ -63,10 +63,6 @@ Alive2 should then be configured as follows:
 cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
 ```
 
-If you want to use Alive2 as a clang plugin, add `-DCLANG_PLUGIN=1` to the
-cmake command.
-
-
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
 ~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
@@ -93,13 +89,19 @@ Testing Time: 0.11s
   Expected Passes    : 1
 ```
 
-Translation validation of the LLVM unit tests:
+To run translation validation on all of the LLVM unit tests for
+IR-level transformations:
 
 ```
 ~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
 
-Running Alive2 as a Clang plugin:
+Running Alive2 as a Clang Plugin
+--------
+
+This plugin tries to validate every IR-level transformation performed
+by LLVM.  To build it, add `-DCLANG_PLUGIN=1` to the cmake
+command. Then, invoke the plugin like this:
 
 ```
 $ clang -O3 <src.c> -S -emit-llvm \
@@ -113,6 +115,21 @@ Or, more conveniently:
 $ $HOME/alive2/build/alivecc -O3 -c <src.c>
 $ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
 ```
+
+The Clang plugin can optionally use multiple cores. To enable parallel
+translation validation, add the `-mllvm -tv-parallel` command line
+options to Clang. In this mode, the Clang plugin uses the POSIX
+jobserver, a mechanism provided by GNU Make to provide global control
+over parallel execution of recursive make invocations. This mechanism
+will only work if GNU Make believes that clang is a make command; tell
+it this by prefixing the `alivecc` command with a `+` character in
+your Makefile. Alas, Ninja does not provide a jobserver. **Parallel
+execution is still experimental, please avoid using it for now.**
+
+The Clang plugin's output can be voluminous. To help control this, it
+supports an option to reduce the amount of output (`-mllvm
+-tv-succinct`) and also an option to redirect most output into a
+collection of files (`-mllvm -tv-report-dir`).
 
 
 Running the Standalone Translation Validation Tool (alive-tv)
@@ -203,6 +220,10 @@ Summary:
   1 incorrect transformations
   0 errors
 ```
+
+Please keep in mind that do not have to compile Alive2 in order to try
+out alive-tv; it is available online: https://alive2.llvm.org/ce/
+
 
 Running the Standalone LLVM Execution Tool (alive-exec)
 --------

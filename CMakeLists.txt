@@ -120,6 +120,7 @@ set(UTIL_SRCS
   util/stopwatch.cpp
   util/symexec.cpp
   util/unionfind.cpp
+  util/parallel.cpp
 )
 
 add_library(util STATIC ${UTIL_SRCS})

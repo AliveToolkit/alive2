@@ -1,12 +1,13 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "llvm_util/llvm2alive.h"
 #include "ir/memory.h"
+#include "llvm_util/llvm2alive.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/parallel.h"
 #include "util/stopwatch.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
@@ -162,6 +163,16 @@ llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
+llvm::cl::opt<bool> parallel_tv(
+    "tv-parallel",
+    llvm::cl::desc("Distribute TV load across cores (requires GNU Make, default=false)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
+llvm::cl::opt<int> max_subprocesses(
+    "tv-max-subprocesses",
+    llvm::cl::desc("Maximum children this clang instance will have at any time (default=128)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(128));
+
 struct FnInfo {
   Function fn;
   unsigned order;
@@ -252,6 +263,21 @@ struct TVPass final : public llvm::FunctionPass {
     if (first || skip_verify)
       return false;
 
+    if (parallel_tv) {
+      out->flush();
+      pid_t res = parallel::limitedFork();
+      if (res == -1)
+        llvm::report_fatal_error("fork() failed");
+      // parent returns to LLVM immediately
+      if (res != 0)
+        return false;
+    }
+
+    /*
+     * from here, we must not return back to LLVM if parallel_tv is
+     * true; instead we call parallel::finishChild()
+     */
+
     if (is_clangtv)
       I->second.fn.setFnCallValidFlag(encode_io_fns_as_unknown);
 
@@ -272,7 +298,7 @@ struct TVPass final : public llvm::FunctionPass {
       if (!types) {
         *out << "Transformation doesn't verify!\n"
                 "ERROR: program doesn't type check!\n\n";
-        return false;
+        goto done;
       }
       assert(types.hasSingleTyping());
     }
@@ -287,8 +313,14 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     // Regenerate tgt because preprocessing may have changed it
-    I->second.fn = *llvm2alive(F, *TLI);
-    return false;
+    if (!parallel_tv)
+      I->second.fn = *llvm2alive(F, *TLI);
+
+  done:
+    if (parallel_tv)
+      parallel::finishChild();
+    else
+      return false;
   }
 
   bool doInitialization(llvm::Module &module) override {
@@ -432,6 +464,13 @@ struct TVInitPass : public llvm::PassInfoMixin<TVInitPass> {
   llvm::PreservedAnalyses run(llvm::Module &M,
                               llvm::ModuleAnalysisManager &MAM) {
     TVPass().doInitialization(M);
+    if (parallel_tv) {
+      if (!parallel::init(max_subprocesses)) {
+        *out << "WARNING: jobserver is unavailable, Alive2 will not use "
+          "multiple cores\n";
+        parallel_tv = false;
+      }
+    }
     return llvm::PreservedAnalyses::all();
   }
 };
@@ -443,6 +482,8 @@ struct TVFinalizePass : public llvm::PassInfoMixin<TVFinalizePass> {
     if (!finalized) {
       finalized = true;
       TVPass().doFinalization(*F.getParent());
+      if (parallel_tv)
+        parallel::waitForAllChildren();
     }
     return llvm::PreservedAnalyses::all();
   }
