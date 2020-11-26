@@ -34,18 +34,18 @@ define i8 @f5() {
   ret i8 %b
 }
 
-define i8 @f6(i8* byval %p) {
+define i8 @f6(i8* byval(i8) %p) {
   %b = call i8 @g(i8* %p)
   ret i8 %b
 }
 
 define i8 @f6_2(i8* %p) {
-  %b = call i8 @g2(i8* byval %p)
+  %b = call i8 @g2(i8* byval(i8) %p)
   ret i8 %b
 }
 
 define i8 @f6_3() {
-  %b = call i8 @g2(i8* byval @glb)
+  %b = call i8 @g2(i8* byval(i8) @glb)
   ret i8 %b
 }
 
@@ -68,7 +68,7 @@ define void @f9() {
 }
 
 declare i8 @g(i8*)
-declare i8 @g2(i8* byval)
+declare i8 @g2(i8* byval(i8))
 declare i8 @h(i8*) readnone
 declare void @j(i32)
 declare i8* @k()

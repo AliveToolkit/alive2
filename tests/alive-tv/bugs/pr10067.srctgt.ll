@@ -10,7 +10,7 @@ target triple = "i386-apple-darwin10"
 define i32 @src() noinline {
   %x = alloca %struct1, align 8
   %y = alloca %struct2, align 8
-  call void @bar(%struct1* sret %x)
+  call void @bar(%struct1* sret(%struct1) %x)
 
   %gepn1 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 0
   store i32 0, i32* %gepn1, align 8
@@ -31,7 +31,7 @@ define i32 @tgt() noinline {
   %x = alloca %struct1, align 8
   %y = alloca %struct2, align 8
   %y1 = bitcast %struct2* %y to %struct1*
-  call void @bar(%struct1* sret %y1)
+  call void @bar(%struct1* sret(%struct1) %y1)
   %gepn1 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 0
   store i32 0, i32* %gepn1, align 8
   %gepn2 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 1
@@ -43,4 +43,4 @@ define i32 @tgt() noinline {
   ret i32 %ret
 }
 
-declare void @bar(%struct1* sret)
+declare void @bar(%struct1* sret(%struct1))
