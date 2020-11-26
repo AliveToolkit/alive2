@@ -299,7 +299,7 @@ public:
 
       if (align) {
         attrs.set(FnAttrs::Align);
-        attrs.align = ilog2(align);
+        attrs.setAlign(align);
       }
     }
 
@@ -353,7 +353,7 @@ public:
 
         assert(a);
         attr.set(ParamAttrs::Align);
-        attr.align = ilog2(a);
+        attr.setAlign(a);
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::ByVal)) {
@@ -362,7 +362,7 @@ public:
         attr.blockSize = DL().getTypeAllocSize(ty);
         if (!attr.has(ParamAttrs::Align)) {
           attr.set(ParamAttrs::Align);
-          attr.align = ilog2(DL().getABITypeAlignment(ty));
+          attr.setAlign(DL().getABITypeAlignment(ty));
         }
       }
 
@@ -1015,7 +1015,7 @@ end:
         attrs.blockSize = DL().getTypeAllocSize(ty);
         if (!attrs.has(ParamAttrs::Align)) {
           attrs.set(ParamAttrs::Align);
-          attrs.align = DL().getABITypeAlignment(ty);
+          attrs.setAlign(DL().getABITypeAlignment(ty));
         }
         continue;
       }
@@ -1043,7 +1043,7 @@ end:
 
       case llvm::Attribute::Alignment:
         attrs.set(ParamAttrs::Align);
-        attrs.align = ilog2(attr.getAlignment()->value());
+        attrs.setAlign(attr.getAlignment()->value());
         continue;
 
       case llvm::Attribute::NoUndef:
@@ -1112,7 +1112,7 @@ end:
       unsigned a = f.getAttribute(ridx, llvm::Attribute::Alignment)
                     .getAlignment()->value();
       attrs.set(FnAttrs::Align);
-      attrs.align = ilog2(a);
+      attrs.setAlign(a);
     }
 
     // create all BBs upfront in topological order

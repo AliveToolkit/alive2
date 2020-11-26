@@ -677,7 +677,7 @@ static void calculateAndInitConstants(Transform &t) {
         continue;
 
       uint64_t align = i->hasAttribute(ParamAttrs::Align) ?
-          1ull << i->getAttributes().align : 1;
+          i->getAttributes().getAlign() : 1;
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
         uint64_t deref_bytes = i->getAttributes().derefBytes;
