@@ -34,7 +34,7 @@ define i8 @f5() {
   ret i8 %b
 }
 
-define i8 @f6(i8* byval %p) {
+define i8 @f6(i8* byval(i8) %p) {
   %a = alloca i8
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* %p, i64 1, i1 false)
   %b = call i8 @g(i8* %a)
@@ -44,14 +44,14 @@ define i8 @f6(i8* byval %p) {
 define i8 @f6_2(i8* %p) {
   %a = alloca i8
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* %p, i64 1, i1 false)
-  %b = call i8 @g2(i8* byval %a)
+  %b = call i8 @g2(i8* byval(i8) %a)
   ret i8 %b
 }
 
 define i8 @f6_3() {
   %a = alloca i8
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %a, i8* @glb, i64 1, i1 false)
-  %b = call i8 @g2(i8* byval %a)
+  %b = call i8 @g2(i8* byval(i8) %a)
   ret i8 %b
 }
 
@@ -76,7 +76,7 @@ define void @f9() {
 }
 
 declare i8 @g(i8*)
-declare i8 @g2(i8* byval)
+declare i8 @g2(i8* byval(i8))
 declare i8 @h(i8*) readnone
 declare void @j(i32)
 declare i8* @k()
