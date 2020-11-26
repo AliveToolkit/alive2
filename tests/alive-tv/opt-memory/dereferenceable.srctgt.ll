@@ -10,5 +10,4 @@ define i32 @tgt(i32* dereferenceable(2) align 4 %p) {
   ret i32 %v1
 }
 
-
 ; CHECK: min_access_size: 2
