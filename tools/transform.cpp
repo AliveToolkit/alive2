@@ -673,7 +673,8 @@ static void calculateAndInitConstants(Transform &t) {
 
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
-      if (!i) continue;
+      if (!i)
+        continue;
 
       uint64_t align = i->hasAttribute(ParamAttrs::Align) ?
           1ull << i->getAttributes().align : 1;
