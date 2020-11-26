@@ -64,6 +64,7 @@ uint64_t ParamAttrs::getAlign() const {
 void ParamAttrs::setAlign(uint64_t a) {
   assert(has(Align));
   bool power2 = is_power2(a, &align);
+  (void)power2;
   assert(power2);
 }
 
@@ -95,6 +96,7 @@ uint64_t FnAttrs::getAlign() const {
 void FnAttrs::setAlign(uint64_t a) {
   assert(has(Align));
   bool power2 = is_power2(a, &align);
+  (void)power2;
   assert(power2);
 }
 
