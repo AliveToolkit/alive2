@@ -23,7 +23,7 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
   if (attr.has(ParamAttrs::NoUndef))
     os << "noundef ";
   if (attr.has(ParamAttrs::Align))
-    os << "align(" << (1ull << attr.align) << ") ";
+    os << "align(" << attr.align << ") ";
   if (attr.has(ParamAttrs::Returned))
     os << "returned ";
   return os;
@@ -50,7 +50,7 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   if (attr.has(FnAttrs::NoUndef))
     os << " noundef";
   if (attr.has(FnAttrs::Align))
-    os << " align(" << (1ull << attr.align) << ")";
+    os << " align(" << attr.align << ")";
   return os;
 }
 
