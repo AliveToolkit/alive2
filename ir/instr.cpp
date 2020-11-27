@@ -1643,7 +1643,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
         s.addUB(p.isNonZero());
 
       if (argflag.has(ParamAttrs::Align))
-        s.addUB(p.isAligned(argflag.getAlign()));
+        s.addUB(p.isAligned(argflag.align));
 
       ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
@@ -1699,7 +1699,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     if (isNonNull)
       s.addUB(p.isNonZero());
     if (isAlign)
-      s.addUB(p.isAligned(attrs.getAlign()));
+      s.addUB(p.isAligned(attrs.align));
   }
 
   return ret;
@@ -2344,7 +2344,7 @@ StateValue Return::toSMT(State &s) const {
       s.addUB(p.isNonZero());
     }
     if (isAlign) {
-      s.addUB(p.isAligned(attrs.getAlign()));
+      s.addUB(p.isAligned(attrs.align));
     }
   }
 

@@ -1585,7 +1585,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
   if (attrs.has(ParamAttrs::NonNull))
     state->addAxiom(p.isNonZero());
   if (attrs.has(ParamAttrs::Align))
-    state->addAxiom(p.isAligned(attrs.getAlign()));
+    state->addAxiom(p.isAligned(attrs.align));
 
   state->addAxiom(bid.ule(max_bid));
 

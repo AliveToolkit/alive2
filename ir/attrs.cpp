@@ -2,11 +2,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
-#include "util/compiler.h"
 #include <cassert>
 
 using namespace std;
-using namespace util;
 
 namespace IR {
 ostream& operator<<(ostream &os, const ParamAttrs &attr) {
@@ -56,18 +54,6 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   return os;
 }
 
-uint64_t ParamAttrs::getAlign() const {
-  assert(has(Align));
-  return 1ull << align;
-}
-
-void ParamAttrs::setAlign(uint64_t a) {
-  assert(has(Align));
-  bool power2 = is_power2(a, &align);
-  (void)power2;
-  assert(power2);
-}
-
 bool ParamAttrs::undefImpliesUB() const {
   bool ub = has(NoUndef);
   assert(!ub || poisonImpliesUB());
@@ -86,18 +72,6 @@ bool ParamAttrs::operator==(const ParamAttrs &rhs) const {
     return false;
 
   return true;
-}
-
-uint64_t FnAttrs::getAlign() const {
-  assert(has(Align));
-  return 1ull << align;
-}
-
-void FnAttrs::setAlign(uint64_t a) {
-  assert(has(Align));
-  bool power2 = is_power2(a, &align);
-  (void)power2;
-  assert(power2);
 }
 
 bool FnAttrs::undefImpliesUB() const {
