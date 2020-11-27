@@ -15,11 +15,11 @@ public:
                    ReadOnly = 1<<3, ReadNone = 1<<4, Dereferenceable = 1<<5,
                    NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8 };
 
-  ParamAttrs(unsigned bits = None) : bits(bits), align(1) {}
+  ParamAttrs(unsigned bits = None) : bits(bits) {}
 
   uint64_t derefBytes; // Dereferenceable
   uint64_t blockSize;  // exact block size for e.g. byval args
-  uint64_t align;      // Align
+  uint64_t align = 1;
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
@@ -48,13 +48,13 @@ public:
                    Dereferenceable = 1 << 5, NonNull = 1 << 6,
                    NoFree = 1 << 7, NoUndef = 1 << 8, Align = 1 << 9 };
 
-  FnAttrs(unsigned bits = None) : bits(bits), align(1) {}
+  FnAttrs(unsigned bits = None) : bits(bits) {}
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
 
   uint64_t derefBytes; // Dereferenceable
-  uint64_t align;      // Align
+  uint64_t align = 1;
 
   // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const
