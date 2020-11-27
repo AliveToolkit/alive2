@@ -85,8 +85,8 @@ class Alive2Test(TestFormat):
 
     clang_tv = test.endswith('.c') or test.endswith('.cpp')
     if clang_tv:
-      execpath = './scripts/%s' % ("alivecc" if test.endswith('.c')
-                                             else "alive++")
+      execpath = './%s' % ("alivecc" if test.endswith('.c')
+                                     else "alive++")
       # 30 seconds is too long to apply to all passes, just use the default to
       cmd = [execpath, "-c", "-o", "/dev/null"]
       if not os.path.isfile(execpath):

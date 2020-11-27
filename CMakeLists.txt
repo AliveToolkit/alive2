@@ -177,7 +177,7 @@ if (BUILD_TV)
   add_subdirectory(tv)
   configure_file(
     ${CMAKE_SOURCE_DIR}/scripts/opt-alive.sh.in
-    ${CMAKE_BINARY_DIR}/scripts/opt-alive.sh
+    ${CMAKE_BINARY_DIR}/opt-alive.sh
     @ONLY
   )
 else()
