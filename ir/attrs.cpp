@@ -42,7 +42,7 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   if (attr.has(FnAttrs::NoReturn))
     os << " noreturn";
   if (attr.has(FnAttrs::Dereferenceable))
-    os << " dereferenceable(" << attr.derefBytes << ")";
+    os << " dereferenceable(" << attr.derefBytes << ')';
   if (attr.has(FnAttrs::NonNull))
     os << " nonnull";
   if (attr.has(FnAttrs::NoFree))
@@ -50,7 +50,7 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   if (attr.has(FnAttrs::NoUndef))
     os << " noundef";
   if (attr.has(FnAttrs::Align))
-    os << " align(" << attr.align << ")";
+    os << " align(" << attr.align << ')';
   return os;
 }
 
