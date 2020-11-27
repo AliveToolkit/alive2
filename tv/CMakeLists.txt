@@ -12,12 +12,12 @@ if (CLANG_PLUGIN)
   )
   configure_file(
     ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/scripts/alivecc
+    ${CMAKE_BINARY_DIR}/alivecc
     @ONLY
   )
   configure_file(
     ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/scripts/alive++
+    ${CMAKE_BINARY_DIR}/alive++
     @ONLY
   )
 else()

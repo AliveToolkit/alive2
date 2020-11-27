@@ -76,7 +76,7 @@ file_put_contents('web/data/data.txt', $entry, FILE_APPEND);
 
 function correct_without_undef($test) {
   echo "Testing $test without undef.. ";
-  $output = `~/llvm/build/bin/llvm-lit -vv -Dopt="\$HOME/alive2/build/scripts/opt-alive.sh -tv-disable-undef-input" ~/llvm/llvm/test/$test 2>&1`;
+  $output = `~/llvm/build/bin/llvm-lit -vv -Dopt="\$HOME/alive2/build/opt-alive.sh -tv-disable-undef-input" ~/llvm/llvm/test/$test 2>&1`;
   $ok = preg_match('/^  Passed:\s*1/Sm', $output) === 1;
   echo ($ok ? "OK\n" : "buggy\n");
   return $ok;

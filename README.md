@@ -82,7 +82,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -96,7 +96,7 @@ Testing Time: 0.11s
 Translation validation of the LLVM unit tests:
 
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/scripts/opt-alive.sh ~/llvm/llvm/test/Transforms
+~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
 
 Running Alive2 as a Clang plugin:
@@ -110,8 +110,8 @@ $ clang -O3 <src.c> -S -emit-llvm \
 Or, more conveniently:
 
 ```
-$ $HOME/alive2/build/scripts/alivecc -O3 -c <src.c>
-$ $HOME/alive2/build/scripts/alive++ -O3 -c <src.cpp>
+$ $HOME/alive2/build/alivecc -O3 -c <src.c>
+$ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
 ```
 
 
