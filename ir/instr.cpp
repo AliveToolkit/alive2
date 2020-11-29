@@ -1579,6 +1579,14 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
       uint64_t b = gcd(arg.second.derefBytes, arg.second.align);
       bytesize = bytesize ? gcd(bytesize, b) : b;
     }
+    // Pointer arguments without dereferenceable attr don't contribute to the
+    // byte size.
+    // call f(* dereferenceable(n) align m %p, * %q) is equivalent to a dummy
+    // load followed by a function call:
+    //   load i<8*n> %p, align m
+    //   call f(* %p, * %q)
+    // f(%p, %q) does not contribute to the bytesize. After bytesize is fixed,
+    // function calls update a memory with the granularity.
   }
   if (!has_deref) {
     // No dereferenceable attribute
