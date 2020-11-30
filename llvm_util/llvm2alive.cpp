@@ -744,6 +744,15 @@ public:
             BB->addInstr(
               make_unique<Assume>(*get_operand(v), Assume::WellDefined));
           }
+        } else if (name == "align") {
+          llvm::Value *ptr = bundle.Inputs[0].get();
+          llvm::Value *align = bundle.Inputs[1].get();
+          vector<Value *> args = {get_operand(ptr), get_operand(align)};
+          BB->addInstr(make_unique<Assume>(move(args), Assume::Align));
+        } else if (name == "nonnull") {
+          llvm::Value *ptr = bundle.Inputs[0].get();
+          BB->addInstr(
+            make_unique<Assume>(*get_operand(ptr), Assume::NonNull));
         } else {
           return error(i);
         }
