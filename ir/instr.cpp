@@ -1565,19 +1565,36 @@ uint64_t FnCall::getMaxAccessSize() const {
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
-  bool has_deref = getAttributes().has(FnAttrs::Dereferenceable);
-  if (!has_deref) {
-    for (auto &arg : args)
-      if (arg.second.has(ParamAttrs::Dereferenceable)) {
-        has_deref = true;
-        break;
-      }
+  auto &retattr = getAttributes();
+  bool has_deref = retattr.has(FnAttrs::Dereferenceable);
+  uint64_t bytesize = has_deref ? gcd(retattr.derefBytes, retattr.align) : 0;
+
+  for (auto &arg : args) {
+    if (!arg.first->getType().isPtrType())
+      continue;
+
+    if (arg.second.has(ParamAttrs::Dereferenceable)) {
+      has_deref = true;
+      // Without align, nothing is guaranteed about the bytesize
+      uint64_t b = gcd(arg.second.derefBytes, arg.second.align);
+      bytesize = bytesize ? gcd(bytesize, b) : b;
+    }
+    // Pointer arguments without dereferenceable attr don't contribute to the
+    // byte size.
+    // call f(* dereferenceable(n) align m %p, * %q) is equivalent to a dummy
+    // load followed by a function call:
+    //   load i<8*n> %p, align m
+    //   call f(* %p, * %q)
+    // f(%p, %q) does not contribute to the bytesize. After bytesize is fixed,
+    // function calls update a memory with the granularity.
   }
-  if (!has_deref)
+  if (!has_deref) {
     // No dereferenceable attribute
+    assert(bytesize == 0);
     return {};
-  // dereferenceable(n) does not guarantee that the pointer is n-byte aligned
-  return ByteAccessInfo::anyType(1);
+  }
+
+  return ByteAccessInfo::anyType(bytesize);
 }
 
 
