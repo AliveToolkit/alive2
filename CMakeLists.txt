@@ -116,11 +116,11 @@ set(UTIL_SRCS
   util/config.cpp
   util/errors.cpp
   util/file.cpp
+  util/parallel.cpp
   util/sort.cpp
   util/stopwatch.cpp
   util/symexec.cpp
   util/unionfind.cpp
-  util/parallel.cpp
 )
 
 add_library(util STATIC ${UTIL_SRCS})
