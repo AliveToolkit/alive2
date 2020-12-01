@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "util/compiler.h"
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -44,13 +45,11 @@ bool init(int _max_subprocesses) {
 }
 
 static void getToken() {
-  int res [[maybe_unused]] = read(jobserver_read_fd, &jobserver_token, 1);
-  assert(res == 1);
+  ENSURE(read(jobserver_read_fd, &jobserver_token, 1) == 1);
 }
 
 static void putToken() {
-  int res [[maybe_unused]] = write(jobserver_write_fd, &jobserver_token, 1);
-  assert(res == 1);
+  ENSURE(write(jobserver_write_fd, &jobserver_token, 1) == 1);
 }
 
 int limitedFork() {
