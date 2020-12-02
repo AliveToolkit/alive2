@@ -204,13 +204,14 @@ struct TVPass final : public llvm::FunctionPass {
     });
 
     llvm::TargetLibraryInfo *TLI = nullptr;
+    llvm::TargetLibraryInfoImpl TLIImpl;
     unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
     if (is_clangtv) {
       // When used as a clang plugin, this is run as a plain function rather
       // than a registered pass, so getAnalysis() cannot be used.
-      TLI_holder
-        = make_unique<llvm::TargetLibraryInfo>(llvm::TargetLibraryInfoImpl(
-           llvm::Triple(F.getParent()->getTargetTriple())), &F);
+      TLIImpl = llvm::TargetLibraryInfoImpl(
+          llvm::Triple(F.getParent()->getTargetTriple()));
+      TLI_holder = make_unique<llvm::TargetLibraryInfo>(TLIImpl, &F);
       TLI = TLI_holder.get();
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
