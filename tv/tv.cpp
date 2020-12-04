@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <sstream>
 #include <unordered_map>
@@ -204,8 +205,19 @@ bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
 const char *parallel_subdir = "tmp_parallel";
 unique_ptr<parallel> parallelMgr;
-default_random_engine re;
-uniform_int_distribution<unsigned> rand;
+
+string get_random_str() {
+  static default_random_engine re;
+  static uniform_int_distribution<unsigned> rand;
+  static bool seeded = false;
+
+  if (!seeded) {
+    random_device rd;
+    re.seed(rd());
+    seeded = true;
+  }
+  return to_string(rand(re));
+}
 
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
@@ -222,7 +234,7 @@ struct TVPass final : public llvm::FunctionPass {
     if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
       return false;
 
-    ScopedWatch timer([&] (const StopWatch &sw) {
+    ScopedWatch timer([&](const StopWatch &sw) {
       fns_elapsed_time[F.getName().str()] += sw.seconds();
     });
 
@@ -277,14 +289,12 @@ struct TVPass final : public llvm::FunctionPass {
       return false;
 
     if (parallelMgr) {
-      random_device rd;
-      re.seed(rd());      
-      string newname;
       fs::path path;
       if (report_dir_created) {
         // NB there's a low-probability toctou race here
+        string newname;
         do {
-          newname = "tmp_" + to_string(rand(re)) + ".txt";
+          newname = "tmp_" + get_random_str() + ".txt";
           path = opt_report_parallel_dir / newname;
         } while (fs::exists(path));
       }
@@ -361,9 +371,8 @@ struct TVPass final : public llvm::FunctionPass {
       llvm_util_init.reset();
       smt_init.reset();
       parallelMgr->finishChild();
-    } else {
-      return false;
     }
+    return false;
   }
 
   bool doInitialization(llvm::Module &module) override {
@@ -387,14 +396,6 @@ struct TVPass final : public llvm::FunctionPass {
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
-      static bool seeded = false;
-
-      if (!seeded) {
-        random_device rd;
-        re.seed(rd());
-        seeded = true;
-      }
-
       try {
         fs::create_directories(opt_report_dir.getValue());
       } catch (...) {
@@ -410,7 +411,7 @@ struct TVPass final : public llvm::FunctionPass {
         // NB there's a low-probability toctou race here
         do {
           auto newname = fname.stem();
-          newname += "_" + to_string(rand(re)) + ".txt";
+          newname += "_" + get_random_str() + ".txt";
           path.replace_filename(newname);
         } while (fs::exists(path));
       }
@@ -576,28 +577,32 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
   llvm_unreachable("Unknown IR unit");
 }
 
+const char* skip_pass_list[] = {
+  "::TVInitPass", "::TVFinalizePass",
+  "ArgumentPromotionPass",
+  "DeadArgumentEliminationPass",
+  "EliminateAvailableExternallyPass",
+  "EntryExitInstrumenterPass",
+  "GlobalOptPass",
+  "HotColdSplittingPass",
+  "InferFunctionAttrsPass", // IPO
+  "InlinerPass",
+  "IPSCCPPass",
+  "ModuleInlinerWrapperPass",
+  "OpenMPOptPass",
+  "PostOrderFunctionAttrsPass", // IPO
+};
+
 bool do_skip(const llvm::StringRef &ref) {
-  const vector<string_view> pass_list = {
-    "::TVInitPass", "::TVFinalizePass",
-    "ArgumentPromotionPass", "DeadArgumentEliminationPass",
-    "HotColdSplittingPass", "InlinerPass",
-    "GlobalOptPass", "IPSCCPPass",
-    "ModuleInlinerWrapperPass", // inliner pass wrapper
-    "OpenMPOptPass", // open mp optimization (concurrency)
-    "PostOrderFunctionAttrsPass", // changes fn signatures
-    "InferFunctionAttrsPass", // changes fn signatures
-    "EntryExitInstrumenterPass", // instruments profiler-related fn calls
-    "EliminateAvailableExternallyPass", // Del. available_externally linkage fns
-  };
   auto sref = ref.str();
   auto ends_with = [](const string_view &a, const string_view &suffix) {
     return a.size() >= suffix.size() &&
            a.substr(a.size() - suffix.size()) == suffix;
   };
   return
-    std::find_if(pass_list.begin(), pass_list.end(), [&](string_view elem) {
-        return ends_with(sref, elem);
-      }) != pass_list.end();
+    find_if(skip_pass_list, end(skip_pass_list), [&](string_view skip) {
+      return ends_with(sref, skip);
+    }) != end(skip_pass_list);
 }
 
 // Entry point for this plugin
