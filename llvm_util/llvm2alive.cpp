@@ -25,7 +25,6 @@ using llvm::LLVMContext;
 
 namespace {
 
-ostream *out;
 unsigned constexpr_idx;
 unsigned copy_idx;
 

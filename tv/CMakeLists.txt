@@ -20,11 +20,6 @@ if (CLANG_PLUGIN)
     ${CMAKE_BINARY_DIR}/alive++
     @ONLY
   )
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/fix_report_files.in
-    ${CMAKE_BINARY_DIR}/fix_report_files
-    @ONLY
-  )
 else()
   message(STATUS "Skipping Clang plugin")
 endif()

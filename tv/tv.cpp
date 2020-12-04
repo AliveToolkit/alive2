@@ -3,6 +3,7 @@
 
 #include "ir/memory.h"
 #include "llvm_util/llvm2alive.h"
+#include "llvm_util/utils.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
@@ -197,8 +198,8 @@ bool report_dir_created = false;
 bool has_failure = false;
 bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
-const char *parallel_subdir = "tmp_parallel";
 unique_ptr<parallel> parallelMgr;
+stringstream parent_ss;
 
 string get_random_str() {
   static default_random_engine re;
@@ -283,38 +284,41 @@ struct TVPass final : public llvm::FunctionPass {
       return false;
 
     if (parallelMgr) {
-      fs::path path;
-      if (report_dir_created) {
-        // NB there's a low-probability toctou race here
-        string newname;
-        do {
-          newname = "tmp_" + get_random_str() + ".txt";
-          path = opt_report_parallel_dir / newname;
-        } while (fs::exists(path));
-      }
-
       out_file.flush();
-      pid_t res = parallelMgr->limitedFork();
+      pid_t pid;
+      ostream *osp;
+      int index;
+      tie(pid, osp, index) = parallelMgr->limitedFork();
 
-      if (res == -1)
+      if (pid == -1)
         llvm::report_fatal_error("fork() failed");
 
-      // parent returns to LLVM immediately
-      if (res != 0) {
-        if (report_dir_created)
-          *out << "include(" << path << ")\n";
+      if (pid != 0) {
+        /*
+         * parent returns to LLVM immediately. starting with the first
+         * time we reach this code, it writes its output to a
+         * stringstream that we'll patch up later to include output
+         * from children, before finally emitting it
+         */
+        out = &parent_ss;
+        *out << "include(" << index << ")\n";
+        set_outs(*out);
+        /*
+         * TODO: this llvm2alive() call isn't needed for correctness,
+         * but only to make parallel output match sequential
+         * output. we can remove it later if we want.
+         */
+        I->second.fn = *llvm2alive(F, *TLI);
         return false;
       }
 
-      if (report_dir_created) {
-        // child writes to the new file now
-        out_file.close();
-        out_file = ofstream(path);
-        if (!out_file.is_open()) {
-          cerr << "Alive2: Couldn't open report file!" << endl;
-          exit(1);
-        }
-      }
+      /*
+       * child now writes to a stringstream provided by the parallel
+       * manager, its output will get pushed to the parent via a pipe
+       * later on
+       */
+      out = osp;
+      set_outs(*out);
     }
 
     /*
@@ -404,17 +408,6 @@ struct TVPass final : public llvm::FunctionPass {
         } while (fs::exists(path));
       }
 
-      if (parallelMgr) {
-        opt_report_parallel_dir = fs::absolute(
-            fs::path(opt_report_dir.getValue()) / parallel_subdir);
-        try {
-          fs::create_directories(opt_report_parallel_dir);
-        } catch (...) {
-          cerr << "Alive2: Couldn't create report subdirectory!" << endl;
-          exit(1);
-        }
-      }
-
       out_file = ofstream(path);
       out = &out_file;
       if (!out_file.is_open()) {
@@ -460,8 +453,10 @@ struct TVPass final : public llvm::FunctionPass {
   }
 
   bool doFinalization(llvm::Module&) override {
-    if (parallelMgr)
+    if (parallelMgr) {
       parallelMgr->waitForAllChildren();
+      parallelMgr->emitOutput(parent_ss, out_file);
+    }
 
     if (!showed_stats) {
       showed_stats = true;
