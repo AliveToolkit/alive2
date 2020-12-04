@@ -128,6 +128,8 @@ set(UTIL_SRCS
   util/config.cpp
   util/errors.cpp
   util/file.cpp
+  util/parallel_jobserver.cpp
+  util/parallel_unrestricted.cpp
   util/sort.cpp
   util/stopwatch.cpp
   util/symexec.cpp

@@ -1,12 +1,13 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "llvm_util/llvm2alive.h"
 #include "ir/memory.h"
+#include "llvm_util/llvm2alive.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
 #include "util/config.h"
+#include "util/parallel.h"
 #include "util/stopwatch.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
@@ -124,7 +125,7 @@ llvm::cl::opt<bool> opt_disable_undef_input(
     llvm::cl::desc("Alive: Assume function input cannot be undef"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::list<std::string>
+llvm::cl::list<string>
     opt_funcs("tv-func",
               llvm::cl::desc("Name of functions to verify (without @)"),
               llvm::cl::cat(TVOptions), llvm::cl::ZeroOrMore,
@@ -162,10 +163,28 @@ llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
+llvm::cl::opt<bool> parallel_tv_jobserver(
+    "tv-parallel-jobserver",
+    llvm::cl::desc("Distribute TV load across cores (requires GNU Make, "
+                   "please see README.md, default=false)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
+llvm::cl::opt<bool> parallel_tv_unrestricted(
+    "tv-parallel-unrestricted",
+    llvm::cl::desc("Distribute TV load across cores without any throttling; "
+                   "use this very carefully, if at all (default=false)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
+llvm::cl::opt<int> max_subprocesses(
+    "tv-max-subprocesses",
+    llvm::cl::desc("Maximum children this clang instance will have at any time "
+                   "(default=128)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(128));
+
 struct FnInfo {
   Function fn;
   unsigned order;
-  std::string fn_tostr;
+  string fn_tostr;
 };
 
 ostream *out;
@@ -182,7 +201,11 @@ bool showed_stats = false;
 bool report_dir_created = false;
 bool has_failure = false;
 bool is_clangtv = false;
-
+fs::path opt_report_parallel_dir;
+const char *parallel_subdir = "tmp_parallel";
+unique_ptr<parallel> parallelMgr;
+default_random_engine re;
+uniform_int_distribution<unsigned> rand;
 
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
@@ -253,6 +276,48 @@ struct TVPass final : public llvm::FunctionPass {
     if (first || skip_verify)
       return false;
 
+    if (parallelMgr) {
+      random_device rd;
+      re.seed(rd());      
+      string newname;
+      fs::path path;
+      if (report_dir_created) {
+        // NB there's a low-probability toctou race here
+        do {
+          newname = "tmp_" + to_string(rand(re)) + ".txt";
+          path = opt_report_parallel_dir / newname;
+        } while (fs::exists(path));
+      }
+
+      out_file.flush();
+      pid_t res = parallelMgr->limitedFork();
+
+      if (res == -1)
+        llvm::report_fatal_error("fork() failed");
+
+      // parent returns to LLVM immediately
+      if (res != 0) {
+        if (report_dir_created)
+          *out << "include(" << path << ")\n";
+        return false;
+      }
+
+      if (report_dir_created) {
+        // child writes to the new file now
+        out_file.close();
+        out_file = ofstream(path);
+        if (!out_file.is_open()) {
+          cerr << "Alive2: Couldn't open report file!" << endl;
+          exit(1);
+        }
+      }
+    }
+
+    /*
+     * from here, we must not return back to LLVM if parallelMgr
+     * is non-null; instead we call parallelMgr->finishChild()
+     */
+
     if (is_clangtv)
       I->second.fn.setFnCallValidFlag(encode_io_fns_as_unknown);
 
@@ -273,7 +338,7 @@ struct TVPass final : public llvm::FunctionPass {
       if (!types) {
         *out << "Transformation doesn't verify!\n"
                 "ERROR: program doesn't type check!\n\n";
-        return false;
+        goto done;
       }
       assert(types.hasSingleTyping());
     }
@@ -288,19 +353,40 @@ struct TVPass final : public llvm::FunctionPass {
     }
 
     // Regenerate tgt because preprocessing may have changed it
-    I->second.fn = *llvm2alive(F, *TLI);
-    return false;
+    if (!parallelMgr)
+      I->second.fn = *llvm2alive(F, *TLI);
+
+  done:
+    if (parallelMgr) {
+      llvm_util_init.reset();
+      smt_init.reset();
+      parallelMgr->finishChild();
+    } else {
+      return false;
+    }
   }
 
   bool doInitialization(llvm::Module &module) override {
     if (initialized++)
       return false;
 
+    if (parallel_tv_jobserver) {
+      parallelMgr = make_unique<jobServer>();
+    } else if (parallel_tv_unrestricted) {
+      parallelMgr = make_unique<unrestricted>();
+    }
+
+    if (parallelMgr) {
+      if (!parallelMgr->init(max_subprocesses)) {
+        cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
+                "unavailable, sorry\n";
+        parallelMgr.reset();
+      }
+    }
+
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
-      static default_random_engine re;
-      static uniform_int_distribution<unsigned> rand;
       static bool seeded = false;
 
       if (!seeded) {
@@ -309,18 +395,35 @@ struct TVPass final : public llvm::FunctionPass {
         seeded = true;
       }
 
-      fs::create_directories(opt_report_dir.getValue());
+      try {
+        fs::create_directories(opt_report_dir.getValue());
+      } catch (...) {
+        cerr << "Alive2: Couldn't create report directory!" << endl;
+        exit(1);
+      }
       auto &source_file = module.getSourceFileName();
       fs::path fname = source_file.empty() ? "alive.txt" : source_file;
       fname.replace_extension(".txt");
       fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
 
       if (!opt_overwrite_reports) {
+        // NB there's a low-probability toctou race here
         do {
           auto newname = fname.stem();
           newname += "_" + to_string(rand(re)) + ".txt";
           path.replace_filename(newname);
         } while (fs::exists(path));
+      }
+
+      if (parallelMgr) {
+        opt_report_parallel_dir = fs::absolute(
+            fs::path(opt_report_dir.getValue()) / parallel_subdir);
+        try {
+          fs::create_directories(opt_report_parallel_dir);
+        } catch (...) {
+          cerr << "Alive2: Couldn't create report subdirectory!" << endl;
+          exit(1);
+        }
       }
 
       out_file = ofstream(path);
@@ -378,6 +481,9 @@ struct TVPass final : public llvm::FunctionPass {
   }
 
   bool doFinalization(llvm::Module&) override {
+    if (parallelMgr)
+      parallelMgr->waitForAllChildren();
+
     if (!showed_stats) {
       showed_stats = true;
       if (opt_smt_stats)
