@@ -64,7 +64,7 @@ class Alive2Test(TestFormat):
           not os.path.isdir(filepath) and \
           (filename.endswith('.opt') or filename.endswith('.src.ll') or
            filename.endswith('.srctgt.ll') or filename.endswith('.c') or
-           filename.endswith('.cpp')):
+           filename.endswith('.cpp') or filename.endswith('.opt.ll')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
 
 
@@ -83,6 +83,12 @@ class Alive2Test(TestFormat):
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
+    opt_tv = test.endswith('.opt.ll')
+    if opt_tv:
+      cmd = ['./opt-alive-test.sh', '-disable-output']
+      if not os.path.isfile('opt-alive-test.sh'):
+        return lit.Test.UNSUPPORTED, ''
+
     clang_tv = test.endswith('.c') or test.endswith('.cpp')
     if clang_tv:
       execpath = './%s' % ("alivecc" if test.endswith('.c')
@@ -92,7 +98,7 @@ class Alive2Test(TestFormat):
       if not os.path.isfile(execpath):
         return lit.Test.UNSUPPORTED, ''
 
-    if not alive_tv_1 and not alive_tv_2 and not clang_tv:
+    if not alive_tv_1 and not alive_tv_2 and not clang_tv and not opt_tv:
       cmd = ['./alive', '-smt-to:20000']
 
     input = readFile(test)

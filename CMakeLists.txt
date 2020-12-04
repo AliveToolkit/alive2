@@ -187,11 +187,19 @@ if (BUILD_TV)
   endif()
   message(STATUS "Compiling translation validation plugin")
   add_subdirectory(tv)
+  set(FOR_ALIVE2_TEST 0)
   configure_file(
     ${CMAKE_SOURCE_DIR}/scripts/opt-alive.sh.in
     ${CMAKE_BINARY_DIR}/opt-alive.sh
     @ONLY
   )
+  set(FOR_ALIVE2_TEST 1)
+  configure_file(
+    ${CMAKE_SOURCE_DIR}/scripts/opt-alive.sh.in
+    ${CMAKE_BINARY_DIR}/opt-alive-test.sh
+    @ONLY
+  )
+  unset(FOR_ALIVE2_TEST)
 else()
   message(STATUS "Skipping translation validation plugin")
 endif()

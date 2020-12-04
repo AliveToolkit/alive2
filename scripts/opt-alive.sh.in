@@ -37,4 +37,15 @@ else
   # Linux, Cygwin/Msys, or Win32?
   TV_SHAREDLIB=tv.so
 fi
-timeout 1000 @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -tv-exit-on-error $TV $@ $TV -tv-smt-to=10000 -tv-report-dir=@CMAKE_BINARY_DIR@/logs -tv-smt-stats $IO_NOBUILTIN
+
+TV_REPORT_DIR=""
+TIMEOUT=""
+TV_SMT_TO=""
+TV_SMT_STATS=""
+if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
+  TV_REPORT_DIR=@CMAKE_BINARY_DIR@/logs
+  TIMEOUT=timeout 1000
+  TV_SMT_TO="-tv-smt-to=10000"
+  TV_SMT_STATS=-tv-smt-stats
+fi
+$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS $IO_NOBUILTIN
