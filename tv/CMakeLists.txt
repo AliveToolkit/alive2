@@ -7,9 +7,6 @@ endif()
 
 if (CLANG_PLUGIN)
   message(STATUS "Clang plugin support enabled")
-  set_target_properties(tv PROPERTIES
-      COMPILE_FLAGS "-DCLANG_PLUGIN"
-  )
   configure_file(
     ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
     ${CMAKE_BINARY_DIR}/alivecc
