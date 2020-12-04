@@ -96,6 +96,10 @@ IR-level transformations:
 ~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
 
+We run this command on the main LLVM branch each day, and keep track of the results
+[here](https://web.ist.utl.pt/nuno.lopes/alive2/).
+
+
 Running Alive2 as a Clang Plugin
 --------
 
