@@ -125,7 +125,7 @@ llvm::cl::opt<bool> opt_disable_undef_input(
     llvm::cl::desc("Alive: Assume function input cannot be undef"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
-llvm::cl::list<std::string>
+llvm::cl::list<string>
     opt_funcs("tv-func",
               llvm::cl::desc("Name of functions to verify (without @)"),
               llvm::cl::cat(TVOptions), llvm::cl::ZeroOrMore,
@@ -184,7 +184,7 @@ llvm::cl::opt<int> max_subprocesses(
 struct FnInfo {
   Function fn;
   unsigned order;
-  std::string fn_tostr;
+  string fn_tostr;
 };
 
 ostream *out;
@@ -203,7 +203,7 @@ bool has_failure = false;
 bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
 const char *parallel_subdir = "tmp_parallel";
-std::unique_ptr<parallel> parallelMgr;
+unique_ptr<parallel> parallelMgr;
 
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
@@ -279,7 +279,7 @@ struct TVPass final : public llvm::FunctionPass {
       uniform_int_distribution<unsigned> rand;
       random_device rd;
       re.seed(rd());      
-      std::string newname;
+      string newname;
       fs::path path;
       if (report_dir_created) {
         // NB there's a low-probability toctou race here
@@ -371,15 +371,15 @@ struct TVPass final : public llvm::FunctionPass {
       return false;
 
     if (parallel_tv_jobserver) {
-      parallelMgr = std::make_unique<jobServer>();
+      parallelMgr = make_unique<jobServer>();
     } else if (parallel_tv_unrestricted) {
-      parallelMgr = std::make_unique<unrestricted>();
+      parallelMgr = make_unique<unrestricted>();
     }
 
     if (parallelMgr) {
       if (!parallelMgr->init(max_subprocesses)) {
-        std::cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
-          "unavailable, sorry\n";
+        cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
+                "unavailable, sorry\n";
         parallelMgr.reset();
       }
     }
