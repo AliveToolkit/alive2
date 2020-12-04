@@ -204,6 +204,8 @@ bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
 const char *parallel_subdir = "tmp_parallel";
 unique_ptr<parallel> parallelMgr;
+default_random_engine re;
+uniform_int_distribution<unsigned> rand;
 
 struct TVPass final : public llvm::FunctionPass {
   static char ID;
@@ -275,8 +277,6 @@ struct TVPass final : public llvm::FunctionPass {
       return false;
 
     if (parallelMgr) {
-      default_random_engine re;
-      uniform_int_distribution<unsigned> rand;
       random_device rd;
       re.seed(rd());      
       string newname;
@@ -387,8 +387,6 @@ struct TVPass final : public llvm::FunctionPass {
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
-      default_random_engine re;
-      uniform_int_distribution<unsigned> rand;
       static bool seeded = false;
 
       if (!seeded) {
