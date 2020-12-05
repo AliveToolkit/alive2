@@ -52,6 +52,14 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     param_attrs[i].set(attr);
   };
 
+  auto fputc_attr = [&]() {
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoUndef);
+    set_param(1, ParamAttrs::NoUndef);
+    set_param(1, ParamAttrs::NoCapture);
+  };
+
   auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
   if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
@@ -102,14 +110,48 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
                            parse_fmath(i)));
   }
 
+  case llvm::LibFunc_fwrite: {
+    auto size = getInt(*args[1]);
+    auto count = getInt(*args[2]);
+    if (size && count) {
+      auto bytes = *size * *count;
+      // size_t fwrite(const void *ptr, 0, 0, FILE *stream) -> 0
+      if (bytes == 0)
+        RETURN_KNOWN(
+          make_unique<UnaryOp>(*ty, value_name(i),
+                               *make_intconst(0, ty->bits()), UnaryOp::Copy));
+
+      // (void)fwrite(const void *ptr, 1, 1, FILE *stream) ->
+      //   (void)fputc(int c, FILE *stream))
+      if (bytes == 1 && i.use_empty() && TLI.has(llvm::LibFunc_fputc)) {
+        fputc_attr();
+        auto &byteTy = get_int_type(8); // FIXME
+        auto &i32 = get_int_type(32);
+        auto call
+          = make_unique<FnCall>(i32, value_name(i), "@fputc", move(attrs));
+        auto load
+          = make_unique<Load>(byteTy, value_name(i) + "#load", *args[0], 1);
+        auto load_zext
+           = make_unique<ConversionOp>(i32, value_name(i) + "#zext", *load,
+                                       ConversionOp::ZExt);
+        call->addArg(*load_zext, move(param_attrs[0]));
+        call->addArg(*args[3], move(param_attrs[1]));
+        BB.addInstr(move(load));
+        BB.addInstr(move(load_zext));
+        RETURN_KNOWN(move(call));
+      }
+    }
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(3, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+  }
+
   case llvm::LibFunc_fputc:
   case llvm::LibFunc_fputc_unlocked:
   case llvm::LibFunc_fstat:
-    attrs.set(FnAttrs::NoUndef);
-    attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoUndef);
-    set_param(1, ParamAttrs::NoUndef);
-    set_param(1, ParamAttrs::NoCapture);
+    fputc_attr();
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_fseek:
