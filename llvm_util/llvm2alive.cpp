@@ -253,11 +253,10 @@ public:
       args.emplace_back(a);
     }
 
-    auto [call_val, known_kind] = known_call(i, TLI, *BB, args);
+    auto [call_val, attrs, param_attrs, valid] = known_call(i, TLI, *BB, args);
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 
-    // TODO: support attributes
     auto fn = i.getCalledFunction();
     if (!fn) // TODO: support indirect calls
       return error(i);
@@ -269,7 +268,6 @@ public:
     if (fn->getName().substr(0, 15) == "__llvm_profile_")
       return NOP(i);
 
-    FnAttrs attrs;
     parse_fnattrs(attrs, i.getType(),
                   [&i](auto attr) { return i.hasFnAttr(attr); },
                   [&i](auto attr) { return i.hasRetAttr(attr); });
@@ -303,25 +301,19 @@ public:
       }
     }
 
-    string fn_name = '@' + fn->getName().str();
-    FnCall::ValidKind valid = FnCall::Invalid;
-    if (known_kind == FnUnknown)
-      valid = FnCall::Valid;
-    else if (known_kind == FnDependsOnOpt)
-      valid = FnCall::DependsOnFlag;
-
-    auto call =
-      make_unique<FnCall>(*ty, value_name(i), move(fn_name), move(attrs),
-                          valid);
+    auto call = make_unique<FnCall>(*ty, value_name(i),
+                                    '@' + fn->getName().str(), move(attrs),
+                                    valid);
     unique_ptr<Instr> ret_val;
 
     // avoid parsing arguments altogether for "unknown known" functions
-    if (known_kind == FnKnown)
+    if (!valid)
       goto end;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto *arg = args[argidx];
-      ParamAttrs attr;
+      ParamAttrs attr = argidx < param_attrs.size() ? param_attrs[argidx]
+                                                    : ParamAttrs();
       // TODO: Once attributes at a call site are fully supported, we should
       // call handleAttributes().
 

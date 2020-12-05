@@ -143,12 +143,6 @@ llvm::cl::opt<unsigned> opt_omit_array_size(
                    "this number"),
     llvm::cl::cat(TVOptions), llvm::cl::init(-1));
 
-llvm::cl::opt<bool> opt_io_nobuiltin(
-    "tv-io-nobuiltin",
-    llvm::cl::desc("Encode standard I/O functions as an unknown function "
-                   "(unused by clang plugin)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
 llvm::cl::opt<bool> opt_elapsed_time(
     "tv-elapsed-time",
     llvm::cl::desc("Print the elapsed time"),
@@ -328,9 +322,6 @@ struct TVPass final : public llvm::FunctionPass {
      * is non-null; instead we call parallelMgr->finishChild()
      */
 
-    if (is_clangtv)
-      I->second.fn.setFnCallValidFlag(encode_io_fns_as_unknown);
-
     smt_init->reset();
     Transform t;
     t.src = move(old_fn);
@@ -339,9 +330,6 @@ struct TVPass final : public llvm::FunctionPass {
     TransformVerify verifier(t, false);
     if (!opt_succinct)
       t.print(*out, print_opts);
-
-    if (is_clangtv)
-      I->second.fn.setFnCallValidFlag(false);
 
     {
       auto types = verifier.getTypings();
@@ -458,16 +446,6 @@ struct TVPass final : public llvm::FunctionPass {
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
 
-    if (!is_clangtv)
-      config::io_nobuiltin = opt_io_nobuiltin;
-    else {
-      config::io_nobuiltin = true;
-      if (opt_io_nobuiltin)
-        cerr << "Warning: -tv-io-nobuiltin isn't used by clang plugin. I/O"
-                " function calls will be always regarded as unknown fn calls"
-                " except InstCombine.\n";
-    }
-
     config::symexec_print_each_value = opt_se_verbose;
     config::disable_undef_input = opt_disable_undef_input;
     config::disable_poison_input = opt_disable_poison_input;
@@ -578,7 +556,8 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 }
 
 const char* skip_pass_list[] = {
-  "::TVInitPass", "::TVFinalizePass",
+  "{anonymous}::TVInitPass",
+  "ModuleToFunctionPassAdaptor<{anonymous}::TVFinalizePass>",
   "ArgumentPromotionPass",
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
@@ -593,16 +572,10 @@ const char* skip_pass_list[] = {
   "PostOrderFunctionAttrsPass", // IPO
 };
 
-bool do_skip(const llvm::StringRef &ref) {
-  auto sref = ref.str();
-  auto ends_with = [](const string_view &a, const string_view &suffix) {
-    return a.size() >= suffix.size() &&
-           a.substr(a.size() - suffix.size()) == suffix;
-  };
-  return
-    find_if(skip_pass_list, end(skip_pass_list), [&](string_view skip) {
-      return ends_with(sref, skip);
-    }) != end(skip_pass_list);
+bool do_skip(const llvm::StringRef &pass0) {
+  auto pass = pass0.str();
+  return any_of(skip_pass_list, end(skip_pass_list),
+                [&](auto skip) { return pass == skip; });
 }
 
 // Entry point for this plugin

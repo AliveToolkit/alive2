@@ -1,4 +1,4 @@
-; TEST-ARGS: -src-unroll=5 -tgt-unroll=5 -io-nobuiltin
+; TEST-ARGS: -src-unroll=5 -tgt-unroll=5
 ; ERROR: Source is more defined than target
 
 ; https://bugs.llvm.org/show_bug.cgi?id=18223
@@ -74,7 +74,7 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
   store i32 1, i32* @d, align 4
   store i32 %inc.lcssa, i32* @b, align 4
   store i32 %conv.lcssa, i32* @f, align 4
-  %call = tail call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
+  %call = tail call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 
@@ -131,9 +131,9 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
   store i32 1, i32* @d, align 4
   store i32 %inc.lcssa, i32* @b, align 4
   store i32 %conv.lcssa, i32* @f, align 4
-  %call = tail call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
+  %call = tail call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 
 
-declare i32 @printf(i8* nocapture readonly, ...)
+declare i32 @myprintf(i8* nocapture readonly, ...)

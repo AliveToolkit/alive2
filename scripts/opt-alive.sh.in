@@ -11,20 +11,12 @@ set -e
 # metarenamer: anonymizes function names
 # sample-profile: inlines functions
 PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmpopt prune-eh tailcallelim -Os -Oz -O1 -O2 -O3"
-PASSES_SIMPLIFYLIB="-instcombine"
 
 TV="-tv"
-IO_NOBUILTIN="-tv-io-nobuiltin"
 for arg in $@; do
   for p in $PASSES; do
     if [[ $arg == *"$p"* ]]; then
       TV=""
-      break
-    fi
-  done
-  for p in $PASSES_SIMPLIFYLIB; do
-    if [[ $arg == "$p" ]]; then
-      IO_NOBUILTIN=""
       break
     fi
   done
@@ -48,4 +40,4 @@ if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
   TV_SMT_TO=-tv-smt-to=10000
   TV_SMT_STATS=-tv-smt-stats
 fi
-$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS $IO_NOBUILTIN
+$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS

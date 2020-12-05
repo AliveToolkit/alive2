@@ -5,7 +5,6 @@
 #include "llvm_util/utils.h"
 #include "ir/function.h"
 #include "ir/instr.h"
-#include "util/config.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -14,19 +13,26 @@
 using namespace IR;
 using namespace std;
 
-#define RETURN_KNOWN(op)    return { op, FnKnown }
-#define RETURN_FAIL_KNOWN() return { nullptr, FnKnown }
-#define RETURN_FAIL_DEPENDS() return { nullptr, FnDependsOnOpt }
-#define RETURN_FAIL_UNKNOWN() return { nullptr, FnUnknown }
+#define RETURN_KNOWN(op) \
+  return { op, move(attrs), move(param_attrs), true }
+#define RETURN_KNOWN_ATTRS() \
+  return { nullptr, move(attrs), move(param_attrs), true }
+#define RETURN_UNKNOWN_KNOWN() \
+  return { nullptr, move(attrs), move(param_attrs), false }
+#define RETURN_UNKNOWN() \
+  return { nullptr, move(attrs), move(param_attrs), true }
 
 namespace llvm_util {
 
-pair<unique_ptr<Instr>, KnownFnKind>
+tuple<unique_ptr<Instr>, FnAttrs, vector<ParamAttrs>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
            BasicBlock &BB, const vector<Value*> &args) {
+  FnAttrs attrs;
+  vector<ParamAttrs> param_attrs;
+
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
-    RETURN_FAIL_UNKNOWN();
+    RETURN_UNKNOWN();
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocLikeFn(&i, &TLI, false)) {
@@ -40,44 +46,16 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_KNOWN(make_unique<Free>(*args[0]));
   }
 
+  auto set_param = [&](unsigned i, ParamAttrs::Attribute attr) {
+    if (param_attrs.size() <= i)
+      param_attrs.resize(i+1);
+    param_attrs[i].set(attr);
+  };
+
   auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
   if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
-    RETURN_FAIL_UNKNOWN();
-
-  if (util::config::io_nobuiltin) {
-    switch (libfn) {
-    case llvm::LibFunc_printf:
-    case llvm::LibFunc_putc:
-    case llvm::LibFunc_putchar:
-    case llvm::LibFunc_puts:
-    case llvm::LibFunc_scanf:
-    case llvm::LibFunc_fclose:
-    case llvm::LibFunc_ferror:
-    case llvm::LibFunc_feof:
-    case llvm::LibFunc_fflush:
-    case llvm::LibFunc_fgetc:
-    case llvm::LibFunc_fopen:
-    case llvm::LibFunc_fopen64:
-    case llvm::LibFunc_fprintf:
-    case llvm::LibFunc_fputc:
-    case llvm::LibFunc_fputs:
-    case llvm::LibFunc_fread:
-    case llvm::LibFunc_fscanf:
-    case llvm::LibFunc_fseek:
-    case llvm::LibFunc_fwrite:
-    case llvm::LibFunc_getc:
-    case llvm::LibFunc_lstat:
-    case llvm::LibFunc_open:
-    case llvm::LibFunc_open64:
-    case llvm::LibFunc_perror:
-    case llvm::LibFunc_read:
-    case llvm::LibFunc_write:
-      RETURN_FAIL_DEPENDS();
-    default:
-      break;
-    }
-  }
+    RETURN_UNKNOWN();
 
   switch (libfn) {
   case llvm::LibFunc_memset: // void* memset(void *ptr, int val, size_t bytes)
@@ -123,8 +101,60 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs,
                            parse_fmath(i)));
   }
+
+  case llvm::LibFunc_fputc:
+  case llvm::LibFunc_fputc_unlocked:
+  case llvm::LibFunc_fstat:
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoUndef);
+    set_param(1, ParamAttrs::NoUndef);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_fseek:
+  case llvm::LibFunc_ftell:
+  case llvm::LibFunc_fgetc:
+  case llvm::LibFunc_fgetc_unlocked:
+  case llvm::LibFunc_fseeko:
+  case llvm::LibFunc_ftello:
+  case llvm::LibFunc_fileno:
+  case llvm::LibFunc_fflush:
+  case llvm::LibFunc_fclose:
+  case llvm::LibFunc_fsetpos:
+  case llvm::LibFunc_ftrylockfile:
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoUndef);
+    set_param(0, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_ferror:
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoUndef);
+    set_param(0, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_fread:
+  case llvm::LibFunc_fread_unlocked:
+    attrs.set(FnAttrs::NoUndef);
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(3, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_perror:
+    attrs.set(FnAttrs::NoThrow);
+    set_param(0, ParamAttrs::NoUndef);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::ReadOnly);
+    RETURN_KNOWN_ATTRS();
+
   default:
-    RETURN_FAIL_KNOWN();
+    RETURN_UNKNOWN_KNOWN();
   }
 }
 

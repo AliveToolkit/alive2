@@ -1,4 +1,3 @@
-; TEST-ARGS: -io-nobuiltin
 target datalayout = "e-p:32:32"
 @str = constant [3 x i8] undef
 @str2 = constant [4 x i8] undef
@@ -14,7 +13,7 @@ entry:
   %ov110 = xor i32 %ov3, 153
   %hvar174 = add i32 %ov110, 1
   %tmp2 = getelementptr [4 x i8], [4 x i8]* @str2, i32 0, i32 0
-  call void (i8*, ...) @printf(i8* %tmp2, i32 %hvar174)
+  call void (i8*, ...) @myprintf(i8* %tmp2, i32 %hvar174)
   br label %return
 return:
   ret i32 0
@@ -30,13 +29,13 @@ entry:
   %ov110 = or i32 %ovm, 9
   %hvar174 = add i32 %ov110, 1
   %tmp2 = getelementptr [4 x i8], [4 x i8]* @str2, i32 0, i32 0
-  call void (i8*, ...) @printf(i8* %tmp2, i32 %hvar174)
+  call void (i8*, ...) @myprintf(i8* %tmp2, i32 %hvar174)
   br label %return
 return:
   ret i32 0
 
 }
 
-declare void @printf(i8*, ...)
+declare void @myprintf(i8*, ...)
 
 ; ERROR: Source is more defined than target

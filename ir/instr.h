@@ -780,20 +780,14 @@ public:
 
 
 class FnCall final : public MemInstr {
-public:
-  enum ValidKind {
-    Invalid, Valid,
-    // This fn call is valid iff Function::fncall_valid_flag is true
-    DependsOnFlag
-  };
 private:
   std::string fnName;
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
-  ValidKind valid;
+  bool valid;
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, ValidKind valid = Valid)
+         FnAttrs &&attrs = FnAttrs::None, bool valid = true)
     : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
       attrs(std::move(attrs)), valid(valid) {}
   void addArg(Value &arg, ParamAttrs &&attrs);

@@ -51,6 +51,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " noundef";
   if (attr.has(FnAttrs::Align))
     os << " align(" << attr.align << ')';
+  if (attr.has(FnAttrs::NoThrow))
+    os << " nothrow";
   return os;
 }
 
