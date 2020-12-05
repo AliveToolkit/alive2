@@ -35,7 +35,7 @@ TIMEOUT=""
 TV_SMT_TO=""
 TV_SMT_STATS=""
 if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
-  TV_REPORT_DIR=@CMAKE_BINARY_DIR@/logs
+  TV_REPORT_DIR=-tv-report-dir=@CMAKE_BINARY_DIR@/logs
   TIMEOUT="timeout 1000"
   TV_SMT_TO=-tv-smt-to=10000
   TV_SMT_STATS=-tv-smt-stats
