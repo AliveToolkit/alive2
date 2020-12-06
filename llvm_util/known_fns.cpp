@@ -52,11 +52,17 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     param_attrs[i].set(attr);
   };
 
+  auto ret_and_args_no_undef = [&]() {
+    if (!dynamic_cast<VoidType*>(ty))
+      attrs.set(FnAttrs::NoUndef);
+    for (unsigned i = 0, e = args.size(); i < e; ++i) {
+      set_param(i, ParamAttrs::NoUndef);
+    }
+  };
+
   auto fputc_attr = [&]() {
-    attrs.set(FnAttrs::NoUndef);
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoUndef);
-    set_param(1, ParamAttrs::NoUndef);
     set_param(1, ParamAttrs::NoCapture);
   };
 
@@ -141,7 +147,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
         RETURN_KNOWN(move(call));
       }
     }
-    attrs.set(FnAttrs::NoUndef);
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
@@ -165,32 +171,30 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_fclose:
   case llvm::LibFunc_fsetpos:
   case llvm::LibFunc_ftrylockfile:
-    attrs.set(FnAttrs::NoUndef);
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoUndef);
     set_param(0, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_ferror:
-    attrs.set(FnAttrs::NoUndef);
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
-    set_param(0, ParamAttrs::NoUndef);
     set_param(0, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_fread:
   case llvm::LibFunc_fread_unlocked:
-    attrs.set(FnAttrs::NoUndef);
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_perror:
+    ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoUndef);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
     RETURN_KNOWN_ATTRS();
