@@ -435,6 +435,8 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         if (copies.back().second == phi) {
           newbb.rauw(*phi, *const_cast<Value*>(val));
           copies.pop_back();
+          if (copies.empty())
+            vmap.erase(val);
           break;
         }
       }
