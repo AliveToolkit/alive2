@@ -103,6 +103,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   vector<llvm::Instruction*> i_constexprs;
   const vector<string_view> &gvnamesInSrc;
   vector<tuple<Phi*, llvm::PHINode*, unsigned>> todo_phis;
+  ostream *out;
 
   using RetTy = unique_ptr<Instr>;
 
@@ -159,7 +160,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
               const vector<string_view> &gvnamesInSrc)
-      : f(f), TLI(TLI), gvnamesInSrc(gvnamesInSrc) {}
+      : f(f), TLI(TLI), gvnamesInSrc(gvnamesInSrc), out(&get_outs()) {}
 
   ~llvm2alive_() {
     for (auto &inst : i_constexprs) {
@@ -1246,7 +1247,6 @@ unsigned omit_array_size = -1;
 
 
 initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
-  out = &os;
   init_llvm_utils(os, DL);
 }
 
