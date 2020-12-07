@@ -429,11 +429,11 @@ void init_llvm_utils(ostream &os, const llvm::DataLayout &dataLayout) {
   DL = &dataLayout;
 }
 
-std::ostream& get_outs() {
+ostream& get_outs() {
   return *out;
 }
 
-void set_outs(std::ostream &os) {
+void set_outs(ostream &os) {
   out = &os;
 }
 
