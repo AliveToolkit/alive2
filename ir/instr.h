@@ -321,8 +321,7 @@ public:
     target_iterator(JumpInstr *instr, unsigned idx) : instr(instr), idx(idx) {}
     const BasicBlock& operator*() const;
     target_iterator& operator++(void) { ++idx; return *this; }
-    bool operator!=(target_iterator &rhs) const { return idx != rhs.idx; }
-    bool operator==(target_iterator &rhs) const { return !(*this != rhs); }
+    bool operator==(const target_iterator &rhs) const { return idx == rhs.idx; }
   };
 
   class it_helper {
