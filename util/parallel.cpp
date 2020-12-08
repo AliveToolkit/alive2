@@ -12,9 +12,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// TODO: read this carefully and make sure it's safe when pids are
-// reused
-
 std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
   ensureParent();
   std::fflush(nullptr);
