@@ -1,29 +1,28 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "util/compiler.h"
 #include "util/parallel.h"
+#include "util/compiler.h"
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <fcntl.h>
-#include <iostream>
 #include <sys/stat.h>
 
-bool jobServer::init(int _max_subprocesses) {
-  parallel::init(_max_subprocesses);
-  auto env = std::getenv("MAKEFLAGS");
+using namespace std;
+
+bool jobServer::init(int max_subprocesses) {
+  ENSURE(parallel::init(max_subprocesses));
+  auto env = getenv("MAKEFLAGS");
   if (!env)
     return false;
-  auto sub = strstr(env, "jobserver-auth="); // new GNU make
-  if (!sub)
-    sub = strstr(env, "jobserver-fds="); // old GNU make
-  if (!sub)
-    return false;
-  int rfd, wfd;
-  int res = sscanf(sub, "jobserver-auth=%d,%d", &rfd, &wfd);
-  if (res != 2)
-    res = sscanf(sub, "jobserver-fds=%d,%d", &rfd, &wfd);
+  
+  int res = 0;
+  if (auto sub = strstr(env, "jobserver-auth=")) // new GNU make
+    res = sscanf(sub, "jobserver-auth=%d,%d", &read_fd, &write_fd);
+  else if (auto sub = strstr(env, "jobserver-fds=")) // old GNU make
+    res = sscanf(sub, "jobserver-fds=%d,%d", &read_fd, &write_fd);
   if (res != 2)
     return false;
 
@@ -63,21 +62,17 @@ bool jobServer::init(int _max_subprocesses) {
    *   CPU utilization and seldom enough to not generate a huge amount
    *   of overhead. this should only happen on OS X.
    */
-  int flags = fcntl(rfd, F_GETFL, 0);
+  int flags = fcntl(read_fd, F_GETFL, 0);
   if (flags == -1)
     return false;
   if (flags & O_NONBLOCK) {
-    char fn[256];
-    sprintf(fn, "/proc/self/fd/%d", rfd);
-    int newfd = open(fn, O_RDONLY);
-    if (newfd == -1)
+    string fn = "/proc/self/fd/" + to_string(rfd);
+    int newfd = open(fn.c_str(), O_RDONLY);
+    if (newfd < 0)
       nonblocking = true;
     else
-      rfd = newfd;
+      read_fd = newfd;
   }
-
-  read_fd = rfd;
-  write_fd = wfd;
   return true;
 }
 
@@ -95,11 +90,11 @@ void jobServer::putToken() {
   ENSURE(write(write_fd, &token, 1) == 1);
 }
 
-std::tuple<pid_t, std::ostream *, int> jobServer::limitedFork() {
+tuple<pid_t, ostream *, int> jobServer::limitedFork() {
   assert(read_fd != -1 && write_fd != -1);
   auto res = doFork();
   // child now waits for a jobserver token
-  if (std::get<0>(res) == 0)
+  if (get<0>(res) == 0)
     getToken();
   return res;
 }
