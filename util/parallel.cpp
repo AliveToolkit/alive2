@@ -59,8 +59,7 @@ std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
     ENSURE(close(newKid.pipe[1]) == 0);
     int flags = fcntl(newKid.pipe[0], F_GETFL, 0);
     assert(flags != -1);
-    res = fcntl(newKid.pipe[0], F_SETFL, flags | O_NONBLOCK);
-    ENSURE(res != -1);
+    ENSURE(fcntl(newKid.pipe[0], F_SETFL, flags | O_NONBLOCK) != -1);
     ++subprocesses;
     newKid.pid = pid;
   }
