@@ -37,10 +37,10 @@ bool jobServer::init(int max_subprocesses) {
    * aware of this but have not solved it yet.
    */
   struct stat statbuf;
-  res = fstat(rfd, &statbuf);
+  res = fstat(read_fd, &statbuf);
   if (res != 0 || !S_ISFIFO(statbuf.st_mode))
     return false;
-  res = fstat(wfd, &statbuf);
+  res = fstat(write_fd, &statbuf);
   if (res != 0 || !S_ISFIFO(statbuf.st_mode))
     return false;
 
@@ -66,7 +66,7 @@ bool jobServer::init(int max_subprocesses) {
   if (flags == -1)
     return false;
   if (flags & O_NONBLOCK) {
-    string fn = "/proc/self/fd/" + to_string(rfd);
+    string fn = "/proc/self/fd/" + to_string(read_fd);
     int newfd = open(fn.c_str(), O_RDONLY);
     if (newfd < 0)
       nonblocking = true;
