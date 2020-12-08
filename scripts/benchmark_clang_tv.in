@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o xtrace # can remove this later, for now it's nice to see commands
+
+# TODO support subsetting the benchmarks from the command line
+
+if [ "$#" -ne 1 ]; then
+    cat << EOM
+Expected one command line argument: the name of an initially-empty working
+directory for sources, binaries, and reports.
+EOM
+    exit -1
+fi
+
+WORK=$1
+
+# TODO give alivecc a mode where it doesn't invoke alive at all, so we
+# can test scripts like this more quickly and easily
+
+FLAGS='-mllvm -tv-parallel-unrestricted -mllvm -tv-disable-undef-input -mllvm -tv-disable-poison-input -mllvm -tv-smt-to=30000 -mllvm -tv-subprocess-timeout=600 -mllvm -tv-overwrite-reports'
+
+CORES=`nproc`
+
+ALIVECC=@CMAKE_BINARY_DIR@/alivecc
+
+mkdir $WORK || true
+cd $WORK
+mkdir downloads
+mkdir sources
+
+function check_bzip {
+    # 16 minutes on John's 10-core machine
+    cd $WORK/downloads
+    wget https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+    cd ../sources
+    tar xvf ../downloads/bzip2-1.0.8.tar.gz
+    cd bzip2-1.0.8
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/bzip2" > make.out 2>&1
+}
+
+function check_gzip {
+    # 16 minutes on John's 10-core machine
+    cd $WORK/downloads
+    wget https://ftp.gnu.org/gnu/gzip/gzip-1.10.tar.xz
+    cd ../sources
+    tar xvf ../downloads/gzip-1.10.tar.xz
+    cd gzip-1.10
+    mkdir build
+    cd build
+    ../configure
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/gzip" > make.out 2>&1
+}
+
+function check_libogg {
+    # 33 minutes on John's 10-core machine
+    cd $WORK/downloads
+    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.4.tar.xz
+    cd ../sources
+    tar xvf ../downloads/libogg-1.3.4.tar.xz
+    cd libogg-1.3.4
+    mkdir build
+    cd build
+    ../configure
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/libogg" > make.out 2>&1
+}
+
+function check_ph7 {
+    # 68 minutes on John's 10-core machine
+    cd $WORK/downloads
+    wget http://www.symisc.net/downloads/ph7-amalgamation-2001004.zip
+    cd ../sources
+    mkdir ph7
+    cd ph7
+    unzip ../../downloads/ph7-amalgamation-2001004.zip
+    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/ph7 -c ph7.c > make.out 2>&1
+}
+
+function check_sqlite {
+    #
+    cd $WORK/downloads
+    wget https://www.sqlite.org/2020/sqlite-amalgamation-3340000.zip
+    cd ../sources
+    unzip ../downloads/sqlite-amalgamation-3340000.zip
+    cd sqlite-amalgamation-3340000
+    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/sqlite -c sqlite3.c > make.out 2>&1
+}
+
+check_bzip
+check_gzip
+check_libogg
+check_ph7
+check_sqlite
+

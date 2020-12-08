@@ -20,6 +20,11 @@ if (CLANG_PLUGIN)
     ${CMAKE_BINARY_DIR}/alive++
     @ONLY
   )
+  configure_file(
+    ${CMAKE_SOURCE_DIR}/scripts/benchmark_clang_tv.in
+    ${CMAKE_BINARY_DIR}/benchmark_clang_tv
+    @ONLY
+  )
 else()
   message(STATUS "Skipping Clang plugin")
 endif()
