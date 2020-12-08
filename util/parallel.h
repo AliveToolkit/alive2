@@ -3,7 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include <iostream>
+#include <ostream>
 #include <sstream>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -42,7 +42,7 @@ protected:
   std::tuple<pid_t, std::ostream *, int> doFork();
 
 public:
-  virtual ~parallel(){};
+  virtual ~parallel() {}
 
   /*
    * must be called before any other methods are used, and this object
@@ -73,8 +73,7 @@ public:
    */
   virtual void waitForAllChildren();
 
-  virtual void emitOutput(std::stringstream &parent_ss,
-                          std::ofstream &out_file);
+  void emitOutput(std::stringstream &parent_ss, std::ofstream &out_file);
 };
 
 class jobServer final : public parallel {
