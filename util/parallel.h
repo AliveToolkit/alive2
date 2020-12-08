@@ -6,9 +6,7 @@
 #include <ostream>
 #include <sstream>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <tuple>
-#include <unistd.h>
 #include <vector>
 
 struct childProcess {
