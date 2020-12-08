@@ -103,7 +103,6 @@ tuple<pid_t, ostream *, int> jobServer::limitedFork() {
 void jobServer::finishChild() {
   writeToParent();
   putToken();
-  exit(0);
 }
 
 void jobServer::waitForAllChildren() {
