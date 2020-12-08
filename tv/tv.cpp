@@ -285,10 +285,7 @@ struct TVPass final : public llvm::FunctionPass {
 
     if (parallelMgr) {
       out_file.flush();
-      pid_t pid;
-      ostream *osp;
-      int index;
-      tie(pid, osp, index) = parallelMgr->limitedFork();
+      auto [pid, osp, index] = parallelMgr->limitedFork();
 
       if (pid == -1)
         llvm::report_fatal_error("fork() failed");
