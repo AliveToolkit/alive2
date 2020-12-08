@@ -86,8 +86,7 @@ bool parallel::readFromChildren() {
       c.eof = true;
       continue;
     }
-    auto *pbuf = c.output.rdbuf();
-    ENSURE((size_t)pbuf->sputn(data, size) == size);
+    c.output.write(data, size);
     /*
      * keep reading from this pipe until there's nothing left -- we
      * want to minimize the time TV processes spend blocked
@@ -118,13 +117,9 @@ static ssize_t safe_write(int fd, const void *void_buf, size_t count) {
 void parallel::writeToParent() {
   ensureChild();
   childProcess &me = children.back();
-  std::streambuf *pbuf = me.output.rdbuf();
-  std::streamsize size = pbuf->pubseekoff(0, me.output.end);
-  pbuf->pubseekoff(0, me.output.beg);
-  char *data = new char[size];
-  pbuf->sgetn(data, size);
-  ENSURE(safe_write(me.pipe[1], data, size) == size);
-  delete[] data;
+  auto data = me.output.str();
+  auto size = str.size();
+  ENSURE(safe_write(me.pipe[1], data.c_str(), size) == size);
 }
 
 void parallel::ensureParent() {
