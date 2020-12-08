@@ -9,6 +9,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <sys/wait.h>
 
 // TODO: read this carefully and make sure it's safe when pids are
 // reused
