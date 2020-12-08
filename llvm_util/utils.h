@@ -52,7 +52,7 @@ PRINT(llvm::Value)
 void init_llvm_utils(std::ostream &os, const llvm::DataLayout &DL);
 
 std::ostream& get_outs();
-void set_outs(std::ostream &);
+void set_outs(std::ostream &os);
 
 void reset_state(IR::Function &f);
 }
