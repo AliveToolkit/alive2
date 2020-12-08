@@ -1,30 +1,29 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "util/compiler.h"
 #include "util/parallel.h"
+#include "util/compiler.h"
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <fcntl.h>
-#include <iostream>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
-bool jobServer::init(int _max_subprocesses) {
-  auto env = std::getenv("MAKEFLAGS");
+using namespace std;
+
+bool jobServer::init(int max_subprocesses) {
+  ENSURE(parallel::init(max_subprocesses));
+  auto env = getenv("MAKEFLAGS");
   if (!env)
     return false;
-  auto sub = strstr(env, "jobserver-auth="); // new GNU make
-  if (!sub)
-    sub = strstr(env, "jobserver-fds="); // old GNU make
-  if (!sub)
-    return false;
-  int rfd, wfd;
-  int res = sscanf(sub, "jobserver-auth=%d,%d", &rfd, &wfd);
-  if (res != 2)
-    res = sscanf(sub, "jobserver-fds=%d,%d", &rfd, &wfd);
+  
+  int res = 0;
+  if (auto sub = strstr(env, "jobserver-auth=")) // new GNU make
+    res = sscanf(sub, "jobserver-auth=%d,%d", &read_fd, &write_fd);
+  else if (auto sub = strstr(env, "jobserver-fds=")) // old GNU make
+    res = sscanf(sub, "jobserver-fds=%d,%d", &read_fd, &write_fd);
   if (res != 2)
     return false;
 
@@ -39,10 +38,10 @@ bool jobServer::init(int _max_subprocesses) {
    * aware of this but have not solved it yet.
    */
   struct stat statbuf;
-  res = fstat(rfd, &statbuf);
+  res = fstat(read_fd, &statbuf);
   if (res != 0 || !S_ISFIFO(statbuf.st_mode))
     return false;
-  res = fstat(wfd, &statbuf);
+  res = fstat(write_fd, &statbuf);
   if (res != 0 || !S_ISFIFO(statbuf.st_mode))
     return false;
 
@@ -64,29 +63,23 @@ bool jobServer::init(int _max_subprocesses) {
    *   CPU utilization and seldom enough to not generate a huge amount
    *   of overhead. this should only happen on OS X.
    */
-  int flags = fcntl(rfd, F_GETFL, 0);
+  int flags = fcntl(read_fd, F_GETFL, 0);
   if (flags == -1)
     return false;
   if (flags & O_NONBLOCK) {
-    char fn[256];
-    sprintf(fn, "/proc/self/fd/%d", rfd);
-    int newfd = open(fn, O_RDONLY);
-    if (newfd == -1)
+    string fn = "/proc/self/fd/" + to_string(read_fd);
+    int newfd = open(fn.c_str(), O_RDONLY);
+    if (newfd < 0)
       nonblocking = true;
     else
-      rfd = newfd;
+      read_fd = newfd;
   }
-
-  parent_pid = getpid();
-  read_fd = rfd;
-  write_fd = wfd;
-  max_subprocesses = _max_subprocesses;
   return true;
 }
 
 void jobServer::getToken() {
   if (nonblocking) {
-    const struct timespec delay = {0, 10 * 1000 * 1000};
+    const struct timespec delay = {0, 10 * 1000 * 1000}; // 10 ms
     while (read(read_fd, &token, 1) != 1)
       nanosleep(&delay, 0);
   } else {
@@ -98,49 +91,22 @@ void jobServer::putToken() {
   ENSURE(write(write_fd, &token, 1) == 1);
 }
 
-pid_t jobServer::limitedFork() {
-  assert(getpid() == parent_pid);
+tuple<pid_t, ostream *, int> jobServer::limitedFork() {
   assert(read_fd != -1 && write_fd != -1);
-  /*
-   * reap zombies
-   */
-  int status;
-  while (waitpid((pid_t)(-1), &status, WNOHANG) > 0) {
-    if (WIFEXITED(status))
-      --subprocesses;
-  }
-  /*
-   * if we have too many children already, wait for some to exit
-   */
-  while (subprocesses >= max_subprocesses) {
-    if (wait(&status) != -1 && WIFEXITED(status))
-      --subprocesses;
-  }
-  std::fflush(nullptr);
-  pid_t res = fork();
-  if (res == -1)
-    return -1;
-
-  // parent returns immediately
-  if (res != 0) {
-    ++subprocesses;
-    return res;
-  }
-
-  // child has to wait for a jobserver token
-  getToken();
-
-  return 0;
+  auto res = doFork();
+  // child now waits for a jobserver token
+  if (get<0>(res) == 0)
+    getToken();
+  return res;
 }
 
 void jobServer::finishChild() {
-  assert(getpid() != parent_pid);
+  writeToParent();
   putToken();
   exit(0);
 }
 
 void jobServer::waitForAllChildren() {
-  assert(getpid() == parent_pid);
   /*
    * every process forked by GNU make implicitly holds a single
    * jobserver token. here we temporarily return this token into the
@@ -161,14 +127,6 @@ void jobServer::waitForAllChildren() {
    * the readers are queued in FIFO order.
    */
   putToken();
-  int status;
-  while (wait(&status) != -1) {
-    if (WIFEXITED(status))
-      --subprocesses;
-  }
+  parallel::waitForAllChildren();
   getToken();
-  if (subprocesses != 0) {
-    std::cerr << "Alive2: Expected 0 subprocesses but have " << subprocesses
-              << "\n";
-  }
 }

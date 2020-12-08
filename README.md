@@ -134,16 +134,7 @@ Because parallel TV jobs complete out of order, Alive2's output will
 be garbled if you allow it to go to the terminal. Avoid this problem
 by always using the (`-mllvm -tv-report-dir=dir`) options for runs
 where Alive2 uses multiple cores. This tells Alive2 to place its
-output files into a specific directory. Then, after it completes, you
-must run a final post-processing step to stitch together small pieces
-of output created by individual processes:
-
-```
-$ $HOME/alive2/build/fix_report_files dir/*.txt
-```
-
-The resulting files should be nearly the same as what you would have
-obtained by running the Alive2 Clang plugin in single-core mode.
+output files into a specific directory.
 
 The Clang plugin's output can be voluminous. To help control this, it
 supports an option to reduce the amount of output (`-mllvm
