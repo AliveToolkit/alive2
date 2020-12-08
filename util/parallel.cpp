@@ -120,7 +120,7 @@ void parallel::writeToParent() {
   childProcess &me = children.back();
   auto data = me.output.str();
   auto size = data.size();
-  ENSURE(safe_write(me.pipe[1], data.c_str(), size) == size);
+  ENSURE((size_t)safe_write(me.pipe[1], data.c_str(), size) == size);
 }
 
 void parallel::ensureParent() {
