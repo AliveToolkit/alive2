@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <sys/wait.h>
+#include <unistd.h>
 
 // TODO: read this carefully and make sure it's safe when pids are
 // reused
