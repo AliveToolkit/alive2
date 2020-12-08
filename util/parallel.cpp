@@ -9,7 +9,6 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <vector>
 
 // TODO: read this carefully and make sure it's safe when pids are
 // reused
@@ -37,13 +36,12 @@ std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
   }
 
   // this is how the child will send results back to the parent
-  int res = pipe(newKid.pipe);
-  if (res == -1)
-    return std::make_tuple(-1, nullptr, -1);
+  if (pipe(newKid.pipe) < 0)
+    return { -1, nullptr, -1 };
 
   pid_t pid = fork();
   if (pid == (pid_t)-1)
-    return std::make_tuple(-1, nullptr, -1);
+    return { -1, nullptr, -1 };
 
   if (pid == 0) {
     /*
@@ -63,7 +61,7 @@ std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
     ++subprocesses;
     newKid.pid = pid;
   }
-  return std::make_tuple(pid, &newKid.output, index);
+  return { pid, &newKid.output, index };
 }
 
 /*
@@ -87,9 +85,8 @@ bool parallel::readFromChildren() {
       c.eof = true;
       continue;
     }
-    std::streambuf *pbuf = c.output.rdbuf();
-    std::streamsize res = pbuf->sputn(data, size);
-    ENSURE((size_t)res == size);
+    auto *pbuf = c.output.rdbuf();
+    ENSURE((size_t)pbuf->sputn(data, size) == size);
     /*
      * keep reading from this pipe until there's nothing left -- we
      * want to minimize the time TV processes spend blocked
@@ -171,7 +168,7 @@ void parallel::emitOutput(std::stringstream &parent_ss,
       out_file << children[index].output.str();
     } else {
       assert(line.rfind("include(", 0) == std::string::npos);
-      out_file << line << "\n";
+      out_file << line << '\n';
     }
   }
 }
