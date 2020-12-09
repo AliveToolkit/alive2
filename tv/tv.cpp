@@ -26,7 +26,9 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <signal.h>
 #include <sstream>
+#include <unistd.h>
 #include <unordered_map>
 #include <utility>
 
@@ -177,6 +179,12 @@ llvm::cl::opt<int> max_subprocesses(
                    "(default=128)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(128));
 
+llvm::cl::opt<long> subprocess_timeout(
+    "tv-subprocess-timeout",
+    llvm::cl::desc("Maximum time, in seconds, that a parallel TV call "
+                   "will be allowed to execeute (default=infinite)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(-1));
+
 struct FnInfo {
   Function fn;
   unsigned order;
@@ -200,6 +208,13 @@ bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
+
+void sigalarm_handler(int) {
+  *out << "ERROR: Timeout\n\n";
+  parallelMgr->finishChild();
+  // this is a fully asynchronous exit, skip destructors and such
+  _Exit(0);
+}
 
 string get_random_str() {
   static default_random_engine re;
@@ -309,6 +324,11 @@ struct TVPass final : public llvm::FunctionPass {
         return false;
       }
 
+      if (subprocess_timeout != -1) {
+        ENSURE(signal(SIGALRM, sigalarm_handler) == nullptr);
+        alarm(subprocess_timeout);
+      }
+
       /*
        * child now writes to a stringstream provided by the parallel
        * manager, its output will get pushed to the parent via a pipe
@@ -360,6 +380,7 @@ struct TVPass final : public llvm::FunctionPass {
       llvm_util_init.reset();
       smt_init.reset();
       parallelMgr->finishChild();
+      exit(0);
     }
     return false;
   }
