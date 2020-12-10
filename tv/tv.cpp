@@ -206,8 +206,8 @@ bool report_dir_created = false;
 bool has_failure = false;
 // If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
-// If it is from new pass manager, tv-io-nobuiltin should be ignored & TLI
-// should be created from outside
+// If the new pass manager is used, TLI should be created from either NPM's
+// analyzer or a direct call to TLI's constructor
 bool is_from_npm = false;
 fs::path opt_report_parallel_dir;
 unique_ptr<parallel> parallelMgr;
