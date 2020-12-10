@@ -389,6 +389,13 @@ struct TVPass final : public llvm::FunctionPass {
     if (initialized++)
       return false;
 
+    if ((parallel_tv_jobserver || parallel_tv_unrestricted) &&
+        opt_report_dir.empty()) {
+      cerr << "Alive2: Please also use -tv-report-dir=... when using "
+        "parallel mode" << endl;
+      exit(1);
+    }
+
     if (parallel_tv_jobserver) {
       parallelMgr = make_unique<jobServer>();
     } else if (parallel_tv_unrestricted) {
