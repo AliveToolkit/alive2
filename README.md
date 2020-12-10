@@ -104,8 +104,7 @@ Running Alive2 as a Clang Plugin
 --------
 
 This plugin tries to validate every IR-level transformation performed
-by LLVM.  To build it, add `-DCLANG_PLUGIN=1` to the cmake
-command. Then, invoke the plugin like this:
+by LLVM.  Invoke the plugin like this:
 
 ```
 $ clang -O3 <src.c> -S -emit-llvm \

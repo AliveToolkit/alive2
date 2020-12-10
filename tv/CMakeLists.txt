@@ -5,26 +5,21 @@ else()
   add_llvm_library(tv MODULE tv.cpp)
 endif()
 
-if (CLANG_PLUGIN)
-  message(STATUS "Clang plugin support enabled")
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/alivecc
-    @ONLY
-  )
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
-    ${CMAKE_BINARY_DIR}/alive++
-    @ONLY
-  )
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/scripts/benchmark_clang_tv.in
-    ${CMAKE_BINARY_DIR}/benchmark_clang_tv
-    @ONLY
-  )
-else()
-  message(STATUS "Skipping Clang plugin")
-endif()
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
+  ${CMAKE_BINARY_DIR}/alivecc
+  @ONLY
+)
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
+  ${CMAKE_BINARY_DIR}/alive++
+  @ONLY
+)
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/benchmark_clang_tv.in
+  ${CMAKE_BINARY_DIR}/benchmark_clang_tv
+  @ONLY
+)
 
 target_link_libraries(tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES}
   $<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_LESS:$<CXX_COMPILER_VERSION>,9.0>>:stdc++fs>)
