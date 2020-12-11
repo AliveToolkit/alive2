@@ -578,11 +578,7 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 const char* skip_pass_list[] = {
   "{anonymous}::TVInitPass",
   "{anonymous}::TVFinalizePass",
-  "AlwaysInlinerPass",
   "ArgumentPromotionPass",
-  "AttributorCGSCCPass",
-  "AttributorPass",
-  "BlockExtractorPass",
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
@@ -591,12 +587,9 @@ const char* skip_pass_list[] = {
   "InferFunctionAttrsPass", // IPO
   "InlinerPass",
   "IPSCCPPass",
-  "MetaRenamerPass",
   "ModuleInlinerWrapperPass",
   "OpenMPOptPass",
-  "PartialInlinerPass",
   "PostOrderFunctionAttrsPass", // IPO
-  "SampleProfileLoaderPass" // IPO
 };
 
 bool do_skip(const llvm::StringRef &pass0) {
