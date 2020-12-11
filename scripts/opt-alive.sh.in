@@ -13,6 +13,7 @@ set -e
 PASSES="-passes= argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmpopt prune-eh tailcallelim -Os -Oz -O1 -O2 -O3"
 
 TV="-tv"
+NPM_TV=0
 for arg in $@; do
   # update the -passes argument only.
   shift
@@ -26,6 +27,7 @@ for arg in $@; do
       set -- "$@" "$arg"
     else
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
+      NPM_TV=1
     fi
   else
     set -- "$@" "$arg"
@@ -56,4 +58,9 @@ if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
   TV_SMT_TO=-tv-smt-to=10000
   TV_SMT_STATS=-tv-smt-stats
 fi
-$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS
+NPM_PLUGIN=""
+# Without this guard, passes like default<Os> invokes whole-pass validation
+if [[ $NPM_TV == 1 ]]; then
+  NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
+fi
+$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS
