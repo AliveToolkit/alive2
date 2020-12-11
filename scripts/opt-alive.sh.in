@@ -19,12 +19,13 @@ for arg in $@; do
   if [[ $arg == "-passes="* ]]; then
     passes=${arg#-passes=}
     passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py @LLVM_BINARY_DIR@/bin/opt $passes`
-    firstpass_level=`echo "$passes_new" | cut -d " " -f1`
-    passes_new=`echo "$passes_new" | cut -d " " -f2-`
+    firstpass_level=`echo $passes_new | cut -d " " -f1`
+    passes_new=`echo $passes_new | cut -d " " -f2-`
     if [[ ( $firstpass_level = "module" ) || ( $firstpass_level = "cgscc" ) ]]
-      set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
-    else
+    then
       set -- "$@" "$arg"
+    else
+      set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
     fi
   else
     set -- "$@" "$arg"
