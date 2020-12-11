@@ -21,7 +21,7 @@ for arg in $@; do
     passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py @LLVM_BINARY_DIR@/bin/opt $passes`
     firstpass_level=`echo "$passes_new" | cut -d " " -f1`
     passes_new=`echo "$passes_new" | cut -d " " -f2-`
-    if [[ $firstpass_level != "module" ]]; then
+    if [[ ( $firstpass_level = "module" ) || ( $firstpass_level = "cgscc" ) ]]
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
     else
       set -- "$@" "$arg"
