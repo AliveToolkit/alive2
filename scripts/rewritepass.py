@@ -11,7 +11,6 @@ passes = sys.argv[2].strip("'\"").split(',')
 plen = len(passes)
 
 level_ancestors = {
-  "module":[],
   "cgscc":["module"],
   "function":["module"],
       # don't use module(cgscc(function(...)), use module(function(...))
@@ -54,7 +53,7 @@ unsupported_module_passes = [
   "sample-profile"
 ]
 
-firstp_level = None
+firstp_level = "module"
 if firstp not in unsupported_module_passes:
   # get the level of the first pass by invoking opt and parsing the output
   # message.
@@ -73,6 +72,8 @@ if firstp not in unsupported_module_passes:
     # get "function"
     firstp_level = level_str.split()[0]
     assert(firstp_level in level_ancestors)
+  else:
+    firstp_level = "module"
 
 i = i + 1
 res = [firstp] + passes[i:]
@@ -80,7 +81,7 @@ res = [firstp] + passes[i:]
 prefix = ""
 suffix = ""
 
-if firstp_level:
+if firstp_level != "module":
   if not firstp.startswith(firstp_level):
     # don't print "function(function(passes))"
     prefix = firstp_level + "("
@@ -91,4 +92,4 @@ if firstp_level:
     suffix = suffix + ")"
 
 
-print(prefix + ",".join(res) + suffix)
+print(firstp_level + " " + prefix + ",".join(res) + suffix)

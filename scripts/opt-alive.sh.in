@@ -18,8 +18,14 @@ for arg in $@; do
   shift
   if [[ $arg == "-passes="* ]]; then
     passes=${arg#-passes=}
-    passes_new=`@CMAKE_BINARY_DIR@/../scripts/rewritepass.py @LLVM_BINARY_DIR@/bin/opt $passes`
-    set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
+    passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py @LLVM_BINARY_DIR@/bin/opt $passes`
+    firstpass_level=`echo "$passes_new" | cut -d " " -f1`
+    passes_new=`echo "$passes_new" | cut -d " " -f2-`
+    if [[ $firstpass_level != "module" ]]; then
+      set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
+    else
+      set -- "$@" "$arg"
+    fi
   else
     set -- "$@" "$arg"
   fi
