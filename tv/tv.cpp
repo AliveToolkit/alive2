@@ -206,9 +206,6 @@ bool report_dir_created = false;
 bool has_failure = false;
 // If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
-// If the new pass manager is used, TLI should be created from either NPM's
-// analyzer or a direct call to TLI's constructor
-bool is_from_npm = false;
 fs::path opt_report_parallel_dir;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
@@ -254,11 +251,10 @@ struct TVPass final : public llvm::FunctionPass {
     });
 
     llvm::TargetLibraryInfo *TLI = nullptr;
-    if (is_from_npm) {
+    if (TLI_override) {
       // When used as a clang plugin or from the new pass manager, this is run
       // as a plain function rather than a registered pass, so getAnalysis()
       // cannot be used.
-      assert(TLI_override);
       TLI = TLI_override;
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
@@ -681,7 +677,6 @@ llvmGetPassPluginInfo() {
           if (Name != "tv")
             return false;
 
-          is_from_npm = true;
           if (first_tv) {
             // Assume that this plugin is loaded from opt when tv pass is
             // explicitly given as an argument
@@ -701,7 +696,6 @@ llvmGetPassPluginInfo() {
       PB.registerPipelineStartEPCallback(
           [](llvm::ModulePassManager &MPM,
              llvm::PassBuilder::OptimizationLevel) {
-            is_from_npm = true;
             MPM.addPass(TVInitPass());
           });
       PB.registerOptimizerLastEPCallback(
