@@ -1,13 +1,13 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "util/parallel.h"
 #include "util/compiler.h"
+#include "util/parallel.h"
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 #include <fcntl.h>
+#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -18,7 +18,7 @@ bool jobServer::init(int max_subprocesses) {
   auto env = getenv("MAKEFLAGS");
   if (!env)
     return false;
-  
+
   int res = 0;
   if (auto sub = strstr(env, "jobserver-auth=")) // new GNU make
     res = sscanf(sub, "jobserver-auth=%d,%d", &read_fd, &write_fd);
@@ -100,8 +100,8 @@ tuple<pid_t, ostream *, int> jobServer::limitedFork() {
   return res;
 }
 
-void jobServer::finishChild() {
-  writeToParent();
+void jobServer::finishChild(bool is_timeout) {
+  writeToParent(is_timeout);
   putToken();
 }
 

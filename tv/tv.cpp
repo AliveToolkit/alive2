@@ -175,8 +175,8 @@ llvm::cl::opt<bool> parallel_tv_unrestricted(
 
 llvm::cl::opt<int> max_subprocesses(
     "tv-max-subprocesses",
-    llvm::cl::desc("Maximum children this clang instance will have at any time "
-                   "(default=128)"),
+    llvm::cl::desc("Maximum children any single clang instance will have at one "
+                   "time (default=128)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(128));
 
 llvm::cl::opt<long> subprocess_timeout(
@@ -211,8 +211,7 @@ unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
 
 void sigalarm_handler(int) {
-  *out << "ERROR: Timeout\n\n";
-  parallelMgr->finishChild();
+  parallelMgr->finishChild(/*is_timeout=*/true);
   // this is a fully asynchronous exit, skip destructors and such
   _Exit(0);
 }
@@ -300,8 +299,10 @@ struct TVPass final : public llvm::FunctionPass {
       out_file.flush();
       auto [pid, osp, index] = parallelMgr->limitedFork();
 
-      if (pid == -1)
-        llvm::report_fatal_error("fork() failed");
+      if (pid == -1) {
+        perror("fork() failed");
+        exit(-1);
+      }
 
       if (pid != 0) {
         /*
@@ -377,7 +378,7 @@ struct TVPass final : public llvm::FunctionPass {
     if (parallelMgr) {
       llvm_util_init.reset();
       smt_init.reset();
-      parallelMgr->finishChild();
+      parallelMgr->finishChild(/*is_timeout=*/false);
       exit(0);
     }
     return false;
@@ -471,7 +472,7 @@ struct TVPass final : public llvm::FunctionPass {
   bool doFinalization(llvm::Module&) override {
     if (parallelMgr) {
       parallelMgr->waitForAllChildren();
-      parallelMgr->emitOutput(parent_ss, out_file);
+      parallelMgr->emitOutput(parent_ss, out_file.is_open() ? out_file : cerr);
     }
 
     if (!showed_stats) {
