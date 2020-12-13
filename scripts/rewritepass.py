@@ -49,7 +49,6 @@ if firstp.find("<") != -1 or firstp.find("(") != -1:
 unsupported_module_passes = [
   "function-import",
   "pgo-instr-use",
-  "insert-gcov-profiling",
   "sample-profile"
 ]
 
