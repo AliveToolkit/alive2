@@ -690,7 +690,11 @@ llvmGetPassPluginInfo() {
           return true;
         });
       // These two register*EPCallbacks are called when 'default' pipelines
-      // such as O2, O3 are used.
+      // such as O2, O3 are used by either opt or clang.
+      // For clang -O2, these are needed. For opt, these are currently redundant
+      // because we don't support e.g. opt -passes="tv,default<O2>,tv".
+      // But there is no way to distinguish which one (clang vs. opt) is invoked
+      // so simply always add these.
       PB.registerPipelineStartEPCallback(
           [](llvm::ModulePassManager &MPM,
              llvm::PassBuilder::OptimizationLevel) {
