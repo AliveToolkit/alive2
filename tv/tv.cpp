@@ -683,11 +683,9 @@ llvmGetPassPluginInfo() {
             is_clangtv = false;
             first_tv = false;
             MPM.addPass(TVInitPass());
-            MPM.addPass(TVNewPass());
-          } else {
-            MPM.addPass(TVNewPass());
-            // Finalization is done by the last TVNewPass
           }
+          MPM.addPass(TVNewPass());
+          // Finalization is done by the last TVNewPass
           TVNewPass::num_tv_pass_created++;
           return true;
         });
