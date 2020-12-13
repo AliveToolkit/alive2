@@ -230,155 +230,157 @@ string get_random_str() {
   return to_string(rand(re));
 }
 
-struct TVPass final : public llvm::FunctionPass {
+struct TVPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
-  // Use TLI_override if it is set
-  llvm::TargetLibraryInfo *TLI_override = nullptr;
+  // Call TLI_override if it is set
+  optional<function<llvm::TargetLibraryInfo*(llvm::Function&)>> TLI_override;
 
-  TVPass() : FunctionPass(ID) {}
+  TVPass() : ModulePass(ID) {}
 
-  bool runOnFunction(llvm::Function &F) override {
-    if (F.isDeclaration())
-      // This can happen at EntryExitInstrumenter pass.
-      return false;
+  bool runOnModule(llvm::Module &M) override {
+    for (auto &F: M) {
+      if (F.isDeclaration())
+        // This can happen at EntryExitInstrumenter pass.
+        continue;
 
-    if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
-      return false;
+      if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
+        continue;
 
-    ScopedWatch timer([&](const StopWatch &sw) {
-      fns_elapsed_time[F.getName().str()] += sw.seconds();
-    });
+      ScopedWatch timer([&](const StopWatch &sw) {
+        fns_elapsed_time[F.getName().str()] += sw.seconds();
+      });
 
-    llvm::TargetLibraryInfo *TLI = nullptr;
-    if (TLI_override) {
-      // When used as a clang plugin or from the new pass manager, this is run
-      // as a plain function rather than a registered pass, so getAnalysis()
-      // cannot be used.
-      TLI = TLI_override;
-    } else {
-      TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
-    }
-
-    auto [I, first] = fns.try_emplace(F.getName().str());
-
-    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
-                                        : I->second.fn.getGlobalVarNames());
-    if (!fn) {
-      fns.erase(I);
-      return false;
-    }
-
-    if (is_clangtv) {
-      // Compare Alive2 IR and skip if syntactically equal
-      stringstream ss;
-      fn->print(ss);
-
-      string str2 = ss.str();
-      // Optimization: since string comparison can be expensive for big
-      // functions, skip it if skip_verify is true.
-      // verifier.verify() will never happen if skip_verify is true, so
-      // there is nothing to prune early.
-      if (!skip_verify && I->second.fn_tostr == str2)
-        return false;
-
-      I->second.fn_tostr = move(str2);
-    }
-
-    auto old_fn = move(I->second.fn);
-    I->second.fn = move(*fn);
-
-    if (opt_print_dot) {
-      string prefix = to_string(I->second.order);
-      I->second.fn.writeDot(prefix.c_str());
-    }
-
-    if (first || skip_verify)
-      return false;
-
-    if (parallelMgr) {
-      out_file.flush();
-      auto [pid, osp, index] = parallelMgr->limitedFork();
-
-      if (pid == -1)
-        llvm::report_fatal_error("fork() failed");
-
-      if (pid != 0) {
-        /*
-         * parent returns to LLVM immediately. starting with the first
-         * time we reach this code, it writes its output to a
-         * stringstream that we'll patch up later to include output
-         * from children, before finally emitting it
-         */
-        out = &parent_ss;
-        *out << "include(" << index << ")\n";
-        set_outs(*out);
-        /*
-         * TODO: this llvm2alive() call isn't needed for correctness,
-         * but only to make parallel output match sequential
-         * output. we can remove it later if we want.
-         */
-        I->second.fn = *llvm2alive(F, *TLI);
-        return false;
+      llvm::TargetLibraryInfo *TLI = nullptr;
+      if (TLI_override) {
+        // When used as a clang plugin or from the new pass manager, this is run
+        // as a plain function rather than a registered pass, so getAnalysis()
+        // cannot be used.
+        TLI = (*TLI_override)(F);
+      } else {
+        TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
       }
 
-      if (subprocess_timeout != -1) {
-        ENSURE(signal(SIGALRM, sigalarm_handler) == nullptr);
-        alarm(subprocess_timeout);
+      auto [I, first] = fns.try_emplace(F.getName().str());
+
+      auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
+                                          : I->second.fn.getGlobalVarNames());
+      if (!fn) {
+        fns.erase(I);
+        continue;
+      }
+
+      if (is_clangtv) {
+        // Compare Alive2 IR and skip if syntactically equal
+        stringstream ss;
+        fn->print(ss);
+
+        string str2 = ss.str();
+        // Optimization: since string comparison can be expensive for big
+        // functions, skip it if skip_verify is true.
+        // verifier.verify() will never happen if skip_verify is true, so
+        // there is nothing to prune early.
+        if (!skip_verify && I->second.fn_tostr == str2)
+          continue;
+
+        I->second.fn_tostr = move(str2);
+      }
+
+      auto old_fn = move(I->second.fn);
+      I->second.fn = move(*fn);
+
+      if (opt_print_dot) {
+        string prefix = to_string(I->second.order);
+        I->second.fn.writeDot(prefix.c_str());
+      }
+
+      if (first || skip_verify)
+        continue;
+
+      if (parallelMgr) {
+        out_file.flush();
+        auto [pid, osp, index] = parallelMgr->limitedFork();
+
+        if (pid == -1)
+          llvm::report_fatal_error("fork() failed");
+
+        if (pid != 0) {
+          /*
+          * parent returns to LLVM immediately. starting with the first
+          * time we reach this code, it writes its output to a
+          * stringstream that we'll patch up later to include output
+          * from children, before finally emitting it
+          */
+          out = &parent_ss;
+          *out << "include(" << index << ")\n";
+          set_outs(*out);
+          /*
+          * TODO: this llvm2alive() call isn't needed for correctness,
+          * but only to make parallel output match sequential
+          * output. we can remove it later if we want.
+          */
+          I->second.fn = *llvm2alive(F, *TLI);
+          return false;
+        }
+
+        if (subprocess_timeout != -1) {
+          ENSURE(signal(SIGALRM, sigalarm_handler) == nullptr);
+          alarm(subprocess_timeout);
+        }
+
+        /*
+        * child now writes to a stringstream provided by the parallel
+        * manager, its output will get pushed to the parent via a pipe
+        * later on
+        */
+        out = osp;
+        set_outs(*out);
       }
 
       /*
-       * child now writes to a stringstream provided by the parallel
-       * manager, its output will get pushed to the parent via a pipe
-       * later on
-       */
-      out = osp;
-      set_outs(*out);
-    }
+      * from here, we must not return back to LLVM if parallelMgr
+      * is non-null; instead we call parallelMgr->finishChild()
+      */
 
-    /*
-     * from here, we must not return back to LLVM if parallelMgr
-     * is non-null; instead we call parallelMgr->finishChild()
-     */
+      smt_init->reset();
+      Transform t;
+      t.src = move(old_fn);
+      t.tgt = move(I->second.fn);
+      t.preprocess();
+      TransformVerify verifier(t, false);
+      if (!opt_succinct)
+        t.print(*out, print_opts);
 
-    smt_init->reset();
-    Transform t;
-    t.src = move(old_fn);
-    t.tgt = move(I->second.fn);
-    t.preprocess();
-    TransformVerify verifier(t, false);
-    if (!opt_succinct)
-      t.print(*out, print_opts);
-
-    {
-      auto types = verifier.getTypings();
-      if (!types) {
-        *out << "Transformation doesn't verify!\n"
-                "ERROR: program doesn't type check!\n\n";
-        goto done;
+      {
+        auto types = verifier.getTypings();
+        if (!types) {
+          *out << "Transformation doesn't verify!\n"
+                  "ERROR: program doesn't type check!\n\n";
+          goto done;
+        }
+        assert(types.hasSingleTyping());
       }
-      assert(types.hasSingleTyping());
-    }
 
-    if (Errors errs = verifier.verify()) {
-      *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
-      if (opt_error_fatal && has_failure)
-        doFinalization(*F.getParent());
-    } else {
-      *out << "Transformation seems to be correct!\n\n";
-    }
+      if (Errors errs = verifier.verify()) {
+        *out << "Transformation doesn't verify!\n" << errs << endl;
+        has_failure |= errs.isUnsound();
+        if (opt_error_fatal && has_failure)
+          doFinalization(*F.getParent());
+      } else {
+        *out << "Transformation seems to be correct!\n\n";
+      }
 
-    // Regenerate tgt because preprocessing may have changed it
-    if (!parallelMgr)
-      I->second.fn = *llvm2alive(F, *TLI);
+      // Regenerate tgt because preprocessing may have changed it
+      if (!parallelMgr)
+        I->second.fn = *llvm2alive(F, *TLI);
 
-  done:
-    if (parallelMgr) {
-      llvm_util_init.reset();
-      smt_init.reset();
-      parallelMgr->finishChild();
-      exit(0);
+    done:
+      if (parallelMgr) {
+        llvm_util_init.reset();
+        smt_init.reset();
+        parallelMgr->finishChild();
+        exit(0);
+      }
     }
     return false;
   }
@@ -640,13 +642,9 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
 
     TVPass tv;
     tv.skip_verify = skip_tv;
-
-    for (auto &F: M) {
-      tv.TLI_override = get_TLI(F);
-
-      // If skip_pass is true, this updates fns map only.
-      tv.runOnFunction(F);
-    }
+    tv.TLI_override = get_TLI;
+    // If skip_pass is true, this updates fns map only.
+    tv.runOnModule(M);
 
     skip_tv = false;
     if (count == num_tv_pass_created) {
