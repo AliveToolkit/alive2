@@ -35,6 +35,8 @@ for k in levels:
   if passes[0].startswith(k + "("):
     firstp_level = k
     break
+if passes[0].startswith("loop-mssa("):
+  firstp_level = "loop"
 
 for i in ["s", "z", "0", "1", "2", "3"]:
   if passes[0] == "default<O" + i + ">":
@@ -81,6 +83,5 @@ if firstp_level != "module":
   for p in level_ancestors[firstp_level]:
     prefix = p + "(" + prefix
     suffix = suffix + ")"
-
 
 print(firstp_level + " " + prefix + ",".join(passes) + suffix)
