@@ -27,7 +27,7 @@ for arg in $@; do
     then
       set -- "$@" "$arg"
     else
-      set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
+      set -- "$@" "-passes=tv,$passes_new,tv"
       NPM_TV=1
     fi
   else
