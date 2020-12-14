@@ -320,7 +320,7 @@ struct TVPass final : public llvm::ModulePass {
           * output. we can remove it later if we want.
           */
           I->second.fn = *llvm2alive(F, *TLI);
-          return false;
+          continue;
         }
 
         if (subprocess_timeout != -1) {
