@@ -19,7 +19,7 @@ WORK=$1
 # TODO give alivecc a mode where it doesn't invoke alive at all, so we
 # can test scripts like this more quickly and easily
 
-FLAGS='-mllvm -tv-parallel-unrestricted -mllvm -tv-disable-undef-input -mllvm -tv-disable-poison-input -mllvm -tv-smt-to=30000 -mllvm -tv-subprocess-timeout=600 -mllvm -tv-overwrite-reports'
+FLAGS='-mllvm -tv-parallel-unrestricted -mllvm -tv-disable-poison-input -mllvm -tv-smt-to=30000 -mllvm -tv-subprocess-timeout=600 -mllvm -tv-overwrite-reports'
 
 CORES=`nproc`
 
@@ -78,7 +78,7 @@ function check_ph7 {
 }
 
 function check_sqlite {
-    #
+    # doesn't finish within 24 hours on John's machine -- we need to parallelize better!
     cd $WORK/downloads
     wget https://www.sqlite.org/2020/sqlite-amalgamation-3340000.zip
     cd ../sources
