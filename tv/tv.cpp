@@ -622,7 +622,7 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
     if (TVFinalizePass::finalized)
       return;
 
-    static int count = 0;
+    static unsigned count = 0;
     if (!out) {
       // TVInitPass is not called yet.
       // This can happen at very early passes, such as
@@ -631,7 +631,7 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
       return;
     }
 
-    count++;
+    ++count;
     if (print_pass_name) {
       // print_pass_name is set only when running clang tv
       *out << "-- " << count << ". " << pass_name
