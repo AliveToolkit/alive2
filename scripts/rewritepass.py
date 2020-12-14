@@ -47,6 +47,10 @@ for i in ["s", "z", "0", "1", "2", "3"]:
   if firstp_level != None:
     break
 
+# PassBuilder.cpp: isCGSCCPassName()
+if passes[0].startswith("devirt<") or passes[0].startswith("repeat<"):
+  firstp_level = "cgscc"
+
 if firstp_level == None:
   # ask PassRegistry.def
   firstpass = passes[0]
