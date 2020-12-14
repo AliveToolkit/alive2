@@ -37,7 +37,7 @@ function check_bzip {
     cd ../sources
     tar xvf ../downloads/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
-    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/bzip2" > make.out 2>&1
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/bzip2" &> make.out
 }
 
 function check_gzip {
@@ -50,7 +50,7 @@ function check_gzip {
     mkdir build
     cd build
     ../configure
-    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/gzip" > make.out 2>&1
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/gzip" &> make.out
 }
 
 function check_libogg {
@@ -63,7 +63,7 @@ function check_libogg {
     mkdir build
     cd build
     ../configure
-    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/libogg" > make.out 2>&1
+    time make -j$CORES CC="$ALIVECC $FLAGS -mllvm -tv-report-dir=$WORK/reports/libogg" &> make.out
 }
 
 function check_ph7 {
@@ -74,7 +74,7 @@ function check_ph7 {
     mkdir ph7
     cd ph7
     unzip ../../downloads/ph7-amalgamation-2001004.zip
-    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/ph7 -c ph7.c > make.out 2>&1
+    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/ph7 -c ph7.c &> make.out
 }
 
 function check_sqlite {
@@ -84,7 +84,7 @@ function check_sqlite {
     cd ../sources
     unzip ../downloads/sqlite-amalgamation-3340000.zip
     cd sqlite-amalgamation-3340000
-    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/sqlite -c sqlite3.c > make.out 2>&1
+    time $ALIVECC -O3 $FLAGS -mllvm -tv-report-dir=$WORK/reports/sqlite -c sqlite3.c &> make.out
 }
 
 check_bzip
@@ -92,4 +92,3 @@ check_gzip
 check_libogg
 check_ph7
 check_sqlite
-
