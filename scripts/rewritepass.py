@@ -39,8 +39,12 @@ if passes[0].startswith("loop-mssa("):
   firstp_level = "loop"
 
 for i in ["s", "z", "0", "1", "2", "3"]:
-  if passes[0] == "default<O" + i + ">":
-    firstp_level = "module"
+  for pipeline in ["default", "thinlto-pre-link", "thinlto", "lto-pre-link",
+                   "lto"]:
+    if passes[0] == "%s<O%s>" % (pipeline, i):
+      firstp_level = "module"
+      break
+  if firstp_level != None:
     break
 
 if firstp_level == None:
@@ -56,7 +60,7 @@ if firstp_level == None:
   found_levels = dict()
   prefixes = ["MODULE_", "CGSCC_", "FUNCTION_", "LOOP_"]
   for l in open(passregpath, "r").readlines():
-    if l.find(firstpass) == -1:
+    if l.find('"%s"' % firstpass) == -1 and l.find('"%s<' % firstpass) == -1:
       continue
     for i in range(0, len(prefixes)):
       if l.startswith(prefixes[i]):
