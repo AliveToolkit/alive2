@@ -8,7 +8,6 @@ if len(sys.argv) != 3:
 
 passregpath = sys.argv[1]
 passes = sys.argv[2].strip("'\"").split(',')
-plen = len(passes)
 
 levels = ["module", "cgscc", "function", "loop"]
 level_ancestors = {
