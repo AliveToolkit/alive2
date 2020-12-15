@@ -232,7 +232,8 @@ string get_random_str() {
 struct TVPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
-  const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override;
+  const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override
+    = nullptr;
 
   TVPass() : ModulePass(ID) {}
 
