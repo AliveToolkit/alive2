@@ -616,7 +616,8 @@ end:
         continue;
       }
 
-      gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()), *op);
+      gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()).getKnownMinValue(),
+                  *op);
     }
     RETURN_IDENTIFIER(move(gep));
   }
