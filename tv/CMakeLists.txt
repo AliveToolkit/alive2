@@ -16,8 +16,13 @@ configure_file(
   @ONLY
 )
 configure_file(
-  ${CMAKE_SOURCE_DIR}/scripts/benchmark_clang_tv.in
-  ${CMAKE_BINARY_DIR}/benchmark_clang_tv
+  ${CMAKE_SOURCE_DIR}/scripts/benchmark-clang-tv.in
+  ${CMAKE_BINARY_DIR}/benchmark-clang-tv
+  @ONLY
+)
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/benchmark-llvm-test-suite.in
+  ${CMAKE_BINARY_DIR}/benchmark-llvm-test-suite
   @ONLY
 )
 
