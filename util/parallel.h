@@ -27,7 +27,7 @@ class parallel {
   pid_t parent_pid = -1;
   int max_active_children;
   int active_children = 0;
-  pollfd *pfd = nullptr;
+  std::vector<pollfd> pfd;
   std::vector<int> pfd_map;
   std::vector<childProcess> children;
   void ensureParent();
@@ -40,9 +40,7 @@ protected:
   std::tuple<pid_t, std::ostream *, int> doFork();
 
 public:
-  virtual ~parallel() {
-    delete[] pfd;
-  }
+  virtual ~parallel() {}
 
   /*
    * must be called before any other methods are used, and this object

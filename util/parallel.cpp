@@ -23,11 +23,11 @@ void parallel::ensureChild() {
 bool parallel::init(int _max_active_children) {
   assert(parent_pid == -1);
   max_active_children = _max_active_children;
-  pfd = new pollfd[max_active_children];
   for (int i = 0; i < max_active_children; ++i) {
     pfd_map.push_back(-1);
-    pfd[i].fd = -1;
-    pfd[i].events = POLL_IN;
+    auto &p = pfd.emplace_back();
+    p.fd = -1;
+    p.events = POLL_IN;
   }
   parent_pid = getpid();
   return true;
@@ -115,7 +115,7 @@ bool parallel::readFromChildren(bool blocking) {
   static char data[maxRead];
   if (active_children == 0)
     return false;
-  int res = poll(pfd, max_active_children, blocking ? -1 : 0);
+  int res = poll(pfd.data(), max_active_children, blocking ? -1 : 0);
   if (res == -1) {
     perror("poll");
     exit(-1);
