@@ -230,15 +230,21 @@ string get_random_str() {
   return to_string(rand(re));
 }
 
-struct TVPass final : public llvm::FunctionPass {
+struct TVPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
   // Use TLI_override if it is set
-  llvm::TargetLibraryInfo *TLI_override = nullptr;
+  optional<function<llvm::TargetLibraryInfo*(llvm::Function&)>> TLI_override;
 
-  TVPass() : FunctionPass(ID) {}
+  TVPass() : ModulePass(ID) {}
 
-  bool runOnFunction(llvm::Function &F) override {
+  bool runOnModule(llvm::Module &M) override {
+    for (auto &F: M)
+      runOnFunction(F);
+    return false;
+  }
+
+  bool runOnFunction(llvm::Function &F) {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
       return false;
@@ -255,7 +261,7 @@ struct TVPass final : public llvm::FunctionPass {
       // When used as a clang plugin or from the new pass manager, this is run
       // as a plain function rather than a registered pass, so getAnalysis()
       // cannot be used.
-      TLI = TLI_override;
+      TLI = (*TLI_override)(F);
     } else {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
@@ -641,12 +647,9 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
     TVPass tv;
     tv.skip_verify = skip_tv;
 
-    for (auto &F: M) {
-      tv.TLI_override = get_TLI(F);
-
-      // If skip_pass is true, this updates fns map only.
-      tv.runOnFunction(F);
-    }
+    tv.TLI_override = get_TLI;
+    // If skip_pass is true, this updates fns map only.
+    tv.runOnModule(M);
 
     skip_tv = false;
     if (count == num_tv_pass_created) {
