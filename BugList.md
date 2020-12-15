@@ -52,6 +52,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 45. Incorrect transformation of fabs with nnan flag (https://llvm.org/PR47960)
 46. Loop peeling introduces OOB stores (https://llvm.org/PR48125)
 47. Loop vectorizer introduces gep inbounds with negative offset (https://llvm.org/PR48126)
+48. DSE incorrectly removes store in function that only triggers UB in one of the branches (https://llvm.org/PR48521)
 
 
 ### Bugs found in Z3
