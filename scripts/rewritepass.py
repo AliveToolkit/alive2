@@ -1,94 +1,115 @@
-#!/usr/bin/python3
-import sys
+#!/usr/bin/python
 import os
+import re
+import sys
 
-if len(sys.argv) != 3:
-  print("Use: %s <PassRegistry.def path> <passes>" % sys.argv[0])
+if len(sys.argv) != 3 and len(sys.argv) != 4:
+  print("Use: %s <PassRegistry.def path> <passes> [run-tests]" % sys.argv[0])
   exit(1)
 
 passregpath = sys.argv[1]
-passes = sys.argv[2].strip("'\"").split(',')
 
-levels = ["module", "cgscc", "function", "loop"]
-level_ancestors = {
-  "module":[],
-  "cgscc":["module"],
-  "function":["module"],
-      # don't use module(cgscc(function(...)), use module(function(...))
-      # the former one results in a different output.
-      # e.g. llvm/test/Transforms/LoopVectorize/reduction-order.ll
-  "loop":["function", "module"]
-}
+def wrap_str(arg, lst):
+  for e in lst:
+    arg = "%s(%s)" % (e, arg)
+  return arg
 
-"""
-PassBuilder.cpp states that:
-  As a special shortcut, if the very first pass is not
-  a module pass (as a module pass manager is), this will automatically form
-  the shortest stack of pass managers that allow inserting that first pass.
-Build the stack of pass managers by finding the first pass from PassRegistry.def
-"""
+def wrap(args):
+  passes = args.split(',')
 
-firstp_level = None
-# If the level is explicitly given, use it
-for k in levels:
-  if passes[0].startswith(k + "("):
-    firstp_level = k
-    break
-if passes[0].startswith("loop-mssa("):
-  firstp_level = "loop"
+  pass_types = {
+    "module"   : [],
+    "cgscc"    : [],
+    "function" : [],
+    "loop"     : ["function"]
+  }
 
-for i in ["s", "z", "0", "1", "2", "3"]:
-  for pipeline in ["default", "thinlto-pre-link", "thinlto", "lto-pre-link",
-                   "lto"]:
-    if passes[0] == "%s<O%s>" % (pipeline, i):
-      firstp_level = "module"
+  firstpass = None
+  type = None
+
+  skip = ['verify', 'invalidate<all>']
+  for p in passes:
+    if not any(p.startswith(s) for s in skip):
+      firstpass = p
       break
-  if firstp_level != None:
-    break
 
-# PassBuilder.cpp: isCGSCCPassName()
-if passes[0].startswith("devirt<") or passes[0].startswith("repeat<"):
-  firstp_level = "cgscc"
+  # decorated already: function(foo)
+  for ty,lst in pass_types.items():
+    if firstpass.startswith(ty + '('):
+      return wrap_str(args, lst)
 
-if firstp_level == None:
-  # ask PassRegistry.def
-  firstpass = passes[0]
-  if passes[0].startswith("require<"):
-    firstpass = passes[0][len("require<"):]
-  firstpass = firstpass.replace("(", ",").replace("<",",").replace(">",",") \
-                       .replace(";", ",").split(",")[0]
+  override = {
+    # pass -> (type, prepend-type?)
+    'devirt<' : ('cgscc', True),
+    'loop-mssa' : ('loop', False),
+  }
+  for arg,(ty,prepend) in override.items():
+    if firstpass.startswith(arg):
+      return wrap_str(args, ([ty] if prepend else []) + pass_types[ty])
 
-  # There are passes like "verify", which can be either function or module
-  # level. We should allow them
-  found_levels = dict()
-  prefixes = ["MODULE_", "CGSCC_", "FUNCTION_", "LOOP_"]
-  for l in open(passregpath, "r").readlines():
-    if l.find('"%s"' % firstpass) == -1 and l.find('"%s<' % firstpass) == -1:
-      continue
-    for i in range(0, len(prefixes)):
-      if l.startswith(prefixes[i]):
-        found_levels[levels[i]] = True
+  # strip e.g. require<foo> -> foo
+  strip = [
+    r'require<([^>]+)>',
+    r'repeat<\d+>\(([^)]+)\)',
+    r'invalidate<([^>]+)>',
+    r'<[^>]+>()'
+  ]
+  for s in strip:
+    firstpass = re.sub(s, '\\1', firstpass)
 
-  if "module" in found_levels and len(found_levels) == 1:
-    # precisely a module level pass
-    firstp_level = "module"
-  else:
-    for i in range(1, len(prefixes)): # can be non-module (ex: verify)
-      if levels[i] in found_levels:
-        firstp_level = levels[i]
-        break
+  # check LLVM's PassRegistry.def file
+  txt = open(passregpath, 'r').read()
+  p = re.escape(firstpass)
+  m = re.search(r'^([A-Z_]+)_(?:PASS|ANALYSIS)[A-Z_]*\("' + p, txt, re.MULTILINE)
+  if m is None:
+    return wrap_str(args, ['module'])
 
-prefix = ""
-suffix = ""
+  type = {
+    'CGSCC'          : 'cgscc',
+    'FUNCTION'       : 'function',
+    'FUNCTION_ALIAS' : 'function',
+    'LOOP'           : 'loop',
+    'MODULE'         : 'module',
+    'MODULE_ALIAS'   : 'module',
+  }[m.group(1)]
+  return wrap_str(args, [type] + pass_types[type])
 
-if firstp_level != "module":
-  if not passes[0].startswith(firstp_level):
-    # don't print "function(function(passes))"
-    prefix = firstp_level + "("
-    suffix = ")"
+def run_opt(passes):
+  error = os.popen('echo "" | opt -passes="%s" -disable-output 2>&1' %
+                    passes).close()
+  return error is None
 
-  for p in level_ancestors[firstp_level]:
-    prefix = p + "(" + prefix
-    suffix = suffix + ")"
+if len(sys.argv) == 3:
+  print(wrap(sys.argv[2].strip("'\"")))
+else:
+  tests = [
+    ('sroa', 'function(sroa)'),
+    ('simplify-cfg', 'function(simplify-cfg)'),
+    ('licm', 'function(loop(licm))'),
+    ('argpromotion', 'cgscc(argpromotion)'),
+    ('loop-extract', 'module(loop-extract)'),
+    ('unswitch<nontrivial>', 'function(loop(unswitch<nontrivial>))'),
+    ('sroa,verify', 'function(sroa,verify)'),
+    ('verify,sroa', 'function(verify,sroa)'),
+    ('loop-mssa(loop-instsimplify)', 'function(loop-mssa(loop-instsimplify))'),
+    ('require<basic-aa>,sroa', 'function(require<basic-aa>,sroa)'),
+    ('cgscc(repeat<2>(inline,function(dce)))', 'cgscc(repeat<2>(inline,function(dce)))'),
+    ('repeat<2>(sroa)', 'function(repeat<2>(sroa))'),
+    ('cgscc(devirt<4>(inline))', 'cgscc(devirt<4>(inline))'),
+    ('devirt<1>(inline,function(gvn))', 'cgscc(devirt<1>(inline,function(gvn)))'),
+    ('invalidate<domtree>,early-cse-memssa', 'function(invalidate<domtree>,early-cse-memssa)'),
+    ('default<O2>', 'module(default<O2>)')
+  ]
 
-print(firstp_level + " " + prefix + ",".join(passes) + suffix)
+  for i,o in tests:
+    if wrap(i) != o:
+      print('FAIL:', i)
+      print('Got:', wrap(i))
+      print('Expected:', o)
+      print()
+    elif not run_opt(i):
+      print('FAIL running input:', i)
+    elif not run_opt(o + ',globalopt'):
+      print('FAIL running output:', o)
+    else:
+      print('PASS:', i)
