@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include <ostream>
+#include <poll.h>
 #include <sstream>
 #include <sys/types.h>
 #include <tuple>
@@ -24,29 +25,30 @@ struct childProcess {
 
 class parallel {
   pid_t parent_pid = -1;
-  int max_subprocesses;
+  int max_active_children;
+  int active_children = 0;
+  pollfd *pfd = nullptr;
+  std::vector<int> pfd_map;
+  std::vector<childProcess> children;
   void ensureParent();
   void ensureChild();
-  int subprocesses = 0;
-  /*
-   * TODO JDR: this may work better as an unordered_map, I'll
-   * investigate this later on
-   */
-  std::vector<childProcess> children;
+  void reapZombies();
 
 protected:
-  void writeToParent();
-  bool readFromChildren();
+  void writeToParent(bool is_timeout);
+  bool readFromChildren(bool blocking);
   std::tuple<pid_t, std::ostream *, int> doFork();
 
 public:
-  virtual ~parallel() {}
+  virtual ~parallel() {
+    delete[] pfd;
+  }
 
   /*
    * must be called before any other methods are used, and this object
    * must not be subsequently used if init() returns false
    */
-  virtual bool init(int _max_subprocesses);
+  virtual bool init(int max_active_children);
 
   /*
    * called from parent; like fork(), returns non-zero to parent and
@@ -63,7 +65,7 @@ public:
   /*
    * called from a child that has finished executing
    */
-  virtual void finishChild() = 0;
+  virtual void finishChild(bool is_timeout) = 0;
 
   /*
    * called from parent, returns when all child processes have
@@ -71,7 +73,7 @@ public:
    */
   virtual void waitForAllChildren();
 
-  void emitOutput(std::stringstream &parent_ss, std::ofstream &out_file);
+  void emitOutput(std::stringstream &parent_ss, std::ostream &out_file);
 };
 
 class jobServer final : public parallel {
@@ -82,16 +84,16 @@ class jobServer final : public parallel {
   void putToken();
 
 public:
-  bool init(int max_subprocesses) override;
+  bool init(int max_active_children) override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
-  void finishChild() override;
+  void finishChild(bool is_timeout) override;
   void waitForAllChildren() override;
 };
 
 class unrestricted final : public parallel {
 public:
-  bool init(int max_subprocesses) override;
+  bool init(int max_active_children) override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
-  void finishChild() override;
+  void finishChild(bool is_timeout) override;
   void waitForAllChildren() override;
 };

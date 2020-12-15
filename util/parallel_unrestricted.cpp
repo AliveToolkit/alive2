@@ -12,8 +12,8 @@ std::tuple<pid_t, std::ostream *, int> unrestricted::limitedFork() {
   return doFork();
 }
 
-void unrestricted::finishChild() {
-  writeToParent();
+void unrestricted::finishChild(bool is_timeout) {
+  writeToParent(is_timeout);
 }
 
 void unrestricted::waitForAllChildren() {

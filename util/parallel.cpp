@@ -12,86 +12,134 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+void parallel::ensureParent() {
+  assert(parent_pid != -1 && getpid() == parent_pid);
+}
+
+void parallel::ensureChild() {
+  assert(parent_pid != -1 && getpid() != parent_pid);
+}
+
+bool parallel::init(int _max_active_children) {
+  assert(parent_pid == -1);
+  max_active_children = _max_active_children;
+  pfd = new pollfd[max_active_children];
+  for (int i = 0; i < max_active_children; ++i) {
+    pfd_map.push_back(-1);
+    pfd[i].fd = -1;
+    pfd[i].events = POLL_IN;
+  }
+  parent_pid = getpid();
+  return true;
+}
+
+void parallel::reapZombies() {
+  while (waitpid((pid_t)-1, nullptr, WNOHANG) > 0)
+    ;
+}
+
 std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
   ensureParent();
-  std::fflush(nullptr);
-  readFromChildren();
+
+  /*
+   * we don't want child processes getting blocked writing to their
+   * output pipes, so drain them all without blocking the parent
+   */
+  while (readFromChildren(/*blocking=*/false))
+    reapZombies();
+
+  /*
+   * however, we'll need to block while there are too many outstanding
+   * child processes
+   */
+  while (active_children >= max_active_children) {
+    readFromChildren(/*blocking=*/true);
+    reapZombies();
+  }
+
   int index = children.size();
   children.emplace_back();
   childProcess &newKid = children.back();
 
-  // reap zombies
-  int status;
-  while (waitpid((pid_t)(-1), &status, WNOHANG) > 0) {
-    if (WIFEXITED(status))
-      --subprocesses;
-  }
-
-  // if there are too many children already, wait for some to finish
-  while (subprocesses >= max_subprocesses) {
-    pid_t pid = wait(&status);
-    if (pid != -1 && WIFEXITED(status))
-      --subprocesses;
-  }
-
   // this is how the child will send results back to the parent
   if (pipe(newKid.pipe) < 0)
-    return { -1, nullptr, -1 };
+    return {-1, nullptr, -1};
 
+  std::fflush(nullptr);
   pid_t pid = fork();
   if (pid == (pid_t)-1)
-    return { -1, nullptr, -1 };
+    return {-1, nullptr, -1};
 
   if (pid == 0) {
     /*
-     * child -- close the read sides of all pipes including the new one
+     * child -- we inherited the read ends of potentially many pipes;
+     * close all of the open ones (including the new one)
      */
     for (auto &c : children)
-      ENSURE(close(c.pipe[0]) == 0);
+      if (!c.eof)
+        ENSURE(close(c.pipe[0]) == 0);
   } else {
     /*
-     * parent -- close the write side of the new pipe and mark the
-     * read side as non-blocking
+     * parent -- close the write side of the new pipe
      */
     ENSURE(close(newKid.pipe[1]) == 0);
-    int flags = fcntl(newKid.pipe[0], F_GETFL, 0);
-    assert(flags != -1);
-    ENSURE(fcntl(newKid.pipe[0], F_SETFL, flags | O_NONBLOCK) != -1);
-    ++subprocesses;
+    ++active_children;
     newKid.pid = pid;
+
+    bool found = false;
+    for (int i = 0; i < max_active_children; ++i) {
+      if (pfd[i].fd == -1) {
+        pfd[i].fd = newKid.pipe[0];
+        pfd_map.at(i) = index;
+        found = true;
+        break;
+      }
+    }
+    assert(found);
   }
-  return { pid, &newKid.output, index };
+  return {pid, &newKid.output, index};
 }
 
 /*
- * return true only if all children have returned EOF
+ * return true iff we got a state change from a child process (either
+ * data or an EOF); if blocking, don't return until there is a state
+ * change
+ *
+ * if !blocking, return false immediately if no children have changed
+ * state
+ *
+ * if blocking, only return false when all children have returned EOF
  */
-bool parallel::readFromChildren() {
-  const int maxRead = 4096;
+bool parallel::readFromChildren(bool blocking) {
+  const int maxRead = 16 * 4096;
   static char data[maxRead];
-  bool allEOF = true;
-  for (auto &c : children) {
-    if (c.eof)
+  if (active_children == 0)
+    return false;
+  int res = poll(pfd, max_active_children, blocking ? -1 : 0);
+  if (res == -1) {
+    perror("poll");
+    exit(-1);
+  }
+  if (res == 0) {
+    assert(!blocking);
+    return false;
+  }
+  for (int i = 0; i < max_active_children; ++i) {
+    if (pfd[i].revents == 0)
       continue;
-    allEOF = false;
-  again:
+    childProcess &c = children[pfd_map.at(i)];
     size_t size = read(c.pipe[0], data, maxRead);
-    if (size == (size_t)-1) {
-      assert(errno == EAGAIN);
-      continue;
-    }
+    assert(size != (size_t)-1);
     if (size == 0) {
       c.eof = true;
-      continue;
+      ENSURE(close(c.pipe[0]) == 0);
+      --active_children;
+      pfd[i].fd = -1;
+    } else {
+      c.output.write(data, size);
     }
-    c.output.write(data, size);
-    /*
-     * keep reading from this pipe until there's nothing left -- we
-     * want to minimize the time TV processes spend blocked
-     */
-    goto again;
   }
-  return allEOF;
+  return true;
 }
 
 /*
@@ -112,45 +160,35 @@ static ssize_t safe_write(int fd, const void *void_buf, size_t count) {
   return written;
 }
 
-void parallel::writeToParent() {
+/*
+ * if is_timeout is true, we in signal handling context and can only
+ * call async-safe functions
+ */
+void parallel::writeToParent(bool is_timeout) {
   ensureChild();
   childProcess &me = children.back();
-  auto data = me.output.str();
-  auto size = data.size();
-  ENSURE((size_t)safe_write(me.pipe[1], data.c_str(), size) == size);
-}
-
-void parallel::ensureParent() {
-  assert(parent_pid != -1 && getpid() == parent_pid);
-}
-
-void parallel::ensureChild() {
-  assert(parent_pid != -1 && getpid() != parent_pid);
-}
-
-bool parallel::init(int _max_subprocesses) {
-  assert(parent_pid == -1);
-  parent_pid = getpid();
-  max_subprocesses = _max_subprocesses;
-  return true;
+  if (is_timeout) {
+    const char *msg = "ERROR: Timeout\n\n";
+    int len = strlen(msg);
+    ENSURE(safe_write(me.pipe[1], msg, len) == len);
+  } else {
+    auto data = me.output.str();
+    auto size = data.size();
+    ENSURE(safe_write(me.pipe[1], data.c_str(), size) == (ssize_t)size);
+  }
 }
 
 void parallel::waitForAllChildren() {
   ensureParent();
-  // FIXME: we could use poll() instead of this polling loop
-  const struct timespec delay = {0, 100 * 1000 * 1000}; // 100ms
-  while (!readFromChildren())
-    nanosleep(&delay, 0);
-  int status;
-  while (wait(&status) != -1) {
-    if (WIFEXITED(status))
-      --subprocesses;
-  }
-  assert(subprocesses == 0);
+  while (readFromChildren(/*blocking=*/true))
+    reapZombies();
+  assert(active_children == 0);
+  while (wait(nullptr) != -1)
+    ;
 }
 
 void parallel::emitOutput(std::stringstream &parent_ss,
-                          std::ofstream &out_file) {
+                          std::ostream &out_file) {
   ensureParent();
   std::string line;
   std::regex rgx("^include\\(([0-9]+)\\)$");
