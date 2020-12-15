@@ -233,8 +233,7 @@ string get_random_str() {
 struct TVPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
-  // Use TLI_override if it is set
-  optional<function<llvm::TargetLibraryInfo*(llvm::Function&)>> TLI_override;
+  const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override;
 
   TVPass() : ModulePass(ID) {}
 
@@ -620,7 +619,7 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
   }
 
   void run(llvm::Module &M,
-           function<llvm::TargetLibraryInfo*(llvm::Function&)> get_TLI) {
+           const function<llvm::TargetLibraryInfo*(llvm::Function&)> &get_TLI) {
     // Check TVFinalizePass::finalized again because TVNewPass can be
     // called after TVFinalizePass registered by
     // registerOptimizerLastEPCallback.
@@ -647,7 +646,7 @@ struct TVNewPass : public llvm::PassInfoMixin<TVNewPass> {
     TVPass tv;
     tv.skip_verify = skip_tv;
 
-    tv.TLI_override = get_TLI;
+    tv.TLI_override = &get_TLI;
     // If skip_pass is true, this updates fns map only.
     tv.runOnModule(M);
 
