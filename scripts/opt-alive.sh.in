@@ -30,6 +30,9 @@ for arg in $@; do
       NPM_TV=1
     fi
   else
+    if [[ $arg == "-enable-new-pm" ]]; then
+      NPM_TV=1
+    fi
     set -- "$@" "$arg"
   fi
   for p in $PASSES; do
