@@ -319,33 +319,35 @@ const StateValue& State::operator[](const Value &val) {
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
+  bool is_non_poison = analysis.non_poison_vals.count(&val);
 
-  auto simplify = [&](StateValue &sv0, bool use_new_slot) -> StateValue&{
-    StateValue *sv = &sv0;
-    if (analysis.non_poison_vals.count(&val)) {
-      if (use_new_slot) {
-        assert(i_tmp_values < tmp_values.size());
-        tmp_values[i_tmp_values++] = *sv;
-        use_new_slot = false;
-      }
-      assert(i_tmp_values > 0);
-      StateValue &sv_new = tmp_values[i_tmp_values - 1];
+  auto no_more_slots = [&]() -> StateValue* {
+    if (i_tmp_values < tmp_values.size()-1)
+      return nullptr;
+    useUnsupported("Too many temporaries");
+    return &(tmp_values.back() = StateValue());
+  };
+
+  auto simplify = [&](StateValue &sv0, bool use_new_slot) -> StateValue& {
+    if (!is_non_undef && !is_non_poison)
+      return sv0;
+
+    if (use_new_slot) {
+      if (auto ret = no_more_slots())
+        return *ret;
+      assert(i_tmp_values < tmp_values.size());
+      tmp_values[i_tmp_values++] = sv0;
+    }
+    assert(i_tmp_values > 0);
+    StateValue &sv_new = tmp_values[i_tmp_values - 1];
+    if (is_non_undef) {
+      sv_new.value = undef_itr->second;
+    }
+    if (is_non_poison) {
       const expr &np = sv_new.non_poison;
       sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np);
-      sv = &sv_new;
     }
-
-    if (is_non_undef) {
-      if (use_new_slot) {
-        assert(i_tmp_values < tmp_values.size());
-        tmp_values[i_tmp_values++] = *sv;
-      }
-      assert(i_tmp_values > 0);
-      StateValue &sv_new = tmp_values[i_tmp_values - 1];
-      sv_new.value = undef_itr->second;
-      sv = &sv_new;
-    }
-    return *sv;
+    return sv_new;
   };
 
   if (is_non_undef) {
@@ -380,6 +382,9 @@ const StateValue& State::operator[](const Value &val) {
   for (auto &p : repls) {
     undef_vars.emplace(move(p.second));
   }
+
+  if (auto ret = no_more_slots())
+    return *ret;
 
   assert(i_tmp_values < tmp_values.size());
   tmp_values[i_tmp_values++] = move(sval_new);

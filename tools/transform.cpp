@@ -110,7 +110,9 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
-    auto &unsupported = src_state.getUnsupported();
+    auto unsupported = src_state.getUnsupported();
+    auto &u_tgt = tgt_state.getUnsupported();
+    unsupported.insert(u_tgt.begin(), u_tgt.end());
     if (!unsupported.empty()) {
       string str = "The program uses the following unsupported features: ";
       bool first = true;
