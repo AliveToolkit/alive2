@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o xtrace # can remove this later, for now it's nice to see commands
+
+if [ "$#" -ne 1 ]; then
+    cat << EOM
+Expected one command line argument: the name of an initially-empty working
+directory for sources, binaries, and reports.
+EOM
+    exit -1
+fi
+
+WORK=$1
+
+ALIVECC=@CMAKE_BINARY_DIR@/alivecc
+ALIVEPP=@CMAKE_BINARY_DIR@/alive++
+
+export ALIVECC_OVERWRITE_REPORTS=1
+export ALIVECC_SUBPROCESS_TIMEOUT=600
+export ALIVECC_SMT_TO=30000
+export ALIVECC_DISABLE_UNDEF_INPUT=1
+export ALIVECC_PARALLEL_UNRESTRICTED=1
+export ALIVECC_REPORT_DIR=$WORK/report
+
+cd $WORK
+git clone https://github.com/llvm/llvm-test-suite.git test-suite
+
+mkdir test-suite-build
+cd test-suite-build
+cmake -DCMAKE_C_COMPILER=$ALIVECC -DCMAKE_CXX_COMPILER=$ALIVEPP -C../test-suite/cmake/caches/O3.cmake ../test-suite -DTEST_SUITE_SUBDIRS=SingleSource
+
+# 8 GB
+ulimit -m 8388608 -v 8388608
+
+# intentionally limit make-level parallelism to < number of cores
+time make -j16
