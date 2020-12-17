@@ -870,6 +870,14 @@ end:
         return error(i);
       RETURN_IDENTIFIER(make_unique<Free>(*b, false));
     }
+    case llvm::Intrinsic::trap:
+    {
+      FnAttrs attrs;
+      attrs.set(FnAttrs::NoReturn);
+      attrs.set(FnAttrs::NoRead);
+      return make_unique<FnCall>(*llvm_type2alive(i.getType()),
+                                 "", "#trap", move(attrs));
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_addr:
