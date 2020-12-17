@@ -874,7 +874,7 @@ end:
     {
       FnAttrs attrs;
       attrs.set(FnAttrs::NoReturn);
-      attrs.set(FnAttrs::NoRead);
+      attrs.set(FnAttrs::NoWrite);
       return make_unique<FnCall>(*llvm_type2alive(i.getType()),
                                  "", "#trap", move(attrs));
     }
