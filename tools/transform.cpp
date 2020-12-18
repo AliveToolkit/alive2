@@ -696,6 +696,10 @@ static void calculateAndInitConstants(Transform &t) {
       }
     }
 
+    if (fn->getFnAttrs().has(FnAttrs::Align)) {
+      min_access_size = gcd(min_access_size, fn->getFnAttrs().align);
+    }
+
     auto update_min_vect_sz = [&](const Type &ty) {
       auto elemsz = minVectorElemSize(ty);
       if (min_vect_elem_sz && elemsz)
