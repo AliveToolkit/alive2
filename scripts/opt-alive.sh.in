@@ -10,7 +10,7 @@ set -e
 # attributor, function-attrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
 # sample-profile: inlines functions
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmpopt prune-eh tailcallelim -Os -Oz -O1 -O2 -O3"
+PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmpopt prune-eh tailcallelim iroutliner -Os -Oz -O1 -O2 -O3"
 PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 
 TV="-tv"
@@ -27,9 +27,9 @@ NPM_TV=0
 for arg in $@; do
   # update the -passes argument only.
   shift
-  if [[ $arg == "-passes="* ]]; then
+  if [[ $arg == "-passes="* || $arg == "--passes="* ]]; then
     TV=""
-    passes=${arg#-passes=}
+    passes=${arg/-*passes=/}
     passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py "$PASSREGISTRY" $passes`
     firstpass_level=`echo $passes_new | cut -d "(" -f1`
     if [[ $SKIP_TV == 0 &&
