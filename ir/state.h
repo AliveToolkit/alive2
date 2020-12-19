@@ -103,6 +103,8 @@ private:
   std::array<StateValue, 64> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
+  StateValue* no_more_tmp_slots();
+
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
   // function_domain: a condition for function having well-defined behavior

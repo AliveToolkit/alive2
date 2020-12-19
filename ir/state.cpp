@@ -312,6 +312,13 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   return e;
 }
 
+StateValue* State::no_more_tmp_slots() {
+  if (i_tmp_values < tmp_values.size()-1)
+    return nullptr;
+  useUnsupported("Too many temporaries");
+  return &(tmp_values.back() = StateValue());
+}
+
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
@@ -321,19 +328,12 @@ const StateValue& State::operator[](const Value &val) {
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
   bool is_non_poison = analysis.non_poison_vals.count(&val);
 
-  auto no_more_slots = [&]() -> StateValue* {
-    if (i_tmp_values < tmp_values.size()-1)
-      return nullptr;
-    useUnsupported("Too many temporaries");
-    return &(tmp_values.back() = StateValue());
-  };
-
   auto simplify = [&](StateValue &sv0, bool use_new_slot) -> StateValue& {
     if (!is_non_undef && !is_non_poison)
       return sv0;
 
     if (use_new_slot) {
-      if (auto ret = no_more_slots())
+      if (auto ret = no_more_tmp_slots())
         return *ret;
       assert(i_tmp_values < tmp_values.size());
       tmp_values[i_tmp_values++] = sv0;
@@ -383,7 +383,7 @@ const StateValue& State::operator[](const Value &val) {
     undef_vars.emplace(move(p.second));
   }
 
-  if (auto ret = no_more_slots())
+  if (auto ret = no_more_tmp_slots())
     return *ret;
 
   assert(i_tmp_values < tmp_values.size());
@@ -461,6 +461,10 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     // If val is an aggregate, all elements should be non-poison
     addUB(not_poison_except_padding(val.getType(), sv.non_poison));
   }
+
+  if (auto ret = no_more_tmp_slots())
+    return *ret;
+
   assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { move(v),
            sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison) };
