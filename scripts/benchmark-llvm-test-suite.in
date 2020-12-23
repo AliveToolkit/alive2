@@ -15,7 +15,7 @@ fi
 WORK=$1
 
 ALIVECC=@CMAKE_BINARY_DIR@/alivecc
-ALIVEPP=@LLVM_BINARY_DIR@/bin/clang++
+ALIVEPP=@LLVM_BINARY_DIR@/bin/clang++ # don't use alive for C++ until we support exceptions!
 
 export ALIVECC_OVERWRITE_REPORTS=1
 export ALIVECC_SUBPROCESS_TIMEOUT=600
