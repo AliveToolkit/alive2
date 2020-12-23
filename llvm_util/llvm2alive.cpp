@@ -888,6 +888,7 @@ end:
     case llvm::Intrinsic::instrprof_increment:
     case llvm::Intrinsic::instrprof_increment_step:
     case llvm::Intrinsic::instrprof_value_profile:
+    case llvm::Intrinsic::prefetch:
       return NOP(i);
 
     default:
