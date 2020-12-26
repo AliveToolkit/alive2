@@ -13,8 +13,8 @@
 
 using namespace std;
 
-bool jobServer::init(int max_subprocesses) {
-  ENSURE(parallel::init(max_subprocesses));
+bool jobServer::init() {
+  ENSURE(parallel::init());
   auto env = getenv("MAKEFLAGS");
   if (!env)
     return false;
@@ -93,7 +93,7 @@ void jobServer::putToken() {
 
 tuple<pid_t, ostream *, int> jobServer::limitedFork() {
   assert(read_fd != -1 && write_fd != -1);
-  auto res = doFork();
+  auto res = parallel::limitedFork();
   // child now waits for a jobserver token
   if (get<0>(res) == 0)
     getToken();
@@ -101,11 +101,11 @@ tuple<pid_t, ostream *, int> jobServer::limitedFork() {
 }
 
 void jobServer::finishChild(bool is_timeout) {
-  writeToParent(is_timeout);
+  parallel::finishChild(is_timeout);
   putToken();
 }
 
-void jobServer::waitForAllChildren() {
+void jobServer::finishParent() {
   /*
    * every process forked by GNU make implicitly holds a single
    * jobserver token. here we temporarily return this token into the
@@ -126,6 +126,6 @@ void jobServer::waitForAllChildren() {
    * the readers are queued in FIFO order.
    */
   putToken();
-  parallel::waitForAllChildren();
+  parallel::finishParent();
   getToken();
 }
