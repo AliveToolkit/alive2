@@ -251,9 +251,11 @@ struct TVPass final : public llvm::ModulePass {
     if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
       return false;
 
-    ScopedWatch timer([&](const StopWatch &sw) {
-      fns_elapsed_time[F.getName().str()] += sw.seconds();
-    });
+    optional<ScopedWatch> timer;
+    if(opt_elapsed_time)
+      timer = ScopedWatch([&](const StopWatch &sw) {
+        fns_elapsed_time[F.getName().str()] += sw.seconds();
+      });
 
     llvm::TargetLibraryInfo *TLI = nullptr;
     if (TLI_override) {
@@ -725,13 +727,14 @@ llvmGetPassPluginInfo() {
         TVNewPass tv;
         tv.print_pass_name = true;
 
-        llvm::TargetLibraryInfoImpl TLIImpl;
+        static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
         unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
 
         auto get_TLI = [&](llvm::Function &F) {
-          TLIImpl = llvm::TargetLibraryInfoImpl(
-              llvm::Triple(F.getParent()->getTargetTriple()));
-          TLI_holder = make_unique<llvm::TargetLibraryInfo>(TLIImpl, &F);
+          if (!TLIImpl)
+            TLIImpl = llvm::TargetLibraryInfoImpl(
+                llvm::Triple(F.getParent()->getTargetTriple()));
+          TLI_holder = make_unique<llvm::TargetLibraryInfo>(*TLIImpl, &F);
           return TLI_holder.get();
         };
 
