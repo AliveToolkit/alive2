@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+using namespace std;
+
 void parallel::ensureParent() {
   assert(parent_pid != -1 && getpid() == parent_pid);
 }
@@ -208,7 +210,7 @@ bool parallel::emitOutput() {
       int index = std::stoi(*std::next(sm.begin()));
       if (children[index].eof) {
         out_file << children[index].output.str();
-        std::stringstream().swap(children[index].output); // free the RAM
+        stringstream().swap(children[index].output); // free the RAM
       } else {
         /*
          * here, for two reasons, we swap parent_ss with a fresh one
@@ -218,10 +220,9 @@ bool parallel::emitOutput() {
          * free the RAM associated with data we've already read out of
          * the stringstream.
          */
-        std::stringstream new_ss;
-        new_ss << line << "\n";
-        while (getline(parent_ss, line))
-          new_ss << line << "\n";
+        stringstream new_ss;
+        new_ss << line << '\n';
+        new_ss << parent_ss.str();
         parent_ss.swap(new_ss);
         return false;
       }
