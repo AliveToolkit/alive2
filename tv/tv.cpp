@@ -161,8 +161,8 @@ llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
-llvm::cl::opt<bool> parallel_tv_jobserver(
-    "tv-parallel-jobserver",
+llvm::cl::opt<bool> parallel_tv_posix(
+    "tv-parallel-posix",
     llvm::cl::desc("Distribute TV load across cores (requires GNU Make, "
                    "please see README.md, default=false)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
@@ -171,6 +171,18 @@ llvm::cl::opt<bool> parallel_tv_unrestricted(
     "tv-parallel-unrestricted",
     llvm::cl::desc("Distribute TV load across cores without any throttling; "
                    "use this very carefully, if at all (default=false)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
+llvm::cl::opt<bool> parallel_tv_fifo(
+    "tv-parallel-fifo",
+    llvm::cl::desc("Distribute TV load across cores using Alive2's job "
+                   "server (please see README.md, default=false)"),
+    llvm::cl::cat(TVOptions), llvm::cl::init(false));
+
+llvm::cl::opt<bool> parallel_tv_null(
+    "tv-parallel-null",
+    llvm::cl::desc("Pretend to fork off child processes but don't really "
+                   "do it. For developer use only (default=false)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
 llvm::cl::opt<int> max_subprocesses(
@@ -437,12 +449,18 @@ struct TVPass final : public llvm::ModulePass {
     }
 
     auto &outstream = out_file.is_open() ? out_file : cerr;
-    if (parallel_tv_jobserver) {
-      parallelMgr = make_unique<jobServer>(max_subprocesses, parent_ss,
-                                           outstream);
+    if (parallel_tv_posix) {
+      parallelMgr = make_unique<posix>(max_subprocesses, parent_ss,
+                                       outstream);
     } else if (parallel_tv_unrestricted) {
       parallelMgr = make_unique<unrestricted>(max_subprocesses, parent_ss,
                                               outstream);
+    } else if (parallel_tv_fifo) {
+      parallelMgr = make_unique<fifo>(max_subprocesses, parent_ss,
+                                      outstream);
+    } else if (parallel_tv_null) {
+      parallelMgr = make_unique<null>(max_subprocesses, parent_ss,
+                                      outstream);
     }
 
     if (parallelMgr) {

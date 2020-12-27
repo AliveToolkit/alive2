@@ -129,7 +129,9 @@ set(UTIL_SRCS
   util/errors.cpp
   util/file.cpp
   util/parallel.cpp
-  util/parallel_jobserver.cpp
+  util/parallel_fifo.cpp
+  util/parallel_posix.cpp
+  util/parallel_null.cpp
   util/parallel_unrestricted.cpp
   util/sort.cpp
   util/stopwatch.cpp
@@ -213,6 +215,10 @@ add_executable(alive
                "tools/alive_parser.cpp"
               )
 target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
+
+add_executable(alive-jobserver
+               "tools/alive-jobserver.cpp"
+              )
 
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 

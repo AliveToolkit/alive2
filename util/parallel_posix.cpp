@@ -13,7 +13,7 @@
 
 using namespace std;
 
-bool jobServer::init() {
+bool posix::init() {
   ENSURE(parallel::init());
   auto env = getenv("MAKEFLAGS");
   if (!env)
@@ -77,7 +77,7 @@ bool jobServer::init() {
   return true;
 }
 
-void jobServer::getToken() {
+void posix::getToken() {
   if (nonblocking) {
     const struct timespec delay = {0, 10 * 1000 * 1000}; // 10 ms
     while (read(read_fd, &token, 1) != 1)
@@ -87,11 +87,11 @@ void jobServer::getToken() {
   }
 }
 
-void jobServer::putToken() {
+void posix::putToken() {
   ENSURE(write(write_fd, &token, 1) == 1);
 }
 
-tuple<pid_t, ostream *, int> jobServer::limitedFork() {
+tuple<pid_t, ostream *, int> posix::limitedFork() {
   assert(read_fd != -1 && write_fd != -1);
   auto res = parallel::limitedFork();
   // child now waits for a jobserver token
@@ -100,12 +100,12 @@ tuple<pid_t, ostream *, int> jobServer::limitedFork() {
   return res;
 }
 
-void jobServer::finishChild(bool is_timeout) {
+void posix::finishChild(bool is_timeout) {
   parallel::finishChild(is_timeout);
   putToken();
 }
 
-void jobServer::finishParent() {
+void posix::finishParent() {
   /*
    * every process forked by GNU make implicitly holds a single
    * jobserver token. here we temporarily return this token into the
