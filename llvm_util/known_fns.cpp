@@ -72,6 +72,14 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_UNKNOWN();
 
   switch (libfn) {
+  case llvm::LibFunc_access:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::ReadOnly);
+    RETURN_KNOWN_ATTRS();
+
   case llvm::LibFunc_memset: // void* memset(void *ptr, int val, size_t bytes)
     BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
     RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
@@ -190,6 +198,14 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoThrow);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_gettimeofday:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_perror:
