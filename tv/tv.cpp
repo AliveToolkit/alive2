@@ -312,14 +312,10 @@ struct TVPass final : public llvm::ModulePass {
 
       if (pid != 0) {
         /*
-         * parent returns to LLVM immediately. starting with the first
-         * time we reach this code, it writes its output to a
-         * stringstream that we'll patch up later to include output
-         * from children, before finally emitting it
+         * parent returns to LLVM immediately; leave a placeholder in
+         * the output that we'll patch up later
          */
-        out = &parent_ss;
         *out << "include(" << index << ")\n";
-        set_outs(*out);
         /*
          * TODO: this llvm2alive() call isn't needed for correctness,
          * but only to make parallel output match sequential
@@ -394,20 +390,6 @@ struct TVPass final : public llvm::ModulePass {
     if (initialized++)
       return false;
 
-    if (parallel_tv_jobserver) {
-      parallelMgr = make_unique<jobServer>();
-    } else if (parallel_tv_unrestricted) {
-      parallelMgr = make_unique<unrestricted>();
-    }
-
-    if (parallelMgr) {
-      if (!parallelMgr->init(max_subprocesses)) {
-        cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
-                "unavailable, sorry\n";
-        parallelMgr.reset();
-      }
-    }
-
     fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
 
     if (!report_dir_created && !opt_report_dir.empty()) {
@@ -454,6 +436,26 @@ struct TVPass final : public llvm::ModulePass {
       }
     }
 
+    auto &outstream = out_file.is_open() ? out_file : cerr;
+    if (parallel_tv_jobserver) {
+      parallelMgr = make_unique<jobServer>(max_subprocesses, parent_ss,
+                                           outstream);
+    } else if (parallel_tv_unrestricted) {
+      parallelMgr = make_unique<unrestricted>(max_subprocesses, parent_ss,
+                                              outstream);
+    }
+
+    if (parallelMgr) {
+      if (parallelMgr->init()) {
+        out = &parent_ss;
+        set_outs(*out);
+      } else {
+        cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
+                "unavailable, sorry\n";
+        parallelMgr.reset();
+      }
+    }
+
     showed_stats = false;
     smt::solver_print_queries(opt_smt_verbose);
     smt::solver_tactic_verbose(opt_tactic_verbose);
@@ -477,8 +479,7 @@ struct TVPass final : public llvm::ModulePass {
 
   bool doFinalization(llvm::Module&) override {
     if (parallelMgr) {
-      parallelMgr->waitForAllChildren();
-      parallelMgr->emitOutput(parent_ss, out_file.is_open() ? out_file : cerr);
+      parallelMgr->finishParent();
     }
 
     if (!showed_stats) {

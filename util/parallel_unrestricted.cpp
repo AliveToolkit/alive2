@@ -2,20 +2,19 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "util/parallel.h"
-#include <cstdlib>
 
-bool unrestricted::init(int max_subprocesses) {
-  return parallel::init(max_subprocesses);
+bool unrestricted::init() {
+  return parallel::init();
 }
 
 std::tuple<pid_t, std::ostream *, int> unrestricted::limitedFork() {
-  return doFork();
+  return parallel::limitedFork();
 }
 
 void unrestricted::finishChild(bool is_timeout) {
-  writeToParent(is_timeout);
+  parallel::finishChild(is_timeout);
 }
 
-void unrestricted::waitForAllChildren() {
-  parallel::waitForAllChildren();
+void unrestricted::finishParent() {
+  parallel::finishParent();
 }

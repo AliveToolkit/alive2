@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+using namespace std;
+
 void parallel::ensureParent() {
   assert(parent_pid != -1 && getpid() == parent_pid);
 }
@@ -20,9 +22,8 @@ void parallel::ensureChild() {
   assert(parent_pid != -1 && getpid() != parent_pid);
 }
 
-bool parallel::init(int _max_active_children) {
+bool parallel::init() {
   assert(parent_pid == -1);
-  max_active_children = _max_active_children;
   for (int i = 0; i < max_active_children; ++i) {
     pfd_map.push_back(-1);
     auto &p = pfd.emplace_back();
@@ -38,7 +39,7 @@ void parallel::reapZombies() {
     ;
 }
 
-std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
+std::tuple<pid_t, std::ostream *, int> parallel::limitedFork() {
   ensureParent();
 
   /*
@@ -60,6 +61,13 @@ std::tuple<pid_t, std::ostream *, int> parallel::doFork() {
   int index = children.size();
   children.emplace_back();
   childProcess &newKid = children.back();
+
+  /*
+   * amortize cost of copying part of the output stringstream to a new
+   * one by not doing this all that often
+   */ 
+  if (index % 100 == 0)
+    emitOutput();
 
   // this is how the child will send results back to the parent
   if (pipe(newKid.pipe) < 0)
@@ -164,7 +172,7 @@ static ssize_t safe_write(int fd, const void *void_buf, size_t count) {
  * if is_timeout is true, we in signal handling context and can only
  * call async-safe functions
  */
-void parallel::writeToParent(bool is_timeout) {
+void parallel::finishChild(bool is_timeout) {
   ensureChild();
   childProcess &me = children.back();
   if (is_timeout) {
@@ -178,17 +186,20 @@ void parallel::writeToParent(bool is_timeout) {
   }
 }
 
-void parallel::waitForAllChildren() {
+void parallel::finishParent() {
   ensureParent();
   while (readFromChildren(/*blocking=*/true))
     reapZombies();
   assert(active_children == 0);
   while (wait(nullptr) != -1)
     ;
+  ENSURE(emitOutput());
 }
 
-void parallel::emitOutput(std::stringstream &parent_ss,
-                          std::ostream &out_file) {
+/*
+ * return true iff end of output has been reached
+ */
+bool parallel::emitOutput() {
   ensureParent();
   std::string line;
   std::regex rgx("^include\\(([0-9]+)\\)$");
@@ -197,10 +208,33 @@ void parallel::emitOutput(std::stringstream &parent_ss,
     if (std::regex_match(line, sm, rgx)) {
       assert(sm.size() == 2);
       int index = std::stoi(*std::next(sm.begin()));
-      out_file << children[index].output.str();
+      if (children[index].eof) {
+        out_file << children[index].output.str();
+        stringstream().swap(children[index].output); // free the RAM
+      } else {
+        /*
+         * here, for two reasons, we swap parent_ss with a fresh one
+         * containing a copy of the unwritten data. first, we've
+         * already grabbed one line too many from parent_ss, and we
+         * don't have a good way to put it back. second, we want to
+         * free the RAM associated with data we've already read out of
+         * the stringstream.
+         */
+        stringstream new_ss;
+        new_ss << line << '\n';
+        new_ss << parent_ss.str();
+        parent_ss.swap(new_ss);
+        return false;
+      }
     } else {
       assert(line.rfind("include(", 0) == std::string::npos);
       out_file << line << '\n';
     }
   }
+  /*
+   * reset the EOF flag since this process is going to keep writing
+   * into parent_ss
+   */
+  parent_ss.clear();
+  return true;
 }

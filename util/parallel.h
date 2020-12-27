@@ -30,23 +30,27 @@ class parallel {
   std::vector<pollfd> pfd;
   std::vector<int> pfd_map;
   std::vector<childProcess> children;
+  std::stringstream &parent_ss;
+  std::ostream &out_file;
   void ensureParent();
   void ensureChild();
   void reapZombies();
-
-protected:
-  void writeToParent(bool is_timeout);
+  bool emitOutput();
   bool readFromChildren(bool blocking);
-  std::tuple<pid_t, std::ostream *, int> doFork();
 
 public:
+  parallel(int max_active_children, std::stringstream &parent_ss,
+           std::ostream &out_file) :
+    max_active_children(max_active_children),
+    parent_ss(parent_ss),
+    out_file(out_file) {}
   virtual ~parallel() {}
 
   /*
    * must be called before any other methods are used, and this object
    * must not be subsequently used if init() returns false
    */
-  virtual bool init(int max_active_children);
+  virtual bool init();
 
   /*
    * called from parent; like fork(), returns non-zero to parent and
@@ -69,9 +73,7 @@ public:
    * called from parent, returns when all child processes have
    * terminated
    */
-  virtual void waitForAllChildren();
-
-  void emitOutput(std::stringstream &parent_ss, std::ostream &out_file);
+  virtual void finishParent() = 0;
 };
 
 class jobServer final : public parallel {
@@ -82,16 +84,22 @@ class jobServer final : public parallel {
   void putToken();
 
 public:
-  bool init(int max_active_children) override;
+  jobServer(int max_active_children, std::stringstream &parent_ss,
+            std::ostream &out_file) :
+    parallel(max_active_children, parent_ss, out_file) {}
+  bool init() override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
-  void waitForAllChildren() override;
+  void finishParent() override;
 };
 
 class unrestricted final : public parallel {
 public:
-  bool init(int max_active_children) override;
+  unrestricted(int max_active_children, std::stringstream &parent_ss,
+               std::ostream &out_file) :
+    parallel(max_active_children, parent_ss, out_file) {}
+  bool init() override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
-  void waitForAllChildren() override;
+  void finishParent() override;
 };
