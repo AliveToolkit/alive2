@@ -253,7 +253,7 @@ struct TVPass final : public llvm::ModulePass {
 
     optional<ScopedWatch> timer;
     if(opt_elapsed_time)
-      timer = ScopedWatch([&](const StopWatch &sw) {
+      timer.emplace([&](const StopWatch &sw) {
         fns_elapsed_time[F.getName().str()] += sw.seconds();
       });
 
