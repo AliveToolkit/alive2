@@ -728,14 +728,13 @@ llvmGetPassPluginInfo() {
         tv.print_pass_name = true;
 
         static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
-        unique_ptr<llvm::TargetLibraryInfo> TLI_holder;
+        optional<llvm::TargetLibraryInfo> TLI_holder;
 
         auto get_TLI = [&](llvm::Function &F) {
           if (!TLIImpl)
             TLIImpl = llvm::TargetLibraryInfoImpl(
                 llvm::Triple(F.getParent()->getTargetTriple()));
-          TLI_holder = make_unique<llvm::TargetLibraryInfo>(*TLIImpl, &F);
-          return TLI_holder.get();
+          return &TLI_holder.emplace(*TLIImpl, &F);
         };
 
         tv.run(*const_cast<llvm::Module *>(unwrapModule(IR)), get_TLI);
