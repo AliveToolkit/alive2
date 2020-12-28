@@ -252,7 +252,7 @@ struct TVPass final : public llvm::ModulePass {
       return false;
 
     optional<ScopedWatch> timer;
-    if(opt_elapsed_time)
+    if (opt_elapsed_time)
       timer.emplace([&](const StopWatch &sw) {
         fns_elapsed_time[F.getName().str()] += sw.seconds();
       });
@@ -732,8 +732,7 @@ llvmGetPassPluginInfo() {
 
         auto get_TLI = [&](llvm::Function &F) {
           if (!TLIImpl)
-            TLIImpl = llvm::TargetLibraryInfoImpl(
-                llvm::Triple(F.getParent()->getTargetTriple()));
+            TLIImpl.emplace(llvm::Triple(F.getParent()->getTargetTriple()));
           return &TLI_holder.emplace(*TLIImpl, &F);
         };
 
