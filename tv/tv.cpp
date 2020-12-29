@@ -161,12 +161,6 @@ llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
-llvm::cl::opt<bool> parallel_tv_posix(
-    "tv-parallel-posix",
-    llvm::cl::desc("Distribute TV load across cores (requires GNU Make, "
-                   "please see README.md, default=false)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
 llvm::cl::opt<bool> parallel_tv_unrestricted(
     "tv-parallel-unrestricted",
     llvm::cl::desc("Distribute TV load across cores without any throttling; "
@@ -221,6 +215,7 @@ bool is_clangtv = false;
 fs::path opt_report_parallel_dir;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
+long llvm2alive_attempts, llvm2alive_valid;
 
 void sigalarm_handler(int) {
   parallelMgr->finishChild(/*is_timeout=*/true);
@@ -281,12 +276,14 @@ struct TVPass final : public llvm::ModulePass {
 
     auto [I, first] = fns.try_emplace(F.getName().str());
 
+    ++llvm2alive_attempts;
     auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
                                         : I->second.fn.getGlobalVarNames());
     if (!fn) {
       fns.erase(I);
       return false;
     }
+    ++llvm2alive_valid;
 
     if (is_clangtv) {
       // Compare Alive2 IR and skip if syntactically equal
@@ -392,6 +389,7 @@ struct TVPass final : public llvm::ModulePass {
 
   done:
     if (parallelMgr) {
+      signal(SIGALRM, SIG_IGN);
       llvm_util_init.reset();
       smt_init.reset();
       parallelMgr->finishChild(/*is_timeout=*/false);
@@ -451,16 +449,23 @@ struct TVPass final : public llvm::ModulePass {
     }
 
     auto &outstream = out_file.is_open() ? out_file : cerr;
-    if (parallel_tv_posix) {
-      parallelMgr = make_unique<posix>(max_subprocesses, parent_ss,
-                                       outstream);
-    } else if (parallel_tv_unrestricted) {
+    if (parallel_tv_unrestricted) {
       parallelMgr = make_unique<unrestricted>(max_subprocesses, parent_ss,
                                               outstream);
-    } else if (parallel_tv_fifo) {
+    }
+    if (parallel_tv_fifo) {
+      if (parallelMgr) {
+        cerr << "Alive2: Please specify only one parallel manager" << endl;
+        exit(1);
+      }
       parallelMgr = make_unique<fifo>(max_subprocesses, parent_ss,
                                       outstream);
-    } else if (parallel_tv_null) {
+    }
+    if (parallel_tv_null) {
+      if (parallelMgr) {
+        cerr << "Alive2: Please specify only one parallel manager" << endl;
+        exit(1);
+      }
       parallelMgr = make_unique<null>(max_subprocesses, parent_ss,
                                       outstream);
     }
@@ -500,7 +505,14 @@ struct TVPass final : public llvm::ModulePass {
   bool doFinalization(llvm::Module&) override {
     if (parallelMgr) {
       parallelMgr->finishParent();
+      out = out_file.is_open() ? &out_file : &cerr;
+      set_outs(*out);
     }
+
+    double pct = (100.0 * llvm2alive_valid) / llvm2alive_attempts;
+    *out << "\nllvm2alive was successful " << llvm2alive_valid << " out of " <<
+      llvm2alive_attempts << " times (" << std::fixed <<
+      std::setprecision(1) << pct << "%)\n\n";
 
     if (!showed_stats) {
       showed_stats = true;

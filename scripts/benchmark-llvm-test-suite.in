@@ -14,15 +14,19 @@ fi
 
 WORK=$1
 
+CORES=`nproc`
+
 ALIVECC=@CMAKE_BINARY_DIR@/alivecc
+JOBSERVER=@CMAKE_BINARY_DIR@/alive-jobserver
 ALIVEPP=@LLVM_BINARY_DIR@/bin/clang++ # don't use alive for C++ until we support exceptions!
 
 export ALIVECC_OVERWRITE_REPORTS=1
 export ALIVECC_SUBPROCESS_TIMEOUT=600
 export ALIVECC_SMT_TO=30000
 export ALIVECC_DISABLE_UNDEF_INPUT=1
-export ALIVECC_PARALLEL_UNRESTRICTED=1
 export ALIVECC_REPORT_DIR=$WORK/report
+export ALIVECC_SUCCINCT=1
+export ALIVECC_MAX_MEM=1000000 # we'll just let ulimit take care of this
 
 cd $WORK
 git clone https://github.com/llvm/llvm-test-suite.git test-suite
@@ -31,10 +35,10 @@ mkdir test-suite-build
 cd test-suite-build
 cmake -DCMAKE_C_FLAGS=-mlong-double-64 -DCMAKE_C_COMPILER=$ALIVECC -DCMAKE_CXX_COMPILER=$ALIVEPP -C../test-suite/cmake/caches/O3.cmake ../test-suite -DTEST_SUITE_SUBDIRS="MicroBenchmarks;SingleSource"
 
-# 7 GB
-ulimit -m 7000000 -v 7000000
+# 5 GB
+ulimit -m 5000000 -v 5000000
 
 # intentionally limit make-level parallelism to < number of cores
-time make -j16
+time $JOBSERVER -j$CORES make -j$CORES
 
 echo Normal termination.

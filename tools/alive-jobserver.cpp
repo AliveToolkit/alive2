@@ -86,6 +86,12 @@ int main(int argc, char *const argv[]) {
     nprocs = strtol(arg.substr(2).data(), nullptr, 10);
   if (nprocs < 1 || nprocs > max_procs)
     usage();
+  /*
+   * process that we initially exec gets a token for free, so put one
+   * fewer tokens into the fifo
+   */
+  if (argc > 2)
+    --nprocs;
 
   srand(getpid() + time(nullptr));
   do {

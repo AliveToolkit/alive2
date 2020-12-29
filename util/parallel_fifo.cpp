@@ -34,16 +34,11 @@ void fifo::putToken() {
 
 tuple<pid_t, ostream *, int> fifo::limitedFork() {
   assert(pipe_fd != -1);
-  auto res = parallel::limitedFork();
-  // child now waits for a jobserver token
-  if (get<0>(res) == 0)
-    getToken();
-  return res;
+  return parallel::limitedFork();
 }
 
 void fifo::finishChild(bool is_timeout) {
   parallel::finishChild(is_timeout);
-  putToken();
 }
 
 void fifo::finishParent() {

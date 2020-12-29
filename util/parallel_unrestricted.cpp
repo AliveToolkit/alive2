@@ -7,6 +7,12 @@ bool unrestricted::init() {
   return parallel::init();
 }
 
+void unrestricted::getToken() {
+}
+
+void unrestricted::putToken() {
+}
+
 std::tuple<pid_t, std::ostream *, int> unrestricted::limitedFork() {
   return parallel::limitedFork();
 }

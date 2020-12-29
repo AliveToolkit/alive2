@@ -130,7 +130,6 @@ set(UTIL_SRCS
   util/file.cpp
   util/parallel.cpp
   util/parallel_fifo.cpp
-  util/parallel_posix.cpp
   util/parallel_null.cpp
   util/parallel_unrestricted.cpp
   util/sort.cpp

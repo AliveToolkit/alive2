@@ -26,6 +26,7 @@ struct childProcess {
 class parallel {
   pid_t parent_pid = -1;
   int max_active_children;
+  int fd_to_parent;
   int active_children = 0;
   std::vector<pollfd> pfd;
   std::vector<int> pfd_map;
@@ -51,15 +52,17 @@ public:
    */
   virtual bool init();
 
+  virtual void getToken() = 0;
+  virtual void putToken() = 0;
+
   /*
    * called from parent; like fork(), returns non-zero to parent and
    * zero to child. it may also return -1 in which case there is no
    * child process and the other two returned values are meaningless.
    * this does not fork until max_processes is respected and,
-   * additionally, may throttle the child using e.g. the POSIX
-   * jobserver. the returned ostream is for the child to write its
-   * results into and the integer is a unique identifier for this
-   * child process.
+   * additionally, may throttle the child. the returned ostream is for
+   * the child to write its results into and the integer is a unique
+   * identifier for this child process.
    */
   virtual std::tuple<pid_t, std::ostream *, int> limitedFork() = 0;
 
@@ -75,28 +78,9 @@ public:
   virtual void finishParent() = 0;
 };
 
-class posix final : public parallel {
-  char token;
-  int read_fd = -1, write_fd = -1;
-  bool nonblocking = false;
-  void getToken();
-  void putToken();
-
-public:
-  posix(int max_active_children, std::stringstream &parent_ss,
-        std::ostream &out_file)
-      : parallel(max_active_children, parent_ss, out_file) {}
-  bool init() override;
-  std::tuple<pid_t, std::ostream *, int> limitedFork() override;
-  void finishChild(bool is_timeout) override;
-  void finishParent() override;
-};
-
 class fifo final : public parallel {
   char token;
   int pipe_fd = -1;
-  void getToken();
-  void putToken();
 
 public:
   fifo(int max_active_children, std::stringstream &parent_ss,
@@ -106,6 +90,8 @@ public:
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
   void finishParent() override;
+  void getToken() override;
+  void putToken() override;
 };
 
 class unrestricted final : public parallel {
@@ -117,6 +103,8 @@ public:
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
   void finishParent() override;
+  void getToken() override;
+  void putToken() override;
 };
 
 class null final : public parallel {
@@ -128,4 +116,6 @@ public:
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
   void finishParent() override;
+  void getToken() override;
+  void putToken() override;
 };
