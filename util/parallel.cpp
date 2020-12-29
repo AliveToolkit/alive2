@@ -65,7 +65,7 @@ std::tuple<pid_t, std::ostream *, int> parallel::limitedFork() {
   /*
    * amortize cost of copying part of the output stringstream to a new
    * one by not doing this all that often
-   */ 
+   */
   if (index % 100 == 0)
     emitOutput();
 

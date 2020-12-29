@@ -40,10 +40,9 @@ class parallel {
 
 public:
   parallel(int max_active_children, std::stringstream &parent_ss,
-           std::ostream &out_file) :
-    max_active_children(max_active_children),
-    parent_ss(parent_ss),
-    out_file(out_file) {}
+           std::ostream &out_file)
+      : max_active_children(max_active_children), parent_ss(parent_ss),
+        out_file(out_file) {}
   virtual ~parallel() {}
 
   /*
@@ -76,7 +75,7 @@ public:
   virtual void finishParent() = 0;
 };
 
-class jobServer final : public parallel {
+class posix final : public parallel {
   char token;
   int read_fd = -1, write_fd = -1;
   bool nonblocking = false;
@@ -84,9 +83,25 @@ class jobServer final : public parallel {
   void putToken();
 
 public:
-  jobServer(int max_active_children, std::stringstream &parent_ss,
-            std::ostream &out_file) :
-    parallel(max_active_children, parent_ss, out_file) {}
+  posix(int max_active_children, std::stringstream &parent_ss,
+        std::ostream &out_file)
+      : parallel(max_active_children, parent_ss, out_file) {}
+  bool init() override;
+  std::tuple<pid_t, std::ostream *, int> limitedFork() override;
+  void finishChild(bool is_timeout) override;
+  void finishParent() override;
+};
+
+class fifo final : public parallel {
+  char token;
+  int pipe_fd = -1;
+  void getToken();
+  void putToken();
+
+public:
+  fifo(int max_active_children, std::stringstream &parent_ss,
+       std::ostream &out_file)
+      : parallel(max_active_children, parent_ss, out_file) {}
   bool init() override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
@@ -96,8 +111,19 @@ public:
 class unrestricted final : public parallel {
 public:
   unrestricted(int max_active_children, std::stringstream &parent_ss,
-               std::ostream &out_file) :
-    parallel(max_active_children, parent_ss, out_file) {}
+               std::ostream &out_file)
+      : parallel(max_active_children, parent_ss, out_file) {}
+  bool init() override;
+  std::tuple<pid_t, std::ostream *, int> limitedFork() override;
+  void finishChild(bool is_timeout) override;
+  void finishParent() override;
+};
+
+class null final : public parallel {
+public:
+  null(int max_active_children, std::stringstream &parent_ss,
+       std::ostream &out_file)
+      : parallel(max_active_children, parent_ss, out_file) {}
   bool init() override;
   std::tuple<pid_t, std::ostream *, int> limitedFork() override;
   void finishChild(bool is_timeout) override;
