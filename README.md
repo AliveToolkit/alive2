@@ -121,20 +121,13 @@ $ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
 
 The Clang plugin can optionally use multiple cores. To enable parallel
 translation validation, add the `-mllvm -tv-parallel-XXX` command line
-options to Clang, where XXX is one of three parallelism managers
-supported by Alive2. The first one (XXX=posix) uses the POSIX
-jobserver, a mechanism provided by GNU Make to provide global control
-over parallel execution of recursive make invocations. This mechanism
-will only work if GNU Make believes that clang is a recursive make
-command; tell it this by prefixing the `alivecc` command with a `+`
-character in your Makefile. Alas, Ninja does not provide a jobserver.
-The second parallelism manager (XXX=fifo) uses alive-jobserver, a new
-job server provided by Alive2. For details about how to use this
-program, please consult its help output by running it without any
-command line arguments. The third parallelism manager
-(XXX=unrestricted) does not restrict parallelism at all, but rather
-calls fork() freely. This is mainly intended for developer use; it
-tends to use a lot of RAM.
+options to Clang, where XXX is one of two parallelism managers
+supported by Alive2. The first (XXX=fifo) uses alive-jobserver: for
+details about how to use this program, please consult its help output
+by running it without any command line arguments. The second
+parallelism manager (XXX=unrestricted) does not restrict parallelism
+at all, but rather calls fork() freely. This is mainly intended for
+developer use; it tends to use a lot of RAM.
 
 Use the `-mllvm -tv-report-dir=dir` to tell Alive2 to place its output
 files into a specific directory.
@@ -156,7 +149,6 @@ interface. For example:
 ```
 ALIVECC_PARALLEL_UNRESTRICTED=1
 ALIVECC_PARALLEL_FIFO=1
-ALIVECC_PARALLEL_POSIX=1
 ALIVECC_DISABLE_UNDEF_INPUT=1
 ALIVECC_DISABLE_POISON_INPUT=1
 ALIVECC_SMT_TO=timeout in milliseconds

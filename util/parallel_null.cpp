@@ -7,6 +7,12 @@ bool null::init() {
   return true;
 }
 
+void null::getToken() {
+}
+
+void null::putToken() {
+}
+
 std::tuple<pid_t, std::ostream *, int> null::limitedFork() {
   static int nextPid = 0;
   ++nextPid;

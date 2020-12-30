@@ -58,6 +58,8 @@ std::tuple<pid_t, std::ostream *, int> parallel::limitedFork() {
     reapZombies();
   }
 
+  getToken();
+
   int index = children.size();
   children.emplace_back();
   childProcess &newKid = children.back();
@@ -86,6 +88,7 @@ std::tuple<pid_t, std::ostream *, int> parallel::limitedFork() {
     for (auto &c : children)
       if (!c.eof)
         ENSURE(close(c.pipe[0]) == 0);
+    fd_to_parent = newKid.pipe[1];
   } else {
     /*
      * parent -- close the write side of the new pipe
@@ -174,16 +177,16 @@ static ssize_t safe_write(int fd, const void *void_buf, size_t count) {
  */
 void parallel::finishChild(bool is_timeout) {
   ensureChild();
-  childProcess &me = children.back();
   if (is_timeout) {
-    const char *msg = "ERROR: Timeout\n\n";
-    int len = strlen(msg);
-    ENSURE(safe_write(me.pipe[1], msg, len) == len);
+    const char *msg = "ERROR: Timeout asynchronous\n\n";
+    safe_write(fd_to_parent, msg, strlen(msg));
   } else {
+    childProcess &me = children.back();
     auto data = me.output.str();
     auto size = data.size();
     ENSURE(safe_write(me.pipe[1], data.c_str(), size) == (ssize_t)size);
   }
+  putToken();
 }
 
 void parallel::finishParent() {

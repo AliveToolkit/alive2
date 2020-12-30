@@ -32,6 +32,10 @@ if ($0 =~ /alivecc$/) {
 
 if (compiling()) {
 
+    if (getenv("ALIVECC_SUCCINCT")) {
+        push @ARGV, ("-mllvm", "-tv-succinct");
+    }
+
     if (getenv("ALIVECC_PARALLEL_UNRESTRICTED")) {
         push @ARGV, ("-mllvm", "-tv-parallel-unrestricted");
     }
@@ -40,8 +44,8 @@ if (compiling()) {
         push @ARGV, ("-mllvm", "-tv-parallel-fifo");
     }
 
-    if (getenv("ALIVECC_PARALLEL_POSIX")) {
-        push @ARGV, ("-mllvm", "-tv-parallel-posix");
+    if (my $mem = getenv("ALIVECC_MAX_MEM")) {
+        push @ARGV, ("-mllvm", "-tv-max-mem=".$mem);
     }
 
     if (getenv("ALIVECC_PARALLEL_NULL")) {
