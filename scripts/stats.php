@@ -6,6 +6,7 @@ if (sizeof($argv) != 2 || !is_dir($logs))
   die("Use: $argv[0] <log dir>\n");
 
 
+$correct     = 0;
 $errors      = array();
 $stats       = array();
 $knownfns    = array();
@@ -13,6 +14,8 @@ $unsupported = array();
 
 foreach (glob("$logs/*.txt") as $f) {
   $txt = file_get_contents($f);
+  $correct += preg_match_all('/Transformation seems to be correct!/', $txt);
+
   preg_match_all('/ERROR: (.+)/S', $txt, $m);
   foreach($m[1] as $err) {
     if (strstr($err, 'Unsupported '))
@@ -44,6 +47,16 @@ foreach (glob("$logs/*.txt") as $f) {
     @++$knownfns[$str];
   }
 }
+
+echo "Total correct: $correct\n";
+$num_errors = 0;
+foreach ([$errors, $unsupported, $knownfns] as $arr) {
+  foreach ($arr as $k => $count) {
+    $num_errors += $count;
+  }
+}
+echo "Total vcgen failures: $num_errors (";
+echo number_format($num_errors / ($correct + $num_errors) * 100, 2), "%)\n\n";
 
 echo "SMT Statistics:\n";
 foreach ($stats as $stat => $n) {
