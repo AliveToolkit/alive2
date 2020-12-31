@@ -30,6 +30,7 @@ vector<unique_ptr<PtrType>> ptr_types;
 FloatType half_type("half", FloatType::Half);
 FloatType float_type("float", FloatType::Float);
 FloatType double_type("double", FloatType::Double);
+FloatType quad_type("fp128", FloatType::Quad);
 
 // cache complex types
 unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
@@ -122,6 +123,8 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return &float_type;
   case llvm::Type::DoubleTyID:
     return &double_type;
+  case llvm::Type::FP128TyID:
+    return &quad_type;
 
   case llvm::Type::PointerTyID: {
     // TODO: support for non-64 bits pointers
@@ -267,6 +270,10 @@ Value* get_operand(llvm::Value *v,
       break;
     case FloatType::Double:
       c = make_unique<FloatConst>(*ty, apfloat.convertToDouble());
+      break;
+    case FloatType::Quad:
+      c = make_unique<FloatConst>(*ty,
+                                  apfloat.bitcastToAPInt().toString(10, true));
       break;
     case FloatType::Unknown:
       UNREACHABLE();

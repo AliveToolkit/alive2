@@ -202,6 +202,10 @@ expr expr::mkDouble(double n) {
   return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx()));
 }
 
+expr expr::mkQuad(double n) {
+  return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_quadruple(ctx()));
+}
+
 expr expr::mkNaN(const expr &type) {
   C2(type);
   return Z3_mk_fpa_nan(ctx(), type.sort());
@@ -250,6 +254,10 @@ expr expr::mkFloatVar(const char *name) {
 
 expr expr::mkDoubleVar(const char *name) {
   return ::mkVar(name, Z3_mk_fpa_sort_double(ctx()));
+}
+
+expr expr::mkQuadVar(const char *name) {
+  return ::mkVar(name, Z3_mk_fpa_sort_quadruple(ctx()));
 }
 
 expr expr::mkFreshVar(const char *prefix, const expr &type) {

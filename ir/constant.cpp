@@ -46,6 +46,9 @@ FloatConst::FloatConst(Type &type, double val)
 FloatConst::FloatConst(Type &type, uint64_t val)
   : Constant(type, to_string(val)), val(val) {}
 
+FloatConst::FloatConst(Type &type, string val)
+  : Constant(type, string(val)), val(move(val)) {}
+
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
          getType().enforceFloatType();
@@ -58,12 +61,17 @@ StateValue FloatConst::toSMT(State &s) const {
              true };
   }
 
+  if (auto n = get_if<string>(&val))
+    return { expr::mkNumber(n->c_str(), getType().getDummyValue(true).value),
+             true };
+
   expr e;
   double v = get<double>(val);
   switch (getType().getAsFloatType()->getFpType()) {
   case FloatType::Half:    e = expr::mkHalf((float)v); break;
   case FloatType::Float:   e = expr::mkFloat((float)v); break;
   case FloatType::Double:  e = expr::mkDouble(v); break;
+  case FloatType::Quad:
   case FloatType::Unknown: UNREACHABLE();
   }
   return { move(e), true };

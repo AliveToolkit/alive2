@@ -90,6 +90,7 @@ public:
   static expr mkHalf(float n);
   static expr mkFloat(float n);
   static expr mkDouble(double n);
+  static expr mkQuad(double n);
   static expr mkNaN(const expr &type);
   static expr mkNumber(const char *n, const expr &type);
   static expr mkVar(const char *name, const expr &type);
@@ -98,6 +99,7 @@ public:
   static expr mkHalfVar(const char *name);
   static expr mkFloatVar(const char *name);
   static expr mkDoubleVar(const char *name);
+  static expr mkQuadVar(const char *name);
   static expr mkFreshVar(const char *prefix, const expr &type);
 
   // return a constant value of the given type
