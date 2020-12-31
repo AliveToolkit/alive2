@@ -16,9 +16,8 @@ Name: fsub 0.0 => neg
 %t = fneg %a
 
 
-; FIXME: timeout
-;Name: -a + 1.0 => 1.0 - a
-;%t1 = fneg half %a
-;%t = fadd half %t1, 1.0
-;  =>
-;%t = fsub half 1.0, %a
+Name: -a + 1.0 => 1.0 - a
+%t1 = fneg half %a
+%t = fadd half %t1, 1.0
+  =>
+%t = fsub half 1.0, %a

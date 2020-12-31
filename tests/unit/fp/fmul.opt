@@ -16,9 +16,8 @@ Name: × * (-1.0) => -0.0 - x
 %t = fsub half -0.0, %a
 
 
-; FIXME: timeout
-;Name: x * 2.0 * 3.125 => × * 6.25
-;%t1 = fmul half %a, 2.0
-;%t = fmul half %t1, 3.125
-;  =>
-;%t = fmul half %a, 6.25
+Name: x * 2.0 * 3.125 => × * 6.25
+%t1 = fmul half %a, 2.0
+%t = fmul half %t1, 3.125
+  =>
+%t = fmul half %a, 6.25

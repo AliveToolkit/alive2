@@ -74,8 +74,8 @@ static Value& get_constant(string_view name, Type &type) {
   return *ret;
 }
 
-static Value& get_fp_constant(double n, Type &t) {
-  auto c = make_unique<FloatConst>(t, n);
+static Value& get_fp_constant(string_view n, Type &t) {
+  auto c = make_unique<FloatConst>(t, string(n));
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;
@@ -519,7 +519,7 @@ static Value& parse_operand(Type &type) {
   case NUM:
     return get_constant(yylval.num, type);
   case FP_NUM:
-    return get_fp_constant(yylval.fp_num, type);
+    return get_fp_constant(yylval.str, type);
   case NUM_STR:
     return get_num_constant(yylval.str, type);
   case CSLT:

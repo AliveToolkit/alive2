@@ -116,7 +116,7 @@ space+ {
 }
 
 [-+]? [0-9]* "." [0-9]+ ([eE] [-+]? [0-9]+)? {
-  yylval.fp_num = strtod((char*)YYTEXT, nullptr);
+  COPY_STR();
   return FP_NUM;
 }
 
