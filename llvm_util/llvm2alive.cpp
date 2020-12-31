@@ -779,8 +779,9 @@ end:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
     case llvm::Intrinsic::expect_with_probability:
+    case llvm::Intrinsic::fabs:
     case llvm::Intrinsic::is_constant:
-    case llvm::Intrinsic::fabs: {
+    case llvm::Intrinsic::sqrt:{
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
@@ -790,8 +791,9 @@ end:
       case llvm::Intrinsic::expect:
       case llvm::Intrinsic::expect_with_probability:
         op = UnaryOp::Copy; break;
-      case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
       case llvm::Intrinsic::fabs:        op = UnaryOp::FAbs; break;
+      case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
+      case llvm::Intrinsic::sqrt:        op = UnaryOp::Sqrt; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,

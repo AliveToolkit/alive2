@@ -842,6 +842,7 @@ void UnaryOp::print(ostream &os) const {
   case Ctpop:       str = "ctpop "; break;
   case IsConstant:  str = "is.constant "; break;
   case FNeg:        str = "fneg "; break;
+  case Sqrt:        str = "sqrt "; break;
   case FFS:         str = "ffs "; break;
   case FAbs:        str = "fabs "; break;
   }
@@ -889,6 +890,11 @@ StateValue UnaryOp::toSMT(State &s) const {
       return fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, fmath, false);
     };
     break;
+  case Sqrt:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np, [](expr &v){ return v.sqrt(); }, fmath, false);
+    };
+    break;
   case FFS:
     fn = [](auto v, auto np) -> StateValue {
       return { v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v), expr(np) };
@@ -929,17 +935,14 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     break;
   case BitReverse:
   case Ctpop:
+  case FFS:
     instrconstr &= getType().enforceIntOrVectorType();
     break;
   case IsConstant:
     instrconstr = getType().enforceIntType(1);
     break;
   case FNeg:
-    instrconstr &= getType().enforceFloatOrVectorType();
-    break;
-  case FFS:
-    instrconstr &= getType().enforceIntType();
-    break;
+  case Sqrt:
   case FAbs:
     instrconstr &= getType().enforceFloatOrVectorType();
     break;

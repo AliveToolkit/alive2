@@ -182,7 +182,6 @@ public:
 
   static expr fshl(const expr &a, const expr &b, const expr &c);
   static expr fshr(const expr &a, const expr &b, const expr &c);
-  static expr fma(const expr &a, const expr &b, const expr &c);
 
   expr shl_no_soverflow(const expr &rhs) const;
   expr shl_no_uoverflow(const expr &rhs) const;
@@ -214,6 +213,9 @@ public:
   expr fmul(const expr &rhs) const;
   expr fdiv(const expr &rhs) const;
   expr fneg() const;
+  expr sqrt() const;
+
+  static expr fma(const expr &a, const expr &b, const expr &c);
 
   expr foeq(const expr &rhs) const;
   expr fogt(const expr &rhs) const;
