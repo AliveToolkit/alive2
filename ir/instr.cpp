@@ -902,7 +902,7 @@ StateValue UnaryOp::toSMT(State &s) const {
     break;
   case FAbs:
     fn = [&](auto v, auto np) -> StateValue {
-      auto f = [](expr &v) { return expr::mkIf(v.isFPNeg(), v.fneg(), v); };
+      auto f = [](expr &v) { return v.fabs(); };
       return fm_poison(s, v, np, f, fmath, true);
     };
     break;

@@ -947,6 +947,10 @@ expr expr::fdiv(const expr &rhs) const {
   return Z3_mk_fpa_div(ctx(), rm, ast(), rhs());
 }
 
+expr expr::fabs() const {
+  return unop_fold(Z3_mk_fpa_abs);
+}
+
 expr expr::fneg() const {
   return unop_fold(Z3_mk_fpa_neg);
 }

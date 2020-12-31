@@ -212,6 +212,7 @@ public:
   expr fsub(const expr &rhs) const;
   expr fmul(const expr &rhs) const;
   expr fdiv(const expr &rhs) const;
+  expr fabs() const;
   expr fneg() const;
   expr sqrt() const;
 
