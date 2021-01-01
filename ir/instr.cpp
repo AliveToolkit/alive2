@@ -2984,6 +2984,14 @@ void Store::print(std::ostream &os) const {
 }
 
 StateValue Store::toSMT(State &s) const {
+  // skip large initializers. FIXME: this should be moved to memory so it can
+  // fold subsequent trivial loads
+  if (s.isInitializationPhase() &&
+      Memory::getStoreByteSize(val->getType()) > 128) {
+    s.doesApproximation("Large constant initializer removed");
+    return {};
+  }
+
   auto &p = s.getAndAddPoisonUB(*ptr).value;
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());

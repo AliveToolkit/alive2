@@ -150,6 +150,19 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   s << msg;
   if (!var_name.empty())
     s << " for " << *var;
+
+  auto &src_approx = src_state.getApproximations();
+  auto &tgt_approx = tgt_state.getApproximations();
+  if (!src_approx.empty() || !tgt_approx.empty()) {
+    s << "\n\nNOTE: Alive2 approximated the semantics of this program.\n"
+         "The bug found may be spurious. Approximations done:\n";
+    auto approx = src_approx;
+    approx.insert(tgt_approx.begin(), tgt_approx.end());
+    for (auto *a : approx) {
+      s << " - " << a << '\n';
+    }
+  }
+
   s << "\n\nExample:\n";
 
   for (auto &[var, val] : src_state.getValues()) {

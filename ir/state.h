@@ -78,6 +78,7 @@ private:
   smt::AndExpr axioms;
 
   std::set<const char*> used_unsupported;
+  std::set<const char*> used_approximations;
 
   const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
@@ -185,6 +186,9 @@ public:
 
   void useUnsupported(const char *name);
   auto& getUnsupported() const { return used_unsupported; }
+
+  void doesApproximation(const char *name);
+  auto& getApproximations() const { return used_approximations; }
 
   void addQuantVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
