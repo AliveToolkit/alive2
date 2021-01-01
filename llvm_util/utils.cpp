@@ -341,15 +341,7 @@ Value* get_operand(llvm::Value *v,
     unsigned opi = 0;
 
     for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
-      if (aty->isPadding(i)) {
-        auto &padty = aty->getChild(i);
-        assert(padty.isIntType());
-        auto poison = make_unique<PoisonValue>(padty);
-        auto ret = poison.get();
-
-        current_fn->addConstant(move(poison));
-        vals.emplace_back(ret);
-      } else {
+      if (!aty->isPadding(i)) {
         if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter))
           vals.emplace_back(op);
         else

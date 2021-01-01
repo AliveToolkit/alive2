@@ -867,9 +867,11 @@ expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
   if (children.size() < element_types->size())
     return false;
 
-  expr r = numElements() == element_types->size();
-  for (unsigned i = 0, e = element_types->size(); i != e; ++i) {
-    r &= *children[i] == *(*element_types)[i];
+  expr r = numElementsExcludingPadding() == element_types->size();
+  auto types = element_types->begin(), types_E = element_types->end();
+  for (unsigned i = 0, e = children.size(); i != e && types != types_E; ++i) {
+    if (!isPadding(i))
+      r &= *children[i] == **types++;
   }
   return r;
 }
