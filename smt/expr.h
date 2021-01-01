@@ -218,6 +218,12 @@ public:
 
   static expr fma(const expr &a, const expr &b, const expr &c);
 
+  expr ceil() const;
+  expr floor() const;
+  expr roundna() const;
+  expr roundne() const;
+  expr roundtz() const;
+
   expr foeq(const expr &rhs) const;
   expr fogt(const expr &rhs) const;
   expr foge(const expr &rhs) const;

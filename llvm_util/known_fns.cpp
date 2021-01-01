@@ -118,11 +118,35 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       make_unique<ConversionOp>(*ty, value_name(i), *Op, ConversionOp::Trunc));
   }
   case llvm::LibFunc_fabs:
-  case llvm::LibFunc_fabsf: {
+  case llvm::LibFunc_fabsf:
     RETURN_KNOWN(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs,
-                           parse_fmath(i)));
-  }
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs));
+
+  case llvm::LibFunc_ceil:
+  case llvm::LibFunc_ceilf:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Ceil));
+
+  case llvm::LibFunc_floor:
+  case llvm::LibFunc_floorf:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Floor));
+
+  case llvm::LibFunc_round:
+  case llvm::LibFunc_roundf:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Round));
+
+  case llvm::LibFunc_roundeven:
+  case llvm::LibFunc_roundevenf:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::RoundEven));
+
+  case llvm::LibFunc_trunc:
+  case llvm::LibFunc_truncf:
+    RETURN_KNOWN(
+      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Trunc));
+
 
   case llvm::LibFunc_fwrite: {
     auto size = getInt(*args[1]);

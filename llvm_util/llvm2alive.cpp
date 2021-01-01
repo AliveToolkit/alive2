@@ -776,24 +776,34 @@ end:
     }
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
+    case llvm::Intrinsic::ceil:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
     case llvm::Intrinsic::expect_with_probability:
     case llvm::Intrinsic::fabs:
+    case llvm::Intrinsic::floor:
     case llvm::Intrinsic::is_constant:
-    case llvm::Intrinsic::sqrt:{
+    case llvm::Intrinsic::round:
+    case llvm::Intrinsic::roundeven:
+    case llvm::Intrinsic::sqrt:
+    case llvm::Intrinsic::trunc: {
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::bitreverse: op = UnaryOp::BitReverse; break;
-      case llvm::Intrinsic::bswap:      op = UnaryOp::BSwap; break;
-      case llvm::Intrinsic::ctpop:      op = UnaryOp::Ctpop; break;
+      case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
+      case llvm::Intrinsic::bswap:       op = UnaryOp::BSwap; break;
+      case llvm::Intrinsic::ceil:        op = UnaryOp::Ceil; break;
+      case llvm::Intrinsic::ctpop:       op = UnaryOp::Ctpop; break;
       case llvm::Intrinsic::expect:
       case llvm::Intrinsic::expect_with_probability:
         op = UnaryOp::Copy; break;
       case llvm::Intrinsic::fabs:        op = UnaryOp::FAbs; break;
+      case llvm::Intrinsic::floor:       op = UnaryOp::Floor; break;
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
+      case llvm::Intrinsic::round:       op = UnaryOp::Round; break;
+      case llvm::Intrinsic::roundeven:   op = UnaryOp::RoundEven; break;
       case llvm::Intrinsic::sqrt:        op = UnaryOp::Sqrt; break;
+      case llvm::Intrinsic::trunc:       op = UnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,

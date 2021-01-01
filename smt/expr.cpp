@@ -967,6 +967,31 @@ expr expr::fma(const expr &a, const expr &b, const expr &c) {
   return Z3_mk_fpa_fma(ctx(), rm, a(), b(), c());
 }
 
+expr expr::ceil() const {
+  C();
+  return Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtp(ctx()), ast());
+}
+
+expr expr::floor() const {
+  C();
+  return Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtn(ctx()), ast());
+}
+
+expr expr::roundna() const {
+  C();
+  return Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rna(ctx()), ast());
+}
+
+expr expr::roundne() const {
+  C();
+  return Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rne(ctx()), ast());
+}
+
+expr expr::roundtz() const {
+  C();
+  return Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtz(ctx()), ast());
+}
+
 expr expr::foeq(const expr &rhs) const {
   return binop_commutative(rhs, Z3_mk_fpa_eq);
 }

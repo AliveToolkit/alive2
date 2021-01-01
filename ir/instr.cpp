@@ -841,10 +841,15 @@ void UnaryOp::print(ostream &os) const {
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
   case IsConstant:  str = "is.constant "; break;
+  case FAbs:        str = "fabs "; break;
   case FNeg:        str = "fneg "; break;
+  case Ceil:        str = "ceil "; break;
+  case Floor:       str = "floor "; break;
+  case Round:       str = "round "; break;
+  case RoundEven:   str = "roundeven "; break;
+  case Trunc:       str = "trunc "; break;
   case Sqrt:        str = "sqrt "; break;
   case FFS:         str = "ffs "; break;
-  case FAbs:        str = "fabs "; break;
   }
 
   os << getName() << " = " << str << fmath << print_type(getType())
@@ -885,9 +890,42 @@ StateValue UnaryOp::toSMT(State &s) const {
     s.addQuantVar(var);
     return { move(var), true };
   }
+  case FAbs:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np, [](expr &v) { return v.fabs(); }, fmath, true);
+    };
+    break;
   case FNeg:
     fn = [&](auto v, auto np) -> StateValue {
       return fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, fmath, false);
+    };
+    break;
+  case Ceil:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np, [](expr &v) { return v.ceil(); }, fmath, true);
+    };
+    break;
+  case Floor:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np, [](expr &v) { return v.floor(); }, fmath, true);
+    };
+    break;
+  case Round:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np,
+                       [](expr &v) { return v.roundna(); }, fmath, true);
+    };
+    break;
+  case RoundEven:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np,
+                       [](expr &v) { return v.roundne(); }, fmath, true);
+    };
+    break;
+  case Trunc:
+    fn = [&](auto v, auto np) -> StateValue {
+      return fm_poison(s, v, np,
+                       [](expr &v) { return v.roundtz(); }, fmath, true);
     };
     break;
   case Sqrt:
@@ -898,12 +936,6 @@ StateValue UnaryOp::toSMT(State &s) const {
   case FFS:
     fn = [](auto v, auto np) -> StateValue {
       return { v.cttz(expr::mkInt(-1, v)) + expr::mkUInt(1, v), expr(np) };
-    };
-    break;
-  case FAbs:
-    fn = [&](auto v, auto np) -> StateValue {
-      auto f = [](expr &v) { return v.fabs(); };
-      return fm_poison(s, v, np, f, fmath, true);
     };
     break;
   }
@@ -924,7 +956,7 @@ StateValue UnaryOp::toSMT(State &s) const {
 
 expr UnaryOp::getTypeConstraints(const Function &f) const {
   expr instrconstr = getType() == val->getType();
-  switch(op) {
+  switch (op) {
   case Copy:
     break;
   case BSwap:
@@ -941,9 +973,14 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
   case IsConstant:
     instrconstr = getType().enforceIntType(1);
     break;
-  case FNeg:
-  case Sqrt:
   case FAbs:
+  case FNeg:
+  case Ceil:
+  case Floor:
+  case Round:
+  case RoundEven:
+  case Trunc:
+  case Sqrt:
     instrconstr &= getType().enforceFloatOrVectorType();
     break;
   }
