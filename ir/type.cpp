@@ -135,6 +135,10 @@ expr Type::enforceFloatType() const {
   return false;
 }
 
+expr Type::enforceScalarType() const {
+  return enforceIntType() || enforcePtrType() || enforceFloatType();
+}
+
 expr Type::enforceVectorType() const {
   return enforceVectorType([](auto &ty) { return true; });
 }

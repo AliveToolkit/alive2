@@ -63,10 +63,30 @@ private:
     void intersect(const ValueAnalysis &other);
   };
 
+  struct VarArgsEntry {
+    smt::expr alive;
+    smt::expr next_arg;
+    smt::expr num_args;
+    smt::expr va_start;
+    smt::expr active; // false if this entry is repeated
+
+    // FIXME: upgrade with C++20
+    bool operator<(const VarArgsEntry &rhs) const;
+  };
+
+  struct VarArgsData {
+    std::map<smt::expr, VarArgsEntry> data;
+    static VarArgsData mkIf(const smt::expr &cond, const VarArgsData &then,
+                            const VarArgsData &els);
+    // FIXME: upgrade with C++20
+    bool operator<(const VarArgsData &rhs) const { return data < rhs.data; }
+  };
+
   struct BasicBlockInfo {
     DomainPreds domain;
     ValueAnalysis analysis;
     smt::DisjointExpr<Memory> mem;
+    VarArgsData var_args;
   };
 
   // TODO: make this const again
@@ -144,6 +164,8 @@ private:
   smt::expr fn_call_pre = true;
   std::set<smt::expr> fn_call_qvars;
 
+  VarArgsData var_args_data;
+
 public:
   State(Function &f, bool source);
 
@@ -183,6 +205,8 @@ public:
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
               const std::vector<Type*> &out_types, const FnAttrs &attrs);
+
+  auto& getVarArgsData() { return var_args_data.data; }
 
   void useUnsupported(const char *name);
   auto& getUnsupported() const { return used_unsupported; }

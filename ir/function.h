@@ -66,6 +66,7 @@ class Function final {
   unsigned bits_pointers = 64;
   unsigned bits_ptr_offset = 64;
   bool little_endian = true;
+  bool is_var_args = false;
 
   // constants used in this function
   std::vector<std::unique_ptr<Value>> constants;
@@ -79,12 +80,15 @@ class Function final {
 
   FnAttrs attrs;
 
+
 public:
   Function() {}
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
-           unsigned bits_ptr_offset = 64, bool little_endian = true)
+           unsigned bits_ptr_offset = 64, bool little_endian = true,
+           bool is_var_args = false)
     : type(&type), name(std::move(name)), bits_pointers(bits_pointers),
-      bits_ptr_offset(bits_ptr_offset), little_endian(little_endian) {}
+      bits_ptr_offset(bits_ptr_offset), little_endian(little_endian),
+      is_var_args(is_var_args) {}
 
   const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
@@ -135,6 +139,7 @@ public:
   unsigned bitsPointers() const { return bits_pointers; }
   unsigned bitsPtrOffset() const { return bits_ptr_offset; }
   bool isLittleEndian() const { return little_endian; }
+  bool isVarArgs() const { return is_var_args; }
 
   void syncDataWithSrc(const Function &src);
 

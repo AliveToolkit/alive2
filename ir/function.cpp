@@ -765,6 +765,8 @@ void Function::print(ostream &os, bool print_header) const {
       os << input;
       first = false;
     }
+    if (isVarArgs())
+      os << (first ? "..." : ", ...");
     os << ") {\n";
   }
 

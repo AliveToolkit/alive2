@@ -890,6 +890,18 @@ end:
       return make_unique<FnCall>(*llvm_type2alive(i.getType()),
                                  "", "#trap", move(attrs));
     }
+    case llvm::Intrinsic::vastart: {
+      PARSE_UNOP();
+      return make_unique<VaStart>(*val);
+    }
+    case llvm::Intrinsic::vaend: {
+      PARSE_UNOP();
+      return make_unique<VaEnd>(*val);
+    }
+    case llvm::Intrinsic::vacopy: {
+      PARSE_BINOP();
+      return make_unique<VaCopy>(*a, *b);
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_addr:
@@ -927,6 +939,11 @@ end:
       mask.push_back(m);
     RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
                                                  move(mask)));
+  }
+
+  RetTy visitVAArg(llvm::VAArgInst &i) {
+    PARSE_UNOP();
+    RETURN_IDENTIFIER(make_unique<VaArg>(*ty, value_name(i), *val));
   }
 
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
@@ -1092,7 +1109,8 @@ end:
       return {};
 
     Function Fn(*type, f.getName().str(), 8 * DL().getPointerSize(),
-                DL().getIndexSizeInBits(0), DL().isLittleEndian());
+                DL().getIndexSizeInBits(0), DL().isLittleEndian(),
+                f.isVarArg());
     reset_state(Fn);
 
     for (auto &arg : f.args()) {

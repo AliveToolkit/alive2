@@ -27,6 +27,9 @@ using namespace std;
   MemInstr::ByteAccessInfo cls::getByteAccessInfo() const \
   { return {}; }
 
+// log2 of max number of var args per function
+#define VARARG_BITS 8
+
 namespace {
 struct print_type {
   IR::Type &ty;
@@ -3288,6 +3291,232 @@ expr Strlen::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Strlen::dup(const string &suffix) const {
   return make_unique<Strlen>(getType(), getName() + suffix, *ptr);
+}
+
+
+vector<Value*> VaStart::operands() const {
+  return { ptr };
+}
+
+void VaStart::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void VaStart::print(ostream &os) const {
+  os << "call void @llvm.va_start(" << *ptr << ')';
+}
+
+StateValue VaStart::toSMT(State &s) const {
+  s.addUB(expr(s.getFn().isVarArgs()));
+
+  auto &data  = s.getVarArgsData();
+  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+
+  expr zero     = expr::mkUInt(0, VARARG_BITS);
+  expr num_args = expr::mkVar("num_va_args", VARARG_BITS);
+
+  // just in case there's already a pointer there
+  OrExpr matched_one;
+  for (auto &[ptr, entry] : data) {
+    // FIXME. if entry.alive => memory leak (though not UB). detect this
+    expr eq = ptr == raw_p;
+    entry.alive   |= eq;
+    entry.next_arg = expr::mkIf(eq, zero, entry.next_arg);
+    entry.num_args = expr::mkIf(eq, num_args, entry.num_args);
+    entry.va_start = expr::mkIf(eq, true, entry.va_start);
+    matched_one.add(move(eq));
+  }
+
+  Pointer ptr(s.getMemory(), raw_p);
+  s.addUB(ptr.isBlockAlive());
+  s.addUB(ptr.blockSize().uge(4)); // FIXME: this is target dependent
+
+  // alive, next_arg, num_args, va_start, active
+  data.try_emplace(raw_p, true, move(zero), move(num_args), true,
+                   !matched_one());
+
+  return {};
+}
+
+expr VaStart::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> VaStart::dup(const string &suffix) const {
+  return make_unique<VaStart>(*ptr);
+}
+
+
+vector<Value*> VaEnd::operands() const {
+  return { ptr };
+}
+
+void VaEnd::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void VaEnd::print(ostream &os) const {
+  os << "call void @llvm.va_end(" << *ptr << ')';
+}
+
+template <typename D>
+static void ensure_varargs_ptr(D &data, State &s, const expr &arg_ptr) {
+  OrExpr matched_one;
+  for (auto &[ptr, entry] : data) {
+    matched_one.add(ptr == arg_ptr);
+  }
+
+  expr matched = matched_one();
+  if (matched.isTrue())
+    return;
+
+  // Insert a new entry in case there was none before.
+  // This might be a ptr passed as argument (va_start in the callee).
+  s.addUB(matched || !Pointer(s.getMemory(), arg_ptr).isLocal());
+
+  expr zero = expr::mkUInt(0, VARARG_BITS);
+  ENSURE(data.try_emplace(arg_ptr,
+                          expr::mkUF("vararg_alive", { arg_ptr }, false),
+                          zero, // = next_arg
+                          expr::mkUF("vararg_num_args", { arg_ptr }, zero),
+                          false, // = va_start
+                          !matched).second);
+}
+
+StateValue VaEnd::toSMT(State &s) const {
+  auto &data  = s.getVarArgsData();
+  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+
+  s.addUB(Pointer(s.getMemory(), raw_p).isBlockAlive());
+
+  ensure_varargs_ptr(data, s, raw_p);
+
+  for (auto &[ptr, entry] : data) {
+    expr eq = ptr == raw_p;
+    s.addUB((eq && entry.active).implies(entry.alive));
+    entry.alive &= !eq;
+  }
+  return {};
+}
+
+expr VaEnd::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> VaEnd::dup(const string &suffix) const {
+  return make_unique<VaEnd>(*ptr);
+}
+
+
+vector<Value*> VaCopy::operands() const {
+  return { dst, src };
+}
+
+void VaCopy::rauw(const Value &what, Value &with) {
+  RAUW(dst);
+  RAUW(src);
+}
+
+void VaCopy::print(ostream &os) const {
+  os << "call void @llvm.va_copy(" << *dst << ", " << *src << ')';
+}
+
+StateValue VaCopy::toSMT(State &s) const {
+  auto &data = s.getVarArgsData();
+  auto &dst_raw = s.getAndAddPoisonUB(*dst, true).value;
+  auto &src_raw = s.getAndAddPoisonUB(*src, true).value;
+  Pointer dst(s.getMemory(), dst_raw);
+  Pointer src(s.getMemory(), src_raw);
+
+  s.addUB(dst.isBlockAlive());
+  s.addUB(src.isBlockAlive());
+  s.addUB(dst.blockSize() == src.blockSize());
+
+  ensure_varargs_ptr(data, s, src_raw);
+
+  DisjointExpr<expr> next_arg, num_args, va_start;
+  for (auto &[ptr, entry] : data) {
+    expr select = entry.active && ptr == src_raw;
+    s.addUB(select.implies(entry.alive));
+
+    next_arg.add(entry.next_arg, select);
+    num_args.add(entry.num_args, select);
+    va_start.add(entry.va_start, move(select));
+  }
+
+  // FIXME: dst should be empty or we have a mem leak
+  // alive, next_arg, num_args, va_start, active
+  data[dst_raw] = { true, *next_arg(), *num_args(), *va_start(), true };
+
+  return {};
+}
+
+expr VaCopy::getTypeConstraints(const Function &f) const {
+  return dst->getType().enforcePtrType() &&
+         src->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> VaCopy::dup(const string &suffix) const {
+  return make_unique<VaCopy>(*dst, *src);
+}
+
+
+vector<Value*> VaArg::operands() const {
+  return { ptr };
+}
+
+void VaArg::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void VaArg::print(ostream &os) const {
+  os << getName() << " = va_arg " << *ptr << ", " << getType();
+}
+
+StateValue VaArg::toSMT(State &s) const {
+  auto &data  = s.getVarArgsData();
+  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+
+  s.addUB(Pointer(s.getMemory(), raw_p).isBlockAlive());
+
+  ensure_varargs_ptr(data, s, raw_p);
+
+  DisjointExpr<StateValue> ret(StateValue{});
+  expr value_kind = getType().getDummyValue(false).value;
+  expr one = expr::mkUInt(1, VARARG_BITS);
+
+  for (auto &[ptr, entry] : data) {
+    string type = getType().toString();
+    string arg_name = "va_arg_" + type;
+    string arg_in_name = "va_arg_in_" + type;
+    StateValue val = {
+      expr::mkIf(entry.va_start,
+                 expr::mkUF(arg_name.c_str(), { entry.next_arg }, value_kind),
+                 expr::mkUF(arg_in_name.c_str(), { ptr, entry.next_arg },
+                            value_kind)),
+      expr::mkIf(entry.va_start,
+                 expr::mkUF("va_arg_np", { entry.next_arg }, true),
+                 expr::mkUF("va_arg_np_in", { ptr, entry.next_arg }, true))
+    };
+    expr eq = ptr == raw_p;
+    expr select = entry.active && eq;
+    ret.add(move(val), select);
+
+    expr next_arg = entry.next_arg + one;
+    s.addUB(select.implies(entry.alive && entry.num_args.uge(next_arg)));
+    entry.next_arg = expr::mkIf(eq, next_arg, entry.next_arg);
+  }
+
+  return *ret();
+}
+
+expr VaArg::getTypeConstraints(const Function &f) const {
+  return getType().enforceScalarType() &&
+         ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> VaArg::dup(const string &suffix) const {
+  return make_unique<VaArg>(getType(), getName() + suffix, *ptr);
 }
 
 

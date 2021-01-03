@@ -85,6 +85,38 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
   return true;
 }
 
+bool State::VarArgsEntry::operator<(const VarArgsEntry &rhs) const {
+  return tie(alive, next_arg, num_args, va_start, active) <
+         tie(rhs.alive, rhs.next_arg, rhs.num_args, rhs.va_start, rhs.active);
+}
+
+State::VarArgsData
+State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
+                         const VarArgsData &els) {
+  VarArgsData ret;
+  for (auto &[ptr, entry] : then.data) {
+    auto other = els.data.find(ptr);
+    if (other == els.data.end()) {
+      ret.data.try_emplace(ptr, cond && entry.alive, entry.next_arg,
+                           entry.num_args, entry.va_start, entry.active);
+    } else {
+#define C(f) expr::mkIf(cond, entry.f, other->second.f)
+      ret.data.try_emplace(ptr, C(alive), C(next_arg), C(num_args), C(va_start),
+                           C(active));
+#undef C
+    }
+  }
+
+  for (auto &[ptr, entry] : els.data) {
+    if (then.data.count(ptr))
+      continue;
+    ret.data.try_emplace(ptr, !cond && entry.alive, entry.next_arg,
+                         entry.num_args, entry.va_start, entry.active);
+  }
+
+  return ret;
+}
+
 State::State(Function &f, bool source)
   : f(f), source(source), memory(*this),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
@@ -322,7 +354,6 @@ StateValue* State::no_more_tmp_slots() {
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars] = values[values_map.at(&val)];
   auto &[sval, uvars] = val_uvars;
-  (void)var;
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
@@ -500,28 +531,30 @@ bool State::startBB(const BasicBlock &bb) {
 
   DisjointExpr<Memory> in_memory;
   DisjointExpr<expr> UB;
+  DisjointExpr<VarArgsData> var_args_in;
   OrExpr path;
 
   bool isFirst = true;
   for (auto &[src, data] : I->second) {
-    (void)src;
-    auto &[dom, anlys, mem] = data;
-    path.add(dom.path);
-    expr p = dom.path();
-    UB.add_disj(dom.UB, p);
-    in_memory.add_disj(mem, move(p));
-    domain.undef_vars.insert(dom.undef_vars.begin(), dom.undef_vars.end());
+    path.add(data.domain.path);
+    expr p = data.domain.path();
+    UB.add_disj(data.domain.UB, p);
+    in_memory.add_disj(data.mem, p);
+    var_args_in.add_disj(data.var_args, move(p));
+    domain.undef_vars.insert(data.domain.undef_vars.begin(),
+                             data.domain.undef_vars.end());
 
     if (isFirst)
-      analysis = anlys;
+      analysis = data.analysis;
     else
-      analysis.intersect(anlys);
+      analysis.intersect(data.analysis);
     isFirst = false;
   }
 
   domain.path = path();
   domain.UB.add(*UB());
   memory = *in_memory();
+  var_args_data = *var_args_in();
 
   return domain;
 }
@@ -893,7 +926,6 @@ expr State::sinkDomain() const {
 
   OrExpr ret;
   for (auto &[src, data] : I->second) {
-    (void)src;
     ret.add(data.domain.path());
   }
   return ret();

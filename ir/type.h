@@ -69,6 +69,7 @@ public:
   virtual smt::expr enforceAggregateType(
     std::vector<Type*> *element_types = nullptr) const;
   virtual smt::expr enforceFloatType() const;
+  smt::expr enforceScalarType() const;
 
   smt::expr enforceVectorType() const;
   // enforce same number of elements if other is a vector
