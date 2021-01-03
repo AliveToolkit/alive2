@@ -3594,7 +3594,7 @@ unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
 
 
 ShuffleVector::ShuffleVector(
-    Type &type, std::string &&name, Value &v1, Value &v2, Op op,
+    Type &type, string &&name, Value &v1, Value &v2, Op op,
     vector<unsigned> mask_)
     : Instr(type, move(name)), v1(&v1), v2(&v2), op(op), mask(move(mask_)) {
   // Shufflevector operations other than LLVMIR_ShufVec do not take const mask
