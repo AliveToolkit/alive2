@@ -540,7 +540,7 @@ bool State::startBB(const BasicBlock &bb) {
     expr p = data.domain.path();
     UB.add_disj(data.domain.UB, p);
     in_memory.add_disj(data.mem, p);
-    var_args_in.add_disj(data.var_args, move(p));
+    var_args_in.add(data.var_args, move(p));
     domain.undef_vars.insert(data.domain.undef_vars.begin(),
                              data.domain.undef_vars.end());
 
@@ -577,6 +577,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   data.domain.undef_vars.insert(domain.undef_vars.begin(),
                                 domain.undef_vars.end());
   data.analysis = analysis;
+  data.var_args = var_args_data;
 }
 
 void State::addJump(const BasicBlock &dst) {

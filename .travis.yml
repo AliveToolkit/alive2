@@ -45,21 +45,6 @@ script:
 
 matrix:
   include:
-    - env: CMAKE_CXX_COMPILER=g++-9 CMAKE_BUILD_TYPE=Debug
-      os: linux
-      dist: focal
-      addons: &gcc9
-        apt:
-          sources: *default_sources
-          packages:
-            - *default_packages
-            - g++-9
-
-    - env: CMAKE_CXX_COMPILER=g++-9 CMAKE_BUILD_TYPE=Release
-      os: linux
-      dist: focal
-      addons: *gcc9
-
     - env: CMAKE_CXX_COMPILER=g++-10 CMAKE_BUILD_TYPE=Debug
       os: linux
       dist: focal

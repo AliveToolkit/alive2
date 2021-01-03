@@ -3434,19 +3434,19 @@ StateValue VaCopy::toSMT(State &s) const {
 
   ensure_varargs_ptr(data, s, src_raw);
 
-  DisjointExpr<expr> next_arg, num_args, va_start;
+  DisjointExpr<expr> next_arg, num_args, is_va_start;
   for (auto &[ptr, entry] : data) {
     expr select = entry.active && ptr == src_raw;
     s.addUB(select.implies(entry.alive));
 
     next_arg.add(entry.next_arg, select);
     num_args.add(entry.num_args, select);
-    va_start.add(entry.va_start, move(select));
+    is_va_start.add(entry.va_start, move(select));
   }
 
   // FIXME: dst should be empty or we have a mem leak
   // alive, next_arg, num_args, va_start, active
-  data[dst_raw] = { true, *next_arg(), *num_args(), *va_start(), true };
+  data[dst_raw] = { true, *next_arg(), *num_args(), *is_va_start(), true };
 
   return {};
 }
