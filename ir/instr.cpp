@@ -3332,7 +3332,7 @@ StateValue VaStart::toSMT(State &s) const {
   s.addUB(ptr.blockSize().uge(4)); // FIXME: this is target dependent
 
   // alive, next_arg, num_args, va_start, active
-  data.try_emplace(raw_p, true, move(zero), move(num_args), true,
+  data.try_emplace(raw_p, expr(true), move(zero), move(num_args), expr(true),
                    !matched_one());
 
   return {};
@@ -3379,7 +3379,7 @@ static void ensure_varargs_ptr(D &data, State &s, const expr &arg_ptr) {
                           expr::mkUF("vararg_alive", { arg_ptr }, false),
                           zero, // = next_arg
                           expr::mkUF("vararg_num_args", { arg_ptr }, zero),
-                          false, // = va_start
+                          expr(false), // = va_start
                           !matched).second);
 }
 
