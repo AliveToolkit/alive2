@@ -70,6 +70,13 @@ private:
     smt::expr va_start;
     smt::expr active; // false if this entry is repeated
 
+    VarArgsEntry() {}
+    VarArgsEntry(smt::expr &&alive, smt::expr &&next_arg, smt::expr &&num_args,
+                 smt::expr &&va_start, smt::expr &&active)
+      : alive(std::move(alive)), next_arg(std::move(next_arg)),
+        num_args(std::move(num_args)), va_start(std::move(va_start)),
+        active(std::move(active)) {}
+
     // FIXME: upgrade with C++20
     bool operator<(const VarArgsEntry &rhs) const;
   };

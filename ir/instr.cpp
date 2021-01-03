@@ -3377,7 +3377,7 @@ static void ensure_varargs_ptr(D &data, State &s, const expr &arg_ptr) {
   expr zero = expr::mkUInt(0, VARARG_BITS);
   ENSURE(data.try_emplace(arg_ptr,
                           expr::mkUF("vararg_alive", { arg_ptr }, false),
-                          zero, // = next_arg
+                          expr(zero), // = next_arg
                           expr::mkUF("vararg_num_args", { arg_ptr }, zero),
                           expr(false), // = va_start
                           !matched).second);
@@ -3442,6 +3442,9 @@ StateValue VaCopy::toSMT(State &s) const {
     next_arg.add(entry.next_arg, select);
     num_args.add(entry.num_args, select);
     is_va_start.add(entry.va_start, move(select));
+
+    // kill aliases
+    entry.active &= ptr != dst_raw;
   }
 
   // FIXME: dst should be empty or we have a mem leak

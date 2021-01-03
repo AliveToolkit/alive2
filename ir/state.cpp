@@ -97,8 +97,9 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
   for (auto &[ptr, entry] : then.data) {
     auto other = els.data.find(ptr);
     if (other == els.data.end()) {
-      ret.data.try_emplace(ptr, cond && entry.alive, entry.next_arg,
-                           entry.num_args, entry.va_start, entry.active);
+      ret.data.try_emplace(ptr, cond && entry.alive, expr(entry.next_arg),
+                           expr(entry.num_args), expr(entry.va_start),
+                           expr(entry.active));
     } else {
 #define C(f) expr::mkIf(cond, entry.f, other->second.f)
       ret.data.try_emplace(ptr, C(alive), C(next_arg), C(num_args), C(va_start),
@@ -110,8 +111,9 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
   for (auto &[ptr, entry] : els.data) {
     if (then.data.count(ptr))
       continue;
-    ret.data.try_emplace(ptr, !cond && entry.alive, entry.next_arg,
-                         entry.num_args, entry.va_start, entry.active);
+    ret.data.try_emplace(ptr, !cond && entry.alive, expr(entry.next_arg),
+                         expr(entry.num_args), expr(entry.va_start),
+                         expr(entry.active));
   }
 
   return ret;
