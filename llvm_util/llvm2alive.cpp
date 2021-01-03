@@ -904,18 +904,6 @@ end:
       return make_unique<VaCopy>(*a, *b);
     }
 
-    // do nothing intrinsics
-    case llvm::Intrinsic::dbg_addr:
-    case llvm::Intrinsic::dbg_declare:
-    case llvm::Intrinsic::dbg_label:
-    case llvm::Intrinsic::dbg_value:
-    case llvm::Intrinsic::donothing:
-    case llvm::Intrinsic::instrprof_increment:
-    case llvm::Intrinsic::instrprof_increment_step:
-    case llvm::Intrinsic::instrprof_value_profile:
-    case llvm::Intrinsic::prefetch:
-      return NOP(i);
-
     // X86 intrinsics
     case llvm::Intrinsic::x86_ssse3_pshuf_b_128:
     case llvm::Intrinsic::x86_avx2_pshuf_b:
@@ -932,6 +920,18 @@ end:
       RETURN_IDENTIFIER(make_unique<ShuffleVector>(
           *llvm_type2alive(i.getType()), value_name(i), *a, *b, op));
     }
+
+    // do nothing intrinsics
+    case llvm::Intrinsic::dbg_addr:
+    case llvm::Intrinsic::dbg_declare:
+    case llvm::Intrinsic::dbg_label:
+    case llvm::Intrinsic::dbg_value:
+    case llvm::Intrinsic::donothing:
+    case llvm::Intrinsic::instrprof_increment:
+    case llvm::Intrinsic::instrprof_increment_step:
+    case llvm::Intrinsic::instrprof_value_profile:
+    case llvm::Intrinsic::prefetch:
+      return NOP(i);
 
     default:
       break;

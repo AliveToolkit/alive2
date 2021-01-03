@@ -1,5 +1,4 @@
 ; ModuleID = 'x86-pshufb.ll'
-source_filename = "x86-pshufb.ll"
 target triple = "x86_64-unknown-unknown"
 
 ; These are copied from Transforms/InstCombine/X86/x86-pshufb.ll.

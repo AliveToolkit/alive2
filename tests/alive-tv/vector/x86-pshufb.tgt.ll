@@ -1,5 +1,4 @@
 ; ModuleID = 'x86-pshufb.ll'
-source_filename = "x86-pshufb.ll"
 target triple = "x86_64-unknown-unknown"
 
 define <16 x i8> @identity_test(<16 x i8> %InVec) {

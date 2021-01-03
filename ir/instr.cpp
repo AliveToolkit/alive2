@@ -3615,7 +3615,7 @@ void ShuffleVector::print(ostream &os) const {
   const char *str = nullptr;
   switch(op) {
   case LLVMIR_ShufVec:   str = "shufflevector"; break;
-  case PShufB:  str = "pshuf"; break;
+  case PShufB:  str = "pshufb"; break;
   }
   os << getName() << " = " << str << " " << *v1 << ", " << *v2;
   if (op == LLVMIR_ShufVec)
