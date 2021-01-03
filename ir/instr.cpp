@@ -3595,9 +3595,8 @@ unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
 
 ShuffleVector::ShuffleVector(
     Type &type, std::string &&name, Value &v1, Value &v2, Op op,
-    std::vector<unsigned> mask_)
-    : Instr(type, move(name)), v1(&v1), v2(&v2), op(op),
-      mask(std::move(mask_)) {
+    vector<unsigned> mask_)
+    : Instr(type, move(name)), v1(&v1), v2(&v2), op(op), mask(move(mask_)) {
   // Shufflevector operations other than LLVMIR_ShufVec do not take const mask
   assert((op != LLVMIR_ShufVec && mask.size() == 0) ||
          (op == LLVMIR_ShufVec && mask.size() != 0));
@@ -3616,9 +3615,7 @@ void ShuffleVector::print(ostream &os) const {
   const char *str = nullptr;
   switch(op) {
   case LLVMIR_ShufVec:   str = "shufflevector"; break;
-  case SSSE3_PShufB128:  str = "ssse3.pshuf.b.128"; break;
-  case AVX2_PShufB:      str = "avx2.pshuf.b"; break;
-  case AVX512_PShufB512: str = "avx512.pshuf.b.512"; break;
+  case PShufB:  str = "pshuf"; break;
   }
   os << getName() << " = " << str << " " << *v1 << ", " << *v2;
   if (op == LLVMIR_ShufVec)
@@ -3631,19 +3628,6 @@ StateValue ShuffleVector::toSMT(State &s) const {
   auto sz = vty->numElementsConst();
   vector<StateValue> vals;
 
-  auto x86_shuffle = [&]() {
-    for (unsigned i = 0; i < vty->numElementsConst(); ++i) {
-      auto mask = vty->extract(s[*v2], expr::mkUInt(i, 64));
-      // mask chooses the element from its own slide, which is 16-elems wide
-      auto idx = (mask.value & expr::mkUInt(15, mask.value))
-                             + expr::mkUInt(i & 0xF0, mask.value);
-      auto elem = vty->extract(s[*v1], move(idx));
-      vals.emplace_back(
-        expr::mkIf(mask.value.isNegative(), expr::mkUInt(0, 8), elem.value),
-        mask.non_poison && (mask.value.isNegative() || elem.non_poison));
-    }
-  };
-
   switch(op) {
   case LLVMIR_ShufVec:
     for (auto m : mask) {
@@ -3655,10 +3639,17 @@ StateValue ShuffleVector::toSMT(State &s) const {
       }
     }
     break;
-  case SSSE3_PShufB128:  // value, mask: <16 x i8>
-  case AVX2_PShufB:      // value, mask: <32 x i8>
-  case AVX512_PShufB512: // value, mask: <64 x i8>
-    x86_shuffle();
+  case PShufB:
+    for (unsigned i = 0; i < vty->numElementsConst(); ++i) {
+      auto mask = vty->extract(s[*v2], expr::mkUInt(i, 64));
+      // mask chooses the element from its own slide, which is 16-elems wide
+      auto idx = (mask.value & expr::mkUInt(15, mask.value))
+                             + expr::mkUInt(i & 0xF0, mask.value);
+      auto elem = vty->extract(s[*v1], move(idx));
+      vals.emplace_back(
+        expr::mkIf(mask.value.isNegative(), expr::mkUInt(0, 8), elem.value),
+        mask.non_poison && (mask.value.isNegative() || elem.non_poison));
+    }
     break;
   default:
     UNREACHABLE();

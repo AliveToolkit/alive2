@@ -897,9 +897,9 @@ public:
 
 class ShuffleVector final : public Instr {
 public:
-  enum Op { LLVMIR_ShufVec,
-            // X86 intrinsics
-            SSSE3_PShufB128, AVX2_PShufB, AVX512_PShufB512 };
+  enum Op { LLVMIR_ShufVec, // The LLVM IR's shufflevector
+            PShufB  // pshufb in X86; see pshufb in SSE3/AVX2/AVX512
+          };
 private:
   Value *v1, *v2;
   Op op;

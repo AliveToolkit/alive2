@@ -925,11 +925,9 @@ end:
       ShuffleVector::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::x86_ssse3_pshuf_b_128:
-        op = ShuffleVector::SSSE3_PShufB128; break;
       case llvm::Intrinsic::x86_avx2_pshuf_b:
-        op = ShuffleVector::AVX2_PShufB; break;
       case llvm::Intrinsic::x86_avx512_pshuf_b_512:
-        op = ShuffleVector::AVX512_PShufB512; break;
+        op = ShuffleVector::PShufB; break;
       }
       RETURN_IDENTIFIER(make_unique<ShuffleVector>(
           *llvm_type2alive(i.getType()), value_name(i), *a, *b, op));
