@@ -86,8 +86,8 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
 }
 
 bool State::VarArgsEntry::operator<(const VarArgsEntry &rhs) const {
-  return tie(alive, next_arg, num_args, va_start, active) <
-         tie(rhs.alive, rhs.next_arg, rhs.num_args, rhs.va_start, rhs.active);
+  return tie(alive, next_arg, num_args, is_va_start, active) <
+         tie(rhs.alive, rhs.next_arg, rhs.num_args, rhs.is_va_start, rhs.active);
 }
 
 State::VarArgsData
@@ -98,12 +98,12 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
     auto other = els.data.find(ptr);
     if (other == els.data.end()) {
       ret.data.try_emplace(ptr, cond && entry.alive, expr(entry.next_arg),
-                           expr(entry.num_args), expr(entry.va_start),
+                           expr(entry.num_args), expr(entry.is_va_start),
                            expr(entry.active));
     } else {
 #define C(f) expr::mkIf(cond, entry.f, other->second.f)
-      ret.data.try_emplace(ptr, C(alive), C(next_arg), C(num_args), C(va_start),
-                           C(active));
+      ret.data.try_emplace(ptr, C(alive), C(next_arg), C(num_args),
+                           C(is_va_start), C(active));
 #undef C
     }
   }
@@ -112,7 +112,7 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
     if (then.data.count(ptr))
       continue;
     ret.data.try_emplace(ptr, !cond && entry.alive, expr(entry.next_arg),
-                         expr(entry.num_args), expr(entry.va_start),
+                         expr(entry.num_args), expr(entry.is_va_start),
                          expr(entry.active));
   }
 

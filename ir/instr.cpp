@@ -3320,10 +3320,10 @@ StateValue VaStart::toSMT(State &s) const {
   for (auto &[ptr, entry] : data) {
     // FIXME. if entry.alive => memory leak (though not UB). detect this
     expr eq = ptr == raw_p;
-    entry.alive   |= eq;
-    entry.next_arg = expr::mkIf(eq, zero, entry.next_arg);
-    entry.num_args = expr::mkIf(eq, num_args, entry.num_args);
-    entry.va_start = expr::mkIf(eq, true, entry.va_start);
+    entry.alive      |= eq;
+    entry.next_arg    = expr::mkIf(eq, zero, entry.next_arg);
+    entry.num_args    = expr::mkIf(eq, num_args, entry.num_args);
+    entry.is_va_start = expr::mkIf(eq, true, entry.is_va_start);
     matched_one.add(move(eq));
   }
 
@@ -3331,7 +3331,7 @@ StateValue VaStart::toSMT(State &s) const {
   s.addUB(ptr.isBlockAlive());
   s.addUB(ptr.blockSize().uge(4)); // FIXME: this is target dependent
 
-  // alive, next_arg, num_args, va_start, active
+  // alive, next_arg, num_args, is_va_start, active
   data.try_emplace(raw_p, expr(true), move(zero), move(num_args), expr(true),
                    !matched_one());
 
@@ -3379,7 +3379,7 @@ static void ensure_varargs_ptr(D &data, State &s, const expr &arg_ptr) {
                           expr::mkUF("vararg_alive", { arg_ptr }, false),
                           expr(zero), // = next_arg
                           expr::mkUF("vararg_num_args", { arg_ptr }, zero),
-                          expr(false), // = va_start
+                          expr(false), // = is_va_start
                           !matched).second);
 }
 
@@ -3441,14 +3441,14 @@ StateValue VaCopy::toSMT(State &s) const {
 
     next_arg.add(entry.next_arg, select);
     num_args.add(entry.num_args, select);
-    is_va_start.add(entry.va_start, move(select));
+    is_va_start.add(entry.is_va_start, move(select));
 
     // kill aliases
     entry.active &= ptr != dst_raw;
   }
 
   // FIXME: dst should be empty or we have a mem leak
-  // alive, next_arg, num_args, va_start, active
+  // alive, next_arg, num_args, is_va_start, active
   data[dst_raw] = { true, *next_arg(), *num_args(), *is_va_start(), true };
 
   return {};
@@ -3493,11 +3493,11 @@ StateValue VaArg::toSMT(State &s) const {
     string arg_name = "va_arg_" + type;
     string arg_in_name = "va_arg_in_" + type;
     StateValue val = {
-      expr::mkIf(entry.va_start,
+      expr::mkIf(entry.is_va_start,
                  expr::mkUF(arg_name.c_str(), { entry.next_arg }, value_kind),
                  expr::mkUF(arg_in_name.c_str(), { ptr, entry.next_arg },
                             value_kind)),
-      expr::mkIf(entry.va_start,
+      expr::mkIf(entry.is_va_start,
                  expr::mkUF("va_arg_np", { entry.next_arg }, true),
                  expr::mkUF("va_arg_np_in", { ptr, entry.next_arg }, true))
     };
