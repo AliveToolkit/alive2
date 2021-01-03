@@ -896,12 +896,17 @@ public:
 
 
 class ShuffleVector final : public Instr {
+public:
+  enum Op { LLVMIR_ShufVec,
+            // X86 intrinsics
+            SSSE3_PShufB128, AVX2_PShufB, AVX512_PShufB512 };
+private:
   Value *v1, *v2;
+  Op op;
   std::vector<unsigned> mask;
 public:
-  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
-                std::vector<unsigned> mask)
-    : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
+  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2, Op op,
+                std::vector<unsigned> mask = {});
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;

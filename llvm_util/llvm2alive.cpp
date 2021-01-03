@@ -10,6 +10,7 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/Operator.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -915,6 +916,25 @@ end:
     case llvm::Intrinsic::prefetch:
       return NOP(i);
 
+    // X86 intrinsics
+    case llvm::Intrinsic::x86_ssse3_pshuf_b_128:
+    case llvm::Intrinsic::x86_avx2_pshuf_b:
+    case llvm::Intrinsic::x86_avx512_pshuf_b_512:
+    {
+      PARSE_BINOP();
+      ShuffleVector::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::x86_ssse3_pshuf_b_128:
+        op = ShuffleVector::SSSE3_PShufB128; break;
+      case llvm::Intrinsic::x86_avx2_pshuf_b:
+        op = ShuffleVector::AVX2_PShufB; break;
+      case llvm::Intrinsic::x86_avx512_pshuf_b_512:
+        op = ShuffleVector::AVX512_PShufB512; break;
+      }
+      RETURN_IDENTIFIER(make_unique<ShuffleVector>(
+          *llvm_type2alive(i.getType()), value_name(i), *a, *b, op));
+    }
+
     default:
       break;
     }
@@ -937,8 +957,8 @@ end:
     vector<unsigned> mask;
     for (auto m : i.getShuffleMask())
       mask.push_back(m);
-    RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
-                                                 move(mask)));
+    RETURN_IDENTIFIER(make_unique<ShuffleVector>(
+        *ty, value_name(i), *a, *b, ShuffleVector::LLVMIR_ShufVec, move(mask)));
   }
 
   RetTy visitVAArg(llvm::VAArgInst &i) {
