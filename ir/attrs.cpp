@@ -53,6 +53,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " align(" << attr.align << ')';
   if (attr.has(FnAttrs::NoThrow))
     os << " nothrow";
+  if (attr.has(FnAttrs::NoAlias))
+    os << " noalias";
   return os;
 }
 
