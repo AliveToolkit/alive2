@@ -191,14 +191,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_KNOWN_ATTRS();
   }
 
-  case llvm::LibFunc_strchr:
-  case llvm::LibFunc_strrchr:
-    attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::ArgMemOnly);
-    attrs.set(FnAttrs::NoWrite);
-    attrs.set(FnAttrs::NoFree);
-    RETURN_KNOWN_ATTRS();
-
   case llvm::LibFunc_fopen:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
