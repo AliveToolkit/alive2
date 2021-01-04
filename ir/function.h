@@ -28,7 +28,6 @@ class BasicBlock final {
   std::vector<std::unique_ptr<Instr>> m_instrs;
 
 public:
-  BasicBlock(std::string &&name) : name(std::move(name)) {}
   BasicBlock(std::string_view name) : name(name) {}
 
   const std::string& getName() const { return name; }
@@ -63,6 +62,8 @@ class Function final {
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
 
+  static BasicBlock sink_bb;
+
   unsigned bits_pointers = 64;
   unsigned bits_ptr_offset = 64;
   bool little_endian = true;
@@ -96,15 +97,16 @@ public:
   const std::string& getName() const { return name; }
 
   auto& getFnAttrs() { return attrs; }
+  auto& getFnAttrs() const { return attrs; }
 
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);
 
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getFirstBB() { return *BB_order[0]; }
+  const BasicBlock& getSinkBB() const { return sink_bb; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;
-  const BasicBlock* getBBIfExists(std::string_view name) const;
 
   void removeBB(BasicBlock &BB);
 

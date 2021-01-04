@@ -43,9 +43,7 @@ void sym_exec(State &s) {
     first = false;
   }
 
-  // TODO: remove copy
-  auto BBs = f.getBBs();
-  for (auto &bb : BBs) {
+  for (auto &bb : f.getBBs()) {
     if (!s.startBB(*bb))
       continue;
 

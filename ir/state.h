@@ -96,8 +96,7 @@ private:
     VarArgsData var_args;
   };
 
-  // TODO: make this const again
-  Function &f;
+  const Function &f;
   bool source;
   bool disable_undef_rewrite = false;
   bool is_initialization_phase = true;
@@ -174,7 +173,7 @@ private:
   VarArgsData var_args_data;
 
 public:
-  State(Function &f, bool source);
+  State(const Function &f, bool source);
 
   static void resetGlobals();
 

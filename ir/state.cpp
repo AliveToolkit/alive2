@@ -119,7 +119,7 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
   return ret;
 }
 
-State::State(Function &f, bool source)
+State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
@@ -567,7 +567,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
 
   auto dst = &dst0;
   if (seen_bbs.count(dst)) {
-    dst = &f.getBB("#sink");
+    dst = &f.getSinkBB();
   }
 
   cond &= domain.path;
@@ -919,11 +919,7 @@ void State::finishInitializer() {
 }
 
 expr State::sinkDomain() const {
-  auto bb = f.getBBIfExists("#sink");
-  if (!bb)
-    return false;
-
-  auto I = predecessor_data.find(bb);
+  auto I = predecessor_data.find(&f.getSinkBB());
   if (I == predecessor_data.end())
     return false;
 

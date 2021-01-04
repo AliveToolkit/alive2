@@ -109,6 +109,8 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
 }
 
 
+BasicBlock Function::sink_bb("#sink");
+
 expr Function::getTypeConstraints() const {
   expr t(true);
   for (auto bb : getBBs()) {
@@ -134,6 +136,7 @@ void Function::fixupTypes(const Model &m) {
 }
 
 BasicBlock& Function::getBB(string_view name, bool push_front) {
+  assert(name != "#sink");
   auto p = BBs.try_emplace(string(name), name);
   if (p.second) {
     if (push_front)
@@ -145,15 +148,12 @@ BasicBlock& Function::getBB(string_view name, bool push_front) {
 }
 
 const BasicBlock& Function::getBB(string_view name) const {
+  assert(name != "#sink");
   return BBs.at(string(name));
 }
 
-const BasicBlock* Function::getBBIfExists(string_view name) const {
-  auto I = BBs.find(string(name));
-  return I != BBs.end() ? &I->second : nullptr;
-}
-
 void Function::removeBB(BasicBlock &BB) {
+  assert(BB.getName() != "#sink");
   BBs.erase(BB.getName());
 
   for (auto I = BB_order.begin(), E = BB_order.end(); I != E; ++I) {
@@ -469,7 +469,7 @@ void Function::unroll(unsigned k) {
     return;
 
   auto &forest = la.getLoopForest();
-  BasicBlock &sink = getBB("#sink");
+  auto &sink = getSinkBB();
 
   vector<tuple<BasicBlock*, unsigned, bool>> worklist;
   // insert in reverse order because the worklist is iterated in LIFO
@@ -869,10 +869,11 @@ void CFG::printDot(ostream &os) const {
 // traverse the cfg in reverse postorder to build dominators.
 void DomTree::buildDominators(const CFG &cfg) {
   // initialization
-  unsigned i = f.getBBs().size();
+  unsigned i = f.getBBs().size() + 1;
   for (auto &b : f.getBBs()) {
     doms.emplace(b, *b).first->second.order = --i;
   }
+  doms.emplace(&f.getSinkBB(), f.getSinkBB()).first->second.order = 0;
 
   // build predecessors relationship
   for (auto [src, tgt, instr] : cfg) {
