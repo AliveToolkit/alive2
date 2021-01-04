@@ -147,22 +147,25 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   auto &var_name = var ? var->getName() : empty;
   auto &m = r.getModel();
 
-  s << msg;
-  if (!var_name.empty())
-    s << " for " << *var;
-
   auto &src_approx = src_state.getApproximations();
   auto &tgt_approx = tgt_state.getApproximations();
   if (!src_approx.empty() || !tgt_approx.empty()) {
-    s << "\n\nNOTE: Alive2 approximated the semantics of this program.\n"
-         "The bug found may be spurious. Approximations done:\n";
+    s << "Couldn't prove the correctness of the transformation\n"
+         "Alive2 approximated the semantics of the programs and therefore we\n"
+         "cannot conclude whether the bug found is valid or not.\n\n"
+         "Approximations done:\n";
     auto approx = src_approx;
     approx.insert(tgt_approx.begin(), tgt_approx.end());
     for (auto *a : approx) {
       s << " - " << a << '\n';
     }
+    errs.add(s.str(), false);
+    return;
   }
 
+  s << msg;
+  if (!var_name.empty())
+    s << " for " << *var;
   s << "\n\nExample:\n";
 
   for (auto &[var, val] : src_state.getValues()) {
