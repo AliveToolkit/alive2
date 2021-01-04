@@ -936,8 +936,7 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
 }
 
 Errors TransformVerify::verify() const {
-  if (t.src.getFnAttrs() != t.tgt.getFnAttrs() ||
-      !t.src.hasSameInputs(t.tgt)) {
+  if (!t.src.hasSameInputs(t.tgt)) {
     return { "Unsupported interprocedural transformation: signature mismatch "
              "between src and tgt", false };
   }

@@ -1,0 +1,11 @@
+; FIXME: this should fail!
+
+define void @src(i8* %p) {
+  store i8 1, i8* %p
+  ret void
+}
+
+define void @tgt(i8* %p) readonly {
+  store i8 1, i8* %p
+  ret void
+}
