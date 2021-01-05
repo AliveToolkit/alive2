@@ -9,6 +9,18 @@ if len(sys.argv) != 3 and len(sys.argv) != 4:
 
 passregpath = sys.argv[1]
 
+def skip_first_pass(s):
+  count = 0
+  for i in range(len(s)):
+    c = s[i]
+    if c == '(':
+      count += 1
+    elif c == ')':
+      count -= 1
+      if count == 0:
+        return s[i+2:]
+  return ''
+
 def wrap_str(arg, lst):
   for e in lst:
     arg = "%s(%s)" % (e, arg)
@@ -36,7 +48,22 @@ def wrap(args):
   # decorated already: function(foo)
   for ty,lst in pass_types.items():
     if firstpass.startswith(ty + '('):
-      return wrap_str(args, lst)
+      if lst:
+        return wrap_str(args, lst)
+
+      # check if we have function(foo), globalopt
+      next_pass = args
+      while True:
+        next_pass = skip_first_pass(next_pass)
+        if not next_pass:
+          return args
+        next_pass = wrap(next_pass)
+        if next_pass.startswith(ty + '('):
+          continue
+        # function(x), cgscc(y)
+        for ty,lst in pass_types.items():
+          if next_pass.startswith(ty + '('):
+            return wrap_str(args, ['module'])
 
   override = {
     # pass -> (type, prepend-type?)
@@ -97,7 +124,16 @@ else:
     ('repeat<2>(sroa)', 'function(repeat<2>(sroa))'),
     ('cgscc(devirt<4>(inline))', 'cgscc(devirt<4>(inline))'),
     ('devirt<1>(inline,function(gvn))', 'cgscc(devirt<1>(inline,function(gvn)))'),
+    ('require<opt-remark-emit>,loop(loop-unroll-full)', 'function(require<opt-remark-emit>,loop(loop-unroll-full))'),
     ('invalidate<domtree>,early-cse-memssa', 'function(invalidate<domtree>,early-cse-memssa)'),
+    ('function(loop-vectorize,instcombine)', 'function(loop-vectorize,instcombine)'),
+    ('function(loop-vectorize),function(instcombine)', 'function(loop-vectorize),function(instcombine)'),
+    ('function(loop-vectorize),function(instcombine),globalopt', 'module(function(loop-vectorize),function(instcombine),globalopt)'),
+    ('function(ee-instrument),function(ee-instrument),cgscc(inline),function(post-inline-ee-instrument)',
+       'module(function(ee-instrument),function(ee-instrument),cgscc(inline),function(post-inline-ee-instrument))'),
+    ('function(print<demanded-bits>),attributor', 'module(function(print<demanded-bits>),attributor)'),
+    ('function(tailcallelim),cgscc(inline)', 'module(function(tailcallelim),cgscc(inline))'),
+    ('function(slp-vectorizer),module(hotcoldsplit)', 'module(function(slp-vectorizer),module(hotcoldsplit))'),
     ('default<O2>', 'module(default<O2>)')
   ]
 
