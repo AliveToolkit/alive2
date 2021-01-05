@@ -910,15 +910,8 @@ end:
     case llvm::Intrinsic::x86_avx512_pshuf_b_512:
     {
       PARSE_BINOP();
-      ShuffleVector::Op op;
-      switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::x86_ssse3_pshuf_b_128:
-      case llvm::Intrinsic::x86_avx2_pshuf_b:
-      case llvm::Intrinsic::x86_avx512_pshuf_b_512:
-        op = ShuffleVector::PShufB; break;
-      }
-      RETURN_IDENTIFIER(make_unique<ShuffleVector>(
-          *llvm_type2alive(i.getType()), value_name(i), *a, *b, op));
+      RETURN_IDENTIFIER(make_unique<X86PShufB>(
+          *llvm_type2alive(i.getType()), value_name(i), *a, *b));
     }
 
     // do nothing intrinsics
@@ -955,8 +948,8 @@ end:
     vector<unsigned> mask;
     for (auto m : i.getShuffleMask())
       mask.push_back(m);
-    RETURN_IDENTIFIER(make_unique<ShuffleVector>(
-        *ty, value_name(i), *a, *b, ShuffleVector::LLVMIR_ShufVec, move(mask)));
+    RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
+                                                 move(mask)));
   }
 
   RetTy visitVAArg(llvm::VAArgInst &i) {
