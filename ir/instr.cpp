@@ -3593,15 +3593,6 @@ unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
 }
 
 
-ShuffleVector::ShuffleVector(
-    Type &type, string &&name, Value &v1, Value &v2, Op op,
-    vector<unsigned> mask_)
-    : Instr(type, move(name)), v1(&v1), v2(&v2), op(op), mask(move(mask_)) {
-  // Shufflevector operations other than LLVMIR_ShufVec do not take const mask
-  assert((op != LLVMIR_ShufVec && mask.size() == 0) ||
-         (op == LLVMIR_ShufVec && mask.size() != 0));
-}
-
 vector<Value*> ShuffleVector::operands() const {
   return { v1, v2 };
 }
@@ -3612,47 +3603,23 @@ void ShuffleVector::rauw(const Value &what, Value &with) {
 }
 
 void ShuffleVector::print(ostream &os) const {
-  const char *str = nullptr;
-  switch(op) {
-  case LLVMIR_ShufVec:   str = "shufflevector"; break;
-  case PShufB:  str = "pshufb"; break;
-  }
-  os << getName() << " = " << str << " " << *v1 << ", " << *v2;
-  if (op == LLVMIR_ShufVec)
-    for (auto m : mask)
-      os << ", " << m;
+  os << getName() << " = shufflevector " << *v1 << ", " << *v2;
+  for (auto m : mask)
+    os << ", " << m;
 }
 
 StateValue ShuffleVector::toSMT(State &s) const {
-  auto vty = static_cast<const VectorType*>(v1->getType().getAsAggregateType());
+  auto vty = v1->getType().getAsAggregateType();
   auto sz = vty->numElementsConst();
   vector<StateValue> vals;
 
-  switch(op) {
-  case LLVMIR_ShufVec:
-    for (auto m : mask) {
-      if (m >= 2 * sz) {
-        vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s).value, true);
-      } else {
-        auto *vect = &s[m < sz ? *v1 : *v2];
-        vals.emplace_back(vty->extract(*vect, expr::mkUInt(m % sz, 64)));
-      }
+  for (auto m : mask) {
+    if (m >= 2 * sz) {
+      vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s).value, true);
+    } else {
+      auto *vect = &s[m < sz ? *v1 : *v2];
+      vals.emplace_back(vty->extract(*vect, m % sz));
     }
-    break;
-  case PShufB:
-    for (unsigned i = 0; i < vty->numElementsConst(); ++i) {
-      auto mask = vty->extract(s[*v2], expr::mkUInt(i, 64));
-      // mask chooses the element from its own slide, which is 16-elems wide
-      auto idx = (mask.value & expr::mkUInt(15, mask.value))
-                             + expr::mkUInt(i & 0xF0, mask.value);
-      auto elem = vty->extract(s[*v1], move(idx));
-      vals.emplace_back(
-        expr::mkIf(mask.value.isNegative(), expr::mkUInt(0, 8), elem.value),
-        mask.non_poison && (mask.value.isNegative() || elem.non_poison));
-    }
-    break;
-  default:
-    UNREACHABLE();
   }
 
   return getType().getAsAggregateType()->aggregateVals(vals);
@@ -3661,16 +3628,58 @@ StateValue ShuffleVector::toSMT(State &s) const {
 expr ShuffleVector::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          getType().enforceVectorTypeSameChildTy(v1->getType()) &&
-         (op == LLVMIR_ShufVec ?
-          getType().getAsAggregateType()->numElements() == mask.size() :
-          expr(true)) &&
+         getType().getAsAggregateType()->numElements() == mask.size() &&
          v1->getType().enforceVectorType() &&
          v1->getType() == v2->getType();
 }
 
 unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
-  return make_unique<ShuffleVector>(getType(), getName() + suffix, *v1, *v2,
-                                    op, mask);
+  return make_unique<ShuffleVector>(getType(), getName() + suffix,
+                                    *v1, *v2, mask);
+}
+
+
+vector<Value*> X86PShufB::operands() const {
+  return { vec, mask };
+}
+
+void X86PShufB::rauw(const Value &what, Value &with) {
+  RAUW(vec);
+  RAUW(mask);
+}
+
+void X86PShufB::print(ostream &os) const {
+  os << getName() << " = pshufb " << *vec << ", " << *mask;
+}
+
+StateValue X86PShufB::toSMT(State &s) const {
+  auto vty = static_cast<const VectorType*>(
+      vec->getType().getAsAggregateType());
+  vector<StateValue> vals;
+
+  for (unsigned i = 0; i < vty->numElementsConst(); ++i) {
+    auto m = vty->extract(s[*mask], expr::mkUInt(i, 64));
+    // mask chooses the element from its own slide, which is 16-elems wide
+    auto idx = (m.value & expr::mkUInt(15, m.value))
+               + expr::mkUInt(i & 0xF0, m.value);
+    auto elem = vty->extract(s[*vec], move(idx));
+    vals.emplace_back(
+      expr::mkIf(m.value.isNegative(), expr::mkUInt(0, 8), elem.value),
+      m.non_poison && (m.value.isNegative() || elem.non_poison));
+  }
+
+  return getType().getAsAggregateType()->aggregateVals(vals);
+}
+
+expr X86PShufB::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+        getType().enforceVectorTypeSameChildTy(vec->getType()) &&
+        mask->getType().enforceVectorType() &&
+        vec->getType() == mask->getType();
+}
+
+unique_ptr<Instr> X86PShufB::dup(const string &suffix) const {
+  return make_unique<X86PShufB>(getType(), getName() + suffix, *vec, *mask);
 }
 
 

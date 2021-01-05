@@ -1064,9 +1064,8 @@ static unique_ptr<Instr> parse_shufflevector(string_view name) {
   while (tokenizer.consumeIf(COMMA)) {
     mask.push_back((unsigned)parse_number());
   }
-  return make_unique<ShuffleVector>(
-      get_sym_type(), string(name), a, b, ShuffleVector::LLVMIR_ShufVec,
-      move(mask));
+  return make_unique<ShuffleVector>(get_sym_type(), string(name), a, b,
+                                    move(mask));
 }
 
 static unique_ptr<Instr> parse_copyop(string_view name, token t) {

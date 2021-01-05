@@ -896,17 +896,12 @@ public:
 
 
 class ShuffleVector final : public Instr {
-public:
-  enum Op { LLVMIR_ShufVec, // The LLVM IR's shufflevector
-            PShufB  // pshufb in X86; see pshufb in SSE3/AVX2/AVX512
-          };
-private:
   Value *v1, *v2;
-  Op op;
   std::vector<unsigned> mask;
 public:
-  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2, Op op,
-                std::vector<unsigned> mask = {});
+  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
+                std::vector<unsigned> mask)
+    : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
@@ -915,6 +910,21 @@ public:
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
+
+// pshufb in X86; see pshufb in SSE3/AVX2/AVX512
+class X86PShufB final : public Instr {
+private:
+  Value *vec, *mask;
+public:
+  X86PShufB(Type &type, std::string &&name, Value &vec, Value &mask)
+    : Instr(type, move(name)), vec(&vec), mask(&mask) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
 
 const ConversionOp *isCast(ConversionOp::Op op, const Value &v);
 bool hasNoSideEffects(const Instr &i);
