@@ -3657,8 +3657,9 @@ StateValue X86PShufB::toSMT(State &s) const {
       vec->getType().getAsAggregateType());
   vector<StateValue> vals;
 
+  auto &mask_val = s[*mask];
   for (unsigned i = 0; i < vty->numElementsConst(); ++i) {
-    auto m = vty->extract(s[*mask], expr::mkUInt(i, 64));
+    auto m = vty->extract(mask_val, expr::mkUInt(i, 64));
     // mask chooses the element from its own slide, which is 16-elems wide
     auto idx = (m.value & expr::mkUInt(15, m.value))
                + expr::mkUInt(i & 0xF0, m.value);
