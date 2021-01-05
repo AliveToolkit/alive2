@@ -150,6 +150,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
+    BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));
     RETURN_KNOWN(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Sqrt));
 

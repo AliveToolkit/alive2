@@ -2466,6 +2466,8 @@ StateValue Assume::toSMT(State &s) const {
 }
 
 expr Assume::getTypeConstraints(const Function &f) const {
+  if (kind == WellDefined)
+    return true;
   return cond->getType().enforceIntType();
 }
 
