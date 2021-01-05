@@ -184,7 +184,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       auto vty = cast<llvm::VectorType>(ty);
       auto elems = vty->getElementCount().getKnownMinValue();
       auto ety = llvm_type2alive(vty->getElementType());
-      if (!ety)
+      if (!ety || elems > 1024)
         return nullptr;
       cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
                                       elems, *ety);
@@ -198,7 +198,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       auto elemty = aty->getElementType();
       auto elems = aty->getNumElements();
       auto ety = llvm_type2alive(elemty);
-      if (!ety)
+      if (!ety || elems > 100 * 1024)
         return nullptr;
 
       auto sz_with_padding = DL->getTypeAllocSize(elemty);
