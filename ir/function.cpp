@@ -219,14 +219,11 @@ bool Function::hasSameInputs(const Function &rhs) const {
   while (litr != lend && ritr != rend) {
     auto *lv = dynamic_cast<Input *>((*litr).get());
     auto *rv = dynamic_cast<Input *>((*ritr).get());
-    // TODO: &lv->getType() != &rv->getType() doesn't work because
-    // two struct types that are structurally equivalent don't compare equal
-    if (lv->getAttributes() != rv->getAttributes()) {
+    if (lv->getType().toString() != rv->getType().toString())
       return false;
-    }
 
-    litr++;
-    ritr++;
+    ++litr;
+    ++ritr;
     skip_constinputs();
   }
 
@@ -757,7 +754,7 @@ void Function::print(ostream &os, bool print_header) const {
   }
 
   if (print_header) {
-    os << "define" << attrs << ' ' << getType() << " @" << name << '(';
+    os << "define " << getType() << " @" << name << '(';
     bool first = true;
     for (auto &input : getInputs()) {
       if (!first)
@@ -767,7 +764,7 @@ void Function::print(ostream &os, bool print_header) const {
     }
     if (isVarArgs())
       os << (first ? "..." : ", ...");
-    os << ") {\n";
+    os << ')' << attrs << " {\n";
   }
 
   bool first = true;
