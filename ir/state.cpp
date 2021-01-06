@@ -22,12 +22,6 @@ State::CurrentDomain::operator bool() const {
   return !path.isFalse() && UB;
 }
 
-void State::CurrentDomain::reset() {
-  path = true;
-  UB.reset();
-  undef_vars.clear();
-}
-
 expr State::DomainPreds::operator()() const {
   return path() && *UB();
 }
@@ -522,8 +516,6 @@ bool State::startBB(const BasicBlock &bb) {
   ENSURE(seen_bbs.emplace(&bb).second);
   current_bb = &bb;
 
-  domain.reset();
-
   if (&f.getFirstBB() == &bb)
     return true;
 
@@ -554,7 +546,7 @@ bool State::startBB(const BasicBlock &bb) {
   }
 
   domain.path = path();
-  domain.UB.add(*UB());
+  domain.UB = *UB();
   memory = *in_memory();
   var_args_data = *var_args_in();
 

@@ -30,7 +30,7 @@ public:
 
 private:
   struct CurrentDomain {
-    smt::expr path; // path from fn entry
+    smt::expr path = true; // path from fn entry
     smt::AndExpr UB;
     std::set<smt::expr> undef_vars;
 

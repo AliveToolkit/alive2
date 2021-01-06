@@ -18,8 +18,8 @@ public:
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
   uint64_t derefBytes; // Dereferenceable
-  uint64_t blockSize;  // exact block size for e.g. byval args
-  uint64_t align = 1;
+  unsigned blockSize;  // exact block size for e.g. byval args
+  unsigned align = 1;
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
@@ -52,7 +52,7 @@ public:
   void set(Attribute a) { bits |= (unsigned)a; }
 
   uint64_t derefBytes; // Dereferenceable
-  uint64_t align = 1;
+  unsigned align = 1;
 
   // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const

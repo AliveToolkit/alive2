@@ -197,11 +197,8 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     return agg->aggregateVals(vals);
   }
 
-  bool has_byval = hasAttribute(ParamAttrs::ByVal);
-  bool has_deref = hasAttribute(ParamAttrs::Dereferenceable);
-
   expr val;
-  if (has_byval) {
+  if (hasAttribute(ParamAttrs::ByVal)) {
     unsigned bid;
     expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
     val = get_global(s, getName(), size, attrs.align, false, bid);
@@ -221,10 +218,15 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addUndefVar(move(var));
   }
 
-  if (has_deref) {
-    Pointer p(s.getMemory(), val);
-    s.addAxiom(p.isDereferenceable(attrs.derefBytes, bits_byte/8, false));
-  }
+  if (hasAttribute(ParamAttrs::NonNull))
+    s.addUB(!Pointer(s.getMemory(), val).isNull());
+
+  if (hasAttribute(ParamAttrs::Align))
+    s.addUB(Pointer(s.getMemory(), val).isAligned(attrs.align));
+
+  if (hasAttribute(ParamAttrs::Dereferenceable))
+    s.addUB(Pointer(s.getMemory(), val)
+              .isDereferenceable(attrs.derefBytes, bits_byte/8, false));
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);

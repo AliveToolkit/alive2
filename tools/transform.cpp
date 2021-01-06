@@ -703,7 +703,7 @@ static void calculateAndInitConstants(Transform &t) {
       }
       if (i->hasAttribute(ParamAttrs::ByVal)) {
         does_mem_access = true;
-        auto sz = i->getAttributes().blockSize;
+        uint64_t sz = i->getAttributes().blockSize;
         max_access_size = max(max_access_size, sz);
         min_global_size = min_global_size != UINT64_MAX
                             ? gcd(sz, min_global_size)
