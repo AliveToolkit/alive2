@@ -1260,18 +1260,16 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case FPToSInt:
     fn = [](auto &&val, auto &to_type) -> StateValue {
-      return { val.fp2sint(to_type.bits()),
-               val.foge(expr::IntSMin(to_type.bits()).sint2fp(val)) &&
-               val.fole(expr::IntSMax(to_type.bits()).sint2fp(val)) &&
-               !val.isInf() };
+      expr bv  = val.fp2sint(to_type.bits());
+      expr fp2 = bv.sint2fp(val);
+      return { move(bv), fp2 == val };
     };
     break;
   case FPToUInt:
     fn = [](auto &&val, auto &to_type) -> StateValue {
-      return { val.fp2uint(to_type.bits()),
-               val.foge(expr::mkFloat(0, val)) &&
-               val.fole(expr::IntUMax(to_type.bits()).uint2fp(val)) &&
-               !val.isInf() };
+      expr bv  = val.fp2uint(to_type.bits());
+      expr fp2 = bv.uint2fp(val);
+      return { move(bv), fp2 == val };
     };
     break;
   case FPExt:
