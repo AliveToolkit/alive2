@@ -63,6 +63,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   auto fputc_attr = [&]() {
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(1, ParamAttrs::NoCapture);
   };
 
@@ -184,16 +185,20 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
         RETURN_KNOWN(move(call));
       }
     }
+  }
+  [[fallthrough]];
+  case llvm::LibFunc_fwrite_unlocked:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
-  }
 
   case llvm::LibFunc_fopen:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::NoAlias);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
@@ -204,6 +209,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_fdopen:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::NoAlias);
     set_param(1, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::ReadOnly);
@@ -215,6 +221,17 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     fputc_attr();
     RETURN_KNOWN_ATTRS();
 
+  case llvm::LibFunc_fputs_unlocked:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::ReadOnly);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_clearerr:
+  case llvm::LibFunc_closedir:
   case llvm::LibFunc_fseek:
   case llvm::LibFunc_ftell:
   case llvm::LibFunc_fgetc:
@@ -239,15 +256,70 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
+  case llvm::LibFunc_fgets:
+  case llvm::LibFunc_fgets_unlocked:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(2, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
   case llvm::LibFunc_fread:
   case llvm::LibFunc_fread_unlocked:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
+  case llvm::LibFunc_open:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::ReadOnly);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_read:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoFree);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_write:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoFree);
+    set_param(1, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::ReadOnly);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_putchar:
+  case llvm::LibFunc_putchar_unlocked:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_stat:
+  case llvm::LibFunc_lstat:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::ReadOnly);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
   case llvm::LibFunc_access:
+  case llvm::LibFunc_chmod:
+  case llvm::LibFunc_chown:
+  case llvm::LibFunc_mkdir:
+  case llvm::LibFunc_perror:
+  case llvm::LibFunc_rmdir:
+  case llvm::LibFunc_remove:
+  case llvm::LibFunc_realpath:
+  case llvm::LibFunc_unlink:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
@@ -255,47 +327,13 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::ReadOnly);
     RETURN_KNOWN_ATTRS();
 
-  case llvm::LibFunc_open:
-    ret_and_args_no_undef();
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_read:
-    ret_and_args_no_undef();
-    set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_write:
-    ret_and_args_no_undef();
-    set_param(1, ParamAttrs::NoCapture);
-    set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_stat:
-  case llvm::LibFunc_lstat:
+  case llvm::LibFunc_opendir:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoAlias);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
-    set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_mkdir:
-  case llvm::LibFunc_rmdir:
-  case llvm::LibFunc_remove:
-  case llvm::LibFunc_realpath:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_clearerr:
-  case llvm::LibFunc_closedir:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
   case llvm::LibFunc_rename:
@@ -303,6 +341,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_utimes:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
     set_param(1, ParamAttrs::NoCapture);
@@ -317,18 +356,10 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(1, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
-  case llvm::LibFunc_chmod:
-  case llvm::LibFunc_chown:
-  case llvm::LibFunc_perror:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
-
   case llvm::LibFunc_dunder_isoc99_sscanf:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
     set_param(1, ParamAttrs::NoCapture);
@@ -347,9 +378,21 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_frexp:
   case llvm::LibFunc_frexpf:
   case llvm::LibFunc_frexpl:
+  case llvm::LibFunc_putc:
+  case llvm::LibFunc_putc_unlocked:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
     set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_ldexp:
+  case llvm::LibFunc_ldexpf:
+  case llvm::LibFunc_ldexpl:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoRead);
     RETURN_KNOWN_ATTRS();
 
   default:
