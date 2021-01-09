@@ -55,8 +55,7 @@ public:
   unsigned align = 1;
 
   // Returns true if returning poison or an aggregate having a poison is UB
-  bool poisonImpliesUB() const
-  { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(Align); }
+  bool poisonImpliesUB() const;
 
   // Returns true if returning (partially) undef is UB
   bool undefImpliesUB() const;

@@ -1696,7 +1696,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
         s.addUB(p.isDereferenceable(argflag.derefBytes, bits_byte / 8, false));
 
       if (argflag.has(ParamAttrs::NonNull))
-        s.addUB(p.isNonZero());
+        s.addUB(!p.isNull());
 
       if (argflag.has(ParamAttrs::Align))
         s.addUB(p.isAligned(argflag.align));
@@ -1753,7 +1753,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     if (isDeref)
       s.addUB(p.isDereferenceable(attrs.derefBytes));
     if (isNonNull)
-      s.addUB(p.isNonZero());
+      s.addUB(!p.isNull());
     if (isAlign)
       s.addUB(p.isAligned(attrs.align));
   }
@@ -1795,6 +1795,29 @@ StateValue FnCall::toSMT(State &s) const {
   fnName_mangled << '!' << getType();
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
+
+  auto check_access = [&]() {
+    if (attrs.has(FnAttrs::ArgMemOnly)) {
+      for (auto &p : ptr_inputs) {
+        if (!p.byval) {
+          Pointer ptr(s.getMemory(), p.val.value);
+          s.addUB(p.val.non_poison.implies(ptr.isLocal()));
+        }
+      }
+    } else {
+      s.addUB(expr(false));
+    }
+  };
+
+  if (!attrs.has(FnAttrs::NoRead)) {
+    if (s.getFn().getFnAttrs().has(FnAttrs::NoRead))
+      check_access();
+  }
+
+  if (!attrs.has(FnAttrs::NoWrite)) {
+    if (s.getFn().getFnAttrs().has(FnAttrs::NoWrite))
+      check_access();
+  }
 
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName_mangled.str(), move(inputs), move(ptr_inputs),
@@ -2353,17 +2376,21 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
-static void addUBForNoCaptureRet(State &s, const StateValue &svret,
-                                 const Type &t) {
-  auto &[vret, npret] = svret;
+static void check_ret_attributes(State &s, const StateValue &sv,
+                                 const Type &t, const FnAttrs &attrs) {
+  auto &[v, np] = sv;
   if (t.isPtrType()) {
-    s.addUB(npret.implies(!Pointer(s.getMemory(), vret).isNocapture()));
+    s.addUB(np.implies(!Pointer(s.getMemory(), v).isNocapture()));
     return;
+  }
+
+  if (attrs.has(FnAttrs::NNaN)) {
+    s.addUB(!v.isNaN());
   }
 
   if (auto agg = t.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      addUBForNoCaptureRet(s, agg->extract(svret, i), agg->getChild(i));
+      check_ret_attributes(s, agg->extract(sv, i), agg->getChild(i), attrs);
     }
   }
 }
@@ -2379,7 +2406,7 @@ StateValue Return::toSMT(State &s) const {
     retval = s[*val];
 
   s.addUB(s.getMemory().checkNocapture());
-  addUBForNoCaptureRet(s, retval, val->getType());
+  check_ret_attributes(s, retval, val->getType(), attrs);
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
@@ -2395,7 +2422,7 @@ StateValue Return::toSMT(State &s) const {
         s.addUB(p.getAllocType() != Pointer::STACK);
     }
     if (isNonNull) {
-      s.addUB(p.isNonZero());
+      s.addUB(!p.isNull());
     }
     if (isAlign) {
       s.addUB(p.isAligned(attrs.align));
@@ -2505,6 +2532,41 @@ MemInstr::ByteAccessInfo::full(unsigned byteSize) {
   return { true, true, true, byteSize };
 }
 
+static expr ptr_only_args(State &s, const FnAttrs &attrs, const expr &p) {
+  if (!attrs.has(FnAttrs::ArgMemOnly))
+    return true;
+
+  OrExpr e;
+  for (auto &in : s.getFn().getInputs()) {
+    auto &in_v = s[in];
+    e.add(in_v.non_poison && p == in_v.value);
+  }
+  return e();
+}
+
+static void check_can_load(State &s, const expr &p0) {
+  auto &attrs = s.getFn().getFnAttrs();
+  Pointer p(s.getMemory(), p0);
+
+  if (attrs.has(FnAttrs::NoRead))
+    s.addUB(p.isLocal());
+
+  s.addUB(p.isLocal() || ptr_only_args(s, attrs, p0));
+}
+
+static void check_can_store(State &s, const expr &p0) {
+  if (s.isInitializationPhase())
+    return;
+
+  auto &attrs = s.getFn().getFnAttrs();
+  Pointer p(s.getMemory(), p0);
+
+  if (attrs.has(FnAttrs::NoWrite))
+    s.addUB(p.isLocal());
+
+  s.addUB(p.isLocal() || ptr_only_args(s, attrs, p0));
+}
+
 
 DEFINE_AS_RETZERO(Alloc, getMaxAccessSize);
 DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
@@ -2606,6 +2668,9 @@ void Malloc::print(std::ostream &os) const {
 }
 
 StateValue Malloc::toSMT(State &s) const {
+  if (ptr && s.getFn().getFnAttrs().has(FnAttrs::NoFree))
+    s.addUB(expr(false));
+
   auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddUndefs(*size);
   s.addUB(np_size);
@@ -2624,6 +2689,7 @@ StateValue Malloc::toSMT(State &s) const {
   } else {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
+    check_can_store(s, p);
 
     m.copy(Pointer(m, p), Pointer(m, p_new.subst(allocated, true).simplify()));
 
@@ -2946,6 +3012,7 @@ void Load::print(std::ostream &os) const {
 
 StateValue Load::toSMT(State &s) const {
   auto &p = s.getAndAddPoisonUB(*ptr).value;
+  check_can_load(s, p);
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(move(ub));
   return sv;
@@ -2996,6 +3063,7 @@ StateValue Store::toSMT(State &s) const {
   }
 
   auto &p = s.getAndAddPoisonUB(*ptr).value;
+  check_can_store(s, p);
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
   return {};
@@ -3052,6 +3120,7 @@ StateValue Memset::toSMT(State &s) const {
     s.addUB((vbytes != 0).implies(sv_ptr.non_poison));
     vptr = sv_ptr.value;
   }
+  check_can_store(s, vptr);
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
   return {};
@@ -3123,6 +3192,8 @@ StateValue Memcpy::toSMT(State &s) const {
     s.addUB(
       vbytes.ule(expr::IntUMax(bits_size_t).zext(vbytes.bits() - bits_size_t)));
 
+  check_can_load(s, vsrc);
+  check_can_store(s, vdst);
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
 }
@@ -3171,6 +3242,9 @@ StateValue Memcmp::toSMT(State &s) const {
   auto &[vptr2, np2] = s[*ptr2];
   auto &vnum = s.getAndAddPoisonUB(*num).value;
   s.addUB((vnum != 0).implies(np1 && np2));
+
+  check_can_load(s, vptr1);
+  check_can_load(s, vptr2);
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
   // memcmp can be optimized to load & icmps, and it requires this
@@ -3265,6 +3339,7 @@ void Strlen::print(ostream &os) const {
 
 StateValue Strlen::toSMT(State &s) const {
   auto &eptr = s.getAndAddPoisonUB(*ptr).value;
+  check_can_load(s, eptr);
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();

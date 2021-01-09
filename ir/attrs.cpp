@@ -64,6 +64,11 @@ bool ParamAttrs::undefImpliesUB() const {
   return ub;
 }
 
+bool FnAttrs::poisonImpliesUB() const {
+  return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(Align) ||
+         has(NNaN);
+}
+
 bool FnAttrs::undefImpliesUB() const {
   bool ub = has(NoUndef);
   assert(!ub || poisonImpliesUB());
