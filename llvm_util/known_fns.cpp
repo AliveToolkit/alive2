@@ -188,6 +188,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   }
   [[fallthrough]];
   case llvm::LibFunc_fwrite_unlocked:
+  case llvm::LibFunc_fread:
+  case llvm::LibFunc_fread_unlocked:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
@@ -248,14 +250,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
-  case llvm::LibFunc_ferror:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoWrite);
-    attrs.set(FnAttrs::NoFree);
-    set_param(0, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
-
   case llvm::LibFunc_fgets:
   case llvm::LibFunc_fgets_unlocked:
     ret_and_args_no_undef();
@@ -265,16 +259,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(2, ParamAttrs::NoCapture);
     RETURN_KNOWN_ATTRS();
 
-  case llvm::LibFunc_fread:
-  case llvm::LibFunc_fread_unlocked:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoFree);
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(3, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
-
   case llvm::LibFunc_open:
+  case llvm::LibFunc_open64:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
@@ -294,6 +280,9 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(1, ParamAttrs::ReadOnly);
     RETURN_KNOWN_ATTRS();
 
+  case llvm::LibFunc_gets:
+  case llvm::LibFunc_getchar:
+  case llvm::LibFunc_getchar_unlocked:
   case llvm::LibFunc_putchar:
   case llvm::LibFunc_putchar_unlocked:
     ret_and_args_no_undef();
@@ -314,6 +303,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_access:
   case llvm::LibFunc_chmod:
   case llvm::LibFunc_chown:
+  case llvm::LibFunc_getpwnam:
   case llvm::LibFunc_mkdir:
   case llvm::LibFunc_perror:
   case llvm::LibFunc_rmdir:
@@ -339,23 +329,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_rename:
   case llvm::LibFunc_utime:
   case llvm::LibFunc_utimes:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoFree);
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(0, ParamAttrs::ReadOnly);
-    set_param(1, ParamAttrs::NoCapture);
-    set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
-
-  case llvm::LibFunc_gettimeofday:
-    ret_and_args_no_undef();
-    attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoFree);
-    set_param(0, ParamAttrs::NoCapture);
-    set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
-
   case llvm::LibFunc_dunder_isoc99_sscanf:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
@@ -366,8 +339,29 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(1, ParamAttrs::ReadOnly);
     RETURN_KNOWN_ATTRS();
 
-  case llvm::LibFunc_getenv:
+  case llvm::LibFunc_getc:
+  case llvm::LibFunc_getc_unlocked:
+  case llvm::LibFunc_getlogin_r:
+  case llvm::LibFunc_mktime:
+  case llvm::LibFunc_rewind:
+  case llvm::LibFunc_uname:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
+  case llvm::LibFunc_gettimeofday:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_KNOWN_ATTRS();
+
   case llvm::LibFunc_atof:
+  case llvm::LibFunc_ferror:
+  case llvm::LibFunc_getenv:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoWrite);
@@ -380,6 +374,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_frexpl:
   case llvm::LibFunc_putc:
   case llvm::LibFunc_putc_unlocked:
+  case llvm::LibFunc_ungetc:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
