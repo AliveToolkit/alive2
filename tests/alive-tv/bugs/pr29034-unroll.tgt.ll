@@ -61,7 +61,7 @@ while.cond2:                                      ; preds = %while.cond2.backedg
 
 sw.bb:                                            ; preds = %while.cond2
   %7 = load i32, i32* %file_num9, align 1
-  %call6 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %7)
+  %call6 = call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %7)
   br label %while.cond2.backedge
 
 sw.bb7:                                           ; preds = %while.cond2
@@ -90,4 +90,4 @@ declare i32 @music_decoder_init(%struct._MUSIC_OP_API_**)
 
 declare i32 @music_play_api(%struct._MUSIC_OP_API_*, i32, i32, i32, i8*)
 
-declare i32 @printf(i8* nocapture readonly, ...)
+declare i32 @myprintf(i8* nocapture readonly, ...)

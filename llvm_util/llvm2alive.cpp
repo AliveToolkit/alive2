@@ -244,7 +244,7 @@ public:
     RETURN_IDENTIFIER(make_unique<Freeze>(*ty, value_name(i), *val));
   }
 
-  RetTy visitCallInst(llvm::CallInst &i) {
+  RetTy visitCallInst(llvm::CallInst &i, bool approx = false) {
     vector<Value *> args;
     for (auto &arg : i.args()) {
       auto a = get_operand(arg);
@@ -253,9 +253,18 @@ public:
       args.emplace_back(a);
     }
 
-    auto [call_val, attrs, param_attrs, approx] = known_call(i, TLI, *BB, args);
-    if (call_val)
-      RETURN_IDENTIFIER(move(call_val));
+    FnAttrs attrs;
+    vector<ParamAttrs> param_attrs;
+    if (!approx) {
+      // call_val, attrs, param_attrs, approx
+      auto known = known_call(i, TLI, *BB, args);
+      if (get<0>(known))
+        RETURN_IDENTIFIER(move(get<0>(known)));
+
+      attrs       = move(get<1>(known));
+      param_attrs = move(get<2>(known));
+      approx      = get<3>(known);
+    }
 
     auto fn = i.getCalledFunction();
     if (!fn) // TODO: support indirect calls
@@ -827,7 +836,8 @@ public:
       case llvm::Intrinsic::vector_reduce_umin: op = UnaryReductionOp::UMin; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));
+      RETURN_IDENTIFIER(
+        make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
@@ -913,7 +923,7 @@ public:
     default:
       break;
     }
-    return error(i);
+    return visitCallInst(i, true);
   }
 
   RetTy visitExtractElementInst(llvm::ExtractElementInst &i) {
