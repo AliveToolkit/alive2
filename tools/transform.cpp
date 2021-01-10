@@ -694,11 +694,9 @@ static void calculateAndInitConstants(Transform &t) {
       if (!i)
         continue;
 
-      uint64_t align = i->getAttributes().align;
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
         uint64_t deref_bytes = i->getAttributes().derefBytes;
-        min_access_size = gcd(min_access_size, gcd(deref_bytes, align));
         max_access_size = max(max_access_size, deref_bytes);
       }
       if (i->hasAttribute(ParamAttrs::ByVal)) {
@@ -708,12 +706,7 @@ static void calculateAndInitConstants(Transform &t) {
         min_global_size = min_global_size != UINT64_MAX
                             ? gcd(sz, min_global_size)
                             : sz;
-        min_global_size = gcd(min_global_size, align);
       }
-    }
-
-    if (fn->getFnAttrs().has(FnAttrs::Align)) {
-      min_access_size = gcd(min_access_size, fn->getFnAttrs().align);
     }
 
     auto update_min_vect_sz = [&](const Type &ty) {
@@ -795,7 +788,6 @@ static void calculateAndInitConstants(Transform &t) {
       min_global_size = min_global_size != UINT64_MAX
                           ? gcd(sz, min_global_size)
                           : sz;
-      min_global_size = gcd(min_global_size, glb->getAlignment());
     }
   }
 

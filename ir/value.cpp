@@ -221,12 +221,11 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (hasAttribute(ParamAttrs::NonNull))
     s.addUB(!Pointer(s.getMemory(), val).isNull());
 
-  if (hasAttribute(ParamAttrs::Align))
-    s.addUB(Pointer(s.getMemory(), val).isAligned(attrs.align));
-
   if (hasAttribute(ParamAttrs::Dereferenceable))
     s.addUB(Pointer(s.getMemory(), val)
-              .isDereferenceable(attrs.derefBytes, bits_byte/8, false));
+              .isDereferenceable(attrs.derefBytes, attrs.align, false));
+  else if (hasAttribute(ParamAttrs::Align))
+    s.addUB(Pointer(s.getMemory(), val).isAligned(attrs.align));
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);

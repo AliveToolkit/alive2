@@ -641,7 +641,6 @@ expr Pointer::blockAlignment() const {
 }
 
 expr Pointer::isBlockAligned(unsigned align, bool exact) const {
-  assert(align >= bits_byte / 8);
   if (!exact && align == 1)
     return true;
 
@@ -651,7 +650,6 @@ expr Pointer::isBlockAligned(unsigned align, bool exact) const {
 }
 
 expr Pointer::isAligned(unsigned align) {
-  assert(align >= bits_byte / 8);
   if (align == 1)
     return true;
 

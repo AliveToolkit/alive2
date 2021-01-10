@@ -1690,13 +1690,12 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
       if (argflag.has(ParamAttrs::Dereferenceable))
-        s.addUB(p.isDereferenceable(argflag.derefBytes, bits_byte / 8, false));
+        s.addUB(p.isDereferenceable(argflag.derefBytes, argflag.align, false));
+      else if (argflag.has(ParamAttrs::Align))
+        s.addUB(p.isAligned(argflag.align));
 
       if (argflag.has(ParamAttrs::NonNull))
         s.addUB(!p.isNull());
-
-      if (argflag.has(ParamAttrs::Align))
-        s.addUB(p.isAligned(argflag.align));
 
       ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
@@ -1748,11 +1747,11 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     Pointer p(s.getMemory(), ret.value);
     s.addUB(ret.non_poison);
     if (isDeref)
-      s.addUB(p.isDereferenceable(attrs.derefBytes));
+      s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
+    else if (isAlign)
+      s.addUB(p.isAligned(attrs.align));
     if (isNonNull)
       s.addUB(!p.isNull());
-    if (isAlign)
-      s.addUB(p.isAligned(attrs.align));
   }
 
   return ret;
@@ -2412,15 +2411,14 @@ StateValue Return::toSMT(State &s) const {
     Pointer p(s.getMemory(), retval.value);
 
     if (isDeref) {
-      s.addUB(p.isDereferenceable(attrs.derefBytes));
+      s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
       if (has_alloca)
         s.addUB(p.getAllocType() != Pointer::STACK);
+    } else if (isAlign) {
+      s.addUB(p.isAligned(attrs.align));
     }
     if (isNonNull) {
       s.addUB(!p.isNull());
-    }
-    if (isAlign) {
-      s.addUB(p.isAligned(attrs.align));
     }
   }
 

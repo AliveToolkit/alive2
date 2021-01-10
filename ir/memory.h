@@ -159,7 +159,7 @@ public:
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(unsigned align, bool exact = false) const;
   smt::expr isAligned(unsigned align);
-  smt::AndExpr isDereferenceable(uint64_t bytes, unsigned align = bits_byte / 8,
+  smt::AndExpr isDereferenceable(uint64_t bytes, unsigned align,
                                  bool iswrite = false);
   smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
                                  bool iswrite);
