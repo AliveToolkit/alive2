@@ -6,14 +6,30 @@ $data = explode("\n", trim($data));
 $errors = array(
   'Out of memory; skipping function.' => 'OOM',
   'Source is more defined than target' => 'domain',
-  'Mismatch in memory' => 'memory',
-  'Precondition is always false' => 'precondition',
+  "Source and target don't have the same return domain" => 'noreturn',
   'Target is more poisonous than source' => 'poison',
+  "Target's return value is more undefined" => 'undef',
+  'Value mismatch' => 'retval',
+  'Mismatch in memory' => 'memory',
+  'Precondition is always false' => 'pre',
+  "Couldn't prove the correctness of the transformation" => 'approx',
+  'SMT Error' => 'SMT error',
 );
 
 foreach ($data as $line) {
   preg_match('/(.+)\.txt:ERROR: (.+)/S', $line, $m);
-  @++$table[$m[1]][$errors[$m[2]]];
+  $err = @$errors[$m[2]];
+  if (!$err) {
+    foreach ($errors as $key => $val) {
+      if (strpos($m[2], $key) === 0) {
+        $err = $val;
+        goto found;
+      }
+    }
+    continue;
+  }
+found:
+  @++$table[$m[1]][$err];
 }
 
 $max_file = 0;

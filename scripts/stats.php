@@ -42,7 +42,7 @@ foreach (glob("$logs/*.txt") as $f) {
     @++$unsupported["metadata $str"];
   }
 
-  preg_match_all('/call.+(@[^ (]+).*; WARNING: unknown known function/S', $txt, $m);
+  preg_match_all('/ - Unknown libcall: (@.+)/S', $txt, $m);
   foreach ($m[1] as $str) {
     @++$knownfns[$str];
   }
