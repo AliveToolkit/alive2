@@ -1671,9 +1671,6 @@ void FnCall::print(ostream &os) const {
     first = false;
   }
   os << ')' << attrs;
-
-  if (!valid)
-    os << "\t; WARNING: unknown known function";
 }
 
 static void unpack_inputs(State &s, Value &argv, Type &ty,
@@ -1762,10 +1759,8 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
 }
 
 StateValue FnCall::toSMT(State &s) const {
-  if (!valid) {
-    s.addUB(expr());
-    return {};
-  }
+  if (approx)
+    s.doesApproximation("Unknown libcall: " + fnName);
 
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
@@ -1843,7 +1838,7 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               FnAttrs(attrs), valid);
+                               FnAttrs(attrs), approx);
   r->args = args;
   return r;
 }

@@ -253,7 +253,7 @@ public:
       args.emplace_back(a);
     }
 
-    auto [call_val, attrs, param_attrs, valid] = known_call(i, TLI, *BB, args);
+    auto [call_val, attrs, param_attrs, approx] = known_call(i, TLI, *BB, args);
     if (call_val)
       RETURN_IDENTIFIER(move(call_val));
 
@@ -303,12 +303,8 @@ public:
 
     auto call = make_unique<FnCall>(*ty, value_name(i),
                                     '@' + fn->getName().str(), move(attrs),
-                                    valid);
+                                    approx);
     unique_ptr<Instr> ret_val;
-
-    // avoid parsing arguments altogether for "unknown known" functions
-    if (!valid)
-      goto end;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto *arg = args[argidx];
@@ -376,7 +372,7 @@ public:
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
           = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                FnAttrs(call->getAttributes()), valid);
+                                FnAttrs(call->getAttributes()), approx);
         for (auto &[arg, flags] : call->getArgs()) {
           call2->addArg(*arg, ParamAttrs(flags));
         }
@@ -399,7 +395,6 @@ public:
       BB->addInstr(move(call));
       RETURN_IDENTIFIER(move(ret_val));
     }
-end:
     RETURN_IDENTIFIER(move(call));
   }
 

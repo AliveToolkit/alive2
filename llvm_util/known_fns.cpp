@@ -13,13 +13,11 @@
 using namespace IR;
 using namespace std;
 
-#define RETURN_KNOWN(op) \
-  return { op, move(attrs), move(param_attrs), true }
-#define RETURN_KNOWN_ATTRS() \
-  return { nullptr, move(attrs), move(param_attrs), true }
-#define RETURN_UNKNOWN_KNOWN() \
+#define RETURN_VAL(op) \
+  return { op, move(attrs), move(param_attrs), false }
+#define RETURN_EXACT() \
   return { nullptr, move(attrs), move(param_attrs), false }
-#define RETURN_UNKNOWN() \
+#define RETURN_APPROX() \
   return { nullptr, move(attrs), move(param_attrs), true }
 
 namespace llvm_util {
@@ -32,18 +30,18 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
-    RETURN_UNKNOWN();
+    RETURN_EXACT();
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocLikeFn(&i, &TLI, false)) {
     bool isNonNull = i.getCalledFunction()->getName() != "malloc";
-    RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull));
+    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull));
   } else if (llvm::isCallocLikeFn(&i, &TLI, false)) {
-    RETURN_KNOWN(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1]));
+    RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1]));
   } else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
-    RETURN_KNOWN(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1]));
+    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1]));
   } else if (llvm::isFreeCall(&i, &TLI)) {
-    RETURN_KNOWN(make_unique<Free>(*args[0]));
+    RETURN_VAL(make_unique<Free>(*args[0]));
   }
 
   auto set_param = [&](unsigned i, ParamAttrs::Attribute attr) {
@@ -70,29 +68,29 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
   if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
-    RETURN_UNKNOWN();
+    RETURN_EXACT();
 
   switch (libfn) {
   case llvm::LibFunc_memset: // void* memset(void *ptr, int val, size_t bytes)
     BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
-    RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
-                                      UnaryOp::Copy));
+    RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
+                                    UnaryOp::Copy));
   case llvm::LibFunc_strlen:
     if (auto BI = llvm::dyn_cast<llvm::BitCastInst>(i.getArgOperand(0))) {
       auto G = llvm::dyn_cast<llvm::GlobalVariable>(BI->getOperand(0));
       if (G && G->isConstant() && G->hasDefinitiveInitializer()) {
         auto C = llvm::dyn_cast<llvm::ConstantDataArray>(G->getInitializer());
         if (C && C->isCString()) {
-          RETURN_KNOWN(make_unique<UnaryOp>(*ty, value_name(i),
+          RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i),
               *make_intconst(C->getAsCString().size(), ty->bits()),
               UnaryOp::Copy));
         }
       }
     }
-    RETURN_KNOWN(make_unique<Strlen>(*ty, value_name(i), *args[0]));
+    RETURN_VAL(make_unique<Strlen>(*ty, value_name(i), *args[0]));
   case llvm::LibFunc_memcmp:
   case llvm::LibFunc_bcmp: {
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<Memcmp>(*ty, value_name(i), *args[0], *args[1], *args[2],
                           libfn == llvm::LibFunc_bcmp));
   }
@@ -104,54 +102,53 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
                            value_name(i) + (needs_trunc ? "#beftrunc" : ""),
                            *args[0], UnaryOp::FFS);
     if (!needs_trunc)
-      RETURN_KNOWN(unique_ptr<UnaryOp>(Op));
+      RETURN_VAL(unique_ptr<UnaryOp>(Op));
 
     BB.addInstr(unique_ptr<UnaryOp>(Op));
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<ConversionOp>(*ty, value_name(i), *Op, ConversionOp::Trunc));
   }
 
   case llvm::LibFunc_abs:
   case llvm::LibFunc_labs:
   case llvm::LibFunc_llabs:
-    RETURN_KNOWN(make_unique<BinOp>(*ty, value_name(i), *args[0],
-                                    *make_intconst(1, 1), BinOp::Abs));
+    RETURN_VAL(make_unique<BinOp>(*ty, value_name(i), *args[0],
+                                  *make_intconst(1, 1), BinOp::Abs));
 
   case llvm::LibFunc_fabs:
   case llvm::LibFunc_fabsf:
-    RETURN_KNOWN(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs,
-                           parse_fmath(i)));
+    RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs,
+                                    parse_fmath(i)));
 
   case llvm::LibFunc_ceil:
   case llvm::LibFunc_ceilf:
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Ceil));
 
   case llvm::LibFunc_floor:
   case llvm::LibFunc_floorf:
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Floor));
 
   case llvm::LibFunc_round:
   case llvm::LibFunc_roundf:
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Round));
 
   case llvm::LibFunc_roundeven:
   case llvm::LibFunc_roundevenf:
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::RoundEven));
 
   case llvm::LibFunc_trunc:
   case llvm::LibFunc_truncf:
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Trunc));
 
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
     BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));
-    RETURN_KNOWN(
+    RETURN_VAL(
       make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Sqrt));
 
   case llvm::LibFunc_fwrite: {
@@ -161,7 +158,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       auto bytes = *size * *count;
       // size_t fwrite(const void *ptr, 0, 0, FILE *stream) -> 0
       if (bytes == 0)
-        RETURN_KNOWN(
+        RETURN_VAL(
           make_unique<UnaryOp>(*ty, value_name(i),
                                *make_intconst(0, ty->bits()), UnaryOp::Copy));
 
@@ -182,7 +179,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
         call->addArg(*args[3], move(param_attrs[1]));
         BB.addInstr(move(load));
         BB.addInstr(move(load_zext));
-        RETURN_KNOWN(move(call));
+        RETURN_VAL(move(call));
       }
     }
   }
@@ -195,7 +192,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(3, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_fopen:
     ret_and_args_no_undef();
@@ -206,7 +203,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::ReadOnly);
     set_param(1, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_fdopen:
     ret_and_args_no_undef();
@@ -215,13 +212,13 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoAlias);
     set_param(1, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_fputc:
   case llvm::LibFunc_fputc_unlocked:
   case llvm::LibFunc_fstat:
     fputc_attr();
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_fputs_unlocked:
     ret_and_args_no_undef();
@@ -230,7 +227,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::ReadOnly);
     set_param(0, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_clearerr:
   case llvm::LibFunc_closedir:
@@ -248,7 +245,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     set_param(0, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_fgets:
   case llvm::LibFunc_fgets_unlocked:
@@ -257,7 +254,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(2, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_open:
   case llvm::LibFunc_open64:
@@ -265,20 +262,20 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_read:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoFree);
     set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_write:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoFree);
     set_param(1, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_gets:
   case llvm::LibFunc_getchar:
@@ -288,7 +285,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_stat:
   case llvm::LibFunc_lstat:
@@ -298,7 +295,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
     set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_access:
   case llvm::LibFunc_chmod:
@@ -315,7 +312,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_opendir:
     ret_and_args_no_undef();
@@ -324,7 +321,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoAlias);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_rename:
   case llvm::LibFunc_utime:
@@ -337,7 +334,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(0, ParamAttrs::ReadOnly);
     set_param(1, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::ReadOnly);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_getc:
   case llvm::LibFunc_getc_unlocked:
@@ -349,7 +346,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_gettimeofday:
     ret_and_args_no_undef();
@@ -357,7 +354,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_atof:
   case llvm::LibFunc_ferror:
@@ -367,7 +364,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_frexp:
   case llvm::LibFunc_frexpf:
@@ -379,7 +376,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     set_param(1, ParamAttrs::NoCapture);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   case llvm::LibFunc_ldexp:
   case llvm::LibFunc_ldexpf:
@@ -388,10 +385,10 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::NoRead);
-    RETURN_KNOWN_ATTRS();
+    RETURN_EXACT();
 
   default:
-    RETURN_UNKNOWN_KNOWN();
+    RETURN_APPROX();
   }
 }
 

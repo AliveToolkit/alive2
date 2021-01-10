@@ -870,8 +870,8 @@ void State::useUnsupported(const char *name) {
   used_unsupported.emplace(name);
 }
 
-void State::doesApproximation(const char *name) {
-  used_approximations.emplace(name);
+void State::doesApproximation(string &&name) {
+  used_approximations.emplace(move(name));
 }
 
 void State::addQuantVar(const expr &var) {

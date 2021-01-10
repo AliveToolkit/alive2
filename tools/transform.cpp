@@ -156,7 +156,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
          "Approximations done:\n";
     auto approx = src_approx;
     approx.insert(tgt_approx.begin(), tgt_approx.end());
-    for (auto *a : approx) {
+    for (auto &a : approx) {
       s << " - " << a << '\n';
     }
     errs.add(s.str(), false);

@@ -786,12 +786,12 @@ private:
   std::string fnName;
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
-  bool valid;
+  bool approx;
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, bool valid = true)
+         FnAttrs &&attrs = FnAttrs::None, bool approx = false)
     : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
-      attrs(std::move(attrs)), valid(valid) {}
+      attrs(std::move(attrs)), approx(approx) {}
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }

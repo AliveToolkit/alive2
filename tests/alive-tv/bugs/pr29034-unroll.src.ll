@@ -61,7 +61,7 @@ sw.bb:                                            ; preds = %while.cond2
   %5 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api4, align 8
   %file_num5 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %5, i64 0, i32 2
   %6 = load i32, i32* %file_num5, align 1
-  %call6 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %6) #6
+  %call6 = call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %6) #6
   br label %while.cond2.backedge
 
 sw.bb7:                                           ; preds = %while.cond2
@@ -102,6 +102,6 @@ declare i32 @music_decoder_init(%struct._MUSIC_OP_API_**)
 
 declare i32 @music_play_api(%struct._MUSIC_OP_API_*, i32, i32, i32, i8*)
 
-declare i32 @printf(i8* nocapture readonly, ...)
+declare i32 @myprintf(i8* nocapture readonly, ...)
 
 ; ERROR: Source is more defined than target

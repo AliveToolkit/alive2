@@ -8,4 +8,4 @@ define void @f() {
 
 declare i32 @printf(i8*, ...)
 
-; ERROR: Invalid expr
+; ERROR: Couldn't prove the correctness of the transformation
