@@ -1810,8 +1810,6 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   expr size_zext = size.zextOrTrunc(bits_size_t);
   expr nooverflow = size_zext.extract(bits_size_t - 1, bits_size_t - 1) == 0;
-  assert(bits_byte == 8 || is_local ||
-         size_zext.urem(expr::mkUInt(bits_byte/8, bits_size_t)).isZero());
 
   expr allocated = precond && nooverflow;
   state->addPre(nonnull.implies(allocated));

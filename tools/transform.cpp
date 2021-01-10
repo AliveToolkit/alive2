@@ -840,23 +840,7 @@ static void calculateAndInitConstants(Transform &t) {
   bits_size_t = ilog2_ceil(max_alloc_size, true);
   bits_size_t = min(max(bits_for_offset, bits_size_t)+1, bits_program_pointer);
 
-  // size of byte
-  if (num_globals != 0) {
-    if (does_mem_access || has_vector_bitcast)
-      min_access_size = gcd(min_global_size, min_access_size);
-    else {
-      min_access_size = min_global_size;
-      while (min_access_size > 8) {
-        if (min_access_size % 2) {
-          min_access_size = 1;
-          break;
-        }
-        min_access_size /= 2;
-      }
-    }
-  }
-  bits_byte = 8 * ((does_mem_access || num_globals != 0)
-                     ? (unsigned)min_access_size : 1);
+  bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
 
   bits_poison_per_byte = 1;
   if (min_vect_elem_sz > 0)
