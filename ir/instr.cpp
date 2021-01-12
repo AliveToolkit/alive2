@@ -1695,7 +1695,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
         s.addUB(p.isAligned(argflag.align));
 
       if (argflag.has(ParamAttrs::NonNull))
-        s.addUB(!p.isNull());
+        s.addUB(p.isNonZero());
 
       ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
                               argflag.has(ParamAttrs::ByVal),
@@ -1735,15 +1735,18 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     return agg->aggregateVals(vs);
   }
 
-  auto &ret = vals[idx++];
-  if (ty.isFloatType() && attrs.has(FnAttrs::NNaN))
+  auto ret = move(vals[idx++]);
+  if (attrs.has(FnAttrs::NNaN)) {
+    assert(ty.isFloatType());
     ret.non_poison &= !ret.value.isNaN();
+  }
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
   bool isAlign = attrs.has(FnAttrs::Align);
 
-  if (ty.isPtrType() && (isDeref || isNonNull || isAlign)) {
+  if (isDeref || isNonNull || isAlign) {
+    assert(ty.isPtrType());
     Pointer p(s.getMemory(), ret.value);
     s.addUB(ret.non_poison);
     if (isDeref)
@@ -1751,7 +1754,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     else if (isAlign)
       s.addUB(p.isAligned(attrs.align));
     if (isNonNull)
-      s.addUB(!p.isNull());
+      s.addUB(p.isNonZero());
   }
 
   return ret;
@@ -2418,7 +2421,7 @@ StateValue Return::toSMT(State &s) const {
       s.addUB(p.isAligned(attrs.align));
     }
     if (isNonNull) {
-      s.addUB(!p.isNull());
+      s.addUB(p.isNonZero());
     }
   }
 

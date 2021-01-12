@@ -1580,11 +1580,6 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
   Pointer p(*this, name, false, false, false, attr_to_bitvec(attrs));
   auto bid = p.getShortBid();
 
-  if (attrs.has(ParamAttrs::NonNull))
-    state->addAxiom(p.isNonZero());
-  if (attrs.has(ParamAttrs::Align))
-    state->addAxiom(p.isAligned(attrs.align));
-
   state->addAxiom(bid.ule(max_bid));
 
   AliasSet alias(*this);

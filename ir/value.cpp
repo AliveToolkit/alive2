@@ -219,7 +219,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   }
 
   if (hasAttribute(ParamAttrs::NonNull))
-    s.addUB(!Pointer(s.getMemory(), val).isNull());
+    s.addUB(Pointer(s.getMemory(), val).isNonZero());
 
   if (hasAttribute(ParamAttrs::Dereferenceable))
     s.addUB(Pointer(s.getMemory(), val)
