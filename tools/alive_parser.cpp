@@ -760,6 +760,41 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   return make_unique<BinOp>(*rettype, string(name), a, b, op, flags, fmath);
 }
 
+static unique_ptr<Instr> parse_vpbinop(string_view name, token op_token) {
+  auto &type = parse_type();
+  auto &a = parse_operand(type);
+  parse_comma();
+  auto &b = parse_operand(type);
+  parse_comma();
+  auto &mt = parse_type();
+  auto &mask = parse_operand(mt);
+  parse_comma();
+  auto &et = parse_type();
+  auto &evl = parse_operand(et);
+  Type *rettype = &type;
+
+  VectorPredicatedBinOp::Op op;
+  switch (op_token) {
+  case VPADD:  op = VectorPredicatedBinOp::Add; break;
+  case VPSUB:  op = VectorPredicatedBinOp::Sub; break;
+  case VPMUL:  op = VectorPredicatedBinOp::Mul; break;
+  case VPSDIV: op = VectorPredicatedBinOp::SDiv; break;
+  case VPUDIV: op = VectorPredicatedBinOp::UDiv; break;
+  case VPSREM: op = VectorPredicatedBinOp::SRem; break;
+  case VPUREM: op = VectorPredicatedBinOp::URem; break;
+  case VPSHL:  op = VectorPredicatedBinOp::Shl; break;
+  case VPLSHR: op = VectorPredicatedBinOp::LShr; break;
+  case VPASHR: op = VectorPredicatedBinOp::AShr; break;
+  case VPAND:  op = VectorPredicatedBinOp::And; break;
+  case VPOR:   op = VectorPredicatedBinOp::Or; break;
+  case VPXOR:  op = VectorPredicatedBinOp::Xor; break;
+  default:
+    UNREACHABLE();
+  }
+  return make_unique<VectorPredicatedBinOp>(*rettype, string(name),
+                                            a, b, mask, evl, op);
+}
+
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   auto fmath = parse_fast_math(op_token);
 
@@ -1119,6 +1154,20 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SMAX:
   case ABS:
     return parse_binop(name, t);
+  case VPADD:
+  case VPSUB:
+  case VPMUL:
+  case VPSDIV:
+  case VPUDIV:
+  case VPSREM:
+  case VPUREM:
+  case VPSHL:
+  case VPASHR:
+  case VPLSHR:
+  case VPAND:
+  case VPOR:
+  case VPXOR:
+    return parse_vpbinop(name, t);
   case BITREVERSE:
   case BSWAP:
   case CTPOP:

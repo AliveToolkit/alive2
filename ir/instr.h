@@ -71,6 +71,32 @@ public:
 };
 
 
+class VectorPredicatedBinOp final : public Instr {
+public:
+  enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
+            And, Or, Xor};
+
+private:
+  Value *lhs, *rhs, *mask, *evl;
+  Op op;
+  bool isDivOrRem() const;
+
+public:
+  VectorPredicatedBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs,
+                        Value &mask, Value &evl, Op op)
+    : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), mask(&mask),
+    evl(&evl), op(op) {}
+
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class UnaryOp final : public Instr {
 public:
   enum Op {

@@ -1,0 +1,150 @@
+Name: constant-folding-xor-1
+%r = vp_xor <2 x i8> <i8 3, i8 5>, <i8 6, i8 4>, <2 x i1> <i1 1, i1 1>, i32 2
+  =>
+%r = <2 x i8> <i8 5, i8 1>
+
+Name: constant-folding-xor-1'
+%r = <2 x i8> <i8 5, i8 1>
+  =>
+%r = vp_xor <2 x i8> <i8 3, i8 5>, <i8 6, i8 4>, <2 x i1> <i1 1, i1 1>, i32 2
+
+Name: constant-folding-xor-2
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 3
+  =>
+%r = <3 x i8> <i8 4, i8 0, i8 4>
+
+Name: constant-folding-xor-2'
+%r = <3 x i8> <i8 4, i8 0, i8 4>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 3
+
+Name: constant-folding-xor-3
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 2
+  =>
+%r = <3 x i8> <i8 4, i8 0, i8 undef>
+
+Name: constant-folding-xor-3'
+%r = <3 x i8> <i8 4, i8 0, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 2
+
+Name: constant-folding-xor-4
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 2
+  =>
+%r = <3 x i8> <i8 4, i8 undef, i8 undef>
+
+Name: constant-folding-xor-4'
+%r = <3 x i8> <i8 4, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 2
+
+Name: constant-folding-xor-5
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+
+Name: constant-folding-xor-5'
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 100
+
+Name: constant-folding-xor-6
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 0, i1 1, i1 0>, i32 100
+  =>
+%r = <3 x i8> <i8 undef, i8 0, i8 undef>
+
+Name: constant-folding-xor-6'
+%r = <3 x i8> <i8 undef, i8 0, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 0, i1 1, i1 0>, i32 100
+
+Name: constant-folding-xor-7
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 1
+  =>
+%r = <3 x i8> <i8 4, i8 undef, i8 undef>
+
+Name: constant-folding-xor-7'
+%r = <3 x i8> <i8 4, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 1
+
+Name: constant-folding-xor-8
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-xor-8'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+
+Name: constant-folding-xor-9
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 undef, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+
+Name: constant-folding-xor-9'
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 undef, i1 1>, i32 100
+
+Name: constant-folding-xor-10
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 undef
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-xor-10'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 undef
+
+Name: constant-folding-xor-11
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 poison
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-xor-11'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 poison
+
+Name: constant-folding-xor-12
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 undef
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-xor-12'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 undef
+
+Name: constant-folding-xor-13
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+
+Name: constant-folding-xor-13'
+%r = <3 x i8> <i8 4, i8 undef, i8 4>
+  =>
+%r = vp_xor <3 x i8> <i8 3, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 100
+
+Name: constant-folding-xor-14
+%r = vp_xor <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-xor-14'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+
+Name: constant-folding-xor-15
+%r = vp_xor <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 0>, i32 100
+  =>
+%r = <3 x i8> <i8 poison, i8 undef, i8 undef>
+
+Name: constant-folding-xor-15'
+%r = <3 x i8> <i8 poison, i8 undef, i8 undef>
+  =>
+%r = vp_xor <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 0>, i32 100
+

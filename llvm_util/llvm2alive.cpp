@@ -55,6 +55,15 @@ string_view s(llvm::StringRef str) {
   if (!ty || !a || !b || !c)              \
     return error(i)
 
+#define PARSE_QUATEROP()                  \
+  auto ty = llvm_type2alive(i.getType()); \
+  auto a = get_operand(i.getOperand(0));  \
+  auto b = get_operand(i.getOperand(1));  \
+  auto c = get_operand(i.getOperand(2));  \
+  auto d = get_operand(i.getOperand(3));  \
+  if (!ty || !a || !b || !c || !d)        \
+    return error(i)
+
 #define RETURN_IDENTIFIER(op)      \
   do {                             \
     auto ret = op;                 \
@@ -838,6 +847,41 @@ public:
       }
       RETURN_IDENTIFIER(
         make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));
+    }
+    case llvm::Intrinsic::vp_add:
+    case llvm::Intrinsic::vp_sub:
+    case llvm::Intrinsic::vp_mul:
+    case llvm::Intrinsic::vp_sdiv:
+    case llvm::Intrinsic::vp_udiv:
+    case llvm::Intrinsic::vp_srem:
+    case llvm::Intrinsic::vp_urem:
+    case llvm::Intrinsic::vp_shl:
+    case llvm::Intrinsic::vp_ashr:
+    case llvm::Intrinsic::vp_lshr:
+    case llvm::Intrinsic::vp_and:
+    case llvm::Intrinsic::vp_or:
+    case llvm::Intrinsic::vp_xor: {
+      PARSE_QUATEROP();
+      VectorPredicatedBinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::vp_add: op = VectorPredicatedBinOp::Add; break;
+      case llvm::Intrinsic::vp_sub: op = VectorPredicatedBinOp::Sub; break;
+      case llvm::Intrinsic::vp_mul: op = VectorPredicatedBinOp::Mul; break;
+      case llvm::Intrinsic::vp_sdiv:  op = VectorPredicatedBinOp::SDiv;  break;
+      case llvm::Intrinsic::vp_udiv: op = VectorPredicatedBinOp::UDiv; break;
+      case llvm::Intrinsic::vp_srem: op = VectorPredicatedBinOp::SRem; break;
+      case llvm::Intrinsic::vp_urem: op = VectorPredicatedBinOp::URem; break;
+      case llvm::Intrinsic::vp_shl: op = VectorPredicatedBinOp::Shl; break;
+      case llvm::Intrinsic::vp_ashr: op = VectorPredicatedBinOp::AShr; break;
+      case llvm::Intrinsic::vp_lshr: op = VectorPredicatedBinOp::LShr; break;
+      case llvm::Intrinsic::vp_and: op = VectorPredicatedBinOp::And; break;
+      case llvm::Intrinsic::vp_or: op = VectorPredicatedBinOp::Or; break;
+      case llvm::Intrinsic::vp_xor: op = VectorPredicatedBinOp::Xor; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(
+        make_unique<VectorPredicatedBinOp>(*ty, value_name(i),
+                                           *a, *b, *c, *d, op));
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:

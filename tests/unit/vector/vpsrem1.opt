@@ -1,0 +1,150 @@
+Name: constant-folding-srem-1
+%r = vp_srem <2 x i8> <i8 3, i8 -5>, <i8 6, i8 4>, <2 x i1> <i1 1, i1 1>, i32 2
+  =>
+%r = <2 x i8> <i8 3, i8 -1>
+
+Name: constant-folding-srem-1'
+%r = <2 x i8> <i8 3, i8 -1>
+  =>
+%r = vp_srem <2 x i8> <i8 3, i8 -5>, <i8 6, i8 4>, <2 x i1> <i1 1, i1 1>, i32 2
+
+Name: constant-folding-srem-2
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 3
+  =>
+%r = <3 x i8> <i8 3, i8 0, i8 1>
+
+Name: constant-folding-srem-2'
+%r = <3 x i8> <i8 3, i8 0, i8 1>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 3
+
+Name: constant-folding-srem-3
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 2
+  =>
+%r = <3 x i8> <i8 3, i8 0, i8 undef>
+
+Name: constant-folding-srem-3'
+%r = <3 x i8> <i8 3, i8 0, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 2
+
+Name: constant-folding-srem-4
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 2
+  =>
+%r = <3 x i8> <i8 3, i8 undef, i8 undef>
+
+Name: constant-folding-srem-4'
+%r = <3 x i8> <i8 3, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 2
+
+Name: constant-folding-srem-5
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+
+Name: constant-folding-srem-5'
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 1>, i32 100
+
+Name: constant-folding-srem-6
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 0, i1 1, i1 0>, i32 100
+  =>
+%r = <3 x i8> <i8 undef, i8 0, i8 undef>
+
+Name: constant-folding-srem-6'
+%r = <3 x i8> <i8 undef, i8 0, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 0, i1 1, i1 0>, i32 100
+
+Name: constant-folding-srem-7
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 1
+  =>
+%r = <3 x i8> <i8 3, i8 undef, i8 undef>
+
+Name: constant-folding-srem-7'
+%r = <3 x i8> <i8 3, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 1
+
+Name: constant-folding-srem-8
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-srem-8'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+
+Name: constant-folding-srem-9
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 undef, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+
+Name: constant-folding-srem-9'
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 undef, i1 1>, i32 100
+
+Name: constant-folding-srem-10
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 undef
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-srem-10'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 undef
+
+Name: constant-folding-srem-11
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 poison
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-srem-11'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 poison
+
+Name: constant-folding-srem-12
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 undef
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-srem-12'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 undef
+
+Name: constant-folding-srem-13
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 100
+  =>
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+
+Name: constant-folding-srem-13'
+%r = <3 x i8> <i8 3, i8 undef, i8 1>
+  =>
+%r = vp_srem <3 x i8> <i8 3, i8 -5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 poison, i1 1>, i32 100
+
+Name: constant-folding-srem-14
+%r = vp_srem <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+  =>
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+
+Name: constant-folding-srem-14'
+%r = <3 x i8> <i8 undef, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 1, i1 1>, i32 0
+
+Name: constant-folding-srem-15
+%r = vp_srem <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 0>, i32 100
+  =>
+%r = <3 x i8> <i8 poison, i8 undef, i8 undef>
+
+Name: constant-folding-srem-15'
+%r = <3 x i8> <i8 poison, i8 undef, i8 undef>
+  =>
+%r = vp_srem <3 x i8> <i8 poison, i8 5, i8 7>, <i8 7, i8 5, i8 3>, <3 x i1> <i1 1, i1 0, i1 0>, i32 100
+

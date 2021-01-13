@@ -824,6 +824,130 @@ bool BinOp::isDivOrRem() const {
 }
 
 
+vector<Value*> VectorPredicatedBinOp::operands() const {
+  return { lhs, rhs, mask, evl };
+}
+
+bool VectorPredicatedBinOp::propagatesPoison() const {
+  return true;
+}
+
+void VectorPredicatedBinOp::rauw(const Value &what, Value &with) {
+  RAUW(lhs);
+  RAUW(rhs);
+  RAUW(mask);
+  RAUW(evl);
+}
+
+void VectorPredicatedBinOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case Add:  str = "vp.add "; break;
+  case Sub:  str = "vp.sub "; break;
+  case Mul:  str = "vp.mul "; break;
+  case SDiv: str = "vp.sdiv "; break;
+  case UDiv: str = "vp.udiv "; break;
+  case SRem: str = "vp.srem "; break;
+  case URem: str = "vp.urem "; break;
+  case Shl:  str = "vp.shl "; break;
+  case AShr: str = "vp.ashr "; break;
+  case LShr: str = "vp.lshr "; break;
+  case And:  str = "vp.and "; break;
+  case Or:   str = "vp.or "; break;
+  case Xor:  str = "vp.xor "; break;
+  }
+
+  os << getName() << " = " << str << print_type(getType())
+     << lhs->getName()  << ", " << rhs->getName() << ", "
+     << mask->getName() << ", " << evl->getName();
+}
+
+StateValue VectorPredicatedBinOp::toSMT(State &s) const {
+  function<expr(const expr&, const expr&)> fn;
+
+  switch (op) {
+  case Add:  fn = [&](auto a, auto b) -> expr { return a + b; };     break;
+  case Sub:  fn = [&](auto a, auto b) -> expr { return a - b; };     break;
+  case Mul:  fn = [&](auto a, auto b) -> expr { return a * b; };     break;
+  case SDiv: fn = [&](auto a, auto b) -> expr { return a.sdiv(b); }; break;
+  case UDiv: fn = [&](auto a, auto b) -> expr { return a.udiv(b); }; break;
+  case SRem: fn = [&](auto a, auto b) -> expr { return a.srem(b); }; break;
+  case URem: fn = [&](auto a, auto b) -> expr { return a.urem(b); }; break;
+  case Shl:  fn = [&](auto a, auto b) -> expr { return a << b; };    break;
+  case AShr: fn = [&](auto a, auto b) -> expr { return a.ashr(b); }; break;
+  case LShr: fn = [&](auto a, auto b) -> expr { return a.lshr(b); }; break;
+  case And:  fn = [&](auto a, auto b) -> expr { return a & b; };     break;
+  case Or:   fn = [&](auto a, auto b) -> expr { return a | b; };     break;
+  case Xor:  fn = [&](auto a, auto b) -> expr { return a ^ b; };     break;
+  }
+
+  auto scalar_op = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    auto v = fn(a, b);
+
+    if (isDivOrRem())
+      div_ub(s, a, b, ap, bp, op == SDiv || op == SRem);
+
+    expr np = true;
+    if (op == Shl || op == AShr || op == LShr)
+      np &= b.ult(b.bits());
+
+    return { move(v), ap && (isDivOrRem() ? expr(true) : bp) && np };
+  };
+
+  auto &a = s[*lhs];
+  auto &b = isDivOrRem() ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
+  auto &m = s[*mask];
+  auto &vl = s[*evl];
+
+  auto retty = getType().getAsAggregateType();
+  auto maskty = mask->getType().getAsAggregateType();
+  vector<StateValue> vals;
+  for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
+    auto ai = retty->extract(a, i);
+    auto bi = retty->extract(b, i);
+    auto mi = maskty->extract(m, i);
+    auto [v, np] = scalar_op(ai.value, ai.non_poison, bi.value, bi.non_poison);
+
+    auto undef = UndefValue(retty->getChild(0)).toSMT(s).value;
+    expr p = mi.value == 1 && vl.value.ugt(i) && mi.non_poison && vl.non_poison;
+    expr m_v = expr::mkIf(p, v, undef);
+    expr m_np = expr::mkIf(p, np, true);
+
+    vals.emplace_back(move(m_v), move(m_np));
+  }
+  return retty->aggregateVals(vals);
+}
+
+expr VectorPredicatedBinOp::getTypeConstraints(const Function &f) const {
+  auto vl = getType().getAsAggregateType()->numElements();
+  auto ml = mask->getType().getAsAggregateType()->numElements();
+  return Value::getTypeConstraints() &&
+         getType().enforceVectorType() &&
+         getType() == lhs->getType() &&
+         getType() == rhs->getType() &&
+         vl == ml && evl->getType().enforceIntType(32) &&
+         mask->getType().enforceVectorType([&](auto &ty)
+                                           { return ty.enforceIntType(1); });
+}
+
+unique_ptr<Instr> VectorPredicatedBinOp::dup(const string &suffix) const {
+  return make_unique<VectorPredicatedBinOp>(getType(), getName()+suffix,
+                                            *lhs, *rhs, *mask, *evl, op);
+}
+
+bool VectorPredicatedBinOp::isDivOrRem() const {
+  switch (op) {
+  case Op::SDiv:
+  case Op::SRem:
+  case Op::UDiv:
+  case Op::URem:
+    return true;
+  default:
+    return false;
+  }
+}
+
+
 vector<Value*> UnaryOp::operands() const {
   return { val };
 }
