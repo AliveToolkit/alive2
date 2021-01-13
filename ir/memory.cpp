@@ -291,6 +291,15 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     Pointer p(mem, val.value);
     unsigned bytesize = bits_program_pointer / bits_byte;
 
+    // constant global can't store pointers that alias with local blocks
+    if (s->isInitializationPhase() && !p.isLocal().isFalse()) {
+      expr bid  = expr::mkUInt(0, 1).concat(p.getShortBid());
+      expr off  = p.getOffset();
+      expr attr = p.getAttrs();
+      p.~Pointer();
+      new (&p) Pointer(mem, bid, off, attr);
+    }
+
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(p, i, val.non_poison);
   } else {
@@ -2007,9 +2016,9 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
           for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
             I->second.setMayAlias(false, i);
           }
-          state->addAxiom(islocal || bid.ule(*max_bid) ||
-                          (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
-                                                  : false));
+          state->addPre(islocal || bid.ule(*max_bid) ||
+                        (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
+                                                : false));
         }
       }
     }
