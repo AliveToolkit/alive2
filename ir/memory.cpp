@@ -1540,26 +1540,6 @@ void Memory::mkAxioms(const Memory &tgt) const {
     }
     state->addAxiom(p1.isBlockAlive().implies(disj));
   }
-
-  // ensure locals fit in their reserved space
-  expr one = expr::mkUInt(1, bits_size_t - 1);
-  auto locals_fit = [&one](const Memory &m) {
-    auto sum = expr::mkUInt(0, bits_size_t - 1);
-    for (unsigned bid = 0, nlocals = m.numLocals(); bid < nlocals; ++bid) {
-      Pointer p(m, bid, true);
-      if (auto sz = m.local_blk_size.lookup(p.getShortBid())) {
-        auto size = sz->extract(bits_size_t - 2, 0);
-        auto align = one << p.blockAlignment().zextOrTrunc(bits_size_t - 1);
-        align = align - one;
-        auto sz_align = size + align;
-        m.state->addPre(size.add_no_uoverflow(align));
-        m.state->addPre(sum.add_no_uoverflow(sz_align));
-        sum = sum + sz_align;
-      }
-    }
-  };
-  locals_fit(*this);
-  locals_fit(tgt);
 }
 
 void Memory::resetGlobals() {
@@ -1784,7 +1764,6 @@ static expr disjoint_local_blocks(const Memory &m, const expr &addr,
   auto one = expr::mkUInt(1, 1);
   auto zero = expr::mkUInt(0, bits_for_offset);
   for (auto &[sbid, addr0] : blk_addr) {
-    (void)addr0;
     Pointer p2(m, prepend_if(one, expr(sbid), ptr_has_local_bit()), zero);
     disj &= p2.isBlockAlive()
               .implies(disjoint(addr, sz, p2.getAddress(), p2.blockSize()));
