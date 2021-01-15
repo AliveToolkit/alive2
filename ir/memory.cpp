@@ -1172,7 +1172,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
     if (has_readonly && write && p.isReadonly().isTrue())
       continue;
 
-    AliasSet this_alias(*this);
+    AliasSet this_alias = aliasing;
     auto is_local = p.isLocal();
     auto shortbid = p.getShortBid();
     expr offset = p.getOffset();
@@ -1200,23 +1200,23 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
 
 end:
     // intersect computed aliasing with known aliasing
-    auto I = ptr_alias.find(ptr.getBid());
+    auto I = ptr_alias.find(p.getBid());
     if (I != ptr_alias.end())
       this_alias.intersectWith(I->second);
     aliasing.unionWith(this_alias);
   }
 
   // intersect computed aliasing with known aliasing
-  auto [I, inserted] = ptr_alias.try_emplace(ptr.getBid(), move(aliasing));
-  auto &alias_info = I->second;
-  if (!inserted) {
-    alias_info.intersectWith(aliasing);
-  }
+  // We can't store the result since our cache is per Bid expression only
+  // and doesn't take byte size, etc into account.
+  auto I = ptr_alias.find(ptr.getBid());
+  if (I != ptr_alias.end())
+    aliasing.intersectWith(I->second);
 
-  alias_info.computeAccessStats();
+  aliasing.computeAccessStats();
 
-  unsigned has_local = alias_info.numMayAlias(true);
-  unsigned has_nonlocal = alias_info.numMayAlias(false);
+  unsigned has_local = aliasing.numMayAlias(true);
+  unsigned has_nonlocal = aliasing.numMayAlias(false);
   bool has_both = has_local && has_nonlocal;
   bool is_singleton = has_local + has_nonlocal == 1;
 
@@ -1225,7 +1225,7 @@ end:
   expr one = expr::mkUInt(1, 1);
 
   for (unsigned i = 0; i < sz_local; ++i) {
-    if (alias_info.mayAlias(true, i)) {
+    if (aliasing.mayAlias(true, i)) {
       auto n = expr::mkUInt(i, bits_shortbid());
       fn(local_block_val[i], i, true,
          is_singleton ? true
@@ -1236,7 +1236,7 @@ end:
   }
 
   for (unsigned i = 0; i < sz_nonlocal; ++i) {
-    if (alias_info.mayAlias(false, i)) {
+    if (aliasing.mayAlias(false, i)) {
       fn(non_local_block_val[i], i, false,
          is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
     }
