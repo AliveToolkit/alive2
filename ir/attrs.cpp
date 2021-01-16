@@ -64,6 +64,16 @@ bool ParamAttrs::undefImpliesUB() const {
   return ub;
 }
 
+uint64_t ParamAttrs::getDerefBytes() const {
+  uint64_t bytes = 0;
+  if (has(ParamAttrs::Dereferenceable))
+    bytes = derefBytes;
+  // byval copies bytes; the ptr needs to be dereferenceable
+  if (has(ParamAttrs::ByVal))
+    bytes = max(bytes, (uint64_t)blockSize);
+  return bytes;
+}
+
 bool FnAttrs::poisonImpliesUB() const {
   return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(Align) ||
          has(NNaN);

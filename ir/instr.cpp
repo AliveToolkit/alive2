@@ -1689,8 +1689,10 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     if (ty.isPtrType()) {
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
-      if (argflag.has(ParamAttrs::Dereferenceable))
-        s.addUB(p.isDereferenceable(argflag.derefBytes, argflag.align, false));
+      if (argflag.has(ParamAttrs::Dereferenceable) ||
+          argflag.has(ParamAttrs::ByVal))
+        s.addUB(
+          p.isDereferenceable(argflag.getDerefBytes(), argflag.align, false));
       else if (argflag.has(ParamAttrs::Align))
         s.addUB(p.isAligned(argflag.align));
 
