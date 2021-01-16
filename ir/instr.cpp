@@ -1692,7 +1692,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       if (argflag.has(ParamAttrs::Dereferenceable) ||
           argflag.has(ParamAttrs::ByVal))
         s.addUB(
-          p.isDereferenceable(argflag.getDerefBytes(), argflag.align,false));
+          p.isDereferenceable(argflag.getDerefBytes(), argflag.align, false));
       else if (argflag.has(ParamAttrs::Align))
         s.addUB(p.isAligned(argflag.align));
 
