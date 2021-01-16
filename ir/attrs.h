@@ -32,6 +32,8 @@ public:
    // Returns true if it is UB for the argument to be (partially) undef.
   bool undefImpliesUB() const;
 
+  uint64_t getDerefBytes() const;
+
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 };
 

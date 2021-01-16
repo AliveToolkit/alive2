@@ -221,9 +221,10 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (hasAttribute(ParamAttrs::NonNull))
     s.addUB(Pointer(s.getMemory(), val).isNonZero());
 
-  if (hasAttribute(ParamAttrs::Dereferenceable))
+  if (hasAttribute(ParamAttrs::Dereferenceable) ||
+      hasAttribute(ParamAttrs::ByVal))
     s.addUB(Pointer(s.getMemory(), val)
-              .isDereferenceable(attrs.derefBytes, attrs.align, false));
+              .isDereferenceable(attrs.getDerefBytes(), attrs.align, false));
   else if (hasAttribute(ParamAttrs::Align))
     s.addUB(Pointer(s.getMemory(), val).isAligned(attrs.align));
 
