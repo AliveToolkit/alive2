@@ -9,6 +9,4 @@ define i1 @tgt(i8* %p) {
   ret i1 0
 }
 
-declare void @f(i8* nonnull)
-
-; ERROR: Value mismatch
+declare void @f(i8* nonnull noundef)

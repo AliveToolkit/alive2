@@ -11,3 +11,5 @@ define void @tgt(i8* %p) {
 }
 
 declare void @g(i8* align(8))
+
+; ERROR: Source is more defined than target

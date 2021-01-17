@@ -1687,19 +1687,30 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 
   auto unpack = [&](StateValue &&value) {
     if (ty.isPtrType()) {
+      expr np = value.non_poison;
+
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
       if (argflag.has(ParamAttrs::Dereferenceable) ||
           argflag.has(ParamAttrs::ByVal))
         s.addUB(
           p.isDereferenceable(argflag.getDerefBytes(), argflag.align, false));
-      else if (argflag.has(ParamAttrs::Align))
-        s.addUB(p.isAligned(argflag.align));
+      else if (argflag.has(ParamAttrs::Align)) {
+        // align and nonnull: the arg becomes poison if the condition isn't met
+        if (argflag.poisonImpliesUB())
+          s.addUB(p.isAligned(argflag.align));
+        else
+          np &= p.isAligned(argflag.align);
+      }
 
-      if (argflag.has(ParamAttrs::NonNull))
-        s.addUB(p.isNonZero());
+      if (argflag.has(ParamAttrs::NonNull)) {
+        if (argflag.poisonImpliesUB())
+          s.addUB(p.isNonZero());
+        else
+          np &= p.isNonZero();
+      }
 
-      ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
+      ptr_inputs.emplace_back(StateValue(p.release(), move(np)),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
@@ -1753,10 +1764,18 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
     s.addUB(ret.non_poison);
     if (isDeref)
       s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
-    else if (isAlign)
-      s.addUB(p.isAligned(attrs.align));
-    if (isNonNull)
-      s.addUB(p.isNonZero());
+    else if (isAlign) {
+      if (attrs.poisonImpliesUB())
+        s.addUB(p.isAligned(attrs.align));
+      else
+        ret.non_poison &= p.isAligned(attrs.align);
+    }
+    if (isNonNull) {
+      if (attrs.poisonImpliesUB())
+        s.addUB(p.isNonZero());
+      else
+        ret.non_poison &= p.isNonZero();
+    }
   }
 
   return ret;

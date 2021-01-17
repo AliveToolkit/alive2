@@ -26,8 +26,7 @@ public:
 
   // Returns true if it's UB for the argument to be poison / have a poison elem.
   bool poisonImpliesUB() const
-  { return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
-           has(Align); }
+  { return has(Dereferenceable) || has(NoUndef) || has(ByVal); }
 
    // Returns true if it is UB for the argument to be (partially) undef.
   bool undefImpliesUB() const;
