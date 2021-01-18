@@ -232,7 +232,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     np_from_attr &= Pointer(s.getMemory(), val).isAligned(attrs.align);
 
   if (attrs.poisonImpliesUB()) {
-    s.addUB(np_from_attr);
+    s.addUB(move(np_from_attr));
     np_from_attr = true;
   }
 
