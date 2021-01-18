@@ -75,8 +75,7 @@ uint64_t ParamAttrs::getDerefBytes() const {
 }
 
 bool FnAttrs::poisonImpliesUB() const {
-  return has(NonNull) || has(Dereferenceable) || has(NoUndef) || has(Align) ||
-         has(NNaN);
+  return has(Dereferenceable) || has(NoUndef) || has(NNaN);
 }
 
 bool FnAttrs::undefImpliesUB() const {

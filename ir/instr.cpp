@@ -1687,6 +1687,11 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 
   auto unpack = [&](StateValue &&value) {
     if (ty.isPtrType()) {
+      // If poisonImpliesUB, getAndAddPoisonUB must have already considered
+      // value.non_poison.
+      assert(!argflag.poisonImpliesUB() || value.non_poison.isTrue());
+
+      expr np(true);
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
       if (argflag.has(ParamAttrs::Dereferenceable) ||
@@ -1694,12 +1699,17 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
         s.addUB(
           p.isDereferenceable(argflag.getDerefBytes(), argflag.align, false));
       else if (argflag.has(ParamAttrs::Align))
-        s.addUB(p.isAligned(argflag.align));
+        np &= p.isAligned(argflag.align);
 
       if (argflag.has(ParamAttrs::NonNull))
-        s.addUB(p.isNonZero());
+        np &= p.isNonZero();
 
-      ptr_inputs.emplace_back(StateValue(p.release(), move(value.non_poison)),
+      if (argflag.poisonImpliesUB()) {
+        s.addUB(move(np));
+        np = true;
+      }
+
+      ptr_inputs.emplace_back(StateValue(p.release(), np && value.non_poison),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
@@ -1750,13 +1760,19 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   if (isDeref || isNonNull || isAlign) {
     assert(ty.isPtrType());
     Pointer p(s.getMemory(), ret.value);
-    s.addUB(ret.non_poison);
+
     if (isDeref)
       s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
     else if (isAlign)
-      s.addUB(p.isAligned(attrs.align));
+      ret.non_poison &= p.isAligned(attrs.align);
+
     if (isNonNull)
-      s.addUB(p.isNonZero());
+      ret.non_poison &= p.isNonZero();
+  }
+
+  if (attrs.poisonImpliesUB()) {
+    s.addUB(move(ret.non_poison));
+    ret.non_poison = true;
   }
 
   return ret;
@@ -2419,11 +2435,17 @@ StateValue Return::toSMT(State &s) const {
       s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
       if (has_alloca)
         s.addUB(p.getAllocType() != Pointer::STACK);
-    } else if (isAlign) {
-      s.addUB(p.isAligned(attrs.align));
-    }
-    if (isNonNull) {
-      s.addUB(p.isNonZero());
+    } else if (isAlign)
+      retval.non_poison &= p.isAligned(attrs.align);
+
+    if (isNonNull)
+      retval.non_poison &= p.isNonZero();
+
+    if (attrs.poisonImpliesUB()) {
+      // Poison created from nonnull/align can raise UB if other attributes are
+      // involved
+      s.addUB(move(retval.non_poison));
+      retval.non_poison = true;
     }
   }
 

@@ -7,6 +7,4 @@ define void @tgt(i8* %p) {
   unreachable
 }
 
-declare void @f(i8* nonnull)
-
-; ERROR: Source is more defined than target
+declare void @f(i8* nonnull noundef)

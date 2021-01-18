@@ -10,6 +10,4 @@ define void @tgt(i8* %p) {
   ret void
 }
 
-declare void @g(i8* align(8))
-
-; ERROR: Source is more defined than target
+declare void @g(i8* align(8) noundef)
