@@ -218,20 +218,30 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addUndefVar(move(var));
   }
 
+  // Some attributes generate poison rather than raise UB
+  expr np_from_attr(true);
+
   if (hasAttribute(ParamAttrs::NonNull))
-    s.addUB(Pointer(s.getMemory(), val).isNonZero());
+    np_from_attr = Pointer(s.getMemory(), val).isNonZero();
 
   if (hasAttribute(ParamAttrs::Dereferenceable) ||
       hasAttribute(ParamAttrs::ByVal))
     s.addUB(Pointer(s.getMemory(), val)
               .isDereferenceable(attrs.getDerefBytes(), attrs.align, false));
   else if (hasAttribute(ParamAttrs::Align))
-    s.addUB(Pointer(s.getMemory(), val).isAligned(attrs.align));
+    np_from_attr &= Pointer(s.getMemory(), val).isAligned(attrs.align);
+
+  if (attrs.poisonImpliesUB()) {
+    s.addUB(np_from_attr);
+    np_from_attr = true;
+  }
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
-  return { move(val), never_poison ? true : expr::mkBoolVar(np_name.c_str()) };
+  return { move(val),
+           np_from_attr && (never_poison ? true :
+                              expr::mkBoolVar(np_name.c_str())) };
 }
 
 bool Input::isUndefMask(const expr &e, const expr &var) {
