@@ -1692,10 +1692,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       assert(!argflag.poisonImpliesUB() || value.non_poison.isTrue());
 
       expr np(true);
-        // align and nonnull: the arg becomes poison if the condition isn't met
-      bool has_poison_attr =
-          argflag.has(ParamAttrs::Align) || argflag.has(ParamAttrs::NonNull);
-
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
       if (argflag.has(ParamAttrs::Dereferenceable) ||
@@ -1708,13 +1704,12 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
       if (argflag.has(ParamAttrs::NonNull))
         np &= p.isNonZero();
 
-      if (has_poison_attr && argflag.poisonImpliesUB()) {
-        s.addUB(np);
+      if (argflag.poisonImpliesUB()) {
+        s.addUB(move(np));
         np = true;
       }
 
-      ptr_inputs.emplace_back(StateValue(p.release(),
-                                         np && move(value.non_poison)),
+      ptr_inputs.emplace_back(StateValue(p.release(), np && value.non_poison),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
@@ -1776,7 +1771,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   }
 
   if (attrs.poisonImpliesUB()) {
-    s.addUB(ret.non_poison);
+    s.addUB(move(ret.non_poison));
     ret.non_poison = true;
   }
 
