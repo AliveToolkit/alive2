@@ -87,11 +87,7 @@ public:
 
       ret = ret ? T::mkIf(domain, val, *ret) : val;
     }
-    if (ret)
-      return *ret;
-    if (default_val)
-      return *default_val;
-    return {};
+    return ret ? ret : default_val;
   }
 
   std::optional<T> lookup(const expr &domain) const {
