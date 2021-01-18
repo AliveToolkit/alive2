@@ -2444,7 +2444,7 @@ StateValue Return::toSMT(State &s) const {
     if (attrs.poisonImpliesUB()) {
       // Poison created from nonnull/align can raise UB if other attributes are
       // involved
-      s.addUB(retval.non_poison);
+      s.addUB(move(retval.non_poison));
       retval.non_poison = true;
     }
   }
