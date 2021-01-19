@@ -1687,10 +1687,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 
   auto unpack = [&](StateValue &&value) {
     if (ty.isPtrType()) {
-      // If poisonImpliesUB, getAndAddPoisonUB must have already considered
-      // value.non_poison.
-      assert(!argflag.poisonImpliesUB() || value.non_poison.isTrue());
-
       expr np(true);
       Pointer p(s.getMemory(), move(value.value));
       p.stripAttrs();
