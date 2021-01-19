@@ -2199,7 +2199,7 @@ void Phi::print(ostream &os) const {
 }
 
 StateValue Phi::toSMT(State &s) const {
-  DisjointExpr<StateValue> ret;
+  DisjointExpr<StateValue> ret(getType().getDummyValue(false));
   map<Value*, StateValue> cache;
 
   for (auto &[val, bb] : values) {
