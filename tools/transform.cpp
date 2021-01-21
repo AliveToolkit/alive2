@@ -8,6 +8,7 @@
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "util/config.h"
+#include "util/dataflow.h"
 #include "util/errors.h"
 #include "util/stopwatch.h"
 #include "util/symexec.h"
@@ -527,6 +528,7 @@ static bool returns_local(const Value &v) {
   return dynamic_cast<const Alloc*>(&v) ||
          dynamic_cast<const Malloc*>(&v) ||
          dynamic_cast<const Calloc*>(&v);
+         // TODO: add noalias fn
 }
 
 static bool may_be_nonlocal(Value *ptr) {
@@ -552,8 +554,8 @@ static bool may_be_nonlocal(Value *ptr) {
     }
 
     if (auto phi = dynamic_cast<Phi*>(ptr)) {
-      for (auto &op : phi->operands())
-        todo.emplace_back(op);
+      auto ops = phi->operands();
+      todo.insert(todo.end(), ops.begin(), ops.end());
       continue;
     }
 
@@ -598,11 +600,56 @@ static unsigned returns_nonlocal(const Instr &inst,
   }
   else if (auto load = dynamic_cast<const Load *>(&inst)) {
     if (may_be_nonlocal(&load->getPtr())) {
-      auto [ptr, offset] = collect_gep_offsets(load->getPtr());
-      rets_nonloc = cache.emplace(ptr, offset).second;
+      rets_nonloc = cache.emplace(collect_gep_offsets(load->getPtr())).second;
     }
   }
   return rets_nonloc ? num_ptrs(inst.getType()) : 0;
+}
+
+namespace {
+struct CountMemBlock {
+  unsigned num_nonlocals = 0;
+  set<pair<Value*, uint64_t>> nonlocal_cache;
+
+  void exec(const Instr &i, CountMemBlock &glb_data) {
+    if (returns_local(i)) {
+      // TODO: can't be path sensitive yet
+    } else {
+      num_nonlocals += returns_nonlocal(i, nonlocal_cache);
+      glb_data.num_nonlocals += returns_nonlocal(i, glb_data.nonlocal_cache);
+      num_nonlocals = min(num_nonlocals, glb_data.num_nonlocals);
+    }
+  }
+
+  void merge(const CountMemBlock &other) {
+    // if LHS has x more non-locals than RHS, then it gets to keep the first
+    // x cached accessed pointers, as for sure we have accessed all common
+    // pointers plus x extra pointers if we go through the LHS path
+    unsigned delta = num_nonlocals - other.num_nonlocals;
+    bool lhs_larger = num_nonlocals >= other.num_nonlocals;
+    if (!lhs_larger) {
+      num_nonlocals = other.num_nonlocals;
+      delta = -delta;
+    }
+
+    for (auto I = nonlocal_cache.begin(); I != nonlocal_cache.end(); ) {
+      if (other.nonlocal_cache.count(*I)) {
+        ++I;
+      } else if (delta > 0) {
+        ++I;
+        --delta;
+      } else {
+        I = nonlocal_cache.erase(I);
+      }
+    }
+
+    for (auto &e : other.nonlocal_cache) {
+      if (delta > 0 && nonlocal_cache.emplace(e).second) {
+        --delta;
+      }
+    }
+  }
+};
 }
 
 
@@ -652,8 +699,6 @@ static void calculateAndInitConstants(Transform &t) {
       num_ptrinputs += n;
   }
 
-  // The number of instructions that can return a pointer to a non-local block.
-  unsigned num_nonlocals_inst_src = 0, num_nonlocals_inst_tgt = 0;
   // The number of local blocks.
   num_locals_src = 0;
   num_locals_tgt = 0;
@@ -686,8 +731,6 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto fn : { &t.src, &t.tgt }) {
     unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
     uint64_t &cur_max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
-    auto &num_nonlocals_inst = fn == &t.src ? num_nonlocals_inst_src
-                                            : num_nonlocals_inst_tgt;
 
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
@@ -717,13 +760,10 @@ static void calculateAndInitConstants(Transform &t) {
         min_vect_elem_sz = elemsz;
     };
 
-    set<pair<Value*, uint64_t>> nonlocal_cache;
     for (auto BB : fn->getBBs()) {
       for (auto &i : BB->instrs()) {
         if (returns_local(i))
           ++cur_num_locals;
-        else
-          num_nonlocals_inst += returns_nonlocal(i, nonlocal_cache);
 
         for (auto op : i.operands()) {
           nullptr_is_used |= has_nullptr(op);
@@ -772,6 +812,12 @@ static void calculateAndInitConstants(Transform &t) {
         }
       }
     }
+  }
+
+  unsigned num_nonlocals_inst_src;
+  {
+    DenseDataFlow<CountMemBlock> df(t.src);
+    num_nonlocals_inst_src = df.getResult().num_nonlocals;
   }
 
   does_ptr_mem_access = has_ptr_load || does_ptr_store;
