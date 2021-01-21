@@ -28,6 +28,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <utility>
 
 using namespace tools;
@@ -115,6 +116,12 @@ static llvm::cl::opt<bool> opt_debug(
 static llvm::cl::opt<bool> opt_print_dot(
     "dot",
     llvm::cl::desc("Alive: print .dot files of each function"),
+    llvm::cl::cat(opt_alive), llvm::cl::init(false));
+
+static llvm::cl::opt<bool> opt_always_verify(
+    "always-verify",
+    llvm::cl::desc("Alive: verify the pair even if they are syntactically"
+                   " equivalent"),
     llvm::cl::cat(opt_alive), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> opt_smt_stats(
@@ -304,6 +311,17 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
   if (opt_print_dot) {
     Func1->writeDot("src");
     Func2->writeDot("tgt");
+  }
+
+  if (!opt_always_verify) {
+    stringstream ss1, ss2;
+    Func1->print(ss1);
+    Func2->print(ss2);
+    if (ss1.str() == ss2.str()) {
+      cout << "Transformation seems to be correct! (syntactically equal)\n\n";
+      ++goodCount;
+      return;
+    }
   }
 
   smt_init->reset();

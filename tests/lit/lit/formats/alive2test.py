@@ -34,7 +34,7 @@ def is_timeout(str):
   return str.find('ERROR: Timeout') > 0
 
 def id_check(fn, cmd, args):
-  out, err, exitCode = executeCommand(cmd + args)
+  out, err, exitCode = executeCommand(cmd + args + ["-always-verify"])
   str = out + err
   if not is_timeout(str) and (exitCode != 0 or str.find(ok_string) < 0):
     raise Exception(fn + ' identity check fail: ' + str)
