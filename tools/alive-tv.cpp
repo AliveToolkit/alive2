@@ -56,6 +56,12 @@ static llvm::cl::opt<bool> opt_disable_poison("disable-poison-input",
     llvm::cl::init(false), llvm::cl::cat(opt_alive),
     llvm::cl::desc("Assume inputs are not poison (default=false)"));
 
+static llvm::cl::opt<size_t> opt_max_offset_in_bits(
+    "max-offset-in-bits", llvm::cl::init(64), llvm::cl::cat(opt_alive),
+    llvm::cl::desc("Upper bound for the maximum pointer offset in bits.  Note "
+                   "that this may impact correctness, if values involved in "
+                   "offset computations exceed the maximum."));
+
 static llvm::cl::opt<bool> opt_se_verbose(
     "se-verbose", llvm::cl::desc("Symbolic execution verbose mode"),
      llvm::cl::cat(opt_alive), llvm::cl::init(false));
@@ -352,6 +358,7 @@ convenient way to demonstrate an existing optimizer bug.
   config::debug = opt_debug;
   config::src_unroll_cnt = opt_src_unrolling_factor;
   config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
+  config::max_offset_bits = opt_max_offset_in_bits;
 
   if (opt_smt_log)
     smt::start_logging();
