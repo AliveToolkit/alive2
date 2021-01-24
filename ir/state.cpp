@@ -22,10 +22,6 @@ State::CurrentDomain::operator bool() const {
   return !path.isFalse() && UB;
 }
 
-expr State::DomainPreds::operator()() const {
-  return path() && *UB();
-}
-
 template<class T>
 static T intersect_set(const T &a, const T &b) {
   T results;
@@ -341,10 +337,10 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 }
 
 StateValue* State::no_more_tmp_slots() {
-  if (i_tmp_values < tmp_values.size()-1)
+  if (i_tmp_values < tmp_values.size())
     return nullptr;
   useUnsupported("Too many temporaries");
-  return &(tmp_values.back() = StateValue());
+  return &null_sv;
 }
 
 const StateValue& State::operator[](const Value &val) {
@@ -504,7 +500,7 @@ const State::ValTy& State::at(const Value &val) const {
 const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   auto &pres = predecessor_data.at(current_bb);
   auto I = pres.find(&bb);
-  return I == pres.end() ? nullptr : &I->second.domain.path;
+  return I == pres.end() ? nullptr : &I->second.path;
 }
 
 bool State::isUndef(const expr &e) const {
@@ -530,13 +526,12 @@ bool State::startBB(const BasicBlock &bb) {
 
   bool isFirst = true;
   for (auto &[src, data] : I->second) {
-    path.add(data.domain.path);
-    expr p = data.domain.path();
-    UB.add_disj(data.domain.UB, p);
+    path.add(data.path);
+    expr p = data.path();
+    UB.add_disj(data.UB, p);
     in_memory.add_disj(data.mem, p);
     var_args_in.add(data.var_args, move(p));
-    domain.undef_vars.insert(data.domain.undef_vars.begin(),
-                             data.domain.undef_vars.end());
+    domain.undef_vars.insert(data.undef_vars.begin(), data.undef_vars.end());
 
     if (isFirst)
       analysis = data.analysis;
@@ -565,11 +560,10 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
   data.mem.add(memory, cond);
-  data.domain.UB.add(domain.UB(), cond);
-  data.domain.path.add(move(cond));
-  data.domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
-  data.domain.undef_vars.insert(domain.undef_vars.begin(),
-                                domain.undef_vars.end());
+  data.UB.add(domain.UB(), cond);
+  data.path.add(move(cond));
+  data.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  data.undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   data.analysis = analysis;
   data.var_args = var_args_data;
 }
@@ -594,8 +588,9 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 void State::addReturn(StateValue &&val) {
   return_val.add(move(val), domain.path);
   return_memory.add(memory, domain.path);
-  return_domain.add(domain());
-  function_domain.add(domain());
+  auto dom = domain();
+  return_domain.add(expr(dom));
+  function_domain.add(move(dom));
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
@@ -917,7 +912,7 @@ expr State::sinkDomain() const {
 
   OrExpr ret;
   for (auto &[src, data] : I->second) {
-    ret.add(data.domain.path());
+    ret.add(data.path());
   }
   return ret();
 }

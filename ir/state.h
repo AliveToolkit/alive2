@@ -36,15 +36,6 @@ private:
 
     smt::expr operator()() const;
     operator bool() const;
-    void reset();
-  };
-
-  struct DomainPreds {
-    smt::OrExpr path;
-    smt::DisjointExpr<smt::expr> UB;
-    std::set<smt::expr> undef_vars;
-
-    smt::expr operator()() const;
   };
 
   struct ValueAnalysis {
@@ -90,9 +81,11 @@ private:
   };
 
   struct BasicBlockInfo {
-    DomainPreds domain;
-    ValueAnalysis analysis;
+    smt::OrExpr path;
+    smt::DisjointExpr<smt::expr> UB;
     smt::DisjointExpr<Memory> mem;
+    std::set<smt::expr> undef_vars;
+    ValueAnalysis analysis;
     VarArgsData var_args;
   };
 
@@ -106,7 +99,6 @@ private:
   std::set<const char*> used_unsupported;
   std::set<std::string> used_approximations;
 
-  const BasicBlock *current_bb = nullptr;
   std::set<smt::expr> quantified_vars;
 
   // var -> ((value, not_poison), undef_vars)
@@ -120,14 +112,16 @@ private:
   std::unordered_set<const BasicBlock*> seen_bbs;
 
   // Global variables' memory block ids & Memory::alloc has been called?
-  std::unordered_map<std::string, std::pair<unsigned, bool> > glbvar_bids;
+  std::unordered_map<std::string, std::pair<unsigned, bool>> glbvar_bids;
 
   // temp state
+  const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
   Memory memory;
   std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
+  StateValue null_sv;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   StateValue* no_more_tmp_slots();
