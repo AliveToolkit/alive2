@@ -318,6 +318,8 @@ static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
     Func1->print(ss1);
     Func2->print(ss2);
     if (ss1.str() == ss2.str()) {
+      if (!opt_succinct)
+        Transform{"", move(*Func1), move(*Func2)}.print(cout, print_opts);
       cout << "Transformation seems to be correct! (syntactically equal)\n\n";
       ++goodCount;
       return;
