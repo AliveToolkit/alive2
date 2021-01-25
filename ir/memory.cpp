@@ -648,7 +648,7 @@ expr Pointer::inbounds(bool simplify_ptr, bool strict) {
 
 expr Pointer::blockAlignment() const {
   return getValue("blk_align", m.local_blk_align, m.non_local_blk_align,
-                   expr::mkUInt(0, 8), true);
+                   expr::mkUInt(0, 6), true);
 }
 
 expr Pointer::isBlockAligned(unsigned align, bool exact) const {
@@ -1860,7 +1860,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   (is_local ? local_blk_size : non_local_blk_size)
     .add(short_bid, size_zext.trunc(bits_size_t - 1));
   (is_local ? local_blk_align : non_local_blk_align)
-    .add(short_bid, expr::mkUInt(align_bits, 8));
+    .add(short_bid, expr::mkUInt(align_bits, 6));
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
@@ -2446,7 +2446,7 @@ void Memory::print(ostream &os, const Model &m) const {
       ENSURE(p.getBid().isUInt(n));
       os << "Block " << n << " >";
       P("size", p.blockSize());
-      P("align", expr::mkInt(1, 32) << p.blockAlignment().zextOrTrunc(32));
+      P("align", expr::mkInt(1, 64) << p.blockAlignment().zextOrTrunc(64));
       P("alloc type", p.getAllocType());
       if (observes_addresses())
         P("address", p.getAddress());
