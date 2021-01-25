@@ -92,6 +92,8 @@ static expr load_bv(const expr &var, const expr &idx0) {
   auto bw = var.bits();
   if (!bw)
     return {};
+  if (var.isAllOnes())
+    return true;
   auto idx = idx0.zextOrTrunc(bw);
   return var.lshr(idx).extract(0, 0) == 1;
 }
@@ -781,8 +783,12 @@ expr Pointer::isBlockAlive() const {
     return false;
 
   auto bid = getShortBid();
+  expr nonnull(true);
+  if (has_null_block)
+    nonnull = bid != 0;
+
   return mkIf_fold(isLocal(), load_bv(m.local_block_liveness, bid),
-                   load_bv(m.non_local_block_liveness, bid));
+                   load_bv(m.non_local_block_liveness, bid) && nonnull);
 }
 
 expr Pointer::getAllocType() const {
@@ -1409,10 +1415,7 @@ static expr mk_liveness_array() {
 
   // consider all non_locals are initially alive
   // block size can still be 0 to invalidate accesses
-  expr l = expr::mkInt(-1, num_nonlocals);
-  if (has_null_block)
-    l = l << expr::mkUInt(1, num_nonlocals);
-  return l;
+  return expr::mkInt(-1, num_nonlocals);
 }
 
 void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
