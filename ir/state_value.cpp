@@ -77,10 +77,6 @@ StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
   return { then.eq(v1) ? move(els) : move(then), move(np) };
 }
 
-bool StateValue::operator<(const StateValue &rhs) const {
-  return tie(value, non_poison) < tie(rhs.value, rhs.non_poison);
-}
-
 ostream& operator<<(ostream &os, const StateValue &val) {
   return os << val.value << " / " << val.non_poison;
 }

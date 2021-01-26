@@ -629,10 +629,7 @@ void State::addNoReturn() {
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
   if (readsmem != rhs.readsmem ||
       argmemonly != rhs.argmemonly ||
-      (readsmem && (
-        fncall_ranges != rhs.fncall_ranges ||
-        m < rhs.m || rhs.m < m
-      )))
+      (readsmem && (fncall_ranges != rhs.fncall_ranges || is_neq(m <=> rhs.m))))
     return false;
 
   AndExpr eq;
@@ -698,22 +695,6 @@ expr State::FnCallInput::refinedBy(
   return refines();
 }
 
-bool State::FnCallInput::operator<(const FnCallInput &rhs) const {
-  return tie(args_nonptr, args_ptr, fncall_ranges, m, readsmem, argmemonly) <
-         tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.m,
-             rhs.readsmem, rhs.argmemonly);
-#if 0
-  auto a = tie(args_nonptr, args_ptr, fncall_ranges, readsmem, argmemonly);
-  auto b = tie(rhs.args_nonptr, rhs.args_ptr, rhs.fncall_ranges, rhs.readsmem,
-               rhs.argmemonly);
-  if (a < b)
-    return true;
-  if (a > b)
-    return false;
-  return m.cmpFnCallInput(rhs.m);
-#endif
-}
-
 State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
                                               const FnCallOutput &a,
                                               const FnCallOutput &b) {
@@ -737,10 +718,6 @@ expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
   return ret;
 }
 
-bool State::FnCallOutput::operator<(const FnCallOutput &rhs) const {
-  return tie(retvals, ub, callstate) < tie(rhs.retvals, rhs.ub, rhs.callstate);
-}
-
 vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
@@ -762,9 +739,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     return vector<StateValue>(out_types.size());
   }
 
-  for (auto &v : ptr_inputs) {
-    if (!v.byval && !v.nocapture && !v.val.non_poison.isFalse())
-      memory.escapeLocalPtr(v.val.value);
+  if (writes_memory) {
+    for (auto &v : ptr_inputs) {
+      if (!v.byval && !v.nocapture && !v.val.non_poison.isFalse())
+        memory.escapeLocalPtr(v.val.value);
+    }
   }
 
   vector<StateValue> retval;
@@ -785,8 +764,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     if (inserted) {
       auto mk_val = [&](const Type &t, const string &name) {
         return t.isPtrType()
-                 // TODO: remove 2nd ret val of mkFnRet
-                 ? memory.mkFnRet(name.c_str(), I->first.args_ptr).first
+                 ? memory.mkFnRet(name.c_str(), I->first.args_ptr)
                  : expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
       };
 
@@ -803,7 +781,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       I->second
         = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
             writes_memory
-              ? memory.mkCallState(argmemonly ? &I->first.args_ptr : nullptr,
+              ? memory.mkCallState(name,
+                                   argmemonly ? &I->first.args_ptr : nullptr,
                                    attrs.has(FnAttrs::NoFree))
               : Memory::CallState() };
 
@@ -811,7 +790,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
         if (II == I)
           continue;
-        fn_call_pre &= (I->first == II->first).implies(I->second == II->second);
+        auto in_eq = I->first == II->first;
+        if (!in_eq.isFalse())
+          fn_call_pre &= in_eq.implies(I->second == II->second);
       }
     }
 

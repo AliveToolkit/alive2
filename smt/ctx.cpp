@@ -18,7 +18,7 @@ static void z3_error_handler(Z3_context ctx, Z3_error_code err) {
     return;
 
   cerr << "Severe Z3 error: " << str << " [code=" << err << "]\n";
-  exit(-1);
+  _Exit(-1);
 }
 
 namespace smt {

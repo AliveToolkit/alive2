@@ -6,6 +6,7 @@
 #include "util/compiler.h"
 #include <algorithm>
 #include <cassert>
+#include <climits>
 #include <limits>
 #include <memory>
 #include <string>
@@ -587,6 +588,9 @@ expr expr::operator-(const expr &rhs) const {
 }
 
 expr expr::operator*(const expr &rhs) const {
+  uint64_t n, power;
+  if (rhs.isUInt(n) && is_power2(n, &power))
+    return *this << expr::mkUInt(power, rhs.sort());
   return binopc(Z3_mk_bvmul, operator*, Z3_OP_BMUL, isOne, isZero);
 }
 
@@ -1485,6 +1489,8 @@ expr expr::extract(unsigned high, unsigned low) const {
         return a.extract(high - b_bw, low - b_bw);
       if (low == 0)
         return a.extract(high - b_bw, 0).concat(b);
+      if (a.isConst())
+        return a.extract(high - b_bw, 0).concat(b.extract(b_bw-1, low));
     }
   }
   {
@@ -1813,6 +1819,35 @@ set<expr> expr::vars(const vector<const expr*> &exprs) {
   return result;
 }
 
+set<expr> expr::leafs(unsigned max) const {
+  C();
+  vector<expr> worklist = { *this };
+  unordered_set<Z3_ast> seen;
+  set<expr> ret;
+  do {
+    auto val = move(worklist.back());
+    worklist.pop_back();
+    if (!seen.emplace(val()).second)
+      continue;
+
+    expr cond, then, els;
+    if (val.isIf(cond, then, els)) {
+      worklist.emplace_back(move(then));
+      worklist.emplace_back(move(els));
+    } else {
+      ret.emplace(move(val));
+    }
+
+    if (ret.size() + worklist.size() >= max) {
+      for (auto &v : worklist)
+        ret.emplace(move(v));
+      break;
+    }
+  } while (!worklist.empty());
+
+  return ret;
+}
+
 void expr::printUnsigned(ostream &os) const {
   os << numeral_string();
 }
@@ -1846,14 +1881,9 @@ ostream& operator<<(ostream &os, const expr &e) {
   return os << (e.isValid() ? Z3_ast_to_string(ctx(), e()) : "(null)");
 }
 
-bool expr::operator<(const expr &rhs) const {
-  if (!isValid()) {
-    return rhs.isValid();
-  }
-  if (!rhs.isValid())
-    return false;
-  assert((id() == rhs.id()) == eq(rhs));
-  return id() < rhs.id();
+strong_ordering expr::operator<=>(const expr &rhs) const {
+  return
+    (isValid() ? id() : UINT_MAX) <=> (rhs.isValid() ? rhs.id() : UINT_MAX);
 }
 
 unsigned expr::id() const {
@@ -1862,31 +1892,6 @@ unsigned expr::id() const {
 
 unsigned expr::hash() const {
   return Z3_get_ast_hash(ctx(), ast());
-}
-
-
-ExprLeafIterator::ExprLeafIterator(const expr &init)
-  : worklist({init}), end(false) {
-  ++*this;
-}
-
-void ExprLeafIterator::operator++(void) {
-  assert(!end);
-  while (!worklist.empty()) {
-    val = move(worklist.back());
-    worklist.pop_back();
-    if (!val.isValid() || !seen.insert(val()).second)
-      continue;
-
-    expr cond, then, els;
-    if (val.isIf(cond, then, els)) {
-      worklist.emplace_back(move(then));
-      worklist.emplace_back(move(els));
-    } else {
-      return;
-    }
-  }
-  end = true;
 }
 
 }

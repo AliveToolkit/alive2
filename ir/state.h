@@ -147,7 +147,7 @@ private:
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
                         const Memory &m, bool readsmem, bool argmemonly) const;
 
-    bool operator<(const FnCallInput &rhs) const;
+    auto operator<=>(const FnCallInput &rhs) const = default;
   };
 
   struct FnCallOutput {
@@ -158,7 +158,7 @@ private:
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);
     smt::expr operator==(const FnCallOutput &rhs) const;
-    bool operator<(const FnCallOutput &rhs) const;
+    auto operator<=>(const FnCallOutput &rhs) const = default;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
   smt::expr fn_call_pre = true;

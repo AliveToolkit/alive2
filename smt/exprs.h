@@ -6,6 +6,7 @@
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include <cassert>
+#include <compare>
 #include <map>
 #include <ostream>
 #include <set>
@@ -178,9 +179,9 @@ public:
 
   auto begin() const { return fn.begin(); }
   auto end() const { return fn.end(); }
+  bool empty() const { return fn.empty() && !default_val; }
 
-  // for container use only
-  bool operator<(const FunctionExpr &rhs) const;
+  std::weak_ordering operator<=>(const FunctionExpr &rhs) const;
 
   friend std::ostream& operator<<(std::ostream &os, const FunctionExpr &e);
 };

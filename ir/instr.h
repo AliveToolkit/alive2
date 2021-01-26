@@ -323,8 +323,6 @@ public:
     const BasicBlock& operator*() const;
     target_iterator& operator++(void) { ++idx; return *this; }
     bool operator==(const target_iterator &rhs) const { return idx == rhs.idx; }
-    // FIXME: remove when we drop g++9 support
-    bool operator!=(const target_iterator &rhs) const { return idx != rhs.idx; }
   };
 
   class it_helper {

@@ -33,7 +33,7 @@ static unsigned next_local_bid;
 static unsigned next_global_bid;
 static unsigned next_ptr_input;
 
-static bool observes_addresses() {
+static bool observesAddresses() {
   return IR::has_ptr2int || IR::has_int2ptr;
 }
 
@@ -535,7 +535,7 @@ expr Pointer::getValue(const char *name, const FunctionExpr &local_fn,
 }
 
 expr Pointer::getAddress(bool simplify) const {
-  assert(observes_addresses());
+  assert(observesAddresses());
 
   auto bid = getShortBid();
   auto zero = expr::mkUInt(0, bits_size_t - 1);
@@ -672,7 +672,7 @@ expr Pointer::isAligned(unsigned align) {
 
   expr blk_align = isBlockAligned(align);
 
-  if (!observes_addresses() || (blk_align.isConst() && offset.isConst())) {
+  if (!observesAddresses() || (blk_align.isConst() && offset.isConst())) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
@@ -906,13 +906,9 @@ expr Pointer::isNull() const {
 }
 
 expr Pointer::isNonZero() const {
-  if (observes_addresses())
+  if (observesAddresses())
     return getAddress() != 0;
   return !isNull();
-}
-
-bool Pointer::operator<(const Pointer &rhs) const {
-  return p < rhs.p;
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
@@ -1054,10 +1050,6 @@ void Memory::AliasSet::printStats(ostream &os) {
      << (alias_buckets_hits.back() / total) << "%\n";
 }
 
-bool Memory::AliasSet::operator<(const AliasSet &rhs) const {
-  return tie(local, non_local) < tie(rhs.local, rhs.non_local);
-}
-
 void Memory::AliasSet::print(ostream &os) const {
   auto print = [&](const char *str, const auto &v) {
     os << str;
@@ -1079,23 +1071,23 @@ void Memory::AliasSet::print(ostream &os) const {
 }
 
 
-static set<Pointer> all_leaf_ptrs(Memory &m, const expr &ptr) {
+static set<Pointer> all_leaf_ptrs(const Memory &m, const expr &ptr) {
   set<Pointer> ptrs;
-  for (auto &ptr_val : allExprLeafs(ptr)) {
+  for (auto &ptr_val : ptr.leafs()) {
     Pointer p(m, ptr_val);
     auto offset = p.getOffset();
-    for (auto &bid : allExprLeafs(p.getBid())) {
+    for (auto &bid : p.getBid().leafs()) {
       ptrs.emplace(m, bid, offset);
     }
   }
   return ptrs;
 }
 
-static vector<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
-  vector<expr> ret;
+static set<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
+  set<expr> ret;
   for (auto &ptr : all_leaf_ptrs(m, eptr)) {
     if (!ptr.isLocal().isFalse())
-      ret.emplace_back(ptr.getShortBid());
+      ret.emplace(ptr.getShortBid());
   }
   return ret;
 }
@@ -1132,7 +1124,7 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   if (auto algn = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
     uint64_t blk_align;
     ENSURE(algn->isUInt(blk_align));
-    if (align > (1ull << blk_align) && (!observes_addresses() || const_offset))
+    if (align > (1ull << blk_align) && (!observesAddresses() || const_offset))
       return false;
   }
 
@@ -1511,7 +1503,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
       state->addAxiom(p_align.ule(q_align));
   }
 
-  if (!observes_addresses())
+  if (!observesAddresses())
     return;
 
   if (has_null_block)
@@ -1612,8 +1604,7 @@ expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
   return val == rhs.val;
 }
 
-pair<expr,expr>
-Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
+expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   bool has_local = escaped_local_blks.numMayAlias(true);
 
   unsigned bits_bid = has_local ? bits_for_bid : bits_shortbid();
@@ -1651,7 +1642,7 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   ptr_alias.emplace(p.getBid(), move(alias));
 
   state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
-  return { p.release(), move(var) };
+  return p.release();
 }
 
 Memory::CallState Memory::CallState::mkIf(const expr &cond,
@@ -1682,13 +1673,9 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
   return ret;
 }
 
-bool Memory::CallState::operator<(const CallState &rhs) const {
-  return tie(non_local_block_val, non_local_block_liveness) <
-         tie(rhs.non_local_block_val, rhs.non_local_block_liveness);
-}
-
 Memory::CallState
-Memory::mkCallState(const vector<PtrInput> *ptr_inputs, bool nofree) const {
+Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
+                    bool nofree) {
   CallState st;
   st.empty = false;
 
@@ -1818,7 +1805,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   auto align_bits = ilog2(align);
 
   if (is_local) {
-    if (observes_addresses()) {
+    if (observesAddresses()) {
       // MSB of local block area's address is 1.
       auto addr_var
         = expr::mkFreshVar("local_addr",
@@ -1846,7 +1833,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       state->addAxiom(p.getAllocType() == alloc_ty);
     }
 
-    if (align_bits && observes_addresses())
+    if (align_bits && observesAddresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
     bool cond = (has_null_block && bid == 0) ||
@@ -1879,7 +1866,7 @@ void Memory::startLifetime(const expr &ptr_local) {
   Pointer p(*this, ptr_local);
   state->addUB(p.isLocal());
 
-  if (observes_addresses())
+  if (observesAddresses())
     state->addPre(disjoint_local_blocks(*this, p.getAddress(), p.blockSize(),
                   local_blk_addr));
 
@@ -2381,51 +2368,6 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   return ret;
 }
 
-bool Memory::operator<(const Memory &rhs) const {
-  // FIXME: remove this once we move to C++20
-  assert(state == rhs.state);
-  return
-    tie(non_local_block_val, local_block_val,
-        non_local_block_liveness, local_block_liveness, local_blk_addr,
-        local_blk_size, local_blk_align, local_blk_kind,
-        non_local_blk_size, non_local_blk_align,
-        non_local_blk_kind, byval_blks, escaped_local_blks,
-        ptr_alias, next_nonlocal_bid) <
-    tie(rhs.non_local_block_val, rhs.local_block_val,
-        rhs.non_local_block_liveness, rhs.local_block_liveness,
-        rhs.local_blk_addr, rhs.local_blk_size, rhs.local_blk_align,
-        rhs.local_blk_kind,
-        rhs.non_local_blk_size, rhs.non_local_blk_align,
-        rhs.non_local_blk_kind, rhs.byval_blks, rhs.escaped_local_blks,
-        rhs.ptr_alias, rhs.next_nonlocal_bid);
-}
-
-bool Memory::cmpFnCallInput(const Memory &rhs) const {
-  assert(state == rhs.state && state->isSource());
-  // first compare non-local memory only
-  auto nla = tie(non_local_block_val, non_local_block_liveness,
-                 non_local_blk_size, non_local_blk_align, non_local_blk_kind,
-                 byval_blks, escaped_local_blks);
-  auto nlb = tie(rhs.non_local_block_val, rhs.non_local_block_liveness,
-                 rhs.non_local_blk_size, rhs.non_local_blk_align,
-                 rhs.non_local_blk_kind, rhs.byval_blks,
-                 rhs.escaped_local_blks);
-  if (nla < nlb)
-    return true;
-  if (nla > nlb)
-    return false;
-
-  // if nothing local escaped, then memories are equivalent for the callee
-  if (escaped_local_blks.numMayAlias(true) == 0)
-    return false;
-
-  return
-    tie(local_block_val, local_block_liveness, local_blk_addr, local_blk_size,
-        local_blk_align, local_blk_kind) <
-    tie(rhs.local_block_val, rhs.local_block_liveness, rhs.local_blk_addr,
-        rhs.local_blk_size, rhs.local_blk_align, rhs.local_blk_kind);
-}
-
 #define P(name, expr) do {      \
   auto v = m.eval(expr, false); \
   uint64_t n;                   \
@@ -2448,7 +2390,7 @@ void Memory::print(ostream &os, const Model &m) const {
       P("size", p.blockSize());
       P("align", expr::mkInt(1, 64) << p.blockAlignment().zextOrTrunc(64));
       P("alloc type", p.getAllocType());
-      if (observes_addresses())
+      if (observesAddresses())
         P("address", p.getAddress());
       os << '\n';
     }
@@ -2498,16 +2440,19 @@ ostream& operator<<(ostream &os, const Memory &m) {
   P("BLOCK SIZE:", local_blk_size, non_local_blk_size);
   P("BLOCK ALIGN:", local_blk_align, non_local_blk_align);
   P("BLOCK KIND:", local_blk_kind, non_local_blk_kind);
-  if (m.numLocals() > 0) {
-    os << "ESCAPED LOCAL BLOCKS: ";
-    m.escaped_local_blks.print(os);
+  if (m.escaped_local_blks.numMayAlias(true) > 0) {
+    m.escaped_local_blks.print(os << "ESCAPED LOCAL BLOCKS: ");
+  }
+  if (!m.local_blk_addr.empty()) {
     os << "\nLOCAL BLOCK ADDR: " << m.local_blk_addr << '\n';
   }
-  os << "\nALIAS SETS:\n";
-  for (auto &[bid, alias] : m.ptr_alias) {
-    os << bid << ": ";
-    alias.print(os);
-    os << '\n';
+  if (!m.ptr_alias.empty()) {
+    os << "\nALIAS SETS:\n";
+    for (auto &[bid, alias] : m.ptr_alias) {
+      os << bid << ": ";
+      alias.print(os);
+      os << '\n';
+    }
   }
   return os;
 }

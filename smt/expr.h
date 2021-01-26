@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include <compare>
 #include <cstdint>
 #include <ostream>
 #include <set>
@@ -333,6 +334,8 @@ public:
   std::set<expr> vars() const;
   static std::set<expr> vars(const std::vector<const expr*> &exprs);
 
+  std::set<expr> leafs(unsigned max = 64) const;
+
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
@@ -341,7 +344,7 @@ public:
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only
-  bool operator<(const expr &rhs) const;
+  std::strong_ordering operator<=>(const expr &rhs) const;
   unsigned id() const;
   unsigned hash() const;
 
@@ -357,34 +360,6 @@ public:
   friend class Model;
   friend class ExprLeafIterator;
 };
-
-
-class ExprLeafIterator {
-  std::vector<expr> worklist;
-  std::unordered_set<Z3_ast> seen;
-  expr val;
-  bool end;
-  ExprLeafIterator() : end(true) {}
-  ExprLeafIterator(const expr &init);
-public:
-  const expr& operator*() const { return val; }
-  void operator++(void);
-  bool operator!=(ExprLeafIterator &rhs) const { return end != rhs.end; }
-  friend class ExprLeafIteratorHelper;
-};
-
-class ExprLeafIteratorHelper {
-  const expr &init;
-public:
-  ExprLeafIteratorHelper(const expr &init ) : init(init) {}
-  ExprLeafIterator begin() const { return { init }; }
-  ExprLeafIterator end() const   { return {}; }
-};
-
-// returns set of all possible leaf expressions (best-effort simplification)
-static inline ExprLeafIteratorHelper allExprLeafs(const expr &e) {
-  return { e };
-}
 
 
 #define mkIf_fold(c, a, b) \

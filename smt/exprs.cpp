@@ -187,8 +187,17 @@ FunctionExpr FunctionExpr::simplify() const {
   return newfn;
 }
 
-bool FunctionExpr::operator<(const FunctionExpr &rhs) const {
-  return tie(fn, default_val) < tie(rhs.fn, rhs.default_val);
+weak_ordering FunctionExpr::operator<=>(const FunctionExpr &rhs) const {
+  if (auto cmp = fn <=> rhs.fn;
+      is_neq(cmp))
+    return cmp;
+
+  // libstdc++'s optional::operator<=> is buggy
+  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98842
+  if (default_val && rhs.default_val)
+    return *default_val <=> *rhs.default_val;
+
+  return (bool)default_val <=> (bool)rhs.default_val;
 }
 
 ostream& operator<<(ostream &os, const FunctionExpr &f) {

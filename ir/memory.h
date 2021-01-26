@@ -193,8 +193,7 @@ public:
   smt::expr isNull() const;
   smt::expr isNonZero() const;
 
-  // for container use only
-  bool operator<(const Pointer &rhs) const;
+  auto operator<=>(const Pointer &rhs) const { return p <=> rhs.p; }
 
   friend std::ostream& operator<<(std::ostream &os, const Pointer &p);
 };
@@ -224,8 +223,7 @@ class Memory {
     void computeAccessStats() const;
     static void printStats(std::ostream &os);
 
-    // for container use only
-    bool operator<(const AliasSet &rhs) const;
+    auto operator<=>(const AliasSet &rhs) const = default;
 
     void print(std::ostream &os) const;
   };
@@ -243,9 +241,9 @@ class Memory {
     MemBlock(smt::expr &&val, DataType type)
       : val(std::move(val)), type(type) {}
 
-    bool operator<(const MemBlock &other) const {
-      return std::tie(val, undef, type) <
-             std::tie(other.val, other.undef, other.type);
+    auto operator<=>(const MemBlock &rhs) const {
+      return std::tie(val, undef, type) <=>
+             std::tie(rhs.val, rhs.undef, rhs.type);
     }
   };
 
@@ -324,8 +322,7 @@ public:
     static CallState mkIf(const smt::expr &cond, const CallState &then,
                           const CallState &els);
     smt::expr operator==(const CallState &rhs) const;
-    // for container use only
-    bool operator<(const CallState &rhs) const;
+    auto operator<=>(const CallState &rhs) const = default;
     friend class Memory;
   };
 
@@ -348,16 +345,12 @@ public:
     PtrInput(StateValue &&v, bool byval, bool nocapture) :
       val(std::move(v)), byval(byval), nocapture(nocapture) {}
     smt::expr operator==(const PtrInput &rhs) const;
-    bool operator<(const PtrInput &rhs) const {
-      return std::tie(val, byval, nocapture) <
-             std::tie(rhs.val, rhs.byval, rhs.nocapture);
-    }
+    auto operator<=>(const PtrInput &rhs) const = default;
   };
 
-  std::pair<smt::expr, smt::expr>
-    mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs);
-  CallState mkCallState(const std::vector<PtrInput> *ptr_inputs, bool nofree)
-      const;
+  smt::expr mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs);
+  CallState mkCallState(const std::string &fnname,
+                        const std::vector<PtrInput> *ptr_inputs, bool nofree);
   void setState(const CallState &st);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
@@ -413,9 +406,7 @@ public:
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
 
-  // for container use only
-  bool operator<(const Memory &rhs) const;
-  bool cmpFnCallInput(const Memory &rhs) const;
+  auto operator<=>(const Memory &rhs) const = default;
 
   static void printAliasStats(std::ostream &os) {
     AliasSet::printStats(os);
