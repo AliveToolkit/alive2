@@ -68,16 +68,14 @@ private:
         num_args(std::move(num_args)), is_va_start(std::move(is_va_start)),
         active(std::move(active)) {}
 
-    // FIXME: upgrade with C++20
-    bool operator<(const VarArgsEntry &rhs) const;
+    auto operator<=>(const VarArgsEntry &rhs) const = default;
   };
 
   struct VarArgsData {
     std::map<smt::expr, VarArgsEntry> data;
     static VarArgsData mkIf(const smt::expr &cond, const VarArgsData &then,
                             const VarArgsData &els);
-    // FIXME: upgrade with C++20
-    bool operator<(const VarArgsData &rhs) const { return data < rhs.data; }
+    auto operator<=>(const VarArgsData &rhs) const = default;
   };
 
   struct BasicBlockInfo {

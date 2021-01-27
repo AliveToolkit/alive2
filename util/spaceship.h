@@ -25,6 +25,26 @@ std::weak_ordering operator<=>(const std::vector<T> &lhs,
   return std::weak_ordering::equivalent;
 }
 
+template <typename K, typename V>
+std::weak_ordering operator<=>(const std::map<K,V> &lhs,
+                               const std::map<K,V> &rhs) {
+  auto sz = lhs.size() <=> rhs.size();
+  if (std::is_neq(sz))
+    return sz;
+
+  auto I = rhs.begin();
+  for (const auto &[k,v] : lhs) {
+    if (auto cmp = k <=> I->first;
+        std::is_neq(cmp))
+      return cmp;
+    if (auto cmp = v <=> I->second;
+        std::is_neq(cmp))
+      return cmp;
+    ++I;
+  }
+  return std::weak_ordering::equivalent;
+}
+
 }
 
 #endif

@@ -4,6 +4,7 @@
 #include "smt/exprs.h"
 #include "smt/smt.h"
 #include "util/compiler.h"
+#include "util/spaceship.h"
 #include <vector>
 
 using namespace std;

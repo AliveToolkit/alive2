@@ -75,11 +75,6 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
   return true;
 }
 
-bool State::VarArgsEntry::operator<(const VarArgsEntry &rhs) const {
-  return tie(alive, next_arg, num_args, is_va_start, active) <
-         tie(rhs.alive, rhs.next_arg, rhs.num_args, rhs.is_va_start, rhs.active);
-}
-
 State::VarArgsData
 State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
                          const VarArgsData &els) {
