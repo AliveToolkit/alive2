@@ -12,8 +12,16 @@ namespace {
 template <typename T>
 std::weak_ordering operator<=>(const std::vector<T> &lhs,
                                const std::vector<T> &rhs) {
-  if (lhs < rhs) return std::weak_ordering::less;
-  if (rhs < lhs) return std::weak_ordering::greater;
+  auto sz = lhs.size() <=> rhs.size();
+  if (std::is_neq(sz))
+    return sz;
+
+  auto I = rhs.begin();
+  for (const auto &e : lhs) {
+    auto cmp = e <=> *I++;
+    if (std::is_neq(cmp))
+      return cmp;
+  }
   return std::weak_ordering::equivalent;
 }
 
