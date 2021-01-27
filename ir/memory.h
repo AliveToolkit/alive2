@@ -8,6 +8,7 @@
 #include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/exprs.h"
+#include "util/spaceship.h"
 #include <map>
 #include <optional>
 #include <ostream>
