@@ -1070,6 +1070,16 @@ void Memory::AliasSet::print(ostream &os) const {
     os << "(empty)";
 }
 
+weak_ordering Memory::MemBlock::operator<=>(const MemBlock &rhs) const {
+  // FIXME:
+  // 1) xcode doesn't have tuple::operator<=>
+  // 2) gcc has a bug and can't generate the default
+  if (auto cmp = val   <=> rhs.val;   is_neq(cmp)) return cmp;
+  if (auto cmp = undef <=> rhs.undef; is_neq(cmp)) return cmp;
+  if (auto cmp = type  <=> rhs.type;  is_neq(cmp)) return cmp;
+  return weak_ordering::equivalent;
+}
+
 
 static set<Pointer> all_leaf_ptrs(const Memory &m, const expr &ptr) {
   set<Pointer> ptrs;

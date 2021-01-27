@@ -9,6 +9,7 @@
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include "util/spaceship.h"
+#include <compare>
 #include <map>
 #include <optional>
 #include <ostream>
@@ -242,10 +243,7 @@ class Memory {
     MemBlock(smt::expr &&val, DataType type)
       : val(std::move(val)), type(type) {}
 
-    auto operator<=>(const MemBlock &rhs) const {
-      return std::tie(val, undef, type) <=>
-             std::tie(rhs.val, rhs.undef, rhs.type);
-    }
+    std::weak_ordering operator<=>(const MemBlock &rhs) const;
   };
 
   std::vector<MemBlock> non_local_block_val;
