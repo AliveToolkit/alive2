@@ -49,23 +49,23 @@ endif()
 
 find_package(Git REQUIRED)
 add_custom_command(
-  OUTPUT "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
-  COMMAND "${CMAKE_COMMAND}" -E echo_append "#define ALIVE_VERSION_MACRO " > "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
-  COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --always >> "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  OUTPUT "${PROJECT_BINARY_DIR}/version_gen.h.tmp"
+  COMMAND "${CMAKE_COMMAND}" -E echo_append "#define ALIVE_VERSION_MACRO " > "${PROJECT_BINARY_DIR}/version_gen.h.tmp"
+  COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --always >> "${PROJECT_BINARY_DIR}/version_gen.h.tmp"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   VERBATIM
 )
 add_custom_command(
-  DEPENDS "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
-  OUTPUT "${CMAKE_BINARY_DIR}/version_gen.h"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_BINARY_DIR}/version_gen.h.tmp" "${CMAKE_BINARY_DIR}/version_gen.h"
-  COMMAND "${CMAKE_COMMAND}" -E remove -f "${CMAKE_BINARY_DIR}/version_gen.h.tmp"
+  DEPENDS "${PROJECT_BINARY_DIR}/version_gen.h.tmp"
+  OUTPUT "${PROJECT_BINARY_DIR}/version_gen.h"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_BINARY_DIR}/version_gen.h.tmp" "${PROJECT_BINARY_DIR}/version_gen.h"
+  COMMAND "${CMAKE_COMMAND}" -E remove -f "${PROJECT_BINARY_DIR}/version_gen.h.tmp"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   VERBATIM
 )
 add_custom_target(
   generate_version ALL
-  DEPENDS "${CMAKE_BINARY_DIR}/version_gen.h"
+  DEPENDS "${PROJECT_BINARY_DIR}/version_gen.h"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
 
@@ -79,10 +79,10 @@ if (RE2C)
 else()
   message(SEND_ERROR "re2c executable not found")
 endif()
-add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
-                   COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/tools"
+add_custom_command(OUTPUT "${PROJECT_BINARY_DIR}/tools/alive_lexer.cpp"
+                   COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/tools"
                    COMMAND ${RE2C} ARGS "-d" "-b" "-T" "--no-generation-date"
-                   "-o" "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
+                   "-o" "${PROJECT_BINARY_DIR}/tools/alive_lexer.cpp"
                    "${PROJECT_SOURCE_DIR}/tools/alive_lexer.re"
                    DEPENDS "tools/alive_lexer.re")
 
@@ -122,7 +122,7 @@ set(TOOLS_SRCS
 add_library(tools STATIC ${TOOLS_SRCS})
 
 set(UTIL_SRCS
-  "${CMAKE_BINARY_DIR}/version_gen.h"
+  "${PROJECT_BINARY_DIR}/version_gen.h"
   util/version.cpp
   util/compiler.cpp
   util/config.cpp
@@ -210,7 +210,7 @@ endif()
 
 add_executable(alive
                "tools/alive.cpp"
-               "${CMAKE_BINARY_DIR}/tools/alive_lexer.cpp"
+               "${PROJECT_BINARY_DIR}/tools/alive_lexer.cpp"
                "tools/alive_parser.cpp"
               )
 target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
