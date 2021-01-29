@@ -6,7 +6,6 @@
 #if defined(__clang__) && __clang_major__ < 13
 
 #include <compare>
-#include <type_traits>
 
 namespace {
 
