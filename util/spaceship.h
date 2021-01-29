@@ -9,7 +9,18 @@
 
 namespace {
 
+inline
+std::weak_ordering operator<=>(const std::string &lhs, const std::string &rhs) {
+  auto cmp = lhs.compare(rhs);
+  if (cmp == 0)
+    return std::weak_ordering::equivalent;
+  return cmp < 0 ? std::weak_ordering::less : std::weak_ordering::equivalent;
+}
+
 template <typename T>
+#ifdef __APPLE__
+std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE);
+#else
 std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
   while (I != E && II != EE) {
     auto cmp = *I <=> *II;
@@ -21,6 +32,7 @@ std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
     return II == EE ? std::weak_ordering::equivalent : std::weak_ordering::less;
   return std::weak_ordering::greater;
 }
+#endif
 
 template <typename T>
 std::weak_ordering operator<=>(const std::vector<T> &lhs,
@@ -42,17 +54,27 @@ std::weak_ordering operator<=>(const std::map<K,V> &lhs,
 template <typename X, typename Y>
 std::weak_ordering operator<=>(const std::pair<X,Y> &lhs,
                                const std::pair<X,Y> &rhs) {
-  return compare_iterators(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+  if (auto cmp = lhs.first <=> rhs.first;
+      std::is_neq(cmp))
+    return cmp;
+  return lhs.second <=> rhs.second;
 }
 
+#ifdef __APPLE__
+template <typename T>
+std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
+  while (I != E && II != EE) {
+    auto cmp = *I <=> *II;
+    if (std::is_neq(cmp))
+      return cmp;
+    ++I, ++II;
+  }
+  if (I == E)
+    return II == EE ? std::weak_ordering::equivalent : std::weak_ordering::less;
+  return std::weak_ordering::greater;
 }
+#endif
 
-static inline
-std::weak_ordering operator<=>(const std::string &lhs, const std::string &rhs) {
-  auto cmp = lhs.compare(rhs);
-  if (cmp == 0)
-    return std::weak_ordering::equivalent;
-  return cmp < 0 ? std::weak_ordering::less : std::weak_ordering::equivalent;
 }
 
 #endif
