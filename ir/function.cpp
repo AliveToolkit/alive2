@@ -483,7 +483,7 @@ void Function::unroll(unsigned k) {
 
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
-    auto &[header, height, flag] = worklist.back();
+    auto [header, height, flag] = worklist.back();
     if (!flag) {
       flag = true;
       auto I = forest.find(header);
@@ -964,8 +964,8 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   while(!worklist.empty()) {
     auto &[bb, flag] = worklist.back();
     if (flag) {
-      worklist.pop_back();
       last[number[bb]] = current - 1;
+      worklist.pop_back();
     } else {
       node[current] = bb;
       number[bb] = current++;
