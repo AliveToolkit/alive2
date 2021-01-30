@@ -258,7 +258,7 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
   instances = move(instances2);
 }
 
-static expr preprocess(Transform &t, const set<expr> &qvars0,
+static expr preprocess(const Transform &t, const set<expr> &qvars0,
                        const set<expr> &undef_qvars, expr &&e) {
   if (hit_half_memory_limit())
     return expr::mkForAll(qvars0, move(e));
@@ -438,7 +438,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     return;
   }
 
-  auto mk_fml = [&](expr &&refines) -> expr {
+  auto mk_fml = [&](const expr &refines) -> expr {
     // from the check above we already know that
     // \exists v,v' . pre_tgt(v') && pre_src(v) is SAT (or timeout)
     // so \forall v . pre_tgt && (!pre_src(v) || refines) simplifies to:
@@ -446,7 +446,7 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     // \forall v . (pre_tgt && !pre_src(v)) ->  [\exists v . pre_src(v)]
     // false
     if (refines.isFalse())
-      return move(refines);
+      return refines;
 
     return axioms_expr &&
             preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
@@ -473,29 +473,29 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   }
 
   Solver::check({
-    { mk_fml(fndom_a.notImplies(fndom_b)),
+    { bind(mk_fml, fndom_a.notImplies(fndom_b)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source is more defined than target");
       }},
-    { mk_fml(move(dom_constr)),
+    { bind(mk_fml, move(dom_constr)),
       [&](const Result &r) {
         err(r, [](ostream&, const Model&){},
             "Source and target don't have the same return domain");
       }},
-    { mk_fml(dom && !poison_cnstr),
+    { bind(mk_fml, dom && !poison_cnstr),
       [&](const Result &r) {
         err(r, print_value, "Target is more poisonous than source");
       }},
-    { mk_fml(dom && undef_cnstr),
+    { bind(mk_fml, dom && undef_cnstr),
       [&](const Result &r) {
         err(r, print_value, "Target's return value is more undefined");
       }},
-    { mk_fml(dom && !value_cnstr),
+    { bind(mk_fml, dom && !value_cnstr),
       [&](const Result &r) {
         err(r, print_value, "Value mismatch");
       }},
-    { mk_fml(dom && !memory_cnstr),
+    { bind(mk_fml, dom && !memory_cnstr),
       [&](const Result &r) {
         err(r, print_ptr_load, "Mismatch in memory");
       }}

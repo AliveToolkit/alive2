@@ -321,7 +321,8 @@ Result Solver::check() const {
 }
 
 void Solver::check(initializer_list<E> queries) {
-  for (auto &[q, error] : queries) {
+  for (auto &[qlazy, error] : queries) {
+    expr q = qlazy();
     if (!q.isValid()) {
       ++num_invalid;
       error(Result::INVALID);

@@ -102,7 +102,8 @@ public:
 class Solver {
   Z3_solver s;
   bool valid = true;
-  using E = std::pair<expr, std::function<void(const Result &r)>>;
+  using E = std::pair<std::function<expr()>, // lazily evaluate the query
+                      std::function<void(const Result &r)>>;
 public:
   Solver(bool simple = false);
   ~Solver();
