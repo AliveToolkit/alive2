@@ -485,7 +485,7 @@ void Function::unroll(unsigned k) {
   while (!worklist.empty()) {
     auto [header, height, flag] = worklist.back();
     if (!flag) {
-      flag = true;
+      get<2>(worklist.back()) = flag = true;
       auto I = forest.find(header);
       if (I != forest.end()) {
         // process all non-leaf children first
