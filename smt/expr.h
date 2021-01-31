@@ -142,9 +142,6 @@ public:
   bool isNot(expr &neg) const;
   bool isAdd(expr &a, expr &b) const;
   bool isBasePlusOffset(expr &base, uint64_t &offset) const;
-  bool isConstArray(expr &val) const;
-  bool isStore(expr &array, expr &idx, expr &val) const;
-  bool isLoad(expr &array, expr &idx) const;
 
   bool isNaNCheck(expr &fp) const;
   bool isfloat2BV(expr &fp) const;
@@ -311,15 +308,8 @@ public:
     return mkUF(name.data(), args, range);
   }
 
-  static expr mkArray(const char *name, const expr &domain, const expr &range);
-  static expr mkConstArray(const expr &domain, const expr &value);
-
-  expr store(const expr &idx, const expr &val) const;
-  expr load(const expr &idx) const;
-
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
-  static expr mkLambda(const expr &var, const expr &val);
 
   expr simplify() const;
   expr simplifyNoTimeout() const;

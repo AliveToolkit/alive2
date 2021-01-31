@@ -210,6 +210,12 @@ expr Pointer::blockSize() const {
                              expr::mkUInt(0, bits_size_t - 1)));
 }
 
+expr Pointer::shortPtr(bool short_bid) const {
+  auto off = zero_bits_offset();
+  return p.extract(totalBits() - 1 - (short_bid ? hasLocalBit() : 0),
+                   bits_for_ptrattrs + off);
+}
+
 Pointer Pointer::operator+(const expr &bytes) const {
   return { m, getBid(), getOffset() + bytes.zextOrTrunc(bits_for_offset),
            getAttrs() };
@@ -316,6 +322,8 @@ expr Pointer::isAligned(unsigned align) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
+#if 0
+    // TODO: recheck if this optimization is any useful..
     auto zero = expr::mkUInt(0, bits);
     auto newp = p.extract(totalBits() - 1, bits_for_ptrattrs + bits)
                  .concat(zero);
@@ -323,7 +331,8 @@ expr Pointer::isAligned(unsigned align) {
       newp = newp.concat(getAttrs());
     p = move(newp);
     assert(!p.isValid() || p.bits() == totalBits());
-    return { blk_align && offset.extract(bits - 1, 0) == zero };
+#endif
+    return { blk_align && offset.extract(bits - 1, 0) == 0 };
   }
 
   return getAddress().extract(bits - 1, 0) == 0;

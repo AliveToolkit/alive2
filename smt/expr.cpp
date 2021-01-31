@@ -460,33 +460,6 @@ bool expr::isBasePlusOffset(expr &base, uint64_t &offset) const {
   return true;
 }
 
-bool expr::isConstArray(expr &val) const {
-  if (auto app = isAppOf(Z3_OP_CONST_ARRAY)) {
-    val = Z3_get_app_arg(ctx(), app, 0);
-    return true;
-  }
-  return false;
-}
-
-bool expr::isStore(expr &array, expr &idx, expr &val) const {
-  if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
-    array = Z3_get_app_arg(ctx(), app, 0);
-    idx = Z3_get_app_arg(ctx(), app, 1);
-    val = Z3_get_app_arg(ctx(), app, 2);
-    return true;
-  }
-  return false;
-}
-
-bool expr::isLoad(expr &array, expr &idx) const {
-  if (auto app = isAppOf(Z3_OP_SELECT)) {
-    array = Z3_get_app_arg(ctx(), app, 0);
-    idx = Z3_get_app_arg(ctx(), app, 1);
-    return true;
-  }
-  return false;
-}
-
 bool expr::isNaNCheck(expr &fp) const {
   if (auto app = isAppOf(Z3_OP_FPA_IS_NAN)) {
     fp = Z3_get_app_arg(ctx(), app, 0);
@@ -1586,69 +1559,6 @@ expr expr::mkUF(const char *name, const vector<expr> &args, const expr &range) {
   return Z3_mk_app(ctx(), decl, num_args, z3_args.data());
 }
 
-expr expr::mkArray(const char *name, const expr &domain, const expr &range) {
-  C2(domain, range);
-  return ::mkVar(name, Z3_mk_array_sort(ctx(), domain.sort(), range.sort()));
-}
-
-expr expr::mkConstArray(const expr &domain, const expr &value) {
-  C2(domain, value);
-  return Z3_mk_const_array(ctx(), domain.sort(), value());
-}
-
-expr expr::store(const expr &idx, const expr &val) const {
-  C(idx, val);
-  expr array, str_idx, str_val;
-  if (isStore(array, str_idx, str_val)) {
-    if ((idx == str_idx).simplify().isTrue())
-      return array.store(idx, val);
-
-  } else if (isConstArray(str_val)) {
-    if (str_val.eq(val))
-      return *this;
-  }
-  return Z3_mk_store(ctx(), ast(), idx(), val());
-}
-
-expr expr::load(const expr &idx) const {
-  C(idx);
-
-  // TODO: add support for alias analysis plugin
-  expr array, str_idx, val;
-  if (isStore(array, str_idx, val)) { // store(array, idx, val)
-    expr cmp = (idx == str_idx).simplify();
-    if (cmp.isTrue())
-      return val;
-    if (cmp.isFalse())
-      return array.load(idx);
-
-  } else if (isConstArray(val)) {
-    return val;
-
-  } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
-             Z3_is_lambda(ctx(), ast())) {
-    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
-    expr body = Z3_get_quantifier_body(ctx(), ast());
-    if (body.isConst())
-      return body;
-
-    auto subst = [&](const expr &e) {
-      if (e.isLoad(array, str_idx)) {
-        return array.load(str_idx.subst({ idx }));
-      }
-      return e.subst({ idx });
-    };
-
-    expr cond, then, els;
-    if (body.isIf(cond, then, els)) {
-      cond = cond.subst({ idx }).simplify();
-      return mkIf_fold(cond, subst(then), subst(els));
-    }
-  }
-
-  return Z3_mk_select(ctx(), ast(), idx());
-}
-
 expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   C2(cond, then, els);
   if (cond.isTrue() || then.eq(els))
@@ -1693,20 +1603,6 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
   }
   return Z3_mk_forall_const(ctx(), 0, vars.size(), vars_ast.get(), 0, nullptr,
                             val());
-}
-
-expr expr::mkLambda(const expr &var, const expr &val) {
-  C2(var, val);
-
-  if (!val.vars().count(var))
-    return mkConstArray(var, val);
-
-  expr array, idx;
-  if (val.isLoad(array, idx) && idx.eq(var))
-    return array;
-
-  auto ast = (Z3_app)var();
-  return Z3_mk_lambda_const(ctx(), 1, &ast, val());
 }
 
 expr expr::simplify() const {

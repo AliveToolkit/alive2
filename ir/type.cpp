@@ -248,11 +248,6 @@ StateValue Type::fromInt(StateValue v) const {
            v.non_poison.isBool() ? expr(v.non_poison) : v.non_poison == 0 };
 }
 
-expr Type::combine_poison(const expr &boolean, const expr &orig) const {
-  return
-    expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
-}
-
 pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
   return { var, var };

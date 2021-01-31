@@ -35,9 +35,10 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
-public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
+
+public:
   Pointer(const Memory &m, const char *var_name,
           const smt::expr &local = false, bool unique_name = true,
           bool align = true, const ParamAttrs &attr = {});
@@ -66,6 +67,11 @@ public:
   smt::expr blockSize() const;
 
   const smt::expr& operator()() const { return p; }
+
+  // Returns expr with bid & offset only. It strips attrs away.
+  // If this pointer is constructed with var_name (has_attr with false),
+  // the returned expr is the variable.
+  smt::expr shortPtr(bool short_bid) const;
   smt::expr release() { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
