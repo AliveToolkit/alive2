@@ -237,11 +237,13 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
 
   expr nums[2] = { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
 
-  for (auto &[e, v] : instances) {
+  for (auto I = instances.begin(); I != instances.end();
+       I = instances.erase(I)) {
+    auto &[e, v] = *I;
     for (unsigned i = 0; i < 2; ++i) {
       expr newexpr = e.subst(var, nums[i]);
       if (newexpr.eq(e)) {
-        instances2[move(newexpr)] = v;
+        instances2[move(newexpr)] = move(v);
         break;
       }
 
