@@ -1995,7 +1995,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
           for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
             I->second.setMayAlias(false, i);
           }
-          state->addPre(islocal || bid.ule(*max_bid) ||
+          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid) ||
                         (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
                                                 : false));
         }
