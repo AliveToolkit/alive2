@@ -94,6 +94,7 @@ set(IR_SRCS
   ir/constant.cpp
   ir/function.cpp
   ir/globals.cpp
+  ir/init.cpp
   ir/instr.cpp
   ir/memory.cpp
   ir/pointer.cpp

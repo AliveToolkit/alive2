@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/init.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/alive_parser.h"
@@ -97,6 +98,7 @@ int main(int argc, char **argv) {
   }
 
   smt::smt_initializer smt_init;
+  IR::initializer ir_init;
   parser_initializer parser_init;
 
   TransformPrintOpts print_opts;
@@ -106,6 +108,7 @@ int main(int argc, char **argv) {
     cout << "Processing " << argv[argc_i] << "..\n";
     try {
       for (auto &t : parse(*file_reader(argv[argc_i], PARSER_READ_AHEAD))) {
+        ir_init.reset();
         smt_init.reset();
 
         if (root_only && (!t.src.hasReturn() || !t.tgt.hasReturn())) {

@@ -101,10 +101,6 @@ public:
   virtual smt::expr fromInt(smt::expr v) const;
   virtual IR::StateValue fromInt(IR::StateValue v) const;
 
-  // combine existing poison value in BV repr with a new boolean expr
-  smt::expr combine_poison(const smt::expr &boolean,
-                           const smt::expr &orig) const;
-
   // returns pair of refinement constraints for <poison, !poison && value>
   virtual std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,

@@ -9,8 +9,8 @@
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include "util/spaceship.h"
-#include <compare>
 #include <map>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <set>
@@ -89,17 +89,21 @@ class Memory {
     std::vector<bool> local, non_local;
 
   public:
+    AliasSet() = default;
     AliasSet(const Memory &m); // no alias
     size_t size(bool local) const;
 
     int isFullUpToAlias(bool local) const; // >= 0 if up to
     bool mayAlias(bool local, unsigned bid) const;
     unsigned numMayAlias(bool local) const;
+    bool intersects(const AliasSet &other) const;
 
     smt::expr mayAlias(bool local, const smt::expr &bid) const;
 
     void setMayAlias(bool local, unsigned bid);
-    void setMayAliasUpTo(bool local, unsigned limit); // [0, limit]
+    // [start, limit]
+    void setMayAliasUpTo(bool local, unsigned limit, unsigned start = 0);
+    void setFullAlias(bool local);
     void setNoAlias(bool local, unsigned bid);
 
     void intersectWith(const AliasSet &other);
@@ -113,24 +117,48 @@ class Memory {
     void print(std::ostream &os) const;
   };
 
-  enum DataType { DATA_NONE = 0, DATA_INT = 1, DATA_PTR = 2,
+  enum DataType { DATA_INT = 1, DATA_PTR = 2,
                   DATA_ANY = DATA_INT | DATA_PTR };
 
-  struct MemBlock {
-    smt::expr val; // array: short offset -> Byte
+  struct MemStore {
+    enum Type { INT_VAL, PTR_VAL, CONST, COPY, FN, COND } type;
+    // store in [ptr, ptr+size)
+    std::optional<Pointer> ptr;
+    std::optional<smt::expr> size; // or branch cond for COND
+
+    StateValue value;
+    std::optional<Pointer> ptr_src; // for COPY
+    std::string uf_name; // for FN
+
+    AliasSet alias;
+    AliasSet src_alias;
+    unsigned align = 1u << 31;
     std::set<smt::expr> undef;
-    unsigned char type = DATA_ANY;
+    const MemStore *next = nullptr, *els = nullptr;
 
-    MemBlock() {}
-    MemBlock(smt::expr &&val) : val(std::move(val)) {}
-    MemBlock(smt::expr &&val, DataType type)
-      : val(std::move(val)), type(type) {}
+    // regular int/ptr store
+    MemStore(Type type, StateValue &&value = {},
+             const std::set<smt::expr> &undef = {})
+      : type(type), value(std::move(value)), undef(undef) {}
 
-    std::weak_ordering operator<=>(const MemBlock &rhs) const;
+    // copy from src
+    MemStore(const Pointer &src, const smt::expr *size, unsigned align_src);
+
+    // function for non-local blocks only
+    MemStore(const Memory &m, const char *uf_name)
+      : type(FN), uf_name(uf_name), alias(m) {}
+
+    static const MemStore* mkIf(const smt::expr &cond, const MemStore *then,
+                                const MemStore *els);
+
+    void print(std::ostream &os) const;
+
+    auto operator<=>(const MemStore &rhs) const = default;
   };
 
-  std::vector<MemBlock> non_local_block_val;
-  std::vector<MemBlock> local_block_val;
+  // DAG of memory stores over the CFG
+  const MemStore *store_seq_head = nullptr;
+  static std::set<MemStore> mem_store_holder;
 
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
@@ -148,18 +176,17 @@ class Memory {
   AliasSet escaped_local_blks;
 
   std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
-  unsigned next_nonlocal_bid;
-  unsigned nextNonlocalBid();
 
   static bool observesAddresses();
-  static int isInitialMemBlock(const smt::expr &e, bool match_any_init = false);
+  static bool isInitialMemBlock(const smt::expr &e);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  void mk_nonlocal_val_axioms(bool skip_consts);
+  void mk_init_mem_val_axioms(const char *uf_name, bool allow_local,
+                              bool short_bid);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
                 unsigned bytes, unsigned align, bool write) const;
@@ -167,46 +194,42 @@ class Memory {
   AliasSet computeAliasing(const Pointer &ptr, unsigned btyes, unsigned align,
                            bool write) const;
 
-  template <typename Fn>
-  void access(const Pointer &ptr, unsigned btyes, unsigned align, bool write,
-              Fn &fn);
-
-  std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
-                         std::set<smt::expr> &undef, unsigned align,
-                         bool left2right = true,
-                         DataType type = DATA_ANY);
+  StateValue load(const Pointer &ptr, unsigned bytes,
+                  std::set<smt::expr> &undef, unsigned align,
+                  DataType type = DATA_ANY) const;
   StateValue load(const Pointer &ptr, const Type &type,
-                  std::set<smt::expr> &undef, unsigned align);
+                  std::set<smt::expr> &undef, unsigned align) const;
 
-  DataType data_type(const std::vector<std::pair<unsigned, smt::expr>> &data,
-                     bool full_store) const;
-
-  void store(const Pointer &ptr,
-             const std::vector<std::pair<unsigned, smt::expr>> &data,
-             const std::set<smt::expr> &undef, unsigned align);
-  void store(const StateValue &val, const Type &type, unsigned offset,
-             std::vector<std::pair<unsigned, smt::expr>> &data);
-
-  void storeLambda(const Pointer &ptr, const smt::expr &offset,
-                   const smt::expr &bytes, const smt::expr &val,
-                   const std::set<smt::expr> &undef, unsigned align);
-
-  smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
-                            const smt::expr &offset,
-                            std::set<smt::expr> &undef) const;
-  smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
-                         std::set<smt::expr> &undef) const;
+  void store(std::optional<Pointer> ptr, const smt::expr *bytes, unsigned align,
+             MemStore &&data, bool alias_write = true);
+  void store(std::optional<Pointer> ptr, unsigned bytes, unsigned align,
+             MemStore &&data, bool alias_write);
+  void store(const Pointer &ptr, unsigned offset, StateValue &&v,
+             const Type &type, unsigned align,
+             const std::set<smt::expr> &undef_vars, bool alias_write);
 
 public:
   enum BlockKind {
     MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
   };
 
-  // TODO: missing local_* equivalents
   class CallState {
-    std::vector<smt::expr> non_local_block_val;
+    struct Data {
+      std::optional<Pointer> ptr;
+      AliasSet alias;
+
+      Data& operator=(const Data &rhs) {
+        ptr.reset();
+        if (rhs.ptr)
+          ptr.emplace(*rhs.ptr);
+        alias = rhs.alias;
+        return *this;
+      }
+
+      auto operator<=>(const Data &rhs) const = default;
+    };
+    std::vector<std::tuple<smt::expr, std::string, std::vector<Data>>> ufs;
     smt::expr non_local_liveness;
-    bool empty = true;
 
   public:
     static CallState mkIf(const smt::expr &cond, const CallState &then,
@@ -220,6 +243,7 @@ public:
 
   void mkAxioms(const Memory &other) const;
 
+  static void cleanGlobals();
   static void resetGlobals();
   void syncWithSrc(const Memory &src);
 
@@ -265,10 +289,10 @@ public:
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              unsigned align, const std::set<smt::expr> &undef_vars);
   std::pair<StateValue, smt::AndExpr>
-    load(const smt::expr &ptr, const Type &type, unsigned align);
+    load(const smt::expr &ptr, const Type &type, unsigned align) const;
 
   // raw load; NB: no UB check
-  Byte load(const Pointer &p, std::set<smt::expr> &undef_vars);
+  Byte load(const Pointer &p, std::set<smt::expr> &undef_vars) const;
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align,

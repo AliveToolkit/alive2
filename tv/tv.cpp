@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/init.h"
 #include "ir/memory.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/utils.h"
@@ -201,6 +202,7 @@ ostream *out;
 ofstream out_file;
 string report_filename;
 optional<smt::smt_initializer> smt_init;
+optional<IR::initializer> ir_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
@@ -352,6 +354,7 @@ struct TVPass final : public llvm::ModulePass {
      * is non-null; instead we call parallelMgr->finishChild()
      */
 
+    ir_init->reset();
     smt_init->reset();
     Transform t;
     t.src = move(old_fn);
@@ -496,6 +499,7 @@ struct TVPass final : public llvm::ModulePass {
 
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();
+    ir_init.emplace();
     return false;
   }
 
@@ -517,6 +521,7 @@ struct TVPass final : public llvm::ModulePass {
     }
 
     llvm_util_init.reset();
+    ir_init.reset();
     smt_init.reset();
     --initialized;
 
