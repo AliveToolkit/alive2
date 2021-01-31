@@ -680,8 +680,9 @@ expr State::FnCallInput::refinedBy(
     s.addFnQuantVar(v);
 
   if (readsmem) {
-    auto restrict_ptrs = argmemonly2 ? &args_ptr2 : nullptr;
-    auto data = m.refined(m2, true, restrict_ptrs);
+    auto restrict_ptrs = argmemonly ? &args_ptr : nullptr;
+    auto restrict_ptrs2 = argmemonly ? &args_ptr2 : nullptr;
+    auto data = m.refined(m2, true, restrict_ptrs, restrict_ptrs2);
     refines.add(get<0>(data));
     for (auto &v : get<2>(data))
       s.addFnQuantVar(v);

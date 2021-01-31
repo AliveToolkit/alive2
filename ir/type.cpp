@@ -244,7 +244,8 @@ expr Type::fromInt(expr e) const {
 }
 
 StateValue Type::fromInt(StateValue v) const {
-  return { fromInt(move(v.value)), v.non_poison == 0 };
+  return { fromInt(move(v.value)),
+           v.non_poison.isBool() ? expr(v.non_poison) : v.non_poison == 0 };
 }
 
 expr Type::combine_poison(const expr &boolean, const expr &orig) const {

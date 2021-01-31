@@ -455,10 +455,9 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto print_ptr_load = [&](ostream &s, const Model &m) {
     set<expr> undef;
     Pointer p(src_mem, m[ptr_refinement()]);
-    unsigned align = bits_byte / 8;
     s << "\nMismatch in " << p
-      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p, undef, align)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef, align)()]);
+      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p, undef)()])
+      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef)()]);
   };
 
   expr dom_constr;
