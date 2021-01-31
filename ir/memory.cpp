@@ -444,6 +444,19 @@ int Memory::AliasSet::isFullUpToAlias(bool islocal) const {
   return i - 1;
 }
 
+expr Memory::AliasSet::mayAlias(bool islocal, const expr &bid) const {
+  int upto = isFullUpToAlias(islocal);
+  if (upto >= 0)
+    return bid.ule(upto);
+
+  expr ret(false);
+  for (unsigned i = 0, e = size(islocal); i < e; ++i) {
+    if (mayAlias(islocal, i))
+      ret |= bid == i;
+  }
+  return ret;
+}
+
 bool Memory::AliasSet::mayAlias(bool islocal, unsigned bid) const {
   return (islocal ? local : non_local)[bid];
 }
@@ -1114,21 +1127,9 @@ expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   if (!has_local)
     p_bid = Pointer::mkLongBid(p_bid, false);
   Pointer p(*this, p_bid, var.extract(bits_for_offset-1, 0));
-  auto bid = p.getShortBid();
 
-  set<expr> local;
-  if (has_local) {
-    int upto = escaped_local_blks.isFullUpToAlias(true);
-    if (upto >= 0) {
-      local.emplace(bid.ule(upto));
-    }
-    else {
-      for (unsigned i = 0, e = escaped_local_blks.size(true); i < e; ++i) {
-        if (escaped_local_blks.mayAlias(true, i))
-          local.emplace(bid == i);
-      }
-    }
-  }
+  auto bid = p.getShortBid();
+  expr local = escaped_local_blks.mayAlias(true, bid);
 
   unsigned max_nonlocal_bid = nextNonlocalBid();
   expr nonlocal = bid.ule(max_nonlocal_bid);
@@ -1141,7 +1142,7 @@ expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   }
   ptr_alias.emplace(p.getBid(), move(alias));
 
-  state->addAxiom(expr::mkIf(p.isLocal(), expr::mk_or(local), nonlocal));
+  state->addAxiom(expr::mkIf(p.isLocal(), local, nonlocal));
   return p.release();
 }
 
@@ -1154,9 +1155,8 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
       expr::mkIf(cond, then.non_local_block_val[i],
                  els.non_local_block_val[i]));
   }
-  ret.non_local_block_liveness
-    = expr::mkIf(cond, then.non_local_block_liveness,
-                 els.non_local_block_liveness);
+  ret.non_local_liveness = expr::mkIf(cond, then.non_local_liveness,
+                                      els.non_local_liveness);
   return ret;
 }
 
@@ -1166,7 +1166,7 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
   if (empty)
     return true;
 
-  expr ret = non_local_block_liveness == rhs.non_local_block_liveness;
+  expr ret = non_local_liveness == rhs.non_local_liveness;
   for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
     ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
   }
@@ -1222,15 +1222,14 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     }
 
     if (mask.isAllOnes()) {
-      st.non_local_block_liveness = non_local_block_liveness;
+      st.non_local_liveness = non_local_block_liveness;
     } else {
       auto liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
       // functions can free an object, but cannot bring a dead one back to live
-      st.non_local_block_liveness
-        = non_local_block_liveness & (liveness_var | mask);
+      st.non_local_liveness = non_local_block_liveness & (liveness_var | mask);
     }
   } else {
-    st.non_local_block_liveness = non_local_block_liveness;
+    st.non_local_liveness = non_local_block_liveness;
   }
   return st;
 }
@@ -1242,7 +1241,7 @@ void Memory::setState(const Memory::CallState &st) {
     if (isInitialMemBlock(non_local_block_val[i].val, true))
       non_local_block_val[i].undef.clear();
   }
-  non_local_block_liveness = st.non_local_block_liveness;
+  non_local_block_liveness = st.non_local_liveness;
   mk_nonlocal_val_axioms(true);
 }
 

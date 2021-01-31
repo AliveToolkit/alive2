@@ -96,6 +96,8 @@ class Memory {
     bool mayAlias(bool local, unsigned bid) const;
     unsigned numMayAlias(bool local) const;
 
+    smt::expr mayAlias(bool local, const smt::expr &bid) const;
+
     void setMayAlias(bool local, unsigned bid);
     void setMayAliasUpTo(bool local, unsigned limit); // [0, limit]
     void setNoAlias(bool local, unsigned bid);
@@ -203,7 +205,7 @@ public:
   // TODO: missing local_* equivalents
   class CallState {
     std::vector<smt::expr> non_local_block_val;
-    smt::expr non_local_block_liveness;
+    smt::expr non_local_liveness;
     bool empty = true;
 
   public:
