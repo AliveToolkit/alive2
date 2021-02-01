@@ -102,8 +102,6 @@ public:
 class Solver {
   Z3_solver s;
   bool valid = true;
-  using E = std::pair<std::function<expr()>, // lazily evaluate the query
-                      std::function<void(const Result &r)>>;
 public:
   Solver(bool simple = false);
   ~Solver();
@@ -116,7 +114,8 @@ public:
   expr assertions() const;
 
   Result check() const;
-  static void check(std::initializer_list<E> queries);
+  // Return true if all queries are successfully evaluated as UNSAT
+  static bool check(expr &&query, std::function<void(const Result &r)> &&err);
 
   friend class SolverPush;
 };
