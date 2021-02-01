@@ -413,10 +413,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   pre_src_forall &= tgt_state.getFnPre();
 
-  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
-    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
-  };
-
   auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that
     // \exists v,v' . pre_tgt(v') && pre_src(v) is SAT (or timeout)
@@ -432,6 +428,10 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   };
 
   // 1. Check UB
+  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
+    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
+  };
+
   if (!Solver::check(
         mk_fml(fndom_a.notImplies(fndom_b)),
         [&](const Result &r) {

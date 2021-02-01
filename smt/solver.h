@@ -114,7 +114,7 @@ public:
   expr assertions() const;
 
   Result check() const;
-  // Return true if all queries are successfully evaluated as UNSAT
+  // Return true if the query is successfully proven to be UNSAT
   static bool check(expr &&query, std::function<void(const Result &r)> &&err);
 
   friend class SolverPush;

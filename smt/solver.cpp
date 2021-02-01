@@ -329,7 +329,7 @@ bool Solver::check(expr &&q, std::function<void(const Result &r)> &&error) {
 
   if (q.isFalse()) {
     ++num_trivial;
-    return true;;
+    return true;
   }
 
   // TODO: benchmark: reset() or new solver every time?
