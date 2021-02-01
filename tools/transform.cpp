@@ -392,12 +392,12 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr pre_tgt = pre_tgt_and();
 
   expr axioms_expr = axioms();
+  pre_tgt &= !sink_tgt;
+
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
     return;
   }
-
-  pre_tgt &= !sink_tgt;
 
   expr pre_src_exists, pre_src_forall;
   {
