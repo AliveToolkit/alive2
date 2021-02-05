@@ -111,20 +111,6 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
-    auto unsupported = src_state.getUnsupported();
-    auto &u_tgt = tgt_state.getUnsupported();
-    unsupported.insert(u_tgt.begin(), u_tgt.end());
-    if (!unsupported.empty()) {
-      string str = "The program uses the following unsupported features: ";
-      bool first = true;
-      for (auto name : unsupported) {
-        if (!first)
-          str += ", ";
-        str += name;
-        first = false;
-      }
-      errs.add(move(str), false);
-    }
     return;
   }
 
@@ -148,20 +134,39 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   auto &var_name = var ? var->getName() : empty;
   auto &m = r.getModel();
 
-  auto &src_approx = src_state.getApproximations();
-  auto &tgt_approx = tgt_state.getApproximations();
-  if (!src_approx.empty() || !tgt_approx.empty()) {
-    s << "Couldn't prove the correctness of the transformation\n"
-         "Alive2 approximated the semantics of the programs and therefore we\n"
-         "cannot conclude whether the bug found is valid or not.\n\n"
-         "Approximations done:\n";
+  {
+    auto &src_approx = src_state.getApproximations();
+    auto &tgt_approx = tgt_state.getApproximations();
     auto approx = src_approx;
     approx.insert(tgt_approx.begin(), tgt_approx.end());
-    for (auto &a : approx) {
-      s << " - " << a << '\n';
+
+    // filter out approximations that don't contribute to the bug
+    // i.e., they don't show up in the SMT model
+    for (auto I = approx.begin(); I != approx.end(); ) {
+      if (!I->second) {
+        ++I;
+        continue;
+      }
+
+      auto &var = *I->second;
+      if (m.eval(var).isConst()) {
+        ++I;
+      } else {
+        I = approx.erase(I);
+      }
     }
-    errs.add(s.str(), false);
-    return;
+
+    if (!approx.empty()) {
+      s << "Couldn't prove the correctness of the transformation\n"
+          "Alive2 approximated the semantics of the programs and therefore we\n"
+          "cannot conclude whether the bug found is valid or not.\n\n"
+          "Approximations done:\n";
+      for (auto &[msg, var] : approx) {
+        s << " - " << msg << '\n';
+      }
+      errs.add(s.str(), false);
+      return;
+    }
   }
 
   s << msg;
@@ -841,7 +846,7 @@ static void calculateAndInitConstants(Transform &t) {
   // check if null block is needed
   // Global variables cannot be null pointers
   has_null_block = num_ptrinputs > 0 || nullptr_is_used || has_malloc ||
-                  has_ptr_load || has_fncall;
+                  has_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
                       has_null_block;

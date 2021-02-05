@@ -320,20 +320,16 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
       non_poison &= !val.isInf();
   }
   if (fmath.flags & FastMathFlags::ARCP) {
-    s.useUnsupported("arcp");
-    non_poison &= expr(); // TODO
+    s.doesApproximation("arcp", val);
   }
   if (fmath.flags & FastMathFlags::Contract) {
-    s.useUnsupported("contract");
-    non_poison &= expr(); // TODO
+    s.doesApproximation("contract", val);
   }
   if (fmath.flags & FastMathFlags::Reassoc) {
-    s.useUnsupported("reassoc");
-    non_poison &= expr(); // TODO
+    s.doesApproximation("reassoc", val);
   }
   if (fmath.flags & FastMathFlags::AFN) {
-    s.useUnsupported("afn");
-    non_poison &= expr(); // TODO
+    s.doesApproximation("afn", val);
   }
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
@@ -606,8 +602,12 @@ StateValue BinOp::toSMT(State &s) const {
   case FRem:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      s.useUnsupported("frem");
-      return fm_poison(s, a, ap, b, bp, [](expr &a, expr &b) { return expr(); },
+      return fm_poison(s, a, ap, b, bp,
+                       [&](expr &a, expr &b) {
+                         auto val = expr::mkUF("fmod", {a, b}, a);
+                         s.doesApproximation("frem", val);
+                         return val;
+                       },
                        fmath, false);
     };
     break;
@@ -1285,8 +1285,9 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case Int2Ptr:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
-      s.useUnsupported("inttoptr");
-      return { s.getMemory().int2ptr(val), true };
+      auto ret =  s.getMemory().int2ptr(val);
+      s.doesApproximation("inttoptr", ret);
+      return { move(ret), true };
     };
     break;
   }
@@ -1689,7 +1690,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     if (ty.isPtrType()) {
       expr np(true);
       Pointer p(s.getMemory(), move(value.value));
-      p.stripAttrs();
       if (argflag.has(ParamAttrs::Dereferenceable) ||
           argflag.has(ParamAttrs::ByVal))
         s.addUB(

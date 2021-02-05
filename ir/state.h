@@ -94,8 +94,7 @@ private:
   smt::AndExpr precondition;
   smt::AndExpr axioms;
 
-  std::set<const char*> used_unsupported;
-  std::set<std::string> used_approximations;
+  std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
 
   std::set<smt::expr> quantified_vars;
 
@@ -119,7 +118,6 @@ private:
   std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
-  StateValue null_sv;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   StateValue* no_more_tmp_slots();
@@ -206,10 +204,7 @@ public:
 
   auto& getVarArgsData() { return var_args_data.data; }
 
-  void useUnsupported(const char *name);
-  auto& getUnsupported() const { return used_unsupported; }
-
-  void doesApproximation(std::string &&name);
+  void doesApproximation(std::string &&name, std::optional<smt::expr> e = {});
   auto& getApproximations() const { return used_approximations; }
 
   void addQuantVar(const smt::expr &var);

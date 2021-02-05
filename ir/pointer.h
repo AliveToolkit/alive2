@@ -113,8 +113,6 @@ public:
   smt::expr isReadonly() const;
   smt::expr isReadnone() const;
 
-  void stripAttrs();
-
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
                            bool is_byval_arg) const;

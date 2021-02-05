@@ -517,11 +517,6 @@ expr Pointer::isReadnone() const {
   return p.extract(idx, idx) == 1;
 }
 
-void Pointer::stripAttrs() {
-  p = p.extract(totalBits()-1, bits_for_ptrattrs)
-       .concat_zeros(bits_for_ptrattrs);
-}
-
 Pointer Pointer::mkNullPointer(const Memory &m) {
   // Null pointer exists if either source or target uses it.
   assert(has_null_block);

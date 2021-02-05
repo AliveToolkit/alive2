@@ -334,8 +334,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 StateValue* State::no_more_tmp_slots() {
   if (i_tmp_values < tmp_values.size())
     return nullptr;
-  useUnsupported("Too many temporaries");
-  return &null_sv;
+  throw AliveException("Too many temporaries", false);
 }
 
 const StateValue& State::operator[](const Value &val) {
@@ -838,12 +837,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   return retval;
 }
 
-void State::useUnsupported(const char *name) {
-  used_unsupported.emplace(name);
-}
-
-void State::doesApproximation(string &&name) {
-  used_approximations.emplace(move(name));
+void State::doesApproximation(string &&name, optional<expr> e) {
+  used_approximations.emplace(move(name), move(e));
 }
 
 void State::addQuantVar(const expr &var) {
