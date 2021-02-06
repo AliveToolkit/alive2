@@ -135,24 +135,14 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
   auto &m = r.getModel();
 
   {
-    auto &src_approx = src_state.getApproximations();
-    auto &tgt_approx = tgt_state.getApproximations();
-    auto approx = src_approx;
-    approx.insert(tgt_approx.begin(), tgt_approx.end());
-
     // filter out approximations that don't contribute to the bug
     // i.e., they don't show up in the SMT model
-    for (auto I = approx.begin(); I != approx.end(); ) {
-      if (!I->second) {
-        ++I;
-        continue;
-      }
-
-      auto &var = *I->second;
-      if (m.eval(var).isConst()) {
-        ++I;
-      } else {
-        I = approx.erase(I);
+    set<string> approx;
+    for (auto *v : { &src_state.getApproximations(),
+                     &tgt_state.getApproximations() }) {
+      for (auto &[msg, var] : *v) {
+        if (!var || m.eval(*var).isConst())
+          approx.emplace(msg);
       }
     }
 
@@ -161,7 +151,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
           "Alive2 approximated the semantics of the programs and therefore we\n"
           "cannot conclude whether the bug found is valid or not.\n\n"
           "Approximations done:\n";
-      for (auto &[msg, var] : approx) {
+      for (auto &msg : approx) {
         s << " - " << msg << '\n';
       }
       errs.add(s.str(), false);
