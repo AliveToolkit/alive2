@@ -599,13 +599,13 @@ public:
 
 class GEP final : public MemInstr {
   Value *ptr;
-  std::vector<std::pair<unsigned, Value*>> idxs;
+  std::vector<std::pair<uint64_t, Value*>> idxs;
   bool inbounds;
 public:
   GEP(Type &type, std::string &&name, Value &ptr, bool inbounds)
     : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds) {}
 
-  void addIdx(unsigned obj_size, Value &idx);
+  void addIdx(uint64_t obj_size, Value &idx);
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
 

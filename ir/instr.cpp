@@ -2612,7 +2612,7 @@ void Alloc::rauw(const Value &what, Value &with) {
   RAUW(mul);
 }
 
-void Alloc::print(std::ostream &os) const {
+void Alloc::print(ostream &os) const {
   os << getName() << " = alloca " << *size;
   if (mul)
     os << " x " << *mul;
@@ -2674,7 +2674,7 @@ void Malloc::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void Malloc::print(std::ostream &os) const {
+void Malloc::print(ostream &os) const {
   os << getName();
   if (!ptr)
     os << " = malloc ";
@@ -2761,7 +2761,7 @@ void Calloc::rauw(const Value &what, Value &with) {
   RAUW(size);
 }
 
-void Calloc::print(std::ostream &os) const {
+void Calloc::print(ostream &os) const {
   os << getName() << " = calloc " << *num << ", " << *size;
 }
 
@@ -2812,7 +2812,7 @@ void StartLifetime::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void StartLifetime::print(std::ostream &os) const {
+void StartLifetime::print(ostream &os) const {
   os << "start_lifetime " << *ptr;
 }
 
@@ -2848,7 +2848,7 @@ void Free::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void Free::print(std::ostream &os) const {
+void Free::print(ostream &os) const {
   os << "free " << *ptr << (heaponly ? "" : " unconstrained");
 }
 
@@ -2872,7 +2872,7 @@ unique_ptr<Instr> Free::dup(const string &suffix) const {
 }
 
 
-void GEP::addIdx(unsigned obj_size, Value &idx) {
+void GEP::addIdx(uint64_t obj_size, Value &idx) {
   idxs.emplace_back(obj_size, &idx);
 }
 
@@ -2881,16 +2881,34 @@ DEFINE_AS_RETZERO(GEP, getMaxAccessSize);
 DEFINE_AS_EMPTYACCESS(GEP);
 DEFINE_AS_RETFALSE(GEP, canFree);
 
+static unsigned off_used_bits(const Value &v) {
+  if (auto c = isCast(ConversionOp::SExt, v))
+    return off_used_bits(c->getValue());
+
+  if (auto ty = dynamic_cast<IntType*>(&v.getType()))
+    return min(ty->bits(), 64u);
+
+  return 64;
+}
+
 uint64_t GEP::getMaxGEPOffset() const {
-  int64_t off = 0;
+  uint64_t off = 0;
   for (auto &[mul, v] : getIdxs()) {
+    if (mul == 0)
+      continue;
+    if (mul >= INT64_MAX)
+      return UINT64_MAX;
+
     if (auto n = getInt(*v)) {
-      off += mul * *n;
+      off = add_saturate(off, abs((int64_t)mul * *n));
       continue;
     }
-    return UINT64_MAX;
+
+    off = add_saturate(off,
+                       mul_saturate(mul,
+                                    UINT64_MAX >> (64 - off_used_bits(*v))));
   }
-  return abs(off);
+  return off;
 }
 
 vector<Value*> GEP::operands() const {
@@ -2908,7 +2926,7 @@ void GEP::rauw(const Value &what, Value &with) {
   }
 }
 
-void GEP::print(std::ostream &os) const {
+void GEP::print(ostream &os) const {
   os << getName() << " = gep ";
   if (inbounds)
     os << "inbounds ";
@@ -3021,7 +3039,7 @@ void Load::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void Load::print(std::ostream &os) const {
+void Load::print(ostream &os) const {
   os << getName() << " = load " << getType() << ", " << *ptr
      << ", align " << align;
 }
@@ -3065,7 +3083,7 @@ void Store::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void Store::print(std::ostream &os) const {
+void Store::print(ostream &os) const {
   os << "store " << *val << ", " << *ptr << ", align " << align;
 }
 
@@ -3742,8 +3760,8 @@ bool hasNoSideEffects(const Instr &i) {
 }
 
 Value* isNoOp(const Value &v) {
-  if (isCast(ConversionOp::BitCast, v))
-    return &static_cast<const ConversionOp*>(&v)->getValue();
+  if (auto *c = isCast(ConversionOp::BitCast, v))
+    return &c->getValue();
 
   if (auto gep = dynamic_cast<const GEP*>(&v))
     return gep->getMaxGEPOffset() == 0 ? &gep->getPtr() : nullptr;
