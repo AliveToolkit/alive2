@@ -65,12 +65,14 @@ unsigned num_trailing_zeros(uint64_t n) {
 }
 
 uint64_t add_saturate(uint64_t a, uint64_t b) {
-  uint64_t res;
+  unsigned long res;
+  static_assert(sizeof(res) == sizeof(uint64_t));
   return __builtin_uaddl_overflow(a, b, &res) ? UINT64_MAX : res;
 }
 
 uint64_t mul_saturate(uint64_t a, uint64_t b) {
-  uint64_t res;
+  unsigned long res;
+  static_assert(sizeof(res) == sizeof(uint64_t));
   return __builtin_umull_overflow(a, b, &res) ? UINT64_MAX : res;
 }
 
