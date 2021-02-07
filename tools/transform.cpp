@@ -234,6 +234,12 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
 
   for (auto I = instances.begin(); I != instances.end();
        I = instances.erase(I)) {
+
+    if (hit_half_memory_limit()) {
+      instances2.insert(instances.begin(), instances.end());
+      break;
+    }
+
     auto &[e, v] = *I;
     for (unsigned i = 0; i < 2; ++i) {
       expr newexpr = e.subst(var, nums[i]);
@@ -260,6 +266,7 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 
   // eliminate all quantified boolean vars; Z3 gets too slow with those
   auto qvars = qvars0;
+  unsigned num_qvars_subst = 0;
   for (auto I = qvars.begin(); I != qvars.end(); ) {
     auto &var = *I;
     if (!var.isBool()) {
@@ -271,6 +278,10 @@ static expr preprocess(Transform &t, const set<expr> &qvars0,
 
     e = (e.subst(var, true) && e.subst(var, false)).simplify();
     I = qvars.erase(I);
+
+    // Z3's subst is *super* slow; avoid exponential run-time
+    if (++num_qvars_subst == 5)
+      break;
   }
 
   if (config::disable_undef_input || undef_qvars.empty() ||
