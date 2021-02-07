@@ -128,8 +128,7 @@ Z3_sort expr::sort() const {
 
 Z3_decl expr::decl() const {
   auto app = isApp();
-  assert(app);
-  return Z3_get_app_decl(ctx(), app);
+  return app ? Z3_get_app_decl(ctx(), app) : nullptr;
 }
 
 Z3_app expr::isApp() const {
@@ -217,7 +216,7 @@ expr expr::mkNumber(const char *n, const expr &type) {
   return Z3_mk_numeral(ctx(), n, type.sort());
 }
 
-expr expr::mkConst(Z3_func_decl decl) {
+expr expr::mkConst(Z3_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
 

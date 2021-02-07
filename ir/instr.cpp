@@ -320,15 +320,19 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
       non_poison &= !val.isInf();
   }
   if (fmath.flags & FastMathFlags::ARCP) {
+    val = expr::mkUF("arcp", { val }, val);
     s.doesApproximation("arcp", val);
   }
   if (fmath.flags & FastMathFlags::Contract) {
+    val = expr::mkUF("contract", { val }, val);
     s.doesApproximation("contract", val);
   }
   if (fmath.flags & FastMathFlags::Reassoc) {
+    val = expr::mkUF("reassoc", { val }, val);
     s.doesApproximation("reassoc", val);
   }
   if (fmath.flags & FastMathFlags::AFN) {
+    val = expr::mkUF("afn", { val }, val);
     s.doesApproximation("afn", val);
   }
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
@@ -1285,9 +1289,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case Int2Ptr:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
-      auto ret =  s.getMemory().int2ptr(val);
-      s.doesApproximation("inttoptr", ret);
-      return { move(ret), true };
+      return { s.getMemory().int2ptr(val), true };
     };
     break;
   }

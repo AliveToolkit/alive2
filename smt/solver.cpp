@@ -185,6 +185,11 @@ int64_t Model::getInt(const expr &var) const {
   return n;
 }
 
+bool Model::hasFnModel(const expr &fn) const {
+  auto fn_decl = fn.decl();
+  return fn_decl ? Z3_model_has_interp(ctx(), m, fn_decl) : false;
+}
+
 pair<expr, expr> Model::iterator::operator*(void) const {
   auto decl = Z3_model_get_const_decl(ctx(), m, idx);
   return { expr::mkConst(decl), Z3_model_get_const_interp(ctx(), m, decl) };

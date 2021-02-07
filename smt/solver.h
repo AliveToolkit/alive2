@@ -36,6 +36,7 @@ public:
   expr eval(const expr &var, bool complete = false) const;
   uint64_t getUInt(const expr &var) const;
   int64_t getInt(const expr &var) const;
+  bool hasFnModel(const expr &fn) const;
 
   class iterator {
     Z3_model m;

@@ -141,7 +141,7 @@ static void error(Errors &errs, State &src_state, State &tgt_state,
     for (auto *v : { &src_state.getApproximations(),
                      &tgt_state.getApproximations() }) {
       for (auto &[msg, var] : *v) {
-        if (!var || m.eval(*var).isConst())
+        if (!var || m.hasFnModel(*var))
           approx.emplace(msg);
       }
     }
