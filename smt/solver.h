@@ -26,7 +26,7 @@ class Model {
   friend class Result;
 
 public:
-  Model(Model &&other) : m(0) {
+  Model(Model &&other) noexcept : m(0) {
     std::swap(other.m, m);
   }
 

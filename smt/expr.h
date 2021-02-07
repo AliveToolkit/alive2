@@ -71,7 +71,7 @@ class expr {
 public:
   expr() : ptr(0) {}
 
-  expr(expr &&other) : ptr(0) {
+  expr(expr &&other) noexcept : ptr(0) {
     std::swap(ptr, other.ptr);
   }
 
