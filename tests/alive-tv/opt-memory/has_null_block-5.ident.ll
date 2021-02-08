@@ -1,10 +1,6 @@
 ; TEST-ARGS: -dbg
 
-define i8* @src() {
-  ret i8* null
-}
-
-define i8* @tgt() {
+define i8* @f() {
   ret i8* null
 }
 

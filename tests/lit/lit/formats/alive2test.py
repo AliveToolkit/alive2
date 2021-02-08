@@ -72,13 +72,9 @@ class Alive2Test(TestFormat):
     test = test.getSourcePath()
 
     alive_tv_1 = test.endswith('.srctgt.ll')
-    if alive_tv_1:
-      cmd = ['./alive-tv', '-smt-to=20000']
-      if not os.path.isfile('alive-tv'):
-        return lit.Test.UNSUPPORTED, ''
-
     alive_tv_2 = test.endswith('.src.ll')
-    if alive_tv_2:
+    alive_tv_3 = test.endswith('.ident.ll')
+    if alive_tv_1 or alive_tv_2 or alive_tv_3:
       cmd = ['./alive-tv', '-smt-to=20000']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
@@ -98,7 +94,8 @@ class Alive2Test(TestFormat):
       if not os.path.isfile(execpath):
         return lit.Test.UNSUPPORTED, ''
 
-    if not alive_tv_1 and not alive_tv_2 and not clang_tv and not opt_tv:
+    if not alive_tv_1 and not alive_tv_2 and not alive_tv_3 and \
+       not clang_tv and not opt_tv:
       cmd = ['./alive', '-smt-to:20000']
 
     input = readFile(test)
@@ -129,6 +126,8 @@ class Alive2Test(TestFormat):
     cmd.append(test)
     if alive_tv_2:
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
+    elif alive_tv_3:
+      cmd = cmd + [test, '-always-verify']
     out, err, exitCode = executeCommand(cmd)
     output = out + err
 

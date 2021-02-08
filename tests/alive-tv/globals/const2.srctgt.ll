@@ -1,6 +1,6 @@
 @glbl = constant i32 10
 
-define i32 @test61(i32* %ptr) {
+define i32 @src(i32* %ptr) {
   %A = load i32, i32* %ptr
   %B = icmp eq i32* %ptr, @glbl
   %C = select i1 %B, i32 %A, i32 10

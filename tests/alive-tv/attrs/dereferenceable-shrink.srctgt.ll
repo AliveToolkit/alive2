@@ -6,6 +6,6 @@ define void @src(i8* %p) {
 }
 
 define void @tgt(i8* %p) {
-  call void @f(i8* dereferenceable(4) %p)
+  call void @f(i8* dereferenceable(2) %p)
   ret void
 }
