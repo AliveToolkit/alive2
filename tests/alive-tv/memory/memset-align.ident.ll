@@ -3,14 +3,7 @@ target triple = "x86_64-unknown-linux-gnu"
 
 declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i1 immarg)
 
-define void @src(i8* %out) {
-entry:
-  call void @llvm.memset.p0i8.i64(i8* align 4 %out, i8 0, i64 0, i1 false)
-  ret void
-}
-
-; identity
-define void @tgt(i8* %out) {
+define void @f(i8* %out) {
 entry:
   call void @llvm.memset.p0i8.i64(i8* align 4 %out, i8 0, i64 0, i1 false)
   ret void
