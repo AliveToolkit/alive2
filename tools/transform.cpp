@@ -51,7 +51,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
   }
 
   if (auto *in = dynamic_cast<const Input*>(var)) {
-    auto var = in->getUndefVar(type, child);
+    auto var = in->getUndefMaskVar(type, child);
     if (var.isValid() && m.eval(var, false).isAllOnes()) {
       os << "undef";
       return;
@@ -223,7 +223,7 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
   if (instances.size() >= 128 || hit_half_memory_limit())
     return;
 
-  auto var = in->getUndefVar(ty, child);
+  auto var = in->getUndefMaskVar(ty, child);
   if (!var.isValid())
     return;
 

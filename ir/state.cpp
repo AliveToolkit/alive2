@@ -146,48 +146,38 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
   return result;
 }
 
-expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
-  if (isUndef(e)) {
+expr State::stripUndefAndAddUB(const Type &valty, const expr &e) {
+  if (isUndefVarInCurrentExec(e)) {
     addUB(expr(false));
     return expr::mkUInt(0, e);
   }
 
-  auto is_undef_cond = [](const expr &e, const expr &var) {
-    expr lhs, rhs;
-    // (= #b0 isundef_%var)
-    if (e.isEq(lhs, rhs)) {
-      return (lhs.isZero() && Input::isUndefMask(rhs, var)) ||
-             (rhs.isZero() && Input::isUndefMask(lhs, var));
-    }
-    return false;
-  };
-
-  auto is_if_undef = [&](const expr &e, expr &var, expr &not_undef) {
-    expr undef;
-    // (ite (= #b0 isundef_%var) %var undef)
-    return e.isIf(not_undef, var, undef) &&
-           isUndef(undef) &&
-           is_undef_cond(not_undef, var);
+  auto is_input = [&](const expr &e, expr &var, expr &not_undef_cond) {
+    expr undef_var;
+    // (ite not_undef_cond %var undef_var) where
+    //    not_undef_cond: (= #b0 isundef_%var)
+    return Input::match(e, var, not_undef_cond, undef_var) &&
+           isUndefVarInCurrentExec(undef_var);
   };
 
   // e2: stripped expression
-  auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef,
+  auto is_input_or_add = [&](const expr &e, expr &var, expr &not_undef,
                                 expr &e2) {
     // when e = (ite (= #b0 isundef_%var) %var undef):
     //   var = %var, e2 = %var
     // when e = (bvadd const (ite (= #b0 isundef_%var) %var undef))
     //   var = %var, e2 = const + %var
-    if (is_if_undef(e, var, not_undef)) {
+    if (is_input(e, var, not_undef)) {
       e2 = var;
       return true;
     }
 
     expr a, b;
     if (e.isAdd(a, b)) {
-      if (b.isConst() && is_if_undef(a, var, not_undef)) {
+      if (b.isConst() && is_input(a, var, not_undef)) {
         e2 = b + var;
         return true;
-      } else if (a.isConst() && is_if_undef(b, var, not_undef)) {
+      } else if (a.isConst() && is_input(b, var, not_undef)) {
         e2 = a + var;
         return true;
       }
@@ -199,15 +189,15 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
 
   // two variants
   // 1) boolean
-  if (is_if_undef(e, a, b)) {
+  if (is_input(e, a, b)) {
     addUB(move(b));
     return a;
   }
 
-  auto has_undef = [&](const expr &e) {
+  auto well_defined = [&](const expr &e) {
     auto vars = e.vars();
-    return any_of(vars.begin(), vars.end(),
-                  [&](auto &v) { return isUndef(v); });
+    return all_of(vars.begin(), vars.end(),
+                  [&](auto &v) { return !isUndefVarInCurrentExec(v); });
   };
 
   auto mark_notundef = [&](const expr &var) {
@@ -225,20 +215,20 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) && well_defined(rhs)) {
         addUB(move(not_undef));
         mark_notundef(val);
         // %var == rhs
         // (bvadd c %var) == rhs
         return expr::mkIf(newe == rhs, a, b);
       }
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
+      if (is_input_or_add(rhs, val, not_undef, newe) && well_defined(lhs)) {
         addUB(move(not_undef));
         mark_notundef(val);
         return expr::mkIf(lhs == newe, a, b);
       }
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) &&
+          is_input_or_add(rhs, val2, not_undef2, newe2)) {
         addUB(move(not_undef));
         addUB(move(not_undef2));
         mark_notundef(val);
@@ -251,7 +241,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
       // (ite (bvsle val (bvadd c (ite (= #b0 isundef_%var) %var undef))
       //       #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
+      if (is_input_or_add(rhs, val, not_undef, newe) && well_defined(lhs)) {
         expr cond = lhs == expr::IntSMin(lhs.bits());
         addUB(not_undef || cond);
         if (cond.isFalse())
@@ -264,7 +254,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
       // (ite (bvsle (bvadd c (ite (= #b0 isundef_%var) %var undef)) val)
       //       #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) && well_defined(rhs)) {
         expr cond = rhs == expr::IntSMax(rhs.bits());
         addUB(not_undef || cond);
         if (cond.isFalse())
@@ -273,8 +263,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       }
 
       // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) &&
+          is_input_or_add(rhs, val2, not_undef2, newe2)) {
         addUB((not_undef && not_undef2) ||
               (not_undef && newe == expr::IntSMin(lhs.bits())) ||
               (not_undef2 && newe2 == expr::IntSMax(rhs.bits())));
@@ -286,7 +276,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
       // (ite (bvule val (bvadd c (ite (= #b0 isundef_%var) %var undef)))
       //       #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
+      if (is_input_or_add(rhs, val, not_undef, newe) && well_defined(lhs)) {
         expr cond = lhs == 0;
         addUB(not_undef || cond);
         if (cond.isFalse())
@@ -299,7 +289,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
       // (ite (bvule (bvadd c (ite (= #b0 isundef_%var) %var undef)) %val)
       //       #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) && well_defined(rhs)) {
         expr cond = rhs == expr::mkInt(-1, rhs);
         addUB(not_undef || cond);
         if (cond.isFalse())
@@ -308,8 +298,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
       }
 
       // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
+      if (is_input_or_add(lhs, val, not_undef, newe) &&
+          is_input_or_add(rhs, val2, not_undef2, newe2)) {
         addUB((not_undef && not_undef2) ||
               (not_undef && newe == 0) ||
               (not_undef2 && newe2 == expr::mkInt(-1, rhs)));
@@ -327,7 +317,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   for (auto &undef : undef_vars) {
     repls.emplace_back(undef, expr::some(undef));
   }
-  addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
+  addUB(eq_except_padding(valty, e, e.subst(repls)));
   return e;
 }
 
@@ -450,7 +440,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     if (I != analysis.non_undef_vals.end()) {
       v = I->second;
     } else {
-      v = strip_undef_and_add_ub(val, v);
+      v = stripUndefAndAddUB(val.getType(), v);
       analysis.non_undef_vals.emplace(&val, v);
     }
   }
@@ -497,7 +487,7 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
   return I == pres.end() ? nullptr : &I->second.path;
 }
 
-bool State::isUndef(const expr &e) const {
+bool State::isUndefVarInCurrentExec(const expr &e) const {
   return undef_vars.count(e) != 0;
 }
 

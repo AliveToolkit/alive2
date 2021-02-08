@@ -113,6 +113,7 @@ class Input final : public Value {
   ParamAttrs attrs;
   std::string getSMTName(unsigned child) const;
   StateValue mkInput(State &s, const Type &ty, unsigned child) const;
+  static bool isUndefMaskVar(const smt::expr &e, std::string_view var_name);
 public:
   Input(Type &type, std::string &&name,
         ParamAttrs &&attrs = ParamAttrs::None);
@@ -121,9 +122,12 @@ public:
   bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }
   const ParamAttrs &getAttributes() const { return attrs; }
   StateValue toSMT(State &s) const override;
-  smt::expr getUndefVar(const Type &ty, unsigned child) const;
 
-  static bool isUndefMask(const smt::expr &e, const smt::expr &var);
+  smt::expr getUndefMaskVar(const Type &ty, unsigned child) const;
+  // Pattern match e and return true if it is an expression created by
+  // Input::toSMT from a non-aggregate type.
+  static bool match(const smt::expr &e, smt::expr &var,
+                    smt::expr &not_undef_cond, smt::expr &undef_var);
 };
 
 }

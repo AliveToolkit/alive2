@@ -208,7 +208,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     val = ty.mkInput(s, name.c_str(), attrs);
   }
 
-  auto undef_mask = getUndefVar(ty, child);
+  auto undef_mask = getUndefMaskVar(ty, child);
   if (undef_mask.isValid()) {
     auto [undef, var] = ty.mkUndefInput(s, attrs);
     if (undef_mask.bits() == 1)
@@ -244,9 +244,8 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
                               expr::mkBoolVar(np_name.c_str())) };
 }
 
-bool Input::isUndefMask(const expr &e, const expr &var) {
+bool Input::isUndefMaskVar(const expr &e, string_view var_name) {
   auto ty_name = e.fn_name();
-  auto var_name = var.fn_name();
   return string_view(ty_name).substr(0, 8) == "isundef_" &&
          string_view(ty_name).substr(8, var_name.size()) == var_name;
 }
@@ -255,7 +254,7 @@ StateValue Input::toSMT(State &s) const {
   return mkInput(s, getType(), 0);
 }
 
-expr Input::getUndefVar(const Type &ty, unsigned child) const {
+expr Input::getUndefMaskVar(const Type &ty, unsigned child) const {
   // TODO: Clarify whether byval/dereferenceable accept partially undefined
   // pointers
   if (config::disable_undef_input ||
@@ -268,6 +267,27 @@ expr Input::getUndefVar(const Type &ty, unsigned child) const {
   //return expr::mkVar(tyname.c_str(), ty.getDummyValue(false).value);
   // FIXME: only whole value undef or non-undef for now
   return expr::mkVar(tyname.c_str(), expr::mkUInt(0, 1));
+}
+
+bool Input::match(const expr &e, expr &var, expr &not_undef_cond,
+                  expr &undef_var) {
+  // TODO: PtrType's undef pattern is different from other types
+
+  // (ite (= #b0 isundef_%var) %var undef)
+  if (!e.isIf(not_undef_cond, var, undef_var) || !isUndef(undef_var))
+    return false;
+
+  // Be slightly stricter and check whether var is indeed a variable
+  if (!var.isVar())
+    return false;
+  auto var_name = var.fn_name();
+
+  // (= #b0 isundef_%var)
+  expr lhs, rhs;
+  if (!not_undef_cond.isEq(lhs, rhs))
+    return false;
+  return (lhs.isZero() && isUndefMaskVar(rhs, var_name)) ||
+         (rhs.isZero() && isUndefMaskVar(lhs, var_name));
 }
 
 }

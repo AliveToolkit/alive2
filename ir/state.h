@@ -115,8 +115,9 @@ private:
   const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
   Memory memory;
-  std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
+  // temp state (reset after each State::exec)
+  std::set<smt::expr> undef_vars;
   std::array<StateValue, 64> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
@@ -175,7 +176,15 @@ public:
   const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false);
 
   const ValTy& at(const Value &val) const;
-  bool isUndef(const smt::expr &e) const;
+
+  // Functions for updating undef vars that are needed to represent Value being
+  // executed
+  void addUndefVar(smt::expr &&var);
+  auto& getUndefVars() const { return undef_vars; }
+  void resetUndefVars();
+
+  StateValue rewriteUndef(StateValue &&val,
+                          const std::set<smt::expr> &undef_vars);
 
   /*--- Control flow ---*/
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
@@ -209,12 +218,6 @@ public:
 
   void addQuantVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
-  void addUndefVar(smt::expr &&var);
-  auto& getUndefVars() const { return undef_vars; }
-  void resetUndefVars();
-
-  StateValue rewriteUndef(StateValue &&val,
-                          const std::set<smt::expr> &undef_vars);
 
   bool isInitializationPhase() const { return is_initialization_phase; }
   void finishInitializer();
@@ -253,7 +256,8 @@ public:
   void mkAxioms(State &tgt);
 
 private:
-  smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e);
+  smt::expr stripUndefAndAddUB(const Type &valty, const smt::expr &e);
+  bool isUndefVarInCurrentExec(const smt::expr &e) const;
   void addJump(const BasicBlock &dst, smt::expr &&domain);
 };
 
