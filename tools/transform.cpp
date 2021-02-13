@@ -888,6 +888,7 @@ static void calculateAndInitConstants(Transform &t) {
     = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_access_size),
                  true) + 1;
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
+  bits_for_offset = min(bits_for_offset, config::max_offset_bits);
 
   // we need an extra bit because 1st bit of size is always 0
   bits_size_t = ilog2_ceil(max_alloc_size, true);

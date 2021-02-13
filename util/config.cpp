@@ -17,6 +17,7 @@ bool disable_undef_input = false;
 bool debug = false;
 unsigned src_unroll_cnt = 0;
 unsigned tgt_unroll_cnt = 0;
+unsigned max_offset_bits = 64;
 
 ostream &dbg() {
   return *debug_os;

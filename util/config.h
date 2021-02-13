@@ -21,6 +21,11 @@ extern unsigned src_unroll_cnt;
 
 extern unsigned tgt_unroll_cnt;
 
+// The maximum number of bits to use for offset computations. Note that this may
+// impact correctness, if values involved in offset computations exceed the
+// maximum.
+extern unsigned max_offset_bits;
+
 std::ostream &dbg();
 void set_debug(std::ostream &os);
 

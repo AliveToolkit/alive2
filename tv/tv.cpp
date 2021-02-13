@@ -161,6 +161,12 @@ llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
     llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
     llvm::cl::cat(TVOptions), llvm::cl::init(0));
 
+llvm::cl::opt<size_t> opt_max_offset_in_bits(
+    "tv-max-offset-in-bits", llvm::cl::init(64), llvm::cl::cat(TVOptions),
+    llvm::cl::desc("Upper bound for the maximum pointer offset in bits.   Note "
+                   "that this may impact correctness, if values involved in "
+                   "offset computations exceed the maximum."));
+
 llvm::cl::opt<bool> parallel_tv_unrestricted(
     "tv-parallel-unrestricted",
     llvm::cl::desc("Distribute TV load across cores without any throttling; "
@@ -492,6 +498,7 @@ struct TVPass final : public llvm::ModulePass {
     config::debug = opt_debug;
     config::src_unroll_cnt = opt_src_unrolling_factor;
     config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
+    config::max_offset_bits = opt_max_offset_in_bits;
     llvm_util::omit_array_size = opt_omit_array_size;
 
     llvm_util_init.emplace(*out, module.getDataLayout());
