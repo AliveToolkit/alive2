@@ -4,13 +4,22 @@
 #include "llvm_util/utils.h"
 #include "ir/constant.h"
 #include "ir/function.h"
+#include "llvm_util/llvm2alive.h"
+#include "smt/smt.h"
+#include "tools/transform.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/Type.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <iostream>
+#include <sstream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -18,6 +27,10 @@
 using namespace IR;
 using namespace std;
 using llvm::cast, llvm::dyn_cast, llvm::isa;
+using namespace tools;
+using namespace util;
+
+extern optional<smt::smt_initializer> smt_init;
 
 namespace {
 
@@ -443,4 +456,101 @@ void reset_state(Function &f) {
   value_id_counter = 0;
 }
 
+void compareFunctions(llvm::Function &F1, llvm::Function &F2,
+                      llvm::Triple &targetTriple, unsigned &goodCount,
+                      unsigned &badCount, unsigned &errorCount,
+                      const CompareOptions &opts) {
+  TransformPrintOpts print_opts;
+
+  auto Func1 = llvm2alive(
+      F1, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F1));
+  if (!Func1) {
+    cerr << "ERROR: Could not translate '" << F1.getName().str()
+         << "' to Alive IR\n";
+    ++errorCount;
+    return;
+  }
+
+  auto Func2 = llvm2alive(
+      F2, llvm::TargetLibraryInfoWrapperPass(targetTriple).getTLI(F2),
+      Func1->getGlobalVarNames());
+  if (!Func2) {
+    cerr << "ERROR: Could not translate '" << F2.getName().str()
+         << "' to Alive IR\n";
+    ++errorCount;
+    return;
+  }
+
+  if (opts.print_dot) {
+    Func1->writeDot("src");
+    Func2->writeDot("tgt");
+  }
+
+  if (!opts.always_verify) {
+    stringstream ss1, ss2;
+    Func1->print(ss1);
+    Func2->print(ss2);
+    if (ss1.str() == ss2.str()) {
+      if (!opts.succinct)
+        Transform{"", move(*Func1), move(*Func2)}.print(cout, print_opts);
+      cout << "Transformation seems to be correct! (syntactically equal)\n\n";
+      ++goodCount;
+      return;
+    }
+  }
+
+  smt_init->reset();
+  Transform t;
+  t.src = move(*Func1);
+  t.tgt = move(*Func2);
+  t.preprocess();
+  TransformVerify verifier(t, false);
+  if (!opts.succinct)
+    t.print(cout, print_opts);
+
+  {
+    auto types = verifier.getTypings();
+    if (!types) {
+      cerr << "Transformation doesn't verify!\n"
+              "ERROR: program doesn't type check!\n\n";
+      ++errorCount;
+      return;
+    }
+    assert(types.hasSingleTyping());
+  }
+
+  Errors errs = verifier.verify();
+  bool result(errs);
+  if (result) {
+    if (errs.isUnsound()) {
+      cout << "Transformation doesn't verify!\n";
+      if (!opts.succinct)
+        cout << errs << endl;
+      ++badCount;
+    } else {
+      cerr << errs << endl;
+      ++errorCount;
+    }
+  } else {
+    cout << "Transformation seems to be correct!\n\n";
+    ++goodCount;
+  }
+
+  if (opts.bidirectional) {
+    smt_init->reset();
+    Transform t2;
+    t2.src = move(t.tgt);
+    t2.tgt = move(t.src);
+    TransformVerify verifier2(t2, false);
+    t2.print(cout, print_opts);
+
+    if (Errors errs2 = verifier2.verify()) {
+      cout << "Reverse transformation doesn't verify!\n" << errs2 << endl;
+    } else {
+      cout << "Reverse transformation seems to be correct!\n\n";
+      if (!result)
+        cout << "These functions are equivalent.\n\n";
+    }
+  }
+}
 }

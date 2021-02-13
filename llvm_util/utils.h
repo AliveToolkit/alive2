@@ -8,6 +8,9 @@
 #include <string>
 #include <functional>
 
+#include "llvm/ADT/Triple.h"
+#include "llvm/IR/Function.h"
+
 namespace llvm {
 class BasicBlock;
 class ConstantExpr;
@@ -55,4 +58,16 @@ std::ostream& get_outs();
 void set_outs(std::ostream &os);
 
 void reset_state(IR::Function &f);
+
+struct CompareOptions {
+  bool print_dot = false;
+  bool succinct = false;
+  bool bidirectional = false;
+  bool always_verify = false;
+};
+
+void compareFunctions(llvm::Function &F1, llvm::Function &F2,
+                      llvm::Triple &targetTriple, unsigned &goodCount,
+                      unsigned &badCount, unsigned &errorCount,
+                      const CompareOptions &Opts);
 }

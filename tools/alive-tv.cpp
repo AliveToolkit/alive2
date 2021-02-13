@@ -1,8 +1,9 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "llvm_util/llvm2alive.h"
 #include "ir/memory.h"
+#include "llvm_util/llvm2alive.h"
+#include "llvm_util/utils.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/config.h"
@@ -172,103 +173,7 @@ static std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   return M;
 }
 
-static optional<smt::smt_initializer> smt_init;
-
-static void compareFunctions(llvm::Function &F1, llvm::Function &F2,
-                             llvm::Triple &targetTriple, unsigned &goodCount,
-                             unsigned &badCount, unsigned &errorCount) {
-  TransformPrintOpts print_opts;
-
-  auto Func1 = llvm2alive(F1, llvm::TargetLibraryInfoWrapperPass(targetTriple)
-                                    .getTLI(F1));
-  if (!Func1) {
-    cerr << "ERROR: Could not translate '" << F1.getName().str()
-         << "' to Alive IR\n";
-    ++errorCount;
-    return;
-  }
-
-  auto Func2 = llvm2alive(F2, llvm::TargetLibraryInfoWrapperPass(targetTriple)
-                                    .getTLI(F2), Func1->getGlobalVarNames());
-  if (!Func2) {
-    cerr << "ERROR: Could not translate '" << F2.getName().str()
-         << "' to Alive IR\n";
-    ++errorCount;
-    return;
-  }
-
-  if (opt_print_dot) {
-    Func1->writeDot("src");
-    Func2->writeDot("tgt");
-  }
-
-  if (!opt_always_verify) {
-    stringstream ss1, ss2;
-    Func1->print(ss1);
-    Func2->print(ss2);
-    if (ss1.str() == ss2.str()) {
-      if (!opt_succinct)
-        Transform{"", move(*Func1), move(*Func2)}.print(cout, print_opts);
-      cout << "Transformation seems to be correct! (syntactically equal)\n\n";
-      ++goodCount;
-      return;
-    }
-  }
-
-  smt_init->reset();
-  Transform t;
-  t.src = move(*Func1);
-  t.tgt = move(*Func2);
-  t.preprocess();
-  TransformVerify verifier(t, false);
-  if (!opt_succinct)
-    t.print(cout, print_opts);
-
-  {
-    auto types = verifier.getTypings();
-    if (!types) {
-      cerr << "Transformation doesn't verify!\n"
-              "ERROR: program doesn't type check!\n\n";
-      ++errorCount;
-      return;
-    }
-    assert(types.hasSingleTyping());
-  }
-
-  Errors errs = verifier.verify();
-  bool result(errs);
-  if (result) {
-    if (errs.isUnsound()) {
-      cout << "Transformation doesn't verify!\n";
-      if (!opt_succinct)
-        cout << errs << endl;
-      ++badCount;
-    } else {
-      cerr << errs << endl;
-      ++errorCount;
-    }
-  } else {
-    cout << "Transformation seems to be correct!\n\n";
-    ++goodCount;
-  }
-
-  if (opt_bidirectional) {
-    smt_init->reset();
-    Transform t2;
-    t2.src = move(t.tgt);
-    t2.tgt = move(t.src);
-    TransformVerify verifier2(t2, false);
-    t2.print(cout, print_opts);
-
-    if (Errors errs2 = verifier2.verify()) {
-      cout << "Reverse transformation doesn't verify!\n" << errs2 << endl;
-    } else {
-      cout << "Reverse transformation seems to be correct!\n\n";
-      if (!result)
-        cout << "These functions are equivalent.\n\n";
-    }
-  }
-}
+optional<smt::smt_initializer> smt_init;
 
 static void optimizeModule(llvm::Module *M) {
   llvm::LoopAnalysisManager LAM;
@@ -376,6 +281,11 @@ convenient way to demonstrate an existing optimizer bug.
   smt_init.emplace();
 
   unsigned goodCount = 0, badCount = 0, errorCount = 0;
+  CompareOptions Opts;
+  Opts.print_dot = opt_print_dot;
+  Opts.succinct = opt_succinct;
+  Opts.bidirectional = opt_bidirectional;
+  Opts.always_verify = opt_always_verify;
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
@@ -383,7 +293,7 @@ convenient way to demonstrate an existing optimizer bug.
     auto TGT = findFunction(*M1, opt_tgt_fn);
     if (SRC && TGT) {
       compareFunctions(*SRC, *TGT, targetTriple, goodCount, badCount,
-                       errorCount);
+                       errorCount, Opts);
       goto end;
     } else {
       M2 = CloneModule(*M1);
@@ -416,7 +326,8 @@ convenient way to demonstrate an existing optimizer bug.
         continue;
       if (!funcNames.empty() && funcNames.count(F1.getName().str()) == 0)
         continue;
-      compareFunctions(F1, F2, targetTriple, goodCount, badCount, errorCount);
+      compareFunctions(F1, F2, targetTriple, goodCount, badCount, errorCount,
+                       Opts);
       break;
     }
   }
