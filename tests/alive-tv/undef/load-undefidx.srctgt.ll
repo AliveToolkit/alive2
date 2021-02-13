@@ -1,4 +1,4 @@
-; Relevant patch: https://reviews.llvm.org/D87994
+; https://reviews.llvm.org/D95238
 
 define i8 @src() {
   ret i8 0
@@ -12,3 +12,5 @@ define i8 @tgt() {
   %v = load i8, i8* %p2
   ret i8 %v
 }
+
+; ERROR: Source is more defined than target

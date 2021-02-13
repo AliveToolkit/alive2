@@ -59,7 +59,7 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
 }
 
 bool ParamAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef);
+  bool ub = has(NoUndef) || has(Dereferenceable) || has(ByVal);
   assert(!ub || poisonImpliesUB());
   return ub;
 }
@@ -79,7 +79,7 @@ bool FnAttrs::poisonImpliesUB() const {
 }
 
 bool FnAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef);
+  bool ub = has(NoUndef) || has(Dereferenceable);
   assert(!ub || poisonImpliesUB());
   return ub;
 }
