@@ -325,28 +325,27 @@ Result Solver::check() const {
   }
 }
 
-void Solver::check(initializer_list<E> queries) {
-  for (auto &[q, error] : queries) {
-    if (!q.isValid()) {
-      ++num_invalid;
-      error(Result::INVALID);
-      return;
-    }
-
-    if (q.isFalse()) {
-      ++num_trivial;
-      continue;
-    }
-
-    // TODO: benchmark: reset() or new solver every time?
-    Solver s;
-    s.add(q);
-    auto res = s.check();
-    if (!res.isUnsat()) {
-      error(res);
-      return;
-    }
+bool Solver::check(expr &&q, std::function<void(const Result &r)> &&error) {
+  if (!q.isValid()) {
+    ++num_invalid;
+    error(Result::INVALID);
+    return false;
   }
+
+  if (q.isFalse()) {
+    ++num_trivial;
+    return true;
+  }
+
+  // TODO: benchmark: reset() or new solver every time?
+  Solver s;
+  s.add(q);
+  auto res = s.check();
+  if (!res.isUnsat()) {
+    error(res);
+    return false;
+  }
+  return true;
 }
 
 Result check_expr(const expr &e) {

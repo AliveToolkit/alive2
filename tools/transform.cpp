@@ -259,7 +259,7 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
   instances = move(instances2);
 }
 
-static expr preprocess(Transform &t, const set<expr> &qvars0,
+static expr preprocess(const Transform &t, const set<expr> &qvars0,
                        const set<expr> &undef_qvars, expr &&e) {
   if (hit_half_memory_limit())
     return expr::mkForAll(qvars0, move(e));
@@ -359,6 +359,19 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
                  const expr &dom_a, const expr &fndom_a, const State::ValTy &ap,
                  const expr &dom_b, const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
+  if (src_state.sinkDomain().isTrue()) {
+    errs.add("The source program doesn't reach a return instruction.\n"
+             "Consider increasing the unroll factor if it has loops", false);
+    return;
+  }
+
+  auto sink_tgt = tgt_state.sinkDomain();
+  if (sink_tgt.isTrue()) {
+    errs.add("The target program doesn't reach a return instruction.\n"
+             "Consider increasing the unroll factor if it has loops", false);
+    return;
+  }
+
   auto &a = ap.first;
   auto &b = bp.first;
 
@@ -367,17 +380,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   qvars.insert(ap.second.begin(), ap.second.end());
   auto &fn_qvars = tgt_state.getFnQuantVars();
   qvars.insert(fn_qvars.begin(), fn_qvars.end());
-
-  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
-    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
-  };
-
-  auto print_value = [&](ostream &s, const Model &m) {
-    s << "Source value: ";
-    print_varval(s, src_state, m, var, type, a);
-    s << "\nTarget value: ";
-    print_varval(s, tgt_state, m, var, type, b);
-  };
 
   AndExpr axioms = src_state.getAxioms();
   axioms.add(tgt_state.getAxioms());
@@ -396,10 +398,12 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr pre_tgt = pre_tgt_and();
 
   expr axioms_expr = axioms();
-  expr dom = dom_a && dom_b;
-
-  auto sink_tgt = tgt_state.sinkDomain();
   pre_tgt &= !sink_tgt;
+
+  if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
+    errs.add("Precondition is always false", false);
+    return;
+  }
 
   expr pre_src_exists, pre_src_forall;
   {
@@ -415,35 +419,6 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   expr pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   pre_src_forall &= tgt_state.getFnPre();
 
-  auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
-  expr undef_cnstr = encode_undef_refinement(type, ap, bp);
-
-  auto src_mem = src_state.returnMemory();
-  auto tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr0, ptr_refinement0, mem_undef]
-    = src_mem.refined(tgt_mem, false);
-  auto &ptr_refinement = ptr_refinement0;
-  auto memory_cnstr = memory_cnstr0.isTrue() ? memory_cnstr0
-                                             : value_cnstr && memory_cnstr0;
-  qvars.insert(mem_undef.begin(), mem_undef.end());
-
-  if (src_state.sinkDomain().isTrue()) {
-    errs.add("The source program doesn't reach a return instruction.\n"
-             "Consider increasing the unroll factor if it has loops", false);
-    return;
-  }
-
-  if (sink_tgt.isTrue()) {
-    errs.add("The target program doesn't reach a return instruction.\n"
-             "Consider increasing the unroll factor if it has loops", false);
-    return;
-  }
-
-  if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
-    errs.add("Precondition is always false", false);
-    return;
-  }
-
   auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that
     // \exists v,v' . pre_tgt(v') && pre_src(v) is SAT (or timeout)
@@ -458,18 +433,24 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
             preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
   };
 
-  auto print_ptr_load = [&](ostream &s, const Model &m) {
-    set<expr> undef;
-    Pointer p(src_mem, m[ptr_refinement()]);
-    s << "\nMismatch in " << p
-      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p, undef)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef)()]);
+  // 1. Check UB
+  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
+    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
   };
 
+  if (!Solver::check(
+        mk_fml(fndom_a.notImplies(fndom_b)),
+        [&](const Result &r) {
+          err(r, [](ostream&, const Model&){},
+              "Source is more defined than target");
+        }))
+    return;
+
+  // 2. Check return domain (noreturn check)
   expr dom_constr;
   if (dom_a.eq(fndom_a)) {
     if (dom_b.eq(fndom_b)) // A /\ B /\ A != B
-       dom_constr = false;
+      dom_constr = false;
     else // A /\ B /\ A != C
       dom_constr = fndom_a && fndom_b && !dom_b;
   } else if (dom_b.eq(fndom_b)) { // A /\ B /\ C != B
@@ -478,34 +459,71 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
     dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
   }
 
-  Solver::check({
-    { mk_fml(fndom_a.notImplies(fndom_b)),
-      [&](const Result &r) {
-        err(r, [](ostream&, const Model&){},
-            "Source is more defined than target");
-      }},
-    { mk_fml(move(dom_constr)),
-      [&](const Result &r) {
-        err(r, [](ostream&, const Model&){},
-            "Source and target don't have the same return domain");
-      }},
-    { mk_fml(dom && !poison_cnstr),
-      [&](const Result &r) {
-        err(r, print_value, "Target is more poisonous than source");
-      }},
-    { mk_fml(dom && undef_cnstr),
-      [&](const Result &r) {
-        err(r, print_value, "Target's return value is more undefined");
-      }},
-    { mk_fml(dom && !value_cnstr),
-      [&](const Result &r) {
-        err(r, print_value, "Value mismatch");
-      }},
-    { mk_fml(dom && !memory_cnstr),
+  if (!Solver::check(
+        mk_fml(move(dom_constr)),
+        [&](const Result &r) {
+          err(r, [](ostream&, const Model&){},
+              "Source and target don't have the same return domain");
+        }))
+    return;
+
+  // 3. Check poison
+  auto print_value = [&](ostream &s, const Model &m) {
+    s << "Source value: ";
+    print_varval(s, src_state, m, var, type, a);
+    s << "\nTarget value: ";
+    print_varval(s, tgt_state, m, var, type, b);
+  };
+
+  auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
+  expr dom = dom_a && dom_b;
+
+  if (!Solver::check(
+        mk_fml(dom && !move(poison_cnstr)),
+        [&](const Result &r) {
+          err(r, print_value, "Target is more poisonous than source");
+        }))
+    return;
+
+  // 4. Check undef
+  if (!Solver::check(
+        mk_fml(dom && encode_undef_refinement(type, ap, bp)),
+        [&](const Result &r) {
+          err(r, print_value, "Target's return value is more undefined");
+        }))
+    return;
+
+  // 5. Check value
+  if (!Solver::check(
+        // value_cnstr is used by memrefine, so can't be moved
+        mk_fml(dom && !value_cnstr),
+        [&](const Result &r) {
+          err(r, print_value, "Value mismatch");
+        }))
+    return;
+
+  // 6. Check memory
+  auto src_mem = src_state.returnMemory();
+  auto tgt_mem = tgt_state.returnMemory();
+  auto [memory_cnstr0, ptr_refinement0, mem_undef]
+    = src_mem.refined(tgt_mem, false);
+  auto &ptr_refinement = ptr_refinement0;
+  qvars.insert(mem_undef.begin(), mem_undef.end());
+
+  auto print_ptr_load = [&](ostream &s, const Model &m) {
+    set<expr> undef;
+    Pointer p(src_mem, m[ptr_refinement()]);
+    s << "\nMismatch in " << p
+      << "\nSource value: " << Byte(src_mem, m[src_mem.load(p, undef)()])
+      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef)()]);
+  };
+
+  Solver::check(
+      mk_fml(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
+                                             : value_cnstr && memory_cnstr0)),
       [&](const Result &r) {
         err(r, print_ptr_load, "Mismatch in memory");
-      }}
-  });
+      });
 }
 
 static bool has_nullptr(const Value *v) {
