@@ -269,7 +269,7 @@ expr Pointer::inbounds(bool simplify_ptr, bool strict) {
     return ::inbounds(*this, strict);
 
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
-  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
+  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
     expr inb = ::inbounds(Pointer(m, ptr_expr), strict);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
@@ -362,7 +362,7 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, unsigned align,
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
-  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, true, true)) {
+  for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
     Pointer ptr(m, ptr_expr);
     auto [ub, aligned] = ::is_dereferenceable(ptr, bytes_off, bytes, align,
                                               iswrite);

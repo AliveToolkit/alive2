@@ -85,9 +85,13 @@ ostream &operator<<(ostream &os, const OrExpr &e) {
 }
 
 
-template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
-                                            bool unpack_concat) {
-  assert(unpack_ite);
+template<>
+DisjointExpr<expr>::DisjointExpr(const expr &e, unsigned depth_limit) {
+  if (depth_limit-- == 0) {
+    add(e, expr(true));
+    return;
+  }
+
   vector<pair<expr, expr>> worklist = { {e, true} };
   expr cond, then, els, a, b;
   unsigned high, low;
@@ -109,9 +113,9 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
       worklist.emplace_back(move(then), c && cond);
       worklist.emplace_back(move(els), c && !cond);
     }
-    else if (unpack_concat && v.isConcat(a, b)) {
-      DisjointExpr<expr> lhs(a, unpack_ite, unpack_concat);
-      DisjointExpr<expr> rhs(b, unpack_ite, unpack_concat);
+    else if (v.isConcat(a, b)) {
+      DisjointExpr<expr> lhs(a, depth_limit);
+      DisjointExpr<expr> rhs(b, depth_limit);
       if (lhs.size() == 1 && rhs.size() == 1) {
         add(move(v), move(c));
         continue;
@@ -134,8 +138,8 @@ template<> DisjointExpr<expr>::DisjointExpr(const expr &e, bool unpack_ite,
         }
       }
     }
-    else if (unpack_concat && v.isExtract(a, high, low)) {
-      DisjointExpr<expr> vals(a, unpack_ite, true);
+    else if (v.isExtract(a, high, low)) {
+      DisjointExpr<expr> vals(a, depth_limit);
       if (vals.size() == 1) {
         add(move(v), move(c));
         continue;
