@@ -33,7 +33,7 @@ static bool is_arbitrary(const expr &e) {
            isUnsat();
 }
 
-static void print_single_varval(ostream &os, State &st, const Model &m,
+static void print_single_varval(ostream &os, const State &st, const Model &m,
                                 const Value *var, const Type &type,
                                 const StateValue &val, unsigned child) {
   if (!val.isValid()) {
@@ -82,7 +82,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
   }
 }
 
-static void print_varval(ostream &os, State &st, const Model &m,
+static void print_varval(ostream &os, const State &st, const Model &m,
                          const Value *var, const Type &type,
                          const StateValue &val, unsigned child = 0) {
   if (!type.isAggregateType()) {
@@ -104,7 +104,7 @@ static void print_varval(ostream &os, State &st, const Model &m,
 
 using print_var_val_ty = function<void(ostream&, const Model&)>;
 
-static void error(Errors &errs, State &src_state, State &tgt_state,
+static void error(Errors &errs, const State &src_state, const State &tgt_state,
                   const Result &r, const Value *var,
                   const char *msg, bool check_each_var,
                   print_var_val_ty print_var_val) {
@@ -354,8 +354,8 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
 }
 
 static void
-check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
-                 const Value *var, const Type &type,
+check_refinement(Errors &errs, const Transform &t, const State &src_state,
+                 const State &tgt_state, const Value *var, const Type &type,
                  const expr &dom_a, const expr &fndom_a, const State::ValTy &ap,
                  const expr &dom_b, const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
@@ -433,39 +433,38 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
             preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
   };
 
-  // 1. Check UB
-  auto err = [&](const Result &r, print_var_val_ty print, const char *msg) {
-    error(errs, src_state, tgt_state, r, var, msg, check_each_var, print);
+  auto check = [&](expr &&e, auto &&printer, const char *msg) -> bool{
+    e = mk_fml(move(e));
+    auto res = check_expr(e);
+    if (res.isUnsat()) {
+      return true;
+    } else {
+      error(errs, src_state, tgt_state, res, var, msg, check_each_var, printer);
+      return false;
+    }
   };
 
-  if (!Solver::check(
-        mk_fml(fndom_a.notImplies(fndom_b)),
-        [&](const Result &r) {
-          err(r, [](ostream&, const Model&){},
-              "Source is more defined than target");
-        }))
-    return;
+#define CHECK(fml, printer, msg) \
+  if (!check(fml, printer, msg)) \
+    return
+
+  // 1. Check UB
+  CHECK(fndom_a.notImplies(fndom_b),
+        [](ostream&, const Model&){}, "Source is more defined than target");
 
   // 2. Check return domain (noreturn check)
-  expr dom_constr;
-  if (dom_a.eq(fndom_a)) {
-    if (dom_b.eq(fndom_b)) // A /\ B /\ A != B
+  {
+    expr dom_constr;
+    if (dom_a.eq(fndom_a) && dom_b.eq(fndom_b)) { // A /\ B /\ A != B
       dom_constr = false;
-    else // A /\ B /\ A != C
-      dom_constr = fndom_a && fndom_b && !dom_b;
-  } else if (dom_b.eq(fndom_b)) { // A /\ B /\ C != B
-    dom_constr = fndom_a && fndom_b && !dom_a;
-  } else {
-    dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
-  }
+    } else {
+      dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
+    }
 
-  if (!Solver::check(
-        mk_fml(move(dom_constr)),
-        [&](const Result &r) {
-          err(r, [](ostream&, const Model&){},
-              "Source and target don't have the same return domain");
-        }))
-    return;
+    CHECK(move(dom_constr),
+          [](ostream&, const Model&){},
+          "Source and target don't have the same return domain");
+  }
 
   // 3. Check poison
   auto print_value = [&](ostream &s, const Model &m) {
@@ -478,29 +477,15 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr dom = dom_a && dom_b;
 
-  if (!Solver::check(
-        mk_fml(dom && !move(poison_cnstr)),
-        [&](const Result &r) {
-          err(r, print_value, "Target is more poisonous than source");
-        }))
-    return;
+  CHECK(dom && !poison_cnstr,
+        print_value, "Target is more poisonous than source");
 
   // 4. Check undef
-  if (!Solver::check(
-        mk_fml(dom && encode_undef_refinement(type, ap, bp)),
-        [&](const Result &r) {
-          err(r, print_value, "Target's return value is more undefined");
-        }))
-    return;
+  CHECK(dom && encode_undef_refinement(type, ap, bp),
+        print_value, "Target's return value is more undefined");
 
   // 5. Check value
-  if (!Solver::check(
-        // value_cnstr is used by memrefine, so can't be moved
-        mk_fml(dom && !value_cnstr),
-        [&](const Result &r) {
-          err(r, print_value, "Value mismatch");
-        }))
-    return;
+  CHECK(dom && !value_cnstr, print_value, "Value mismatch");
 
   // 6. Check memory
   auto src_mem = src_state.returnMemory();
@@ -518,12 +503,11 @@ check_refinement(Errors &errs, Transform &t, State &src_state, State &tgt_state,
       << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.load(p, undef)()]);
   };
 
-  Solver::check(
-      mk_fml(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
-                                             : value_cnstr && memory_cnstr0)),
-      [&](const Result &r) {
-        err(r, print_ptr_load, "Mismatch in memory");
-      });
+  CHECK(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
+                                        : value_cnstr && memory_cnstr0),
+        print_ptr_load, "Mismatch in memory");
+
+#undef CHECK
 }
 
 static bool has_nullptr(const Value *v) {

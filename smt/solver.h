@@ -5,8 +5,6 @@
 
 #include "smt/expr.h"
 #include <cassert>
-#include <cstdint>
-#include <functional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -90,19 +88,11 @@ private:
 };
 
 
-class Solver;
-
-class SolverPush {
-  Solver &s;
-public:
-  SolverPush(Solver &s);
-  ~SolverPush();
-};
-
-
 class Solver {
   Z3_solver s;
   bool valid = true;
+  bool is_unsat = false;
+
 public:
   Solver(bool simple = false);
   ~Solver();
@@ -115,13 +105,19 @@ public:
   expr assertions() const;
 
   Result check() const;
-  // Return true if the query is successfully proven to be UNSAT
-  static bool check(expr &&query, std::function<void(const Result &r)> &&err);
 
   friend class SolverPush;
 };
 
 Result check_expr(const expr &e);
+
+
+class SolverPush {
+  Solver &s;
+public:
+  SolverPush(Solver &s);
+  ~SolverPush();
+};
 
 
 void solver_print_queries(bool yes);

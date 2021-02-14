@@ -220,6 +220,7 @@ public:
   void finishInitializer();
 
   auto& getFn() const { return f; }
+  auto& getMemory() const { return memory; }
   auto& getMemory() { return memory; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }

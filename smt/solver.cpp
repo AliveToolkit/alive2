@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <z3.h>
@@ -208,15 +209,6 @@ ostream& operator<<(ostream &os, const Model &m) {
 }
 
 
-SolverPush::SolverPush(Solver &s) : s(s) {
-  Z3_solver_push(ctx(), s.s);
-}
-
-SolverPush::~SolverPush() {
-  Z3_solver_pop(ctx(), s.s, 1);
-}
-
-
 static bool print_queries = false;
 void solver_print_queries(bool yes) {
   print_queries = yes;
@@ -238,7 +230,9 @@ Solver::~Solver() {
 }
 
 void Solver::add(const expr &e) {
-  if (e.isValid()) {
+  if (e.isFalse()) {
+    is_unsat = true;
+  } else if (e.isValid()) {
     auto ast = e();
     Z3_solver_assert(ctx(), s, ast);
     tactic->add(ast);
@@ -288,14 +282,19 @@ expr Solver::assertions() const {
 }
 
 Result Solver::check() const {
-  if (config::skip_smt) {
-    ++num_skips;
-    return Result::SKIP;
-  }
-
   if (!valid) {
     ++num_invalid;
     return Result::INVALID;
+  }
+
+  if (is_unsat) {
+    ++num_trivial;
+    return Result::UNSAT;
+  }
+
+  if (config::skip_smt) {
+    ++num_skips;
+    return Result::SKIP;
   }
 
   ++num_queries;
@@ -312,40 +311,17 @@ Result Solver::check() const {
     ++num_sats;
     return Z3_solver_get_model(ctx(), s);
   case Z3_L_UNDEF: {
-    string reason = Z3_solver_get_reason_unknown(ctx(), s);
+    string_view reason = Z3_solver_get_reason_unknown(ctx(), s);
     if (reason == "timeout") {
       ++num_timeout;
       return Result::TIMEOUT;
     }
     ++num_errors;
-    return { Result::ERROR, move(reason) };
+    return { Result::ERROR, string(reason) };
   }
   default:
     UNREACHABLE();
   }
-}
-
-bool Solver::check(expr &&q, std::function<void(const Result &r)> &&error) {
-  if (!q.isValid()) {
-    ++num_invalid;
-    error(Result::INVALID);
-    return false;
-  }
-
-  if (q.isFalse()) {
-    ++num_trivial;
-    return true;
-  }
-
-  // TODO: benchmark: reset() or new solver every time?
-  Solver s;
-  s.add(q);
-  auto res = s.check();
-  if (!res.isUnsat()) {
-    error(res);
-    return false;
-  }
-  return true;
 }
 
 Result check_expr(const expr &e) {
@@ -353,6 +329,16 @@ Result check_expr(const expr &e) {
   s.add(e);
   return s.check();
 }
+
+
+SolverPush::SolverPush(Solver &s) : s(s) {
+  Z3_solver_push(ctx(), s.s);
+}
+
+SolverPush::~SolverPush() {
+  Z3_solver_pop(ctx(), s.s, 1);
+}
+
 
 void solver_print_stats(ostream &os) {
   float total = num_queries / 100.0;

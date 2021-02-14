@@ -289,7 +289,7 @@ void VoidType::fixup(const Model &m) {
 }
 
 pair<expr, expr>
-VoidType::refines(State &src_s, State &tgt_s, const StateValue &src,
+VoidType::refines(const State &src_s, const State &tgt_s, const StateValue &src,
                   const StateValue &tgt) const {
   return { true, true };
 }
@@ -299,7 +299,7 @@ expr VoidType::mkInput(State &s, const char *name,
   UNREACHABLE();
 }
 
-void VoidType::printVal(ostream &os, State &s, const expr &e) const {
+void VoidType::printVal(ostream &os, const State &s, const expr &e) const {
   UNREACHABLE();
 }
 
@@ -347,7 +347,7 @@ expr IntType::enforceIntType(unsigned bits) const {
 }
 
 pair<expr, expr>
-IntType::refines(State &src_s, State &tgt_s, const StateValue &src,
+IntType::refines(const State &src_s, const State &tgt_s, const StateValue &src,
                  const StateValue &tgt) const {
   return { src.non_poison.implies(tgt.non_poison),
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
@@ -358,7 +358,7 @@ expr IntType::mkInput(State &s, const char *name,
   return expr::mkVar(name, bits());
 }
 
-void IntType::printVal(ostream &os, State &s, const expr &e) const {
+void IntType::printVal(ostream &os, const State &s, const expr &e) const {
   e.printHexadecimal(os);
   os << " (";
   e.printUnsigned(os);
@@ -533,8 +533,8 @@ expr FloatType::enforceFloatType() const {
 }
 
 pair<expr, expr>
-FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
-                   const StateValue &tgt) const {
+FloatType::refines(const State &src_s, const State &tgt_s,
+                   const StateValue &src, const StateValue &tgt) const {
   expr non_poison = src.non_poison && tgt.non_poison;
   return { src.non_poison.implies(tgt.non_poison),
            (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
@@ -552,7 +552,7 @@ expr FloatType::mkInput(State &s, const char *name,
   UNREACHABLE();
 }
 
-void FloatType::printVal(ostream &os, State &s, const expr &e) const {
+void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
   if (e.isNaN().isTrue()) {
     os << "NaN";
     return;
@@ -652,7 +652,7 @@ StateValue PtrType::fromInt(StateValue v) const {
 }
 
 pair<expr, expr>
-PtrType::refines(State &src_s, State &tgt_s, const StateValue &src,
+PtrType::refines(const State &src_s, const State &tgt_s, const StateValue &src,
                  const StateValue &tgt) const {
   auto sm = src_s.returnMemory(), tm = tgt_s.returnMemory();
   Pointer p(sm, src.value);
@@ -672,7 +672,7 @@ PtrType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   return s.getMemory().mkUndefInput(attrs);
 }
 
-void PtrType::printVal(ostream &os, State &s, const expr &e) const {
+void PtrType::printVal(ostream &os, const State &s, const expr &e) const {
   os << Pointer(s.getMemory(), e);
 }
 
@@ -926,8 +926,8 @@ StateValue AggregateType::fromInt(StateValue v) const {
 }
 
 pair<expr, expr>
-AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
-                       const StateValue &tgt) const {
+AggregateType::refines(const State &src_s, const State &tgt_s,
+                       const StateValue &src, const StateValue &tgt) const {
   set<expr> poison, value;
   for (unsigned i = 0; i < elements; ++i) {
     auto [p, v] = children[i]->refines(src_s, tgt_s, extract(src, i),
@@ -954,7 +954,7 @@ unsigned AggregateType::numPointerElements() const {
   return count;
 }
 
-void AggregateType::printVal(ostream &os, State &s, const expr &e) const {
+void AggregateType::printVal(ostream &os, const State &s, const expr &e) const {
   UNREACHABLE();
 }
 
@@ -1360,8 +1360,8 @@ StateValue SymbolicType::fromInt(StateValue val) const {
 }
 
 pair<expr, expr>
-SymbolicType::refines(State &src_s, State &tgt_s, const StateValue &src,
-                      const StateValue &tgt) const {
+SymbolicType::refines(const State &src_s, const State &tgt_s,
+                      const StateValue &src, const StateValue &tgt) const {
   DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
 }
 
@@ -1375,7 +1375,7 @@ SymbolicType::mkUndefInput(State &st, const ParamAttrs &attrs) const {
   DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }
 
-void SymbolicType::printVal(ostream &os, State &st, const expr &e) const {
+void SymbolicType::printVal(ostream &os, const State &st, const expr &e) const {
   DISPATCH(printVal(os, st, e), UNREACHABLE());
 }
 
