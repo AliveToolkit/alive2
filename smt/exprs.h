@@ -8,6 +8,7 @@
 #include <cassert>
 #include <compare>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <tuple>
