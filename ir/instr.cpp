@@ -2556,6 +2556,8 @@ static expr ptr_only_args(State &s, const FnAttrs &attrs, const expr &p) {
 
   OrExpr e;
   for (auto &in : s.getFn().getInputs()) {
+    if (!in.getType().isPtrType())
+      continue;
     auto &in_v = s[in];
     e.add(in_v.non_poison && p == in_v.value);
   }
