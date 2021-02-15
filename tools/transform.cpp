@@ -701,7 +701,6 @@ static void calculateAndInitConstants(Transform &t) {
   num_ptrinputs = 0;
   for (auto &arg : t.src.getInputs()) {
     auto n = num_ptrs(arg.getType());
-    auto p = dynamic_cast<const Input*>(&arg);
     if (dynamic_cast<const Input*>(&arg)->hasAttribute(ParamAttrs::ByVal)) {
       num_globals_src += n;
       num_globals += n;
