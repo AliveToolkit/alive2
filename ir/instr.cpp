@@ -2550,16 +2550,28 @@ MemInstr::ByteAccessInfo::full(unsigned byteSize) {
   return { true, true, true, byteSize };
 }
 
-static expr ptr_only_args(State &s, const FnAttrs &attrs, const expr &p) {
-  if (!attrs.has(FnAttrs::ArgMemOnly))
-    return true;
+static void eq_bids(OrExpr &acc, Memory &m, const Type &t,
+                    const StateValue &val, const expr &bid) {
+  if (auto agg = t.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      eq_bids(acc, m, agg->getChild(i), agg->extract(val, i), bid);
+    }
+    return;
+  }
+
+  if (t.isPtrType()) {
+    acc.add(val.non_poison && Pointer(m, val.value).getBid() == bid);
+  }
+}
+
+static expr ptr_only_args(State &s, const Pointer &p) {
+  expr bid = p.getBid();
+  auto &m  = s.getMemory();
 
   OrExpr e;
   for (auto &in : s.getFn().getInputs()) {
-    if (!in.getType().isPtrType())
-      continue;
-    auto &in_v = s[in];
-    e.add(in_v.non_poison && p == in_v.value);
+    if (hasPtr(in.getType()))
+      eq_bids(e, m, in.getType(), s[in], bid);
   }
   return e();
 }
@@ -2570,8 +2582,8 @@ static void check_can_load(State &s, const expr &p0) {
 
   if (attrs.has(FnAttrs::NoRead))
     s.addUB(p.isLocal());
-
-  s.addUB(p.isLocal() || ptr_only_args(s, attrs, p0));
+  else if (attrs.has(FnAttrs::ArgMemOnly))
+    s.addUB(p.isLocal() || ptr_only_args(s, p));
 }
 
 static void check_can_store(State &s, const expr &p0) {
@@ -2583,8 +2595,8 @@ static void check_can_store(State &s, const expr &p0) {
 
   if (attrs.has(FnAttrs::NoWrite))
     s.addUB(p.isLocal());
-
-  s.addUB(p.isLocal() || ptr_only_args(s, attrs, p0));
+  else if (attrs.has(FnAttrs::ArgMemOnly))
+    s.addUB(p.isLocal() || ptr_only_args(s, p));
 }
 
 
