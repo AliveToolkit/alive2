@@ -108,7 +108,7 @@ by LLVM.  Invoke the plugin like this:
 
 ```
 $ clang -O3 <src.c> -S -emit-llvm \
-  -fpass-plugin=$HOME/alive2/build/tv/tv.so -fexperimental-new-pass-manager \
+  -fpass-plugin=$HOME/alive2/build/tv/tv.so \
   -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
 ```
 

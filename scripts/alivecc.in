@@ -97,7 +97,6 @@ if (compiling()) {
     }
 
     push @ARGV, "-fpass-plugin=@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}";
-    push @ARGV, "-fexperimental-new-pass-manager";
     push @ARGV, ("-Xclang", "-load", "-Xclang", "@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}");
 }
 
