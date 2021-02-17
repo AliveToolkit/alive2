@@ -1,4 +1,4 @@
-; TEST-ARGS: -passes=attributor -attributor-manifest-internal
+; TEST-ARGS: -passes=attributor
 
 define void @f() {
   call void @g()
