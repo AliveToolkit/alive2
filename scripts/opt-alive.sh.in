@@ -40,7 +40,10 @@ for arg in $@; do
       set -- "$@" "$arg"
     fi
   else
-    if [[ $arg == "-enable-new-pm" ]]; then
+    # opt enables NPM by default.
+    if [[ $arg == "-enable-new-pm=0" ]]; then
+      NPM_TV=0
+    else
       NPM_TV=1
     fi
     set -- "$@" "$arg"
