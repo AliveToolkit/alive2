@@ -5,4 +5,4 @@ define i32 @f() {
 }
 
 ; src and tgt are identical, but opt-alive should not validate anything
-; CHECK-NOT: Transformation
+; CHECK-NOT: Transformation seems
