@@ -4,9 +4,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include <ostream>
+#include <set>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace util {
 
@@ -21,7 +21,7 @@ public:
 
 
 class Errors {
-  std::vector<std::pair<std::string, bool>> errs;
+  std::set<std::pair<std::string, bool>> errs;
 
 public:
   Errors() = default;

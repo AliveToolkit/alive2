@@ -20,11 +20,13 @@ Errors::Errors(AliveException &&e) {
 }
 
 void Errors::add(const char *str, bool is_unsound) {
-  errs.emplace_back(str, is_unsound);
+  add(string(str), is_unsound);
 }
 
 void Errors::add(string &&str, bool is_unsound) {
-  errs.emplace_back(move(str), is_unsound);
+  if (is_unsound)
+    errs.clear();
+  errs.emplace(move(str), is_unsound);
 }
 
 void Errors::add(AliveException &&e) {
@@ -33,7 +35,6 @@ void Errors::add(AliveException &&e) {
 
 bool Errors::isUnsound() const {
   for (auto &[msg, unsound] : errs) {
-    (void)msg;
     if (unsound)
       return true;
   }
@@ -42,7 +43,6 @@ bool Errors::isUnsound() const {
 
 ostream& operator<<(ostream &os, const Errors &errs) {
   for (auto &[msg, unsound] : errs.errs) {
-    (void)unsound;
     os << "ERROR: " << msg << '\n';
   }
   return os;

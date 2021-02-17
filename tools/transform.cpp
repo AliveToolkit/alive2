@@ -104,29 +104,29 @@ static void print_varval(ostream &os, const State &st, const Model &m,
 
 using print_var_val_ty = function<void(ostream&, const Model&)>;
 
-static void error(Errors &errs, const State &src_state, const State &tgt_state,
+static bool error(Errors &errs, const State &src_state, const State &tgt_state,
                   const Result &r, const Value *var,
                   const char *msg, bool check_each_var,
                   print_var_val_ty print_var_val) {
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
-    return;
+    return true;
   }
 
   if (r.isTimeout()) {
     errs.add("Timeout", false);
-    return;
+    return false;
   }
 
   if (r.isError()) {
     errs.add("SMT Error: " + r.getReason(), false);
-    return;
+    return false;
   }
 
   if (r.isSkip()) {
     errs.add("Skip", false);
-    return;
+    return true;
   }
 
   stringstream s;
@@ -155,7 +155,7 @@ static void error(Errors &errs, const State &src_state, const State &tgt_state,
         s << " - " << msg << '\n';
       }
       errs.add(s.str(), false);
-      return;
+      return false;
     }
   }
 
@@ -204,6 +204,7 @@ static void error(Errors &errs, const State &src_state, const State &tgt_state,
 
   print_var_val(s, m);
   errs.add(s.str(), true);
+  return false;
 }
 
 
@@ -436,12 +437,11 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
   auto check = [&](expr &&e, auto &&printer, const char *msg) -> bool{
     e = mk_fml(move(e));
     auto res = check_expr(e);
-    if (res.isUnsat()) {
-      return true;
-    } else {
-      error(errs, src_state, tgt_state, res, var, msg, check_each_var, printer);
+    if (!res.isUnsat() &&
+        !error(errs, src_state, tgt_state, res, var, msg, check_each_var,
+               printer))
       return false;
-    }
+    return true;
   };
 
 #define CHECK(fml, printer, msg) \
