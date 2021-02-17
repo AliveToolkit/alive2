@@ -23,7 +23,8 @@ for arg in $@; do
   fi
 done
 
-NPM_TV=0
+# opt enables NPM by default.
+NPM_TV=1
 for arg in $@; do
   # update the -passes argument only.
   shift
@@ -35,21 +36,20 @@ for arg in $@; do
     if [[ $SKIP_TV == 0 &&
         $firstpass_level != "module" && $firstpass_level != "cgscc" ]]; then
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
-      NPM_TV=1
     else
+      # Module/CGSCC-level passes shouldn't invoke tv
+      NPM_TV=0
       set -- "$@" "$arg"
     fi
   else
-    # opt enables NPM by default.
     if [[ $arg == "-enable-new-pm=0" ]]; then
       NPM_TV=0
-    else
-      NPM_TV=1
     fi
     set -- "$@" "$arg"
     for p in $PASSES; do
       if [[ $arg == *"$p"* ]]; then
         TV=""
+        NPM_TV=0
         break
       fi
     done
