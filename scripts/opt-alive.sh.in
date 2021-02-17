@@ -49,6 +49,7 @@ for arg in $@; do
     for p in $PASSES; do
       if [[ $arg == *"$p"* ]]; then
         TV=""
+        NPM_TV=0
         break
       fi
     done
