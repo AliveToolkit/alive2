@@ -41,6 +41,10 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   } else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
     RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1]));
   } else if (llvm::isFreeCall(&i, &TLI)) {
+    if (i.hasFnAttr(llvm::Attribute::NoFree)) {
+      auto zero = make_intconst(0, 1);
+      RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
+    }
     RETURN_VAL(make_unique<Free>(*args[0]));
   }
 
