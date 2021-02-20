@@ -606,6 +606,7 @@ const char* skip_pass_list[] = {
   "ModuleInlinerWrapperPass",
   "OpenMPOptPass",
   "PostOrderFunctionAttrsPass", // IPO
+  "TailCallElimPass",
 };
 
 bool do_skip(const llvm::StringRef &pass0) {
