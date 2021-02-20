@@ -33,8 +33,10 @@ for arg in $@; do
     passes=${arg/-*passes=/}
     passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py "$PASSREGISTRY" $passes`
     firstpass_level=`echo $passes_new | cut -d "(" -f1`
+    # tailcallelim is a function pass but unsupported by Alive2
     if [[ $SKIP_TV == 0 &&
-        $firstpass_level != "module" && $firstpass_level != "cgscc" ]]; then
+        $firstpass_level != "module" && $firstpass_level != "cgscc" &&
+        $passes != *"tailcallelim"* && $NPM_TV -eq 1 ]]; then
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
     else
       # Module/CGSCC-level passes shouldn't invoke tv
