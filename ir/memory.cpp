@@ -679,9 +679,9 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
 
   // collect over-approximation of possible touched bids
   for (auto &p : all_leaf_ptrs(*this, ptr())) {
-    if (has_readnone && p.isReadnone().isTrue())
+    if (has_noread && !write && p.isNoRead().isTrue())
       continue;
-    if (has_readonly && write && p.isReadonly().isTrue())
+    if (has_nowrite && write && p.isNoWrite().isTrue())
       continue;
 
     AliasSet this_alias = aliasing;

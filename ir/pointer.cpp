@@ -46,8 +46,8 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
     return b ? ((attrs.has(a) ? 1 : 0) << idx++) : 0;
   };
   bits |= to_bit(has_nocapture, ParamAttrs::NoCapture);
-  bits |= to_bit(has_readonly, ParamAttrs::ReadOnly);
-  bits |= to_bit(has_readnone, ParamAttrs::ReadNone);
+  bits |= to_bit(has_noread, ParamAttrs::NoRead);
+  bits |= to_bit(has_nowrite, ParamAttrs::NoWrite);
   return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
@@ -341,10 +341,11 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
   cond &= offset.add_no_uoverflow(bytes_off);
 
   cond &= p.isBlockAlive();
-  cond &= !p.isReadnone();
 
   if (iswrite)
-    cond &= p.isWritable() && !p.isReadonly();
+    cond &= p.isWritable() && !p.isNoWrite();
+  else
+    cond &= !p.isNoRead();
 
   // try some constant folding; these are implied by the conditions above
   if (bytes.ugt(block_sz).isTrue() ||
@@ -504,16 +505,16 @@ expr Pointer::isNocapture(bool simplify) const {
   return p.extract(0, 0) == 1;
 }
 
-expr Pointer::isReadonly() const {
-  if (!has_readonly)
+expr Pointer::isNoRead() const {
+  if (!has_noread)
     return false;
   return p.extract(has_nocapture, has_nocapture) == 1;
 }
 
-expr Pointer::isReadnone() const {
-  if (!has_readnone)
+expr Pointer::isNoWrite() const {
+  if (!has_nowrite)
     return false;
-  unsigned idx = (unsigned)has_nocapture + (unsigned)has_readonly;
+  unsigned idx = (unsigned)has_nocapture + (unsigned)has_noread;
   return p.extract(idx, idx) == 1;
 }
 

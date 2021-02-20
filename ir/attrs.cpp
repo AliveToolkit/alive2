@@ -14,10 +14,10 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "byval(" << attr.blockSize << ") ";
   if (attr.has(ParamAttrs::NoCapture))
     os << "nocapture ";
-  if (attr.has(ParamAttrs::ReadOnly))
-    os << "readonly ";
-  if (attr.has(ParamAttrs::ReadNone))
-    os << "readnone ";
+  if (attr.has(ParamAttrs::NoRead))
+    os << "noread ";
+  if (attr.has(ParamAttrs::NoWrite))
+    os << "nowrite ";
   if (attr.has(ParamAttrs::Dereferenceable))
     os << "dereferenceable(" << attr.derefBytes << ") ";
   if (attr.has(ParamAttrs::NoUndef))
@@ -26,6 +26,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "align(" << attr.align << ") ";
   if (attr.has(ParamAttrs::Returned))
     os << "returned ";
+if (attr.has(ParamAttrs::NoAlias))
+    os << "noalias ";
   return os;
 }
 
@@ -55,6 +57,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " nothrow";
   if (attr.has(FnAttrs::NoAlias))
     os << " noalias";
+  if (attr.has(FnAttrs::WillReturn))
+    os << " willreturn";
   return os;
 }
 

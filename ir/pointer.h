@@ -110,8 +110,8 @@ public:
   smt::expr getAllocType() const;
   smt::expr isHeapAllocated() const;
   smt::expr isNocapture(bool simplify = true) const;
-  smt::expr isReadonly() const;
-  smt::expr isReadnone() const;
+  smt::expr isNoRead() const;
+  smt::expr isNoWrite() const;
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,

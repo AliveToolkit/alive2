@@ -12,8 +12,9 @@ class ParamAttrs final {
 
 public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
-                   ReadOnly = 1<<3, ReadNone = 1<<4, Dereferenceable = 1<<5,
-                   NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8 };
+                   NoRead = 1<<3, NoWrite = 1<<4, Dereferenceable = 1<<5,
+                   NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8,
+                   NoAlias = 1<<9 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -45,7 +46,7 @@ public:
                    ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4,
                    Dereferenceable = 1 << 5, NonNull = 1 << 6,
                    NoFree = 1 << 7, NoUndef = 1 << 8, Align = 1 << 9,
-                   NoThrow = 1 << 10, NoAlias = 1 << 11 };
+                   NoThrow = 1 << 10, NoAlias = 1 << 11, WillReturn = 1 << 12 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 

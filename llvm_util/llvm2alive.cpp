@@ -1065,11 +1065,17 @@ public:
         continue;
 
       case llvm::Attribute::ReadOnly:
-        attrs.set(ParamAttrs::ReadOnly);
+        attrs.set(ParamAttrs::NoWrite);
+        continue;
+
+      case llvm::Attribute::WriteOnly:
+        attrs.set(ParamAttrs::NoRead);
         continue;
 
       case llvm::Attribute::ReadNone:
-        attrs.set(ParamAttrs::ReadNone);
+        // TODO: can this pointer be freed?
+        attrs.set(ParamAttrs::NoRead);
+        attrs.set(ParamAttrs::NoWrite);
         continue;
 
       case llvm::Attribute::Dereferenceable:
