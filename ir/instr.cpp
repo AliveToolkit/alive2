@@ -2704,8 +2704,7 @@ StateValue Malloc::toSMT(State &s) const {
     s.addUB(expr(false));
 
   auto &m = s.getMemory();
-  auto &[sz, np_size] = s.getAndAddUndefs(*size);
-  s.addUB(np_size);
+  auto &[sz, np_size] = s.getAndAddPoisonUB(*size, true);
 
   unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
@@ -2782,10 +2781,8 @@ void Calloc::print(ostream &os) const {
 }
 
 StateValue Calloc::toSMT(State &s) const {
-  auto &[nm, np_num] = s.getAndAddUndefs(*num);
-  auto &[sz, np_sz] = s.getAndAddUndefs(*size);
-  s.addUB(np_num);
-  s.addUB(np_sz);
+  auto &[nm, np_num] = s.getAndAddPoisonUB(*num, true);
+  auto &[sz, np_sz] = s.getAndAddPoisonUB(*size, true);
 
   unsigned align = heap_block_alignment;
   auto np = np_num && np_sz;
