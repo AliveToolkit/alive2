@@ -1614,41 +1614,28 @@ uint64_t FnCall::getMaxAccessSize() const {
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
-  auto &retattr = getAttributes();
-
-  bool has_deref = retattr.has(FnAttrs::Dereferenceable);
-  bool has_deref_or_null = retattr.has(FnAttrs::DereferenceableOrNull);
+  // If bytesize is zero, this call does not participate in byte encoding.
   uint64_t bytesize = 0;
-  if (has_deref || has_deref_or_null) {
-    // Null pointers do not contribute to the byte encoding, so it is okay to
-    // treat dereferenceable_or_null(sz) as dereferenceable(sz).
-    uint64_t sz = 0;
-    if (has_deref)
-      sz = retattr.derefBytes;
-    else
-      sz = retattr.derefOrNullBytes;
-    bytesize = gcd(sz, retattr.align);
-    has_deref = true;
+
+#define UPDATE(attr)                                     \
+  if (true) {                                            \
+    uint64_t sz = 0;                                     \
+    if (attr.has(decay<decltype(attr)>::type::Dereferenceable))       \
+      sz = attr.derefBytes;                              \
+    if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull)) \
+      sz = gcd(sz, attr.derefOrNullBytes);               \
+    sz = gcd(sz, retattr.align);                         \
+    bytesize = bytesize ? gcd(bytesize, sz) : sz;        \
   }
+
+  auto &retattr = getAttributes();
+  UPDATE(retattr);
 
   for (auto &arg : args) {
     if (!arg.first->getType().isPtrType())
       continue;
 
-    if (arg.second.has(ParamAttrs::Dereferenceable) ||
-        arg.second.has(ParamAttrs::DereferenceableOrNull)) {
-      has_deref = true;
-
-      uint64_t sz = 0;
-      if (arg.second.has(ParamAttrs::Dereferenceable))
-        sz = arg.second.derefBytes;
-      if (arg.second.has(ParamAttrs::DereferenceableOrNull))
-        sz = gcd(sz, arg.second.derefOrNullBytes);
-
-      // Without align, nothing is guaranteed about the bytesize
-      uint64_t b = gcd(sz, arg.second.align);
-      bytesize = bytesize ? gcd(bytesize, b) : b;
-    }
+    UPDATE(arg.second);
     // Pointer arguments without dereferenceable attr don't contribute to the
     // byte size.
     // call f(* dereferenceable(n) align m %p, * %q) is equivalent to a dummy
@@ -1658,11 +1645,12 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
     // f(%p, %q) does not contribute to the bytesize. After bytesize is fixed,
     // function calls update a memory with the granularity.
   }
-  if (!has_deref && !has_deref_or_null) {
+  if (bytesize == 0) {
     // No dereferenceable attribute
-    assert(bytesize == 0);
     return {};
   }
+
+#undef UPDATE
 
   return ByteAccessInfo::anyType(bytesize);
 }
