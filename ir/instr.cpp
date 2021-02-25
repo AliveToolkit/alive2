@@ -1624,6 +1624,7 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
       sz = attr.derefBytes;                              \
     if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull)) \
       sz = gcd(sz, attr.derefOrNullBytes);               \
+    /* Without align, nothing is guaranteed about the bytesize */ \
     sz = gcd(sz, retattr.align);                         \
     bytesize = bytesize ? gcd(bytesize, sz) : sz;        \
   }
