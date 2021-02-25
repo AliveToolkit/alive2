@@ -756,6 +756,8 @@ static void calculateAndInitConstants(Transform &t) {
         // Optimization: unless explicitly compared with a null pointer, assume
         // that the pointer can never be null.
         // Hence, nullptr_is_used doesn't need to be updated.
+        // Note that dereferenceable_or_null implies num_ptrinputs > 0,
+        // which may turn has_null_block on.
         does_mem_access = true;
         uint64_t deref_bytes = i->getAttributes().derefOrNullBytes;
         max_access_size = max(max_access_size, deref_bytes);

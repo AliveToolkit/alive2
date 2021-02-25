@@ -1103,6 +1103,11 @@ public:
         attrs.derefBytes = attr.getDereferenceableBytes();
         continue;
 
+      case llvm::Attribute::DereferenceableOrNull:
+        attrs.set(ParamAttrs::DereferenceableOrNull);
+        attrs.derefOrNullBytes = attr.getDereferenceableOrNullBytes();
+        continue;
+
       case llvm::Attribute::Alignment:
         attrs.set(ParamAttrs::Align);
         attrs.align = attr.getAlignment()->value();
