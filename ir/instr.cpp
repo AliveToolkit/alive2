@@ -1601,28 +1601,42 @@ bool FnCall::canFree() const {
 
 uint64_t FnCall::getMaxAccessSize() const {
   uint64_t sz = attrs.has(FnAttrs::Dereferenceable) ? attrs.derefBytes : 0;
+  if (attrs.has(FnAttrs::DereferenceableOrNull))
+    sz = max(sz, attrs.derefOrNullBytes);
+
   for (auto &arg : args) {
     if (arg.second.has(ParamAttrs::Dereferenceable))
       sz = max(sz, arg.second.derefBytes);
+    if (arg.second.has(ParamAttrs::DereferenceableOrNull))
+      sz = max(sz, arg.second.derefOrNullBytes);
   }
   return sz;
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
+  // If bytesize is zero, this call does not participate in byte encoding.
+  uint64_t bytesize = 0;
+
+#define UPDATE(attr)                                                   \
+  do {                                                                 \
+    uint64_t sz = 0;                                                   \
+    if (attr.has(decay<decltype(attr)>::type::Dereferenceable))        \
+      sz = attr.derefBytes;                                            \
+    if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull))  \
+      sz = gcd(sz, attr.derefOrNullBytes);                             \
+    /* Without align, nothing is guaranteed about the bytesize */      \
+    sz = gcd(sz, retattr.align);                                       \
+    bytesize = bytesize ? gcd(bytesize, sz) : sz;                      \
+  } while (0)
+
   auto &retattr = getAttributes();
-  bool has_deref = retattr.has(FnAttrs::Dereferenceable);
-  uint64_t bytesize = has_deref ? gcd(retattr.derefBytes, retattr.align) : 0;
+  UPDATE(retattr);
 
   for (auto &arg : args) {
     if (!arg.first->getType().isPtrType())
       continue;
 
-    if (arg.second.has(ParamAttrs::Dereferenceable)) {
-      has_deref = true;
-      // Without align, nothing is guaranteed about the bytesize
-      uint64_t b = gcd(arg.second.derefBytes, arg.second.align);
-      bytesize = bytesize ? gcd(bytesize, b) : b;
-    }
+    UPDATE(arg.second);
     // Pointer arguments without dereferenceable attr don't contribute to the
     // byte size.
     // call f(* dereferenceable(n) align m %p, * %q) is equivalent to a dummy
@@ -1632,11 +1646,12 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
     // f(%p, %q) does not contribute to the bytesize. After bytesize is fixed,
     // function calls update a memory with the granularity.
   }
-  if (!has_deref) {
+  if (bytesize == 0) {
     // No dereferenceable attribute
-    assert(bytesize == 0);
     return {};
   }
+
+#undef UPDATE
 
   return ByteAccessInfo::anyType(bytesize);
 }
@@ -1692,11 +1707,19 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     if (ty.isPtrType()) {
       expr np(true);
       Pointer p(s.getMemory(), move(value.value));
-      if (argflag.has(ParamAttrs::Dereferenceable) ||
-          argflag.has(ParamAttrs::ByVal))
-        s.addUB(
-          p.isDereferenceable(argflag.getDerefBytes(), argflag.align, false));
-      else if (argflag.has(ParamAttrs::Align))
+
+      bool isDeref = argflag.has(ParamAttrs::Dereferenceable) ||
+                       argflag.has(ParamAttrs::ByVal);
+      bool isDerefOrNull = argflag.has(ParamAttrs::DereferenceableOrNull);
+
+      if (isDeref || isDerefOrNull) {
+        if (isDeref)
+          s.addUB(p.isDereferenceable(argflag.getDerefBytes(), argflag.align));
+        if (isDerefOrNull)
+          s.addUB(
+              p.isDereferenceable(argflag.derefOrNullBytes, argflag.align)() ||
+              !p.isNonZero());
+      } else if (argflag.has(ParamAttrs::Align))
         np &= p.isAligned(argflag.align);
 
       if (argflag.has(ParamAttrs::NonNull))
@@ -1752,16 +1775,21 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   }
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
+  bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
   bool isAlign = attrs.has(FnAttrs::Align);
 
-  if (isDeref || isNonNull || isAlign) {
+  if (isDeref || isDerefOrNull || isNonNull || isAlign) {
     assert(ty.isPtrType());
     Pointer p(s.getMemory(), ret.value);
 
-    if (isDeref)
-      s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
-    else if (isAlign)
+    if (isDeref || isDerefOrNull) {
+      if (isDeref)
+        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
+      if (isDerefOrNull)
+        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
+                !p.isNonZero());
+    } else if (isAlign)
       ret.non_poison &= p.isAligned(attrs.align);
 
     if (isNonNull)
@@ -2422,15 +2450,21 @@ StateValue Return::toSMT(State &s) const {
   check_ret_attributes(s, retval, val->getType(), attrs);
 
   bool isDeref = attrs.has(FnAttrs::Dereferenceable);
+  bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
   bool isNonNull = attrs.has(FnAttrs::NonNull);
   bool isAlign = attrs.has(FnAttrs::Align);
 
-  if (isDeref || isNonNull || isAlign) {
+  if (isDeref || isDerefOrNull || isNonNull || isAlign) {
     assert(val->getType().isPtrType());
     Pointer p(s.getMemory(), retval.value);
 
-    if (isDeref) {
-      s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
+    if (isDeref || isDerefOrNull) {
+      if (isDeref)
+        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
+      if (isDerefOrNull)
+        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
+                !p.isNonZero());
+
       if (has_alloca)
         s.addUB(p.getAllocType() != Pointer::STACK);
     } else if (isAlign)

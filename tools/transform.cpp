@@ -752,6 +752,16 @@ static void calculateAndInitConstants(Transform &t) {
         uint64_t deref_bytes = i->getAttributes().derefBytes;
         max_access_size = max(max_access_size, deref_bytes);
       }
+      if (i->hasAttribute(ParamAttrs::DereferenceableOrNull)) {
+        // Optimization: unless explicitly compared with a null pointer, don't
+        // set nullptr_is_used to true.
+        // Null constant pointer will set nullptr_is_used to true anyway.
+        // Note that dereferenceable_or_null implies num_ptrinputs > 0,
+        // which may turn has_null_block on.
+        does_mem_access = true;
+        uint64_t deref_bytes = i->getAttributes().derefOrNullBytes;
+        max_access_size = max(max_access_size, deref_bytes);
+      }
       if (i->hasAttribute(ParamAttrs::ByVal)) {
         does_mem_access = true;
         uint64_t sz = i->getAttributes().blockSize;
