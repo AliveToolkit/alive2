@@ -1617,17 +1617,17 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
   // If bytesize is zero, this call does not participate in byte encoding.
   uint64_t bytesize = 0;
 
-#define UPDATE(attr)                                     \
-  if (true) {                                            \
-    uint64_t sz = 0;                                     \
-    if (attr.has(decay<decltype(attr)>::type::Dereferenceable))       \
-      sz = attr.derefBytes;                              \
-    if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull)) \
-      sz = gcd(sz, attr.derefOrNullBytes);               \
-    /* Without align, nothing is guaranteed about the bytesize */ \
-    sz = gcd(sz, retattr.align);                         \
-    bytesize = bytesize ? gcd(bytesize, sz) : sz;        \
-  }
+#define UPDATE(attr)                                                   \
+  do {                                                                 \
+    uint64_t sz = 0;                                                   \
+    if (attr.has(decay<decltype(attr)>::type::Dereferenceable))        \
+      sz = attr.derefBytes;                                            \
+    if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull))  \
+      sz = gcd(sz, attr.derefOrNullBytes);                             \
+    /* Without align, nothing is guaranteed about the bytesize */      \
+    sz = gcd(sz, retattr.align);                                       \
+    bytesize = bytesize ? gcd(bytesize, sz) : sz;                      \
+  } while (0)
 
   auto &retattr = getAttributes();
   UPDATE(retattr);
