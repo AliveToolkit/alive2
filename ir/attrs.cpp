@@ -26,8 +26,10 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "align(" << attr.align << ") ";
   if (attr.has(ParamAttrs::Returned))
     os << "returned ";
-if (attr.has(ParamAttrs::NoAlias))
+  if (attr.has(ParamAttrs::NoAlias))
     os << "noalias ";
+  if (attr.has(ParamAttrs::DereferenceableOrNull))
+    os << "dereferenceable_or_null(" << attr.derefOrNullBytes << ") ";
   return os;
 }
 
@@ -59,11 +61,14 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " noalias";
   if (attr.has(FnAttrs::WillReturn))
     os << " willreturn";
+  if (attr.has(FnAttrs::DereferenceableOrNull))
+    os << " dereferenceable_or_null(" << attr.derefOrNullBytes << ')';
   return os;
 }
 
 bool ParamAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef) || has(Dereferenceable) || has(ByVal);
+  bool ub = has(NoUndef) || has(Dereferenceable) || has(ByVal) ||
+            has(DereferenceableOrNull);
   assert(!ub || poisonImpliesUB());
   return ub;
 }
@@ -79,11 +84,12 @@ uint64_t ParamAttrs::getDerefBytes() const {
 }
 
 bool FnAttrs::poisonImpliesUB() const {
-  return has(Dereferenceable) || has(NoUndef) || has(NNaN);
+  return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||
+         has(DereferenceableOrNull);
 }
 
 bool FnAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef) || has(Dereferenceable);
+  bool ub = has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull);
   assert(!ub || poisonImpliesUB());
   return ub;
 }

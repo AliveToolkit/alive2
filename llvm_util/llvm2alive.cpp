@@ -293,6 +293,12 @@ public:
       attrs.derefBytes = b;
     }
 
+    if (uint64_t b = max(i.getDereferenceableOrNullBytes(ret),
+                         fn->getDereferenceableOrNullBytes(ret))) {
+      attrs.set(FnAttrs::DereferenceableOrNull);
+      attrs.derefOrNullBytes = b;
+    }
+
     {
       uint64_t align = 0;
       llvm::MaybeAlign ra = i.getRetAlign();
@@ -335,6 +341,20 @@ public:
         assert(derefb);
         attr.set(ParamAttrs::Dereferenceable);
         attr.derefBytes = derefb;
+      }
+
+      if (i.paramHasAttr(argidx, llvm::Attribute::DereferenceableOrNull)) {
+        uint64_t sz = 0;
+        // dereferenceable_or_null at caller
+        if (i.getAttributes()
+             .hasParamAttr(argidx, llvm::Attribute::DereferenceableOrNull))
+          sz = i.getParamAttr(argidx, llvm::Attribute::DereferenceableOrNull)
+                .getDereferenceableOrNullBytes();
+        if (argidx < fn->arg_size())
+          sz = max(sz, fn->getParamDereferenceableOrNullBytes(argidx));
+        assert(sz);
+        attr.set(ParamAttrs::DereferenceableOrNull);
+        attr.derefOrNullBytes = sz;
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Alignment)) {
