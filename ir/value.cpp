@@ -220,7 +220,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
 
   // Some attributes generate poison rather than raise UB
   expr np_from_attr(true);
-  {
+  if (ty.isPtrType()) {
     Pointer p(s.getMemory(), val);
 
     if (hasAttribute(ParamAttrs::NonNull))
