@@ -1754,6 +1754,47 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
   }
 }
 
+static void check_return_value(State &s, StateValue &val, const Type &ty,
+                               const FnAttrs &attrs, bool is_ret_instr) {
+  if (attrs.has(FnAttrs::NNaN)) {
+    assert(ty.isFloatType());
+    expr nnan = !val.value.isNaN();
+    if (is_ret_instr)
+      s.addUB(nnan);
+    val.non_poison &= move(nnan);
+  }
+
+  if (ty.isPtrType()) {
+    Pointer p(s.getMemory(), val.value);
+
+    if (is_ret_instr && has_nocapture)
+      s.addUB(val.non_poison.implies(!p.isNocapture()));
+
+    bool isDeref = attrs.has(FnAttrs::Dereferenceable);
+    bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
+
+    if (isDeref || isDerefOrNull) {
+      if (isDeref)
+        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
+      if (isDerefOrNull)
+        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
+                !p.isNonZero());
+
+      if (is_ret_instr && has_alloca)
+        s.addUB(p.getAllocType() != Pointer::STACK);
+    } else if (attrs.has(FnAttrs::Align))
+      val.non_poison &= p.isAligned(attrs.align);
+
+    if (attrs.has(FnAttrs::NonNull))
+      val.non_poison &= p.isNonZero();
+  }
+
+  if (attrs.poisonImpliesUB()) {
+    s.addUB(move(val.non_poison));
+    val.non_poison = true;
+  }
+}
+
 static StateValue
 pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
             unsigned &idx) {
@@ -1769,38 +1810,7 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   }
 
   auto ret = move(vals[idx++]);
-  if (attrs.has(FnAttrs::NNaN)) {
-    assert(ty.isFloatType());
-    ret.non_poison &= !ret.value.isNaN();
-  }
-
-  bool isDeref = attrs.has(FnAttrs::Dereferenceable);
-  bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
-  bool isNonNull = attrs.has(FnAttrs::NonNull);
-  bool isAlign = attrs.has(FnAttrs::Align);
-
-  if (isDeref || isDerefOrNull || isNonNull || isAlign) {
-    assert(ty.isPtrType());
-    Pointer p(s.getMemory(), ret.value);
-
-    if (isDeref || isDerefOrNull) {
-      if (isDeref)
-        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
-      if (isDerefOrNull)
-        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
-                !p.isNonZero());
-    } else if (isAlign)
-      ret.non_poison &= p.isAligned(attrs.align);
-
-    if (isNonNull)
-      ret.non_poison &= p.isNonZero();
-  }
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(ret.non_poison));
-    ret.non_poison = true;
-  }
-
+  check_return_value(s, ret, ty, attrs, false);
   return ret;
 }
 
@@ -2417,23 +2427,21 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
-static void check_ret_attributes(State &s, const StateValue &sv,
-                                 const Type &t, const FnAttrs &attrs) {
-  auto &[v, np] = sv;
-  if (t.isPtrType()) {
-    s.addUB(np.implies(!Pointer(s.getMemory(), v).isNocapture()));
-    return;
-  }
-
-  if (attrs.has(FnAttrs::NNaN)) {
-    s.addUB(!v.isNaN());
-  }
-
+static void
+check_ret_attributes(State &s, StateValue &sv, const Type &t,
+                     const FnAttrs &attrs) {
   if (auto agg = t.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      check_ret_attributes(s, agg->extract(sv, i), agg->getChild(i), attrs);
+      if (agg->isPadding(i))
+        continue;
+      StateValue svi = agg->extract(sv, i);
+      check_ret_attributes(s, svi, agg->getChild(i), attrs);
     }
+    // Don't aggregate the updated state values; if agg has many elements
+    // this might be costly.
+    return;
   }
+  check_return_value(s, sv, t, attrs, true);
 }
 
 StateValue Return::toSMT(State &s) const {
@@ -2447,39 +2455,7 @@ StateValue Return::toSMT(State &s) const {
     retval = s[*val];
 
   s.addUB(s.getMemory().checkNocapture());
-  check_ret_attributes(s, retval, val->getType(), attrs);
-
-  bool isDeref = attrs.has(FnAttrs::Dereferenceable);
-  bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
-  bool isNonNull = attrs.has(FnAttrs::NonNull);
-  bool isAlign = attrs.has(FnAttrs::Align);
-
-  if (isDeref || isDerefOrNull || isNonNull || isAlign) {
-    assert(val->getType().isPtrType());
-    Pointer p(s.getMemory(), retval.value);
-
-    if (isDeref || isDerefOrNull) {
-      if (isDeref)
-        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
-      if (isDerefOrNull)
-        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
-                !p.isNonZero());
-
-      if (has_alloca)
-        s.addUB(p.getAllocType() != Pointer::STACK);
-    } else if (isAlign)
-      retval.non_poison &= p.isAligned(attrs.align);
-
-    if (isNonNull)
-      retval.non_poison &= p.isNonZero();
-
-    if (attrs.poisonImpliesUB()) {
-      // Poison created from nonnull/align can raise UB if other attributes are
-      // involved
-      s.addUB(move(retval.non_poison));
-      retval.non_poison = true;
-    }
-  }
+  check_ret_attributes(s, retval, getType(), attrs);
 
   if (attrs.has(FnAttrs::NoReturn))
     s.addUB(expr(false));
