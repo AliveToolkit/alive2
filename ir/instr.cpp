@@ -1758,17 +1758,16 @@ static void check_return_value(State &s, StateValue &val, const Type &ty,
                                const FnAttrs &attrs, bool is_ret_instr) {
   if (attrs.has(FnAttrs::NNaN)) {
     assert(ty.isFloatType());
-    expr nnan = !val.value.isNaN();
-    if (is_ret_instr)
-      s.addUB(nnan);
-    val.non_poison &= move(nnan);
+    s.addUB(val.non_poison.implies(!val.value.isNaN()));
   }
 
   if (ty.isPtrType()) {
     Pointer p(s.getMemory(), val.value);
 
-    if (is_ret_instr && has_nocapture)
-      s.addUB(val.non_poison.implies(!p.isNocapture()));
+    if (is_ret_instr) {
+      s.addUB(val.non_poison.implies(!p.isStackAllocated() &&
+                                     !p.isNocapture()));
+    }
 
     bool isDeref = attrs.has(FnAttrs::Dereferenceable);
     bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
@@ -1779,9 +1778,6 @@ static void check_return_value(State &s, StateValue &val, const Type &ty,
       if (isDerefOrNull)
         s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
                 !p.isNonZero());
-
-      if (is_ret_instr && has_alloca)
-        s.addUB(p.getAllocType() != Pointer::STACK);
     } else if (attrs.has(FnAttrs::Align))
       val.non_poison &= p.isAligned(attrs.align);
 

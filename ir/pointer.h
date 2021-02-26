@@ -108,6 +108,7 @@ public:
     CXX_NEW,
   };
   smt::expr getAllocType() const;
+  smt::expr isStackAllocated() const;
   smt::expr isHeapAllocated() const;
   smt::expr isNocapture(bool simplify = true) const;
   smt::expr isNoRead() const;
