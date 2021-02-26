@@ -219,37 +219,15 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   }
 
   // Some attributes generate poison rather than raise UB
-  expr np_from_attr(true);
-  if (ty.isPtrType()) {
-    Pointer p(s.getMemory(), val);
-
-    if (hasAttribute(ParamAttrs::NonNull))
-      np_from_attr = p.isNonZero();
-
-    bool hasDeref = hasAttribute(ParamAttrs::Dereferenceable) ||
-                    hasAttribute(ParamAttrs::ByVal);
-    bool hasDerefOrNull = hasAttribute(ParamAttrs::DereferenceableOrNull);
-    if (hasDeref || hasDerefOrNull) {
-      if (hasDeref)
-        s.addUB(p.isDereferenceable(attrs.getDerefBytes(), attrs.align));
-      if (hasDerefOrNull)
-        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
-                !p.isNonZero());
-    } else if (hasAttribute(ParamAttrs::Align))
-      np_from_attr &= p.isAligned(attrs.align);
-  }
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(np_from_attr));
-    np_from_attr = true;
-  }
+  StateValue sval(move(val), true);
+  encodeParamAttrs(attrs, s, sval, ty);
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
-  return { move(val),
-           np_from_attr && (never_poison ? true :
-                              expr::mkBoolVar(np_name.c_str())) };
+  return { move(sval.value),
+           move(sval.non_poison) &&
+              (never_poison ? true : expr::mkBoolVar(np_name.c_str())) };
 }
 
 bool Input::isUndefMask(const expr &e, const expr &var) {

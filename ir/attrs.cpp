@@ -2,6 +2,10 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include "ir/memory.h"
+#include "ir/state.h"
+#include "ir/state_value.h"
+#include "ir/type.h"
 #include <cassert>
 
 using namespace std;
@@ -93,4 +97,55 @@ bool FnAttrs::undefImpliesUB() const {
   assert(!ub || poisonImpliesUB());
   return ub;
 }
+
+
+// Encode pointer attributes
+static void encodePtrAttrs(State &s, StateValue &val, uint64_t derefBytes,
+                           uint64_t derefOrNullBytes, uint64_t align,
+                           bool nonnull) {
+  Pointer p(s.getMemory(), val.value);
+
+  if (nonnull)
+    val.non_poison &= p.isNonZero();
+
+  if (derefBytes || derefOrNullBytes) {
+    // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
+    if (derefBytes)
+      s.addUB(p.isDereferenceable(derefBytes, align));
+    if (derefOrNullBytes)
+      s.addUB(p.isDereferenceable(derefOrNullBytes, align)() || !p.isNonZero());
+  } else if (align != 1)
+    // align
+    val.non_poison &= p.isAligned(align);
+}
+
+void encodeParamAttrs(const ParamAttrs &attrs, State &s, StateValue &val,
+                      const Type &ty) {
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val, attrs.getDerefBytes(), attrs.derefOrNullBytes,
+                   attrs.align, attrs.has(ParamAttrs::NonNull));
+
+  if (attrs.poisonImpliesUB()) {
+    s.addUB(move(val.non_poison));
+    val.non_poison = true;
+  }
+}
+
+void encodeFnAttrs(const FnAttrs &attrs, State &s, StateValue &val,
+                   const Type &ty) {
+  if (attrs.has(FnAttrs::NNaN)) {
+    assert(ty.isFloatType());
+    s.addUB(val.non_poison.implies(!val.value.isNaN()));
+  }
+
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val, attrs.derefBytes, attrs.derefOrNullBytes,
+                   attrs.align, attrs.has(FnAttrs::NonNull));
+
+  if (attrs.poisonImpliesUB()) {
+    s.addUB(move(val.non_poison));
+    val.non_poison = true;
+  }
+}
+
 }

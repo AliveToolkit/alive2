@@ -1704,33 +1704,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   }
 
   auto unpack = [&](StateValue &&value) {
+    encodeParamAttrs(argflag, s, value, ty);
     if (ty.isPtrType()) {
-      expr np(true);
-      Pointer p(s.getMemory(), move(value.value));
-
-      bool isDeref = argflag.has(ParamAttrs::Dereferenceable) ||
-                       argflag.has(ParamAttrs::ByVal);
-      bool isDerefOrNull = argflag.has(ParamAttrs::DereferenceableOrNull);
-
-      if (isDeref || isDerefOrNull) {
-        if (isDeref)
-          s.addUB(p.isDereferenceable(argflag.getDerefBytes(), argflag.align));
-        if (isDerefOrNull)
-          s.addUB(
-              p.isDereferenceable(argflag.derefOrNullBytes, argflag.align)() ||
-              !p.isNonZero());
-      } else if (argflag.has(ParamAttrs::Align))
-        np &= p.isAligned(argflag.align);
-
-      if (argflag.has(ParamAttrs::NonNull))
-        np &= p.isNonZero();
-
-      if (argflag.poisonImpliesUB()) {
-        s.addUB(move(np));
-        np = true;
-      }
-
-      ptr_inputs.emplace_back(StateValue(p.release(), np && value.non_poison),
+      ptr_inputs.emplace_back(move(value),
                               argflag.has(ParamAttrs::ByVal),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
@@ -1756,38 +1732,11 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
 
 static void check_return_value(State &s, StateValue &val, const Type &ty,
                                const FnAttrs &attrs, bool is_ret_instr) {
-  if (attrs.has(FnAttrs::NNaN)) {
-    assert(ty.isFloatType());
-    s.addUB(val.non_poison.implies(!val.value.isNaN()));
-  }
-
-  if (ty.isPtrType()) {
+  encodeFnAttrs(attrs, s, val, ty);
+  if (ty.isPtrType() && is_ret_instr) {
     Pointer p(s.getMemory(), val.value);
-
-    if (is_ret_instr) {
-      s.addUB(val.non_poison.implies(!p.isStackAllocated() &&
-                                     !p.isNocapture()));
-    }
-
-    bool isDeref = attrs.has(FnAttrs::Dereferenceable);
-    bool isDerefOrNull = attrs.has(FnAttrs::DereferenceableOrNull);
-
-    if (isDeref || isDerefOrNull) {
-      if (isDeref)
-        s.addUB(p.isDereferenceable(attrs.derefBytes, attrs.align));
-      if (isDerefOrNull)
-        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
-                !p.isNonZero());
-    } else if (attrs.has(FnAttrs::Align))
-      val.non_poison &= p.isAligned(attrs.align);
-
-    if (attrs.has(FnAttrs::NonNull))
-      val.non_poison &= p.isNonZero();
-  }
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(val.non_poison));
-    val.non_poison = true;
+    s.addUB(val.non_poison.implies(!p.isStackAllocated() &&
+                                    !p.isNocapture()));
   }
 }
 

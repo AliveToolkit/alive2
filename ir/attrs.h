@@ -7,6 +7,10 @@
 
 namespace IR {
 
+class State;
+struct StateValue;
+class Type;
+
 class ParamAttrs final {
   unsigned bits;
 
@@ -18,8 +22,8 @@ public:
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
-  uint64_t derefBytes; // Dereferenceable
-  uint64_t derefOrNullBytes; // DereferenceableOrNull
+  uint64_t derefBytes = 0; // Dereferenceable
+  uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned blockSize;  // exact block size for e.g. byval args
   unsigned align = 1;
 
@@ -56,8 +60,8 @@ public:
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
 
-  uint64_t derefBytes; // Dereferenceable
-  uint64_t derefOrNullBytes; // DereferenceableOrNull
+  uint64_t derefBytes = 0; // Dereferenceable
+  uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned align = 1;
 
   // Returns true if returning poison or an aggregate having a poison is UB
@@ -68,5 +72,13 @@ public:
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };
+
+
+// Encode attributes for a non-aggregate value using UB and poison.
+// Attributes requiring more than UB or poison are not encoded.
+void encodeParamAttrs(const ParamAttrs &attrs, State &s, StateValue &value,
+                      const Type &ty);
+void encodeFnAttrs(const FnAttrs &attrs, State &s, StateValue &value,
+                   const Type &ty);
 
 }
