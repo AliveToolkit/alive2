@@ -218,15 +218,14 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addUndefVar(move(var));
   }
 
-  // Some attributes generate poison rather than raise UB
-  StateValue sval(move(val), true);
-  encodeParamAttrs(attrs, s, sval, ty);
+  auto [UB, non_poison] = attrs.encode(s, {expr(val), expr(true)}, ty);
+  s.addUB(move(UB));
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
-  return { move(sval.value),
-           move(sval.non_poison) &&
+  return { move(val),
+           move(non_poison) &&
               (never_poison ? true : expr::mkBoolVar(np_name.c_str())) };
 }
 

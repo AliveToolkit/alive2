@@ -9,6 +9,7 @@
 #include <cassert>
 
 using namespace std;
+using namespace smt;
 
 namespace IR {
 ostream& operator<<(ostream &os, const ParamAttrs &attr) {
@@ -87,6 +88,51 @@ uint64_t ParamAttrs::getDerefBytes() const {
   return bytes;
 }
 
+static pair<AndExpr, expr>
+encodePtrAttrs(const State &s, const expr &ptrvalue, uint64_t derefBytes,
+               uint64_t derefOrNullBytes, uint64_t align, bool nonnull) {
+  Pointer p(s.getMemory(), ptrvalue);
+  AndExpr UB;
+  expr non_poison = true;
+
+  if (nonnull)
+    non_poison &= p.isNonZero();
+
+  if (derefBytes || derefOrNullBytes) {
+    // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
+    if (derefBytes)
+      UB.add(p.isDereferenceable(derefBytes, align));
+    if (derefOrNullBytes)
+      UB.add(p.isDereferenceable(derefOrNullBytes, align)() || !p.isNonZero());
+  } else if (align != 1)
+    // align
+    non_poison &= p.isAligned(align);
+
+  return make_pair(move(UB), move(non_poison));
+}
+
+pair<AndExpr, expr>
+ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
+  AndExpr UB;
+  expr new_non_poison = val.non_poison;
+
+  if (ty.isPtrType()) {
+    auto [UBptr, npptr] =
+        encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
+                       has(NonNull));
+    UB.add(move(UBptr));
+    new_non_poison &= move(npptr);
+  }
+
+  if (poisonImpliesUB()) {
+    UB.add(move(new_non_poison));
+    new_non_poison = true;
+  }
+
+  return make_pair(move(UB), move(new_non_poison));
+}
+
+
 bool FnAttrs::poisonImpliesUB() const {
   return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||
          has(DereferenceableOrNull);
@@ -98,54 +144,30 @@ bool FnAttrs::undefImpliesUB() const {
   return ub;
 }
 
+pair<AndExpr, expr>
+FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
+  AndExpr UB;
+  expr new_non_poison = val.non_poison;
 
-// Encode pointer attributes
-static void encodePtrAttrs(State &s, StateValue &val, uint64_t derefBytes,
-                           uint64_t derefOrNullBytes, uint64_t align,
-                           bool nonnull) {
-  Pointer p(s.getMemory(), val.value);
-
-  if (nonnull)
-    val.non_poison &= p.isNonZero();
-
-  if (derefBytes || derefOrNullBytes) {
-    // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
-    if (derefBytes)
-      s.addUB(p.isDereferenceable(derefBytes, align));
-    if (derefOrNullBytes)
-      s.addUB(p.isDereferenceable(derefOrNullBytes, align)() || !p.isNonZero());
-  } else if (align != 1)
-    // align
-    val.non_poison &= p.isAligned(align);
-}
-
-void encodeParamAttrs(const ParamAttrs &attrs, State &s, StateValue &val,
-                      const Type &ty) {
-  if (ty.isPtrType())
-    encodePtrAttrs(s, val, attrs.getDerefBytes(), attrs.derefOrNullBytes,
-                   attrs.align, attrs.has(ParamAttrs::NonNull));
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(val.non_poison));
-    val.non_poison = true;
-  }
-}
-
-void encodeFnAttrs(const FnAttrs &attrs, State &s, StateValue &val,
-                   const Type &ty) {
-  if (attrs.has(FnAttrs::NNaN)) {
+  if (has(FnAttrs::NNaN)) {
     assert(ty.isFloatType());
-    s.addUB(val.non_poison.implies(!val.value.isNaN()));
+    UB.add(val.non_poison.implies(!val.value.isNaN()));
   }
 
-  if (ty.isPtrType())
-    encodePtrAttrs(s, val, attrs.derefBytes, attrs.derefOrNullBytes,
-                   attrs.align, attrs.has(FnAttrs::NonNull));
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(val.non_poison));
-    val.non_poison = true;
+  if (ty.isPtrType()) {
+    auto [UBptr, npptr] =
+        encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
+                       has(NonNull));
+    UB.add(move(UBptr));
+    new_non_poison &= move(npptr);
   }
+
+  if (poisonImpliesUB()) {
+    UB.add(move(new_non_poison));
+    new_non_poison = true;
+  }
+
+  return make_pair(move(UB), move(new_non_poison));
 }
 
 }

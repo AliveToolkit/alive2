@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "smt/exprs.h"
 #include <ostream>
 
 namespace IR {
@@ -41,6 +42,10 @@ public:
   uint64_t getDerefBytes() const;
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
+
+  // Encodes the semantics of attributes using UB and poison.
+  std::pair<smt::AndExpr, smt::expr>
+      encode(const State &s, const StateValue &val, const Type &ty) const;
 };
 
 
@@ -71,14 +76,10 @@ public:
   bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
+
+  // Encodes the semantics of attributes using UB and poison.
+  std::pair<smt::AndExpr, smt::expr>
+      encode(const State &s, const StateValue &val, const Type &ty) const;
 };
-
-
-// Encode attributes for a non-aggregate value using UB and poison.
-// Attributes requiring more than UB or poison are not encoded.
-void encodeParamAttrs(const ParamAttrs &attrs, State &s, StateValue &value,
-                      const Type &ty);
-void encodeFnAttrs(const FnAttrs &attrs, State &s, StateValue &value,
-                   const Type &ty);
 
 }

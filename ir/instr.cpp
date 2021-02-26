@@ -1704,7 +1704,10 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   }
 
   auto unpack = [&](StateValue &&value) {
-    encodeParamAttrs(argflag, s, value, ty);
+    auto [UB, new_non_poison] = argflag.encode(s, value, ty);
+    s.addUB(move(UB));
+    value.non_poison = move(new_non_poison);
+
     if (ty.isPtrType()) {
       ptr_inputs.emplace_back(move(value),
                               argflag.has(ParamAttrs::ByVal),
@@ -1732,11 +1735,14 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
 
 static void check_return_value(State &s, StateValue &val, const Type &ty,
                                const FnAttrs &attrs, bool is_ret_instr) {
-  encodeFnAttrs(attrs, s, val, ty);
+  auto [UB, new_non_poison] = attrs.encode(s, val, ty);
+  s.addUB(move(UB));
+  val.non_poison = move(new_non_poison);
+
   if (ty.isPtrType() && is_ret_instr) {
     Pointer p(s.getMemory(), val.value);
     s.addUB(val.non_poison.implies(!p.isStackAllocated() &&
-                                    !p.isNocapture()));
+                                   !p.isNocapture()));
   }
 }
 
