@@ -91,8 +91,8 @@ uint64_t ParamAttrs::getDerefBytes() const {
 static void
 encodePtrAttrs(const State &s, const expr &ptrvalue,
                AndExpr &UB, expr &non_poison,
-               uint64_t derefBytes,
-               uint64_t derefOrNullBytes, uint64_t align, bool nonnull) {
+               uint64_t derefBytes, uint64_t derefOrNullBytes, uint64_t align,
+               bool nonnull) {
   Pointer p(s.getMemory(), ptrvalue);
 
   if (nonnull)
