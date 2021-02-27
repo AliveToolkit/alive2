@@ -88,12 +88,12 @@ uint64_t ParamAttrs::getDerefBytes() const {
   return bytes;
 }
 
-static pair<AndExpr, expr>
-encodePtrAttrs(const State &s, const expr &ptrvalue, uint64_t derefBytes,
+static void
+encodePtrAttrs(const State &s, const expr &ptrvalue,
+               AndExpr &UB, expr &non_poison,
+               uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull) {
   Pointer p(s.getMemory(), ptrvalue);
-  AndExpr UB;
-  expr non_poison = true;
 
   if (nonnull)
     non_poison &= p.isNonZero();
@@ -107,8 +107,6 @@ encodePtrAttrs(const State &s, const expr &ptrvalue, uint64_t derefBytes,
   } else if (align != 1)
     // align
     non_poison &= p.isAligned(align);
-
-  return make_pair(move(UB), move(non_poison));
 }
 
 pair<AndExpr, expr>
@@ -116,20 +114,16 @@ ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const 
   AndExpr UB;
   expr new_non_poison = val.non_poison;
 
-  if (ty.isPtrType()) {
-    auto [UBptr, npptr] =
-        encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                       has(NonNull));
-    UB.add(move(UBptr));
-    new_non_poison &= move(npptr);
-  }
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val.value, UB, new_non_poison,
+                   getDerefBytes(), derefOrNullBytes, align, has(NonNull));
 
   if (poisonImpliesUB()) {
     UB.add(move(new_non_poison));
     new_non_poison = true;
   }
 
-  return make_pair(move(UB), move(new_non_poison));
+  return { move(UB), move(new_non_poison) };
 }
 
 
@@ -154,20 +148,16 @@ FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
     UB.add(val.non_poison.implies(!val.value.isNaN()));
   }
 
-  if (ty.isPtrType()) {
-    auto [UBptr, npptr] =
-        encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
-                       has(NonNull));
-    UB.add(move(UBptr));
-    new_non_poison &= move(npptr);
-  }
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val.value, UB, new_non_poison,
+                   derefBytes, derefOrNullBytes, align, has(NonNull));
 
   if (poisonImpliesUB()) {
     UB.add(move(new_non_poison));
     new_non_poison = true;
   }
 
-  return make_pair(move(UB), move(new_non_poison));
+  return { move(UB), move(new_non_poison) };
 }
 
 }
