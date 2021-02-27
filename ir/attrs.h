@@ -23,7 +23,7 @@ public:
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
-  uint64_t derefBytes = 0; // Dereferenceable
+  uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned blockSize;  // exact block size for e.g. byval args
   unsigned align = 1;
@@ -65,7 +65,7 @@ public:
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
 
-  uint64_t derefBytes = 0; // Dereferenceable
+  uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned align = 1;
 
