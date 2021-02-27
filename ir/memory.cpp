@@ -18,7 +18,9 @@ using namespace util;
 
   // Non-local block ids (assuming that no block is optimized out):
   // 1. null block: 0
-  // 2. global vars in source: 1 ~ num_globals_src
+  // 2. global vars in source:
+  //      1 ~ num_consts_src                    (constant globals)
+  //      num_consts_src + 1 ~ num_globals_src  (non-constant globals)
   // 3. pointer argument inputs:
   //      num_globals_src + 1 ~ num_globals_src + num_ptrinputs
   // 4. a block reserved for encoding the memory touched by calls:
@@ -26,7 +28,58 @@ using namespace util;
   // 5. nonlocal blocks returned by loads/calls:
   //      num_globals_src + num_ptrinputs + 2 ~ num_nonlocals_src - 1:
   // 6. global vars in target only:
-  //      num_nonlocals_src ~ num_nonlocals - 1
+  //      num_nonlocals_src ~ num_nonlocals_src + num_extra_nonconst_tgt - 1
+  //            (non-constant globals in target only)
+  //      num_nonlocals_src + num_extra_nonconst_tgt ~ num_nonlocals - 1
+  //            (constant globals in target only)
+
+//--- Functions for non-local block analysis based on bid ---//
+
+// If include_tgtonly is false, bid cannot be the global vars existing in target
+// only
+static bool nonlocal_is_globalvar(unsigned bid, bool include_tgtonly) {
+  if (bid < has_null_block)
+    return false;
+  return bid < has_null_block + num_globals_src ||
+         (include_tgtonly && num_nonlocals_src <= bid && bid < num_nonlocals);
+}
+
+static bool nonlocal_is_constglb(unsigned bid) {
+  if (has_null_block <= bid && bid < num_consts_src + has_null_block) {
+    // src constglb
+    assert(nonlocal_is_globalvar(bid, false));
+    return true;
+  } else if (num_nonlocals_src + num_extra_nonconst_tgt <= bid &&
+             bid < num_nonlocals) {
+    // tgt constglb
+    assert(!nonlocal_is_globalvar(bid, false) &&
+            nonlocal_is_globalvar(bid, true));
+    return true;
+  }
+  return false;
+}
+
+static bool nonlocal_always_live(unsigned bid) {
+  return nonlocal_is_globalvar(bid, true); // globals are always live
+  // TODO: We can assume that bid is always live if it is a fncall mem.
+  // Otherwise, fncall cannot write to the block.
+}
+
+static bool nonlocal_always_noread(unsigned bid) {
+  // TODO: fncall mem cannot be accessed with loads and stores.
+  return bid < has_null_block;
+}
+
+static bool nonlocal_always_nowrite(unsigned bid) {
+  bool flag = bid <  num_consts_src + has_null_block ||
+              bid >= num_nonlocals_src + num_extra_nonconst_tgt;
+
+  // If a block cannot be read, it cannot be written as well
+  assert(!nonlocal_always_noread(bid) || flag);
+
+  // TODO: fncall mem cannot be accessed with loads and stores.
+  return flag;
+}
 
 static unsigned next_local_bid;
 static unsigned next_global_bid;
@@ -623,8 +676,8 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
                       unsigned bytes, unsigned align, bool write) const {
   if (local && bid0 >= next_local_bid)
     return false;
-  if (!local && (bid0 >= (write ? num_nonlocals_src : numNonlocals()) ||
-                 bid0 < has_null_block + write * num_consts_src))
+  if (!local && (nonlocal_always_noread(bid0) ||
+                 (write && nonlocal_always_nowrite(bid0))))
     return false;
 
   int64_t offset = 0;
@@ -652,8 +705,7 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   } else if (local) // allocated in another branch
     return false;
 
-  // globals are always live
-  if (local || (bid0 >= num_globals_src && bid0 < num_nonlocals_src)) {
+  if (local || !nonlocal_always_live(bid0)) {
     if ((local ? local_block_liveness : non_local_block_liveness)
           .extract(bid0, bid0).isZero())
       return false;
@@ -999,7 +1051,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     return;
 
   auto nonlocal_used = [&](unsigned bid) {
-    return bid < tgt.next_nonlocal_bid || bid >= num_nonlocals_src;
+    return bid < tgt.next_nonlocal_bid || nonlocal_is_globalvar(bid, true);
   };
 
   // transformation can increase alignment
@@ -1068,7 +1120,7 @@ void Memory::syncWithSrc(const Memory &src) {
 }
 
 void Memory::markByVal(unsigned bid) {
-  assert(bid < has_null_block + num_globals_src);
+  assert(nonlocal_is_globalvar(bid, true));
   byval_blks.emplace_back(bid);
 }
 
@@ -1334,11 +1386,9 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     if (align_bits && observesAddresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
-    bool cond = (has_null_block && bid == 0) ||
-                (bid >= has_null_block + num_consts_src &&
-                 bid < num_nonlocals_src + num_extra_nonconst_tgt);
-    if (blockKind == CONSTGLOBAL) assert(!cond); else assert(cond);
-    (void)cond;
+    bool nonconst = (has_null_block && bid == 0) || !nonlocal_is_constglb(bid);
+    if (blockKind == CONSTGLOBAL) assert(!nonconst); else assert(nonconst);
+    (void)nonconst;
   }
 
   store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
