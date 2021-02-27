@@ -1119,7 +1119,7 @@ void Memory::syncWithSrc(const Memory &src) {
 }
 
 void Memory::markByVal(unsigned bid) {
-  assert(nonlocal_is_globalvar(bid, true));
+  assert(nonlocal_is_globalvar(bid, false));
   byval_blks.emplace_back(bid);
 }
 
