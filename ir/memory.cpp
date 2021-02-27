@@ -35,13 +35,12 @@ using namespace util;
 
 //--- Functions for non-local block analysis based on bid ---//
 
-// If include_tgtonly is false, bid cannot be the global vars existing in target
-// only
-static bool nonlocal_is_globalvar(unsigned bid, bool include_tgtonly) {
-  if (bid < has_null_block)
-    return false;
-  return bid < has_null_block + num_globals_src ||
-         (include_tgtonly && num_nonlocals_src <= bid && bid < num_nonlocals);
+// If include_tgt is true, return true if bid is a global var existing in target
+// only as well
+static bool nonlocal_is_globalvar(unsigned bid, bool include_tgt) {
+  bool srcglb = has_null_block <= bid && bid < has_null_block + num_globals_src;
+  bool tgtglb = num_nonlocals_src <= bid && bid < num_nonlocals;
+  return srcglb || (include_tgt && tgtglb);
 }
 
 static bool nonlocal_is_constglb(unsigned bid) {
