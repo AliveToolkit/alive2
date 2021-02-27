@@ -3,9 +3,14 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "smt/exprs.h"
 #include <ostream>
 
 namespace IR {
+
+class State;
+struct StateValue;
+class Type;
 
 class ParamAttrs final {
   unsigned bits;
@@ -18,8 +23,8 @@ public:
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
-  uint64_t derefBytes; // Dereferenceable
-  uint64_t derefOrNullBytes; // DereferenceableOrNull
+  uint64_t derefBytes = 0;       // Dereferenceable
+  uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned blockSize;  // exact block size for e.g. byval args
   unsigned align = 1;
 
@@ -37,6 +42,10 @@ public:
   uint64_t getDerefBytes() const;
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
+
+  // Encodes the semantics of attributes using UB and poison.
+  std::pair<smt::AndExpr, smt::expr>
+      encode(const State &s, const StateValue &val, const Type &ty) const;
 };
 
 
@@ -56,8 +65,8 @@ public:
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
 
-  uint64_t derefBytes; // Dereferenceable
-  uint64_t derefOrNullBytes; // DereferenceableOrNull
+  uint64_t derefBytes = 0;       // Dereferenceable
+  uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned align = 1;
 
   // Returns true if returning poison or an aggregate having a poison is UB
@@ -67,6 +76,10 @@ public:
   bool undefImpliesUB() const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
+
+  // Encodes the semantics of attributes using UB and poison.
+  std::pair<smt::AndExpr, smt::expr>
+      encode(const State &s, const StateValue &val, const Type &ty) const;
 };
 
 }

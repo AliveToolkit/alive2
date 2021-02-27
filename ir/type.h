@@ -275,8 +275,8 @@ public:
   unsigned numPaddingsConst() const;
 
   StateValue aggregateVals(const std::vector<StateValue> &vals) const;
-  IR::StateValue extract(const IR::StateValue &val, unsigned index,
-                         bool fromInt = false) const;
+  StateValue extract(const StateValue &val, unsigned index,
+                     bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }
   bool isPadding(unsigned i) const { return is_padding[i]; }
   unsigned countPaddings(unsigned to_idx) const;

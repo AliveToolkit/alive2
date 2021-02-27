@@ -2,9 +2,14 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include "ir/memory.h"
+#include "ir/state.h"
+#include "ir/state_value.h"
+#include "ir/type.h"
 #include <cassert>
 
 using namespace std;
+using namespace smt;
 
 namespace IR {
 ostream& operator<<(ostream &os, const ParamAttrs &attr) {
@@ -83,6 +88,45 @@ uint64_t ParamAttrs::getDerefBytes() const {
   return bytes;
 }
 
+static void
+encodePtrAttrs(const State &s, const expr &ptrvalue,
+               AndExpr &UB, expr &non_poison,
+               uint64_t derefBytes, uint64_t derefOrNullBytes, uint64_t align,
+               bool nonnull) {
+  Pointer p(s.getMemory(), ptrvalue);
+
+  if (nonnull)
+    non_poison &= p.isNonZero();
+
+  if (derefBytes || derefOrNullBytes) {
+    // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
+    if (derefBytes)
+      UB.add(p.isDereferenceable(derefBytes, align));
+    if (derefOrNullBytes)
+      UB.add(p.isDereferenceable(derefOrNullBytes, align)() || !p.isNonZero());
+  } else if (align != 1)
+    // align
+    non_poison &= p.isAligned(align);
+}
+
+pair<AndExpr, expr>
+ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
+  AndExpr UB;
+  expr new_non_poison = val.non_poison;
+
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val.value, UB, new_non_poison,
+                   getDerefBytes(), derefOrNullBytes, align, has(NonNull));
+
+  if (poisonImpliesUB()) {
+    UB.add(move(new_non_poison));
+    new_non_poison = true;
+  }
+
+  return { move(UB), move(new_non_poison) };
+}
+
+
 bool FnAttrs::poisonImpliesUB() const {
   return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||
          has(DereferenceableOrNull);
@@ -93,4 +137,27 @@ bool FnAttrs::undefImpliesUB() const {
   assert(!ub || poisonImpliesUB());
   return ub;
 }
+
+pair<AndExpr, expr>
+FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
+  AndExpr UB;
+  expr new_non_poison = val.non_poison;
+
+  if (has(FnAttrs::NNaN)) {
+    assert(ty.isFloatType());
+    UB.add(val.non_poison.implies(!val.value.isNaN()));
+  }
+
+  if (ty.isPtrType())
+    encodePtrAttrs(s, val.value, UB, new_non_poison,
+                   derefBytes, derefOrNullBytes, align, has(NonNull));
+
+  if (poisonImpliesUB()) {
+    UB.add(move(new_non_poison));
+    new_non_poison = true;
+  }
+
+  return { move(UB), move(new_non_poison) };
+}
+
 }

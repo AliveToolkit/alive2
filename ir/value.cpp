@@ -218,38 +218,15 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addUndefVar(move(var));
   }
 
-  // Some attributes generate poison rather than raise UB
-  expr np_from_attr(true);
-  if (ty.isPtrType()) {
-    Pointer p(s.getMemory(), val);
-
-    if (hasAttribute(ParamAttrs::NonNull))
-      np_from_attr = p.isNonZero();
-
-    bool hasDeref = hasAttribute(ParamAttrs::Dereferenceable) ||
-                    hasAttribute(ParamAttrs::ByVal);
-    bool hasDerefOrNull = hasAttribute(ParamAttrs::DereferenceableOrNull);
-    if (hasDeref || hasDerefOrNull) {
-      if (hasDeref)
-        s.addUB(p.isDereferenceable(attrs.getDerefBytes(), attrs.align));
-      if (hasDerefOrNull)
-        s.addUB(p.isDereferenceable(attrs.derefOrNullBytes, attrs.align)() ||
-                !p.isNonZero());
-    } else if (hasAttribute(ParamAttrs::Align))
-      np_from_attr &= p.isAligned(attrs.align);
-  }
-
-  if (attrs.poisonImpliesUB()) {
-    s.addUB(move(np_from_attr));
-    np_from_attr = true;
-  }
+  auto [UB, non_poison] = attrs.encode(s, {expr(val), expr(true)}, ty);
+  s.addUB(move(UB));
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
   return { move(val),
-           np_from_attr && (never_poison ? true :
-                              expr::mkBoolVar(np_name.c_str())) };
+           move(non_poison) && (never_poison ? true :
+                                  expr::mkBoolVar(np_name.c_str())) };
 }
 
 bool Input::isUndefMask(const expr &e, const expr &var) {
@@ -264,12 +241,7 @@ StateValue Input::toSMT(State &s) const {
 }
 
 expr Input::getUndefVar(const Type &ty, unsigned child) const {
-  // TODO: Clarify whether byval/dereferenceable accept partially undefined
-  // pointers
-  if (config::disable_undef_input ||
-      hasAttribute(ParamAttrs::ByVal) ||
-      hasAttribute(ParamAttrs::Dereferenceable) ||
-      attrs.undefImpliesUB())
+  if (config::disable_undef_input || attrs.undefImpliesUB())
     return {};
 
   string tyname = "isundef_" + getSMTName(child);
