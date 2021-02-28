@@ -114,6 +114,12 @@ llvm::cl::opt<bool>
                 llvm::cl::desc("Alive: log interactions with the SMT solver"),
                 llvm::cl::cat(TVOptions), llvm::cl::init(false));
 
+llvm::cl::opt<string>
+    opt_smt_bench_dir("tv-smt-bench",
+                      llvm::cl::desc("Alive: dump smtlib benchmarks"),
+                      llvm::cl::cat(TVOptions),
+                      llvm::cl::value_desc("directory"));
+
 llvm::cl::opt<bool> opt_print_dot(
     "tv-dot",
     llvm::cl::desc("Alive: print .dot files of each function"),
@@ -496,6 +502,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     smt::set_random_seed(to_string(opt_smt_random_seed));
     smt::set_memory_limit(opt_max_mem * 1024 * 1024);
     config::skip_smt = opt_smt_skip;
+    config::smt_benchmark_dir = opt_smt_bench_dir;
 
     config::symexec_print_each_value = opt_se_verbose;
     config::disable_undef_input = opt_disable_undef_input;

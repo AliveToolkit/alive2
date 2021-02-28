@@ -133,6 +133,7 @@ set(UTIL_SRCS
   util/parallel_fifo.cpp
   util/parallel_null.cpp
   util/parallel_unrestricted.cpp
+  util/random.cpp
   util/sort.cpp
   util/stopwatch.cpp
   util/symexec.cpp

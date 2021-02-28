@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include <string>
 #include <ostream>
 
 namespace util::config {
@@ -10,6 +11,9 @@ namespace util::config {
 extern bool symexec_print_each_value;
 
 extern bool skip_smt;
+
+// don't dumo if empty
+extern std::string smt_benchmark_dir;
 
 extern bool disable_poison_input;
 

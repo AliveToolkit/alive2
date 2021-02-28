@@ -5,7 +5,9 @@
 #include "smt/ctx.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include "util/file.h"
 #include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <optional>
@@ -295,6 +297,23 @@ Result Solver::check() const {
   if (config::skip_smt) {
     ++num_skips;
     return Result::SKIP;
+  }
+
+  if (!config::smt_benchmark_dir.empty()) {
+    const char *banner =
+    R"(Alive2 compiler optimization refinement query
+; More info in "Alive2: Bounded Translation Validation for LLVM", PLDI'21.)";
+    expr fml = assertions();
+    if (!fml.isTrue()) {
+      auto str = Z3_benchmark_to_smtlib_string(ctx(), banner, nullptr, nullptr,
+                                               nullptr, 0, nullptr, fml());
+      ofstream file(get_random_filename(config::smt_benchmark_dir, "smt2"));
+      if (!file.is_open()) {
+        cerr << "Alive2: Couldn't open smtlib benchmark file!" << endl;
+        exit(1);
+      }
+      file << str;
+    }
   }
 
   ++num_queries;
