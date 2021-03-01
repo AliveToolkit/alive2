@@ -2791,7 +2791,7 @@ void StartLifetime::print(ostream &os) const {
 }
 
 StateValue StartLifetime::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr).value;
+  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
   s.getMemory().startLifetime(p);
   return {};
 }
@@ -3351,7 +3351,7 @@ void Strlen::print(ostream &os) const {
 }
 
 StateValue Strlen::toSMT(State &s) const {
-  auto &eptr = s.getAndAddPoisonUB(*ptr).value;
+  auto &eptr = s.getAndAddPoisonUB(*ptr, true).value;
   check_can_load(s, eptr);
 
   Pointer p(s.getMemory(), eptr);
