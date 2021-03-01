@@ -294,11 +294,6 @@ Result Solver::check() const {
     return Result::UNSAT;
   }
 
-  if (config::skip_smt) {
-    ++num_skips;
-    return Result::SKIP;
-  }
-
   if (!config::smt_benchmark_dir.empty()) {
     const char *banner =
     R"(Alive2 compiler optimization refinement query
@@ -314,6 +309,11 @@ Result Solver::check() const {
       }
       file << str;
     }
+  }
+
+  if (config::skip_smt) {
+    ++num_skips;
+    return Result::SKIP;
   }
 
   ++num_queries;
