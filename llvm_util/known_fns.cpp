@@ -321,6 +321,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
     set_param(0, ParamAttrs::NoWrite);
+    set_param_deref(0, 1);
     RETURN_EXACT();
 
   case llvm::LibFunc_opendir:
@@ -365,7 +366,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     set_param(1, ParamAttrs::NoCapture);
     RETURN_EXACT();
 
-  case llvm::LibFunc_atof:
   case llvm::LibFunc_ferror:
   case llvm::LibFunc_getenv:
     ret_and_args_no_undef();
@@ -396,6 +396,54 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoRead);
     attrs.set(FnAttrs::WillReturn);
     RETURN_EXACT();
+
+  case llvm::LibFunc_strcoll:
+  case llvm::LibFunc_strcasecmp:
+    set_param_deref(0, 1);
+    set_param_deref(1, 1);
+    [[fallthrough]];
+  case llvm::LibFunc_strncasecmp:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::WillReturn);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_printf:
+  case llvm::LibFunc_puts:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::NoWrite);
+    set_param_deref(0, 1);
+    RETURN_APPROX();
+
+  case llvm::LibFunc_fscanf:
+  case llvm::LibFunc_fprintf:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoWrite);
+    set_param_deref(1, 1);
+    RETURN_APPROX();
+
+  case llvm::LibFunc_sprintf:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::NoRead);
+    set_param(1, ParamAttrs::NoWrite);
+    set_param_deref(0, 1);
+    set_param_deref(1, 1);
+    RETURN_APPROX();
 
   case llvm::LibFunc_strcat:
   case llvm::LibFunc_strcpy:
@@ -430,6 +478,38 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::WillReturn);
     set_param(0, ParamAttrs::NoCapture);
+    set_param(1, ParamAttrs::NoCapture);
+    RETURN_APPROX();
+
+  case llvm::LibFunc_atoi:
+  case llvm::LibFunc_atol:
+  case llvm::LibFunc_atof:
+  case llvm::LibFunc_atoll:
+    set_param(0, ParamAttrs::NoCapture);
+    [[fallthrough]];
+  case llvm::LibFunc_strchr:
+  case llvm::LibFunc_strrchr:
+    set_param_deref(0, 1);
+    [[fallthrough]];
+  case llvm::LibFunc_memchr:
+  case llvm::LibFunc_memrchr:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::WillReturn);
+    RETURN_APPROX();
+
+  case llvm::LibFunc_strstr:
+  case llvm::LibFunc_strpbrk:
+    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoWrite);
+    attrs.set(FnAttrs::WillReturn);
+    set_param_deref(0, 1);
+    set_param_deref(1, 1);
     set_param(1, ParamAttrs::NoCapture);
     RETURN_APPROX();
 
