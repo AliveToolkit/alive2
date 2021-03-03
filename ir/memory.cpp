@@ -73,14 +73,7 @@ static bool always_noread(unsigned bid) {
 
 // bid: nonlocal block id
 static bool always_nowrite(unsigned bid) {
-  bool flag = bid <  num_consts_src + has_null_block ||
-              bid >= num_nonlocals_src + num_extra_nonconst_tgt;
-
-  // If a block cannot be read, it cannot be written as well
-  assert(!always_noread(bid) || flag);
-
-  // TODO: fncall mem cannot be accessed with loads and stores.
-  return flag;
+  return always_noread(bid) || is_constglb(bid);
 }
 
 
