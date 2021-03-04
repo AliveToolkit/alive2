@@ -2511,7 +2511,7 @@ expr Assume::getTypeConstraints(const Function &f) const {
     return true;
   case AndNonPoison:
   case IfNonPoison:
-    return args[0]->getType().enforceIntType(1);
+    return args[0]->getType().enforceIntType();
   case Align:
     return args[0]->getType().enforcePtrType() &&
            args[1]->getType().enforceIntType();
