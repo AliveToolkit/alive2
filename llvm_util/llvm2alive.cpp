@@ -759,8 +759,12 @@ public:
           BB->addInstr(make_unique<Assume>(move(args), Assume::Align));
         } else if (name == "nonnull") {
           llvm::Value *ptr = bundle.Inputs[0].get();
+          auto *aptr = get_operand(ptr);
+          if (!aptr)
+            return error(i);
+
           BB->addInstr(
-            make_unique<Assume>(*get_operand(ptr), Assume::NonNull));
+            make_unique<Assume>(*aptr, Assume::NonNull));
         } else {
           return error(i);
         }
