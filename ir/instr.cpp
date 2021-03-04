@@ -2435,7 +2435,8 @@ unique_ptr<Instr> Return::dup(const string &suffix) const {
 
 Assume::Assume(Value &cond, Kind kind)
     : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
-  assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined);
+  assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined ||
+         kind == NonNull);
 }
 
 Assume::Assume(vector<Value *> &&args0, Kind kind)
