@@ -741,9 +741,30 @@ public:
           // Be conservative & simply assume it can take arbitrary num of ops.
           for (unsigned j = 0; j < bundle.Inputs.size(); ++j) {
             llvm::Value *v = bundle.Inputs[j].get();
+            auto *av = get_operand(v);
+            if (!av)
+              return error(i);
+
             BB->addInstr(
-              make_unique<Assume>(*get_operand(v), Assume::WellDefined));
+              make_unique<Assume>(*av, Assume::WellDefined));
           }
+        } else if (name == "align") {
+          llvm::Value *ptr = bundle.Inputs[0].get();
+          llvm::Value *align = bundle.Inputs[1].get();
+          auto *aptr = get_operand(ptr), *aalign = get_operand(align);
+          if (!aptr || !aalign)
+            return error(i);
+
+          vector<Value *> args = {aptr, aalign};
+          BB->addInstr(make_unique<Assume>(move(args), Assume::Align));
+        } else if (name == "nonnull") {
+          llvm::Value *ptr = bundle.Inputs[0].get();
+          auto *aptr = get_operand(ptr);
+          if (!aptr)
+            return error(i);
+
+          BB->addInstr(
+            make_unique<Assume>(*aptr, Assume::NonNull));
         } else {
           return error(i);
         }

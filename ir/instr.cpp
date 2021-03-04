@@ -2433,50 +2433,96 @@ unique_ptr<Instr> Return::dup(const string &suffix) const {
 }
 
 
+Assume::Assume(Value &cond, Kind kind)
+    : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
+  assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined ||
+         kind == NonNull);
+}
+
+Assume::Assume(vector<Value *> &&args0, Kind kind)
+    : Instr(Type::voidTy, "assume"), args(move(args0)), kind(kind) {
+  if (args.size() == 1)
+    assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined ||
+           kind == NonNull);
+  else {
+    assert(kind == Align && args.size() == 2);
+  }
+}
+
 vector<Value*> Assume::operands() const {
-  return { cond };
+  return args;
 }
 
 void Assume::rauw(const Value &what, Value &with) {
-  RAUW(cond);
+  for (auto &arg: args)
+    RAUW(arg);
 }
 
 void Assume::print(ostream &os) const {
   switch (kind) {
-  case AndNonPoison: os << "assume "; break;
-  case IfNonPoison: os << "assume_non_poison "; break;
-  case WellDefined: os << "assume_welldefined "; break;
+  case AndNonPoison: os << "assume"; break;
+  case IfNonPoison: os << "assume_non_poison"; break;
+  case WellDefined: os << "assume_welldefined"; break;
+  case Align: os << "assume_align"; break;
+  case NonNull: os << "assume_nonnull"; break;
   }
-  os << *cond;
+  for (auto &arg: args)
+    os << ' ' << *arg;
 }
 
 StateValue Assume::toSMT(State &s) const {
   switch (kind) {
   case AndNonPoison: {
-    auto &v = s.getAndAddPoisonUB(*cond);
+    auto &v = s.getAndAddPoisonUB(*args[0]);
     s.addUB(v.value != 0);
     break;
   }
   case IfNonPoison: {
-    auto &[v, np] = s[*cond];
+    auto &[v, np] = s[*args[0]];
     s.addUB(np.implies(v != 0));
     break;
   }
   case WellDefined:
-    (void)s.getAndAddPoisonUB(*cond, true);
+    (void)s.getAndAddPoisonUB(*args[0], true);
     break;
+  case Align: {
+    // assume(ptr, align)
+    const auto &vptr = s.getAndAddPoisonUB(*args[0]);
+    uint64_t align = *dynamic_cast<IntConst *>(args[1])->getInt();
+
+    Pointer ptr(s.getMemory(), vptr.value);
+    s.addUB(ptr.isAligned(align));
+    break;
+  }
+  case NonNull: {
+    // assume(ptr)
+    const auto &vptr = s.getAndAddPoisonUB(*args[0]);
+    Pointer ptr(s.getMemory(), vptr.value);
+    s.addUB(ptr.isNonZero());
+    break;
+  }
   }
   return {};
 }
 
 expr Assume::getTypeConstraints(const Function &f) const {
-  if (kind == WellDefined)
+  switch (kind) {
+  case WellDefined:
     return true;
-  return cond->getType().enforceIntType();
+  case AndNonPoison:
+  case IfNonPoison:
+    return args[0]->getType().enforceIntType();
+  case Align:
+    return args[0]->getType().enforcePtrType() &&
+           args[1]->getType().enforceIntType();
+  case NonNull:
+    return args[0]->getType().enforcePtrType();
+  }
+  return {};
 }
 
 unique_ptr<Instr> Assume::dup(const string &suffix) const {
-  return make_unique<Assume>(*cond, kind);
+  return make_unique<Assume>(vector<Value *>(args), kind);
 }
 
 
