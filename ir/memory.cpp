@@ -1814,7 +1814,8 @@ expr Memory::checkNocapture() const {
 }
 
 void Memory::escapeLocalPtr(const expr &ptr) {
-  if (next_local_bid == 0)
+  if (next_local_bid == 0 ||
+      escaped_local_blks.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;
 
   uint64_t bid;
