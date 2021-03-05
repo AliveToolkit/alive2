@@ -734,7 +734,8 @@ public:
   // 2: unknown
   unsigned lifetime_type(llvm::IntrinsicInst &i) {
     llvm::SmallVector<const llvm::Value *> Objs;
-    // TODO: should check offset
+    // WIP: should check offset
+    // WIP: should check double lifetime.start
     llvm::getUnderlyingObjects(i.getOperand(1), Objs);
     auto is_local = llvm::all_of(Objs, [](const llvm::Value *V) {
       return llvm::isa<llvm::AllocaInst>(V);
