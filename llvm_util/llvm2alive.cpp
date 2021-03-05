@@ -5,6 +5,7 @@
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
 #include "util/sort.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
@@ -728,6 +729,25 @@ public:
     return make_unique<Assume>(*fals, Assume::AndNonPoison);
   }
 
+  // 0: local
+  // 1: non-local
+  // 2: unknown
+  unsigned lifetime_type(llvm::IntrinsicInst &i) {
+    llvm::SmallVector<const llvm::Value *> Objs;
+    // TODO: should check offset
+    llvm::getUnderlyingObjects(i.getOperand(1), Objs);
+    auto is_local = llvm::all_of(Objs, [](const llvm::Value *V) {
+      return llvm::isa<llvm::AllocaInst>(V);
+    });
+    // Conservatively consider argument/globals only
+    auto is_nonlocal = llvm::all_of(Objs, [](const llvm::Value *V) {
+      return llvm::isa<llvm::Argument>(V) ||
+              llvm::isa<llvm::GlobalVariable>(V);
+    });
+
+    return is_local ? 0 : (is_nonlocal ? 1 : 2);
+  }
+
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
     switch (i.getIntrinsicID()) {
     case llvm::Intrinsic::assume:
@@ -917,20 +937,21 @@ public:
                                            op, BinOp::None, parse_fmath(i)));
     }
     case llvm::Intrinsic::lifetime_start:
-    {
-      PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
-          i.getOperand(1))))
-        return error(i);
-      RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
-    }
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
-          i.getOperand(1))))
+      unsigned lifetime_ty = lifetime_type(i);
+      if (lifetime_ty == 0) {
+        // local
+        if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_start)
+          RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
+        else
+          RETURN_IDENTIFIER(make_unique<Free>(*b, false));
+      } else if (lifetime_ty == 1)
+        // nonlocal
+        RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+      else
         return error(i);
-      RETURN_IDENTIFIER(make_unique<Free>(*b, false));
     }
     case llvm::Intrinsic::trap:
     {

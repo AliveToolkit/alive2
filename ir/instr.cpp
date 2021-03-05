@@ -3193,6 +3193,49 @@ unique_ptr<Instr> Memset::dup(const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZERO(FillPoison, getMaxAllocSize);
+DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset);
+DEFINE_AS_RETFALSE(FillPoison, canFree);
+
+uint64_t FillPoison::getMaxAccessSize() const {
+  return getGlobalVarSize(ptr);
+}
+
+FillPoison::ByteAccessInfo FillPoison::getByteAccessInfo() const {
+  return ByteAccessInfo::intOnly(1);
+}
+
+vector<Value*> FillPoison::operands() const {
+  return { ptr };
+}
+
+void FillPoison::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void FillPoison::print(ostream &os) const {
+  os << "fillpoison " << *ptr;
+}
+
+StateValue FillPoison::toSMT(State &s) const {
+  auto &vptr = s.getAndAddPoisonUB(*ptr, true).value;
+  Memory &m = s.getMemory();
+  Pointer p(m, vptr);
+  Pointer p0(m, p.getBid(), expr::mkUInt(0, p.getOffset().bits()));
+  m.memset(p0.release(), IntType("i8", 8).getDummyValue(false),
+           p.blockSize(), bits_byte / 8, {}, false);
+  return {};
+}
+
+expr FillPoison::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> FillPoison::dup(const string &suffix) const {
+  return make_unique<FillPoison>(*ptr);
+}
+
+
 DEFINE_AS_RETZERO(Memcpy, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Memcpy, canFree);

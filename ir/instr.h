@@ -704,6 +704,26 @@ public:
 };
 
 
+class FillPoison final : public MemInstr {
+  Value *ptr;
+public:
+  FillPoison(Value &ptr) : MemInstr(Type::voidTy, "fillpoison"), ptr(&ptr) {}
+
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  bool canFree() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 class Memcpy final : public MemInstr {
   Value *dst, *src, *bytes;
   unsigned align_dst, align_src;
