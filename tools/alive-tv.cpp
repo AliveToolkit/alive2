@@ -291,7 +291,7 @@ static void optimizeModule(llvm::Module *M) {
 
   llvm::FunctionPassManager FPM =
     PB.buildFunctionSimplificationPipeline(
-      llvm::PassBuilder::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
+      llvm::PassBuilder::OptimizationLevel::O2, llvm::PassBuilder::ThinLTOPhase::None);
   llvm::ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   MPM.run(*M, MAM);
