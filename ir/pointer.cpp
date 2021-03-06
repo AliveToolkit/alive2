@@ -126,8 +126,19 @@ expr Pointer::isLocal(bool simplify) const {
   auto bit = totalBits() - 1;
   expr local = p.extract(bit, bit);
 
-  if (simplify && m.isInitialMemBlock(local))
-    return false;
+  if (simplify) {
+    switch (m.isInitialMemBlock(local, true)) {
+      case 0:  break;
+      case 1:  return false;
+      case 2:
+        // If no local escaped, pointers written to memory by a callee can't
+        // alias with a local pointer.
+        if (!m.hasEscapedLocals())
+          return false;
+        break;
+      default: UNREACHABLE();
+    }
+  }
 
   return local == 1;
 }

@@ -147,6 +147,10 @@ class Memory {
   std::vector<unsigned> byval_blks;
   AliasSet escaped_local_blks;
 
+  bool hasEscapedLocals() const {
+    return escaped_local_blks.numMayAlias(true) > 0;
+  }
+
   std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
   unsigned next_nonlocal_bid;
   unsigned nextNonlocalBid();
