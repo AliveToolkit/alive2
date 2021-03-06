@@ -751,6 +751,10 @@ public:
         } else if (name == "align") {
           llvm::Value *ptr = bundle.Inputs[0].get();
           llvm::Value *align = bundle.Inputs[1].get();
+          if (bundle.Inputs.size() != 2)
+            // TODO: "align" assume operand bundle may take a third argument.
+            return error(i);
+
           auto *aptr = get_operand(ptr), *aalign = get_operand(align);
           if (!aptr || !aalign)
             return error(i);
