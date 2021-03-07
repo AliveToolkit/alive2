@@ -1881,8 +1881,15 @@ ostream& operator<<(ostream &os, const expr &e) {
 }
 
 strong_ordering expr::operator<=>(const expr &rhs) const {
-  return
-    (isValid() ? id() : UINT_MAX) <=> (rhs.isValid() ? rhs.id() : UINT_MAX);
+  if (ptr == rhs.ptr)
+    return strong_ordering::equal;
+  if (!isValid()) {
+    assert(rhs.isValid());
+    return strong_ordering::less;
+  }
+  if (!rhs.isValid())
+    return strong_ordering::greater;
+  return id() <=> rhs.id();
 }
 
 unsigned expr::id() const {
