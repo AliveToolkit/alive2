@@ -1881,14 +1881,9 @@ ostream& operator<<(ostream &os, const expr &e) {
 }
 
 strong_ordering expr::operator<=>(const expr &rhs) const {
-  if (ptr == rhs.ptr)
-    return strong_ordering::equal;
-  if (!isValid()) {
-    assert(rhs.isValid());
-    return strong_ordering::less;
-  }
-  if (!rhs.isValid())
-    return strong_ordering::greater;
+  if (ptr == rhs.ptr || !isValid() || !rhs.isValid())
+    return ptr <=> rhs.ptr;
+  // so iterators are stable
   return id() <=> rhs.id();
 }
 
