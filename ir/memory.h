@@ -284,6 +284,8 @@ public:
   // full copy of memory blocks
   void copy(const Pointer &src, const Pointer &dst);
 
+  void fillPoison(const smt::expr &bid);
+
   smt::expr ptr2int(const smt::expr &ptr) const;
   smt::expr int2ptr(const smt::expr &val) const;
 

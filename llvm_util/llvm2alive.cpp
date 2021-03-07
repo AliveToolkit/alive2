@@ -5,6 +5,7 @@
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
 #include "util/sort.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
@@ -103,6 +104,9 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   const vector<string_view> &gvnamesInSrc;
   vector<tuple<Phi*, llvm::PHINode*, unsigned>> todo_phis;
   ostream *out;
+  // (LLVM alloca, (Alive2 alloc, has lifetime.start?))
+  map<const llvm::AllocaInst *, std::pair<Alloc *, bool>> allocs;
+
 
   using RetTy = unique_ptr<Instr>;
 
@@ -551,23 +555,6 @@ public:
     RETURN_IDENTIFIER(move(inst));
   }
 
-  bool hasLifetimeStart(llvm::User &i, unordered_set<llvm::Value*> &visited) {
-    for (auto I = i.user_begin(), E = i.user_end(); I != E; ++I) {
-      llvm::User *U = *I;
-      if (!visited.insert(U).second)
-        continue;
-      if (auto I = llvm::dyn_cast<llvm::IntrinsicInst>(U)) {
-        if (I->getIntrinsicID() == llvm::Intrinsic::lifetime_start)
-          return true;
-      }
-      if ((llvm::isa<llvm::BitCastInst>(U) ||
-           llvm::isa<llvm::GetElementPtrInst>(U) ||
-           llvm::isa<llvm::PHINode>(U)) && hasLifetimeStart(*U, visited))
-        return true;
-    }
-    return false;
-  }
-
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
@@ -579,12 +566,12 @@ public:
         return error(i);
     }
 
-    unordered_set<llvm::Value*> visited;
     // FIXME: size bits shouldn't be a constant
     auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
-    RETURN_IDENTIFIER(make_unique<Alloc>(*ty, value_name(i), *size, mul,
-                        pref_alignment(i, i.getAllocatedType()),
-                        hasLifetimeStart(i, visited)));
+    auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
+                      pref_alignment(i, i.getAllocatedType()));
+    allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
+    RETURN_IDENTIFIER(move(alloc));
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
@@ -726,6 +713,83 @@ public:
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
     auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
     return make_unique<Assume>(*fals, Assume::AndNonPoison);
+  }
+
+  enum LifetimeKind {
+    LIFETIME_START,
+    LIFETIME_START_FILLPOISON,
+    LIFETIME_FILLPOISON,
+    LIFETIME_FREE,
+    LIFETIME_UNKNOWN
+  };
+  LifetimeKind getLifetimeKind(llvm::IntrinsicInst &i) {
+    llvm::Value *Ptr = i.getOperand(1);
+    llvm::SmallVector<const llvm::Value *> Objs;
+    llvm::getUnderlyingObjects(Ptr, Objs);
+
+    if (llvm::all_of(Objs, [](const llvm::Value *V) {
+        // Stack coloring algorithm doesn't assign slots for global variables
+        // or objects passed as pointer arguments
+        return llvm::isa<llvm::Argument>(V) ||
+               llvm::isa<llvm::GlobalVariable>(V); }))
+      return LIFETIME_FILLPOISON;
+
+    Objs.clear();
+    // Restricted to ops without ptr offset changes only
+    Ptr = Ptr->stripPointerCasts();
+    if (auto *Sel = dyn_cast<llvm::SelectInst>(Ptr)) {
+      Objs.emplace_back(Sel->getTrueValue());
+      Objs.emplace_back(Sel->getFalseValue());
+    } else if (auto *Phi = dyn_cast<llvm::PHINode>(Ptr)) {
+      for (auto &U : Phi->incoming_values())
+        Objs.emplace_back(U.get());
+    } else
+      Objs.emplace_back(Ptr);
+
+    if (!llvm::all_of(Objs, [](const llvm::Value *V) {
+         return llvm::isa<llvm::AllocaInst>(V->stripPointerCasts()); })) {
+      // If it is gep(alloca, const) where const != 0, it is fillpoison.
+      // Since such pattern is rare, check the simplest case and just return
+      // unknown otherwise
+      if (Objs.size() == 1) {
+        const auto *GEPI = llvm::dyn_cast<llvm::GetElementPtrInst>(Objs[0]);
+        if (GEPI && llvm::isa<llvm::AllocaInst>(
+                            GEPI->getPointerOperand()->stripPointerCasts())) {
+          unsigned BitWidth = DL().getIndexTypeSizeInBits(GEPI->getType());
+          llvm::APInt Offset(BitWidth, 0);
+          if (GEPI->accumulateConstantOffset(DL(), Offset) &&
+              !Offset.isNullValue())
+            return LIFETIME_FILLPOISON;
+        }
+      }
+      return LIFETIME_UNKNOWN;
+    }
+
+    // Now, it is guaranteed that Ptr points to alloca with zero offset.
+
+    if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
+      // double free is okay
+      return LIFETIME_FREE;
+
+    // lifetime.start
+    bool needs_fillpoison = false;
+
+    for (const auto *V : Objs) {
+      auto *ai = cast<llvm::AllocaInst>(V);
+      auto itr = allocs.find(ai);
+      if (itr == allocs.end())
+        // AllocaInst isn't visited; it is in a loop.
+        return LIFETIME_UNKNOWN;
+
+      itr->second.first->markAsInitiallyDead();
+      if (itr->second.second) {
+        // it isn't the first lifetime.start; conservatively add fillpoison
+        // to correctly encode the precise semantics
+        needs_fillpoison = true;
+      }
+      itr->second.second = true;
+    }
+    return needs_fillpoison ? LIFETIME_START_FILLPOISON : LIFETIME_START;
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
@@ -917,20 +981,22 @@ public:
                                            op, BinOp::None, parse_fmath(i)));
     }
     case llvm::Intrinsic::lifetime_start:
-    {
-      PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
-          i.getOperand(1))))
-        return error(i);
-      RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
-    }
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_BINOP();
-      if (!llvm::isa<llvm::AllocaInst>(llvm::getUnderlyingObject(
-          i.getOperand(1))))
+      switch(getLifetimeKind(i)) {
+      case LIFETIME_START:
+        RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
+      case LIFETIME_START_FILLPOISON:
+        BB->addInstr(make_unique<StartLifetime>(*b));
+        RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+      case LIFETIME_FREE:
+        RETURN_IDENTIFIER(make_unique<Free>(*b, false));
+      case LIFETIME_FILLPOISON:
+        RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+      case LIFETIME_UNKNOWN:
         return error(i);
-      RETURN_IDENTIFIER(make_unique<Free>(*b, false));
+      }
     }
     case llvm::Intrinsic::trap:
     {

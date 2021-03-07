@@ -475,16 +475,15 @@ public:
 class Alloc final : public MemInstr {
   Value *size, *mul;
   unsigned align;
-  bool initially_dead;
+  bool initially_dead = false;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, Value *mul, unsigned align,
-        bool initially_dead)
-    : MemInstr(type, std::move(name)), size(&size), mul(mul), align(align),
-      initially_dead(initially_dead) {}
+  Alloc(Type &type, std::string &&name, Value &size, Value *mul, unsigned align)
+    : MemInstr(type, std::move(name)), size(&size), mul(mul), align(align) {}
 
   Value& getSize() const { return *size; }
   Value* getMul() const { return mul; }
   bool initDead() const { return initially_dead; }
+  void markAsInitiallyDead() { initially_dead = true; }
 
   uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -688,6 +687,26 @@ public:
 
   Value& getBytes() const { return *bytes; }
   unsigned getAlign() const { return align; }
+
+  uint64_t getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  bool canFree() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FillPoison final : public MemInstr {
+  Value *ptr;
+public:
+  FillPoison(Value &ptr) : MemInstr(Type::voidTy, "fillpoison"), ptr(&ptr) {}
 
   uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

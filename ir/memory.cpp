@@ -1658,6 +1658,13 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   dst_blk.val = *val();
 }
 
+void Memory::fillPoison(const expr &bid) {
+  Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
+  expr blksz = p.blockSize();
+  memset(p.release(), IntType("i8", 8).getDummyValue(false),
+         move(blksz), bits_byte / 8, {}, false);
+}
+
 expr Memory::ptr2int(const expr &ptr) const {
   assert(!memory_unused());
   return Pointer(*this, ptr).getAddress();

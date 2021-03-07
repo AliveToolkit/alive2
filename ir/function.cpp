@@ -697,7 +697,7 @@ void Function::unroll(unsigned k) {
           unsigned align = 16;
           auto name = val->getName() + "#ptr#" + to_string(phi_counter++);
           auto alloca = make_unique<Alloc>(ptr_type, string(name), *size,
-                                           nullptr, align, false);
+                                           nullptr, align);
 
           auto store = [&](auto *bb, const auto *val) {
             bb->addInstrAt(make_unique<Store>(*alloca.get(),

@@ -2668,8 +2668,10 @@ expr Alloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
-  return make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align,
-                            initially_dead);
+  auto a = make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align);
+  if (initially_dead)
+    a->markAsInitiallyDead();
+  return a;
 }
 
 
@@ -3190,6 +3192,46 @@ expr Memset::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Memset::dup(const string &suffix) const {
   return make_unique<Memset>(*ptr, *val, *bytes, align);
+}
+
+
+DEFINE_AS_RETZERO(FillPoison, getMaxAllocSize);
+DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset);
+DEFINE_AS_RETFALSE(FillPoison, canFree);
+
+uint64_t FillPoison::getMaxAccessSize() const {
+  return getGlobalVarSize(ptr);
+}
+
+FillPoison::ByteAccessInfo FillPoison::getByteAccessInfo() const {
+  return ByteAccessInfo::intOnly(1);
+}
+
+vector<Value*> FillPoison::operands() const {
+  return { ptr };
+}
+
+void FillPoison::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+}
+
+void FillPoison::print(ostream &os) const {
+  os << "fillpoison " << *ptr;
+}
+
+StateValue FillPoison::toSMT(State &s) const {
+  auto &vptr = s.getAndAddPoisonUB(*ptr, true).value;
+  Memory &m = s.getMemory();
+  m.fillPoison(Pointer(m, vptr).getBid());
+  return {};
+}
+
+expr FillPoison::getTypeConstraints(const Function &f) const {
+  return ptr->getType().enforcePtrType();
+}
+
+unique_ptr<Instr> FillPoison::dup(const string &suffix) const {
+  return make_unique<FillPoison>(*ptr);
 }
 
 
