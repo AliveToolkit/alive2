@@ -2668,8 +2668,10 @@ expr Alloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Alloc::dup(const string &suffix) const {
-  return make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align,
-                            initially_dead);
+  auto a = make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align);
+  if (initially_dead)
+    a->markAsInitiallyDead();
+  return a;
 }
 
 
@@ -3220,10 +3222,7 @@ void FillPoison::print(ostream &os) const {
 StateValue FillPoison::toSMT(State &s) const {
   auto &vptr = s.getAndAddPoisonUB(*ptr, true).value;
   Memory &m = s.getMemory();
-  Pointer p(m, vptr);
-  Pointer p0(m, p.getBid(), expr::mkUInt(0, p.getOffset().bits()));
-  m.memset(p0.release(), IntType("i8", 8).getDummyValue(false),
-           p.blockSize(), bits_byte / 8, {}, false);
+  m.fillPoison(Pointer(m, vptr).getBid());
   return {};
 }
 

@@ -18,6 +18,3 @@ define i8 @tgt(i8* %p) {
 
 declare void @llvm.lifetime.start.p0i8(i64, i8*)
 declare void @llvm.lifetime.end.p0i8(i64, i8*)
-
-; WIP: deal with the second lifetime.start
-; ERROR: Target's return value is more undefined
