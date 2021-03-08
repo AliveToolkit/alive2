@@ -6,6 +6,7 @@
 #include "llvm_util/utils.h"
 #include "util/sort.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
@@ -720,18 +721,25 @@ public:
     LIFETIME_START_FILLPOISON,
     LIFETIME_FILLPOISON,
     LIFETIME_FREE,
+    LIFETIME_NOP,
     LIFETIME_UNKNOWN
   };
   LifetimeKind getLifetimeKind(llvm::IntrinsicInst &i) {
     llvm::Value *Ptr = i.getOperand(1);
+
+    if (isa<llvm::UndefValue>(Ptr))
+      // lifetime with undef ptr is no-op
+      return LIFETIME_NOP;
+
     llvm::SmallVector<const llvm::Value *> Objs;
     llvm::getUnderlyingObjects(Ptr, Objs);
 
-    if (llvm::all_of(Objs, [](const llvm::Value *V) {
+    if (llvm::all_of(Objs, [this](const llvm::Value *V) {
         // Stack coloring algorithm doesn't assign slots for global variables
         // or objects passed as pointer arguments
         return llvm::isa<llvm::Argument>(V) ||
-               llvm::isa<llvm::GlobalVariable>(V); }))
+               llvm::isa<llvm::GlobalVariable>(V) ||
+               llvm::isMallocLikeFn(V, &TLI, false); }))
       return LIFETIME_FILLPOISON;
 
     Objs.clear();
@@ -994,6 +1002,8 @@ public:
         RETURN_IDENTIFIER(make_unique<Free>(*b, false));
       case LIFETIME_FILLPOISON:
         RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+      case LIFETIME_NOP:
+        return NOP(i);
       case LIFETIME_UNKNOWN:
         return error(i);
       }
