@@ -805,17 +805,18 @@ private:
   std::string fnName;
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
-  bool approx;
+  bool approx = false;
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, bool approx = false)
+         FnAttrs &&attrs = FnAttrs::None)
     : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
-      attrs(std::move(attrs)), approx(approx) {}
+      attrs(std::move(attrs)) {}
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }
   const auto& getAttributes() const { return attrs; }
   bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
+  void setApproximated(bool flag) { approx = flag; }
 
   uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

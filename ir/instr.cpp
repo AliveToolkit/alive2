@@ -1845,8 +1845,9 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FnCall::dup(const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               FnAttrs(attrs), approx);
+                               FnAttrs(attrs));
   r->args = args;
+  r->approx = approx;
   return r;
 }
 

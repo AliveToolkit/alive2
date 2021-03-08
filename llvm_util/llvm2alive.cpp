@@ -65,37 +65,6 @@ string_view s(llvm::StringRef str) {
   } while (0)
 
 
-template <typename Fn, typename RetFn>
-void parse_fnattrs(FnAttrs &attrs, llvm::Type *retTy, Fn &&hasAttr,
-                   RetFn &&hasRetAttr) {
-  if (hasAttr(llvm::Attribute::ReadOnly)) {
-    attrs.set(FnAttrs::NoWrite);
-    attrs.set(FnAttrs::NoFree);
-  }
-  if (hasAttr(llvm::Attribute::ReadNone)) {
-    attrs.set(FnAttrs::NoRead);
-    attrs.set(FnAttrs::NoWrite);
-    attrs.set(FnAttrs::NoFree);
-  }
-  if (hasAttr(llvm::Attribute::WriteOnly))
-    attrs.set(FnAttrs::NoRead);
-
-  if (hasAttr(llvm::Attribute::ArgMemOnly))
-    attrs.set(FnAttrs::ArgMemOnly);
-
-  if (hasAttr(llvm::Attribute::NoFree))
-    attrs.set(FnAttrs::NoFree);
-
-  if (hasAttr(llvm::Attribute::NoReturn))
-    attrs.set(FnAttrs::NoReturn);
-
-  if (hasRetAttr(llvm::Attribute::NonNull))
-    attrs.set(FnAttrs::NonNull);
-
-  if (hasRetAttr(llvm::Attribute::NoUndef))
-    attrs.set(FnAttrs::NoUndef);
-}
-
 
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
@@ -282,131 +251,48 @@ public:
     if (fn->getName().substr(0, 15) == "__llvm_profile_")
       return NOP(i);
 
-    parse_fnattrs(attrs, i.getType(),
-                  [&i](auto attr) { return i.hasFnAttr(attr); },
-                  [&i](auto attr) { return i.hasRetAttr(attr); });
+    llvm::AttributeList attrs_callsite = i.getAttributes();
+    llvm::AttributeList attrs_fndef = fn->getAttributes();
+    const auto &ret = llvm::AttributeList::ReturnIndex;
+    const auto &fnidx = llvm::AttributeList::FunctionIndex;
+
+    handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
+    handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
+    handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
+    handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
 
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
     }
 
-    const auto &ret = llvm::AttributeList::ReturnIndex;
-    if (uint64_t b = max(i.getDereferenceableBytes(ret),
-                         fn->getDereferenceableBytes(ret))) {
-      attrs.set(FnAttrs::Dereferenceable);
-      attrs.derefBytes = b;
-    }
-
-    if (uint64_t b = max(i.getDereferenceableOrNullBytes(ret),
-                         fn->getDereferenceableOrNullBytes(ret))) {
-      attrs.set(FnAttrs::DereferenceableOrNull);
-      attrs.derefOrNullBytes = b;
-    }
-
-    {
-      uint64_t align = 0;
-      llvm::MaybeAlign ra = i.getRetAlign();
-      if (ra)
-        align = ra->value();
-
-      if (fn->hasAttribute(ret, llvm::Attribute::Alignment))
-        align = max(align,
-            fn->getAttribute(ret, llvm::Attribute::Alignment)
-                .getAlignment()->value());
-
-      if (align) {
-        attrs.set(FnAttrs::Align);
-        attrs.align = align;
-      }
-    }
-
     auto call = make_unique<FnCall>(*ty, value_name(i),
-                                    '@' + fn->getName().str(), move(attrs),
-                                    approx);
+                                    '@' + fn->getName().str(), move(attrs));
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto *arg = args[argidx];
-      ParamAttrs attr = argidx < param_attrs.size() ? param_attrs[argidx]
-                                                    : ParamAttrs();
-      // TODO: Once attributes at a call site are fully supported, we should
-      // call handleAttributes().
+      ParamAttrs pattr = argidx < param_attrs.size() ? param_attrs[argidx]
+                                                     : ParamAttrs();
 
-      if (i.paramHasAttr(argidx, llvm::Attribute::Dereferenceable)) {
-        uint64_t derefb = 0;
-        // dereferenceable at caller
-        if (i.getAttributes()
-             .hasParamAttr(argidx, llvm::Attribute::Dereferenceable))
-          derefb = i.getParamAttr(argidx, llvm::Attribute::Dereferenceable)
-                    .getDereferenceableBytes();
-        if (argidx < fn->arg_size())
-          derefb = max(derefb,
-                       fn->getParamDereferenceableBytes(argidx));
-        assert(derefb);
-        attr.set(ParamAttrs::Dereferenceable);
-        attr.derefBytes = derefb;
-      }
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::DereferenceableOrNull)) {
-        uint64_t sz = 0;
-        // dereferenceable_or_null at caller
-        if (i.getAttributes()
-             .hasParamAttr(argidx, llvm::Attribute::DereferenceableOrNull))
-          sz = i.getParamAttr(argidx, llvm::Attribute::DereferenceableOrNull)
-                .getDereferenceableOrNullBytes();
-        if (argidx < fn->arg_size())
-          sz = max(sz, fn->getParamDereferenceableOrNullBytes(argidx));
-        assert(sz);
-        attr.set(ParamAttrs::DereferenceableOrNull);
-        attr.derefOrNullBytes = sz;
-      }
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::Alignment)) {
-        uint64_t a = 0;
-        // alignment at caller
-        if (i.getAttributes()
-             .hasParamAttr(argidx, llvm::Attribute::Alignment))
-          a = i.getParamAttr(argidx, llvm::Attribute::Alignment)
-               .getAlignment()->value();
-        if (argidx < fn->arg_size() &&
-            fn->hasParamAttribute(argidx, llvm::Attribute::Alignment))
-          a = max(a, fn->getParamAlign(argidx)->value());
-
-        assert(a);
-        attr.set(ParamAttrs::Align);
-        attr.align = a;
-      }
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::ByVal)) {
-        attr.set(ParamAttrs::ByVal);
-        auto ty = i.getParamByValType(argidx);
-        attr.blockSize = DL().getTypeAllocSize(ty);
-        if (!attr.has(ParamAttrs::Align)) {
-          attr.set(ParamAttrs::Align);
-          attr.align = DL().getABITypeAlignment(ty);
-        }
-      }
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::NoCapture))
-        attr.set(ParamAttrs::NoCapture);
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::NonNull))
-        attr.set(ParamAttrs::NonNull);
+      unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
+      approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
+                                  pattr, true);
+      if (argidx < fn->arg_size())
+        approx |= !handleParamAttrs(attrs_fndef.getAttributes(attr_argidx),
+                                    pattr, true);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NoUndef)) {
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
           // TODO: noundef aggregate should be supported; it can have undef
           // padding
           return errorAttr(i.getAttribute(argidx, llvm::Attribute::NoUndef));
-
-        attr.set(ParamAttrs::NoUndef);
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
           = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                FnAttrs(call->getAttributes()), approx);
+                                FnAttrs(call->getAttributes()));
         for (auto &[arg, flags] : call->getArgs()) {
           call2->addArg(*arg, ParamAttrs(flags));
         }
@@ -423,8 +309,11 @@ public:
                                               ConversionOp::BitCast);
       }
 
-      call->addArg(*arg, move(attr));
+      call->addArg(*arg, move(pattr));
     }
+
+    call->setApproximated(approx);
+
     if (ret_val) {
       BB->addInstr(move(call));
       RETURN_IDENTIFIER(move(ret_val));
@@ -1154,11 +1043,22 @@ public:
     return true;
   }
 
-  optional<ParamAttrs> handleAttributes(llvm::Argument &arg) {
-    ParamAttrs attrs;
-    for (auto &attr : arg.getParent()->getAttributes()
-                         .getParamAttributes(arg.getArgNo())) {
-      switch (attr.getKindAsEnum()) {
+  // If is_callsite is true, encode attributes at call sites' params
+  // Otherwise, encode attributes at function definition's arguments
+  // TODO: Once attributes at a call site are fully supported, we should
+  // remove is_callsite flag
+  bool handleParamAttrs(const llvm::AttributeSet &aset, ParamAttrs &attrs,
+                        bool is_callsite) {
+    bool precise = true;
+    for (const llvm::Attribute &llvmattr : aset) {
+      // To call getKindAsEnum, llvmattr should be enum or int attribute
+      // llvm/include/llvm/IR/Attributes.td has attribute types
+      if (!llvmattr.isEnumAttribute() && // e.g. nonnull
+          !llvmattr.isIntAttribute() &&  // e.g. dereferenceable
+          !llvmattr.isTypeAttribute())   // e.g. byval
+        continue;
+
+      switch (llvmattr.getKindAsEnum()) {
       case llvm::Attribute::InReg:
       case llvm::Attribute::SExt:
       case llvm::Attribute::ZExt:
@@ -1168,12 +1068,12 @@ public:
 
       case llvm::Attribute::ByVal: {
         attrs.set(ParamAttrs::ByVal);
-        auto ty = arg.getParamByValType();
-        attrs.blockSize = DL().getTypeAllocSize(ty);
-        if (!attrs.has(ParamAttrs::Align)) {
-          attrs.set(ParamAttrs::Align);
-          attrs.align = DL().getABITypeAlignment(ty);
-        }
+        auto ty = aset.getByValType();
+        unsigned asz = DL().getTypeAllocSize(ty);
+        attrs.blockSize = max(attrs.blockSize, asz);
+
+        attrs.set(ParamAttrs::Align);
+        attrs.align = max(attrs.align, DL().getABITypeAlignment(ty));
         continue;
       }
 
@@ -1186,32 +1086,39 @@ public:
         continue;
 
       case llvm::Attribute::ReadOnly:
-        attrs.set(ParamAttrs::NoWrite);
+        if (!is_callsite)
+          attrs.set(ParamAttrs::NoWrite);
         continue;
 
       case llvm::Attribute::WriteOnly:
-        attrs.set(ParamAttrs::NoRead);
+        if (!is_callsite)
+          attrs.set(ParamAttrs::NoRead);
         continue;
 
       case llvm::Attribute::ReadNone:
-        // TODO: can this pointer be freed?
-        attrs.set(ParamAttrs::NoRead);
-        attrs.set(ParamAttrs::NoWrite);
+        if (!is_callsite) {
+          // TODO: can this pointer be freed?
+          attrs.set(ParamAttrs::NoRead);
+          attrs.set(ParamAttrs::NoWrite);
+        }
         continue;
 
       case llvm::Attribute::Dereferenceable:
         attrs.set(ParamAttrs::Dereferenceable);
-        attrs.derefBytes = attr.getDereferenceableBytes();
+        attrs.derefBytes = max(attrs.derefBytes,
+                               llvmattr.getDereferenceableBytes());
         continue;
 
       case llvm::Attribute::DereferenceableOrNull:
         attrs.set(ParamAttrs::DereferenceableOrNull);
-        attrs.derefOrNullBytes = attr.getDereferenceableOrNullBytes();
+        attrs.derefOrNullBytes = max(attrs.derefOrNullBytes,
+                                     llvmattr.getDereferenceableOrNullBytes());
         continue;
 
       case llvm::Attribute::Alignment:
         attrs.set(ParamAttrs::Align);
-        attrs.align = attr.getAlignment()->value();
+        attrs.align = max(attrs.align,
+                          (unsigned)llvmattr.getAlignment()->value());
         continue;
 
       case llvm::Attribute::NoUndef:
@@ -1223,12 +1130,87 @@ public:
         continue;
 
       default:
-        errorAttr(attr);
-        return nullopt;
+        // If it is call site, it should be added at approximation list
+        if (!is_callsite)
+          errorAttr(llvmattr);
+        precise = false;
       }
     }
-    return attrs;
+    return precise;
   }
+
+  void handleRetAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
+    for (const llvm::Attribute &llvmattr : aset) {
+      if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
+          !llvmattr.isTypeAttribute())
+        continue;
+
+      switch (llvmattr.getKindAsEnum()) {
+      case llvm::Attribute::NonNull: attrs.set(FnAttrs::NonNull); break;
+      case llvm::Attribute::NoUndef: attrs.set(FnAttrs::NoUndef); break;
+
+      case llvm::Attribute::Dereferenceable:
+        attrs.set(FnAttrs::Dereferenceable);
+        attrs.derefBytes = max(attrs.derefBytes,
+                              llvmattr.getDereferenceableBytes());
+        break;
+      case llvm::Attribute::DereferenceableOrNull:
+        attrs.set(FnAttrs::DereferenceableOrNull);
+        attrs.derefOrNullBytes = max(attrs.derefOrNullBytes,
+                                     llvmattr.getDereferenceableOrNullBytes());
+        break;
+
+      case llvm::Attribute::Alignment:
+        attrs.set(FnAttrs::Align);
+        attrs.align = max(attrs.align,
+                          (unsigned)llvmattr.getAlignment()->value());
+        break;
+
+      default: break;
+      }
+    }
+  }
+
+  void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
+    for (const llvm::Attribute &llvmattr : aset) {
+      if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
+          !llvmattr.isTypeAttribute())
+        continue;
+
+      switch (llvmattr.getKindAsEnum()) {
+      case llvm::Attribute::ReadOnly:
+        attrs.set(FnAttrs::NoWrite);
+        attrs.set(FnAttrs::NoFree);
+        break;
+
+      case llvm::Attribute::ReadNone:
+        attrs.set(FnAttrs::NoRead);
+        attrs.set(FnAttrs::NoWrite);
+        attrs.set(FnAttrs::NoFree);
+        break;
+
+      case llvm::Attribute::WriteOnly:
+        attrs.set(FnAttrs::NoRead);
+        break;
+
+      case llvm::Attribute::ArgMemOnly:
+        attrs.set(FnAttrs::ArgMemOnly);
+        break;
+
+      case llvm::Attribute::NoFree:
+        attrs.set(FnAttrs::NoFree);
+        break;
+
+      case llvm::Attribute::NoReturn:
+        attrs.set(FnAttrs::NoReturn);
+        break;
+
+      default:
+        break;
+      }
+    }
+  }
+
 
   optional<Function> run() {
     constexpr_idx = 0;
@@ -1250,12 +1232,18 @@ public:
                 f.isVarArg());
     reset_state(Fn);
 
-    for (auto &arg : f.args()) {
+    llvm::AttributeList attrlist = f.getAttributes();
+
+    for (unsigned idx = 0; idx < f.arg_size(); ++idx) {
+      llvm::Argument &arg = *f.getArg(idx);
+      llvm::AttributeSet argattr =
+          attrlist.getAttributes(llvm::AttributeList::FirstArgIndex + idx);
+
       auto ty = llvm_type2alive(arg.getType());
-      auto attrs = handleAttributes(arg);
-      if (!ty || !attrs)
+      ParamAttrs attrs;
+      if (!ty || !handleParamAttrs(argattr, attrs, false))
         return {};
-      auto val = make_unique<Input>(*ty, value_name(arg), move(*attrs));
+      auto val = make_unique<Input>(*ty, value_name(arg), move(attrs));
       add_identifier(arg, *val.get());
 
       if (arg.hasReturnedAttr()) {
@@ -1268,21 +1256,9 @@ public:
 
     auto &attrs = Fn.getFnAttrs();
     const auto &ridx = llvm::AttributeList::ReturnIndex;
-    parse_fnattrs(attrs, f.getReturnType(),
-                  [&](auto attr) { return f.hasFnAttribute(attr); },
-                  [&](auto attr) { return f.hasAttribute(ridx, attr); });
-
-    if (uint64_t b = f.getDereferenceableBytes(ridx)) {
-      attrs.set(FnAttrs::Dereferenceable);
-      attrs.derefBytes = b;
-    }
-
-    if (f.hasAttribute(ridx, llvm::Attribute::Alignment)) {
-      unsigned a = f.getAttribute(ridx, llvm::Attribute::Alignment)
-                    .getAlignment()->value();
-      attrs.set(FnAttrs::Align);
-      attrs.align = a;
-    }
+    const auto &fnidx = llvm::AttributeList::FunctionIndex;
+    handleRetAttrs(attrlist.getAttributes(ridx), attrs);
+    handleFnAttrs(attrlist.getAttributes(fnidx), attrs);
 
     // create all BBs upfront in topological order
     vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;
