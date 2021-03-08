@@ -266,8 +266,7 @@ public:
     }
 
     auto call = make_unique<FnCall>(*ty, value_name(i),
-                                    '@' + fn->getName().str(), move(attrs),
-                                    approx);
+                                    '@' + fn->getName().str(), move(attrs));
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
@@ -276,9 +275,11 @@ public:
                                                      : ParamAttrs();
 
       unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
-      handleParamAttrs(attrs_callsite.getAttributes(attr_argidx), pattr, true);
+      approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
+                                  pattr, true);
       if (argidx < fn->arg_size())
-        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, true);
+        approx |= !handleParamAttrs(attrs_fndef.getAttributes(attr_argidx),
+                                    pattr, true);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NoUndef)) {
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
@@ -290,7 +291,7 @@ public:
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
         auto call2
           = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                FnAttrs(call->getAttributes()), approx);
+                                FnAttrs(call->getAttributes()));
         for (auto &[arg, flags] : call->getArgs()) {
           call2->addArg(*arg, ParamAttrs(flags));
         }
@@ -309,6 +310,9 @@ public:
 
       call->addArg(*arg, move(pattr));
     }
+
+    call->setApproximated(approx);
+
     if (ret_val) {
       BB->addInstr(move(call));
       RETURN_IDENTIFIER(move(ret_val));
@@ -1035,6 +1039,7 @@ public:
   // remove is_callsite flag
   bool handleParamAttrs(const llvm::AttributeSet &aset, ParamAttrs &attrs,
                         bool is_callsite) {
+    bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
       // To call getKindAsEnum, llvmattr should be enum or int attribute
       // llvm/include/llvm/IR/Attributes.td has attribute types
@@ -1115,14 +1120,13 @@ public:
         continue;
 
       default:
-        // If it is call site, don't raise unsupported attribute error
-        if (!is_callsite) {
+        // If it is call site, it should be added at approximation list
+        if (!is_callsite)
           errorAttr(llvmattr);
-        }
-        return false;
+        precise = false;
       }
     }
-    return true;
+    return precise;
   }
 
   void handleRetAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
@@ -1142,8 +1146,8 @@ public:
         break;
       case llvm::Attribute::DereferenceableOrNull:
         attrs.set(FnAttrs::DereferenceableOrNull);
-        attrs.derefBytes = max(attrs.derefOrNullBytes,
-                               llvmattr.getDereferenceableOrNullBytes());
+        attrs.derefOrNullBytes = max(attrs.derefOrNullBytes,
+                                     llvmattr.getDereferenceableOrNullBytes());
         break;
 
       case llvm::Attribute::Alignment:
