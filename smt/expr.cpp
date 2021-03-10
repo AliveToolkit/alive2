@@ -403,7 +403,7 @@ bool expr::isIf(expr &cond, expr &then, expr &els) const {
 
 bool expr::isConcat(expr &a, expr &b) const {
   if (auto app = isAppOf(Z3_OP_CONCAT)) {
-    auto nargs = Z3_get_domain_size(ctx(), decl());
+    auto nargs = Z3_get_app_num_args(ctx(), app);
     assert(nargs >= 2);
     a = Z3_get_app_arg(ctx(), app, 0);
     b = Z3_get_app_arg(ctx(), app, 1);
