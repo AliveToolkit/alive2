@@ -1,4 +1,3 @@
-; SKIP-IDENTITY
 declare void @llvm.assume(i1)
 
 declare void @f(i8* align(4)) ; has no noundef
@@ -14,5 +13,4 @@ define void @tgt(i8* %ptr) {
   ret void
 }
 
-; align with 3 ops isn't supported yet.
-; XFAIL: Unsupported instruction
+; ERROR: Source is more defined than target

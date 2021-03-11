@@ -29,6 +29,7 @@ namespace {
 
 unsigned constexpr_idx;
 unsigned copy_idx;
+unsigned alignopbundle_idx;
 
 #if 0
 string_view s(llvm::StringRef str) {
@@ -712,13 +713,34 @@ public:
         } else if (name == "align") {
           llvm::Value *ptr = bundle.Inputs[0].get();
           llvm::Value *align = bundle.Inputs[1].get();
-          if (bundle.Inputs.size() != 2)
-            // TODO: "align" assume operand bundle may take a third argument.
-            return error(i);
 
           auto *aptr = get_operand(ptr), *aalign = get_operand(align);
           if (!aptr || !aalign)
             return error(i);
+
+          if (bundle.Inputs.size() >= 3) {
+            assert(bundle.Inputs.size() == 3);
+            auto *adjustofs = get_operand(bundle.Inputs[2].get());
+            if (!adjustofs)
+              return error(i);
+
+            auto adjust_inst = make_unique<BinOp>(
+                adjustofs->getType(),
+                "#align_offset" + to_string(alignopbundle_idx),
+                *make_intconst(0, adjustofs->getType().bits()),
+                *adjustofs,
+                BinOp::Sub);
+
+            auto gep = make_unique<GEP>(
+                aptr->getType(),
+                "#align_adjustedptr" + to_string(alignopbundle_idx++),
+                *aptr, false);
+            gep->addIdx(1, *adjust_inst.get());
+
+            aptr = gep.get();
+            BB->addInstr(move(adjust_inst));
+            BB->addInstr(move(gep));
+          }
 
           vector<Value *> args = {aptr, aalign};
           BB->addInstr(make_unique<Assume>(move(args), Assume::Align));
@@ -1215,6 +1237,7 @@ public:
   optional<Function> run() {
     constexpr_idx = 0;
     copy_idx = 0;
+    alignopbundle_idx = 0;
 
     // don't even bother if number of BBs or instructions is huge..
     if (distance(f.begin(), f.end()) > 5000 ||
