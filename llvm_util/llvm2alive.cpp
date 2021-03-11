@@ -719,7 +719,8 @@ public:
             return error(i);
 
           if (bundle.Inputs.size() >= 3) {
-            assert(bundle.Inputs.size() == 3);
+            assert(bundle.Inputs.size() == 3 &&
+                   llvm::isa<llvm::ConstantInt>(bundle.Inputs[2].get()));
             auto *adjustofs = get_operand(bundle.Inputs[2].get());
             if (!adjustofs)
               return error(i);
