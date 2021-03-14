@@ -58,17 +58,36 @@ static bool is_constglb(unsigned bid) {
   return false;
 }
 
+// Return true if bid is the nonlocal block used to encode function calls' side
+// effects
+static bool is_fncall_mem(unsigned bid) {
+  if (!has_fncall)
+    return false;
+  return bid == num_globals_src + num_ptrinputs + 1;
+}
+static unsigned get_fncallmem_bid() {
+  assert(has_fncall);
+  return num_globals_src + num_ptrinputs + 1;
+}
+void ensure_non_fncallmem(const Pointer &p) {
+  if (!p.isLocal().isFalse())
+    return;
+  uint64_t ubid;
+  ENSURE(!p.getShortBid().isUInt(ubid) || !is_fncall_mem(ubid));
+}
+
 // bid: nonlocal block id
 static bool always_alive(unsigned bid) {
-  return is_globalvar(bid, true); // globals are always live
-  // TODO: We can assume that bid is always live if it is a fncall mem.
-  // Otherwise, fncall cannot write to the block.
+  return // globals are always live
+         is_globalvar(bid, true) ||
+         // We can assume that bid is always live if it is a fncall mem.
+         // Otherwise, fncall cannot write to the block.
+         is_fncall_mem(bid);
 }
 
 // bid: nonlocal block id
 static bool always_noread(unsigned bid) {
-  // TODO: fncall mem cannot be accessed with loads and stores.
-  return bid < has_null_block;
+  return bid < has_null_block || is_fncall_mem(bid);
 }
 
 // bid: nonlocal block id
@@ -807,6 +826,11 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
 
   for (unsigned i = 0; i < sz_nonlocal; ++i) {
     if (aliasing.mayAlias(false, i)) {
+      // A nonlocal block for encoding fn calls' side effects cannot be
+      // accessed.
+      // If aliasing info says it can, either imprecise analysis or incorrect
+      // block id encoding is happening.
+      assert(!is_fncall_mem(i));
       fn(non_local_block_val[i], i, false,
          is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
     }
@@ -973,7 +997,7 @@ static expr mk_block_val_array(unsigned bid) {
                        expr::mkUInt(0, Byte::bitsByte()));
 }
 
-static expr mk_liveness_array() {
+static expr mk_nonlocal_liveness_array() {
   if (!num_nonlocals)
     return {};
 
@@ -994,11 +1018,14 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     Byte byte(*this, non_local_block_val[i].val.load(offset));
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
+    expr loadedptr_cond = !loadedptr.isLocal(false) &&
+                          !loadedptr.isNocapture(false) &&
+                          bid.ule(numNonlocals() - 1);
+    if (has_fncall)
+      loadedptr_cond &= bid != expr::mkUInt(get_fncallmem_bid(), bid);
+
     state->addAxiom(
-      expr::mkForAll({ offset },
-        byte.isPtr().implies(!loadedptr.isLocal(false) &&
-                             !loadedptr.isNocapture(false) &&
-                             bid.ule(numNonlocals() - 1))));
+      expr::mkForAll({ offset }, byte.isPtr().implies(move(loadedptr_cond))));
   }
 }
 
@@ -1017,7 +1044,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
     non_local_block_val.emplace_back(mk_block_val_array(bid));
   }
 
-  non_local_block_liveness = mk_liveness_array();
+  non_local_block_liveness = mk_nonlocal_liveness_array();
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
@@ -1038,6 +1065,16 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   // Initialize a memory block for null pointer.
   if (has_null_block)
     alloc(expr::mkUInt(0, bits_size_t), bits_byte / 8, GLOBAL, false, false, 0);
+
+  if (has_fncall) {
+    // Fix the nonlocal block for encoding fn calls' side effects to be always
+    // alive & have GLOBAL type.
+    // Note that liveness of the block is already encoded by
+    // mk_nonlocal_liveness_array().
+    non_local_blk_kind.add(
+        expr::mkUInt(get_fncallmem_bid(), Pointer::bitsShortBid()),
+        expr::mkUInt(GLOBAL, 2));
+  }
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -1075,7 +1112,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
   // Non-local blocks are disjoint.
   // Ignore null pointer block
   for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-    if (!nonlocal_used(bid))
+    if (!nonlocal_used(bid) || is_fncall_mem(bid))
       continue;
 
     Pointer p1(*this, bid, false);
@@ -1090,7 +1127,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
-      if (!nonlocal_used(bid2))
+      if (!nonlocal_used(bid2) || is_fncall_mem(bid2))
         continue;
       Pointer p2(*this, bid2, false);
       disj &= p2.isBlockAlive()
@@ -1186,6 +1223,10 @@ expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
 
+  unsigned fncallmem_bid = get_fncallmem_bid();
+  nonlocal &= bid != expr::mkUInt(fncallmem_bid, bid);
+  alias.setNoAlias(false, fncallmem_bid);
+
   for (auto byval_bid : byval_blks) {
     nonlocal &= bid != byval_bid;
     alias.setNoAlias(false, byval_bid);
@@ -1275,7 +1316,8 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     if (mask.isAllOnes()) {
       st.non_local_liveness = non_local_block_liveness;
     } else {
-      auto liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
+      auto liveness_var =
+          expr::mkFreshVar("blk_liveness", mk_nonlocal_liveness_array());
       // functions can free an object, but cannot bring a dead one back to live
       st.non_local_liveness = non_local_block_liveness & (liveness_var | mask);
     }
@@ -1426,8 +1468,11 @@ void Memory::free(const expr &ptr, bool unconstrained) {
     state->addUB(p.isNull() || (p.getOffset() == 0 &&
                                 p.isBlockAlive() &&
                                 p.getAllocType() == Pointer::MALLOC));
-  if (!p.isNull().isTrue())
+  if (!p.isNull().isTrue()) {
+    // A nonlocal block for encoding fn calls' side effects cannot be freed.
+    ensure_non_fncallmem(p);
     store_bv(p, false, local_block_liveness, non_local_block_liveness);
+  }
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
@@ -1523,20 +1568,33 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
     for (auto &p : all_leaf_ptrs(*this, val.value)) {
       auto islocal = p.isLocal();
       auto bid = p.getShortBid();
-      if (!islocal.isTrue() && !bid.isConst()) {
-        auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
-        if (inserted) {
-          if (!max_bid)
-            max_bid = nextNonlocalBid();
-          I->second.setMayAliasUpTo(false, *max_bid);
-          for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
-            I->second.setMayAlias(false, i);
-          }
-          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid) ||
-                        (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
-                                                : false));
-        }
+      if (islocal.isTrue() || bid.isConst())
+        continue;
+
+      auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
+      if (!inserted) continue;
+
+      // Build alias set + condition for the returned pointer.
+      if (!max_bid)
+        max_bid = nextNonlocalBid();
+
+      I->second.setMayAliasUpTo(false, *max_bid);
+      expr bid_cond = bid.ule(*max_bid);
+
+      if (has_fncall) {
+        // The mem block for fn call side effects cannot be touched
+        unsigned fbid = get_fncallmem_bid();
+        I->second.setNoAlias(false, fbid);
+        bid_cond &= bid != expr::mkUInt(fbid, bid);
       }
+
+      if (num_extra_nonconst_tgt)
+        bid_cond |= bid.uge(num_nonlocals_src);
+      for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
+        I->second.setMayAlias(false, i);
+      }
+
+      state->addPre(!val.non_poison || islocal || move(bid_cond));
     }
   }
 
