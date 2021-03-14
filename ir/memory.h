@@ -253,6 +253,7 @@ public:
   // If bid is specified, the bid is used, and last_bid is not increased.
   // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
+  // Returns <pointer if allocated, allocated?>
   std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, unsigned align,
       BlockKind blockKind, const smt::expr &precond = true,
       const smt::expr &nonnull = false,

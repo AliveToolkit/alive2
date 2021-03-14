@@ -1402,8 +1402,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   expr nondet_nonnull = expr::mkFreshVar("#alloc_nondet_nonnull", true);
   state->addQuantVar(nondet_nonnull);
   allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
-  return { expr::mkIf(allocated, p(), Pointer::mkNullPointer(*this)()),
-           move(allocated) };
+  return { p.release(), move(allocated) };
 }
 
 void Memory::startLifetime(const expr &ptr_local) {

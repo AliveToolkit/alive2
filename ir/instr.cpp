@@ -2707,6 +2707,8 @@ void Malloc::print(ostream &os) const {
   else
     os << " = realloc " << *ptr << ", ";
   os << *size;
+  if (isNonNull)
+    os << ", nonnull";
 }
 
 StateValue Malloc::toSMT(State &s) const {
@@ -2721,25 +2723,28 @@ StateValue Malloc::toSMT(State &s) const {
   auto [p_new, allocated]
     = m.alloc(sz, align, Memory::MALLOC, np_size, nonnull);
 
+  expr nullp = Pointer::mkNullPointer(m)();
+  expr ret = expr::mkIf(allocated, p_new, nullp);
+
   if (!ptr) {
     if (isNonNull) {
       // TODO: In C++ we need to throw an exception if the allocation fails,
       // but exception hasn't been modeled yet
       s.addPre(move(allocated));
+      ret = p_new;
     }
   } else {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
     check_can_store(s, p);
 
-    m.copy(Pointer(m, p), Pointer(m, p_new.subst(allocated, true).simplify()));
+    m.copy(Pointer(m, p), Pointer(m, p_new));
 
     // 1) realloc(ptr, 0) always free the ptr.
     // 2) If allocation failed, we should not free previous ptr.
-    expr nullp = Pointer::mkNullPointer(m)();
     m.free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
   }
-  return { move(p_new), true };
+  return { move(ret), true };
 }
 
 expr Malloc::getTypeConstraints(const Function &f) const {
@@ -2798,14 +2803,13 @@ StateValue Calloc::toSMT(State &s) const {
   auto np = np_num && np_sz;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p, allocated] = s.getMemory().alloc(size, align, Memory::MALLOC,
-                                            np && nm.mul_no_uoverflow(sz),
-                                            nonnull);
-  p = p.subst(allocated, true).simplify();
+  auto &m = s.getMemory();
+  auto [p, allocated] = m.alloc(size, align, Memory::MALLOC,
+                                np && nm.mul_no_uoverflow(sz), nonnull);
 
-  s.getMemory().memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
+  m.memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
 
-  return { move(p), true };
+  return { expr::mkIf(allocated, p, Pointer::mkNullPointer(m)()), true };
 }
 
 expr Calloc::getTypeConstraints(const Function &f) const {
