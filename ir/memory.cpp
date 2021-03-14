@@ -1167,6 +1167,7 @@ expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
 }
 
 expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
+  assert(has_fncall);
   bool has_local = hasEscapedLocals();
 
   unsigned bits_bid = has_local ? bits_for_bid : Pointer::bitsShortBid();
@@ -1225,6 +1226,7 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
 Memory::CallState
 Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
                     bool nofree) {
+  assert(has_fncall);
   CallState st;
   st.empty = false;
 
@@ -1284,6 +1286,7 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
 }
 
 void Memory::setState(const Memory::CallState &st) {
+  assert(has_fncall);
   auto consts = has_null_block + num_consts_src;
   for (unsigned i = consts; i < num_nonlocals_src; ++i) {
     non_local_block_val[i].val = st.non_local_block_val[i - consts];
@@ -1396,12 +1399,11 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
-  if (nonnull.isTrue())
-    return { p.release(), move(allocated) };
-
-  expr nondet_nonnull = expr::mkFreshVar("#alloc_nondet_nonnull", true);
-  state->addQuantVar(nondet_nonnull);
-  allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
+  if (!nonnull.isTrue()) {
+    expr nondet_nonnull = expr::mkFreshVar("#alloc_nondet_nonnull", true);
+    state->addQuantVar(nondet_nonnull);
+    allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
+  }
   return { p.release(), move(allocated) };
 }
 
