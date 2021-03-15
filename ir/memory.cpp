@@ -23,10 +23,10 @@ using namespace util;
   //      num_consts_src + 1 ~ num_globals_src  (non-constant globals)
   // 3. pointer argument inputs:
   //      num_globals_src + 1 ~ num_globals_src + num_ptrinputs
-  // 4. a block reserved for encoding the memory touched by calls:
-  //      num_globals_src + num_ptrinputs + 1
-  // 5. nonlocal blocks returned by loads/calls:
-  //      num_globals_src + num_ptrinputs + 2 ~ num_nonlocals_src - 1:
+  // 4. nonlocal blocks returned by loads/calls:
+  //      num_globals_src + num_ptrinputs + 1 ~ num_nonlocals_src - 2:
+  // 5. a block reserved for encoding the memory touched by calls:
+  //      num_nonlocals_src - 1
   // 6. global vars in target only:
   //      num_nonlocals_src ~ num_nonlocals_src + num_extra_nonconst_tgt - 1
   //            (non-constant globals in target only)
@@ -60,14 +60,14 @@ static bool is_constglb(unsigned bid) {
 
 // Return true if bid is the nonlocal block used to encode function calls' side
 // effects
+static unsigned get_fncallmem_bid() {
+  assert(has_fncall);
+  return num_nonlocals_src - 1;
+}
 static bool is_fncall_mem(unsigned bid) {
   if (!has_fncall)
     return false;
-  return bid == num_globals_src + num_ptrinputs + 1;
-}
-static unsigned get_fncallmem_bid() {
-  assert(has_fncall);
-  return num_globals_src + num_ptrinputs + 1;
+  return bid == get_fncallmem_bid();
 }
 void ensure_non_fncallmem(const Pointer &p) {
   if (!p.isLocal().isFalse())
@@ -670,7 +670,9 @@ static set<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
 }
 
 unsigned Memory::nextNonlocalBid() {
-  return min(next_nonlocal_bid++, num_nonlocals_src-1);
+  unsigned next = min(next_nonlocal_bid++, num_nonlocals_src - 1 - has_fncall);
+  assert(!is_fncall_mem(next));
+  return next;
 }
 
 unsigned Memory::numLocals() const {
@@ -1006,7 +1008,7 @@ static expr mk_nonlocal_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
+void Memory::mkNonlocalValAxioms(bool skip_consts) {
   if (!does_ptr_mem_access)
     return;
 
@@ -1018,10 +1020,17 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     Byte byte(*this, non_local_block_val[i].val.load(offset));
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
+
+    unsigned bid_upperbound = numNonlocals() - 1;
+    if (has_fncall && state->isSource())
+      // exclude fncall mem block (src)
+      bid_upperbound = numNonlocals() - 2;
     expr loadedptr_cond = !loadedptr.isLocal(false) &&
                           !loadedptr.isNocapture(false) &&
-                          bid.ule(numNonlocals() - 1);
-    if (has_fncall)
+                          bid.ule(bid_upperbound);
+
+    if (has_fncall && !state->isSource())
+      // exclude fncall mem block (tgt): bid_upperbound is larger than fnbid
       loadedptr_cond &= bid != expr::mkUInt(get_fncallmem_bid(), bid);
 
     state->addAxiom(
@@ -1048,7 +1057,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
-  mk_nonlocal_val_axioms(false);
+  mkNonlocalValAxioms(false);
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
@@ -1223,10 +1232,6 @@ expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
 
-  unsigned fncallmem_bid = get_fncallmem_bid();
-  nonlocal &= bid != expr::mkUInt(fncallmem_bid, bid);
-  alias.setNoAlias(false, fncallmem_bid);
-
   for (auto byval_bid : byval_blks) {
     nonlocal &= bid != byval_bid;
     alias.setNoAlias(false, byval_bid);
@@ -1336,7 +1341,7 @@ void Memory::setState(const Memory::CallState &st) {
       non_local_block_val[i].undef.clear();
   }
   non_local_block_liveness = st.non_local_liveness;
-  mk_nonlocal_val_axioms(true);
+  mkNonlocalValAxioms(true);
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
@@ -1580,13 +1585,6 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
 
       I->second.setMayAliasUpTo(false, *max_bid);
       expr bid_cond = bid.ule(*max_bid);
-
-      if (has_fncall) {
-        // The mem block for fn call side effects cannot be touched
-        unsigned fbid = get_fncallmem_bid();
-        I->second.setNoAlias(false, fbid);
-        bid_cond &= bid != expr::mkUInt(fbid, bid);
-      }
 
       if (num_extra_nonconst_tgt)
         bid_cond |= bid.uge(num_nonlocals_src);
