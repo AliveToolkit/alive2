@@ -426,6 +426,14 @@ bool expr::isExtract(expr &e, unsigned &high, unsigned &low) const {
   return false;
 }
 
+bool expr::isSignExt(expr &val) const {
+  if (auto app = isAppOf(Z3_OP_SIGN_EXT)) {
+    val = Z3_get_app_arg(ctx(), app, 0);
+    return true;
+  }
+  return false;
+}
+
 bool expr::isAnd(expr &a, expr &b) const {
   return isBinOp(a, b, Z3_OP_AND);
 }
@@ -1487,6 +1495,15 @@ expr expr::extract(unsigned high, unsigned low) const {
     unsigned high_2, low_2;
     if (isExtract(sub, high_2, low_2))
       return sub.extract(high + low_2, low + low_2);
+  }
+  if (low == 0) {
+    expr val;
+    if (isSignExt(val)) {
+      auto val_bits = val.bits();
+      if (high < val_bits)
+        return val.extract(high, 0);
+      return val.sext(high - val_bits + 1);
+    }
   }
   {
     expr a, b;
