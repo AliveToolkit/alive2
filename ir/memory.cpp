@@ -1021,7 +1021,6 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     Byte byte(*this, non_local_block_val[i].val.load(offset));
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
-
     state->addAxiom(
       expr::mkForAll({ offset },
         byte.isPtr().implies(!loadedptr.isLocal(false) &&
