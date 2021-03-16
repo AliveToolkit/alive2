@@ -1022,20 +1022,11 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
 
-    unsigned bid_upperbound = numNonlocals() - 1;
-    if (has_fncall && state->isSource())
-      // exclude fncall mem block (src)
-      bid_upperbound = numNonlocals() - 2;
-    expr loadedptr_cond = !loadedptr.isLocal(false) &&
-                          !loadedptr.isNocapture(false) &&
-                          bid.ule(bid_upperbound);
-
-    if (has_fncall && !state->isSource())
-      // exclude fncall mem block (tgt): bid_upperbound is larger than fnbid
-      loadedptr_cond &= bid != expr::mkUInt(get_fncallmem_bid(), bid);
-
     state->addAxiom(
-      expr::mkForAll({ offset }, byte.isPtr().implies(move(loadedptr_cond))));
+      expr::mkForAll({ offset },
+        byte.isPtr().implies(!loadedptr.isLocal(false) &&
+                             !loadedptr.isNocapture(false) &&
+                             bid.ule(numNonlocals() - 1))));
   }
 }
 
