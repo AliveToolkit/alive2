@@ -1285,11 +1285,6 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = has_null_block ? one : zero;
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-      if (is_fncall_mem(bid)) {
-        mask = mask | (one << expr::mkUInt(bid, num_nonlocals));
-        continue;
-      }
-
       expr may_free = true;
       if (ptr_inputs) {
         may_free = false;
@@ -1299,7 +1294,7 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
         }
       }
       expr heap = Pointer(*this, bid, false).isHeapAllocated();
-      mask = mask | expr::mkIf(heap && may_free,
+      mask = mask | expr::mkIf(heap && may_free && !is_fncall_mem(bid),
                                zero,
                                one << expr::mkUInt(bid, num_nonlocals));
     }
