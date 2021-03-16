@@ -999,7 +999,7 @@ static expr mk_block_val_array(unsigned bid) {
                        expr::mkUInt(0, Byte::bitsByte()));
 }
 
-static expr mk_nonlocal_liveness_array() {
+static expr mk_liveness_array() {
   if (!num_nonlocals)
     return {};
 
@@ -1008,7 +1008,7 @@ static expr mk_nonlocal_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mkNonlocalValAxioms(bool skip_consts) {
+void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
   if (!does_ptr_mem_access)
     return;
 
@@ -1053,11 +1053,11 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
     non_local_block_val.emplace_back(mk_block_val_array(bid));
   }
 
-  non_local_block_liveness = mk_nonlocal_liveness_array();
+  non_local_block_liveness = mk_liveness_array();
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
-  mkNonlocalValAxioms(false);
+  mk_nonlocal_val_axioms(false);
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
@@ -1074,16 +1074,6 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   // Initialize a memory block for null pointer.
   if (has_null_block)
     alloc(expr::mkUInt(0, bits_size_t), bits_byte / 8, GLOBAL, false, false, 0);
-
-  if (has_fncall) {
-    // Fix the nonlocal block for encoding fn calls' side effects to be always
-    // alive & have GLOBAL type.
-    // Note that liveness of the block is already encoded by
-    // mk_nonlocal_liveness_array().
-    non_local_blk_kind.add(
-        expr::mkUInt(get_fncallmem_bid(), Pointer::bitsShortBid()),
-        expr::mkUInt(GLOBAL, 2));
-  }
 
   assert(bits_for_offset <= bits_size_t);
 }
@@ -1304,6 +1294,11 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = has_null_block ? one : zero;
     for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
+      if (is_fncall_mem(bid)) {
+        mask = mask | (one << expr::mkUInt(bid, num_nonlocals));
+        continue;
+      }
+
       expr may_free = true;
       if (ptr_inputs) {
         may_free = false;
@@ -1321,8 +1316,7 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     if (mask.isAllOnes()) {
       st.non_local_liveness = non_local_block_liveness;
     } else {
-      auto liveness_var =
-          expr::mkFreshVar("blk_liveness", mk_nonlocal_liveness_array());
+      auto liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
       // functions can free an object, but cannot bring a dead one back to live
       st.non_local_liveness = non_local_block_liveness & (liveness_var | mask);
     }
@@ -1341,7 +1335,7 @@ void Memory::setState(const Memory::CallState &st) {
       non_local_block_val[i].undef.clear();
   }
   non_local_block_liveness = st.non_local_liveness;
-  mkNonlocalValAxioms(true);
+  mk_nonlocal_val_axioms(true);
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
@@ -1573,26 +1567,20 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
     for (auto &p : all_leaf_ptrs(*this, val.value)) {
       auto islocal = p.isLocal();
       auto bid = p.getShortBid();
-      if (islocal.isTrue() || bid.isConst())
-        continue;
-
-      auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
-      if (!inserted) continue;
-
-      // Build alias set + condition for the returned pointer.
-      if (!max_bid)
-        max_bid = nextNonlocalBid();
-
-      I->second.setMayAliasUpTo(false, *max_bid);
-      expr bid_cond = bid.ule(*max_bid);
-
-      if (num_extra_nonconst_tgt)
-        bid_cond |= bid.uge(num_nonlocals_src);
-      for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
-        I->second.setMayAlias(false, i);
+      if (!islocal.isTrue() && !bid.isConst()) {
+        auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
+        if (inserted) {
+          if (!max_bid)
+            max_bid = nextNonlocalBid();
+          I->second.setMayAliasUpTo(false, *max_bid);
+          for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
+            I->second.setMayAlias(false, i);
+          }
+          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid) ||
+                        (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
+                                                : false));
+        }
       }
-
-      state->addPre(!val.non_poison || islocal || move(bid_cond));
     }
   }
 

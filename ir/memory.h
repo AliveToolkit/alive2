@@ -163,7 +163,7 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  void mkNonlocalValAxioms(bool skip_consts);
+  void mk_nonlocal_val_axioms(bool skip_consts);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
                 unsigned bytes, unsigned align, bool write) const;
