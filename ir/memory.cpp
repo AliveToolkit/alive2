@@ -23,10 +23,10 @@ using namespace util;
   //      num_consts_src + 1 ~ num_globals_src  (non-constant globals)
   // 3. pointer argument inputs:
   //      num_globals_src + 1 ~ num_globals_src + num_ptrinputs
-  // 4. a block reserved for encoding the memory touched by calls:
-  //      num_globals_src + num_ptrinputs + 1
-  // 5. nonlocal blocks returned by loads/calls:
-  //      num_globals_src + num_ptrinputs + 2 ~ num_nonlocals_src - 1:
+  // 4. nonlocal blocks returned by loads/calls:
+  //      num_globals_src + num_ptrinputs + 1 ~ num_nonlocals_src - 2:
+  // 5. a block reserved for encoding the memory touched by calls:
+  //      num_nonlocals_src - 1
   // 6. global vars in target only:
   //      num_nonlocals_src ~ num_nonlocals_src + num_extra_nonconst_tgt - 1
   //            (non-constant globals in target only)
@@ -58,17 +58,37 @@ static bool is_constglb(unsigned bid) {
   return false;
 }
 
+// Return true if bid is the nonlocal block used to encode function calls' side
+// effects
+static unsigned get_fncallmem_bid() {
+  assert(has_fncall);
+  return num_nonlocals_src - 1;
+}
+static bool is_fncall_mem(unsigned bid) {
+  if (!has_fncall)
+    return false;
+  return bid == get_fncallmem_bid();
+}
+void ensure_non_fncallmem(const Pointer &p) {
+  if (!p.isLocal().isFalse())
+    return;
+  uint64_t ubid;
+  assert(!p.getShortBid().isUInt(ubid) || !is_fncall_mem(ubid));
+  (void)ubid;
+}
+
 // bid: nonlocal block id
 static bool always_alive(unsigned bid) {
-  return is_globalvar(bid, true); // globals are always live
-  // TODO: We can assume that bid is always live if it is a fncall mem.
-  // Otherwise, fncall cannot write to the block.
+  return // globals are always live
+         is_globalvar(bid, true) ||
+         // We can assume that bid is always live if it is a fncall mem.
+         // Otherwise, fncall cannot write to the block.
+         is_fncall_mem(bid);
 }
 
 // bid: nonlocal block id
 static bool always_noread(unsigned bid) {
-  // TODO: fncall mem cannot be accessed with loads and stores.
-  return bid < has_null_block;
+  return bid < has_null_block || is_fncall_mem(bid);
 }
 
 // bid: nonlocal block id
@@ -651,7 +671,9 @@ static set<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
 }
 
 unsigned Memory::nextNonlocalBid() {
-  return min(next_nonlocal_bid++, num_nonlocals_src-1);
+  unsigned next = min(next_nonlocal_bid++, num_nonlocals_src - 1 - has_fncall);
+  assert(!is_fncall_mem(next));
+  return next;
 }
 
 unsigned Memory::numLocals() const {
@@ -807,6 +829,11 @@ void Memory::access(const Pointer &ptr, unsigned bytes, unsigned align,
 
   for (unsigned i = 0; i < sz_nonlocal; ++i) {
     if (aliasing.mayAlias(false, i)) {
+      // A nonlocal block for encoding fn calls' side effects cannot be
+      // accessed.
+      // If aliasing info says it can, either imprecise analysis or incorrect
+      // block id encoding is happening.
+      assert(!is_fncall_mem(i));
       fn(non_local_block_val[i], i, false,
          is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
     }
@@ -1075,7 +1102,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
   // Non-local blocks are disjoint.
   // Ignore null pointer block
   for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-    if (!nonlocal_used(bid))
+    if (!nonlocal_used(bid) || is_fncall_mem(bid))
       continue;
 
     Pointer p1(*this, bid, false);
@@ -1090,7 +1117,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
-      if (!nonlocal_used(bid2))
+      if (!nonlocal_used(bid2) || is_fncall_mem(bid2))
         continue;
       Pointer p2(*this, bid2, false);
       disj &= p2.isBlockAlive()
@@ -1267,7 +1294,7 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
         }
       }
       expr heap = Pointer(*this, bid, false).isHeapAllocated();
-      mask = mask | expr::mkIf(heap && may_free,
+      mask = mask | expr::mkIf(heap && may_free && !is_fncall_mem(bid),
                                zero,
                                one << expr::mkUInt(bid, num_nonlocals));
     }
@@ -1426,8 +1453,11 @@ void Memory::free(const expr &ptr, bool unconstrained) {
     state->addUB(p.isNull() || (p.getOffset() == 0 &&
                                 p.isBlockAlive() &&
                                 p.getAllocType() == Pointer::MALLOC));
-  if (!p.isNull().isTrue())
+  if (!p.isNull().isTrue()) {
+    // A nonlocal block for encoding fn calls' side effects cannot be freed.
+    ensure_non_fncallmem(p);
     store_bv(p, false, local_block_liveness, non_local_block_liveness);
+  }
 }
 
 unsigned Memory::getStoreByteSize(const Type &ty) {
