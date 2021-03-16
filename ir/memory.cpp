@@ -73,7 +73,8 @@ void ensure_non_fncallmem(const Pointer &p) {
   if (!p.isLocal().isFalse())
     return;
   uint64_t ubid;
-  ENSURE(!p.getShortBid().isUInt(ubid) || !is_fncall_mem(ubid));
+  assert(!p.getShortBid().isUInt(ubid) || !is_fncall_mem(ubid));
+  (void)ubid;
 }
 
 // bid: nonlocal block id
