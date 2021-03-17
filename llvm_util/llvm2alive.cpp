@@ -712,34 +712,45 @@ public:
           }
         } else if (name == "align") {
           llvm::Value *ptr = bundle.Inputs[0].get();
-          llvm::Value *align = bundle.Inputs[1].get();
-
-          auto *aptr = get_operand(ptr), *aalign = get_operand(align);
-          if (!aptr || !aalign)
+          auto *aptr = get_operand(ptr);
+          if (!aptr)
             return error(i);
 
-          if (bundle.Inputs.size() >= 3) {
-            assert(bundle.Inputs.size() == 3 &&
-                   llvm::isa<llvm::ConstantInt>(bundle.Inputs[2].get()));
-            auto *adjustofs = get_operand(bundle.Inputs[2].get());
-            if (!adjustofs)
-              return error(i);
+          auto *align = llvm::cast<llvm::ConstantInt>(bundle.Inputs[1].get());
+          if (align->uge(UINT64_MAX))
+            return error(i);
+          uint64_t align_value = align->getZExtValue();
+          auto *aalign = make_intconst(align_value, 64);
 
-            auto adjust_inst = make_unique<BinOp>(
-                adjustofs->getType(),
-                "#align_offset" + to_string(alignopbundle_idx),
-                *make_intconst(0, adjustofs->getType().bits()),
-                *adjustofs,
-                BinOp::Sub);
+          if (bundle.Inputs.size() >= 3) {
+            assert(bundle.Inputs.size() == 3);
+            auto *ofs =
+                llvm::dyn_cast<llvm::ConstantInt>(bundle.Inputs[2].get());
+            Value *adjust_ofs;
+
+            if (ofs->uge(UINT64_MAX)) {
+              Value *bundlearg = get_operand(bundle.Inputs[2].get());
+              auto adjust_inst = make_unique<BinOp>(
+                  bundlearg->getType(),
+                  "#align_offset" + to_string(alignopbundle_idx),
+                  *make_intconst(0, bundlearg->getType().bits()),
+                  *bundlearg,
+                  BinOp::Sub);
+              adjust_ofs = adjust_inst.get();
+
+              BB->addInstr(move(adjust_inst));
+            } else {
+              unsigned ofs_bw = ofs->getBitWidth();
+              adjust_ofs = make_intconst(-ofs->getZExtValue(), ofs_bw);
+            }
 
             auto gep = make_unique<GEP>(
                 aptr->getType(),
                 "#align_adjustedptr" + to_string(alignopbundle_idx++),
                 *aptr, false);
-            gep->addIdx(1, *adjust_inst.get());
+            gep->addIdx(1, *adjust_ofs);
 
             aptr = gep.get();
-            BB->addInstr(move(adjust_inst));
             BB->addInstr(move(gep));
           }
 
