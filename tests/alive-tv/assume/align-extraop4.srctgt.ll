@@ -1,3 +1,4 @@
+; SKIP-IDENTITY
 declare void @llvm.assume(i1)
 
 declare void @f(i8* align(4) noundef)
@@ -14,4 +15,5 @@ define void @tgt(i8* %ptr) {
   ret void
 }
 
-; ERROR: Source is more defined than target
+; Check that this does not crash
+; ERROR: Unsupported instruction

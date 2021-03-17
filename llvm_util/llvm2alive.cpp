@@ -712,15 +712,10 @@ public:
           }
         } else if (name == "align") {
           llvm::Value *ptr = bundle.Inputs[0].get();
-          auto *aptr = get_operand(ptr);
-          if (!aptr)
+          llvm::Value *align = bundle.Inputs[1].get();
+          auto *aptr = get_operand(ptr), *aalign = get_operand(align);
+          if (!aptr || !aalign || align->getType()->getIntegerBitWidth() > 64)
             return error(i);
-
-          auto *align = llvm::cast<llvm::ConstantInt>(bundle.Inputs[1].get());
-          if (align->uge(UINT64_MAX))
-            return error(i);
-          uint64_t align_value = align->getZExtValue();
-          auto *aalign = make_intconst(align_value, 64);
 
           if (bundle.Inputs.size() >= 3) {
             assert(bundle.Inputs.size() == 3);
