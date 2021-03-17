@@ -724,31 +724,11 @@ public:
 
           if (bundle.Inputs.size() >= 3) {
             assert(bundle.Inputs.size() == 3);
-            auto *ofs =
-                llvm::dyn_cast<llvm::ConstantInt>(bundle.Inputs[2].get());
-            Value *adjust_ofs;
-
-            if (ofs->uge(UINT64_MAX)) {
-              Value *bundlearg = get_operand(bundle.Inputs[2].get());
-              auto adjust_inst = make_unique<BinOp>(
-                  bundlearg->getType(),
-                  "#align_offset" + to_string(alignopbundle_idx),
-                  *make_intconst(0, bundlearg->getType().bits()),
-                  *bundlearg,
-                  BinOp::Sub);
-              adjust_ofs = adjust_inst.get();
-
-              BB->addInstr(move(adjust_inst));
-            } else {
-              unsigned ofs_bw = ofs->getBitWidth();
-              adjust_ofs = make_intconst(-ofs->getZExtValue(), ofs_bw);
-            }
-
             auto gep = make_unique<GEP>(
                 aptr->getType(),
                 "#align_adjustedptr" + to_string(alignopbundle_idx++),
                 *aptr, false);
-            gep->addIdx(1, *adjust_ofs);
+            gep->addIdx(-1ull, *get_operand(bundle.Inputs[2].get()));
 
             aptr = gep.get();
             BB->addInstr(move(gep));
