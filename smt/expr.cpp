@@ -631,6 +631,9 @@ expr expr::srem(const expr &rhs) const {
   if (rhs.isZero())
     return rhs;
 
+  if (isNegative().isFalse() && rhs.isNegative().isFalse())
+    return urem(rhs);
+
   return binop_fold(rhs, Z3_mk_bvsrem);
 }
 
@@ -1428,6 +1431,10 @@ expr expr::sext(unsigned amount) const {
   C();
   if (amount == 0)
     return *this;
+
+  if (isNegative().isFalse())
+    return zext(amount);
+
   return simplify_const(Z3_mk_sign_ext(ctx(), amount, ast()), *this);
 }
 
