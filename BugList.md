@@ -54,6 +54,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 47. Loop vectorizer introduces gep inbounds with negative offset (https://llvm.org/PR48126)
 48. DSE incorrectly removes store in function that only triggers UB in one of the branches (https://llvm.org/PR48521)
 49. Incorrect swap of fptrunc with fast-math instructions (https://llvm.org/PR49080)
+50. Incorrect propagation of nsz from fneg to fdiv  (https://llvm.org/PR49654)
 
 
 ### Bugs found in Z3
