@@ -41,11 +41,9 @@ static void print_single_varval(ostream &os, const State &st, const Model &m,
     return;
   }
 
-  // if the model is partial, we don't know for sure if it's poison or not
-  // this happens if the poison constraint depends on an undef
-  // however, cexs are usually triggered by the worst case, which is poison
+  // Best effort detection of poison if model is partial
   if (auto v = m.eval(val.non_poison);
-      (!v.isConst() || v.isFalse())) {
+      (v.isFalse() || check_expr(!v).isSat())) {
     os << "poison";
     return;
   }
