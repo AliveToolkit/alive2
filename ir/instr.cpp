@@ -269,7 +269,7 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
     s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
 }
 
-static expr any_fp_zero(State &s, expr v) {
+static expr any_fp_zero(State &s, const expr &v) {
   expr is_zero = v.isFPZero();
   if (is_zero.isFalse())
     return v;
@@ -282,21 +282,26 @@ static expr any_fp_zero(State &s, expr v) {
                     v);
 }
 
-static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
-                            const expr &bp, expr c,
+static StateValue fm_poison(State &s, const expr &a, const expr &ap,
+                            const expr &b, const expr &bp, const expr &c,
                             function<expr(expr&,expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input,
                             int nary = 3) {
+  expr new_a, new_b, new_c;
   if (fmath.flags & FastMathFlags::NSZ) {
-    a = any_fp_zero(s, move(a));
+    new_a = any_fp_zero(s, a);
     if (nary >= 2) {
-      b = any_fp_zero(s, move(b));
+      new_b = any_fp_zero(s, b);
       if (nary == 3)
-        c = any_fp_zero(s, move(c));
+        new_c = any_fp_zero(s, c);
     }
+  } else {
+    new_a = a;
+    new_b = b;
+    new_c = c;
   }
 
-  expr val = fn(a, b, c);
+  expr val = fn(new_a, new_b, new_c);
   expr non_poison(true);
 
   if (fmath.flags & FastMathFlags::NNaN) {
@@ -341,8 +346,8 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   return { move(val), (nary >= 2 ? ap && bp : ap) && non_poison };
 }
 
-static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
-                            const expr &bp,
+static StateValue fm_poison(State &s, const expr &a, const expr &ap,
+                            const expr &b, const expr &bp,
                             function<expr(expr&,expr&)> fn,
                             FastMathFlags fmath, bool only_input) {
   return fm_poison(s, move(a), ap, move(b), bp, expr(),
@@ -350,7 +355,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                    fmath, only_input, 2);
 }
 
-static StateValue fm_poison(State &s, expr a, const expr &ap,
+static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             function<expr(expr&)> fn,
                             FastMathFlags fmath, bool only_input) {
   return fm_poison(s, move(a), ap, expr(), expr(), expr(),
