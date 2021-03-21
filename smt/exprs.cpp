@@ -85,6 +85,30 @@ ostream &operator<<(ostream &os, const OrExpr &e) {
 }
 
 
+// do simple rewrites that cover the common cases
+static expr simplify(const expr &e, const expr &cond, bool negate) {
+  // (bvadd ((_ extract ..) (ite cond X Y)) Z)
+  // -> (bvadd ((_ extract ..) X) Z)  or  (bvadd ((_ extract ..) Y) Z)
+  // NB: although this potentially increases the circuit size, it allows further
+  // simplifications down the road, and has been shown to be benefitial to perf
+  expr a, b;
+  if (e.isAdd(a, b)) {
+    auto test = [&](const expr &a, const expr &b) -> expr {
+      expr extract, ifcond, t, e;
+      unsigned high, low;
+      if (b.isExtract(extract, high, low) &&
+          extract.isIf(ifcond, t, e) &&
+          ifcond.eq(cond)) {
+        return a + (negate ? e : t).extract(high, low);
+      }
+      return {};
+    };
+    if (auto r = test(a, b); r.isValid()) return r;
+    if (auto r = test(b, a); r.isValid()) return r;
+  }
+  return e;
+}
+
 template<>
 DisjointExpr<expr>::DisjointExpr(const expr &e, unsigned depth_limit) {
   if (depth_limit-- == 0) {
@@ -125,14 +149,15 @@ DisjointExpr<expr>::DisjointExpr(const expr &e, unsigned depth_limit) {
         if (auto rhs_val = rhs.lookup(lhs_domain)) {
           add(lhs_v.concat(*rhs_val), c && lhs_domain);
         } else {
-          expr from, to(false);
+          expr from;
+          bool negate = true;
           if (!lhs_domain.isNot(from)) {
             from = lhs_domain;
-            to = true;
+            negate = false;
           }
 
           for (auto &[rhs_v, rhs_domain] : rhs) {
-            add(lhs_v.concat(rhs_v.subst(from, to).simplify()),
+            add(lhs_v.concat(simplify(rhs_v, from, negate)),
                 c && lhs_domain && rhs_domain);
           }
         }
