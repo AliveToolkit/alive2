@@ -1,0 +1,37 @@
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  linux:
+    name: linux ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        compiler:   [g++-10, clang++-12]
+        build_type: [Release, Debug]
+        cxxflags:   ["-fsanitize=address,undefined"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"
+          sudo apt-get update
+          sudo apt-get install z3 re2c ninja-build g++-10 clang-12
+
+      - name: Compile
+        run: ./.github/scripts/build.sh
+
+      - name: Run Tests
+        run: ninja check
+        working-directory: build
+
+    env:
+      CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
+      CMAKE_CXX_COMPILER: ${{ matrix.compiler }}
+      CMAKE_CXX_FLAGS: ${{ matrix.cxxflags }}
