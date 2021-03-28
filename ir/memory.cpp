@@ -1030,7 +1030,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
         assert(is_fncall_mem(upperbid));
         upperbid--;
       } else if (upperbid > get_fncallmem_bid()) { // target-only glb vars exist
-        bid_cond = bid != expr::mkUInt(get_fncallmem_bid(), bid);
+        bid_cond = bid != get_fncallmem_bid();
       }
     }
     bid_cond &= bid.ule(upperbid);
