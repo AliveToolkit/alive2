@@ -1009,7 +1009,7 @@ static expr mk_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
+void Memory::mkNonlocalValAxioms(bool skip_consts) {
   if (!does_ptr_mem_access)
     return;
 
@@ -1021,11 +1021,25 @@ void Memory::mk_nonlocal_val_axioms(bool skip_consts) {
     Byte byte(*this, non_local_block_val[i].val.load(offset));
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
+
+    unsigned upperbid = numNonlocals() - 1;
+    expr bid_cond(true);
+    if (has_fncall) {
+      // initial memory cannot contain a pointer to fncall mem block.
+      if (is_fncall_mem(upperbid)) {
+        upperbid--;
+      } else {
+        assert(!state->isSource()); // target-only glb vars exist
+        bid_cond = bid != get_fncallmem_bid();
+      }
+    }
+    bid_cond &= bid.ule(upperbid);
+
     state->addAxiom(
       expr::mkForAll({ offset },
         byte.isPtr().implies(!loadedptr.isLocal(false) &&
                              !loadedptr.isNocapture(false) &&
-                             bid.ule(numNonlocals() - 1))));
+                             move(bid_cond))));
   }
 }
 
@@ -1048,7 +1062,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
-  mk_nonlocal_val_axioms(false);
+  mkNonlocalValAxioms(false);
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
@@ -1321,7 +1335,7 @@ void Memory::setState(const Memory::CallState &st) {
       non_local_block_val[i].undef.clear();
   }
   non_local_block_liveness = st.non_local_liveness;
-  mk_nonlocal_val_axioms(true);
+  mkNonlocalValAxioms(true);
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
