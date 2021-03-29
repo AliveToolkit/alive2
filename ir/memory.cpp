@@ -1026,10 +1026,10 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     expr bid_cond(true);
     if (has_fncall) {
       // initial memory cannot contain a pointer to fncall mem block.
-      if (state->isSource()) {
-        assert(is_fncall_mem(upperbid));
+      if (is_fncall_mem(upperbid)) {
         upperbid--;
-      } else if (upperbid > get_fncallmem_bid()) { // target-only glb vars exist
+      } else {
+        assert(!state->isSource()); // target-only glb vars exist
         bid_cond = bid != get_fncallmem_bid();
       }
     }
