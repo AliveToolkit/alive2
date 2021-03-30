@@ -457,8 +457,11 @@ public:
         return error(i);
     }
 
-    // FIXME: size bits shouldn't be a constant
-    auto size = make_intconst(DL().getTypeAllocSize(i.getAllocatedType()), 64);
+    auto typesz = DL().getTypeAllocSize(i.getAllocatedType());
+    if (typesz.isScalable()) // TODO: scalable vectors not supported
+      return error(i);
+
+    auto size = make_intconst(typesz, 64);
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
                       pref_alignment(i, i.getAllocatedType()));
     allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
