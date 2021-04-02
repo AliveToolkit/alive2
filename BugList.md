@@ -55,6 +55,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 48. DSE incorrectly removes store in function that only triggers UB in one of the branches (https://llvm.org/PR48521)
 49. Incorrect swap of fptrunc with fast-math instructions (https://llvm.org/PR49080)
 50. Incorrect propagation of nsz from fneg to fdiv  (https://llvm.org/PR49654)
+51. Incorrect offset calculation when adding align to load from assume (https://reviews.llvm.org/D98759)
 
 
 ### Bugs found in Z3
