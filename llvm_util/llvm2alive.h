@@ -17,11 +17,6 @@ class TargetLibraryInfo;
 
 namespace llvm_util {
 
-// The maximum number of elements of an array initializer to explicitly store.
-// If longer, the initializer will simply be omitted.
-extern unsigned omit_array_size;
-
-
 struct initializer {
   initializer(std::ostream &os, const llvm::DataLayout &DL);
 };

@@ -7,7 +7,6 @@
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
-#include "util/config.h"
 #include "util/parallel.h"
 #include "util/stopwatch.h"
 #include "util/version.h"
@@ -19,9 +18,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -37,171 +34,31 @@ using namespace llvm_util;
 using namespace tools;
 using namespace util;
 using namespace std;
-namespace fs = std::filesystem;
+
+#define LLVM_ARGS_PREFIX "tv-"
+#define ARGS_SRC_TGT
+#define ARGS_REFINEMENT
+#include "llvm_util/cmd_args_list.h"
 
 namespace {
 
-llvm::cl::OptionCategory TVOptions("Alive translation verifier options");
+llvm::cl::opt<string> parallel_tv("tv-parallel",
+  llvm::cl::desc("Parallelization mode. Accepted values:"
+                  " unrestricted (no throttling)"
+                  ", fifo (use Alive2's job server)"
+                  ", null (developer mode)"),
+  llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<bool> opt_error_fatal("tv-exit-on-error",
-                                    llvm::cl::desc("Alive: exit on error"),
-                                    llvm::cl::cat(TVOptions),
-                                    llvm::cl::init(false));
+llvm::cl::opt<int> max_subprocesses("max-subprocesses",
+  llvm::cl::desc("Maximum children any single clang instance will have at one "
+                 "time (default=128)"),
+  llvm::cl::init(128), llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<unsigned>
-    opt_smt_to("tv-smt-to", llvm::cl::desc("Alive: timeout for SMT queries"),
-               llvm::cl::cat(TVOptions), llvm::cl::init(1000),
-               llvm::cl::value_desc("ms"));
+llvm::cl::opt<long> subprocess_timeout("tv-subprocess-timeout",
+  llvm::cl::desc("Maximum time, in seconds, that a parallel TV call "
+                 "will be allowed to execeute (default=infinite)"),
+  llvm::cl::init(-1), llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<unsigned> opt_smt_random_seed(
-    "tv-smt-random-seed",
-    llvm::cl::desc("Alive: Random seed for the SMT solver (default=0)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(0));
-
-llvm::cl::opt<unsigned> opt_max_mem("tv-max-mem",
-                                    llvm::cl::desc("Alive: max memory (aprox)"),
-                                    llvm::cl::cat(TVOptions),
-                                    llvm::cl::init(1024),
-                                    llvm::cl::value_desc("MB"));
-
-llvm::cl::opt<bool>
-    opt_se_verbose("tv-se-verbose",
-                   llvm::cl::desc("Alive: symbolic execution verbose mode"),
-                   llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> opt_smt_stats("tv-smt-stats",
-                                  llvm::cl::desc("Alive: show SMT statistics"),
-                                  llvm::cl::cat(TVOptions),
-                                  llvm::cl::init(false));
-
-llvm::cl::opt<bool>
-    opt_succinct("tv-succinct",
-                 llvm::cl::desc("Alive2: make the output succinct"),
-                 llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool>
-    opt_alias_stats("tv-alias-stats",
-                    llvm::cl::desc("Alive: show alias sets statistics"),
-                    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> opt_smt_skip("tv-smt-skip",
-                                 llvm::cl::desc("Alive: skip SMT queries"),
-                                 llvm::cl::cat(TVOptions),
-                                 llvm::cl::init(false));
-
-llvm::cl::opt<string>
-    opt_report_dir("tv-report-dir",
-                   llvm::cl::desc("Alive: save report to disk"),
-                   llvm::cl::cat(TVOptions), llvm::cl::value_desc("directory"));
-
-llvm::cl::opt<bool> opt_overwrite_reports(
-    "tv-overwrite-reports",
-    llvm::cl::desc("Alive: overwrite existing report files"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> opt_smt_verbose("tv-smt-verbose",
-                                    llvm::cl::desc("Alive: SMT verbose mode"),
-                                    llvm::cl::cat(TVOptions),
-                                    llvm::cl::init(false));
-
-llvm::cl::opt<bool>
-    opt_tactic_verbose("tv-tactic-verbose",
-                       llvm::cl::desc("Alive: SMT Tactic verbose mode"),
-                       llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool>
-    opt_smt_log("tv-smt-log",
-                llvm::cl::desc("Alive: log interactions with the SMT solver"),
-                llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<string>
-    opt_smt_bench_dir("tv-smt-bench",
-                      llvm::cl::desc("Alive: dump smtlib benchmarks"),
-                      llvm::cl::cat(TVOptions),
-                      llvm::cl::value_desc("directory"));
-
-llvm::cl::opt<bool> opt_print_dot(
-    "tv-dot",
-    llvm::cl::desc("Alive: print .dot files of each function"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> opt_disable_poison_input(
-    "tv-disable-poison-input",
-    llvm::cl::desc("Alive: Assume function input cannot be poison"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> opt_disable_undef_input(
-    "tv-disable-undef-input",
-    llvm::cl::desc("Alive: Assume function input cannot be undef"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::list<string>
-    opt_funcs("tv-func",
-              llvm::cl::desc("Name of functions to verify (without @)"),
-              llvm::cl::cat(TVOptions), llvm::cl::ZeroOrMore,
-              llvm::cl::value_desc("function name"));
-
-llvm::cl::opt<bool> opt_debug("tv-dbg",
-                              llvm::cl::desc("Alive: Show debug data"),
-                              llvm::cl::cat(TVOptions), llvm::cl::init(false),
-                              llvm::cl::Hidden);
-
-llvm::cl::opt<unsigned> opt_omit_array_size(
-    "tv-omit-array-size",
-    llvm::cl::desc("Omit an array initializer if it has elements more than "
-                   "this number"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(-1));
-
-llvm::cl::opt<bool> opt_elapsed_time(
-    "tv-elapsed-time",
-    llvm::cl::desc("Print the elapsed time"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<unsigned> opt_src_unrolling_factor(
-    "tv-src-unroll",
-    llvm::cl::desc("Unrolling factor for src function (default=0)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(0));
-
-llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(
-    "tv-tgt-unroll",
-    llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(0));
-
-llvm::cl::opt<size_t> opt_max_offset_in_bits(
-    "tv-max-offset-in-bits", llvm::cl::init(64), llvm::cl::cat(TVOptions),
-    llvm::cl::desc("Upper bound for the maximum pointer offset in bits.   Note "
-                   "that this may impact correctness, if values involved in "
-                   "offset computations exceed the maximum."));
-
-llvm::cl::opt<bool> parallel_tv_unrestricted(
-    "tv-parallel-unrestricted",
-    llvm::cl::desc("Distribute TV load across cores without any throttling; "
-                   "use this very carefully, if at all (default=false)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> parallel_tv_fifo(
-    "tv-parallel-fifo",
-    llvm::cl::desc("Distribute TV load across cores using Alive2's job "
-                   "server (please see README.md, default=false)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<bool> parallel_tv_null(
-    "tv-parallel-null",
-    llvm::cl::desc("Pretend to fork off child processes but don't really "
-                   "do it. For developer use only (default=false)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(false));
-
-llvm::cl::opt<int> max_subprocesses(
-    "tv-max-subprocesses",
-    llvm::cl::desc("Maximum children any single clang instance will have at one "
-                   "time (default=128)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(128));
-
-llvm::cl::opt<long> subprocess_timeout(
-    "tv-subprocess-timeout",
-    llvm::cl::desc("Maximum time, in seconds, that a parallel TV call "
-                   "will be allowed to execeute (default=infinite)"),
-    llvm::cl::cat(TVOptions), llvm::cl::init(-1));
 
 struct FnInfo {
   Function fn;
@@ -209,22 +66,15 @@ struct FnInfo {
   string fn_tostr;
 };
 
-ostream *out;
-ofstream out_file;
-string report_filename;
 optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
 TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
-unordered_map<string, float> fns_elapsed_time;
-set<string> fnsToVerify;
 unsigned initialized = 0;
 bool showed_stats = false;
-bool report_dir_created = false;
 bool has_failure = false;
 // If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
-fs::path opt_report_parallel_dir;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
 
@@ -232,19 +82,6 @@ void sigalarm_handler(int) {
   parallelMgr->finishChild(/*is_timeout=*/true);
   // this is a fully asynchronous exit, skip destructors and such
   _Exit(0);
-}
-
-string get_random_str() {
-  static default_random_engine re;
-  static uniform_int_distribution<unsigned> rand;
-  static bool seeded = false;
-
-  if (!seeded) {
-    random_device rd;
-    re.seed(rd());
-    seeded = true;
-  }
-  return to_string(rand(re));
 }
 
 struct TVLegacyPass final : public llvm::ModulePass {
@@ -266,13 +103,13 @@ struct TVLegacyPass final : public llvm::ModulePass {
       // This can happen at EntryExitInstrumenter pass.
       return false;
 
-    if (!fnsToVerify.empty() && !fnsToVerify.count(F.getName().str()))
+    if (!func_names.empty() && !func_names.count(F.getName().str()))
       return false;
 
     optional<ScopedWatch> timer;
     if (opt_elapsed_time)
       timer.emplace([&](const StopWatch &sw) {
-        fns_elapsed_time[F.getName().str()] += sw.seconds();
+        *out << "Took " << sw.seconds() << "s\n";
       });
 
     llvm::TargetLibraryInfo *TLI = nullptr;
@@ -294,7 +131,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
-    if (is_clangtv) {
+    if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
       stringstream ss;
       fn->print(ss);
@@ -370,7 +207,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.tgt = move(I->second.fn);
     t.preprocess();
     TransformVerify verifier(t, false);
-    if (!opt_succinct)
+    if (!opt_quiet)
       t.print(*out, print_opts);
 
     {
@@ -416,72 +253,19 @@ struct TVLegacyPass final : public llvm::ModulePass {
     if (initialized++)
       return;
 
-    fnsToVerify.insert(opt_funcs.begin(), opt_funcs.end());
+#define ARGS_MODULE_VAR (&module)
+#   include "llvm_util/cmd_args_def.h"
 
-    if (!report_dir_created && !opt_report_dir.empty()) {
-      try {
-        fs::create_directories(opt_report_dir.getValue());
-      } catch (...) {
-        cerr << "Alive2: Couldn't create report directory!" << endl;
-        exit(1);
-      }
-      auto &source_file = module.getSourceFileName();
-      fs::path fname = source_file.empty() ? "alive.txt" : source_file;
-      fname.replace_extension(".txt");
-      fs::path path = fs::path(opt_report_dir.getValue()) / fname.filename();
-
-      if (!opt_overwrite_reports) {
-        // NB there's a low-probability toctou race here
-        do {
-          auto newname = fname.stem();
-          newname += "_" + get_random_str() + ".txt";
-          path.replace_filename(newname);
-        } while (fs::exists(path));
-      }
-
-      out_file = ofstream(path);
-      out = &out_file;
-      if (!out_file.is_open()) {
-        cerr << "Alive2: Couldn't open report file!" << endl;
-        exit(1);
-      }
-
-      report_filename = path;
-      *out << "Source: " << source_file << endl;
-      report_dir_created = true;
-
-      if (opt_smt_log) {
-        fs::path path_z3log = path;
-        path_z3log.replace_extension("z3_log.txt");
-        smt::start_logging(path_z3log.c_str());
-      }
-    } else if (opt_report_dir.empty()) {
-      out = &cerr;
-      if (opt_smt_log) {
-        smt::start_logging();
-      }
-    }
-
-    auto &outstream = out_file.is_open() ? out_file : cerr;
-    if (parallel_tv_unrestricted) {
+    if (parallel_tv == "unrestricted") {
       parallelMgr = make_unique<unrestricted>(max_subprocesses, parent_ss,
-                                              outstream);
-    }
-    if (parallel_tv_fifo) {
-      if (parallelMgr) {
-        cerr << "Alive2: Please specify only one parallel manager" << endl;
-        exit(1);
-      }
-      parallelMgr = make_unique<fifo>(max_subprocesses, parent_ss,
-                                      outstream);
-    }
-    if (parallel_tv_null) {
-      if (parallelMgr) {
-        cerr << "Alive2: Please specify only one parallel manager" << endl;
-        exit(1);
-      }
-      parallelMgr = make_unique<null>(max_subprocesses, parent_ss,
-                                      outstream);
+                                              *out);
+    } else if (parallel_tv == "fifo") {
+      parallelMgr = make_unique<fifo>(max_subprocesses, parent_ss, *out);
+    } else if (parallel_tv == "null") {
+      parallelMgr = make_unique<null>(max_subprocesses, parent_ss, *out);
+    } else if (!parallel_tv.empty()) {
+      cerr << "Alive2: Unknown parallelization mode: " << parallel_tv << endl;
+      exit(1);
     }
 
     if (parallelMgr) {
@@ -489,30 +273,13 @@ struct TVLegacyPass final : public llvm::ModulePass {
         out = &parent_ss;
         set_outs(*out);
       } else {
-        cerr << "WARNING: Parallel execution of Alive2 Clang plugin is "
+        *out << "WARNING: Parallel execution of Alive2 Clang plugin is "
                 "unavailable, sorry\n";
         parallelMgr.reset();
       }
     }
 
     showed_stats = false;
-    smt::solver_print_queries(opt_smt_verbose);
-    smt::solver_tactic_verbose(opt_tactic_verbose);
-    smt::set_query_timeout(to_string(opt_smt_to));
-    smt::set_random_seed(to_string(opt_smt_random_seed));
-    smt::set_memory_limit(opt_max_mem * 1024 * 1024);
-    config::skip_smt = opt_smt_skip;
-    config::smt_benchmark_dir = opt_smt_bench_dir;
-
-    config::symexec_print_each_value = opt_se_verbose;
-    config::disable_undef_input = opt_disable_undef_input;
-    config::disable_poison_input = opt_disable_poison_input;
-    config::debug = opt_debug;
-    config::src_unroll_cnt = opt_src_unrolling_factor;
-    config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
-    config::max_offset_bits = opt_max_offset_in_bits;
-    llvm_util::omit_array_size = opt_omit_array_size;
-
     llvm_util_init.emplace(*out, module.getDataLayout());
     smt_init.emplace();
     return;
@@ -526,7 +293,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
   static void finalize() {
     if (parallelMgr) {
       parallelMgr->finishParent();
-      out = out_file.is_open() ? &out_file : &cerr;
+      out = out_file.is_open() ? &out_file : &cout;
       set_outs(*out);
     }
 
@@ -535,7 +302,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
       if (opt_smt_stats)
         smt::solver_print_stats(*out);
       if (opt_alias_stats)
-        IR::Memory::printAliasStats(cout);
+        IR::Memory::printAliasStats(*out);
       if (has_failure && !report_filename.empty())
         cerr << "Report written to " << report_filename << endl;
     }
@@ -544,21 +311,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
     smt_init.reset();
     --initialized;
 
-    if (opt_elapsed_time) {
-      *out << "\n----------------- ELAPSED TIME ------------------\n";
-      float total = 0;
-      for (auto &[name, t]: fns_elapsed_time) {
-        *out << "  " << name << ": " << t << " s\n";
-        total += t;
-      }
-      *out << "  <TOTAL>: " << total << " s\n";
-    }
-
     if (has_failure) {
       if (opt_error_fatal)
-        cerr << "Alive2: Transform doesn't verify; aborting!" << endl;
+        *out << "Alive2: Transform doesn't verify; aborting!" << endl;
       else
-        cerr << "Alive2: Transform doesn't verify!" << endl;
+        *out << "Alive2: Transform doesn't verify!" << endl;
 
       if (!is_clangtv)
         exit(1);

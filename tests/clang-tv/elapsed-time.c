@@ -1,7 +1,7 @@
-// TEST-ARGS: -mllvm -tv-elapsed-time
+// TEST-ARGS: -mllvm -tv-time-verify
 
 int f(int x) {
   return x + 1 - 1;
 }
 
-// CHECK: f: 
+// CHECK: Took 
