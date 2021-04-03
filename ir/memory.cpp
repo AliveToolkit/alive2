@@ -1718,9 +1718,13 @@ expr Memory::ptr2int(const expr &ptr) const {
 expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused());
   // TODO
+  // Approximation:
+  // int2ptr(0) => null
+  // else => non-null
   expr null = Pointer::mkNullPointer(*this).release();
   expr fn = expr::mkUF("int2ptr", { val }, null);
   state->doesApproximation("inttoptr", fn);
+  state->addPre(fn != null);
   return expr::mkIf(val == 0, null, fn);
 }
 
