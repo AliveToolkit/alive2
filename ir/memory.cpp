@@ -1711,21 +1711,21 @@ void Memory::fillPoison(const expr &bid) {
 }
 
 expr Memory::ptr2int(const expr &ptr) const {
-  assert(!memory_unused());
+  assert(!memory_unused() && observesAddresses());
   return Pointer(*this, ptr).getAddress();
 }
 
 expr Memory::int2ptr(const expr &val) const {
-  assert(!memory_unused());
-  // TODO
-  // Approximation:
-  // int2ptr(0) => null
-  // else => non-null
-  expr null = Pointer::mkNullPointer(*this).release();
-  expr fn = expr::mkUF("int2ptr", { val }, null);
-  state->doesApproximation("inttoptr", fn);
-  state->addPre(fn != null);
-  return expr::mkIf(val == 0, null, fn);
+  assert(!memory_unused() && observesAddresses());
+  // FIXME
+  // Note that this is an over-approximation, as it doesn't take escaped
+  // pointers into account. Plus it's non-determinisc over overlapping ptrs.
+  // We don't mark it as an approximation as Z3 always puts the int2ptr in the
+  // partial model in practice, plus LLVM's reasoning power around int2ptr
+  // is very limited.
+  expr fn = expr::mkUF("int2ptr", { val }, Pointer::mkNullPointer(*this)());
+  state->addPre(ptr2int(fn) == val);
+  return fn;
 }
 
 expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
