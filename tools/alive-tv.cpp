@@ -102,6 +102,7 @@ struct Results {
 
 Results verify(llvm::Function &F1, llvm::Function &F2,
                llvm::TargetLibraryInfoWrapperPass &TLI,
+               bool print_transform = false,
                bool always_verify = false) {
   auto fn1 = llvm2alive(F1, TLI.getTLI(F1));
   if (!fn1)
@@ -116,6 +117,9 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   Results r;
   r.t.src = move(*fn1);
   r.t.tgt = move(*fn2);
+
+  if (print_transform)
+    r.t.print(*out, TransformPrintOpts());
 
   if (!always_verify) {
     stringstream ss1, ss2;
@@ -156,9 +160,7 @@ unsigned num_errors = 0;
 
 bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       llvm::TargetLibraryInfoWrapperPass &TLI) {
-  TransformPrintOpts print_opts;
-
-  auto r = verify(F1, F2, TLI, opt_always_verify);
+  auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
   if (r.status == Results::ERROR) {
     *out << "ERROR: " << r.error;
     ++num_errors;
@@ -169,9 +171,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     r.t.src.writeDot("src");
     r.t.tgt.writeDot("tgt");
   }
-
-  if (!opt_quiet)
-    r.t.print(*out, print_opts);
 
   switch (r.status) {
   case Results::ERROR:
@@ -208,7 +207,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
 
   if (opt_bidirectional) {
-    r = verify(F2, F1, TLI, opt_always_verify);
+    r = verify(F2, F1, TLI, false, opt_always_verify);
     switch (r.status) {
     case Results::ERROR:
     case Results::TYPE_CHECKER_FAILED:
