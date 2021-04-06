@@ -87,7 +87,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   auto Func1 = llvm2alive(F1, TLI.getTLI(F1));
   if (!Func1) {
-    cerr << "ERROR: Could not translate '" << F1.getName().str()
+    *out << "ERROR: Could not translate '" << F1.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
     return true;
@@ -95,7 +95,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   auto Func2 = llvm2alive(F2, TLI.getTLI(F2), Func1->getGlobalVarNames());
   if (!Func2) {
-    cerr << "ERROR: Could not translate '" << F2.getName().str()
+    *out << "ERROR: Could not translate '" << F2.getName().str()
          << "' to Alive IR\n";
     ++errorCount;
     return true;
@@ -116,8 +116,8 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     t.tgt.print(ss2);
     if (ss1.str() == ss2.str()) {
       if (!opt_quiet)
-        t.print(cout, print_opts);
-      cout << "Transformation seems to be correct! (syntactically equal)\n\n";
+        t.print(*out, print_opts);
+      *out << "Transformation seems to be correct! (syntactically equal)\n\n";
       ++goodCount;
       return true;
     }
@@ -127,12 +127,12 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   t.preprocess();
   TransformVerify verifier(t, false);
   if (!opt_quiet)
-    t.print(cout, print_opts);
+    t.print(*out, print_opts);
 
   {
     auto types = verifier.getTypings();
     if (!types) {
-      cerr << "Transformation doesn't verify!\n"
+      *out << "Transformation doesn't verify!\n"
               "ERROR: program doesn't type check!\n\n";
       ++errorCount;
       return false;
@@ -144,17 +144,17 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   bool result(errs);
   if (result) {
     if (errs.isUnsound()) {
-      cout << "Transformation doesn't verify!\n";
+      *out << "Transformation doesn't verify!\n";
       if (!opt_quiet)
-        cout << errs << endl;
+        *out << errs << endl;
       ++badCount;
       return false;
     } else {
-      cerr << errs << endl;
+      *out << errs << endl;
       ++errorCount;
     }
   } else {
-    cout << "Transformation seems to be correct!\n\n";
+    *out << "Transformation seems to be correct!\n\n";
     ++goodCount;
   }
 
@@ -164,15 +164,15 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     t2.src = move(t.tgt);
     t2.tgt = move(t.src);
     TransformVerify verifier2(t2, false);
-    t2.print(cout, print_opts);
+    t2.print(*out, print_opts);
 
     if (Errors errs2 = verifier2.verify()) {
-      cout << "Reverse transformation doesn't verify!\n" << errs2 << endl;
+      *out << "Reverse transformation doesn't verify!\n" << errs2 << endl;
       return false;
     } else {
-      cout << "Reverse transformation seems to be correct!\n\n";
+      *out << "Reverse transformation seems to be correct!\n\n";
       if (!result)
-        cout << "These functions are equivalent.\n\n";
+        *out << "These functions are equivalent.\n\n";
     }
   }
   return true;
@@ -260,7 +260,7 @@ convenient way to demonstrate an existing optimizer bug.
   llvm::Triple targetTriple(M1.get()->getTargetTriple());
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-  llvm_util::initializer llvm_util_init(cerr, DL);
+  llvm_util::initializer llvm_util_init(*out, DL);
   smt_init.emplace();
 
   unsigned goodCount = 0, badCount = 0, errorCount = 0;
@@ -279,13 +279,13 @@ convenient way to demonstrate an existing optimizer bug.
   } else {
     M2 = openInputFile(Context, opt_file2);
     if (!M2.get()) {
-      cerr << "Could not read bitcode from '" << opt_file2 << "'\n";
+      *out << "Could not read bitcode from '" << opt_file2 << "'\n";
       return -1;
     }
   }
 
   if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple()) {
-    cerr << "Modules have different target triples\n";
+    *out << "Modules have different target triples\n";
     return -1;
   }
 
@@ -306,19 +306,19 @@ convenient way to demonstrate an existing optimizer bug.
     }
   }
 
-  cout << "Summary:\n"
+  *out << "Summary:\n"
           "  " << goodCount << " correct transformations\n"
           "  " << badCount << " incorrect transformations\n"
           "  " << errorCount << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
-    smt::solver_print_stats(cout);
+    smt::solver_print_stats(*out);
 
   smt_init.reset();
 
   if (opt_alias_stats)
-    IR::Memory::printAliasStats(cout);
+    IR::Memory::printAliasStats(*out);
 
   return errorCount > 0;
 }
