@@ -24,6 +24,7 @@ using namespace smt;
 using namespace tools;
 using namespace util;
 using namespace std;
+using util::config::dbg;
 
 
 static bool is_arbitrary(const expr &e) {
@@ -207,13 +208,11 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
 
 
 static void instantiate_undef(const Input *in, map<expr, expr> &instances,
-                              map<expr, expr> &instances2, const Type &ty,
-                              unsigned child) {
+                              const Type &ty, unsigned child) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
       if (!agg->isPadding(i))
-        instantiate_undef(in, instances, instances2, agg->getChild(i),
-                          child + i);
+        instantiate_undef(in, instances, agg->getChild(i), child + i);
     }
     return;
   }
@@ -229,6 +228,7 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
   // TODO: add support for per-bit input undef
   assert(var.bits() == 1);
 
+  map<expr, expr> instances2;
   expr nums[2] = { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
 
   for (auto I = instances.begin(); I != instances.end();
@@ -289,11 +289,10 @@ static expr preprocess(const Transform &t, const set<expr> &qvars0,
 
   // manually instantiate undef masks
   map<expr, expr> instances({ { move(e), true } });
-  map<expr, expr> instances2;
 
   for (auto &i : t.src.getInputs()) {
     if (auto in = dynamic_cast<const Input*>(&i))
-      instantiate_undef(in, instances, instances2, i.getType(), 0);
+      instantiate_undef(in, instances, i.getType(), 0);
   }
 
   expr insts(false);
@@ -960,7 +959,11 @@ TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
 }
 
 pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
-  StopWatch symexec_watch;
+  ScopedWatch symexec_watch([](auto &w) {
+    if (w.seconds() > 5)
+      dbg() << "WARNING: slow vcgen! Took " << w << '\n';
+  });
+
   t.tgt.syncDataWithSrc(t.src);
   calculateAndInitConstants(t);
   State::resetGlobals();
@@ -972,10 +975,6 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
   sym_exec(*tgt_state);
   src_state->mkAxioms(*tgt_state);
 
-  symexec_watch.stop();
-  if (symexec_watch.seconds() > 5) {
-    cerr << "WARNING: slow vcgen! Took " << symexec_watch << '\n';
-  }
   return { move(src_state), move(tgt_state) };
 }
 
