@@ -73,3 +73,5 @@ if (!opt_outputfile.empty()) {
     exit(-1);
   }
 }
+
+util::config::set_debug(*out);

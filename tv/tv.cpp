@@ -264,7 +264,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     } else if (parallel_tv == "null") {
       parallelMgr = make_unique<null>(max_subprocesses, parent_ss, *out);
     } else if (!parallel_tv.empty()) {
-      cerr << "Alive2: Unknown parallelization mode: " << parallel_tv << endl;
+      *out << "Alive2: Unknown parallelization mode: " << parallel_tv << endl;
       exit(1);
     }
 

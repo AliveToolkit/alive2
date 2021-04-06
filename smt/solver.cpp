@@ -19,6 +19,7 @@
 using namespace smt;
 using namespace util;
 using namespace std;
+using util::config::dbg;
 
 static bool tactic_verbose = false;
 
@@ -115,7 +116,7 @@ public:
     string last_result;
 
     for (auto &t : tactics) {
-      cout << "\nApplying " << t.name << endl;
+      dbg() << "\nApplying " << t.name << endl;
 
       Tactic to(Z3_tactic_try_for(ctx(), t.t, 5000));
       Tactic skip(Z3_tactic_skip(ctx()));
@@ -135,10 +136,10 @@ public:
 
       string new_r = Z3_goal_to_string(ctx(), goal);
       if (new_r != last_result) {
-        cout << new_r << '\n';
+        dbg() << new_r << '\n';
         last_result = move(new_r);
       } else {
-        cout << "(no change)\n";
+        dbg() << "(no change)\n";
       }
     }
   }
@@ -304,7 +305,7 @@ Result Solver::check() const {
                                                nullptr, 0, nullptr, fml());
       ofstream file(get_random_filename(config::smt_benchmark_dir, "smt2"));
       if (!file.is_open()) {
-        cerr << "Alive2: Couldn't open smtlib benchmark file!" << endl;
+        dbg() << "Alive2: Couldn't open smtlib benchmark file!" << endl;
         exit(1);
       }
       file << str;
@@ -318,7 +319,7 @@ Result Solver::check() const {
 
   ++num_queries;
   if (print_queries)
-    cout << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s) << endl;
+    dbg() << "\nSMT query:\n" << Z3_solver_to_string(ctx(), s) << endl;
 
   tactic->check();
 

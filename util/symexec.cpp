@@ -9,6 +9,7 @@
 
 using namespace IR;
 using namespace std;
+using util::config::dbg;
 
 namespace util {
 
@@ -54,17 +55,17 @@ void sym_exec(State &s) {
       auto &name = i.getName();
 
       if (config::symexec_print_each_value && name[0] == '%')
-        cout << name << " = " << val << '\n';
+        dbg() << name << " = " << val << '\n';
     }
 
     first = false;
   }
 
   if (config::symexec_print_each_value) {
-    cout << "domain = " << s.functionDomain()
-         << "\nreturn domain = " << s.returnDomain()
-         << "\nreturn = " << s.returnVal().first
-         << s.returnMemory() << "\n\n";
+    dbg() << "domain = " << s.functionDomain()
+          << "\nreturn domain = " << s.returnDomain()
+          << "\nreturn = " << s.returnVal().first
+          << s.returnMemory() << "\n\n";
   }
 }
 
