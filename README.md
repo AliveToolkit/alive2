@@ -65,11 +65,11 @@ cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=R
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -load-pass-plugin $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
 On a Mac:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -load-pass-plugin $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
