@@ -79,100 +79,158 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
 
 optional<smt::smt_initializer> smt_init;
 
-bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
-                      llvm::TargetLibraryInfoWrapperPass &TLI,
-                      unsigned &goodCount, unsigned &badCount,
-                      unsigned &errorCount) {
-  TransformPrintOpts print_opts;
-
-  auto Func1 = llvm2alive(F1, TLI.getTLI(F1));
-  if (!Func1) {
-    *out << "ERROR: Could not translate '" << F1.getName().str()
-         << "' to Alive IR\n";
-    ++errorCount;
-    return true;
-  }
-
-  auto Func2 = llvm2alive(F2, TLI.getTLI(F2), Func1->getGlobalVarNames());
-  if (!Func2) {
-    *out << "ERROR: Could not translate '" << F2.getName().str()
-         << "' to Alive IR\n";
-    ++errorCount;
-    return true;
-  }
-
-  if (opt_print_dot) {
-    Func1->writeDot("src");
-    Func2->writeDot("tgt");
-  }
-
+struct Results {
   Transform t;
-  t.src = move(*Func1);
-  t.tgt = move(*Func2);
+  string error;
+  Errors errs;
+  enum {
+    ERROR,
+    TYPE_CHECKER_FAILED,
+    SYNTACTIC_EQ,
+    CORRECT,
+    UNSOUND,
+    FAILED_TO_PROVE
+  } status;
 
-  if (!opt_always_verify) {
+  static Results Error(string &&err) {
+    Results r;
+    r.status = ERROR;
+    r.error = move(err);
+    return r;
+  }
+};
+
+Results verify(llvm::Function &F1, llvm::Function &F2,
+               llvm::TargetLibraryInfoWrapperPass &TLI,
+               bool always_verify = false) {
+  auto fn1 = llvm2alive(F1, TLI.getTLI(F1));
+  if (!fn1)
+    return Results::Error("Could not translate '" + F1.getName().str() +
+                          "' to Alive IR\n");
+
+  auto fn2 = llvm2alive(F2, TLI.getTLI(F2), fn1->getGlobalVarNames());
+  if (!fn2)
+    return Results::Error("Could not translate '" + F2.getName().str() +
+                          "' to Alive IR\n");
+
+  Results r;
+  r.t.src = move(*fn1);
+  r.t.tgt = move(*fn2);
+
+  if (!always_verify) {
     stringstream ss1, ss2;
-    t.src.print(ss1);
-    t.tgt.print(ss2);
+    r.t.src.print(ss1);
+    r.t.tgt.print(ss2);
     if (ss1.str() == ss2.str()) {
-      if (!opt_quiet)
-        t.print(*out, print_opts);
-      *out << "Transformation seems to be correct! (syntactically equal)\n\n";
-      ++goodCount;
-      return true;
+      r.status = Results::SYNTACTIC_EQ;
+      return r;
     }
   }
 
   smt_init->reset();
-  t.preprocess();
-  TransformVerify verifier(t, false);
-  if (!opt_quiet)
-    t.print(*out, print_opts);
+  r.t.preprocess();
+  TransformVerify verifier(r.t, false);
 
   {
     auto types = verifier.getTypings();
     if (!types) {
-      *out << "Transformation doesn't verify!\n"
-              "ERROR: program doesn't type check!\n\n";
-      ++errorCount;
-      return false;
+      r.status = Results::TYPE_CHECKER_FAILED;
+      return r;
     }
     assert(types.hasSingleTyping());
   }
 
-  Errors errs = verifier.verify();
-  bool result(errs);
-  if (result) {
-    if (errs.isUnsound()) {
-      *out << "Transformation doesn't verify!\n";
-      if (!opt_quiet)
-        *out << errs << endl;
-      ++badCount;
-      return false;
-    } else {
-      *out << errs << endl;
-      ++errorCount;
-    }
+  r.errs = verifier.verify();
+  if (r.errs) {
+    r.status = r.errs.isUnsound() ? Results::UNSOUND : Results::FAILED_TO_PROVE;
   } else {
+    r.status = Results::CORRECT;
+  }
+  return r;
+}
+
+unsigned num_correct = 0;
+unsigned num_unsound = 0;
+unsigned num_failed = 0;
+unsigned num_errors = 0;
+
+bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
+                      llvm::TargetLibraryInfoWrapperPass &TLI) {
+  TransformPrintOpts print_opts;
+
+  auto r = verify(F1, F2, TLI, opt_always_verify);
+  if (r.status == Results::ERROR) {
+    *out << "ERROR: " << r.error;
+    ++num_errors;
+    return true;
+  }
+
+  if (opt_print_dot) {
+    r.t.src.writeDot("src");
+    r.t.tgt.writeDot("tgt");
+  }
+
+  if (!opt_quiet)
+    r.t.print(*out, print_opts);
+
+  switch (r.status) {
+  case Results::ERROR:
+    UNREACHABLE();
+    break;
+
+  case Results::SYNTACTIC_EQ:
+    *out << "Transformation seems to be correct! (syntactically equal)\n\n";
+    ++num_correct;
+    break;
+
+  case Results::CORRECT:
     *out << "Transformation seems to be correct!\n\n";
-    ++goodCount;
+    ++num_correct;
+    break;
+
+  case Results::TYPE_CHECKER_FAILED:
+    *out << "Transformation doesn't verify!\n"
+            "ERROR: program doesn't type check!\n\n";
+    ++num_errors;
+    return true;
+
+  case Results::UNSOUND:
+    *out << "Transformation doesn't verify!\n\n";
+    if (!opt_quiet)
+      *out << r.errs << endl;
+    ++num_unsound;
+    return false;
+
+  case Results::FAILED_TO_PROVE:
+    *out << r.errs << endl;
+    ++num_failed;
+    return true;
   }
 
   if (opt_bidirectional) {
-    smt_init->reset();
-    Transform t2;
-    t2.src = move(t.tgt);
-    t2.tgt = move(t.src);
-    TransformVerify verifier2(t2, false);
-    t2.print(*out, print_opts);
+    r = verify(F2, F1, TLI, opt_always_verify);
+    switch (r.status) {
+    case Results::ERROR:
+    case Results::TYPE_CHECKER_FAILED:
+      UNREACHABLE();
+      break;
 
-    if (Errors errs2 = verifier2.verify()) {
-      *out << "Reverse transformation doesn't verify!\n" << errs2 << endl;
+    case Results::SYNTACTIC_EQ:
+    case Results::CORRECT:
+      *out << "These functions seem to be equivalent!\n\n";
+      return true;
+
+    case Results::FAILED_TO_PROVE:
+      *out << "Failed to verify the reverse transformation\n\n";
+      if (!opt_quiet)
+        *out << r.errs << endl;
+      return true;
+
+    case Results::UNSOUND:
+      *out << "Reverse transformation doesn't verify!\n\n";
+      if (!opt_quiet)
+        *out << r.errs << endl;
       return false;
-    } else {
-      *out << "Reverse transformation seems to be correct!\n\n";
-      if (!result)
-        *out << "These functions are equivalent.\n\n";
     }
   }
   return true;
@@ -263,14 +321,12 @@ convenient way to demonstrate an existing optimizer bug.
   llvm_util::initializer llvm_util_init(*out, DL);
   smt_init.emplace();
 
-  unsigned goodCount = 0, badCount = 0, errorCount = 0;
-
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
     auto SRC = findFunction(*M1, opt_src_fn);
     auto TGT = findFunction(*M1, opt_tgt_fn);
     if (SRC && TGT) {
-      compareFunctions(*SRC, *TGT, TLI, goodCount, badCount, errorCount);
+      compareFunctions(*SRC, *TGT, TLI);
       goto end;
     } else {
       M2 = CloneModule(*M1);
@@ -299,7 +355,7 @@ convenient way to demonstrate an existing optimizer bug.
     for (auto &F2 : *M2.get()) {
       if (F2.isDeclaration() || F1.getName() != F2.getName())
         continue;
-      if (!compareFunctions(F1, F2, TLI, goodCount, badCount, errorCount))
+      if (!compareFunctions(F1, F2, TLI))
         if (opt_error_fatal)
           goto end;
       break;
@@ -307,9 +363,10 @@ convenient way to demonstrate an existing optimizer bug.
   }
 
   *out << "Summary:\n"
-          "  " << goodCount << " correct transformations\n"
-          "  " << badCount << " incorrect transformations\n"
-          "  " << errorCount << " Alive2 errors\n";
+          "  " << num_correct << " correct transformations\n"
+          "  " << num_unsound << " incorrect transformations\n"
+          "  " << num_failed  << " failed-to-prove transformations\n"
+          "  " << num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
@@ -320,5 +377,5 @@ end:
   if (opt_alias_stats)
     IR::Memory::printAliasStats(*out);
 
-  return errorCount > 0;
+  return num_errors > 0;
 }
