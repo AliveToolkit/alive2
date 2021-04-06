@@ -1250,7 +1250,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
         return c == c2;
 
       // (= (ite c t e) x) -> (ite c (= t x) (= e x))
-      if ((rhs.isConst() && (!t.isVar() || !e.isVar())) ||
+      if ((rhs.isConst() && (t.isConst() || e.isConst())) ||
           (t.isConst() && e.isConst() && !rhs.isVar()))
         return mkIf(c, t == rhs, e == rhs);
     }
