@@ -162,11 +162,20 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     return false;
   };
 
+  // pointer undef vars show up like (concat 0 undef)
+  auto is_undef_or_concat = [&](const expr &e) {
+    if (isUndef(e))
+      return true;
+
+    expr a, b;
+    return e.isConcat(a, b) && a.isZero() && isUndef(b);
+  };
+
   auto is_if_undef = [&](const expr &e, expr &var, expr &not_undef) {
     expr undef;
     // (ite (= #b0 isundef_%var) %var undef)
     return e.isIf(not_undef, var, undef) &&
-           isUndef(undef) &&
+           is_undef_or_concat(undef) &&
            is_undef_cond(not_undef, var);
   };
 
@@ -325,7 +334,9 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   // fixed to a const value
   vector<pair<expr,expr>> repls;
   for (auto &undef : undef_vars) {
-    repls.emplace_back(undef, expr::some(undef));
+    expr newv = expr::mkFreshVar("#undef'", undef);
+    addQuantVar(newv);
+    repls.emplace_back(undef, move(newv));
   }
   addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
   return e;
