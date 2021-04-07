@@ -7,6 +7,18 @@
 
 using namespace std;
 
+#if defined(__clang__) && __clang_major__ < 13 && defined(__apple_build_version__)
+namespace {
+bool has_single_bit(uint64_t n) {
+  return n != 0 && (n & (n - 1)) == 0;
+}
+
+unsigned bit_width(uint64_t n) {
+  return 64 - countl_zero(n);
+}
+}
+#endif
+
 namespace util {
 
 unsigned ilog2(uint64_t n) {
@@ -28,7 +40,7 @@ bool is_power2(uint64_t n, uint64_t *log) {
 }
 
 unsigned num_sign_bits(uint64_t n) {
-  return max(countl_zero(n), countl_one(n));
+  return max(countl_zero(n), countl_one(n)) -1;
 }
 
 uint64_t add_saturate(uint64_t a, uint64_t b) {
