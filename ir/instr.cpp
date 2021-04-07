@@ -10,6 +10,7 @@
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include <functional>
+#include <numeric>
 #include <sstream>
 
 using namespace smt;

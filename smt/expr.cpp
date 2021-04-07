@@ -5,6 +5,7 @@
 #include "smt/ctx.h"
 #include "util/compiler.h"
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <climits>
 #include <limits>
@@ -516,7 +517,7 @@ unsigned expr::min_leading_zeros() const {
   if (isConcat(a, b)) {
     return a.min_leading_zeros();
   } else if (isUInt(n)) {
-    return num_leading_zeros(n) - (64 - bits());
+    return countl_zero(n) - (64 - bits());
   }
   return 0;
 }
@@ -1094,8 +1095,8 @@ expr expr::operator&(const expr &rhs) const {
     if (!a.isUInt(n) || n == 0 || n == numeric_limits<uint64_t>::max())
       return expr();
 
-    auto lead  = num_leading_zeros(n);
-    auto trail = num_trailing_zeros(n);
+    auto lead  = countl_zero(n);
+    auto trail = countr_zero(n);
 
     if (!is_power2((n >> trail) + 1))
       return expr();

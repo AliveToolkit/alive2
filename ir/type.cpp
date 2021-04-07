@@ -8,6 +8,7 @@
 #include "util/compiler.h"
 #include <array>
 #include <cassert>
+#include <numeric>
 #include <sstream>
 
 using namespace smt;
