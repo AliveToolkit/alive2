@@ -495,7 +495,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
 
   assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { move(v),
-           sv.non_poison.isBool() ? true : expr::mkUInt(0, sv.non_poison) };
+           sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
 }
 
 const State::ValTy& State::at(const Value &val) const {

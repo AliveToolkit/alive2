@@ -1334,7 +1334,7 @@ StateValue ConversionOp::toSMT(State &s) const {
 
   // turn poison data into boolean
   if (op == BitCast)
-    v.non_poison = v.non_poison == 0;
+    v.non_poison = v.non_poison == expr::mkInt(-1, v.non_poison);
 
   return scalar(move(v), getType());
 }
@@ -2403,7 +2403,6 @@ check_ret_attributes(State &s, StateValue &sv, const Type &t,
 }
 
 StateValue Return::toSMT(State &s) const {
-  // Encode nocapture semantics.
   StateValue retval;
 
   auto &attrs = s.getFn().getFnAttrs();

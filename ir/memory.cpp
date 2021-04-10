@@ -184,8 +184,8 @@ Byte::Byte(const Memory &m, const StateValue &ptr, unsigned i) : m(m) {
   if (byte_has_ptr_bit())
     p = expr::mkUInt(1, 1);
   p = concat_if(p,
-                expr::mkIf(ptr.non_poison, expr::mkUInt(0, 1),
-                           expr::mkUInt(1, 1)))
+                expr::mkIf(ptr.non_poison, expr::mkUInt(1, 1),
+                           expr::mkUInt(0, 1)))
       .concat(ptr.value);
   if (bits_ptr_byte_offset())
     p = p.concat(expr::mkUInt(i, bits_ptr_byte_offset()));
@@ -206,8 +206,9 @@ Byte::Byte(const Memory &m, const StateValue &v) : m(m) {
   if (byte_has_ptr_bit())
     p = expr::mkUInt(0, 1);
   expr np = v.non_poison.isBool()
-              ? expr::mkIf(v.non_poison, expr::mkUInt(0, bits_poison_per_byte),
-                           expr::mkUInt(1, bits_poison_per_byte))
+              ? expr::mkIf(v.non_poison,
+                           expr::mkInt(-1, bits_poison_per_byte),
+                           expr::mkUInt(0, bits_poison_per_byte))
               : v.non_poison;
   p = concat_if(p, np.concat(v.value).concat_zeros(padding_nonptr_byte()));
   assert(!p.isValid() || p.bits() == bitsByte());
@@ -230,7 +231,7 @@ expr Byte::ptrNonpoison() const {
   if (!does_ptr_mem_access)
     return true;
   auto bit = p.bits() - 1 - byte_has_ptr_bit();
-  return p.extract(bit, bit) == 0;
+  return p.extract(bit, bit) == 1;
 }
 
 Pointer Byte::ptr() const {
@@ -269,14 +270,13 @@ expr Byte::nonptrValue() const {
   return p.extract(start + bits_byte - 1, start);
 }
 
-expr Byte::isPoison(bool fullbit) const {
+expr Byte::isPoison() const {
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
-    assert(!np.isValid() || ptrNonpoison().eq(np == 0));
-    return np == 1;
+    assert(!np.isValid() || ptrNonpoison().eq(np == 1));
+    return np == 0;
   }
-  return expr::mkIf(isPtr(), !ptrNonpoison(),
-                              fullbit ? np == -1ull : np != 0);
+  return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
 }
 
 expr Byte::isZero() const {
@@ -295,7 +295,7 @@ expr Byte::refined(const Byte &other) const {
 
   expr int_cnstr;
   if (bits_poison_per_byte == bits_byte) {
-    int_cnstr = (np2 | np1) == np1 && (v1 | np1) == (v2 | np1);
+    int_cnstr = (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
   }
   else if (bits_poison_per_byte > 1) {
     assert((bits_byte % bits_poison_per_byte) == 0);
@@ -307,10 +307,11 @@ expr Byte::refined(const Byte &other) const {
       expr enp1 = np1.extract(i, i);
       expr enp2 = np2.extract(i, i);
       int_cnstr
-        &= enp1 == 1 || ((enp1.eq(enp2) ? true : enp2 == 0) && ev1 == ev2);
+        &= enp1 == 0 || ((enp1.eq(enp2) ? true : enp2 == 1) && ev1 == ev2);
     }
   } else {
-    int_cnstr = np1 == 1 || ((np1.eq(np2) ? true : np2 == 0) && v1 == v2);
+    assert(!np1.isValid() || np1.bits() == 1);
+    int_cnstr = np1 == 0 || ((np1.eq(np2) ? true : np2 == 1) && v1 == v2);
   }
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
@@ -454,7 +455,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
         expr::mkIf(is_ptr,
                    b.ptrByteoffset() == i && ptr_value == loaded_ptr,
                    b.nonptrValue() == 0);
-      non_poison &= !b.isPoison(false);
+      non_poison &= !b.isPoison();
     }
 
     // if bits of loaded ptr are a subset of the non-ptr value,

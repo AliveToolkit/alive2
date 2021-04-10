@@ -61,7 +61,7 @@ public:
   smt::expr ptrByteoffset() const;
   smt::expr nonptrNonpoison() const;
   smt::expr nonptrValue() const;
-  smt::expr isPoison(bool fullbit = true) const;
+  smt::expr isPoison() const;
   smt::expr isZero() const; // zero or null
 
   smt::expr&& operator()() && { return std::move(p); }

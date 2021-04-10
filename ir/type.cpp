@@ -215,10 +215,9 @@ expr Type::toBV(expr e) const {
 }
 
 StateValue Type::toBV(StateValue v) const {
-  expr val = toBV(move(v.value));
   auto bw = np_bits();
-  return { move(val),
-           expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
+  return { toBV(move(v.value)),
+           expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
 
 expr Type::fromBV(expr e) const {
@@ -226,7 +225,8 @@ expr Type::fromBV(expr e) const {
 }
 
 StateValue Type::fromBV(StateValue v) const {
-  return { fromBV(move(v.value)), v.non_poison == 0 };
+  return { fromBV(move(v.value)),
+           v.non_poison == expr::mkInt(-1, v.non_poison) };
 }
 
 expr Type::toInt(State &s, expr v) const {
@@ -234,10 +234,9 @@ expr Type::toInt(State &s, expr v) const {
 }
 
 StateValue Type::toInt(State &s, StateValue v) const {
-  expr val = toInt(s, move(v.value));
   auto bw = np_bits();
-  return { move(val),
-           expr::mkIf(v.non_poison, expr::mkUInt(0, bw), expr::mkInt(-1, bw)) };
+  return { toInt(s, move(v.value)),
+           expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
 
 expr Type::fromInt(expr e) const {
@@ -246,12 +245,14 @@ expr Type::fromInt(expr e) const {
 
 StateValue Type::fromInt(StateValue v) const {
   return { fromInt(move(v.value)),
-           v.non_poison.isBool() ? expr(v.non_poison) : v.non_poison == 0 };
+           v.non_poison.isBool()
+             ? expr(v.non_poison)
+             : v.non_poison == expr::mkInt(-1, v.non_poison) };
 }
 
 expr Type::combine_poison(const expr &boolean, const expr &orig) const {
   return
-    expr::mkIf(boolean, expr::mkInt(0, orig), expr::mkInt(-1, orig)) | orig;
+    expr::mkIf(boolean, expr::mkInt(-1, orig), expr::mkInt(0, orig)) & orig;
 }
 
 pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
@@ -738,7 +739,7 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
   assert(vals.size() + numPaddingsConst() == elements);
   // structs can be empty
   if (elements == 0)
-    return { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
+    return { expr::mkUInt(0, 1), expr::mkUInt(0, 1) };
 
   StateValue v;
   bool first = true;
