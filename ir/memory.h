@@ -158,7 +158,6 @@ class Memory {
   static bool observesAddresses();
   static int isInitialMemBlock(const smt::expr &e, bool match_any_init = false);
 
-  unsigned numLocals() const;
   unsigned numNonlocals() const;
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
@@ -226,6 +225,8 @@ public:
 
   static void resetGlobals();
   void syncWithSrc(const Memory &src);
+
+  unsigned numLocals() const;
 
   void markByVal(unsigned bid);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);

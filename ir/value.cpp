@@ -48,6 +48,10 @@ StateValue UndefValue::toSMT(State &s) const {
   auto val = getType().getDummyValue(true);
   expr var = expr::mkFreshVar("undef", val.value);
   s.addUndefVar(expr(var));
+  if (getType().isPtrType() && s.getMemory().numLocals() == 0) {
+    expr one = expr::mkUInt(1, var);
+    var = var & ((one << expr::mkUInt(var.bits() - 1, var)) - one);
+  }
   return { move(var), move(val.non_poison) };
 }
 
