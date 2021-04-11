@@ -255,6 +255,13 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
     expr::mkIf(boolean, expr::mkInt(-1, orig), expr::mkInt(0, orig)) & orig;
 }
 
+StateValue Type::mkUndef(State &s) const {
+  auto val = getDummyValue(true);
+  expr var = expr::mkFreshVar("undef", val.value);
+  s.addUndefVar(expr(var));
+  return { move(var), move(val.non_poison) };
+}
+
 pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   auto var = expr::mkFreshVar("undef", mkInput(s, "", attrs));
   return { var, var };
@@ -664,6 +671,10 @@ PtrType::refines(const State &src_s, const State &tgt_s, const StateValue &src,
            (src.non_poison && tgt.non_poison).implies(p.refined(q)) };
 }
 
+StateValue PtrType::mkUndef(State &s) const {
+  return { Pointer::mkUndef(s), true };
+}
+
 expr PtrType::mkInput(State &s, const char *name,
                       const ParamAttrs &attrs) const {
   return s.getMemory().mkInput(name, attrs);
@@ -938,6 +949,15 @@ AggregateType::refines(const State &src_s, const State &tgt_s,
     value.insert(move(v));
   }
   return { expr::mk_and(poison), expr::mk_and(value) };
+}
+
+StateValue AggregateType::mkUndef(State &s) const {
+  vector<StateValue> vals;
+  for (unsigned i = 0; i < elements; ++i) {
+    if (!isPadding(i))
+      vals.emplace_back(children[i]->mkUndef(s));
+  }
+  return aggregateVals(vals);
 }
 
 expr AggregateType::mkInput(State &s, const char *name,
@@ -1365,6 +1385,10 @@ pair<expr, expr>
 SymbolicType::refines(const State &src_s, const State &tgt_s,
                       const StateValue &src, const StateValue &tgt) const {
   DISPATCH(refines(src_s, tgt_s, src, tgt), UNREACHABLE());
+}
+
+StateValue SymbolicType::mkUndef(State &st) const {
+  DISPATCH(mkUndef(st), UNREACHABLE());
 }
 
 expr SymbolicType::mkInput(State &st, const char *name,

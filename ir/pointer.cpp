@@ -103,6 +103,25 @@ expr Pointer::mkLongBid(const expr &short_bid, bool local) {
   return expr::mkUInt(local, 1).concat(short_bid);
 }
 
+expr Pointer::mkUndef(State &s) {
+  auto &m = s.getMemory();
+  bool force_local = false, force_nonlocal = false;
+  if (has_local_bit()) {
+    force_nonlocal = m.numLocals() == 0;
+    force_local    = !force_nonlocal && m.numNonlocals() == 0;
+  }
+
+  unsigned var_bits = bits_for_bid + bits_for_offset
+                        - (force_local | force_nonlocal);
+  expr var = expr::mkFreshVar("undef", expr::mkUInt(0, var_bits));
+  s.addUndefVar(expr(var));
+
+  if (force_local || force_nonlocal)
+    var = mkLongBid(var, force_local);
+
+  return var.concat_zeros(bits_for_ptrattrs);
+}
+
 unsigned Pointer::totalBits() {
   return bits_for_ptrattrs + bits_for_bid + bits_for_offset;
 }

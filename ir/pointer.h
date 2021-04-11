@@ -47,6 +47,7 @@ public:
           const ParamAttrs &attr = {});
 
   static smt::expr mkLongBid(const smt::expr &short_bid, bool local);
+  static smt::expr mkUndef(State &s);
 
   static unsigned totalBits();
   static unsigned bitsShortBid();

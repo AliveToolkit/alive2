@@ -110,6 +110,7 @@ public:
     refines(const State &src_s, const State &tgt_s, const StateValue &src,
             const StateValue &tgt) const = 0;
 
+  virtual StateValue mkUndef(State &s) const;
   virtual smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const = 0;
   virtual std::pair<smt::expr, smt::expr>
@@ -245,6 +246,7 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(const State &src_s, const State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  StateValue mkUndef(State &s) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
   std::pair<smt::expr, smt::expr>
@@ -302,6 +304,7 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(const State &src_s, const State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  StateValue mkUndef(State &s) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
   unsigned numPointerElements() const;
@@ -409,9 +412,9 @@ public:
   std::pair<smt::expr, smt::expr>
     refines(const State &src_s, const State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
+  StateValue mkUndef(State &s) const override;
   smt::expr
-    mkInput(State &s, const char *name, const ParamAttrs &attrs)
-    const override;
+    mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
   std::pair<smt::expr, smt::expr>
     mkUndefInput(State &s, const ParamAttrs &attrs) const override;
   void printVal(std::ostream &os, const State &s,
