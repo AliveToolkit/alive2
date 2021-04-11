@@ -95,8 +95,11 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
   : Pointer(m, bid, offset, attr_to_bitvec(attr)) {}
 
 expr Pointer::mkLongBid(const expr &short_bid, bool local) {
-  if (!has_local_bit())
+  assert((local  && (num_locals_src || num_locals_tgt)) ||
+         (!local && num_nonlocals));
+  if (!has_local_bit()) {
     return short_bid;
+  }
   return expr::mkUInt(local, 1).concat(short_bid);
 }
 

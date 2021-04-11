@@ -1346,7 +1346,7 @@ static expr disjoint_local_blocks(const Memory &m, const expr &addr,
   // Disjointness of block's address range with other local blocks
   auto zero = expr::mkUInt(0, bits_for_offset);
   for (auto &[sbid, addr0] : blk_addr) {
-    Pointer p2(m, Pointer::mkLongBid(sbid, false), zero);
+    Pointer p2(m, Pointer::mkLongBid(sbid, true), zero);
     disj &= p2.isBlockAlive()
               .implies(disjoint(addr, sz, p2.getAddress(), p2.blockSize()));
   }
