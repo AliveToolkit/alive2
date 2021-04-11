@@ -1395,6 +1395,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
 
   assert(align != 0);
   auto align_bits = ilog2(align);
+  bool is_null = !is_local && has_null_block && bid == 0;
 
   if (is_local) {
     if (observesAddresses()) {
@@ -1421,9 +1422,8 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   } else {
     state->addAxiom(p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));
-    if (!has_null_block || bid != 0) {
+    if (!is_null)
       state->addAxiom(p.getAllocType() == alloc_ty);
-    }
 
     if (align_bits && observesAddresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
@@ -1433,7 +1433,8 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     (void)nonconst;
   }
 
-  store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
+  if (!is_null)
+    store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
   (is_local ? local_blk_size : non_local_blk_size)
     .add(short_bid, size_zext.trunc(bits_size_t - 1));
   (is_local ? local_blk_align : non_local_blk_align)
