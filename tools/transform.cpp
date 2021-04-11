@@ -827,6 +827,9 @@ static void calculateAndInitConstants(Transform &t) {
           auto &t = bc->getType();
           has_vector_bitcast |= t.isVectorType();
           min_access_size = gcd(min_access_size, getCommonAccessSize(t));
+
+        } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
+          has_ptr2int |= ic->isPtrCmp();
         }
       }
     }

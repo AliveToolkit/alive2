@@ -24,3 +24,6 @@ f:
 
 
 declare i8* @g(i8*)
+
+; If %a = %b + n, this is wrong.
+; ERROR: Source is more defined than target
