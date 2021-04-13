@@ -1634,7 +1634,7 @@ expr expr::store(const expr &idx, const expr &val) const {
   C(idx, val);
   expr array, str_idx, str_val;
   if (isStore(array, str_idx, str_val)) {
-    if ((idx == str_idx).simplify().isTrue())
+    if ((idx == str_idx).isTrue())
       return array.store(idx, val);
 
   } else if (isConstArray(str_val)) {
@@ -1650,7 +1650,7 @@ expr expr::load(const expr &idx) const {
   // TODO: add support for alias analysis plugin
   expr array, str_idx, val;
   if (isStore(array, str_idx, val)) { // store(array, idx, val)
-    expr cmp = (idx == str_idx).simplify();
+    expr cmp = idx == str_idx;
     if (cmp.isTrue())
       return val;
     if (cmp.isFalse())
