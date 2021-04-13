@@ -141,6 +141,7 @@ public:
   bool isAnd(expr &a, expr &b) const;
   bool isNot(expr &neg) const;
   bool isAdd(expr &a, expr &b) const;
+  bool isURem(expr &a, expr &b) const;
   bool isBasePlusOffset(expr &base, uint64_t &offset) const;
   bool isConstArray(expr &val) const;
   bool isStore(expr &array, expr &idx, expr &val) const;

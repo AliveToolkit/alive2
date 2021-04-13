@@ -451,6 +451,10 @@ bool expr::isAdd(expr &a, expr &b) const {
   return isBinOp(a, b, Z3_OP_BADD);
 }
 
+bool expr::isURem(expr &a, expr &b) const {
+  return isBinOp(a, b, Z3_OP_BUREM);
+}
+
 bool expr::isBasePlusOffset(expr &base, uint64_t &offset) const {
   expr a, b;
   if (isAdd(a, b)) {
@@ -1258,6 +1262,13 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
     else if (rhs.isAppOf(Z3_OP_ITE)) {
       return rhs == *this;
     }
+  }
+
+  // (a u% b) == c -> false if c u>= b
+  {
+    expr a, b;
+    if (isURem(a, b) && rhs.uge(b).isTrue())
+      return false;
   }
 
 end:
