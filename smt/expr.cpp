@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/expr.h"
+#include "smt/exprs.h"
 #include "smt/ctx.h"
 #include "util/compiler.h"
 #include <algorithm>
@@ -1215,33 +1216,55 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
   if (auto app = isAppOf(Z3_OP_CONCAT)) {
     unsigned num_args = Z3_get_app_num_args(ctx(), app);
     if (rhs.isConst()) {
-      set<expr> eqs;
+      AndExpr eqs;
       unsigned high = bits();
       for (unsigned i = 0; i < num_args; ++i) {
         expr arg = Z3_get_app_arg(ctx(), app, i);
         unsigned low = high - arg.bits();
-        eqs.emplace(arg == rhs.extract(high - 1, low));
+        eqs.add(arg == rhs.extract(high - 1, low));
         high = low;
       }
-      return mk_and(eqs);
+      return eqs();
     }
 
     if (auto app_rhs = rhs.isAppOf(Z3_OP_CONCAT);
         app_rhs != nullptr &&
         num_args == Z3_get_app_num_args(ctx(), app_rhs)) {
-      set<expr> eqs;
-      bool ok = true;
+      AndExpr eqs;
+      bool all_aligned = true;
+      unsigned l_idx = 0, r_idx = 0;
       for (unsigned i = 0; i < num_args; ++i) {
         expr lhs = Z3_get_app_arg(ctx(), app, i);
         expr rhs = Z3_get_app_arg(ctx(), app_rhs, i);
-        if (lhs.bits() != rhs.bits()) {
-          ok = false;
-          break;
+        unsigned l_bits = lhs.bits();
+        unsigned r_bits = rhs.bits();
+        all_aligned &= l_bits == r_bits;
+
+        if (l_idx == r_idx && l_bits == r_bits) {
+          eqs.add(lhs == rhs);
         }
-        eqs.emplace(lhs == rhs);
+        // even if the concats aren't aligned, we still compare the constant
+        // bits in an attempt to prove the comparison false
+        else if (lhs.isConst() && rhs.isConst()) {
+          // r .. l .. r+sz
+          if (l_idx >= r_idx && l_idx < (r_idx + r_bits)) {
+            unsigned overlap = min(r_bits - (l_idx - r_idx), l_bits);
+            eqs.add(lhs.extract(l_bits-1, l_bits - overlap) ==
+                    rhs.extract(overlap-1, 0));
+          }
+          else if (r_idx >= l_idx && r_idx < (l_idx + l_bits)) {
+            unsigned overlap = min(l_bits - (r_idx - l_idx), r_bits);
+            eqs.add(lhs.extract(overlap-1, 0) ==
+                    rhs.extract(r_bits-1, r_bits - overlap));
+          }
+        }
+        l_idx += l_bits;
+        r_idx += r_bits;
       }
-      if (ok)
-        return mk_and(eqs);
+      assert(l_idx == r_idx);
+
+      if (all_aligned || !eqs)
+        return eqs();
     }
   }
 
