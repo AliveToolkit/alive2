@@ -659,6 +659,7 @@ expr State::FnCallInput::refinedBy(
     return false;
 
   AndExpr refines;
+  assert(args_nonptr.size() == args_nonptr2.size());
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
     refines.add(args_nonptr[i].non_poison.implies(
       args_nonptr[i].value == args_nonptr2[i].value &&
@@ -669,6 +670,7 @@ expr State::FnCallInput::refinedBy(
     return false;
 
   set<expr> undef_vars;
+  assert(args_ptr.size() == args_ptr2.size());
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
     // TODO: needs to take read/read2 as input to control if mem blocks
     // need to be compared

@@ -1700,12 +1700,11 @@ void FnCall::print(ostream &os) const {
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag, StateValue value,
                           StateValue value2, vector<StateValue> &inputs,
-                          vector<Memory::PtrInput> &ptr_inputs,
-                          bool has_two_vals) {
+                          vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
-                    agg->extract(value2, i), inputs, ptr_inputs, has_two_vals);
+                    agg->extract(value2, i), inputs, ptr_inputs);
     }
     return;
   }
@@ -1724,8 +1723,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     }
   };
   unpack(move(value));
-  if (has_two_vals)
-    unpack(move(value2));
+  unpack(move(value2));
 }
 
 static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
@@ -1787,11 +1785,10 @@ StateValue FnCall::toSMT(State &s) const {
     // we duplicate each argument so that undef values are allowed to take
     // different values so we can catch the bug in f(freeze(undef)) -> f(undef)
     StateValue sv, sv2;
-    bool has_two_vals = true;
     if (flags.poisonImpliesUB()) {
       sv = s.getAndAddPoisonUB(*arg, flags.undefImpliesUB());
       if (flags.undefImpliesUB())
-        has_two_vals = false;
+        sv2 = sv;
       else
         sv2 = s.getAndAddPoisonUB(*arg, false);
     } else {
@@ -1800,7 +1797,7 @@ StateValue FnCall::toSMT(State &s) const {
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, move(sv), move(sv2), inputs,
-                  ptr_inputs, has_two_vals);
+                  ptr_inputs);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
