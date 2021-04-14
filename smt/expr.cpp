@@ -1189,6 +1189,8 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
       return false;
     return rhs == *this;
   }
+  // constants on rhs from now.
+
   if (rhs.isTrue())
     return *this;
   if (rhs.isFalse())
@@ -1202,7 +1204,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
       return lhs_b == rhs_b;
   }
 
-  // (= (+ a c1) (+ a  c2)) -> false
+  // (= (+ a c1) (+ a c2)) -> false
   {
     expr lhs_base, rhs_base;
     uint64_t lhs_offset, rhs_offset;
@@ -1215,6 +1217,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
 
   if (auto app = isAppOf(Z3_OP_CONCAT)) {
     unsigned num_args = Z3_get_app_num_args(ctx(), app);
+    // (concat x y) == const -> x == const[..] /\ y == const[..]
     if (rhs.isConst()) {
       AndExpr eqs;
       unsigned high = bits();
@@ -1227,6 +1230,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
       return eqs();
     }
 
+    // (concat ..) == (concat ..)
     if (auto app_rhs = rhs.isAppOf(Z3_OP_CONCAT);
         app_rhs != nullptr &&
         num_args == Z3_get_app_num_args(ctx(), app_rhs)) {
@@ -1284,6 +1288,18 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
     }
     else if (rhs.isAppOf(Z3_OP_ITE)) {
       return rhs == *this;
+    }
+  }
+
+  {
+    expr a, b;
+    if (isAdd(a, b)) {
+      // Pre: a >= 0, b >= 0, rhs u< b
+      // a + b == rhs -> false
+      if (a.isNegative().isFalse() &&
+          b.isNegative().isFalse() &&
+          (rhs.ult(a).isTrue() || rhs.ult(b).isTrue()))
+        return false;
     }
   }
 
