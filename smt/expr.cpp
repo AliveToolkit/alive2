@@ -1708,26 +1708,6 @@ expr expr::load(const expr &idx) const {
 
   } else if (isConstArray(val)) {
     return val;
-
-  } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
-             Z3_is_lambda(ctx(), ast())) {
-    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
-    expr body = Z3_get_quantifier_body(ctx(), ast());
-    if (body.isConst())
-      return body;
-
-    auto subst = [&](const expr &e) {
-      if (e.isLoad(array, str_idx)) {
-        return array.load(str_idx.subst({ idx }));
-      }
-      return e.subst({ idx });
-    };
-
-    expr cond, then, els;
-    if (body.isIf(cond, then, els)) {
-      cond = cond.subst({ idx }).simplify();
-      return mkIf_fold(cond, subst(then), subst(els));
-    }
   }
 
   return Z3_mk_select(ctx(), ast(), idx());
