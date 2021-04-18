@@ -1708,6 +1708,12 @@ expr expr::load(const expr &idx) const {
 
   } else if (isConstArray(val)) {
     return val;
+
+  } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
+             Z3_is_lambda(ctx(), ast())) {
+    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
+    expr body = Z3_get_quantifier_body(ctx(), ast());
+    return body.subst({ idx });
   }
 
   return Z3_mk_select(ctx(), ast(), idx());
