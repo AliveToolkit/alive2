@@ -2717,9 +2717,6 @@ void Malloc::print(ostream &os) const {
 }
 
 StateValue Malloc::toSMT(State &s) const {
-  if (ptr && s.getFn().getFnAttrs().has(FnAttrs::NoFree))
-    s.addUB(expr(false));
-
   auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddPoisonUB(*size, true);
 
@@ -2743,7 +2740,11 @@ StateValue Malloc::toSMT(State &s) const {
     s.addUB(np_ptr);
     check_can_store(s, p);
 
-    m.copy(Pointer(m, p), Pointer(m, p_new));
+    Pointer ptr_old(m, p);
+    if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
+      s.addUB(ptr_old.isNull() || ptr_old.isLocal());
+
+    m.copy(ptr_old, Pointer(m, p_new));
 
     // 1) realloc(ptr, 0) always free the ptr.
     // 2) If allocation failed, we should not free previous ptr.
@@ -2889,8 +2890,10 @@ StateValue Free::toSMT(State &s) const {
   // If not heaponly, don't encode constraints
   s.getMemory().free(p, !heaponly);
 
-  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly)
-    s.addUB(expr(false));
+  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly) {
+    Pointer ptr(s.getMemory(), p);
+    s.addUB(ptr.isNull() || ptr.isLocal());
+  }
 
   return {};
 }

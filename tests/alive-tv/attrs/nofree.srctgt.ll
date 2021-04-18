@@ -14,7 +14,5 @@ define void @tgt(i1 %c) nofree {
   ret void
 }
 
-; ERROR: Source is more defined than target
-
 declare void @free(i8*)
 declare i8* @malloc(i64)
