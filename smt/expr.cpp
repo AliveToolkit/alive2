@@ -60,6 +60,19 @@ static expr simplify_const(expr &&e, const expr &input,
   return move(e);
 }
 
+static bool is_power2(const expr &e, unsigned &log) {
+  if (e.isZero() || !(e & (e - expr::mkUInt(1, e))).isZero())
+    return false;
+
+  for (unsigned i = 0, bits = e.bits(); i < bits; ++i) {
+    if (e.extract(i, i).isAllOnes()) {
+      log = i;
+      return true;
+    }
+  }
+  UNREACHABLE();
+}
+
 
 namespace smt {
 
@@ -619,9 +632,11 @@ expr expr::operator-(const expr &rhs) const {
 }
 
 expr expr::operator*(const expr &rhs) const {
-  uint64_t n, power;
-  if (rhs.isUInt(n) && is_power2(n, &power))
-    return *this << expr::mkUInt(power, rhs.sort());
+  unsigned power;
+  if (rhs.isConst() && is_power2(rhs, power))
+    return *this << expr::mkUInt(power, sort());
+  if (isConst() && is_power2(*this, power))
+    return rhs << expr::mkUInt(power, sort());
   return binopc(Z3_mk_bvmul, operator*, Z3_OP_BMUL, isOne, isZero);
 }
 
@@ -1319,13 +1334,14 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
           (rhs.ult(a).isTrue() || rhs.ult(b).isTrue()))
         return false;
     }
-  }
 
-  // (a u% b) == c -> false if c u>= b
-  {
-    expr a, b;
+    // (a u% b) == c -> false if c u>= b
     if (isURem(a, b) && rhs.uge(b).isTrue())
       return false;
+
+    // (sext a) == (sext b) -> a == b
+    if (isSignExt(a) && rhs.isSignExt(b))
+      return a == b;
   }
 
 end:
@@ -1501,6 +1517,10 @@ expr expr::sext(unsigned amount) const {
   if (amount == 0)
     return *this;
 
+  expr e;
+  if (isSignExt(e))
+    return e.sext((bits() - e.bits()) + amount);
+
   if (isNegative().isFalse())
     return zext(amount);
 
@@ -1604,6 +1624,17 @@ expr expr::extract(unsigned high, unsigned low) const {
         return then;
       if (then.isConst() && els.isConst())
         return mkIf(cond, then, els);
+    }
+  }
+  {
+    // extract (or a b 111 c) -> 111
+    if (auto app = isAppOf(Z3_OP_BOR)) {
+      unsigned num_args = Z3_get_app_num_args(ctx(), app);
+      for (unsigned i = 0; i < num_args; ++i) {
+        expr arg = expr(Z3_get_app_arg(ctx(), app, i)).extract(high, low);
+        if (arg.isAllOnes())
+          return arg;
+      }
     }
   }
   return simplify_const(Z3_mk_extract(ctx(), high, low, ast()), *this);
