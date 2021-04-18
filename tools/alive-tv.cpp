@@ -118,14 +118,13 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   r.t.src = move(*fn1);
   r.t.tgt = move(*fn2);
 
-  if (print_transform)
-    r.t.print(*out, TransformPrintOpts());
-
   if (!always_verify) {
     stringstream ss1, ss2;
     r.t.src.print(ss1);
     r.t.tgt.print(ss2);
     if (ss1.str() == ss2.str()) {
+      if (print_transform)
+        r.t.print(*out, {});
       r.status = Results::SYNTACTIC_EQ;
       return r;
     }
@@ -134,6 +133,9 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   smt_init->reset();
   r.t.preprocess();
   TransformVerify verifier(r.t, false);
+
+  if (print_transform)
+    r.t.print(*out, {});
 
   {
     auto types = verifier.getTypings();

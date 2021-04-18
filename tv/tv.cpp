@@ -62,8 +62,8 @@ llvm::cl::opt<long> subprocess_timeout("tv-subprocess-timeout",
 
 struct FnInfo {
   Function fn;
-  unsigned order;
   string fn_tostr;
+  unsigned n = 0;
 };
 
 optional<smt::smt_initializer> smt_init;
@@ -131,32 +131,37 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
+    Transform t;
+    t.src = move(I->second.fn);
+    t.tgt = move(*fn);
+
+    if (opt_print_dot) {
+      string prefix = to_string(I->second.n++);
+      t.tgt.writeDot(prefix.c_str());
+    }
+
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
       stringstream ss;
-      fn->print(ss);
+      t.tgt.print(ss);
 
       string str2 = ss.str();
       // Optimization: since string comparison can be expensive for big
       // functions, skip it if skip_verify is true.
-      // verifier.verify() will never happen if skip_verify is true, so
-      // there is nothing to prune early.
-      if (!skip_verify && I->second.fn_tostr == str2)
+      if (!skip_verify && !first && I->second.fn_tostr == str2) {
+        if (!opt_quiet)
+          t.print(*out, print_opts);
+        *out << "Transformation seems to be correct! (syntactically equal)\n\n";
         return false;
+      }
 
       I->second.fn_tostr = move(str2);
     }
 
-    auto old_fn = move(I->second.fn);
-    I->second.fn = move(*fn);
-
-    if (opt_print_dot) {
-      string prefix = to_string(I->second.order);
-      I->second.fn.writeDot(prefix.c_str());
-    }
-
-    if (first || skip_verify)
+    if (first || skip_verify) {
+      I->second.fn = move(t.tgt);
       return false;
+    }
 
     if (parallelMgr) {
       out_file.flush();
@@ -202,9 +207,6 @@ struct TVLegacyPass final : public llvm::ModulePass {
      */
 
     smt_init->reset();
-    Transform t;
-    t.src = move(old_fn);
-    t.tgt = move(I->second.fn);
     t.preprocess();
     TransformVerify verifier(t, false);
     if (!opt_quiet)
