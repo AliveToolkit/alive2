@@ -1585,12 +1585,15 @@ expr expr::concat_zeros(unsigned bits) const {
   return bits ? concat(expr::mkUInt(0, bits)) : *this;
 }
 
-expr expr::extract(unsigned high, unsigned low) const {
+expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
   C();
   assert(high >= low && high < bits());
 
   if (low == 0 && high == bits()-1)
     return *this;
+
+  if (--depth == 0)
+    goto end;
 
   {
     expr sub;
@@ -1633,16 +1636,40 @@ expr expr::extract(unsigned high, unsigned low) const {
     }
   }
   {
-    // extract (or a b 111 c) -> 111
-    if (auto app = isAppOf(Z3_OP_BOR)) {
-      unsigned num_args = Z3_get_app_num_args(ctx(), app);
-      for (unsigned i = 0; i < num_args; ++i) {
-        expr arg = expr(Z3_get_app_arg(ctx(), app, i)).extract(high, low);
-        if (arg.isAllOnes())
-          return arg;
+    auto simpl_bitwise = [&](int type, bool (expr::*absorvent)() const) {
+      if (auto app = isAppOf(type)) {
+        expr extracted;
+        bool first = true;
+        unsigned num_args = Z3_get_app_num_args(ctx(), app);
+
+        for (unsigned i = 0; i < num_args; ++i) {
+          expr arg
+            = expr(Z3_get_app_arg(ctx(), app, i)).extract(high, low, depth);
+
+          // extract (op a b absorvent) -> absorvent
+          if ((arg.*absorvent)())
+            return arg;
+
+          if (first)
+            extracted = move(arg);
+          else if (!arg.eq(extracted))
+            extracted = expr();
+          first = false;
+        }
+
+        // extract (op a b) -> (op (extract a) (extract b)) -> (extract a)
+        // if (extract a) = (extract b)
+        if (extracted.isValid())
+          return extracted;
       }
-    }
+      return expr();
+    };
+    if (auto ret = simpl_bitwise(Z3_OP_BAND, &expr::isZero); ret.isValid())
+      return ret;
+    if (auto ret = simpl_bitwise(Z3_OP_BOR, &expr::isAllOnes); ret.isValid())
+      return ret;
   }
+end:
   return simplify_const(Z3_mk_extract(ctx(), high, low, ast()), *this);
 }
 

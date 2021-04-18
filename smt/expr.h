@@ -281,7 +281,7 @@ public:
 
   expr concat(const expr &rhs) const;
   expr concat_zeros(unsigned bits) const;
-  expr extract(unsigned high, unsigned low) const;
+  expr extract(unsigned high, unsigned low, unsigned depth = 3) const;
 
   expr toBVBool() const;
   expr float2BV() const;
