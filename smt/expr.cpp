@@ -1339,9 +1339,15 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
     if (isURem(a, b) && rhs.uge(b).isTrue())
       return false;
 
-    // (sext a) == (sext b) -> a == b
-    if (isSignExt(a) && rhs.isSignExt(b))
-      return a == b;
+    if (isSignExt(a)) {
+      // (sext a) == (sext b) -> a == b
+      if (rhs.isSignExt(b))
+        return a == b;
+
+      // (sext a) == 0 -> a == 0
+      if (b.isZero())
+        return a == mkUInt(0, a);
+    }
   }
 
 end:
