@@ -1341,7 +1341,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
 
     if (isSignExt(a)) {
       // (sext a) == (sext b) -> a == b
-      if (rhs.isSignExt(b))
+      if (rhs.isSignExt(b) && a.bits() == b.bits())
         return a == b;
 
       // (sext a) == 0 -> a == 0
