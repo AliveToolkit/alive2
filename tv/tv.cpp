@@ -152,6 +152,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
         if (!opt_quiet)
           t.print(*out, print_opts);
         *out << "Transformation seems to be correct! (syntactically equal)\n\n";
+        I->second.fn = move(t.tgt);
         return false;
       }
 
