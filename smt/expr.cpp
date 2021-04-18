@@ -15,11 +15,13 @@
 #include <z3.h>
 
 #define DEBUG_Z3_RC 0
+#define WARN_MISSING_FOLDS 0
 
-#if DEBUG_Z3_RC
+#if DEBUG_Z3_RC || WARN_MISSING_FOLDS
 # include <iostream>
 #endif
 
+using namespace smt;
 using namespace std;
 using namespace util;
 
@@ -40,6 +42,22 @@ static Z3_sort mkBVSort(unsigned bits) {
 
 static Z3_ast mkVar(const char *name, Z3_sort sort) {
   return Z3_mk_const(smt::ctx(), Z3_mk_string_symbol(smt::ctx(), name), sort);
+}
+
+static expr simplify_const(expr &&e) { return e.simplifyNoTimeout(); }
+
+template <typename... Exprs>
+static expr simplify_const(expr &&e, const expr &input,
+                           const Exprs &... inputs) {
+  if (input.isConst())
+    return simplify_const(std::move(e), inputs...);
+
+#if WARN_MISSING_FOLDS
+  if (!e.isConst() && e.simplify().isConst()) {
+    cout << "\n[WARN] missing fold: " << e << "\n->\n" << e.simplify() << '\n';
+  }
+#endif
+  return move(e);
 }
 
 

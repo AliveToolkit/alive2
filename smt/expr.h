@@ -48,15 +48,6 @@ class expr {
   expr binop_fold(const expr &rhs,
                   Z3_ast(*op)(Z3_context, Z3_ast, Z3_ast)) const;
 
-  template <typename... Exprs>
-  static expr simplify_const(expr &&e, const expr &input,
-                             const Exprs &... inputs) {
-    if (input.isConst())
-      return simplify_const(std::move(e), inputs...);
-    return std::move(e);
-  }
-  static expr simplify_const(expr &&e) { return e.simplifyNoTimeout(); }
-
   bool alwaysFalse() const { return false; }
 
   static Z3_ast mkTrue();
