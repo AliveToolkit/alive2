@@ -695,10 +695,12 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
                       unsigned bytes, unsigned align, bool write) const {
   if (local && bid0 >= next_local_bid)
     return false;
-  if (!local &&
-      ((!write && (always_noread(bid0) || bid0 >= numNonlocals())) ||
-        (write &&  always_nowrite(bid0))))
-    return false;
+
+  if (!local) {
+    if (bid0 >= numNonlocals())         return false;
+    if (!write && always_noread(bid0))  return false;
+    if ( write && always_nowrite(bid0)) return false;
+  }
 
   int64_t offset = 0;
   bool const_offset = offset0.isInt(offset);
@@ -717,11 +719,9 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   }
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    uint64_t blk_size;
-    if (sz->isUInt(blk_size)) {
-      if ((uint64_t)offset >= blk_size || bytes > (blk_size - offset))
-        return false;
-    }
+    expr offset = offset0.sextOrTrunc(bits_size_t - 1);
+    if (offset.uge(*sz).isTrue() || (*sz - offset).ult(bytes).isTrue())
+      return false;
   } else if (local) // allocated in another branch
     return false;
 
