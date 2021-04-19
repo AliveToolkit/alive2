@@ -1592,7 +1592,7 @@ expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
   if (low == 0 && high == bits()-1)
     return *this;
 
-  if (--depth == 0)
+  if (depth-- == 0)
     goto end;
 
   {
@@ -1627,8 +1627,8 @@ expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
   {
     expr cond, then, els;
     if (isIf(cond, then, els)) {
-      then = then.extract(high, low);
-      els = els.extract(high, low);
+      then = then.extract(high, low, depth);
+      els = els.extract(high, low, depth);
       if (then.eq(els))
         return then;
       if (then.isConst() && els.isConst())
