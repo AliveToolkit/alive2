@@ -84,6 +84,19 @@ void sigalarm_handler(int) {
   _Exit(0);
 }
 
+static void printDot(const Function &tgt, int n) {
+  if (opt_print_dot) {
+    string prefix = to_string(n);
+    tgt.writeDot(prefix.c_str());
+  }
+}
+
+static string toString(const Function &fn) {
+  stringstream ss;
+  fn.print(ss);
+  return ss.str();
+}
+
 struct TVLegacyPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
@@ -131,37 +144,45 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
+    if (first || skip_verify) {
+      I->second.fn = move(*fn);
+      if (!opt_always_verify)
+        // Prepare syntactic check
+        I->second.fn_tostr = toString(I->second.fn);
+      printDot(I->second.fn, I->second.n++);
+      return false;
+    }
+
     Transform t;
     t.src = move(I->second.fn);
     t.tgt = move(*fn);
 
-    if (opt_print_dot) {
-      string prefix = to_string(I->second.n++);
-      t.tgt.writeDot(prefix.c_str());
-    }
+    bool regenerate_tgt = verify(t, I->second);
+
+    if (regenerate_tgt)
+      I->second.fn = *llvm2alive(F, *TLI);
+    else
+      I->second.fn = move(t.tgt);
+
+    I->second.fn_tostr = toString(I->second.fn);
+    I->second.n++;
+
+    return false;
+  }
+
+  // If it returns true, the caller should regenerate tgt using llvm2alive().
+  // If it returns false, the caller can simply move t.tgt to info.fn
+  static bool verify(Transform &t, const FnInfo &info) {
+    printDot(t.tgt, info.n);
 
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
-      stringstream ss;
-      t.tgt.print(ss);
-
-      string str2 = ss.str();
-      // Optimization: since string comparison can be expensive for big
-      // functions, skip it if skip_verify is true.
-      if (!skip_verify && !first && I->second.fn_tostr == str2) {
+      if (info.fn_tostr == toString(t.tgt)) {
         if (!opt_quiet)
           t.print(*out, print_opts);
         *out << "Transformation seems to be correct! (syntactically equal)\n\n";
-        I->second.fn = move(t.tgt);
         return false;
       }
-
-      I->second.fn_tostr = move(str2);
-    }
-
-    if (first || skip_verify) {
-      I->second.fn = move(t.tgt);
-      return false;
     }
 
     if (parallelMgr) {
@@ -180,12 +201,12 @@ struct TVLegacyPass final : public llvm::ModulePass {
          */
         *out << "include(" << index << ")\n";
         /*
+         * Tell the caller that tgt should be regenerated via llvm2alive.
          * TODO: this llvm2alive() call isn't needed for correctness,
          * but only to make parallel output match sequential
          * output. we can remove it later if we want.
          */
-        I->second.fn = *llvm2alive(F, *TLI);
-        return false;
+        return true;
       }
 
       if (subprocess_timeout != -1) {
@@ -227,14 +248,14 @@ struct TVLegacyPass final : public llvm::ModulePass {
       *out << "Transformation doesn't verify!\n" << errs << endl;
       has_failure |= errs.isUnsound();
       if (opt_error_fatal && has_failure)
-        doFinalization(*F.getParent());
+        finalize();
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
 
     // Regenerate tgt because preprocessing may have changed it
     if (!parallelMgr)
-      I->second.fn = *llvm2alive(F, *TLI);
+      return true;
 
   done:
     if (parallelMgr) {
