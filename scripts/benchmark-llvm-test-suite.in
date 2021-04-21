@@ -25,7 +25,7 @@ export ALIVECC_SUBPROCESS_TIMEOUT=600
 export ALIVECC_SMT_TO=30000
 export ALIVECC_DISABLE_UNDEF_INPUT=1
 export ALIVECC_REPORT_DIR=$WORK/report
-export ALIVECC_SUCCINCT=1
+export ALIVECC_QUIET=1
 export ALIVECC_MAX_MEM=1000000 # we'll just let ulimit take care of this
 
 cd $WORK
