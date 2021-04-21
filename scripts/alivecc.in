@@ -32,8 +32,8 @@ if ($0 =~ /alivecc$/) {
 
 if (compiling()) {
 
-    if (getenv("ALIVECC_SUCCINCT")) {
-        push @ARGV, ("-mllvm", "-tv-succinct");
+    if (getenv("ALIVECC_QUIET")) {
+        push @ARGV, ("-mllvm", "-tv-quiet");
     }
 
     if (getenv("ALIVECC_PARALLEL_UNRESTRICTED")) {
