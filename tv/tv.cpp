@@ -170,7 +170,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
       I->second.fn_tostr = toString(I->second.fn);
     } else {
       I->second.fn = move(t.tgt);
-      I->second.fn_tostr = move(tgt_tostr);
+      // updating I->second.fn_tostr isn't necessary because two functions are
+      // equal or some error occurred.
     }
 
     I->second.n++;
