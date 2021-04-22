@@ -157,14 +157,22 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.src = move(I->second.fn);
     t.tgt = move(*fn);
 
-    bool regenerate_tgt = verify(t, I->second);
+    std::string src_tostr = move(I->second.fn_tostr);
+    std::string tgt_tostr;
+    if (!opt_always_verify)
+      // Prepare syntactic check
+      tgt_tostr = toString(t.tgt);
 
-    if (regenerate_tgt)
+    bool regenerate_tgt = verify(t, I->second.n, src_tostr, tgt_tostr);
+
+    if (regenerate_tgt) {
       I->second.fn = *llvm2alive(F, *TLI);
-    else
+      I->second.fn_tostr = toString(I->second.fn);
+    } else {
       I->second.fn = move(t.tgt);
+      I->second.fn_tostr = move(tgt_tostr);
+    }
 
-    I->second.fn_tostr = toString(I->second.fn);
     I->second.n++;
 
     return false;
@@ -172,12 +180,13 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   // If it returns true, the caller should regenerate tgt using llvm2alive().
   // If it returns false, the caller can simply move t.tgt to info.fn
-  static bool verify(Transform &t, const FnInfo &info) {
-    printDot(t.tgt, info.n);
+  static bool verify(Transform &t, int n, const string &src_tostr,
+                     const string &tgt_tostr) {
+    printDot(t.tgt, n);
 
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
-      if (info.fn_tostr == toString(t.tgt)) {
+      if (src_tostr == tgt_tostr) {
         if (!opt_quiet)
           t.print(*out, print_opts);
         *out << "Transformation seems to be correct! (syntactically equal)\n\n";
