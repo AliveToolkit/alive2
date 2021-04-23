@@ -239,6 +239,7 @@ private:
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
 
+  bool isPtrCmp() const;
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;

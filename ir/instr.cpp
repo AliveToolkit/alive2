@@ -9,6 +9,7 @@
 #include "smt/exprs.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <functional>
 #include <numeric>
 #include <sstream>
@@ -1876,6 +1877,13 @@ bool ICmp::propagatesPoison() const {
   return true;
 }
 
+bool ICmp::isPtrCmp() const {
+  auto &elem_ty = a->getType();
+  return elem_ty.isPtrType() ||
+      (elem_ty.isVectorType() &&
+       elem_ty.getAsAggregateType()->getChild(0).isPtrType());
+}
+
 void ICmp::rauw(const Value &what, Value &with) {
   RAUW(a);
   RAUW(b);
@@ -1936,10 +1944,7 @@ StateValue ICmp::toSMT(State &s) const {
   };
   function<StateValue(const expr&, const expr&, Cond)> fn;
 
-  auto &elem_ty = a->getType();
-  if (elem_ty.isPtrType() ||
-      (elem_ty.isVectorType() &&
-       elem_ty.getAsAggregateType()->getChild(0).isPtrType())) {
+  if (isPtrCmp()) {
     fn = [&](auto &av, auto &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
@@ -1955,6 +1960,7 @@ StateValue ICmp::toSMT(State &s) const {
     return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
   };
 
+  auto &elem_ty = a->getType();
   if (auto agg = elem_ty.getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
