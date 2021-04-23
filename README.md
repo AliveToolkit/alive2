@@ -120,7 +120,7 @@ $ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
-translation validation, add the `-mllvm -tv-parallel-XXX` command line
+translation validation, add the `-mllvm -tv-parallel=XXX` command line
 options to Clang, where XXX is one of two parallelism managers
 supported by Alive2. The first (XXX=fifo) uses alive-jobserver: for
 details about how to use this program, please consult its help output
@@ -134,7 +134,7 @@ files into a specific directory.
 
 The Clang plugin's output can be voluminous. To help control this, it
 supports an option to reduce the amount of output (`-mllvm
--tv-succinct`).
+-tv-quiet`).
 
 Our goal is for the `alivecc` and `alive++` compiler drivers to be
 drop-in replacements for `clang` and `clang++`. So, for example, they

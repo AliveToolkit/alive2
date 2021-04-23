@@ -37,19 +37,19 @@ if (compiling()) {
     }
 
     if (getenv("ALIVECC_PARALLEL_UNRESTRICTED")) {
-        push @ARGV, ("-mllvm", "-tv-parallel-unrestricted");
+        push @ARGV, ("-mllvm", "-tv-parallel=unrestricted");
     }
 
     if (getenv("ALIVECC_PARALLEL_FIFO")) {
-        push @ARGV, ("-mllvm", "-tv-parallel-fifo");
+        push @ARGV, ("-mllvm", "-tv-parallel=fifo");
     }
 
     if (my $mem = getenv("ALIVECC_MAX_MEM")) {
-        push @ARGV, ("-mllvm", "-tv-max-mem=".$mem);
+        push @ARGV, ("-mllvm", "-tv-smt-max-mem=".$mem);
     }
 
     if (getenv("ALIVECC_PARALLEL_NULL")) {
-        push @ARGV, ("-mllvm", "-tv-parallel-null");
+        push @ARGV, ("-mllvm", "-tv-parallel=null");
     }
 
     if (getenv("ALIVECC_DISABLE_UNDEF_INPUT")) {
