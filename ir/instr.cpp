@@ -1924,7 +1924,8 @@ StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  auto fn = [&](const expr &av, const expr &bv, Cond cond) {
+  function<StateValue(const expr&, const expr&, Cond)> fn =
+      [&](auto &av, auto &bv, Cond cond) {
     switch (cond) {
     case EQ:  return StateValue(av == bv, true);
     case NE:  return StateValue(av != bv, true);
