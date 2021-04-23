@@ -1944,7 +1944,7 @@ StateValue ICmp::toSMT(State &s) const {
   };
 
   if (isPtrCmp()) {
-    fn = [&](const expr &av, const expr &bv, Cond cond) {
+    fn = [&s, fn](const expr &av, const expr &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
       return fn(lhs.getAddress(), rhs.getAddress(), cond);
