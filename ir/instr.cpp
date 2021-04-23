@@ -1923,8 +1923,8 @@ static StateValue build_icmp_chain(const expr &var,
 StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
-  function<StateValue(const expr&, const expr&, Cond)> intfn =
-      [&](auto &av, auto &bv, Cond cond) {
+
+  auto fn = [&](const expr &av, const expr &bv, Cond cond) {
     switch (cond) {
     case EQ:  return StateValue(av == bv, true);
     case NE:  return StateValue(av != bv, true);
@@ -1941,16 +1941,13 @@ StateValue ICmp::toSMT(State &s) const {
     }
     UNREACHABLE();
   };
-  function<StateValue(const expr&, const expr&, Cond)> fn;
 
   if (isPtrCmp()) {
-    fn = [&](auto &av, auto &bv, Cond cond) {
+    fn = [&](const expr &av, const expr &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
-      return intfn(lhs.getAddress(), rhs.getAddress(), cond);
+      return fn(lhs.getAddress(), rhs.getAddress(), cond);
     };
-  } else {  // integer comparison
-    fn = intfn;
   }
 
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
