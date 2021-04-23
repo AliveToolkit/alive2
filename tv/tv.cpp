@@ -59,6 +59,10 @@ llvm::cl::opt<long> subprocess_timeout("tv-subprocess-timeout",
                  "will be allowed to execeute (default=infinite)"),
   llvm::cl::init(-1), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> batch_opts("tv-batch-opts",
+  llvm::cl::desc("batch supported optimizations and verify them at once "
+                 "(clang plugin only)"), llvm::cl::cat(alive_cmdargs));
+
 
 struct FnInfo {
   Function fn;
@@ -97,11 +101,56 @@ static string toString(const Function &fn) {
   return ss.str();
 }
 
+static bool isInAllowList(llvm::Function &F) {
+  if (F.isDeclaration())
+    // Function declaration does not need to be verified.
+    // This can happen at EntryExitInstrumenter pass.
+    return false;
+
+  if (!func_names.empty() && !func_names.count(F.getName().str()))
+    return false;
+
+  return true;
+}
+
+#define SET_TIMER(timer) {                          \
+  timer.emplace([&](const StopWatch &sw) {          \
+        *out << "Took " << sw.seconds() << "s\n";   \
+  });                                               \
+}
+
+class TLIHelper {
+  llvm::ModuleAnalysisManager *MAM = nullptr;
+  bool createNewTLI = false;
+
+  optional<llvm::TargetLibraryInfo> TLI_holder;
+
+public:
+  TLIHelper(llvm::ModuleAnalysisManager *MAM) : MAM(MAM) {}
+  TLIHelper(bool createNewTLI = false) : createNewTLI(createNewTLI) {}
+
+  llvm::TargetLibraryInfo *get(llvm::Function &F) {
+    if (MAM) {
+      assert(!createNewTLI);
+      auto &FAM =
+          MAM->getResult<llvm::FunctionAnalysisManagerModuleProxy>(
+              *F.getParent()).getManager();
+      return &FAM.getResult<llvm::TargetLibraryAnalysis>(F);
+    } else if (createNewTLI) {
+      static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
+
+      if (!TLIImpl)
+        TLIImpl.emplace(llvm::Triple(F.getParent()->getTargetTriple()));
+      return &TLI_holder.emplace(*TLIImpl, &F);
+    }
+    return nullptr;
+  }
+};
+
 struct TVLegacyPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
-  const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override
-    = nullptr;
+  TLIHelper TLI_override;
 
   TVLegacyPass() : ModulePass(ID) {}
 
@@ -112,28 +161,19 @@ struct TVLegacyPass final : public llvm::ModulePass {
   }
 
   bool runOnFunction(llvm::Function &F) {
-    if (F.isDeclaration())
-      // This can happen at EntryExitInstrumenter pass.
-      return false;
-
-    if (!func_names.empty() && !func_names.count(F.getName().str()))
+    if (!isInAllowList(F))
       return false;
 
     optional<ScopedWatch> timer;
     if (opt_elapsed_time)
-      timer.emplace([&](const StopWatch &sw) {
-        *out << "Took " << sw.seconds() << "s\n";
-      });
+      SET_TIMER(timer);
 
-    llvm::TargetLibraryInfo *TLI = nullptr;
-    if (TLI_override) {
-      // When used as a clang plugin or from the new pass manager, this is run
-      // as a plain function rather than a registered pass, so getAnalysis()
-      // cannot be used.
-      TLI = (*TLI_override)(F);
-    } else {
+    // When used as a clang plugin or from the new pass manager, this is run
+    // as a plain function rather than a registered pass, so getAnalysis()
+    // cannot be used.
+    llvm::TargetLibraryInfo *TLI = TLI_override.get(F);
+    if (!TLI)
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
-    }
 
     auto [I, first] = fns.try_emplace(F.getName().str());
 
@@ -404,10 +444,10 @@ bool do_skip(const llvm::StringRef &pass0) {
                 [&](auto skip) { return pass == skip; });
 }
 
+unsigned clang_num_opt = 0;
+
 struct TVPass : public llvm::PassInfoMixin<TVPass> {
   static bool skip_tv;
-  static string pass_name;
-  bool print_pass_name = false;
   // A reference counter for TVPass objects.
   // If this counter reaches zero, finalization should be called.
   // Note that this is necessary for opt + NPM only.
@@ -419,7 +459,6 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
   TVPass() { ++num_instances; }
   TVPass(TVPass &&other) {
     other.is_moved = true;
-    print_pass_name = other.print_pass_name;
   }
   ~TVPass() {
     assert(num_instances >= (unsigned)!is_moved);
@@ -437,33 +476,23 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 
   llvm::PreservedAnalyses run(llvm::Module &M,
                               llvm::ModuleAnalysisManager &AM) {
-    auto &FAM = AM.getResult<llvm::FunctionAnalysisManagerModuleProxy>(M)
-                  .getManager();
-    auto get_TLI = [&FAM](llvm::Function &F) {
-      return &FAM.getResult<llvm::TargetLibraryAnalysis>(F);
-    };
-    run(M, get_TLI);
+    run(M, TLIHelper(&AM));
     return llvm::PreservedAnalyses::all();
   }
 
-  void run(llvm::Module &M,
-           const function<llvm::TargetLibraryInfo*(llvm::Function&)> &get_TLI) {
+  static void run(llvm::Module &M, TLIHelper &&helper,
+                  optional<string> pass_name = nullopt) {
     if (!initialized)
       TVLegacyPass::initialize(M);
 
-    static unsigned count = 0;
-
-    ++count;
-    if (print_pass_name) {
-      // print_pass_name is set only when running clang tv
-      *out << "-- " << count << ". " << pass_name
+    if (pass_name) {
+      *out << "-- " << clang_num_opt << ". " << *pass_name
            << (skip_tv ? " : Skipping\n" : "\n");
     }
 
     TVLegacyPass tv;
     tv.skip_verify = skip_tv;
-
-    tv.TLI_override = &get_TLI;
+    tv.TLI_override = helper;
     // If skip_pass is true, this updates fns map only.
     tv.runOnModule(M);
 
@@ -472,9 +501,86 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 };
 
 bool TVPass::skip_tv = false;
-string TVPass::pass_name;
 unsigned TVPass::num_instances = 0;
 bool is_clangtv_done = false;
+
+namespace batchedtv {
+  struct FnPair {
+    Function src;
+    optional<Function> tgt;
+  };
+  unordered_map<string, FnPair> fns;
+
+  string opt_begin;
+  string opt_end;
+  int numopt_begin = -1;
+
+  void translate(llvm::Module *M, TLIHelper &&helper) {
+    if (!initialized)
+      TVLegacyPass::initialize(*M);
+
+    for (auto &F: *M) {
+      if (!isInAllowList(F))
+        continue;
+
+      optional<ScopedWatch> timer;
+      if (opt_elapsed_time)
+        SET_TIMER(timer);
+
+      auto [I, first] = fns.try_emplace(F.getName().str());
+
+      auto globalvars = first ? vector<string_view>()
+                                : I->second.src.getGlobalVarNames();
+      auto fn = llvm2alive(F, *helper.get(F), move(globalvars));
+      if (!fn) {
+        if (first)
+          fns.erase(I);
+
+        // If !first, leave tgt as it is; if llvm2alive was successful before,
+        // we can use it.
+        continue;
+      }
+
+      if (first)
+        I->second.src = move(*fn);
+      else
+        I->second.tgt = move(*fn);
+    }
+  }
+
+  // Consume fns and validate all pairs.
+  void verify() {
+    if (batchedtv::numopt_begin == clang_num_opt - 1)
+      *out << "-- " << clang_num_opt << ". " << batchedtv::opt_begin << "\n";
+    else
+      *out << "-- From "
+           << batchedtv::numopt_begin << ". "
+           << batchedtv::opt_begin << "\n"
+           << "   To " << (clang_num_opt - 1) << ". "
+           << batchedtv::opt_end << "\n";
+
+    for (auto &[name, srctgt] : fns) {
+      (void)name;
+      if (!srctgt.tgt)
+        // translate() couldn't build a proper tgt.
+        continue;
+
+      optional<ScopedWatch> timer;
+      if (opt_elapsed_time)
+        SET_TIMER(timer);
+
+      Transform t;
+      t.src = move(srctgt.src);
+      t.tgt = move(*srctgt.tgt);
+
+      // '- 1' is necessary because we're verifying to the previous optimization
+      TVLegacyPass::verify(t, clang_num_opt - 1, toString(t.src));
+      // Regeneration of tgt is not needed because fns.clear() is called below
+    }
+
+    fns.clear();
+  }
+};
 
 struct ClangTVFinalizePass : public llvm::PassInfoMixin<ClangTVFinalizePass> {
   llvm::PreservedAnalyses run(llvm::Module &M,
@@ -482,6 +588,8 @@ struct ClangTVFinalizePass : public llvm::PassInfoMixin<ClangTVFinalizePass> {
     if (is_clangtv) {
       if (initialized)
         TVLegacyPass::finalize();
+      if (batch_opts)
+        batchedtv::verify();
       is_clangtv_done = true;
     }
     return llvm::PreservedAnalyses::all();
@@ -520,27 +628,37 @@ llvmGetPassPluginInfo() {
           });
       auto clang_tv = [](llvm::StringRef P, llvm::Any IR,
                   const llvm::PreservedAnalyses &PA) {
-        TVPass::pass_name = P.str();
-        TVPass::skip_tv |= do_skip(TVPass::pass_name);
         if (!is_clangtv)
           return;
         else if (is_clangtv_done)
           return;
 
-        // If it is clang tv, validate each pass
-        TVPass tv;
-        tv.print_pass_name = true;
+        string pass_name = P.str();
+        bool is_unsupported_opt = do_skip(pass_name);
+        auto M = const_cast<llvm::Module *>(unwrapModule(IR));
+        clang_num_opt++;
 
-        static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
-        optional<llvm::TargetLibraryInfo> TLI_holder;
+        if (batch_opts) {
+          if (is_unsupported_opt) {
+            // Verify batched pairs
+            bool has_nothing_to_verify = batchedtv::numopt_begin == -1;
+            if (!has_nothing_to_verify) {
+              batchedtv::verify();
+              batchedtv::numopt_begin = -1;
+            }
+          } else if (batchedtv::numopt_begin == -1) {
+            // Initialize beginning opt info
+            batchedtv::opt_begin = pass_name;
+            batchedtv::numopt_begin = clang_num_opt;
+          }
 
-        auto get_TLI = [&](llvm::Function &F) {
-          if (!TLIImpl)
-            TLIImpl.emplace(llvm::Triple(F.getParent()->getTargetTriple()));
-          return &TLI_holder.emplace(*TLIImpl, &F);
-        };
+          batchedtv::translate(M, TLIHelper(true));
+          batchedtv::opt_end = pass_name;
 
-        tv.run(*const_cast<llvm::Module *>(unwrapModule(IR)), get_TLI);
+        } else {
+          TVPass::skip_tv |= is_unsupported_opt;
+          TVPass::run(*M, TLIHelper(true), pass_name);
+        }
       };
       // For clang tv, manually run TVPass after each pass
       PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
