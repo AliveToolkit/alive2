@@ -10,7 +10,6 @@ entry:
   ; `%a` is non-null at the end of the block, because we store through it.
   ; However, `%q` is derived from `%a` via a GEP that is not `inbounds`, therefore we cannot judge `%q` is non-null as well
   ; and must retain the `icmp` instruction.
-  ; CHECK: %c = icmp eq i8* %q, null
   ret i1 %c 
 }
 
