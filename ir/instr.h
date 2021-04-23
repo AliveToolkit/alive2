@@ -234,12 +234,17 @@ private:
   std::string cond_name;
   Cond cond;
   bool defined;
+  bool use_provenance = false;
   smt::expr cond_var() const;
 
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
 
   bool isPtrCmp() const;
+  bool usesProvenance() const { return use_provenance; }
+  void setUseProvenance(bool flag) { use_provenance = flag; }
+  Cond getCond() const { return cond; }
+
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
@@ -610,6 +615,7 @@ public:
   void addIdx(uint64_t obj_size, Value &idx);
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
+  bool isInBounds() const { return inbounds; }
 
   uint64_t getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

@@ -829,7 +829,7 @@ static void calculateAndInitConstants(Transform &t) {
           min_access_size = gcd(min_access_size, getCommonAccessSize(t));
 
         } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
-          has_ptr2int |= ic->isPtrCmp();
+          has_ptr2int |= ic->isPtrCmp() && !ic->usesProvenance();
         }
       }
     }
@@ -1216,6 +1216,40 @@ static void remove_unreachable_bbs(Function &f) {
   }
 }
 
+static void optimize_ptrcmp(Function &f) {
+  auto is_inbounds = [](const Value &v) {
+    if (auto *gep = dynamic_cast<const GEP*>(&v))
+      return gep->isInBounds();
+
+    return returns_local(v);
+  };
+
+  for (auto bb : f.getBBs()) {
+    for (auto &i : bb->instrs()) {
+      auto *icmp = dynamic_cast<const ICmp*>(&i);
+      if (!icmp)
+        continue;
+
+      auto cond = icmp->getCond();
+      bool is_eq = cond == ICmp::EQ || cond == ICmp::NE;
+
+      Value *op0 = const_cast<Value *>(icmp->operands()[0]);
+      Value *op1 = const_cast<Value *>(icmp->operands()[1]);
+      if (is_eq &&
+          ((is_inbounds(*op0) && dynamic_cast<NullPointerValue*>(op1)) ||
+           (is_inbounds(*op1) && dynamic_cast<NullPointerValue*>(op0)))) {
+        // (gep inbounds p, ofs) == null
+        const_cast<ICmp*>(icmp)->setUseProvenance(true);
+      }
+
+      auto base_and_ofs0 = collect_gep_offsets(*op0);
+      auto base_and_ofs1 = collect_gep_offsets(*op1);
+      if (is_eq && base_and_ofs0.first == base_and_ofs1.first)
+        const_cast<ICmp*>(icmp)->setUseProvenance(true);
+    }
+  }
+}
+
 void Transform::preprocess() {
   remove_unreachable_bbs(src);
   remove_unreachable_bbs(tgt);
@@ -1240,6 +1274,10 @@ void Transform::preprocess() {
     if (find(src_gvs.begin(), src_gvs.end(), name.substr(1)) == src_gvs.end())
       tgt.getFirstBB().delInstr(itgt);
   }
+
+  // optimize pointer comparisons
+  optimize_ptrcmp(src);
+  optimize_ptrcmp(tgt);
 
   // remove side-effect free instructions without users
   vector<Instr*> to_remove;
