@@ -269,24 +269,6 @@ expr Pointer::operator!=(const Pointer &rhs) const {
   return !operator==(rhs);
 }
 
-#define DEFINE_CMP(op)                                                      \
-StateValue Pointer::op(const Pointer &rhs) const {                          \
-  /* Note that attrs are not compared. */                                   \
-  expr nondet = expr::mkFreshVar("nondet", true);                           \
-  m.state->addQuantVar(nondet);                                             \
-  return { expr::mkIf(getBid() == rhs.getBid(),                             \
-                      getOffset().op(rhs.getOffset()), nondet), true };     \
-}
-
-DEFINE_CMP(sle)
-DEFINE_CMP(slt)
-DEFINE_CMP(sge)
-DEFINE_CMP(sgt)
-DEFINE_CMP(ule)
-DEFINE_CMP(ult)
-DEFINE_CMP(uge)
-DEFINE_CMP(ugt)
-
 static expr inbounds(const Pointer &p, bool strict) {
   if (isUndef(p.getOffset()))
     return false;

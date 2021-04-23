@@ -79,15 +79,6 @@ public:
   smt::expr operator==(const Pointer &rhs) const;
   smt::expr operator!=(const Pointer &rhs) const;
 
-  StateValue sle(const Pointer &rhs) const;
-  StateValue slt(const Pointer &rhs) const;
-  StateValue sge(const Pointer &rhs) const;
-  StateValue sgt(const Pointer &rhs) const;
-  StateValue ule(const Pointer &rhs) const;
-  StateValue ult(const Pointer &rhs) const;
-  StateValue uge(const Pointer &rhs) const;
-  StateValue ugt(const Pointer &rhs) const;
-
   smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(unsigned align, bool exact = false) const;

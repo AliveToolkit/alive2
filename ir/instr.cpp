@@ -1876,6 +1876,13 @@ bool ICmp::propagatesPoison() const {
   return true;
 }
 
+bool ICmp::isPtrCmp() const {
+  auto &elem_ty = a->getType();
+  return elem_ty.isPtrType() ||
+      (elem_ty.isVectorType() &&
+       elem_ty.getAsAggregateType()->getChild(0).isPtrType());
+}
+
 void ICmp::rauw(const Value &what, Value &with) {
   RAUW(a);
   RAUW(b);
@@ -1916,49 +1923,31 @@ static StateValue build_icmp_chain(const expr &var,
 StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
-  function<StateValue(const expr&, const expr&, Cond)> fn;
 
-  auto &elem_ty = a->getType();
-  if (elem_ty.isPtrType() ||
-      (elem_ty.isVectorType() &&
-       elem_ty.getAsAggregateType()->getChild(0).isPtrType())) {
-    fn = [&](auto &av, auto &bv, Cond cond) {
+  function<StateValue(const expr&, const expr&, Cond)> fn =
+      [&](auto &av, auto &bv, Cond cond) {
+    switch (cond) {
+    case EQ:  return StateValue(av == bv, true);
+    case NE:  return StateValue(av != bv, true);
+    case SLE: return StateValue(av.sle(bv), true);
+    case SLT: return StateValue(av.slt(bv), true);
+    case SGE: return StateValue(av.sge(bv), true);
+    case SGT: return StateValue(av.sgt(bv), true);
+    case ULE: return StateValue(av.ule(bv), true);
+    case ULT: return StateValue(av.ult(bv), true);
+    case UGE: return StateValue(av.uge(bv), true);
+    case UGT: return StateValue(av.ugt(bv), true);
+    case Any:
+      UNREACHABLE();
+    }
+    UNREACHABLE();
+  };
+
+  if (isPtrCmp()) {
+    fn = [&](const expr &av, const expr &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
-      switch (cond) {
-      case EQ:  return StateValue(lhs == rhs, true);
-      case NE:  return StateValue(lhs != rhs, true);
-      case SLE: return lhs.sle(rhs);
-      case SLT: return lhs.slt(rhs);
-      case SGE: return lhs.sge(rhs);
-      case SGT: return lhs.sgt(rhs);
-      case ULE: return lhs.ule(rhs);
-      case ULT: return lhs.ult(rhs);
-      case UGE: return lhs.uge(rhs);
-      case UGT: return lhs.ugt(rhs);
-      case Any:
-        UNREACHABLE();
-      }
-      UNREACHABLE();
-    };
-
-  } else {  // integer comparison
-    fn = [&](auto &av, auto &bv, Cond cond) {
-      switch (cond) {
-      case EQ:  return StateValue(av == bv, true);
-      case NE:  return StateValue(av != bv, true);
-      case SLE: return StateValue(av.sle(bv), true);
-      case SLT: return StateValue(av.slt(bv), true);
-      case SGE: return StateValue(av.sge(bv), true);
-      case SGT: return StateValue(av.sgt(bv), true);
-      case ULE: return StateValue(av.ule(bv), true);
-      case ULT: return StateValue(av.ult(bv), true);
-      case UGE: return StateValue(av.uge(bv), true);
-      case UGT: return StateValue(av.ugt(bv), true);
-      case Any:
-        UNREACHABLE();
-      }
-      UNREACHABLE();
+      return fn(lhs.getAddress(), rhs.getAddress(), cond);
     };
   }
 
@@ -1968,6 +1957,7 @@ StateValue ICmp::toSMT(State &s) const {
     return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
   };
 
+  auto &elem_ty = a->getType();
   if (auto agg = elem_ty.getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
