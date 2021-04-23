@@ -550,7 +550,7 @@ namespace batchedtv {
 
   // Consume fns and validate all pairs.
   void verify() {
-    if (batchedtv::numopt_begin == clang_num_opt - 1)
+    if (batchedtv::numopt_begin == (int)clang_num_opt - 1)
       *out << "-- " << clang_num_opt << ". " << batchedtv::opt_begin << "\n";
     else
       *out << "-- From "
