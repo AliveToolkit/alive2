@@ -45,7 +45,7 @@ if (compiling()) {
     }
 
     if (my $mem = getenv("ALIVECC_MAX_MEM")) {
-        push @ARGV, ("-mllvm", "-tv-max-mem=".$mem);
+        push @ARGV, ("-mllvm", "-tv-smt-max-mem=".$mem);
     }
 
     if (getenv("ALIVECC_PARALLEL_NULL")) {
