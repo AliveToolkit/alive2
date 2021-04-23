@@ -1906,17 +1906,17 @@ void ICmp::print(ostream &os) const {
   os << getName() << " = icmp " << condtxt << *a << ", " << b->getName();
 }
 
-static StateValue build_icmp_chain(const expr &var,
-                                   const function<StateValue(ICmp::Cond)> &fn,
-                                   ICmp::Cond cond = ICmp::Any,
-                                   StateValue last = StateValue()) {
+static expr build_icmp_chain(const expr &var,
+                             const function<expr(ICmp::Cond)> &fn,
+                             ICmp::Cond cond = ICmp::Any,
+                             expr last = expr()) {
   auto old_cond = cond;
   cond = ICmp::Cond(cond - 1);
 
   if (old_cond == ICmp::Any)
     return build_icmp_chain(var, fn, cond, fn(cond));
 
-  auto e = StateValue::mkIf(var == cond, fn(cond), last);
+  auto e = expr::mkIf(var == cond, fn(cond), last);
   return cond == 0 ? e : build_icmp_chain(var, fn, cond, move(e));
 }
 
@@ -1924,19 +1924,19 @@ StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  function<StateValue(const expr&, const expr&, Cond)> fn =
+  function<expr(const expr&, const expr&, Cond)> fn =
       [&](auto &av, auto &bv, Cond cond) {
     switch (cond) {
-    case EQ:  return StateValue(av == bv, true);
-    case NE:  return StateValue(av != bv, true);
-    case SLE: return StateValue(av.sle(bv), true);
-    case SLT: return StateValue(av.slt(bv), true);
-    case SGE: return StateValue(av.sge(bv), true);
-    case SGT: return StateValue(av.sgt(bv), true);
-    case ULE: return StateValue(av.ule(bv), true);
-    case ULT: return StateValue(av.ult(bv), true);
-    case UGE: return StateValue(av.uge(bv), true);
-    case UGT: return StateValue(av.ugt(bv), true);
+    case EQ:  return av == bv;
+    case NE:  return av != bv;
+    case SLE: return av.sle(bv);
+    case SLT: return av.slt(bv);
+    case SGE: return av.sge(bv);
+    case SGT: return av.sgt(bv);
+    case ULE: return av.ule(bv);
+    case ULT: return av.ult(bv);
+    case UGE: return av.uge(bv);
+    case UGT: return av.ugt(bv);
     case Any:
       UNREACHABLE();
     }
@@ -1954,7 +1954,7 @@ StateValue ICmp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
     auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
-    return { v.value.toBVBool(), a.non_poison && b.non_poison && v.non_poison };
+    return { v.toBVBool(), a.non_poison && b.non_poison };
   };
 
   auto &elem_ty = a->getType();
