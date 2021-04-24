@@ -778,59 +778,57 @@ static void calculateAndInitConstants(Transform &t) {
         min_vect_elem_sz = elemsz;
     };
 
-    for (auto BB : fn->getBBs()) {
-      for (auto &i : BB->instrs()) {
-        if (returns_local(i))
-          ++cur_num_locals;
+    for (auto &i : fn->instrs()) {
+      if (returns_local(i))
+        ++cur_num_locals;
 
-        for (auto op : i.operands()) {
-          nullptr_is_used |= has_nullptr(op);
-          update_min_vect_sz(op->getType());
+      for (auto op : i.operands()) {
+        nullptr_is_used |= has_nullptr(op);
+        update_min_vect_sz(op->getType());
+      }
+
+      update_min_vect_sz(i.getType());
+
+      if (dynamic_cast<const FnCall*>(&i))
+        has_fncall |= true;
+
+      if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
+        max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
+        max_access_size = max(max_access_size, mi->getMaxAccessSize());
+        cur_max_gep     = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
+        has_free       |= mi->canFree();
+
+        auto info = mi->getByteAccessInfo();
+        has_ptr_load         |= info.doesPtrLoad;
+        does_ptr_store       |= info.doesPtrStore;
+        does_int_mem_access  |= info.hasIntByteAccess;
+        does_mem_access      |= info.doesMemAccess();
+        min_access_size       = gcd(min_access_size, info.byteSize);
+        if (info.doesMemAccess() && !info.hasIntByteAccess &&
+            !info.doesPtrLoad && !info.doesPtrStore)
+          does_any_byte_access = true;
+
+        if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
+          has_alloca = true;
+          has_dead_allocas |= alloc->initDead();
+        } else {
+          has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
+                        dynamic_cast<const Calloc*>(&i) != nullptr;
         }
 
-        update_min_vect_sz(i.getType());
+      } else if (isCast(ConversionOp::Int2Ptr, i) ||
+                  isCast(ConversionOp::Ptr2Int, i)) {
+        max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
+        has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
+        has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
 
-        if (dynamic_cast<const FnCall*>(&i))
-          has_fncall |= true;
+      } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
+        auto &t = bc->getType();
+        has_vector_bitcast |= t.isVectorType();
+        min_access_size = gcd(min_access_size, getCommonAccessSize(t));
 
-        if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
-          max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
-          max_access_size = max(max_access_size, mi->getMaxAccessSize());
-          cur_max_gep     = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
-          has_free       |= mi->canFree();
-
-          auto info = mi->getByteAccessInfo();
-          has_ptr_load         |= info.doesPtrLoad;
-          does_ptr_store       |= info.doesPtrStore;
-          does_int_mem_access  |= info.hasIntByteAccess;
-          does_mem_access      |= info.doesMemAccess();
-          min_access_size       = gcd(min_access_size, info.byteSize);
-          if (info.doesMemAccess() && !info.hasIntByteAccess &&
-              !info.doesPtrLoad && !info.doesPtrStore)
-            does_any_byte_access = true;
-
-          if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
-            has_alloca = true;
-            has_dead_allocas |= alloc->initDead();
-          } else {
-            has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
-                          dynamic_cast<const Calloc*>(&i) != nullptr;
-          }
-
-        } else if (isCast(ConversionOp::Int2Ptr, i) ||
-                   isCast(ConversionOp::Ptr2Int, i)) {
-          max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
-          has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
-          has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
-
-        } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
-          auto &t = bc->getType();
-          has_vector_bitcast |= t.isVectorType();
-          min_access_size = gcd(min_access_size, getCommonAccessSize(t));
-
-        } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
-          has_ptr2int |= ic->isPtrCmp() && !ic->usesProvenance();
-        }
+      } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
+        has_ptr2int |= ic->isPtrCmp()  && !ic->usesProvenance();
       }
     }
   }
