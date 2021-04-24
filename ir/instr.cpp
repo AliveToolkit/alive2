@@ -1904,6 +1904,8 @@ void ICmp::print(ostream &os) const {
   case Any: condtxt = ""; break;
   }
   os << getName() << " = icmp " << condtxt << *a << ", " << b->getName();
+  if (use_provenance)
+    os << ", use_provenance";
 }
 
 static expr build_icmp_chain(const expr &var,
@@ -1944,9 +1946,13 @@ StateValue ICmp::toSMT(State &s) const {
   };
 
   if (isPtrCmp()) {
-    fn = [&s, fn](const expr &av, const expr &bv, Cond cond) {
+    fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
+      if (use_provenance) {
+        assert(cond == EQ || cond == NE);
+        return cond == EQ ? lhs == rhs : lhs != rhs;
+      }
       return fn(lhs.getAddress(), rhs.getAddress(), cond);
     };
   }

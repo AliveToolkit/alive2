@@ -138,9 +138,11 @@ class Alive2Test(TestFormat):
     if is_timeout(output):
       return lit.Test.PASS, ''
 
-    chk = self.regex_check.search(input)
-    if chk != None and output.find(chk.group(1).strip()) == -1:
-      return lit.Test.FAIL, output
+    # allow multiple 'CHECK: ..'
+    chks = self.regex_check.findall(input)
+    for chk in chks:
+      if output.find(chk.strip()) == -1:
+        return lit.Test.FAIL, output
 
     chk_not = self.regex_check_not.search(input)
     if chk_not != None and output.find(chk_not.group(1).strip()) != -1:
@@ -152,7 +154,8 @@ class Alive2Test(TestFormat):
       return lit.Test.FAIL, output
 
     expect_err = self.regex_errs.search(input)
-    if expect_err is None and xfail is None and chk is None and chk_not is None:
+    if expect_err is None and xfail is None and len(chks) == 0 and \
+       chk_not is None:
       # If there's no other test, correctness of the transformation should be
       # checked.
       if exitCode == 0 and output.find(ok_string) != -1 and \
