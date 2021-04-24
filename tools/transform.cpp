@@ -1224,29 +1224,27 @@ static void optimize_ptrcmp(Function &f) {
     return returns_local(v);
   };
 
-  for (auto bb : f.getBBs()) {
-    for (auto &i : bb->instrs()) {
-      auto *icmp = dynamic_cast<const ICmp*>(&i);
-      if (!icmp)
-        continue;
+  for (auto &i : f.instrs()) {
+    auto *icmp = dynamic_cast<const ICmp*>(&i);
+    if (!icmp)
+      continue;
 
-      auto cond = icmp->getCond();
-      bool is_eq = cond == ICmp::EQ || cond == ICmp::NE;
+    auto cond = icmp->getCond();
+    bool is_eq = cond == ICmp::EQ || cond == ICmp::NE;
 
-      Value *op0 = const_cast<Value *>(icmp->operands()[0]);
-      Value *op1 = const_cast<Value *>(icmp->operands()[1]);
-      if (is_eq &&
-          ((is_inbounds(*op0) && dynamic_cast<NullPointerValue*>(op1)) ||
-           (is_inbounds(*op1) && dynamic_cast<NullPointerValue*>(op0)))) {
-        // (gep inbounds p, ofs) == null
-        const_cast<ICmp*>(icmp)->setUseProvenance(true);
-      }
-
-      auto base_and_ofs0 = collect_gep_offsets(*op0);
-      auto base_and_ofs1 = collect_gep_offsets(*op1);
-      if (is_eq && base_and_ofs0.first == base_and_ofs1.first)
-        const_cast<ICmp*>(icmp)->setUseProvenance(true);
+    Value *op0 = const_cast<Value *>(icmp->operands()[0]);
+    Value *op1 = const_cast<Value *>(icmp->operands()[1]);
+    if (is_eq &&
+        ((is_inbounds(*op0) && dynamic_cast<NullPointerValue*>(op1)) ||
+         (is_inbounds(*op1) && dynamic_cast<NullPointerValue*>(op0)))) {
+      // (gep inbounds p, ofs) == null
+      const_cast<ICmp*>(icmp)->setUseProvenance(true);
     }
+
+    auto base_and_ofs0 = collect_gep_offsets(*op0);
+    auto base_and_ofs1 = collect_gep_offsets(*op1);
+    if (is_eq && base_and_ofs0.first == base_and_ofs1.first)
+      const_cast<ICmp*>(icmp)->setUseProvenance(true);
   }
 }
 
