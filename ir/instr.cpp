@@ -1904,8 +1904,11 @@ void ICmp::print(ostream &os) const {
   case Any: condtxt = ""; break;
   }
   os << getName() << " = icmp " << condtxt << *a << ", " << b->getName();
-  if (use_provenance)
-    os << ", use_provenance";
+  switch (pcmode) {
+  case INTEGRAL: break;
+  case PROVENANCE: os << ", use_provenance"; break;
+  case OFFSETONLY: os << ", offsetonly"; break;
+  }
 }
 
 static expr build_icmp_chain(const expr &var,
@@ -1949,11 +1952,15 @@ StateValue ICmp::toSMT(State &s) const {
     fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
       Pointer lhs(s.getMemory(), av);
       Pointer rhs(s.getMemory(), bv);
-      if (use_provenance) {
+      switch (pcmode) {
+      case INTEGRAL:
+        return fn(lhs.getAddress(), rhs.getAddress(), cond);
+      case PROVENANCE:
         assert(cond == EQ || cond == NE);
         return cond == EQ ? lhs == rhs : lhs != rhs;
+      case OFFSETONLY:
+        return fn(lhs.getOffset(), rhs.getOffset(), cond);
       }
-      return fn(lhs.getAddress(), rhs.getAddress(), cond);
     };
   }
 

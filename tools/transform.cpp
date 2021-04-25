@@ -538,6 +538,48 @@ static bool returns_local(const Value &v) {
          // TODO: add noalias fn
 }
 
+static Value *get_base_ptr(Value *ptr) {
+  vector<Value*> todo = { ptr };
+  Value *base_ptr = nullptr;
+  set<Value*> seen;
+  do {
+    ptr = todo.back();
+    todo.pop_back();
+    if (!seen.insert(ptr).second)
+      continue;
+
+    if (auto gep = dynamic_cast<GEP*>(ptr)) {
+      todo.emplace_back(&gep->getPtr());
+      continue;
+    }
+
+    if (auto c = isNoOp(*ptr)) {
+      todo.emplace_back(c);
+      continue;
+    }
+
+    if (auto phi = dynamic_cast<Phi*>(ptr)) {
+      auto ops = phi->operands();
+      todo.insert(todo.end(), ops.begin(), ops.end());
+      continue;
+    }
+
+    if (auto s = dynamic_cast<Select*>(ptr)) {
+      todo.emplace_back(s->getTrueValue());
+      todo.emplace_back(s->getFalseValue());
+      continue;
+    }
+
+    if (base_ptr)
+      return nullptr;
+
+    base_ptr = ptr;
+
+  } while (!todo.empty());
+
+  return base_ptr;
+}
+
 static bool may_be_nonlocal(Value *ptr) {
   vector<Value*> todo = { ptr };
   set<Value*> seen;
@@ -828,7 +870,8 @@ static void calculateAndInitConstants(Transform &t) {
         min_access_size = gcd(min_access_size, getCommonAccessSize(t));
 
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
-        has_ptr2int |= ic->isPtrCmp() && !ic->usesProvenance();
+        has_ptr2int |= ic->isPtrCmp() &&
+                       (ic->getPtrCmpMode() == ICmp::INTEGRAL);
       }
     }
   }
@@ -1236,13 +1279,17 @@ static void optimize_ptrcmp(Function &f) {
         ((is_inbounds(*op0) && dynamic_cast<NullPointerValue*>(op1)) ||
          (is_inbounds(*op1) && dynamic_cast<NullPointerValue*>(op0)))) {
       // (gep inbounds p, ofs) == null
-      const_cast<ICmp*>(icmp)->setUseProvenance(true);
+      const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::PROVENANCE);
     }
 
-    auto base_and_ofs0 = collect_gep_offsets(*op0);
-    auto base_and_ofs1 = collect_gep_offsets(*op1);
-    if (is_eq && base_and_ofs0.first == base_and_ofs1.first)
-      const_cast<ICmp*>(icmp)->setUseProvenance(true);
+    auto base0 = get_base_ptr(op0);
+    auto base1 = get_base_ptr(op1);
+    if (base0 && base0 == base1) {
+      if (is_eq)
+        const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::PROVENANCE);
+      else if (is_inbounds(*op0) && is_inbounds(*op1))
+        const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::OFFSETONLY);
+    }
   }
 }
 
