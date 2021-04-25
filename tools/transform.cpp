@@ -570,7 +570,7 @@ static Value *get_base_ptr(Value *ptr) {
       continue;
     }
 
-    if (base_ptr)
+    if (base_ptr && base_ptr != ptr)
       return nullptr;
 
     base_ptr = ptr;
