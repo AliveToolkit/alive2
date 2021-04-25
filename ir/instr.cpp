@@ -1960,6 +1960,8 @@ StateValue ICmp::toSMT(State &s) const {
         return cond == EQ ? lhs == rhs : lhs != rhs;
       case OFFSETONLY:
         return fn(lhs.getOffset(), rhs.getOffset(), cond);
+      default:
+        UNREACHABLE();
       }
     };
   }
