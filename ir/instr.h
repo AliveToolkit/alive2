@@ -228,7 +228,11 @@ public:
 class ICmp final : public Instr {
 public:
   enum Cond { EQ, NE, SLE, SLT, SGE, SGT, ULE, ULT, UGE, UGT, Any };
-  enum PtrCmpMode { INTEGRAL, PROVENANCE, OFFSETONLY };
+  enum PtrCmpMode {
+    INTEGRAL,
+    PROVENANCE, // compare pointer provenance & offsets
+    OFFSETONLY // cmp ofs only. meaningful only when ptrs are based on same obj
+  };
 
 private:
   Value *a, *b;
