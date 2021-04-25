@@ -1273,11 +1273,12 @@ static void optimize_ptrcmp(Function &f) {
     auto cond = icmp->getCond();
     bool is_eq = cond == ICmp::EQ || cond == ICmp::NE;
 
-    Value *op0 = const_cast<Value *>(icmp->operands()[0]);
-    Value *op1 = const_cast<Value *>(icmp->operands()[1]);
+    auto ops = icmp->operands();
+    auto *op0 = ops[0];
+    auto *op1 = ops[1];
     if (is_eq &&
-        ((is_inbounds(*op0) && dynamic_cast<NullPointerValue*>(op1)) ||
-         (is_inbounds(*op1) && dynamic_cast<NullPointerValue*>(op0)))) {
+        ((is_inbounds(*op0) && dynamic_cast<const NullPointerValue*>(op1)) ||
+         (is_inbounds(*op1) && dynamic_cast<const NullPointerValue*>(op0)))) {
       // (gep inbounds p, ofs) == null
       const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::PROVENANCE);
     }
