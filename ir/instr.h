@@ -242,7 +242,7 @@ public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
 
   bool isPtrCmp() const;
-  bool getPtrCmpMode() const { return pcmode; }
+  PtrCmpMode getPtrCmpMode() const { return pcmode; }
   void setPtrCmpMode(PtrCmpMode mode) { pcmode = mode; }
   Cond getCond() const { return cond; }
 
