@@ -64,7 +64,8 @@ class Alive2Test(TestFormat):
           not os.path.isdir(filepath) and \
           (filename.endswith('.opt') or filename.endswith('.src.ll') or
            filename.endswith('.srctgt.ll') or filename.endswith('.c') or
-           filename.endswith('.cpp') or filename.endswith('.opt.ll')):
+           filename.endswith('.cpp') or filename.endswith('.opt.ll') or
+           filename.endswith('.ident.ll')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
 
 

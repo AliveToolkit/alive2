@@ -228,21 +228,26 @@ public:
 class ICmp final : public Instr {
 public:
   enum Cond { EQ, NE, SLE, SLT, SGE, SGT, ULE, ULT, UGE, UGT, Any };
+  enum PtrCmpMode {
+    INTEGRAL,
+    PROVENANCE, // compare pointer provenance & offsets
+    OFFSETONLY // cmp ofs only. meaningful only when ptrs are based on same obj
+  };
 
 private:
   Value *a, *b;
   std::string cond_name;
   Cond cond;
   bool defined;
-  bool use_provenance = false;
+  PtrCmpMode pcmode = INTEGRAL;
   smt::expr cond_var() const;
 
 public:
   ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b);
 
   bool isPtrCmp() const;
-  bool usesProvenance() const { return use_provenance; }
-  void setUseProvenance(bool flag) { use_provenance = flag; }
+  PtrCmpMode getPtrCmpMode() const { return pcmode; }
+  void setPtrCmpMode(PtrCmpMode mode) { pcmode = mode; }
   Cond getCond() const { return cond; }
 
   std::vector<Value*> operands() const override;
