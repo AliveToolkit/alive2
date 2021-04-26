@@ -53,7 +53,8 @@ extern bool little_endian;
 
 /// Whether int2ptr or ptr2int are used in either function
 extern bool has_int2ptr;
-extern bool has_ptr2int;
+extern bool has_ptr2int_local;
+extern bool has_ptr2int_nonlocal;
 
 /// Whether malloc or free/delete is used in either function
 extern bool has_malloc;

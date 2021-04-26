@@ -217,19 +217,21 @@ expr Pointer::getAddress(bool simplify) const {
 
   auto bid = getShortBid();
   auto zero = expr::mkUInt(0, bits_size_t - 1);
-  // fast path for null ptrs
-  auto non_local
-    = simplify && bid.isZero() && has_null_block ?
-          zero : expr::mkUF("blk_addr", { bid }, zero);
+
+  auto non_local = zero;
+  if (Memory::observesAddresses(true)) {
+    // fast path for null ptrs
+    non_local = simplify && bid.isZero() && has_null_block ?
+                zero : expr::mkUF("blk_addr", { bid }, zero);
+  }
   // Non-local block area is the lower half
   non_local = expr::mkUInt(0, 1).concat(non_local);
 
-  expr addr;
-  if (auto local = m.local_blk_addr(bid))
-    // Local block area is the upper half of the memory
-    addr = expr::mkIf(isLocal(), expr::mkUInt(1, 1).concat(*local), non_local);
-  else
-    addr = move(non_local);
+  expr addr = move(non_local);
+  if (Memory::observesAddresses(false))
+    if (auto local = m.local_blk_addr(bid))
+      // Local block area is the upper half of the memory
+      addr = expr::mkIf(isLocal(), expr::mkUInt(1, 1).concat(*local), addr);
 
   return addr + getOffsetSizet();
 }

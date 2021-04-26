@@ -538,6 +538,23 @@ static bool returns_local(const Value &v) {
          // TODO: add noalias fn
 }
 
+static bool next_base_ptrs(Value *ptr, vector<Value *> &ops) {
+  if (auto gep = dynamic_cast<GEP*>(ptr)) {
+    ops.emplace_back(&gep->getPtr());
+  } else if (auto c = isNoOp(*ptr)) {
+    ops.emplace_back(c);
+  } else if (auto phi = dynamic_cast<Phi*>(ptr)) {
+    auto phiops = phi->operands();
+    ops.insert(ops.end(), phiops.begin(), phiops.end());
+  } else if (auto s = dynamic_cast<Select*>(ptr)) {
+    ops.emplace_back(s->getTrueValue());
+    ops.emplace_back(s->getFalseValue());
+  } else {
+    return false;
+  }
+  return true;
+}
+
 static Value *get_base_ptr(Value *ptr) {
   vector<Value*> todo = { ptr };
   Value *base_ptr = nullptr;
@@ -548,27 +565,8 @@ static Value *get_base_ptr(Value *ptr) {
     if (!seen.insert(ptr).second)
       continue;
 
-    if (auto gep = dynamic_cast<GEP*>(ptr)) {
-      todo.emplace_back(&gep->getPtr());
+    if (next_base_ptrs(ptr, todo))
       continue;
-    }
-
-    if (auto c = isNoOp(*ptr)) {
-      todo.emplace_back(c);
-      continue;
-    }
-
-    if (auto phi = dynamic_cast<Phi*>(ptr)) {
-      auto ops = phi->operands();
-      todo.insert(todo.end(), ops.begin(), ops.end());
-      continue;
-    }
-
-    if (auto s = dynamic_cast<Select*>(ptr)) {
-      todo.emplace_back(s->getTrueValue());
-      todo.emplace_back(s->getFalseValue());
-      continue;
-    }
 
     if (base_ptr && base_ptr != ptr)
       return nullptr;
@@ -592,27 +590,9 @@ static bool may_be_nonlocal(Value *ptr) {
     if (returns_local(*ptr))
       continue;
 
-    if (auto gep = dynamic_cast<GEP*>(ptr)) {
-      todo.emplace_back(&gep->getPtr());
+    if (next_base_ptrs(ptr, todo))
       continue;
-    }
 
-    if (auto c = isNoOp(*ptr)) {
-      todo.emplace_back(c);
-      continue;
-    }
-
-    if (auto phi = dynamic_cast<Phi*>(ptr)) {
-      auto ops = phi->operands();
-      todo.insert(todo.end(), ops.begin(), ops.end());
-      continue;
-    }
-
-    if (auto s = dynamic_cast<Select*>(ptr)) {
-      todo.emplace_back(s->getTrueValue());
-      todo.emplace_back(s->getFalseValue());
-      continue;
-    }
     return true;
 
   } while (!todo.empty());
@@ -758,15 +738,16 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_global_size = UINT64_MAX;
 
   bool nullptr_is_used = false;
-  has_int2ptr      = false;
-  has_ptr2int      = false;
-  has_alloca       = false;
-  has_dead_allocas = false;
-  has_malloc       = false;
-  has_free         = false;
-  has_fncall       = false;
-  has_null_block   = false;
-  does_ptr_store   = false;
+  has_int2ptr          = false;
+  has_ptr2int_local    = false;
+  has_ptr2int_nonlocal = false;
+  has_alloca           = false;
+  has_dead_allocas     = false;
+  has_malloc           = false;
+  has_free             = false;
+  has_fncall           = false;
+  has_null_block       = false;
+  does_ptr_store       = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
   bool does_any_byte_access = false;
@@ -819,6 +800,17 @@ static void calculateAndInitConstants(Transform &t) {
       else if (elemsz)
         min_vect_elem_sz = elemsz;
     };
+    // If cv is used by ptr2int, update has_ptr2int_*.
+    auto update_ptr2ints = [](const Value *cv) {
+      Value *v = const_cast<Value *>(cv);
+      Value *basev = get_base_ptr(v);
+      if (dynamic_cast<Input*>(basev) || dynamic_cast<NullPointerValue*>(basev))
+        has_ptr2int_nonlocal = true;
+      else if (returns_local(*get_base_ptr(v)))
+        has_ptr2int_local = true;
+      else
+        has_ptr2int_local = has_ptr2int_nonlocal = true;
+    };
 
     for (auto &i : fn->instrs()) {
       if (returns_local(i))
@@ -862,7 +854,8 @@ static void calculateAndInitConstants(Transform &t) {
                   isCast(ConversionOp::Ptr2Int, i)) {
         max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
-        has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
+        if (auto *p2i = isCast(ConversionOp::Ptr2Int, i))
+          update_ptr2ints(p2i->operands()[0]);
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
@@ -870,8 +863,11 @@ static void calculateAndInitConstants(Transform &t) {
         min_access_size = gcd(min_access_size, getCommonAccessSize(t));
 
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
-        has_ptr2int |= ic->isPtrCmp() &&
-                       (ic->getPtrCmpMode() == ICmp::INTEGRAL);
+        if (ic->isPtrCmp() && ic->getPtrCmpMode() == ICmp::INTEGRAL) {
+          auto ops = ic->operands();
+          update_ptr2ints(ops[0]);
+          update_ptr2ints(ops[1]);
+        }
       }
     }
   }
@@ -980,7 +976,8 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nlittle_endian: " << little_endian
                   << "\nnullptr_is_used: " << nullptr_is_used
                   << "\nhas_int2ptr: " << has_int2ptr
-                  << "\nhas_ptr2int: " << has_ptr2int
+                  << "\nhas_ptr2int_nonlocal: " << has_ptr2int_nonlocal
+                  << "\nhas_ptr2int_local: " << has_ptr2int_local
                   << "\nhas_malloc: " << has_malloc
                   << "\nhas_free: " << has_free
                   << "\nhas_null_block: " << has_null_block

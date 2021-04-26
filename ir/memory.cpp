@@ -368,7 +368,11 @@ ostream& operator<<(ostream &os, const Byte &byte) {
 }
 
 bool Memory::observesAddresses() {
-  return has_ptr2int || has_int2ptr;
+  return has_ptr2int_nonlocal || has_ptr2int_local || has_int2ptr;
+}
+
+bool Memory::observesAddresses(bool nonlocal) {
+  return (nonlocal ? has_ptr2int_nonlocal : has_ptr2int_local) || has_int2ptr;
 }
 
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
@@ -714,7 +718,8 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   if (auto algn = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
     uint64_t blk_align;
     ENSURE(algn->isUInt(blk_align));
-    if (align > (1ull << blk_align) && (!observesAddresses() || const_offset))
+    if (align > (1ull << blk_align) &&
+        (!observesAddresses(!local) || const_offset))
       return false;
   }
 
@@ -1108,7 +1113,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
       state->addAxiom(p_align.ule(q_align));
   }
 
-  if (!observesAddresses())
+  if (!observesAddresses(true))
     return;
 
   if (has_null_block)
@@ -1398,7 +1403,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   bool is_null = !is_local && has_null_block && bid == 0;
 
   if (is_local) {
-    if (observesAddresses()) {
+    if (observesAddresses(false)) {
       // MSB of local block area's address is 1.
       auto addr_var
         = expr::mkFreshVar("local_addr",
@@ -1425,7 +1430,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     if (!is_null)
       state->addAxiom(p.getAllocType() == alloc_ty);
 
-    if (align_bits && observesAddresses())
+    if (align_bits && observesAddresses(true))
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
     bool nonconst = (has_null_block && bid == 0) || !is_constglb(bid);
@@ -1455,7 +1460,7 @@ void Memory::startLifetime(const expr &ptr_local) {
   Pointer p(*this, ptr_local);
   state->addUB(p.isLocal());
 
-  if (observesAddresses())
+  if (observesAddresses(false))
     state->addPre(disjoint_local_blocks(*this, p.getAddress(), p.blockSize(),
                                         local_blk_addr));
 
@@ -1713,12 +1718,14 @@ void Memory::fillPoison(const expr &bid) {
 }
 
 expr Memory::ptr2int(const expr &ptr) const {
-  assert(!memory_unused() && observesAddresses());
+  assert(!memory_unused() &&
+         (observesAddresses(true) || observesAddresses(false)));
   return Pointer(*this, ptr).getAddress();
 }
 
 expr Memory::int2ptr(const expr &val) const {
-  assert(!memory_unused() && observesAddresses());
+  assert(!memory_unused() &&
+         (observesAddresses(true) || observesAddresses(false)));
   // TODO
   expr null = Pointer::mkNullPointer(*this).release();
   expr fn = expr::mkUF("int2ptr", { val }, null);
@@ -1952,7 +1959,7 @@ void Memory::print(ostream &os, const Model &m) const {
       P("size", p.blockSize());
       P("align", expr::mkInt(1, 64) << p.blockAlignment().zextOrTrunc(64));
       P("alloc type", p.getAllocType());
-      if (observesAddresses())
+      if (observesAddresses(!local))
         P("address", p.getAddress());
       os << '\n';
     }
