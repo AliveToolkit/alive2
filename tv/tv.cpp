@@ -97,6 +97,14 @@ static string toString(const Function &fn) {
   return ss.str();
 }
 
+static void showStats() {
+  if (opt_smt_stats)
+    smt::solver_print_stats(*out);
+  if (opt_alias_stats)
+    IR::Memory::printAliasStats(*out);
+}
+
+
 struct TVLegacyPass final : public llvm::ModulePass {
   static char ID;
   bool skip_verify = false;
@@ -260,6 +268,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   done:
     if (parallelMgr) {
+      showStats();
       signal(SIGALRM, SIG_IGN);
       llvm_util_init.reset();
       smt_init.reset();
@@ -322,12 +331,10 @@ struct TVLegacyPass final : public llvm::ModulePass {
       set_outs(*out);
     }
 
-    if (!showed_stats) {
+    // If it is run in parallel, stats are shown by children
+    if (!showed_stats && !parallelMgr) {
       showed_stats = true;
-      if (opt_smt_stats)
-        smt::solver_print_stats(*out);
-      if (opt_alias_stats)
-        IR::Memory::printAliasStats(*out);
+      showStats();
       if (has_failure && !report_filename.empty())
         cerr << "Report written to " << report_filename << endl;
     }
