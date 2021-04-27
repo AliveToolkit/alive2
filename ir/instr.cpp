@@ -2622,14 +2622,22 @@ DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Alloc);
 DEFINE_AS_RETFALSE(Alloc, canFree);
 
+static uint64_t local_alloc_size(uint64_t size, unsigned align) {
+  // To find an available space, alignment should be considered as well.
+  // Add 1 again because the end of address space cannot be allocated.
+  return size + (align - 1) + 1;
+}
+
 uint64_t Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
+    uint64_t sz = *bytes;
     if (mul) {
       if (auto n = getInt(*mul))
-        return *n * abs(*bytes);
-      return UINT64_MAX;
+        sz = *n * abs(*bytes);
+      else
+        return UINT64_MAX;
     }
-    return *bytes;
+    return local_alloc_size(sz, align);
   }
   return UINT64_MAX;
 }
@@ -2690,7 +2698,9 @@ DEFINE_AS_RETZERO(Malloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Malloc);
 
 uint64_t Malloc::getMaxAllocSize() const {
-  return getIntOr(*size, UINT64_MAX);
+  if (auto sz = getInt(*size))
+    return local_alloc_size(*sz, heap_block_alignment);
+  return UINT64_MAX;
 }
 
 bool Malloc::canFree() const {
@@ -2778,7 +2788,7 @@ DEFINE_AS_RETFALSE(Calloc, canFree);
 uint64_t Calloc::getMaxAllocSize() const {
   if (auto sz = getInt(*size)) {
     if (auto n = getInt(*num))
-      return *sz * *n;
+      return local_alloc_size(*sz * *n, heap_block_alignment);
   }
   return UINT64_MAX;
 }
