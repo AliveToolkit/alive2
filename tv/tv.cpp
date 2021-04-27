@@ -84,14 +84,14 @@ void sigalarm_handler(int) {
   _Exit(0);
 }
 
-static void printDot(const Function &tgt, int n) {
+void printDot(const Function &tgt, int n) {
   if (opt_print_dot) {
     string prefix = to_string(n);
     tgt.writeDot(prefix.c_str());
   }
 }
 
-static string toString(const Function &fn) {
+string toString(const Function &fn) {
   stringstream ss;
   fn.print(ss);
   return ss.str();

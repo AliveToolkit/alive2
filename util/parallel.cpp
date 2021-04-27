@@ -182,7 +182,7 @@ void parallel::finishChild(bool is_timeout) {
     safe_write(fd_to_parent, msg, strlen(msg));
   } else {
     childProcess &me = children.back();
-    auto data = me.output.str();
+    auto data = move(me.output).str();
     auto size = data.size();
     ENSURE(safe_write(me.pipe[1], data.c_str(), size) == (ssize_t)size);
   }
@@ -212,7 +212,7 @@ bool parallel::emitOutput() {
       assert(sm.size() == 2);
       int index = std::stoi(*std::next(sm.begin()));
       if (children[index].eof) {
-        out_file << children[index].output.str();
+        out_file << move(children[index].output).str();
         stringstream().swap(children[index].output); // free the RAM
       } else {
         /*
