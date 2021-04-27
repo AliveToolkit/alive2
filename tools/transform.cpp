@@ -804,7 +804,10 @@ static void calculateAndInitConstants(Transform &t) {
     auto update_ptr2ints = [](const Value *cv) {
       Value *v = const_cast<Value *>(cv);
       Value *basev = get_base_ptr(v);
-      if (dynamic_cast<Input*>(basev) || dynamic_cast<NullPointerValue*>(basev))
+      if (!basev)
+        has_ptr2int_local = has_ptr2int_nonlocal = true;
+      else if (dynamic_cast<Input*>(basev) ||
+               dynamic_cast<NullPointerValue*>(basev))
         has_ptr2int_nonlocal = true;
       else if (returns_local(*get_base_ptr(v)))
         has_ptr2int_local = true;
