@@ -225,7 +225,7 @@ bool parallel::emitOutput() {
          */
         stringstream new_ss;
         new_ss << line << '\n';
-        new_ss << parent_ss.str().substr(parent_ss.tellg());
+        new_ss << move(parent_ss).str().substr(parent_ss.tellg());
         parent_ss.swap(new_ss);
         return false;
       }
