@@ -206,6 +206,8 @@ bool parallel::emitOutput() {
   ensureParent();
   std::string line;
   std::regex rgx("^include\\(([0-9]+)\\)$");
+
+  auto befpos = parent_ss.tellg();
   while (getline(parent_ss, line)) {
     std::smatch sm;
     if (std::regex_match(line, sm, rgx)) {
@@ -215,24 +217,14 @@ bool parallel::emitOutput() {
         out_file << children[index].output.str();
         stringstream().swap(children[index].output); // free the RAM
       } else {
-        /*
-         * here, for two reasons, we swap parent_ss with a fresh one
-         * containing a copy of the unwritten data. first, we've
-         * already grabbed one line too many from parent_ss, and we
-         * don't have a good way to put it back. second, we want to
-         * free the RAM associated with data we've already read out of
-         * the stringstream.
-         */
-        stringstream new_ss;
-        new_ss << line << '\n';
-        new_ss << parent_ss.str().substr(parent_ss.tellg());
-        parent_ss.swap(new_ss);
+        parent_ss.seekg(befpos);
         return false;
       }
     } else {
       assert(line.rfind("include(", 0) == std::string::npos);
       out_file << line << '\n';
     }
+    befpos = parent_ss.tellg();
   }
   /*
    * reset the EOF flag since this process is going to keep writing
