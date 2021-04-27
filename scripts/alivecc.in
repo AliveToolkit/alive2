@@ -36,6 +36,10 @@ if (compiling()) {
         push @ARGV, ("-mllvm", "-tv-quiet");
     }
 
+    if (getenv("ALIVECC_BATCH_OPTS")) {
+        push @ARGV, ("-mllvm", "-tv-batch-opts");
+    }
+
     if (getenv("ALIVECC_PARALLEL_UNRESTRICTED")) {
         push @ARGV, ("-mllvm", "-tv-parallel=unrestricted");
     }
