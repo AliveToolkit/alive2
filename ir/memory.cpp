@@ -607,16 +607,20 @@ void Memory::AliasSet::printStats(ostream &os) {
   os << fixed;
 
   os << "\n\nAlias sets statistics\n=====================\n"
-        "Only local:     " << (only_local / total)
-     << "%\nOnly non-local: " << (only_nonlocal / total)
-     << "%\n\nBuckets:\n";
+        "Only local:     " << only_local
+     << " (" << (only_local / total)
+     << "%)\nOnly non-local: " << only_nonlocal
+     << " (" << (only_nonlocal / total)
+     << "%)\n\nBuckets:\n";
 
   for (unsigned i = 0; i < alias_buckets_vals.size(); ++i) {
     os << "\u2264 " << alias_buckets_vals[i] << ": "
-       << (alias_buckets_hits[i] / total) << "%\n";
+       << alias_buckets_hits[i]
+       << " (" << (alias_buckets_hits[i] / total) << "%)\n";
   }
   os << "> " << alias_buckets_vals.back() << ": "
-     << (alias_buckets_hits.back() / total) << "%\n";
+     << alias_buckets_hits.back()
+     << " (" << (alias_buckets_hits.back() / total) << "%)\n";
 }
 
 void Memory::AliasSet::print(ostream &os) const {
