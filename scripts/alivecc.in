@@ -8,7 +8,7 @@ use File::Basename;
 sub compiling() {
     foreach my $arg (@ARGV) {
         return 1
-            if ($arg =~ /\.c$|\.cpp$|\.CC$|\.c\+\+$|\.cc$|\.cxx$|\.C$|\.c\+$/);
+            if ($arg =~ /\.ll$|\.i$|\.c$|\.cpp$|\.CC$|\.c\+\+$|\.cc$|\.cxx$|\.C$|\.c\+$/);
     }
     return 0;
 }

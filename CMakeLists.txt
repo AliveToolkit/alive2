@@ -264,3 +264,15 @@ add_custom_target("check"
 if (BUILD_TV)
   add_dependencies("check" "alive-tv" "tv")
 endif()
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/reduce-interesting.in
+  ${CMAKE_BINARY_DIR}/reduce-interesting
+  @ONLY
+)
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/reduce-interesting-to-html.in
+  ${CMAKE_BINARY_DIR}/reduce-interesting-to-html
+  @ONLY
+)

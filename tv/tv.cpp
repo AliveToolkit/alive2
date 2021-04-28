@@ -7,6 +7,7 @@
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
+#include "util/file.h"
 #include "util/parallel.h"
 #include "util/stopwatch.h"
 #include "util/version.h"
@@ -58,6 +59,11 @@ llvm::cl::opt<long> subprocess_timeout("tv-subprocess-timeout",
   llvm::cl::desc("Maximum time, in seconds, that a parallel TV call "
                  "will be allowed to execeute (default=infinite)"),
   llvm::cl::init(-1), llvm::cl::cat(alive_cmdargs));
+
+llvm::cl::opt<bool> save_temps("tv-save-temps",
+  llvm::cl::desc("Save IR before and after each LLVM transformation "
+		 "(default=false)"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 
 struct FnInfo {
@@ -183,6 +189,18 @@ struct TVLegacyPass final : public llvm::ModulePass {
   // If it returns false, the caller can simply move t.tgt to info.fn
   static bool verify(Transform &t, int n, const string &src_tostr) {
     printDot(t.tgt, n);
+
+    if (save_temps) {
+      auto fn = get_random_filename(".", "ll");
+      std::error_code EC;
+      llvm::raw_fd_ostream Out(fn, EC);
+      if (EC) {
+        *out << "Error opening output file: " << EC.message() << "!\n";
+        exit(1);
+      }
+      F.getParent()->print(Out, /*AnnotationWriter=*/nullptr);
+      *out << "Saved IR as " << fn << "\n";
+    }
 
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal

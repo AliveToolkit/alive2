@@ -1,0 +1,208 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+use autodie;
+use File::Basename;
+use File::Temp;
+use Sys::CPU;
+use File::Copy;
+
+## TODO
+## - support C++?
+## - make absolute/relative command paths controlled by command line option
+
+###################################################################################
+
+my $ALIVECC;
+my $CLANG;
+my $OPT;
+my $LLVM_REDUCE;
+
+if (1) {
+    $ALIVECC = "@CMAKE_BINARY_DIR@/alivecc";
+    $CLANG = "@LLVM_BINARY_DIR@/bin/clang";
+    $OPT = "@LLVM_BINARY_DIR@/bin/opt";
+    $LLVM_REDUCE = "@LLVM_BINARY_DIR@/bin/llvm-reduce";
+} else {
+    $ALIVECC = "alivecc";
+    $CLANG = "clang";
+    $OPT = "opt";
+    $LLVM_REDUCE = "llvm-reduce";
+}
+
+## my $WERRORS = "-Werror=int-conversion -Werror=implicit-int -Werror=return-type -Werror=implicit-function-declaration -Werror=incompatible-pointer-types";
+my $WERRORS = "";
+
+## milliseconds
+my $SMT_TO = 100000;
+
+## seconds
+my $ALIVE_TO = 180;
+
+my @looking_for = (
+    "Value mismatch",
+    "Mismatch in memory",
+    "Target is more poisonous than source",
+    "Source is more defined than target",
+    "Source and target don't have the same return domain",
+    "Target's return value is more undefined",
+    );
+
+my $NPROCS = Sys::CPU::cpu_count();
+print "we'll use $NPROCS cores.\n";
+
+my @CFILES;
+
+foreach my $arg (@ARGV) {
+    if (!((-f $arg) && (($arg =~ /\.i$/) || ($arg =~ /\.c$/)))) {
+        print "$0 expects a list of at least one preprocessed\n";
+        print "C files each with a '.c' or '.i' extension.\n";
+        print "IMPORTANT: make sure to preprocess using Clang.\n";
+        exit(-1);
+    }
+    push @CFILES, $arg;
+}
+
+###################################################################################
+
+sub runit ($) {
+    (my $cmd) = @_;
+    my $ret = "";
+    my $res = (system "$cmd");
+    my $exit_value  = $? >> 8;
+    if ($exit_value == 0) {
+    } elsif ($exit_value == 124) {
+        ## 124 is Linux-specific!
+        $ret .= "<TIMEOUT>\n";
+    } else {
+	$ret .= "ERROR due to '$cmd'\n";
+    }
+    return $ret;
+}
+
+my @funcs;
+my @files;
+
+foreach my $fn (@CFILES) {
+    my $t1 = File::Temp::tmpnam();
+    my $t2 = File::Temp::tmpnam();
+
+    my $res = runit("$CLANG -fno-strict-aliasing -c -O2 $WERRORS $fn -o $t1 >/dev/null 2>&1");
+    if ($res ne "") {
+        print "initial compilation of '${fn}' fails, please make sure it was produced by clang";
+        next;
+    }
+    die unless runit("nm $t1 > $t2") eq "";
+    open my $INF, "<$t2" or die;
+    my $n = 0;
+    while (my $line = <$INF>) {
+        chomp $line;
+        next unless $line =~ / [tT] (.*)$/;
+        push @funcs, $1;
+        push @files, $fn;
+        $n++;
+    }
+    close $INF;
+    print "found ${n} functions from $fn using nm output\n";
+}
+
+die unless scalar(@funcs) > 0;
+
+my $num_running = 0;
+my $opid = $$;
+
+sub test($$$$) {
+    (my $func, my $CFILE, my $n, my $total) = @_;
+    my $t5 = File::Temp::tmpnam();
+    my $output = "\n\n============================ $func ($n / $total) ============================\n\n";
+    my $CMD3 = "timeout $ALIVE_TO $ALIVECC -c -O2 -mllvm -tv-func=$func -mllvm -tv-smt-to=$SMT_TO";
+    $output .= runit("$CMD3 $CFILE -o /dev/null > $t5 2>&1");
+
+    open my $INF, "<$t5" or die;
+    my $lines = 0;
+    while (my $line = <$INF>) {
+        $lines++;
+    }
+    close $INF;
+
+    my $l = 0;
+    my $str;
+    open $INF, "<$t5" or die;
+    while (my $line = <$INF>) {
+        if ($l > ($lines-10)) {
+            $output .= $line;
+        }
+        $l++;
+        foreach my $i (@looking_for) {
+            if ($line =~ /$i/) {
+                $str = $i;
+                last;
+            }
+        }
+    }
+    close $INF;
+
+    if (defined($str)) {
+        $output .= "\ninteresting!\n";
+        my $dir = "reduce-$$";
+        mkdir($dir) or die();
+        File::Copy::copy($CFILE, "$dir/small.c") or die();
+        chdir($dir) or die();
+        open my $ERR, ">error.txt" or die();
+        print $ERR "${str}\n";
+        close $ERR;
+
+        open my $OUTF, ">test1.sh" or die();
+        print $OUTF "timeout $ALIVE_TO $ALIVECC -c -O2 -mllvm -tv-func=$func -mllvm -tv-smt-to=$SMT_TO small.c -o /dev/null $WERRORS > out2.txt 2>&1\n";
+        print $OUTF "grep '${str}' out2.txt\n";
+        close $OUTF;
+        chmod 0755, "test1.sh";
+        runit("creduce --n 1 ./test1.sh small.c > creduce.log 2>&1");
+        $output .= "done reducing C.\n";
+
+        runit("$CLANG -fno-strict-aliasing -S -emit-llvm -Xclang -disable-llvm-optzns -O2 small.c -o small.ll");
+
+        open $OUTF, ">test2.sh" or die();
+        print $OUTF "timeout $ALIVE_TO $ALIVECC -c -O2 -mllvm -tv-smt-to=$SMT_TO \$1 -o /dev/null > out2.txt 2>&1\n";
+        print $OUTF "grep '${str}' out2.txt\n";
+        close $OUTF;
+        chmod 0755, "test2.sh";
+        runit("$LLVM_REDUCE --test /bin/bash --test-arg ./test2.sh small.ll > llvm-reduce.log 2>&1");
+        $output .= "done reducing IR.\n";
+    } else {
+        $output .= "\nnot interesting\n";
+    }
+
+    print $output;
+}
+
+sub wait_for_one() {
+    my $xpid = wait();
+    die if $xpid == -1;
+    $num_running--;
+}
+
+my $n = 0;
+foreach my $func (@funcs) {
+    my $CFILE = $files[$n];
+    $n++;
+    wait_for_one() unless $num_running < $NPROCS;
+    die unless $num_running < $NPROCS;
+    my $pid = fork();
+    die unless $pid >= 0;
+    if ($pid == 0) {
+        srand();
+        test($func, $CFILE, $n, scalar(@funcs));
+	exit(0);
+    }
+    # make sure we're in the parent
+    die unless $$ == $opid;
+    $num_running++;
+}
+
+wait_for_one() while ($num_running > 0);
+
+print "done.\n";
+
+###################################################################################

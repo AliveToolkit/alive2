@@ -13,6 +13,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/Verifier.h"
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1225,6 +1226,12 @@ public:
 
 
   optional<Function> run() {
+    if (verifyFunction(f)) {
+      *out << "ERROR: IR for function '" << (string)f.getName()
+           << "' is broken and cannot be processed by Alive2.\n";
+      return {};
+    }
+
     constexpr_idx = 0;
     copy_idx = 0;
     alignopbundle_idx = 0;

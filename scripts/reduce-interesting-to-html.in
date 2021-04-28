@@ -1,0 +1,255 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+use autodie;
+use File::Basename;
+use File::Temp;
+use Sys::CPU;
+use File::Copy;
+use Cwd;
+
+my %errs;
+my %sizes;
+my %dups;
+my @dirs;
+my %repro;
+
+my $ALIVECC = "@CMAKE_BINARY_DIR@/alivecc";
+my $OPTALIVE = "@CMAKE_BINARY_DIR@/opt-alive-test.sh";
+my $CLANG = "@LLVM_BINARY_DIR@/bin/clang";
+my $OPT = "@LLVM_BINARY_DIR@/bin/opt";
+my $LLVM_REDUCE = "@LLVM_BINARY_DIR@/bin/llvm-reduce";
+
+my %passmap = (
+    "SROA" => "-sroa",
+    "InstCombinePass" => "-instcombine",
+    "SimplifyCFGPass" => "-simplifycfg",
+    );
+
+foreach my $dir (glob "reduce-*") {
+    next unless -d $dir;
+    next unless -e "$dir/reduced.ll";
+    my $size = -s "$dir/reduced.ll";
+    next unless ($size < 50000);
+    open my $INF, "<$dir/error.txt" or die;
+    my $err = <$INF>;
+    chomp $err;
+    close $INF;
+    my $lref = $errs{$err};
+    my @l;
+    if (defined $lref) {
+	@l = @{$lref};
+	push @l, $dir;
+    } else {
+	@l = ($dir);
+    }
+    $errs{$err} = \@l;
+    $sizes{$dir} = $size;
+    $dups{$dir} = 0;
+    push @dirs, $dir;
+}
+
+sub bysize {
+    return $sizes{$a} <=> $sizes{$b};
+}
+
+sub to_link($) {
+    (my $l) = @_;
+    $l =~ s/ /\-/g;
+    return lc($l);
+}
+
+sub fingerprint($$) {
+    (my $dir, my $fn) = @_;
+    open my $INF, "<$dir/$fn" or die;
+    my $fp = "";
+    while (my $line = <$INF>) {
+	# print $line;
+	if ($line =~ /^\s+\%[0-9a-zA-Z._]+ = ([a-zA-Z0-9._]+) /) {
+	    $fp .= "$1\n";
+	    next;
+	}
+	if ($line =~ /^\s+(ret|store|call|br) /) {
+	    $fp .= "$1\n";
+	    next;
+	}
+    }
+    close $INF;
+    # print "<".$fp.">";
+    # print "\n\n\n\n";
+    return $fp;
+}
+
+sub highlight($$) {
+    (my $OUTF, my $fn) = @_;
+    if (1) {
+	open my $INF, "pygmentize -f html $fn |" or die;
+	while (my $line = <$INF>) {
+	    print $OUTF $line;
+	}
+	close $INF;
+    } else {
+	print $OUTF "<pre>";
+	open my $INF, "<$fn" or die;
+	while (my $line = <$INF>) {
+	    print $OUTF $line;
+	}
+	close $INF;
+	print $OUTF "</pre><br>\n";
+    }
+}
+
+open my $OUTF, ">index.html" or die;
+
+print $OUTF <<'EOM';
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <link rel="stylesheet" href="pygments.css" type="text/css" />
+<style type="text/css">
+  table.right { float: right; margin-left: 20px; }
+  table.right td { border: 1px solid #ccc; }
+</style>
+
+  </head><body>
+
+EOM
+
+print $OUTF "Summary:\n";
+print $OUTF "<ul>\n";
+my $n = 0;
+foreach my $err (sort keys %errs) {
+    my $lref = $errs{$err};
+    my @l = @{$lref};
+    my $count = scalar(@l);
+    my $link = to_link($err);
+    print $OUTF "<li><a href=\"#sec$n\">${err}</a> ($count)\n";
+    $n++;
+}
+
+print $OUTF "</ul>\n";
+print $OUTF "<hr size=\"5\">\n\n";
+$n = 0;
+
+# TODO
+# links to compiler explorer, if possible
+# refer back to file and function
+# some sort of basic CSS for margins
+# click to minimize?
+# click to expand
+#   C code
+#   alive2 output
+
+my $orig_dir = Cwd::getcwd();
+
+foreach my $dir (@dirs) {
+    chdir $dir or die;
+    system("$ALIVECC -c -O2 -mllvm -tv-smt-to=100000 reduced.ll -mllvm -tv-save-temps > out.txt 2>&1");
+    open my $INF, "<error.txt" or die;
+    my $error = <$INF>;
+    chomp $error;
+    close $INF;
+    open $INF, "<out.txt" or die;
+    my $found = 0;
+    my $last_pass;
+    my $pass;
+    my $before;
+    my $after;
+    my $trigger;
+    while (my $line = <$INF>) {
+	if ($line =~ /^\-\- [0-9]+\. (.*)$/) {
+	    $last_pass = $1;
+	    next;
+	}
+	if ($line =~ /^Saved IR as (.*)$/) {
+	    $before = $after;
+	    $after = $1;
+	    next;
+	}
+	if ($line =~ /$error/) {
+	    $found = 1;
+	    $trigger = $before;
+	    $pass = $last_pass;
+	    next;
+	}
+    }
+    close $INF;
+    die unless $found;
+    print "$dir: $before, $after, $pass\n";
+
+    my $p = $passmap{$pass};
+    die unless defined($p);
+
+    open my $T3, ">test3.sh" or die;
+    my $r = "$OPTALIVE $p";
+    $repro{$dir} = $r;
+    print $T3 "$r \$1 -o /dev/null > out3.txt 2>&1\n";
+    print $T3 "grep \"$error\" out3.txt\n";
+    close $T3;
+    chmod 0755, "test3.sh";
+
+    system("cp $trigger reduced3.ll");
+    system("./test3.sh reduced3.ll > out3.txt 2>&1");
+    system("$LLVM_REDUCE --in-place --test /bin/bash --test-arg ./test3.sh reduced3.ll > /dev/null 2>&1");
+
+    system("$OPT $p reduced3.ll -S -o reduced3-out.ll");
+
+    chdir $orig_dir or die;
+}
+
+# sort by error type
+foreach my $err (sort keys %errs) {
+    my $lref = $errs{$err};
+    my @l = @{$lref};
+    my @l2;
+
+    # secondary sort by size
+    my %seen;
+    foreach my $dir (sort bysize @l) {
+	my $fp = fingerprint($dir, "reduced3.ll");
+	if (exists($seen{$fp})) {
+	    $dups{$seen{$fp}}++;
+	    my $x = $dups{$dir};
+	} else {
+	    $seen{$fp} = $dir;
+	    push @l2, $dir;
+	}
+    }
+    $errs{$err} = \@l2;
+}
+
+# sort by error type
+foreach my $err (sort keys %errs) {
+    my $lref = $errs{$err};
+    my @l = @{$lref};
+
+    print $OUTF "\n<h1 id=\"sec$n\">$err</h2>\n";
+    $n++;
+
+    # secondary sort by size
+    my %seen;
+    foreach my $dir (sort bysize @l) {
+
+	print $OUTF "Source:<br>\n";
+	highlight($OUTF, "$dir/reduced3.ll");
+
+	print $OUTF "Target:<br>\n";
+	highlight($OUTF, "$dir/reduced3-out.ll");
+
+	my $d = $dups{$dir};
+	print $OUTF "repro: <tt>$repro{$dir}</tt><br>\n";
+	if ($d > 0) {
+	    print $OUTF "(eliding $d duplicate".
+		(($d > 1) ? "s" : "")
+		.")\n<br>\n";
+	}
+	print $OUTF "\n<br><hr size=\"5\"><br>\n\n";
+    }
+}
+
+print $OUTF "</body></html>\n";
+
+close $OUTF;
