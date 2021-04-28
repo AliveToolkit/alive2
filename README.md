@@ -157,6 +157,15 @@ ALIVECC_OVERWRITE_REPORTS=1
 ALIVECC_REPORT_DIR=dir
 ```
 
+If validating the program takes a long time, you can batch optimizations to
+verify.
+First, emit a list of batched optimizations by running `clang`/`clang++` with
+the `build/tv/batchutil/tv_batchutil.so` plugin.
+You can use `-mllvm --tv-batch-out=...` to designate the path of the output.
+Second, set `ALIVECC_BATCHED_OPTS=...` to the path of the saved text file
+and run `alivecc`/`alive++`.
+
+
 Running the Standalone Translation Validation Tool (alive-tv)
 --------
 

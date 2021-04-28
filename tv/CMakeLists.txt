@@ -1,8 +1,8 @@
 # add_llvm_loadable_module was removed in https://reviews.llvm.org/D51748
 if (COMMAND add_llvm_loadable_module)
-  add_llvm_loadable_module(tv tv.cpp)
+  add_llvm_loadable_module(tv tv.cpp utils.cpp)
 else()
-  add_llvm_library(tv MODULE tv.cpp)
+  add_llvm_library(tv MODULE tv.cpp utils.cpp)
 endif()
 
 configure_file(
@@ -34,3 +34,5 @@ if(APPLE)
         LINK_FLAGS "-undefined dynamic_lookup"
     )
 endif(APPLE)
+
+add_subdirectory(batchutil)
