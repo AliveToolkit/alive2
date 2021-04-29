@@ -156,6 +156,7 @@ class Memory {
   unsigned nextNonlocalBid();
 
   static bool observesAddresses();
+  static bool observesAddresses(bool nonlocal);
   static int isInitialMemBlock(const smt::expr &e, bool match_any_init = false);
 
   unsigned numLocals() const;

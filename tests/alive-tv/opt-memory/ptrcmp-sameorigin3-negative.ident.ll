@@ -6,4 +6,4 @@ define i1 @f(i8* %p, i64 %i, i64 %j) {
   ret i1 %c
 }
 
-; CHECK: has_ptr2int: 1
+; CHECK: has_ptr2int_nonlocal: 1
