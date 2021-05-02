@@ -1093,14 +1093,19 @@ void Memory::mkAxioms(const Memory &tgt) const {
   if (memory_unused())
     return;
 
-  auto nonlocal_used = [&](unsigned bid) {
-    return bid < tgt.next_nonlocal_bid || is_globalvar(bid, true);
+  auto skip_bid = [&](unsigned bid) {
+    if (is_globalvar(bid, true))
+      return false;
+    if (is_fncall_mem(bid))
+      return true;
+    return bid >= tgt.next_nonlocal_bid;
   };
 
   // transformation can increase alignment
-  unsigned align = ilog2(heap_block_alignment);
-  for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-    if (!nonlocal_used(bid))
+  expr align = expr::mkUInt(ilog2(heap_block_alignment), 6);
+
+  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+    if (skip_bid(bid))
       continue;
     Pointer p(*this, bid, false);
     Pointer q(tgt, bid, false);
@@ -1110,6 +1115,12 @@ void Memory::mkAxioms(const Memory &tgt) const {
       p.isHeapAllocated().implies(p_align == align && q_align == align));
     if (!p_align.isConst() || !q_align.isConst())
       state->addAxiom(p_align.ule(q_align));
+  }
+  for (unsigned bid = num_nonlocals_src; bid < num_nonlocals; ++bid) {
+    if (skip_bid(bid))
+      continue;
+    Pointer q(tgt, bid, false);
+    state->addAxiom(q.isHeapAllocated().implies(q.blockAlignment() == align));
   }
 
   if (!observesAddresses())
@@ -1121,7 +1132,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
   // Non-local blocks are disjoint.
   // Ignore null pointer block
   for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-    if (!nonlocal_used(bid) || is_fncall_mem(bid))
+    if (skip_bid(bid))
       continue;
 
     Pointer p1(*this, bid, false);
@@ -1136,7 +1147,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
-      if (!nonlocal_used(bid2) || is_fncall_mem(bid2))
+      if (skip_bid(bid2))
         continue;
       Pointer p2(*this, bid2, false);
       disj &= p2.isBlockAlive()
