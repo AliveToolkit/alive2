@@ -674,14 +674,14 @@ expr State::FnCallInput::refinedBy(
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
     // TODO: needs to take read/read2 as input to control if mem blocks
     // need to be compared
-    auto &[ptr_in, is_byval, is_nocapture] = args_ptr[i];
-    auto &[ptr_in2, is_byval2, is_nocapture2] = args_ptr2[i];
-    if (is_byval != is_byval2 || is_nocapture != is_nocapture2)
+    auto &[ptr_in, byval, is_nocapture] = args_ptr[i];
+    auto &[ptr_in2, byval2, is_nocapture2] = args_ptr2[i];
+    if (byval != byval2 || is_nocapture != is_nocapture2)
       return false;
 
     expr eq_val = Pointer(m, ptr_in.value)
                     .fninputRefined(Pointer(m2, ptr_in2.value),
-                                    undef_vars, is_byval2);
+                                    undef_vars, byval2);
     refines.add(ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison));
 
     if (!refines)

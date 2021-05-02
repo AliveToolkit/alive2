@@ -233,10 +233,10 @@ public:
 
   struct PtrInput {
     StateValue val;
-    bool byval;
+    unsigned byval;
     bool nocapture;
 
-    PtrInput(StateValue &&v, bool byval, bool nocapture) :
+    PtrInput(StateValue &&v, unsigned byval, bool nocapture) :
       val(std::move(v)), byval(byval), nocapture(nocapture) {}
     smt::expr operator==(const PtrInput &rhs) const;
     auto operator<=>(const PtrInput &rhs) const = default;

@@ -43,6 +43,9 @@ extern unsigned bits_program_pointer;
 /// sizeof(size_t)
 extern unsigned bits_size_t;
 
+/// >= bits_size_t && <= bits_program_pointer
+extern unsigned bits_ptr_address;
+
 /// Number of bits for a byte.
 extern unsigned bits_byte;
 

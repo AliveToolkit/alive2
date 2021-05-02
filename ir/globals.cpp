@@ -24,6 +24,7 @@ unsigned bits_for_bid;
 unsigned bits_for_offset;
 unsigned bits_program_pointer;
 unsigned bits_size_t;
+unsigned bits_ptr_address;
 unsigned bits_byte;
 unsigned strlen_unroll_cnt;
 unsigned memcmp_unroll_cnt;

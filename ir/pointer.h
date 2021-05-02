@@ -53,6 +53,7 @@ public:
   static unsigned bitsShortBid();
   static unsigned bitsShortOffset();
   static unsigned zeroBitsShortOffset();
+  static bool hasLocalBit();
 
   smt::expr isLocal(bool simplify = true) const;
 
@@ -65,6 +66,7 @@ public:
   smt::expr getAddress(bool simplify = true) const;
 
   smt::expr blockSize() const;
+  smt::expr blockSizeOffsetT() const; // to compare with offsets
 
   const smt::expr& operator()() const { return p; }
   smt::expr release() { return std::move(p); }
@@ -81,7 +83,7 @@ public:
 
   smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
   smt::expr blockAlignment() const; // log(bits)
-  smt::expr isBlockAligned(unsigned align, bool exact = false) const;
+  smt::expr isBlockAligned(uint64_t align, bool exact = false) const;
   smt::expr isAligned(unsigned align);
   smt::AndExpr isDereferenceable(uint64_t bytes, unsigned align,
                                  bool iswrite = false);
@@ -108,7 +110,7 @@ public:
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
-                           bool is_byval_arg) const;
+                           unsigned byval_bytes) const;
 
   const Memory& getMemory() const { return m; }
 

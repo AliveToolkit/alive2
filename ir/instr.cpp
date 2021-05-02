@@ -22,6 +22,8 @@ using namespace std;
     val = &with
 #define DEFINE_AS_RETZERO(cls, method) \
   uint64_t cls::method() const { return 0; }
+#define DEFINE_AS_RETZEROPAIR(cls, method) \
+  pair<uint64_t, unsigned> cls::method() const { return {}; }
 #define DEFINE_AS_RETFALSE(cls, method) \
   bool cls::method() const { return false; }
 #define DEFINE_AS_EMPTYACCESS(cls) \
@@ -1598,7 +1600,7 @@ unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
   return ret;
 }
 
-DEFINE_AS_RETZERO(FnCall, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(FnCall, getMaxAllocSize);
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
 
 bool FnCall::canFree() const {
@@ -1716,7 +1718,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 
     if (ty.isPtrType()) {
       ptr_inputs.emplace_back(move(value),
-                              argflag.has(ParamAttrs::ByVal),
+                              argflag.blockSize,
                               argflag.has(ParamAttrs::NoCapture));
     } else {
       inputs.emplace_back(move(value));
@@ -2622,16 +2624,16 @@ DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Alloc);
 DEFINE_AS_RETFALSE(Alloc, canFree);
 
-uint64_t Alloc::getMaxAllocSize() const {
+pair<uint64_t, unsigned> Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
     if (mul) {
       if (auto n = getInt(*mul))
-        return *n * abs(*bytes);
-      return UINT64_MAX;
+        return { *n * abs(*bytes), align };
+      return { UINT64_MAX, align };
     }
-    return *bytes;
+    return { *bytes, align };
   }
-  return UINT64_MAX;
+  return { UINT64_MAX, align };
 }
 
 vector<Value*> Alloc::operands() const {
@@ -2658,9 +2660,15 @@ StateValue Alloc::toSMT(State &s) const {
   auto sz = s.getAndAddPoisonUB(*size, true).value;
 
   if (mul) {
-    auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
+    if (sz.bits() > bits_size_t)
+      s.addUB(sz.extract(sz.bits()-1, bits_size_t) == 0);
     sz = sz.zextOrTrunc(bits_size_t);
+
+    auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
+    if (mul_e.bits() > bits_size_t)
+      s.addUB(mul_e.extract(mul_e.bits()-1, bits_size_t) == 0);
     auto m = mul_e.zextOrTrunc(bits_size_t);
+
     s.addUB(sz.mul_no_uoverflow(m));
     sz = sz * m;
   }
@@ -2689,8 +2697,8 @@ DEFINE_AS_RETZERO(Malloc, getMaxAccessSize);
 DEFINE_AS_RETZERO(Malloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Malloc);
 
-uint64_t Malloc::getMaxAllocSize() const {
-  return getIntOr(*size, UINT64_MAX);
+pair<uint64_t, unsigned> Malloc::getMaxAllocSize() const {
+  return { getIntOr(*size, UINT64_MAX), heap_block_alignment };
 }
 
 bool Malloc::canFree() const {
@@ -2775,12 +2783,12 @@ DEFINE_AS_RETZERO(Calloc, getMaxAccessSize);
 DEFINE_AS_RETZERO(Calloc, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Calloc, canFree);
 
-uint64_t Calloc::getMaxAllocSize() const {
+pair<uint64_t, unsigned> Calloc::getMaxAllocSize() const {
   if (auto sz = getInt(*size)) {
     if (auto n = getInt(*num))
-      return *sz * *n;
+      return { *sz * *n, heap_block_alignment };
   }
-  return UINT64_MAX;
+  return { UINT64_MAX, heap_block_alignment };
 }
 
 Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
@@ -2835,7 +2843,7 @@ unique_ptr<Instr> Calloc::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(StartLifetime, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(StartLifetime, getMaxAllocSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(StartLifetime);
@@ -2868,7 +2876,7 @@ unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Free, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Free, getMaxAllocSize);
 DEFINE_AS_RETZERO(Free, getMaxAccessSize);
 DEFINE_AS_RETZERO(Free, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Free);
@@ -2915,7 +2923,7 @@ void GEP::addIdx(uint64_t obj_size, Value &idx) {
   idxs.emplace_back(obj_size, &idx);
 }
 
-DEFINE_AS_RETZERO(GEP, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(GEP, getMaxAllocSize);
 DEFINE_AS_RETZERO(GEP, getMaxAccessSize);
 DEFINE_AS_EMPTYACCESS(GEP);
 DEFINE_AS_RETFALSE(GEP, canFree);
@@ -3058,7 +3066,7 @@ unique_ptr<Instr> GEP::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Load, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Load, getMaxAllocSize);
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Load, canFree);
 
@@ -3101,7 +3109,7 @@ unique_ptr<Instr> Load::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Store, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Store, getMaxAllocSize);
 DEFINE_AS_RETZERO(Store, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Store, canFree);
 
@@ -3151,7 +3159,7 @@ unique_ptr<Instr> Store::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Memset, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Memset, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Memset, canFree);
 
@@ -3212,7 +3220,7 @@ unique_ptr<Instr> Memset::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(FillPoison, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(FillPoison, getMaxAllocSize);
 DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(FillPoison, canFree);
 
@@ -3252,7 +3260,7 @@ unique_ptr<Instr> FillPoison::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Memcpy, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Memcpy, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Memcpy, canFree);
 
@@ -3328,7 +3336,7 @@ unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
 
 
 
-DEFINE_AS_RETZERO(Memcmp, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Memcmp, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcmp, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Memcmp, canFree);
 
@@ -3431,7 +3439,7 @@ unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Strlen, getMaxAllocSize);
+DEFINE_AS_RETZEROPAIR(Strlen, getMaxAllocSize);
 DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset);
 DEFINE_AS_RETFALSE(Strlen, canFree);
 

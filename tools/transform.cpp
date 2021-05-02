@@ -754,6 +754,7 @@ static void calculateAndInitConstants(Transform &t) {
   num_locals_tgt = 0;
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
   uint64_t max_alloc_size = 0;
+  uint64_t max_aligned_size = 0;
   uint64_t max_access_size = 0;
   uint64_t min_global_size = UINT64_MAX;
 
@@ -835,10 +836,12 @@ static void calculateAndInitConstants(Transform &t) {
         has_fncall |= true;
 
       if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
-        max_alloc_size  = max(max_alloc_size, mi->getMaxAllocSize());
-        max_access_size = max(max_access_size, mi->getMaxAccessSize());
-        cur_max_gep     = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
-        has_free       |= mi->canFree();
+        auto [alloc, align] = mi->getMaxAllocSize();
+        max_alloc_size   = max(max_alloc_size, alloc);
+        max_aligned_size = max(max_aligned_size, add_saturate(alloc, align-1));
+        max_access_size  = max(max_access_size, mi->getMaxAccessSize());
+        cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
+        has_free        |= mi->canFree();
 
         auto info = mi->getByteAccessInfo();
         has_ptr_load         |= info.doesPtrLoad;
@@ -860,7 +863,8 @@ static void calculateAndInitConstants(Transform &t) {
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
                   isCast(ConversionOp::Ptr2Int, i)) {
-        max_alloc_size = max_access_size = cur_max_gep = UINT64_MAX;
+        max_alloc_size = max_access_size = cur_max_gep = max_aligned_size
+          = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
         has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
 
@@ -945,9 +949,20 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
 
-  // we need an extra bit because 1st bit of size is always 0
+  // ASSUMPTION: programs can only allocate up to half of address space
+  // so the first bit of size is always zero.
+  // We need this assumption to support negative offsets.
   bits_size_t = ilog2_ceil(max_alloc_size, true);
-  bits_size_t = min(max(bits_for_offset, bits_size_t)+1, bits_program_pointer);
+  bits_size_t = min(max(bits_for_offset, bits_size_t), bits_program_pointer-1);
+
+  // +1 because the pointer after the object must be valid (can't overflow)
+  bits_ptr_address = ilog2_ceil(add_saturate(max_aligned_size, 1), true);
+
+  // as an (unsound) optimization, we fix the first bit of the addr for
+  // local/non-local if both exist (to reduce axiom fml size)
+  bool has_local_bit = (num_locals_src || num_locals_tgt) && num_nonlocals;
+  bits_ptr_address = min(max(bits_size_t, bits_ptr_address + has_local_bit),
+                         bits_program_pointer);
 
   bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
 
@@ -969,8 +984,10 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nbits_for_bid: " << bits_for_bid
                   << "\nbits_for_offset: " << bits_for_offset
                   << "\nbits_size_t: " << bits_size_t
+                  << "\nbits_ptr_address: " << bits_ptr_address
                   << "\nbits_program_pointer: " << bits_program_pointer
                   << "\nmax_alloc_size: " << max_alloc_size
+                  << "\nmax_aligned_size: " << max_aligned_size
                   << "\nmin_access_size: " << min_access_size
                   << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte

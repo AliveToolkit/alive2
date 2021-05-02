@@ -28,10 +28,6 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
-static bool has_local_bit() {
-  return (num_locals_src || num_locals_tgt) && num_nonlocals;
-}
-
 static unsigned total_bits_short() {
   return Pointer::bitsShortBid() + Pointer::bitsShortOffset();
 }
@@ -68,7 +64,7 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
 
   unsigned bits = total_bits_short() + !align * zeroBitsShortOffset();
   p = prepend_if(local.toBVBool(),
-                 expr::mkVar(name.c_str(), bits), has_local_bit());
+                 expr::mkVar(name.c_str(), bits), hasLocalBit());
   if (align)
     p = p.concat_zeros(zeroBitsShortOffset());
   if (bits_for_ptrattrs)
@@ -85,7 +81,7 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
     prepend_if(expr::mkUInt(local, 1),
                expr::mkUInt(bid, bitsShortBid())
                  .concat_zeros(bits_for_offset + bits_for_ptrattrs),
-               has_local_bit())) {
+               hasLocalBit())) {
   assert((local && bid < m.numLocals()) || (!local && bid < num_nonlocals));
   assert(p.bits() == totalBits());
 }
@@ -97,7 +93,7 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 expr Pointer::mkLongBid(const expr &short_bid, bool local) {
   assert((local  && (num_locals_src || num_locals_tgt)) ||
          (!local && num_nonlocals));
-  if (!has_local_bit()) {
+  if (!hasLocalBit()) {
     return short_bid;
   }
   return expr::mkUInt(local, 1).concat(short_bid);
@@ -106,7 +102,7 @@ expr Pointer::mkLongBid(const expr &short_bid, bool local) {
 expr Pointer::mkUndef(State &s) {
   auto &m = s.getMemory();
   bool force_local = false, force_nonlocal = false;
-  if (has_local_bit()) {
+  if (hasLocalBit()) {
     force_nonlocal = m.numLocals() == 0;
     force_local    = !force_nonlocal && m.numNonlocals() == 0;
   }
@@ -127,7 +123,7 @@ unsigned Pointer::totalBits() {
 }
 
 unsigned Pointer::bitsShortBid() {
-  return bits_for_bid - has_local_bit();
+  return bits_for_bid - hasLocalBit();
 }
 
 unsigned Pointer::bitsShortOffset() {
@@ -137,6 +133,10 @@ unsigned Pointer::bitsShortOffset() {
 unsigned Pointer::zeroBitsShortOffset() {
   assert(is_power2(bits_byte));
   return ilog2(bits_byte / 8);
+}
+
+bool Pointer::hasLocalBit() {
+  return (num_locals_src || num_locals_tgt) && num_nonlocals;
 }
 
 expr Pointer::isLocal(bool simplify) const {
@@ -170,7 +170,7 @@ expr Pointer::getBid() const {
 }
 
 expr Pointer::getShortBid() const {
-  return p.extract(totalBits() - 1 - has_local_bit(),
+  return p.extract(totalBits() - 1 - hasLocalBit(),
                    bits_for_offset + bits_for_ptrattrs);
 }
 
@@ -179,7 +179,8 @@ expr Pointer::getOffset() const {
 }
 
 expr Pointer::getOffsetSizet() const {
-  return getOffset().sextOrTrunc(bits_size_t);
+  auto off = getOffset();
+  return bits_for_offset >= bits_size_t ? off : off.sextOrTrunc(bits_size_t);
 }
 
 expr Pointer::getShortOffset() const {
@@ -216,31 +217,34 @@ expr Pointer::getAddress(bool simplify) const {
   assert(Memory::observesAddresses());
 
   auto bid = getShortBid();
-  auto zero = expr::mkUInt(0, bits_size_t - 1);
+  auto zero = expr::mkUInt(0, bits_ptr_address - hasLocalBit());
   // fast path for null ptrs
   auto non_local
     = simplify && bid.isZero() && has_null_block ?
           zero : expr::mkUF("blk_addr", { bid }, zero);
   // Non-local block area is the lower half
-  non_local = expr::mkUInt(0, 1).concat(non_local);
+  if (hasLocalBit())
+    non_local = expr::mkUInt(0, 1).concat(non_local);
 
   expr addr;
-  if (auto local = m.local_blk_addr(bid))
+  if (auto local = m.local_blk_addr(bid)) {
     // Local block area is the upper half of the memory
-    addr = expr::mkIf(isLocal(), expr::mkUInt(1, 1).concat(*local), non_local);
-  else
+    expr lc = hasLocalBit() ? expr::mkUInt(1, 1).concat(*local) : *local;
+    addr = expr::mkIf(isLocal(), lc, non_local);
+  } else
     addr = move(non_local);
 
-  return addr + getOffsetSizet();
+  return addr + getOffset().zextOrTrunc(bits_ptr_address);
 }
 
 expr Pointer::blockSize() const {
-  // ASSUMPTION: programs can only allocate up to half of address space
-  // so the first bit of size is always zero.
-  // We need this assumption to support negative offsets.
-  return expr::mkUInt(0, 1)
-           .concat(getValue("blk_size", m.local_blk_size, m.non_local_blk_size,
-                             expr::mkUInt(0, bits_size_t - 1)));
+  return getValue("blk_size", m.local_blk_size, m.non_local_blk_size,
+                  expr::mkUInt(0, bits_size_t));
+}
+
+expr Pointer::blockSizeOffsetT() const {
+  expr sz = blockSize();
+  return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
@@ -275,8 +279,8 @@ static expr inbounds(const Pointer &p, bool strict) {
 
   // equivalent to offset >= 0 && offset <= block_size
   // because block_size u<= 0x7FFF..FF
-  return strict ? p.getOffsetSizet().ult(p.blockSize()) :
-                  p.getOffsetSizet().ule(p.blockSize());
+  return strict ? p.getOffsetSizet().ult(p.blockSizeOffsetT()) :
+                  p.getOffsetSizet().ule(p.blockSizeOffsetT());
 }
 
 expr Pointer::inbounds(bool simplify_ptr, bool strict) {
@@ -305,7 +309,7 @@ expr Pointer::blockAlignment() const {
                    expr::mkUInt(0, 6), true);
 }
 
-expr Pointer::isBlockAligned(unsigned align, bool exact) const {
+expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
   if (!exact && align == 1)
     return true;
 
@@ -348,11 +352,11 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
                                            const expr &bytes_off,
                                            const expr &bytes,
                                            unsigned align, bool iswrite) {
-  expr block_sz = p.blockSize();
+  expr block_sz = p.blockSizeOffsetT();
   expr offset = p.getOffset();
 
   // check that offset is within bounds and that arith doesn't overflow
-  expr cond = (offset + bytes_off).sextOrTrunc(bits_size_t).ule(block_sz);
+  expr cond = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
   cond &= offset.add_no_uoverflow(bytes_off);
 
   cond &= p.isBlockAlive();
@@ -363,8 +367,8 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
     cond &= !p.isNoRead();
 
   // try some constant folding; these are implied by the conditions above
-  if (bytes.ugt(block_sz).isTrue() ||
-      offset.sextOrTrunc(bits_size_t).uge(block_sz).isTrue() ||
+  if (bytes.ugt(p.blockSize()).isTrue() ||
+      p.getOffsetSizet().uge(block_sz).isTrue() ||
       isUndef(offset))
     cond = false;
 
@@ -420,10 +424,11 @@ void Pointer::isDisjointOrEqual(const expr &len1, const Pointer &ptr2,
                                 const expr &len2) const {
   auto off = getOffsetSizet();
   auto off2 = ptr2.getOffsetSizet();
+  unsigned bits = off.bits();
   m.state->addUB(getBid() != ptr2.getBid() ||
                  off == off2 ||
-                 disjoint(off, len1.zextOrTrunc(bits_size_t), off2,
-                          len2.zextOrTrunc(bits_size_t)));
+                 disjoint(off, len1.zextOrTrunc(bits), off2,
+                          len2.zextOrTrunc(bits)));
 }
 
 expr Pointer::isBlockAlive() const {
@@ -470,27 +475,31 @@ expr Pointer::refined(const Pointer &other) const {
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
-                             bool is_byval_arg) const {
-  expr size = blockSize();
+                             unsigned byval_bytes) const {
+  expr size = blockSizeOffsetT();
   expr off = getOffsetSizet();
-  expr size2 = other.blockSize();
+  expr size2 = other.blockSizeOffsetT();
   expr off2 = other.getOffsetSizet();
+
+  // TODO: check block value for byval_bytes
+  if (byval_bytes)
+    return true;
 
   expr local
     = expr::mkIf(isHeapAllocated(),
                  getAllocType() == other.getAllocType() &&
-                 off == off2 && size == size2,
+                   off == off2 && size == size2,
 
-                 // must maintain same dereferenceability before & after
-                 expr::mkIf(off.sle(-1),
-                            off == off2 && size2.uge(size),
+                 expr::mkIf(off.sge(0),
                             off2.sge(0) &&
-                              expr::mkIf(off.sle(size),
-                                         off2.sle(size2) && off2.uge(off) &&
+                              expr::mkIf(off.ule(size),
+                                         off2.ule(size2) && off2.uge(off) &&
                                            (size2 - off2).uge(size - off),
-                                         off2.sgt(size2) && off == off2 &&
-                                           size2.uge(size))));
-  local = (other.isLocal() || other.isByval() || is_byval_arg) && local;
+                                         off2.ugt(size2) && off == off2 &&
+                                           size2.uge(size)),
+                            // maintains same dereferenceability before/after
+                            off == off2 && size2.uge(size)));
+  local = (other.isLocal() || other.isByval()) && local;
 
   // TODO: this induces an infinite loop
   // block_refined(other);
