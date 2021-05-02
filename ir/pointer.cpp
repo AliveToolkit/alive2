@@ -357,7 +357,9 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
 
   // check that offset is within bounds and that arith doesn't overflow
   expr cond = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
-  cond &= offset.add_no_uoverflow(bytes_off);
+  cond &= !offset.isNegative();
+  if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
+    cond &= offset.add_no_soverflow(bytes_off);
 
   cond &= p.isBlockAlive();
 

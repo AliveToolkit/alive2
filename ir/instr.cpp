@@ -2626,7 +2626,7 @@ DEFINE_AS_RETFALSE(Alloc, canFree);
 
 pair<uint64_t, unsigned> Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
-    if (mul) {
+    if (*bytes && mul) {
       if (auto n = getInt(*mul))
         return { *n * abs(*bytes), align };
       return { UINT64_MAX, align };
@@ -2660,11 +2660,12 @@ StateValue Alloc::toSMT(State &s) const {
   auto sz = s.getAndAddPoisonUB(*size, true).value;
 
   if (mul) {
+    auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
+
     if (sz.bits() > bits_size_t)
-      s.addUB(sz.extract(sz.bits()-1, bits_size_t) == 0);
+      s.addUB(mul_e == 0 || sz.extract(sz.bits()-1, bits_size_t) == 0);
     sz = sz.zextOrTrunc(bits_size_t);
 
-    auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
     if (mul_e.bits() > bits_size_t)
       s.addUB(mul_e.extract(mul_e.bits()-1, bits_size_t) == 0);
     auto m = mul_e.zextOrTrunc(bits_size_t);
