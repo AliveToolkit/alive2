@@ -64,12 +64,14 @@ static unsigned get_fncallmem_bid() {
   assert(has_fncall);
   return num_nonlocals_src - 1;
 }
+
 static bool is_fncall_mem(unsigned bid) {
   if (!has_fncall)
     return false;
   return bid == get_fncallmem_bid();
 }
-void ensure_non_fncallmem(const Pointer &p) {
+
+static void ensure_non_fncallmem(const Pointer &p) {
   if (!p.isLocal().isFalse())
     return;
   uint64_t ubid;
@@ -128,12 +130,18 @@ static string local_name(const State *s, const char *name) {
   return string(name) + (s->isSource() ? "_src" : "_tgt");
 }
 
+static bool align_ge_size(const expr &align, const expr &size) {
+  uint64_t algn, sz;
+  return align.isUInt(algn) && size.isUInt(sz) && (1ull << algn) >= sz;
+}
+
 // Assumes that both begin + len don't overflow
 static expr disjoint(const expr &begin1, const expr &len1, const expr &align1,
                      const expr &begin2, const expr &len2, const expr &align2) {
   // if blocks have the same alignment they can't start in the middle of
   // each other. We just need to ensure they have a different addr.
-  if (align1.eq(align2))
+  if (align1.eq(align2) && align_ge_size(align1, len1) &&
+      align_ge_size(align2, len2))
     return begin1 != begin2;
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
@@ -1142,20 +1150,19 @@ void Memory::mkAxioms(const Memory &tgt) const {
       continue;
 
     Pointer p1(*this, bid, false);
-    auto addr = p1.getAddress();
-    auto sz = p1.blockSize().zextOrTrunc(bits_ptr_address);
+    auto addr  = p1.getAddress();
+    auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
+    auto align = p1.blockAlignment();
 
     state->addAxiom(addr != 0);
 
     // Ensure block ptr doesn't overflow
     auto msb_bit = bits_ptr_address - 1;
-    uint64_t align, size_const;
+    uint64_t align_const;
 
-    if (p1.blockAlignment().isUInt(align) &&
-        sz.isUInt(size_const) &&
-        (1ull << align) >= size_const) {
+    if (align_ge_size(align, sz) && align.isUInt(align_const)) {
       expr addr_trunc = Pointer::hasLocalBit() ? addr.trunc(msb_bit) : addr;
-      state->addAxiom(aligned_ptr_noovl(addr_trunc, align));
+      state->addAxiom(aligned_ptr_noovl(addr_trunc, align_const));
     } else {
       state->addAxiom(
         Pointer::hasLocalBit()
