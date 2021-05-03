@@ -162,7 +162,8 @@ static expr load_bv(const expr &var, const expr &idx0) {
 }
 
 static void store_bv(Pointer &p, const expr &val, expr &local,
-                     expr &non_local, bool assume_local = false) {
+                     expr &non_local, bool assume_local = false,
+                     const expr &cond = true) {
   auto bid0 = p.getShortBid();
 
   auto set = [&](const expr &var) {
@@ -178,8 +179,8 @@ static void store_bv(Pointer &p, const expr &val, expr &local,
   };
 
   auto is_local = p.isLocal() || assume_local;
-  local = expr::mkIf(is_local, set(local), local);
-  non_local = expr::mkIf(!is_local, set(non_local), non_local);
+  local = mkIf_fold(cond && is_local, set(local), local);
+  non_local = mkIf_fold(cond && !is_local, set(non_local), non_local);
 }
 
 namespace IR {
@@ -1520,14 +1521,18 @@ void Memory::startLifetime(const expr &ptr_local) {
 void Memory::free(const expr &ptr, bool unconstrained) {
   assert(!memory_unused() && (has_free || has_dead_allocas));
   Pointer p(*this, ptr);
+  expr nonzero = p.isNonZero();
+
   if (!unconstrained)
-    state->addUB(p.isNull() || (p.getOffset() == 0 &&
-                                p.isBlockAlive() &&
-                                p.getAllocType() == Pointer::MALLOC));
-  if (!p.isNull().isTrue()) {
+    state->addUB(nonzero.implies(p.getOffset() == 0 &&
+                                 p.isBlockAlive() &&
+                                 p.getAllocType() == Pointer::MALLOC));
+
+  if (!nonzero.isFalse()) {
     // A nonlocal block for encoding fn calls' side effects cannot be freed.
     ensure_non_fncallmem(p);
-    store_bv(p, false, local_block_liveness, non_local_block_liveness);
+    store_bv(p, false, local_block_liveness, non_local_block_liveness, false,
+             nonzero);
   }
 }
 

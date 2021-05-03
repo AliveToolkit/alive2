@@ -2755,7 +2755,7 @@ StateValue Malloc::toSMT(State &s) const {
 
     Pointer ptr_old(m, p);
     if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
-      s.addUB(ptr_old.isNull() || ptr_old.isLocal());
+      s.addUB(ptr_old.isNonZero().implies(ptr_old.isLocal()));
 
     m.copy(ptr_old, Pointer(m, p_new));
 
@@ -2905,7 +2905,7 @@ StateValue Free::toSMT(State &s) const {
 
   if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly) {
     Pointer ptr(s.getMemory(), p);
-    s.addUB(ptr.isNull() || ptr.isLocal());
+    s.addUB(ptr.isNonZero().implies(ptr.isLocal()));
   }
 
   return {};
