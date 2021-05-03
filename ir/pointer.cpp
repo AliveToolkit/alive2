@@ -277,10 +277,9 @@ static expr inbounds(const Pointer &p, bool strict) {
   if (isUndef(p.getOffset()))
     return false;
 
-  // equivalent to offset >= 0 && offset <= block_size
-  // because block_size u<= 0x7FFF..FF
-  return strict ? p.getOffsetSizet().ult(p.blockSizeOffsetT()) :
-                  p.getOffsetSizet().ule(p.blockSizeOffsetT());
+  auto offset = p.getOffsetSizet();
+  auto size   = p.blockSizeOffsetT();
+  return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
 }
 
 expr Pointer::inbounds(bool simplify_ptr, bool strict) {

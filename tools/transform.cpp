@@ -948,6 +948,7 @@ static void calculateAndInitConstants(Transform &t) {
                  true) + 1;
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
+  bits_for_offset = min(bits_for_offset, bits_program_pointer);
 
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.

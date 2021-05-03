@@ -81,7 +81,6 @@ class Function final {
 
   FnAttrs attrs;
 
-
 public:
   Function() {}
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
