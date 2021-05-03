@@ -96,14 +96,14 @@ encodePtrAttrs(const State &s, const expr &ptrvalue,
   Pointer p(s.getMemory(), ptrvalue);
 
   if (nonnull)
-    non_poison &= p.isNonZero();
+    non_poison &= !p.isNull();
 
   if (derefBytes || derefOrNullBytes) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
       UB.add(p.isDereferenceable(derefBytes, align));
     if (derefOrNullBytes)
-      UB.add(p.isDereferenceable(derefOrNullBytes, align)() || !p.isNonZero());
+      UB.add(p.isDereferenceable(derefOrNullBytes, align)() || p.isNull());
   } else if (align != 1)
     // align
     non_poison &= p.isAligned(align);

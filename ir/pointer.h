@@ -116,7 +116,6 @@ public:
 
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
-  smt::expr isNonZero() const;
 
   static void resetGlobals();
 

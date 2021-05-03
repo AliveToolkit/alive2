@@ -560,15 +560,11 @@ Pointer Pointer::mkNullPointer(const Memory &m) {
 }
 
 expr Pointer::isNull() const {
+  if (Memory::observesAddresses())
+    return getAddress() == 0;
   if (!has_null_block)
     return false;
   return *this == mkNullPointer(m);
-}
-
-expr Pointer::isNonZero() const {
-  if (Memory::observesAddresses())
-    return getAddress() != 0;
-  return !isNull();
 }
 
 void Pointer::resetGlobals() {

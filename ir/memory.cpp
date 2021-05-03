@@ -1521,18 +1521,18 @@ void Memory::startLifetime(const expr &ptr_local) {
 void Memory::free(const expr &ptr, bool unconstrained) {
   assert(!memory_unused() && (has_free || has_dead_allocas));
   Pointer p(*this, ptr);
-  expr nonzero = p.isNonZero();
+  expr isnnull = p.isNull();
 
   if (!unconstrained)
-    state->addUB(nonzero.implies(p.getOffset() == 0 &&
-                                 p.isBlockAlive() &&
-                                 p.getAllocType() == Pointer::MALLOC));
+    state->addUB(isnnull || (p.getOffset() == 0 &&
+                             p.isBlockAlive() &&
+                             p.getAllocType() == Pointer::MALLOC));
 
-  if (!nonzero.isFalse()) {
+  if (!isnnull.isTrue()) {
     // A nonlocal block for encoding fn calls' side effects cannot be freed.
     ensure_non_fncallmem(p);
     store_bv(p, false, local_block_liveness, non_local_block_liveness, false,
-             nonzero);
+             !isnnull);
   }
 }
 
