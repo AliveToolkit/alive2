@@ -471,8 +471,9 @@ expr Pointer::refined(const Pointer &other) const {
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  return expr::mkIf(isLocal(), move(local), *this == other) &&
-         isBlockAlive().implies(other.isBlockAlive());
+  return expr::mkIf(isNull(), other.isNull(),
+                    expr::mkIf(isLocal(), move(local), *this == other) &&
+                      isBlockAlive().implies(other.isBlockAlive()));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
