@@ -1274,7 +1274,8 @@ StateValue ConversionOp::toSMT(State &s) const {
     fn = [](auto &&val, auto &to_type) -> StateValue {
       expr bv  = val.fp2sint(to_type.bits());
       expr fp2 = bv.sint2fp(val);
-      return { move(bv), fp2 == val };
+      // -0.0 is converted to 0 and then to 0.0, though -0.0 is ok to convert
+      return { move(bv), val.isFPZero() || fp2 == val };
     };
     break;
   case FPToUInt:
