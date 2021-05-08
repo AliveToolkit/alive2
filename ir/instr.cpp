@@ -1422,12 +1422,14 @@ StateValue Select::toSMT(State &s) const {
   auto &av = s[*a];
   auto &bv = s[*b];
 
-  auto scalar = [&](const auto &a, const auto &b, const auto &c) {
+  auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
     auto cond = c.value == 1;
-    return fm_poison(s, a.value, c.non_poison, b.value,
-                     expr::mkIf(cond, a.non_poison, b.non_poison),
-                     [&](expr &a, expr &b) { return expr::mkIf(cond, a, b); },
-                     fmath, false);
+    StateValue sva
+      = fm_poison(s, a.value, a.non_poison, std::identity(), fmath, true);
+    StateValue svb
+      = fm_poison(s, b.value, b.non_poison, std::identity(), fmath, true);
+    return { expr::mkIf(cond, sva.value, svb.value),
+             c.non_poison && expr::mkIf(cond, a.non_poison, b.non_poison) };
   };
 
   if (auto agg = getType().getAsAggregateType()) {
