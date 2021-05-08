@@ -1709,7 +1709,7 @@ expr expr::float2Float(const expr &type) const {
 
 expr expr::fp2sint(unsigned bits) const {
   C();
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  auto rm = Z3_mk_fpa_rtz(ctx());
   return simplify_const(Z3_mk_fpa_to_sbv(ctx(), rm, ast(), bits), *this);
 }
 
