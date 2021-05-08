@@ -1425,10 +1425,9 @@ StateValue Select::toSMT(State &s) const {
 
   auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
     auto cond = c.value == 1;
-    StateValue sva
-      = fm_poison(s, a.value, a.non_poison, std::identity(), fmath, true);
-    StateValue svb
-      = fm_poison(s, b.value, b.non_poison, std::identity(), fmath, true);
+    auto identity = [](const expr &x) { return x; };
+    StateValue sva = fm_poison(s, a.value, a.non_poison, identity, fmath, true);
+    StateValue svb = fm_poison(s, b.value, b.non_poison, identity, fmath, true);
     return { expr::mkIf(cond, sva.value, svb.value),
              c.non_poison && expr::mkIf(cond, a.non_poison, b.non_poison) };
   };
