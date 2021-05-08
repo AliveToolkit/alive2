@@ -506,8 +506,9 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   // TODO: this induces an infinite loop
   // block_refined(other);
 
-  return expr::mkIf(isLocal(), local, *this == other) &&
-         isBlockAlive().implies(other.isBlockAlive());
+  return expr::mkIf(isNull(), other.isNull(),
+                    expr::mkIf(isLocal(), local, *this == other) &&
+                      isBlockAlive().implies(other.isBlockAlive()));
 }
 
 expr Pointer::isWritable() const {
