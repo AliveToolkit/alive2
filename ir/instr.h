@@ -175,9 +175,11 @@ public:
 
 class Select final : public Instr {
   Value *cond, *a, *b;
+  FastMathFlags fmath;
 public:
-  Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b)
-    : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b) {}
+  Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b,
+         FastMathFlags fmath = {})
+    : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b), fmath(fmath) {}
 
   Value *getTrueValue() const { return a; }
   Value *getFalseValue() const { return b; }

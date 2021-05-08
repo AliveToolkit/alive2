@@ -405,7 +405,8 @@ public:
 
   RetTy visitSelectInst(llvm::SelectInst &i) {
     PARSE_TRIOP();
-    RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c));
+    RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c,
+                                          parse_fmath(i)));
   }
 
   RetTy visitExtractValueInst(llvm::ExtractValueInst &i) {

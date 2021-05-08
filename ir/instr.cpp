@@ -1414,7 +1414,7 @@ void Select::rauw(const Value &what, Value &with) {
 }
 
 void Select::print(ostream &os) const {
-  os << getName() << " = select " << *cond << ", " << *a << ", " << *b;
+  os << getName() << " = select " << fmath << *cond << ", " << *a << ", " << *b;
 }
 
 StateValue Select::toSMT(State &s) const {
@@ -1422,10 +1422,12 @@ StateValue Select::toSMT(State &s) const {
   auto &av = s[*a];
   auto &bv = s[*b];
 
-  auto scalar = [](const auto &a, const auto &b, const auto &c) -> StateValue {
+  auto scalar = [&](const auto &a, const auto &b, const auto &c) {
     auto cond = c.value == 1;
-    return { expr::mkIf(cond, a.value, b.value),
-             c.non_poison && expr::mkIf(cond, a.non_poison, b.non_poison) };
+    return fm_poison(s, a.value, c.non_poison, b.value,
+                     expr::mkIf(cond, a.non_poison, b.non_poison),
+                     [&](expr &a, expr &b) { return expr::mkIf(cond, a, b); },
+                     fmath, false);
   };
 
   if (auto agg = getType().getAsAggregateType()) {
@@ -1446,6 +1448,7 @@ expr Select::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
          cond->getType().enforceIntOrVectorType(1) &&
          getType().enforceVectorTypeIff(cond->getType()) &&
+         (fmath.isNone() ? expr(true) : getType().enforceFloatOrVectorType()) &&
          getType() == a->getType() &&
          getType() == b->getType();
 }
