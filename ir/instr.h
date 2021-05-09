@@ -534,8 +534,6 @@ public:
   unsigned getAlign() const;
   bool isRealloc() const { return ptr != nullptr; }
 
-  void setAlign(unsigned val) { align = val; }
-
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
@@ -562,8 +560,6 @@ public:
   Value& getNum() const { return *num; }
   Value& getSize() const { return *size; }
   unsigned getAlign() const;
-
-  void setAlign(unsigned val) { align = val; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
