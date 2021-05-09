@@ -57,6 +57,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 50. Incorrect propagation of nsz from fneg to fdiv  (https://llvm.org/PR49654)
 51. Incorrect offset calculation when adding align to load from assume (https://reviews.llvm.org/D98759)
 52. InstSimplify: incorrect fold of pointer comparison between globals (https://llvm.org/PR50208)
+53. ConstraintElimination: incorrect fold of pointer comparison (https://llvm.org/PR50280)
+54. InstCombine: incorrect select fast-math folds (https://llvm.org/PR50281)
 
 
 ### Bugs found in Z3
