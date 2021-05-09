@@ -515,19 +515,26 @@ public:
 
 class Malloc final : public MemInstr {
   Value *ptr = nullptr, *size;
+  unsigned align;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
   bool isNonNull = false;
 
 public:
-  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull)
-    : MemInstr(type, std::move(name)), size(&size), isNonNull(isNonNull) {}
+  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull,
+         unsigned align = 0)
+    : MemInstr(type, std::move(name)), size(&size), align(align),
+      isNonNull(isNonNull) {}
 
-  Malloc(Type &type, std::string &&name, Value &ptr, Value &size)
-    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size) {}
+  Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
+         unsigned align = 0)
+    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size), align(align) {}
 
   Value& getSize() const { return *size; }
+  unsigned getAlign() const;
   bool isRealloc() const { return ptr != nullptr; }
+
+  void setAlign(unsigned val) { align = val; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -546,12 +553,17 @@ public:
 
 class Calloc final : public MemInstr {
   Value *num, *size;
+  unsigned align;
 public:
-  Calloc(Type &type, std::string &&name, Value &num, Value &size)
-    : MemInstr(type, std::move(name)), num(&num), size(&size) {}
+  Calloc(Type &type, std::string &&name, Value &num, Value &size,
+         unsigned align = 0)
+    : MemInstr(type, std::move(name)), num(&num), size(&size), align(align) {}
 
   Value& getNum() const { return *num; }
   Value& getSize() const { return *size; }
+  unsigned getAlign() const;
+
+  void setAlign(unsigned val) { align = val; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

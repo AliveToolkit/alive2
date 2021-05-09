@@ -2704,11 +2704,15 @@ DEFINE_AS_RETZERO(Malloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Malloc);
 
 pair<uint64_t, unsigned> Malloc::getMaxAllocSize() const {
-  return { getIntOr(*size, UINT64_MAX), heap_block_alignment };
+  return { getIntOr(*size, UINT64_MAX), getAlign() };
 }
 
 bool Malloc::canFree() const {
   return ptr != nullptr;
+}
+
+unsigned Malloc::getAlign() const {
+  return align ? align : heap_block_alignment;
 }
 
 vector<Value*> Malloc::operands() const {
@@ -2730,6 +2734,8 @@ void Malloc::print(ostream &os) const {
   else
     os << " = realloc " << *ptr << ", ";
   os << *size;
+  if (align)
+    os << ", align " << align;
   if (isNonNull)
     os << ", nonnull";
 }
@@ -2738,10 +2744,9 @@ StateValue Malloc::toSMT(State &s) const {
   auto &m = s.getMemory();
   auto &[sz, np_size] = s.getAndAddPoisonUB(*size, true);
 
-  unsigned align = heap_block_alignment;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto [p_new, allocated]
-    = m.alloc(sz, align, Memory::MALLOC, np_size, nonnull);
+    = m.alloc(sz, getAlign(), Memory::MALLOC, np_size, nonnull);
 
   expr nullp = Pointer::mkNullPointer(m)();
   expr ret = expr::mkIf(allocated, p_new, nullp);
@@ -2792,18 +2797,22 @@ DEFINE_AS_RETFALSE(Calloc, canFree);
 pair<uint64_t, unsigned> Calloc::getMaxAllocSize() const {
   if (auto sz = getInt(*size)) {
     if (auto n = getInt(*num))
-      return { *sz * *n, heap_block_alignment };
+      return { *sz * *n, getAlign() };
   }
-  return { UINT64_MAX, heap_block_alignment };
+  return { UINT64_MAX, getAlign() };
 }
 
 Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
   auto info = ByteAccessInfo::intOnly(1);
   if (auto n = getInt(*num))
     if (auto sz = getInt(*size)) {
-      info.byteSize = gcd(heap_block_alignment, *n * *sz);
+      info.byteSize = gcd(getAlign(), *n * *sz);
     }
   return info;
+}
+
+unsigned Calloc::getAlign() const {
+  return align ? align : heap_block_alignment;
 }
 
 vector<Value*> Calloc::operands() const {
@@ -2817,21 +2826,22 @@ void Calloc::rauw(const Value &what, Value &with) {
 
 void Calloc::print(ostream &os) const {
   os << getName() << " = calloc " << *num << ", " << *size;
+  if (align)
+    os << ", align " << align;
 }
 
 StateValue Calloc::toSMT(State &s) const {
   auto &[nm, np_num] = s.getAndAddPoisonUB(*num, true);
   auto &[sz, np_sz] = s.getAndAddPoisonUB(*size, true);
 
-  unsigned align = heap_block_alignment;
   auto np = np_num && np_sz;
   expr size = nm * sz;
   expr nonnull = expr::mkBoolVar("malloc_never_fails");
   auto &m = s.getMemory();
-  auto [p, allocated] = m.alloc(size, align, Memory::MALLOC,
+  auto [p, allocated] = m.alloc(size, getAlign(), Memory::MALLOC,
                                 np && nm.mul_no_uoverflow(sz), nonnull);
 
-  m.memset(p, { expr::mkUInt(0, 8), true }, size, align, {}, false);
+  m.memset(p, { expr::mkUInt(0, 8), true }, size, getAlign(), {}, false);
 
   return { expr::mkIf(allocated, p, Pointer::mkNullPointer(m)()), true };
 }

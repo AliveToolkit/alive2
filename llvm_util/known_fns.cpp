@@ -20,6 +20,11 @@ using namespace std;
 #define RETURN_APPROX() \
   return { nullptr, move(attrs), move(param_attrs), true }
 
+static unsigned align(llvm::CallInst &i) {
+  auto a = i.getRetAlign();
+  return a.hasValue() ? a.getValue().value() : 0;
+}
+
 namespace llvm_util {
 
 tuple<unique_ptr<Instr>, FnAttrs, vector<ParamAttrs>, bool>
@@ -35,12 +40,18 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocLikeFn(&i, &TLI, false)) {
     bool isNonNull = i.getCalledFunction()->getName() != "malloc";
-    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull));
-  } else if (llvm::isCallocLikeFn(&i, &TLI, false)) {
-    RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1]));
-  } else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
-    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1]));
-  } else if (llvm::isFreeCall(&i, &TLI)) {
+    RETURN_VAL(
+      make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
+  }
+  else if (llvm::isCallocLikeFn(&i, &TLI, false)) {
+    RETURN_VAL(
+      make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+  }
+  else if (llvm::isReallocLikeFn(&i, &TLI, false)) {
+    RETURN_VAL(
+      make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+  }
+  else if (llvm::isFreeCall(&i, &TLI)) {
     if (i.hasFnAttr(llvm::Attribute::NoFree)) {
       auto zero = make_intconst(0, 1);
       RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
