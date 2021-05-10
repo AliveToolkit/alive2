@@ -146,11 +146,6 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &align1,
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
-static expr aligned_ptr_noovl(const expr &addr, unsigned align) {
-  auto bits = addr.bits();
-  return addr != (expr::mkInt(-1, bits) - expr::mkUInt(align-1, bits));
-}
-
 static expr load_bv(const expr &var, const expr &idx0) {
   auto bw = var.bits();
   if (!bw)
@@ -1158,13 +1153,9 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(addr != 0);
 
     // Ensure block ptr doesn't overflow
-    auto msb_bit = bits_ptr_address - 1;
-    uint64_t align_const;
-
-    if (align_ge_size(align, sz) && align.isUInt(align_const)) {
-      expr addr_trunc = Pointer::hasLocalBit() ? addr.trunc(msb_bit) : addr;
-      state->addAxiom(aligned_ptr_noovl(addr_trunc, align_const));
-    } else {
+    // Note: the aligned case is handled in alloc()
+    if (!align_ge_size(align, sz)) {
+      auto msb_bit = bits_ptr_address - 1;
       state->addAxiom(
         Pointer::hasLocalBit()
           // don't spill to local addr section
@@ -1457,7 +1448,7 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
       // addr + size only overflows for one case when obj is aligned
       expr no_ovfl;
       if (size.ule(align).isTrue())
-        no_ovfl = aligned_ptr_noovl(blk_addr, align);
+        no_ovfl = addr_var != expr::mkInt(-1, addr_var);
       else
         no_ovfl
           = blk_addr.add_no_uoverflow(
@@ -1479,8 +1470,15 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
     if (!is_null)
       state->addAxiom(p.getAllocType() == alloc_ty);
 
-    if (align_bits && observesAddresses())
-      state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
+    if (align_bits && observesAddresses()) {
+      auto addr = p.getAddress();
+      state->addAxiom(addr.extract(align_bits - 1, 0) == 0);
+      if (size.ule(align).isTrue()) {
+        expr msb = addr.extract(bits_ptr_address - 1 - Pointer::hasLocalBit(),
+                                align_bits);
+        state->addAxiom(msb != expr::mkInt(-1, msb));
+      }
+    }
 
     bool nonconst = (has_null_block && bid == 0) || !is_constglb(bid);
     if (blockKind == CONSTGLOBAL) assert(!nonconst); else assert(nonconst);
