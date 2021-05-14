@@ -305,27 +305,30 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
   }
 
   expr val = fn(new_a, new_b, new_c);
-  expr non_poison(true);
+  AndExpr non_poison;
+  non_poison.add(ap);
+  if (nary >= 2)
+    non_poison.add(bp);
 
   if (fmath.flags & FastMathFlags::NNaN) {
-    non_poison &= !a.isNaN();
+    non_poison.add(!a.isNaN());
     if (nary >= 2) {
-      non_poison &= !b.isNaN();
+      non_poison.add(!b.isNaN());
       if (nary == 3)
-        non_poison &= !c.isNaN();
+        non_poison.add(!c.isNaN());
     }
     if (!only_input)
-      non_poison &= !val.isNaN();
+      non_poison.add(!val.isNaN());
   }
   if (fmath.flags & FastMathFlags::NInf) {
-    non_poison &= !a.isInf();
+    non_poison.add(!a.isInf());
     if (nary >= 2) {
-      non_poison &= !b.isInf();
+      non_poison.add(!b.isInf());
       if (nary == 3)
-        non_poison &= !c.isInf();
+        non_poison.add(!c.isInf());
     }
     if (!only_input)
-      non_poison &= !val.isInf();
+      non_poison.add(!val.isInf());
   }
   if (fmath.flags & FastMathFlags::ARCP) {
     val = expr::mkUF("arcp", { val }, val);
@@ -346,7 +349,7 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, move(val));
 
-  return { move(val), (nary >= 2 ? ap && bp : ap) && non_poison };
+  return { move(val), non_poison() };
 }
 
 static StateValue fm_poison(State &s, const expr &a, const expr &ap,
@@ -1429,7 +1432,7 @@ StateValue Select::toSMT(State &s) const {
     StateValue sva = fm_poison(s, a.value, a.non_poison, identity, fmath, true);
     StateValue svb = fm_poison(s, b.value, b.non_poison, identity, fmath, true);
     return { expr::mkIf(cond, sva.value, svb.value),
-             c.non_poison && expr::mkIf(cond, a.non_poison, b.non_poison) };
+             c.non_poison && expr::mkIf(cond, sva.non_poison, svb.non_poison) };
   };
 
   if (auto agg = getType().getAsAggregateType()) {
