@@ -15,4 +15,4 @@ B:
   ret i8* null
 }
 
-; ERROR: Source is more defined than target
+; ERROR: Target is more poisonous than source

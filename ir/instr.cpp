@@ -1749,17 +1749,18 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
   }
 }
 
-static void check_return_value(State &s, StateValue &val, const Type &ty,
-                               const FnAttrs &attrs, bool is_ret_instr) {
-  auto [UB, new_non_poison] = attrs.encode(s, val, ty);
-  s.addUB(move(UB));
-  val.non_poison = move(new_non_poison);
-
+static StateValue
+check_return_value(State &s, StateValue &&val, const Type &ty,
+                   const FnAttrs &attrs, bool is_ret_instr) {
   if (ty.isPtrType() && is_ret_instr) {
     Pointer p(s.getMemory(), val.value);
-    s.addUB(val.non_poison.implies(!p.isStackAllocated() &&
-                                   !p.isNocapture()));
+    val.non_poison &= !p.isStackAllocated();
+    val.non_poison &= !p.isNocapture();
   }
+
+  auto [UB, new_non_poison] = attrs.encode(s, val, ty);
+  s.addUB(move(UB));
+  return { move(val.value), move(new_non_poison) };
 }
 
 static StateValue
@@ -1768,17 +1769,13 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      // Padding is automatically filled with poison
-      if (agg->isPadding(i))
-        continue;
-      vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
+      if (!agg->isPadding(i))
+        vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
     }
     return agg->aggregateVals(vs);
   }
 
-  auto ret = move(vals[idx++]);
-  check_return_value(s, ret, ty, attrs, false);
-  return ret;
+  return check_return_value(s, move(vals[idx++]), ty, attrs, false);
 }
 
 StateValue FnCall::toSMT(State &s) const {
@@ -2399,21 +2396,20 @@ void Return::print(ostream &os) const {
   os << val->getName();
 }
 
-static void
-check_ret_attributes(State &s, StateValue &sv, const Type &t,
+static StateValue
+check_ret_attributes(State &s, StateValue &&sv, const Type &t,
                      const FnAttrs &attrs) {
   if (auto agg = t.getAsAggregateType()) {
+    vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (agg->isPadding(i))
         continue;
-      StateValue svi = agg->extract(sv, i);
-      check_ret_attributes(s, svi, agg->getChild(i), attrs);
+      vals.emplace_back(
+        check_ret_attributes(s, agg->extract(sv, i), agg->getChild(i), attrs));
     }
-    // Don't aggregate the updated state values; if agg has many elements
-    // this might be costly.
-    return;
+    return agg->aggregateVals(vals);
   }
-  check_return_value(s, sv, t, attrs, true);
+  return check_return_value(s, move(sv), t, attrs, true);
 }
 
 StateValue Return::toSMT(State &s) const {
@@ -2426,7 +2422,7 @@ StateValue Return::toSMT(State &s) const {
     retval = s[*val];
 
   s.addUB(s.getMemory().checkNocapture());
-  check_ret_attributes(s, retval, getType(), attrs);
+  retval = check_ret_attributes(s, move(retval), getType(), attrs);
 
   if (attrs.has(FnAttrs::NoReturn))
     s.addUB(expr(false));

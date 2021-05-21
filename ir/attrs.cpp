@@ -145,7 +145,7 @@ FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
 
   if (has(FnAttrs::NNaN)) {
     assert(ty.isFloatType());
-    UB.add(val.non_poison.implies(!val.value.isNaN()));
+    new_non_poison &= !val.value.isNaN();
   }
 
   if (ty.isPtrType())
