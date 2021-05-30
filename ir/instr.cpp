@@ -279,10 +279,7 @@ static expr any_fp_zero(State &s, const expr &v) {
 
   expr var = expr::mkFreshVar("anyzero", true);
   s.addQuantVar(var);
-  return expr::mkIf(is_zero,
-                    expr::mkIf(var, expr::mkNumber("0", v),
-                               expr::mkNumber("-0", v)),
-                    v);
+  return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
 static StateValue fm_poison(State &s, const expr &a, const expr &ap,
