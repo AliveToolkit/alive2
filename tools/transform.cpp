@@ -777,7 +777,6 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned min_vect_elem_sz = 0;
   bool does_mem_access = false;
   bool has_ptr_load = false;
-  bool has_vector_bitcast = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
     unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
@@ -870,7 +869,6 @@ static void calculateAndInitConstants(Transform &t) {
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
-        has_vector_bitcast |= t.isVectorType();
         min_access_size = gcd(min_access_size, getCommonAccessSize(t));
 
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
