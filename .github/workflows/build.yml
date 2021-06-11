@@ -30,7 +30,7 @@ jobs:
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"
           sudo apt-get update
-          sudo apt-get install z3 re2c ninja-build clang-12
+          sudo apt-get install z3 re2c ninja-build clang-12 g++-11
 
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
