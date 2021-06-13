@@ -32,11 +32,9 @@ public:
   void set(Attribute a) { bits |= (unsigned)a; }
 
   // Returns true if it's UB for the argument to be poison / have a poison elem.
-  bool poisonImpliesUB() const
-  { return has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
-           has(DereferenceableOrNull); }
+  bool poisonImpliesUB() const;
 
-   // Returns true if it is UB for the argument to be (partially) undef.
+  // Returns true if it is UB for the argument to be (partially) undef.
   bool undefImpliesUB() const;
 
   uint64_t getDerefBytes() const;
@@ -80,6 +78,19 @@ public:
   // Encodes the semantics of attributes using UB and poison.
   std::pair<smt::AndExpr, smt::expr>
       encode(const State &s, const StateValue &val, const Type &ty) const;
+};
+
+
+struct FastMathFlags final {
+  enum Flags {
+    None = 0, NNaN = 1 << 0, NInf = 1 << 1, NSZ = 1 << 2, ARCP = 1 << 3,
+    Contract = 1 << 4, Reassoc = 1 << 5, AFN = 1 << 6,
+    FastMath = NNaN | NInf | NSZ | ARCP | Contract | Reassoc | AFN
+  };
+  unsigned flags = None;
+
+  bool isNone() const { return flags == None; }
+  friend std::ostream& operator<<(std::ostream &os, const FastMathFlags &fm);
 };
 
 }

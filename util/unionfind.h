@@ -10,7 +10,8 @@ namespace util {
 class UnionFind final {
   std::vector<unsigned> id;
 public:
-  UnionFind(unsigned n);
+  UnionFind(unsigned n = 0);
+  unsigned mk();
   unsigned find(unsigned i);
   void merge(unsigned p, unsigned q);
 };

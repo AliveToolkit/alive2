@@ -56,7 +56,9 @@ class expr {
   static expr mkInt(int64_t n, Z3_sort sort);
   static expr mkConst(Z3_decl decl);
 
+  bool isUnOp(expr &a, int z3op) const;
   bool isBinOp(expr &a, expr &b, int z3op) const;
+  bool isTernaryOp(expr &a, expr &b, expr &c, int z3op) const;
 
 public:
   expr() : ptr(0) {}
@@ -138,6 +140,11 @@ public:
   bool isStore(expr &array, expr &idx, expr &val) const;
   bool isLoad(expr &array, expr &idx) const;
 
+  bool isFPAdd(expr &rounding, expr &lhs, expr &rhs) const;
+  bool isFPSub(expr &rounding, expr &lhs, expr &rhs) const;
+  bool isFPMul(expr &rounding, expr &lhs, expr &rhs) const;
+  bool isFPDiv(expr &rounding, expr &lhs, expr &rhs) const;
+  bool isFPNeg(expr &neg) const;
   bool isNaNCheck(expr &fp) const;
   bool isfloat2BV(expr &fp) const;
 
@@ -198,7 +205,7 @@ public:
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;
-  expr isFPNeg() const;
+  expr isFPNegative() const;
   expr isFPNegZero() const;
 
   expr fadd(const expr &rhs) const;
@@ -333,6 +340,7 @@ public:
   void printHexadecimal(std::ostream &os) const;
   std::string numeral_string() const;
   std::string fn_name() const; // empty if not a function
+  expr getFnArg(unsigned i) const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
   // for container use only

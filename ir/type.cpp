@@ -569,9 +569,9 @@ void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
   e.float2BV().printHexadecimal(os);
   os << " (";
   if (e.isFPZero().isTrue()) {
-    os << (e.isFPNeg().isTrue() ? "-0.0" : "+0.0");
+    os << (e.isFPNegative().isTrue() ? "-0.0" : "+0.0");
   } else if (e.isInf().isTrue()) {
-    os << (e.isFPNeg().isTrue() ? "-oo" : "+oo");
+    os << (e.isFPNegative().isTrue() ? "-oo" : "+oo");
   } else {
     os << e.float2Real().numeral_string();
   }

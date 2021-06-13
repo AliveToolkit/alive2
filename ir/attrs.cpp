@@ -71,6 +71,11 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   return os;
 }
 
+bool ParamAttrs::poisonImpliesUB() const {
+  return has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
+         has(DereferenceableOrNull);
+}
+
 bool ParamAttrs::undefImpliesUB() const {
   bool ub = has(NoUndef) || has(Dereferenceable) || has(ByVal) ||
             has(DereferenceableOrNull);
@@ -158,6 +163,28 @@ FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
   }
 
   return { move(UB), move(new_non_poison) };
+}
+
+
+ostream& operator<<(ostream &os, const FastMathFlags &fm) {
+  if (fm.flags == FastMathFlags::FastMath)
+    return os << "fast ";
+
+  if (fm.flags & FastMathFlags::NNaN)
+    os << "nnan ";
+  if (fm.flags & FastMathFlags::NInf)
+    os << "ninf ";
+  if (fm.flags & FastMathFlags::NSZ)
+    os << "nsz ";
+  if (fm.flags & FastMathFlags::ARCP)
+    os << "arcp ";
+  if (fm.flags & FastMathFlags::Contract)
+    os << "contract ";
+  if (fm.flags & FastMathFlags::Reassoc)
+    os << "reassoc ";
+  if (fm.flags & FastMathFlags::AFN)
+    os << "afn ";
+  return os;
 }
 
 }

@@ -14,6 +14,12 @@ UnionFind::UnionFind(unsigned n) {
   }
 }
 
+unsigned UnionFind::mk() {
+  unsigned n = id.size();
+  id.push_back(n);
+  return n;
+}
+
 unsigned UnionFind::find(unsigned i) {
   unsigned root = i;
   while (root != id[root])

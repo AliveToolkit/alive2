@@ -27,19 +27,6 @@ public:
 };
 
 
-struct FastMathFlags final {
-  enum Flags {
-    None = 0, NNaN = 1 << 0, NInf = 1 << 1, NSZ = 1 << 2, ARCP = 1 << 3,
-    Contract = 1 << 4, Reassoc = 1 << 5, AFN = 1 << 6,
-    FastMath = NNaN | NInf | NSZ | ARCP | Contract | Reassoc | AFN
-  };
-  unsigned flags = None;
-
-  bool isNone() const { return flags == None; }
-  friend std::ostream& operator<<(std::ostream &os, const FastMathFlags &fm);
-};
-
-
 class BinOp final : public Instr {
 public:
   enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,

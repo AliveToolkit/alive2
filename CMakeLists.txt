@@ -92,6 +92,7 @@ include_directories(${PROJECT_BINARY_DIR})
 set(IR_SRCS
   ir/attrs.cpp
   ir/constant.cpp
+  ir/fast_math.cpp
   ir/function.cpp
   ir/globals.cpp
   ir/instr.cpp

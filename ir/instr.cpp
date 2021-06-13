@@ -109,28 +109,6 @@ expr Instr::getTypeConstraints() const {
 }
 
 
-ostream& operator<<(ostream &os, const FastMathFlags &fm) {
-  if (fm.flags == FastMathFlags::FastMath)
-    return os << "fast ";
-
-  if (fm.flags & FastMathFlags::NNaN)
-    os << "nnan ";
-  if (fm.flags & FastMathFlags::NInf)
-    os << "ninf ";
-  if (fm.flags & FastMathFlags::NSZ)
-    os << "nsz ";
-  if (fm.flags & FastMathFlags::ARCP)
-    os << "arcp ";
-  if (fm.flags & FastMathFlags::Contract)
-    os << "contract ";
-  if (fm.flags & FastMathFlags::Reassoc)
-    os << "reassoc ";
-  if (fm.flags & FastMathFlags::AFN)
-    os << "afn ";
-  return os;
-}
-
-
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
              unsigned flags, FastMathFlags fmath)
   : Instr(type, move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags),
@@ -650,8 +628,8 @@ StateValue BinOp::toSMT(State &s) const {
       auto v = [&](expr &a, expr &b) {
         expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
         expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
-        expr neg_cond = (op == FMinimum) ? a.isFPNeg() || b.isFPNeg()
-                                         : a.isFPNeg() && b.isFPNeg();
+        expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
+                                       : (a.isFPNegative() && b.isFPNegative());
         expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
                             expr::mkIf(neg_cond, zneg, zpos),
                             expr::mkIf(cmp, a, b));

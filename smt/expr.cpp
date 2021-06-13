@@ -253,12 +253,30 @@ expr expr::mkConst(Z3_decl decl) {
   return Z3_mk_app(ctx(), decl, 0, {});
 }
 
+bool expr::isUnOp(expr &a, int z3op) const {
+  if (auto app = isAppOf(z3op)) {
+    a = Z3_get_app_arg(ctx(), app, 0);
+    return true;
+  }
+  return false;
+}
+
 bool expr::isBinOp(expr &a, expr &b, int z3op) const {
   if (auto app = isAppOf(z3op)) {
     if (Z3_get_app_num_args(ctx(), app) != 2)
       return false;
     a = Z3_get_app_arg(ctx(), app, 0);
     b = Z3_get_app_arg(ctx(), app, 1);
+    return true;
+  }
+  return false;
+}
+
+bool expr::isTernaryOp(expr &a, expr &b, expr &c, int z3op) const {
+  if (auto app = isAppOf(z3op)) {
+    a = Z3_get_app_arg(ctx(), app, 0);
+    b = Z3_get_app_arg(ctx(), app, 1);
+    c = Z3_get_app_arg(ctx(), app, 2);
     return true;
   }
   return false;
@@ -425,13 +443,7 @@ bool expr::isULE(expr &lhs, expr &rhs) const {
 }
 
 bool expr::isIf(expr &cond, expr &then, expr &els) const {
-  if (auto app = isAppOf(Z3_OP_ITE)) {
-    cond = Z3_get_app_arg(ctx(), app, 0);
-    then = Z3_get_app_arg(ctx(), app, 1);
-    els = Z3_get_app_arg(ctx(), app, 2);
-    return true;
-  }
-  return false;
+  return isTernaryOp(cond, then, els, Z3_OP_ITE);
 }
 
 bool expr::isConcat(expr &a, expr &b) const {
@@ -460,11 +472,7 @@ bool expr::isExtract(expr &e, unsigned &high, unsigned &low) const {
 }
 
 bool expr::isSignExt(expr &val) const {
-  if (auto app = isAppOf(Z3_OP_SIGN_EXT)) {
-    val = Z3_get_app_arg(ctx(), app, 0);
-    return true;
-  }
-  return false;
+  return isUnOp(val, Z3_OP_SIGN_EXT);
 }
 
 bool expr::isAnd(expr &a, expr &b) const {
@@ -472,11 +480,7 @@ bool expr::isAnd(expr &a, expr &b) const {
 }
 
 bool expr::isNot(expr &neg) const {
-  if (auto app = isAppOf(Z3_OP_NOT)) {
-    neg = Z3_get_app_arg(ctx(), app, 0);
-    return true;
-  }
-  return false;
+  return isUnOp(neg, Z3_OP_NOT);
 }
 
 bool expr::isAdd(expr &a, expr &b) const {
@@ -505,30 +509,35 @@ bool expr::isBasePlusOffset(expr &base, uint64_t &offset) const {
 }
 
 bool expr::isConstArray(expr &val) const {
-  if (auto app = isAppOf(Z3_OP_CONST_ARRAY)) {
-    val = Z3_get_app_arg(ctx(), app, 0);
-    return true;
-  }
-  return false;
+  return isUnOp(val, Z3_OP_CONST_ARRAY);
 }
 
 bool expr::isStore(expr &array, expr &idx, expr &val) const {
-  if (auto app = isAppOf(Z3_OP_STORE)) { // store(array, idx, val)
-    array = Z3_get_app_arg(ctx(), app, 0);
-    idx = Z3_get_app_arg(ctx(), app, 1);
-    val = Z3_get_app_arg(ctx(), app, 2);
-    return true;
-  }
-  return false;
+  return isTernaryOp(array, idx, val, Z3_OP_STORE);
 }
 
 bool expr::isLoad(expr &array, expr &idx) const {
-  if (auto app = isAppOf(Z3_OP_SELECT)) {
-    array = Z3_get_app_arg(ctx(), app, 0);
-    idx = Z3_get_app_arg(ctx(), app, 1);
-    return true;
-  }
-  return false;
+  return isBinOp(array, idx, Z3_OP_SELECT);
+}
+
+bool expr::isFPAdd(expr &rounding, expr &lhs, expr &rhs) const {
+  return isTernaryOp(rounding, lhs, rhs, Z3_OP_FPA_ADD);
+}
+
+bool expr::isFPSub(expr &rounding, expr &lhs, expr &rhs) const {
+  return isTernaryOp(rounding, lhs, rhs, Z3_OP_FPA_SUB);
+}
+
+bool expr::isFPMul(expr &rounding, expr &lhs, expr &rhs) const {
+  return isTernaryOp(rounding, lhs, rhs, Z3_OP_FPA_MUL);
+}
+
+bool expr::isFPDiv(expr &rounding, expr &lhs, expr &rhs) const {
+  return isTernaryOp(rounding, lhs, rhs, Z3_OP_FPA_DIV);
+}
+
+bool expr::isFPNeg(expr &val) const {
+  return isUnOp(val, Z3_OP_FPA_NEG);
 }
 
 bool expr::isNaNCheck(expr &fp) const {
@@ -540,11 +549,7 @@ bool expr::isNaNCheck(expr &fp) const {
 }
 
 bool expr::isfloat2BV(expr &fp) const {
-  if (auto app = isAppOf(Z3_OP_FPA_TO_IEEE_BV)) {
-    fp = Z3_get_app_arg(ctx(), app, 0);
-    return true;
-  }
-  return false;
+  return isUnOp(fp, Z3_OP_FPA_TO_IEEE_BV);
 }
 
 unsigned expr::min_leading_zeros() const {
@@ -967,12 +972,12 @@ expr expr::isFPZero() const {
   return unop_fold(Z3_mk_fpa_is_zero);
 }
 
-expr expr::isFPNeg() const {
+expr expr::isFPNegative() const {
   return unop_fold(Z3_mk_fpa_is_negative);
 }
 
 expr expr::isFPNegZero() const {
-  return isFPZero() && isFPNeg();
+  return isFPZero() && isFPNegative();
 }
 
 // TODO: make rounding mode customizable
@@ -2027,6 +2032,12 @@ string expr::fn_name() const {
   if (isApp())
     return Z3_get_symbol_string(ctx(), Z3_get_decl_name(ctx(), decl()));
   return "";
+}
+
+expr expr::getFnArg(unsigned i) const {
+  auto app = isApp();
+  assert(app && i < Z3_get_app_num_args(ctx(), app));
+  return Z3_get_app_arg(ctx(), app, i);
 }
 
 ostream& operator<<(ostream &os, const expr &e) {
