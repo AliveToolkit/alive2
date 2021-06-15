@@ -3,7 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#if defined(__clang__) && __clang_major__ < 13
+#if defined(__clang__) && __clang_major__ < 14
 
 #include <compare>
 
