@@ -71,6 +71,8 @@ std::tuple<pid_t, std::ostream *, int> parallel::limitedFork() {
   if (index % 100 == 0)
     emitOutput();
 
+  out_file.flush();
+
   // this is how the child will send results back to the parent
   if (pipe(newKid.pipe) < 0)
     return {-1, nullptr, -1};

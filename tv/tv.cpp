@@ -195,7 +195,6 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (parallelMgr) {
-      out_file.flush();
       auto [pid, osp, index] = parallelMgr->limitedFork();
 
       if (pid == -1) {
