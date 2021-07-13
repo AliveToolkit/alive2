@@ -217,7 +217,6 @@ bool parallel::emitOutput() {
         out_file << move(children[index].output).str();
         stringstream().swap(children[index].output); // free the RAM
       } else {
-        out_file.flush();
         /*
          * here, for two reasons, we swap parent_ss with a fresh one
          * containing a copy of the unwritten data. first, we've
@@ -238,7 +237,6 @@ bool parallel::emitOutput() {
       out_file << line << '\n';
     }
   }
-  out_file.flush();
   /*
    * reset the EOF flag since this process is going to keep writing
    * into parent_ss
