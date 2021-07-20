@@ -940,6 +940,59 @@ public:
 };
 
 
+class X86IntrinBinOp final : public Instr {
+public:
+  enum Op {
+  /* llvm.x86.sse2.psrl.w */ sse2_psrl_w,
+  /* llvm.x86.sse2.psrl.d */ sse2_psrl_d,
+  /* llvm.x86.sse2.psrl.q */ sse2_psrl_q,
+  /* llvm.x86.avx2.psrl.w */ avx2_psrl_w,
+  /* llvm.x86.avx2.psrl.d */ avx2_psrl_d,
+  /* llvm.x86.avx2.psrl.q */ avx2_psrl_q
+  };
+
+  // the shape of a vector is stored as <# of lanes, element bits>
+  static constexpr std::array<std::pair<unsigned, unsigned>, 6> shape_op0 = {
+  /* sse2_psrl_w */       std::make_pair(8, 16),
+  /* sse2_psrl_d */       std::make_pair(4, 32),
+  /* sse2_psrl_w */       std::make_pair(2, 64),
+  /* avx2_psrl_w */       std::make_pair(16, 16),
+  /* avx2_psrl_d */       std::make_pair(8, 32),
+  /* avx2_psrl_w */       std::make_pair(4, 64),
+  };
+  static constexpr std::array<std::pair<unsigned, unsigned>, 6> shape_op1 = {
+  /* sse2_psrl_w */       std::make_pair(8, 16),
+  /* sse2_psrl_d */       std::make_pair(4, 32),
+  /* sse2_psrl_w */       std::make_pair(2, 64),
+  /* avx2_psrl_w */       std::make_pair(8, 16),
+  /* avx2_psrl_d */       std::make_pair(4, 32),
+  /* avx2_psrl_w */       std::make_pair(2, 64),
+  };
+  static constexpr std::array<std::pair<unsigned, unsigned>, 6> shape_ret = {
+  /* sse2_psrl_w */       std::make_pair(8, 16),
+  /* sse2_psrl_d */       std::make_pair(4, 32),
+  /* sse2_psrl_w */       std::make_pair(2, 64),
+  /* avx2_psrl_w */       std::make_pair(16, 16),
+  /* avx2_psrl_d */       std::make_pair(8, 32),
+  /* avx2_psrl_w */       std::make_pair(4, 64),
+  };
+
+private:
+  Value *a, *b;
+  Op op;
+
+public:
+  X86IntrinBinOp(Type &type, std::string &&name, Value &a, Value &b, Op op)
+    : Instr(type, move(name)), a(&a), b(&b), op(op) {}
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
 const ConversionOp *isCast(ConversionOp::Op op, const Value &v);
 bool hasNoSideEffects(const Instr &i);
 Value *isNoOp(const Value &v);

@@ -12,6 +12,7 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/Operator.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -942,6 +943,34 @@ public:
     case llvm::Intrinsic::instrprof_value_profile:
     case llvm::Intrinsic::prefetch:
       return NOP(i);
+
+    // intel x86 intrinsics
+    case llvm::Intrinsic::x86_sse2_psrl_w:
+    case llvm::Intrinsic::x86_sse2_psrl_d:
+    case llvm::Intrinsic::x86_sse2_psrl_q:
+    case llvm::Intrinsic::x86_avx2_psrl_w:
+    case llvm::Intrinsic::x86_avx2_psrl_d:
+    case llvm::Intrinsic::x86_avx2_psrl_q: {
+      PARSE_BINOP();
+      X86IntrinBinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::x86_sse2_psrl_w:
+        op = X86IntrinBinOp::sse2_psrl_w; break;
+      case llvm::Intrinsic::x86_sse2_psrl_d:
+        op = X86IntrinBinOp::sse2_psrl_d; break;
+      case llvm::Intrinsic::x86_sse2_psrl_q:
+        op = X86IntrinBinOp::sse2_psrl_q; break;
+      case llvm::Intrinsic::x86_avx2_psrl_w:
+        op = X86IntrinBinOp::avx2_psrl_w; break;
+      case llvm::Intrinsic::x86_avx2_psrl_d:
+        op = X86IntrinBinOp::avx2_psrl_d; break;
+      case llvm::Intrinsic::x86_avx2_psrl_q:
+        op = X86IntrinBinOp::avx2_psrl_q; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<X86IntrinBinOp>(*ty, value_name(i),
+                                                    *a, *b, op));
+    }
 
     default:
       break;

@@ -3830,6 +3830,105 @@ unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
 }
 
 
+vector<Value*> X86IntrinBinOp::operands() const {
+  return { a, b };
+}
+
+void X86IntrinBinOp::rauw(const Value &what, Value &with) {
+  RAUW(a);
+  RAUW(b);
+}
+
+void X86IntrinBinOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case sse2_psrl_w:
+    str = "x86.sse2.psrl.w ";
+    break;
+  case sse2_psrl_d:
+    str = "x86.sse2.psrl.d ";
+    break;
+  case sse2_psrl_q:
+    str = "x86.sse2.psrl.q ";
+    break;
+  case avx2_psrl_w:
+    str = "x86.avx2.psrl.w ";
+    break;
+  case avx2_psrl_d:
+    str = "x86.avx2.psrl.d ";
+    break;
+  case avx2_psrl_q:
+    str = "x86.avx2.psrl.q ";
+    break;
+  }
+  os << getName() << " = " << str << *a << ", " << *b;
+}
+
+StateValue X86IntrinBinOp::toSMT(State &s) const {
+  auto rty =    getType().getAsAggregateType();
+  auto aty = a->getType().getAsAggregateType();
+  auto bty = b->getType().getAsAggregateType();
+  auto &av = s[*a];
+  auto &bv = s[*b];
+
+  switch (op) {
+  case sse2_psrl_w:
+  case sse2_psrl_d:
+  case sse2_psrl_q:
+  case avx2_psrl_w:
+  case avx2_psrl_d:
+  case avx2_psrl_q:
+  {
+    vector<StateValue> vals;
+    unsigned elem_bw = bty->getChild(0).bits();
+
+    expr shift_np = true;
+    expr shift_v;
+    // extract lower 64 bits from b
+    for (unsigned i = 0, e = 64 / elem_bw; i != e ; ++i) {
+      StateValue vv = bty->extract(bv, i);
+      shift_v = (i == 0) ? vv.value : vv.value.concat(shift_v);
+      // if any elements in lower 64 bits is poison, the result is poison
+      shift_np &= vv.non_poison;
+    }
+
+    for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
+      auto ai = aty->extract(av, i);
+      // ret_i.v = (ite shift.v >= elem_bw, 0, a_i.v >> shift.v) 
+      expr v = expr::mkIf(shift_v.uge(expr::mkUInt(elem_bw, 64)),
+                          expr::mkUInt(0, elem_bw),
+                          ai.value.lshr(shift_v.trunc(elem_bw)));
+      vals.emplace_back(move(v), shift_np && ai.non_poison);
+    }
+    return rty->aggregateVals(vals);
+  }
+  // TODO: add semantic for other intrinsics
+  default:
+    UNREACHABLE();
+  }
+}
+
+expr X86IntrinBinOp::getTypeConstraints(const Function &f) const {
+  auto &[op0_elems, op0_bw] = shape_op0[op];
+  auto &[op1_elems, op1_bw] = shape_op1[op];
+  auto &[ret_elems, ret_bw] = shape_ret[op];
+  return Value::getTypeConstraints() &&
+    a->getType().enforceVectorType(
+      [op0_bw](auto &ty) { return ty.enforceIntType(op0_bw); }) &&
+    b->getType().enforceVectorType(
+      [op1_bw](auto &ty) { return ty.enforceIntType(op1_bw); }) &&
+       getType().enforceVectorType(
+      [ret_bw](auto &ty) { return ty.enforceIntType(ret_bw); }) &&
+    a->getType().getAsAggregateType()->numElements() == op0_elems &&
+    b->getType().getAsAggregateType()->numElements() == op1_elems &&
+       getType().getAsAggregateType()->numElements() == ret_elems;
+}
+
+unique_ptr<Instr> X86IntrinBinOp::dup(const string &suffix) const {
+  return make_unique<X86IntrinBinOp>(getType(), getName() + suffix, *a, *b, op);
+}
+
+
 const ConversionOp* isCast(ConversionOp::Op op, const Value &v) {
   auto c = dynamic_cast<const ConversionOp*>(&v);
   return (c && c->getOp() == op) ? c : nullptr;
