@@ -250,9 +250,8 @@ void optimizeModule(llvm::Module *M) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  llvm::FunctionPassManager FPM =
-    PB.buildFunctionSimplificationPipeline(
-      llvm::PassBuilder::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
+  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
+      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
   llvm::ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   MPM.run(*M, MAM);
