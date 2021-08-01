@@ -1720,7 +1720,7 @@ expr expr::fp2sint(unsigned bits) const {
 
 expr expr::fp2uint(unsigned bits) const {
   C();
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
+  auto rm = Z3_mk_fpa_rtz(ctx());
   return simplify_const(Z3_mk_fpa_to_ubv(ctx(), rm, ast(), bits), *this);
 }
 
