@@ -23,7 +23,7 @@ namespace smt {
 class expr {
   uintptr_t ptr;
 
-  expr(Z3_ast ast);
+  expr(Z3_ast ast) noexcept;
   bool isZ3Ast() const;
   Z3_ast ast() const;
   Z3_ast operator()() const { return ast(); }
@@ -67,9 +67,9 @@ public:
     std::swap(ptr, other.ptr);
   }
 
-  expr(const expr &other);
-  expr(bool val) : expr(val ? mkTrue() : mkFalse()) {}
-  ~expr();
+  expr(const expr &other) noexcept;
+  expr(bool val) noexcept : expr(val ? mkTrue() : mkFalse()) {}
+  ~expr() noexcept;
 
   void operator=(expr &&other);
   void operator=(const expr &other);

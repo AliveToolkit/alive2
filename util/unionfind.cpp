@@ -2,7 +2,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "util/unionfind.h"
-#include <vector>
 
 using namespace std;
 

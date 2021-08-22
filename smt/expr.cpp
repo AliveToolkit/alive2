@@ -76,7 +76,7 @@ static bool is_power2(const expr &e, unsigned &log) {
 
 namespace smt {
 
-expr::expr(Z3_ast ast) : ptr((uintptr_t)ast) {
+expr::expr(Z3_ast ast) noexcept : ptr((uintptr_t)ast) {
   static_assert(sizeof(Z3_ast) == sizeof(uintptr_t));
   assert(isZ3Ast() && isValid());
   incRef();
@@ -100,7 +100,7 @@ Z3_ast expr::ast() const {
   return 0;
 }
 
-expr::expr(const expr &other) {
+expr::expr(const expr &other) noexcept {
   if (!other.isValid()) {
     ptr = 0;
   } else if (other.isZ3Ast()) {
@@ -111,7 +111,7 @@ expr::expr(const expr &other) {
   }
 }
 
-expr::~expr() {
+expr::~expr() noexcept {
   if (isValid()) {
     if (isZ3Ast()) {
       decRef();
