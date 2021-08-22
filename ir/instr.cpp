@@ -846,8 +846,7 @@ void UnaryOp::print(ostream &os) const {
   case FFS:         str = "ffs "; break;
   }
 
-  os << getName() << " = " << str << fmath << print_type(getType())
-     << val->getName();
+  os << getName() << " = " << str << fmath << *val;
 }
 
 StateValue UnaryOp::toSMT(State &s) const {
@@ -886,7 +885,7 @@ StateValue UnaryOp::toSMT(State &s) const {
   }
   case IsNaN:
     fn = [](auto v, auto np) -> StateValue {
-      return { v.isNaN(), expr(np) };
+      return { v.isNaN().toBVBool(), expr(np) };
     };
     break;
   case FAbs:
@@ -943,12 +942,12 @@ StateValue UnaryOp::toSMT(State &s) const {
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
-    auto ty = getType().getAsAggregateType();
+    auto ty = val->getType().getAsAggregateType();
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
       auto vi = ty->extract(v, i);
       vals.emplace_back(fn(vi.value, vi.non_poison));
     }
-    return ty->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
   return fn(v.value, v.non_poison);
 }

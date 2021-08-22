@@ -14,7 +14,6 @@ public:
   unsigned mk();
   unsigned find(unsigned i);
   unsigned merge(unsigned p, unsigned q);
-  auto size() const { return id.size(); }
 };
 
 }

@@ -202,7 +202,7 @@ public:
 
   expr smtOf(unsigned n) {
     vector<optional<expr>> exprs;  // map node id -> smt expr
-    exprs.resize(uf.size());
+    exprs.resize(nodes_eqs.size());
     vector<unsigned> todo = { n };
 
     do {
