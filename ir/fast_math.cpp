@@ -5,6 +5,7 @@
 #include "ir/attrs.h"
 #include "util/unionfind.h"
 #include <map>
+#include <vector>
 
 #define DEBUG_FMF
 
@@ -25,7 +26,7 @@ class EGraph;
 
 struct Node {
   enum { Add, Sub, Mul, Div, Neg, Leaf } operation;
-  unsigned op1 = 0, op2 = 0;
+  unsigned op1 = -1u, op2 = -1u;
   expr leaf;
   // FIXME: we currently ignore rounding
   expr rounding;
@@ -34,25 +35,70 @@ struct Node {
   auto operator<=>(const Node &other) const = default;
 
 #ifdef DEBUG_FMF
-  void print(ostream &os, EGraph &g) const;
+  friend ostream& operator<<(ostream &os, const Node &n) {
+    const char *op;
+    switch (n.operation) {
+      case Add:  op = "add "; break;
+      case Sub:  op = "sub "; break;
+      case Mul:  op = "mul "; break;
+      case Div:  op = "div "; break;
+      case Neg:  op = "neg "; break;
+      case Leaf: op = "leaf "; break;
+    }
+    os << op;
+
+    if (n.operation == Leaf)
+      return os << n.leaf;
+
+    os << n.op1;
+    if (n.op2 != -1u) {
+      os << ", " << n.op2;
+    }
+
+    FastMathFlags fmf{n.flags};
+    if (!fmf.isNone())
+      os << "\t# " << fmf;
+    return os;
+  }
 #endif
 };
 
 
 class EGraph {
-  UnionFind uf;
-  map<Node, unsigned> nodes;
+  UnionFind uf;                          // id -> root
+  map<Node, unsigned> nodes;             // node -> id
+  vector<vector<const Node*>> nodes_eqs; // root -> equiv nodes
 
   unsigned get(Node &&n) {
     auto [I, inserted] = nodes.try_emplace(move(n), 0);
-    if (inserted)
+    if (inserted) {
       I->second = uf.mk();
+      nodes_eqs.emplace_back(1, &I->first);
+    }
     return I->second;
   }
 
   void decl_equivalent(Node &&node, unsigned n1) {
-    unsigned n2 = nodes.try_emplace(move(node), n1).first->second;
-    uf.merge(n1, n2);
+    unsigned n2 = get(move(node));
+    unsigned new_root = uf.merge(n1, n2);
+    auto &root = nodes_eqs[new_root];
+
+    auto merge = [&](unsigned n) {
+      if (n != new_root) {
+        auto &prev = nodes_eqs[n];
+        root.insert(root.end(), prev.begin(), prev.end());
+        prev = vector<const Node*>();
+      }
+    };
+    merge(n1);
+    merge(n2);
+  }
+
+  void remove(const Node &node) {
+    auto I = nodes.find(node);
+    assert(I != nodes.end());
+    erase(nodes_eqs[I->second], &node);
+    nodes.erase(I);
   }
 
 public:
@@ -108,7 +154,24 @@ public:
   void saturate() {
     while (true) {
       auto nodes_copy = nodes;
+      bool changed = false;
+
       for (auto &[node, n] : nodes_copy) {
+        // canonicalize operand ids
+        if ((node.op1 != -1u && node.op1 != root(node.op1)) ||
+            (node.op2 != -1u && node.op2 != root(node.op2))) {
+          Node nn = node;
+          nn.op1 = root(node.op1);
+          if (node.op2 != -1u)
+            nn.op2 = root(node.op2);
+          assert(is_neq(node <=> nn));
+
+          decl_equivalent(move(nn), n);
+          remove(node);
+          changed = true;
+          continue;
+        }
+
         // commutativity: x . y == y . x
         // Always correct for add & mul regardless of fast-math
         if (node.operation == Node::Add || node.operation == Node::Mul) {
@@ -119,8 +182,10 @@ public:
 
         if (node.flags & FastMathFlags::Reassoc) {
           // distributivity: x . (y + z) == x . y + x . z
+          // TODO
 
           // associativity (x . y) . z == x . (y . z)
+          // TODO
 
         }
 
@@ -129,28 +194,100 @@ public:
           // TODO
         }
       }
-      if (nodes.size() == nodes_copy.size())
+
+      if (!changed && nodes.size() == nodes_copy.size())
         return;
     }
   }
 
-#ifdef DEBUG_FMF
-  friend ostream& operator<<(ostream &os, EGraph &g) {
-    vector<vector<const Node*>> sorted;
-    for (auto &[node, n] : g.nodes) {
-      unsigned r = g.root(n);
-      if (r >= sorted.size())
-        sorted.resize(r + 1);
-      sorted[r].emplace_back(&node);
-    }
+  expr smtOf(unsigned n) {
+    vector<optional<expr>> exprs;  // map node id -> smt expr
+    exprs.resize(uf.size());
+    vector<unsigned> todo = { n };
 
-    for (unsigned i = 0, e = sorted.size(); i != e; ++i) {
-      auto &nodes = sorted[i];
+    do {
+      unsigned node_id = todo.back();
+      if (exprs[node_id]) {
+        todo.pop_back();
+        continue;
+      }
+
+      ChoiceExpr<expr> vals;
+      bool has_all = true;
+
+      for (auto *node : nodes_eqs[node_id]) {
+        switch (node->operation) {
+        case Node::Add:
+        case Node::Sub:
+        case Node::Mul:
+        case Node::Div:
+          if (!exprs[node->op2]) {
+            todo.emplace_back(node->op2);
+            has_all = false;
+          }
+          [[fallthrough]];
+
+        case Node::Neg:
+          if (!exprs[node->op1]) {
+            todo.emplace_back(node->op1);
+            has_all = false;
+          }
+          break;
+
+        case Node::Leaf:
+          break;
+        }
+
+        if (!has_all)
+          continue;
+
+        // TODO: handle other fastmath flags like nsz
+        expr val;
+        switch (node->operation) {
+        case Node::Add:
+          val = exprs[node->op1]->fadd(*exprs[node->op2]);
+          break;
+        case Node::Sub:
+          val = exprs[node->op1]->fsub(*exprs[node->op2]);
+          break;
+        case Node::Mul:
+          val = exprs[node->op1]->fmul(*exprs[node->op2]);
+          break;
+        case Node::Div:
+          val = exprs[node->op1]->fdiv(*exprs[node->op2]);
+          break;
+        case Node::Neg:
+          val = exprs[node->op1]->fneg();
+          break;
+        case Node::Leaf:
+          val = node->leaf;
+        }
+        vals.add(move(val), expr(true));
+      }
+
+      if (!has_all)
+        continue;
+
+      auto [val, domain, qvar, pre] = vals();
+      assert(domain.isTrue());
+      exprs[node_id] = move(val);
+      // TODO: handle qvar, pre
+      todo.pop_back();
+
+    } while (!todo.empty());
+
+    assert(exprs.size() >= n && exprs[n]);
+    return move(*exprs[n]);
+  }
+
+#ifdef DEBUG_FMF
+  friend ostream& operator<<(ostream &os, const EGraph &g) {
+    for (unsigned i = 0, e = g.nodes_eqs.size(); i != e; ++i) {
+      auto &nodes = g.nodes_eqs[i];
       if (!nodes.empty()) {
         os << "Root " << i << '\n';
         for (auto *n : nodes) {
-          n->print(os << "  ", g);
-          os << '\n';
+          os << "  " << *n << '\n';
         }
       }
     }
@@ -158,37 +295,6 @@ public:
   }
 #endif
 };
-
-
-#ifdef DEBUG_FMF
-void Node::print(ostream &os, EGraph &g) const {
-  const char *op;
-  switch (operation) {
-    case Add:  op = "add "; break;
-    case Sub:  op = "sub "; break;
-    case Mul:  op = "mul "; break;
-    case Div:  op = "div "; break;
-    case Neg:  op = "neg "; break;
-    case Leaf: op = "leaf "; break;
-  }
-  os << op;
-
-  if (operation == Leaf) {
-    os << leaf;
-    return;
-  }
-
-  os << g.root(op1);
-  if (operation != Neg) {
-    os << ", " << g.root(op2);
-  }
-
-  FastMathFlags fmf;
-  fmf.flags = flags;
-  if (!fmf.isNone())
-    os << "\t# " << fmf;
-}
-#endif
 
 }
 
@@ -215,8 +321,11 @@ expr float_refined(const expr &a, const expr &b) {
   if (na == nb)
     return true;
 
-  // TODO
-  return false;
+#ifdef DEBUG_FMF
+  cout << "Expr A: " << g.smtOf(na) << "\n\nExpr B: " << g.smtOf(nb) << "\n\n";
+#endif
+
+  return g.smtOf(na) == g.smtOf(nb);
 }
 
 }

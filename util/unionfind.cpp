@@ -27,10 +27,11 @@ unsigned UnionFind::find(unsigned i) {
   return root;
 }
 
-void UnionFind::merge(unsigned p, unsigned q) {
+unsigned UnionFind::merge(unsigned p, unsigned q) {
   unsigned i = find(p);
   unsigned j = find(q);
-  id[i] = j;
+  id[j] = i;
+  return i;
 }
 
 }

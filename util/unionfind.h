@@ -13,7 +13,8 @@ public:
   UnionFind(unsigned n = 0);
   unsigned mk();
   unsigned find(unsigned i);
-  void merge(unsigned p, unsigned q);
+  unsigned merge(unsigned p, unsigned q);
+  auto size() const { return id.size(); }
 };
 
 }
