@@ -834,6 +834,7 @@ void UnaryOp::print(ostream &os) const {
   case BSwap:       str = "bswap "; break;
   case Ctpop:       str = "ctpop "; break;
   case IsConstant:  str = "is.constant "; break;
+  case IsNaN:       str = "isnan "; break;
   case FAbs:        str = "fabs "; break;
   case FNeg:        str = "fneg "; break;
   case Ceil:        str = "ceil "; break;
@@ -883,6 +884,11 @@ StateValue UnaryOp::toSMT(State &s) const {
     s.addQuantVar(var);
     return { move(var), true };
   }
+  case IsNaN:
+    fn = [](auto v, auto np) -> StateValue {
+      return { v.isNaN(), expr(np) };
+    };
+    break;
   case FAbs:
     fn = [&](auto v, auto np) -> StateValue {
       return fm_poison(s, v, np, [](expr &v) { return v.fabs(); }, fmath, true);
@@ -965,6 +971,11 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     break;
   case IsConstant:
     instrconstr = getType().enforceIntType(1);
+    break;
+  case IsNaN:
+    instrconstr = val->getType().enforceFloatOrVectorType() &&
+                  getType().enforceIntOrVectorType(1) &&
+                  getType().enforceVectorTypeIff(val->getType());
     break;
   case FAbs:
   case FNeg:

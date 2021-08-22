@@ -61,7 +61,7 @@ public:
 class UnaryOp final : public Instr {
 public:
   enum Op {
-    Copy, BitReverse, BSwap, Ctpop, IsConstant, FAbs, FNeg,
+    Copy, BitReverse, BSwap, Ctpop, IsConstant, IsNaN, FAbs, FNeg,
     Ceil, Floor, Round, RoundEven, Trunc, Sqrt, FFS
   };
 
