@@ -30,10 +30,11 @@ def wrap(args):
   passes = args.split(',')
 
   pass_types = {
-    "module"   : [],
-    "cgscc"    : [],
-    "function" : [],
-    "loop"     : ["function"]
+    "module"    : [],
+    "cgscc"     : [],
+    "function"  : [],
+    "loop"      : ["function"],
+    "loop-mssa" : ["function"],
   }
 
   firstpass = None
@@ -91,14 +92,26 @@ def wrap(args):
   if m is None:
     return wrap_str(args, ['module'])
 
+  type = m.group(1)
+
+  # Some loop passes must use loop-mssa instead of loop
+  # And there's no place to get this info
+  loop_mssa = {
+    'licm',
+    'simple-loop-unswitch',
+  }
+  if p in loop_mssa:
+    type = 'LOOP-MSSA'
+
   type = {
     'CGSCC'          : 'cgscc',
     'FUNCTION'       : 'function',
     'FUNCTION_ALIAS' : 'function',
     'LOOP'           : 'loop',
+    'LOOP-MSSA'      : 'loop-mssa',
     'MODULE'         : 'module',
     'MODULE_ALIAS'   : 'module',
-  }[m.group(1)]
+  }[type]
   return wrap_str(args, [type] + pass_types[type])
 
 def run_opt(passes):
@@ -111,11 +124,12 @@ if len(sys.argv) == 3:
 else:
   tests = [
     ('sroa', 'function(sroa)'),
-    ('simplify-cfg', 'function(simplify-cfg)'),
-    ('licm', 'function(loop(licm))'),
+    ('simplifycfg', 'function(simplifycfg)'),
+    ('licm', 'function(loop-mssa(licm))'),
+    ('loop-mssa(licm)', 'function(loop-mssa(licm))'),
     ('argpromotion', 'cgscc(argpromotion)'),
     ('loop-extract', 'module(loop-extract)'),
-    ('unswitch<nontrivial>', 'function(loop(unswitch<nontrivial>))'),
+    ('loop-mssa(simple-loop-unswitch<nontrivial>)', 'function(loop-mssa(simple-loop-unswitch<nontrivial>))'),
     ('sroa,verify', 'function(sroa,verify)'),
     ('verify,sroa', 'function(verify,sroa)'),
     ('loop-mssa(loop-instsimplify)', 'function(loop-mssa(loop-instsimplify))'),
@@ -144,8 +158,8 @@ else:
       print('Expected:', o)
       print()
     elif not run_opt(i):
-      print('FAIL running input:', i)
+      print('FAIL running input:', i, '\n')
     elif not run_opt(o + ',globalopt'):
-      print('FAIL running output:', o)
+      print('FAIL running output:', o, '\n')
     else:
       print('PASS:', i)
