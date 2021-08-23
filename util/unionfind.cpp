@@ -30,8 +30,8 @@ unsigned UnionFind::find(unsigned i) {
 unsigned UnionFind::merge(unsigned p, unsigned q) {
   unsigned i = find(p);
   unsigned j = find(q);
-  id[j] = i;
-  return i;
+  id[i] = j;
+  return j;
 }
 
 }

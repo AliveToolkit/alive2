@@ -80,7 +80,7 @@ class EGraph {
 
   void decl_equivalent(Node &&node, unsigned n1) {
     unsigned n2 = get(move(node));
-    unsigned new_root = uf.merge(n1, n2);
+    unsigned new_root = uf.merge(n2, n1);
     auto &root = nodes_eqs[new_root];
 
     auto merge = [&](unsigned n) {

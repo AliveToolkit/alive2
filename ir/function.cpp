@@ -1037,7 +1037,7 @@ void LoopAnalysis::run() {
 
     for (unsigned x : P) {
       header[x] = w;
-      uf.merge(x, w);
+      ENSURE(uf.merge(x, w) == w);
     }
   }
 
