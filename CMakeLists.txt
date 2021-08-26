@@ -214,6 +214,10 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
     "tools/alive-exec.cpp"
   )
   target_compile_options(alive-exec PRIVATE -fexceptions)
+  
+  add_llvm_executable(alive-mutate
+    "tools/alive-mutate.cpp"
+  )
 
 else()
   set(LLVM_UTIL_SRCS "")
