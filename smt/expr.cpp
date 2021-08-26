@@ -227,6 +227,14 @@ expr expr::mkHalf(float n) {
   return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_half(ctx()));
 }
 
+static Z3_sort mk_bfloat_sort() {
+  return Z3_mk_fpa_sort(ctx(), 8, 8);
+}
+
+expr expr::mkBFloat(float n) {
+  return Z3_mk_fpa_numeral_float(ctx(), n, mk_bfloat_sort());
+}
+
 expr expr::mkFloat(float n) {
   return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_single(ctx()));
 }
@@ -297,6 +305,10 @@ expr expr::mkBoolVar(const char *name) {
 
 expr expr::mkHalfVar(const char *name) {
   return ::mkVar(name, Z3_mk_fpa_sort_half(ctx()));
+}
+
+expr expr::mkBFloatVar(const char *name) {
+  return ::mkVar(name, mk_bfloat_sort());
 }
 
 expr expr::mkFloatVar(const char *name) {

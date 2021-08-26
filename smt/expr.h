@@ -81,6 +81,7 @@ public:
   static expr mkInt(const char *n, unsigned bits);
   static expr mkFloat(double n, const expr &type);
   static expr mkHalf(float n);
+  static expr mkBFloat(float n);
   static expr mkFloat(float n);
   static expr mkDouble(double n);
   static expr mkQuad(double n);
@@ -90,6 +91,7 @@ public:
   static expr mkVar(const char *name, unsigned bits);
   static expr mkBoolVar(const char *name);
   static expr mkHalfVar(const char *name);
+  static expr mkBFloatVar(const char *name);
   static expr mkFloatVar(const char *name);
   static expr mkDoubleVar(const char *name);
   static expr mkQuadVar(const char *name);

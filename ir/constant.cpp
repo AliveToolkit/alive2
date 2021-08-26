@@ -71,6 +71,7 @@ StateValue FloatConst::toSMT(State &s) const {
   case FloatType::Half:    e = expr::mkHalf((float)v); break;
   case FloatType::Float:   e = expr::mkFloat((float)v); break;
   case FloatType::Double:  e = expr::mkDouble(v); break;
+  case FloatType::BFloat:  e = expr::mkBFloat((float)v); break;
   case FloatType::Quad:
   case FloatType::Unknown: UNREACHABLE();
   }

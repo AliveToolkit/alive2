@@ -385,11 +385,12 @@ void IntType::print(ostream &os) const {
 
 
 // total bits, exponent bits
-static array<pair<unsigned, unsigned>, 4> float_sizes = {
+static array<pair<unsigned, unsigned>, 5> float_sizes = {
   /* Half */   make_pair(16, 5),
   /* Float */  make_pair(32, 8),
   /* Double */ make_pair(64, 11),
   /* Quad */   make_pair(128, 15),
+  /* BFloat */ make_pair(16, 8),
 };
 
 unsigned FloatType::bits() const {
@@ -499,6 +500,7 @@ StateValue FloatType::getDummyValue(bool non_poison) const {
   case Float:   e = expr::mkFloat(0); break;
   case Double:  e = expr::mkDouble(0); break;
   case Quad:    e = expr::mkQuad(0); break;
+  case BFloat:  e = expr::mkBFloat(0); break;
   case Unknown: UNREACHABLE();
   }
   return { move(e), non_poison };
@@ -556,6 +558,7 @@ expr FloatType::mkInput(State &s, const char *name,
   case Float:   return expr::mkFloatVar(name);
   case Double:  return expr::mkDoubleVar(name);
   case Quad:    return expr::mkQuadVar(name);
+  case BFloat:  return expr::mkBFloatVar(name);
   case Unknown: UNREACHABLE();
   }
   UNREACHABLE();
@@ -579,22 +582,16 @@ void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
 }
 
 void FloatType::print(ostream &os) const {
+  const char *name = "";
   switch (fpType) {
-  case Half:
-    os << "half";
-    break;
-  case Float:
-    os << "float";
-    break;
-  case Double:
-    os << "double";
-    break;
-  case Quad:
-    os << "fp128";
-    break;
-  case Unknown:
-    break;
+  case Half:   name = "half"; break;
+  case Float:  name = "float"; break;
+  case Double: name = "double"; break;
+  case Quad:   name = "fp128"; break;
+  case BFloat: name = "bfloat"; break;
+  case Unknown: break;
   }
+  os << name;
 }
 
 

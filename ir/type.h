@@ -178,7 +178,7 @@ public:
 class FloatType final : public Type {
 public:
   enum FpType {
-    Half, Float, Double, Quad, Unknown
+    Half, Float, Double, Quad, BFloat, Unknown
   };
 
 private:
