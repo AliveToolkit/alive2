@@ -23,12 +23,15 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/CommandLine.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <utility>
-#include "llvm/Support/CommandLine.h"
+#include <chrono>
+
 
 using namespace tools;
 using namespace util;
@@ -53,9 +56,11 @@ namespace {
   llvm::cl::opt<int> numCopy("n",llvm::cl::desc("number copies of test files"),llvm::cl::init(-1));
 
   llvm::cl::opt<int> timeElapsed("t",llvm::cl::desc("seconds of mutator should run"),llvm::cl::init(-1));
-
+  llvm::cl::opt<bool> verbose("-v",llvm::cl::desc("verbose mode"));
 
   llvm::ExitOnError ExitOnErr;
+
+  filesystem::path inputPath,outputPath;
 
   // adapted from llvm-dis.cpp
   std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
@@ -72,20 +77,6 @@ namespace {
     ExitOnErr(M->materializeAll());
     return M;
   }
-
-  vector<string> getOutputFiles(const string& inputFile,const string& outputPath,int numCopy){
-    vector<string> res;
-    string opt=(outputPath.back()=='/'?outputPath:(outputPath+'/'));
-    string inputFileName=Util::split(inputFile,"/").back();
-    if(size_t pos=inputFileName.find_last_of('.');pos!=string::npos){
-        string fileName=string(inputFileName.begin(),inputFileName.begin()+pos);
-        string extension=inputFileName.substr(pos+1);
-        for(int i=0;i<numCopy;++i){
-            res.push_back(opt+fileName+std::to_string(i)+"."+extension);
-        }
-    }
-    return res;
-  }
   /*llvm::Function *findFunction(llvm::Module &M, const string &FName) {
     for (auto &F : M) {
       if (F.isDeclaration())
@@ -99,6 +90,8 @@ namespace {
 }
 
 void copyMode(),timeMode();
+bool isValidInputPath(),isValidOutputPath();
+string getOutputFile(int ith);
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -116,6 +109,12 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
   if(numCopy<0&&timeElapsed<0){
     cerr<<"Please specify either number of copies or running time!\n";
+    return -1;
+  }else if(!isValidInputPath()){
+    cerr<<"Input file does not exist!\n";
+    return -1;
+  }else if(!isValidOutputPath()){
+    cerr<<"Output folder does not exist!\n";
     return -1;
   }
 
@@ -139,13 +138,57 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+bool isValidInputPath(){
+  bool result=filesystem::status(string(testfile)).type()==filesystem::file_type::regular;
+  if(result){
+    inputPath=filesystem::path(string(testfile));
+  }
+  return result;
+}
+
+bool isValidOutputPath(){
+  bool result= filesystem::status(string(outputFolder)).type()==filesystem::file_type::directory;
+  if(result){
+    outputPath=filesystem::path(string(outputFolder));
+  }
+  return result;
+}
+
+string getOutputFile(int ith){
+  static string templateName=string(outputFolder)+inputPath.stem().string();
+  return templateName+to_string(ith)+".ll";
+}
+
 void copyMode(){
   SingleLineMutator mutator;
   if(mutator.openInputFile(testfile)&&mutator.init()){
-    
+    for(int i=1;i<=numCopy;++i){
+      if(verbose){
+        std::cout<<"Currently generating "+to_string(i)+"th copies\n";
+      }
+      mutator.generateTest(getOutputFile(i));
+    }
+  }else{
+    cerr<<"Mutator error! Please check your testfile\n";
   }
 }
 
 void timeMode(){
-
+  SingleLineMutator mutator;
+  if(mutator.openInputFile(testfile)&&mutator.init()){
+    std::chrono::duration<double> sum=std::chrono::duration<double>::zero();
+    int cnt=1;
+    while(sum.count()<timeElapsed){
+      auto t_start = std::chrono::high_resolution_clock::now();
+      mutator.generateTest(getOutputFile(cnt));
+      auto t_end = std::chrono::high_resolution_clock::now();
+      if(verbose){
+        std::cout<<"Generted "+to_string(cnt)+"th copies in "+to_string((t_end-t_start).count())+" seconds\n";
+      }
+      sum+=t_end-t_start;
+      ++cnt;
+    }
+  }else{
+    cerr<<"Mutator error! Please check your testfile\n";
+  }
 }
