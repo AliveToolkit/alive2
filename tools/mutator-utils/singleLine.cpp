@@ -4,7 +4,7 @@
 const string FunctionAttributeGroupDefinition::ATTRIBUTES_PREFIX("attributes");
 std::map<string,std::pair<bool,std::vector<std::unique_ptr<FunctionAttribute>>>> FunctionAttributeGroupDefinition::groupAttrs;
 
-FunctionAttributeGroupDefinition::FunctionAttributeGroupDefinition(const string& name,std::vector<std::unique_ptr<FunctionAttribute>>& attrs,const string& comment):name(name),SingleLine(comment){
+FunctionAttributeGroupDefinition::FunctionAttributeGroupDefinition(const string& name,std::vector<std::unique_ptr<FunctionAttribute>>& attrs,const string& comment):SingleLine(comment),name(name){
     std::vector<std::unique_ptr<FunctionAttribute>> result;
     bool hasNoFree=false;
     for(auto& attr:attrs){
@@ -110,10 +110,10 @@ const string FunctionDefinition::FUNCTION_PREFIX("define");
 FunctionDefinition::FunctionDefinition(const string& beforeNameStr,const string& functionName,
                     std::vector<std::unique_ptr<Parameter>>& para,
                     const string& middleStr,std::vector<std::unique_ptr<FunctionAttribute>>& funcAttr,
-                    const string& afterAttrStr,const string& comment):
-            beforeNameStr(beforeNameStr),functionName(functionName),para(std::move(para)),middleStr(middleStr),
-            afterAttrStr(afterAttrStr),SingleLine(comment){
-                for(int i=0;i<funcAttr.size();++i){
+                    const string& afterAttrStr,const string& comment):SingleLine(comment),
+            functionName(functionName),beforeNameStr(beforeNameStr),middleStr(middleStr),
+            afterAttrStr(afterAttrStr),para(std::move(para)){
+                for(int i=0;i<(int)funcAttr.size();++i){
                     if(!(funcAttr[i]->isSingleFunctionAttribute()&&funcAttr[i]->hasSupportedFunctionAttribute())){
                         (this->funcAttr).push_back(std::move(funcAttr[i]));
                     }else{

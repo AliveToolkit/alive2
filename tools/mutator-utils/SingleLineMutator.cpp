@@ -41,7 +41,7 @@ bool SingleLineMutator::init(){
         std::cerr<<"Cannot find any function to update!";
     }
     
-    return !funcDefPos.empty()&&!updPos.empty();
+    return !funcDefPos.empty()||!updPos.empty();
 }
 
 void SingleLineMutator::generateTest(const string& outputFile){
@@ -49,7 +49,7 @@ void SingleLineMutator::generateTest(const string& outputFile){
         std::cout<<"writing to file: "<<outputFile<<"\n";
     }
     std::ofstream fout(outputFile,std::ofstream::out);
-    for(int i=0,tmp;i<testFile.size();++i){
+    for(int i=0,tmp;i<(int)testFile.size();++i){
         if(!changed&&i==cur->first){
             cur->second->mutate();
             if(debug){

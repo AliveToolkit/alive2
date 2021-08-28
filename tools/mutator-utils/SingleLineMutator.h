@@ -20,7 +20,7 @@ class SingleLineMutator{
     std::unordered_set<string> funcGroupAttrNames;
     const static std::string INST_INDENT;
 public:
-    SingleLineMutator():changed(false),funcChanged(false){};
+    SingleLineMutator():debug(false),changed(false),funcChanged(false){};
     ~SingleLineMutator(){};
     bool openInputFile(const string& inputFile);
     bool init();

@@ -28,7 +28,7 @@ protected:
     string param;
     int supportedAttribute;
 public:
-    ParameterAttribute(const string& name,const string& param):param(param),Attribute(name){
+    ParameterAttribute(const string& name,const string& param):Attribute(name),param(param){
         supportedAttribute=0;
         if(name=="dereferenceable"){
             supportedAttribute|=1;

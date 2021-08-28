@@ -45,7 +45,7 @@ bool Util::isFloatExponential(const string& str){
 }
 
 std::vector<string> Util::split(const string& origin,const string& delimiter){
-    int startPos = 0,endPos = origin.find(delimiter);
+    size_t startPos = 0,endPos = origin.find(delimiter);
     std::vector<string> res;
     while (endPos != string::npos) {
         res.push_back(origin.substr(startPos,endPos-startPos));
@@ -59,13 +59,13 @@ std::vector<string> Util::split(const string& origin,const string& delimiter){
 std::vector<string> Util::splitWithToken(const std::string& str,const std::string& pattern){ 
     std::vector<std::string> tmpRes;
     std::vector<int> pos(1,-(int)(pattern.size()));
-    for(int i=0,neasted=0;i<str.size();++i){
+    for(int i=0,neasted=0;i<(int)str.size();++i){
         if(str[i]=='<')++neasted;
         else if(str[i]=='>')--neasted;
         else if(neasted==0&&str.substr(i,pattern.size())==pattern)pos.push_back(i);
     }
     pos.push_back(str.size());
-    for(int i=1;i<pos.size();++i){
+    for(int i=1;i<(int)pos.size();++i){
         tmpRes.push_back(std::string(str.begin()+pos[i-1]+pattern.size(),str.begin()+pos[i]));
     }
     return tmpRes;
@@ -73,7 +73,7 @@ std::vector<string> Util::splitWithToken(const std::string& str,const std::strin
 
 bool Util::isPrefix(const string& str,const string& prefix,int offset){
     if(str.size()>=prefix.size()+offset){
-        for(int i=0;i<prefix.size();++i)
+        for(int i=0;i<(int)prefix.size();++i)
         if(str[i+offset]!=prefix[i])
             return false;
         return true;

@@ -44,8 +44,8 @@ public:
     string toString()const override{
         return result +" = " +INSTRUCTION +(hasInbounds?" inbounds ":" ") + rest+" "+comment;
     }
-    GEPInstruction(const string& result,const string& rest,const string& comment,bool hasInbounds):
-            result(result),rest(rest),Instruction(comment),hasInbounds(hasInbounds){}
+    GEPInstruction(const string& result,const string& rest,const string& comment,bool hasInbounds):Instruction(comment),
+            result(result),rest(rest),hasInbounds(hasInbounds){}
     ~GEPInstruction(){}
     void mutate() override{
         resetFlags();
@@ -95,8 +95,8 @@ public:
         }
     };
     ~BinaryInstruction(){};
-    BinaryInstruction(const string& result, const string& oper,const vector<string>& flags,const string& ty,const string& op1,const string& op2,int flagIndex,const string& comment=""):
-                    result(result),oper(oper),flags(flags),ty(ty),op1(op1),op2(op2),flagIndex(flagIndex),Instruction(comment){};
+    BinaryInstruction(const string& result, const string& oper,const vector<string>& flags,const string& ty,const string& op1,const string& op2,int flagIndex,const string& comment=""):Instruction(comment),
+                    result(result),oper(oper),op1(op1),op2(op2),ty(ty),flags(flags),flagIndex(flagIndex){};
     string toString()const override{
         return result+" = "+oper+" "+std::accumulate(flags.begin(),flags.end(),string(),Util::stringAccumulateAdd)+ty+" "+op1+", "+op2+comment;
     };

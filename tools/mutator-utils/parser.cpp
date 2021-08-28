@@ -64,7 +64,7 @@ unique_ptr<BinaryInstruction> Parser::parseBinaryInstruction(const vector<string
         const string& op2=tokens.back();
         const string& op1=tokens[tokens.size()-2];
         vector<string> flags;
-        for(int i=3;i<tokens.size()-3;++i){
+        for(int i=3;i<(int)tokens.size()-3;++i){
             flags.push_back(tokens[i]);
         }
         return std::make_unique<BinaryInstruction>(tokens[0],tokens[2],
@@ -109,7 +109,7 @@ unique_ptr<FunctionAttributeGroupDefinition> Parser::parseFunctionAttributeGroup
         const string& name=tokens[1];
         if(isFunctionGroupID(name)){
             std::vector<unique_ptr<FunctionAttribute>> attrs;
-            for(int i=4;i<tokens.size()-1;++i){
+            for(int i=4;i<(int)tokens.size()-1;++i){
                 if(unique_ptr<FunctionAttribute> ptr=parseFunctionAttribute(tokens[i]);ptr!=nullptr){
                     attrs.push_back(std::move(ptr));
                 }else{
@@ -145,13 +145,13 @@ std::tuple<string,string,string,string> Parser::getFunctionNameAndParameter(cons
 static std::deque<string> splitFunctionAttribute(const string& str){
     std::deque<std::string> tmpRes;
     std::vector<int> pos(1,-1);
-    for(int i=0,neasted=0;i<str.size();++i){
+    for(int i=0,neasted=0;i<(int)str.size();++i){
         if(str[i]=='(')++neasted;
         else if(str[i]==')')--neasted;
         else if(neasted==0&&isblank(str[i]))pos.push_back(i);
     }
     pos.push_back(str.size());
-    for(int i=1;i<pos.size();++i){
+    for(int i=1;i<(int)pos.size();++i){
         tmpRes.push_back(std::string(str.begin()+pos[i-1]+1,str.begin()+pos[i]));
     }
     return tmpRes;
@@ -174,7 +174,7 @@ std::tuple<string,std::vector<std::unique_ptr<FunctionAttribute>>,string> Parser
             for(int i=0;i<=lastDetectableAttr;++i){
                 funcAttr.push_back(std::move(parseFunctionAttribute(tokens[i])));
             }
-            for(int i=lastDetectableAttr+1;i<tokens.size();++i){
+            for(int i=lastDetectableAttr+1;i<(int)tokens.size();++i){
                 afterAttrStr+=(tokens[i]+" ");
             }
             return {middleStr,std::move(funcAttr),afterAttrStr};
@@ -201,14 +201,14 @@ unique_ptr<Parameter> Parser::parseParameter(const string& str){
         std::vector<std::unique_ptr<ParameterAttribute>> paras;
         int hasName=0;
         if(tokens.size()>1){
-            if(isNamedValues(tokens.back())){
+            if(isNamedValues(tokens.back())||isUnnamedValues(tokens.back())){
                 hasName=1;
                 name=tokens.back();
             }
         }
-        for(int i=1;i<tokens.size()-hasName;){
+        for(int i=1;i<(int)tokens.size()-hasName;){
             if(tokens[i]=="align"){
-                if(i+1>=tokens.size()-hasName){
+                if(i+1>=(int)tokens.size()-hasName){
                     return nullptr;
                 }
                 if(unique_ptr<ParameterAttribute> ptr=parseParameterAttribute(tokens[i]+"("+tokens[i+1]+")");ptr){

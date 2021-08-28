@@ -121,6 +121,12 @@ add_library(smt STATIC ${SMT_SRCS})
 
 set(TOOLS_SRCS
   tools/transform.cpp
+  tools/mutator-utils/SingleLineMutator.cpp
+  tools/mutator-utils/attributes.cpp
+  tools/mutator-utils/parser.cpp
+  tools/mutator-utils/instructions.cpp
+  tools/mutator-utils/singleLine.cpp
+  tools/mutator-utils/util.cpp
 )
 
 add_library(tools STATIC ${TOOLS_SRCS})
