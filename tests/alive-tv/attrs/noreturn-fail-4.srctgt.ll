@@ -10,4 +10,4 @@ define i8 @tgt() {
   ret i8 0
 }
 
-; ERROR: Source and target don't have the same return domain
+; ERROR: Source is more defined than target

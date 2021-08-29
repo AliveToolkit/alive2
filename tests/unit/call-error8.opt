@@ -7,4 +7,4 @@ ret true
   =>
 ret false
 
-; FIXME: this test should fail
+; ERROR: Source and target don't have the same return domain

@@ -135,13 +135,14 @@ private:
     std::vector<Memory::PtrInput> args_ptr;
     ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
-    bool readsmem, argmemonly;
+    bool readsmem, argmemonly, noret;
 
     smt::expr operator==(const FnCallInput &rhs) const;
     smt::expr refinedBy(State &s, const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
-                        const Memory &m, bool readsmem, bool argmemonly) const;
+                        const Memory &m, bool readsmem, bool argmemonly,
+                        bool noret) const;
 
     auto operator<=>(const FnCallInput &rhs) const = default;
   };
@@ -149,6 +150,7 @@ private:
   struct FnCallOutput {
     std::vector<StateValue> retvals;
     smt::expr ub;
+    smt::expr noreturns;
     Memory::CallState callstate;
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
@@ -195,7 +197,7 @@ public:
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
-  void addNoReturn();
+  void addNoReturn(const smt::expr &cond);
 
   std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,

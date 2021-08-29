@@ -24,4 +24,4 @@ define i8 @tgt() {
   ret i8 1
 }
 
-; ERROR: Value mismatch
+; ERROR: Source and target don't have the same return domain

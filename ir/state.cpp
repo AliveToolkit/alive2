@@ -622,18 +622,20 @@ void State::addUB(AndExpr &&ubs) {
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
-void State::addNoReturn() {
-  return_memory.add(memory, domain.path);
-  function_domain.add(domain());
+void State::addNoReturn(const expr &cond) {
+  return_memory.add(memory, domain.path && cond);
+  function_domain.add(domain() && cond);
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
-  undef_vars.clear();
-  addUB(expr(false));
+  if (cond.isTrue())
+    undef_vars.clear();
+  addUB(!cond);
 }
 
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
   if (readsmem != rhs.readsmem ||
       argmemonly != rhs.argmemonly ||
+      noret != rhs.noret ||
       (readsmem && (fncall_ranges != rhs.fncall_ranges || is_neq(m <=> rhs.m))))
     return false;
 
@@ -652,9 +654,9 @@ expr State::FnCallInput::refinedBy(
   State &s, const vector<StateValue> &args_nonptr2,
   const vector<Memory::PtrInput> &args_ptr2,
   const ValueAnalysis::FnCallRanges &fncall_ranges2,
-  const Memory &m2, bool readsmem2, bool argmemonly2) const {
+  const Memory &m2, bool readsmem2, bool argmemonly2, bool noret2) const {
 
-  if (readsmem != readsmem2 || argmemonly != argmemonly2 ||
+  if (readsmem != readsmem2 || argmemonly != argmemonly2 || noret != noret2 ||
       (readsmem && !fncall_ranges.overlaps(fncall_ranges2)))
     return false;
 
@@ -708,6 +710,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
                                               const FnCallOutput &b) {
   FnCallOutput ret;
   ret.ub = expr::mkIf(cond, a.ub, b.ub);
+  ret.noreturns = expr::mkIf(cond, a.noreturns, b.noreturns);
   ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
   assert(a.retvals.size() == b.retvals.size());
   for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
@@ -719,6 +722,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
 
 expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
   expr ret = ub == rhs.ub;
+  ret &= noreturns == rhs.noreturns;
   for (unsigned i = 0, e = retvals.size(); i != e; ++i) {
     ret &= retvals[i] == rhs.retvals[i];
   }
@@ -735,6 +739,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
   bool writes_memory = !attrs.has(FnAttrs::NoWrite);
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
+  bool noret = attrs.has(FnAttrs::NoReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
 
   bool all_valid = std::all_of(inputs.begin(), inputs.end(),
@@ -765,7 +770,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
             reads_memory ? analysis.ranges_fn_calls
                          : State::ValueAnalysis::FnCallRanges(),
             reads_memory ? memory : Memory(*this),
-            reads_memory, argmemonly });
+            reads_memory, argmemonly, noret });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
 
@@ -785,9 +790,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
           noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
       }
 
-      string ub_name = name + "#ub";
+      string ub_name    = name + "#ub";
+      string noret_name = name + "#noreturn";
       I->second
         = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
+            noret ? expr(true) : expr::mkFreshVar(noret_name.c_str(), false),
             writes_memory
               ? memory.mkCallState(name,
                                    argmemonly ? &I->first.args_ptr : nullptr,
@@ -805,6 +812,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     addUB(I->second.ub);
+    addNoReturn(I->second.noreturns);
     retval = I->second.retvals;
     if (writes_memory)
       memory.setState(I->second.callstate);
@@ -816,7 +824,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     for (auto &[in, out] : fn_call_data[name]) {
       auto refined = in.refinedBy(*this, inputs, ptr_inputs,
                                   analysis.ranges_fn_calls, memory,
-                                  reads_memory, argmemonly);
+                                  reads_memory, argmemonly, noret);
       data.add(out, move(refined));
     }
 
@@ -824,6 +832,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto [d, domain, qvar, pre] = data();
       addUB(move(domain));
       addUB(move(d.ub));
+      addNoReturn(move(d.noreturns));
       retval = move(d.retvals);
       if (writes_memory)
         memory.setState(d.callstate);

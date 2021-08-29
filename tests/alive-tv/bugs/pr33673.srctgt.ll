@@ -1,5 +1,4 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=33673
-; To find counter-example from this, function should be able to throw or exit
 define void @src() {
   %p = alloca i32, align 4
   %a = load i32, i32* %p, align 4
@@ -16,3 +15,5 @@ define void @tgt() {
 }
 
 declare void @foo(i32)
+
+; ERROR: Source is more defined than target
