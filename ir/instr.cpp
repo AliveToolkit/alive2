@@ -2584,7 +2584,7 @@ static void check_can_load(State &s, const expr &p0) {
   Pointer p(s.getMemory(), p0);
 
   if (attrs.has(FnAttrs::NoRead))
-    s.addUB(p.isLocal());
+    s.addUB(p.isLocal() || p.isConstGlobal());
   else if (attrs.has(FnAttrs::ArgMemOnly))
     s.addUB(p.isLocal() || ptr_only_args(s, p));
 }

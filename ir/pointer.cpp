@@ -165,6 +165,15 @@ expr Pointer::isLocal(bool simplify) const {
   return local == 1;
 }
 
+expr Pointer::isConstGlobal() const {
+  auto bid = getShortBid();
+  auto generic = bid.uge(has_null_block) &&
+                 bid.ule(num_consts_src + has_null_block - 1);
+  auto tgt = bid.uge(num_nonlocals_src + num_extra_nonconst_tgt) &&
+             bid.ule(num_nonlocals - 1);
+  return !isLocal() && (generic || tgt);
+}
+
 expr Pointer::getBid() const {
   return p.extract(totalBits() - 1, bits_for_offset + bits_for_ptrattrs);
 }
