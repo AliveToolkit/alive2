@@ -1003,8 +1003,10 @@ static unique_ptr<Instr> parse_call(string_view name) {
   FnAttrs attrs;
   while (true) {
     switch (auto t = *tokenizer) {
-    case NOREAD:  attrs.set(FnAttrs::NoRead); break;
-    case NOWRITE: attrs.set(FnAttrs::NoWrite); break;
+    case NOREAD:     attrs.set(FnAttrs::NoRead); break;
+    case NOWRITE:    attrs.set(FnAttrs::NoWrite); break;
+    case NORETURN:   attrs.set(FnAttrs::NoReturn); break;
+    case WILLRETURN: attrs.set(FnAttrs::WillReturn); break;
     default:
       tokenizer.unget(t);
       goto exit;

@@ -232,6 +232,8 @@ space+ {
 "call" { return CALL; }
 "noread" { return NOREAD; }
 "nowrite" { return NOWRITE; }
+"noreturn" { return NORETURN; }
+"willreturn" { return WILLRETURN; }
 "freeze" { return FREEZE; }
 "malloc" { return MALLOC; }
 "free" { return FREE; }

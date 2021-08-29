@@ -1220,6 +1220,10 @@ public:
         attrs.set(FnAttrs::NoReturn);
         break;
 
+      case llvm::Attribute::WillReturn:
+        attrs.set(FnAttrs::WillReturn);
+        break;
+
       default:
         break;
       }

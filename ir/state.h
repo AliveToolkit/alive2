@@ -135,14 +135,14 @@ private:
     std::vector<Memory::PtrInput> args_ptr;
     ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
-    bool readsmem, argmemonly, noret;
+    bool readsmem, argmemonly, noret, willret;
 
     smt::expr operator==(const FnCallInput &rhs) const;
     smt::expr refinedBy(State &s, const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
                         const Memory &m, bool readsmem, bool argmemonly,
-                        bool noret) const;
+                        bool noret, bool willret) const;
 
     auto operator<=>(const FnCallInput &rhs) const = default;
   };
