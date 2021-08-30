@@ -59,6 +59,10 @@ Please contact us or submit a PR if something is missing or inaccurate.
 52. InstSimplify: incorrect fold of pointer comparison between globals (https://llvm.org/PR50208)
 53. ConstraintElimination: incorrect fold of pointer comparison (https://llvm.org/PR50280)
 54. InstCombine: incorrect select fast-math folds (https://llvm.org/PR50281)
+55. EarlyCSE incorrectly assumes that readonly functions return (https://llvm.org/PR51668)
+56. LoopIdiomRecognize: Overflow in ctlz shifting loop (https://llvm.org/PR51669)
+57. LoopUnroll: runtime check introduces branch on poison if fn call doesn't return (https://llvm.org/PR51670)
+58. (Simple)LoopUnswitch introduces branch on poison if call doesn't return (https://llvm.org/PR51671)
 
 
 ### Bugs found in Z3
