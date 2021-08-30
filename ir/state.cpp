@@ -30,45 +30,54 @@ static T intersect_set(const T &a, const T &b) {
   return results;
 }
 
-void State::ValueAnalysis::intersect(const State::ValueAnalysis &other) {
+void State::ValueAnalysis::meet_with(const State::ValueAnalysis &other) {
   non_poison_vals = intersect_set(non_poison_vals, other.non_poison_vals);
   non_undef_vals = intersect_set(non_undef_vals, other.non_undef_vals);
   unused_vars = intersect_set(unused_vars, other.unused_vars);
 
-  for (auto &[fn, interval] : other.ranges_fn_calls) {
-    auto [I, inserted] = ranges_fn_calls.try_emplace(fn, 0, interval.second);
-    if (!inserted) {
-      I->second.first  = min(I->second.first, interval.first);
-      I->second.second = max(I->second.second, interval.second);
+  for (auto &[fn, calls] : other.ranges_fn_calls) {
+    auto [I, inserted] = ranges_fn_calls.try_emplace(fn, calls);
+    if (inserted) {
+      I->second.emplace(0);
+    } else {
+      I->second.insert(calls.begin(), calls.end());
     }
   }
 
-  for (auto &[fn, interval] : ranges_fn_calls) {
+  for (auto &[fn, calls] : ranges_fn_calls) {
     if (!other.ranges_fn_calls.count(fn))
-      interval.first = 0;
+      calls.emplace(0);
+  }
+}
+
+void State::ValueAnalysis::FnCallRanges::inc(const std::string &name) {
+  auto [I, inserted] = try_emplace(name);
+  if (inserted) {
+    I->second.emplace(1);
+  } else {
+    set<unsigned> new_set;
+    for (unsigned n : I->second) {
+      new_set.emplace(n+1);
+    }
+    I->second = move(new_set);
   }
 }
 
 bool
 State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
-  auto overlaps = [](auto &a, auto &b) {
-    return (a.first <= b.first && a.second >= b.first) ||
-           (b.first <= a.first && b.second >= a.first);
-  };
-
-  for (auto &[fn, interval] : *this) {
+  for (auto &[fn, calls] : *this) {
     auto I = other.find(fn);
     if (I == other.end()) {
-      if (interval.first == 0)
+      if (calls.count(0))
         continue;
       return false;
     }
-    if (!overlaps(interval, I->second))
+    if (intersect_set(calls, I->second).empty())
       return false;
   }
 
-  for (auto &[fn, interval] : other) {
-    if (interval.first != 0 && !count(fn))
+  for (auto &[fn, calls] : other) {
+    if (!calls.count(0) && !count(fn))
       return false;
   }
 
@@ -541,7 +550,7 @@ bool State::startBB(const BasicBlock &bb) {
     if (isFirst)
       analysis = data.analysis;
     else
-      analysis.intersect(data.analysis);
+      analysis.meet_with(data.analysis);
     isFirst = false;
   }
 
@@ -738,8 +747,6 @@ vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
                  const vector<Type*> &out_types, const FnAttrs &attrs) {
-  // TODO: can read/write=false fn calls be removed?
-
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
   bool writes_memory = !attrs.has(FnAttrs::NoWrite);
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
@@ -857,13 +864,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
   }
 
-  if (writes_memory) {
-    auto [I, inserted] = analysis.ranges_fn_calls.try_emplace(name, 1, 1);
-    if (!inserted) {
-      ++I->second.first;
-      ++I->second.second;
-    }
-  }
+  if (writes_memory)
+    analysis.ranges_fn_calls.inc(name);
 
   return retval;
 }

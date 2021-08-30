@@ -45,13 +45,15 @@ private:
     // vars that have never been used
     std::set<const Value *> unused_vars;
 
-    struct FnCallRanges
-      : public std::map<std::string, std::pair<unsigned, unsigned>> {
+    // Possible number of calls per functio name that occurred so far
+    // This is an over-approximation, union over all predecessors
+    struct FnCallRanges : public std::map<std::string, std::set<unsigned>> {
+      void inc(const std::string &name);
       bool overlaps(const FnCallRanges &other) const;
     };
     FnCallRanges ranges_fn_calls;
 
-    void intersect(const ValueAnalysis &other);
+    void meet_with(const ValueAnalysis &other);
   };
 
   struct VarArgsEntry {
