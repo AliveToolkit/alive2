@@ -11,6 +11,7 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include <unordered_map>
@@ -241,19 +242,30 @@ public:
       approx      = get<3>(known);
     }
 
-    auto fn = i.getCalledFunction();
-    if (!fn) // TODO: support indirect calls
-      return error(i);
-
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
       return error(i);
 
-    if (fn->getName().substr(0, 15) == "__llvm_profile_")
-      return NOP(i);
+    unique_ptr<FnCall> call;
+    auto fn = i.getCalledFunction();
+
+    if (auto *iasm = dyn_cast<llvm::InlineAsm>(i.getCalledOperand())) {
+      assert(!approx);
+      if (!iasm->canThrow())
+        attrs.set(FnAttrs::NoThrow);
+      call = make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
+                                    iasm->getConstraintString(), move(attrs));
+    } else {
+      if (!fn) // TODO: support indirect calls
+        return error(i);
+
+      if (fn->getName().substr(0, 15) == "__llvm_profile_")
+        return NOP(i);
+    }
 
     llvm::AttributeList attrs_callsite = i.getAttributes();
-    llvm::AttributeList attrs_fndef = fn->getAttributes();
+    llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
+                                         : llvm::AttributeList();
     const auto &ret = llvm::AttributeList::ReturnIndex;
     const auto &fnidx = llvm::AttributeList::FunctionIndex;
 
@@ -267,8 +279,9 @@ public:
         attrs.set(FnAttrs::NNaN);
     }
 
-    auto call = make_unique<FnCall>(*ty, value_name(i),
-                                    '@' + fn->getName().str(), move(attrs));
+    if (fn)
+      call = make_unique<FnCall>(*ty, value_name(i),
+                                 '@' + fn->getName().str(), move(attrs));
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
@@ -279,7 +292,7 @@ public:
       unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
       approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
                                   pattr, true);
-      if (argidx < fn->arg_size())
+      if (fn && argidx < fn->arg_size())
         approx |= !handleParamAttrs(attrs_fndef.getAttributes(attr_argidx),
                                     pattr, true);
 

@@ -809,7 +809,7 @@ public:
 };
 
 
-class FnCall final : public MemInstr {
+class FnCall : public MemInstr {
 private:
   std::string fnName;
   std::vector<std::pair<Value*, ParamAttrs>> args;
@@ -839,6 +839,13 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class InlineAsm final : public FnCall {
+public:
+  InlineAsm(Type &type, std::string &&name, const std::string &asm_str,
+            const std::string &constraints, FnAttrs &&attrs = FnAttrs::None);
 };
 
 

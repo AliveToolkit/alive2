@@ -1845,6 +1845,12 @@ unique_ptr<Instr> FnCall::dup(const string &suffix) const {
 }
 
 
+InlineAsm::InlineAsm(Type &type, string &&name, const string &asm_str,
+                     const string &constraints, FnAttrs &&attrs)
+  : FnCall(type, move(name), "asm " + asm_str + ", " + constraints,
+           move(attrs)) {}
+
+
 ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
   : Instr(type, move(name)), a(&a), b(&b), cond(cond), defined(cond != Any) {
   if (!defined)
