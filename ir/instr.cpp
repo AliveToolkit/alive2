@@ -1819,9 +1819,14 @@ StateValue FnCall::toSMT(State &s) const {
       check_access();
   }
 
-  // Caller has nofree attribute, so callee must have it as well
-  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) &&
-      !attrs.has(FnAttrs::NoFree))
+  // Check attributes that calles must have if caller has them
+  auto check = [&](FnAttrs::Attribute attr) {
+    return s.getFn().getFnAttrs().has(attr) && !attrs.has(attr);
+  };
+
+  if (check(FnAttrs::NoFree) ||
+      check(FnAttrs::NoThrow) ||
+      check(FnAttrs::WillReturn))
     s.addUB(expr(false));
 
   unsigned idx = 0;
