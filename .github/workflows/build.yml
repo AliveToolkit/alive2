@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-20.04]
-        compiler:   [g++-10, g++-11, clang++-12]
+        compiler:   [g++-10, g++-11, clang++-12, clang++-13]
         build_type: [Release, Debug]
         include:
           - os: macos-latest
@@ -27,10 +27,10 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
-          #wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          #sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"
-          #sudo apt-get update
-          sudo apt-get install z3 re2c ninja-build g++-11
+          wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
+          sudo apt-get update
+          sudo apt-get install z3 re2c ninja-build g++-11 clang++-13
 
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
