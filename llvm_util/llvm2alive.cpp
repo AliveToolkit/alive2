@@ -819,7 +819,7 @@ public:
     case llvm::Intrinsic::fabs:
     case llvm::Intrinsic::floor:
     case llvm::Intrinsic::is_constant:
-    case llvm::Intrinsic::isnan:
+    //case llvm::Intrinsic::isnan:
     case llvm::Intrinsic::round:
     case llvm::Intrinsic::roundeven:
     case llvm::Intrinsic::sqrt:
@@ -837,7 +837,7 @@ public:
       case llvm::Intrinsic::fabs:        op = UnaryOp::FAbs; break;
       case llvm::Intrinsic::floor:       op = UnaryOp::Floor; break;
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
-      case llvm::Intrinsic::isnan:       op = UnaryOp::IsNaN; break;
+      ///case llvm::Intrinsic::isnan:       op = UnaryOp::IsNaN; break;
       case llvm::Intrinsic::round:       op = UnaryOp::Round; break;
       case llvm::Intrinsic::roundeven:   op = UnaryOp::RoundEven; break;
       case llvm::Intrinsic::sqrt:        op = UnaryOp::Sqrt; break;
