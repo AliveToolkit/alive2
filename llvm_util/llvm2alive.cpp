@@ -300,7 +300,7 @@ public:
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
           // TODO: noundef aggregate should be supported; it can have undef
           // padding
-          return errorAttr(i.getAttribute(argidx, llvm::Attribute::NoUndef));
+          return errorAttr(i.getAttributeAtIndex(argidx, llvm::Attribute::NoUndef));
       }
 
       if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
