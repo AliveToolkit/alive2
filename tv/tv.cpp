@@ -398,6 +398,9 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 }
 
 
+// List 'leaf' interprocedural passes only.
+// For example, ModuleInlinerWrapperPass shouldn't be here because it is an
+// interprocedural pass having other passes as children.
 const char* skip_pass_list[] = {
   "ArgumentPromotionPass",
   "DeadArgumentEliminationPass",
@@ -408,7 +411,6 @@ const char* skip_pass_list[] = {
   "InferFunctionAttrsPass", // IPO
   "InlinerPass",
   "IPSCCPPass",
-  "ModuleInlinerWrapperPass",
   "OpenMPOptPass",
   "PostOrderFunctionAttrsPass", // IPO
   "TailCallElimPass",
@@ -425,7 +427,8 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
   static string pass_name;
   static string batched_pass_begin_name;
   static bool batch_started;
-  static unsigned pass_count;
+  // # of run passes when batching is enabled
+  static unsigned batched_pass_count;
 
   bool print_pass_name = false;
   // A reference counter for TVPass objects.
@@ -484,10 +487,10 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
         // Prepare src. Do this by setting skip_pass to true.
         tv.skip_verify = true;
         *out << "-- FROM THE BITCODE AFTER "
-              << pass_count << ". " << batched_pass_begin_name << "\n";
+              << batched_pass_count << ". " << batched_pass_begin_name << "\n";
       } else {
         *out << "-- TO THE BITCODE AFTER "
-              << pass_count << ". " << pass_name << "\n";
+              << batched_pass_count << ". " << pass_name << "\n";
 
         // Translate LLVM to Alive2 only if there exists src
         tv.onlyif_src_exists = true;
@@ -498,14 +501,16 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
       tv.runOnModule(M);
 
       if (!set_src)
-        *out << "-- DONE: " << pass_count << ". " << pass_name << "\n";
+        *out << "-- DONE: " << batched_pass_count << ". " << pass_name << "\n";
       batch_started = !batch_started;
     } else {
       bool skip_tv = do_skip(pass_name);
 
+      static unsigned count = 0;
+      count++;
       if (print_pass_name) {
         // print_pass_name is set only when running clang tv
-        *out << "-- " << pass_count << ". " << pass_name
+        *out << "-- " << count << ". " << pass_name
             << (skip_tv ? " : Skipping\n" : "\n");
       }
 
@@ -522,7 +527,7 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 string TVPass::pass_name;
 string TVPass::batched_pass_begin_name;
 bool TVPass::batch_started;
-unsigned TVPass::pass_count;
+unsigned TVPass::batched_pass_count;
 unsigned TVPass::num_instances = 0;
 bool is_clangtv_done = false;
 
@@ -585,39 +590,52 @@ llvmGetPassPluginInfo() {
           [](llvm::ModulePassManager &MPM, llvm::OptimizationLevel) {
             MPM.addPass(ClangTVFinalizePass());
           });
-      PB.getPassInstrumentationCallbacks()->registerAfterPassCallback([&](
-          llvm::StringRef P, llvm::Any, const llvm::PreservedAnalyses &) {
-        TVPass::pass_count++;
-        TVPass::pass_name = P.str();
-      });
-      auto clang_tv = [](llvm::StringRef P, llvm::Any IR) {
-        if (!is_clangtv || is_clangtv_done)
-          return;
-        else if (TVPass::pass_name.empty())
-          // Skip the first pass; it is Annotation2MetadataPass, which isn't
-          // interesting
-          return;
 
-        bool run_tv = true;
-        if (batch_opts) {
+      if (batch_opts) {
+        // For batched clang tv, manually run TVPass before each pass
+        PB.getPassInstrumentationCallbacks()
+            ->registerBeforeNonSkippedPassCallback(
+              [](llvm::StringRef P, llvm::Any IR) {
+          assert(is_clangtv && "Batching is enabled for clang-tv only");
+          if (is_clangtv_done)
+            return;
+          else if (TVPass::pass_name.empty()) {
+            // Skip the first pass; it is Annotation2MetadataPass, which isn't
+            // interesting
+            assert(P.str() == "Annotation2MetadataPass");
+            return;
+          }
+
           // Run only when it is at the boundary
           bool do_start = !TVPass::batch_started && do_skip(TVPass::pass_name)
               && !do_skip(P);
           bool do_finish = TVPass::batch_started && !do_skip(TVPass::pass_name)
               && do_skip(P);
 
-          run_tv = do_start || do_finish;
-
           if (do_start)
             TVPass::batched_pass_begin_name = TVPass::pass_name;
-        }
 
-        if (run_tv)
+          if (do_start || do_finish)
+            runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
+        });
+        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback([&](
+            llvm::StringRef P, llvm::Any, const llvm::PreservedAnalyses &) {
+          TVPass::batched_pass_count++;
+          TVPass::pass_name = P.str();
+        });
+
+      } else {
+        // For non-batched clang tv, manually run TVPass after each pass
+        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
+            [](llvm::StringRef P, llvm::Any IR,
+                    const llvm::PreservedAnalyses &PA) {
+          TVPass::pass_name = P.str();
+          if (!is_clangtv || is_clangtv_done)
+            return;
+
           runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
-      };
-      // For clang tv, manually run TVPass before each pass
-      PB.getPassInstrumentationCallbacks()
-          ->registerBeforeNonSkippedPassCallback(move(clang_tv));
+        });
+      }
     }
   };
 }
