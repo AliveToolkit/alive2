@@ -20,7 +20,7 @@ class AndExpr {
   std::set<expr> exprs;
 
 public:
-  AndExpr() {}
+  AndExpr() = default;
   template <typename T>
   AndExpr(T &&e) { add(std::forward<T>(e)); }
 
@@ -41,8 +41,14 @@ class OrExpr {
   std::set<expr> exprs;
 
 public:
+  OrExpr() = default;
+  template <typename T>
+  OrExpr(T &&e) { add(std::forward<T>(e)); }
+
+  void add(const expr &e);
   void add(expr &&e);
   void add(const OrExpr &other);
+  bool contains(const expr &e) const;
   expr operator()() const;
   friend std::ostream &operator<<(std::ostream &os, const OrExpr &e);
 };
@@ -122,6 +128,8 @@ public:
     if (!inserted)
       I->second |= std::forward<D>(domain);
   }
+
+  auto size() const { return vals.size(); }
 
   operator bool() const {
     return !vals.empty();

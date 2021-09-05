@@ -45,14 +45,20 @@ private:
     // vars that have never been used
     std::set<const Value *> unused_vars;
 
-    // Possible number of calls per functio name that occurred so far
+    // Possible number of calls per function name that occurred so far
+    // Plus the path to the last call
     // This is an over-approximation, union over all predecessors
-    struct FnCallRanges : public std::map<std::string, std::set<unsigned>> {
-      void inc(const std::string &name);
+    struct FnCallRanges
+      : public std::map<std::string, std::set<std::pair<unsigned, smt::expr>>> {
+      smt::OrExpr path { smt::expr(true) };
+      void inc(const std::string &name, const smt::expr &cond);
       bool overlaps(const FnCallRanges &other) const;
+      // compare only number of fn calls; ignores path
+      bool operator==(const FnCallRanges &other) const;
     };
     FnCallRanges ranges_fn_calls;
 
+    ValueAnalysis jump(const smt::expr &path) const;
     void meet_with(const ValueAnalysis &other);
   };
 
