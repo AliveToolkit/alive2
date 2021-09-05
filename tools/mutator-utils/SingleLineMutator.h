@@ -26,6 +26,4 @@ public:
     bool init();
     void generateTest(const string& outputFileName);
     void setDebug(bool debug){this->debug=debug;}
-
-
 };

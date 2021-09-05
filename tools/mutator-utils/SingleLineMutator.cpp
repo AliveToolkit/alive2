@@ -29,19 +29,25 @@ bool SingleLineMutator::init(){
         for(const auto& p:funcDefPos){
             p.second->calcSupportedFunctionAttribute();
         }
-        cur=updPos.begin();
-        
+        if(debug){
+            std::cout<<"find "<<updPos.size()<<" locations to mutate instructions!\n";
+        }
     }else{
         std::cerr<<"Cannot find any instruction to update!";
     }
+    cur=updPos.begin();
 
     if(!funcDefPos.empty()){
-        funcCur=funcDefPos.begin();
+
+        if(debug){
+            std::cout<<"find "<<funcDefPos.size()<<" functions to mutate!\n";
+        }
     }else{
         std::cerr<<"Cannot find any function to update!";
     }
+    funcCur=funcDefPos.begin();
     
-    return !funcDefPos.empty()||!updPos.empty();
+    return !funcDefPos.empty()||!funcDefPos.empty();
 }
 
 void SingleLineMutator::generateTest(const string& outputFile){
@@ -49,22 +55,25 @@ void SingleLineMutator::generateTest(const string& outputFile){
         std::cout<<"writing to file: "<<outputFile<<"\n";
     }
     std::ofstream fout(outputFile,std::ofstream::out);
+    if(cur==updPos.end()&&funcCur==funcDefPos.end()){
+        cur=updPos.begin();
+        funcCur=funcDefPos.begin();
+    }
     for(int i=0,tmp;i<(int)testFile.size();++i){
-        if(!changed&&i==cur->first){
+        if(!changed&&cur!=updPos.end()&&i==cur->first){
             cur->second->mutate();
             if(debug){
                 cur->second->print(std::cout<<"Upd line: ")<<"\n";
             }
             cur->second->print(fout<<INST_INDENT)<<"\n";
             ++cur;
-            if(cur==updPos.end())cur=updPos.begin();
             if(updPos.find(i)->second->isGEPInstruction()){
                 tmp=cur->first;
                 updPos.erase(i);
                 cur=updPos.find(tmp);
             }
             changed=true;
-        }else if(!changed&&!funcDefPos.empty()&&i==funcCur->first){
+        }else if(!changed&&funcCur!=funcDefPos.end()&&i==funcCur->first){
             funcCur->second->mutate();
             if(debug){
                 funcCur->second->print(std::cout<<"Upd line: ")<<"\n";
@@ -77,9 +86,6 @@ void SingleLineMutator::generateTest(const string& outputFile){
             }
             funcDefPos.begin()->second->print(fout)<<"\n";
             ++funcCur;
-            if(funcCur==funcDefPos.end()){{
-                funcCur=funcDefPos.begin();
-            }}
             changed=funcChanged=true;
         }else{
             if(funcChanged){
