@@ -7,7 +7,21 @@
 #include "singleLine.h"
 #include <unordered_map>
 
-
+/*
+ * This class is used for doing simple mutations on a given file.
+ Current supported opeartions on binary instructions:
+    + swap operands
+    + replacing operator
+    + reset math flag
+    + replace constant
+ On GEP instructions:
+    + reset inbounds flag
+ On function definitions:
+    + reset nofree flag
+ On function parameters:
+    + reset dereferenceable flag with random value (garantee is power and 2 and value range is [1,8])
+    + reset nocapture flag
+*/
 class SingleLineMutator{
     std::map<int,unique_ptr<Instruction>> updPos;
     std::map<int,unique_ptr<FunctionDefinition>> funcDefPos;

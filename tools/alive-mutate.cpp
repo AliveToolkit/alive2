@@ -46,11 +46,11 @@ namespace {
 
 
   llvm::cl::opt<string> testfile(llvm::cl::Positional,
-    llvm::cl::desc("input test file"),
+    llvm::cl::desc("inputTestFile"),
     llvm::cl::Required, llvm::cl::value_desc("filename"));
 
   llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
-    llvm::cl::desc("output file folder"),
+    llvm::cl::desc("outputFileFolder"),
     llvm::cl::Required, llvm::cl::value_desc("folder"));
 
   llvm::cl::opt<int> numCopy("n",llvm::cl::desc("number copies of test files"),llvm::cl::init(-1));
@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
   
 
   std::string Usage =
-      R"EOF(Alive2 stand-alone translation validator:
+      R"EOF(Alive2 stand-alone LLVM test mutator:
 version )EOF";
   Usage += alive_version;
   init();
@@ -270,6 +270,10 @@ version )EOF";
 }
 
 
+/*
+ * Adapted from llvm_util/cmd_args_def.h
+ * Init part is moved here, and part of setting log is moved to loggerInit;
+*/
 void init(){
   config::src_unroll_cnt = opt_src_unrolling_factor;
   config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
@@ -289,6 +293,10 @@ void init(){
   func_names.insert(opt_funcs.begin(), opt_funcs.end());
 }
 
+/*
+ * Set Alive2's log path. if verbose flag is used, it could output to /def/null or stdout. 
+ * Otherwise it will output to file if find a value mismatch
+*/
 void loggerInit(llvm::Module* pm){
   static std::ofstream nout("/dev/null");
   if(verbose){
@@ -340,9 +348,21 @@ string getOutputFile(int ith,bool isOptimized){
   return templateName+to_string(ith)+(isOptimized?"-opt.ll":".ll");
 }
 
+
+/*
+ * Mutate file once and send it and its optmized version into Alive2
+ * LogIndex is updated here if find a value mismatch.
+*/
 void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,ComplexMutator& cmutator){
-    cmutator.generateTest(getOutputFile(ith));
-    auto M1 = openInputFile(context, getOutputFile(ith));
+    std::unique_ptr<llvm::Module> M1=nullptr;
+    bool isSimpleMutate=Random::getRandomBool();
+    if(isSimpleMutate){
+      mutator.generateTest(getOutputFile(verbose?ith:-1));
+      M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
+    }else{
+      cmutator.generateTest(getOutputFile(ith));
+      M1=cmutator.getModule();
+    }
     
     if (!M1.get()) {
       cerr << "Could not read file from '" << getOutputFile(ith)<< "'\n";
@@ -372,6 +392,7 @@ void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,Compl
     }
     if(num_unsound>0){
       ++logIndex;
+      std::cout<<"Unsound found! at "<<ith<<"th copies\n";
     }
     *out << "Summary:\n"
             "  " << num_correct << " correct transformations\n"
@@ -384,29 +405,45 @@ void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,Compl
       smt::solver_print_stats(*out);
     smt_init.reset();
     num_correct=num_unsound=num_failed=num_errors=0;
+    if(!isSimpleMutate){
+      cmutator.setModule(std::move(M1));
+    }
 }
 
+/*
+ * call runOnce for numCopy times.
+*/
 void copyMode(){
   llvm::LLVMContext context;
   SingleLineMutator mutator;
   ComplexMutator cmutator;
-  mutator.setDebug(true);
+  mutator.setDebug(verbose);
+  cmutator.setDebug(verbose);
   if(mutator.openInputFile(testfile)&&cmutator.openInputFile(testfile)){
       if(mutator.init()&&cmutator.init()){
         for(int i=0;i<numCopy;++i){
+          if(true){
+            std::cout<<"Running "<<i<<"th copies."<<std::endl;
+          }
           runOnce(i,context,mutator,cmutator);
       }
     }
   }
 }
 
+/*
+ * keep calling runOnce and soft exit once time's up.
+*/
 void timeMode(){
   SingleLineMutator mutator;
   ComplexMutator cmutator;
   llvm::LLVMContext context;
   mutator.setDebug(verbose);
-  if(mutator.openInputFile(testfile)){
-    if(!mutator.init()){
+  cmutator.setDebug(verbose);
+  if(mutator.openInputFile(testfile)&&cmutator.openInputFile(testfile)){
+    bool mInit=mutator.init();
+    bool cInit=cmutator.init();
+    if(!mInit||!cInit){
       cerr<<"Cannot find any lotaion to mutate, "+testfile+" skipped\n";
       return;
     }
@@ -417,7 +454,7 @@ void timeMode(){
       runOnce(cnt,context,mutator,cmutator);
       auto t_end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> cur=t_end-t_start;
-      if(verbose){
+      if(true){
         std::cout<<"Generted "+to_string(cnt)+"th copies in "+to_string((cur).count())+" seconds\n";
       }
       sum+=cur;
