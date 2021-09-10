@@ -1097,8 +1097,8 @@ public:
       case llvm::Attribute::ByVal: {
         attrs.set(ParamAttrs::ByVal);
         auto ty = aset.getByValType();
-        unsigned asz = DL().getTypeAllocSize(ty);
-        attrs.blockSize = max(attrs.blockSize, asz);
+        auto asz = DL().getTypeAllocSize(ty);
+        attrs.blockSize = max(attrs.blockSize, (unsigned)asz.getKnownMinSize());
 
         attrs.set(ParamAttrs::Align);
         attrs.align = max(attrs.align, DL().getABITypeAlignment(ty));
