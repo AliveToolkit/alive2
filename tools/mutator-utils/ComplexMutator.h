@@ -46,7 +46,7 @@ class ComplexMutator:public Mutator{
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
     std::unordered_set<std::string> filterSet;
-    
+    std::string currFuncName;
     
 
     decltype(pm->begin()) fit;
@@ -66,8 +66,22 @@ class ComplexMutator:public Mutator{
 public:
     ComplexMutator(bool debug=false):Mutator(debug),updatedInst(nullptr){};
     ~ComplexMutator(){};
+<<<<<<< HEAD
     virtual bool init();
     virtual void mutateModule(const std::string& outputFileName);
     virtual std::string getCurrentFunction()const{return fit->getName().str();}
+=======
+    bool init();
+    void generateTest(const std::string& outputFileName);
+    void setDebug(bool debug){this->debug=debug;}
+    bool openInputFile(const std::string &InputFilename);// adapted from llvm-dis.cpp
+    std::unique_ptr<llvm::Module> getModule(){
+        return std::move(pm);
+    }
+    void setModule(std::unique_ptr<llvm::Module>&& ptr){
+        pm=std::move(ptr);
+    }
+    std::string getCurrentFunction()const{return currFuncName;}
+>>>>>>> only verifying mutated function now
 };
 

@@ -7,6 +7,7 @@ bool ComplexMutator::init(){
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
                 result=true;
+                currFuncName=fit->getName().str();
                 goto end;
                 }
             }
@@ -91,6 +92,7 @@ void ComplexMutator::moveToNextFuction(){
     DT=llvm::DominatorTree(*fit);
     bit=fit->begin();
     iit=bit->begin();
+    currFuncName=fit->getName().str();
 }
 
 void ComplexMutator::moveToNextBasicBlock(){

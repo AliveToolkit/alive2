@@ -335,8 +335,19 @@ string getOutputFile(int ith,bool isOptimized){
 */
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
+<<<<<<< HEAD
     mutator.mutateModule(getOutputFile(ith));
     M1 = mutator.getModule();
+=======
+    bool isSimpleMutate=false;//Random::getRandomBool();
+    if(false){
+      mutator.generateTest(getOutputFile(verbose?ith:-1));
+      M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
+    }else{
+      cmutator.generateTest(getOutputFile(ith));
+      M1=cmutator.getModule();
+    }
+>>>>>>> only verifying mutated function now
     
     if (!M1.get()) {
       cerr << "Could not read file from '" << getOutputFile(ith)<< "'\n";
@@ -355,8 +366,14 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     M2 = CloneModule(*M1);
     optimizeModule(M2.get());
 
+<<<<<<< HEAD
     const string optFunc=mutator.getCurrentFunction();
     if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
+=======
+    const string optFunc=cmutator.getCurrentFunction();
+    if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
+    //for(llvm::Function& f1:*M1){
+>>>>>>> only verifying mutated function now
       if(!pf1->isDeclaration()){
         if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
             if (!compareFunctions(*pf1, *pf2, TLI))
