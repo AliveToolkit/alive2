@@ -157,6 +157,11 @@ ALIVECC_OVERWRITE_REPORTS=1
 ALIVECC_REPORT_DIR=dir
 ```
 
+If validating the program takes a long time, you can batch optimizations to
+verify.
+Please set `ALIVECC_BATCH_OPTS=1` and run `alivecc`/`alive++`.
+
+
 Running the Standalone Translation Validation Tool (alive-tv)
 --------
 
