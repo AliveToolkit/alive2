@@ -599,14 +599,9 @@ llvmGetPassPluginInfo() {
           assert(is_clangtv && "Batching is enabled for clang-tv only");
           if (is_clangtv_done)
             return;
-          else if (TVPass::pass_name.empty()) {
-            // Skip the first pass; it is Annotation2MetadataPass, which isn't
-            // interesting
-            assert(P.str() == "Annotation2MetadataPass");
-            return;
-          }
 
           // Run only when it is at the boundary
+          bool is_first = TVPass::pass_name.empty();
           bool do_start = !TVPass::batch_started && do_skip(TVPass::pass_name)
               && !do_skip(P);
           bool do_finish = TVPass::batch_started && !do_skip(TVPass::pass_name)
@@ -614,8 +609,10 @@ llvmGetPassPluginInfo() {
 
           if (do_start)
             TVPass::batched_pass_begin_name = TVPass::pass_name;
+          else if (is_first)
+            TVPass::batched_pass_begin_name = "beginning";
 
-          if (do_start || do_finish)
+          if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
         });
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback([&](
