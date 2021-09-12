@@ -1115,9 +1115,9 @@ Errors TransformVerify::verify() const {
         if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
           continue;
 
-        // TODO: add data-flow domain tracking for Alive, but not for TV
+        auto &val_tgt = tgt_state->at(*tgt_instrs.at(name));
         check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
-                         true, val, true, tgt_state->at(*tgt_instrs.at(name)),
+                         val.domain, val, val_tgt.domain, val_tgt,
                          check_each_var);
         if (errs)
           return errs;

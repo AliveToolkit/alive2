@@ -1,0 +1,4 @@
+Name: undef
+%r = udiv i8 %x, 0
+  =>
+%r = i8 undef

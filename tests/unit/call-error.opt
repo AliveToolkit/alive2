@@ -1,4 +1,4 @@
-; ERROR: Source and target don't have the same return domain
+; ERROR: Source is more defined
 %call = call i32 @f(i32 32)
   =>
 %call = call i32 @f(i32 poison)
