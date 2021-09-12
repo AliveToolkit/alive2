@@ -6,4 +6,4 @@ define i1 @f(i8* %p) {
 }
 
 ; CHECK: use_provenance
-; CHECK: has_ptr2int: 0
+; CHECK: observes_addresses: 0

@@ -906,6 +906,10 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
   return val.subst(repls);
 }
 
+expr State::rewriteUndef(expr &&val, const set<expr> &undef_vars) {
+  return rewriteUndef({move(val), expr()}, undef_vars).value;
+}
+
 void State::finishInitializer() {
   is_initialization_phase = false;
 }

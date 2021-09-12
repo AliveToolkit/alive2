@@ -54,9 +54,8 @@ extern unsigned memcmp_unroll_cnt;
 
 extern bool little_endian;
 
-/// Whether int2ptr or ptr2int are used in either function
-extern bool has_int2ptr;
-extern bool has_ptr2int;
+/// Whether pointer addresses are observed
+extern bool observes_addresses;
 
 /// Whether malloc or free/delete is used in either function
 extern bool has_malloc;

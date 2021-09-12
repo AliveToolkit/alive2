@@ -381,7 +381,7 @@ ostream& operator<<(ostream &os, const Byte &byte) {
 }
 
 bool Memory::observesAddresses() {
-  return has_ptr2int || has_int2ptr;
+  return observes_addresses;
 }
 
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
@@ -1658,8 +1658,13 @@ Memory::load(const expr &p, const Type &type, unsigned align) {
   return { state->rewriteUndef(move(ret), undef_vars), move(ubs) };
 }
 
-Byte Memory::load(const Pointer &p, set<expr> &undef) {
+Byte Memory::raw_load(const Pointer &p, set<expr> &undef) {
   return move(load(p, bits_byte / 8, undef, 1)[0]);
+}
+
+Byte Memory::raw_load(const Pointer &p) {
+  set<expr> undef;
+  return { *this, state->rewriteUndef(raw_load(p, undef)(), undef) };
 }
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
@@ -1725,7 +1730,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
     Pointer ptr_src = src + (offset - dst.getShortOffset());
     set<expr> undef;
-    auto val = load(ptr_src, undef);
+    auto val = raw_load(ptr_src, undef);
     storeLambda(dst, offset, bytesize, move(val)(), undef, align_dst);
   }
 }

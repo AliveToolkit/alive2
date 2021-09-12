@@ -223,6 +223,8 @@ public:
 
   StateValue rewriteUndef(StateValue &&val,
                           const std::set<smt::expr> &undef_vars);
+  smt::expr rewriteUndef(smt::expr &&val,
+                         const std::set<smt::expr> &undef_vars);
 
   bool isInitializationPhase() const { return is_initialization_phase; }
   void finishInitializer();

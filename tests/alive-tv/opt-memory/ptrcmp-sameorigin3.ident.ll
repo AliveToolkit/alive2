@@ -7,4 +7,4 @@ define i1 @f(i8* %p, i64 %i, i64 %j) {
 }
 
 ; CHECK: offsetonly
-; CHECK: has_ptr2int: 0
+; CHECK: observes_addresses: 0

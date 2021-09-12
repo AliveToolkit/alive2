@@ -273,7 +273,8 @@ public:
     load(const smt::expr &ptr, const Type &type, unsigned align);
 
   // raw load; NB: no UB check
-  Byte load(const Pointer &p, std::set<smt::expr> &undef_vars);
+  Byte raw_load(const Pointer &p, std::set<smt::expr> &undef_vars);
+  Byte raw_load(const Pointer &p);
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, unsigned align,

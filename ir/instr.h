@@ -452,6 +452,7 @@ public:
     bool hasIntByteAccess = false;
     bool doesPtrLoad = false;
     bool doesPtrStore = false;
+    bool observesAddresses = false;
 
     // The maximum size of a byte that this instruction can support.
     // If zero, this instruction does not read/write bytes.
