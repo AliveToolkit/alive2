@@ -106,6 +106,7 @@ public:
   const BasicBlock& getSinkBB() const { return sink_bb; }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;
+  const BasicBlock& bbOf(const Instr &i) const;
 
   void removeBB(BasicBlock &BB);
 

@@ -12,7 +12,6 @@
 #include <ostream>
 #include <set>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -21,12 +20,17 @@
 namespace IR {
 
 class Value;
+class JumpInstr;
 class BasicBlock;
 class Function;
 
 class State {
 public:
-  using ValTy = std::pair<StateValue, std::set<smt::expr>>;
+  struct ValTy {
+    StateValue val;
+    smt::expr domain;
+    std::set<smt::expr> undef_vars;
+  };
 
 private:
   struct CurrentDomain {
@@ -100,7 +104,7 @@ private:
 
   std::set<smt::expr> quantified_vars;
 
-  // var -> ((value, not_poison), undef_vars)
+  // var -> ((value, not_poison), ub, undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
   std::vector<std::pair<const Value*, ValTy>> values;
 
@@ -172,7 +176,7 @@ public:
   static void resetGlobals();
 
   /*--- Get values or update registers ---*/
-  const StateValue& exec(const Value &v);
+  const ValTy& exec(const Value &v);
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
   // If undef_ub is true, UB is also added when val was undef
@@ -234,13 +238,14 @@ public:
   const auto& getFnQuantVars() const { return fn_call_qvars; }
 
   auto& functionDomain() const { return function_domain; }
-  auto& returnDomain() const { return return_domain; }
   smt::expr sinkDomain() const;
   Memory returnMemory() const { return *return_memory(); }
 
-  std::pair<StateValue, const std::set<smt::expr>&> returnVal() const {
-    return { *return_val(), return_undef_vars };
+  ValTy returnVal() const {
+    return { *return_val(), return_domain(), return_undef_vars };
   }
+
+  smt::expr getJumpCond(const BasicBlock &src, const BasicBlock &dst) const;
 
   void startParsingPre() { disable_undef_rewrite = true; }
 

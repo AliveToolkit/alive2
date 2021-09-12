@@ -1,3 +1,5 @@
+; TEST-ARGS: -root-only
+
 %f3 = call i8 @f(i8 3) nowrite noread
 %f4 = call i8 @f(i8 4) nowrite noread
 %eq1 = icmp eq i8 %f3, 3

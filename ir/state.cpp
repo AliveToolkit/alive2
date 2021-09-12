@@ -121,11 +121,11 @@ void State::resetGlobals() {
   Memory::resetGlobals();
 }
 
-const StateValue& State::exec(const Value &v) {
+const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy(move(val), move(undef_vars)));
+  values.emplace_back(&v, ValTy{move(val), domain.UB(), move(undef_vars)});
   analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
@@ -133,7 +133,7 @@ const StateValue& State::exec(const Value &v) {
     tmp_values[--i_tmp_values] = StateValue();
   }
 
-  return get<1>(values.back()).first;
+  return get<1>(values.back());
 }
 
 static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
@@ -359,7 +359,7 @@ StateValue* State::no_more_tmp_slots() {
 
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars] = values[values_map.at(&val)];
-  auto &[sval, uvars] = val_uvars;
+  auto &[sval, _ub, uvars] = val_uvars;
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
@@ -430,7 +430,7 @@ const StateValue& State::operator[](const Value &val) {
 
 const StateValue& State::getAndAddUndefs(const Value &val) {
   auto &v = (*this)[val];
-  for (auto uvar: at(val).second)
+  for (auto uvar: at(val).undef_vars)
     addQuantVar(move(uvar));
   return v;
 }
@@ -920,6 +920,16 @@ expr State::sinkDomain() const {
     ret.add(data.path());
   }
   return ret();
+}
+
+expr State::getJumpCond(const BasicBlock &src, const BasicBlock &dst) const {
+  auto I = predecessor_data.find(&dst);
+  if (I == predecessor_data.end())
+    return false;
+
+  auto J = I->second.find(&src);
+  return J == I->second.end() ? expr(false)
+                              : J->second.path() && *J->second.UB();
 }
 
 void State::addGlobalVarBid(const string &glbvar, unsigned bid) {

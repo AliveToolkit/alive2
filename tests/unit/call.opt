@@ -17,3 +17,13 @@ Name: 2 vals
 %call = call i32 @g(i32 42, i32 3)
   =>
 %call = call i32 @g(i32 42, i32 3)
+
+Name: eq calls
+%a = call i4 @f(i4 poison) noread nowrite
+%b = call i4 @f(i4 poison) noread nowrite
+%add = add i4 %a, %b
+%eq = icmp eq %add, 1
+assume(%eq)
+ret true
+  =>
+ret false

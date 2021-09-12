@@ -102,8 +102,7 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
     auto p = verifier.exec();
     auto &state = *p.first;
 
-    auto ret_domain = state.returnDomain()();
-    auto [ret_val, ret_undefs] = state.returnVal();
+    auto [ret_val, ret_domain, ret_undefs] = state.returnVal();
     auto ret = expr::mkVar("ret_val", ret_val.value);
     auto ret_np = expr::mkVar("ret_np", ret_val.non_poison);
 

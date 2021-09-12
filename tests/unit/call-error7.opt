@@ -1,3 +1,5 @@
+; TEST-ARGS: -root-only
+
 %c1 = call i1 @f(i8 poison) nowrite
 assume(%c1)
 ret i4 0

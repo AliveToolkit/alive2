@@ -1,5 +1,5 @@
 ; TEST-ARGS: -root-only
-; ERROR: Source and target don't have the same return domain
+; ERROR: Value mismatch
 
   %c = call i32 @f(i32 3)
   %d = call i32 @f(i32 3)

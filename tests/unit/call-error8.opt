@@ -1,10 +1,10 @@
 %a = call i4 @f(i4 poison) noread nowrite
 %b = call i4 @f(i4 poison) noread nowrite
 %add = add i4 %a, %b
-%eq = icmp eq %add, 1
+%eq = icmp eq %add, 2
 assume(%eq)
 ret true
   =>
 ret false
 
-; ERROR: Source and target don't have the same return domain
+; ERROR: Value mismatch

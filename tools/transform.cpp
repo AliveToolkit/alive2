@@ -105,9 +105,8 @@ static void print_varval(ostream &os, const State &st, const Model &m,
 using print_var_val_ty = function<void(ostream&, const Model&)>;
 
 static bool error(Errors &errs, const State &src_state, const State &tgt_state,
-                  const Result &r, const Value *var,
-                  const char *msg, bool check_each_var,
-                  print_var_val_ty print_var_val) {
+                  const Result &r, const Value *var, const char *msg,
+                  bool check_each_var, print_var_val_ty print_var_val) {
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
@@ -169,7 +168,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
         !dynamic_cast<const ConstantInput*>(var))
       continue;
     s << *var << " = ";
-    print_varval(s, src_state, m, var, var->getType(), val.first);
+    print_varval(s, src_state, m, var, var->getType(), val.val);
     s << '\n';
   }
 
@@ -183,19 +182,48 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       }
     }
 
+    auto *bb = &st->getFn().getFirstBB();
+
     for (auto &[var, val] : st->getValues()) {
       auto &name = var->getName();
       if (name == var_name)
         break;
 
-      if (name[0] != '%' ||
-          dynamic_cast<const Input*>(var) ||
+      auto *i = dynamic_cast<const Instr*>(var);
+      if (!i || &st->getFn().bbOf(*i) != bb ||
           (check_each_var && !seen_vars.insert(name).second))
         continue;
 
+      if (auto *jmp = dynamic_cast<const JumpInstr*>(var)) {
+        bool jumped = false;
+        for (auto &dst : jmp->targets()) {
+          const expr &cond = st->getJumpCond(*bb, dst);
+          if ((jumped = !m.eval(cond).isFalse())) {
+            s << "  >> Jump to " << dst.getName() << '\n';
+            bb = &dst;
+            break;
+          }
+        }
+
+        if (jumped) {
+          continue;
+        } else {
+          s << "UB triggered on " << var->getName() << '\n';
+          break;
+        }
+      }
+
+      if (!dynamic_cast<const Return*>(var) && // domain always false after exec
+          !m.eval(val.domain).isTrue()) {
+        s << *var << " = UB triggered!\n";
+        break;
+      }
+
+      if (name[0] != '%')
+        continue;
+
       s << *var << " = ";
-      print_varval(s, const_cast<State&>(*st), m, var, var->getType(),
-                   val.first);
+      print_varval(s, const_cast<State&>(*st), m, var, var->getType(), val.val);
       s << '\n';
     }
 
@@ -336,27 +364,27 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
 
   if (dynamic_cast<const VoidType *>(&type))
     return false;
-  if (b.second.empty())
+  if (b.undef_vars.empty())
     // target is never undef
     return false;
 
   auto subst = [](const auto &val) {
     vector<pair<expr, expr>> repls;
-    for (auto &v : val.second) {
+    for (auto &v : val.undef_vars) {
       repls.emplace_back(v, expr::some(v));
     }
-    return val.first.value.subst(repls);
+    return val.val.value.subst(repls);
   };
 
-  return encode_undef_refinement_per_elem(type, a.first, subst(a),
-                                          expr(b.first.value), subst(b));
+  return encode_undef_refinement_per_elem(type, a.val, subst(a),
+                                          expr(b.val.value), subst(b));
 }
 
 static void
 check_refinement(Errors &errs, const Transform &t, const State &src_state,
                  const State &tgt_state, const Value *var, const Type &type,
-                 const expr &dom_a, const expr &fndom_a, const State::ValTy &ap,
-                 const expr &dom_b, const expr &fndom_b, const State::ValTy &bp,
+                 const expr &fndom_a, const State::ValTy &ap,
+                 const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
   if (src_state.sinkDomain().isTrue()) {
     errs.add("The source program doesn't reach a return instruction.\n"
@@ -371,12 +399,14 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
     return;
   }
 
-  auto &a = ap.first;
-  auto &b = bp.first;
+  auto &dom_a = ap.domain;
+  auto &dom_b = bp.domain;
+  auto &a = ap.val;
+  auto &b = bp.val;
 
-  auto &uvars = ap.second;
+  auto &uvars = ap.undef_vars;
   auto qvars = src_state.getQuantVars();
-  qvars.insert(ap.second.begin(), ap.second.end());
+  qvars.insert(ap.undef_vars.begin(), ap.undef_vars.end());
   auto &fn_qvars = tgt_state.getFnQuantVars();
   qvars.insert(fn_qvars.begin(), fn_qvars.end());
 
@@ -432,7 +462,7 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
             preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
   };
 
-  auto check = [&](expr &&e, auto &&printer, const char *msg) -> bool{
+  auto check = [&](expr &&e, auto &&printer, const char *msg) {
     e = mk_fml(move(e));
     auto res = check_expr(e);
     if (!res.isUnsat() &&
@@ -1087,8 +1117,7 @@ Errors TransformVerify::verify() const {
 
         // TODO: add data-flow domain tracking for Alive, but not for TV
         check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
-                         true, true, val,
-                         true, true, tgt_state->at(*tgt_instrs.at(name)),
+                         true, val, true, tgt_state->at(*tgt_instrs.at(name)),
                          check_each_var);
         if (errs)
           return errs;
@@ -1096,10 +1125,8 @@ Errors TransformVerify::verify() const {
     }
 
     check_refinement(errs, t, *src_state, *tgt_state, nullptr, t.src.getType(),
-                     src_state->returnDomain()(), src_state->functionDomain()(),
-                     src_state->returnVal(),
-                     tgt_state->returnDomain()(), tgt_state->functionDomain()(),
-                     tgt_state->returnVal(),
+                     src_state->functionDomain()(), src_state->returnVal(),
+                     tgt_state->functionDomain()(), tgt_state->returnVal(),
                      check_each_var);
   } catch (AliveException e) {
     return move(e);

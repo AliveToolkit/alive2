@@ -1,4 +1,4 @@
-; ERROR: Target is more poisonous
+; ERROR: Source and target don't have the same return domain
 %call = call i32 @f(i32 32)
   =>
 %call = call i32 @f(i32 poison)

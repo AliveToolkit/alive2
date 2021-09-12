@@ -494,7 +494,12 @@ static Value& get_or_copy_instr(const string &name) {
 
   auto ret = tgt_instr.get();
   identifiers.emplace(name, ret);
-  bb->addInstr(move(tgt_instr));
+  if (!bb->empty() &&
+       (dynamic_cast<JumpInstr*>(&bb->back()) ||
+        dynamic_cast<Return*>(&bb->back())))
+    bb->addInstrAt(move(tgt_instr), &bb->back(), true);
+  else
+    bb->addInstr(move(tgt_instr));
   return *ret;
 }
 
@@ -1317,7 +1322,6 @@ vector<Transform> parse(string_view buf) {
 
     // copy any missing instruction in tgt from src
     for (auto &[name, val] : identifiers_src) {
-      (void)val;
       get_or_copy_instr(name);
     }
 

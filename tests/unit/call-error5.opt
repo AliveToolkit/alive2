@@ -5,4 +5,4 @@ ret i8 %d
   =>
 ret i8 1
 
-; ERROR: Source and target don't have the same return domain
+; ERROR: Value mismatch
