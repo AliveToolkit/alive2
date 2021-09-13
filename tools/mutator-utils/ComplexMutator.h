@@ -25,6 +25,7 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Verifier.h"
 #include "tools/mutator-utils/util.h"
+#include "simpleMutator.h"
 
 /*
   This class is used for doing complex mutations on a given file.
@@ -33,11 +34,7 @@
       replace B with a random generated SSA. This SSA would use definitions in context.
 */
 
-class ComplexMutator{
-    llvm::LLVMContext context;
-    llvm::ExitOnError ExitOnErr;
-    std::unique_ptr<llvm::Module> pm;
-
+class ComplexMutator:public Mutator{
     //instArgs, newAdded and updatedInst are used for restoring updates. they are used by restoreBackup() and updated when doing mutations.
     std::vector<llvm::Value*> instArgs;
     std::vector<llvm::Instruction*> newAdded;
@@ -51,8 +48,6 @@ class ComplexMutator{
     std::unordered_set<std::string> filterSet;
     
     
-    bool debug;
-
 
     decltype(pm->begin()) fit;
     decltype(fit->begin()) bit;
@@ -69,17 +64,9 @@ class ComplexMutator{
     llvm::Constant* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomValue(llvm::Type* ty);
 public:
-    ComplexMutator(bool debug=false):updatedInst(nullptr),debug(debug){};
+    ComplexMutator(bool debug=false):Mutator(debug),updatedInst(nullptr){};
     ~ComplexMutator(){};
-    bool init();
-    void generateTest(const std::string& outputFileName);
-    void setDebug(bool debug){this->debug=debug;}
-    bool openInputFile(const std::string &InputFilename);// adapted from llvm-dis.cpp
-    std::unique_ptr<llvm::Module> getModule(){
-        return std::move(pm);
-    }
-    void setModule(std::unique_ptr<llvm::Module>&& ptr){
-        pm=std::move(ptr);
-    }
+    virtual bool init();
+    virtual void mutateModule(const std::string& outputFileName);
 };
 

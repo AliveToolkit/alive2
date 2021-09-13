@@ -355,12 +355,12 @@ string getOutputFile(int ith,bool isOptimized){
 */
 void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,ComplexMutator& cmutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
-    bool isSimpleMutate=Random::getRandomBool();
+    bool isSimpleMutate=false;//Random::getRandomBool();
     if(isSimpleMutate){
       mutator.generateTest(getOutputFile(verbose?ith:-1));
       M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
     }else{
-      cmutator.generateTest(getOutputFile(ith));
+      cmutator.mutateModule(getOutputFile(ith));
       M1=cmutator.getModule();
     }
     
