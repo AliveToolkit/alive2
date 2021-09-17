@@ -7,7 +7,7 @@
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
-#include "tools/mutator-utils/SingleLineMutator.h"
+#include "tools/mutator-utils/simpleMutator.h"
 #include "tools/mutator-utils/ComplexMutator.h"
 
 #include "llvm/ADT/StringExtras.h"
@@ -228,7 +228,7 @@ void optimizeModule(llvm::Module *M) {
 }
 
 int logIndex;
-void copyMode(),timeMode(),loggerInit(llvm::Module* pm),init(),runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,ComplexMutator& cmutator);
+void copyMode(),timeMode(),loggerInit(llvm::Module* pm),init(),runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMutator& cmutator);
 bool isValidInputPath(),isValidOutputPath();
 string getOutputFile(int ith,bool isOptimized=false);
 
@@ -353,11 +353,11 @@ string getOutputFile(int ith,bool isOptimized){
  * Mutate file once and send it and its optmized version into Alive2
  * LogIndex is updated here if find a value mismatch.
 */
-void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,ComplexMutator& cmutator){
+void runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMutator& cmutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
     bool isSimpleMutate=false;//Random::getRandomBool();
-    if(isSimpleMutate){
-      mutator.generateTest(getOutputFile(verbose?ith:-1));
+    if(false){
+      mutator.mutateModule(getOutputFile(verbose?ith:-1));
       M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
     }else{
       cmutator.mutateModule(getOutputFile(ith));
@@ -381,10 +381,12 @@ void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,Compl
     M2 = CloneModule(*M1);
     optimizeModule(M2.get());
 
-    for(llvm::Function& f1:*M1){
-      if(!f1.isDeclaration()){
-        if(llvm::Function* pf2=M2->getFunction(f1.getName());pf2!=nullptr){
-            if (!compareFunctions(f1, *pf2, TLI))
+    const string optFunc=cmutator.getCurrentFunction();
+    if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
+    //for(llvm::Function& f1:*M1){
+      if(!pf1->isDeclaration()){
+        if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
+            if (!compareFunctions(*pf1, *pf2, TLI))
               if (opt_error_fatal)
                 goto end;
         }
@@ -415,7 +417,7 @@ void runOnce(int ith,llvm::LLVMContext& context,SingleLineMutator& mutator,Compl
 */
 void copyMode(){
   llvm::LLVMContext context;
-  SingleLineMutator mutator;
+  SimpleMutator mutator;
   ComplexMutator cmutator;
   mutator.setDebug(verbose);
   cmutator.setDebug(verbose);
@@ -435,7 +437,7 @@ void copyMode(){
  * keep calling runOnce and soft exit once time's up.
 */
 void timeMode(){
-  SingleLineMutator mutator;
+  SimpleMutator mutator;
   ComplexMutator cmutator;
   llvm::LLVMContext context;
   mutator.setDebug(verbose);
