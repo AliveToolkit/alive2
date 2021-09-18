@@ -16,15 +16,3 @@ class Random{
     static unsigned getRandomUnsigned(){return abs(dist(rd));}
     static bool getRandomBool(){return dist(rd)&1;}
 };
-
-class Util{
-public:     
-    static string trim(const string& str);
-    static bool isInteger(const string& str);
-    static bool isFloatDecimal(const string& str);
-    static bool isFloatExponential(const string& str);
-    static std::vector<string> split(const string& origin,const string& delimiter);
-    static std::vector<string> splitWithToken(const std::string& str,const std::string& pattern=" ");
-    static bool isPrefix(const string& str,const string& prefix,int offset=0);
-    static string stringAccumulateAdd(const string& a,const string& b){return a+b+" ";}
-};
