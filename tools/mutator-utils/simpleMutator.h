@@ -39,11 +39,12 @@ protected:
     
 public:
     Mutator(bool debug=false):debug(debug),pm(nullptr){};
-    ~Mutator(){};
+    virtual ~Mutator(){};
 
     bool openInputFile(const string& inputFile);
     virtual bool init()=0;
     virtual void mutateModule(const std::string& outputFileName)=0;
+    virtual std::string getCurrentFunction()const=0;
     void setDebug(bool debug){this->debug=debug;}
     std::unique_ptr<llvm::Module> getModule(){return std::move(pm);}
     void setModule(std::unique_ptr<llvm::Module>&& ptr){pm=std::move(ptr);}
@@ -52,10 +53,11 @@ public:
 class Mutant{
 public:
     Mutant(){}
-    ~Mutant(){}
+    virtual ~Mutant(){}
     virtual void mutate()=0;
     virtual void restoreMutate()=0;    
     virtual bool isBoring()const{return false;};
+    virtual void print()const=0;        
 };
 
 class BinaryInstructionMutant:public Mutant{
@@ -72,9 +74,9 @@ class BinaryInstructionMutant:public Mutant{
     const static std::vector<std::vector<llvm::Instruction::BinaryOps>> indexToOperSet;
     void replaceConstant(llvm::Value*& v){
         llvm::Type* ty=v->getType();
-        if (ty->isIntegerTy()) {
+        if (llvm::isa<llvm::ConstantInt>(v)&&ty->isIntegerTy()) {
             v=llvm::ConstantInt::get(ty,Random::getRandomUnsigned());
-        } else if (ty->isFloatingPointTy()) {
+        } else if (llvm::isa<llvm::ConstantFP>(v)&&ty->isFloatingPointTy()) {
             v=llvm::ConstantFP::get(ty,Random::getRandomUnsigned());
         }
     }
@@ -100,11 +102,11 @@ public:
         if(auto it=operToIndex.find(op);it!=operToIndex.end()){
             index=it->second;
         }
-        val1=binaryInst->getOperand(0);
-        val2=binaryInst->getOperand(1);
+        val1=binaryInst->getOperand(0),val2=binaryInst->getOperand(1);
     };
-    ~BinaryInstructionMutant(){};
+    ~BinaryInstructionMutant(){if(mutatedInst!=nullptr)binaryInst->insertBefore(mutatedInst);};
     virtual void mutate(){
+        
         replaceConstant(val1);
         replaceConstant(val2);
         if(Random::getRandomBool()){
@@ -124,6 +126,14 @@ public:
             mutatedInst=nullptr;
         }
     }
+    virtual void print()const{
+        llvm::errs()<<"Orginal binary inst:\n";
+        binaryInst->print(llvm::errs());
+        llvm::errs()<<"\nMutated binary inst:\n";
+        mutatedInst->print(llvm::outs());
+        llvm::errs()<<"\n";
+        mutatedInst->getParent()->print(llvm::errs());
+    }
 };
 
 class GEPInstructionMutant:public Mutant{
@@ -135,6 +145,11 @@ public:
     virtual void mutate(){GEPInst->setIsInBounds(!isInBounds);};
     virtual void restoreMutate(){GEPInst->setIsInBounds(isInBounds);};    
     virtual bool isBoring()const{return true;};
+    virtual void print()const{
+        llvm::errs()<<"Original GEP inst:\n";
+        GEPInst->print(llvm::outs());
+        llvm::errs()<<"inbounds flag reversed.\n";
+    }
 };
 
 #define setFuncAttr(flag,attrName) func->removeFnAttr(attrName);if(flag){func->addFnAttr(attrName);}
@@ -185,6 +200,11 @@ public:
     virtual bool isBoring()const{
         return std::any_of(func->arg_begin(),func->arg_end(),[](const llvm::Argument& arg){return arg.getType()->isPointerTy();});
     }  
+    virtual void print()const{
+        llvm::errs()<<"Function name:\n";
+        llvm::errs()<<func->getName()<<"\n";
+        llvm::errs()<<"attributes are set randomly.\n";
+    }
 };
 #undef setFuncAttr
 #undef setFuncParamAttr
@@ -210,8 +230,8 @@ class SimpleMutator:public Mutator{
     bool isFirstRun;  
 public:
     SimpleMutator(bool debug=false):Mutator(debug),isFirstRun(true){};
-    ~SimpleMutator(){};
+    virtual ~SimpleMutator(){mutants.clear();};
     virtual bool init();
     virtual void mutateModule(const string& outputFileName);
-    std::string getCurrentFunction()const{return it->second.str();};
+    virtual std::string getCurrentFunction()const{return it->second.str();};
 };

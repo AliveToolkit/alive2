@@ -60,24 +60,6 @@ namespace {
 
   filesystem::path inputPath,outputPath;
 
-llvm::ExitOnError ExitOnErr;
-
-// adapted from llvm-dis.cpp
-std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
-                                            const string &InputFilename) {
-  auto MB =
-    ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
-  llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(move(MB), Diag, Context,
-                           /*ShouldLazyLoadMetadata=*/true);
-  if (!M) {
-    Diag.print("", llvm::errs(), false);
-    return 0;
-  }
-  ExitOnErr(M->materializeAll());
-  return M;
-}
-
 optional<smt::smt_initializer> smt_init;
 
 struct Results {
@@ -169,7 +151,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     ++num_errors;
     return true;
   }
-
   switch (r.status) {
   case Results::ERROR:
     UNREACHABLE();
@@ -228,7 +209,7 @@ void optimizeModule(llvm::Module *M) {
 }
 
 int logIndex;
-void copyMode(),timeMode(),loggerInit(llvm::Module* pm),init(),runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMutator& cmutator);
+void copyMode(),timeMode(),loggerInit(llvm::Module* pm),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator);
 bool isValidInputPath(),isValidOutputPath();
 string getOutputFile(int ith,bool isOptimized=false);
 
@@ -244,7 +225,6 @@ int main(int argc, char **argv) {
       R"EOF(Alive2 stand-alone LLVM test mutator:
 version )EOF";
   Usage += alive_version;
-  init();
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
@@ -306,7 +286,7 @@ void loggerInit(llvm::Module* pm){
       auto &source_file = pm->getSourceFileName();
       fs::path fname = "log"+to_string(logIndex)+".txt";
       fs::path path = fs::path(outputFolder.getValue()) / fname.filename();
-
+      if(out_file.is_open())out_file.close();
       out_file.open(path);
       out = &out_file;
       if (!out_file.is_open()) {
@@ -353,16 +333,10 @@ string getOutputFile(int ith,bool isOptimized){
  * Mutate file once and send it and its optmized version into Alive2
  * LogIndex is updated here if find a value mismatch.
 */
-void runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMutator& cmutator){
+void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
-    bool isSimpleMutate=false;//Random::getRandomBool();
-    if(false){
-      mutator.mutateModule(getOutputFile(verbose?ith:-1));
-      M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
-    }else{
-      cmutator.mutateModule(getOutputFile(ith));
-      M1=cmutator.getModule();
-    }
+    mutator.mutateModule(getOutputFile(ith));
+    M1 = mutator.getModule();
     
     if (!M1.get()) {
       cerr << "Could not read file from '" << getOutputFile(ith)<< "'\n";
@@ -381,9 +355,8 @@ void runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMu
     M2 = CloneModule(*M1);
     optimizeModule(M2.get());
 
-    const string optFunc=cmutator.getCurrentFunction();
+    const string optFunc=mutator.getCurrentFunction();
     if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
-    //for(llvm::Function& f1:*M1){
       if(!pf1->isDeclaration()){
         if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
             if (!compareFunctions(*pf1, *pf2, TLI))
@@ -407,9 +380,7 @@ void runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMu
       smt::solver_print_stats(*out);
     smt_init.reset();
     num_correct=num_unsound=num_failed=num_errors=0;
-    if(!isSimpleMutate){
-      cmutator.setModule(std::move(M1));
-    }
+    mutator.setModule(std::move(M1));
 }
 
 /*
@@ -417,17 +388,14 @@ void runOnce(int ith,llvm::LLVMContext& context,SimpleMutator& mutator,ComplexMu
 */
 void copyMode(){
   llvm::LLVMContext context;
-  SimpleMutator mutator;
-  ComplexMutator cmutator;
-  mutator.setDebug(verbose);
-  cmutator.setDebug(verbose);
-  if(mutator.openInputFile(testfile)&&cmutator.openInputFile(testfile)){
-      if(mutator.init()&&cmutator.init()){
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
+  if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+      if(mutators[0]->init()&&mutators[1]->init()){
         for(int i=0;i<numCopy;++i){
           if(true){
             std::cout<<"Running "<<i<<"th copies."<<std::endl;
           }
-          runOnce(i,context,mutator,cmutator);
+          runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
       }
     }
   }
@@ -437,14 +405,11 @@ void copyMode(){
  * keep calling runOnce and soft exit once time's up.
 */
 void timeMode(){
-  SimpleMutator mutator;
-  ComplexMutator cmutator;
   llvm::LLVMContext context;
-  mutator.setDebug(verbose);
-  cmutator.setDebug(verbose);
-  if(mutator.openInputFile(testfile)&&cmutator.openInputFile(testfile)){
-    bool mInit=mutator.init();
-    bool cInit=cmutator.init();
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
+  if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+    bool mInit=mutators[0]->init();
+    bool cInit=mutators[1]->init();
     if(!mInit||!cInit){
       cerr<<"Cannot find any lotaion to mutate, "+testfile+" skipped\n";
       return;
@@ -453,7 +418,7 @@ void timeMode(){
     int cnt=1;
     while(sum.count()<timeElapsed){
       auto t_start = std::chrono::high_resolution_clock::now();
-      runOnce(cnt,context,mutator,cmutator);
+      runOnce(cnt,context,*mutators[Random::getRandomUnsigned()&1]);
       auto t_end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> cur=t_end-t_start;
       if(true){

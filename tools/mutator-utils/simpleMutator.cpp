@@ -101,7 +101,12 @@ void SimpleMutator::mutateModule(const string& outputFileName){
         isFirstRun=false;
     }
     it->first->mutate();
-    /*
-        output to file
-    */   
+    if(debug){
+        it->first->print();
+        std::error_code ec;
+        llvm::raw_fd_ostream fout(outputFileName,ec);
+        fout<<*pm;
+        fout.close();
+        llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
+    }
 }

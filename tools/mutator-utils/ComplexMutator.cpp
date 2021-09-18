@@ -1,8 +1,6 @@
 #include "ComplexMutator.h"
 
 bool ComplexMutator::init(){
-    //return true;
-    llvm::errs()<<"pm pointer"<<(pm==nullptr)<<"\n";
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
         for(bit=fit->begin();bit!=fit->end();++bit)
