@@ -769,14 +769,18 @@ static void calculateAndInitConstants(Transform &t) {
   }
 
   num_ptrinputs = 0;
+  unsigned num_null_ptrinputs = 0;
   for (auto &arg : t.src.getInputs()) {
     auto n = num_ptrs(arg.getType());
     auto in = dynamic_cast<const Input*>(&arg);
     if (in && in->hasAttribute(ParamAttrs::ByVal)) {
       num_globals_src += n;
       num_globals += n;
-    } else
+    } else {
       num_ptrinputs += n;
+      if (!in || !in->hasAttribute(ParamAttrs::NonNull))
+        num_null_ptrinputs += n;
+    }
   }
 
   // The number of local blocks.
@@ -935,7 +939,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   // check if null block is needed
   // Global variables cannot be null pointers
-  has_null_block = num_ptrinputs > 0 || nullptr_is_used || has_malloc ||
+  has_null_block = num_null_ptrinputs > 0 || nullptr_is_used || has_malloc ||
                   has_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
