@@ -168,6 +168,7 @@ expr Pointer::isLocal(bool simplify) const {
 expr Pointer::isConstGlobal() const {
   auto bid = getShortBid();
   auto generic = bid.uge(has_null_block) &&
+                 expr(num_consts_src > 0) &&
                  bid.ule(num_consts_src + has_null_block - 1);
   auto tgt = bid.uge(num_nonlocals_src + num_extra_nonconst_tgt) &&
              bid.ule(num_nonlocals - 1);
