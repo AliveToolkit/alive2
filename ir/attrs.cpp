@@ -97,11 +97,13 @@ static void
 encodePtrAttrs(const State &s, const expr &ptrvalue,
                AndExpr &UB, expr &non_poison,
                uint64_t derefBytes, uint64_t derefOrNullBytes, uint64_t align,
-               bool nonnull) {
+               bool nonnull, bool nocapture) {
   Pointer p(s.getMemory(), ptrvalue);
 
   if (nonnull)
     non_poison &= !p.isNull();
+
+  non_poison &= p.isNocapture().implies(nocapture);
 
   if (derefBytes || derefOrNullBytes) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
@@ -120,8 +122,8 @@ ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const 
   expr new_non_poison = val.non_poison;
 
   if (ty.isPtrType())
-    encodePtrAttrs(s, val.value, UB, new_non_poison,
-                   getDerefBytes(), derefOrNullBytes, align, has(NonNull));
+    encodePtrAttrs(s, val.value, UB, new_non_poison, getDerefBytes(),
+                   derefOrNullBytes, align, has(NonNull), has(NoCapture));
 
   if (poisonImpliesUB()) {
     UB.add(move(new_non_poison));
@@ -154,8 +156,8 @@ FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
   }
 
   if (ty.isPtrType())
-    encodePtrAttrs(s, val.value, UB, new_non_poison,
-                   derefBytes, derefOrNullBytes, align, has(NonNull));
+    encodePtrAttrs(s, val.value, UB, new_non_poison, derefBytes,
+                   derefOrNullBytes, align, has(NonNull), false);
 
   if (poisonImpliesUB()) {
     UB.add(move(new_non_poison));
