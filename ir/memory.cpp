@@ -1777,7 +1777,9 @@ void Memory::fillPoison(const expr &bid) {
 
 expr Memory::ptr2int(const expr &ptr) const {
   assert(!memory_unused() && observesAddresses());
-  return Pointer(*this, ptr).getAddress();
+  Pointer p(*this, ptr);
+  state->addUB(!p.isNocapture());
+  return p.getAddress();
 }
 
 expr Memory::int2ptr(const expr &val) const {
