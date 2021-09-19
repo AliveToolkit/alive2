@@ -1690,14 +1690,42 @@ void FnCall::print(ostream &os) const {
   os << ')' << attrs;
 }
 
+static void eq_bids(OrExpr &acc, Memory &m, const Type &t,
+                    const StateValue &val, const expr &bid) {
+  if (auto agg = t.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      eq_bids(acc, m, agg->getChild(i), agg->extract(val, i), bid);
+    }
+    return;
+  }
+
+  if (t.isPtrType()) {
+    acc.add(val.non_poison && Pointer(m, val.value).getBid() == bid);
+  }
+}
+
+static expr ptr_only_args(State &s, const Pointer &p) {
+  expr bid = p.getBid();
+  auto &m  = s.getMemory();
+
+  OrExpr e;
+  for (auto &in : s.getFn().getInputs()) {
+    if (hasPtr(in.getType()))
+      eq_bids(e, m, in.getType(), s[in], bid);
+  }
+  return e();
+}
+
 static void unpack_inputs(State &s, Value &argv, Type &ty,
-                          const ParamAttrs &argflag, StateValue value,
-                          StateValue value2, vector<StateValue> &inputs,
+                          const ParamAttrs &argflag, bool argmemonly,
+                          StateValue value, StateValue value2,
+                          vector<StateValue> &inputs,
                           vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
-                    agg->extract(value2, i), inputs, ptr_inputs);
+      unpack_inputs(s, argv, agg->getChild(i), argflag, argmemonly,
+                    agg->extract(value, i), agg->extract(value2, i), inputs,
+                    ptr_inputs);
     }
     return;
   }
@@ -1708,6 +1736,10 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     value.non_poison = move(new_non_poison);
 
     if (ty.isPtrType()) {
+      if (argmemonly)
+        value.non_poison
+          &= ptr_only_args(s, Pointer(s.getMemory(), value.value));
+
       ptr_inputs.emplace_back(move(value),
                               argflag.blockSize,
                               argflag.has(ParamAttrs::NoCapture));
@@ -1768,6 +1800,7 @@ StateValue FnCall::toSMT(State &s) const {
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
   vector<Type*> out_types;
+  bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
 
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
@@ -1786,8 +1819,8 @@ StateValue FnCall::toSMT(State &s) const {
       sv2 = s[*arg];
     }
 
-    unpack_inputs(s, *arg, arg->getType(), flags, move(sv), move(sv2), inputs,
-                  ptr_inputs);
+    unpack_inputs(s, *arg, arg->getType(), flags, argmemonly, move(sv),
+                  move(sv2), inputs, ptr_inputs);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
@@ -1795,7 +1828,7 @@ StateValue FnCall::toSMT(State &s) const {
     unpack_ret_ty(out_types, getType());
 
   auto check_access = [&]() {
-    if (attrs.has(FnAttrs::ArgMemOnly)) {
+    if (argmemonly) {
       for (auto &p : ptr_inputs) {
         if (!p.byval) {
           Pointer ptr(s.getMemory(), p.val.value);
@@ -1822,7 +1855,8 @@ StateValue FnCall::toSMT(State &s) const {
     return s.getFn().getFnAttrs().has(attr) && !attrs.has(attr);
   };
 
-  if (check(FnAttrs::NoFree) ||
+  if (check(FnAttrs::ArgMemOnly) ||
+      check(FnAttrs::NoFree) ||
       check(FnAttrs::NoThrow) ||
       check(FnAttrs::WillReturn))
     s.addUB(expr(false));
@@ -2559,32 +2593,6 @@ MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
   return { true, true, true, true, byteSize };
 }
 
-
-static void eq_bids(OrExpr &acc, Memory &m, const Type &t,
-                    const StateValue &val, const expr &bid) {
-  if (auto agg = t.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      eq_bids(acc, m, agg->getChild(i), agg->extract(val, i), bid);
-    }
-    return;
-  }
-
-  if (t.isPtrType()) {
-    acc.add(val.non_poison && Pointer(m, val.value).getBid() == bid);
-  }
-}
-
-static expr ptr_only_args(State &s, const Pointer &p) {
-  expr bid = p.getBid();
-  auto &m  = s.getMemory();
-
-  OrExpr e;
-  for (auto &in : s.getFn().getInputs()) {
-    if (hasPtr(in.getType()))
-      eq_bids(e, m, in.getType(), s[in], bid);
-  }
-  return e();
-}
 
 static void check_can_load(State &s, const expr &p0) {
   auto &attrs = s.getFn().getFnAttrs();
