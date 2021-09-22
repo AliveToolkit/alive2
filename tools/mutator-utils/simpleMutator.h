@@ -198,7 +198,7 @@ public:
         }
     }
     virtual bool isBoring()const{
-        return std::any_of(func->arg_begin(),func->arg_end(),[](const llvm::Argument& arg){return arg.getType()->isPointerTy();});
+        return std::none_of(func->arg_begin(),func->arg_end(),[](const llvm::Argument& arg){return arg.getType()->isPointerTy();});
     }  
     virtual void print()const{
         llvm::errs()<<"Function name:\n";

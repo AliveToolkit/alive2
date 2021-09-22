@@ -26,6 +26,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/IR/Verifier.h"
 
 #include <fstream>
 #include <iostream>
@@ -407,13 +408,20 @@ void copyMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
   if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-      if(mutators[0]->init()&&mutators[1]->init()){
-        for(int i=0;i<numCopy;++i){
-          if(true){
-            std::cout<<"Running "<<i<<"th copies."<<std::endl;
-          }
+    if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
+      for(int i=0;i<numCopy;++i){
+        if(true){
+          std::cout<<"Running "<<i<<"th copies."<<std::endl;
+        }
+        if(sInit^cInit){
+          runOnce(i,context,*mutators[sInit?0:1]);
+        }else{
           runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
+        }
       }
+    }else{
+      cerr<<"Cannot find any locations to mutate, "+testfile+" skipped\n!";
+      return;
     }
   }
 }
@@ -425,9 +433,9 @@ void timeMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
   if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-    bool mInit=mutators[0]->init();
+    bool sInit=mutators[0]->init();
     bool cInit=mutators[1]->init();
-    if(!mInit||!cInit){
+    if(!sInit&&!cInit){
       cerr<<"Cannot find any lotaion to mutate, "+testfile+" skipped\n";
       return;
     }
@@ -435,7 +443,11 @@ void timeMode(){
     int cnt=1;
     while(sum.count()<timeElapsed){
       auto t_start = std::chrono::high_resolution_clock::now();
-      runOnce(cnt,context,*mutators[Random::getRandomUnsigned()&1]);
+      if(sInit^cInit){
+        runOnce(cnt,context,*mutators[sInit?0:1]);
+      }else{
+        runOnce(cnt,context,*mutators[Random::getRandomUnsigned()&1]);
+      }
       auto t_end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> cur=t_end-t_start;
       if(true){

@@ -122,11 +122,11 @@ void ComplexMutator::moveToNextReplaceableInst(){
 
 
 void ComplexMutator::calcDomInst(){
-    llvm::BasicBlock* bb=&*bit;
     domInst.clear();
+    DT=llvm::DominatorTree(*fit);
     for(auto bitTmp=bit->getParent()->begin();bitTmp!=bit;++bitTmp){
         for(auto iitTmp=bitTmp->begin();iitTmp!=bitTmp->end();++iitTmp){
-            if(DT.dominates(&*iitTmp,bb)){
+            if(DT.dominates(&*iitTmp,&*iit)){
                 domInst.push_back(&*iitTmp);
             }
         }
@@ -148,9 +148,10 @@ void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
             break;
         }
     }
-    /*llvm::errs()<<"dom size"<<domInst.size()<<"\n";
+   /* llvm::errs()<<"dom size"<<domInst.size()<<"\n";
     for(const auto& x:domInst){
         x->print(llvm::errs());
+        llvm::errs()<<"\n";
     }
     llvm::errs()<<"\n";*/
     llvm::Value* val1=getRandomValue(ty),*val2=getRandomValue(ty);
