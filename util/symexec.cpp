@@ -54,8 +54,12 @@ void sym_exec(State &s) {
       auto &[val, ub, uvars] = s.exec(i);
       auto &name = i.getName();
 
-      if (config::symexec_print_each_value && name[0] == '%')
-        dbg() << name << " = " << val << " / UB=" << ub << '\n';
+      if (config::symexec_print_each_value) {
+        dbg() << name;
+        if (name[0] == '%')
+          dbg() << " = " << val << " /";
+        dbg() << " UB=" << ub << '\n';
+      }
     }
 
     first = false;

@@ -201,6 +201,11 @@ class Memory {
   smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
                          std::set<smt::expr> &undef) const;
 
+  void mkLocalDisjAddrAxioms(const smt::expr &allocated,
+                             const smt::expr &short_bid,
+                             const smt::expr &size, const smt::expr &align,
+                             unsigned align_bits);
+
 public:
   enum BlockKind {
     MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
@@ -242,7 +247,19 @@ public:
     auto operator<=>(const PtrInput &rhs) const = default;
   };
 
-  smt::expr mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs);
+  struct FnRetData {
+    smt::expr size;
+    smt::expr align;
+    smt::expr var;
+
+    static FnRetData mkIf(const smt::expr &cond, const FnRetData &a,
+                          const FnRetData &b);
+    auto operator<=>(const FnRetData &rhs) const = default;
+  };
+
+  std::pair<smt::expr,FnRetData>
+  mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs,
+          bool is_local, const FnRetData *data = nullptr);
   CallState mkCallState(const std::string &fnname,
                         const std::vector<PtrInput> *ptr_inputs, bool nofree);
   void setState(const CallState &st);

@@ -158,6 +158,7 @@ private:
     smt::expr ub;
     smt::expr noreturns;
     Memory::CallState callstate;
+    std::vector<Memory::FnRetData> ret_data;
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);

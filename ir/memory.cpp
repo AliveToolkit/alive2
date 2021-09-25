@@ -728,8 +728,8 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   if (auto algn = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
     int64_t offset = 0;
     uint64_t blk_align;
-    ENSURE(algn->isUInt(blk_align));
-    if (align > (1ull << blk_align) &&
+    if (algn->isUInt(blk_align) &&
+        align > (1ull << blk_align) &&
         (!observesAddresses() || offset0.isInt(offset)))
       return false;
   }
@@ -1241,8 +1241,55 @@ expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
   return val == rhs.val;
 }
 
-expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
+Memory::FnRetData Memory::FnRetData::mkIf(const expr &cond, const FnRetData &a,
+                                          const FnRetData &b) {
+  return { expr::mkIf(cond, a.size, b.size),
+           expr::mkIf(cond, a.align, b.align),
+           expr::mkIf(cond, a.var, b.var) };
+}
+
+pair<expr,Memory::FnRetData>
+Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
+                bool is_local, const FnRetData *data) {
   assert(has_fncall);
+
+  // can return local block or null (on address space 0 only FIXME)
+  if (is_local) {
+    auto bid = next_local_bid++;
+    assert(bid < numLocals());
+
+    expr size = data ? data->size
+                     : expr::mkFreshVar((name + string("#size")).c_str(),
+                                        expr::mkUInt(0, bits_size_t-1)).zext(1);
+    expr align = data ? data->align
+                      : expr::mkFreshVar((name + string("#align")).c_str(),
+                                         expr::mkUInt(0, 6));
+
+    expr var
+      = data ? data->var
+             : expr::mkFreshVar(name, expr::mkUInt(0, 2 + bits_for_offset));
+    auto is_null = var.extract(0, 0) == 0;
+    auto alloc_ty = var.extract(1, 1);
+    auto offset = var.extract(bits_for_offset+2-1, 2);
+    auto allocated = !is_null;
+
+    auto p_bid = expr::mkUInt(bid, Pointer::bitsShortBid());
+    p_bid = Pointer::mkLongBid(p_bid, true);
+    Pointer ptr(*this, p_bid, offset);
+
+    auto short_bid = ptr.getShortBid();
+    mkLocalDisjAddrAxioms(allocated, short_bid, size, align, 0);
+    store_bv(ptr, allocated, local_block_liveness, non_local_block_liveness);
+    local_blk_size.add(short_bid, expr(size));
+    local_blk_align.add(short_bid, expr(align));
+
+    assert((Pointer::MALLOC & 2) == 2 && (Pointer::CXX_NEW & 2) == 2);
+    local_blk_kind.add(short_bid, expr::mkUInt(1, 1).concat(alloc_ty));
+
+    return { expr::mkIf(is_null, Pointer::mkNullPointer(*this)(), ptr()),
+             { move(size), move(align), move(var) } };
+  }
+
   bool has_local = hasEscapedLocals();
 
   unsigned bits_bid = has_local ? bits_for_bid : Pointer::bitsShortBid();
@@ -1268,7 +1315,7 @@ expr Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs) {
   ptr_alias.emplace(p.getBid(), move(alias));
 
   state->addAxiom(expr::mkIf(p.isLocal(), local, nonlocal));
-  return p.release();
+  return { p.release(), {} };
 }
 
 Memory::CallState Memory::CallState::mkIf(const expr &cond,
@@ -1389,6 +1436,46 @@ static expr disjoint_local_blocks(const Memory &m, const expr &addr,
   return disj;
 }
 
+void Memory::mkLocalDisjAddrAxioms(const expr &allocated, const expr &short_bid,
+                                   const expr &size, const expr &align,
+                                   unsigned align_bits) {
+  if (!observesAddresses())
+    return;
+
+  unsigned var_bw = bits_ptr_address - align_bits - Pointer::hasLocalBit();
+  auto addr_var = expr::mkFreshVar("local_addr", expr::mkUInt(0, var_bw));
+  state->addQuantVar(addr_var);
+
+  expr blk_addr = addr_var.concat_zeros(align_bits);
+  expr full_addr = Pointer::hasLocalBit()
+                     ? expr::mkUInt(1, 1).concat(blk_addr) : blk_addr;
+
+  if (align_bits == 0) {
+    auto shift = expr::mkUInt(bits_ptr_address, full_addr) -
+                   align.zextOrTrunc(bits_ptr_address);
+    state->addPre((full_addr << shift) == 0);
+  }
+
+  // addr + size only overflows for one case when obj is aligned
+  expr no_ovfl;
+  if (size.ule(align.zextOrTrunc(bits_size_t)).isTrue())
+    no_ovfl = addr_var != expr::mkInt(-1, addr_var);
+  else
+    no_ovfl
+      = blk_addr.add_no_uoverflow(
+          size.zextOrTrunc(bits_ptr_address - Pointer::hasLocalBit()));
+  state->addPre(allocated.implies(no_ovfl));
+
+  // Disjointness of block's address range with other local blocks
+  state->addPre(
+    allocated.implies(
+      disjoint_local_blocks(*this, full_addr,
+                            size.zextOrTrunc(bits_ptr_address),
+                            align, local_blk_addr)));
+
+  local_blk_addr.add(short_bid, move(blk_addr));
+}
+
 pair<expr, expr>
 Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
               const expr &precond, const expr &nonnull,
@@ -1436,34 +1523,8 @@ Memory::alloc(const expr &size, unsigned align, BlockKind blockKind,
   bool is_null = !is_local && has_null_block && bid == 0;
 
   if (is_local) {
-    if (observesAddresses()) {
-      unsigned var_bw = bits_ptr_address - align_bits - Pointer::hasLocalBit();
-      auto addr_var = expr::mkFreshVar("local_addr", expr::mkUInt(0, var_bw));
-      state->addQuantVar(addr_var);
-
-      expr blk_addr = addr_var.concat_zeros(align_bits);
-      expr full_addr = Pointer::hasLocalBit()
-                         ? expr::mkUInt(1, 1).concat(blk_addr) : blk_addr;
-
-      // addr + size only overflows for one case when obj is aligned
-      expr no_ovfl;
-      if (size.ule(align).isTrue())
-        no_ovfl = addr_var != expr::mkInt(-1, addr_var);
-      else
-        no_ovfl
-          = blk_addr.add_no_uoverflow(
-              size_zext.zextOrTrunc(bits_ptr_address - Pointer::hasLocalBit()));
-      state->addPre(allocated.implies(no_ovfl));
-
-      // Disjointness of block's address range with other local blocks
-      state->addPre(
-        allocated.implies(
-          disjoint_local_blocks(*this, full_addr,
-                                size_zext.zextOrTrunc(bits_ptr_address),
-                                align_expr, local_blk_addr)));
-
-      local_blk_addr.add(short_bid, move(blk_addr));
-    }
+    mkLocalDisjAddrAxioms(allocated, short_bid, size_zext, align_expr,
+                          align_bits);
   } else {
     state->addAxiom(p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));

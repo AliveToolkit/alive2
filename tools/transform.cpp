@@ -562,10 +562,13 @@ static unsigned num_ptrs(const Type &ty) {
 }
 
 static bool returns_local(const Value &v) {
+  // no alias fns return local block
+  if (auto call = dynamic_cast<const FnCall*>(&v))
+    return call->getAttributes().has(FnAttrs::NoAlias);
+
   return dynamic_cast<const Alloc*>(&v) ||
          dynamic_cast<const Malloc*>(&v) ||
          dynamic_cast<const Calloc*>(&v);
-         // TODO: add noalias fn
 }
 
 static Value *get_base_ptr(Value *ptr) {

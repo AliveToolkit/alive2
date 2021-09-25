@@ -729,6 +729,8 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
     ret.retvals.emplace_back(
       StateValue::mkIf(cond, a.retvals[i], b.retvals[i]));
+    ret.ret_data.emplace_back(
+      Memory::FnRetData::mkIf(cond, a.ret_data[i], b.ret_data[i]));
   }
   return ret;
 }
@@ -753,6 +755,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool noret = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
+  bool noalias = attrs.has(FnAttrs::NoAlias);
 
   assert(!noret || !willret);
 
@@ -790,32 +793,36 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
     if (inserted) {
       auto mk_val = [&](const Type &t, const string &name) {
-        return t.isPtrType()
-                 ? memory.mkFnRet(name.c_str(), I->first.args_ptr)
-                 : expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value);
+        if (t.isPtrType())
+          return memory.mkFnRet(name.c_str(), I->first.args_ptr, noalias);
+
+         return make_pair(
+           expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value),
+           Memory::FnRetData());
       };
 
       vector<StateValue> values;
+      vector<Memory::FnRetData> ret_data;
       string valname = name + "#val";
       string npname = name + "#np";
       for (auto t : out_types) {
+        auto [val, data] = mk_val(*t, valname);
         values.emplace_back(
-          mk_val(*t, valname),
+          move(val),
           noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
+        ret_data.emplace_back(move(data));
       }
 
-      string ub_name    = name + "#ub";
-      string noret_name = name + "#noreturn";
       I->second
-        = { move(values), expr::mkFreshVar(ub_name.c_str(), false),
+        = { move(values), expr::mkFreshVar((name + "#ub").c_str(), false),
             (noret || willret)
               ? expr(noret)
-              : expr::mkFreshVar(noret_name.c_str(), false),
+              : expr::mkFreshVar((name + "#noreturn").c_str(), false),
             writes_memory
               ? memory.mkCallState(name,
                                    argmemonly ? &I->first.args_ptr : nullptr,
                                    attrs.has(FnAttrs::NoFree))
-              : Memory::CallState() };
+              : Memory::CallState(), move(ret_data) };
 
       // add equality constraints between source's function calls
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
@@ -849,7 +856,23 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       addUB(move(domain));
       addUB(move(d.ub));
       addNoReturn(move(d.noreturns));
-      retval = move(d.retvals);
+
+      if (noalias) {
+        // no alias functions in tgt must allocate a local block on each call
+        // bid may be different from that of src
+        unsigned i = 0;
+        for (auto t : out_types) {
+          retval.emplace_back(
+            t->isPtrType()
+              ? StateValue(memory.mkFnRet(name.c_str(), ptr_inputs, noalias,
+                                          &d.ret_data[i]).first,
+                           move(d.retvals[i].non_poison))
+              : move(d.retvals[i]));
+          ++i;
+        }
+      } else
+        retval = move(d.retvals);
+
       if (writes_memory)
         memory.setState(d.callstate);
 
