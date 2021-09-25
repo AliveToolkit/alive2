@@ -1,28 +1,30 @@
 #include "ComplexMutator.h"
 
 bool ComplexMutator::init(){
+    for(auto funcIt=pm->begin();funcIt!=pm->end();++funcIt){
+        for(auto ait=funcIt->arg_begin();ait!=funcIt->arg_end();++ait){
+            if(ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)){
+                filterSet.insert(funcIt->getName().str());
+                break;
+            }
+        }
+    }
+
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
         for(bit=fit->begin();bit!=fit->end();++bit)
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
-                result=true;
-                currFuncName=fit->getName().str();
-                goto end;
+                    result=true;
+                    currFuncName=fit->getName().str();
+                    goto end;
                 }
             }
     }
 end:
     if(result){
-        for(auto funcIt=pm->begin();funcIt!=pm->end();++funcIt){
-            for(auto ait=funcIt->arg_begin();ait!=funcIt->arg_end();++ait){
-                if(ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)){
-                    filterSet.insert(funcIt->getName().str());
-                    break;
-                }
-            }
-        }
-    }    
+        calcDomInst();
+    }
     return result;
 }
 
@@ -48,6 +50,8 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
     }
     moveToNextReplaceableInst();
+    while(newAdded.back()==&*iit)
+        moveToNextReplaceableInst();
 }
 
 void ComplexMutator::restoreBackUp(){
@@ -71,7 +75,14 @@ void ComplexMutator::restoreBackUp(){
 
 bool ComplexMutator::isReplaceable(llvm::Instruction* inst){
     //contain immarg attributes
-    if(llvm::isa<llvm::CallBase>(inst)&&filterSet.find(((llvm::CallBase*)inst)->getCalledFunction()->getName().str())!=filterSet.end()){
+    if(llvm::isa<llvm::CallBase>(inst)){
+        //in case of cannot find function name
+        if(llvm::Function* func=((llvm::CallBase*)inst)->getCalledFunction();func!=nullptr&&filterSet.find(func->getName().str())!=filterSet.end()){
+            return false;
+        }
+    }
+    //don't do replacement on PHI node
+    if(llvm::isa<llvm::PHINode>(inst)||llvm::isa<llvm::GetElementPtrInst>(inst)){
         return false;
     }
 

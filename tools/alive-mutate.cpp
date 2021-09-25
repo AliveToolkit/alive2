@@ -101,7 +101,6 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   Results r;
   r.t.src = move(*fn1);
   r.t.tgt = move(*fn2);
-
   if (!always_verify) {
     stringstream ss1, ss2;
     r.t.src.print(ss1);
@@ -117,7 +116,6 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   smt_init->reset();
   r.t.preprocess();
   TransformVerify verifier(r.t, false);
-
   if (print_transform)
     r.t.print(*out, {});
 
@@ -143,12 +141,19 @@ unsigned num_correct = 0;
 unsigned num_unsound = 0;
 unsigned num_failed = 0;
 unsigned num_errors = 0;
+unsigned long long tot_num_correct=0;
+unsigned long long tot_num_unsound=0;
+unsigned long long tot_num_failed=0;
+unsigned long long tot_num_errors=0;
+
+
 
 bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       llvm::TargetLibraryInfoWrapperPass &TLI) {
   auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
   if (r.status == Results::ERROR) {
     *out << "ERROR: " << r.error;
+    std::cout<<"Error: "<<r.error<<std::endl;
     ++num_errors;
     return true;
   }
@@ -175,13 +180,16 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 
   case Results::UNSOUND:
     *out << "Transformation doesn't verify!\n\n";
-    if (!opt_quiet)
+    if (!opt_quiet){
       *out << r.errs << endl;
+      std::cout<<r.errs<<std::endl;
+    }
     ++num_unsound;
     return false;
 
   case Results::FAILED_TO_PROVE:
     *out << r.errs << endl;
+    std::cout<<r.errs<<std::endl;
     ++num_failed;
     return true;
   }
@@ -247,6 +255,11 @@ version )EOF";
     timeMode();
   }
   std::cout<<"program ended\n";
+  std::cout << "Summary:\n"
+        "  " << tot_num_correct << " correct transformations\n"
+        "  " << tot_num_unsound << " incorrect transformations\n"
+        "  " << tot_num_failed  << " failed-to-prove transformations\n"
+        "  " << tot_num_errors << " Alive2 errors\n";
   return num_errors > 0;
 }
 
@@ -383,20 +396,27 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
         }
       }
     }
+
     if(num_unsound>0){
+      std::cout<<"Unsound found! at "<<ith<<"th copies, log recorded at log"<<logIndex<<".txt\n";
       ++logIndex;
-      std::cout<<"Unsound found! at "<<ith<<"th copies\n";
+    }else if(num_errors>0){
+      std::cout<<"Alive2 error found! at "<<ith<<"th copies, log recorded at log"<<logIndex<<".txt\n";
+      ++logIndex;
     }
     *out << "Summary:\n"
             "  " << num_correct << " correct transformations\n"
             "  " << num_unsound << " incorrect transformations\n"
             "  " << num_failed  << " failed-to-prove transformations\n"
             "  " << num_errors << " Alive2 errors\n";
-
   end:
     if (opt_smt_stats)
       smt::solver_print_stats(*out);
     smt_init.reset();
+    tot_num_correct+=num_correct;
+    tot_num_unsound+=num_unsound;
+    tot_num_failed+=num_failed;
+    tot_num_errors+=num_errors;
     num_correct=num_unsound=num_failed=num_errors=0;
     mutator.setModule(std::move(M1));
 }
@@ -420,9 +440,11 @@ void copyMode(){
         }
       }
     }else{
-      cerr<<"Cannot find any locations to mutate, "+testfile+" skipped\n!";
+      cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";
       return;
     }
+  }else{
+    cerr<<"Cannot open input file "+testfile+"!\n";
   }
 }
 
@@ -457,6 +479,6 @@ void timeMode(){
       ++cnt;
     }
   }else{
-    cerr<<"Cannot opne your input file "+testfile+"!\n";
+    cerr<<"Cannot open input file "+testfile+"!\n";
   }
 }

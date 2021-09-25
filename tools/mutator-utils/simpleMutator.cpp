@@ -61,28 +61,32 @@ bool Mutator::openInputFile(const string& inputFile){
         return false;
     }
     ExitOnErr(pm->materializeAll());
-    llvm::errs()<<"\n readfile successfully\n";
     return true;
 }
 bool SimpleMutator::init(){
     int isBoring=0;
-    for(auto fit=pm->begin();fit!=pm->end();++fit){
-        mutants.push_back(std::make_pair(std::make_unique<FunctionDefinitionMutant>(&*fit),fit->getName()));
-        if(mutants.back().first->isBoring()){
-            ++isBoring;
-        }
-        for(llvm::inst_iterator iit=llvm::inst_begin(*fit),iitEnd=llvm::inst_end(*fit);iit!=iitEnd;++iit){
-            if(llvm::isa<llvm::BinaryOperator>(&*iit)){
-                mutants.push_back(std::make_pair(std::make_unique<BinaryInstructionMutant>((llvm::BinaryOperator*)&*iit),fit->getName()));
-                if(mutants.back().first->isBoring()){
-                    ++isBoring;
-                }       
-            }else if(llvm::isa<llvm::GetElementPtrInst>(&*iit)){
-                mutants.push_back(std::make_pair(std::make_unique<GEPInstructionMutant>((llvm::GetElementPtrInst*)&*iit),fit->getName()));
-                if(mutants.back().first->isBoring()){
-                    ++isBoring;
-                }       
+    for(auto fit=pm->begin();fit!=pm->end();++fit)
+        if(!fit->isDeclaration()){
+            mutants.push_back(std::make_pair(std::make_unique<FunctionDefinitionMutant>(&*fit),fit->getName()));
+            if(mutants.back().first->isBoring()){
+                ++isBoring;
             }
+            for(llvm::inst_iterator iit=llvm::inst_begin(*fit),iitEnd=llvm::inst_end(*fit);iit!=iitEnd;++iit){
+                if(llvm::isa<llvm::BinaryOperator>(&*iit)){
+                    llvm::BinaryOperator* ptr=(llvm::BinaryOperator*)&*iit;
+                    if(ptr->getOperand(0)->getType()->isVectorTy()){
+                        continue;
+                    }
+                    mutants.push_back(std::make_pair(std::make_unique<BinaryInstructionMutant>(ptr),fit->getName()));
+                    if(mutants.back().first->isBoring()){
+                        ++isBoring;
+                    }       
+                }else if(llvm::isa<llvm::GetElementPtrInst>(&*iit)){
+                    mutants.push_back(std::make_pair(std::make_unique<GEPInstructionMutant>((llvm::GetElementPtrInst*)&*iit),fit->getName()));
+                    if(mutants.back().first->isBoring()){
+                        ++isBoring;
+                    }       
+                }
         }
     }
     it=mutants.begin();
