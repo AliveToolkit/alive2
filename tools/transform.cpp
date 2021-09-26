@@ -1321,7 +1321,8 @@ static void optimize_ptrcmp(Function &f) {
     if (auto *gep = dynamic_cast<const GEP*>(&v))
       return gep->isInBounds();
 
-    return returns_local(v);
+    // noalias functions aren't required to return an inbounds ptr
+    return returns_local(v) && !dynamic_cast<const FnCall*>(&v);
   };
 
   for (auto &i : f.instrs()) {
