@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/type.h"
 #include "llvm_util/llvm2alive.h"
 #include "smt/expr.h"
 #include "smt/smt.h"
@@ -23,12 +24,12 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 
 #include <fstream>
 #include <iostream>
 #include <utility>
 
+using namespace IR;
 using namespace llvm_util;
 using namespace smt;
 using namespace tools;
@@ -97,68 +98,107 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
     assert(types.hasSingleTyping());
   }
 
+  auto error = [&](const Result &r) {
+    if (r.isSat() || r.isUnsat())
+      return false;
+
+    if (r.isInvalid()) {
+      cout << "ERROR: invalid expression\n";
+    } else if (r.isError()) {
+      cout << "ERROR: Error in SMT solver: " << r.getReason() << '\n';
+    } else if (r.isTimeout()) {
+      cout << "ERROR: SMT solver timedout\n";
+    } else if (r.isSkip()) {
+      cout << "ERROR: SMT queries disabled";
+    } else {
+      UNREACHABLE();
+    }
+    ++errorCount;
+    return true;
+  };
+
   smt_init->reset();
   try {
     auto p = verifier.exec();
-    auto &state = *p.first;
+    const auto &state = *p.first;
+    const auto &fn = t.src;
+    const auto *bb = &fn.getFirstBB();
 
-    auto [ret_val, ret_domain, ret_undefs] = state.returnVal();
-    auto ret = expr::mkVar("ret_val", ret_val.value);
-    auto ret_np = expr::mkVar("ret_np", ret_val.non_poison);
+    Solver s(true);
 
-    Solver s;
-    s.add(ret_domain);
-    auto r = s.check();
-    if (r.isUnsat()) {
-      cout << "ERROR: Function doesn't reach a return statement\n";
-      ++errorCount;
-      return;
-    }
-    if (r.isInvalid()) {
-      cout << "ERROR: invalid expression\n";
-      ++errorCount;
-      return;
-    }
-    if (r.isError()) {
-      cout << "ERROR: Error in SMT solver: " << r.getReason() << '\n';
-      ++errorCount;
-      return;
-    }
-    if (r.isTimeout()) {
-      cout << "ERROR: SMT solver timedout\n";
-      ++errorCount;
-      return;
-    }
-    if (r.isSkip()) {
-      cout << "ERROR: SMT queries disabled";
-      ++errorCount;
-      return;
-    }
-    if (r.isSat()) {
-      auto &m = r.getModel();
-      cout << "Return value: ";
-      // TODO: add support for aggregates
-      if (m.eval(ret_val.non_poison, true).isFalse()) {
-        cout << "poison\n\n";
-      } else {
-        t.src.getType().printVal(cout, state, m.eval(ret_val.value, true));
+    for (auto &[var, val] : state.getValues()) {
+      auto &name = var->getName();
+      auto *i = dynamic_cast<const Instr*>(var);
+      if (!i || &fn.bbOf(*i) != bb)
+        continue;
 
-        s.block(m);
-        if (s.check().isSat()) {
-          cout << "\n\nWARNING: There are multiple return values";
+      if (auto *jmp = dynamic_cast<const JumpInstr*>(var)) {
+        bool jumped = false;
+        expr cond;
+        for (auto &dst : jmp->targets()) {
+          cond = state.getJumpCond(*bb, dst);
+
+          SolverPush push(s);
+          s.add(cond);
+          auto r = s.check();
+          if (error(r))
+            return;
+
+          if ((jumped = r.isSat())) {
+            cout << "  >> Jump to " << dst.getName() << "\n\n";
+            bb = &dst;
+            break;
+          }
         }
-        cout << "\n\n";
-      }
-      ++successCount;
-      return;
-    }
-    UNREACHABLE();
 
+        if (jumped) {
+          s.add(cond);
+          continue;
+        } else {
+          cout << "UB triggered on " << name << "\n\n";
+          ++successCount;
+          return;
+        }
+      }
+
+      if (dynamic_cast<const Return*>(var)) {
+        const auto &ret = state.returnVal();
+        s.add(ret.domain);
+        auto r = s.check();
+        if (error(r))
+            return;
+        cout << "Returned: ";
+        print_model_val(cout, state, r.getModel(), var, fn.getType(), ret.val);
+        cout << "\n\n";
+        ++successCount;
+        return;
+      }
+
+      s.add(val.domain);
+      auto r = s.check();
+      if (error(r))
+        return;
+
+      if (r.isUnsat()) {
+        cout << *var << " = UB triggered!\n\n";
+        ++successCount;
+        return;
+      }
+
+      if (name[0] != '%')
+        continue;
+
+      cout << *var << " = ";
+      print_model_val(cout, state, r.getModel(), var, var->getType(), val.val);
+      cout << '\n';
+      continue;
+    }
   } catch (const AliveException &e) {
     cout << "ERROR: " << e.msg << '\n';
     ++errorCount;
     return;
   }
+  ++successCount;
 }
 }
 

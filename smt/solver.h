@@ -114,6 +114,7 @@ Result check_expr(const expr &e);
 
 class SolverPush {
   Solver &s;
+  bool valid, is_unsat;
 public:
   SolverPush(Solver &s);
   ~SolverPush();

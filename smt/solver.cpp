@@ -351,11 +351,13 @@ Result check_expr(const expr &e) {
 }
 
 
-SolverPush::SolverPush(Solver &s) : s(s) {
+SolverPush::SolverPush(Solver &s) : s(s), valid(s.valid), is_unsat(s.is_unsat) {
   Z3_solver_push(ctx(), s.s);
 }
 
 SolverPush::~SolverPush() {
+  s.valid = valid;
+  s.is_unsat = is_unsat;
   Z3_solver_pop(ctx(), s.s, 1);
 }
 
