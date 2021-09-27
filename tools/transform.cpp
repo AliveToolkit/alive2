@@ -392,14 +392,14 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
                  const expr &fndom_a, const State::ValTy &ap,
                  const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
-  if (src_state.sinkDomain().isTrue()) {
+  if (check_expr(!src_state.sinkDomain()).isUnsat()) {
     errs.add("The source program doesn't reach a return instruction.\n"
              "Consider increasing the unroll factor if it has loops", false);
     return;
   }
 
   auto sink_tgt = tgt_state.sinkDomain();
-  if (sink_tgt.isTrue()) {
+  if (check_expr(!sink_tgt).isUnsat()) {
     errs.add("The target program doesn't reach a return instruction.\n"
              "Consider increasing the unroll factor if it has loops", false);
     return;
