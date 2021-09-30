@@ -37,7 +37,7 @@ def wrap(args):
     "loop-mssa" : ["function"],
   }
 
-  firstpass = None
+  firstpass = ''
   type = None
 
   skip = ['verify', 'invalidate<all>']
@@ -139,15 +139,16 @@ else:
     ('cgscc(devirt<4>(inline))', 'cgscc(devirt<4>(inline))'),
     ('devirt<1>(inline,function(gvn))', 'cgscc(devirt<1>(inline,function(gvn)))'),
     ('require<opt-remark-emit>,loop(loop-unroll-full)', 'function(require<opt-remark-emit>,loop(loop-unroll-full))'),
-    ('invalidate<domtree>,early-cse-memssa', 'function(invalidate<domtree>,early-cse-memssa)'),
+    ('invalidate<domtree>,early-cse<memssa>', 'function(invalidate<domtree>,early-cse<memssa>)'),
     ('function(loop-vectorize,instcombine)', 'function(loop-vectorize,instcombine)'),
     ('function(loop-vectorize),function(instcombine)', 'function(loop-vectorize),function(instcombine)'),
     ('function(loop-vectorize),function(instcombine),globalopt', 'module(function(loop-vectorize),function(instcombine),globalopt)'),
-    ('function(ee-instrument),function(ee-instrument),cgscc(inline),function(post-inline-ee-instrument)',
-       'module(function(ee-instrument),function(ee-instrument),cgscc(inline),function(post-inline-ee-instrument))'),
+    ('function(ee-instrument),function(ee-instrument),cgscc(inline),function(ee-instrument<post-inline>)',
+       'module(function(ee-instrument),function(ee-instrument),cgscc(inline),function(ee-instrument<post-inline>))'),
     ('function(print<demanded-bits>),attributor', 'module(function(print<demanded-bits>),attributor)'),
     ('function(tailcallelim),cgscc(inline)', 'module(function(tailcallelim),cgscc(inline))'),
     ('function(slp-vectorizer),module(hotcoldsplit)', 'module(function(slp-vectorizer),module(hotcoldsplit))'),
+    ('verify', 'module(verify)'),
     ('default<O2>', 'module(default<O2>)')
   ]
 
