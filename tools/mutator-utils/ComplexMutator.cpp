@@ -12,6 +12,9 @@ bool ComplexMutator::init(){
 
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
+        if(fit->isDeclaration()){
+            continue;
+        }
         for(bit=fit->begin();bit!=fit->end();++bit)
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
@@ -29,7 +32,6 @@ end:
 }
 
 void ComplexMutator::mutateModule(const std::string& outputFileName){
-    //return;
     restoreBackUp();
     for(auto it=iit->op_begin();it!=iit->op_end();++it){
         instArgs.push_back(it->get());
@@ -77,12 +79,16 @@ bool ComplexMutator::isReplaceable(llvm::Instruction* inst){
     //contain immarg attributes
     if(llvm::isa<llvm::CallBase>(inst)){
         //in case of cannot find function name
-        if(llvm::Function* func=((llvm::CallBase*)inst)->getCalledFunction();func!=nullptr&&filterSet.find(func->getName().str())!=filterSet.end()){
+        if(llvm::Function* func=((llvm::CallBase*)inst)->getCalledFunction();func!=nullptr&&
+            (filterSet.find(func->getName().str())!=filterSet.end()||func->getName().startswith("llvm"))){
             return false;
         }
     }
     //don't do replacement on PHI node
-    if(llvm::isa<llvm::PHINode>(inst)||llvm::isa<llvm::GetElementPtrInst>(inst)){
+    //don't update an alloca inst
+    //don't do operations on Switch inst for now.
+    if(llvm::isa<llvm::PHINode>(inst)||llvm::isa<llvm::GetElementPtrInst>(inst)||llvm::isa<llvm::AllocaInst>(inst)
+        ||llvm::isa<llvm::SwitchInst>(inst)){
         return false;
     }
 

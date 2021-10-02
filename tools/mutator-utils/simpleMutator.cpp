@@ -65,7 +65,7 @@ bool Mutator::openInputFile(const string& inputFile){
 }
 bool SimpleMutator::init(){
     int isBoring=0;
-    for(auto fit=pm->begin();fit!=pm->end();++fit)
+    for(auto fit=pm->begin();fit!=pm->end();++fit){
         if(!fit->isDeclaration()){
             mutants.push_back(std::make_pair(std::make_unique<FunctionDefinitionMutant>(&*fit),fit->getName()));
             if(mutants.back().first->isBoring()){
@@ -87,6 +87,7 @@ bool SimpleMutator::init(){
                         ++isBoring;
                     }       
                 }
+            }
         }
     }
     it=mutants.begin();
