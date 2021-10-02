@@ -254,7 +254,9 @@ version )EOF";
   }else if(timeElapsed>0){
     timeMode();
   }
+  if(verbose){
   std::cout<<"program ended\n";
+ 
   std::cout << "Summary:\n"
         "  " << tot_num_correct << " correct transformations\n"
         "  " << tot_num_unsound << " incorrect transformations\n"
@@ -349,19 +351,8 @@ string getOutputFile(int ith,bool isOptimized){
 */
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
-<<<<<<< HEAD
     mutator.mutateModule(getOutputFile(ith));
     M1 = mutator.getModule();
-=======
-    bool isSimpleMutate=false;//Random::getRandomBool();
-    if(false){
-      mutator.generateTest(getOutputFile(verbose?ith:-1));
-      M1 = openInputFile(context, getOutputFile(verbose?ith:-1));
-    }else{
-      cmutator.generateTest(getOutputFile(ith));
-      M1=cmutator.getModule();
-    }
->>>>>>> only verifying mutated function now
     
     if (!M1.get()) {
       cerr << "Could not read file from '" << getOutputFile(ith)<< "'\n";
@@ -380,14 +371,8 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     M2 = CloneModule(*M1);
     optimizeModule(M2.get());
 
-<<<<<<< HEAD
     const string optFunc=mutator.getCurrentFunction();
     if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
-=======
-    const string optFunc=cmutator.getCurrentFunction();
-    if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
-    //for(llvm::Function& f1:*M1){
->>>>>>> only verifying mutated function now
       if(!pf1->isDeclaration()){
         if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
             if (!compareFunctions(*pf1, *pf2, TLI))
@@ -404,11 +389,13 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
       std::cout<<"Alive2 error found! at "<<ith<<"th copies, log recorded at log"<<logIndex<<".txt\n";
       ++logIndex;
     }
+    if(verbose){
     *out << "Summary:\n"
             "  " << num_correct << " correct transformations\n"
             "  " << num_unsound << " incorrect transformations\n"
             "  " << num_failed  << " failed-to-prove transformations\n"
             "  " << num_errors << " Alive2 errors\n";
+    }
   end:
     if (opt_smt_stats)
       smt::solver_print_stats(*out);
@@ -430,7 +417,7 @@ void copyMode(){
   if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
     if(bool sInit=false&&mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
       for(int i=0;i<numCopy;++i){
-        if(true){
+        if(verbose){
           std::cout<<"Running "<<i<<"th copies."<<std::endl;
         }
         if(sInit^cInit){
@@ -472,7 +459,7 @@ void timeMode(){
       }
       auto t_end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<double> cur=t_end-t_start;
-      if(true){
+      if(verbose){
         std::cout<<"Generted "+to_string(cnt)+"th copies in "+to_string((cur).count())+" seconds\n";
       }
       sum+=cur;
