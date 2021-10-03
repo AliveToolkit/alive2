@@ -42,3 +42,12 @@ Name: overflow
 %a = umul_overflow i8 12, -10
 %v0 = 136
 %v1 = 1
+
+Name: typing
+%X = umul_overflow i8 %a, undef
+%Op = extractvalue {i8, i1} %X, 0
+%Ov = extractvalue {i8, i1} %X, 1
+  =>
+%X = umul_overflow i8 %a, undef
+%Op = 0
+%Ov = 0

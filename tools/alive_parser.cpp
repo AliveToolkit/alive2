@@ -129,8 +129,7 @@ struct tokenizer_t {
   }
 
   bool isType() {
-    // TODO: support other aggregate types
-    return isScalarType() || isVectorType() || isArrayType();
+    return isScalarType() || isVectorType() || isArrayType() || isStructType();
   }
 
   bool isScalarType() {
@@ -144,6 +143,10 @@ struct tokenizer_t {
 
   bool isArrayType() {
     return peek() == ARRAY_TYPE_PREFIX;
+  }
+
+  bool isStructType() {
+    return peek() == LBRACE;
   }
 
 private:
@@ -320,10 +323,9 @@ static Type& get_pointer_type(unsigned address_space_number) {
   return *pointer_types[address_space_number].get();
 }
 
-static unsigned vector_num;
 static vector<unique_ptr<VectorType>> vector_types;
-static unsigned array_num;
 static vector<unique_ptr<ArrayType>> array_types;
+static vector<unique_ptr<StructType>> struct_types;
 
 static Type& parse_scalar_type() {
   switch (*tokenizer) {
@@ -358,24 +360,25 @@ static Type& parse_vector_type() {
 
   tokenizer.ensure(CSGT);
   return *vector_types.emplace_back(
-    make_unique<VectorType>("vty_" + to_string(vector_num++),
+    make_unique<VectorType>("vty_" + to_string(vector_types.size()),
                             elements, elemTy)).get();
 }
 
 static Type& parse_array_type();
+static Type& parse_struct_type();
 
 static Type& parse_type(bool optional = true) {
-  if (tokenizer.isScalarType()) {
+  if (tokenizer.isScalarType())
     return parse_scalar_type();
-  }
 
-  if (tokenizer.isArrayType()) {
+  if (tokenizer.isArrayType())
     return parse_array_type();
-  }
 
-  if (tokenizer.isVectorType()) {
+  if (tokenizer.isVectorType())
     return parse_vector_type();
-  }
+
+  if (tokenizer.isStructType())
+    return parse_struct_type();
 
   if (optional)
     return get_sym_type();
@@ -392,8 +395,31 @@ static Type& parse_array_type() {
   Type &elemTy = parse_type(false);
   tokenizer.ensure(RSQBRACKET);
   return *array_types.emplace_back(
-          make_unique<ArrayType>("aty_" + to_string(array_num++),
+          make_unique<ArrayType>("aty_" + to_string(array_types.size()),
                                   elements, elemTy)).get();
+}
+
+static Type& parse_struct_type() {
+  tokenizer.ensure(LBRACE);
+
+  vector<Type*> tys;
+  vector<bool> padding;
+  do {
+    tys.emplace_back(&parse_type(false));
+    padding.emplace_back(false);
+
+    switch (auto t = *tokenizer) {
+      case COMMA: break;
+      case RBRACE: goto end;
+      default:
+        error("Expected comma or }", t);
+    }
+  } while (true);
+
+end:
+  return *struct_types.emplace_back(
+    make_unique<StructType>("sty_" + to_string(struct_types.size()),
+                            move(tys), move(padding))).get();
 }
 
 static Type& try_parse_type(Type &default_type) {
@@ -1188,6 +1214,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FLOAT:
   case DOUBLE:
   case VECTOR_TYPE_PREFIX:
+  case LBRACE:
   case NUM:
   case FP_NUM:
   case TRUE:
