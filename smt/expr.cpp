@@ -575,6 +575,13 @@ unsigned expr::min_leading_zeros() const {
   return 0;
 }
 
+unsigned expr::min_trailing_ones() const {
+  uint64_t n;
+  if (isUInt(n))
+    return countr_one(n);
+  return 0;
+}
+
 expr expr::binop_commutative(const expr &rhs,
                              Z3_ast (*op)(Z3_context, Z3_ast, Z3_ast),
                              expr (expr::*expr_op)(const expr &) const,
@@ -1447,6 +1454,10 @@ expr expr::ule(const expr &rhs) const {
     return true;
   if (rhs.isZero() || isAllOnes())
     return *this == rhs;
+
+  // 00... <= ..111 -> true
+  if (min_leading_zeros() + rhs.min_trailing_ones() >= bits())
+    return true;
 
   return binop_fold(rhs, Z3_mk_bvule);
 }
