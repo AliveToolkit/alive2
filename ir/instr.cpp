@@ -3869,6 +3869,7 @@ const ConversionOp* isCast(ConversionOp::Op op, const Value &v) {
 
 bool hasNoSideEffects(const Instr &i) {
   return isNoOp(i) ||
+         dynamic_cast<const ExtractValue*>(&i) ||
          dynamic_cast<const GEP*>(&i) ||
          dynamic_cast<const ShuffleVector*>(&i);
 }
