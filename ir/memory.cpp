@@ -356,23 +356,26 @@ unsigned Byte::bitsByte() {
 }
 
 ostream& operator<<(ostream &os, const Byte &byte) {
-  if (byte.isPoison().isTrue())
-    return os << "poison";
-
   if (byte.isPtr().isTrue()) {
-    os << byte.ptr() << ", byte offset=";
-    byte.ptrByteoffset().printSigned(os);
+    if (byte.ptrNonpoison().isTrue()) {
+      os << byte.ptr() << ", byte offset=";
+      byte.ptrByteoffset().printSigned(os);
+    } else {
+      os << "poison";
+    }
   } else {
     auto np = byte.nonptrNonpoison();
     auto val = byte.nonptrValue();
-    if (np.isZero()) {
+    if (np.isAllOnes()) {
       val.printHexadecimal(os);
+    } else if (np.isZero()) {
+      os << "poison";
     } else {
       os << "#b";
       for (unsigned i = 0; i < bits_poison_per_byte; ++i) {
         unsigned idx = bits_poison_per_byte - i - 1;
-        auto is_poison = (np.extract(idx, idx) == 1).isTrue();
-        auto v = (val.extract(idx, idx) == 1).isTrue();
+        auto is_poison = np.extract(idx, idx).isZero();
+        auto v = val.extract(idx, idx).isAllOnes();
         os << (is_poison ? 'p' : (v ? '1' : '0'));
       }
     }
