@@ -2704,7 +2704,7 @@ bool Malloc::canFree() const {
   return ptr != nullptr;
 }
 
-unsigned Malloc::getAlign() const {
+uint64_t Malloc::getAlign() const {
   return align ? align : heap_block_alignment;
 }
 
@@ -2804,7 +2804,7 @@ Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
   return info;
 }
 
-unsigned Calloc::getAlign() const {
+uint64_t Calloc::getAlign() const {
   return align ? align : heap_block_alignment;
 }
 

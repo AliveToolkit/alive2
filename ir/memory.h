@@ -166,34 +166,34 @@ class Memory {
   void mkNonlocalValAxioms(bool skip_consts);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
-                unsigned bytes, unsigned align, bool write) const;
+                unsigned bytes, uint64_t align, bool write) const;
 
-  AliasSet computeAliasing(const Pointer &ptr, unsigned btyes, unsigned align,
+  AliasSet computeAliasing(const Pointer &ptr, unsigned btyes, uint64_t align,
                            bool write) const;
 
   template <typename Fn>
-  void access(const Pointer &ptr, unsigned btyes, unsigned align, bool write,
+  void access(const Pointer &ptr, unsigned btyes, uint64_t align, bool write,
               Fn &fn);
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
-                         std::set<smt::expr> &undef, unsigned align,
+                         std::set<smt::expr> &undef, uint64_t align,
                          bool left2right = true,
                          DataType type = DATA_ANY);
   StateValue load(const Pointer &ptr, const Type &type,
-                  std::set<smt::expr> &undef, unsigned align);
+                  std::set<smt::expr> &undef, uint64_t align);
 
   DataType data_type(const std::vector<std::pair<unsigned, smt::expr>> &data,
                      bool full_store) const;
 
   void store(const Pointer &ptr,
              const std::vector<std::pair<unsigned, smt::expr>> &data,
-             const std::set<smt::expr> &undef, unsigned align);
+             const std::set<smt::expr> &undef, uint64_t align);
   void store(const StateValue &val, const Type &type, unsigned offset,
              std::vector<std::pair<unsigned, smt::expr>> &data);
 
   void storeLambda(const Pointer &ptr, const smt::expr &offset,
                    const smt::expr &bytes, const smt::expr &val,
-                   const std::set<smt::expr> &undef, unsigned align);
+                   const std::set<smt::expr> &undef, uint64_t align);
 
   smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
                             const smt::expr &offset,
@@ -271,7 +271,7 @@ public:
   // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
   // Returns <pointer if allocated, allocated?>
-  std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, unsigned align,
+  std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, uint64_t align,
       BlockKind blockKind, const smt::expr &precond = true,
       const smt::expr &nonnull = false,
       std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);
@@ -285,19 +285,19 @@ public:
 
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
-             unsigned align, const std::set<smt::expr> &undef_vars);
+             uint64_t align, const std::set<smt::expr> &undef_vars);
   std::pair<StateValue, smt::AndExpr>
-    load(const smt::expr &ptr, const Type &type, unsigned align);
+    load(const smt::expr &ptr, const Type &type, uint64_t align);
 
   // raw load; NB: no UB check
   Byte raw_load(const Pointer &p, std::set<smt::expr> &undef_vars);
   Byte raw_load(const Pointer &p);
 
   void memset(const smt::expr &ptr, const StateValue &val,
-              const smt::expr &bytesize, unsigned align,
+              const smt::expr &bytesize, uint64_t align,
               const std::set<smt::expr> &undef_vars, bool deref_check = true);
   void memcpy(const smt::expr &dst, const smt::expr &src,
-              const smt::expr &bytesize, unsigned align_dst, unsigned align_src,
+              const smt::expr &bytesize, uint64_t align_dst, uint64_t align_src,
               bool move);
 
   // full copy of memory blocks

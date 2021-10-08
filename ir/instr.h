@@ -473,10 +473,10 @@ public:
 
 class Alloc final : public MemInstr {
   Value *size, *mul;
-  unsigned align;
+  uint64_t align;
   bool initially_dead = false;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, Value *mul, unsigned align)
+  Alloc(Type &type, std::string &&name, Value &size, Value *mul, uint64_t align)
     : MemInstr(type, std::move(name)), size(&size), mul(mul), align(align) {}
 
   Value& getSize() const { return *size; }
@@ -501,23 +501,23 @@ public:
 
 class Malloc final : public MemInstr {
   Value *ptr = nullptr, *size;
-  unsigned align;
+  uint64_t align;
   // Is this malloc (or equivalent operation, like new()) never returning
   // null?
   bool isNonNull = false;
 
 public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull,
-         unsigned align = 0)
+         uint64_t align = 0)
     : MemInstr(type, std::move(name)), size(&size), align(align),
       isNonNull(isNonNull) {}
 
   Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
-         unsigned align = 0)
+         uint64_t align = 0)
     : MemInstr(type, std::move(name)), ptr(&ptr), size(&size), align(align) {}
 
   Value& getSize() const { return *size; }
-  unsigned getAlign() const;
+  uint64_t getAlign() const;
   bool isRealloc() const { return ptr != nullptr; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
@@ -537,15 +537,15 @@ public:
 
 class Calloc final : public MemInstr {
   Value *num, *size;
-  unsigned align;
+  uint64_t align;
 public:
   Calloc(Type &type, std::string &&name, Value &num, Value &size,
-         unsigned align = 0)
+         uint64_t align = 0)
     : MemInstr(type, std::move(name)), num(&num), size(&size), align(align) {}
 
   Value& getNum() const { return *num; }
   Value& getSize() const { return *size; }
-  unsigned getAlign() const;
+  uint64_t getAlign() const;
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -635,13 +635,13 @@ public:
 
 class Load final : public MemInstr {
   Value *ptr;
-  unsigned align;
+  uint64_t align;
 public:
-  Load(Type &type, std::string &&name, Value &ptr, unsigned align)
+  Load(Type &type, std::string &&name, Value &ptr, uint64_t align)
     : MemInstr(type, std::move(name)), ptr(&ptr), align(align) {}
 
   Value& getPtr() const { return *ptr; }
-  unsigned getAlign() const { return align; }
+  uint64_t getAlign() const { return align; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -660,14 +660,14 @@ public:
 
 class Store final : public MemInstr {
   Value *ptr, *val;
-  unsigned align;
+  uint64_t align;
 public:
-  Store(Value &ptr, Value &val, unsigned align)
+  Store(Value &ptr, Value &val, uint64_t align)
     : MemInstr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
 
   Value& getValue() const { return *val; }
   Value& getPtr() const { return *ptr; }
-  unsigned getAlign() const { return align; }
+  uint64_t getAlign() const { return align; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -687,14 +687,14 @@ public:
 
 class Memset final : public MemInstr {
   Value *ptr, *val, *bytes;
-  unsigned align;
+  uint64_t align;
 public:
-  Memset(Value &ptr, Value &val, Value &bytes, unsigned align)
+  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align)
     : MemInstr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
             align(align) {}
 
   Value& getBytes() const { return *bytes; }
-  unsigned getAlign() const { return align; }
+  uint64_t getAlign() const { return align; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -733,17 +733,17 @@ public:
 
 class Memcpy final : public MemInstr {
   Value *dst, *src, *bytes;
-  unsigned align_dst, align_src;
+  uint64_t align_dst, align_src;
   bool move;
 public:
   Memcpy(Value &dst, Value &src, Value &bytes,
-         unsigned align_dst, unsigned align_src, bool move)
+         uint64_t align_dst, uint64_t align_src, bool move)
     : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
             align_dst(align_dst), align_src(align_src), move(move) {}
 
   Value& getBytes() const { return *bytes; }
-  unsigned getSrcAlign() const { return align_src; }
-  unsigned getDstAlign() const { return align_dst; }
+  uint64_t getSrcAlign() const { return align_src; }
+  uint64_t getDstAlign() const { return align_dst; }
 
   std::pair<uint64_t, unsigned> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

@@ -85,10 +85,10 @@ public:
   smt::expr inbounds(bool simplify_ptr = false, bool strict = false);
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(uint64_t align, bool exact = false) const;
-  smt::expr isAligned(unsigned align);
-  smt::AndExpr isDereferenceable(uint64_t bytes, unsigned align,
+  smt::expr isAligned(uint64_t align);
+  smt::AndExpr isDereferenceable(uint64_t bytes, uint64_t align,
                                  bool iswrite = false);
-  smt::AndExpr isDereferenceable(const smt::expr &bytes, unsigned align,
+  smt::AndExpr isDereferenceable(const smt::expr &bytes, uint64_t align,
                                  bool iswrite);
   void isDisjointOrEqual(const smt::expr &len1, const Pointer &ptr2,
                          const smt::expr &len2) const;

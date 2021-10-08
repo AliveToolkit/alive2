@@ -85,13 +85,13 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   auto DL() const { return f.getParent()->getDataLayout(); }
 
   template <typename T>
-  unsigned alignment(T &i, llvm::Type *ty) const {
+  uint64_t alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlignment();
     return a != 0 ? a : DL().getABITypeAlignment(ty);
   }
 
   template <typename T>
-  unsigned pref_alignment(T &i, llvm::Type *ty) const {
+  uint64_t pref_alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlignment();
     return a != 0 ? a : DL().getPrefTypeAlignment(ty);
   }
