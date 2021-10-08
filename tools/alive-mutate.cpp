@@ -251,6 +251,8 @@ version )EOF";
   //llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::HideUnrelatedOptions(mutatorArgs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
+  if(outputFolder.back()!='/')
+    outputFolder+='/';
 
   if(numCopy<0&&timeElapsed<0){
     cerr<<"Please specify either number of copies or running time!\n";

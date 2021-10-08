@@ -19,7 +19,6 @@ bool ComplexMutator::init(){
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
                     result=true;
-                    currFuncName=fit->getName().str();
                     goto end;
                 }
             }
@@ -40,6 +39,7 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         iit->print(llvm::errs());
     }
     updatedInst=&*iit;
+    currFuncName=fit->getName().str();
     insertRandomBinaryInstruction(updatedInst);
     if(debug){
         bit->print(llvm::errs());
@@ -109,7 +109,6 @@ void ComplexMutator::moveToNextFuction(){
     DT=llvm::DominatorTree(*fit);
     bit=fit->begin();
     iit=bit->begin();
-    currFuncName=fit->getName().str();
 }
 
 void ComplexMutator::moveToNextBasicBlock(){
