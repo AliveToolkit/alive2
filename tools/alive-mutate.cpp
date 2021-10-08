@@ -44,20 +44,33 @@ using namespace llvm_util;
 #include "llvm_util/cmd_args_list.h"
 
 namespace {
-
+  llvm::cl::OptionCategory mutatorArgs("Mutator options");
 
   llvm::cl::opt<string> testfile(llvm::cl::Positional,
-    llvm::cl::desc("inputTestFile"),
-    llvm::cl::Required, llvm::cl::value_desc("filename"));
+    llvm::cl::desc("<inputTestFile>"),
+    llvm::cl::Required, llvm::cl::value_desc("filename"),
+    llvm::cl::cat(mutatorArgs));
 
   llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
-    llvm::cl::desc("outputFileFolder"),
-    llvm::cl::Required, llvm::cl::value_desc("folder"));
+    llvm::cl::desc("<outputFileFolder>"),
+    llvm::cl::Required, llvm::cl::value_desc("folder"),
+    llvm::cl::cat(mutatorArgs));
 
-  llvm::cl::opt<int> numCopy("n",llvm::cl::desc("number copies of test files"),llvm::cl::init(-1));
+  llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",llvm::cl::value_desc("number of copies of test files"),
+    llvm::cl::desc("specify number of copies of test files"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::init(-1));
 
-  llvm::cl::opt<int> timeElapsed("t",llvm::cl::desc("seconds of mutator should run"),llvm::cl::init(-1));
-  llvm::cl::opt<bool> verbose("v",llvm::cl::desc("verbose mode"));
+  llvm::cl::opt<int> timeElapsed(LLVM_ARGS_PREFIX "t",
+    llvm::cl::value_desc("seconds of the mutator should run"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("specify seconds of the mutator should run"),
+    llvm::cl::init(-1));
+
+  llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
+    llvm::cl::value_desc("verbose mode"),
+    llvm::cl::desc("specify if verbose mode is on"),
+    llvm::cl::cat(mutatorArgs));
 
   filesystem::path inputPath,outputPath;
 
@@ -235,7 +248,8 @@ int main(int argc, char **argv) {
 version )EOF";
   Usage += alive_version;
 
-  llvm::cl::HideUnrelatedOptions(alive_cmdargs);
+  //llvm::cl::HideUnrelatedOptions(alive_cmdargs);
+  llvm::cl::HideUnrelatedOptions(mutatorArgs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
   if(numCopy<0&&timeElapsed<0){
