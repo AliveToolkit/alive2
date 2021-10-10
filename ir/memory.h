@@ -195,7 +195,7 @@ class Memory {
                    const smt::expr &bytes, const smt::expr &val,
                    const std::set<smt::expr> &undef, uint64_t align);
 
-  // If bid_src == nullopt, it encodes the non-local block refinement
+  // If bid_other == nullopt, it encodes the non-local block refinement
   // Otherwise, it encodes the local block refinement between bid and *bid_other
   smt::expr blockValRefined(const Memory &other, unsigned bid,
                             std::optional<unsigned> bid_other,
