@@ -44,3 +44,5 @@ define i32 @tgt() noinline {
 }
 
 declare void @bar(%struct1* sret(%struct1))
+
+; ERROR: Couldn't prove the correctness of the transformation

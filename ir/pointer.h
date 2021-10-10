@@ -35,6 +35,14 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
+  smt::expr encodeLoadedByteRefined(const Pointer &other,
+                                    std::set<smt::expr> &undefs) const;
+  smt::expr encodeLocalPtrRefinement(const Pointer &other,
+                                     std::set<smt::expr> &undefs) const;
+  smt::expr encodeByValArgRefinement(const Pointer &otherByval,
+                                     std::set<smt::expr> &undefs,
+                                     unsigned byval_size) const;
+
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
