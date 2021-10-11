@@ -522,6 +522,8 @@ expr Pointer::encodeByValArgRefinement(
   Pointer this_ofs = *this + ofs;
   Pointer other_ofs = other + ofs;
 
+  // Dereferenceability of this and other ptr is already encoded by
+  // ParamAttrs::encode.
   return ofs.ugt(expr::mkUInt(size, ofs))
       .implies(this_ofs.encodeLoadedByteRefined(other_ofs, undefs));
 }
