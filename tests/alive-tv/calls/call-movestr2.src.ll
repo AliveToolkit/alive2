@@ -1,5 +1,3 @@
-; TODO: needs refinement of local blocks working
-
 define i8 @f() {
   %a = alloca i8
   store i8 3, i8* %a
