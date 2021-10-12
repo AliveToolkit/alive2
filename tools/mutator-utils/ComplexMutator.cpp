@@ -56,6 +56,14 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         moveToNextReplaceableInst();
 }
 
+void ComplexMutator::saveModule(const std::string& outputFileName){
+    std::error_code ec;
+    llvm::raw_fd_ostream fout(outputFileName,ec);
+    fout<<*pm;
+    fout.close();
+    llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
+}
+
 void ComplexMutator::restoreBackUp(){
     if(updatedInst!=nullptr){
         llvm::Instruction* newInst=&*iit;

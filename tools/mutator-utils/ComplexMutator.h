@@ -68,7 +68,7 @@ public:
     ~ComplexMutator(){};
     virtual bool init();
     virtual void mutateModule(const std::string& outputFileName);
-    virtual std::string getCurrentFunction()const{return fit->getName().str();}
-
+    virtual std::string getCurrentFunction()const {return currFuncName;}
+    virtual void saveModule(const std::string& outputFileName);
 };
 
