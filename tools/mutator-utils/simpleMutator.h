@@ -232,9 +232,9 @@ class SimpleMutator:public Mutator{
 public:
     SimpleMutator(bool debug=false):Mutator(debug),isFirstRun(true){};
     virtual ~SimpleMutator(){mutants.clear();};
-    virtual bool init();
-    virtual void mutateModule(const string& outputFileName);
-    virtual std::string getCurrentFunction()const{return it->second.str();};
+    virtual bool init()override;
+    virtual void mutateModule(const string& outputFileName)override;
+    virtual std::string getCurrentFunction()const override{return it->second.str();};
     //needs to be fixed
-    virtual void saveModule(const std::string& outputFileName){};
+    virtual void saveModule(const std::string& outputFileName)override{};
 };

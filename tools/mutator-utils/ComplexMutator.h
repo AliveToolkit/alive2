@@ -66,9 +66,9 @@ class ComplexMutator:public Mutator{
 public:
     ComplexMutator(bool debug=false):Mutator(debug),updatedInst(nullptr){};
     ~ComplexMutator(){};
-    virtual bool init();
-    virtual void mutateModule(const std::string& outputFileName);
-    virtual std::string getCurrentFunction()const {return currFuncName;}
-    virtual void saveModule(const std::string& outputFileName);
+    virtual bool init()override;
+    virtual void mutateModule(const std::string& outputFileName)override;
+    virtual std::string getCurrentFunction()const override{return currFuncName;}
+    virtual void saveModule(const std::string& outputFileName)override;
 };
 
