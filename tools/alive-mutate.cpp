@@ -350,7 +350,7 @@ void loggerInit(int ith){
       out=&nout;
       //out=&cout;
   }else{
-      fs::path fname = getOutputFile(ith)+"-log"+to_string(logIndex)+".txt";
+      fs::path fname = getOutputFile(ith)+"-log"+".txt";
       fs::path path = fs::path(outputFolder.getValue()) / fname.filename();
       if(out_file.is_open()){
         out_file.flush();
@@ -428,7 +428,7 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
       if(!pf1->isDeclaration()){
         if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
-            if (!compareFunctions(*pf1, *pf2, TLI)){
+            if (compareFunctions(*pf1, *pf2, TLI)){
               shouldLog=true;
               if (opt_error_fatal)
                 goto end;
