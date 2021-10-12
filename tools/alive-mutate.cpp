@@ -247,7 +247,7 @@ void optimizeModule(llvm::Module *M) {
 }
 
 int logIndex;
-void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator),programEnd();
+void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator),programEnd(),deleteLog(int ith);
 bool isValidInputPath(),isValidOutputPath();
 string getOutputFile(int ith,bool isOptimized=false);
 
@@ -334,8 +334,10 @@ void programEnd(){
         "  " << tot_num_unsound << " incorrect transformations\n"
         "  " << tot_num_failed  << " failed-to-prove transformations\n"
         "  " << tot_num_errors << " Alive2 errors\n";
+}
 
-  fs::path fname = testfile+"-log"+to_string(logIndex)+".txt";
+void deleteLog(int ith){
+  fs::path fname = getOutputFile(ith)+"-log"+".txt";
   fs::path path = fs::path(outputFolder.getValue()) / fname.filename();
   fs::remove(path);
 }
@@ -464,6 +466,8 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     mutator.setModule(std::move(M1));
     if(shouldLog){
       mutator.saveModule(getOutputFile(ith));
+    }else{
+      deleteLog(ith);
     }
 }
 
