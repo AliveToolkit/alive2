@@ -172,12 +172,7 @@ void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
             break;
         }
     }
-   /* llvm::errs()<<"dom size"<<domInst.size()<<"\n";
-    for(const auto& x:domInst){
-        x->print(llvm::errs());
-        llvm::errs()<<"\n";
-    }
-    llvm::errs()<<"\n";*/
+   
     llvm::Value* val1=getRandomValue(ty),*val2=getRandomValue(ty);
     llvm::Instruction::BinaryOps Op;
 
