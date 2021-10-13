@@ -67,6 +67,12 @@ namespace {
     llvm::cl::desc("specify seconds of the mutator should run"),
     llvm::cl::init(-1));
 
+  llvm::cl::opt<long long> randomSeed(LLVM_ARGS_PREFIX "s",
+    llvm::cl::value_desc("specify the seed of the random number generator"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("specify the seed of the random number generator"),
+    llvm::cl::init(-1));
+
   llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
     llvm::cl::value_desc("verbose mode"),
     llvm::cl::desc("specify if verbose mode is on"),
@@ -175,6 +181,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     case Results::UNSOUND:
     case Results::TYPE_CHECKER_FAILED:
     case Results::FAILED_TO_PROVE:
+    *out<<"Current seed:"<<Random::getSeed()<<"\n";
     *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
     r.t.print(*out, {});
     default:
@@ -269,6 +276,10 @@ version )EOF";
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
   if(outputFolder.back()!='/')
     outputFolder+='/';
+
+  if(randomSeed>=0){
+    Random::setSeed((unsigned)randomSeed);
+  }
 
   if(numCopy<0&&timeElapsed<0){
     cerr<<"Please specify either number of copies or running time!\n";
