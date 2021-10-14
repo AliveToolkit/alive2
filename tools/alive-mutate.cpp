@@ -176,16 +176,22 @@ unsigned long long tot_num_errors=0;
 bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       llvm::TargetLibraryInfoWrapperPass &TLI) {
   auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
-  switch(r.status){
-    case Results::ERROR:
-    case Results::UNSOUND:
-    case Results::TYPE_CHECKER_FAILED:
-    case Results::FAILED_TO_PROVE:
+  if(verbose){
     *out<<"Current seed:"<<Random::getSeed()<<"\n";
     *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
     r.t.print(*out, {});
-    default:
-      break;
+  }else{
+    switch(r.status){
+      case Results::ERROR:
+      case Results::UNSOUND:
+      case Results::TYPE_CHECKER_FAILED:
+      case Results::FAILED_TO_PROVE:
+      *out<<"Current seed:"<<Random::getSeed()<<"\n";
+      *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
+      r.t.print(*out, {});
+      default:
+        break;
+    }
   }
   if (r.status == Results::ERROR) {
     *out << "ERROR: " << r.error;
@@ -199,12 +205,10 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     break;
 
   case Results::SYNTACTIC_EQ:
-    //*out << "Transformation seems to be correct! (syntactically equal)\n\n";
     ++num_correct;
     break;
 
   case Results::CORRECT:
-    //*out << "Transformation seems to be correct!\n\n";
     ++num_correct;
     break;
 
@@ -359,10 +363,10 @@ void deleteLog(int ith){
 */
 void loggerInit(int ith){
   static std::ofstream nout("/dev/null");
-  if(verbose){
-      out=&nout;
+  //if(verbose){
+      //out=&nout;
       //out=&cout;
-  }else{
+  //}else{
       fs::path fname = getOutputFile(ith)+"-log"+".txt";
       fs::path path = fs::path(outputFolder.getValue()) / fname.filename();
       if(out_file.is_open()){
@@ -384,7 +388,7 @@ void loggerInit(int ith){
         path_z3log.replace_extension("z3_log.txt");
         smt::start_logging(path_z3log.c_str());
       }
-  }
+  //}
   util::config::set_debug(*out);
 }
 
@@ -475,7 +479,7 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     tot_num_errors+=num_errors;
     num_correct=num_unsound=num_failed=num_errors=0;
     mutator.setModule(std::move(M1));
-    if(shouldLog){
+    if(verbose||shouldLog){
       mutator.saveModule(getOutputFile(ith));
     }else{
       deleteLog(ith);
