@@ -40,8 +40,19 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
     }
     updatedInst=&*iit;
     currFuncName=fit->getName().str();
-    insertRandomBinaryInstruction(updatedInst);
+    //75% chances to add a new inst, 25% chances to replace with a existent usage
+    //if(false){
+    if((Random::getRandomUnsigned()&3)!=0){
+        insertRandomBinaryInstruction(updatedInst);
+    }else{
+        replaceRandomUsage(updatedInst);
+    }
     if(debug){
+        if(newAdded.empty()){
+            llvm::errs()<<"\nReplaced with a existant usage\n";
+        }else{
+            llvm::errs()<<"\nNew Inst added\n";
+        }
         bit->print(llvm::errs());
         llvm::errs()<<"\nDT info"<<DT.dominates(&*(fit->getFunction().begin()->begin()),updatedInst);
         llvm::errs()<<"\n";
@@ -52,7 +63,7 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
     }
     moveToNextReplaceableInst();
-    while(newAdded.back()==&*iit)
+    while(!newAdded.empty()&&newAdded.back()==&*iit)
         moveToNextReplaceableInst();
 }
 
@@ -162,6 +173,20 @@ void ComplexMutator::calcDomInst(){
     }
 }
 
+void ComplexMutator::replaceRandomUsage(llvm::Instruction* inst){
+    size_t pos=Random::getRandomUnsigned()%inst->getNumOperands();;
+    llvm::Type* ty=nullptr;
+    for(size_t i=0;i<inst->getNumOperands();++i,++pos){
+        if(pos==inst->getNumOperands())pos=0;
+        if(inst->getOperand(pos)->getType()->isIntegerTy()){
+            ty=inst->getOperand(pos)->getType();
+            break;
+        }
+    }
+    llvm::Value* val=getRandomValue(ty);
+    inst->setOperand(pos,val);
+}
+
 void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
     size_t pos=Random::getRandomUnsigned()%inst->getNumOperands();
     llvm::Type* ty=nullptr;
@@ -172,7 +197,7 @@ void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
             break;
         }
     }
-   
+    
     llvm::Value* val1=getRandomValue(ty),*val2=getRandomValue(ty);
     llvm::Instruction::BinaryOps Op;
 

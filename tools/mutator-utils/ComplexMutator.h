@@ -61,6 +61,7 @@ class ComplexMutator:public Mutator{
     void moveToNextReplaceableInst();
     void restoreBackUp();
     void insertRandomBinaryInstruction(llvm::Instruction* inst);
+    void replaceRandomUsage(llvm::Instruction* inst);
     llvm::Constant* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomValue(llvm::Type* ty);
 public:
