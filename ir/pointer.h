@@ -37,8 +37,11 @@ class Pointer {
 
   smt::expr encodeLoadedByteRefined(const Pointer &other,
                                     std::set<smt::expr> &undefs) const;
+  // Encode the refinement between
+  // (src ptr, tgt ptr) = (local, local) or (local, byval ptr)
   smt::expr encodeLocalPtrRefinement(const Pointer &other,
                                      std::set<smt::expr> &undefs) const;
+  // Encode the refinement when two ptrs are given as byval args
   smt::expr encodeByValArgRefinement(const Pointer &otherByval,
                                      std::set<smt::expr> &undefs,
                                      unsigned byval_size) const;

@@ -1950,7 +1950,8 @@ expr Memory::blockPropertiesRefined(const Pointer &src, const Pointer &tgt)
 
   return src.isBlockAlive() == tgt.isBlockAlive() &&
          src.blockSize() == tgt.blockSize() &&
-         src.getAllocType() == tgt.getAllocType() &&
+         ((src.isLocal() && tgt.isByval()) ||
+          src.getAllocType() == tgt.getAllocType()) &&
          aligned;
 }
 
