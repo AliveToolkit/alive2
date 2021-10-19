@@ -85,6 +85,7 @@ public:
   static expr mkFloat(float n);
   static expr mkDouble(double n);
   static expr mkQuad(double n);
+  static expr mkQuad(bool sign, unsigned exp, const char *sig);
   static expr mkNaN(const expr &type);
   static expr mkNumber(const char *n, const expr &type);
   static expr mkVar(const char *name, const expr &type);

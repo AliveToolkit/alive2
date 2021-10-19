@@ -247,6 +247,11 @@ expr expr::mkQuad(double n) {
   return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_quadruple(ctx()));
 }
 
+expr expr::mkQuad(bool sign, unsigned exp, const char *sig) {
+  return Z3_mk_fpa_fp(ctx(),
+                      mkUInt(sign, 1)(), mkUInt(exp, 15)(), mkInt(sig, 112)());
+}
+
 expr expr::mkNaN(const expr &type) {
   C2(type);
   return Z3_mk_fpa_nan(ctx(), type.sort());

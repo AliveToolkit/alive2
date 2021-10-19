@@ -276,10 +276,14 @@ Value* get_operand(llvm::Value *v,
     case FloatType::Double:
       c = make_unique<FloatConst>(*ty, apfloat.convertToDouble());
       break;
-    case FloatType::Quad:
-      c = make_unique<FloatConst>(*ty,
-                                  toString(apfloat.bitcastToAPInt(), 10, true));
+    case FloatType::Quad: {
+      auto bv = apfloat.bitcastToAPInt();
+      bool sign = bv.extractBits(1, 127).isOne();
+      unsigned exp = bv.extractBitsAsZExtValue(15, 112);
+      string sig = toString(bv.extractBits(112, 0), 10, false);
+      c = make_unique<FloatConst>(*ty, sign, exp, move(sig));
       break;
+    }
     case FloatType::Unknown:
       UNREACHABLE();
     }

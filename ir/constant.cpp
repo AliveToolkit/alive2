@@ -49,6 +49,10 @@ FloatConst::FloatConst(Type &type, uint64_t val)
 FloatConst::FloatConst(Type &type, string val)
   : Constant(type, string(val)), val(move(val)) {}
 
+FloatConst::FloatConst(Type &type, bool sign, unsigned exp, string sig)
+  : Constant(type, to_string(sign) + "," + to_string(exp) + "," + sig),
+    val(make_tuple(sign, exp, sig)) {}
+
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
          getType().enforceFloatType();
@@ -64,6 +68,11 @@ StateValue FloatConst::toSMT(State &s) const {
   if (auto n = get_if<string>(&val))
     return { expr::mkNumber(n->c_str(), getType().getDummyValue(true).value),
              true };
+
+  if (auto n = get_if<tuple<bool, unsigned, string>>(&val)) {
+    return { expr::mkQuad(get<0>(*n), get<1>(*n), get<2>(*n).c_str()),
+             true };
+  }
 
   expr e;
   double v = get<double>(val);
