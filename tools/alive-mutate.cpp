@@ -262,7 +262,6 @@ void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVM
 bool isValidInputPath(),isValidOutputPath();
 string getOutputFile(int ith,bool isOptimized=false);
 
-
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
@@ -419,6 +418,7 @@ string getOutputFile(int ith,bool isOptimized){
  * LogIndex is updated here if find a value mismatch.
 */
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
+    static bool first=true;
     std::unique_ptr<llvm::Module> M1=nullptr;
     mutator.mutateModule(getOutputFile(ith));
     M1 = mutator.getModule();
@@ -433,7 +433,10 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     llvm::Triple targetTriple(M1.get()->getTargetTriple());
     llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-    llvm_util::initializer llvm_util_init(*out, DL);
+    if(first){
+      llvm_util::initializer llvm_util_init(*out, DL);
+      first=false;
+    }
     smt_init.emplace();
 
     unique_ptr<llvm::Module> M2;
