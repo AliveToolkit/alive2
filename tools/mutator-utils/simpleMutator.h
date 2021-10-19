@@ -51,6 +51,25 @@ public:
     void setModule(std::unique_ptr<llvm::Module>&& ptr){pm=std::move(ptr);}
 };
 
+class StubMutator: public Mutator{
+    decltype(pm->begin()) fit;
+    decltype(fit->begin()) bit;
+    decltype(bit->begin()) iit;
+
+    std::string currFunction;
+    void moveToNextInst();
+    void moveToNextBlock();
+    void moveToNextFunction();
+
+public:
+    StubMutator(bool debug):Mutator(debug){};
+    virtual ~StubMutator(){};
+    virtual bool init()override;
+    virtual void mutateModule(const std::string& outputFileName)override;
+    virtual void saveModule(const std::string& outputFileName)override;
+    virtual std::string getCurrentFunction()const override;
+};
+
 class Mutant{
 public:
     Mutant(){}

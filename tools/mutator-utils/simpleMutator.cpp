@@ -1,5 +1,83 @@
 #include "simpleMutator.h"
 
+
+void StubMutator::moveToNextInst(){
+    ++iit;
+    if(iit==bit->end()){
+        moveToNextBlock();
+        iit=bit->begin();
+    }
+}
+
+void StubMutator::moveToNextBlock(){
+    ++bit;
+    if(bit==fit->end()){
+        moveToNextFunction();
+        bit=fit->begin();
+    }
+}
+
+void StubMutator::moveToNextFunction(){
+    ++fit;
+    while(fit==pm->end()||fit->isDeclaration()){
+        if(fit==pm->end()){
+            fit=pm->begin();
+        }else{
+            ++fit;
+        }
+    }
+    currFunction=fit->getName();
+}
+
+bool StubMutator::init(){
+    fit=pm->begin();
+    while(fit!=pm->end()){
+        bit=fit->begin();
+        while(bit!=fit->end()){
+            iit=bit->begin();
+            if(iit==bit->end()){
+                ++bit;
+                continue;
+            }
+            currFunction=fit->getName();
+            return true;
+        }
+        ++fit;
+    }
+    return false;
+}
+
+void StubMutator::mutateModule(const std::string& outputFileName){
+    if(debug){
+        llvm::errs()<<"current inst:\n";
+        iit->print(llvm::errs());
+        llvm::errs()<<"\n";
+    }
+    llvm::errs()<<"stub mutation visited.\n";
+    if(debug){
+        llvm::errs()<<"current basic block\n";
+        bit->print(llvm::errs());
+        std::error_code ec;
+        llvm::raw_fd_ostream fout(outputFileName,ec);
+        fout<<*pm;
+        fout.close();
+        llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
+    }
+    moveToNextInst();
+}
+
+void StubMutator::saveModule(const std::string& outputFileName){
+    std::error_code ec;
+    llvm::raw_fd_ostream fout(outputFileName,ec);
+    fout<<*pm;
+    fout.close();
+    llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
+}
+
+std::string StubMutator::getCurrentFunction()const{
+    return currFunction;
+}
+
 void BinaryInstructionMutant::resetFastMathFlags(llvm::BinaryOperator* inst){
     if(llvm::isa<llvm::FPMathOperator>(inst)){
         llvm::FastMathFlags flags;
