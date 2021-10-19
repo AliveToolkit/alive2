@@ -10,7 +10,7 @@ set -e
 # attributor, function-attrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
 # sample-profile: inlines functions
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner -Os -Oz -O1 -O2 -O3"
+PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner -O0 -Os -Oz -O1 -O2 -O3"
 PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 
 TV="-tv"
