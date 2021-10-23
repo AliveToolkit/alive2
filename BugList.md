@@ -103,7 +103,6 @@ Please contact us or submit a PR if something is missing or inaccurate.
 96. DSE removes store before free() incorrectly (https://llvm.org/PR97956)
 97. GlobalOpt breaks !callees metadata (https://llvm.org/PR121265)
 
-
 ### Bugs found in Z3
 1. Incorrect bitblast for fprem (https://github.com/Z3Prover/z3/issues/2369)
 2. Bug in FPA w/ quantifiers (https://github.com/Z3Prover/z3/issues/2596)
