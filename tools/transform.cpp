@@ -1120,6 +1120,20 @@ Errors TransformVerify::verify() const {
       return { ss.str(), false };
     }
   }
+  for (auto GVT : globals_tgt) {
+    auto I = find_if(globals_src.begin(), globals_src.end(),
+      [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
+    if (I != globals_src.end())
+      continue;
+
+    if (!GVT->isConst()) {
+        stringstream ss;
+        ss << "Unsupported interprocedural transformation: non-constant "
+           << "global variable " << GVT->getName() << " is introduced in"
+           << " target";
+        return { ss.str(), false };
+    }
+  }
 
   Errors errs;
   try {
