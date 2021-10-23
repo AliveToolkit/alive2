@@ -62,7 +62,8 @@ StateValue FloatConst::toSMT(State &s) const {
   }
 
   if (auto n = get_if<string>(&val))
-    return { expr::mkNumber(n->c_str(), getType().getDummyValue(true).value),
+    return { expr::mkNumber(n->c_str(), expr::mkUInt(0, getType().bits()))
+               .BV2float(getType().getDummyValue(true).value),
              true };
 
   expr e;
