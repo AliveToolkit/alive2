@@ -75,7 +75,7 @@ static Value& get_constant(string_view name, Type &type) {
 }
 
 static Value& get_fp_constant(string_view n, Type &t) {
-  auto c = make_unique<FloatConst>(t, strtod(n.data(), nullptr));
+  auto c = make_unique<FloatConst>(t, string(n), false);
   auto ret = c.get();
   fn->addConstant(move(c));
   return *ret;

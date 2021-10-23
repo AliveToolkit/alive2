@@ -265,10 +265,6 @@ Value* get_operand(llvm::Value *v,
     auto &apfloat = cnst->getValueAPF();
     unique_ptr<FloatConst> c;
     switch (ty->getAsFloatType()->getFpType()) {
-    case FloatType::Half:
-      c = make_unique<FloatConst>(*ty,
-                                  apfloat.bitcastToAPInt().getLimitedValue());
-      break;
     case FloatType::Float:
     case FloatType::BFloat:
       c = make_unique<FloatConst>(*ty, apfloat.convertToFloat());
@@ -276,9 +272,11 @@ Value* get_operand(llvm::Value *v,
     case FloatType::Double:
       c = make_unique<FloatConst>(*ty, apfloat.convertToDouble());
       break;
+    case FloatType::Half:
     case FloatType::Quad:
       c = make_unique<FloatConst>(*ty,
-                                  toString(apfloat.bitcastToAPInt(), 10, true));
+                                  toString(apfloat.bitcastToAPInt(), 10, false),
+                                  true);
       break;
     case FloatType::Unknown:
       UNREACHABLE();

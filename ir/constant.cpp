@@ -43,11 +43,8 @@ expr IntConst::getTypeConstraints() const {
 FloatConst::FloatConst(Type &type, double val)
   : Constant(type, to_string(val)), val(val) {}
 
-FloatConst::FloatConst(Type &type, uint64_t val)
-  : Constant(type, to_string(val)), val(val) {}
-
-FloatConst::FloatConst(Type &type, string val)
-  : Constant(type, string(val)), val(move(val)) {}
+FloatConst::FloatConst(Type &type, string val, bool bit_value)
+  : Constant(type, string(val)), val(move(val)), bit_value(bit_value) {}
 
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
@@ -55,16 +52,14 @@ expr FloatConst::getTypeConstraints() const {
 }
 
 StateValue FloatConst::toSMT(State &s) const {
-  if (auto n = get_if<uint64_t>(&val)) {
-    return { expr::mkUInt(*n, getType().bits())
-               .BV2float(getType().getDummyValue(true).value),
-             true };
-  }
-
-  if (auto n = get_if<string>(&val))
+  if (auto n = get_if<string>(&val)) {
+    if (!bit_value)
+      return { expr::mkNumber(n->c_str(), getType().getDummyValue(true).value),
+               true };
     return { expr::mkNumber(n->c_str(), expr::mkUInt(0, getType().bits()))
                .BV2float(getType().getDummyValue(true).value),
              true };
+  }
 
   expr e;
   double v = get<double>(val);
