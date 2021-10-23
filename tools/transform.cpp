@@ -1124,11 +1124,10 @@ Errors TransformVerify::verify() const {
       continue;
 
     if (!GVT->isConst()) {
-        stringstream ss;
-        ss << "Unsupported interprocedural transformation: non-constant "
-           << "global variable " << GVT->getName() << " is introduced in"
-           << " target";
-        return { ss.str(), false };
+        string s = "Unsupported interprocedural transformation: non-constant "
+                   "global variable " + GVT->getName() + " is introduced in"
+                   " target";
+        return { move(s), false };
     }
   }
 
