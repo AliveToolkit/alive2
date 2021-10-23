@@ -27,10 +27,8 @@ using namespace util;
   //      num_globals_src + num_ptrinputs + 1 ~ num_nonlocals_src - 2:
   // 5. a block reserved for encoding the memory touched by calls:
   //      num_nonlocals_src - 1
-  // 6. global vars in target only:
-  //      num_nonlocals_src ~ num_nonlocals_src + num_extra_nonconst_tgt - 1
-  //            (non-constant globals in target only)
-  //      num_nonlocals_src + num_extra_nonconst_tgt ~ num_nonlocals - 1
+  // 6. constant global vars in target only:
+  //      num_nonlocals_src ~ num_nonlocals - 1
   //            (constant globals in target only)
 
 //--- Functions for non-local block analysis based on bid ---//
@@ -48,8 +46,7 @@ static bool is_constglb(unsigned bid) {
     // src constglb
     assert(is_globalvar(bid, false));
     return true;
-  } else if (num_nonlocals_src + num_extra_nonconst_tgt <= bid &&
-             bid < num_nonlocals) {
+  } else if (num_nonlocals_src <= bid && bid < num_nonlocals) {
     // tgt constglb
     assert(!is_globalvar(bid, false) &&
             is_globalvar(bid, true));
@@ -1700,9 +1697,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
           for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
             I->second.setMayAlias(false, i);
           }
-          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid) ||
-                        (num_extra_nonconst_tgt ? bid.uge(num_nonlocals_src)
-                                                : false));
+          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid));
         }
       }
     }

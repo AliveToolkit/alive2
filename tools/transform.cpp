@@ -760,7 +760,6 @@ static void calculateAndInitConstants(Transform &t) {
   heap_block_alignment = 8;
 
   num_consts_src = 0;
-  num_extra_nonconst_tgt = 0;
 
   for (auto GV : globals_src) {
     if (GV->isConst())
@@ -772,8 +771,6 @@ static void calculateAndInitConstants(Transform &t) {
       [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
     if (I == globals_src.end()) {
       ++num_globals;
-      if (!GVT->isConst())
-        ++num_extra_nonconst_tgt;
     }
   }
 
