@@ -170,8 +170,7 @@ expr Pointer::isConstGlobal() const {
   auto generic = bid.uge(has_null_block) &&
                  expr(num_consts_src > 0) &&
                  bid.ule(num_consts_src + has_null_block - 1);
-  auto tgt = bid.uge(num_nonlocals_src + num_extra_nonconst_tgt) &&
-             bid.ule(num_nonlocals - 1);
+  auto tgt = bid.uge(num_nonlocals_src) && bid.ule(num_nonlocals - 1);
   return !isLocal() && (generic || tgt);
 }
 
@@ -526,8 +525,8 @@ expr Pointer::isWritable() const {
   expr non_local
     = num_consts_src == 1 ? bid != has_null_block :
         (num_consts_src ? bid.ugt(has_null_block + num_consts_src - 1) : true);
-  if (m.numNonlocals() > num_nonlocals_src + num_extra_nonconst_tgt)
-    non_local &= bid.ult(num_nonlocals_src + num_extra_nonconst_tgt);
+  if (m.numNonlocals() > num_nonlocals_src)
+    non_local &= bid.ult(num_nonlocals_src);
   return isLocal() || non_local;
 }
 

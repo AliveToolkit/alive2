@@ -15,7 +15,6 @@ unsigned num_locals_tgt;
 unsigned num_consts_src;
 unsigned num_globals_src;
 unsigned num_ptrinputs;
-unsigned num_extra_nonconst_tgt;
 unsigned num_nonlocals;
 unsigned num_nonlocals_src;
 unsigned bits_poison_per_byte;

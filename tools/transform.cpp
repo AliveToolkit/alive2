@@ -760,7 +760,6 @@ static void calculateAndInitConstants(Transform &t) {
   heap_block_alignment = 8;
 
   num_consts_src = 0;
-  num_extra_nonconst_tgt = 0;
 
   for (auto GV : globals_src) {
     if (GV->isConst())
@@ -772,8 +771,6 @@ static void calculateAndInitConstants(Transform &t) {
       [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
     if (I == globals_src.end()) {
       ++num_globals;
-      if (!GVT->isConst())
-        ++num_extra_nonconst_tgt;
     }
   }
 
@@ -1118,6 +1115,19 @@ Errors TransformVerify::verify() const {
       ss << "Unsupported interprocedural transformation: global variable "
          << GVS->getName() << " is const in target but not in source";
       return { ss.str(), false };
+    }
+  }
+  for (auto GVT : globals_tgt) {
+    auto I = find_if(globals_src.begin(), globals_src.end(),
+      [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
+    if (I != globals_src.end())
+      continue;
+
+    if (!GVT->isConst()) {
+        string s = "Unsupported interprocedural transformation: non-constant "
+                   "global variable " + GVT->getName() + " is introduced in"
+                   " target";
+        return { move(s), false };
     }
   }
 
