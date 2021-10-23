@@ -14,7 +14,7 @@ std::weak_ordering operator<=>(const std::string &lhs, const std::string &rhs) {
   auto cmp = lhs.compare(rhs);
   if (cmp == 0)
     return std::weak_ordering::equivalent;
-  return cmp < 0 ? std::weak_ordering::less : std::weak_ordering::equivalent;
+  return cmp < 0 ? std::weak_ordering::less : std::weak_ordering::greater;
 }
 
 template <typename T>
