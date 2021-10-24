@@ -254,6 +254,5 @@ public:
     virtual bool init()override;
     virtual void mutateModule(const string& outputFileName)override;
     virtual std::string getCurrentFunction()const override{return it->second.str();};
-    //needs to be fixed
-    virtual void saveModule(const std::string& outputFileName)override{};
+    virtual void saveModule(const std::string& outputFileName)override;
 };

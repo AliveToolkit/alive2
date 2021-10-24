@@ -193,3 +193,11 @@ void SimpleMutator::mutateModule(const string& outputFileName){
         llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
     }
 }
+
+void SimpleMutator::saveModule(const string& outputFileName){
+    std::error_code ec;
+    llvm::raw_fd_ostream fout(outputFileName,ec);
+    fout<<*pm;
+    fout.close();
+    llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
+}
