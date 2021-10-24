@@ -496,7 +496,7 @@ void copyMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
   if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-    if(bool sInit=false&&mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
+    if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
       for(int i=0;i<numCopy;++i){
         if(verbose){
           std::cout<<"Running "<<i<<"th copies."<<std::endl;
@@ -523,7 +523,7 @@ void timeMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
   if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-    bool sInit=false;//mutators[0]->init();
+    bool sInit=mutators[0]->init();
     bool cInit=mutators[1]->init();
     if(!sInit&&!cInit){
       cerr<<"Cannot find any lotaion to mutate, "+testfile+" skipped\n";
