@@ -182,10 +182,10 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     r.t.print(*out, {});
   }else{
     switch(r.status){
-      case Results::ERROR:
+      //case Results::ERROR:
       case Results::UNSOUND:
       case Results::TYPE_CHECKER_FAILED:
-      case Results::FAILED_TO_PROVE:
+      //case Results::FAILED_TO_PROVE:
       *out<<"Current seed:"<<Random::getSeed()<<"\n";
       *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
       r.t.print(*out, {});
