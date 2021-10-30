@@ -262,7 +262,7 @@ void optimizeModule(llvm::Module *M) {
 
 int logIndex,validFuncNum;
 void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator),programEnd(),deleteLog(int ith);
-StubMutator stubMutator;
+StubMutator stubMutator(false);
 unordered_set<std::string> invalidFuncNameSet;
 bool isValidInputPath(),isValidOutputPath(),inputVerify();
 string getOutputFile(int ith,bool isOptimized=false);
@@ -326,7 +326,12 @@ version )EOF";
 }
 
 bool inputVerify(){
-  return true;
+  if(stubMutator.openInputFile(testfile)){
+    
+  }else{
+    cerr<<"Cannot open input file "+testfile+"!\n";
+  }
+  return false;
 }
 
 /*
