@@ -32,6 +32,7 @@
 #include <iostream>
 #include <sstream>
 #include <utility>
+#include <unordered_set>
 
 using namespace tools;
 using namespace util;
@@ -259,9 +260,11 @@ void optimizeModule(llvm::Module *M) {
 }
 }
 
-int logIndex;
+int logIndex,validFuncNum;
 void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator),programEnd(),deleteLog(int ith);
-bool isValidInputPath(),isValidOutputPath();
+StubMutator stubMutator;
+unordered_set<std::string> invalidFuncNameSet;
+bool isValidInputPath(),isValidOutputPath(),inputVerify();
 string getOutputFile(int ith,bool isOptimized=false);
 
 int main(int argc, char **argv) {
@@ -297,6 +300,14 @@ version )EOF";
     return -1;
   }
   init();
+  if(!inputVerify()){
+    if(validFuncNum==0){
+      cerr<<"All input functions can't pass Alive2 check!\nProgram Ended\n";
+      return 0;
+    }else if(!invalidFuncNameSet.empty()){
+      cerr<<"Some input functions can't pass Alive2 check. Those would be skipped during mutation phrase.\n";
+    }
+  }
   if(numCopy>0){
     copyMode();
   }else if(timeElapsed>0){
@@ -314,6 +325,9 @@ version )EOF";
   return num_errors > 0;
 }
 
+bool inputVerify(){
+  return true;
+}
 
 /*
  * Adapted from llvm_util/cmd_args_def.h
