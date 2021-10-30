@@ -5,7 +5,6 @@ void StubMutator::moveToNextInst(){
     ++iit;
     if(iit==bit->end()){
         moveToNextBlock();
-        iit=bit->begin();
     }
 }
 
@@ -13,7 +12,8 @@ void StubMutator::moveToNextBlock(){
     ++bit;
     if(bit==fit->end()){
         moveToNextFunction();
-        bit=fit->begin();
+    }else{
+        iit=bit->begin();
     }
 }
 
@@ -26,6 +26,8 @@ void StubMutator::moveToNextFunction(){
             ++fit;
         }
     }
+    bit=fit->begin();
+    iit=bit->begin();
     currFunction=fit->getName();
 }
 
