@@ -73,6 +73,8 @@ namespace {
     llvm::cl::desc("specify the seed of the random number generator"),
     llvm::cl::init(-1));
 
+  llvm::cl::opt<int> exitNum(LLVM_ARGS_PREFIX "e",llvm::cl::value_desc("number of errors allowed"),llvm::cl::cat(mutatorArgs),llvm::cl::desc("program would exit after the number of errors detected"),llvm::cl::init(10));
+
   llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
     llvm::cl::value_desc("verbose mode"),
     llvm::cl::desc("specify if verbose mode is on"),
@@ -184,7 +186,7 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     switch(r.status){
       //case Results::ERROR:
       case Results::UNSOUND:
-      case Results::TYPE_CHECKER_FAILED:
+      //case Results::TYPE_CHECKER_FAILED:
       //case Results::FAILED_TO_PROVE:
       *out<<"Current seed:"<<Random::getSeed()<<"\n";
       *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
@@ -506,6 +508,10 @@ void copyMode(){
         }else{
           runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
         }
+	if(tot_num_unsound>(unsigned long long)exitNum){
+	  programEnd();
+	  exit(0);
+	}
       }
     }else{
       cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";
@@ -545,6 +551,11 @@ void timeMode(){
       }
       sum+=cur;
       ++cnt;
+      if(tot_num_unsound>(unsigned long long)exitNum){
+        programEnd();
+        exit(0);
+      }
+
     }
   }else{
     cerr<<"Cannot open input file "+testfile+"!\n";
