@@ -329,11 +329,11 @@ bool inputVerify(){
     smt_init.emplace();
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());  
-    for(auto fit=M1->begin();fit!=M1->end();++M1)
+    for(auto fit=M1->begin();fit!=M1->end();++fit)
     if(!fit->isDeclaration()){
       if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
         auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
-	if(r.status==Results::correct){
+	if(r.status==Results::CORRECT){
 	  ++validFuncNum;
 	}else{
 	  invalidFuncNameSet.insert(fit->getName().str());
@@ -469,7 +469,7 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     }
     loggerInit(ith);
 
-    auto &DL = M1.get()->getDataLayout();
+    //auto &DL = M1.get()->getDataLayout();
     llvm::Triple targetTriple(M1.get()->getTargetTriple());
     llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
