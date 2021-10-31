@@ -323,16 +323,20 @@ bool inputVerify(){
   if(stubMutator.openInputFile(testfile)){
     std::unique_ptr<llvm::Module> M1=stubMutator.getModule();
     auto &DL = M1.get()->getDataLayout();
-    llvm::Triple targetTriple(M1.get()->getTargetTriple());
-    llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+    //llvm::Triple targetTriple(M1.get()->getTargetTriple());
+    //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+    loggerInit(0);
     llvm_util::initializer llvm_util_init(*out, DL);
-    smt_init.emplace();
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-    optimizeModule(M2.get());  
+    optimizeModule(M2.get());
     for(auto fit=M1->begin();fit!=M1->end();++fit)
-    if(!fit->isDeclaration()){
+    if(!fit->isDeclaration()&&!fit->getName().empty()){
       if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
-        auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
+	llvm::Triple targetTriple(M1.get()->getTargetTriple());
+        llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+	smt_init.emplace();
+	auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
+        smt_init.reset();
 	if(r.status==Results::CORRECT){
 	  ++validFuncNum;
 	}else{
@@ -347,7 +351,6 @@ bool inputVerify(){
 	}
     }
     stubMutator.setModule(std::move(M1));
-    smt_init.reset();
     tot_num_correct=0;
     tot_num_unsound=0;
     tot_num_failed=0;
