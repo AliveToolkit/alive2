@@ -347,6 +347,13 @@ bool inputVerify(){
 	}
     }
     stubMutator.setModule(std::move(M1));
+    smt_init.reset();
+    tot_num_correct=0;
+    tot_num_unsound=0;
+    tot_num_failed=0;
+    tot_num_errors=0;
+
+    num_correct=num_unsound=num_failed=num_errors=0;
   }else{
     cerr<<"Cannot open input file "+testfile+"!\n";
   }
