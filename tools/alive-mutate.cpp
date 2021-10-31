@@ -138,14 +138,8 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   smt_init->reset();
   r.t.preprocess();
   TransformVerify verifier(r.t, false);
-<<<<<<< HEAD
-  if (print_transform)
-    r.t.print(*out, {});
-=======
-
   //if (print_transform)
     //r.t.print(*out, {});
->>>>>>> log files fixed.
 
   {
     auto types = verifier.getTypings();
@@ -327,7 +321,31 @@ version )EOF";
 
 bool inputVerify(){
   if(stubMutator.openInputFile(testfile)){
-    
+    std::unique_ptr<llvm::Module> M1=stubMutator.getModule();
+    auto &DL = M1.get()->getDataLayout();
+    llvm::Triple targetTriple(M1.get()->getTargetTriple());
+    llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+    smt_init.emplace();
+    unique_ptr<llvm::Module> M2 = CloneModule(*M1);
+    optimizeModule(M2.get());  
+    for(auto fit=M1->begin();fit!=M1->end();++M1)
+    if(!fit->isDeclaration()){
+      if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
+        auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
+	if(r.status==Results::correct){
+	  ++validFuncNum;
+	}else{
+	  invalidFuncNameSet.insert(fit->getName());
+	}
+      }
+    }
+	  
+    for(const std::string& str:invalidFuncNameSet){
+        if(llvm::Function* f=M1->getFunction(str);f!=nullptr){
+	  f->eraseFromParent();
+	}
+    }
+    stubMutator.setModule(std::move(M1));
   }else{
     cerr<<"Cannot open input file "+testfile+"!\n";
   }
@@ -439,7 +457,7 @@ string getOutputFile(int ith,bool isOptimized){
  * LogIndex is updated here if find a value mismatch.
 */
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
-    static bool first=true;
+    //static bool first=true;
     std::unique_ptr<llvm::Module> M1=nullptr;
     mutator.mutateModule(getOutputFile(ith));
     M1 = mutator.getModule();
@@ -454,10 +472,10 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     llvm::Triple targetTriple(M1.get()->getTargetTriple());
     llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-    if(first){
+    /*if(first){
       llvm_util::initializer llvm_util_init(*out, DL);
       first=false;
-    }
+    }*/
     smt_init.emplace();
 
     unique_ptr<llvm::Module> M2;
@@ -516,7 +534,11 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
 void copyMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
-  if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+  //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+  std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
+  mutators[0]->setModule(CloneModule(*pm));
+  mutators[1]->setModule(CloneModule(*pm));
+  stubMutator.setModule(std::move(pm));
     if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
       for(int i=0;i<numCopy;++i){
         if(verbose){
@@ -536,9 +558,9 @@ void copyMode(){
       cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";
       return;
     }
-  }else{
-    cerr<<"Cannot open input file "+testfile+"!\n";
-  }
+  }//else{
+  //  cerr<<"Cannot open input file "+testfile+"!\n";
+  //}
 }
 
 /*
@@ -547,7 +569,11 @@ void copyMode(){
 void timeMode(){
   llvm::LLVMContext context;
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
-  if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+  std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
+  mutators[0]->setModule(CloneModule(*pm));
+  mutators[1]->setModule(CloneModule(*pm));
+  stubMutator.setModule(std::move(pm));
+  //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
     bool sInit=mutators[0]->init();
     bool cInit=mutators[1]->init();
     if(!sInit&&!cInit){
@@ -576,7 +602,8 @@ void timeMode(){
       }
 
     }
-  }else{
-    cerr<<"Cannot open input file "+testfile+"!\n";
-  }
+  }//else{
+  //  cerr<<"Cannot open input file "+testfile+"!\n";
+
+  //}
 }
