@@ -325,6 +325,7 @@ bool inputVerify(){
     auto &DL = M1.get()->getDataLayout();
     llvm::Triple targetTriple(M1.get()->getTargetTriple());
     llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+    llvm_util::initializer llvm_util_init(*out, DL);
     smt_init.emplace();
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());  
@@ -335,7 +336,7 @@ bool inputVerify(){
 	if(r.status==Results::correct){
 	  ++validFuncNum;
 	}else{
-	  invalidFuncNameSet.insert(fit->getName());
+	  invalidFuncNameSet.insert(fit->getName().str());
 	}
       }
     }
@@ -558,7 +559,7 @@ void copyMode(){
       cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";
       return;
     }
-  }//else{
+  //}else{
   //  cerr<<"Cannot open input file "+testfile+"!\n";
   //}
 }
@@ -602,8 +603,7 @@ void timeMode(){
       }
 
     }
-  }//else{
+  //}else{
   //  cerr<<"Cannot open input file "+testfile+"!\n";
-
   //}
 }
