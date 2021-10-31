@@ -550,7 +550,7 @@ void copyMode(){
         }else{
           runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
         }
-	if(tot_num_unsound>(unsigned long long)exitNum){
+	if(tot_num_unsound>(unsigned long long)exitNum || tot_num_failed>(unsigned long long)exitNum || tot_num_errors>(unsigned long long)exitNum){
 	  programEnd();
 	  exit(0);
 	}
@@ -597,7 +597,7 @@ void timeMode(){
       }
       sum+=cur;
       ++cnt;
-      if(tot_num_unsound>(unsigned long long)exitNum){
+      if(tot_num_unsound>(unsigned long long)exitNum || tot_num_failed>(unsigned long long)exitNum || tot_num_errors>(unsigned long long)exitNum){
         programEnd();
         exit(0);
       }
