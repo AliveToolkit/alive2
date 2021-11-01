@@ -258,6 +258,7 @@ int logIndex,validFuncNum;
 void copyMode(),timeMode(),loggerInit(int ith),init(),runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator),programEnd(),deleteLog(int ith);
 StubMutator stubMutator(false);
 unordered_set<std::string> invalidFuncNameSet;
+bool hasInvalidFunc=false;
 bool isValidInputPath(),isValidOutputPath(),inputVerify();
 string getOutputFile(int ith,bool isOptimized=false);
 
@@ -298,7 +299,7 @@ version )EOF";
     if(validFuncNum==0){
       cerr<<"All input functions can't pass Alive2 check!\nProgram Ended\n";
       return 0;
-    }else if(!invalidFuncNameSet.empty()){
+    }else if(hasInvalidFunc){
       cerr<<"Some input functions can't pass Alive2 check. Those would be skipped during mutation phrase.\n";
     }
   }
@@ -329,6 +330,9 @@ bool inputVerify(){
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());
+    bool changed=false;
+    while(true){
+    changed=false;;
     for(auto fit=M1->begin();fit!=M1->end();++fit)
     if(!fit->isDeclaration()&&!fit->getName().empty()){
       if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
@@ -340,6 +344,8 @@ bool inputVerify(){
 	if(r.status==Results::CORRECT){
 	  ++validFuncNum;
 	}else{
+	  changed=true;
+	  hasInvalidFunc=true;
 	  invalidFuncNameSet.insert(fit->getName().str());
 	}
       }
@@ -347,19 +353,11 @@ bool inputVerify(){
 	  
     for(const std::string& str:invalidFuncNameSet){
         if(llvm::Function* f=M1->getFunction(str);f!=nullptr){
-	  /*for(auto it=f->user_begin();it!=f->user_end();++it){
-	    cerr<<"in use\n";
-	    it->print(llvm::errs());
-	    llvm::errs()<<" "<<isa<llvm::Operator>(it)<<"\n";
-	    if(llvm::Instruction* call=llvm::dyn_cast<llvm::Instruction>(it);call!=nullptr){
-	      llvm::Function* caller=call->getParent()->getParent();
-	      cerr<<"func name "<<caller->getName().str()<<"\n";
-	    }
-
-	  }*/
 	  f->replaceAllUsesWith(llvm::UndefValue::get(f->getType()));
 	  f->eraseFromParent();
 	}
+    }
+    if(!changed)break;
     }
     stubMutator.setModule(std::move(M1));
     tot_num_correct=0;
