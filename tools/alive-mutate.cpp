@@ -347,6 +347,17 @@ bool inputVerify(){
 	  
     for(const std::string& str:invalidFuncNameSet){
         if(llvm::Function* f=M1->getFunction(str);f!=nullptr){
+	  /*for(auto it=f->user_begin();it!=f->user_end();++it){
+	    cerr<<"in use\n";
+	    it->print(llvm::errs());
+	    llvm::errs()<<" "<<isa<llvm::Operator>(it)<<"\n";
+	    if(llvm::Instruction* call=llvm::dyn_cast<llvm::Instruction>(it);call!=nullptr){
+	      llvm::Function* caller=call->getParent()->getParent();
+	      cerr<<"func name "<<caller->getName().str()<<"\n";
+	    }
+
+	  }*/
+	  f->replaceAllUsesWith(llvm::UndefValue::get(f->getType()));
 	  f->eraseFromParent();
 	}
     }
