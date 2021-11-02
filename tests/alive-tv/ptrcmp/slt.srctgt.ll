@@ -13,5 +13,3 @@ entry:
   %cmp = icmp slt i8* %first1, %last1
   ret i1 %cmp
 }
-
-
