@@ -130,6 +130,11 @@ Please contact us or submit a PR if something is missing or inaccurate.
 
 
 ### Mutation bugs
+#### Confirmed bugs
+1. InstCombine: 2 related logic bugs from over-generalizing "lshr" to "any shr" (https://llvm.org/PR51351)
+2. Inbounds: might cause problem in signed GEP instruction (https://bugs.llvm.org/show_bug.cgi?id=52429)
+
+#### Suspected bugs
 1. This bug combines vectors, UB, and non-standard FP (https://alive2.llvm.org/ce/z/jwZ7uS)
 2. LLVM bug. briefly, uitofp(undef) is more defined than undef, the transformation tries to replace uiofp(undef) with undef (in 2nd lane) (https://alive2.llvm.org/ce/z/CYafMt)
 3. Alive2 Bug. bitcast should not change any bits (cite: langref), bitcast in Alive2 (from float to BV) doesn’t follow this rule. (https://alive2.llvm.org/ce/z/CYafMt )
