@@ -2,6 +2,25 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 
+/*
+
+1. Special constants
+  min/max ± ∆
+  Small numbers, required for peephole optimizations
+  Based on context
+  Bit blocks + end bits
+  Reuse existing constants
+2. Binary op replacement not only within a subset
+3. Typecast operations
+4. Create probabilities to control things that happen
+  Swarm testing
+5. Intrinsics / function calls
+6. Insert arguments to function, reuse them
+7. Swap/replace operands of different instructions
+8. support more attributes
+9. Randomly move instructions
+*/
+
 
 #include "llvm_util/llvm2alive.h"
 #include "smt/smt.h"
