@@ -19,6 +19,7 @@
 7. Swap/replace operands of different instructions
 8. support more attributes
 9. Randomly move instructions
+10. remove void call or invoke
 */
 
 
