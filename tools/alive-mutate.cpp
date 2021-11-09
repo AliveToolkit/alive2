@@ -364,18 +364,18 @@ bool inputVerify(){
     auto &DL = M1.get()->getDataLayout();
     //llvm::Triple targetTriple(M1.get()->getTargetTriple());
     //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+    int unsoundCases=-1;
+    loggerInit(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());
     bool changed=false;
-    int unsoundCases=-1;
     while(true){
       changed=false;;
       for(auto fit=M1->begin();fit!=M1->end();++fit)
       if(!fit->isDeclaration()&&!fit->getName().empty()){
         if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
-          llvm::Triple targetTriple(M1.get()->getTargetTriple());
-          llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+          llvm::TargetLibraryInfoWrapperPass TLI(llvm::Triple(M1.get()->getTargetTriple()));
           smt_init.emplace();
           auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
           smt_init.reset();
