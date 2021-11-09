@@ -364,11 +364,11 @@ bool inputVerify(){
     auto &DL = M1.get()->getDataLayout();
     //llvm::Triple targetTriple(M1.get()->getTargetTriple());
     //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-    loggerInit(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());
     bool changed=false;
+    int unsoundCases=-1;
     while(true){
       changed=false;;
       for(auto fit=M1->begin();fit!=M1->end();++fit)
@@ -382,6 +382,12 @@ bool inputVerify(){
           if(r.status==Results::CORRECT){
             ++validFuncNum;
           }else{
+            if(r.status==Results::UNSOUND){
+              loggerInit(unsoundCases--);
+              *out<<"Current seed:"<<Random::getSeed()<<"\n";
+              *out<<"Source file:"<<fit->getParent()->getSourceFileName()<<"\n";
+              r.t.print(*out, {});
+            }
             changed=true;
             hasInvalidFunc=true;
             invalidFuncNameSet.insert(fit->getName().str());
@@ -516,7 +522,6 @@ string getOutputFile(int ith,bool isOptimized){
  * LogIndex is updated here if find a value mismatch.
 */
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
-    //static bool first=true;
     std::unique_ptr<llvm::Module> M1=nullptr;
     mutator.mutateModule(getOutputFile(ith));
     M1 = mutator.getModule();
