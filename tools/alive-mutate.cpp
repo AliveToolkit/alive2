@@ -252,6 +252,24 @@ void optimizeModule(llvm::Module *M) {
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   MPM.run(*M, MAM);
 }
+
+void optimizeFunction(llvm::Function* f){
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+
+  llvm::PassBuilder PB;
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
+      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
+  FPM.run(*f,FAM);
+}
 }
 
 int logIndex,validFuncNum;
@@ -332,33 +350,34 @@ bool inputVerify(){
     optimizeModule(M2.get());
     bool changed=false;
     while(true){
-    changed=false;;
-    for(auto fit=M1->begin();fit!=M1->end();++fit)
-    if(!fit->isDeclaration()&&!fit->getName().empty()){
-      if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
-	llvm::Triple targetTriple(M1.get()->getTargetTriple());
-        llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-	smt_init.emplace();
-	auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
-        smt_init.reset();
-	if(r.status==Results::CORRECT){
-	  ++validFuncNum;
-	}else{
-	  changed=true;
-	  hasInvalidFunc=true;
-	  invalidFuncNameSet.insert(fit->getName().str());
-	}
+      changed=false;;
+      for(auto fit=M1->begin();fit!=M1->end();++fit)
+      if(!fit->isDeclaration()&&!fit->getName().empty()){
+        if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
+          llvm::Triple targetTriple(M1.get()->getTargetTriple());
+          llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+          smt_init.emplace();
+          auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
+          smt_init.reset();
+          if(r.status==Results::CORRECT){
+            ++validFuncNum;
+          }else{
+            changed=true;
+            hasInvalidFunc=true;
+            invalidFuncNameSet.insert(fit->getName().str());
+          }
+        }
       }
-    }
-	  
-    for(const std::string& str:invalidFuncNameSet){
+      
+      for(const std::string& str:invalidFuncNameSet){
         if(llvm::Function* f=M1->getFunction(str);f!=nullptr){
-	  f->replaceAllUsesWith(llvm::UndefValue::get(f->getType()));
-	  f->eraseFromParent();
-	}
+          f->replaceAllUsesWith(llvm::UndefValue::get(f->getType()));
+          f->eraseFromParent();
+        }
+      }
+      if(!changed)break;
     }
-    if(!changed)break;
-    }
+
     stubMutator.setModule(std::move(M1));
     tot_num_correct=0;
     tot_num_unsound=0;
@@ -488,30 +507,22 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     }
     loggerInit(ith);
 
-    //auto &DL = M1.get()->getDataLayout();
     llvm::Triple targetTriple(M1.get()->getTargetTriple());
     llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-    /*if(first){
-      llvm_util::initializer llvm_util_init(*out, DL);
-      first=false;
-    }*/
     smt_init.emplace();
-
-    unique_ptr<llvm::Module> M2;
-    M2 = CloneModule(*M1);
-    optimizeModule(M2.get());
 
     const string optFunc=mutator.getCurrentFunction();
     bool shouldLog=false;
     if(llvm::Function* pf1=M1->getFunction(optFunc);pf1!=nullptr){
       if(!pf1->isDeclaration()){
-        if(llvm::Function* pf2=M2->getFunction(optFunc);pf2!=nullptr){
-            if (compareFunctions(*pf1, *pf2, TLI)){
+        llvm::ValueToValueMapTy vMap;
+        llvm::Function* pf2=llvm::CloneFunction(pf1,vMap);
+        optimizeFunction(pf2);
+        if (compareFunctions(*pf1, *pf2, TLI)){
               shouldLog=true;
               if (opt_error_fatal)
                 goto end;
-            }
         }
       }
     }
@@ -553,13 +564,12 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
 */
 void copyMode(){
   llvm::LLVMContext context;
-  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
-  //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(CloneModule(*pm),verbose)};
+  //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   mutators[0]->setModule(CloneModule(*pm));
-  mutators[1]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
-    if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
+    if(bool sInit=mutators[0]->init()&&false,cInit=mutators[1]->init();sInit||cInit){
       for(int i=0;i<numCopy;++i){
         if(verbose){
           std::cout<<"Running "<<i<<"th copies."<<std::endl;
@@ -569,10 +579,10 @@ void copyMode(){
         }else{
           runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
         }
-	if(tot_num_unsound>(unsigned long long)exitNum){
-	  programEnd();
-	  exit(0);
-	}
+        if(tot_num_unsound>(unsigned long long)exitNum){
+          programEnd();
+          exit(0);
+        }
       }
     }else{
       cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";

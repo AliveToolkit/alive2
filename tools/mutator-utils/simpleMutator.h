@@ -47,8 +47,8 @@ public:
     virtual void saveModule(const std::string& outputFileName)=0;
     virtual std::string getCurrentFunction()const=0;
     void setDebug(bool debug){this->debug=debug;}
-    std::unique_ptr<llvm::Module> getModule(){return std::move(pm);}
-    void setModule(std::unique_ptr<llvm::Module>&& ptr){pm=std::move(ptr);}
+    virtual std::unique_ptr<llvm::Module> getModule(){return std::move(pm);}
+    virtual void setModule(std::unique_ptr<llvm::Module>&& ptr){pm=std::move(ptr);}
 };
 
 class StubMutator: public Mutator{

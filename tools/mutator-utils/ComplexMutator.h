@@ -41,17 +41,17 @@ class ComplexMutator:public Mutator{
     //domInst is used for maintain instructions which dominates current instruction. 
     //this vector would be updated when moveToNextBasicBlock, moveToNextInst and restoreBackup
     std::vector<llvm::Instruction*> domInst;
-    llvm::Instruction* updatedInst;
-    llvm::DominatorTree DT;
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
     std::unordered_set<std::string> filterSet;
     std::string currFuncName;
-    
+    std::unique_ptr<llvm::Module> tmpCopy;
+    llvm::ValueToValueMapTy vMap;
+    llvm::StringMap<llvm::DominatorTree> dtMap;
 
-    decltype(pm->begin()) fit;
-    decltype(fit->begin()) bit;
-    decltype(bit->begin()) iit;
+    llvm::Module::iterator fit,tmpFit;
+    llvm::Function::iterator bit,tmpBit;
+    llvm::BasicBlock::iterator iit,tmpIit;
     void moveToNextInst();
     void moveToNextBasicBlock();
     void moveToNextFuction();
@@ -59,17 +59,22 @@ class ComplexMutator:public Mutator{
 
     bool isReplaceable(llvm::Instruction* inst);
     void moveToNextReplaceableInst();
-    void restoreBackUp();
+    void resetTmpModule();
     void insertRandomBinaryInstruction(llvm::Instruction* inst);
     void replaceRandomUsage(llvm::Instruction* inst);
     llvm::Constant* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomValue(llvm::Type* ty);
 public:
-    ComplexMutator(bool debug=false):Mutator(debug),updatedInst(nullptr){};
+    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr){};
+    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr){
+      pm=std::move(pm_);
+    }
     ~ComplexMutator(){};
     virtual bool init()override;
     virtual void mutateModule(const std::string& outputFileName)override;
     virtual std::string getCurrentFunction()const override{return currFuncName;}
     virtual void saveModule(const std::string& outputFileName)override;
+    virtual std::unique_ptr<llvm::Module> getModule()override{return std::move(tmpCopy);}
+    virtual void setModule(std::unique_ptr<llvm::Module>&& ptr)override{tmpCopy=std::move(ptr);}
 };
 
