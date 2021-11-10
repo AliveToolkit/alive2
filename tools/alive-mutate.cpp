@@ -623,10 +623,9 @@ void copyMode(){
 */
 void timeMode(){
   llvm::LLVMContext context;
-  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(verbose)};
   std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(CloneModule(*pm),verbose)};
   mutators[0]->setModule(CloneModule(*pm));
-  mutators[1]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
   //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
     bool sInit=mutators[0]->init();
