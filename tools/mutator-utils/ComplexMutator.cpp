@@ -28,6 +28,9 @@ bool ComplexMutator::init(){
     }
 end:
     if(result){
+        for(auto git=pm->global_begin();git!=pm->global_end();++git){
+            domInst.push_back(&*git);
+        }
         calcDomInst();
     }
     return result;
@@ -77,33 +80,6 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         llvm::errs()<<"file wrote to "<<outputFileName<<"\n";*/
     }
     moveToNextReplaceableInst();
-    /*
-    //75% chances to add a new inst, 25% chances to replace with a existent usage
-    //if(false){
-    if((Random::getRandomUnsigned()&3)!=0){
-        insertRandomBinaryInstruction(updatedInst);
-    }else{
-        replaceRandomUsage(updatedInst);
-    }
-    if(debug){
-        if(newAdded.empty()){
-            llvm::errs()<<"\nReplaced with a existant usage\n";
-        }else{
-            llvm::errs()<<"\nNew Inst added\n";
-        }
-        bit->print(llvm::errs());
-        llvm::errs()<<"\nDT info"<<dtMap.find(fit->getName())->second.dominates(&*(fit->getFunction().begin()->begin()),updatedInst);
-        llvm::errs()<<"\n";
-        std::error_code ec;
-        llvm::raw_fd_ostream fout(outputFileName,ec);
-        fout<<*pm;
-        fout.close();
-        llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
-    }
-    moveToNextReplaceableInst();
-    while(!newAdded.empty()&&newAdded.back()==&*iit)
-        moveToNextReplaceableInst();
-    */
 }
 
 void ComplexMutator::saveModule(const std::string& outputFileName){
@@ -174,9 +150,14 @@ void ComplexMutator::moveToNextReplaceableInst(){
 
 
 void ComplexMutator::calcDomInst(){
-    domInst.clear();
+    domInst.resize(pm->global_size());
     if(auto it=dtMap.find(fit->getName());it!=dtMap.end()){
+        //add Parameters
+        for(auto ait=fit->arg_begin();ait!=fit->arg_end();++ait){
+            domInst.push_back(&*ait);
+        }
         llvm::DominatorTree& DT=it->second;
+        //add BasicBlocks before bitTmp
         for(auto bitTmp=fit->begin();bitTmp!=bit;++bitTmp){
             if(DT.dominates(&*bitTmp,&*bit)){
                 for(auto iitTmp=bitTmp->begin();iitTmp!=bitTmp->end();++iitTmp){
@@ -184,6 +165,7 @@ void ComplexMutator::calcDomInst(){
                 }
             }
         }
+        //add Instructions before iitTmp
         for(auto iitTmp=bit->begin();iitTmp!=iit;++iitTmp){
             if(DT.dominates(&*iitTmp,&*iit)){
                 domInst.push_back(&*iitTmp);
@@ -239,7 +221,6 @@ void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
     }
 
     llvm::Instruction* newInst=llvm::BinaryOperator::Create(Op, val1, val2, "", inst);
-    newAdded.push_back(newInst);
     inst->setOperand(pos,newInst);
 }
 

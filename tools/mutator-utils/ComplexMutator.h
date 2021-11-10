@@ -35,12 +35,9 @@
 */
 
 class ComplexMutator:public Mutator{
-    //instArgs, newAdded and updatedInst are used for restoring updates. they are used by restoreBackup() and updated when doing mutations.
-    std::vector<llvm::Value*> instArgs;
-    std::vector<llvm::Instruction*> newAdded;
     //domInst is used for maintain instructions which dominates current instruction. 
     //this vector would be updated when moveToNextBasicBlock, moveToNextInst and restoreBackup
-    std::vector<llvm::Instruction*> domInst;
+    std::vector<llvm::Value*> domInst;
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
     std::unordered_set<std::string> filterSet;
