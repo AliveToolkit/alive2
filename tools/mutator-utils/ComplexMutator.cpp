@@ -107,6 +107,7 @@ bool ComplexMutator::isReplaceable(llvm::Instruction* inst){
         return false;
     }
 
+    //only consider inst within an integer type
     for(llvm::Use& u:inst->operands()){
         if(u.get()->getType()->isIntegerTy()){
             return true;
@@ -161,7 +162,7 @@ void ComplexMutator::calcDomInst(){
         for(auto bitTmp=fit->begin();bitTmp!=bit;++bitTmp){
             if(DT.dominates(&*bitTmp,&*bit)){
                 for(auto iitTmp=bitTmp->begin();iitTmp!=bitTmp->end();++iitTmp){
-                        domInst.push_back(&*iitTmp);
+                    domInst.push_back(&*iitTmp);
                 }
             }
         }
