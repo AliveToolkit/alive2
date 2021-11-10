@@ -86,20 +86,31 @@ public:
 class VoidFunctionCallMutant:public Mutant{
     llvm::CallBase* callInst;
     llvm::Instruction* nextInst;
+    bool shouldPutback;
 public:
-    VoidFunctionCallMutant(llvm::CallBase* callInst,llvm::Instruction* nextInst):callInst(callInst),nextInst(nextInst){
+    VoidFunctionCallMutant(llvm::CallBase* callInst,llvm::Instruction* nextInst):callInst(callInst),nextInst(nextInst),shouldPutback(false){
 
     }
-    virtual ~VoidFunctionCallMutant(){};
+    virtual ~VoidFunctionCallMutant(){
+        if(shouldPutback){
+            callInst->insertBefore(nextInst);
+        }
+    };
     virtual void mutate()override{
         callInst->removeFromParent();
+        shouldPutback=true;
     }
     virtual void restoreMutate()override{
         callInst->insertBefore(nextInst);
+        shouldPutback=false;
     }
     virtual bool isBoring()const{return true;}
     virtual void print()const{
-
+        llvm::errs()<<"Removed function\n";
+        callInst->print(llvm::errs());
+        llvm::errs()<<"\nBaisc block\n";
+        nextInst->getParent()->print(llvm::errs());
+        llvm::errs()<<"\n";
     }
 };
 

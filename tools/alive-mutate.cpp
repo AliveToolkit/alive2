@@ -594,7 +594,7 @@ void copyMode(){
   //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   mutators[0]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
-    if(bool sInit=mutators[0]->init()&&false,cInit=mutators[1]->init();sInit||cInit){
+    if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
       for(int i=0;i<numCopy;++i){
         if(verbose){
           std::cout<<"Running "<<i<<"th copies."<<std::endl;

@@ -167,7 +167,9 @@ bool SimpleMutator::init(){
                         ++isBoring;
                     }       
                 }else if(llvm::isa<llvm::CallBase>(&*iit)&&!iit->isTerminator()){
-                    mutants.push_back(std::make_pair(std::make_unique<VoidFunctionCallMutant>((llvm::CallBase*)&*iit,iit->getNextNonDebugInstruction()),fit->getName()));
+                    if(llvm::CallBase* callInst=(llvm::CallBase*)&*iit;callInst->getType()->isVoidTy()){
+                        mutants.push_back(std::make_pair(std::make_unique<VoidFunctionCallMutant>(callInst,iit->getNextNonDebugInstruction()),fit->getName()));
+                    }
                 }
             }
         }
@@ -190,11 +192,6 @@ void SimpleMutator::mutateModule(const string& outputFileName){
     it->first->mutate();
     if(debug){
         it->first->print();
-        std::error_code ec;
-        llvm::raw_fd_ostream fout(outputFileName,ec);
-        fout<<*pm;
-        fout.close();
-        llvm::errs()<<"file wrote to "<<outputFileName<<"\n";
     }
 }
 
