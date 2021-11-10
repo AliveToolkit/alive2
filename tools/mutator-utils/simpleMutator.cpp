@@ -166,6 +166,8 @@ bool SimpleMutator::init(){
                     if(mutants.back().first->isBoring()){
                         ++isBoring;
                     }       
+                }else if(llvm::isa<llvm::CallBase>(&*iit)&&!iit->isTerminator()){
+                    mutants.push_back(std::make_pair(std::make_unique<VoidFunctionCallMutant>((llvm::CallBase*)&*iit,iit->getNextNonDebugInstruction()),fit->getName()));
                 }
             }
         }

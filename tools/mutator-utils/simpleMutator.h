@@ -80,6 +80,29 @@ public:
     virtual void print()const=0;        
 };
 
+/*
+  remove void function call or invoke
+*/
+class VoidFunctionCallMutant:public Mutant{
+    llvm::CallBase* callInst;
+    llvm::Instruction* nextInst;
+public:
+    VoidFunctionCallMutant(llvm::CallBase* callInst,llvm::Instruction* nextInst):callInst(callInst),nextInst(nextInst){
+
+    }
+    virtual ~VoidFunctionCallMutant(){};
+    virtual void mutate()override{
+        callInst->removeFromParent();
+    }
+    virtual void restoreMutate()override{
+        callInst->insertBefore(nextInst);
+    }
+    virtual bool isBoring()const{return true;}
+    virtual void print()const{
+
+    }
+};
+
 class BinaryInstructionMutant:public Mutant{
     llvm::BinaryOperator* binaryInst,*mutatedInst;
     llvm::Instruction::BinaryOps op;
