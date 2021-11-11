@@ -45,6 +45,13 @@ class ComplexMutator:public Mutator{
     std::unique_ptr<llvm::Module> tmpCopy;
     llvm::ValueToValueMapTy vMap;
     llvm::StringMap<llvm::DominatorTree> dtMap;
+    using ShuffleBlock = llvm::SmallVector<llvm::Instruction*>;
+    using BasicBlockShuffleBlock = llvm::SmallVector<ShuffleBlock>;
+    using FunctionShuffleBlock = llvm::SmallVector<BasicBlockShuffleBlock>;
+    
+
+    llvm::StringMap<FunctionShuffleBlock> shuffleMap;
+    size_t shuffleBasicBlockIndex,shuffleBlockIndex;
 
     llvm::Module::iterator fit,tmpFit;
     llvm::Function::iterator bit,tmpBit;
@@ -54,6 +61,7 @@ class ComplexMutator:public Mutator{
     void moveToNextFuction();
     void calcDomInst();
 
+    void shuffleBlock();
     bool isReplaceable(llvm::Instruction* inst);
     void moveToNextReplaceableInst();
     void resetTmpModule();
@@ -62,8 +70,8 @@ class ComplexMutator:public Mutator{
     llvm::Constant* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomValue(llvm::Type* ty);
 public:
-    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr){};
-    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr){
+    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),shuffleBasicBlockIndex(0),shuffleBlockIndex(0){};
+    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),shuffleBasicBlockIndex(0),shuffleBlockIndex(0){
       pm=std::move(pm_);
     }
     ~ComplexMutator(){};

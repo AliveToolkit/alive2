@@ -1,33 +1,73 @@
 #include "ComplexMutator.h"
 
 bool ComplexMutator::init(){
-    for(auto funcIt=pm->begin();funcIt!=pm->end();++funcIt){
-        for(auto ait=funcIt->arg_begin();ait!=funcIt->arg_end();++ait){
-            if(ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)){
-                filterSet.insert(funcIt->getName().str());
-                break;
-            }
-        }
-        if(!funcIt->isDeclaration()&&!funcIt->getName().empty()){
-            dtMap[funcIt->getName()]=llvm::DominatorTree(*funcIt);
-        }
-    }
-
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
         if(fit->isDeclaration()){
             continue;
         }
-        for(bit=fit->begin();bit!=fit->end();++bit)
+        for(bit=fit->begin(),shuffleBasicBlockIndex=0;bit!=fit->end();++bit,++shuffleBasicBlockIndex){
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
                     result=true;
                     goto end;
                 }
             }
+        }
     }
+
 end:
     if(result){
+        for(auto funcIt=pm->begin();funcIt!=pm->end();++funcIt){
+            for(auto ait=funcIt->arg_begin();ait!=funcIt->arg_end();++ait){
+                if(ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)){
+                    filterSet.insert(funcIt->getName().str());
+                    break;
+                }
+            }
+            
+            if(!funcIt->isDeclaration()&&!funcIt->getName().empty()){
+            /*
+                Handle Dominator tree
+            */
+                dtMap[funcIt->getName()]=llvm::DominatorTree(*funcIt);
+
+            /*
+                Handle shuffle map
+            */
+                shuffleMap.insert(std::make_pair(funcIt->getName(),FunctionShuffleBlock()));
+                FunctionShuffleBlock& fSBlock=shuffleMap[funcIt->getName()];
+                fSBlock.resize(funcIt->size());
+                size_t idx=0;
+                for(auto bbIt=funcIt->begin();bbIt!=funcIt->end();++bbIt,++idx){
+                    BasicBlockShuffleBlock& bSBlock=fSBlock[idx];
+                    ShuffleBlock tmp;
+                    std::unordered_set<llvm::Value*> us;
+                    for(auto instIt=bbIt->begin();!instIt->isTerminator();++instIt){
+                        bool flag=true;
+                        for(size_t op=0;flag&&op<instIt->getNumOperands();++op){
+                            if(us.find(instIt->getOperand(op))!=us.end()){
+                                flag=false;
+                            }
+                        }
+                        if(!flag){
+                            if(tmp.size()>=2){
+                                bSBlock.push_back(tmp);
+                                
+                            }
+                            tmp.clear();
+                            us.clear();
+                        }
+                        tmp.push_back(&*instIt);
+                        us.insert(&*instIt);
+                    }
+                    if(tmp.size()>=2){
+                        bSBlock.push_back(tmp);
+                    }
+                }
+            }
+        }
+
         for(auto git=pm->global_begin();git!=pm->global_end();++git){
             domInst.push_back(&*git);
         }
@@ -56,16 +96,25 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
 
     }
     currFuncName=tmpFit->getName().str();
-    bool newAdded=false;
+    bool newAdded=false,shuffled=false;
+    if(shuffleMap[fit->getName()][shuffleBasicBlockIndex].size()>shuffleBlockIndex){
+        llvm::errs()<<"current shuffle size"<<shuffleMap[fit->getName()][shuffleBasicBlockIndex].size()<<"\n";
+        shuffleBlock();
+        ++shuffleBlockIndex;
+        shuffled=true;
+    }
     //75% chances to add a new inst, 25% chances to replace with a existent usage
-    if((Random::getRandomUnsigned()&3)!=0){
+    else if((Random::getRandomUnsigned()&3)!=0){
         insertRandomBinaryInstruction(&*tmpIit);
         newAdded=true;
     }else{
         replaceRandomUsage(&*tmpIit);
     }
     if(debug){
-        if(!newAdded){
+        if(shuffled){
+            llvm::errs()<<"\nInstructions shuffled\n";
+        }
+        else if(!newAdded){
             llvm::errs()<<"\nReplaced with a existant usage\n";
         }else{
             llvm::errs()<<"\nNew Inst added\n";
@@ -79,7 +128,9 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
         fout.close();
         llvm::errs()<<"file wrote to "<<outputFileName<<"\n";*/
     }
-    moveToNextReplaceableInst();
+    if(!shuffled){
+        moveToNextReplaceableInst();
+    }
 }
 
 void ComplexMutator::saveModule(const std::string& outputFileName){
@@ -124,6 +175,7 @@ void ComplexMutator::moveToNextFuction(){
     }
     bit=fit->begin();
     iit=bit->begin();
+    shuffleBasicBlockIndex=0;
 }
 
 void ComplexMutator::moveToNextBasicBlock(){
@@ -134,6 +186,7 @@ void ComplexMutator::moveToNextBasicBlock(){
         iit=bit->begin();
     }
     calcDomInst();
+    shuffleBlockIndex=0;
 }
 
 void ComplexMutator::moveToNextInst(){
@@ -172,6 +225,26 @@ void ComplexMutator::calcDomInst(){
                 domInst.push_back(&*iitTmp);
             }
         }
+    }
+}
+
+void ComplexMutator::shuffleBlock(){
+    ShuffleBlock& sblock=shuffleMap[fit->getName()][shuffleBasicBlockIndex][shuffleBlockIndex];
+    llvm::SmallVector<llvm::Instruction*> sv;
+    for(const auto& p:sblock){
+        sv.push_back(p);
+        //sv.push_back((llvm::Instruction*)&*vMap[p]);
+    }
+    llvm::Instruction* nextInst=(llvm::Instruction*)&*vMap[sv.back()->getNextNonDebugInstruction()];
+    while(sv==sblock){
+        std::random_shuffle(sv.begin(),sv.end());
+    }
+    for(llvm::Instruction* p:sv){
+        ((llvm::Instruction*)&*vMap[p])->removeFromParent();
+    }
+    
+    for(llvm::Instruction* p:sv){
+        ((llvm::Instruction*)&*vMap[p])->insertBefore(nextInst);
     }
 }
 
