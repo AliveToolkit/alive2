@@ -44,34 +44,3 @@ class Random{
       mt=std::mt19937(seed);
     }
 };
-
-class ModuleIterator{
-llvm::Module::iterator fit;
-llvm::Function::iterator bit;
-llvm::BasicBlock::iterator iit;
-int functionDistance,basicBlockDistance,instructionDistance;
-public:
-  ModuleIterator(llvm::Module::iterator fit, 
-                 llvm::Function::iterator bit,
-                 llvm::BasicBlock::iterator iit):fit(fit),bit(bit),iit(iit){
-                   functionDistance=basicBlockDistance=instructionDistance=0;
-                 }
-  ModuleIterator(llvm::Module* pm,const ModuleIterator& mit){
-    fit=pm->begin();
-    functionDistance=mit.functionAdvanced();
-    for(int i=0;i<functionDistance;++i)++fit;
-    bit=fit->begin();
-    basicBlockDistance=mit.basicBlockAdvanced();
-    for(int i=0;i<basicBlockDistance;++i)++bit;
-    iit=bit->begin();
-    instructionDistance=mit.instructionAdvanced();
-    for(int i=0;i<instructionDistance;++i)++iit;
-  }
-  ~ModuleIterator(){};
-  int functionAdvanced()const{return functionDistance;}
-  int basicBlockAdvanced()const{return basicBlockDistance;}
-  int instructionAdvanced()const{return instructionDistance;}
-  void moveToNextInstruction();
-  void moveToNextBasicBlock();
-  void moveToNextFuction();
-};
