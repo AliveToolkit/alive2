@@ -366,6 +366,7 @@ bool inputVerify(){
     //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
     int unsoundCases=-1;
     loggerInit(0);
+    deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     optimizeModule(M2.get());
