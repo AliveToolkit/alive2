@@ -1260,11 +1260,8 @@ StateValue ConversionOp::toSMT(State &s) const {
       expr bv  = val.fp2sint(to_type.bits());
       expr fp2 = bv.sint2fp(val);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
-      expr minus_one = expr::mkFloat(-1.0, val);
-      expr minus_zero = expr::mkFloat(-0.0, val);
-      return { move(bv),
-          (val.fogt(minus_one) && val.fole(minus_zero)) ||
-          fp2 == val.roundtz() };
+      expr valrtz = val.roundtz();
+      return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
     };
     break;
   case FPToUInt:
@@ -1272,11 +1269,8 @@ StateValue ConversionOp::toSMT(State &s) const {
       expr bv  = val.fp2uint(to_type.bits());
       expr fp2 = bv.uint2fp(val);
       // -0.xx must be converted to 0, not poison.
-      expr minus_one = expr::mkFloat(-1.0, val);
-      expr minus_zero = expr::mkFloat(-0.0, val);
-      return { move(bv),
-          (val.fogt(minus_one) && val.fole(minus_zero)) ||
-          fp2 == val.roundtz() };
+      expr valrtz = val.roundtz();
+      return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
     };
     break;
   case FPExt:
