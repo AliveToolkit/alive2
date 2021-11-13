@@ -1277,7 +1277,6 @@ StateValue ConversionOp::toSMT(State &s) const {
       return { move(bv),
           (val.fogt(minus_one) && val.fole(minus_zero)) ||
           fp2 == val.roundtz() };
-      return { move(bv), fp2 == val.roundtz() };
     };
     break;
   case FPExt:
