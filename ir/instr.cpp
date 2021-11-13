@@ -1259,14 +1259,24 @@ StateValue ConversionOp::toSMT(State &s) const {
     fn = [](auto &&val, auto &to_type) -> StateValue {
       expr bv  = val.fp2sint(to_type.bits());
       expr fp2 = bv.sint2fp(val);
-      // -0.0 is converted to 0 and then to 0.0, though -0.0 is ok to convert
-      return { move(bv), val.isFPZero() || fp2 == val.roundtz() };
+      // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
+      expr minus_one = expr::mkFloat(-1.0, val);
+      expr minus_zero = expr::mkFloat(-0.0, val);
+      return { move(bv),
+          (val.fogt(minus_one) && val.fole(minus_zero)) ||
+          fp2 == val.roundtz() };
     };
     break;
   case FPToUInt:
     fn = [](auto &&val, auto &to_type) -> StateValue {
       expr bv  = val.fp2uint(to_type.bits());
       expr fp2 = bv.uint2fp(val);
+      // -0.xx must be converted to 0, not poison.
+      expr minus_one = expr::mkFloat(-1.0, val);
+      expr minus_zero = expr::mkFloat(-0.0, val);
+      return { move(bv),
+          (val.fogt(minus_one) && val.fole(minus_zero)) ||
+          fp2 == val.roundtz() };
       return { move(bv), fp2 == val.roundtz() };
     };
     break;
