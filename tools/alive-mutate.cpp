@@ -252,44 +252,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   }
   return false;
 }
-
-void optimizeModule(llvm::Module *M) {
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
-      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  llvm::ModulePassManager MPM;
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  MPM.run(*M, MAM);
-}
-
-void optimizeFunction(llvm::Function* f){
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
-      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  FPM.run(*f,FAM);
-}
 }
 
 int logIndex,validFuncNum;
@@ -369,7 +331,7 @@ bool inputVerify(){
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-    optimizeModule(M2.get());
+    LLVMUtil::optimizeModule(M2.get());
     bool changed=false;
     while(true){
       changed=false;;
@@ -544,7 +506,7 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
       if(!pf1->isDeclaration()){
         llvm::ValueToValueMapTy vMap;
         llvm::Function* pf2=llvm::CloneFunction(pf1,vMap);
-        optimizeFunction(pf2);
+        LLVMUtil::optimizeFunction(pf2);
         if (compareFunctions(*pf1, *pf2, TLI)){
               shouldLog=true;
               if (opt_error_fatal)
