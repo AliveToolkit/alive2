@@ -88,9 +88,18 @@ void ComplexMutator::resetTmpModule(){
 void ComplexMutator::mutateModule(const std::string& outputFileName){
     resetTmpModule();    
     if(debug){
-        for(size_t i=0;i<tmpIit->getNumOperands();++i){
-            insertAndGetGlobalVariable(tmpIit->getOperand(i)->getType());
+        /*llvm::SmallVector<llvm::Type*> tys;
+        for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
+            tys.push_back(ait->getType());
         }
+        llvm::ValueToValueMapTy VMap;
+        LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
+        tmpIit=((llvm::Instruction*)&*VMap[&*tmpIit])->getIterator();
+        tmpBit=((llvm::BasicBlock*)&*VMap[&*tmpBit])->getIterator();
+        tmpFit=tmpBit->getParent()->getIterator();
+        for(auto it=vMap.begin();it!=vMap.end();++it){
+            it->second=VMap[it->second];
+        }*/
         llvm::errs()<<"Current function "<<tmpFit->getName()<<"\n";
         llvm::errs()<<"Current basic block:\n";
         tmpBit->print(llvm::errs());
@@ -375,21 +384,6 @@ llvm::Constant* ComplexMutator::getRandomConstant(llvm::Type* ty){
 
 
 
-llvm::Value* ComplexMutator::insertAndGetGlobalVariable(llvm::Type* ty){
-    static const std::string GLOBAL_VAR_NAME_PREFIX="aliveMutateGlobalVar";
-    static int varCount=0;
-    tmpCopy->getOrInsertGlobal(GLOBAL_VAR_NAME_PREFIX+std::to_string(varCount),ty);
-    llvm::GlobalVariable* val=tmpCopy->getGlobalVariable(GLOBAL_VAR_NAME_PREFIX+std::to_string(varCount));
-    ++varCount;
-    val->setLinkage(llvm::GlobalValue::LinkageTypes::ExternalLinkage);
-    val->setAlignment(llvm::MaybeAlign(1));
-    return val;
-}
-
-llvm::Value* ComplexMutator::insertAndGetFunctionParameter(llvm::Type* ty){
-    return nullptr;
-}
-
 llvm::Value* ComplexMutator::getRandomDominatedValue(llvm::Type* ty){
     if(ty!=nullptr&&!domInst.empty()){
         for(size_t i=0,pos=Random::getRandomUnsigned()%domInst.size();i<domInst.size();++i,++pos){
@@ -407,4 +401,25 @@ llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
         return result;
     }
     return getRandomConstant(ty);
+}
+
+llvm::SmallVector<llvm::Value*> ComplexMutator::addFunctionArguments(llvm::SmallVector<llvm::Type*> tys){
+    llvm::SmallVector<llvm::Value*> result;
+    llvm::SmallVector<llvm::Type*> tys;
+    for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
+        tys.push_back(ait->getType());
+    }
+    size_t oldArgSize=tmpFit->arg_size();
+    llvm::ValueToValueMapTy VMap;
+    LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
+    tmpIit=((llvm::Instruction*)&*VMap[&*tmpIit])->getIterator();
+    tmpBit=((llvm::BasicBlock*)&*VMap[&*tmpBit])->getIterator();
+    tmpFit=tmpBit->getParent()->getIterator();
+    for(auto it=vMap.begin();it!=vMap.end();++it){
+        it->second=VMap[it->second];
+    }
+    for(size_t i=0;i<tys.size();++i){
+        result.push_back(tmpFit->getArg(i+oldArgSize));
+    }
+    return result;
 }
