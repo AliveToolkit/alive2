@@ -71,7 +71,10 @@ class ComplexMutator:public Mutator{
     void randomMoveInstructionBackward(llvm::Instruction* inst);
     void insertRandomBinaryInstruction(llvm::Instruction* inst);
     void replaceRandomUsage(llvm::Instruction* inst);
+    llvm::Value* insertAndGetGlobalVariable(llvm::Type* ty);
+    llvm::Value* insertAndGetFunctionParameter(llvm::Type* ty);
     llvm::Constant* getRandomConstant(llvm::Type* ty);
+    llvm::Value* getRandomDominatedValue(llvm::Type* ty);
     llvm::Value* getRandomValue(llvm::Type* ty);
 public:
     ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),shuffleBasicBlockIndex(0),shuffleBlockIndex(0),moved(false){};

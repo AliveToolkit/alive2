@@ -88,6 +88,9 @@ void ComplexMutator::resetTmpModule(){
 void ComplexMutator::mutateModule(const std::string& outputFileName){
     resetTmpModule();    
     if(debug){
+        for(size_t i=0;i<tmpIit->getNumOperands();++i){
+            insertAndGetGlobalVariable(tmpIit->getOperand(i)->getType());
+        }
         llvm::errs()<<"Current function "<<tmpFit->getName()<<"\n";
         llvm::errs()<<"Current basic block:\n";
         tmpBit->print(llvm::errs());
@@ -263,10 +266,7 @@ void ComplexMutator::randomMoveInstruction(llvm::Instruction* inst){
 
 void ComplexMutator::randomMoveInstructionForward(llvm::Instruction* inst){
     size_t pos=0,newPos;
-    /*llvm::errs()<<"in function\n";
-    inst->print(llvm::errs());
-    llvm::errs()<<"\n------------\n";
-    inst->getParent()->print(llvm::errs());*/
+
     for(auto it=inst->getParent()->begin();&*it!=inst;++it,++pos);
     newPos=Random::getRandomUnsigned()%pos;
     //llvm::errs()<<"both pos: "<<pos<<' '<<newPos<<"\n";
@@ -281,39 +281,13 @@ void ComplexMutator::randomMoveInstructionForward(llvm::Instruction* inst){
         domInst.pop_back();
     }
 
-    /*llvm::errs()<<"size of stored inst"<<v.size()<<"\n";
-    for(const auto& p:v){
-        p->print(llvm::errs());
-        llvm::errs()<<"\n";
-    }
-    llvm::errs()<<"\n";*/
-
     for(size_t i=0;i<inst->getNumOperands();++i){
-        /*llvm::errs()<<"comparing --\n";
-        inst->getOperand(i)->print(llvm::errs());
-        llvm::errs()<<"\n";
-        llvm::errs()<<"ptr compare"<<(inst->getOperand(i)==v[0])<<"\n";*/
-
         if(llvm::Value* op=inst->getOperand(i);std::find(v.begin(),v.end(),op)!=v.end()){
-            //llvm::errs()<<"should set ------\n";
             inst->setOperand(i,getRandomValue(op->getType()));
         }
     }
 
-    /*
-    llvm::errs()<<"\n----\n";
-    inst->print(llvm::errs());
-    llvm::errs()<<"\n";
-    newPosInst->print(llvm::errs());
-    llvm::errs()<<"\n----\n";
-    inst->getParent()->print(llvm::errs());
-    llvm::errs()<<"\n----\n";*/
-
     inst->moveBefore(newPosInst);
-    /*
-    llvm::errs()<<"\n----\n";
-    newPosInst->getParent()->print(llvm::errs());
-    llvm::errs()<<"\n----\n";*/
 
     //restore domInst
     while(!domBackup.empty()){
@@ -323,7 +297,23 @@ void ComplexMutator::randomMoveInstructionForward(llvm::Instruction* inst){
 }
 
 void ComplexMutator::randomMoveInstructionBackward(llvm::Instruction* inst){
+    size_t pos=0,newPos;
 
+    for(auto it=inst->getParent()->begin();&*it!=inst;++it,++pos);
+    newPos=Random::getRandomInt()%(inst->getParent()->size()-pos)+1+pos;    
+
+    //need fix all insts used current inst in [pos,newPos]
+    llvm::Instruction* newPosInst=inst;
+    for(size_t i=pos;i!=newPos;++i){
+        newPosInst=inst->getNextNonDebugInstruction();
+        for(size_t op=0;op<newPosInst->getNumOperands();++op){
+            if(llvm::Value* opP=newPosInst->getOperand(op);opP!=nullptr&&opP==inst){
+                newPosInst->setOperand(op,getRandomValue(opP->getType()));
+            }
+        }
+    }
+
+    inst->moveBefore(newPosInst);
 }
 
 void ComplexMutator::replaceRandomUsage(llvm::Instruction* inst){
@@ -383,7 +373,24 @@ llvm::Constant* ComplexMutator::getRandomConstant(llvm::Type* ty){
     return llvm::UndefValue::get(ty);
 }
 
-llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
+
+
+llvm::Value* ComplexMutator::insertAndGetGlobalVariable(llvm::Type* ty){
+    static const std::string GLOBAL_VAR_NAME_PREFIX="aliveMutateGlobalVar";
+    static int varCount=0;
+    tmpCopy->getOrInsertGlobal(GLOBAL_VAR_NAME_PREFIX+std::to_string(varCount),ty);
+    llvm::GlobalVariable* val=tmpCopy->getGlobalVariable(GLOBAL_VAR_NAME_PREFIX+std::to_string(varCount));
+    ++varCount;
+    val->setLinkage(llvm::GlobalValue::LinkageTypes::ExternalLinkage);
+    val->setAlignment(llvm::MaybeAlign(1));
+    return val;
+}
+
+llvm::Value* ComplexMutator::insertAndGetFunctionParameter(llvm::Type* ty){
+    return nullptr;
+}
+
+llvm::Value* ComplexMutator::getRandomDominatedValue(llvm::Type* ty){
     if(ty!=nullptr&&!domInst.empty()){
         for(size_t i=0,pos=Random::getRandomUnsigned()%domInst.size();i<domInst.size();++i,++pos){
             if(pos==domInst.size())pos=0;
@@ -391,6 +398,13 @@ llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
                 return &*vMap[domInst[pos]];
             }
         }
+    }
+    return nullptr;
+}
+
+llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
+    if(llvm::Value* result=getRandomDominatedValue(ty);result!=nullptr){
+        return result;
     }
     return getRandomConstant(ty);
 }
