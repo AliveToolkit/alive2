@@ -124,6 +124,7 @@ set(TOOLS_SRCS
   tools/mutator-utils/util.cpp
   tools/mutator-utils/ComplexMutator.cpp
   tools/mutator-utils/simpleMutator.cpp
+  tools/mutator-utils/ComplexMutatorHelper.cpp
 )
 
 add_library(tools STATIC ${TOOLS_SRCS})

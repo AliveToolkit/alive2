@@ -6,7 +6,7 @@ bool ComplexMutator::init(){
         if(fit->isDeclaration()){
             continue;
         }
-        for(bit=fit->begin(),shuffleBasicBlockIndex=0;bit!=fit->end();++bit,++shuffleBasicBlockIndex){
+        for(bit=fit->begin();bit!=fit->end();++bit){
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
                     result=true;
@@ -32,40 +32,6 @@ end:
                 Handle Dominator tree
             */
                 dtMap[funcIt->getName()]=llvm::DominatorTree(*funcIt);
-
-            /*
-                Handle shuffle map
-            */
-                shuffleMap.insert(std::make_pair(funcIt->getName(),FunctionShuffleBlock()));
-                FunctionShuffleBlock& fSBlock=shuffleMap[funcIt->getName()];
-                fSBlock.resize(funcIt->size());
-                size_t idx=0;
-                for(auto bbIt=funcIt->begin();bbIt!=funcIt->end();++bbIt,++idx){
-                    BasicBlockShuffleBlock& bSBlock=fSBlock[idx];
-                    ShuffleBlock tmp;
-                    std::unordered_set<llvm::Value*> us;
-                    for(auto instIt=bbIt->begin();!instIt->isTerminator();++instIt){
-                        bool flag=true;
-                        for(size_t op=0;flag&&op<instIt->getNumOperands();++op){
-                            if(us.find(instIt->getOperand(op))!=us.end()){
-                                flag=false;
-                            }
-                        }
-                        if(!flag){
-                            if(tmp.size()>=2){
-                                bSBlock.push_back(tmp);
-                                
-                            }
-                            tmp.clear();
-                            us.clear();
-                        }
-                        tmp.push_back(&*instIt);
-                        us.insert(&*instIt);
-                    }
-                    if(tmp.size()>=2){
-                        bSBlock.push_back(tmp);
-                    }
-                }
             }
         }
 
@@ -73,6 +39,22 @@ end:
             domInst.push_back(&*git);
         }
         calcDomInst();
+        /*
+          Hard code for when to update helpers 
+        */
+        helpers.push_back(std::make_unique<ShuffleHelper>(this));
+        whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
+        whenMoveToNextBasicBlockFuncs.push_back(helpers.size()-1);
+
+        helpers.push_back(std::make_unique<MutateInstructionHelper>(this));
+        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+
+        helpers.push_back(std::make_unique<RandomMoveHelper>(this));
+        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+        for(size_t i=0;i<helpers.size();++i){
+            helpers[i]->init();
+        }
+        currHelpersIt=helpers.begin();
     }
     return result;
 }
@@ -88,18 +70,6 @@ void ComplexMutator::resetTmpModule(){
 void ComplexMutator::mutateModule(const std::string& outputFileName){
     resetTmpModule();    
     if(debug){
-        /*llvm::SmallVector<llvm::Type*> tys;
-        for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
-            tys.push_back(ait->getType());
-        }
-        llvm::ValueToValueMapTy VMap;
-        LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
-        tmpIit=((llvm::Instruction*)&*VMap[&*tmpIit])->getIterator();
-        tmpBit=((llvm::BasicBlock*)&*VMap[&*tmpBit])->getIterator();
-        tmpFit=tmpBit->getParent()->getIterator();
-        for(auto it=vMap.begin();it!=vMap.end();++it){
-            it->second=VMap[it->second];
-        }*/
         llvm::errs()<<"Current function "<<tmpFit->getName()<<"\n";
         llvm::errs()<<"Current basic block:\n";
         tmpBit->print(llvm::errs());
@@ -109,41 +79,44 @@ void ComplexMutator::mutateModule(const std::string& outputFileName){
 
     }
     currFuncName=tmpFit->getName().str();
-    bool newAdded=false,shuffled=false;
-    if(shuffleMap[fit->getName()][shuffleBasicBlockIndex].size()>shuffleBlockIndex){
+    if((*currHelpersIt)->shouldMutate()){
+        (*currHelpersIt)->mutate();
+    }
+    /*if(false&&shuffleMap[fit->getName()][shuffleBasicBlockIndex].size()>shuffleBlockIndex){
         //llvm::errs()<<"current shuffle size"<<shuffleMap[fit->getName()][shuffleBasicBlockIndex].size()<<"\n";
         shuffleBlock();
         ++shuffleBlockIndex;
         shuffled=true;
-    }else if(!moved&&tmpIit!=tmpBit->begin()&&!tmpIit->isTerminator()){
+    }else if(!moved&&tmpBit->size()>2&&!tmpIit->isTerminator()){
         randomMoveInstruction(&*tmpIit);
+        moveAround=true;
     }
     //75% chances to add a new inst, 25% chances to replace with a existent usage
-    else if((Random::getRandomUnsigned()&3)!=0){
+    else if(false&&(Random::getRandomUnsigned()&3)!=0){
         insertRandomBinaryInstruction(&*tmpIit);
         newAdded=true;
-    }else{
+    }else if(false){
         replaceRandomUsage(&*tmpIit);
-    }
+    }*/
     if(debug){
-        if(shuffled){
+        /*if(shuffled){
             llvm::errs()<<"\nInstructions shuffled\n";
-        }
-        else if(!newAdded){
+        }else if(moveAround){
+            llvm::errs()<<"\nInst was moved around\n";
+        }else if(!newAdded){
             llvm::errs()<<"\nReplaced with a existant usage\n";
         }else{
             llvm::errs()<<"\nNew Inst added\n";
-        }
+        }*/
+        (*currHelpersIt)->debug();
         tmpBit->print(llvm::errs());
         llvm::errs()<<"\nDT info"<<dtMap.find(fit->getName())->second.dominates(&*(fit->getFunction().begin()->begin()),&*iit);
         llvm::errs()<<"\n";
-        /*std::error_code ec;
-        llvm::raw_fd_ostream fout(outputFileName,ec);
-        fout<<*tmpCopy;
-        fout.close();
-        llvm::errs()<<"file wrote to "<<outputFileName<<"\n";*/
     }
-    if(!shuffled){
+    while(currHelpersIt!=helpers.end()&&!(*currHelpersIt)->shouldMutate()){
+        ++currHelpersIt;
+    }
+    if(currHelpersIt==helpers.end()){
         moveToNextReplaceableInst();
     }
 }
@@ -190,7 +163,10 @@ void ComplexMutator::moveToNextFuction(){
     }
     bit=fit->begin();
     iit=bit->begin();
-    shuffleBasicBlockIndex=0;
+    //shuffleBasicBlockIndex=0;
+    for(size_t i:whenMoveToNextFuncFuncs){
+        helpers[i]->whenMoveToNextFunction();
+    }
 }
 
 void ComplexMutator::moveToNextBasicBlock(){
@@ -201,7 +177,10 @@ void ComplexMutator::moveToNextBasicBlock(){
         iit=bit->begin();
     }
     calcDomInst();
-    shuffleBlockIndex=0;
+    //shuffleBlockIndex=0;
+    for(size_t i:whenMoveToNextBasicBlockFuncs){
+        helpers[i]->whenMoveToNextBasicBlock();
+    }
 }
 
 void ComplexMutator::moveToNextInst(){
@@ -215,7 +194,10 @@ void ComplexMutator::moveToNextInst(){
 void ComplexMutator::moveToNextReplaceableInst(){
     moveToNextInst();
     while(!isReplaceable(&*iit))moveToNextInst();
-    moved=false;
+    for(size_t i:whenMoveToNextInstFuncs){
+        helpers[i]->whenMoveToNextInst();
+    }
+    currHelpersIt=helpers.begin();
 }
 
 
@@ -244,32 +226,18 @@ void ComplexMutator::calcDomInst(){
     }
 }
 
-void ComplexMutator::shuffleBlock(){
-    ShuffleBlock& sblock=shuffleMap[fit->getName()][shuffleBasicBlockIndex][shuffleBlockIndex];
-    llvm::SmallVector<llvm::Instruction*> sv;
-    for(const auto& p:sblock){
-        sv.push_back(p);
-        //sv.push_back((llvm::Instruction*)&*vMap[p]);
-    }
-    llvm::Instruction* nextInst=(llvm::Instruction*)&*vMap[sv.back()->getNextNonDebugInstruction()];
-    while(sv==sblock){
-        std::random_shuffle(sv.begin(),sv.end());
-    }
-    for(llvm::Instruction* p:sv){
-        ((llvm::Instruction*)&*vMap[p])->removeFromParent();
-    }
-    
-    for(llvm::Instruction* p:sv){
-        ((llvm::Instruction*)&*vMap[p])->insertBefore(nextInst);
-    }
-}
-
 void ComplexMutator::randomMoveInstruction(llvm::Instruction* inst){
-    if(true){
+    if(inst->getNextNonDebugInstruction()->isTerminator()){
     //if(Random::getRandomBool()){
         randomMoveInstructionForward(inst);
-    }else{
+    }else if(inst!=&*(inst->getParent()->begin())){
         randomMoveInstructionBackward(inst);
+    }else{
+        if(Random::getRandomBool()){
+            randomMoveInstructionForward(inst);
+        }else{
+            randomMoveInstructionBackward(inst);
+        }
     }
 }
 
@@ -292,7 +260,8 @@ void ComplexMutator::randomMoveInstructionForward(llvm::Instruction* inst){
 
     for(size_t i=0;i<inst->getNumOperands();++i){
         if(llvm::Value* op=inst->getOperand(i);std::find(v.begin(),v.end(),op)!=v.end()){
-            inst->setOperand(i,getRandomValue(op->getType()));
+            setOperandRandomValue(inst,i);
+            //inst->setOperand(i,getRandomValue(op->getType()));
         }
     }
 
@@ -303,6 +272,7 @@ void ComplexMutator::randomMoveInstructionForward(llvm::Instruction* inst){
         domInst.push_back(domBackup.back());
         domBackup.pop_back();
     }
+    fixAllValues();
 }
 
 void ComplexMutator::randomMoveInstructionBackward(llvm::Instruction* inst){
@@ -317,65 +287,17 @@ void ComplexMutator::randomMoveInstructionBackward(llvm::Instruction* inst){
         newPosInst=inst->getNextNonDebugInstruction();
         for(size_t op=0;op<newPosInst->getNumOperands();++op){
             if(llvm::Value* opP=newPosInst->getOperand(op);opP!=nullptr&&opP==inst){
-                newPosInst->setOperand(op,getRandomValue(opP->getType()));
+                setOperandRandomValue(newPosInst,op);
+                //newPosInst->setOperand(op,getRandomValue(opP->getType()));
             }
         }
     }
 
     inst->moveBefore(newPosInst);
+    fixAllValues();
 }
 
-void ComplexMutator::replaceRandomUsage(llvm::Instruction* inst){
-    size_t pos=Random::getRandomUnsigned()%inst->getNumOperands();;
-    llvm::Type* ty=nullptr;
-    for(size_t i=0;i<inst->getNumOperands();++i,++pos){
-        if(pos==inst->getNumOperands())pos=0;
-        if(inst->getOperand(pos)->getType()->isIntegerTy()){
-            ty=inst->getOperand(pos)->getType();
-            break;
-        }
-    }
-    llvm::Value* val=getRandomValue(ty);
-    inst->setOperand(pos,val);
-}
-
-void ComplexMutator::insertRandomBinaryInstruction(llvm::Instruction* inst){
-    size_t pos=Random::getRandomUnsigned()%inst->getNumOperands();
-    llvm::Type* ty=nullptr;
-    for(size_t i=0;i<inst->getNumOperands();++i,++pos){
-        if(pos==inst->getNumOperands())pos=0;
-        if(inst->getOperand(pos)->getType()->isIntegerTy()){
-            ty=inst->getOperand(pos)->getType();
-            break;
-        }
-    }
-    
-    llvm::Value* val1=getRandomValue(ty),*val2=getRandomValue(ty);
-    llvm::Instruction::BinaryOps Op;
-
-    using llvm::Instruction;
-    switch (Random::getRandomUnsigned() % 13) {
-        default: llvm_unreachable("Invalid BinOp");
-        case 0:{Op = Instruction::Add; break; }
-        case 1:{Op = Instruction::Sub; break; }
-        case 2:{Op = Instruction::Mul; break; }
-        case 3:{Op = Instruction::SDiv; break; }
-        case 4:{Op = Instruction::UDiv; break; }
-        case 5:{Op = Instruction::SRem; break; }
-        case 6:{Op = Instruction::URem; break; }
-        case 7: {Op = Instruction::Shl;  break; }
-        case 8: {Op = Instruction::LShr; break; }
-        case 9: {Op = Instruction::AShr; break; }
-        case 10:{Op = Instruction::And;  break; }
-        case 11:{Op = Instruction::Or;   break; }
-        case 12:{Op = Instruction::Xor;  break; }
-    }
-
-    llvm::Instruction* newInst=llvm::BinaryOperator::Create(Op, val1, val2, "", inst);
-    inst->setOperand(pos,newInst);
-}
-
-llvm::Constant* ComplexMutator::getRandomConstant(llvm::Type* ty){
+llvm::Value* ComplexMutator::getRandomConstant(llvm::Type* ty){
     if(ty->isIntegerTy()){
         return llvm::ConstantInt::get(ty,Random::getRandomUnsigned());
     }
@@ -396,30 +318,84 @@ llvm::Value* ComplexMutator::getRandomDominatedValue(llvm::Type* ty){
     return nullptr;
 }
 
-llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
-    if(llvm::Value* result=getRandomDominatedValue(ty);result!=nullptr){
-        return result;
+llvm::Value* ComplexMutator::getRandomValueFromExtraFuncArgs(llvm::Type* ty){
+    if(ty!=nullptr&&!extraFuncArgs.empty()){
+        for(size_t i=0,pos=Random::getRandomUnsigned()%extraFuncArgs.size();i<extraFuncArgs.size();++i,++pos){
+            if(pos==extraFuncArgs.size())pos=0;
+            if(extraFuncArgs[pos]->getType()==ty){
+                return &*vMap[extraFuncArgs[pos]];
+            }
+        }
     }
-    return getRandomConstant(ty);
+    return nullptr;
 }
 
-llvm::SmallVector<llvm::Value*> ComplexMutator::addFunctionArguments(llvm::SmallVector<llvm::Type*> tys){
-    llvm::SmallVector<llvm::Value*> result;
-    llvm::SmallVector<llvm::Type*> tys;
-    for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
-        tys.push_back(ait->getType());
+llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
+    if(ty!=nullptr&&!valueFuncs.empty()){
+        for(size_t i=0,pos=Random::getRandomUnsigned()%valueFuncs.size();i<valueFuncs.size();++i,++pos){
+            if(pos==valueFuncs.size())pos=0;
+            if(llvm::Value* result=(this->*valueFuncs[pos])(ty);result!=nullptr){
+                return result;
+            }
+        }
     }
-    size_t oldArgSize=tmpFit->arg_size();
-    llvm::ValueToValueMapTy VMap;
-    LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
-    tmpIit=((llvm::Instruction*)&*VMap[&*tmpIit])->getIterator();
-    tmpBit=((llvm::BasicBlock*)&*VMap[&*tmpBit])->getIterator();
-    tmpFit=tmpBit->getParent()->getIterator();
-    for(auto it=vMap.begin();it!=vMap.end();++it){
-        it->second=VMap[it->second];
+    return nullptr;
+}
+
+llvm::Value* ComplexMutator::getRandomPointerValue(llvm::Type* ty){
+    if(ty->isPointerTy()){
+        if(Random::getRandomUnsigned()%(1+valueFuncs.size())==0){
+            return llvm::ConstantPointerNull::get((llvm::PointerType*)(ty));
+        }
+        return getRandomValue(ty);
     }
-    for(size_t i=0;i<tys.size();++i){
-        result.push_back(tmpFit->getArg(i+oldArgSize));
+    return nullptr;
+}
+
+void ComplexMutator::addFunctionArguments(const llvm::SmallVector<llvm::Type*>& tys){
+    if(!lazyUpdateInsts.empty()){
+        llvm::SmallVector<llvm::Type*> tys;
+        for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
+            tys.push_back(ait->getType());
+        }
+        size_t oldArgSize=tmpFit->arg_size();
+        llvm::ValueToValueMapTy VMap;
+        LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
+        tmpIit=((llvm::Instruction*)&*VMap[&*tmpIit])->getIterator();
+        tmpBit=((llvm::BasicBlock*)&*VMap[&*tmpBit])->getIterator();
+        tmpFit=tmpBit->getParent()->getIterator();
+        for(size_t i=0;i<lazyUpdateInsts.size();++i){
+            lazyUpdateInsts[i]=(llvm::Instruction*)&*VMap[lazyUpdateInsts[i]];
+        }
+        for(auto it=vMap.begin();it!=vMap.end();++it){
+            it->second=VMap[it->second];
+        }
+        for(size_t i=0;i<tys.size();++i){
+            extraFuncArgs.push_back(tmpFit->getArg(i+oldArgSize));
+        }
     }
-    return result;
+}
+
+void ComplexMutator::fixAllValues(){
+    if(!lazyUpdateInsts.empty()){
+        llvm::SmallVector<llvm::Type*> tys;
+        for(size_t i=0;i<lazyUpdateInsts.size();++i){
+            tys.push_back(lazyUpdateInsts[i]->getOperand(lazyUpdateArgPos[i])->getType());
+        }
+        addFunctionArguments(tys);
+        for(size_t i=0;i<lazyUpdateInsts.size();++i){
+            lazyUpdateInsts[i]->setOperand(lazyUpdateArgPos[i],getRandomValue(tys[i]));
+        }
+    }
+}
+
+void ComplexMutator::setOperandRandomValue(llvm::Instruction* inst,size_t pos){
+    if(llvm::Type* ty=inst->getOperand(pos)->getType();ty!=nullptr){
+        if(llvm::Value* val=getRandomValue(ty);val==nullptr||llvm::isa<llvm::UndefValue>(val)){
+            lazyUpdateInsts.push_back(inst);
+            lazyUpdateArgPos.push_back(pos);
+        }else{
+            inst->setOperand(pos,val);
+        }
+    }
 }

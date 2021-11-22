@@ -3,29 +3,8 @@
 #include <memory>
 #include <vector>
 #include <unordered_set>
-#include "llvm/IR/Module.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Verifier.h"
-#include "tools/mutator-utils/util.h"
 #include "simpleMutator.h"
+#include "ComplexMutatorHelper.h"
 
 /*
   This class is used for doing complex mutations on a given file.
@@ -37,6 +16,10 @@
 class ComplexMutator:public Mutator{
     //domInst is used for maintain instructions which dominates current instruction. 
     //this vector would be updated when moveToNextBasicBlock, moveToNextInst and restoreBackup
+    friend class ShuffleHelper;
+    friend class MutateInstructionHelper;
+    friend class RandomMoveHelper;
+
     std::vector<llvm::Value*> domInst;
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
@@ -45,12 +28,6 @@ class ComplexMutator:public Mutator{
     std::unique_ptr<llvm::Module> tmpCopy;
     llvm::ValueToValueMapTy vMap;
     llvm::StringMap<llvm::DominatorTree> dtMap;
-    using ShuffleBlock = llvm::SmallVector<llvm::Instruction*>;
-    using BasicBlockShuffleBlock = llvm::SmallVector<ShuffleBlock>;
-    using FunctionShuffleBlock = llvm::SmallVector<BasicBlockShuffleBlock>;
-    
-    llvm::StringMap<FunctionShuffleBlock> shuffleMap;
-    size_t shuffleBasicBlockIndex,shuffleBlockIndex;
 
     bool moved;
 
@@ -62,23 +39,37 @@ class ComplexMutator:public Mutator{
     void moveToNextFuction();
     void calcDomInst();
 
-    void shuffleBlock();
     bool isReplaceable(llvm::Instruction* inst);
     void moveToNextReplaceableInst();
     void resetTmpModule();
     void randomMoveInstruction(llvm::Instruction* inst);
     void randomMoveInstructionForward(llvm::Instruction* inst);
     void randomMoveInstructionBackward(llvm::Instruction* inst);
-    void insertRandomBinaryInstruction(llvm::Instruction* inst);
-    void replaceRandomUsage(llvm::Instruction* inst);
 
-    llvm::SmallVector<llvm::Value*> addFunctionArguments(llvm::SmallVector<llvm::Type*> tys);
-    llvm::Constant* getRandomConstant(llvm::Type* ty);
+    llvm::SmallVector<llvm::Instruction*> lazyUpdateInsts;
+    llvm::SmallVector<size_t> lazyUpdateArgPos;
+    llvm::SmallVector<llvm::Value*> extraFuncArgs;
+    void addFunctionArguments(const llvm::SmallVector<llvm::Type*>& tys);
+    llvm::Value* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomDominatedValue(llvm::Type* ty);
+    llvm::Value* getRandomValueFromExtraFuncArgs(llvm::Type* ty);
+    llvm::Value* getRandomPointerValue(llvm::Type* ty);
+    llvm::SmallVector<llvm::Value* (ComplexMutator::*)(llvm::Type*)> valueFuncs;
+
+    llvm::SmallVector<std::unique_ptr<ComplexMutatorHelper>>::iterator currHelpersIt;
+    llvm::SmallVector<std::unique_ptr<ComplexMutatorHelper>> helpers;
+    llvm::SmallVector<size_t> whenMoveToNextInstFuncs;
+    llvm::SmallVector<size_t> whenMoveToNextBasicBlockFuncs;
+    llvm::SmallVector<size_t> whenMoveToNextFuncFuncs;
     llvm::Value* getRandomValue(llvm::Type* ty);
+    void setOperandRandomValue(llvm::Instruction* inst,size_t pos);
+    void fixAllValues();
 public:
-    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),shuffleBasicBlockIndex(0),shuffleBlockIndex(0),moved(false){};
-    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),shuffleBasicBlockIndex(0),shuffleBlockIndex(0),moved(false){
+    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),moved(false),
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+    };
+    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),moved(false),
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
       pm=std::move(pm_);
     }
     ~ComplexMutator(){};
