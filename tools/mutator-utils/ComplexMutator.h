@@ -29,8 +29,6 @@ class ComplexMutator:public Mutator{
     llvm::ValueToValueMapTy vMap;
     llvm::StringMap<llvm::DominatorTree> dtMap;
 
-    bool moved;
-
     llvm::Module::iterator fit,tmpFit;
     llvm::Function::iterator bit,tmpBit;
     llvm::BasicBlock::iterator iit,tmpIit;
@@ -63,10 +61,10 @@ class ComplexMutator:public Mutator{
     void setOperandRandomValue(llvm::Instruction* inst,size_t pos);
     void fixAllValues();
 public:
-    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),moved(false),
+    ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
     };
-    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),moved(false),
+    ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
       pm=std::move(pm_);
     }

@@ -10,7 +10,6 @@ bool ComplexMutator::init(){
             for(iit=bit->begin();iit!=bit->end();++iit){
                 if(isReplaceable(&*iit)){
                     result=true;
-                    moved=false;
                     goto end;
                 }
             }
