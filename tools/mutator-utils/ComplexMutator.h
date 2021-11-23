@@ -42,12 +42,10 @@ class ComplexMutator:public Mutator{
     bool isReplaceable(llvm::Instruction* inst);
     void moveToNextReplaceableInst();
     void resetTmpModule();
-    void randomMoveInstruction(llvm::Instruction* inst);
-    void randomMoveInstructionForward(llvm::Instruction* inst);
-    void randomMoveInstructionBackward(llvm::Instruction* inst);
-
+    
     llvm::SmallVector<llvm::Instruction*> lazyUpdateInsts;
     llvm::SmallVector<size_t> lazyUpdateArgPos;
+    llvm::SmallVector<llvm::Type*> lazyUpdateArgTys;
     llvm::SmallVector<llvm::Value*> extraFuncArgs;
     void addFunctionArguments(const llvm::SmallVector<llvm::Type*>& tys);
     llvm::Value* getRandomConstant(llvm::Type* ty);
