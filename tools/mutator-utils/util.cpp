@@ -5,6 +5,110 @@ std::uniform_int_distribution<int> Random::dist(0,2147483647u);
 unsigned Random::seed(rd());
 std::mt19937 Random::mt(Random::seed);
 
+llvm::SmallVector<unsigned> Random::usedInts;
+llvm::SmallVector<double> Random::usedDoubles;
+llvm::SmallVector<float> Random::usedFloats;
+
+unsigned Random::getExtremeInt(llvm::IntegerType* ty){
+    unsigned size=ty->getBitWidth();
+    size=std::min(size,32u);
+    if(size<=7){
+        return getRandomUnsigned(size);
+    }else{
+        return getRandomBool()?(0+getRandomUnsigned(7)):(unsigned)((1ull<<size)-getRandomUnsigned(7)-1);
+    }
+}
+
+unsigned Random::getBitmask(llvm::IntegerType* ty){
+    unsigned size=ty->getBitWidth();
+    size=std::min(size,32u);
+    unsigned result=(unsigned)((1ull<<size)-1);
+    unsigned le=(unsigned)((1ull<<(1+getRandomUnsigned()%32))-1);
+    unsigned ri=(unsigned)((1ull<<(getRandomUnsigned()%le))-1);
+    return result^le^ri;
+}
+
+double Random::getExtremeDouble(){
+    return 0;
+}
+
+float Random::getExtremeFloat(){
+    return 0;
+}
+
+double Random::getRandomDouble(){
+    return 0;
+}
+
+float Random::getRandomFloat(){
+    return 0;
+}
+
+unsigned Random::getUsedInt(llvm::IntegerType* ty){
+    if(usedInts.empty()){
+        return getRandomUnsigned(ty->getBitWidth());
+    }else{
+        for(size_t i=0,pos=getRandomUnsigned()%usedInts.size();i<usedInts.size();++i,++pos){
+            if(pos==usedInts.size()){
+                pos=0;
+            }
+            if(usedInts[pos]<=ty->getBitMask()){
+                return usedInts[pos];
+            }
+        }
+        return getRandomUnsigned(ty->getBitWidth());
+    }
+}
+
+double Random::getUsedDouble(){
+    return 0;
+}
+
+float Random::getUsedFloat(){
+    return 0;
+}
+
+unsigned Random::getRandomLLVMInt(llvm::IntegerType* ty){
+    switch (getRandomUnsigned(2))
+    {
+    case 0:
+        return getUsedInt(ty);
+    case 1:
+        return getBitmask(ty);;
+    case 2:
+        return getExtremeInt(ty);
+    case 3:
+        return getRandomUnsigned(ty->getBitWidth());
+    default:
+        return getRandomUnsigned(ty->getBitWidth());
+    }
+}
+
+double Random::getRandomLLVMDouble(){
+    switch (getRandomUnsigned()%3){
+        case 0:
+            return getUsedDouble();
+        case 1:
+            return getExtremeDouble();
+        case 2:
+            return getRandomDouble();
+        default:
+            return getRandomDouble();
+    }
+}
+
+float Random::getRandomLLVMFloat(){
+    switch (getRandomUnsigned()%3){
+        case 0:
+            return getUsedFloat();
+        case 1:
+            return getExtremeFloat();
+        case 2:
+            return getRandomFloat();
+        default:
+            return getRandomFloat();
+    }
+}
 
 void LLVMUtil::optimizeModule(llvm::Module *M) {
   llvm::LoopAnalysisManager LAM;

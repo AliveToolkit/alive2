@@ -5,6 +5,7 @@
 #include <memory>
 #include <random>
 #include <ctime>
+#include <climits>
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
@@ -34,15 +35,32 @@ class Random{
   static unsigned seed;
   static std::mt19937 mt;
   static std::uniform_int_distribution<int> dist;
+  static llvm::SmallVector<unsigned> usedInts;
+  static llvm::SmallVector<double> usedDoubles;
+  static llvm::SmallVector<float> usedFloats;
+  static unsigned getExtremeInt(llvm::IntegerType* ty);
+  static unsigned getBitmask(llvm::IntegerType* ty);
+  static double getExtremeDouble();
+  static float getExtremeFloat();
+  static unsigned getUsedInt(llvm::IntegerType* ty);
+  static double getUsedDouble();
+  static float getUsedFloat();
   public:
     static int getRandomInt(){return dist(mt);}
+    static void addUsedInt(unsigned i){usedInts.push_back(i);}
+    static double getRandomDouble();
+    static float getRandomFloat();
     static unsigned getRandomUnsigned(){return abs(dist(mt));}
+    static unsigned getRandomUnsigned(unsigned bits){return abs(dist(mt))%(1u<<bits);}
     static bool getRandomBool(){return dist(mt)&1;}
     static unsigned getSeed(){return seed;}
     static void setSeed(unsigned seed_){
       seed=seed_;
       mt=std::mt19937(seed);
     }
+    static unsigned getRandomLLVMInt(llvm::IntegerType* ty);
+    static double getRandomLLVMDouble();
+    static float getRandomLLVMFloat();
 };
 
 class LLVMUtil{
