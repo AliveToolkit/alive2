@@ -146,6 +146,7 @@ bool RandomMoveHelper::shouldMutate(){
 
 void RandomMoveHelper::mutate(){
     randomMoveInstruction(&*(mutator->tmpIit));
+    mutator->extraFuncArgs.clear();
 }
 
 void RandomMoveHelper::randomMoveInstruction(llvm::Instruction* inst){
