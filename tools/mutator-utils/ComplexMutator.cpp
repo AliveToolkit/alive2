@@ -41,12 +41,12 @@ end:
         /*
           Hard code for when to update helpers 
         */
-        helpers.push_back(std::make_unique<ShuffleHelper>(this));
+        /*helpers.push_back(std::make_unique<ShuffleHelper>(this));
         whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
         whenMoveToNextBasicBlockFuncs.push_back(helpers.size()-1);
 
         helpers.push_back(std::make_unique<MutateInstructionHelper>(this));
-        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+        whenMoveToNextInstFuncs.push_back(helpers.size()-1);*/
 
         helpers.push_back(std::make_unique<RandomMoveHelper>(this));
         whenMoveToNextInstFuncs.push_back(helpers.size()-1);
@@ -224,7 +224,7 @@ llvm::Value* ComplexMutator::getRandomValueFromExtraFuncArgs(llvm::Type* ty){
         for(size_t i=0,pos=Random::getRandomUnsigned()%extraFuncArgs.size();i<extraFuncArgs.size();++i,++pos){
             if(pos==extraFuncArgs.size())pos=0;
             if(extraFuncArgs[pos]->getType()==ty){
-                return &*vMap[extraFuncArgs[pos]];
+                return extraFuncArgs[pos];
             }
         }
     }
@@ -233,11 +233,19 @@ llvm::Value* ComplexMutator::getRandomValueFromExtraFuncArgs(llvm::Type* ty){
 
 llvm::Value* ComplexMutator::getRandomValue(llvm::Type* ty){
     if(ty!=nullptr&&!valueFuncs.empty()){
+        bool isUndef=false;
         for(size_t i=0,pos=Random::getRandomUnsigned()%valueFuncs.size();i<valueFuncs.size();++i,++pos){
             if(pos==valueFuncs.size())pos=0;
             if(llvm::Value* result=(this->*valueFuncs[pos])(ty);result!=nullptr){
+                if(llvm::isa<llvm::UndefValue>(result)){
+                    isUndef=true;
+                    continue;
+                }
                 return result;
             }
+        }
+        if(isUndef){
+            return llvm::UndefValue::get(ty);
         }
     }
     return nullptr;
@@ -255,10 +263,10 @@ llvm::Value* ComplexMutator::getRandomPointerValue(llvm::Type* ty){
 
 void ComplexMutator::addFunctionArguments(const llvm::SmallVector<llvm::Type*>& tys){
     if(!lazyUpdateInsts.empty()){
-        llvm::SmallVector<llvm::Type*> tys;
-        for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
+        //llvm::SmallVector<llvm::Type*> tys;
+        /*for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
             tys.push_back(ait->getType());
-        }
+        }*/
         size_t oldArgSize=tmpFit->arg_size();
         llvm::ValueToValueMapTy VMap;
         LLVMUtil::insertFunctionArguments(&*tmpFit,tys,VMap);
