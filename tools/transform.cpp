@@ -13,6 +13,7 @@
 #include "util/stopwatch.h"
 #include "util/symexec.h"
 #include <algorithm>
+#include <climits>
 #include <iostream>
 #include <map>
 #include <numeric>
