@@ -190,12 +190,13 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
 
     inst->moveBefore(newPosInst);
 
+    mutator->fixAllValues();
+
     //restore domInst
     while(!domBackup.empty()){
         mutator->domInst.push_back(domBackup.back());
         domBackup.pop_back();
     }
-    mutator->fixAllValues();
 }
 
 void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction* inst){
