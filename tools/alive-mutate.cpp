@@ -191,44 +191,58 @@ unsigned long long tot_num_errors=0;
 std::stringstream logs;
 unordered_set<std::string> logsFilter;
 
-void writeLog(bool repeatCheck,llvm::Function& F1,Results& r){
+bool writeLog(bool repeatCheck,llvm::Function& F1,Results& r){
   std::string str=logs.str();
-  if(!str.empty()){
-      if(repeatCheck){
-        if(logsFilter.find(str)==logsFilter.end()){
-          logsFilter.insert(str);
-        }else{
-          return;
-        }
-      }
-      out_file<<str<<"\n";
-      out_file<<"Current seed:"<<Random::getSeed()<<"\n";
-      out_file<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
-      r.t.print(out_file, {});
+  if(repeatCheck){
+    if(logsFilter.find(str)==logsFilter.end()){
+      logsFilter.insert(str);
+    }else{
+      return false;
+    }
   }
+  out_file<<str<<"\n";
+  out_file<<"Current seed:"<<Random::getSeed()<<"\n";
+  out_file<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
+  r.t.print(out_file, {});
+  if (r.status == Results::ERROR) {
+    out_file << "ERROR: " << r.error;
+    return true;
+  }else if(r.status==Results::TYPE_CHECKER_FAILED){
+    out_file << "Transformation doesn't verify!\n"
+            "ERROR: program doesn't type check!\n\n";
+  }else if(r.status==Results::UNSOUND){
+    out_file << "Transformation doesn't verify!\n\n";
+    if (!opt_quiet)
+      out_file << r.errs << endl;
+  }else if(r.status==Results::FAILED_TO_PROVE){
+    out_file << r.errs << endl;
+  }
+  return true;
 }
 
 bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       llvm::TargetLibraryInfoWrapperPass &TLI) {
   auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
+  bool shouldLog=false;
   if(verbose){
     writeLog(false,F1,r);
+    shouldLog=true;
   }else{
     switch(r.status){
       case Results::ERROR:
       case Results::UNSOUND:
       case Results::TYPE_CHECKER_FAILED:
       case Results::FAILED_TO_PROVE:
-        writeLog(r.status==Results::UNSOUND,F1,r);
+        shouldLog=writeLog(r.status==Results::UNSOUND,F1,r);
       default:
         break;
     }
   }
   if (r.status == Results::ERROR) {
-    *out << "ERROR: " << r.error;
-    std::cout<<"Error: "<<r.error<<std::endl;
+    out_file << "ERROR: " << r.error;
+
     ++num_errors;
-    return true;
+    return shouldLog;
   }
   switch (r.status) {
   case Results::ERROR:
@@ -244,27 +258,18 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
     break;
 
   case Results::TYPE_CHECKER_FAILED:
-    *out << "Transformation doesn't verify!\n"
-            "ERROR: program doesn't type check!\n\n";
     ++num_errors;
-    return true;
+    break;
 
   case Results::UNSOUND:
-    *out << "Transformation doesn't verify!\n\n";
-    if (!opt_quiet){
-      *out << r.errs << endl;
-      std::cout<<r.errs<<std::endl;
-    }
     ++num_unsound;
-    return true;
+    break;
 
   case Results::FAILED_TO_PROVE:
-    *out << r.errs << endl;
-    std::cout<<r.errs<<std::endl;
     ++num_failed;
-    return true;
+    break;
   }
-  return false;
+  return shouldLog;
 }
 }
 
