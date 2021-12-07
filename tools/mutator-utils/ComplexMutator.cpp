@@ -41,12 +41,12 @@ end:
         /*
           Hard code for when to update helpers 
         */
-        /*helpers.push_back(std::make_unique<ShuffleHelper>(this));
+        helpers.push_back(std::make_unique<ShuffleHelper>(this));
         whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
         whenMoveToNextBasicBlockFuncs.push_back(helpers.size()-1);
 
         helpers.push_back(std::make_unique<MutateInstructionHelper>(this));
-        whenMoveToNextInstFuncs.push_back(helpers.size()-1);*/
+        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
 
         helpers.push_back(std::make_unique<RandomMoveHelper>(this));
         whenMoveToNextInstFuncs.push_back(helpers.size()-1);

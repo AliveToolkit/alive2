@@ -188,24 +188,38 @@ unsigned long long tot_num_unsound=0;
 unsigned long long tot_num_failed=0;
 unsigned long long tot_num_errors=0;
 
+std::stringstream logs;
+unordered_set<std::string> logsFilter;
 
+void writeLog(bool repeatCheck,llvm::Function& F1,Results& r){
+  std::string str=logs.str();
+  if(!str.empty()){
+      if(repeatCheck){
+        if(logsFilter.find(str)==logsFilter.end()){
+          logsFilter.insert(str);
+        }else{
+          return;
+        }
+      }
+      out_file<<str<<"\n";
+      out_file<<"Current seed:"<<Random::getSeed()<<"\n";
+      out_file<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
+      r.t.print(out_file, {});
+  }
+}
 
 bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
                       llvm::TargetLibraryInfoWrapperPass &TLI) {
   auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
   if(verbose){
-    *out<<"Current seed:"<<Random::getSeed()<<"\n";
-    *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
-    r.t.print(*out, {});
+    writeLog(false,F1,r);
   }else{
     switch(r.status){
-      //case Results::ERROR:
+      case Results::ERROR:
       case Results::UNSOUND:
-      //case Results::TYPE_CHECKER_FAILED:
-      //case Results::FAILED_TO_PROVE:
-      *out<<"Current seed:"<<Random::getSeed()<<"\n";
-      *out<<"Source file:"<<F1.getParent()->getSourceFileName()<<"\n";
-      r.t.print(*out, {});
+      case Results::TYPE_CHECKER_FAILED:
+      case Results::FAILED_TO_PROVE:
+        writeLog(r.status==Results::UNSOUND,F1,r);
       default:
         break;
     }
@@ -440,7 +454,9 @@ void loggerInit(int ith){
         out_file.close();
       }
       out_file.open(path);
-      out = &out_file;
+      logs.str("");
+      logs.clear();
+      out = &logs;
       if (!out_file.is_open()) {
         cerr << "Alive2: Couldn't open report file!" << endl;
         exit(1);
