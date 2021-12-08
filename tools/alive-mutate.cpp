@@ -199,6 +199,28 @@ bool writeLog(bool repeatCheck,llvm::Function& F1,Results& r){
     }else{
       return false;
     }
+    if (r.status == Results::ERROR) {
+      if(logsFilter.find(r.error)==logsFilter.end()){
+        logsFilter.insert(r.error);
+      }else{
+        return false;
+      }
+    }else if(r.status==Results::TYPE_CHECKER_FAILED){
+      if(logsFilter.find("ERROR: program doesn't type check!")==logsFilter.end()){
+        logsFilter.insert("ERROR: program doesn't type check!");
+      }else{
+        return false;
+      }
+    }else if(r.status==Results::FAILED_TO_PROVE){
+      std::stringstream tmp;
+      tmp<<r.errs;
+      std::string tmpS=tmp.str();
+      if(logsFilter.find(tmpS)==logsFilter.end()){
+        logsFilter.insert(tmpS);
+      }else{
+        return false;
+      }
+    }
   }
   out_file<<str<<"\n";
   out_file<<"Current seed:"<<Random::getSeed()<<"\n";
@@ -233,14 +255,12 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
       case Results::UNSOUND:
       case Results::TYPE_CHECKER_FAILED:
       case Results::FAILED_TO_PROVE:
-        shouldLog=writeLog(r.status==Results::UNSOUND,F1,r);
+        shouldLog=writeLog(r.status!=Results::UNSOUND,F1,r);
       default:
         break;
     }
   }
   if (r.status == Results::ERROR) {
-    out_file << "ERROR: " << r.error;
-
     ++num_errors;
     return shouldLog;
   }
