@@ -386,9 +386,10 @@ bool inputVerify(){
           }else{
             if(r.status==Results::UNSOUND){
               loggerInit(unsoundCases--);
-              *out<<"Current seed:"<<Random::getSeed()<<"\n";
+              writeLog(false,*fit,r);
+              /**out<<"Current seed:"<<Random::getSeed()<<"\n";
               *out<<"Source file:"<<fit->getParent()->getSourceFileName()<<"\n";
-              r.t.print(*out, {});
+              r.t.print(*out, {});*/
             }
             changed=true;
             hasInvalidFunc=true;
@@ -617,9 +618,6 @@ void copyMode(){
       cerr<<"Cannot find any locations to mutate, "+testfile+" skipped!\n";
       return;
     }
-  //}else{
-  //  cerr<<"Cannot open input file "+testfile+"!\n";
-  //}
 }
 
 /*
@@ -658,9 +656,5 @@ void timeMode(){
         programEnd();
         exit(0);
       }
-
     }
-  //}else{
-  //  cerr<<"Cannot open input file "+testfile+"!\n";
-  //}
 }
