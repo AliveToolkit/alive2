@@ -169,6 +169,9 @@ bool SimpleMutator::init(){
                 }else if(llvm::isa<llvm::CallBase>(&*iit)&&!iit->isTerminator()){
                     if(llvm::CallBase* callInst=(llvm::CallBase*)&*iit;callInst->getType()->isVoidTy()){
                         mutants.push_back(std::make_pair(std::make_unique<VoidFunctionCallMutant>(callInst,iit->getNextNonDebugInstruction()),fit->getName()));
+                        if(mutants.back().first->isBoring()){
+                            ++isBoring;
+                        }
                     }
                 }
             }
