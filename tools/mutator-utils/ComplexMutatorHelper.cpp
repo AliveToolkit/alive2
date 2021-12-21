@@ -168,6 +168,13 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
 
     for(auto it=inst->getParent()->begin();&*it!=inst;++it,++pos);
     newPos=Random::getRandomUnsigned()%pos;
+    /**
+     * PHINode must be the first inst in the basic block.
+     * 
+     */
+    if(llvm::isa<llvm::PHINode>(inst->getParent()->begin())&&newPos==0){
+        ++newPos;
+    }
     //llvm::errs()<<"both pos: "<<pos<<' '<<newPos<<"\n";
     llvm::SmallVector<llvm::Instruction*> v;
     llvm::SmallVector<llvm::Value*> domBackup;
