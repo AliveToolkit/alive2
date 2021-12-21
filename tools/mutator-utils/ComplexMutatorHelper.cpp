@@ -64,7 +64,6 @@ void ShuffleHelper::shuffleBlock(){
     llvm::SmallVector<llvm::Instruction*> sv;
     for(const auto& p:sblock){
         sv.push_back(p);
-        //sv.push_back((llvm::Instruction*)&*vMap[p]);
     }
     llvm::Instruction* nextInst=(llvm::Instruction*)&*(mutator->vMap)[sv.back()->getNextNonDebugInstruction()];
     while(sv==sblock){
@@ -184,7 +183,6 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
     for(size_t i=0;i<inst->getNumOperands();++i){
         if(llvm::Value* op=inst->getOperand(i);std::find(v.begin(),v.end(),op)!=v.end()){
             mutator->setOperandRandomValue(inst,i);
-            //inst->setOperand(i,getRandomValue(op->getType()));
         }
     }
 
@@ -212,7 +210,6 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction* inst){
         for(size_t op=0;op<newPosInst->getNumOperands();++op){
             if(llvm::Value* opP=newPosInst->getOperand(op);opP!=nullptr&&opP==inst){
                 mutator->setOperandRandomValue(newPosInst,op);
-                //newPosInst->setOperand(op,getRandomValue(opP->getType()));
             }
         }
     }
