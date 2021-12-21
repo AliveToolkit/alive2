@@ -32,10 +32,33 @@ end:
             */
                 dtMap[funcIt->getName()]=llvm::DominatorTree(*funcIt);
             }
+
+            /*
+              find all used ints and add them to the Random class
+            */
+            for(auto instIt=llvm::inst_begin(*funcIt); instIt != llvm::inst_end(*funcIt); instIt++){
+                for(size_t i=0;i<instIt->getNumOperands();++i){
+                    if(llvm::Value* val=instIt->getOperand(i);val!=nullptr&&llvm::isa<llvm::ConstantInt>(val)){
+                        Random::addUsedInt(((llvm::ConstantInt*)val)->getValue().getLimitedValue());
+                    }
+                }
+            }
         }
 
         for(auto git=pm->global_begin();git!=pm->global_end();++git){
             domInst.push_back(&*git);
+
+            for(auto ait=git->op_begin();ait!=git->op_end();++ait){
+                
+                if(llvm::isa<llvm::ConstantInt>(ait->get())){
+                    llvm::ConstantInt* pci=(llvm::ConstantInt*)ait->get();
+                    Random::addUsedInt(pci->getValue().getLimitedValue());
+                }
+            }
+            if(llvm::isa<llvm::ConstantInt>(&*git)){
+                llvm::ConstantInt* pci=(llvm::ConstantInt*)&*git;
+                Random::addUsedInt(pci->getZExtValue());
+            }
         }
         calcDomInst();
         /*
