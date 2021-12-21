@@ -49,15 +49,14 @@ end:
             domInst.push_back(&*git);
 
             for(auto ait=git->op_begin();ait!=git->op_end();++ait){
-                
-                if(llvm::isa<llvm::ConstantInt>(ait->get())){
+                if(ait->get()!=nullptr&&llvm::isa<llvm::ConstantInt>(ait->get())){
                     llvm::ConstantInt* pci=(llvm::ConstantInt*)ait->get();
                     Random::addUsedInt(pci->getValue().getLimitedValue());
                 }
             }
             if(llvm::isa<llvm::ConstantInt>(&*git)){
                 llvm::ConstantInt* pci=(llvm::ConstantInt*)&*git;
-                Random::addUsedInt(pci->getZExtValue());
+                Random::addUsedInt(pci->getValue().getLimitedValue());
             }
         }
         calcDomInst();
