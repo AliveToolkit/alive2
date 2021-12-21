@@ -129,9 +129,9 @@ class BinaryInstructionMutant:public Mutant{
     void replaceConstant(llvm::Value*& v){
         llvm::Type* ty=v->getType();
         if (llvm::isa<llvm::ConstantInt>(v)&&ty->isIntegerTy()) {
-            v=llvm::ConstantInt::get(ty,Random::getRandomUnsigned());
+            v=llvm::ConstantInt::get(ty,Random::getRandomLLVMInt((llvm::IntegerType*)ty));
         } else if (llvm::isa<llvm::ConstantFP>(v)&&ty->isFloatingPointTy()) {
-            v=llvm::ConstantFP::get(ty,Random::getRandomUnsigned());
+            v=llvm::ConstantFP::get(ty,Random::getRandomLLVMDouble());
         }
     }
     void resetMathFlags(){
