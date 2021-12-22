@@ -164,17 +164,28 @@ void RandomMoveHelper::randomMoveInstruction(llvm::Instruction* inst){
 }
 
 void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
-    size_t pos=0,newPos;
+    size_t pos=0,newPos,beginPos=0;
 
     for(auto it=inst->getParent()->begin();&*it!=inst;++it,++pos);
-    newPos=Random::getRandomUnsigned()%pos;
     /**
      * PHINode must be the first inst in the basic block.
      * 
      */
-    if(llvm::isa<llvm::PHINode>(inst->getParent()->begin())&&newPos==0){
-        ++newPos;
+    if(!llvm::isa<llvm::PHINode>(inst)){
+        for(llvm::Instruction* phiInst=&*inst->getParent()->begin();llvm::isa<llvm::PHINode>(phiInst);phiInst=phiInst->getNextNonDebugInstruction()){
+            ++beginPos;
+        }
     }
+
+    /*
+     *  Current inst cannot move forward because current inst is not PHI inst,
+     *  and there are zero or more PHI inst(s) in front of current inst.
+     */
+    if(pos==beginPos){
+        return;
+    }
+
+    newPos=Random::getRandomUnsigned()%(pos-beginPos)+beginPos;
     //llvm::errs()<<"both pos: "<<pos<<' '<<newPos<<"\n";
     llvm::SmallVector<llvm::Instruction*> v;
     llvm::SmallVector<llvm::Value*> domBackup;
@@ -205,10 +216,23 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
 }
 
 void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction* inst){
-    size_t pos=0,newPos;
+    size_t pos=0,newPos,endPos=0;
 
     for(auto it=inst->getParent()->begin();&*it!=inst;++it,++pos);
-    newPos=Random::getRandomInt()%(inst->getParent()->size()-pos)+1+pos;    
+    if(llvm::isa<llvm::PHINode>(inst)){
+        for(llvm::Instruction* phiInst=&*inst->getParent()->begin();llvm::isa<llvm::PHINode>(phiInst);phiInst=phiInst->getNextNonDebugInstruction()){
+            ++endPos;
+        }
+    }
+
+    /*
+     * Current inst is a phi instruction and is the end of phi instruction block.
+     */
+    if(pos+1==endPos){
+        return;
+    }
+
+    newPos=Random::getRandomInt()%(endPos-pos)+1+pos;    
 
     //need fix all insts used current inst in [pos,newPos]
     llvm::Instruction* newPosInst=inst;
