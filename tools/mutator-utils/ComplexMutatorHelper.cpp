@@ -224,7 +224,9 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction* inst){
             ++endPos;
         }
     }
-
+    if(endPos==0){
+        endPos=inst->getParent()->size()-1;
+    }
     /*
      * Current inst is a phi instruction and is the end of phi instruction block.
      */
