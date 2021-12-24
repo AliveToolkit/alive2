@@ -6,6 +6,10 @@ void ShuffleHelper::init(){
             continue;
         }
         shuffleBasicBlockIndex=0;
+        /**
+         * find the same location as iit,bit,fit, and set shuffleBasicBlock
+         * 
+         */
         for(auto bit=fit->begin();bit!=fit->end();++bit,++shuffleBasicBlockIndex){
             for(auto iit=bit->begin();iit!=bit->end();++iit){
                 if(&*iit==(&*(mutator->iit))){
@@ -29,7 +33,19 @@ varSetEnd:
                 BasicBlockShuffleBlock& bSBlock=fSBlock[idx];
                 ShuffleBlock tmp;
                 std::unordered_set<llvm::Value*> us;
-                for(auto instIt=bbIt->begin();!instIt->isTerminator();++instIt){
+                auto instIt=bbIt->begin();
+                /**
+                 * handle phi instructions at beginning.
+                 */
+                while(!instIt->isTerminator()&&llvm::isa<llvm::PHINode>(instIt)){
+                    tmp.push_back(&*instIt);
+                    ++instIt;
+                }
+                if(tmp.size()>=2){
+                    bSBlock.push_back(tmp);
+                }
+                tmp.clear();
+                for(;!instIt->isTerminator();++instIt){
                     bool flag=true;
                     for(size_t op=0;flag&&op<instIt->getNumOperands();++op){
                         if(us.find(instIt->getOperand(op))!=us.end()){
