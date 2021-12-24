@@ -186,17 +186,20 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
     }
 
     newPos=Random::getRandomUnsigned()%(pos-beginPos)+beginPos;
+    //llvm::errs()<<pos<<' '<<beginPos<<' '<<newPos<<"AAAAAAAAAAAAAA\n";
     //llvm::errs()<<"both pos: "<<pos<<' '<<newPos<<"\n";
     llvm::SmallVector<llvm::Instruction*> v;
     llvm::SmallVector<llvm::Value*> domBackup;
     llvm::Instruction* newPosInst=inst;
+    llvm::BasicBlock::iterator newPosIt=newPosInst->getIterator();
     for(size_t i=pos;i!=newPos;--i){
-        newPosInst=newPosInst->getPrevNonDebugInstruction();
-        v.push_back(newPosInst);
+        --newPosIt;
+        v.push_back(&*newPosIt);
         //remove Insts in current basic block
         domBackup.push_back(mutator->domInst.back());
         mutator->domInst.pop_back();
     }
+    newPosInst=&*newPosIt;
 
     for(size_t i=0;i<inst->getNumOperands();++i){
         if(llvm::Value* op=inst->getOperand(i);std::find(v.begin(),v.end(),op)!=v.end()){
