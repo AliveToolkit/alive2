@@ -371,8 +371,46 @@ bool inputVerify(){
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     LLVMUtil::optimizeModule(M2.get());
-    bool changed=false;
-    while(true){
+    //bool changed=false;
+    std::unordered_set<std::string> funcNames;
+    for(auto fit=M1->begin(); fit!=M1->end();++fit)
+    if(!fit->isDeclaration()&&!fit->getName().empty()){
+      funcNames.insert(fit->getName().str());
+    }
+    while(!funcNames.empty()){
+      std::string curFunc=*funcNames.begin();
+      funcNames.erase(funcNames.begin());
+      if(llvm::Function* f1=M1->getFunction(curFunc),*f2=M2->getFunction(curFunc);f1!=nullptr&&f2!=nullptr){
+        llvm::TargetLibraryInfoWrapperPass TLI(llvm::Triple(M1.get()->getTargetTriple()));
+        smt_init.emplace();
+        auto r = verify(*f1, *f2, TLI, !opt_quiet, opt_always_verify);
+        smt_init.reset();
+        if(r.status==Results::CORRECT){
+          ++validFuncNum;
+        }else{
+          if(r.status==Results::UNSOUND){
+            loggerInit(unsoundCases--);
+            writeLog(false,*f1,r);
+          }
+          //changed=true;
+          hasInvalidFunc=true;
+          for(auto it=f1->user_begin();it!=f1->user_end();++it){
+            llvm::Function* invalidFunc=nullptr;
+            if(llvm::isa<llvm::Instruction>(*it)){
+              invalidFunc=((llvm::Instruction*)*it)->getParent()->getParent();
+            }else if(llvm::isa<llvm::BasicBlock>(*it)){
+              invalidFunc=((llvm::BasicBlock*)*it)->getParent();
+            }else if(llvm::isa<llvm::Function>(*it)){
+              invalidFunc=((llvm::Function*)*it);
+            }
+            if(invalidFunc!=nullptr&&funcNames.find(invalidFunc->getName().str())!=funcNames.end()){
+              funcNames.erase(invalidFunc->getName().str());
+            }
+          }
+        }
+      }
+    }
+    /*while(true){
       changed=false;;
       for(auto fit=M1->begin();fit!=M1->end();++fit)
       if(!fit->isDeclaration()&&!fit->getName().empty()){
@@ -386,10 +424,7 @@ bool inputVerify(){
           }else{
             if(r.status==Results::UNSOUND){
               loggerInit(unsoundCases--);
-              writeLog(false,*fit,r);
-              /**out<<"Current seed:"<<Random::getSeed()<<"\n";
-              *out<<"Source file:"<<fit->getParent()->getSourceFileName()<<"\n";
-              r.t.print(*out, {});*/
+              writeLog(false,*fit,r);              
             }
             changed=true;
             hasInvalidFunc=true;
@@ -405,7 +440,7 @@ bool inputVerify(){
         }
       }
       if(!changed)break;
-    }
+    }*/
 
     stubMutator.setModule(std::move(M1));
     tot_num_correct=0;
