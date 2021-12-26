@@ -37,7 +37,7 @@ varSetEnd:
                 /**
                  * handle phi instructions at beginning.
                  */
-                while(!instIt->isTerminator()&&llvm::isa<llvm::PHINode>(instIt)){
+                while(!instIt->isTerminator()&&llvm::isa<llvm::PHINode>(&*instIt)){
                     tmp.push_back(&*instIt);
                     ++instIt;
                 }
@@ -81,7 +81,7 @@ void ShuffleHelper::shuffleBlock(){
     for(const auto& p:sblock){
         sv.push_back(p);
     }
-    llvm::Instruction* nextInst=(llvm::Instruction*)&*(mutator->vMap)[sv.back()->getNextNonDebugInstruction()];
+    llvm::Instruction* nextInst=(llvm::Instruction*)&*(mutator->vMap)[&*(++sv.back()->getIterator())];
     while(sv==sblock){
         std::random_shuffle(sv.begin(),sv.end());
     }
