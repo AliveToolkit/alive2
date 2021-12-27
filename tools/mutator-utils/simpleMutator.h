@@ -280,10 +280,13 @@ public:
 */
 class SimpleMutator:public Mutator{
     std::list<std::pair<std::unique_ptr<Mutant>,llvm::StringRef>> mutants;
+    std::unordered_set<std::string> invalidFunctions;
     decltype(mutants.begin()) it;
     bool isFirstRun;  
 public:
     SimpleMutator(bool debug=false):Mutator(debug),isFirstRun(true){};
+    SimpleMutator(const std::unordered_set<std::string>& invalidFunctions,bool debug=false):Mutator(debug),
+        invalidFunctions(invalidFunctions),isFirstRun(true){};
     virtual ~SimpleMutator(){mutants.clear();};
     virtual bool init()override;
     virtual void mutateModule(const string& outputFileName)override;

@@ -372,7 +372,6 @@ bool inputVerify(){
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     LLVMUtil::optimizeModule(M2.get());
     //bool changed=false;
-    std::unordered_set<std::string> invalidFuncNames;
     for(auto fit=M1->begin(); fit!=M1->end();++fit)
     if(!fit->isDeclaration()&&!fit->getName().empty()){
       if(llvm::Function* f2=M2->getFunction(fit->getName());f2!=nullptr){
@@ -388,16 +387,10 @@ bool inputVerify(){
             writeLog(false,*fit,r);
           }
           //changed=true;
-          invalidFuncNames.insert(fit->getName().str());
+          invalidFuncNameSet.insert(fit->getName().str());
         }
       }
     }
-    for(const std::string& str:invalidFuncNames){
-      if(llvm::Function* f=M1->getFunction(str);f!=nullptr){
-        f->eraseFromParent();
-      }
-    }
-
 
     stubMutator.setModule(std::move(M1));
     tot_num_correct=0;
@@ -587,8 +580,10 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
 void copyMode(){
   llvm::LLVMContext context;
   std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
-  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(CloneModule(*pm),verbose)};
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(invalidFuncNameSet,verbose),
+                                      std::make_unique<ComplexMutator>(invalidFuncNameSet,verbose)};
   //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
+  mutators[1]->setModule(CloneModule(*pm));
   mutators[0]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
     if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){

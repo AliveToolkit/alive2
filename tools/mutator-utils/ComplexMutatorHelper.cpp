@@ -2,7 +2,7 @@
 
 void ShuffleHelper::init(){
     for(auto fit=mutator->pm->begin();fit!=mutator->pm->end();++fit){
-        if(fit->isDeclaration()){
+        if(fit->isDeclaration()||mutator->invalidFunctions.find(fit->getName().str())!=mutator->invalidFunctions.end()){
             continue;
         }
         shuffleBasicBlockIndex=0;
@@ -21,7 +21,8 @@ void ShuffleHelper::init(){
 varSetEnd:
 
     for(auto funcIt=mutator->pm->begin();funcIt!=mutator->pm->end();++funcIt){
-        if(!funcIt->isDeclaration()&&!funcIt->getName().empty()){
+        if(!funcIt->isDeclaration()&&!funcIt->getName().empty()
+                &&mutator->invalidFunctions.find(funcIt->getName().str())==mutator->invalidFunctions.end()){
             /*
                 Handle shuffle map
             */

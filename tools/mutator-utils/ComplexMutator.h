@@ -20,6 +20,8 @@ class ComplexMutator:public Mutator{
     friend class MutateInstructionHelper;
     friend class RandomMoveHelper;
 
+
+    std::unordered_set<std::string> invalidFunctions;
     std::vector<llvm::Value*> domInst;
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
@@ -62,6 +64,9 @@ class ComplexMutator:public Mutator{
     void fixAllValues();
 public:
     ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+    };
+    ComplexMutator(const std::unordered_set<std::string>& invalidFunctions,bool debug=false):Mutator(debug),invalidFunctions(invalidFunctions),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
     };
     ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),

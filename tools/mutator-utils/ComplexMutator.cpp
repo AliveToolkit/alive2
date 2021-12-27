@@ -3,7 +3,7 @@
 bool ComplexMutator::init(){
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
-        if(fit->isDeclaration()){
+        if(fit->isDeclaration()||invalidFunctions.find(fit->getName().str())!=invalidFunctions.end()){
             continue;
         }
         for(bit=fit->begin();bit!=fit->end();++bit){
@@ -26,7 +26,8 @@ end:
                 }
             }
             
-            if(!funcIt->isDeclaration()&&!funcIt->getName().empty()){
+            if(!funcIt->isDeclaration()&&!funcIt->getName().empty()&&
+                invalidFunctions.find(fit->getName().str())==invalidFunctions.end()){
             /*
                 Handle Dominator tree
             */
@@ -155,7 +156,7 @@ bool ComplexMutator::isReplaceable(llvm::Instruction* inst){
 void ComplexMutator::moveToNextFuction(){
     ++fit;
     if(fit==pm->end())fit=pm->begin();
-    while(fit->isDeclaration()){
+    while(fit->isDeclaration()||invalidFunctions.find(fit->getName().str())!=invalidFunctions.end()){
         ++fit;if(fit==pm->end())fit=pm->begin();
     }
     bit=fit->begin();
