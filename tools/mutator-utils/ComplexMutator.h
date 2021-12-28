@@ -66,8 +66,9 @@ public:
     ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
     };
-    ComplexMutator(const std::unordered_set<std::string>& invalidFunctions,bool debug=false):Mutator(debug),invalidFunctions(invalidFunctions),tmpCopy(nullptr),
+    ComplexMutator(std::unique_ptr<llvm::Module> pm_,const std::unordered_set<std::string>& invalidFunctions,bool debug=false):Mutator(debug),invalidFunctions(invalidFunctions),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+      pm=std::move(pm_);
     };
     ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),
       valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){

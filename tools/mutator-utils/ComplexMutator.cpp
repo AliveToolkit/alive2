@@ -3,7 +3,7 @@
 bool ComplexMutator::init(){
     bool result=false;
     for(fit=pm->begin();fit!=pm->end();++fit){
-        if(fit->isDeclaration()||invalidFunctions.find(fit->getName().str())!=invalidFunctions.end()){
+        if(fit->isDeclaration()||fit->getName().empty()||invalidFunctions.find(fit->getName().str())!=invalidFunctions.end()){
             continue;
         }
         for(bit=fit->begin();bit!=fit->end();++bit){

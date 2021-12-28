@@ -385,6 +385,8 @@ bool inputVerify(){
           if(r.status==Results::UNSOUND){
             loggerInit(unsoundCases--);
             writeLog(false,*fit,r);
+          }else{
+            hasInvalidFunc=true;
           }
           //changed=true;
           invalidFuncNameSet.insert(fit->getName().str());
@@ -581,9 +583,8 @@ void copyMode(){
   llvm::LLVMContext context;
   std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
   std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(invalidFuncNameSet,verbose),
-                                      std::make_unique<ComplexMutator>(invalidFuncNameSet,verbose)};
+                                      std::make_unique<ComplexMutator>(CloneModule(*pm),invalidFuncNameSet,verbose)};
   //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-  mutators[1]->setModule(CloneModule(*pm));
   mutators[0]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
     if(bool sInit=mutators[0]->init(),cInit=mutators[1]->init();sInit||cInit){
@@ -613,7 +614,8 @@ void copyMode(){
 void timeMode(){
   llvm::LLVMContext context;
   std::unique_ptr<llvm::Module> pm=stubMutator.getModule();
-  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(verbose),std::make_unique<ComplexMutator>(CloneModule(*pm),verbose)};
+  std::unique_ptr<Mutator> mutators[2]{std::make_unique<SimpleMutator>(invalidFuncNameSet,verbose),
+                              std::make_unique<ComplexMutator>(CloneModule(*pm),invalidFuncNameSet,verbose)};
   mutators[0]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
   //if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
