@@ -93,6 +93,7 @@ void ShuffleHelper::shuffleBlock(){
     for(llvm::Instruction* p:sv){
         ((llvm::Instruction*)&*(mutator->vMap)[p])->insertBefore(nextInst);
     }
+    mutator->tmpIit=llvm::BasicBlock::iterator((llvm::Instruction*)&*mutator->vMap[&*mutator->iit]);
 }
 
 void MutateInstructionHelper::mutate(){

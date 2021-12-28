@@ -54,8 +54,8 @@ class ComplexMutator:public Mutator{
     llvm::Value* getRandomPointerValue(llvm::Type* ty);
     llvm::SmallVector<llvm::Value* (ComplexMutator::*)(llvm::Type*)> valueFuncs;
 
-    llvm::SmallVector<std::unique_ptr<ComplexMutatorHelper>>::iterator currHelpersIt;
     llvm::SmallVector<std::unique_ptr<ComplexMutatorHelper>> helpers;
+    llvm::SmallVector<int> helpersPossbility;
     llvm::SmallVector<size_t> whenMoveToNextInstFuncs;
     llvm::SmallVector<size_t> whenMoveToNextBasicBlockFuncs;
     llvm::SmallVector<size_t> whenMoveToNextFuncFuncs;
