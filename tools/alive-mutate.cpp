@@ -385,9 +385,8 @@ bool inputVerify(){
           if(r.status==Results::UNSOUND){
             loggerInit(unsoundCases--);
             writeLog(false,*fit,r);
-          }else{
-            hasInvalidFunc=true;
           }
+          hasInvalidFunc=true;
           //changed=true;
           invalidFuncNameSet.insert(fit->getName().str());
         }
