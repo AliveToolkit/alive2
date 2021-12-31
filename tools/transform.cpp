@@ -807,6 +807,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_malloc       = false;
   has_free         = false;
   has_fncall       = false;
+  has_write_fncall = false;
   has_null_block   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
