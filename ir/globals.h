@@ -17,6 +17,8 @@ extern unsigned num_globals_src;
 
 extern unsigned num_ptrinputs;
 
+extern unsigned num_inaccessiblememonly_fns;
+
 /// Number of non-constant globals introduced in tgt
 extern unsigned num_extra_nonconst_tgt;
 
@@ -64,6 +66,9 @@ extern bool has_free;
 extern bool has_alloca;
 
 extern bool has_fncall;
+
+// has a function call that writes to global memory (not-inaccessible only)
+extern bool has_write_fncall;
 
 /// Whether any function argument (not function call arg) has the attribute
 extern bool has_nocapture;

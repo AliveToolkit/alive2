@@ -17,17 +17,19 @@ using namespace std;
 using namespace util;
 
   // Non-local block ids (assuming that no block is optimized out):
-  // 1. null block: 0
+  // 1. null block: has_null_block
   // 2. global vars in source:
-  //      1 ~ num_consts_src                    (constant globals)
-  //      num_consts_src + 1 ~ num_globals_src  (non-constant globals)
+  //      + num_consts_src    (constant globals)
+  //      + num_globals_src   (all globals incl constant)
   // 3. pointer argument inputs:
-  //      num_globals_src + 1 ~ num_globals_src + num_ptrinputs
+  //      has_null_block + num_globals_src + num_ptrinputs
   // 4. nonlocal blocks returned by loads/calls:
-  //      num_globals_src + num_ptrinputs + 1 ~ num_nonlocals_src - 2:
+  //      has_null_block + num_globals_src + num_ptrinputs + 1 -> ...
   // 5. a block reserved for encoding the memory touched by calls:
-  //      num_nonlocals_src - 1
-  // 6. constant global vars in target only:
+  //      num_nonlocals_src - num_inaccessiblememonly_fns - has_write_fncall
+  // 6. 1 block per inaccessiblememonly
+  //      + num_inaccessiblememonly_fns ~ num_nonlocals_src - 1
+  // 7. constant global vars in target only:
   //      num_nonlocals_src ~ num_nonlocals - 1
   //            (constant globals in target only)
 
@@ -58,12 +60,12 @@ static bool is_constglb(unsigned bid) {
 // Return true if bid is the nonlocal block used to encode function calls' side
 // effects
 static unsigned get_fncallmem_bid() {
-  assert(has_fncall);
-  return num_nonlocals_src - 1;
+  assert(has_write_fncall);
+  return num_nonlocals_src - num_inaccessiblememonly_fns - 1;
 }
 
 static bool is_fncall_mem(unsigned bid) {
-  if (!has_fncall)
+  if (!has_write_fncall)
     return false;
   return bid == get_fncallmem_bid();
 }
@@ -1045,9 +1047,14 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
       // initial memory cannot contain a pointer to fncall mem block.
       if (is_fncall_mem(upperbid)) {
         upperbid--;
-      } else {
+      } else if (!num_inaccessiblememonly_fns) {
         assert(!state->isSource()); // target-only glb vars exist
         bid_cond = bid != get_fncallmem_bid();
+      } else {
+        bid_cond = bid.ult(num_nonlocals_src - num_inaccessiblememonly_fns
+                                             - has_write_fncall);
+        if (upperbid > num_nonlocals_src)
+          bid_cond |= bid.ugt(num_nonlocals_src - 1);
       }
     }
     bid_cond &= bid.ule(upperbid);
@@ -1347,7 +1354,7 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
 
 Memory::CallState
 Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
-                    bool nofree) {
+                    bool nofree, bool inaccessiblememonly) {
   assert(has_fncall);
   CallState st;
   st.empty = false;
@@ -1356,12 +1363,21 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
 
   auto blk_type = mk_block_val_array(1);
   unsigned num_consts = has_null_block + num_consts_src;
-  for (unsigned i = num_consts; i < num_nonlocals_src; ++i) {
+  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+
+  if (inaccessiblememonly) {
     st.non_local_block_val.emplace_back(expr::mkFreshVar("blk_val", blk_type));
+  } else {
+    for (unsigned i = num_consts; i < limit; ++i) {
+      st.non_local_block_val.emplace_back(
+        expr::mkFreshVar("blk_val", blk_type));
+    }
   }
 
+  // TODO: this code should be moved to setState as old_val should be the one
+  // from the corresponding state, not always from source
   if (ptr_inputs) {
-    for (unsigned bid = num_consts; bid < num_nonlocals_src; ++bid) {
+    for (unsigned bid = num_consts; bid < limit - has_write_fncall; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
         if (!ptr_in.byval && bid < next_nonlocal_bid) {
@@ -1375,7 +1391,7 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
     }
   }
 
-  if (num_nonlocals_src && !nofree) {
+  if (num_nonlocals_src && !nofree && !inaccessiblememonly) {
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = has_null_block ? one : zero;
@@ -1407,15 +1423,26 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
   return st;
 }
 
-void Memory::setState(const Memory::CallState &st) {
+void Memory::setState(const Memory::CallState &st, unsigned modifies_bid) {
   assert(has_fncall);
-  auto consts = has_null_block + num_consts_src;
-  for (unsigned i = consts; i < num_nonlocals_src; ++i) {
-    non_local_block_val[i].val = st.non_local_block_val[i - consts];
-    if (isInitialMemBlock(non_local_block_val[i].val, true))
-      non_local_block_val[i].undef.clear();
+  if (modifies_bid != -1u) {
+    assert(st.non_local_block_val.size() == 1);
+    unsigned bid
+      = num_nonlocals_src - num_inaccessiblememonly_fns + modifies_bid;
+    assert(bid < num_nonlocals_src);
+    assert(non_local_block_val[bid].undef.empty());
+    non_local_block_val[bid].val = st.non_local_block_val[0];
+  } else {
+    auto consts = has_null_block + num_consts_src;
+    unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+    for (unsigned i = consts; i < limit; ++i) {
+      non_local_block_val[i].val = st.non_local_block_val[i - consts];
+      if (isInitialMemBlock(non_local_block_val[i].val, true))
+        non_local_block_val[i].undef.clear();
+    }
+    // TODO: this is not ok for functions that can be reordered
+    non_local_block_liveness = st.non_local_liveness;
   }
-  non_local_block_liveness = st.non_local_liveness;
   mkNonlocalValAxioms(true);
 }
 
@@ -1939,13 +1966,22 @@ Memory::refined(const Memory &other, bool skip_constants,
   expr ret(true);
   set<expr> undef_vars;
 
-  auto nonlocal_used = [](const Memory &m, unsigned bid) {
-    return bid < m.next_nonlocal_bid;
-  };
+  AliasSet block_alias(other);
+  for (auto &[mem, set]
+         : { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2)}) {
+    if (set) {
+      for (auto &it: *set_ptrs) {
+        block_alias.unionWith(
+          computeAliasing(Pointer(*mem, it.val.value), 1, 1, false));
+      }
+    } else if (mem->next_nonlocal_bid > 0) {
+      block_alias.setMayAliasUpTo(false, mem->next_nonlocal_bid-1);
+    }
+  }
 
   unsigned bid = has_null_block + skip_constants * num_consts_src;
   for (; bid < num_nonlocals_src; ++bid) {
-    if (!nonlocal_used(*this, bid) && !nonlocal_used(other, bid))
+    if (!block_alias.mayAlias(false, bid))
       continue;
 
     expr bid_expr = expr::mkUInt(bid, bits_for_bid);
@@ -1958,14 +1994,17 @@ Memory::refined(const Memory &other, bool skip_constants,
 
   // restrict refinement check to set of request blocks
   if (set_ptrs) {
-    expr c(false);
-    for (auto &itm: *set_ptrs) {
-      // TODO: deal with the byval arg case (itm.second)
-      auto &ptr = itm.val;
-      c |= ptr.non_poison && Pointer(*this, ptr.value).getBid() == ptr_bid;
+    OrExpr c;
+    for (auto set : {set_ptrs, set_ptrs2}) {
+      for (auto &it: *set) {
+        auto &ptr = it.val;
+        c.add(ptr.non_poison && Pointer(*this, ptr.value).getBid() == ptr_bid);
+      }
     }
-    ret = c.implies(ret);
+    ret = c().implies(ret);
   }
+
+  // TODO: missing refinement of escaped local blocks!
 
   return { move(ret), move(ptr), move(undef_vars) };
 }

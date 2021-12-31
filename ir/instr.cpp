@@ -1860,7 +1860,12 @@ StateValue FnCall::toSMT(State &s) const {
   if (check(FnAttrs::ArgMemOnly) ||
       check(FnAttrs::NoFree) ||
       check(FnAttrs::NoThrow) ||
-      check(FnAttrs::WillReturn))
+      check(FnAttrs::WillReturn) ||
+      check(FnAttrs::InaccessibleMemOnly))
+    s.addUB(expr(false));
+
+  // can't have both!
+  if (attrs.has(FnAttrs::ArgMemOnly) && attrs.has(FnAttrs::InaccessibleMemOnly))
     s.addUB(expr(false));
 
   unsigned idx = 0;

@@ -814,6 +814,9 @@ static void calculateAndInitConstants(Transform &t) {
   observes_addresses  = false;
   bool does_any_byte_access = false;
 
+  set<string> inaccessiblememonly_fns;
+  num_inaccessiblememonly_fns = 0;
+
   // Mininum access size (in bytes)
   uint64_t min_access_size = 8;
   unsigned min_vect_elem_sz = 0;
@@ -873,8 +876,15 @@ static void calculateAndInitConstants(Transform &t) {
 
       update_min_vect_sz(i.getType());
 
-      if (dynamic_cast<const FnCall*>(&i))
+      if (auto fn = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
+        if (fn->hasAttribute(FnAttrs::InaccessibleMemOnly)) {
+          if (inaccessiblememonly_fns.emplace(fn->getName()).second)
+            ++num_inaccessiblememonly_fns;
+        } else {
+          has_write_fncall |= !fn->hasAttribute(FnAttrs::NoWrite);
+        }
+      }
 
       if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
         auto [alloc, align] = mi->getMaxAllocSize();
@@ -950,10 +960,10 @@ static void calculateAndInitConstants(Transform &t) {
                   has_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
-                      has_null_block;
+                      num_inaccessiblememonly_fns + has_null_block;
 
   // Allow at least one non-const global for calls to change
-  num_nonlocals_src += has_fncall;
+  num_nonlocals_src += has_write_fncall;
 
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
@@ -1025,6 +1035,8 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nnum_locals_tgt: " << num_locals_tgt
                   << "\nnum_nonlocals_src: " << num_nonlocals_src
                   << "\nnum_nonlocals: " << num_nonlocals
+                  << "\nnum_inaccessiblememonly_fns: "
+                    << num_inaccessiblememonly_fns
                   << "\nbits_for_bid: " << bits_for_bid
                   << "\nbits_for_offset: " << bits_for_offset
                   << "\nbits_size_t: " << bits_size_t

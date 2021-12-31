@@ -35,53 +35,77 @@ void State::ValueAnalysis::meet_with(const State::ValueAnalysis &other) {
   non_undef_vals = intersect_set(non_undef_vals, other.non_undef_vals);
   unused_vars = intersect_set(unused_vars, other.unused_vars);
 
-  for (auto &[fn, calls] : other.ranges_fn_calls) {
-    auto [I, inserted] = ranges_fn_calls.try_emplace(fn, calls);
+  for (auto &[fn, pair] : other.ranges_fn_calls) {
+    auto &[calls, inaccessiblememonly] = pair;
+    auto [I, inserted] = ranges_fn_calls.try_emplace(fn, pair);
     if (inserted) {
-      I->second.emplace(0);
+      I->second.first.emplace(0);
     } else {
-      I->second.insert(calls.begin(), calls.end());
+      assert(I->second.second == inaccessiblememonly);
+      I->second.first.insert(calls.begin(), calls.end());
     }
   }
 
-  for (auto &[fn, calls] : ranges_fn_calls) {
+  for (auto &[fn, pair] : ranges_fn_calls) {
+    auto &[calls, inaccessiblememonly] = pair;
     if (!other.ranges_fn_calls.count(fn))
       calls.emplace(0);
   }
 }
 
-void State::ValueAnalysis::FnCallRanges::inc(const std::string &name) {
+void State::ValueAnalysis::FnCallRanges::inc(const std::string &name,
+                                             bool inaccessiblememonly) {
   auto [I, inserted] = try_emplace(name);
   if (inserted) {
-    I->second.emplace(1);
+    I->second.first.emplace(1);
+    I->second.second = inaccessiblememonly;
   } else {
+    assert(I->second.second == inaccessiblememonly);
     set<unsigned> new_set;
-    for (unsigned n : I->second) {
+    for (unsigned n : I->second.first) {
       new_set.emplace(n+1);
     }
-    I->second = move(new_set);
+    I->second.first = move(new_set);
   }
 }
 
 bool
 State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
-  for (auto &[fn, calls] : *this) {
+  for (auto &[fn, pair] : *this) {
+    auto &[calls, inaccessiblememonly] = pair;
+    if (inaccessiblememonly)
+      continue;
+
     auto I = other.find(fn);
     if (I == other.end()) {
       if (calls.count(0))
         continue;
       return false;
     }
-    if (intersect_set(calls, I->second).empty())
+    if (intersect_set(calls, I->second.first).empty())
       return false;
   }
 
-  for (auto &[fn, calls] : other) {
+  for (auto &[fn, pair] : other) {
+    auto &[calls, inaccessiblememonly] = pair;
+    if (inaccessiblememonly)
+      continue;
+
     if (!calls.count(0) && !count(fn))
       return false;
   }
 
   return true;
+}
+
+State::ValueAnalysis::FnCallRanges
+State::ValueAnalysis::FnCallRanges::project(const string &name) const {
+  auto I = find(name);
+  if (I == end())
+    return {};
+  FnCallRanges ranges;
+  ranges.emplace(name, make_pair(I->second.first, false));
+  return ranges;
 }
 
 State::VarArgsData
@@ -646,6 +670,7 @@ void State::addNoReturn(const expr &cond) {
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
   if (readsmem != rhs.readsmem ||
       argmemonly != rhs.argmemonly ||
+      inaccessiblememonly != rhs.inaccessiblememonly ||
       noret != rhs.noret || willret != rhs.willret ||
       (readsmem && (fncall_ranges != rhs.fncall_ranges || is_neq(m <=> rhs.m))))
     return false;
@@ -662,13 +687,14 @@ expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
 }
 
 expr State::FnCallInput::refinedBy(
-  State &s, const vector<StateValue> &args_nonptr2,
+  State &s, unsigned modifies_bid, const vector<StateValue> &args_nonptr2,
   const vector<Memory::PtrInput> &args_ptr2,
   const ValueAnalysis::FnCallRanges &fncall_ranges2,
-  const Memory &m2, bool readsmem2, bool argmemonly2, bool noret2,
-  bool willret2) const {
+  const Memory &m2, bool readsmem2, bool argmemonly2, bool inaccessiblememonly2,
+  bool noret2, bool willret2) const {
 
   if (readsmem != readsmem2 || argmemonly != argmemonly2 ||
+      inaccessiblememonly != inaccessiblememonly2 ||
       noret != noret2 || willret != willret2 ||
       (readsmem && !fncall_ranges.overlaps(fncall_ranges2)))
     return false;
@@ -685,30 +711,41 @@ expr State::FnCallInput::refinedBy(
     return false;
 
   set<expr> undef_vars;
-  assert(args_ptr.size() == args_ptr2.size());
-  for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
-    // TODO: needs to take read/read2 as input to control if mem blocks
-    // need to be compared
-    auto &[ptr_in, byval, is_nocapture] = args_ptr[i];
-    auto &[ptr_in2, byval2, is_nocapture2] = args_ptr2[i];
-    if (byval != byval2 || is_nocapture != is_nocapture2)
-      return false;
+  if (!inaccessiblememonly) {
+    assert(args_ptr.size() == args_ptr2.size());
+    for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
+      // TODO: needs to take read/read2 as input to control if mem blocks
+      // need to be compared
+      auto &[ptr_in, byval, is_nocapture] = args_ptr[i];
+      auto &[ptr_in2, byval2, is_nocapture2] = args_ptr2[i];
+      if (byval != byval2 || is_nocapture != is_nocapture2)
+        return false;
 
-    expr eq_val = Pointer(m, ptr_in.value)
-                    .fninputRefined(Pointer(m2, ptr_in2.value),
-                                    undef_vars, byval2);
-    refines.add(ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison));
+      expr eq_val = Pointer(m, ptr_in.value)
+                      .fninputRefined(Pointer(m2, ptr_in2.value),
+                                      undef_vars, byval2);
+      refines.add(ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison));
 
-    if (!refines)
-      return false;
+      if (!refines)
+        return false;
+    }
   }
 
   for (auto &v : undef_vars)
     s.addFnQuantVar(v);
 
   if (readsmem) {
+    vector<Memory::PtrInput> dummy1, dummy2;
     auto restrict_ptrs = argmemonly ? &args_ptr : nullptr;
     auto restrict_ptrs2 = argmemonly ? &args_ptr2 : nullptr;
+    if (modifies_bid != -1u) {
+      dummy1.emplace_back(
+        StateValue(Pointer(m, modifies_bid, false).release(), true), 0, false);
+      dummy2.emplace_back(
+        StateValue(Pointer(m2, modifies_bid, false).release(), true), 0, false);
+      restrict_ptrs = &dummy1;
+      restrict_ptrs2 = &dummy2;
+    }
     auto data = m.refined(m2, true, restrict_ptrs, restrict_ptrs2);
     refines.add(get<0>(data));
     for (auto &v : get<2>(data))
@@ -752,6 +789,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool reads_memory = !attrs.has(FnAttrs::NoRead);
   bool writes_memory = !attrs.has(FnAttrs::NoWrite);
   bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
+  bool inaccessiblememonly = attrs.has(FnAttrs::InaccessibleMemOnly);
   bool noret = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
@@ -777,17 +815,26 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   vector<StateValue> retval;
+  unsigned modifies_bid = -1u;
+  if (inaccessiblememonly)
+    modifies_bid
+      = inaccessiblemem_bids.try_emplace(name, inaccessiblemem_bids.size())
+                            .first->second;
+
+  State::ValueAnalysis::FnCallRanges call_ranges;
+  if (reads_memory)
+    call_ranges = inaccessiblememonly
+                    ? analysis.ranges_fn_calls.project(name)
+                    : analysis.ranges_fn_calls;
 
   // source may create new fn symbols, target just references src symbols
   if (isSource()) {
     auto &calls_fn = fn_call_data[name];
     auto call_data_pair
       = calls_fn.try_emplace(
-          { move(inputs), move(ptr_inputs),
-            reads_memory ? analysis.ranges_fn_calls
-                         : State::ValueAnalysis::FnCallRanges(),
+          { move(inputs), move(ptr_inputs), move(call_ranges),
             reads_memory ? memory : Memory(*this),
-            reads_memory, argmemonly, noret, willret });
+            reads_memory, argmemonly, inaccessiblememonly, noret, willret });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
 
@@ -821,7 +868,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
             writes_memory
               ? memory.mkCallState(name,
                                    argmemonly ? &I->first.args_ptr : nullptr,
-                                   attrs.has(FnAttrs::NoFree))
+                                   attrs.has(FnAttrs::NoFree),
+                                   inaccessiblememonly)
               : Memory::CallState(), move(ret_data) };
 
       // add equality constraints between source's function calls
@@ -838,16 +886,16 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     addNoReturn(I->second.noreturns);
     retval = I->second.retvals;
     if (writes_memory)
-      memory.setState(I->second.callstate);
+      memory.setState(I->second.callstate, modifies_bid);
   }
   else {
     // target: this fn call must match one from the source, otherwise it's UB
     ChoiceExpr<FnCallOutput> data;
 
     for (auto &[in, out] : fn_call_data[name]) {
-      auto refined = in.refinedBy(*this, inputs, ptr_inputs,
-                                  analysis.ranges_fn_calls, memory,
-                                  reads_memory, argmemonly, noret, willret);
+      auto refined = in.refinedBy(*this, modifies_bid, inputs, ptr_inputs,
+                                  call_ranges, memory, reads_memory, argmemonly,
+                                  inaccessiblememonly, noret, willret);
       data.add(out, move(refined));
     }
 
@@ -874,7 +922,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         retval = move(d.retvals);
 
       if (writes_memory)
-        memory.setState(d.callstate);
+        memory.setState(d.callstate, modifies_bid);
 
       fn_call_pre &= pre;
       if (qvar.isValid())
@@ -888,7 +936,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   if (writes_memory)
-    analysis.ranges_fn_calls.inc(name);
+    analysis.ranges_fn_calls.inc(name, inaccessiblememonly);
 
   return retval;
 }
@@ -988,6 +1036,7 @@ void State::syncSEdataWithSrc(const State &src) {
     itm.second.second = false;
 
   fn_call_data = src.fn_call_data;
+  inaccessiblemem_bids = src.inaccessiblemem_bids;
   memory.syncWithSrc(src.returnMemory());
 }
 
