@@ -1,4 +1,4 @@
-; ERROR: Source and target don't have the same return domain
+; ERROR: Mismatch in memory
 
 define i4 @src(i4* %p) {
   call void @llvm.sideeffect()

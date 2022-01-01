@@ -1968,6 +1968,9 @@ Memory::refined(const Memory &other, bool skip_constants,
   expr ret(true);
   set<expr> undef_vars;
 
+  unsigned max_prog_bids
+    = num_nonlocals_src - num_inaccessiblememonly_fns - has_write_fncall;
+
   AliasSet block_alias(other);
   for (auto &[mem, set]
          : { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2)}) {
@@ -1976,8 +1979,14 @@ Memory::refined(const Memory &other, bool skip_constants,
         block_alias.unionWith(
           computeAliasing(Pointer(*mem, it.val.value), 1, 1, false));
       }
-    } else if (mem->next_nonlocal_bid > 0) {
-      block_alias.setMayAliasUpTo(false, mem->next_nonlocal_bid-1);
+    } else {
+      if (mem->next_nonlocal_bid > 0)
+        block_alias.setMayAliasUpTo(false, mem->next_nonlocal_bid-1);
+
+      // Check all fn calls blocks
+      for (unsigned bid = max_prog_bids; bid < num_nonlocals_src; ++bid) {
+        block_alias.setMayAlias(false, bid);
+      }
     }
   }
 
