@@ -1955,7 +1955,7 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
 }
 
 tuple<expr, Pointer, set<expr>>
-Memory::refined(const Memory &other, bool skip_constants,
+Memory::refined(const Memory &other, bool fncall,
                 const vector<PtrInput> *set_ptrs,
                 const vector<PtrInput> *set_ptrs2) const {
   if (num_nonlocals <= has_null_block)
@@ -1967,9 +1967,6 @@ Memory::refined(const Memory &other, bool skip_constants,
   expr offset = ptr.getOffset();
   expr ret(true);
   set<expr> undef_vars;
-
-  unsigned max_prog_bids
-    = num_nonlocals_src - num_inaccessiblememonly_fns - has_write_fncall;
 
   AliasSet block_alias(other);
   for (auto &[mem, set]
@@ -1983,14 +1980,19 @@ Memory::refined(const Memory &other, bool skip_constants,
       if (mem->next_nonlocal_bid > 0)
         block_alias.setMayAliasUpTo(false, mem->next_nonlocal_bid-1);
 
-      // Check all fn calls blocks
-      for (unsigned bid = max_prog_bids; bid < num_nonlocals_src; ++bid) {
-        block_alias.setMayAlias(false, bid);
+      if (has_write_fncall)
+        block_alias.setMayAlias(false, get_fncallmem_bid());
+
+      if (!fncall) {
+        for (unsigned bid = num_nonlocals_src - num_inaccessiblememonly_fns;
+             bid < num_nonlocals_src; ++bid) {
+          block_alias.setMayAlias(false, bid);
+        }
       }
     }
   }
 
-  unsigned bid = has_null_block + skip_constants * num_consts_src;
+  unsigned bid = has_null_block + fncall * num_consts_src;
   for (; bid < num_nonlocals_src; ++bid) {
     if (!block_alias.mayAlias(false, bid))
       continue;
