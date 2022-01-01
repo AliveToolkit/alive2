@@ -928,6 +928,7 @@ public:
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
       attrs.set(FnAttrs::InaccessibleMemOnly);
+      attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
       return make_unique<FnCall>(Type::voidTy, "", "#sideeffect", move(attrs));
     }
