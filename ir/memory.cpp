@@ -1049,10 +1049,10 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
       // initial memory cannot contain a pointer to fncall mem block.
       if (is_fncall_mem(upperbid)) {
         upperbid--;
-      } else if (!num_inaccessiblememonly_fns) {
+      } else if (has_write_fncall && !num_inaccessiblememonly_fns) {
         assert(!state->isSource()); // target-only glb vars exist
         bid_cond = bid != get_fncallmem_bid();
-      } else {
+      } else if (num_inaccessiblememonly_fns) {
         bid_cond = bid.ult(num_nonlocals_src - num_inaccessiblememonly_fns
                                              - has_write_fncall);
         if (upperbid > num_nonlocals_src)
