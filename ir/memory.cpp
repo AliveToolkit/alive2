@@ -691,7 +691,9 @@ static set<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
 }
 
 unsigned Memory::nextNonlocalBid() {
-  unsigned next = min(next_nonlocal_bid++, num_nonlocals_src - 1 - has_fncall);
+  unsigned next
+    = min(next_nonlocal_bid++,
+          num_nonlocals_src-1 - num_inaccessiblememonly_fns - has_write_fncall);
   assert(!is_fncall_mem(next));
   return next;
 }
