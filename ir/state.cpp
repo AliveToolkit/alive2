@@ -54,13 +54,13 @@ void State::ValueAnalysis::meet_with(const State::ValueAnalysis &other) {
 }
 
 void State::ValueAnalysis::FnCallRanges::inc(const std::string &name,
-                                             bool inaccessiblememonly) {
+                                             bool inaccessible_or_args_memonly) {
   auto [I, inserted] = try_emplace(name);
   if (inserted) {
     I->second.first.emplace(1);
-    I->second.second = inaccessiblememonly;
+    I->second.second = inaccessible_or_args_memonly;
   } else {
-    assert(I->second.second == inaccessiblememonly);
+    assert(I->second.second == inaccessible_or_args_memonly);
     set<unsigned> new_set;
     for (unsigned n : I->second.first) {
       new_set.emplace(n+1);
@@ -822,7 +822,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                             .first->second;
 
   State::ValueAnalysis::FnCallRanges call_ranges;
-  if (reads_memory)
+  if (reads_memory && !argmemonly)
     call_ranges = inaccessiblememonly
                     ? analysis.ranges_fn_calls.project(name)
                     : analysis.ranges_fn_calls;
@@ -867,7 +867,6 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
               : expr::mkFreshVar((name + "#noreturn").c_str(), false),
             writes_memory
               ? memory.mkCallState(name,
-                                   argmemonly ? &I->first.args_ptr : nullptr,
                                    attrs.has(FnAttrs::NoFree),
                                    inaccessiblememonly)
               : Memory::CallState(), move(ret_data) };
@@ -886,7 +885,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     addNoReturn(I->second.noreturns);
     retval = I->second.retvals;
     if (writes_memory)
-      memory.setState(I->second.callstate, modifies_bid);
+      memory.setState(I->second.callstate,
+                      argmemonly ? &I->first.args_ptr : nullptr,
+                      modifies_bid);
   }
   else {
     // target: this fn call must match one from the source, otherwise it's UB
@@ -922,7 +923,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         retval = move(d.retvals);
 
       if (writes_memory)
-        memory.setState(d.callstate, modifies_bid);
+        memory.setState(d.callstate,
+                        argmemonly ? &ptr_inputs : nullptr,
+                        modifies_bid);
 
       fn_call_pre &= pre;
       if (qvar.isValid())
@@ -936,7 +939,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   if (writes_memory)
-    analysis.ranges_fn_calls.inc(name, inaccessiblememonly);
+    analysis.ranges_fn_calls.inc(name, argmemonly | inaccessiblememonly);
 
   return retval;
 }

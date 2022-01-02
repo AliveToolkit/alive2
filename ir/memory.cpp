@@ -1355,8 +1355,8 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
 }
 
 Memory::CallState
-Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
-                    bool nofree, bool inaccessiblememonly) {
+Memory::mkCallState(const string &fnname, bool nofree,
+                    bool inaccessiblememonly) {
   assert(has_fncall);
   CallState st;
   st.empty = false;
@@ -1364,36 +1364,71 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
   // TODO: handle havoc of local blocks
 
   auto blk_type = mk_block_val_array(1);
-  unsigned num_consts = has_null_block + num_consts_src;
-  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
 
   if (inaccessiblememonly) {
     st.non_local_block_val.emplace_back(expr::mkFreshVar("blk_val", blk_type));
   } else {
+    unsigned num_consts = has_null_block + num_consts_src;
+    unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
     for (unsigned i = num_consts; i < limit; ++i) {
       st.non_local_block_val.emplace_back(
         expr::mkFreshVar("blk_val", blk_type));
     }
   }
 
-  // TODO: this code should be moved to setState as old_val should be the one
-  // from the corresponding state, not always from source
-  if (ptr_inputs) {
+  st.non_local_liveness = mk_liveness_array();
+  if (num_nonlocals_src && !nofree && !inaccessiblememonly)
+    st.non_local_liveness
+      = expr::mkFreshVar("blk_liveness", st.non_local_liveness);
+
+  return st;
+}
+
+void Memory::setState(const Memory::CallState &st,
+                      const vector<PtrInput> *ptr_inputs,
+                      unsigned modifies_bid) {
+  assert(has_fncall);
+
+  unsigned num_consts = has_null_block + num_consts_src;
+  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+
+  // 1) Havoc memory
+
+  // inaccessibleonly fncall
+  if (modifies_bid != -1u) {
+    assert(st.non_local_block_val.size() == 1);
+    unsigned bid
+      = num_nonlocals_src - num_inaccessiblememonly_fns + modifies_bid;
+    assert(bid < num_nonlocals_src);
+    assert(non_local_block_val[bid].undef.empty());
+    non_local_block_val[bid].val = st.non_local_block_val[0];
+  }
+  // argmemonly fncall
+  else if (ptr_inputs) {
     for (unsigned bid = num_consts; bid < limit - has_write_fncall; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
         if (!ptr_in.byval && bid < next_nonlocal_bid) {
-          modifies |= Pointer(*this, ptr_in.val.value).getBid() == bid;
+          modifies |= ptr_in.val.non_poison &&
+                      Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
 
       auto &new_val = st.non_local_block_val[bid - num_consts];
-      auto &old_val = non_local_block_val[bid].val;
-      new_val = expr::mkIf(modifies, new_val, old_val);
+      auto &cur_val = non_local_block_val[bid].val;
+      cur_val = expr::mkIf(modifies, new_val, cur_val);
+      if (modifies.isTrue())
+        non_local_block_val[bid].undef.clear();
+    }
+  // generic fncall
+  } else {
+    for (unsigned bid = num_consts; bid < limit; ++bid) {
+      non_local_block_val[bid].val = st.non_local_block_val[bid - num_consts];
+      non_local_block_val[bid].undef.clear();
     }
   }
 
-  if (num_nonlocals_src && !nofree && !inaccessiblememonly) {
+  if (!st.non_local_liveness.isAllOnes()) {
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = has_null_block ? one : zero;
@@ -1403,48 +1438,21 @@ Memory::mkCallState(const string &fnname, const vector<PtrInput> *ptr_inputs,
         may_free = false;
         for (auto &ptr_in : *ptr_inputs) {
           if (!ptr_in.byval && bid < next_nonlocal_bid)
-            may_free |= Pointer(*this, ptr_in.val.value).getBid() == bid;
+            may_free |= ptr_in.val.non_poison &&
+                        Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
       expr heap = Pointer(*this, bid, false).isHeapAllocated();
       mask = mask | expr::mkIf(heap && may_free && !is_fncall_mem(bid),
                                zero,
-                               one << expr::mkUInt(bid, num_nonlocals));
+                               one << expr::mkUInt(bid, one));
     }
 
-    if (mask.isAllOnes()) {
-      st.non_local_liveness = non_local_block_liveness;
-    } else {
-      auto liveness_var = expr::mkFreshVar("blk_liveness", mk_liveness_array());
-      // functions can free an object, but cannot bring a dead one back to live
-      st.non_local_liveness = non_local_block_liveness & (liveness_var | mask);
-    }
-  } else {
-    st.non_local_liveness = non_local_block_liveness;
+    // functions can free an object, but cannot bring a dead one back to live
+    non_local_block_liveness
+      = non_local_block_liveness & (st.non_local_liveness | mask);
   }
-  return st;
-}
 
-void Memory::setState(const Memory::CallState &st, unsigned modifies_bid) {
-  assert(has_fncall);
-  if (modifies_bid != -1u) {
-    assert(st.non_local_block_val.size() == 1);
-    unsigned bid
-      = num_nonlocals_src - num_inaccessiblememonly_fns + modifies_bid;
-    assert(bid < num_nonlocals_src);
-    assert(non_local_block_val[bid].undef.empty());
-    non_local_block_val[bid].val = st.non_local_block_val[0];
-  } else {
-    auto consts = has_null_block + num_consts_src;
-    unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
-    for (unsigned i = consts; i < limit; ++i) {
-      non_local_block_val[i].val = st.non_local_block_val[i - consts];
-      if (isInitialMemBlock(non_local_block_val[i].val, true))
-        non_local_block_val[i].undef.clear();
-    }
-    // TODO: this is not ok for functions that can be reordered
-    non_local_block_liveness = st.non_local_liveness;
-  }
   mkNonlocalValAxioms(true);
 }
 

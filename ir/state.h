@@ -52,9 +52,9 @@ private:
     // Possible number of calls per function name that occurred so far
     // This is an over-approximation, union over all predecessors
     struct FnCallRanges
-      // bool records whether fn only accesses inaccessible memory only
+      // bool records whether fn only accesses inaccessible/args memory only
       : public std::map<std::string, std::pair<std::set<unsigned>, bool>> {
-      void inc(const std::string &name, bool inaccessiblememonly);
+      void inc(const std::string &name, bool inaccessible_or_args_memonly);
       bool overlaps(const FnCallRanges &other) const;
       // remove all ranges but name
       FnCallRanges project(const std::string &name) const;
