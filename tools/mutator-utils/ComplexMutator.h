@@ -35,11 +35,28 @@ class DominatedValueVector{
   bool hasBackup;
 public:
   DominatedValueVector():hasBackup(false){};
+  ~DominatedValueVector(){}
   llvm::Value*& operator[](size_t idx){
     if(idx<domInst.size()){
       return domInst[idx];
     }else{
       return rear[idx-domInst.size()];
+    }
+  }
+
+  void push_back_tmp(llvm::Value* val){
+    if(hasBackup){
+      rear.push_back(val);
+    }else{
+      domInst.push_back(val);
+    }
+  }
+
+  void pop_back_tmp(){
+    if(hasBackup){
+      rear.pop_back();
+    }else{
+      domInst.pop_back();
     }
   }
 
@@ -77,9 +94,8 @@ public:
   }
 
   void restoreBackup(){
-    rear.clear();
-    for(llvm::Value* val:backup){
-      rear.push_back(val);
+    if(hasBackup){
+      rear=backup;
     }
   }
 
@@ -105,8 +121,19 @@ public:
   llvm::Value*& back(){
     return rear.empty()?domInst.back():rear.back();
   }
+  bool inBackup()const{return hasBackup;}
   size_t size()const{return domInst.size()+rear.size();}
+  size_t tmp_size()const{return rear.size();}
   size_t empty()const{return domInst.empty()&&(!hasBackup||rear.empty());}
+  int find(llvm::Value* val)const{
+    for(size_t i=0;i<domInst.size();++i)
+    if(val==domInst[i])return i;
+    if(hasBackup){
+      for(size_t i=0;i<rear.size();++i)
+      if(val==rear[i])return i+domInst.size();
+    }
+    return -1;
+  }
 };
 /*
   This class is used for doing complex mutations on a given file.
@@ -152,11 +179,11 @@ class ComplexMutator:public Mutator{
     llvm::SmallVector<llvm::Instruction*> lazyUpdateInsts;
     llvm::SmallVector<size_t> lazyUpdateArgPos;
     llvm::SmallVector<llvm::Type*> lazyUpdateArgTys;
-    llvm::SmallVector<llvm::Value*> extraFuncArgs;
+    llvm::SmallVector<llvm::Value*> extraValue;
     void addFunctionArguments(const llvm::SmallVector<llvm::Type*>& tys);
     llvm::Value* getRandomConstant(llvm::Type* ty);
     llvm::Value* getRandomDominatedValue(llvm::Type* ty);
-    llvm::Value* getRandomValueFromExtraFuncArgs(llvm::Type* ty);
+    llvm::Value* getRandomValueFromExtraValue(llvm::Type* ty);
     llvm::Value* getRandomPointerValue(llvm::Type* ty);
     llvm::SmallVector<llvm::Value* (ComplexMutator::*)(llvm::Type*)> valueFuncs;
 
@@ -170,14 +197,14 @@ class ComplexMutator:public Mutator{
     void fixAllValues();
 public:
     ComplexMutator(bool debug=false):Mutator(debug),tmpCopy(nullptr),
-      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraValue}){
     };
     ComplexMutator(std::unique_ptr<llvm::Module> pm_,const std::unordered_set<std::string>& invalidFunctions,bool debug=false):Mutator(debug),invalidFunctions(invalidFunctions),tmpCopy(nullptr),
-      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraValue}){
       pm=std::move(pm_);
     };
     ComplexMutator(std::unique_ptr<llvm::Module> pm_,bool debug=false):Mutator(debug),tmpCopy(nullptr),
-      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraFuncArgs}){
+      valueFuncs({&ComplexMutator::getRandomConstant,&ComplexMutator::getRandomDominatedValue,&ComplexMutator::getRandomValueFromExtraValue}){
       pm=std::move(pm_);
     }
     ~ComplexMutator(){};

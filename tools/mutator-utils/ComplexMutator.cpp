@@ -68,12 +68,12 @@ end:
         whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
         whenMoveToNextBasicBlockFuncs.push_back(helpers.size()-1);
 
+        helpers.push_back(std::make_unique<RandomMoveHelper>(this));
+        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+
         helpers.push_back(std::make_unique<MutateInstructionHelper>(this));
         whenMoveToNextInstFuncs.push_back(helpers.size()-1);
 
-        helpers.push_back(std::make_unique<RandomMoveHelper>(this));
-        whenMoveToNextInstFuncs.push_back(helpers.size()-1);
-        
         for(size_t i=0;i<helpers.size();++i){
             helpers[i]->init();
         }
@@ -83,6 +83,7 @@ end:
 
 void ComplexMutator::resetTmpModule(){
     vMap.clear();
+    extraValue.clear();
     tmpCopy=llvm::CloneModule(*pm,vMap);
     tmpFit=llvm::Module::iterator((llvm::Function*)&*vMap[&*fit]);
     tmpBit=llvm::Function::iterator((llvm::BasicBlock*)&*vMap[&*bit]);
@@ -190,10 +191,10 @@ void ComplexMutator::moveToNextInst(){
 void ComplexMutator::moveToNextReplaceableInst(){
     moveToNextInst();
     while(!isReplaceable(&*iit))moveToNextInst();
+    domInst.restoreBackup();
     for(size_t i:whenMoveToNextInstFuncs){
         helpers[i]->whenMoveToNextInst();
     }
-    domInst.restoreBackup();
 }
 
 
@@ -243,12 +244,12 @@ llvm::Value* ComplexMutator::getRandomDominatedValue(llvm::Type* ty){
     return nullptr;
 }
 
-llvm::Value* ComplexMutator::getRandomValueFromExtraFuncArgs(llvm::Type* ty){
-    if(ty!=nullptr&&!extraFuncArgs.empty()){
-        for(size_t i=0,pos=Random::getRandomUnsigned()%extraFuncArgs.size();i<extraFuncArgs.size();++i,++pos){
-            if(pos==extraFuncArgs.size())pos=0;
-            if(extraFuncArgs[pos]->getType()==ty){
-                return extraFuncArgs[pos];
+llvm::Value* ComplexMutator::getRandomValueFromExtraValue(llvm::Type* ty){
+    if(ty!=nullptr&&!extraValue.empty()){
+        for(size_t i=0,pos=Random::getRandomUnsigned()%extraValue.size();i<extraValue.size();++i,++pos){
+            if(pos==extraValue.size())pos=0;
+            if(extraValue[pos]->getType()==ty){
+                return extraValue[pos];
             }
         }
     }
@@ -304,7 +305,7 @@ void ComplexMutator::addFunctionArguments(const llvm::SmallVector<llvm::Type*>& 
             it->second=VMap[it->second];
         }
         for(size_t i=0;i<tys.size();++i){
-            extraFuncArgs.push_back(tmpFit->getArg(i+oldArgSize));
+            extraValue.push_back(tmpFit->getArg(i+oldArgSize));
         }
     }
 }
