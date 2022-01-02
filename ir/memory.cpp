@@ -1986,7 +1986,8 @@ Memory::refined(const Memory &other, bool fncall,
       }
     } else {
       if (mem->next_nonlocal_bid > 0)
-        block_alias.setMayAliasUpTo(false, mem->next_nonlocal_bid-1);
+        block_alias.setMayAliasUpTo(false, min(mem->next_nonlocal_bid,
+                                               num_nonlocals)-1);
 
       if (has_write_fncall)
         block_alias.setMayAlias(false, get_fncallmem_bid());
