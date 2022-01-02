@@ -342,6 +342,9 @@ version )EOF";
       cerr<<"Some input functions can't pass Alive2 check. Those would be skipped during mutation phrase.\n";
     }
   }
+  if(verbose){
+    cerr<<"Current seed"<<Random::getSeed<<"\n";
+  }
   if(numCopy>0){
     copyMode();
   }else if(timeElapsed>0){
