@@ -6,6 +6,108 @@
 #include "simpleMutator.h"
 #include "ComplexMutatorHelper.h"
 
+
+/*
+  This is a class for holding dominated value with a backup function.
+         /E-F-G(backup)
+  A-B-C-D(domInst)
+         \E-F-G(rear)
+  all operations on rear can be restored by a 'backup' operation
+
+         /E-F-G(backup)
+  A-B-C-D(domInst)
+         \E-F-G(rear)
+
+  (update on rear)
+
+         /E-F-G(backup)
+  A-B-C-D(domInst)
+         \E-F-H(rear)
+
+  (restore)
+
+         /E-F-G(backup)
+  A-B-C-D(domInst)
+         \E-F-G(rear)
+*/
+class DominatedValueVector{
+  std::vector<llvm::Value*> domInst,backup,rear;
+  bool hasBackup;
+public:
+  DominatedValueVector():hasBackup(false){};
+  llvm::Value*& operator[](size_t idx){
+    if(idx<domInst.size()){
+      return domInst[idx];
+    }else{
+      return rear[idx-domInst.size()];
+    }
+  }
+
+  void push_back(llvm::Value* val){
+    if(hasBackup){
+      backup.push_back(val);
+      rear.push_back(val);
+    }else{
+      domInst.push_back(val);
+    }
+  }
+
+  void pop_back(){
+    if(hasBackup){
+      backup.pop_back();
+      rear.pop_back();
+    }else{
+      domInst.pop_back();
+    }
+  }
+
+  void startBackup(){hasBackup=true;}
+
+  /**
+   * rear would be clear.
+   * all elements in backup would be push_back to domInst and backup clear;
+   */
+  void deleteBackup(){
+    hasBackup=false;
+    while(!backup.empty()){
+      domInst.push_back(backup.back());
+      backup.pop_back();
+    }
+    rear.clear();
+  }
+
+  void restoreBackup(){
+    rear.clear();
+    for(llvm::Value* val:backup){
+      rear.push_back(val);
+    }
+  }
+
+  void clear(){
+    hasBackup=false;
+    domInst.clear();rear.clear();backup.clear();
+  }
+
+  void resize(size_t sz){
+    if(hasBackup){
+      if(sz<=domInst.size()){
+        deleteBackup();
+        domInst.resize(sz);
+      }else{
+        rear.resize(sz-domInst.size());
+        backup.resize(sz-domInst.size());
+      }
+    }else{
+      domInst.resize(sz);
+    }
+  }
+
+  llvm::Value*& back(){
+    return rear.empty()?domInst.back():rear.back();
+  }
+  size_t size()const{return domInst.size()+rear.size();}
+  size_t empty()const{return domInst.empty()&&(!hasBackup||rear.empty());}
+};
 /*
   This class is used for doing complex mutations on a given file.
   Current supported operation: 
@@ -22,7 +124,11 @@ class ComplexMutator:public Mutator{
 
 
     std::unordered_set<std::string> invalidFunctions;
-    std::vector<llvm::Value*> domInst;
+    /**
+     * 1. time point of starting and deleting backup.
+     * 2. update those class updates domInst
+     */
+    DominatedValueVector domInst;
 
     //some functions contain 'immarg' in their arguments. Skip those function calls.
     std::unordered_set<std::string> filterSet;
