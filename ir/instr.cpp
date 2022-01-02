@@ -1802,7 +1802,7 @@ StateValue FnCall::toSMT(State &s) const {
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
   vector<Type*> out_types;
-  bool argmemonly = attrs.has(FnAttrs::ArgMemOnly);
+  bool argmemonly = s.getFn().getFnAttrs().has(FnAttrs::ArgMemOnly);
 
   ostringstream fnName_mangled;
   fnName_mangled << fnName;
