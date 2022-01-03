@@ -60,12 +60,12 @@ void State::ValueAnalysis::FnCallRanges::inc(const std::string &name,
     I->second.first.emplace(1);
     I->second.second = inaccessible_or_args_memonly;
   } else {
-    assert(I->second.second == inaccessible_or_args_memonly);
     set<unsigned> new_set;
     for (unsigned n : I->second.first) {
       new_set.emplace(n+1);
     }
-    I->second.first = move(new_set);
+    I->second.first   = move(new_set);
+    I->second.second |= inaccessible_or_args_memonly;
   }
 }
 
@@ -82,6 +82,8 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
         continue;
       return false;
     }
+    if (I->second.second) // argmemonly
+      continue;
     if (intersect_set(calls, I->second.first).empty())
       return false;
   }
