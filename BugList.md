@@ -133,6 +133,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 #### Confirmed bugs
 1. InstCombine: 2 related logic bugs from over-generalizing "lshr" to "any shr" (https://llvm.org/PR51351)
 2. Inbounds: might cause problem in signed GEP instruction (https://bugs.llvm.org/show_bug.cgi?id=52429)
+3. NUW and NSW flag in InstSimplify (https://reviews.llvm.org/D116322) 
 
 #### Suspected bugs
 1. This bug combines vectors, UB, and non-standard FP (https://alive2.llvm.org/ce/z/jwZ7uS)
