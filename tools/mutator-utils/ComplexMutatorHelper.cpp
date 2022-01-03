@@ -289,9 +289,9 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction* inst){
                 mutator->setOperandRandomValue(newPosInst,op);
             }
         }
+        mutator->fixAllValues();
         mutator->extraValue.push_back(newPosInst);
     }
 
     inst->moveBefore(newPosInst);
-    mutator->fixAllValues();
 }

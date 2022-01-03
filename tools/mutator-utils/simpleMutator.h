@@ -158,7 +158,10 @@ public:
         }
         val1=binaryInst->getOperand(0),val2=binaryInst->getOperand(1);
     };
-    virtual ~BinaryInstructionMutant(){if(mutatedInst!=nullptr)binaryInst->insertBefore(mutatedInst);};
+    virtual ~BinaryInstructionMutant(){
+        if(mutatedInst!=nullptr)binaryInst->insertBefore(mutatedInst);
+    };
+
     virtual void mutate(){
         
         replaceConstant(val1);

@@ -313,13 +313,19 @@ void ComplexMutator::addFunctionArguments(const llvm::SmallVector<llvm::Type*>& 
 
 void ComplexMutator::fixAllValues(){
     if(!lazyUpdateInsts.empty()){
+        //llvm::errs()<<"extra values"<<extraValue.size()<<"CCCCCCC\n";
         addFunctionArguments(lazyUpdateArgTys);
+        //llvm::errs()<<"extra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
+        //lazyUpdateInsts[0]->getParent()->print(llvm::errs());
+        //llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
+        //extraValue.back()->print(llvm::errs());
+        //llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
         for(size_t i=0;i<lazyUpdateInsts.size();++i){
             lazyUpdateInsts[i]->setOperand(lazyUpdateArgPos[i],getRandomValue(lazyUpdateArgTys[i]));
-            /*llvm::errs()<<"AAAAAAAAAAAAAAAAAAAAAAA\n";
-            lazyUpdateInsts[i]->getOperand(lazyUpdateArgPos[i])->print(llvm::errs());            
-            llvm::errs()<<"\nAAAAAAAAAAAAAAAAAAAAAAA\n";
-            llvm::errs()<<lazyUpdateInsts[i]->getParent()->getParent()->getName()<<"\n";*/
+            //llvm::errs()<<"after resetting value AAAAAAAAAAAAAAAAAAAAAAA\n";
+            //lazyUpdateInsts[i]->print(llvm::errs());            
+            //llvm::errs()<<"\nAAAAAAAAAAAAAAAAAAAAAAA\n";
+            //llvm::errs()<<lazyUpdateInsts[i]->getParent()->getParent()->getName()<<"\n";
         }
         lazyUpdateArgTys.clear();
         lazyUpdateArgPos.clear();
