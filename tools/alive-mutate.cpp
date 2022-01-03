@@ -365,6 +365,7 @@ version )EOF";
 bool inputVerify(){
   if(stubMutator.openInputFile(testfile)){
     std::unique_ptr<llvm::Module> M1=stubMutator.getModule();
+    LLVMUtil::removeTBAAMetadata(M1.get());
     auto &DL = M1.get()->getDataLayout();
     //llvm::Triple targetTriple(M1.get()->getTargetTriple());
     //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);

@@ -67,6 +67,7 @@ class LLVMUtil{
 public:
   static void optimizeModule(llvm::Module *M);
   static void optimizeFunction(llvm::Function* f);
+  static void removeTBAAMetadata(llvm::Module* M);
   static llvm::Value* insertGlobalVariable(llvm::Module* m,llvm::Type* ty);
   static void insertFunctionArguments(llvm::Function* f,llvm::SmallVector<llvm::Type*> tys,llvm::ValueToValueMapTy& VMap);
 };

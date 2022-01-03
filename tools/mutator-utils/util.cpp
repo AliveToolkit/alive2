@@ -202,3 +202,13 @@ void LLVMUtil::insertFunctionArguments(llvm::Function* F,llvm::SmallVector<llvm:
     F->setName(newFuncName);
     NewF->setName(oldFuncName);
 }
+
+void LLVMUtil::removeTBAAMetadata(llvm::Module* M){
+    for(auto fit=M->begin(); fit!=M->end(); fit++){
+        if(!fit->isDeclaration()&&!fit->getName().empty()){
+            for(auto iit=llvm::inst_begin(*fit); iit!=llvm::inst_end(*fit); iit++){
+                iit->setMetadata("tbaa",nullptr);
+            }
+        }
+    }
+}
