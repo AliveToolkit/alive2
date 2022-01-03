@@ -66,6 +66,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 59. LIVM introduces load in writeonly function (https://llvm.org/PR51906)
 60. InstSimplify incorrectly folds signed comparisons of 'gep inbounds' (https://llvm.org/PR52429)
 61. LoadStoreVectorizer assumes non-willreturn calls always return (https://llvm.org/PR52950)
+62. SROA sub-vector memcpy w/subsequent load loses the store (https://llvm.org/PR52971)
 
 
 ### Bugs found in Z3
