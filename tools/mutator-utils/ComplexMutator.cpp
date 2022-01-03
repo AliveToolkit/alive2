@@ -181,6 +181,7 @@ void ComplexMutator::moveToNextBasicBlock(){
 }
 
 void ComplexMutator::moveToNextInst(){
+    assert(domInst.inBackup());
     domInst.push_back(&*iit);
     ++iit;
     if(iit==bit->end()){
@@ -217,7 +218,7 @@ void ComplexMutator::calcDomInst(){
         }
         domInst.startBackup();
         //add Instructions before iitTmp
-        for(auto iitTmp=bit->begin();iitTmp!=iit;++iitTmp){
+        for(auto iitTmp=bit->begin();iitTmp!=iit;++iitTmp){ 
             if(DT.dominates(&*iitTmp,&*iit)){
                 domInst.push_back(&*iitTmp);
             }

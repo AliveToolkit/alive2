@@ -35,7 +35,7 @@ class DominatedValueVector{
   bool hasBackup;
 public:
   DominatedValueVector():hasBackup(false){};
-  ~DominatedValueVector(){}
+  ~DominatedValueVector(){domInst.clear();backup.clear();rear.clear();}
   llvm::Value*& operator[](size_t idx){
     if(idx<domInst.size()){
       return domInst[idx];

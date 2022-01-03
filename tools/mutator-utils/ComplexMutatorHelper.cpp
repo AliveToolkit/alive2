@@ -192,6 +192,7 @@ bool RandomMoveHelper::shouldMutate(){
 
 void RandomMoveHelper::mutate(){
     randomMoveInstruction(&*(mutator->tmpIit));
+    moved=true;
     mutator->extraValue.clear();
 }
 
@@ -199,7 +200,7 @@ void RandomMoveHelper::randomMoveInstruction(llvm::Instruction* inst){
     if(inst->getNextNonDebugInstruction()->isTerminator()){
     //if(Random::getRandomBool()){
         randomMoveInstructionForward(inst);
-    }else if(inst==&*(inst->getParent()->begin())){
+    }else if(inst->getIterator()==(inst->getParent()->begin())){
         randomMoveInstructionBackward(inst);
     }else{
         if(Random::getRandomBool()){
@@ -240,6 +241,7 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction* inst){
         --newPosIt;
         v.push_back(&*newPosIt);
         //remove Insts in current basic block
+        assert(mutator->domInst.tmp_size()!=0);
         mutator->domInst.pop_back_tmp();
     }
     newPosInst=&*newPosIt;
