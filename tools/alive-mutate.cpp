@@ -386,10 +386,10 @@ bool inputVerify(){
         if(r.status==Results::CORRECT){
           ++validFuncNum;
         }else{
-          if(r.status==Results::UNSOUND){
+          /*if(r.status==Results::UNSOUND){
             loggerInit(unsoundCases--);
             writeLog(false,*fit,r);
-          }
+          }*/
           hasInvalidFunc=true;
           //changed=true;
           invalidFuncNameSet.insert(fit->getName().str());
