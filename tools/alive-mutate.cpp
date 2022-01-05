@@ -369,7 +369,7 @@ bool inputVerify(){
     auto &DL = M1.get()->getDataLayout();
     //llvm::Triple targetTriple(M1.get()->getTargetTriple());
     //llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-    int unsoundCases=-1;
+    //int unsoundCases=-1;
     loggerInit(0);
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
