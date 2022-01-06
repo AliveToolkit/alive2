@@ -94,7 +94,7 @@ namespace {
     llvm::cl::desc("specify the seed of the random number generator"),
     llvm::cl::init(-1));
 
-  llvm::cl::opt<int> exitNum(LLVM_ARGS_PREFIX "e",llvm::cl::value_desc("number of errors allowed"),llvm::cl::cat(mutatorArgs),llvm::cl::desc("program would exit after the number of errors detected"),llvm::cl::init(10));
+  llvm::cl::opt<int> exitNum(LLVM_ARGS_PREFIX "e",llvm::cl::value_desc("number of errors allowed"),llvm::cl::cat(mutatorArgs),llvm::cl::desc("program would exit after the number of errors detected"),llvm::cl::init(20));
 
   llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
     llvm::cl::value_desc("verbose mode"),
@@ -606,8 +606,9 @@ void copyMode(){
           runOnce(i,context,*mutators[Random::getRandomUnsigned()&1]);
         }
         if(tot_num_unsound>(unsigned long long)exitNum){
-          programEnd();
-          exit(0);
+          cerr<<"Total unsound number exceeds the number of threshold.\n";
+          //programEnd();
+          return;
         }
       }
     }else{
