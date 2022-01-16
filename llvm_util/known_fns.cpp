@@ -174,14 +174,15 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_fwrite: {
     auto size = getInt(*args[1]);
     auto count = getInt(*args[2]);
-    if (size && count) {
-      auto bytes = *size * *count;
+    if (size || count) {
       // size_t fwrite(const void *ptr, 0, 0, FILE *stream) -> 0
-      if (bytes == 0)
+      if ((size && *size == 0) || (count && *count == 0))
         RETURN_VAL(
           make_unique<UnaryOp>(*ty, value_name(i),
                                *make_intconst(0, ty->bits()), UnaryOp::Copy));
-
+    }
+    if (size && count) {
+      auto bytes = *size * *count;
       // (void)fwrite(const void *ptr, 1, 1, FILE *stream) ->
       //   (void)fputc(int c, FILE *stream))
       if (bytes == 1 && i.use_empty() && TLI.has(llvm::LibFunc_fputc)) {
