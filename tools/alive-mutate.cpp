@@ -524,6 +524,9 @@ string getOutputFile(int ith,bool isOptimized){
 void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     std::unique_ptr<llvm::Module> M1=nullptr;
     mutator.mutateModule(getOutputFile(ith));
+    if(verbose){
+      mutator.saveModule(getOutputFile(ith));
+    }
     M1 = mutator.getModule();
     
     if (!M1.get()) {
@@ -582,10 +585,11 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
     tot_num_errors+=num_errors;
     num_correct=num_unsound=num_failed=num_errors=0;
     mutator.setModule(std::move(M1));
-    if(verbose||shouldLog){
-      mutator.saveModule(getOutputFile(ith));
-    }else{
+    if(!verbose&&!shouldLog){
       deleteLog(ith);
+    }
+    if(shouldLog){
+      mutator.saveModule(getOutputFile(ith));
     }
 }
 
