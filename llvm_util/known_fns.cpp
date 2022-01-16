@@ -43,17 +43,30 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
   }
-  else if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
+  if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
+    // aligned malloc
+    if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
+      if (auto algnint = dyn_cast<llvm::ConstantInt>(algn)) {
+        RETURN_VAL(
+          make_unique<Malloc>(*ty, value_name(i), *args[1], false,
+                              algnint->getZExtValue()));
+      } else {
+        // TODO: add support for non-const alignments
+        RETURN_APPROX();
+      }
+    }
+
+    // calloc
     assert(
       llvm::getInitialValueOfAllocation(&i, &TLI, i.getType())->isNullValue());
     RETURN_VAL(
       make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
   }
-  else if (llvm::isReallocLikeFn(&i, &TLI)) {
+  if (llvm::isReallocLikeFn(&i, &TLI)) {
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
   }
-  else if (llvm::isFreeCall(&i, &TLI)) {
+  if (llvm::isFreeCall(&i, &TLI)) {
     if (i.hasFnAttr(llvm::Attribute::NoFree)) {
       auto zero = make_intconst(0, 1);
       RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
