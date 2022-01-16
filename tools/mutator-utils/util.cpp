@@ -110,7 +110,7 @@ float Random::getRandomLLVMFloat(){
     }
 }
 
-void LLVMUtil::optimizeModule(llvm::Module *M) {
+void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
@@ -123,14 +123,19 @@ void LLVMUtil::optimizeModule(llvm::Module *M) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
+  llvm::FunctionPassManager FPM ;
+  if(newGVN){
+    FPM.addPass(llvm::NewGVNPass());
+  }else{
+    FPM = PB.buildFunctionSimplificationPipeline(
       llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
+  }
   llvm::ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
   MPM.run(*M, MAM);
 }
 
-void LLVMUtil::optimizeFunction(llvm::Function* f){
+void LLVMUtil::optimizeFunction(llvm::Function* f,bool newGVN){
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
@@ -143,8 +148,13 @@ void LLVMUtil::optimizeFunction(llvm::Function* f){
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
+  llvm::FunctionPassManager FPM ;
+  if(newGVN){
+    FPM.addPass(llvm::NewGVNPass());
+  }else{
+    FPM = PB.buildFunctionSimplificationPipeline(
       llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
+  }
   FPM.run(*f,FAM);
 }
 

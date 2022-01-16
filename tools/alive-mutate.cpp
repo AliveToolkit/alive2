@@ -101,6 +101,11 @@ namespace {
     llvm::cl::desc("specify if verbose mode is on"),
     llvm::cl::cat(mutatorArgs));
 
+  llvm::cl::opt<bool> newGVN(LLVM_ARGS_PREFIX "newgvn",
+    llvm::cl::value_desc("gvn optimization"),
+    llvm::cl::desc("turn on gvn optimization, fault O2 will be disabled"),
+    llvm::cl::cat(mutatorArgs));
+
   filesystem::path inputPath,outputPath;
 
 optional<smt::smt_initializer> smt_init;
@@ -374,7 +379,7 @@ bool inputVerify(){
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-    LLVMUtil::optimizeModule(M2.get());
+    LLVMUtil::optimizeModule(M2.get(),newGVN);
     //bool changed=false;
     for(auto fit=M1->begin(); fit!=M1->end();++fit)
     if(!fit->isDeclaration()&&!fit->getName().empty()){
@@ -543,7 +548,7 @@ void runOnce(int ith,llvm::LLVMContext& context,Mutator& mutator){
         }*/
         llvm::ValueToValueMapTy vMap;
         llvm::Function* pf2=llvm::CloneFunction(pf1,vMap);
-        LLVMUtil::optimizeFunction(pf2);
+        LLVMUtil::optimizeFunction(pf2,newGVN);
         if (compareFunctions(*pf1, *pf2, TLI)){
               shouldLog=true;
               if (opt_error_fatal)

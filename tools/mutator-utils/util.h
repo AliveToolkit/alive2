@@ -27,6 +27,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
 
 using std::string;
 
@@ -65,8 +66,8 @@ class Random{
 
 class LLVMUtil{
 public:
-  static void optimizeModule(llvm::Module *M);
-  static void optimizeFunction(llvm::Function* f);
+  static void optimizeModule(llvm::Module *M,bool newGVN=false);
+  static void optimizeFunction(llvm::Function* f,bool newGVN=false);
   static void removeTBAAMetadata(llvm::Module* M);
   static llvm::Value* insertGlobalVariable(llvm::Module* m,llvm::Type* ty);
   static void insertFunctionArguments(llvm::Function* f,llvm::SmallVector<llvm::Type*> tys,llvm::ValueToValueMapTy& VMap);
