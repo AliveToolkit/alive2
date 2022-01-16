@@ -402,6 +402,22 @@ int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
 }
 }
 
+static void pad(StateValue &v, unsigned amount, State &s) {
+  if (amount == 0)
+    return;
+
+  expr ty = expr::mkUInt(0, amount);
+  auto pad = [&](expr &v) {
+    expr var = expr::mkFreshVar("padding", ty);
+    v = var.concat(v);
+    s.addQuantVar(var);
+  };
+
+  pad(v.value);
+  if (!v.non_poison.isBool())
+    pad(v.non_poison);
+}
+
 static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
                                  const Memory &mem, State *s) {
   vector<Byte> bytes;
@@ -426,7 +442,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     unsigned bitsize = bvval.bits();
     unsigned bytesize = divide_up(bitsize, bits_byte);
 
-    bvval = bvval.zext(bytesize * bits_byte - bitsize);
+    pad(bvval, bytesize * bits_byte - bitsize, *s);
     unsigned np_mul = bits_poison_per_byte;
 
     for (unsigned i = 0; i < bytesize; ++i) {
