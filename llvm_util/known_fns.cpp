@@ -43,7 +43,9 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
   }
-  else if (llvm::isCallocLikeFn(&i, &TLI)) {
+  else if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
+    assert(
+      llvm::getInitialValueOfAllocation(&i, &TLI, i.getType())->isNullValue());
     RETURN_VAL(
       make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
   }
