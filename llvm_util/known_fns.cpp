@@ -38,11 +38,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_EXACT();
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
-  if (llvm::isMallocLikeFn(&i, &TLI)) {
-    bool isNonNull = i.getCalledFunction()->getName() != "malloc";
-    RETURN_VAL(
-      make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
-  }
   if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
     // aligned malloc
     if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
@@ -57,10 +52,15 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     }
 
     // calloc
-    assert(
-      llvm::getInitialValueOfAllocation(&i, &TLI, i.getType())->isNullValue());
+    if (auto *init = llvm::getInitialValueOfAllocation(&i, &TLI, i.getType());
+        init && init->isNullValue())
+      RETURN_VAL(
+        make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+
+    // malloc or new
+    bool isNonNull = i.getCalledFunction()->getName() != "malloc";
     RETURN_VAL(
-      make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+      make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
   }
   if (llvm::isReallocLikeFn(&i, &TLI)) {
     RETURN_VAL(

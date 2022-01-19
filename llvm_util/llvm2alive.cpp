@@ -646,7 +646,7 @@ public:
         // or objects passed as pointer arguments
         return llvm::isa<llvm::Argument>(V) ||
                llvm::isa<llvm::GlobalVariable>(V) ||
-               llvm::isMallocLikeFn(V, &TLI); }))
+               llvm::isAllocLikeFn(V, &TLI); }))
       return LIFETIME_FILLPOISON;
 
     Objs.clear();
