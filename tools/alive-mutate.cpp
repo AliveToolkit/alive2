@@ -385,6 +385,9 @@ version )EOF";
 bool inputVerify() {
   if (stubMutator.openInputFile(testfile)) {
     if(onlyDump){
+      std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
+      validFuncNum=M1->size();
+      stubMutator.setModule(std::move(M1));
       return false;
     }
     std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
