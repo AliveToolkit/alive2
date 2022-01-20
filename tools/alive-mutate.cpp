@@ -113,6 +113,10 @@ llvm::cl::opt<bool> newGVN(
     llvm::cl::desc("turn on gvn optimization, fault O2 will be disabled"),
     llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<bool> onlyDump(LLVM_ARGS_PREFIX "onlyDump", llvm::cl::value_desc("only dump IR files without mutation"),
+  llvm::cl::desc("only dump IR files without"),
+  llvm::cl::cat(mutatorArgs));
+
 filesystem::path inputPath, outputPath;
 
 optional<smt::smt_initializer> smt_init;
@@ -380,6 +384,9 @@ version )EOF";
 
 bool inputVerify() {
   if (stubMutator.openInputFile(testfile)) {
+    if(onlyDump){
+      return false;
+    }
     std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
     LLVMUtil::removeTBAAMetadata(M1.get());
     auto &DL = M1.get()->getDataLayout();
@@ -545,8 +552,11 @@ string getOutputFile(int ith, bool isOptimized) {
 void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
   std::unique_ptr<llvm::Module> M1 = nullptr;
   mutator.mutateModule(getOutputFile(ith));
-  if (verbose) {
+  if (verbose||onlyDump) {
     mutator.saveModule(getOutputFile(ith));
+  }
+  if(onlyDump){
+    return;
   }
   M1 = mutator.getModule();
 
