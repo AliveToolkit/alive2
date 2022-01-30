@@ -83,6 +83,9 @@ end:
     helpers.push_back(std::make_unique<MutateInstructionHelper>(this));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
 
+    helpers.push_back(std::make_unique<RandomCodeInserterHelper>(this));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+
     for (size_t i = 0; i < helpers.size(); ++i) {
       helpers[i]->init();
     }
@@ -136,7 +139,7 @@ void ComplexMutator::saveModule(const std::string &outputFileName) {
   llvm::raw_fd_ostream fout(outputFileName, ec);
   fout << *tmpCopy;
   fout.close();
-  if(debug){
+  if (debug) {
     llvm::errs() << "file wrote to " << outputFileName << "\n";
   }
 }

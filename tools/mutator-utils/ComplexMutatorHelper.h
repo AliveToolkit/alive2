@@ -131,3 +131,22 @@ public:
     llvm::errs() << "Inst was moved around";
   }
 };
+
+class RandomCodeInserterHelper : public ComplexMutatorHelper {
+  bool generated;
+
+public:
+  RandomCodeInserterHelper(ComplexMutator *mutator)
+      : ComplexMutatorHelper(mutator), generated(false) {}
+  virtual void init() {
+    generated = false;
+  }
+  virtual void reset() {
+    generated = false;
+  }
+  virtual void mutate();
+  virtual bool shouldMutate();
+  virtual void debug() {
+    llvm::errs() << "Code piece generated";
+  }
+};

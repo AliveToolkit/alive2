@@ -363,3 +363,17 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
 
   inst->moveBefore(newPosInst);
 }
+
+bool RandomCodeInserterHelper::shouldMutate() {
+  return !generated && !llvm::isa<llvm::PHINode>(mutator->tmpIit);
+}
+
+void RandomCodeInserterHelper::mutate() {
+  generated = true;
+  // if not the first inst of this block, we can do a split
+  llvm::Instruction *insertPoint = &*mutator->tmpIit;
+  if (mutator->tmpBit->getFirstNonPHIOrDbg() != insertPoint) {
+    mutator->tmpBit->splitBasicBlock(mutator->tmpIit);
+  }
+  LLVMUtil::insertRandomCodeBefore(insertPoint);
+}
