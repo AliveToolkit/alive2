@@ -1,4 +1,5 @@
 #pragma once
+#include "llvmStress.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -85,4 +86,5 @@ public:
   static void insertFunctionArguments(llvm::Function *f,
                                       llvm::SmallVector<llvm::Type *> tys,
                                       llvm::ValueToValueMapTy &VMap);
+  static void insertRandomCodeBefore(llvm::Instruction *inst);
 };

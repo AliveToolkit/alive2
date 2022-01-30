@@ -230,3 +230,8 @@ void LLVMUtil::removeTBAAMetadata(llvm::Module *M) {
     }
   }
 }
+
+void LLVMUtil::insertRandomCodeBefore(llvm::Instruction *inst) {
+  RandomCodePieceGenerator::insertCodeBefore(
+      inst, 5 + (Random::getRandomUnsigned() & 15)); // last 4 binary bits
+}
