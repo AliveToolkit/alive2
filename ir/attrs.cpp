@@ -73,6 +73,27 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   return os;
 }
 
+bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
+  // check attributes that are properties of the caller
+  unsigned attrs =
+    NonNull |
+    Dereferenceable |
+    NoUndef |
+    Align |
+    NoAlias |
+    DereferenceableOrNull
+  ;
+
+  auto other_params = (other.bits & attrs);
+  if ((bits & other_params) != other_params)
+    return false;
+
+  return derefBytes == other.derefBytes &&
+         derefOrNullBytes == other.derefOrNullBytes &&
+         blockSize == other.blockSize &&
+         align == other.align;
+}
+
 bool ParamAttrs::poisonImpliesUB() const {
   return has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
          has(DereferenceableOrNull);

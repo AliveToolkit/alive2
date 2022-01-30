@@ -133,7 +133,6 @@ public:
   util::const_strip_unique_ptr<decltype(inputs)> getInputs() const {
     return inputs;
   }
-  bool hasSameInputs(const Function &rhs) const;
   Value *getReturnedInput() const { return returned_input; }
   void setReturnedInput(Value *v) { returned_input = v; }
 

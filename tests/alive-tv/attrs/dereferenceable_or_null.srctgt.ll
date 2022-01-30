@@ -6,4 +6,4 @@ define i32* @tgt(i32* dereferenceable(4) %p) {
   ret i32* %p
 }
 
-; ERROR: Source is more defined than target
+; ERROR: Parameter attributes not refined

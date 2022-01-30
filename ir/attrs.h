@@ -30,6 +30,7 @@ public:
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
+  bool refinedBy(const ParamAttrs &other) const;
 
   // Returns true if it's UB for the argument to be poison / have a poison elem.
   bool poisonImpliesUB() const;

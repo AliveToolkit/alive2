@@ -1,5 +1,4 @@
-; Introduction of align isn't immediate UB
-; ERROR: Target is more poisonous than source
+; ERROR: Parameter attributes not refined
 
 define i8* @src(i8* %p) {
   ret i8* %p

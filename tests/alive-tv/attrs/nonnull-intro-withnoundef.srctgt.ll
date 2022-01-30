@@ -1,5 +1,4 @@
-; Introduction of nonnull AND noundef may introduce UB
-; ERROR: Source is more defined than target
+; ERROR: Parameter attributes not refined
 
 define i8* @src(i8* %p) {
   ret i8* %p

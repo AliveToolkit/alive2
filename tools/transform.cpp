@@ -1097,9 +1097,27 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
 }
 
 Errors TransformVerify::verify() const {
-  if (!t.src.hasSameInputs(t.tgt)) {
-    return { "Unsupported interprocedural transformation: signature mismatch "
-             "between src and tgt", false };
+  {
+    auto src_inputs = t.src.getInputs();
+    auto tgt_inputs = t.tgt.getInputs();
+    auto litr = src_inputs.begin(), lend = src_inputs.end();
+    auto ritr = tgt_inputs.begin(), rend = tgt_inputs.end();
+
+    while (litr != lend && ritr != rend) {
+      auto *lv = dynamic_cast<const Input*>(&*litr);
+      auto *rv = dynamic_cast<const Input*>(&*ritr);
+      if (lv->getType().toString() != rv->getType().toString())
+        return { "Signature mismatch between src and tgt", false };
+
+      if (!lv->getAttributes().refinedBy(rv->getAttributes()))
+        return { "Parameter attributes not refined", true };
+
+      ++litr;
+      ++ritr;
+    }
+
+    if (litr != lend || ritr != rend)
+      return { "Signature mismatch between src and tgt", false };
   }
 
   // Check sizes of global variables
