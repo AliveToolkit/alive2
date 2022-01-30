@@ -234,7 +234,7 @@ void SimpleMutator::saveModule(const string &outputFileName) {
   llvm::raw_fd_ostream fout(outputFileName, ec);
   fout << *pm;
   fout.close();
-  if(debug){
+  if (debug) {
     llvm::errs() << "file wrote to " << outputFileName << "\n";
   }
 }

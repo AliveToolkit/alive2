@@ -113,9 +113,11 @@ llvm::cl::opt<bool> newGVN(
     llvm::cl::desc("turn on gvn optimization, fault O2 will be disabled"),
     llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<bool> onlyDump(LLVM_ARGS_PREFIX "onlyDump", llvm::cl::value_desc("only dump IR files without mutation"),
-  llvm::cl::desc("only dump IR files without"),
-  llvm::cl::cat(mutatorArgs));
+llvm::cl::opt<bool>
+    onlyDump(LLVM_ARGS_PREFIX "onlyDump",
+             llvm::cl::value_desc("only dump IR files without mutation"),
+             llvm::cl::desc("only dump IR files without"),
+             llvm::cl::cat(mutatorArgs));
 
 filesystem::path inputPath, outputPath;
 
@@ -384,9 +386,9 @@ version )EOF";
 
 bool inputVerify() {
   if (stubMutator.openInputFile(testfile)) {
-    if(onlyDump){
+    if (onlyDump) {
       std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
-      validFuncNum=M1->size();
+      validFuncNum = M1->size();
       stubMutator.setModule(std::move(M1));
       return false;
     }
@@ -555,10 +557,10 @@ string getOutputFile(int ith, bool isOptimized) {
 void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
   std::unique_ptr<llvm::Module> M1 = nullptr;
   mutator.mutateModule(getOutputFile(ith));
-  if (verbose||onlyDump) {
+  if (verbose || onlyDump) {
     mutator.saveModule(getOutputFile(ith));
   }
-  if(onlyDump){
+  if (onlyDump) {
     return;
   }
   M1 = mutator.getModule();
