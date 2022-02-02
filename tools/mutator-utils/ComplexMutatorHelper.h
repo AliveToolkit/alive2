@@ -144,6 +144,9 @@ public:
   virtual void reset() {
     generated = false;
   }
+  virtual void whenMoveToNextInst(){
+    generated= false;
+  }
   virtual void mutate();
   virtual bool shouldMutate();
   virtual void debug() {
