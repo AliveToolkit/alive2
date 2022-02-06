@@ -28,6 +28,19 @@ using llvm::LLVMContext;
 
 namespace {
 
+FpRoundingMode parse_rounding(llvm::Instruction &i) {
+  auto *fp = cast<llvm::ConstrainedFPIntrinsic>(&i);
+  switch (fp->getRoundingMode().getValue()) {
+  case llvm::RoundingMode::Dynamic:           return FpRoundingMode::Dynamic;
+  case llvm::RoundingMode::NearestTiesToAway: return FpRoundingMode::RNA;
+  case llvm::RoundingMode::NearestTiesToEven: return FpRoundingMode::RNE;
+  case llvm::RoundingMode::TowardNegative:    return FpRoundingMode::RTN;
+  case llvm::RoundingMode::TowardPositive:    return FpRoundingMode::RTP;
+  case llvm::RoundingMode::TowardZero:        return FpRoundingMode::RTZ;
+  default: UNREACHABLE();
+  }
+}
+
 unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
@@ -910,6 +923,25 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op,
                                              parse_fmath(i)));
+    }
+    case llvm::Intrinsic::experimental_constrained_fadd:
+    case llvm::Intrinsic::experimental_constrained_fsub:
+    case llvm::Intrinsic::experimental_constrained_fmul:
+    case llvm::Intrinsic::experimental_constrained_fdiv:
+    {
+      PARSE_BINOP();
+      FpBinOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::experimental_constrained_fadd: op = FpBinOp::FAdd; break;
+      case llvm::Intrinsic::experimental_constrained_fsub: op = FpBinOp::FSub; break;
+      case llvm::Intrinsic::experimental_constrained_fmul: op = FpBinOp::FMul; break;
+      case llvm::Intrinsic::experimental_constrained_fdiv: op = FpBinOp::FDiv; break;
+      default: UNREACHABLE();
+      }
+      // TODO: missing support for exceptions
+      RETURN_IDENTIFIER(
+        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
+                             parse_rounding(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:

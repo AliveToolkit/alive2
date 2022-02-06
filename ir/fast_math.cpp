@@ -28,7 +28,6 @@ struct Node {
   enum { Add, Sub, Mul, Div, Neg, Leaf } operation;
   unsigned op1 = -1u, op2 = -1u;
   expr leaf;
-  // FIXME: we currently ignore rounding
   expr rounding;
   unsigned flags = 0;
 
@@ -245,16 +244,16 @@ public:
         expr val;
         switch (node->operation) {
         case Node::Add:
-          val = exprs[node->op1]->fadd(*exprs[node->op2]);
+          val = exprs[node->op1]->fadd(*exprs[node->op2], node->rounding);
           break;
         case Node::Sub:
-          val = exprs[node->op1]->fsub(*exprs[node->op2]);
+          val = exprs[node->op1]->fsub(*exprs[node->op2], node->rounding);
           break;
         case Node::Mul:
-          val = exprs[node->op1]->fmul(*exprs[node->op2]);
+          val = exprs[node->op1]->fmul(*exprs[node->op2], node->rounding);
           break;
         case Node::Div:
-          val = exprs[node->op1]->fdiv(*exprs[node->op2]);
+          val = exprs[node->op1]->fdiv(*exprs[node->op2], node->rounding);
           break;
         case Node::Neg:
           val = exprs[node->op1]->fneg();

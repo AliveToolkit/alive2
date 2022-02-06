@@ -95,4 +95,12 @@ struct FastMathFlags final {
   friend std::ostream& operator<<(std::ostream &os, const FastMathFlags &fm);
 };
 
+
+struct FpRoundingMode final {
+  enum Mode { Dynamic, RNE, RNA, RTP, RTN, RTZ } mode;
+  FpRoundingMode(Mode mode) : mode(mode) {}
+  smt::expr toSMT() const;
+  friend std::ostream& operator<<(std::ostream &os, FpRoundingMode rounding);
+};
+
 }

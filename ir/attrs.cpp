@@ -212,4 +212,30 @@ ostream& operator<<(ostream &os, const FastMathFlags &fm) {
   return os;
 }
 
+
+smt::expr FpRoundingMode::toSMT() const {
+  switch (mode) {
+  case FpRoundingMode::Dynamic: UNREACHABLE();
+  case FpRoundingMode::RNE:     return expr::rne();
+  case FpRoundingMode::RNA:     return expr::rna();
+  case FpRoundingMode::RTP:     return expr::rtp();
+  case FpRoundingMode::RTN:     return expr::rtn();
+  case FpRoundingMode::RTZ:     return expr::rtz();
+  }
+  UNREACHABLE();
+}
+
+ostream& operator<<(std::ostream &os, FpRoundingMode rounding) {
+  const char *str;
+  switch (rounding.mode) {
+  case FpRoundingMode::Dynamic: str = "dynamic"; break;
+  case FpRoundingMode::RNE:     str = "tonearest"; break;
+  case FpRoundingMode::RNA:     str = "tonearestaway"; break;
+  case FpRoundingMode::RTP:     str = "upward"; break;
+  case FpRoundingMode::RTN:     str = "downward"; break;
+  case FpRoundingMode::RTZ:     str = "towardzero"; break;
+  }
+  return os << str;
+}
+
 }

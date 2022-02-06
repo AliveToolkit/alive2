@@ -211,10 +211,16 @@ public:
   expr isFPNegative() const;
   expr isFPNegZero() const;
 
-  expr fadd(const expr &rhs) const;
-  expr fsub(const expr &rhs) const;
-  expr fmul(const expr &rhs) const;
-  expr fdiv(const expr &rhs) const;
+  static expr rne();
+  static expr rna();
+  static expr rtp();
+  static expr rtn();
+  static expr rtz();
+
+  expr fadd(const expr &rhs, const expr &rm) const;
+  expr fsub(const expr &rhs, const expr &rm) const;
+  expr fmul(const expr &rhs, const expr &rm) const;
+  expr fdiv(const expr &rhs, const expr &rm) const;
   expr fabs() const;
   expr fneg() const;
   expr sqrt() const;
@@ -223,9 +229,7 @@ public:
 
   expr ceil() const;
   expr floor() const;
-  expr roundna() const;
-  expr roundne() const;
-  expr roundtz() const;
+  expr round(const expr &rm) const;
 
   expr foeq(const expr &rhs) const;
   expr fogt(const expr &rhs) const;

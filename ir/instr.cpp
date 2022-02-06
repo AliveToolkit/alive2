@@ -597,7 +597,8 @@ void FpBinOp::print(ostream &os) const {
   case FMaximum: str = "fmaximum "; break;
   case FMinimum: str = "fminimum "; break;
   }
-  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
+  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName()
+     << ", rounding=" << rm;
 }
 
 static expr any_fp_zero(State &s, const expr &v) {
@@ -701,7 +702,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FAdd:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
-                       [](expr &a, expr &b) { return a.fadd(b); },
+                       [&](expr &a, expr &b) { return a.fadd(b, rm.toSMT()); },
                        fmath, false);
     };
     break;
@@ -709,7 +710,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FSub:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
-                       [](expr &a, expr &b) { return a.fsub(b); },
+                       [&](expr &a, expr &b) { return a.fsub(b, rm.toSMT()); },
                        fmath, false);
     };
     break;
@@ -717,7 +718,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMul:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
-                       [](expr &a, expr &b) { return a.fmul(b); },
+                       [&](expr &a, expr &b) { return a.fmul(b, rm.toSMT()); },
                        fmath, false);
     };
     break;
@@ -725,7 +726,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FDiv:
     fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
-                       [](expr &a, expr &b) { return a.fdiv(b); },
+                       [&](expr &a, expr &b) { return a.fdiv(b, rm.toSMT()); },
                        fmath, false);
     };
     break;
@@ -908,19 +909,22 @@ StateValue UnaryOp::toSMT(State &s) const {
   case Round:
     fn = [&](auto v, auto np) -> StateValue {
       return fm_poison(s, v, np,
-                       [](expr &v) { return v.roundna(); }, fmath, true);
+                       [](expr &v) { return v.round(expr::rna()); },
+                       fmath, true);
     };
     break;
   case RoundEven:
     fn = [&](auto v, auto np) -> StateValue {
       return fm_poison(s, v, np,
-                       [](expr &v) { return v.roundne(); }, fmath, true);
+                       [](expr &v) { return v.round(expr::rne()); },
+                       fmath, true);
     };
     break;
   case Trunc:
     fn = [&](auto v, auto np) -> StateValue {
       return fm_poison(s, v, np,
-                       [](expr &v) { return v.roundtz(); }, fmath, true);
+                       [](expr &v) { return v.round(expr::rtz()); },
+                       fmath, true);
     };
     break;
   case Sqrt:
@@ -1260,7 +1264,7 @@ StateValue ConversionOp::toSMT(State &s) const {
       expr bv  = val.fp2sint(to_type.bits());
       expr fp2 = bv.sint2fp(val);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
-      expr valrtz = val.roundtz();
+      expr valrtz = val.round(expr::rtz());
       return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
     };
     break;
@@ -1269,7 +1273,7 @@ StateValue ConversionOp::toSMT(State &s) const {
       expr bv  = val.fp2uint(to_type.bits());
       expr fp2 = bv.uint2fp(val);
       // -0.xx must be converted to 0, not poison.
-      expr valrtz = val.roundtz();
+      expr valrtz = val.round(expr::rtz());
       return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
     };
     break;

@@ -64,11 +64,13 @@ private:
   Value *lhs, *rhs;
   Op op;
   FastMathFlags fmath;
+  FpRoundingMode rm;
 
 public:
   FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-          FastMathFlags fmath)
-  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath) {}
+          FastMathFlags fmath, FpRoundingMode rm = FpRoundingMode::RNE)
+  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
+    rm(rm) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

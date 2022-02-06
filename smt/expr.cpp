@@ -999,29 +999,44 @@ expr expr::isFPNegZero() const {
   return isFPZero() && isFPNegative();
 }
 
-// TODO: make rounding mode customizable
-expr expr::fadd(const expr &rhs) const {
-  C(rhs);
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
-  return simplify_const(Z3_mk_fpa_add(ctx(), rm, ast(), rhs()), *this, rhs);
+expr expr::rne() {
+  return Z3_mk_fpa_rne(ctx());
 }
 
-expr expr::fsub(const expr &rhs) const {
-  C(rhs);
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
-  return simplify_const(Z3_mk_fpa_sub(ctx(), rm, ast(), rhs()), *this, rhs);
+expr expr::rna() {
+  return Z3_mk_fpa_rna(ctx());
 }
 
-expr expr::fmul(const expr &rhs) const {
-  C(rhs);
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
-  return simplify_const(Z3_mk_fpa_mul(ctx(), rm, ast(), rhs()), *this, rhs);
+expr expr::rtp() {
+  return Z3_mk_fpa_rtp(ctx());
 }
 
-expr expr::fdiv(const expr &rhs) const {
-  C(rhs);
-  auto rm = Z3_mk_fpa_round_nearest_ties_to_even(ctx());
-  return simplify_const(Z3_mk_fpa_div(ctx(), rm, ast(), rhs()), *this, rhs);
+expr expr::rtn() {
+  return Z3_mk_fpa_rtn(ctx());
+}
+
+expr expr::rtz() {
+  return Z3_mk_fpa_rtz(ctx());
+}
+
+expr expr::fadd(const expr &rhs, const expr &rm) const {
+  C(rhs, rm);
+  return simplify_const(Z3_mk_fpa_add(ctx(), rm(), ast(), rhs()), *this, rhs);
+}
+
+expr expr::fsub(const expr &rhs, const expr &rm) const {
+  C(rhs, rm);
+  return simplify_const(Z3_mk_fpa_sub(ctx(), rm(), ast(), rhs()), *this, rhs);
+}
+
+expr expr::fmul(const expr &rhs, const expr &rm) const {
+  C(rhs, rm);
+  return simplify_const(Z3_mk_fpa_mul(ctx(), rm(), ast(), rhs()), *this, rhs);
+}
+
+expr expr::fdiv(const expr &rhs, const expr &rm) const {
+  C(rhs, rm);
+  return simplify_const(Z3_mk_fpa_div(ctx(), rm(), ast(), rhs()), *this, rhs);
 }
 
 expr expr::fabs() const {
@@ -1045,38 +1060,17 @@ expr expr::fma(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::ceil() const {
-  C();
-  return
-    simplify_const(
-      Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtp(ctx()), ast()), *this);
+  return round(rtp());
 }
 
 expr expr::floor() const {
-  C();
-  return
-    simplify_const(
-      Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtn(ctx()), ast()), *this);
+  return round(rtn());
 }
 
-expr expr::roundna() const {
-  C();
+expr expr::round(const expr &rm) const {
+  C(rm);
   return
-    simplify_const(
-      Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rna(ctx()), ast()), *this);
-}
-
-expr expr::roundne() const {
-  C();
-  return
-    simplify_const(
-      Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rne(ctx()), ast()), *this);
-}
-
-expr expr::roundtz() const {
-  C();
-  return
-    simplify_const(
-      Z3_mk_fpa_round_to_integral(ctx(), Z3_mk_fpa_rtz(ctx()), ast()), *this);
+    simplify_const(Z3_mk_fpa_round_to_integral(ctx(), rm(), ast()), *this);
 }
 
 expr expr::foeq(const expr &rhs) const {
