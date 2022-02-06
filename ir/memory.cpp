@@ -1948,7 +1948,7 @@ expr Memory::blockPropertiesRefined(const Pointer &src, const Pointer &tgt)
   if (src_align.isConst() || tgt_align.isConst())
     aligned = src_align.ule(tgt_align);
 
-  return src.isBlockAlive() == tgt.isBlockAlive() &&
+  return src.isBlockAlive().implies(tgt.isBlockAlive()) &&
          src.blockSize() == tgt.blockSize() &&
          ((src.isLocal() && tgt.isByval()) ||
           src.getAllocType() == tgt.getAllocType()) &&

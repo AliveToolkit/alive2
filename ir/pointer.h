@@ -40,7 +40,8 @@ class Pointer {
   // Encode the refinement between
   // (src ptr, tgt ptr) = (local, local) or (local, byval ptr)
   smt::expr encodeLocalPtrRefinement(const Pointer &other,
-                                     std::set<smt::expr> &undefs) const;
+                                     std::set<smt::expr> &undefs,
+                                     bool readsbytes) const;
   // Encode the refinement when two ptrs are given as byval args
   smt::expr encodeByValArgRefinement(const Pointer &otherByval,
                                      std::set<smt::expr> &undefs,
@@ -122,7 +123,7 @@ public:
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
-                           unsigned byval_bytes) const;
+                           unsigned byval_bytes, bool readsbytes) const;
 
   const Memory& getMemory() const { return m; }
 
