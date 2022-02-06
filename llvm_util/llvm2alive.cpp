@@ -159,6 +159,8 @@ public:
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
     PARSE_BINOP();
     BinOp::Op alive_op;
+    FpBinOp::Op fp_op;
+    bool is_fp = false;
     switch (i.getOpcode()) {
     case llvm::Instruction::Add:  alive_op = BinOp::Add; break;
     case llvm::Instruction::Sub:  alive_op = BinOp::Sub; break;
@@ -173,14 +175,18 @@ public:
     case llvm::Instruction::And:  alive_op = BinOp::And; break;
     case llvm::Instruction::Or:   alive_op = BinOp::Or; break;
     case llvm::Instruction::Xor:  alive_op = BinOp::Xor; break;
-    case llvm::Instruction::FAdd: alive_op = BinOp::FAdd; break;
-    case llvm::Instruction::FSub: alive_op = BinOp::FSub; break;
-    case llvm::Instruction::FMul: alive_op = BinOp::FMul; break;
-    case llvm::Instruction::FDiv: alive_op = BinOp::FDiv; break;
-    case llvm::Instruction::FRem: alive_op = BinOp::FRem; break;
+    case llvm::Instruction::FAdd: fp_op = FpBinOp::FAdd; is_fp = true; break;
+    case llvm::Instruction::FSub: fp_op = FpBinOp::FSub; is_fp = true; break;
+    case llvm::Instruction::FMul: fp_op = FpBinOp::FMul; is_fp = true; break;
+    case llvm::Instruction::FDiv: fp_op = FpBinOp::FDiv; is_fp = true; break;
+    case llvm::Instruction::FRem: fp_op = FpBinOp::FRem; is_fp = true; break;
     default:
       return error(i);
     }
+
+    if (is_fp)
+      RETURN_IDENTIFIER(make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op,
+                                             parse_fmath(i)));
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
@@ -190,7 +196,7 @@ public:
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
-                                         flags, parse_fmath(i)));
+                                         flags));
   }
 
   RetTy visitCastInst(llvm::CastInst &i) {
@@ -894,16 +900,16 @@ public:
     case llvm::Intrinsic::maximum:
     {
       PARSE_BINOP();
-      BinOp::Op op;
+      FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::minnum:   op = BinOp::FMin; break;
-      case llvm::Intrinsic::maxnum:   op = BinOp::FMax; break;
-      case llvm::Intrinsic::minimum:  op = BinOp::FMinimum; break;
-      case llvm::Intrinsic::maximum:  op = BinOp::FMaximum; break;
+      case llvm::Intrinsic::minnum:  op = FpBinOp::FMin; break;
+      case llvm::Intrinsic::maxnum:  op = FpBinOp::FMax; break;
+      case llvm::Intrinsic::minimum: op = FpBinOp::FMinimum; break;
+      case llvm::Intrinsic::maximum: op = FpBinOp::FMaximum; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b,
-                                           op, BinOp::None, parse_fmath(i)));
+      RETURN_IDENTIFIER(make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op,
+                                             parse_fmath(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:

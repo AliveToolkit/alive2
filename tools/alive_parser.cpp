@@ -638,25 +638,6 @@ static FastMathFlags parse_fast_math(token op_token) {
       break;
     }
   }
-
-  switch (op_token) {
-  case FABS:
-  case FADD:
-  case FSUB:
-  case FMUL:
-  case FDIV:
-  case FREM:
-  case FCMP:
-  case FMA:
-  case FMAX:
-  case FMIN:
-  case FMAXIMUM:
-  case FMINIMUM:
-    break;
-  default:
-    if (!fmath.isNone())
-      error("Unexpected fast-math tokens");
-  }
   return fmath;
 }
 
@@ -714,7 +695,6 @@ static unsigned parse_binop_flags(token op_token) {
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto flags = parse_binop_flags(op_token);
-  auto fmath = parse_fast_math(op_token);
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
@@ -769,26 +749,41 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
     op = BinOp::UMul_Overflow;
     rettype = &get_overflow_type(type);
     break;
-  case FADD: op = BinOp::FAdd; break;
-  case FSUB: op = BinOp::FSub; break;
-  case FMUL: op = BinOp::FMul; break;
-  case FDIV: op = BinOp::FDiv; break;
-  case FREM: op = BinOp::FRem; break;
-  case FMAX: op = BinOp::FMax; break;
-  case FMIN: op = BinOp::FMin; break;
-  case FMAXIMUM: op = BinOp::FMaximum; break;
-  case FMINIMUM: op = BinOp::FMinimum; break;
   case UMIN: op = BinOp::UMin; break;
   case UMAX: op = BinOp::UMax; break;
   case SMIN: op = BinOp::SMin; break;
   case SMAX: op = BinOp::SMax; break;
-  case ABS:
-    op = BinOp::Abs;
-    break;
+  case ABS:  op = BinOp::Abs; break;
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags, fmath);
+  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags);
+}
+
+static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
+  auto fmath = parse_fast_math(op_token);
+  auto &type = parse_type();
+  auto &a = parse_operand(type);
+  parse_comma();
+  Type &type_rhs = try_parse_type(type);
+  auto &b = parse_operand(type_rhs);
+  Type *rettype = &type;
+
+  FpBinOp::Op op;
+  switch (op_token) {
+  case FADD:     op = FpBinOp::FAdd; break;
+  case FSUB:     op = FpBinOp::FSub; break;
+  case FMUL:     op = FpBinOp::FMul; break;
+  case FDIV:     op = FpBinOp::FDiv; break;
+  case FREM:     op = FpBinOp::FRem; break;
+  case FMAX:     op = FpBinOp::FMax; break;
+  case FMIN:     op = FpBinOp::FMin; break;
+  case FMAXIMUM: op = FpBinOp::FMaximum; break;
+  case FMINIMUM: op = FpBinOp::FMinimum; break;
+  default:
+    UNREACHABLE();
+  }
+  return make_unique<FpBinOp>(*rettype, string(name), a, b, op, fmath);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -1137,6 +1132,12 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case USUB_OVERFLOW:
   case SMUL_OVERFLOW:
   case UMUL_OVERFLOW:
+  case UMIN:
+  case UMAX:
+  case SMIN:
+  case SMAX:
+  case ABS:
+    return parse_binop(name, t);
   case FADD:
   case FSUB:
   case FMUL:
@@ -1146,12 +1147,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FMIN:
   case FMAXIMUM:
   case FMINIMUM:
-  case UMIN:
-  case UMAX:
-  case SMIN:
-  case SMAX:
-  case ABS:
-    return parse_binop(name, t);
+    return parse_fp_binop(name, t);
   case BITREVERSE:
   case BSWAP:
   case CTPOP:

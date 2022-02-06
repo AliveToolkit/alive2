@@ -33,7 +33,6 @@ public:
             SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat, SShl_Sat, UShl_Sat,
             SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
             SMul_Overflow, UMul_Overflow,
-            FAdd, FSub, FMul, FDiv, FRem, FMax, FMin, FMaximum, FMinimum,
             And, Or, Xor, Cttz, Ctlz, UMin, UMax, SMin, SMax, Abs };
   enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2 };
 
@@ -41,12 +40,35 @@ private:
   Value *lhs, *rhs;
   Op op;
   unsigned flags;
-  FastMathFlags fmath;
   bool isDivOrRem() const;
 
 public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-        unsigned flags = 0, FastMathFlags fmath = {});
+        unsigned flags = None);
+
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FpBinOp final : public Instr {
+public:
+  enum Op { FAdd, FSub, FMul, FDiv, FRem, FMax, FMin, FMaximum, FMinimum };
+
+private:
+  Value *lhs, *rhs;
+  Op op;
+  FastMathFlags fmath;
+
+public:
+  FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
+          FastMathFlags fmath)
+  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
