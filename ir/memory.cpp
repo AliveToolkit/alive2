@@ -1904,11 +1904,11 @@ expr Memory::int2ptr(const expr &val) const {
 }
 
 expr Memory::blockValRefined(const Memory &other, unsigned bid,
-                             optional<unsigned> bid_other,
+                             optional<unsigned> another_localbid,
                              const expr &offset, set<expr> &undef) const {
-  auto &mem1 = (bid_other ? local_block_val : non_local_block_val)[bid];
-  auto &mem2 = bid_other ? other.local_block_val[*bid_other].val : 
-                           other.non_local_block_val[bid].val;
+  auto &mem1 = (another_localbid ? local_block_val : non_local_block_val)[bid];
+  auto &mem2 = another_localbid ? other.local_block_val[*another_localbid].val :
+                                  other.non_local_block_val[bid].val;
 
   if (mem1.val.eq(mem2))
     return true;

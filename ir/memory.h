@@ -198,7 +198,7 @@ class Memory {
   // If bid_other == nullopt, it encodes the non-local block refinement
   // Otherwise, it encodes the local block refinement between bid and *bid_other
   smt::expr blockValRefined(const Memory &other, unsigned bid,
-                            std::optional<unsigned> bid_other,
+                            std::optional<unsigned> another_local_bid,
                             const smt::expr &offset,
                             std::set<smt::expr> &undef) const;
   smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
