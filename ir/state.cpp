@@ -141,6 +141,7 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
 
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
+    fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
 
 void State::resetGlobals() {

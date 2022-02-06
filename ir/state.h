@@ -125,6 +125,7 @@ private:
   const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
   Memory memory;
+  smt::expr fp_rounding_mode;
   std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
@@ -240,6 +241,7 @@ public:
   auto& getFn() const { return f; }
   auto& getMemory() const { return memory; }
   auto& getMemory() { return memory; }
+  auto& getFpRoundingMode() const { return fp_rounding_mode; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
   auto& getFnPre() const { return fn_call_pre; }

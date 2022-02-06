@@ -696,11 +696,12 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
-  function<StateValue(const expr&, const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const expr&, const expr&, const expr&, const expr&,
+                      FpRoundingMode)> fn;
 
   switch (op) {
   case FAdd:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
                        [&](expr &a, expr &b) { return a.fadd(b, rm.toSMT()); },
                        fmath, false);
@@ -708,7 +709,7 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case FSub:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
                        [&](expr &a, expr &b) { return a.fsub(b, rm.toSMT()); },
                        fmath, false);
@@ -716,7 +717,7 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case FMul:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
                        [&](expr &a, expr &b) { return a.fmul(b, rm.toSMT()); },
                        fmath, false);
@@ -724,7 +725,7 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case FDiv:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       return fm_poison(s, a, ap, b, bp,
                        [&](expr &a, expr &b) { return a.fdiv(b, rm.toSMT()); },
                        fmath, false);
@@ -732,7 +733,7 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case FRem:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       return fm_poison(s, a, ap, b, bp,
                        [&](expr &a, expr &b) {
@@ -746,7 +747,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMin:
   case FMax:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addQuantVar(ndet);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
@@ -766,7 +767,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMinimum:
   case FMaximum:
-    fn = [&](auto a, auto ap, auto b, auto bp) -> StateValue {
+    fn = [&](auto a, auto ap, auto b, auto bp, auto rm) -> StateValue {
       auto v = [&](expr &a, expr &b) {
         expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
         expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
@@ -783,6 +784,20 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
   }
 
+  auto scalar = [&](auto &a, auto &ap, auto &b, auto &bp) {
+    if (!rm.isDynamic())
+      return fn(a, ap, b, bp, rm);
+
+    auto &var = s.getFpRoundingMode();
+    DisjointExpr<StateValue> vals;
+    for (auto rm : { FpRoundingMode::RNE, FpRoundingMode::RNA,
+                     FpRoundingMode::RTP, FpRoundingMode::RTN,
+                     FpRoundingMode::RTZ }) {
+      vals.add(fn(a, ap, b, bp, rm), var == rm);
+    }
+    return *vals();
+  };
+
   auto &a = s[*lhs];
   auto &b = s[*rhs];
 
@@ -792,11 +807,12 @@ StateValue FpBinOp::toSMT(State &s) const {
     for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
       auto ai = retty->extract(a, i);
       auto bi = retty->extract(b, i);
-      vals.emplace_back(fn(ai.value, ai.non_poison, bi.value, bi.non_poison));
+      vals.emplace_back(
+        scalar(ai.value, ai.non_poison, bi.value, bi.non_poison));
     }
     return retty->aggregateVals(vals);
   }
-  return fn(a.value, a.non_poison, b.value, b.non_poison);
+  return scalar(a.value, a.non_poison, b.value, b.non_poison);
 }
 
 expr FpBinOp::getTypeConstraints(const Function &f) const {
