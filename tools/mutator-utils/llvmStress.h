@@ -118,8 +118,8 @@ struct Modifier {
 
 public:
   /// C'tor
-  Modifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : PT(PT), Ran(R), Context(context) {}
+  Modifier(PieceTable *PT, RandomFromLLVMStress *R, Module* module)
+      : PT(PT), Ran(R), module(module) {}
 
   /// virtual D'tor to silence warnings.
   virtual ~Modifier() = default;
@@ -147,6 +147,40 @@ protected:
     return Ran->Rand();
   }
 
+  Value* getOrInsertFromGlobalValue(Type* ty){
+    if(glbVals.empty()){
+      for(auto it=module->global_begin();it!=module->global_end();++it){
+        glbVals.push_back(&*it);
+      }
+    }
+    bool shouldInsert=getRandomFromLLVMStress()&1,found=false;
+    Value* res=nullptr;
+    if(!shouldInsert&&!glbVals.empty()){
+      for(size_t i=0,pos=getRandomFromLLVMStress()%glbVals.size();i<glbVals.size();++i,++pos){
+        if(pos==glbVals.size()){
+          pos=0;
+        }
+        if(glbVals[pos]->getType()==ty){
+          found=true;
+          res=glbVals[pos];
+          break;
+        }
+      }
+    }
+    if(shouldInsert||!found){
+      std::string varName=std::string("aliveMutateGeneratedGlobalVariable")+std::to_string(glbVals.size());
+      module->getOrInsertGlobal(varName,ty);
+      GlobalVariable* glbVal=module->getGlobalVariable(varName);
+      glbVals.push_back(glbVal);
+      glbVal->setLinkage(GlobalValue::ExternalLinkage);
+      Value *V = new LoadInst(glbVal->getType()->getPointerElementType(), glbVal, "L",
+                            insertPoint);
+      PT->push_back(V);
+      res=V;
+    }
+    return res;
+  }
+
   /// Return a RandomFromLLVMStress value from the list of known values.
   Value *getRandomFromLLVMStressVal() {
     assert(PT->size());
@@ -163,7 +197,7 @@ protected:
         return ConstantFP::getAllOnesValue(Tp);
       return ConstantFP::getNullValue(Tp);
     }
-    return UndefValue::get(Tp);
+    return (Constant*)getOrInsertFromGlobalValue(Tp);
   }
 
   /// Return a RandomFromLLVMStress value with a known type.
@@ -197,7 +231,7 @@ protected:
       return ConstantVector::get(VectorValue);
     }
 
-    return UndefValue::get(Tp);
+    return getOrInsertFromGlobalValue(Tp);
   }
 
   /// Return a RandomFromLLVMStress value of any pointer type.
@@ -208,7 +242,7 @@ protected:
       if (V->getType()->isPointerTy())
         return V;
     }
-    return UndefValue::get(pickPointerType());
+    return getOrInsertFromGlobalValue(pickPointerType());
   }
 
   /// Return a RandomFromLLVMStress value of any vector type.
@@ -216,10 +250,10 @@ protected:
     unsigned index = getRandomFromLLVMStress();
     for (unsigned i = 0; i < PT->size(); ++i) {
       Value *V = PT->at((index + i) % PT->size());
-      if (V->getType()->isVectorTy())
+      if (isa<FixedVectorType>(V->getType()))
         return V;
     }
-    return UndefValue::get(pickVectorType());
+    return getOrInsertFromGlobalValue(pickVectorType());
   }
 
   /// Pick a RandomFromLLVMStress type.
@@ -257,6 +291,7 @@ protected:
   Type *pickScalarType() {
     static std::vector<Type *> ScalarTypes;
     if (ScalarTypes.empty()) {
+      LLVMContext& Context=module->getContext();
       ScalarTypes.assign({Type::getInt1Ty(Context), Type::getInt8Ty(Context),
                           Type::getInt16Ty(Context), Type::getInt32Ty(Context),
                           Type::getInt64Ty(Context), Type::getFloatTy(Context),
@@ -271,14 +306,15 @@ protected:
   /// RandomFromLLVMStress number generator
   RandomFromLLVMStress *Ran;
 
-  /// Context
-  LLVMContext &Context;
+  /// Module
+  Module* module;
+  SmallVector<Value*> glbVals;
 };
 Instruction *Modifier::insertPoint = nullptr;
 
 struct LoadModifier : public Modifier {
-  LoadModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  LoadModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
@@ -290,8 +326,8 @@ struct LoadModifier : public Modifier {
 };
 
 struct StoreModifier : public Modifier {
-  StoreModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  StoreModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
@@ -310,8 +346,8 @@ struct StoreModifier : public Modifier {
 };
 
 struct BinModifier : public Modifier {
-  BinModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  BinModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVal();
@@ -393,8 +429,8 @@ struct BinModifier : public Modifier {
 
 /// Generate constant values.
 struct ConstModifier : public Modifier {
-  ConstModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  ConstModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Type *Ty = pickType();
@@ -449,8 +485,8 @@ struct ConstModifier : public Modifier {
 };
 
 struct AllocaModifier : public Modifier {
-  AllocaModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  AllocaModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Type *Tp = pickType();
@@ -462,25 +498,25 @@ struct AllocaModifier : public Modifier {
 
 struct ExtractElementModifier : public Modifier {
   ExtractElementModifier(PieceTable *PT, RandomFromLLVMStress *R,
-                         LLVMContext &context)
-      : Modifier(PT, R, context) {}
+                          Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVectorValue();
     Value *V = ExtractElementInst::Create(
         Val0,
         ConstantInt::get(
-            Type::getInt32Ty(Context),
+            Type::getInt32Ty(module->getContext()),
             getRandomFromLLVMStress() %
-                cast<FixedVectorType>(Val0->getType())->getNumElements()),
+                (((FixedVectorType*)(Val0->getType()))->getNumElements())),
         "E", insertPoint);
     return PT->push_back(V);
   }
 };
 
 struct ShuffModifier : public Modifier {
-  ShuffModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  ShuffModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVectorValue();
@@ -489,13 +525,13 @@ struct ShuffModifier : public Modifier {
     unsigned Width = cast<FixedVectorType>(Val0->getType())->getNumElements();
     std::vector<Constant *> Idxs;
 
-    Type *I32 = Type::getInt32Ty(Context);
+    Type *I32 = Type::getInt32Ty(module->getContext());
     for (unsigned i = 0; i < Width; ++i) {
       Constant *CI =
           ConstantInt::get(I32, getRandomFromLLVMStress() % (Width * 2));
       // Pick some undef values.
-      if (!(getRandomFromLLVMStress() % 5))
-        CI = UndefValue::get(I32);
+      //if (!(getRandomFromLLVMStress() % 5))
+        //CI = UndefValue::get(I32);
       Idxs.push_back(CI);
     }
 
@@ -508,8 +544,8 @@ struct ShuffModifier : public Modifier {
 
 struct InsertElementModifier : public Modifier {
   InsertElementModifier(PieceTable *PT, RandomFromLLVMStress *R,
-                        LLVMContext &context)
-      : Modifier(PT, R, context) {}
+                         Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVectorValue();
@@ -519,7 +555,7 @@ struct InsertElementModifier : public Modifier {
     Value *V = InsertElementInst::Create(
         Val0, Val1,
         ConstantInt::get(
-            Type::getInt32Ty(Context),
+            Type::getInt32Ty(module->getContext()),
             getRandomFromLLVMStress() %
                 cast<FixedVectorType>(Val0->getType())->getNumElements()),
         "I", insertPoint);
@@ -528,8 +564,8 @@ struct InsertElementModifier : public Modifier {
 };
 
 struct CastModifier : public Modifier {
-  CastModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  CastModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *V = getRandomFromLLVMStressVal();
@@ -601,15 +637,15 @@ struct CastModifier : public Modifier {
 };
 
 struct SelectModifier : public Modifier {
-  SelectModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  SelectModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try a bunch of different select configuration until a valid one is found.
     Value *Val0 = getRandomFromLLVMStressVal();
     Value *Val1 = getRandomFromLLVMStressValue(Val0->getType());
 
-    Type *CondTy = Type::getInt1Ty(Context);
+    Type *CondTy = Type::getInt1Ty(module->getContext());
 
     // If the value type is a vector, and we allow vector select, then in 50%
     // of the cases generate a vector select.
@@ -627,8 +663,8 @@ struct SelectModifier : public Modifier {
 };
 
 struct CmpModifier : public Modifier {
-  CmpModifier(PieceTable *PT, RandomFromLLVMStress *R, LLVMContext &context)
-      : Modifier(PT, R, context) {}
+  CmpModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+      : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVal();
@@ -676,30 +712,30 @@ public:
     // Consider arguments as legal values.
     for (auto &arg : insertPoint->getParent()->getParent()->args())
       PT.push_back(&arg);
-    LLVMContext &context = insertPoint->getContext();
+    Module* module=insertPoint->getModule();
     // List of modifiers which add new RandomFromLLVMStress instructions.
     std::vector<std::unique_ptr<Modifier>> Modifiers;
-    Modifiers.emplace_back(new LoadModifier(&PT, &R, context));
-    Modifiers.emplace_back(new StoreModifier(&PT, &R, context));
+    Modifiers.emplace_back(new LoadModifier(&PT, &R, module));
+    Modifiers.emplace_back(new StoreModifier(&PT, &R, module));
     auto SM = Modifiers.back().get();
-    Modifiers.emplace_back(new ExtractElementModifier(&PT, &R, context));
-    Modifiers.emplace_back(new ShuffModifier(&PT, &R, context));
-    Modifiers.emplace_back(new InsertElementModifier(&PT, &R, context));
-    Modifiers.emplace_back(new BinModifier(&PT, &R, context));
-    Modifiers.emplace_back(new CastModifier(&PT, &R, context));
-    Modifiers.emplace_back(new SelectModifier(&PT, &R, context));
-    Modifiers.emplace_back(new CmpModifier(&PT, &R, context));
+    Modifiers.emplace_back(new ExtractElementModifier(&PT, &R, module));
+    Modifiers.emplace_back(new ShuffModifier(&PT, &R, module));
+    Modifiers.emplace_back(new InsertElementModifier(&PT, &R, module));
+    Modifiers.emplace_back(new BinModifier(&PT, &R, module));
+    Modifiers.emplace_back(new CastModifier(&PT, &R, module));
+    Modifiers.emplace_back(new SelectModifier(&PT, &R, module));
+    Modifiers.emplace_back(new CmpModifier(&PT, &R, module));
 
     int tmpNum = R.Rand() % std::min(5, (int)codeSize);
     codeSize -= tmpNum;
     // Generate the RandomFromLLVMStress instructions
-    AllocaModifier{&PT, &R, context}.ActN(tmpNum); // Throw in a few allocas
+    AllocaModifier{&PT, &R, module}.ActN(tmpNum); // Throw in a few allocas
     if (codeSize == 0)
       return;
 
     tmpNum = R.Rand() % std::min(5, (int)codeSize);
     codeSize -= tmpNum;
-    ConstModifier{&PT, &R, context}.ActN(tmpNum); // Throw in a few constants
+    ConstModifier{&PT, &R, module}.ActN(tmpNum); // Throw in a few constants
 
     for (unsigned i = 0; codeSize != 0 && codeSize >= Modifiers.size(); ++i) {
       for (auto &Mod : Modifiers) {
