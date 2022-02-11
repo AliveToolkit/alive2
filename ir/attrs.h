@@ -98,6 +98,7 @@ struct FastMathFlags final {
 
 struct FpRoundingMode final {
   enum Mode { Dynamic, RNE, RNA, RTP, RTN, RTZ } mode;
+  FpRoundingMode() : mode(RNE) {}
   FpRoundingMode(Mode mode) : mode(mode) {}
   bool isDynamic() const { return mode == Dynamic; }
   smt::expr toSMT() const;

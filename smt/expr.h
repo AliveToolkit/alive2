@@ -223,9 +223,9 @@ public:
   expr fdiv(const expr &rhs, const expr &rm) const;
   expr fabs() const;
   expr fneg() const;
-  expr sqrt() const;
+  expr sqrt(const expr &rm) const;
 
-  static expr fma(const expr &a, const expr &b, const expr &c);
+  static expr fma(const expr &a, const expr &b, const expr &c, const expr &rm);
 
   expr ceil() const;
   expr floor() const;

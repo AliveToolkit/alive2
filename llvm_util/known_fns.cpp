@@ -152,39 +152,39 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   case llvm::LibFunc_fabs:
   case llvm::LibFunc_fabsf:
-    RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::FAbs,
-                                    parse_fmath(i)));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::FAbs, parse_fmath(i)));
 
   case llvm::LibFunc_ceil:
   case llvm::LibFunc_ceilf:
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Ceil));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::Ceil, parse_fmath(i)));
 
   case llvm::LibFunc_floor:
   case llvm::LibFunc_floorf:
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Floor));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::Floor, parse_fmath(i)));
 
   case llvm::LibFunc_round:
   case llvm::LibFunc_roundf:
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Round));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::Round, parse_fmath(i)));
 
   case llvm::LibFunc_roundeven:
   case llvm::LibFunc_roundevenf:
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::RoundEven));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::RoundEven, parse_fmath(i)));
 
   case llvm::LibFunc_trunc:
   case llvm::LibFunc_truncf:
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Trunc));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::Trunc, parse_fmath(i)));
 
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
     BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));
-    RETURN_VAL(
-      make_unique<UnaryOp>(*ty, value_name(i), *args[0], UnaryOp::Sqrt));
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::Sqrt, parse_fmath(i)));
 
   case llvm::LibFunc_fwrite: {
     auto size = getInt(*args[1]);

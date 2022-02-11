@@ -68,7 +68,7 @@ private:
 
 public:
   FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-          FastMathFlags fmath, FpRoundingMode rm = FpRoundingMode::RNE)
+          FastMathFlags fmath, FpRoundingMode rm = {})
   : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
     rm(rm) {}
 
@@ -85,22 +85,46 @@ public:
 class UnaryOp final : public Instr {
 public:
   enum Op {
-    Copy, BitReverse, BSwap, Ctpop, IsConstant, IsNaN, FAbs, FNeg,
-    Ceil, Floor, Round, RoundEven, Trunc, Sqrt, FFS
+    Copy, BitReverse, BSwap, Ctpop, IsConstant, FFS
+  };
+
+private:
+  Value *val;
+  Op op;
+
+public:
+  UnaryOp(Type &type, std::string &&name, Value &val, Op op)
+    : Instr(type, std::move(name)), val(&val), op(op) {}
+
+  Op getOp() const { return op; }
+  Value& getValue() const { return *val; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FpUnaryOp final : public Instr {
+public:
+  enum Op {
+    FAbs, FNeg, Ceil, Floor, Round, RoundEven, Trunc, FpTrunc, Sqrt
   };
 
 private:
   Value *val;
   Op op;
   FastMathFlags fmath;
+  FpRoundingMode rm;
 
 public:
-  UnaryOp(Type &type, std::string &&name, Value &val, Op op,
-          FastMathFlags fmath = {})
-    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath) {}
+  FpUnaryOp(Type &type, std::string &&name, Value &val, Op op,
+            FastMathFlags fmath, FpRoundingMode rm = {})
+    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm) {}
 
-  Op getOp() const { return op; }
-  Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
@@ -138,16 +162,42 @@ public:
 
 class TernaryOp final : public Instr {
 public:
-  enum Op { FShl, FShr, FMA };
+  enum Op { FShl, FShr };
+
+private:
+  Value *a, *b, *c;
+  Op op;
+
+public:
+  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
+            Op op)
+    : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
+
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FpTernaryOp final : public Instr {
+public:
+  enum Op { FMA, MulAdd };
 
 private:
   Value *a, *b, *c;
   Op op;
   FastMathFlags fmath;
+  FpRoundingMode rm;
 
 public:
-  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c, Op op,
-            FastMathFlags fmath = {});
+  FpTernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
+              Op op, FastMathFlags fmath, FpRoundingMode rm = {})
+    : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath),
+      rm(rm) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

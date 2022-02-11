@@ -29,7 +29,9 @@ using llvm::LLVMContext;
 namespace {
 
 FpRoundingMode parse_rounding(llvm::Instruction &i) {
-  auto *fp = cast<llvm::ConstrainedFPIntrinsic>(&i);
+  auto *fp = dyn_cast<llvm::ConstrainedFPIntrinsic>(&i);
+  if (!fp)
+    return {};
   switch (fp->getRoundingMode().getValue()) {
   case llvm::RoundingMode::Dynamic:           return FpRoundingMode::Dynamic;
   case llvm::RoundingMode::NearestTiesToAway: return FpRoundingMode::RNA;
@@ -159,14 +161,14 @@ public:
 
   RetTy visitUnaryOperator(llvm::UnaryOperator &i) {
     PARSE_UNOP();
-    UnaryOp::Op op;
+    FpUnaryOp::Op op;
     switch (i.getOpcode()) {
-    case llvm::Instruction::FNeg: op = UnaryOp::FNeg; break;
+    case llvm::Instruction::FNeg: op = FpUnaryOp::FNeg; break;
     default:
       return error(i);
     }
-    RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,
-                                           parse_fmath(i)));
+    RETURN_IDENTIFIER(
+      make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i)));
   }
 
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
@@ -831,40 +833,44 @@ public:
     }
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
-    case llvm::Intrinsic::ceil:
     case llvm::Intrinsic::ctpop:
     case llvm::Intrinsic::expect:
     case llvm::Intrinsic::expect_with_probability:
-    case llvm::Intrinsic::fabs:
-    case llvm::Intrinsic::floor:
-    case llvm::Intrinsic::is_constant:
-    //case llvm::Intrinsic::isnan:
-    case llvm::Intrinsic::round:
-    case llvm::Intrinsic::roundeven:
-    case llvm::Intrinsic::sqrt:
-    case llvm::Intrinsic::trunc: {
+    case llvm::Intrinsic::is_constant: {
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
       case llvm::Intrinsic::bswap:       op = UnaryOp::BSwap; break;
-      case llvm::Intrinsic::ceil:        op = UnaryOp::Ceil; break;
       case llvm::Intrinsic::ctpop:       op = UnaryOp::Ctpop; break;
       case llvm::Intrinsic::expect:
       case llvm::Intrinsic::expect_with_probability:
         op = UnaryOp::Copy; break;
-      case llvm::Intrinsic::fabs:        op = UnaryOp::FAbs; break;
-      case llvm::Intrinsic::floor:       op = UnaryOp::Floor; break;
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
-      ///case llvm::Intrinsic::isnan:       op = UnaryOp::IsNaN; break;
-      case llvm::Intrinsic::round:       op = UnaryOp::Round; break;
-      case llvm::Intrinsic::roundeven:   op = UnaryOp::RoundEven; break;
-      case llvm::Intrinsic::sqrt:        op = UnaryOp::Sqrt; break;
-      case llvm::Intrinsic::trunc:       op = UnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op,
-                                             parse_fmath(i)));
+      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+    }
+    case llvm::Intrinsic::fabs:
+    case llvm::Intrinsic::floor:
+    case llvm::Intrinsic::round:
+    case llvm::Intrinsic::roundeven:
+    case llvm::Intrinsic::sqrt:
+    case llvm::Intrinsic::trunc: {
+      PARSE_UNOP();
+      FpUnaryOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::ceil:        op = FpUnaryOp::Ceil; break;
+      case llvm::Intrinsic::fabs:        op = FpUnaryOp::FAbs; break;
+      case llvm::Intrinsic::floor:       op = FpUnaryOp::Floor; break;
+      case llvm::Intrinsic::round:       op = FpUnaryOp::Round; break;
+      case llvm::Intrinsic::roundeven:   op = FpUnaryOp::RoundEven; break;
+      case llvm::Intrinsic::sqrt:        op = FpUnaryOp::Sqrt; break;
+      case llvm::Intrinsic::trunc:       op = FpUnaryOp::Trunc; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<FpUnaryOp>(*ty, value_name(i), *val, op,
+                                               parse_fmath(i)));
     }
     case llvm::Intrinsic::vector_reduce_add:
     case llvm::Intrinsic::vector_reduce_mul:
@@ -894,54 +900,94 @@ public:
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
-    case llvm::Intrinsic::fma:
     {
       PARSE_TRIOP();
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
       case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
-      case llvm::Intrinsic::fma:  op = TernaryOp::FMA; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c,
-                                               op, parse_fmath(i)));
+      RETURN_IDENTIFIER(
+        make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op));
+    }
+    case llvm::Intrinsic::fma:
+    case llvm::Intrinsic::fmuladd:
+    case llvm::Intrinsic::experimental_constrained_fma:
+    case llvm::Intrinsic::experimental_constrained_fmuladd:
+    {
+      PARSE_TRIOP();
+      FpTernaryOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::fma:
+      case llvm::Intrinsic::experimental_constrained_fma:     op = FpTernaryOp::FMA; break;
+      case llvm::Intrinsic::fmuladd:
+      case llvm::Intrinsic::experimental_constrained_fmuladd: op = FpTernaryOp::MulAdd; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(
+        make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
+                                 parse_fmath(i), parse_rounding(i)));
     }
     case llvm::Intrinsic::minnum:
     case llvm::Intrinsic::maxnum:
     case llvm::Intrinsic::minimum:
     case llvm::Intrinsic::maximum:
-    {
-      PARSE_BINOP();
-      FpBinOp::Op op;
-      switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::minnum:  op = FpBinOp::FMin; break;
-      case llvm::Intrinsic::maxnum:  op = FpBinOp::FMax; break;
-      case llvm::Intrinsic::minimum: op = FpBinOp::FMinimum; break;
-      case llvm::Intrinsic::maximum: op = FpBinOp::FMaximum; break;
-      default: UNREACHABLE();
-      }
-      RETURN_IDENTIFIER(make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op,
-                                             parse_fmath(i)));
-    }
     case llvm::Intrinsic::experimental_constrained_fadd:
     case llvm::Intrinsic::experimental_constrained_fsub:
     case llvm::Intrinsic::experimental_constrained_fmul:
     case llvm::Intrinsic::experimental_constrained_fdiv:
+    case llvm::Intrinsic::experimental_constrained_minnum:
+    case llvm::Intrinsic::experimental_constrained_maxnum:
+    case llvm::Intrinsic::experimental_constrained_minimum:
+    case llvm::Intrinsic::experimental_constrained_maximum:
     {
       PARSE_BINOP();
       FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::experimental_constrained_fadd: op = FpBinOp::FAdd; break;
-      case llvm::Intrinsic::experimental_constrained_fsub: op = FpBinOp::FSub; break;
-      case llvm::Intrinsic::experimental_constrained_fmul: op = FpBinOp::FMul; break;
-      case llvm::Intrinsic::experimental_constrained_fdiv: op = FpBinOp::FDiv; break;
+      case llvm::Intrinsic::minnum:
+      case llvm::Intrinsic::experimental_constrained_minnum:  op = FpBinOp::FMin; break;
+      case llvm::Intrinsic::maxnum:
+      case llvm::Intrinsic::experimental_constrained_maxnum:  op = FpBinOp::FMax; break;
+      case llvm::Intrinsic::minimum:
+      case llvm::Intrinsic::experimental_constrained_minimum: op = FpBinOp::FMinimum; break;
+      case llvm::Intrinsic::maximum:
+      case llvm::Intrinsic::experimental_constrained_maximum: op = FpBinOp::FMaximum; break;
+      case llvm::Intrinsic::experimental_constrained_fadd:    op = FpBinOp::FAdd; break;
+      case llvm::Intrinsic::experimental_constrained_fsub:    op = FpBinOp::FSub; break;
+      case llvm::Intrinsic::experimental_constrained_fmul:    op = FpBinOp::FMul; break;
+      case llvm::Intrinsic::experimental_constrained_fdiv:    op = FpBinOp::FDiv; break;
       default: UNREACHABLE();
       }
       // TODO: missing support for exceptions
       RETURN_IDENTIFIER(
         make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
                              parse_rounding(i)));
+    }
+    case llvm::Intrinsic::experimental_constrained_ceil:
+    case llvm::Intrinsic::experimental_constrained_floor:
+    case llvm::Intrinsic::experimental_constrained_fptrunc:
+    case llvm::Intrinsic::experimental_constrained_round:
+    case llvm::Intrinsic::experimental_constrained_roundeven:
+    case llvm::Intrinsic::experimental_constrained_sqrt:
+    case llvm::Intrinsic::experimental_constrained_trunc:
+    {
+      PARSE_UNOP();
+      FpUnaryOp::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::experimental_constrained_ceil:      op = FpUnaryOp::Ceil; break;
+      case llvm::Intrinsic::experimental_constrained_floor:     op = FpUnaryOp::Floor; break;
+      case llvm::Intrinsic::experimental_constrained_fptrunc:   op = FpUnaryOp::FpTrunc; break;
+      case llvm::Intrinsic::experimental_constrained_round:     op = FpUnaryOp::Round; break;
+      case llvm::Intrinsic::experimental_constrained_roundeven: op = FpUnaryOp::RoundEven; break;
+      case llvm::Intrinsic::experimental_constrained_sqrt:      op = FpUnaryOp::Sqrt; break;
+      case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
+      default: UNREACHABLE();
+      }
+      // TODO: missing support for exceptions
+      RETURN_IDENTIFIER(
+        make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
+                               parse_rounding(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:
