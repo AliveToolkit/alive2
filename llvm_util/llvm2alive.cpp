@@ -30,7 +30,7 @@ namespace {
 
 FpRoundingMode parse_rounding(llvm::Instruction &i) {
   auto *fp = dyn_cast<llvm::ConstrainedFPIntrinsic>(&i);
-  if (!fp)
+  if (!fp || !fp->getRoundingMode().hasValue())
     return {};
   switch (fp->getRoundingMode().getValue()) {
   case llvm::RoundingMode::Dynamic:           return FpRoundingMode::Dynamic;
