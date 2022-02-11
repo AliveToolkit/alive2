@@ -895,17 +895,32 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   case SEXT:     op = ConversionOp::SExt; break;
   case ZEXT:     op = ConversionOp::ZExt; break;
   case TRUNC:    op = ConversionOp::Trunc; break;
-  case SITOFP:   op = ConversionOp::SIntToFP; break;
-  case UITOFP:   op = ConversionOp::UIntToFP; break;
-  case FPTOSI:   op = ConversionOp::FPToSInt; break;
-  case FPTOUI:   op = ConversionOp::FPToUInt; break;
-  case FPEXT:    op = ConversionOp::FPExt; break;
-  case FPTRUNC:  op = ConversionOp::FPTrunc; break;
   case PTRTOINT: op = ConversionOp::Ptr2Int; break;
   default:
     UNREACHABLE();
   }
   return make_unique<ConversionOp>(ty2, string(name), val, op);
+}
+
+static unique_ptr<Instr>
+parse_fp_conversionop(string_view name, token op_token) {
+  // op ty %op to ty2
+  auto &opty = parse_type();
+  auto &val = parse_operand(opty);
+  auto &ty2 = parse_type(/*optional=*/!tokenizer.consumeIf(TO));
+
+  FpConversionOp::Op op;
+  switch (op_token) {
+  case SITOFP:  op = FpConversionOp::SIntToFP; break;
+  case UITOFP:  op = FpConversionOp::UIntToFP; break;
+  case FPTOSI:  op = FpConversionOp::FPToSInt; break;
+  case FPTOUI:  op = FpConversionOp::FPToUInt; break;
+  case FPEXT:   op = FpConversionOp::FPExt; break;
+  case FPTRUNC: op = FpConversionOp::FPTrunc; break;
+  default:
+    UNREACHABLE();
+  }
+  return make_unique<FpConversionOp>(ty2, string(name), val, op);
 }
 
 static unique_ptr<Instr> parse_select(string_view name) {
@@ -1205,14 +1220,15 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SEXT:
   case ZEXT:
   case TRUNC:
+  case PTRTOINT:
+    return parse_conversionop(name, t);
   case SITOFP:
   case UITOFP:
   case FPTOSI:
   case FPTOUI:
   case FPEXT:
   case FPTRUNC:
-  case PTRTOINT:
-    return parse_conversionop(name, t);
+    return parse_fp_conversionop(name, t);
   case SELECT:
     return parse_select(name);
   case EXTRACTVALUE:

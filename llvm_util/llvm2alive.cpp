@@ -216,24 +216,36 @@ public:
 
   RetTy visitCastInst(llvm::CastInst &i) {
     PARSE_UNOP();
-    ConversionOp::Op op;
+    {
+      ConversionOp::Op op;
+      bool has_non_fp = true;
+      switch (i.getOpcode()) {
+      case llvm::Instruction::SExt:     op = ConversionOp::SExt; break;
+      case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
+      case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
+      case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
+      case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
+      case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
+      default: has_non_fp = false; break;
+      }
+      if (has_non_fp)
+        RETURN_IDENTIFIER(
+          make_unique<ConversionOp>(*ty, value_name(i), *val, op));
+    }
+
+    FpConversionOp::Op op;
     switch (i.getOpcode()) {
-    case llvm::Instruction::SExt:     op = ConversionOp::SExt; break;
-    case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
-    case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
-    case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
-    case llvm::Instruction::SIToFP:   op = ConversionOp::SIntToFP; break;
-    case llvm::Instruction::UIToFP:   op = ConversionOp::UIntToFP; break;
-    case llvm::Instruction::FPToSI:   op = ConversionOp::FPToSInt; break;
-    case llvm::Instruction::FPToUI:   op = ConversionOp::FPToUInt; break;
-    case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
-    case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
-    case llvm::Instruction::FPExt:    op = ConversionOp::FPExt; break;
-    case llvm::Instruction::FPTrunc:  op = ConversionOp::FPTrunc; break;
+    case llvm::Instruction::SIToFP:  op = FpConversionOp::SIntToFP; break;
+    case llvm::Instruction::UIToFP:  op = FpConversionOp::UIntToFP; break;
+    case llvm::Instruction::FPToSI:  op = FpConversionOp::FPToSInt; break;
+    case llvm::Instruction::FPToUI:  op = FpConversionOp::FPToUInt; break;
+    case llvm::Instruction::FPExt:   op = FpConversionOp::FPExt; break;
+    case llvm::Instruction::FPTrunc: op = FpConversionOp::FPTrunc; break;
     default:
       return error(i);
     }
-    RETURN_IDENTIFIER(make_unique<ConversionOp>(*ty, value_name(i), *val, op));
+    RETURN_IDENTIFIER(
+      make_unique<FpConversionOp>(*ty, value_name(i), *val, op));
   }
 
   RetTy visitFreezeInst(llvm::FreezeInst &i) {
@@ -966,7 +978,6 @@ public:
     }
     case llvm::Intrinsic::experimental_constrained_ceil:
     case llvm::Intrinsic::experimental_constrained_floor:
-    case llvm::Intrinsic::experimental_constrained_fptrunc:
     case llvm::Intrinsic::experimental_constrained_round:
     case llvm::Intrinsic::experimental_constrained_roundeven:
     case llvm::Intrinsic::experimental_constrained_sqrt:
@@ -977,7 +988,6 @@ public:
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::experimental_constrained_ceil:      op = FpUnaryOp::Ceil; break;
       case llvm::Intrinsic::experimental_constrained_floor:     op = FpUnaryOp::Floor; break;
-      case llvm::Intrinsic::experimental_constrained_fptrunc:   op = FpUnaryOp::FpTrunc; break;
       case llvm::Intrinsic::experimental_constrained_round:     op = FpUnaryOp::Round; break;
       case llvm::Intrinsic::experimental_constrained_roundeven: op = FpUnaryOp::RoundEven; break;
       case llvm::Intrinsic::experimental_constrained_sqrt:      op = FpUnaryOp::Sqrt; break;
@@ -988,6 +998,29 @@ public:
       RETURN_IDENTIFIER(
         make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
                                parse_rounding(i)));
+    }
+    case llvm::Intrinsic::experimental_constrained_sitofp:
+    case llvm::Intrinsic::experimental_constrained_uitofp:
+    case llvm::Intrinsic::experimental_constrained_fptosi:
+    case llvm::Intrinsic::experimental_constrained_fptoui:
+    case llvm::Intrinsic::experimental_constrained_fpext:
+    case llvm::Intrinsic::experimental_constrained_fptrunc:
+    {
+      PARSE_UNOP();
+      FpConversionOp::Op op;
+      switch (i.getOpcode()) {
+      case llvm::Intrinsic::experimental_constrained_sitofp:  op = FpConversionOp::SIntToFP; break;
+      case llvm::Intrinsic::experimental_constrained_uitofp:  op = FpConversionOp::UIntToFP; break;
+      case llvm::Intrinsic::experimental_constrained_fptosi:  op = FpConversionOp::FPToSInt; break;
+      case llvm::Intrinsic::experimental_constrained_fptoui:  op = FpConversionOp::FPToUInt; break;
+      case llvm::Intrinsic::experimental_constrained_fpext:   op = FpConversionOp::FPExt; break;
+      case llvm::Intrinsic::experimental_constrained_fptrunc: op = FpConversionOp::FPTrunc; break;
+      default:
+        return error(i);
+      }
+      // TODO: missing support for exceptions
+      RETURN_IDENTIFIER(make_unique<FpConversionOp>(*ty, value_name(i), *val,
+                                                    op, parse_rounding(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:

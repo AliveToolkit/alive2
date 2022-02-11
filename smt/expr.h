@@ -301,12 +301,12 @@ public:
   expr float2BV() const;
   expr float2Real() const;
   expr BV2float(const expr &type) const;
-  expr float2Float(const expr &type) const;
+  expr float2Float(const expr &type, const expr &rm) const;
 
   expr fp2sint(unsigned bits) const;
   expr fp2uint(unsigned bits) const;
-  expr sint2fp(const expr &type) const;
-  expr uint2fp(const expr &type) const;
+  expr sint2fp(const expr &type, const expr &rm) const;
+  expr uint2fp(const expr &type, const expr &rm) const;
 
   // we don't expose SMT expr types, so range must be passed as a dummy value
   // of the desired type

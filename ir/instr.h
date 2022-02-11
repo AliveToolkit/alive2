@@ -111,7 +111,7 @@ public:
 class FpUnaryOp final : public Instr {
 public:
   enum Op {
-    FAbs, FNeg, Ceil, Floor, Round, RoundEven, Trunc, FpTrunc, Sqrt
+    FAbs, FNeg, Ceil, Floor, Round, RoundEven, Trunc, Sqrt
   };
 
 private:
@@ -211,8 +211,7 @@ public:
 
 class ConversionOp final : public Instr {
 public:
-  enum Op { SExt, ZExt, Trunc, BitCast, SIntToFP, UIntToFP, FPToSInt, FPToUInt,
-            FPExt, FPTrunc, Ptr2Int, Int2Ptr };
+  enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
 
 private:
   Value *val;
@@ -224,6 +223,30 @@ public:
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
+};
+
+
+class FpConversionOp final : public Instr {
+public:
+  enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc };
+
+private:
+  Value *val;
+  Op op;
+  FpRoundingMode rm;
+
+public:
+  FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
+                 FpRoundingMode rm = {})
+    : Instr(type, std::move(name)), val(&val), op(op), rm(rm) {}
+
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
