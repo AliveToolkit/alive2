@@ -165,6 +165,16 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
                                       FpUnaryOp::Floor, parse_fmath(i)));
 
+  case llvm::LibFunc_nearbyint:
+  case llvm::LibFunc_nearbyintf:
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::NearbyInt, parse_fmath(i)));
+
+  case llvm::LibFunc_rint:
+  case llvm::LibFunc_rintf:
+    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+                                      FpUnaryOp::RInt, parse_fmath(i)));
+
   case llvm::LibFunc_round:
   case llvm::LibFunc_roundf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
