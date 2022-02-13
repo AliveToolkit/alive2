@@ -24,8 +24,8 @@ public:
   template <typename T>
   AndExpr(T &&e) { add(std::forward<T>(e)); }
 
-  void add(const expr &e);
-  void add(expr &&e);
+  void add(const expr &e, unsigned limit = 16);
+  void add(expr &&e, unsigned limit = 16);
   void add(const AndExpr &other);
   void del(const AndExpr &other);
   void reset();

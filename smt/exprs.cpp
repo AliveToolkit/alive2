@@ -11,27 +11,27 @@ using namespace std;
 
 namespace smt {
 
-void AndExpr::add(const expr &e) {
+void AndExpr::add(const expr &e, unsigned limit) {
   if (e.isTrue())
     return;
 
   expr a, b;
-  if (e.isAnd(a, b)) {
-    add(move(a));
-    add(move(b));
+  if (limit > 0 && e.isAnd(a, b)) {
+    add(move(a), limit-1);
+    add(move(b), limit-1);
     return;
   }
   exprs.insert(e);
 }
 
-void AndExpr::add(expr &&e) {
+void AndExpr::add(expr &&e, unsigned limit) {
   if (e.isTrue())
     return;
 
   expr a, b;
-  if (e.isAnd(a, b)) {
-    add(move(a));
-    add(move(b));
+  if (limit > 0 && e.isAnd(a, b)) {
+    add(move(a), limit-1);
+    add(move(b), limit-1);
     return;
   }
   exprs.insert(move(e));
