@@ -1021,8 +1021,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   case NearbyInt:
     // TODO: they differ in exception behavior
     fn = [&](auto &v, auto &np, auto rm) -> StateValue {
-      return fm_poison(s, v, np,
-                       [&](expr &v) { return v.round(get_fp_rounding(s)); },
+      return fm_poison(s, v, np, [&](expr &v) { return v.round(rm.toSMT()); },
                        fmath, true);
     };
     break;
