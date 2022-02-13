@@ -190,6 +190,11 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
                                       FpUnaryOp::Trunc, parse_fmath(i)));
 
+  case llvm::LibFunc_copysign:
+  case llvm::LibFunc_copysignf:
+    RETURN_VAL(make_unique<FpBinOp>(*ty, value_name(i), *args[0], *args[1],
+                                    FpBinOp::CopySign, parse_fmath(i)));
+
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
     BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));

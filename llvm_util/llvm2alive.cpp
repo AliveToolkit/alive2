@@ -920,6 +920,7 @@ public:
         make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
                                  parse_fmath(i), parse_rounding(i)));
     }
+    case llvm::Intrinsic::copysign:
     case llvm::Intrinsic::minnum:
     case llvm::Intrinsic::maxnum:
     case llvm::Intrinsic::minimum:
@@ -936,6 +937,7 @@ public:
       PARSE_BINOP();
       FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::copysign:                         op = FpBinOp::CopySign; break;
       case llvm::Intrinsic::minnum:
       case llvm::Intrinsic::experimental_constrained_minnum:  op = FpBinOp::FMin; break;
       case llvm::Intrinsic::maxnum:

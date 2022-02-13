@@ -596,6 +596,7 @@ void FpBinOp::print(ostream &os) const {
   case FMin:     str = "fmin "; break;
   case FMaximum: str = "fmaximum "; break;
   case FMinimum: str = "fminimum "; break;
+  case CopySign: str = "copysign "; break;
   }
   os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName()
      << ", rounding=" << rm;
@@ -804,6 +805,15 @@ StateValue FpBinOp::toSMT(State &s) const {
         return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
       };
       return fm_poison(s, a, ap, b, bp, v, fmath, false);
+    };
+    break;
+  case CopySign:
+    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto rm) -> StateValue {
+      return fm_poison(s, a, ap, b, bp,
+                       [](expr &a, expr &b) {
+                         return expr::mkIf(a.isFPNegative() == b.isFPNegative(),
+                                           a, a.fneg()); },
+                       fmath, false);
     };
     break;
   }
