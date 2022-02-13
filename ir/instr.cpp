@@ -1561,12 +1561,13 @@ StateValue FpConversionOp::toSMT(State &s) const {
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
-    auto ty = getType().getAsAggregateType();
+    auto ty = val->getType().getAsAggregateType();
+    auto retty = getType().getAsAggregateType();
 
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(v, i), ty->getChild(i)));
+      vals.emplace_back(scalar(ty->extract(v, i), retty->getChild(i)));
     }
-    return ty->aggregateVals(vals);
+    return retty->aggregateVals(vals);
   }
   return scalar(v, getType());
 }
