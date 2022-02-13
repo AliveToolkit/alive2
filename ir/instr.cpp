@@ -2759,7 +2759,7 @@ StateValue Assume::toSMT(State &s) const {
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
     if (auto align = dynamic_cast<IntConst *>(args[1])) {
       Pointer ptr(s.getMemory(), vptr.value);
-      s.addUB(ptr.isAligned((uint64_t)align->getInt()));
+      s.addUB(ptr.isAligned(*align->getInt()));
     } else {
       // TODO: add support for non-constant align
       s.addUB(expr());
