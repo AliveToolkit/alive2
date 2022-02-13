@@ -2720,15 +2720,23 @@ void Assume::rauw(const Value &what, Value &with) {
 }
 
 void Assume::print(ostream &os) const {
+  const char *str = nullptr;
   switch (kind) {
-  case AndNonPoison: os << "assume"; break;
-  case IfNonPoison: os << "assume_non_poison"; break;
-  case WellDefined: os << "assume_welldefined"; break;
-  case Align: os << "assume_align"; break;
-  case NonNull: os << "assume_nonnull"; break;
+  case AndNonPoison: str = "assume "; break;
+  case IfNonPoison:  str = "assume_non_poison "; break;
+  case WellDefined:  str = "assume_welldefined "; break;
+  case Align:        str = "assume_align "; break;
+  case NonNull:      str = "assume_nonnull "; break;
   }
-  for (auto &arg: args)
-    os << ' ' << *arg;
+  os << str;
+
+  bool first = true;
+  for (auto &arg: args) {
+    if (!first)
+      os << ", ";
+    os << *arg;
+    first = false;
+  }
 }
 
 StateValue Assume::toSMT(State &s) const {
@@ -2749,10 +2757,13 @@ StateValue Assume::toSMT(State &s) const {
   case Align: {
     // assume(ptr, align)
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
-    uint64_t align = *dynamic_cast<IntConst *>(args[1])->getInt();
-
-    Pointer ptr(s.getMemory(), vptr.value);
-    s.addUB(ptr.isAligned(align));
+    if (auto align = dynamic_cast<IntConst *>(args[1])) {
+      Pointer ptr(s.getMemory(), vptr.value);
+      s.addUB(ptr.isAligned((uint64_t)align->getInt()));
+    } else {
+      // TODO: add support for non-constant align
+      s.addUB(expr());
+    }
     break;
   }
   case NonNull: {
