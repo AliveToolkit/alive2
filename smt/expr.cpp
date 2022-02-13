@@ -1726,16 +1726,14 @@ expr expr::float2Float(const expr &type, const expr &rm) const {
   return Z3_mk_fpa_to_fp_float(ctx(), rm(), ast(), type.sort());
 }
 
-expr expr::fp2sint(unsigned bits) const {
-  C();
-  auto rm = Z3_mk_fpa_rtz(ctx());
-  return simplify_const(Z3_mk_fpa_to_sbv(ctx(), rm, ast(), bits), *this);
+expr expr::fp2sint(unsigned bits, const expr &rm) const {
+  C(rm);
+  return simplify_const(Z3_mk_fpa_to_sbv(ctx(), rm(), ast(), bits), *this);
 }
 
-expr expr::fp2uint(unsigned bits) const {
-  C();
-  auto rm = Z3_mk_fpa_rtz(ctx());
-  return simplify_const(Z3_mk_fpa_to_ubv(ctx(), rm, ast(), bits), *this);
+expr expr::fp2uint(unsigned bits, const expr &rm) const {
+  C(rm);
+  return simplify_const(Z3_mk_fpa_to_ubv(ctx(), rm(), ast(), bits), *this);
 }
 
 expr expr::sint2fp(const expr &type, const expr &rm) const {

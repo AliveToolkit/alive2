@@ -704,13 +704,19 @@ static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
     return fn(rm);
 
   auto &var = s.getFpRoundingMode();
-  DisjointExpr<StateValue> vals;
-  for (auto rm : { FpRoundingMode::RNE, FpRoundingMode::RNA,
-                   FpRoundingMode::RTP, FpRoundingMode::RTN,
-                   FpRoundingMode::RTZ }) {
-    vals.add(fn(rm), var == rm);
-  }
-  return *vals();
+  return StateValue::mkIf(var == FpRoundingMode::RNE, fn(FpRoundingMode::RNE),
+         StateValue::mkIf(var == FpRoundingMode::RNA, fn(FpRoundingMode::RNA),
+         StateValue::mkIf(var == FpRoundingMode::RTP, fn(FpRoundingMode::RTP),
+         StateValue::mkIf(var == FpRoundingMode::RTN, fn(FpRoundingMode::RTN),
+                          fn(FpRoundingMode::RTZ)))));
+}
+
+static expr get_fp_rounding(const State &s) {
+  auto &var = s.getFpRoundingMode();
+  return expr::mkIf(var == FpRoundingMode::RNE, expr::rne(),
+         expr::mkIf(var == FpRoundingMode::RNA, expr::rna(),
+         expr::mkIf(var == FpRoundingMode::RTP, expr::rtp(),
+         expr::mkIf(var == FpRoundingMode::RTN, expr::rtn(), expr::rtz()))));
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -965,6 +971,8 @@ void FpUnaryOp::print(ostream &os) const {
   case FNeg:      str = "fneg "; break;
   case Ceil:      str = "ceil "; break;
   case Floor:     str = "floor "; break;
+  case RInt:      str = "rint "; break;
+  case NearbyInt: str = "nearbyint "; break;
   case Round:     str = "round "; break;
   case RoundEven: str = "roundeven "; break;
   case Trunc:     str = "trunc "; break;
@@ -997,6 +1005,15 @@ StateValue FpUnaryOp::toSMT(State &s) const {
     fn = [&](auto &v, auto &np, auto rm) -> StateValue {
       return fm_poison(s, v, np, [](expr &v) { return v.floor(); }, fmath,
                        true);
+    };
+    break;
+  case RInt:
+  case NearbyInt:
+    // TODO: they differ in exception behavior
+    fn = [&](auto &v, auto &np, auto rm) -> StateValue {
+      return fm_poison(s, v, np,
+                       [&](expr &v) { return v.round(get_fp_rounding(s)); },
+                       fmath, true);
     };
     break;
   case Round:
@@ -1462,6 +1479,10 @@ void FpConversionOp::print(ostream &os) const {
   case FPToUInt: str = "fptoui "; break;
   case FPExt:    str = "fpext "; break;
   case FPTrunc:  str = "fptrunc "; break;
+  case LRInt:    str = "lrint "; break;
+  case LLRInt:   str = "llrint "; break;
+  case LRound:   str = "lround "; break;
+  case LLRound:  str = "llround "; break;
   }
 
   os << getName() << " = " << str << *val << print_type(getType(), " to ", "")
@@ -1486,21 +1507,41 @@ StateValue FpConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToSInt:
-    fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
-      expr bv  = val.fp2sint(to_type.bits());
-      expr fp2 = bv.sint2fp(val, expr::rtz());
+  case LRInt:
+  case LLRInt:
+  case LRound:
+  case LLRound:
+    fn = [&](auto &val, auto &to_type, auto rm_) -> StateValue {
+      expr rm;
+      switch (op) {
+      case FPToSInt:
+        rm = expr::rtz();
+        break;
+      case LRInt:
+      case LLRInt:
+        rm = get_fp_rounding(s);
+        break;
+      case LRound:
+      case LLRound:
+        rm = expr::rna();
+        break;
+      default: UNREACHABLE();
+      }
+      expr bv  = val.fp2sint(to_type.bits(), rm);
+      expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
-      expr valrtz = val.round(expr::rtz());
-      return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
+      expr val_rounded = val.round(rm);
+      return { move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
     };
     break;
   case FPToUInt:
-    fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
-      expr bv  = val.fp2uint(to_type.bits());
-      expr fp2 = bv.uint2fp(val, expr::rtz());
+    fn = [](auto &val, auto &to_type, auto rm_) -> StateValue {
+      expr rm = expr::rtz();
+      expr bv  = val.fp2uint(to_type.bits(), rm);
+      expr fp2 = bv.uint2fp(val, rm);
       // -0.xx must be converted to 0, not poison.
-      expr valrtz = val.round(expr::rtz());
-      return { move(bv), valrtz.isFPZero() || fp2 == valrtz };
+      expr val_rounded = val.round(rm);
+      return { move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
     };
     break;
   case FPExt:
@@ -1540,6 +1581,10 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
     break;
   case FPToSInt:
   case FPToUInt:
+  case LRInt:
+  case LLRInt:
+  case LRound:
+  case LLRound:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforceFloatOrVectorType();
     break;

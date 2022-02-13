@@ -863,27 +863,6 @@ public:
       }
       RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
     }
-    case llvm::Intrinsic::fabs:
-    case llvm::Intrinsic::floor:
-    case llvm::Intrinsic::round:
-    case llvm::Intrinsic::roundeven:
-    case llvm::Intrinsic::sqrt:
-    case llvm::Intrinsic::trunc: {
-      PARSE_UNOP();
-      FpUnaryOp::Op op;
-      switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::ceil:        op = FpUnaryOp::Ceil; break;
-      case llvm::Intrinsic::fabs:        op = FpUnaryOp::FAbs; break;
-      case llvm::Intrinsic::floor:       op = FpUnaryOp::Floor; break;
-      case llvm::Intrinsic::round:       op = FpUnaryOp::Round; break;
-      case llvm::Intrinsic::roundeven:   op = FpUnaryOp::RoundEven; break;
-      case llvm::Intrinsic::sqrt:        op = FpUnaryOp::Sqrt; break;
-      case llvm::Intrinsic::trunc:       op = FpUnaryOp::Trunc; break;
-      default: UNREACHABLE();
-      }
-      RETURN_IDENTIFIER(make_unique<FpUnaryOp>(*ty, value_name(i), *val, op,
-                                               parse_fmath(i)));
-    }
     case llvm::Intrinsic::vector_reduce_add:
     case llvm::Intrinsic::vector_reduce_mul:
     case llvm::Intrinsic::vector_reduce_and:
@@ -976,21 +955,41 @@ public:
         make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
                              parse_rounding(i)));
     }
+    case llvm::Intrinsic::ceil:
     case llvm::Intrinsic::experimental_constrained_ceil:
+    case llvm::Intrinsic::floor:
     case llvm::Intrinsic::experimental_constrained_floor:
+    case llvm::Intrinsic::rint:
+    case llvm::Intrinsic::experimental_constrained_rint:
+    case llvm::Intrinsic::nearbyint:
+    case llvm::Intrinsic::experimental_constrained_nearbyint:
+    case llvm::Intrinsic::round:
     case llvm::Intrinsic::experimental_constrained_round:
+    case llvm::Intrinsic::roundeven:
     case llvm::Intrinsic::experimental_constrained_roundeven:
+    case llvm::Intrinsic::sqrt:
     case llvm::Intrinsic::experimental_constrained_sqrt:
+    case llvm::Intrinsic::trunc:
     case llvm::Intrinsic::experimental_constrained_trunc:
     {
       PARSE_UNOP();
       FpUnaryOp::Op op;
       switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::ceil:
       case llvm::Intrinsic::experimental_constrained_ceil:      op = FpUnaryOp::Ceil; break;
+      case llvm::Intrinsic::floor:
       case llvm::Intrinsic::experimental_constrained_floor:     op = FpUnaryOp::Floor; break;
+      case llvm::Intrinsic::rint:
+      case llvm::Intrinsic::experimental_constrained_rint:      op = FpUnaryOp::RInt; break;
+      case llvm::Intrinsic::nearbyint:
+      case llvm::Intrinsic::experimental_constrained_nearbyint: op = FpUnaryOp::NearbyInt; break;
+      case llvm::Intrinsic::round:
       case llvm::Intrinsic::experimental_constrained_round:     op = FpUnaryOp::Round; break;
+      case llvm::Intrinsic::roundeven:
       case llvm::Intrinsic::experimental_constrained_roundeven: op = FpUnaryOp::RoundEven; break;
+      case llvm::Intrinsic::sqrt:
       case llvm::Intrinsic::experimental_constrained_sqrt:      op = FpUnaryOp::Sqrt; break;
+      case llvm::Intrinsic::trunc:
       case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
@@ -1005,6 +1004,14 @@ public:
     case llvm::Intrinsic::experimental_constrained_fptoui:
     case llvm::Intrinsic::experimental_constrained_fpext:
     case llvm::Intrinsic::experimental_constrained_fptrunc:
+    case llvm::Intrinsic::lrint:
+    case llvm::Intrinsic::experimental_constrained_lrint:
+    case llvm::Intrinsic::llrint:
+    case llvm::Intrinsic::experimental_constrained_llrint:
+    case llvm::Intrinsic::lround:
+    case llvm::Intrinsic::experimental_constrained_lround:
+    case llvm::Intrinsic::llround:
+    case llvm::Intrinsic::experimental_constrained_llround:
     {
       PARSE_UNOP();
       FpConversionOp::Op op;
@@ -1015,6 +1022,14 @@ public:
       case llvm::Intrinsic::experimental_constrained_fptoui:  op = FpConversionOp::FPToUInt; break;
       case llvm::Intrinsic::experimental_constrained_fpext:   op = FpConversionOp::FPExt; break;
       case llvm::Intrinsic::experimental_constrained_fptrunc: op = FpConversionOp::FPTrunc; break;
+      case llvm::Intrinsic::lrint:
+      case llvm::Intrinsic::experimental_constrained_lrint:   op = FpConversionOp::LRInt; break;
+      case llvm::Intrinsic::llrint:
+      case llvm::Intrinsic::experimental_constrained_llrint:  op = FpConversionOp::LLRInt; break;
+      case llvm::Intrinsic::lround:
+      case llvm::Intrinsic::experimental_constrained_lround:  op = FpConversionOp::LRound; break;
+      case llvm::Intrinsic::llround:
+      case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LLRound; break;
       default:
         return error(i);
       }

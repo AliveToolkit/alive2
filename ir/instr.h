@@ -111,7 +111,7 @@ public:
 class FpUnaryOp final : public Instr {
 public:
   enum Op {
-    FAbs, FNeg, Ceil, Floor, Round, RoundEven, Trunc, Sqrt
+    FAbs, FNeg, Ceil, Floor, RInt, NearbyInt, Round, RoundEven, Trunc, Sqrt
   };
 
 private:
@@ -235,7 +235,8 @@ public:
 
 class FpConversionOp final : public Instr {
 public:
-  enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc };
+  enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc, LRInt,
+            LLRInt, LRound, LLRound };
 
 private:
   Value *val;
