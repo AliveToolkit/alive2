@@ -237,7 +237,7 @@ public:
 class FpConversionOp final : public Instr {
 public:
   enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc, LRInt,
-            LLRInt, LRound, LLRound };
+            LRound };
 
 private:
   Value *val;

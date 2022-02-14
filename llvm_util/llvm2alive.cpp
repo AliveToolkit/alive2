@@ -1027,13 +1027,13 @@ public:
       case llvm::Intrinsic::experimental_constrained_fpext:   op = FpConversionOp::FPExt; break;
       case llvm::Intrinsic::experimental_constrained_fptrunc: op = FpConversionOp::FPTrunc; break;
       case llvm::Intrinsic::lrint:
-      case llvm::Intrinsic::experimental_constrained_lrint:   op = FpConversionOp::LRInt; break;
+      case llvm::Intrinsic::experimental_constrained_lrint:
       case llvm::Intrinsic::llrint:
-      case llvm::Intrinsic::experimental_constrained_llrint:  op = FpConversionOp::LLRInt; break;
+      case llvm::Intrinsic::experimental_constrained_llrint:  op = FpConversionOp::LRInt; break;
       case llvm::Intrinsic::lround:
-      case llvm::Intrinsic::experimental_constrained_lround:  op = FpConversionOp::LRound; break;
+      case llvm::Intrinsic::experimental_constrained_lround:
       case llvm::Intrinsic::llround:
-      case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LLRound; break;
+      case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
       default:
         return error(i);
       }

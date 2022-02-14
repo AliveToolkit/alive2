@@ -1489,9 +1489,7 @@ void FpConversionOp::print(ostream &os) const {
   case FPExt:    str = "fpext "; break;
   case FPTrunc:  str = "fptrunc "; break;
   case LRInt:    str = "lrint "; break;
-  case LLRInt:   str = "llrint "; break;
   case LRound:   str = "lround "; break;
-  case LLRound:  str = "llround "; break;
   }
 
   os << getName() << " = " << str << *val << print_type(getType(), " to ", "")
@@ -1517,9 +1515,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     break;
   case FPToSInt:
   case LRInt:
-  case LLRInt:
   case LRound:
-  case LLRound:
     fn = [&](auto &val, auto &to_type, auto rm_) -> StateValue {
       expr rm;
       switch (op) {
@@ -1527,11 +1523,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
         rm = expr::rtz();
         break;
       case LRInt:
-      case LLRInt:
         rm = get_fp_rounding(s);
         break;
       case LRound:
-      case LLRound:
         rm = expr::rna();
         break;
       default: UNREACHABLE();
@@ -1592,9 +1586,7 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
   case FPToSInt:
   case FPToUInt:
   case LRInt:
-  case LLRInt:
   case LRound:
-  case LLRound:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforceFloatOrVectorType();
     break;
