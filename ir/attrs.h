@@ -107,4 +107,13 @@ struct FpRoundingMode final {
   friend std::ostream& operator<<(std::ostream &os, FpRoundingMode rounding);
 };
 
+
+struct FpExceptionMode final {
+  enum Mode { Ignore, MayTrap, Strict } mode;
+  FpExceptionMode() : mode(Ignore) {}
+  FpExceptionMode(Mode mode) : mode(mode) {}
+  Mode getMode() const { return mode; }
+  friend std::ostream& operator<<(std::ostream &os, FpExceptionMode ex);
+};
+
 }

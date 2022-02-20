@@ -66,12 +66,13 @@ private:
   Op op;
   FastMathFlags fmath;
   FpRoundingMode rm;
+  FpExceptionMode ex;
 
 public:
   FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-          FastMathFlags fmath, FpRoundingMode rm = {})
+          FastMathFlags fmath, FpRoundingMode rm = {}, FpExceptionMode ex = {})
   : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
-    rm(rm) {}
+    rm(rm), ex(ex) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -120,11 +121,14 @@ private:
   Op op;
   FastMathFlags fmath;
   FpRoundingMode rm;
+  FpExceptionMode ex;
 
 public:
   FpUnaryOp(Type &type, std::string &&name, Value &val, Op op,
-            FastMathFlags fmath, FpRoundingMode rm = {})
-    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm) {}
+            FastMathFlags fmath, FpRoundingMode rm = {},
+            FpExceptionMode ex = {})
+    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm),
+      ex(ex) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -193,12 +197,14 @@ private:
   Op op;
   FastMathFlags fmath;
   FpRoundingMode rm;
+  FpExceptionMode ex;
 
 public:
   FpTernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
-              Op op, FastMathFlags fmath, FpRoundingMode rm = {})
+              Op op, FastMathFlags fmath, FpRoundingMode rm = {},
+              FpExceptionMode ex = {})
     : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath),
-      rm(rm) {}
+      rm(rm), ex(ex) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -243,11 +249,12 @@ private:
   Value *val;
   Op op;
   FpRoundingMode rm;
+  FpExceptionMode ex;
 
 public:
   FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
-                 FpRoundingMode rm = {})
-    : Instr(type, std::move(name)), val(&val), op(op), rm(rm) {}
+                 FpRoundingMode rm = {}, FpExceptionMode ex = {})
+    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

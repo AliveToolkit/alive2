@@ -240,4 +240,14 @@ ostream& operator<<(std::ostream &os, FpRoundingMode rounding) {
   return os << str;
 }
 
+ostream& operator<<(std::ostream &os, FpExceptionMode ex) {
+  const char *str;
+  switch (ex.mode) {
+  case FpExceptionMode::Ignore:  str = "ignore"; break;
+  case FpExceptionMode::MayTrap: str = "maytrap"; break;
+  case FpExceptionMode::Strict:  str = "strict"; break;
+  }
+  return os << str;
+}
+
 }

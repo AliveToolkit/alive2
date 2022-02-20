@@ -43,6 +43,18 @@ FpRoundingMode parse_rounding(llvm::Instruction &i) {
   }
 }
 
+FpExceptionMode parse_exceptions(llvm::Instruction &i) {
+  auto *fp = dyn_cast<llvm::ConstrainedFPIntrinsic>(&i);
+  if (!fp || !fp->getExceptionBehavior().hasValue())
+    return {};
+  switch (fp->getExceptionBehavior().getValue()) {
+  case llvm::fp::ebIgnore:  return FpExceptionMode::Ignore;
+  case llvm::fp::ebMayTrap: return FpExceptionMode::MayTrap;
+  case llvm::fp::ebStrict:  return FpExceptionMode::Strict;
+  default: UNREACHABLE();
+  }
+}
+
 unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
@@ -918,7 +930,8 @@ public:
       }
       RETURN_IDENTIFIER(
         make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
-                                 parse_fmath(i), parse_rounding(i)));
+                                 parse_fmath(i), parse_rounding(i),
+                                 parse_exceptions(i)));
     }
     case llvm::Intrinsic::copysign:
     case llvm::Intrinsic::minnum:
@@ -952,10 +965,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_fdiv:    op = FpBinOp::FDiv; break;
       default: UNREACHABLE();
       }
-      // TODO: missing support for exceptions
       RETURN_IDENTIFIER(
         make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
-                             parse_rounding(i)));
+                             parse_rounding(i), parse_exceptions(i)));
     }
     case llvm::Intrinsic::fabs:
     case llvm::Intrinsic::ceil:
@@ -997,10 +1009,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
-      // TODO: missing support for exceptions
       RETURN_IDENTIFIER(
         make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
-                               parse_rounding(i)));
+                               parse_rounding(i), parse_exceptions(i)));
     }
     case llvm::Intrinsic::experimental_constrained_sitofp:
     case llvm::Intrinsic::experimental_constrained_uitofp:
@@ -1037,9 +1048,9 @@ public:
       default:
         return error(i);
       }
-      // TODO: missing support for exceptions
       RETURN_IDENTIFIER(make_unique<FpConversionOp>(*ty, value_name(i), *val,
-                                                    op, parse_rounding(i)));
+                                                    op, parse_rounding(i),
+                                                    parse_exceptions(i)));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:

@@ -601,6 +601,7 @@ void FpBinOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
+  os << ", exceptions=" << ex;
 }
 
 static expr any_fp_zero(State &s, const expr &v) {
@@ -990,6 +991,7 @@ void FpUnaryOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *val;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
+  os << ", exceptions=" << ex;
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
@@ -1263,6 +1265,7 @@ void FpTernaryOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
+  os << ", exceptions=" << ex;
 }
 
 StateValue FpTernaryOp::toSMT(State &s) const {
@@ -1496,6 +1499,7 @@ void FpConversionOp::print(ostream &os) const {
   os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
   if (!rm.isDefault())
     os << ", rounding=" << rm;
+  os << ", exceptions=" << ex;
 }
 
 StateValue FpConversionOp::toSMT(State &s) const {
