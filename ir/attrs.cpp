@@ -221,6 +221,7 @@ smt::expr FpRoundingMode::toSMT() const {
   case FpRoundingMode::RTP:     return expr::rtp();
   case FpRoundingMode::RTN:     return expr::rtn();
   case FpRoundingMode::RTZ:     return expr::rtz();
+  case FpRoundingMode::Default: UNREACHABLE();
   }
   UNREACHABLE();
 }
@@ -234,6 +235,7 @@ ostream& operator<<(std::ostream &os, FpRoundingMode rounding) {
   case FpRoundingMode::RTP:     str = "upward"; break;
   case FpRoundingMode::RTN:     str = "downward"; break;
   case FpRoundingMode::RTZ:     str = "towardzero"; break;
+  case FpRoundingMode::Default: UNREACHABLE();
   }
   return os << str;
 }

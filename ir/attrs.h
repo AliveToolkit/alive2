@@ -97,10 +97,12 @@ struct FastMathFlags final {
 
 
 struct FpRoundingMode final {
-  enum Mode { Dynamic, RNE, RNA, RTP, RTN, RTZ } mode;
-  FpRoundingMode() : mode(RNE) {}
+  enum Mode { RNE, RNA, RTP, RTN, RTZ, Dynamic, Default } mode;
+  FpRoundingMode() : mode(Default) {}
   FpRoundingMode(Mode mode) : mode(mode) {}
   bool isDynamic() const { return mode == Dynamic; }
+  bool isDefault() const { return mode == Default; }
+  Mode getMode() const { return mode; }
   smt::expr toSMT() const;
   friend std::ostream& operator<<(std::ostream &os, FpRoundingMode rounding);
 };

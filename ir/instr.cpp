@@ -598,8 +598,9 @@ void FpBinOp::print(ostream &os) const {
   case FMinimum: str = "fminimum "; break;
   case CopySign: str = "copysign "; break;
   }
-  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName()
-     << ", rounding=" << rm;
+  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
+  if (!rm.isDefault())
+    os << ", rounding=" << rm;
 }
 
 static expr any_fp_zero(State &s, const expr &v) {
@@ -701,23 +702,20 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
 
 static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
                               const State &s, FpRoundingMode rm) {
-  if (!rm.isDynamic())
-    return fn(rm);
+  if (rm.isDefault())
+    return fn(FpRoundingMode::RNE);
 
   auto &var = s.getFpRoundingMode();
+  if (!rm.isDynamic()) {
+    auto [v, np] = fn(rm);
+    return { move(v), np && var == rm.getMode() };
+  }
+
   return StateValue::mkIf(var == FpRoundingMode::RNE, fn(FpRoundingMode::RNE),
          StateValue::mkIf(var == FpRoundingMode::RNA, fn(FpRoundingMode::RNA),
          StateValue::mkIf(var == FpRoundingMode::RTP, fn(FpRoundingMode::RTP),
          StateValue::mkIf(var == FpRoundingMode::RTN, fn(FpRoundingMode::RTN),
                           fn(FpRoundingMode::RTZ)))));
-}
-
-static expr get_fp_rounding(const State &s) {
-  auto &var = s.getFpRoundingMode();
-  return expr::mkIf(var == FpRoundingMode::RNE, expr::rne(),
-         expr::mkIf(var == FpRoundingMode::RNA, expr::rna(),
-         expr::mkIf(var == FpRoundingMode::RTP, expr::rtp(),
-         expr::mkIf(var == FpRoundingMode::RTN, expr::rtn(), expr::rtz()))));
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -989,7 +987,9 @@ void FpUnaryOp::print(ostream &os) const {
   case Sqrt:      str = "sqrt "; break;
   }
 
-  os << getName() << " = " << str << fmath << *val << ", rounding=" << rm;
+  os << getName() << " = " << str << fmath << *val;
+  if (!rm.isDefault())
+    os << ", rounding=" << rm;
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
@@ -1260,8 +1260,9 @@ void FpTernaryOp::print(ostream &os) const {
   case MulAdd: str = "fmuladd "; break;
   }
 
-  os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c
-     << ", rounding=" << rm;
+  os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
+  if (!rm.isDefault())
+    os << ", rounding=" << rm;
 }
 
 StateValue FpTernaryOp::toSMT(State &s) const {
@@ -1492,8 +1493,9 @@ void FpConversionOp::print(ostream &os) const {
   case LRound:   str = "lround "; break;
   }
 
-  os << getName() << " = " << str << *val << print_type(getType(), " to ", "")
-     << ", rounding=" << rm;
+  os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
+  if (!rm.isDefault())
+    os << ", rounding=" << rm;
 }
 
 StateValue FpConversionOp::toSMT(State &s) const {
@@ -1516,14 +1518,14 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case FPToSInt:
   case LRInt:
   case LRound:
-    fn = [&](auto &val, auto &to_type, auto rm_) -> StateValue {
+    fn = [&](auto &val, auto &to_type, auto rm_in) -> StateValue {
       expr rm;
       switch (op) {
       case FPToSInt:
         rm = expr::rtz();
         break;
       case LRInt:
-        rm = get_fp_rounding(s);
+        rm = rm_in.toSMT();
         break;
       case LRound:
         rm = expr::rna();
