@@ -69,6 +69,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 62. SROA sub-vector memcpy w/subsequent load loses the store (https://llvm.org/PR52971)
 63. NewGVN miscompiles with equal instructions modulo attributes (https://llvm.org/PR53218)
 64. InstCombine miscompiles combination of signed comparisons (https://llvm.org/PR53252)
+65. InstCombine propagates nsz flag from select to fneg incorrectly (https://llvm.org/PR54077)
 
 
 ### Bugs found in Z3
