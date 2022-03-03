@@ -817,8 +817,10 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
   }
 
-  auto scalar = [&](auto &a, auto &ap, auto &b, auto &bp) {
-    return round_value([&](auto rm) { return fn(a, ap, b, bp, rm); }, s, rm);
+  auto scalar = [&](const auto &a, const auto &b) {
+    return round_value([&](auto rm) {
+      return fn(a.value, a.non_poison, b.value, b.non_poison, rm);
+    }, s, rm);
   };
 
   auto &a = s[*lhs];
@@ -828,14 +830,11 @@ StateValue FpBinOp::toSMT(State &s) const {
     auto retty = getType().getAsAggregateType();
     vector<StateValue> vals;
     for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
-      auto ai = retty->extract(a, i);
-      auto bi = retty->extract(b, i);
-      vals.emplace_back(
-        scalar(ai.value, ai.non_poison, bi.value, bi.non_poison));
+      vals.emplace_back(scalar(retty->extract(a, i), retty->extract(b, i)));
     }
     return retty->aggregateVals(vals);
   }
-  return scalar(a.value, a.non_poison, b.value, b.non_poison);
+  return scalar(a, b);
 }
 
 expr FpBinOp::getTypeConstraints(const Function &f) const {
@@ -1142,24 +1141,10 @@ StateValue UnaryReductionOp::toSMT(State &s) const {
 }
 
 expr UnaryReductionOp::getTypeConstraints(const Function &f) const {
-  expr instrconstr = getType() == val->getType();
-  switch(op) {
-  case Add:
-  case Mul:
-  case And:
-  case Or:
-  case Xor:
-  case SMax:
-  case SMin:
-  case UMax:
-  case UMin:
-    instrconstr = getType().enforceIntType();
-    instrconstr &= val->getType().enforceVectorType(
-        [this](auto &scalar) { return scalar == getType(); });
-    break;
-  }
-
-  return Value::getTypeConstraints() && move(instrconstr);
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType() &&
+         val->getType().enforceVectorType(
+           [this](auto &scalar) { return scalar == getType(); });
 }
 
 unique_ptr<Instr> UnaryReductionOp::dup(const string &suffix) const {
@@ -1199,14 +1184,10 @@ StateValue TernaryOp::toSMT(State &s) const {
 
   switch (op) {
   case FShl:
-    fn = [](auto &a, auto &b, auto &c) -> expr {
-      return expr::fshl(a, b, c);
-    };
+    fn = expr::fshl;
     break;
   case FShr:
-    fn = [](auto &a, auto &b, auto &c) -> expr {
-      return expr::fshr(a, b, c);
-    };
+    fn = expr::fshr;
     break;
   }
 
