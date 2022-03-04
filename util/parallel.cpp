@@ -4,6 +4,7 @@
 #include "util/parallel.h"
 #include "util/compiler.h"
 #include <cassert>
+#include <cstring>
 #include <fcntl.h>
 #include <fstream>
 #include <regex>
@@ -181,7 +182,7 @@ void parallel::finishChild(bool is_timeout) {
   ensureChild();
   if (is_timeout) {
     const char *msg = "ERROR: Timeout asynchronous\n\n";
-    safe_write(fd_to_parent, msg, strlen(msg));
+    safe_write(fd_to_parent, msg, std::strlen(msg));
   } else {
     childProcess &me = children.back();
     auto data = move(me.output).str();
