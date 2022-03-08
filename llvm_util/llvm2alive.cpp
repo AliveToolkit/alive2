@@ -444,16 +444,8 @@ public:
     case llvm::CmpInst::FCMP_ULE:   cond = FCmp::ULE; break;
     case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
     case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
-    case llvm::CmpInst::FCMP_TRUE: {
-      auto tru = get_operand(llvm::ConstantInt::getTrue(i.getType()));
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *tru,
-                                             UnaryOp::Copy));
-    }
-    case llvm::CmpInst::FCMP_FALSE: {
-      auto fals = get_operand(llvm::ConstantInt::getFalse(i.getType()));
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *fals,
-                                             UnaryOp::Copy));
-    }
+    case llvm::CmpInst::FCMP_TRUE:  cond = FCmp::TRUE; break;
+    case llvm::CmpInst::FCMP_FALSE: cond = FCmp::FALSE; break;
     default:
       UNREACHABLE();
     }

@@ -2262,6 +2262,8 @@ void FCmp::print(ostream &os) const {
   case ULE:   condtxt = "ule "; break;
   case UNE:   condtxt = "une "; break;
   case UNO:   condtxt = "uno "; break;
+  case TRUE:  condtxt = "true "; break;
+  case FALSE: condtxt = "false "; break;
   }
   os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
      << b->getName();
@@ -2288,6 +2290,8 @@ StateValue FCmp::toSMT(State &s) const {
       case ULE: return a.fule(b);
       case UNE: return a.fune(b);
       case UNO: return a.funo(b);
+      case TRUE:  return expr(true);
+      case FALSE: return expr(false);
       }
       UNREACHABLE();
     };

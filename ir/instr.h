@@ -358,7 +358,7 @@ public:
 class FCmp final : public Instr {
 public:
   enum Cond { OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
-              UEQ, UGT, UGE, ULT, ULE, UNE, UNO };
+              UEQ, UGT, UGE, ULT, ULE, UNE, UNO, TRUE, FALSE };
 
 private:
   Value *a, *b;
