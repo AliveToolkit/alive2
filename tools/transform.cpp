@@ -749,6 +749,12 @@ static void initBitsProgramPointer(Transform &t) {
   assert(bits_program_pointer == t.tgt.bitsPointers());
 }
 
+static uint64_t aligned_alloc_size(uint64_t size, unsigned align) {
+  if (size <= align)
+    return align;
+  return add_saturate(size, align - 1);
+}
+
 static void calculateAndInitConstants(Transform &t) {
   if (!bits_program_pointer)
     initBitsProgramPointer(t);
@@ -757,6 +763,7 @@ static void calculateAndInitConstants(Transform &t) {
   const auto &globals_src = t.src.getGlobalVars();
   num_globals_src = globals_src.size();
   unsigned num_globals = num_globals_src;
+  uint64_t glb_alloc_aligned_size = 0;
 
   heap_block_alignment = 8;
 
@@ -765,6 +772,9 @@ static void calculateAndInitConstants(Transform &t) {
   for (auto GV : globals_src) {
     if (GV->isConst())
       ++num_consts_src;
+    glb_alloc_aligned_size
+      = add_saturate(glb_alloc_aligned_size,
+                     aligned_alloc_size(GV->size(), GV->getAlignment()));
   }
 
   for (auto GVT : globals_tgt) {
@@ -773,6 +783,9 @@ static void calculateAndInitConstants(Transform &t) {
     if (I == globals_src.end()) {
       ++num_globals;
     }
+    glb_alloc_aligned_size
+      = add_saturate(glb_alloc_aligned_size,
+                     aligned_alloc_size(GVT->size(), GVT->getAlignment()));
   }
 
   num_ptrinputs = 0;
@@ -795,7 +808,6 @@ static void calculateAndInitConstants(Transform &t) {
   num_locals_tgt = 0;
   uint64_t max_gep_src = 0, max_gep_tgt = 0;
   uint64_t max_alloc_size = 0;
-  uint64_t max_aligned_size = 0;
   uint64_t max_access_size = 0;
   uint64_t min_global_size = UINT64_MAX;
 
@@ -820,13 +832,18 @@ static void calculateAndInitConstants(Transform &t) {
 
   // Mininum access size (in bytes)
   uint64_t min_access_size = 8;
+  uint64_t loc_src_alloc_aligned_size = 0;
+  uint64_t loc_tgt_alloc_aligned_size = 0;
   unsigned min_vect_elem_sz = 0;
   bool does_mem_access = false;
   bool has_ptr_load = false;
 
   for (auto fn : { &t.src, &t.tgt }) {
-    unsigned &cur_num_locals = fn == &t.src ? num_locals_src : num_locals_tgt;
-    uint64_t &cur_max_gep    = fn == &t.src ? max_gep_src : max_gep_tgt;
+    bool is_src = fn == &t.src;
+    unsigned &cur_num_locals = is_src ? num_locals_src : num_locals_tgt;
+    uint64_t &cur_max_gep    = is_src ? max_gep_src : max_gep_tgt;
+    uint64_t &loc_alloc_aligned_size
+      = is_src ? loc_src_alloc_aligned_size : loc_tgt_alloc_aligned_size;
 
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
@@ -889,8 +906,9 @@ static void calculateAndInitConstants(Transform &t) {
 
       if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
         auto [alloc, align] = mi->getMaxAllocSize();
-        max_alloc_size   = max(max_alloc_size, alloc);
-        max_aligned_size = max(max_aligned_size, add_saturate(alloc, align-1));
+        max_alloc_size     = max(max_alloc_size, alloc);
+        loc_alloc_aligned_size = add_saturate(loc_alloc_aligned_size,
+                                              aligned_alloc_size(alloc, align));
         max_access_size  = max(max_access_size, mi->getMaxAccessSize());
         cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
         has_free        |= mi->canFree();
@@ -916,7 +934,7 @@ static void calculateAndInitConstants(Transform &t) {
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
                   isCast(ConversionOp::Ptr2Int, i)) {
-        max_alloc_size = max_access_size = cur_max_gep = max_aligned_size
+        max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
           = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
         has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
@@ -998,8 +1016,8 @@ static void calculateAndInitConstants(Transform &t) {
   // counterexamples more readable
   // Allow an extra bit for the sign
   auto max_geps
-    = ilog2_ceil(add_saturate(max(max_gep_src, max_gep_tgt), max_access_size),
-                 true) + 1;
+    = bit_width(add_saturate(max(max_gep_src, max_gep_tgt), max_access_size))
+        + 1;
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
   bits_for_offset = min(bits_for_offset, bits_program_pointer);
@@ -1007,11 +1025,15 @@ static void calculateAndInitConstants(Transform &t) {
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
-  bits_size_t = ilog2_ceil(max_alloc_size, true);
+  bits_size_t = bit_width(max_alloc_size);
   bits_size_t = min(max(bits_for_offset, bits_size_t), bits_program_pointer-1);
 
   // +1 because the pointer after the object must be valid (can't overflow)
-  bits_ptr_address = ilog2_ceil(add_saturate(max_aligned_size, 1), true);
+  uint64_t loc_alloc_aligned_size
+    = max(loc_src_alloc_aligned_size, loc_tgt_alloc_aligned_size);
+  bits_ptr_address
+    = add_saturate(
+        bit_width(max(glb_alloc_aligned_size, loc_alloc_aligned_size)), 1);
 
   // as an (unsound) optimization, we fix the first bit of the addr for
   // local/non-local if both exist (to reduce axiom fml size)
@@ -1044,7 +1066,8 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nbits_ptr_address: " << bits_ptr_address
                   << "\nbits_program_pointer: " << bits_program_pointer
                   << "\nmax_alloc_size: " << max_alloc_size
-                  << "\nmax_aligned_size: " << max_aligned_size
+                  << "\nglb_alloc_aligned_size: " << glb_alloc_aligned_size
+                  << "\nloc_alloc_aligned_size: " << loc_alloc_aligned_size
                   << "\nmin_access_size: " << min_access_size
                   << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte
