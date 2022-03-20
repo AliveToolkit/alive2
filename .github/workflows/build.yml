@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-20.04]
-        compiler:   [g++-10, g++-11, clang++-12, clang++-13]
+        compiler:   [g++-10, g++-11, clang++-13, clang++-14]
         build_type: [Release, Debug]
         include:
           - os: macos-latest
@@ -28,9 +28,20 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
+          if [[ ${{ matrix.compiler }} == "clang++-13" ]]; then
+            sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-14" ]]; then
+            sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"
+          fi
           sudo apt-get update
-          sudo apt-get install z3 re2c ninja-build g++-11 clang++-13
+          sudo apt-get install z3 re2c ninja-build g++-11
+          if [[ ${{ matrix.compiler }} == "clang++-13" ]]; then
+            sudo apt-get install clang++-13
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-14" ]]; then
+            sudo apt-get install clang++-14
+          fi
 
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
