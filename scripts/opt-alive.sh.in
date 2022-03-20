@@ -13,6 +13,9 @@ set -e
 PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization =tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner globals-aa -O0 -Os -Oz -O1 -O2 -O3"
 PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 
+# see opt.cpp: shouldForceLegacyPM()
+FORCE_OLD_NPM="safe-stack codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp"
+
 TV="-tv"
 SKIP_TV=0
 for arg in $@; do
@@ -44,13 +47,19 @@ for arg in $@; do
       set -- "$@" "$arg"
     fi
   else
-    if [[ $arg == "-enable-new-pm=0" ]]; then
+    if [[ $arg == "-enable-new-pm=0" || $arg == "-enable-new-pm=false" ]]; then
       NPM_TV=0
     fi
     set -- "$@" "$arg"
     for p in $PASSES; do
       if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
         TV=""
+        NPM_TV=0
+        break
+      fi
+    done
+    for p in $FORCE_OLD_NPM; do
+      if [[ $arg == "-$p" ]]; then
         NPM_TV=0
         break
       fi
