@@ -4,9 +4,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/instr.h"
+#include <functional>
 #include <ostream>
 #include <string>
-#include <functional>
 
 namespace llvm {
 class BasicBlock;

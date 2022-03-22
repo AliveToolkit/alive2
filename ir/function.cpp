@@ -161,6 +161,15 @@ const BasicBlock& Function::bbOf(const Instr &i) const {
   UNREACHABLE();
 }
 
+BasicBlock& Function::insertBBBefore(string_view name, const BasicBlock &bb) {
+  auto p = BBs.try_emplace(string(name), name);
+  assert(p.second);
+  auto I = find(BB_order.begin(), BB_order.end(), &bb);
+  assert(I != BB_order.end());
+  BB_order.insert(I, &p.first->second);
+  return p.first->second;
+}
+
 void Function::removeBB(BasicBlock &BB) {
   assert(BB.getName() != "#sink");
   BBs.erase(BB.getName());

@@ -108,6 +108,8 @@ public:
   const BasicBlock& getBB(std::string_view name) const;
   const BasicBlock& bbOf(const Instr &i) const;
 
+  BasicBlock& insertBBBefore(std::string_view name, const BasicBlock &bb);
+
   void removeBB(BasicBlock &BB);
 
   void addConstant(std::unique_ptr<Value> &&c);

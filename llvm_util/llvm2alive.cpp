@@ -101,7 +101,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   const llvm::TargetLibraryInfo &TLI;
   vector<llvm::Instruction*> i_constexprs;
   const vector<string_view> &gvnamesInSrc;
-  vector<tuple<Phi*, llvm::PHINode*, unsigned>> todo_phis;
+  vector<pair<Phi*, llvm::PHINode*>> todo_phis;
   ostream *out;
   // (LLVM alloca, (Alive2 alloc, has lifetime.start?))
   map<const llvm::AllocaInst *, std::pair<Alloc *, bool>> allocs;
@@ -605,14 +605,7 @@ public:
       return error(i);
 
     auto phi = make_unique<Phi>(*ty, value_name(i));
-    for (unsigned idx = 0, e = i.getNumIncomingValues(); idx != e; ++idx) {
-      if (auto op = get_operand(i.getIncomingValue(idx))) {
-        phi->addValue(*op, value_name(*i.getIncomingBlock(idx)));
-      } else {
-        todo_phis.emplace_back(phi.get(), &i, idx);
-      }
-    }
-
+    todo_phis.emplace_back(phi.get(), &i);
     RETURN_IDENTIFIER(move(phi));
   }
 
@@ -1486,13 +1479,31 @@ public:
     }
 
     // patch phi nodes for recursive defs
-    for (auto &[phi, llvm_i, idx] : todo_phis) {
-      auto op = get_operand(llvm_i->getIncomingValue(idx));
-      if (!op) {
-        error(*llvm_i);
-        return {};
+    for (auto &[phi, i] : todo_phis) {
+      for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
+        // evaluation of constexprs in phi nodes is done "in the edge", thus we
+        // introduce a new BB even if not always needed.
+        auto val = i->getIncomingValue(idx);
+        if (isa<llvm::ConstantExpr>(val) || isa<llvm::ConstantAggregate>(val)) {
+          auto &phi_bb = getBB(i->getParent());
+          string bridge
+            = value_name(*i->getIncomingBlock(idx)) + "_" + phi_bb.getName();
+          BB = &Fn.insertBBBefore(bridge, phi_bb);
+          getBB(i->getIncomingBlock(idx)).replaceTargetWith(&phi_bb, BB);
+          auto op = get_operand(val);
+          assert(op);
+          phi->addValue(*op, move(bridge));
+          BB->addInstr(make_unique<Branch>(phi_bb));
+          continue;
+        }
+
+        if (auto op = get_operand(val)) {
+          phi->addValue(*op, value_name(*i->getIncomingBlock(idx)));
+        } else {
+          error(*i);
+          return {};
+        }
       }
-      phi->addValue(*op, value_name(*llvm_i->getIncomingBlock(idx)));
     }
 
     auto getGlobalVariable =
