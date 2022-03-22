@@ -1490,11 +1490,13 @@ public:
             = value_name(*i->getIncomingBlock(idx)) + "_" + phi_bb.getName();
           BB = &Fn.insertBBBefore(bridge, phi_bb);
           getBB(i->getIncomingBlock(idx)).replaceTargetWith(&phi_bb, BB);
-          auto op = get_operand(val);
-          assert(op);
-          phi->addValue(*op, move(bridge));
-          BB->addInstr(make_unique<Branch>(phi_bb));
-          continue;
+          if (auto op = get_operand(val)) {
+            phi->addValue(*op, move(bridge));
+            BB->addInstr(make_unique<Branch>(phi_bb));
+            continue;
+          }
+          error(*i);
+          return {};
         }
 
         if (auto op = get_operand(val)) {
