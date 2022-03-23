@@ -56,16 +56,7 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
 }
 
 bool has_constant_expr(llvm::Value *val) {
-  if (isa<llvm::ConstantExpr>(val))
-    return true;
-
-  if (auto *agg = dyn_cast<llvm::ConstantAggregate>(val)) {
-    for (auto &op : agg->operands()) {
-      if (has_constant_expr(op))
-        return true;
-    }
-  }
-  return false;
+  return isa<llvm::ConstantExpr, llvm::ConstantAggregate>(val);
 }
 
 unsigned constexpr_idx;
