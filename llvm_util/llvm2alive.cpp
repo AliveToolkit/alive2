@@ -55,6 +55,19 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   }
 }
 
+bool has_constant_expr(llvm::Value *val) {
+  if (isa<llvm::ConstantExpr>(val))
+    return true;
+
+  if (auto *agg = dyn_cast<llvm::ConstantAggregate>(val)) {
+    for (auto &op : agg->operands()) {
+      if (has_constant_expr(op))
+        return true;
+    }
+  }
+  return false;
+}
+
 unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
@@ -1478,16 +1491,34 @@ public:
       }
     }
 
+    // BB -> BB edge
+    set<pair<llvm::BasicBlock*, llvm::BasicBlock*>> split_edges;
+    for (auto &[phi, i] : todo_phis) {
+      for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
+        if (has_constant_expr(i->getIncomingValue(idx))) {
+          split_edges.emplace(i->getParent(), i->getIncomingBlock(idx));
+          break;
+        }
+      }
+    }
+
+    auto predecessor = [&](llvm::PHINode *phi, unsigned idx) {
+      auto pred = phi->getIncomingBlock(idx);
+      auto name = value_name(*pred);
+      if (!split_edges.count({phi->getParent(), pred}))
+        return name;
+      return move(name) + "_" +  getBB(phi->getParent()).getName();
+    };
+
     // patch phi nodes for recursive defs
     for (auto &[phi, i] : todo_phis) {
       for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
         // evaluation of constexprs in phi nodes is done "in the edge", thus we
         // introduce a new BB even if not always needed.
         auto val = i->getIncomingValue(idx);
-        if (isa<llvm::ConstantExpr>(val) || isa<llvm::ConstantAggregate>(val)) {
+        if (has_constant_expr(val)) {
           auto &phi_bb = getBB(i->getParent());
-          string bridge
-            = value_name(*i->getIncomingBlock(idx)) + "_" + phi_bb.getName();
+          auto bridge = predecessor(i, idx);
           BB = &Fn.insertBBBefore(bridge, phi_bb);
           getBB(i->getIncomingBlock(idx)).replaceTargetWith(&phi_bb, BB);
           if (auto op = get_operand(val)) {
@@ -1500,7 +1531,7 @@ public:
         }
 
         if (auto op = get_operand(val)) {
-          phi->addValue(*op, value_name(*i->getIncomingBlock(idx)));
+          phi->addValue(*op, predecessor(i, idx));
         } else {
           error(*i);
           return {};
