@@ -1099,7 +1099,7 @@ static unique_ptr<Instr> parse_malloc(string_view name) {
   auto &op = parse_operand(ty);
   // Malloc returns a pointer at address space 0
   Type &pointer_type = get_pointer_type(0);
-  return make_unique<Malloc>(pointer_type, string(name), op, false);
+  return make_unique<Malloc>(pointer_type, string(name), op, false, 0);
 }
 
 static unique_ptr<Instr> parse_extractelement(string_view name) {

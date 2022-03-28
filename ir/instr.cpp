@@ -2972,11 +2972,10 @@ StateValue Malloc::toSMT(State &s) const {
 
   if (!ptr) {
     if (isNonNull) {
-      // TODO: In C++ we need to throw an exception if the allocation fails,
-      // but exception hasn't been modeled yet
       s.addPre(move(allocated));
       ret = p_new;
     }
+    // TODO: In C++ we need to throw an exception if the allocation fails.
   } else {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
@@ -3003,9 +3002,11 @@ expr Malloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Malloc::dup(const string &suffix) const {
-  if (ptr)
-    return make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size);
-  return make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull);
+  return ptr
+    ? make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size, isNonNull,
+                          align)
+    : make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull,
+                          align);
 }
 
 

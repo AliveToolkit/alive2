@@ -608,19 +608,18 @@ public:
 class Malloc final : public MemInstr {
   Value *ptr = nullptr, *size;
   uint64_t align;
-  // Is this malloc (or equivalent operation, like new()) never returning
-  // null?
   bool isNonNull = false;
 
 public:
   Malloc(Type &type, std::string &&name, Value &size, bool isNonNull,
-         uint64_t align = 0)
+         uint64_t align)
     : MemInstr(type, std::move(name)), size(&size), align(align),
       isNonNull(isNonNull) {}
 
   Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
-         uint64_t align = 0)
-    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size), align(align) {}
+         bool isNonNull, uint64_t align)
+    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size), align(align),
+      isNonNull(isNonNull) {}
 
   Value& getSize() const { return *size; }
   uint64_t getAlign() const;

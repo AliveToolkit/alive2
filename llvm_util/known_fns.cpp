@@ -39,11 +39,14 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
+    bool isNonNull = i.hasRetAttr(llvm::Attribute::NonNull);
+    //TODO: also null for C++'s new throwing operator
+
     // aligned malloc
     if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
       if (auto algnint = dyn_cast<llvm::ConstantInt>(algn)) {
         RETURN_VAL(
-          make_unique<Malloc>(*ty, value_name(i), *args[1], false,
+          make_unique<Malloc>(*ty, value_name(i), *args[1], isNonNull,
                               algnint->getZExtValue()));
       } else {
         // TODO: add support for non-const alignments
@@ -58,13 +61,13 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
         make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
 
     // malloc or new
-    bool isNonNull = i.getCalledFunction()->getName() != "malloc";
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
   }
   if (llvm::isReallocLikeFn(&i, &TLI)) {
-    RETURN_VAL(
-      make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+    bool isNonNull = i.hasRetAttr(llvm::Attribute::NonNull);
+    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
+                                   isNonNull, align(i)));
   }
   if (llvm::isFreeCall(&i, &TLI)) {
     if (i.hasFnAttr(llvm::Attribute::NoFree)) {
