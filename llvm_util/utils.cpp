@@ -177,7 +177,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
         }
       }
       cache = make_unique<StructType>("ty_" + to_string(type_id_counter++),
-                                      move(elems), move(is_padding));
+                                      std::move(elems), std::move(is_padding));
     }
     return cache.get();
   }
@@ -227,7 +227,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
 Value* make_intconst(uint64_t val, int bits) {
   auto c = make_unique<IntConst>(get_int_type(bits), val);
   auto ret = c.get();
-  current_fn->addConstant(move(c));
+  current_fn->addConstant(std::move(c));
   return ret;
 }
 
@@ -257,7 +257,7 @@ Value* get_operand(llvm::Value *v,
     else
       c = make_unique<IntConst>(*ty, toString(cnst->getValue(), 10, false));
     auto ret = c.get();
-    current_fn->addConstant(move(c));
+    current_fn->addConstant(std::move(c));
     RETURN_CACHE(ret);
   }
 
@@ -282,28 +282,28 @@ Value* get_operand(llvm::Value *v,
       UNREACHABLE();
     }
     auto ret = c.get();
-    current_fn->addConstant(move(c));
+    current_fn->addConstant(std::move(c));
     RETURN_CACHE(ret);
   }
 
   if (isa<llvm::PoisonValue>(v)) {
     auto val = make_unique<PoisonValue>(*ty);
     auto ret = val.get();
-    current_fn->addConstant(move(val));
+    current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
   }
 
   if (isa<llvm::UndefValue>(v)) {
     auto val = make_unique<UndefValue>(*ty);
     auto ret = val.get();
-    current_fn->addUndef(move(val));
+    current_fn->addUndef(std::move(val));
     RETURN_CACHE(ret);
   }
 
   if (isa<llvm::ConstantPointerNull>(v)) {
     auto val = make_unique<NullPointerValue>(*ty);
     auto ret = val.get();
-    current_fn->addConstant(move(val));
+    current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
   }
 
@@ -331,10 +331,10 @@ Value* get_operand(llvm::Value *v,
     } else {
       name = '@' + gv->getName().str();
     }
-    auto val = make_unique<GlobalVariable>(*ty, move(name), size, align,
+    auto val = make_unique<GlobalVariable>(*ty, std::move(name), size, align,
                                            gv->isConstant());
     auto gvar = val.get();
-    current_fn->addConstant(move(val));
+    current_fn->addConstant(std::move(val));
     RETURN_CACHE(gvar);
   }
 
@@ -361,14 +361,14 @@ Value* get_operand(llvm::Value *v,
             [&cnst](auto i) { return cnst->getOperand(i); }, vals))
       return nullptr;
 
-    auto val = make_unique<AggregateValue>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, std::move(vals));
     auto ret = val.get();
     if (all_of(cnst->op_begin(), cnst->op_end(), [](auto &V) -> bool
         { return isa<llvm::ConstantData>(V); })) {
-      current_fn->addConstant(move(val));
+      current_fn->addConstant(std::move(val));
       RETURN_CACHE(ret);
     } else {
-      current_fn->addAggregate(move(val));
+      current_fn->addAggregate(std::move(val));
       return copy_inserter(ret);
     }
   }
@@ -379,9 +379,9 @@ Value* get_operand(llvm::Value *v,
             [&cnst](auto i) { return cnst->getElementAsConstant(i); }, vals))
       return nullptr;
 
-    auto val = make_unique<AggregateValue>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, std::move(vals));
     auto ret = val.get();
-    current_fn->addConstant(move(val));
+    current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
   }
 
@@ -391,9 +391,9 @@ Value* get_operand(llvm::Value *v,
             [&cnst](auto i) { return cnst->getElementValue(i); }, vals))
       return nullptr;
 
-    auto val = make_unique<AggregateValue>(*ty, move(vals));
+    auto val = make_unique<AggregateValue>(*ty, std::move(vals));
     auto ret = val.get();
-    current_fn->addConstant(move(val));
+    current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
   }
 

@@ -12,11 +12,11 @@ Errors::Errors(const char *str, bool is_unsound) {
 }
 
 Errors::Errors(string &&str, bool is_unsound) {
-  add(move(str), is_unsound);
+  add(std::move(str), is_unsound);
 }
 
 Errors::Errors(AliveException &&e) {
-  add(move(e));
+  add(std::move(e));
 }
 
 void Errors::add(const char *str, bool is_unsound) {
@@ -26,11 +26,11 @@ void Errors::add(const char *str, bool is_unsound) {
 void Errors::add(string &&str, bool is_unsound) {
   if (is_unsound)
     errs.clear();
-  errs.emplace(move(str), is_unsound);
+  errs.emplace(std::move(str), is_unsound);
 }
 
 void Errors::add(AliveException &&e) {
-  add(move(e.msg), e.is_unsound);
+  add(std::move(e.msg), e.is_unsound);
 }
 
 bool Errors::isUnsound() const {

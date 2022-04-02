@@ -55,7 +55,7 @@ static pair<const char*,unsigned> fn_data[] = {
 };
 
 FnPred::FnPred(string_view name, vector<Value *> &&args)
-  : args(move(args)) {
+  : args(std::move(args)) {
   int idx = -1;
   for (unsigned i = 0; i < sizeof_array(fn_data); ++i) {
     if (fn_data[i].first == name) {
@@ -95,7 +95,7 @@ expr FnPred::mkMustAnalysis(State &s, expr &&e) const {
 
   // analyses are precise when given constant inputs
   if (all_const)
-    return move(e);
+    return std::move(e);
 
   stringstream ss;
   print(ss);
@@ -207,7 +207,7 @@ expr CmpPred::toSMT(State &s) const {
   case UGE: r = a.uge(b); break;
   case UGT: r = a.ugt(b); break;
   }
-  return { ap && bp && move(r) };
+  return { ap && bp && std::move(r) };
 }
 
 expr CmpPred::getTypeConstraints() const {

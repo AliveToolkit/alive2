@@ -122,7 +122,7 @@ static unsigned padding_nonptr_byte() {
 }
 
 static expr concat_if(const expr &ifvalid, expr &&e) {
-  return ifvalid.isValid() ? ifvalid.concat(e) : move(e);
+  return ifvalid.isValid() ? ifvalid.concat(e) : std::move(e);
 }
 
 static string local_name(const State *s, const char *name) {
@@ -179,7 +179,7 @@ static void store_bv(Pointer &p, const expr &val, expr &local,
 
 namespace IR {
 
-Byte::Byte(const Memory &m, expr &&byterepr) : m(m), p(move(byterepr)) {
+Byte::Byte(const Memory &m, expr &&byterepr) : m(m), p(std::move(byterepr)) {
   assert(!p.isValid() || p.bits() == bitsByte());
 }
 
@@ -478,7 +478,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
 
       if (i == 0) {
         loaded_ptr = ptr_value;
-        is_ptr     = move(b_is_ptr);
+        is_ptr     = std::move(b_is_ptr);
       } else {
         non_poison &= is_ptr == b_is_ptr;
       }
@@ -497,11 +497,11 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     if (loaded_ptr.isExtract(_, high, low) &&
         bytes[0].nonptrValue().isExtract(_, high2, low2) &&
         high2 >= high && low2 <= low) {
-      value = move(loaded_ptr);
+      value = std::move(loaded_ptr);
     } else {
       value = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
     }
-    return { move(value), move(non_poison) };
+    return { std::move(value), std::move(non_poison) };
 
   } else {
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
@@ -515,7 +515,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     for (auto &b: bytes) {
       StateValue v(b.nonptrValue(),
                    ibyteTy.combine_poison(!b.isPtr(), b.nonptrNonpoison()));
-      val = first ? move(v) : v.concat(val);
+      val = first ? std::move(v) : v.concat(val);
       first = false;
     }
     return toType.fromInt(val.trunc(bitsize, toType.np_bits()));
@@ -1081,7 +1081,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
       expr::mkForAll({ offset },
         byte.isPtr().implies(!loadedptr.isLocal(false) &&
                              !loadedptr.isNocapture(false) &&
-                             move(bid_cond))));
+                             std::move(bid_cond))));
   }
 }
 
@@ -1112,7 +1112,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
     auto poison_array
       = expr::mkConstArray(expr::mkUInt(0, Pointer::bitsShortOffset()),
                            Byte::mkPoisonByte(*this)());
-    local_block_val.resize(numLocals(), { move(poison_array), DATA_NONE });
+    local_block_val.resize(numLocals(), { std::move(poison_array), DATA_NONE });
 
     // all local blocks are dead in the beginning
     local_block_liveness = expr::mkUInt(0, numLocals());
@@ -1236,7 +1236,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
     state->addAxiom(bid != byval_bid);
     alias.setNoAlias(false, byval_bid);
   }
-  ptr_alias.emplace(p.getBid(), move(alias));
+  ptr_alias.emplace(p.getBid(), std::move(alias));
 
   return p.release();
 }
@@ -1257,7 +1257,7 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
     offset = undef.extract(bits_undef - 1, log_offset) | shl;
   }
   Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset, attrs);
-  return { p.release(), move(undef) };
+  return { p.release(), std::move(undef) };
 }
 
 expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
@@ -1312,7 +1312,7 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
     local_blk_kind.add(short_bid, expr::mkUInt(1, 1).concat(alloc_ty));
 
     return { expr::mkIf(is_null, Pointer::mkNullPointer(*this)(), ptr()),
-             { move(size), move(align), move(var) } };
+             { std::move(size), std::move(align), std::move(var) } };
   }
 
   bool has_local = hasEscapedLocals();
@@ -1337,7 +1337,7 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
     nonlocal &= bid != byval_bid;
     alias.setNoAlias(false, byval_bid);
   }
-  ptr_alias.emplace(p.getBid(), move(alias));
+  ptr_alias.emplace(p.getBid(), std::move(alias));
 
   state->addAxiom(expr::mkIf(p.isLocal(), local, nonlocal));
   return { p.release(), {} };
@@ -1526,7 +1526,7 @@ void Memory::mkLocalDisjAddrAxioms(const expr &allocated, const expr &short_bid,
                             size.zextOrTrunc(bits_ptr_address),
                             align, local_blk_addr)));
 
-  local_blk_addr.add(short_bid, move(blk_addr));
+  local_blk_addr.add(short_bid, std::move(blk_addr));
 }
 
 pair<expr, expr>
@@ -1602,9 +1602,9 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
   if (!is_null)
     store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
   (is_local ? local_blk_size : non_local_blk_size)
-    .add(short_bid, move(size_zext));
+    .add(short_bid, std::move(size_zext));
   (is_local ? local_blk_align : non_local_blk_align)
-    .add(short_bid, move(align_expr));
+    .add(short_bid, std::move(align_expr));
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
 
@@ -1613,7 +1613,7 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
     state->addQuantVar(nondet_nonnull);
     allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
   }
-  return { p.release(), move(allocated) };
+  return { p.release(), std::move(allocated) };
 }
 
 void Memory::startLifetime(const expr &ptr_local) {
@@ -1686,7 +1686,7 @@ void Memory::store(const StateValue &v, const Type &type, unsigned offset0,
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       unsigned offset = little_endian ? i * bytesz : (e - i - 1) * bytesz;
-      data.emplace_back(offset0 + offset, move(bytes[i])());
+      data.emplace_back(offset0 + offset, std::move(bytes[i])());
     }
   }
 }
@@ -1767,11 +1767,11 @@ Memory::load(const expr &p, const Type &type, uint64_t align) {
   auto ubs = ptr.isDereferenceable(getStoreByteSize(type), align, false);
   set<expr> undef_vars;
   auto ret = load(ptr, type, undef_vars, align);
-  return { state->rewriteUndef(move(ret), undef_vars), move(ubs) };
+  return { state->rewriteUndef(std::move(ret), undef_vars), std::move(ubs) };
 }
 
 Byte Memory::raw_load(const Pointer &p, set<expr> &undef) {
-  return move(load(p, bits_byte / 8, undef, 1)[0]);
+  return std::move(load(p, bits_byte / 8, undef, 1)[0]);
 }
 
 Byte Memory::raw_load(const Pointer &p) {
@@ -1797,7 +1797,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
 
   auto bytes = valueToBytes(wval, IntType("", bits_byte), *this, state);
   assert(bytes.size() == 1);
-  expr raw_byte = move(bytes[0])();
+  expr raw_byte = std::move(bytes[0])();
 
   uint64_t n;
   if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
@@ -1834,7 +1834,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     set<expr> undef;
     unsigned i = 0;
     for (auto &byte : load(src, n, undef, align_src)) {
-      to_store.emplace_back(i++ * bytesz, move(byte)());
+      to_store.emplace_back(i++ * bytesz, std::move(byte)());
     }
     store(dst, to_store, undef, align_dst);
   } else {
@@ -1843,7 +1843,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     Pointer ptr_src = src + (offset - dst.getShortOffset());
     set<expr> undef;
     auto val = raw_load(ptr_src, undef);
-    storeLambda(dst, offset, bytesize, move(val)(), undef, align_dst);
+    storeLambda(dst, offset, bytesize, std::move(val)(), undef, align_dst);
   }
 }
 
@@ -1872,7 +1872,7 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
     // we assume src != dst
     if (local == dst_local && bid == dst_bid)
       return;
-    val.add(blk.val, move(cond));
+    val.add(blk.val, std::move(cond));
     dst_blk.undef.insert(blk.undef.begin(), blk.undef.end());
     dst_blk.type |= blk.type;
   };
@@ -1884,7 +1884,7 @@ void Memory::fillPoison(const expr &bid) {
   Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
   expr blksz = p.blockSize();
   memset(p.release(), IntType("i8", 8).getDummyValue(false),
-         move(blksz), bits_byte / 8, {}, false);
+         std::move(blksz), bits_byte / 8, {}, false);
 }
 
 expr Memory::ptr2int(const expr &ptr) const {
@@ -2044,7 +2044,7 @@ Memory::refined(const Memory &other, bool fncall,
 
   // TODO: missing refinement of escaped local blocks!
 
-  return { move(ret), move(ptr), move(undef_vars) };
+  return { std::move(ret), std::move(ptr), std::move(undef_vars) };
 }
 
 expr Memory::checkNocapture() const {

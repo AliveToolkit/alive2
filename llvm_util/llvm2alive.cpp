@@ -137,7 +137,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
       return nullptr;
 
     auto i = ptr.get();
-    BB->addInstr(move(ptr));
+    BB->addInstr(std::move(ptr));
     return i;
   }
 
@@ -146,7 +146,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
                                   "%__copy_" + to_string(copy_idx++), *ag,
                                   UnaryOp::Copy);
     auto val = v.get();
-    BB->addInstr(move(v));
+    BB->addInstr(std::move(v));
     return val;
   }
 
@@ -284,10 +284,10 @@ public:
       // call_val, attrs, param_attrs, approx
       auto known = known_call(i, TLI, *BB, args);
       if (get<0>(known))
-        RETURN_IDENTIFIER(move(get<0>(known)));
+        RETURN_IDENTIFIER(std::move(get<0>(known)));
 
-      attrs       = move(get<1>(known));
-      param_attrs = move(get<2>(known));
+      attrs       = std::move(get<1>(known));
+      param_attrs = std::move(get<2>(known));
       approx      = get<3>(known);
     }
 
@@ -303,7 +303,7 @@ public:
       if (!iasm->canThrow())
         attrs.set(FnAttrs::NoThrow);
       call = make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
-                                    iasm->getConstraintString(), move(attrs));
+                                    iasm->getConstraintString(), std::move(attrs));
     } else {
       if (!fn) // TODO: support indirect calls
         return error(i);
@@ -330,7 +330,7 @@ public:
 
     if (fn)
       call = make_unique<FnCall>(*ty, value_name(i),
-                                 '@' + fn->getName().str(), move(attrs));
+                                 '@' + fn->getName().str(), std::move(attrs));
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
@@ -359,7 +359,7 @@ public:
         for (auto &[arg, flags] : call->getArgs()) {
           call2->addArg(*arg, ParamAttrs(flags));
         }
-        call = move(call2);
+        call = std::move(call2);
 
         // fn may have different type than argument. LLVM assumes there's
         // an implicit bitcast
@@ -372,16 +372,16 @@ public:
                                               ConversionOp::BitCast);
       }
 
-      call->addArg(*arg, move(pattr));
+      call->addArg(*arg, std::move(pattr));
     }
 
     call->setApproximated(approx);
 
     if (ret_val) {
-      BB->addInstr(move(call));
-      RETURN_IDENTIFIER(move(ret_val));
+      BB->addInstr(std::move(call));
+      RETURN_IDENTIFIER(std::move(ret_val));
     }
-    RETURN_IDENTIFIER(move(call));
+    RETURN_IDENTIFIER(std::move(call));
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
@@ -479,7 +479,7 @@ public:
       valty = &aty->getChild(idx_with_paddings);
     }
 
-    RETURN_IDENTIFIER(move(inst));
+    RETURN_IDENTIFIER(std::move(inst));
   }
 
   RetTy visitInsertValueInst(llvm::InsertValueInst &i) {
@@ -498,7 +498,7 @@ public:
       ty = &aty->getChild(idx_with_paddings);
     }
 
-    RETURN_IDENTIFIER(move(inst));
+    RETURN_IDENTIFIER(std::move(inst));
   }
 
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
@@ -520,7 +520,7 @@ public:
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
                       pref_alignment(i, i.getAllocatedType()));
     allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
-    RETURN_IDENTIFIER(move(alloc));
+    RETURN_IDENTIFIER(std::move(alloc));
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
@@ -579,7 +579,7 @@ public:
       gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()).getKnownMinValue(),
                   *op);
     }
-    RETURN_IDENTIFIER(move(gep));
+    RETURN_IDENTIFIER(std::move(gep));
   }
 
   RetTy visitLoadInst(llvm::LoadInst &i) {
@@ -610,7 +610,7 @@ public:
 
     auto phi = make_unique<Phi>(*ty, value_name(i));
     todo_phis.emplace_back(phi.get(), &i);
-    RETURN_IDENTIFIER(move(phi));
+    RETURN_IDENTIFIER(std::move(phi));
   }
 
   RetTy visitBranchInst(llvm::BranchInst &i) {
@@ -777,11 +777,11 @@ public:
             gep->addIdx(-1ull, *get_operand(bundle.Inputs[2].get()));
 
             aptr = gep.get();
-            BB->addInstr(move(gep));
+            BB->addInstr(std::move(gep));
           }
 
           vector<Value *> args = {aptr, aalign};
-          BB->addInstr(make_unique<Assume>(move(args), Assume::Align));
+          BB->addInstr(make_unique<Assume>(std::move(args), Assume::Align));
         } else if (name == "nonnull") {
           llvm::Value *ptr = bundle.Inputs[0].get();
           auto *aptr = get_operand(ptr);
@@ -1066,13 +1066,13 @@ public:
       attrs.set(FnAttrs::InaccessibleMemOnly);
       attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
-      return make_unique<FnCall>(Type::voidTy, "", "#sideeffect", move(attrs));
+      return make_unique<FnCall>(Type::voidTy, "", "#sideeffect", std::move(attrs));
     }
     case llvm::Intrinsic::trap: {
       FnAttrs attrs;
       attrs.set(FnAttrs::NoReturn);
       attrs.set(FnAttrs::NoThrow);
-      return make_unique<FnCall>(Type::voidTy, "", "#trap", move(attrs));
+      return make_unique<FnCall>(Type::voidTy, "", "#trap", std::move(attrs));
     }
     case llvm::Intrinsic::vastart: {
       PARSE_UNOP();
@@ -1122,7 +1122,7 @@ public:
     for (auto m : i.getShuffleMask())
       mask.push_back(m);
     RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
-                                                 move(mask)));
+                                                 std::move(mask)));
   }
 
   RetTy visitVAArg(llvm::VAArgInst &i) {
@@ -1173,9 +1173,9 @@ public:
                                       wrap ? BinOp::Or : BinOp::And);
 
           auto r_ptr = r.get();
-          BB->addInstr(move(l));
-          BB->addInstr(move(h));
-          BB->addInstr(move(r));
+          BB->addInstr(std::move(l));
+          BB->addInstr(std::move(h));
+          BB->addInstr(std::move(r));
 
           if (range) {
             auto range_or = make_unique<BinOp>(boolTy,
@@ -1183,7 +1183,7 @@ public:
                                                  value_name(llvm_i),
                                                *range, *r_ptr, BinOp::Or);
             range = range_or.get();
-            BB->addInstr(move(range_or));
+            BB->addInstr(std::move(range_or));
           } else {
             range = r_ptr;
           }
@@ -1421,7 +1421,7 @@ public:
       ParamAttrs attrs;
       if (!ty || !handleParamAttrs(argattr, attrs, false))
         return {};
-      auto val = make_unique<Input>(*ty, value_name(arg), move(attrs));
+      auto val = make_unique<Input>(*ty, value_name(arg), std::move(attrs));
       add_identifier(arg, *val.get());
 
       if (arg.hasReturnedAttr()) {
@@ -1429,7 +1429,7 @@ public:
         assert(Fn.getReturnedInput() == nullptr);
         Fn.setReturnedInput(val.get());
       }
-      Fn.addInput(move(val));
+      Fn.addInput(std::move(val));
     }
 
     auto &attrs = Fn.getFnAttrs();
@@ -1472,7 +1472,7 @@ public:
       for (auto &i : *llvm_bb) {
         if (auto I = visit(i)) {
           auto alive_i = I.get();
-          BB->addInstr(move(I));
+          BB->addInstr(std::move(I));
 
           if (i.hasMetadataOtherThanDebugLoc() &&
               !handleMetadata(i, *alive_i))
@@ -1498,7 +1498,7 @@ public:
       auto name = value_name(*pred);
       if (!split_edges.count({phi->getParent(), pred}))
         return name;
-      return move(name) + "_" +  getBB(phi->getParent()).getName();
+      return std::move(name) + "_" +  getBB(phi->getParent()).getName();
     };
 
     // patch phi nodes for recursive defs
@@ -1513,7 +1513,7 @@ public:
           BB = &Fn.insertBBBefore(bridge, phi_bb);
           getBB(i->getIncomingBlock(idx)).replaceTargetWith(&phi_bb, BB);
           if (auto op = get_operand(val)) {
-            phi->addValue(*op, move(bridge));
+            phi->addValue(*op, std::move(bridge));
             BB->addInstr(make_unique<Branch>(phi_bb));
             continue;
           }
@@ -1592,14 +1592,14 @@ public:
 
     for (auto &itm : stores)
       // Insert stores in lexicographical order of global var's names
-      BB->addInstr(move(itm.second));
+      BB->addInstr(std::move(itm.second));
 
     if (BB->empty())
       Fn.removeBB(*BB);
     else
       BB->addInstr(make_unique<Branch>(Fn.getBB(entry_name)));
 
-    return move(Fn);
+    return std::move(Fn);
   }
 };
 }

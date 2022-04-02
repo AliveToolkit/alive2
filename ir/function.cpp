@@ -32,9 +32,9 @@ void BasicBlock::fixupTypes(const Model &m) {
 
 void BasicBlock::addInstr(unique_ptr<Instr> &&i, bool push_front) {
   if (push_front)
-    m_instrs.emplace(m_instrs.begin(), move(i));
+    m_instrs.emplace(m_instrs.begin(), std::move(i));
   else
-    m_instrs.emplace_back(move(i));
+    m_instrs.emplace_back(std::move(i));
 }
 
 void BasicBlock::addInstrAt(unique_ptr<Instr> &&i, const Instr *other,
@@ -44,7 +44,7 @@ void BasicBlock::addInstrAt(unique_ptr<Instr> &&i, const Instr *other,
     if (I->get() == other) {
       if (!before)
         ++I;
-      m_instrs.emplace(I, move(i));
+      m_instrs.emplace(I, std::move(i));
       break;
     }
   }
@@ -184,7 +184,7 @@ void Function::removeBB(BasicBlock &BB) {
 }
 
 void Function::addConstant(unique_ptr<Value> &&c) {
-  constants.emplace_back(move(c));
+  constants.emplace_back(std::move(c));
 }
 
 vector<GlobalVariable *> Function::getGlobalVars() const {
@@ -205,21 +205,21 @@ vector<string_view> Function::getGlobalVarNames() const {
 }
 
 void Function::addPredicate(unique_ptr<Predicate> &&p) {
-  predicates.emplace_back(move(p));
+  predicates.emplace_back(std::move(p));
 }
 
 void Function::addUndef(unique_ptr<UndefValue> &&u) {
-  undefs.emplace_back(move(u));
+  undefs.emplace_back(std::move(u));
 }
 
 void Function::addAggregate(unique_ptr<AggregateValue> &&a) {
-  aggregates.emplace_back(move(a));
+  aggregates.emplace_back(std::move(a));
 }
 
 void Function::addInput(unique_ptr<Value> &&i) {
   assert(dynamic_cast<Input *>(i.get()) ||
          dynamic_cast<ConstantInput*>(i.get()));
-  inputs.emplace_back(move(i));
+  inputs.emplace_back(std::move(i));
 }
 
 bool Function::hasReturn() const {
@@ -250,7 +250,7 @@ void Function::syncDataWithSrc(const Function &src) {
 Function::instr_iterator::
 instr_iterator(vector<BasicBlock*>::const_iterator &&BBI,
                vector<BasicBlock*>::const_iterator &&BBE)
-  : BBI(move(BBI)), BBE(move(BBE)) {
+  : BBI(std::move(BBI)), BBE(std::move(BBE)) {
   next_bb();
 }
 
@@ -395,7 +395,7 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
     }
     if (!i.isVoid())
       vmap[&i].emplace_back(&newbb, d.get());
-    newbb.addInstr(move(d));
+    newbb.addInstr(std::move(d));
   }
 
   for (auto *phi : newbb.phis()) {
@@ -638,9 +638,9 @@ void Function::unroll(unsigned k) {
           auto &newphi = new_phis[make_pair(dst, val)];
           if (!newphi) {
             auto name = val->getName() + "#phi#" + to_string(phi_counter++);
-            auto phi = make_unique<Phi>(val->getType(), move(name));
+            auto phi = make_unique<Phi>(val->getType(), std::move(name));
             newphi = phi.get();
-            dst->addInstr(move(phi), true);
+            dst->addInstr(std::move(phi), true);
           }
 
           // we may have multiple edges from the loop into this BB
@@ -684,7 +684,7 @@ void Function::unroll(unsigned k) {
           auto size_alloc
             = make_unique<IntConst>(i32, Memory::getStoreByteSize(type));
           auto *size = size_alloc.get();
-          addConstant(move(size_alloc));
+          addConstant(std::move(size_alloc));
 
           unsigned align = 16;
           auto name = val->getName() + "#ptr#" + to_string(phi_counter++);
@@ -706,9 +706,9 @@ void Function::unroll(unsigned k) {
             = make_unique<Load>(type, name + "#load", *alloca.get(), align);
           auto *i = static_cast<Instr*>(user);
           i->rauw(*first_added_phi, *load.get());
-          user_bb->addInstrAt(move(load), i, true);
+          user_bb->addInstrAt(std::move(load), i, true);
 
-          getFirstBB().addInstr(move(alloca), true);
+          getFirstBB().addInstr(std::move(alloca), true);
         }
       }
     }
@@ -816,7 +816,7 @@ void CFG::edge_iterator::next() {
 
 CFG::edge_iterator::edge_iterator(vector<BasicBlock*>::iterator &&it,
                                   vector<BasicBlock*>::iterator &&end)
-  : bbi(move(it)), bbe(move(end)) {
+  : bbi(std::move(it)), bbe(std::move(end)) {
   next();
 }
 

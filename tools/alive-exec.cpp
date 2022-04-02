@@ -54,7 +54,7 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   auto MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
   llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(move(MB), Diag, Context,
+  auto M = getLazyIRModule(std::move(MB), Diag, Context,
                            /*ShouldLazyLoadMetadata=*/true);
   if (!M) {
     Diag.print("", llvm::errs(), false);
@@ -80,7 +80,7 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
   }
 
   Transform t;
-  t.src = move(*Func);
+  t.src = std::move(*Func);
   t.tgt = *llvm2alive(F, TLI.getTLI(F));
   t.preprocess();
   TransformVerify verifier(t, false);
