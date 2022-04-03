@@ -64,7 +64,7 @@ void State::ValueAnalysis::FnCallRanges::inc(const std::string &name,
     for (unsigned n : I->second.first) {
       new_set.emplace(n+1);
     }
-    I->second.first   = move(new_set);
+    I->second.first   = std::move(new_set);
     I->second.second |= inaccessible_or_args_memonly;
   }
 }
@@ -152,7 +152,7 @@ const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy{move(val), domain.UB(), move(undef_vars)});
+  values.emplace_back(&v, ValTy{std::move(val), domain.UB(), std::move(undef_vars)});
   analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
@@ -245,7 +245,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   // two variants
   // 1) boolean
   if (is_if_undef(e, a, b)) {
-    addUB(move(b));
+    addUB(std::move(b));
     return a;
   }
 
@@ -271,21 +271,21 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
     if (c.isEq(lhs, rhs)) {
       if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        addUB(move(not_undef));
+        addUB(std::move(not_undef));
         mark_notundef(val);
         // %var == rhs
         // (bvadd c %var) == rhs
         return expr::mkIf(newe == rhs, a, b);
       }
       if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        addUB(move(not_undef));
+        addUB(std::move(not_undef));
         mark_notundef(val);
         return expr::mkIf(lhs == newe, a, b);
       }
       if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
           is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
-        addUB(move(not_undef));
-        addUB(move(not_undef2));
+        addUB(std::move(not_undef));
+        addUB(std::move(not_undef2));
         mark_notundef(val);
         mark_notundef(val2);
         return expr::mkIf(newe == newe2, a, b);
@@ -372,7 +372,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   for (auto &undef : undef_vars) {
     expr newv = expr::mkFreshVar("#undef'", undef);
     addQuantVar(newv);
-    repls.emplace_back(undef, move(newv));
+    repls.emplace_back(undef, std::move(newv));
   }
   addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
   return e;
@@ -444,21 +444,21 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   for (auto &p : repls) {
-    undef_vars.emplace(move(p.second));
+    undef_vars.emplace(std::move(p.second));
   }
 
   if (auto ret = no_more_tmp_slots())
     return *ret;
 
   assert(i_tmp_values < tmp_values.size());
-  tmp_values[i_tmp_values++] = move(sval_new);
+  tmp_values[i_tmp_values++] = std::move(sval_new);
   return simplify(tmp_values[i_tmp_values - 1], false);
 }
 
 const StateValue& State::getAndAddUndefs(const Value &val) {
   auto &v = (*this)[val];
   for (auto uvar: at(val).undef_vars)
-    addQuantVar(move(uvar));
+    addQuantVar(std::move(uvar));
   return v;
 }
 
@@ -530,7 +530,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     return *ret;
 
   assert(i_tmp_values < tmp_values.size());
-  return tmp_values[i_tmp_values++] = { move(v),
+  return tmp_values[i_tmp_values++] = { std::move(v),
            sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
 }
 
@@ -571,7 +571,7 @@ bool State::startBB(const BasicBlock &bb) {
     expr p = data.path();
     UB.add_disj(data.UB, p);
     in_memory.add_disj(data.mem, p);
-    var_args_in.add(data.var_args, move(p));
+    var_args_in.add(data.var_args, std::move(p));
     domain.undef_vars.insert(data.undef_vars.begin(), data.undef_vars.end());
 
     if (isFirst)
@@ -602,7 +602,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
   auto &data = predecessor_data[dst][current_bb];
   data.mem.add(memory, cond);
   data.UB.add(domain.UB(), cond);
-  data.path.add(move(cond));
+  data.path.add(std::move(cond));
   data.undef_vars.insert(undef_vars.begin(), undef_vars.end());
   data.undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   data.analysis = analysis;
@@ -615,23 +615,23 @@ void State::addJump(const BasicBlock &dst) {
 }
 
 void State::addJump(expr &&cond, const BasicBlock &dst) {
-  addJump(dst, move(cond));
+  addJump(dst, std::move(cond));
 }
 
 void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
   expr cond_false = cond == 0;
   addJump(dst_true,  !cond_false);
-  addJump(dst_false, move(cond_false));
+  addJump(dst_false, std::move(cond_false));
   addUB(expr(false));
 }
 
 void State::addReturn(StateValue &&val) {
-  return_val.add(move(val), domain.path);
+  return_val.add(std::move(val), domain.path);
   return_memory.add(memory, domain.path);
   auto dom = domain();
   return_domain.add(expr(dom));
-  function_domain.add(move(dom));
+  function_domain.add(std::move(dom));
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   undef_vars.clear();
@@ -640,7 +640,7 @@ void State::addReturn(StateValue &&val) {
 
 void State::addUB(expr &&ub) {
   bool isconst = ub.isConst();
-  domain.UB.add(move(ub));
+  domain.UB.add(std::move(ub));
   if (!isconst)
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
@@ -653,7 +653,7 @@ void State::addUB(const expr &ub) {
 
 void State::addUB(AndExpr &&ubs) {
   bool isconst = ubs.isTrue();
-  domain.UB.add(move(ubs));
+  domain.UB.add(std::move(ubs));
   if (!isconst)
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
@@ -835,7 +835,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     auto &calls_fn = fn_call_data[name];
     auto call_data_pair
       = calls_fn.try_emplace(
-          { move(inputs), move(ptr_inputs), move(call_ranges),
+          { std::move(inputs), std::move(ptr_inputs), std::move(call_ranges),
             reads_memory ? memory : Memory(*this),
             reads_memory, argmemonly, inaccessiblememonly, noret, willret });
     auto &I = call_data_pair.first;
@@ -858,13 +858,13 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       for (auto t : out_types) {
         auto [val, data] = mk_val(*t, valname);
         values.emplace_back(
-          move(val),
+          std::move(val),
           noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
-        ret_data.emplace_back(move(data));
+        ret_data.emplace_back(std::move(data));
       }
 
       I->second
-        = { move(values), expr::mkFreshVar((name + "#ub").c_str(), false),
+        = { std::move(values), expr::mkFreshVar((name + "#ub").c_str(), false),
             (noret || willret)
               ? expr(noret)
               : expr::mkFreshVar((name + "#noreturn").c_str(), false),
@@ -872,7 +872,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
               ? memory.mkCallState(name,
                                    attrs.has(FnAttrs::NoFree),
                                    inaccessiblememonly)
-              : Memory::CallState(), move(ret_data) };
+              : Memory::CallState(), std::move(ret_data) };
 
       // add equality constraints between source's function calls
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
@@ -900,14 +900,14 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto refined = in.refinedBy(*this, modifies_bid, inputs, ptr_inputs,
                                   call_ranges, memory, reads_memory, argmemonly,
                                   inaccessiblememonly, noret, willret);
-      data.add(out, move(refined));
+      data.add(out, std::move(refined));
     }
 
     if (data) {
       auto [d, domain, qvar, pre] = data();
-      addUB(move(domain));
-      addUB(move(d.ub));
-      addNoReturn(move(d.noreturns));
+      addUB(std::move(domain));
+      addUB(std::move(d.ub));
+      addNoReturn(std::move(d.noreturns));
 
       if (noalias) {
         // no alias functions in tgt must allocate a local block on each call
@@ -918,12 +918,12 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
             t->isPtrType()
               ? StateValue(memory.mkFnRet(name.c_str(), ptr_inputs, noalias,
                                           &d.ret_data[i]).first,
-                           move(d.retvals[i].non_poison))
-              : move(d.retvals[i]));
+                           std::move(d.retvals[i].non_poison))
+              : std::move(d.retvals[i]));
           ++i;
         }
       } else
-        retval = move(d.retvals);
+        retval = std::move(d.retvals);
 
       if (writes_memory)
         memory.setState(d.callstate,
@@ -932,7 +932,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
       fn_call_pre &= pre;
       if (qvar.isValid())
-        fn_call_qvars.emplace(move(qvar));
+        fn_call_qvars.emplace(std::move(qvar));
     } else {
       addUB(expr(false));
       for (auto *t : out_types) {
@@ -948,7 +948,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 }
 
 void State::doesApproximation(string &&name, optional<expr> e) {
-  used_approximations.emplace(move(name), move(e));
+  used_approximations.emplace(std::move(name), std::move(e));
 }
 
 void State::addQuantVar(const expr &var) {
@@ -960,7 +960,7 @@ void State::addFnQuantVar(const expr &var) {
 }
 
 void State::addUndefVar(expr &&var) {
-  undef_vars.emplace(move(var));
+  undef_vars.emplace(std::move(var));
 }
 
 void State::resetUndefVars() {
@@ -970,7 +970,7 @@ void State::resetUndefVars() {
 
 StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
   if (undef_vars.empty())
-    return move(val);
+    return std::move(val);
   if (hit_half_memory_limit())
     throw AliveException("Out of memory; skipping function.", false);
 
@@ -978,13 +978,13 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
   for (auto &var : undef_vars) {
     auto newvar = expr::mkFreshVar("undef", var);
     repls.emplace_back(var, newvar);
-    addUndefVar(move(newvar));
+    addUndefVar(std::move(newvar));
   }
   return val.subst(repls);
 }
 
 expr State::rewriteUndef(expr &&val, const set<expr> &undef_vars) {
-  return rewriteUndef({move(val), expr()}, undef_vars).value;
+  return rewriteUndef({std::move(val), expr()}, undef_vars).value;
 }
 
 void State::finishInitializer() {

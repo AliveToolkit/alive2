@@ -29,7 +29,7 @@ class ScopedWatch {
 
 public:
   ScopedWatch(std::function<void(const StopWatch &)> &&callback)
-      : callback(move(callback)) {}
+      : callback(std::move(callback)) {}
   ~ScopedWatch();
 };
 

@@ -368,7 +368,7 @@ private:
 public:
   FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
        FastMathFlags fmath)
-    : Instr(type, move(name)), a(&a), b(&b), cond(cond), fmath(fmath) {}
+    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath) {}
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;
@@ -535,7 +535,7 @@ public:
 
 class MemInstr : public Instr {
 public:
-  MemInstr(Type &type, std::string &&name) : Instr(type, move(name)) {}
+  MemInstr(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
 
   // If this instruction allocates a memory block, return its size and
   //  alignment. Returns 0 if it doesn't allocate anything.

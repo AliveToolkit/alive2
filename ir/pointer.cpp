@@ -15,7 +15,7 @@ using namespace util;
 static unsigned ptr_next_idx;
 
 static expr prepend_if(const expr &pre, expr &&e, bool prepend) {
-  return prepend ? pre.concat(e) : move(e);
+  return prepend ? pre.concat(e) : std::move(e);
 }
 
 static string local_name(const State *s, const char *name) {
@@ -72,7 +72,7 @@ Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
   assert(!local.isValid() || p.bits() == totalBits());
 }
 
-Pointer::Pointer(const Memory &m, expr repr) : m(m), p(move(repr)) {
+Pointer::Pointer(const Memory &m, expr repr) : m(m), p(std::move(repr)) {
   assert(!p.isValid() || p.bits() == totalBits());
 }
 
@@ -241,7 +241,7 @@ expr Pointer::getAddress(bool simplify) const {
     expr lc = hasLocalBit() ? expr::mkUInt(1, 1).concat(*local) : *local;
     addr = expr::mkIf(isLocal(), lc, non_local);
   } else
-    addr = move(non_local);
+    addr = std::move(non_local);
 
   return addr + getOffset().zextOrTrunc(bits_ptr_address);
 }
@@ -300,7 +300,7 @@ expr Pointer::inbounds(bool simplify_ptr, bool strict) {
     expr inb = ::inbounds(Pointer(m, ptr_expr), strict);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
-    ret.add(move(inb), domain);
+    ret.add(std::move(inb), domain);
   }
 
   // trim set of valid ptrs
@@ -348,7 +348,7 @@ expr Pointer::isAligned(uint64_t align) {
                  .concat(zero);
     if (bits_for_ptrattrs)
       newp = newp.concat(getAttrs());
-    p = move(newp);
+    p = std::move(newp);
     assert(!p.isValid() || p.bits() == totalBits());
     return { blk_align && offset.extract(bits - 1, 0) == zero };
   }
@@ -382,7 +382,7 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
       isUndef(offset))
     cond = false;
 
-  return { move(cond), p.isAligned(align) };
+  return { std::move(cond), p.isAligned(align) };
 }
 
 // When bytes is 0, pointer is always derefenceable
@@ -401,8 +401,8 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.blockSize().isZero())
       all_ptrs.add(ptr.release(), domain);
 
-    UB.add(move(ub), domain);
-    is_aligned.add(move(aligned), domain);
+    UB.add(std::move(ub), domain);
+    is_aligned.add(std::move(aligned), domain);
   }
 
   AndExpr exprs;
@@ -481,7 +481,7 @@ expr Pointer::refined(const Pointer &other) const {
   //local &= block_refined(other);
 
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(isLocal(), move(local), *this == other) &&
+                    expr::mkIf(isLocal(), std::move(local), *this == other) &&
                       isBlockAlive().implies(other.isBlockAlive()));
 }
 

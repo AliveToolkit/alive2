@@ -14,11 +14,11 @@ using namespace IR;
 using namespace std;
 
 #define RETURN_VAL(op) \
-  return { op, move(attrs), move(param_attrs), false }
+  return { op, std::move(attrs), std::move(param_attrs), false }
 #define RETURN_EXACT() \
-  return { nullptr, move(attrs), move(param_attrs), false }
+  return { nullptr, std::move(attrs), std::move(param_attrs), false }
 #define RETURN_APPROX() \
-  return { nullptr, move(attrs), move(param_attrs), true }
+  return { nullptr, std::move(attrs), std::move(param_attrs), true }
 
 static unsigned align(llvm::CallInst &i) {
   auto a = i.getRetAlign();
@@ -223,17 +223,17 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
         auto &byteTy = get_int_type(8); // FIXME
         auto &i32 = get_int_type(32);
         auto call
-          = make_unique<FnCall>(i32, value_name(i), "@fputc", move(attrs));
+          = make_unique<FnCall>(i32, value_name(i), "@fputc", std::move(attrs));
         auto load
           = make_unique<Load>(byteTy, value_name(i) + "#load", *args[0], 1);
         auto load_zext
            = make_unique<ConversionOp>(i32, value_name(i) + "#zext", *load,
                                        ConversionOp::ZExt);
-        call->addArg(*load_zext, move(param_attrs[0]));
-        call->addArg(*args[3], move(param_attrs[1]));
-        BB.addInstr(move(load));
-        BB.addInstr(move(load_zext));
-        RETURN_VAL(move(call));
+        call->addArg(*load_zext, std::move(param_attrs[0]));
+        call->addArg(*args[3], std::move(param_attrs[1]));
+        BB.addInstr(std::move(load));
+        BB.addInstr(std::move(load_zext));
+        RETURN_VAL(std::move(call));
       }
     }
   }

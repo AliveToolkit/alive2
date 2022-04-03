@@ -216,7 +216,7 @@ expr Type::toBV(expr e) const {
 
 StateValue Type::toBV(StateValue v) const {
   auto bw = np_bits();
-  return { toBV(move(v.value)),
+  return { toBV(std::move(v.value)),
            expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
 
@@ -225,26 +225,26 @@ expr Type::fromBV(expr e) const {
 }
 
 StateValue Type::fromBV(StateValue v) const {
-  return { fromBV(move(v.value)),
+  return { fromBV(std::move(v.value)),
            v.non_poison == expr::mkInt(-1, v.non_poison) };
 }
 
 expr Type::toInt(State &s, expr v) const {
-  return toBV(move(v));
+  return toBV(std::move(v));
 }
 
 StateValue Type::toInt(State &s, StateValue v) const {
   auto bw = np_bits();
-  return { toInt(s, move(v.value)),
+  return { toInt(s, std::move(v.value)),
            expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
 
 expr Type::fromInt(expr e) const {
-  return fromBV(move(e));
+  return fromBV(std::move(e));
 }
 
 StateValue Type::fromInt(StateValue v) const {
-  return { fromInt(move(v.value)),
+  return { fromInt(std::move(v.value)),
            v.non_poison.isBool()
              ? expr(v.non_poison)
              : v.non_poison == expr::mkInt(-1, v.non_poison) };
@@ -259,7 +259,7 @@ StateValue Type::mkUndef(State &s) const {
   auto val = getDummyValue(true);
   expr var = expr::mkFreshVar("undef", val.value);
   s.addUndefVar(expr(var));
-  return { move(var), move(val.non_poison) };
+  return { std::move(var), std::move(val.non_poison) };
 }
 
 pair<expr, expr> Type::mkUndefInput(State &s, const ParamAttrs &attrs) const {
@@ -407,7 +407,7 @@ expr FloatType::toBV(expr e) const {
 }
 
 StateValue FloatType::toBV(StateValue v) const {
-  return Type::toBV(move(v));
+  return Type::toBV(std::move(v));
 }
 
 expr FloatType::fromBV(expr e) const {
@@ -415,7 +415,7 @@ expr FloatType::fromBV(expr e) const {
 }
 
 StateValue FloatType::fromBV(StateValue v) const {
-  return Type::fromBV(move(v));
+  return Type::fromBV(std::move(v));
 }
 
 expr FloatType::toInt(State &s, expr fp) const {
@@ -443,7 +443,7 @@ expr FloatType::toInt(State &s, expr fp) const {
 }
 
 StateValue FloatType::toInt(State &s, StateValue v) const {
-  return Type::toInt(s, move(v));
+  return Type::toInt(s, std::move(v));
 }
 
 bool FloatType::isNaNInt(const expr &e) const {
@@ -482,11 +482,11 @@ expr FloatType::fromInt(expr e) const {
       n.eq(n2))
     return n;
 
-  return fromBV(move(e));
+  return fromBV(std::move(e));
 }
 
 StateValue FloatType::fromInt(StateValue v) const {
-  return Type::fromInt(move(v));
+  return Type::fromInt(std::move(v));
 }
 
 expr FloatType::sizeVar() const {
@@ -503,7 +503,7 @@ StateValue FloatType::getDummyValue(bool non_poison) const {
   case BFloat:  e = expr::mkBFloat(0); break;
   case Unknown: UNREACHABLE();
   }
-  return { move(e), non_poison };
+  return { std::move(e), non_poison };
 }
 
 expr FloatType::getTypeConstraints() const {
@@ -646,7 +646,7 @@ expr PtrType::toInt(State &s, expr v) const {
 }
 
 StateValue PtrType::toInt(State &s, StateValue v) const {
-  return Type::toInt(s, move(v));
+  return Type::toInt(s, std::move(v));
 }
 
 expr PtrType::fromInt(expr v) const {
@@ -654,7 +654,7 @@ expr PtrType::fromInt(expr v) const {
 }
 
 StateValue PtrType::fromInt(StateValue v) const {
-  return Type::fromInt(move(v));
+  return Type::fromInt(std::move(v));
 }
 
 pair<expr, expr>
@@ -717,7 +717,7 @@ AggregateType::AggregateType(string &&name, bool symbolic)
 
 AggregateType::AggregateType(string &&name, vector<Type*> &&vchildren,
                              vector<bool> &&vis_padding)
-: Type(move(name)), children(move(vchildren)), is_padding(move(vis_padding)) {
+: Type(std::move(name)), children(std::move(vchildren)), is_padding(std::move(vis_padding)) {
   assert(children.size() == is_padding.size());
   elements = children.size();
 }
@@ -764,8 +764,8 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
       vv = children[idx]->getDummyValue(false);
     else
       vv = vals[val_idx++];
-    vv = children[idx]->toBV(move(vv));
-    v = first ? move(vv) : v.concat(vv);
+    vv = children[idx]->toBV(std::move(vv));
+    v = first ? std::move(vv) : v.concat(vv);
     first = false;
   }
   return v;
@@ -799,8 +799,8 @@ AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
 
   StateValue sv(val.value.extract(h_val, l_val),
                 val.non_poison.extract(h_np, l_np));
-  return fromInt ? children[index]->fromInt(move(sv)) :
-                   children[index]->fromBV(move(sv));
+  return fromInt ? children[index]->fromInt(std::move(sv)) :
+                   children[index]->fromBV(std::move(sv));
 }
 
 unsigned AggregateType::bits() const {
@@ -892,7 +892,7 @@ expr AggregateType::enforceAggregateType(vector<Type*> *element_types) const {
 }
 
 expr AggregateType::toBV(expr e) const {
-  return Type::toBV(move(e));
+  return Type::toBV(std::move(e));
 }
 
 StateValue AggregateType::toBV(StateValue v) const {
@@ -900,7 +900,7 @@ StateValue AggregateType::toBV(StateValue v) const {
 }
 
 expr AggregateType::fromBV(expr e) const {
-  return Type::fromBV(move(e));
+  return Type::fromBV(std::move(e));
 }
 
 StateValue AggregateType::fromBV(StateValue v) const {
@@ -919,7 +919,7 @@ StateValue AggregateType::toInt(State &s, StateValue v) const {
   StateValue ret;
   for (unsigned i = 0; i < elements; ++i) {
     auto vv = children[i]->toInt(s, extract(v, i));
-    ret = i == 0 ? move(vv) : (little_endian ? vv.concat(ret) : ret.concat(vv));
+    ret = i == 0 ? std::move(vv) : (little_endian ? vv.concat(ret) : ret.concat(vv));
   }
   return ret;
 }
@@ -942,8 +942,8 @@ AggregateType::refines(const State &src_s, const State &tgt_s,
   for (unsigned i = 0; i < elements; ++i) {
     auto [p, v] = children[i]->refines(src_s, tgt_s, extract(src, i),
                                        extract(tgt, i));
-    poison.insert(move(p));
-    value.insert(move(v));
+    poison.insert(std::move(p));
+    value.insert(std::move(v));
   }
   return { expr::mk_and(poison), expr::mk_and(value) };
 }
@@ -984,7 +984,7 @@ const AggregateType* AggregateType::getAsAggregateType() const {
 
 ArrayType::ArrayType(string &&name, unsigned elements, Type &elementTy,
                      Type *paddingTy)
-  : AggregateType(move(name), false) {
+  : AggregateType(std::move(name), false) {
   defined = true;
   if (paddingTy) {
     this->elements = elements * 2;
@@ -1021,7 +1021,7 @@ void ArrayType::print(ostream &os) const {
 
 
 VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(move(name), false) {
+  : AggregateType(std::move(name), false) {
   assert(elements != 0);
   this->elements = elements;
   defined = true;
@@ -1118,7 +1118,7 @@ void VectorType::print(ostream &os) const {
 
 StructType::StructType(string &&name, vector<Type*> &&children,
                        vector<bool> &&is_padding)
-  : AggregateType(move(name), move(children), move(is_padding)) {
+  : AggregateType(std::move(name), std::move(children), std::move(is_padding)) {
   elements = this->children.size();
   defined = true;
 }
@@ -1250,7 +1250,7 @@ expr SymbolicType::operator==(const Type &b) const {
     if (a && rhs->a) c |= isArray()  && *a == *rhs->a;
     if (v && rhs->v) c |= isVector() && *v == *rhs->v;
     if (s && rhs->s) c |= isStruct() && *s == *rhs->s;
-    return move(c) && typeVar() == rhs->typeVar();
+    return std::move(c) && typeVar() == rhs->typeVar();
   }
   assert(0 && "unhandled case in SymbolicType::operator==");
   UNREACHABLE();
@@ -1347,35 +1347,35 @@ const StructType* SymbolicType::getAsStructType() const {
 }
 
 expr SymbolicType::toBV(expr e) const {
-  DISPATCH(toBV(move(e)), UNREACHABLE());
+  DISPATCH(toBV(std::move(e)), UNREACHABLE());
 }
 
 StateValue SymbolicType::toBV(StateValue val) const {
-  DISPATCH(toBV(move(val)), UNREACHABLE());
+  DISPATCH(toBV(std::move(val)), UNREACHABLE());
 }
 
 expr SymbolicType::fromBV(expr e) const {
-  DISPATCH(fromBV(move(e)), UNREACHABLE());
+  DISPATCH(fromBV(std::move(e)), UNREACHABLE());
 }
 
 StateValue SymbolicType::fromBV(StateValue val) const {
-  DISPATCH(fromBV(move(val)), UNREACHABLE());
+  DISPATCH(fromBV(std::move(val)), UNREACHABLE());
 }
 
 expr SymbolicType::toInt(State &st, expr e) const {
-  DISPATCH(toInt(st, move(e)), UNREACHABLE());
+  DISPATCH(toInt(st, std::move(e)), UNREACHABLE());
 }
 
 StateValue SymbolicType::toInt(State &st, StateValue val) const {
-  DISPATCH(toInt(st, move(val)), UNREACHABLE());
+  DISPATCH(toInt(st, std::move(val)), UNREACHABLE());
 }
 
 expr SymbolicType::fromInt(expr e) const {
-  DISPATCH(fromInt(move(e)), UNREACHABLE());
+  DISPATCH(fromInt(std::move(e)), UNREACHABLE());
 }
 
 StateValue SymbolicType::fromInt(StateValue val) const {
-  DISPATCH(fromInt(move(val)), UNREACHABLE());
+  DISPATCH(fromInt(std::move(val)), UNREACHABLE());
 }
 
 pair<expr, expr>

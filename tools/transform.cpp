@@ -279,7 +279,7 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
     for (unsigned i = 0; i < 2; ++i) {
       expr newexpr = e.subst(var, nums[i]);
       if (newexpr.eq(e)) {
-        instances2[move(newexpr)] = move(v);
+        instances2[std::move(newexpr)] = std::move(v);
         break;
       }
 
@@ -288,16 +288,16 @@ static void instantiate_undef(const Input *in, map<expr, expr> &instances,
         continue;
 
       // keep 'var' variables for counterexample printing
-      instances2.try_emplace(move(newexpr), v && var == nums[i]);
+      instances2.try_emplace(std::move(newexpr), v && var == nums[i]);
     }
   }
-  instances = move(instances2);
+  instances = std::move(instances2);
 }
 
 static expr preprocess(const Transform &t, const set<expr> &qvars0,
                        const set<expr> &undef_qvars, expr &&e) {
   if (hit_half_memory_limit())
-    return expr::mkForAll(qvars0, move(e));
+    return expr::mkForAll(qvars0, std::move(e));
 
   // eliminate all quantified boolean vars; Z3 gets too slow with those
   auto qvars = qvars0;
@@ -321,10 +321,10 @@ static expr preprocess(const Transform &t, const set<expr> &qvars0,
 
   if (config::disable_undef_input || undef_qvars.empty() ||
       hit_half_memory_limit())
-    return expr::mkForAll(qvars, move(e));
+    return expr::mkForAll(qvars, std::move(e));
 
   // manually instantiate undef masks
-  map<expr, expr> instances({ { move(e), true } });
+  map<expr, expr> instances({ { std::move(e), true } });
 
   for (auto &i : t.src.getInputs()) {
     if (auto in = dynamic_cast<const Input*>(&i))
@@ -333,7 +333,7 @@ static expr preprocess(const Transform &t, const set<expr> &qvars0,
 
   expr insts(false);
   for (auto &[e, v] : instances) {
-    insts |= expr::mkForAll(qvars, move(const_cast<expr&>(e))) && v;
+    insts |= expr::mkForAll(qvars, std::move(const_cast<expr&>(e))) && v;
   }
   return insts;
 }
@@ -346,8 +346,8 @@ encode_undef_refinement_per_elem(const Type &ty, const StateValue &sva,
   if (!aty)
     return sva.non_poison && sva.value == a2 && b != b2;
 
-  StateValue sva2{move(a2), expr()};
-  StateValue svb{move(b), expr()}, svb2{move(b2), expr()};
+  StateValue sva2{std::move(a2), expr()};
+  StateValue svb{std::move(b), expr()}, svb2{std::move(b2), expr()};
   expr result = false;
 
   for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
@@ -463,14 +463,14 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
     // \forall v . (pre_tgt && !pre_src(v)) ->  [\exists v . pre_src(v)]
     // false
     if (refines.isFalse())
-      return move(refines);
+      return std::move(refines);
 
     return axioms_expr &&
             preprocess(t, qvars, uvars, pre && pre_src_forall.implies(refines));
   };
 
   auto check = [&](expr &&e, auto &&printer, const char *msg) {
-    e = mk_fml(move(e));
+    e = mk_fml(std::move(e));
     auto res = check_expr(e);
     if (!res.isUnsat() &&
         !error(errs, src_state, tgt_state, res, var, msg, check_each_var,
@@ -496,7 +496,7 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
       dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
     }
 
-    CHECK(move(dom_constr),
+    CHECK(std::move(dom_constr),
           [](ostream&, const Model&){},
           "Source and target don't have the same return domain");
   }
@@ -1116,7 +1116,7 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
   sym_exec(*tgt_state);
   src_state->mkAxioms(*tgt_state);
 
-  return { move(src_state), move(tgt_state) };
+  return { std::move(src_state), std::move(tgt_state) };
 }
 
 Errors TransformVerify::verify() const {
@@ -1182,7 +1182,7 @@ Errors TransformVerify::verify() const {
         string s = "Unsupported interprocedural transformation: non-constant "
                    "global variable " + GVT->getName() + " is introduced in"
                    " target";
-        return { move(s), false };
+        return { std::move(s), false };
     }
   }
 
@@ -1210,7 +1210,7 @@ Errors TransformVerify::verify() const {
                      tgt_state->functionDomain()(), tgt_state->returnVal(),
                      check_each_var);
   } catch (AliveException e) {
-    return move(e);
+    return std::move(e);
   }
   return errs;
 }
@@ -1257,7 +1257,7 @@ TypingAssignments TransformVerify::getTypings() const {
         c &= i.getType() == tgt_instrs.at(i.getName())->getType();
     }
   }
-  return { move(c) };
+  return { std::move(c) };
 }
 
 void TransformVerify::fixupTypes(const TypingAssignments &ty) {

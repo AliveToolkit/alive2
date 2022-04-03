@@ -49,7 +49,7 @@ const char *const token_name[] = {
 };
 
 static void error(string &&str) {
-  throw LexException("[Lex] " + move(str), yylineno);
+  throw LexException("[Lex] " + std::move(str), yylineno);
 }
 
 static void COPY_STR(unsigned off = 0) {

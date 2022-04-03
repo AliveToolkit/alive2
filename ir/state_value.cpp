@@ -70,12 +70,12 @@ StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
   expr cond, then, els, a, b, np;
   ENSURE(val.isIf(cond, then, els));
   if (cond.isEq(a, b)) {
-    np = a.eq(v2) ? move(b) : move(a);
+    np = a.eq(v2) ? std::move(b) : std::move(a);
   } else {
     assert(non_poison.isBool() && non_poison.isConst());
     np = non_poison;
   }
-  return { then.eq(v1) ? move(els) : move(then), move(np) };
+  return { then.eq(v1) ? std::move(els) : std::move(then), std::move(np) };
 }
 
 ostream& operator<<(ostream &os, const StateValue &val) {

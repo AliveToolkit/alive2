@@ -87,7 +87,7 @@ public:
       Tactic t(*I);
       *this = mkThen(*this, t);
       if (tactic_verbose)
-        tactics.emplace_back(move(t));
+        tactics.emplace_back(std::move(t));
     }
   }
 
@@ -97,7 +97,7 @@ public:
   }
 
   void operator=(Tactic &&other) {
-    static_cast<Tactic&>(*this) = move(other);
+    static_cast<Tactic&>(*this) = std::move(other);
   }
 
   static Tactic mkThen(const Tactic &a, const Tactic &b) {
@@ -137,7 +137,7 @@ public:
       string new_r = Z3_goal_to_string(ctx(), goal);
       if (new_r != last_result) {
         dbg() << new_r << '\n';
-        last_result = move(new_r);
+        last_result = std::move(new_r);
       } else {
         dbg() << "(no change)\n";
       }
@@ -259,7 +259,7 @@ void Solver::block(const Model &m, Solver *sneg) {
 
       sneg->add(expr::mk_and(assignments));
       if (!sneg->check().isUnsat())
-        assignments.insert(move(val));
+        assignments.insert(std::move(val));
     }
   }
 

@@ -163,7 +163,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (first || skip_verify) {
-      I->second.fn = move(*fn);
+      I->second.fn = std::move(*fn);
       if (!opt_always_verify)
         // Prepare syntactic check
         I->second.fn_tostr = toString(I->second.fn);
@@ -172,8 +172,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     Transform t;
-    t.src = move(I->second.fn);
-    t.tgt = move(*fn);
+    t.src = std::move(I->second.fn);
+    t.tgt = std::move(*fn);
 
     bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr);
 
@@ -181,7 +181,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
       I->second.fn = *llvm2alive(F, *TLI);
       I->second.fn_tostr = toString(I->second.fn);
     } else {
-      I->second.fn = move(t.tgt);
+      I->second.fn = std::move(t.tgt);
       // updating I->second.fn_tostr isn't necessary because the two functions
       // are equal or some error occurred.
     }

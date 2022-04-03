@@ -128,7 +128,7 @@ static string agg_str(const Type &ty, vector<Value*> &vals) {
 }
 
 AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
-  : Value(type, agg_str(type, vals)), vals(move(vals)) {}
+  : Value(type, agg_str(type, vals)), vals(std::move(vals)) {}
 
 StateValue AggregateValue::toSMT(State &s) const {
   vector<StateValue> state_vals;
@@ -164,8 +164,8 @@ static string attr_str(const ParamAttrs &attr) {
 }
 
 Input::Input(Type &type, string &&name, ParamAttrs &&attributes)
-  : Value(type, attr_str(attributes) + name), smt_name(move(name)),
-    attrs(move(attributes)) {}
+  : Value(type, attr_str(attributes) + name), smt_name(std::move(name)),
+    attrs(std::move(attributes)) {}
 
 void Input::copySMTName(const Input &other) {
   smt_name = other.smt_name;
@@ -212,17 +212,17 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
       val = expr::mkIf(undef_mask == 0, val, undef);
     else
       val = (~undef_mask & val) | (undef_mask & undef);
-    s.addUndefVar(move(var));
+    s.addUndefVar(std::move(var));
   }
 
   auto [UB, non_poison] = attrs.encode(s, {expr(val), expr(true)}, ty);
-  s.addUB(move(UB));
+  s.addUB(std::move(UB));
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   string np_name = "np_" + getSMTName(child);
 
-  return { move(val),
-           move(non_poison) && (never_poison ? true :
+  return { std::move(val),
+           std::move(non_poison) && (never_poison ? true :
                                   expr::mkBoolVar(np_name.c_str())) };
 }
 

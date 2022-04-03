@@ -44,11 +44,11 @@ static string query_timeout = "10000";
 static string rand_seed = "0";
 
 void set_query_timeout(string ms) {
-  query_timeout = move(ms);
+  query_timeout = std::move(ms);
 }
 
 void set_random_seed(string seed) {
-  rand_seed = move(seed);
+  rand_seed = std::move(seed);
 }
 
 const char* get_query_timeout() {

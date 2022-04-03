@@ -67,7 +67,7 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   auto MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
   llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(move(MB), Diag, Context,
+  auto M = getLazyIRModule(std::move(MB), Diag, Context,
                            /*ShouldLazyLoadMetadata=*/true);
   if (!M) {
     Diag.print("", llvm::errs(), false);
@@ -95,7 +95,7 @@ struct Results {
   static Results Error(string &&err) {
     Results r;
     r.status = ERROR;
-    r.error = move(err);
+    r.error = std::move(err);
     return r;
   }
 };
@@ -115,8 +115,8 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
                           "' to Alive IR\n");
 
   Results r;
-  r.t.src = move(*fn1);
-  r.t.tgt = move(*fn2);
+  r.t.src = std::move(*fn1);
+  r.t.tgt = std::move(*fn2);
 
   if (!always_verify) {
     stringstream ss1, ss2;

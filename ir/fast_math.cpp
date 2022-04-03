@@ -69,7 +69,7 @@ class EGraph {
   vector<vector<const Node*>> nodes_eqs; // root -> equiv nodes
 
   unsigned get(Node &&n) {
-    auto [I, inserted] = nodes.try_emplace(move(n), 0);
+    auto [I, inserted] = nodes.try_emplace(std::move(n), 0);
     if (inserted) {
       I->second = uf.mk();
       nodes_eqs.emplace_back(1, &I->first);
@@ -78,7 +78,7 @@ class EGraph {
   }
 
   void decl_equivalent(Node &&node, unsigned n1) {
-    unsigned n2 = get(move(node));
+    unsigned n2 = get(std::move(node));
     unsigned new_root = uf.merge(n2, n1);
     auto &root = nodes_eqs[new_root];
 
@@ -140,13 +140,13 @@ public:
 
       if (is_leaf) {
         n.operation = Node::Leaf;
-        n.leaf      = move(e);
+        n.leaf      = std::move(e);
       } else {
         n.op1      = get(a);
-        n.rounding = move(rounding);
+        n.rounding = std::move(rounding);
       }
 
-      return get(move(n));
+      return get(std::move(n));
     }
   }
 
@@ -165,7 +165,7 @@ public:
             nn.op2 = root(node.op2);
           assert(is_neq(node <=> nn));
 
-          decl_equivalent(move(nn), n);
+          decl_equivalent(std::move(nn), n);
           remove(node);
           changed = true;
           continue;
@@ -176,7 +176,7 @@ public:
         if (node.operation == Node::Add || node.operation == Node::Mul) {
           Node nn = node;
           swap(nn.op1, nn.op2);
-          decl_equivalent(move(nn), n);
+          decl_equivalent(std::move(nn), n);
         }
 
         if (node.flags & FastMathFlags::Reassoc) {
@@ -261,7 +261,7 @@ public:
         case Node::Leaf:
           val = node->leaf;
         }
-        vals.add(move(val), expr(true));
+        vals.add(std::move(val), expr(true));
       }
 
       if (!has_all)
@@ -269,14 +269,14 @@ public:
 
       auto [val, domain, qvar, pre] = vals();
       assert(domain.isTrue());
-      exprs[node_id] = move(val);
+      exprs[node_id] = std::move(val);
       // TODO: handle qvar, pre
       todo.pop_back();
 
     } while (!todo.empty());
 
     assert(exprs.size() >= n && exprs[n]);
-    return move(*exprs[n]);
+    return std::move(*exprs[n]);
   }
 
 #ifdef DEBUG_FMF
