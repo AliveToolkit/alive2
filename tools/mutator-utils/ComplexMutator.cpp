@@ -86,6 +86,9 @@ end:
     helpers.push_back(std::make_unique<RandomCodeInserterHelper>(this));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
 
+    helpers.push_back(std::make_unique<FunctionCallInlineHelper>(this));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+
     for (size_t i = 0; i < helpers.size(); ++i) {
       helpers[i]->init();
     }

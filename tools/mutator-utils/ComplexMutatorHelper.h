@@ -153,3 +153,24 @@ public:
     llvm::errs() << "Code piece generated";
   }
 };
+
+class FunctionCallInlineHelper: public ComplexMutatorHelper{
+  bool inlined;
+public:
+  FunctionCallInlineHelper(ComplexMutator* mutator):
+    ComplexMutatorHelper(mutator),inlined(false) {}
+  virtual void init(){
+    inlined=false;
+  }
+  virtual void reset(){
+    inlined=false;
+  }
+  virtual void whenMoveToNextInst(){
+    inlined=false;
+  }
+  virtual void mutate();
+  virtual bool shouldMutate();
+  virtual void debug(){
+    llvm::errs()<<"Function call inline";
+  }
+};

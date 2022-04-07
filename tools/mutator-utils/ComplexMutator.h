@@ -169,6 +169,7 @@ class ComplexMutator : public Mutator {
   friend class MutateInstructionHelper;
   friend class RandomMoveHelper;
   friend class RandomCodeInserterHelper;
+  friend class FunctionCallInlineHelper;
 
   std::unordered_set<std::string> invalidFunctions;
   /**

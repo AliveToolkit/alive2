@@ -377,3 +377,14 @@ void RandomCodeInserterHelper::mutate() {
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
+
+bool FunctionCallInlineHelper::shouldMutate() {
+  return !inlined && llvm::isa<llvm::CallInst>(mutator->tmpIit);
+}
+
+void FunctionCallInlineHelper::mutate() {
+  inlined = true;
+  llvm::InlineFunctionInfo ifi;
+  llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->tmpIit);
+  llvm::InlineFunction(*callInst,ifi);
+}
