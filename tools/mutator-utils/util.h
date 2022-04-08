@@ -21,6 +21,8 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/FunctionComparator.h"
+ 
 #include <algorithm>
 #include <climits>
 #include <ctime>
@@ -77,7 +79,27 @@ public:
   static float getRandomLLVMFloat();
 };
 
+class FunctionComparatorWrapper:public llvm::FunctionComparator{
+public:
+  FunctionComparatorWrapper(const llvm::Function* func1, const llvm::Function* func2,  llvm::GlobalNumberState *GN):
+    llvm::FunctionComparator(func1, func2, GN){};
+  bool compareSignature()const{return  compareSignature()==0;}
+};
+
+class LLVMFunctionComparator{
+  llvm::GlobalNumberState gn;
+  FunctionComparatorWrapper wrapper;
+public:
+  LLVMFunctionComparator():gn(llvm::GlobalNumberState()),wrapper(FunctionComparatorWrapper(nullptr,nullptr,&gn)){}
+  bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
+    gn.clear();
+    wrapper=FunctionComparatorWrapper(func1,func2,&gn);
+    return wrapper.compareSignature();
+  }
+};
+
 class LLVMUtil {
+  static LLVMFunctionComparator comparator;
 public:
   static void optimizeModule(llvm::Module *M, bool newGVN = false);
   static void optimizeFunction(llvm::Function *f, bool newGVN = false);
@@ -87,4 +109,11 @@ public:
                                       llvm::SmallVector<llvm::Type *> tys,
                                       llvm::ValueToValueMapTy &VMap);
   static void insertRandomCodeBefore(llvm::Instruction *inst);
+  static bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
+    return comparator.compareSignature(func1, func2);
+  }
+  static llvm::InlineResult inlineFunction(llvm::CallBase &CB,llvm::Function* func, llvm::InlineFunctionInfo &IFI,
+                                         llvm::AAResults *CalleeAAR,
+                                         bool InsertLifetime,
+                                         llvm::Function *ForwardVarArgsTo);
 };
