@@ -654,7 +654,7 @@ void copyMode() {
   stubMutator.setModule(std::move(pm));
   if (bool sInit = mutators[0]->init(), cInit = mutators[1]->init();
       sInit || cInit) {
-        cInit=false;
+        
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
