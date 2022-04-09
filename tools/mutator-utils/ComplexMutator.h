@@ -253,4 +253,11 @@ public:
   virtual void setModule(std::unique_ptr<llvm::Module> &&ptr) override {
     tmpCopy = std::move(ptr);
   }
+  virtual void eraseFunctionInModule(const std::string& funcName){
+    if(tmpCopy!=nullptr){
+      if(llvm::Function* func=pm->getFunction(funcName);func!=nullptr){
+        func->eraseFromParent();
+      }
+    }
+  }
 };

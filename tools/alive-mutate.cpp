@@ -413,7 +413,7 @@ bool inputVerify() {
           smt_init.emplace();
           auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
           smt_init.reset();
-          if (r.status == Results::CORRECT) {
+          if (r.status == Results::CORRECT || r.status == Results::SYNTACTIC_EQ) {
             ++validFuncNum;
           } else {
             /*if(r.status==Results::UNSOUND){
@@ -577,6 +577,7 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
   smt_init.emplace();
 
   const string optFunc = mutator.getCurrentFunction();
+  std::string newFunc;
   bool shouldLog = false;
   if (llvm::Function *pf1 = M1->getFunction(optFunc); pf1 != nullptr) {
     if (!pf1->isDeclaration()) {
@@ -588,6 +589,7 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
       llvm::ValueToValueMapTy vMap;
       llvm::Function *pf2 = llvm::CloneFunction(pf1, vMap);
       LLVMUtil::optimizeFunction(pf2, newGVN);
+      newFunc=pf2->getName();
       if (compareFunctions(*pf1, *pf2, TLI)) {
         shouldLog = true;
         if (opt_error_fatal)
@@ -634,6 +636,7 @@ end:
   if (shouldLog) {
     mutator.saveModule(getOutputFile(ith));
   }
+  mutator.eraseFunctionInModule(newFunc);
 }
 
 /*
@@ -651,6 +654,7 @@ void copyMode() {
   stubMutator.setModule(std::move(pm));
   if (bool sInit = mutators[0]->init(), cInit = mutators[1]->init();
       sInit || cInit) {
+        cInit=false;
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
