@@ -184,7 +184,7 @@ bool ComplexMutator::isReplaceable(llvm::Instruction *inst) {
       return true;
     }
   }
-  return false;
+  return true;
 }
 
 void ComplexMutator::moveToNextFuction() {
@@ -385,7 +385,7 @@ void ComplexMutator::setOperandRandomValue(llvm::Instruction *inst,
                                            size_t pos) {
   if (llvm::Type *ty = inst->getOperand(pos)->getType(); ty != nullptr) {
     if (llvm::Value *val = getRandomValue(ty);
-        val == nullptr || llvm::isa<llvm::UndefValue>(val)) {
+        Random::getRandomBool() || val == nullptr || llvm::isa<llvm::UndefValue>(val)) {
       lazyUpdateInsts.push_back(inst);
       lazyUpdateArgPos.push_back(pos);
       lazyUpdateArgTys.push_back(inst->getOperand(pos)->getType());

@@ -215,6 +215,14 @@ class ComplexMutator : public Mutator {
   llvm::SmallVector<size_t> whenMoveToNextBasicBlockFuncs;
   llvm::SmallVector<size_t> whenMoveToNextFuncFuncs;
   llvm::Value *getRandomValue(llvm::Type *ty);
+  /**
+   * @brief Set the Operand with Random Value 
+   * 
+   * @param inst 
+   * @param pos 
+   * if the type could be found in the environment. It has a possibility to make a new one or use existent.
+   * it not, it would definitely make a new one.
+   */
   void setOperandRandomValue(llvm::Instruction *inst, size_t pos);
   void fixAllValues();
 
