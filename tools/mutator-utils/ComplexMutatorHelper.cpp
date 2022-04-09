@@ -138,18 +138,26 @@ void ShuffleHelper::shuffleBlock() {
       (llvm::Instruction *)&*mutator->vMap[&*mutator->iit]);
 }
 
+bool MutateInstructionHelper::shouldMutate() {
+  return !mutated && 
+    (mutator->tmpIit->getNumOperands()-llvm::isa<CallBase>(&*(mutator->tmpIit)))>0;
+}
+
 void MutateInstructionHelper::mutate() {
   // 75% chances to add a new inst, 25% chances to replace with a existent usage
   if ((Random::getRandomUnsigned() & 3) != 0) {
-    insertRandomBinaryInstruction(&*(mutator->tmpIit));
-    newAdded = true;
+    bool res=insertRandomBinaryInstruction(&*(mutator->tmpIit));
+    if(!res){
+      replaceRandomUsage(&*(mutator->tmpIit));
+    }
+    newAdded=res;
   } else {
     replaceRandomUsage(&*(mutator->tmpIit));
   }
   mutated = true;
 };
 
-void MutateInstructionHelper::insertRandomBinaryInstruction(
+bool MutateInstructionHelper::insertRandomBinaryInstruction(
     llvm::Instruction *inst) {
   size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
   llvm::Type *ty = nullptr;
@@ -160,6 +168,10 @@ void MutateInstructionHelper::insertRandomBinaryInstruction(
       ty = inst->getOperand(pos)->getType();
       break;
     }
+  }
+
+  if(ty==nullptr){
+    return false;
   }
 
   llvm::Value *val1 = mutator->getRandomValue(ty),
@@ -227,12 +239,13 @@ void MutateInstructionHelper::insertRandomBinaryInstruction(
   llvm::Instruction *newInst =
       llvm::BinaryOperator::Create(Op, val1, val2, "", inst);
   inst->setOperand(pos, newInst);
+  return true;
 }
 
 void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
   size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
-  ;
-  llvm::Type *ty = nullptr;
+  
+  /*llvm::Type *ty = nullptr;
   for (size_t i = 0; i < inst->getNumOperands(); ++i, ++pos) {
     if (pos == inst->getNumOperands())
       pos = 0;
@@ -242,7 +255,10 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
     }
   }
   llvm::Value *val = mutator->getRandomValue(ty);
-  inst->setOperand(pos, val);
+  inst->setOperand(pos, val);*/
+  mutator->setOperandRandomValue(inst,pos);
+  mutator->fixAllValues();
+
 }
 
 bool RandomMoveHelper::shouldMutate() {

@@ -79,7 +79,10 @@ public:
 
 class MutateInstructionHelper : public ComplexMutatorHelper {
   bool mutated, newAdded;
-  void insertRandomBinaryInstruction(llvm::Instruction *inst);
+  /** Try to insert new random binary instruction for int type
+   *  return false if it fails to find one int parameter
+   * */
+  bool insertRandomBinaryInstruction(llvm::Instruction *inst);
   void replaceRandomUsage(llvm::Instruction *inst);
 
 public:
@@ -92,9 +95,8 @@ public:
     mutated = newAdded = false;
   };
   virtual void mutate() override;
-  virtual bool shouldMutate() override {
-    return !mutated;
-  };
+  virtual bool shouldMutate() override;
+
   virtual void whenMoveToNextInst() override {
     mutated = newAdded = false;
   }
