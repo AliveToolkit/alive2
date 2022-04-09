@@ -100,7 +100,7 @@ void ShuffleHelper::shuffleBlock() {
     }
   }
   while (sv == sblock) {
-    std::random_shuffle(sv.begin(), sv.end());
+    std::random_shuffle(sv.begin(), sv.end(),[](int i){return Random::getRandomUnsigned()%i;});
   }
 
   /**
