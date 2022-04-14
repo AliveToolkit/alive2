@@ -158,21 +158,24 @@ public:
 
 class FunctionCallInlineHelper: public ComplexMutatorHelper{
   bool inlined;
+  std::vector<std::vector<std::string>> idToFuncSet;
+  llvm::StringMap<int> funcToId;
+  std::string functionInlined;
 public:
   FunctionCallInlineHelper(ComplexMutator* mutator):
     ComplexMutatorHelper(mutator),inlined(false) {}
-  virtual void init(){
-    inlined=false;
-  }
+  virtual void init();
   virtual void reset(){
     inlined=false;
+    functionInlined.clear();
   }
   virtual void whenMoveToNextInst(){
     inlined=false;
+    functionInlined.clear();
   }
   virtual void mutate();
   virtual bool shouldMutate();
   virtual void debug(){
-    llvm::errs()<<"Function call inline";
+    llvm::errs()<<"Function call inline with "<<functionInlined<<"\n";
   }
 };

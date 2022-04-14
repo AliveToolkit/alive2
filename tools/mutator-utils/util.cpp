@@ -8,6 +8,7 @@ std::mt19937 Random::mt(Random::seed);
 llvm::SmallVector<unsigned> Random::usedInts;
 llvm::SmallVector<double> Random::usedDoubles;
 llvm::SmallVector<float> Random::usedFloats;
+LLVMFunctionComparator LLVMUtil::comparator;
 
 unsigned Random::getExtremeInt(llvm::IntegerType *ty) {
   unsigned size = ty->getBitWidth();

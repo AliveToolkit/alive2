@@ -83,18 +83,20 @@ class FunctionComparatorWrapper:public llvm::FunctionComparator{
 public:
   FunctionComparatorWrapper(const llvm::Function* func1, const llvm::Function* func2,  llvm::GlobalNumberState *GN):
     llvm::FunctionComparator(func1, func2, GN){};
-  bool compareSignature()const{return  compareSignature()==0;}
+  bool isSameSignature()const{
+    return  compareSignature()==0;
+  }
 };
 
 class LLVMFunctionComparator{
   llvm::GlobalNumberState gn;
   FunctionComparatorWrapper wrapper;
 public:
-  LLVMFunctionComparator():gn(llvm::GlobalNumberState()),wrapper(FunctionComparatorWrapper(nullptr,nullptr,&gn)){}
+  LLVMFunctionComparator():gn(llvm::GlobalNumberState()),wrapper(FunctionComparatorWrapper(nullptr,nullptr,nullptr)){}
   bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
     gn.clear();
     wrapper=FunctionComparatorWrapper(func1,func2,&gn);
-    return wrapper.compareSignature();
+    return wrapper.isSameSignature();
   }
 };
 
@@ -112,8 +114,4 @@ public:
   static bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
     return comparator.compareSignature(func1, func2);
   }
-  static llvm::InlineResult inlineFunction(llvm::CallBase &CB,llvm::Function* func, llvm::InlineFunctionInfo &IFI,
-                                         llvm::AAResults *CalleeAAR,
-                                         bool InsertLifetime,
-                                         llvm::Function *ForwardVarArgsTo);
 };

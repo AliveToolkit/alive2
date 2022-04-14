@@ -394,13 +394,66 @@ void RandomCodeInserterHelper::mutate() {
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
 
+void FunctionCallInlineHelper::init(){
+  if(funcToId.empty()){
+    for(auto fit=mutator->pm->begin(); fit != mutator->pm->end();++fit){
+      if(fit->isDeclaration()){
+        continue;
+      }
+      bool shouldAdd=true;
+      for(size_t i=0;i<idToFuncSet.size()&&shouldAdd;++i){
+        if(LLVMUtil::compareSignature(&*fit,mutator->pm->getFunction(idToFuncSet[i][0]))){
+          funcToId.insert(std::make_pair(fit->getName(),funcToId[idToFuncSet[i][0]]));
+          idToFuncSet[i].push_back(fit->getName().str());
+          shouldAdd=false;
+        }
+      }
+      if(shouldAdd){
+        funcToId.insert(std::make_pair(fit->getName(),idToFuncSet.size()));
+        idToFuncSet.push_back(std::vector<std::string>());
+        idToFuncSet.back().push_back(fit->getName().str());
+      }
+    }
+  }
+  inlined=false;
+}
+
+/*
+* Not inlined. 
+* is a function call
+* could find replacement
+*/
 bool FunctionCallInlineHelper::shouldMutate() {
-  return !inlined && llvm::isa<llvm::CallInst>(mutator->tmpIit);
+  if(!inlined&& llvm::isa<llvm::CallInst>(mutator->tmpIit)){
+     llvm::CallInst* callInst=(llvm::CallInst*)&*mutator->tmpIit;
+     llvm::Function* func=callInst->getCalledFunction();
+     if(!func->isDeclaration()){
+       auto it=funcToId.find(func->getName());
+       if(it!=funcToId.end()&&idToFuncSet[it->second].size()>1){
+         //make sure there is a replacement
+          size_t idx=Random::getRandomUnsigned()%idToFuncSet[it->second].size();
+          while(idToFuncSet[it->second][idx]==func->getName()){
+            ++idx;
+            if(idx==idToFuncSet[it->second].size()){
+              idx=0;
+            }
+          }
+          functionInlined=idToFuncSet[it->second][idx];
+       }
+     }
+  }
+  return !inlined&&!functionInlined.empty();
 }
 
 void FunctionCallInlineHelper::mutate() {
   inlined = true;
   llvm::InlineFunctionInfo ifi;
+  llvm::Function* func=mutator->tmpCopy->getFunction(functionInlined);
   llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->tmpIit);
-  llvm::InlineFunction(*callInst,ifi);
+  callInst->setCalledFunction(func);
+  llvm::InlineResult res=llvm::InlineFunction(*callInst,ifi);
+  llvm::errs()<<res.isSuccess()<<" result\n";
+  if(!res.isSuccess()){
+    llvm::errs()<<res.getFailureReason()<<"\n";
+  }
 }
