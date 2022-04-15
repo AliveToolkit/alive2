@@ -160,7 +160,7 @@ void AggregateValue::print(std::ostream &os) const {
 static string attr_str(const ParamAttrs &attr) {
   stringstream ss;
   ss << attr;
-  return ss.str();
+  return std::move(ss).str();
 }
 
 Input::Input(Type &type, string &&name, ParamAttrs &&attributes)

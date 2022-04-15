@@ -193,6 +193,7 @@ void BinOp::print(ostream &os) const {
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
   // addUB(bp) is not needed because it is registered by getAndAddPoisonUB.
+  assert(!bp.isValid() || bp.isTrue());
   s.addUB(b != 0);
   if (sign)
     s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
@@ -456,7 +457,7 @@ StateValue BinOp::toSMT(State &s) const {
   } else {
     scalar_op = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
       auto [v, np] = fn(a, ap, b, bp);
-      return { std::move(v), ap && (isDivOrRem() ? expr(true) : bp) && np };
+      return { std::move(v), ap && bp && np };
     };
   }
 

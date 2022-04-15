@@ -409,7 +409,7 @@ const StateValue& State::operator[](const Value &val) {
     }
     if (is_non_poison) {
       const expr &np = sv_new.non_poison;
-      sv_new.non_poison = np.isBool() ? true : expr::mkUInt(0, np);
+      sv_new.non_poison = np.isBool() ? true : expr::mkInt(-1, np);
     }
     return sv_new;
   };
