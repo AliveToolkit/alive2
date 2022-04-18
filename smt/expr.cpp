@@ -552,6 +552,10 @@ bool expr::isFPNeg(expr &val) const {
   return isUnOp(val, Z3_OP_FPA_NEG);
 }
 
+bool expr::isIsFPZero() const {
+  return isAppOf(Z3_OP_FPA_IS_ZERO);
+}
+
 bool expr::isNaNCheck(expr &fp) const {
   if (auto app = isAppOf(Z3_OP_FPA_IS_NAN)) {
     fp = Z3_get_app_arg(ctx(), app, 0);

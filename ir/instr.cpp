@@ -610,6 +610,17 @@ static expr any_fp_zero(State &s, const expr &v) {
   if (is_zero.isFalse())
     return v;
 
+  // any-fp-zero2(any-fp-zero1(x)) -> any-fp-zero2(x)
+  {
+    expr cond, neg, negv, val;
+    if (v.isIf(cond, neg, val) && neg.isFPNeg(negv) && negv.eq(val)) {
+      expr a, b;
+      if (cond.isAnd(a, b) && a.isVar() && a.fn_name().starts_with("anyzero") &&
+          b.isIsFPZero())
+        return any_fp_zero(s, val);
+    }
+  }
+
   expr var = expr::mkFreshVar("anyzero", true);
   s.addQuantVar(var);
   return expr::mkIf(var && is_zero, v.fneg(), v);
