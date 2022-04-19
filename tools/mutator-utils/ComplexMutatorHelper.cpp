@@ -452,7 +452,6 @@ void FunctionCallInlineHelper::mutate() {
   llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->tmpIit);
   callInst->setCalledFunction(func);
   llvm::InlineResult res=llvm::InlineFunction(*callInst,ifi);
-  llvm::errs()<<res.isSuccess()<<" result\n";
   if(!res.isSuccess()){
     llvm::errs()<<res.getFailureReason()<<"\n";
   }
