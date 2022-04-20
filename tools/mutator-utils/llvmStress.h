@@ -173,7 +173,7 @@ protected:
       GlobalVariable* glbVal=module->getGlobalVariable(varName);
       glbVals.push_back(glbVal);
       glbVal->setLinkage(GlobalValue::ExternalLinkage);
-      Value *V = new LoadInst(glbVal->getType()->getPointerElementType(), glbVal, "L",
+      Value *V = new LoadInst(glbVal->getType()->getNonOpaquePointerElementType(), glbVal, "L",
                             insertPoint);
       PT->push_back(V);
       res=V;
@@ -319,7 +319,7 @@ struct LoadModifier : public Modifier {
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue();
-    Value *V = new LoadInst(Ptr->getType()->getPointerElementType(), Ptr, "L",
+    Value *V = new LoadInst(Ptr->getType()-> getNonOpaquePointerElementType(), Ptr, "L",
                             insertPoint);
     PT->push_back(V);
   }
@@ -333,7 +333,7 @@ struct StoreModifier : public Modifier {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue();
     Value *Val =
-        getRandomFromLLVMStressValue(Ptr->getType()->getPointerElementType());
+        getRandomFromLLVMStressValue(Ptr->getType()->getNonOpaquePointerElementType());
     Type *ValTy = Val->getType();
 
     // Do not store vectors of i1s because they are unsupported
