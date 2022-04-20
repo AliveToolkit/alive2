@@ -144,8 +144,24 @@ bool MutateInstructionHelper::shouldMutate() {
 }
 
 void MutateInstructionHelper::mutate() {
+  //do extra handling for br insts
+  if(llvm::isa<llvm::BranchInst>(mutator->tmpIit)){
+    llvm::BranchInst* brInst=(llvm::BranchInst*)&*mutator->tmpIit;
+    unsigned sz=brInst->getNumSuccessors();
+    llvm::SmallVector<llvm::BasicBlock*> bbs;
+    if(sz>0){
+      for(auto it=mutator->tmpFit->begin();it!=mutator->tmpFit->end();++it){
+        bbs.push_back(&*it);
+      }
+    }
+    for(unsigned i=0;i<sz;++i){
+      if(Random::getRandomBool()){
+        brInst->setSuccessor(i,bbs[Random::getRandomUnsigned()%bbs.size()]);
+      }
+    }
+  }
   // 75% chances to add a new inst, 25% chances to replace with a existent usage
-  if ((Random::getRandomUnsigned() & 3) != 0) {
+  else if ((Random::getRandomUnsigned() & 3) != 0) {
     bool res=insertRandomBinaryInstruction(&*(mutator->tmpIit));
     if(!res){
       replaceRandomUsage(&*(mutator->tmpIit));
