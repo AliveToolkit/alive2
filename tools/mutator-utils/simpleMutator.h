@@ -119,10 +119,10 @@ public:
     callInst->insertBefore(nextInst);
     shouldPutback = false;
   }
-  virtual bool isBoring() const {
+  virtual bool isBoring() const override {
     return true;
   }
-  virtual void print() const {
+  virtual void print() const override {
     llvm::errs() << "Removed function\n";
     callInst->print(llvm::errs());
     llvm::errs() << "\nBaisc block\n";
