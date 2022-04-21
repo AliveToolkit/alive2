@@ -406,8 +406,17 @@ void RandomCodeInserterHelper::mutate() {
   llvm::Instruction *insertPoint = &*mutator->tmpIit;
   if (mutator->tmpBit->getFirstNonPHIOrDbg() != insertPoint) {
     llvm::BasicBlock* oldBB=&*mutator->tmpBit;
+    llvm::Instruction* inst=oldBB->getTerminator();
+    llvm::SmallVector<llvm::BasicBlock*> succs;
+    for(size_t i=0;i<inst->getNumOperands();++i){
+      if(llvm::Value* val=inst->getOperand(i);llvm::isa<BasicBlock>(val)){
+        succs.push_back((llvm::BasicBlock*)val);
+      }
+    }
     llvm::BasicBlock* newBB=mutator->tmpBit->splitBasicBlock(mutator->tmpIit);
-    oldBB->replaceSuccessorsPhiUsesWith(newBB);
+    for(auto bb:succs){
+      bb->replacePhiUsesWith(oldBB,newBB);
+    }
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
