@@ -119,6 +119,12 @@ llvm::cl::opt<bool>
              llvm::cl::desc("only dump IR files without"),
              llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<bool>
+    testMode(LLVM_ARGS_PREFIX "test",
+             llvm::cl::value_desc("mutation file and verify its syntax, without calling alive2"),
+             llvm::cl::desc("mutation file and verify its syntax, without calling alive2"),
+             llvm::cl::cat(mutatorArgs));
+
 filesystem::path inputPath, outputPath;
 
 optional<smt::smt_initializer> smt_init;
@@ -404,7 +410,7 @@ bool inputVerify() {
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     LLVMUtil::optimizeModule(M2.get(), newGVN);
     // bool changed=false;
-    for (auto fit = M1->begin(); fit != M1->end(); ++fit)
+    for (auto fit = M1->begin(); !testMode&&fit != M1->end(); ++fit)
       if (!fit->isDeclaration() && !fit->getName().empty()) {
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
             f2 != nullptr) {
@@ -427,6 +433,9 @@ bool inputVerify() {
           }
         }
       }
+    if(testMode){
+      validFuncNum=M1->getFunctionList().size();
+    }
 
     stubMutator.setModule(std::move(M1));
     tot_num_correct = 0;
@@ -572,14 +581,23 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
   }
   loggerInit(ith);
 
-  llvm::Triple targetTriple(M1.get()->getTargetTriple());
-  llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-
-  smt_init.emplace();
-
   const string optFunc = mutator.getCurrentFunction();
   std::string newFunc;
   bool shouldLog = false;
+
+  llvm::Triple targetTriple(M1.get()->getTargetTriple());
+  llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+
+  if(testMode){
+    llvm::Function* pf1=M1->getFunction(optFunc);
+    llvm::ValueToValueMapTy vMap;
+    llvm::Function *pf2 = llvm::CloneFunction(pf1, vMap);
+    LLVMUtil::optimizeFunction(pf2, newGVN);
+    goto end;
+  }
+
+  smt_init.emplace();
+
   if (llvm::Function *pf1 = M1->getFunction(optFunc); pf1 != nullptr) {
     if (!pf1->isDeclaration()) {
       /*if(llvm::verifyFunction(*pf1,&llvm::errs())){
@@ -631,7 +649,7 @@ end:
 
   num_correct = num_unsound = num_failed = num_errors = 0;
   mutator.setModule(std::move(M1));
-  if (!verbose && !shouldLog) {
+  if (testMode||(!verbose && !shouldLog)) {
     deleteLog(ith);
   }
   if (shouldLog) {
