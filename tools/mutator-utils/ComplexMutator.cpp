@@ -370,7 +370,6 @@ void ComplexMutator::fixAllValues() {
     // llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
     // extraValue.back()->print(llvm::errs());
     // llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
-    tmpFit->getType()->print(llvm::errs());
     for (size_t i = 0; i < lazyUpdateInsts.size(); ++i) {
       lazyUpdateInsts[i]->setOperand(lazyUpdateArgPos[i],
                                      getRandomValue(lazyUpdateArgTys[i]));
