@@ -405,7 +405,9 @@ void RandomCodeInserterHelper::mutate() {
   // if not the first inst of this block, we can do a split
   llvm::Instruction *insertPoint = &*mutator->tmpIit;
   if (mutator->tmpBit->getFirstNonPHIOrDbg() != insertPoint) {
-    mutator->tmpBit->splitBasicBlock(mutator->tmpIit);
+    llvm::BasicBlock* oldBB=&*mutator->tmpBit;
+    llvm::BasicBlock* newBB=mutator->tmpBit->splitBasicBlock(mutator->tmpIit);
+    oldBB->replaceSuccessorsPhiUsesWith(newBB);
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
