@@ -147,7 +147,49 @@ protected:
     return Ran->Rand();
   }
 
+  Value* getOrInsertFromGlobalFunction(Type* ty){ 
+    assert(ty->isFunctionTy()&& "getOrInsertFromGlobalFunction should be a function!");
+    if(glbFuncs.empty()){
+      for(auto it=module->begin();it!=module->end();++it){
+        glbFuncs.push_back(&*it);
+      }
+    }
+    bool shouldInsert=getRandomFromLLVMStress()&1,found=false;
+    Value* res=nullptr;
+    if(!shouldInsert&&!glbFuncs.empty()){
+      for(size_t i=0,pos=getRandomFromLLVMStress()%glbFuncs.size();i<glbFuncs.size();++i,++pos){
+        if(pos==glbFuncs.size()){
+          pos=0;
+        }
+        if(glbFuncs[pos]->getType()==ty){
+          found=true;
+          res=glbFuncs[pos];
+          break;
+        }
+      }
+    }
+    for(size_t i=0;i<glbFuncs.size();++i){
+      glbFuncs[i]->getType()->print(llvm::errs());
+      llvm::errs()<<"\n";      
+    }
+    if(shouldInsert||!found){
+      std::string varName=std::string("aliveMutateGeneratedFunc")+std::to_string(glbFuncs.size());
+      llvm::errs()<<"AAAAAAAAAAa\n";
+      ty->print(llvm::errs());
+      llvm::errs()<<"AAAAAAAAAAa\n";
+      module->getOrInsertFunction(varName,ty);
+      Function* glbFunc=module->getFunction(varName);
+      glbFuncs.push_back(glbFunc);
+      glbFunc->setLinkage(GlobalValue::ExternalLinkage);
+      res=glbFunc;
+    }
+    return res;
+  }
+
   Value* getOrInsertFromGlobalValue(Type* ty){
+    if(ty->isFunctionTy()){
+      return getOrInsertFromGlobalFunction(ty);
+    }
     if(glbVals.empty()){
       for(auto it=module->global_begin();it!=module->global_end();++it){
         glbVals.push_back(&*it);
@@ -235,12 +277,16 @@ protected:
   }
 
   /// Return a RandomFromLLVMStress value of any pointer type.
-  Value *getRandomFromLLVMStressPointerValue() {
+  Value *getRandomFromLLVMStressPointerValue(bool canBeFuncTy=true) {
     unsigned index = getRandomFromLLVMStress();
     for (unsigned i = 0; i < PT->size(); ++i) {
       Value *V = PT->at((index + i) % PT->size());
-      if (V->getType()->isPointerTy())
+      if (V->getType()->isPointerTy()){
+        if(!canBeFuncTy&&V->getType()->	getNonOpaquePointerElementType()->isFunctionTy()){
+          continue;
+        }
         return V;
+      }
     }
     return getOrInsertFromGlobalValue(pickPointerType());
   }
@@ -309,6 +355,7 @@ protected:
   /// Module
   Module* module;
   SmallVector<Value*> glbVals;
+  SmallVector<Value*> glbFuncs;
 };
 Instruction *Modifier::insertPoint = nullptr;
 
@@ -331,7 +378,8 @@ struct StoreModifier : public Modifier {
 
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
-    Value *Ptr = getRandomFromLLVMStressPointerValue();
+    Value *Ptr = getRandomFromLLVMStressPointerValue(false);
+    
     Value *Val =
         getRandomFromLLVMStressValue(Ptr->getType()->getNonOpaquePointerElementType());
     Type *ValTy = Val->getType();
