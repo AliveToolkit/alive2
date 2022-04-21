@@ -202,7 +202,6 @@ class ComplexMutator : public Mutator {
   llvm::SmallVector<size_t> lazyUpdateArgPos;
   llvm::SmallVector<llvm::Type *> lazyUpdateArgTys;
   llvm::SmallVector<llvm::Value *> extraValue;
-  void addFunctionArguments(const llvm::SmallVector<llvm::Type *> &tys);
   llvm::Value *getRandomConstant(llvm::Type *ty);
   llvm::Value *getRandomDominatedValue(llvm::Type *ty);
   llvm::Value *getRandomValueFromExtraValue(llvm::Type *ty);
@@ -222,9 +221,11 @@ class ComplexMutator : public Mutator {
    * @param pos 
    * if the type could be found in the environment. It has a possibility to make a new one or use existent.
    * it not, it would definitely make a new one.
+   * Need to call fixAllValues() after this function called.
    */
   void setOperandRandomValue(llvm::Instruction *inst, size_t pos);
-  void fixAllValues();
+  void addFunctionArguments(const llvm::SmallVector<llvm::Type *> &tys,llvm::ValueToValueMapTy& VMap);
+  void fixAllValues(llvm::SmallVector<llvm::Value*>& vals);
 
 public:
   ComplexMutator(bool debug = false)

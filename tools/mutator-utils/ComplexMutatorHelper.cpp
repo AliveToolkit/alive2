@@ -273,7 +273,7 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
     if(pos==mutator->tmpIit->getNumOperands()){
       pos=0;
     }
-    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(pos))&&llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(pos))){
+    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(pos))&&!llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(pos))){
       found=true;
       break;
     }
@@ -291,7 +291,8 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
   llvm::Value *val = mutator->getRandomValue(ty);
   inst->setOperand(pos, val);*/
   mutator->setOperandRandomValue(inst,pos);
-  mutator->fixAllValues();
+  llvm::SmallVector<llvm::Value*> vals;
+  mutator->fixAllValues(vals);
 
 }
 
@@ -366,8 +367,8 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     }
   }
   inst->moveBefore(newPosInst);
-
-  mutator->fixAllValues();
+  llvm::SmallVector<llvm::Value*> vals;
+  mutator->fixAllValues(vals);
   // restore domInst
 }
 
@@ -394,10 +395,11 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   }
 
   newPos = Random::getRandomInt() % (endPos - pos) + 1 + pos;
-
   // need fix all insts used current inst in [pos,newPos]
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
+  llvm::SmallVector<llvm::Value*> extraVals;
+  extraVals.push_back(newPosInst);
   for (size_t i = pos; i != newPos; ++i) {
     ++newPosIt;
     newPosInst = &*newPosIt;
@@ -407,7 +409,11 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
         mutator->setOperandRandomValue(newPosInst, op);
       }
     }
-    mutator->fixAllValues();
+    //llvm::errs()<<"\nAAAAAAAAAAAAAA\n";
+    //mutator->domInst.back()->print(llvm::errs());
+    mutator->fixAllValues(extraVals);
+    newPosInst=(llvm::Instruction*)extraVals[0];
+    newPosIt=newPosInst->getIterator();
     mutator->extraValue.push_back(newPosInst);
   }
 

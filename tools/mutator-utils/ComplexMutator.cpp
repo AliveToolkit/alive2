@@ -334,14 +334,13 @@ llvm::Value *ComplexMutator::getRandomPointerValue(llvm::Type *ty) {
 }
 
 void ComplexMutator::addFunctionArguments(
-    const llvm::SmallVector<llvm::Type *> &tys) {
+    const llvm::SmallVector<llvm::Type *> &tys,llvm::ValueToValueMapTy& VMap) {
   if (!lazyUpdateInsts.empty()) {
     // llvm::SmallVector<llvm::Type*> tys;
     /*for(auto ait=tmpFit->arg_begin();ait!=tmpFit->arg_end();++ait){
         tys.push_back(ait->getType());
     }*/
     size_t oldArgSize = tmpFit->arg_size();
-    llvm::ValueToValueMapTy VMap;
     LLVMUtil::insertFunctionArguments(&*tmpFit, tys, VMap);
     tmpIit = ((llvm::Instruction *)&*VMap[&*tmpIit])->getIterator();
     tmpBit = ((llvm::BasicBlock *)&*VMap[&*tmpBit])->getIterator();
@@ -361,10 +360,20 @@ void ComplexMutator::addFunctionArguments(
   }
 }
 
-void ComplexMutator::fixAllValues() {
+void ComplexMutator::fixAllValues(llvm::SmallVector<llvm::Value*>& vals) {
   if (!lazyUpdateInsts.empty()) {
     // llvm::errs()<<"extra values"<<extraValue.size()<<"CCCCCCC\n";
-    addFunctionArguments(lazyUpdateArgTys);
+    llvm::ValueToValueMapTy VMap;
+    addFunctionArguments(lazyUpdateArgTys,VMap);
+    for(size_t i=0;i<extraValue.size();++i){
+      if(VMap.find(extraValue[i])!=VMap.end()){
+        extraValue[i]=(llvm::Value*)&*VMap[extraValue[i]];
+      }
+    }
+    for(size_t i=0;i<vals.size();++i){
+      vals[i]=(llvm::Value*)&*VMap[vals[i]];
+    }
+    
     // llvm::errs()<<"extra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
     // lazyUpdateInsts[0]->getParent()->print(llvm::errs());
     // llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
