@@ -349,8 +349,11 @@ void ComplexMutator::addFunctionArguments(
     for (size_t i = 0; i < lazyUpdateInsts.size(); ++i) {
       lazyUpdateInsts[i] = (llvm::Instruction *)&*VMap[lazyUpdateInsts[i]];
     }
+    
     for (auto it = vMap.begin(); it != vMap.end(); ++it) {
-      it->second = VMap[it->second];
+      if(VMap.find(it->second)!=VMap.end()) {
+        it->second = VMap[it->second];
+      }
     }
     for (size_t i = 0; i < tys.size(); ++i) {
       extraValue.push_back(tmpFit->getArg(i + oldArgSize));
@@ -367,6 +370,7 @@ void ComplexMutator::fixAllValues() {
     // llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
     // extraValue.back()->print(llvm::errs());
     // llvm::errs()<<"\nextra values"<<extraValue.size()<<' '<<"CCCCCCC\n";
+    tmpFit->getType()->print(llvm::errs());
     for (size_t i = 0; i < lazyUpdateInsts.size(); ++i) {
       lazyUpdateInsts[i]->setOperand(lazyUpdateArgPos[i],
                                      getRandomValue(lazyUpdateArgTys[i]));
