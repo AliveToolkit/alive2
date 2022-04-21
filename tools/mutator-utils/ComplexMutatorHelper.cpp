@@ -142,7 +142,7 @@ bool MutateInstructionHelper::shouldMutate() {
   bool allBasicBlockOrFunc=true;
   //make sure at least one 
   for(size_t i=0;allBasicBlockOrFunc&&i<mutator->tmpIit->getNumOperands();i++){
-    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(i))&&llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(i))){
+    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(i))&&!llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(i))){
       allBasicBlockOrFunc=false;
     }
   }
