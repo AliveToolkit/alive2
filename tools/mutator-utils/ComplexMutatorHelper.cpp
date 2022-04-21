@@ -139,7 +139,14 @@ void ShuffleHelper::shuffleBlock() {
 }
 
 bool MutateInstructionHelper::shouldMutate() {
-  return !mutated && 
+  bool allBasicBlockOrFunc=true;
+  //make sure at least one 
+  for(size_t i=0;allBasicBlockOrFunc&&i<mutator->tmpIit->getNumOperands();i++){
+    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(i))&&llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(i))){
+      allBasicBlockOrFunc=false;
+    }
+  }
+  return !mutated && !allBasicBlockOrFunc &&
     (mutator->tmpIit->getNumOperands()-llvm::isa<CallBase>(&*(mutator->tmpIit)))>0;
 }
 
@@ -259,8 +266,19 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
 }
 
 void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
-  size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
-  
+  bool found=false;
+  size_t pos=Random::getRandomUnsigned() % inst->getNumOperands();
+  //make sure at least one 
+  for(size_t i=0;!found&&i<mutator->tmpIit->getNumOperands();i++,pos++){
+    if(pos==mutator->tmpIit->getNumOperands()){
+      pos=0;
+    }
+    if(!llvm::isa<llvm::BasicBlock>(mutator->tmpIit->getOperand(pos))&&llvm::isa<llvm::Function>(mutator->tmpIit->getOperand(pos))){
+      found=true;
+      break;
+    }
+  }
+  assert(found && "at least should find a location which is not a basic block and function!");
   /*llvm::Type *ty = nullptr;
   for (size_t i = 0; i < inst->getNumOperands(); ++i, ++pos) {
     if (pos == inst->getNumOperands())
