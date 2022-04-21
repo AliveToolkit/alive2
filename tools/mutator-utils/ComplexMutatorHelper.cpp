@@ -413,9 +413,6 @@ void RandomCodeInserterHelper::mutate() {
         succs.push_back((llvm::BasicBlock*)val);
       }
     }
-    for(auto bb:succs){
-      bb->print(llvm::errs());
-    }
     llvm::BasicBlock* newBB=mutator->tmpBit->splitBasicBlock(mutator->tmpIit);
     for(auto bb:succs){
       bb->replacePhiUsesWith(oldBB,newBB);
