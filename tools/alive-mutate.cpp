@@ -413,6 +413,7 @@ bool inputVerify() {
           smt_init.emplace();
           auto r = verify(*fit, *f2, TLI, !opt_quiet, opt_always_verify);
           smt_init.reset();
+          llvm::errs()<<r.status<<"AAAAAAAAA\n";
           if (r.status == Results::CORRECT || r.status == Results::SYNTACTIC_EQ) {
             ++validFuncNum;
           } else {
