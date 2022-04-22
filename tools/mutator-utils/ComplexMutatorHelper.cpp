@@ -399,6 +399,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
   llvm::SmallVector<llvm::Value*> extraVals;
+  extraVals.push_back(inst);
   extraVals.push_back(newPosInst);
   for (size_t i = pos; i != newPos; ++i) {
     ++newPosIt;
@@ -412,11 +413,11 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
     //llvm::errs()<<"\nAAAAAAAAAAAAAA\n";
     //mutator->domInst.back()->print(llvm::errs());
     mutator->fixAllValues(extraVals);
-    newPosInst=(llvm::Instruction*)extraVals[0];
+    newPosInst=(llvm::Instruction*)extraVals[1];
     newPosIt=newPosInst->getIterator();
     mutator->extraValue.push_back(newPosInst);
   }
-
+  inst=(llvm::Instruction*)extraVals[0];
   inst->moveBefore(newPosInst);
 }
 
