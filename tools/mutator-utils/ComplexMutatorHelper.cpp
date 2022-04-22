@@ -147,7 +147,9 @@ bool MutateInstructionHelper::shouldMutate() {
     }
   }
   return !mutated && !allBasicBlockOrFunc &&
-    (mutator->tmpIit->getNumOperands()-llvm::isa<CallBase>(&*(mutator->tmpIit)))>0;
+    (mutator->tmpIit->getNumOperands()-llvm::isa<CallBase>(&*(mutator->tmpIit)))>0
+    //cannot be a LangdingPadInst, its catch clause requires the value has to be a global variable.
+    && !llvm::isa<llvm::LandingPadInst>(mutator->tmpIit);
 }
 
 void MutateInstructionHelper::mutate() {
