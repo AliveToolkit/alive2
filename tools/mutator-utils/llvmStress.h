@@ -402,7 +402,7 @@ struct BinModifier : public Modifier {
     Value *Val1 = getRandomFromLLVMStressValue(Val0->getType());
 
     // Don't handle pointer types.
-    if (Val0->getType()->isPointerTy() || Val1->getType()->isPointerTy())
+    if (!(Val0->getType()->isIntegerTy() || Val0->getType()->isFloatingPointTy()))
       return;
 
     // Don't handle i1 types.
