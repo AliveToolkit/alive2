@@ -596,7 +596,8 @@ void FloatType::print(ostream &os) const {
 
 
 PtrType::PtrType(unsigned addr_space)
-  : Type(addr_space == 0 ? "*" : "as(" + to_string(addr_space) + ")*"),
+  : Type(addr_space == 0 ? "ptr"
+                         : "ptr addrspace(" + to_string(addr_space) + ')'),
     addr_space(addr_space), defined(true) {}
 
 expr PtrType::ASVar() const {
@@ -687,10 +688,9 @@ void PtrType::printVal(ostream &os, const State &s, const expr &e) const {
 }
 
 void PtrType::print(ostream &os) const {
+  os << "ptr";
   if (addr_space != 0)
-    os << "as(" << addr_space << ")*";
-  else
-    os << '*';
+    os << " addrspace(" << addr_space << ')';
 }
 
 
