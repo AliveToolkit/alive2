@@ -33,6 +33,7 @@ foreach ($test_failures as $test) {
 
   $err = $m[1];
   $stderr = store_log(preg_replace('/Report written to \S+/S', '', $err));
+  $func = null;
 
   preg_match('/Report written to (\S+)/S', $err, $m);
   if (empty($m[1])) {
@@ -49,11 +50,15 @@ foreach ($test_failures as $test) {
     } else {
       $error = '?';
     }
+
+    if (preg_match_all('/^define (?:\S+) @([^(]+)/mS', $log, $m)) {
+      $func = end($m[1]);
+    }
+
     $log = store_log($log);
   }
-  
-  // TODO: check if correct without undef
-  $ok_wo_undef = correct_without_undef($test);
+
+  $ok_wo_undef = correct_without_undef($test, $func);
   if (!$ok_wo_undef)
    ++$fail_without_undef;
   $tests[] = array($test, $ok_wo_undef, $stderr, $log, $error);
@@ -74,9 +79,11 @@ $entry = "$tests_csv,$num_failures,$fail_without_undef,$alive_git,$llvm_git\n";
 file_put_contents('web/data/data.txt', $entry, FILE_APPEND);
 
 
-function correct_without_undef($test) {
+function correct_without_undef($test, $func) {
   echo "Testing $test without undef.. ";
-  $output = `~/llvm/build/bin/llvm-lit -vv -Dopt="\$HOME/alive2/build/opt-alive.sh -tv-disable-undef-input" ~/llvm/llvm/test/$test 2>&1`;
+  if ($func)
+    $func = " -tv-func=$func";
+  $output = `~/llvm/build/bin/llvm-lit -vv -Dopt="\$HOME/alive2/build/opt-alive.sh -tv-disable-undef-input$func" ~/llvm/llvm/test/$test 2>&1`;
   $ok = preg_match('/^  Passed:\s*1/Sm', $output) === 1;
   echo ($ok ? "OK\n" : "buggy\n");
   return $ok;

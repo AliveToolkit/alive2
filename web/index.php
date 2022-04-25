@@ -270,7 +270,7 @@ new Chart(ctx, {
         display: true,
         scaleLabel: {
           display: true,
-          labelString: 'Date & LLVM commit'
+          labelString: 'Date'
         }
       }],
       yAxes: [{
