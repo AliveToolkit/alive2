@@ -481,7 +481,7 @@ bool FunctionCallInlineHelper::shouldMutate() {
   if(!inlined&& llvm::isa<llvm::CallInst>(mutator->tmpIit)){
      llvm::CallInst* callInst=(llvm::CallInst*)&*mutator->tmpIit;
      llvm::Function* func=callInst->getCalledFunction();
-     if(!func->isDeclaration()){
+     if(func!=nullptr&&!func->isDeclaration()){
        auto it=funcToId.find(func->getName());
        if(it!=funcToId.end()&&idToFuncSet[it->second].size()>1){
          //make sure there is a replacement
@@ -493,6 +493,11 @@ bool FunctionCallInlineHelper::shouldMutate() {
             }
           }
           functionInlined=idToFuncSet[it->second][idx];
+          //final check the inlined function must have the same type with called function
+          //because of the pre-calculated function signature might be added with more args
+          if(mutator->tmpCopy->getFunction(functionInlined)->getFunctionType()!=func->getFunctionType()){
+            functionInlined.clear();
+          }
        }
      }
   }
