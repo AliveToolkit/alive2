@@ -619,7 +619,10 @@ struct CastModifier : public Modifier {
     Value *V = getRandomFromLLVMStressVal();
     Type *VTy = V->getType();
     Type *DestTy = pickScalarType();
-
+    
+    if(!VTy->isIntegerTy()&&!VTy->isFloatingPointTy()){
+      return;
+    }
     // Handle vector casts vectors.
     if (VTy->isVectorTy()) {
       auto *VecTy = cast<FixedVectorType>(VTy);
