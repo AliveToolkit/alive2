@@ -168,15 +168,8 @@ protected:
         }
       }
     }
-    for(size_t i=0;i<glbFuncs.size();++i){
-      glbFuncs[i]->getType()->print(llvm::errs());
-      llvm::errs()<<"\n";      
-    }
     if(shouldInsert||!found){
       std::string varName=std::string("aliveMutateGeneratedFunc")+std::to_string(glbFuncs.size());
-      llvm::errs()<<"AAAAAAAAAAa\n";
-      ty->print(llvm::errs());
-      llvm::errs()<<"AAAAAAAAAAa\n";
       module->getOrInsertFunction(varName,ty);
       Function* glbFunc=module->getFunction(varName);
       glbFuncs.push_back(glbFunc);
@@ -282,13 +275,18 @@ protected:
     for (unsigned i = 0; i < PT->size(); ++i) {
       Value *V = PT->at((index + i) % PT->size());
       if (V->getType()->isPointerTy()){
-        if(!canBeFuncTy&&V->getType()->	getNonOpaquePointerElementType()->isFunctionTy()){
+        //should not be a opaque pointer if we want to access its internal type
+        if(!canBeFuncTy&&!V->getType()->isOpaquePointerTy()&&V->getType()->getNonOpaquePointerElementType()->isFunctionTy()){
           continue;
         }
         return V;
       }
     }
-    return getOrInsertFromGlobalValue(pickPointerType());
+    llvm::Type* ty=pickPointerType();
+    if(ty==nullptr||!ty->isSized()){
+      return nullptr;
+    }
+    return getOrInsertFromGlobalValue(ty);
   }
 
   /// Return a RandomFromLLVMStress value of any vector type.
@@ -379,7 +377,10 @@ struct StoreModifier : public Modifier {
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue(false);
-    
+    //The ptr should have a size 
+    if(Ptr==nullptr||!Ptr->getType()->isSized()||!Ptr->getType()->getNonOpaquePointerElementType()->isSized()){
+      return;
+    }
     Value *Val =
         getRandomFromLLVMStressValue(Ptr->getType()->getNonOpaquePointerElementType());
     Type *ValTy = Val->getType();
