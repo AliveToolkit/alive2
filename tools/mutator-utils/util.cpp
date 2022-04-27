@@ -1,4 +1,5 @@
 #include "util.h"
+#include "llvm/Analysis/IntervalPartition.h"
 
 std::random_device Random::rd;
 std::uniform_int_distribution<int> Random::dist(0, 2147483647u);
@@ -114,12 +115,12 @@ float Random::getRandomLLVMFloat() {
   }
 }
 
-void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN) {
+void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN,bool licm) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
   llvm::ModuleAnalysisManager MAM;
-
+  
   llvm::PassBuilder PB;
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
@@ -128,8 +129,13 @@ void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   llvm::FunctionPassManager FPM;
-  if (newGVN) {
-    FPM.addPass(llvm::NewGVNPass());
+  if (newGVN||licm) {
+    if(newGVN){
+      FPM.addPass(llvm::NewGVNPass());
+    }
+    if(licm){
+      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(llvm::LICMPass(llvm::LICMOptions()),true));
+    }
   } else {
     FPM = PB.buildFunctionSimplificationPipeline(
         llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
@@ -139,7 +145,7 @@ void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN) {
   MPM.run(*M, MAM);
 }
 
-void LLVMUtil::optimizeFunction(llvm::Function *f, bool newGVN) {
+void LLVMUtil::optimizeFunction(llvm::Function *f, bool newGVN, bool licm) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
@@ -153,8 +159,13 @@ void LLVMUtil::optimizeFunction(llvm::Function *f, bool newGVN) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   llvm::FunctionPassManager FPM;
-  if (newGVN) {
-    FPM.addPass(llvm::NewGVNPass());
+  if (newGVN||licm) {
+    if(newGVN){
+      FPM.addPass(llvm::NewGVNPass());
+    }
+    if(licm){
+      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(llvm::LICMPass(llvm::LICMOptions()),true));
+    }
   } else {
     FPM = PB.buildFunctionSimplificationPipeline(
         llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);

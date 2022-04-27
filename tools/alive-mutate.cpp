@@ -110,7 +110,12 @@ llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
 
 llvm::cl::opt<bool> newGVN(
     LLVM_ARGS_PREFIX "newgvn", llvm::cl::value_desc("gvn optimization"),
-    llvm::cl::desc("turn on gvn optimization, fault O2 will be disabled"),
+    llvm::cl::desc("turn on gvn optimization, default O2 will be disabled"),
+    llvm::cl::cat(mutatorArgs));
+
+llvm::cl::opt<bool> LICM(
+    LLVM_ARGS_PREFIX "licm", llvm::cl::value_desc("licm optimization"),
+    llvm::cl::desc("turn on licm optimization, default O2 will be disabled"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool>
@@ -408,7 +413,7 @@ bool inputVerify() {
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-    LLVMUtil::optimizeModule(M2.get(), newGVN);
+    LLVMUtil::optimizeModule(M2.get(), newGVN,LICM);
     // bool changed=false;
     for (auto fit = M1->begin(); !testMode&&fit != M1->end(); ++fit)
       if (!fit->isDeclaration() && !fit->getName().empty()) {
@@ -591,7 +596,7 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
     llvm::Function* pf1=M1->getFunction(optFunc);
     llvm::ValueToValueMapTy vMap;
     llvm::Function *pf2 = llvm::CloneFunction(pf1, vMap);
-    LLVMUtil::optimizeFunction(pf2, newGVN);
+    LLVMUtil::optimizeFunction(pf2, newGVN,LICM);
     goto end;
   }
 
@@ -606,7 +611,7 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
       }*/
       llvm::ValueToValueMapTy vMap;
       llvm::Function *pf2 = llvm::CloneFunction(pf1, vMap);
-      LLVMUtil::optimizeFunction(pf2, newGVN);
+      LLVMUtil::optimizeFunction(pf2, newGVN,LICM);
       newFunc=pf2->getName();
       if (compareFunctions(*pf1, *pf2, TLI)) {
         shouldLog = true;

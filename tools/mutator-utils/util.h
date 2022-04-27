@@ -20,6 +20,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar/NewGVN.h"
+#include "llvm/Transforms/Scalar/LICM.h"
+#include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
  
@@ -103,8 +105,8 @@ public:
 class LLVMUtil {
   static LLVMFunctionComparator comparator;
 public:
-  static void optimizeModule(llvm::Module *M, bool newGVN = false);
-  static void optimizeFunction(llvm::Function *f, bool newGVN = false);
+  static void optimizeModule(llvm::Module *M, bool newGVN = false, bool licm=false);
+  static void optimizeFunction(llvm::Function *f, bool newGVN = false,bool licm=false);
   static void removeTBAAMetadata(llvm::Module *M);
   static llvm::Value *insertGlobalVariable(llvm::Module *m, llvm::Type *ty);
   static void insertFunctionArguments(llvm::Function *f,
