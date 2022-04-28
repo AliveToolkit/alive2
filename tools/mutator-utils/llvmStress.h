@@ -139,6 +139,11 @@ public:
   static Instruction *getInsertPoint() {
     return insertPoint;
   }
+  //clear both glbVars and glbFuncs;
+  static void init(){
+    glbVals.clear();
+    glbFuncs.clear();
+  }
 
 protected:
   static Instruction *insertPoint;
@@ -204,6 +209,7 @@ protected:
     }
     if(shouldInsert||!found){
       std::string varName=std::string("aliveMutateGeneratedGlobalVariable")+std::to_string(glbVals.size());
+      assert(nullptr==module->getGlobalVariable(varName)&&"The glb var already exists!");
       module->getOrInsertGlobal(varName,ty);
       GlobalVariable* glbVal=module->getGlobalVariable(varName);
       glbVals.push_back(glbVal);
@@ -265,7 +271,6 @@ protected:
       ArrayRef<Constant *> VectorValue(TempValues);
       return ConstantVector::get(VectorValue);
     }
-
     return getOrInsertFromGlobalValue(Tp);
   }
 
@@ -297,7 +302,8 @@ protected:
       if (isa<FixedVectorType>(V->getType()))
         return V;
     }
-    return getOrInsertFromGlobalValue(pickVectorType());
+    llvm::Type* ty=pickVectorType();
+    return getOrInsertFromGlobalValue(ty);
   }
 
   /// Pick a RandomFromLLVMStress type.
@@ -352,10 +358,13 @@ protected:
 
   /// Module
   Module* module;
-  SmallVector<Value*> glbVals;
-  SmallVector<Value*> glbFuncs;
+  static SmallVector<Value*> glbVals;
+  static SmallVector<Value*> glbFuncs;
 };
 Instruction *Modifier::insertPoint = nullptr;
+SmallVector<Value*> Modifier::glbVals;
+SmallVector<Value*> Modifier::glbFuncs;
+
 
 struct LoadModifier : public Modifier {
   LoadModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
@@ -378,17 +387,21 @@ struct StoreModifier : public Modifier {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue(false);
     //The ptr should have a size 
-    if(Ptr==nullptr||!Ptr->getType()->isSized()||!Ptr->getType()->getNonOpaquePointerElementType()->isSized()){
+    if(Ptr==nullptr||Ptr->getType()->isOpaquePointerTy()||
+      !Ptr->getType()->isSized()||!Ptr->getType()->getNonOpaquePointerElementType()->isSized()){
       return;
     }
     Value *Val =
         getRandomFromLLVMStressValue(Ptr->getType()->getNonOpaquePointerElementType());
     Type *ValTy = Val->getType();
+    
 
     // Do not store vectors of i1s because they are unsupported
     // by the codegen.
     if (ValTy->isVectorTy() && ValTy->getScalarSizeInBits() == 1)
       return;
+
+    assert(ValTy==Ptr->getType()->getNonOpaquePointerElementType() && "type should be equal");
 
     new StoreInst(Val, Ptr, insertPoint);
   }
@@ -559,7 +572,7 @@ struct ExtractElementModifier : public Modifier {
             getRandomFromLLVMStress() %
                 (((FixedVectorType*)(Val0->getType()))->getNumElements())),
         "E", insertPoint);
-    return PT->push_back(V);
+    PT->push_back(V);
   }
 };
 
@@ -805,6 +818,7 @@ public:
     SM->ActN(codeSize); // Throw in a few stores.
   }
   static void insertCodeBefore(Instruction *inst, unsigned codeSize) {
+    Modifier::init();
     setInsertPoint(inst);
     insertCode(codeSize);
   }
