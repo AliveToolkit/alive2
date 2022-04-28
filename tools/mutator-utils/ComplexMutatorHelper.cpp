@@ -151,7 +151,11 @@ bool MutateInstructionHelper::shouldMutate() {
     //cannot be a LangdingPadInst, its catch clause requires the value has to be a global variable.
     && !llvm::isa<llvm::LandingPadInst>(mutator->tmpIit)
     //The ret value of CleanupRet Inst must be a CleanupPad, needs extra check so ignore for now.
-    && !llvm::isa<llvm::CleanupReturnInst>(mutator->tmpIit);
+    && !llvm::isa<llvm::CleanupReturnInst>(mutator->tmpIit)
+    //all catch related inst require the value has to be label
+    && !llvm::isa<llvm::CatchPadInst>(mutator->tmpIit)
+    && !llvm::isa<llvm::CatchSwitchInst>(mutator->tmpIit)
+    && !llvm::isa<llvm::CatchReturnInst>(mutator->tmpIit);
 }
 
 void MutateInstructionHelper::mutate() {
