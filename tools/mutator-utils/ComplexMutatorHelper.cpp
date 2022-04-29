@@ -489,15 +489,9 @@ bool FunctionCallInlineHelper::shouldMutate() {
      llvm::Function* func=callInst->getCalledFunction();
      if(func!=nullptr&&!func->isDeclaration()){
        auto it=funcToId.find(func->getName());
-       if(it!=funcToId.end()&&idToFuncSet[it->second].size()>1){
+       if(it!=funcToId.end()&&!idToFuncSet[it->second].empty()){
          //make sure there is a replacement
           size_t idx=Random::getRandomUnsigned()%idToFuncSet[it->second].size();
-          while(idToFuncSet[it->second][idx]==func->getName()){
-            ++idx;
-            if(idx==idToFuncSet[it->second].size()){
-              idx=0;
-            }
-          }
           functionInlined=idToFuncSet[it->second][idx];
           //final check the inlined function must have the same type with called function
           //because of the pre-calculated function signature might be added with more args
