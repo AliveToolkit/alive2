@@ -4,7 +4,7 @@ This category is for bugs that generating wrong codes from passes
 2. Another miscompile due to instcombine(https://bugs.llvm.org/show_bug.cgi?id=51351)
 3. GEP in InstSimplify(https://bugs.llvm.org/show_bug.cgi?id=52429)
 4. NewGVN miscompiles(https://github.com/llvm/llvm-project/issues/53218)
-5. 
+5. arm64 backend bug (https://github.com/llvm/llvm-project/issues/55003)
 
 
 ## Category 2
