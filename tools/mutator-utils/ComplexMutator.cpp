@@ -118,12 +118,25 @@ void ComplexMutator::mutateModule(const std::string &outputFileName) {
     llvm::errs() << "\n";
   }
   currFuncName = tmpFit->getName().str();
-  for (size_t idx = 0; idx < helpers.size(); ++idx) {
-    while (helpers[idx]->shouldMutate() && Random::getRandomBool()) {
-      helpers[idx]->mutate();
-      if (debug) {
-        helpers[idx]->debug();
-      }
+  llvm::SmallVector<size_t> idxs;
+  for(size_t idx=0;idx<helpers.size(); ++idx){
+    if(helpers[idx]->shouldMutate()){
+      idxs.push_back(idx);
+    }
+  }
+  if(!idxs.empty()){
+    size_t idx=Random::getRandomUnsigned()%idxs.size();
+    helpers[idxs[idx]]->mutate();
+    if(debug){
+      helpers[idxs[idx]]->debug();
+    }
+    for(;idx<idxs.size();++idx){
+      while (helpers[idxs[idx]]->shouldMutate() && Random::getRandomBool()) {
+        helpers[idxs[idx]]->mutate();
+        if (debug) {
+          helpers[idxs[idx]]->debug();
+        }
+      } 
     }
   }
   if (debug) {
