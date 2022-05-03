@@ -175,6 +175,7 @@ public:
   }
   virtual void mutate();
   virtual bool shouldMutate();
+  llvm::Function* getReplacedFunction();
   virtual void debug(){
     llvm::errs()<<"Function call inline with "<<functionInlined<<"\n";
   }

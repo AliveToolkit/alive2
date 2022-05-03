@@ -487,27 +487,34 @@ bool FunctionCallInlineHelper::shouldMutate() {
   if(!inlined&& llvm::isa<llvm::CallInst>(mutator->tmpIit)){
      llvm::CallInst* callInst=(llvm::CallInst*)&*mutator->tmpIit;
      llvm::Function* func=callInst->getCalledFunction();
-     if(func!=nullptr&&!func->isDeclaration()){
-       auto it=funcToId.find(func->getName());
-       if(it!=funcToId.end()&&!idToFuncSet[it->second].empty()){
-         //make sure there is a replacement
-          size_t idx=Random::getRandomUnsigned()%idToFuncSet[it->second].size();
-          functionInlined=idToFuncSet[it->second][idx];
-          //final check the inlined function must have the same type with called function
-          //because of the pre-calculated function signature might be added with more args
-          if(mutator->tmpCopy->getFunction(functionInlined)->getFunctionType()!=func->getFunctionType()){
-            functionInlined.clear();
-          }
-       }
-     }
+     return func!=nullptr&&!func->isDeclaration();
   }
-  return !inlined&&!functionInlined.empty();
+  return false;
+}
+
+llvm::Function* FunctionCallInlineHelper::getReplacedFunction(){
+  assert(llvm::isa<llvm::CallInst>(mutator->tmpIit)&&"function inline should be a call inst");
+  llvm::CallInst* callInst=(llvm::CallInst*)&*mutator->tmpIit;
+  llvm::Function* func=callInst->getCalledFunction();
+  functionInlined=func->getName();
+  auto it=funcToId.find(func->getName());
+  if(it!=funcToId.end()&&!idToFuncSet[it->second].empty()){
+    //make sure there is a replacement
+    size_t idx=Random::getRandomUnsigned()%idToFuncSet[it->second].size();
+    functionInlined=idToFuncSet[it->second][idx];
+    //final check the inlined function must have the same type with called function
+    //because of the pre-calculated function signature might be added with more args
+    if(mutator->tmpCopy->getFunction(functionInlined)->getFunctionType()!=func->getFunctionType()){
+      functionInlined=func->getName();
+    }
+  }
+  return mutator->tmpCopy->getFunction(functionInlined);
 }
 
 void FunctionCallInlineHelper::mutate() {
   inlined = true;
   llvm::InlineFunctionInfo ifi;
-  llvm::Function* func=mutator->tmpCopy->getFunction(functionInlined);
+  llvm::Function* func=getReplacedFunction();
   llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->tmpIit);
   callInst->setCalledFunction(func);
   llvm::InlineResult res=llvm::InlineFunction(*callInst,ifi);
