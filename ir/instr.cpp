@@ -3234,7 +3234,7 @@ void GEP::print(ostream &os) const {
 
 StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
-                    vector<pair<unsigned, StateValue>> &offsets) -> StateValue {
+                    vector<pair<uint64_t, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
     AndExpr non_poison(ptrval.non_poison);
 
@@ -3275,7 +3275,7 @@ StateValue GEP::toSMT(State &s) const {
     bool ptr_isvect = ptr->getType().isVectorType();
 
     for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
-      vector<pair<unsigned, StateValue>> offsets;
+      vector<pair<uint64_t, StateValue>> offsets;
       for (auto &[sz, idx] : idxs) {
         if (auto idx_aty = idx->getType().getAsAggregateType())
           offsets.emplace_back(sz, idx_aty->extract(s[*idx], i));
@@ -3287,7 +3287,7 @@ StateValue GEP::toSMT(State &s) const {
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  vector<pair<unsigned, StateValue>> offsets;
+  vector<pair<uint64_t, StateValue>> offsets;
   for (auto &[sz, idx] : idxs)
     offsets.emplace_back(sz, s[*idx]);
   return scalar(s[*ptr], offsets);
