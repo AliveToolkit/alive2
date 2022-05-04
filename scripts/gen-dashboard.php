@@ -51,7 +51,7 @@ foreach ($test_failures as $test) {
       $error = '?';
     }
 
-    if (preg_match_all('/^define (?:\S+) @([^(]+)/mS', $log, $m)) {
+    if (preg_match_all('/^define [^@]+ @([^(]+)/mS', $log, $m)) {
       $func = end($m[1]);
     }
 
