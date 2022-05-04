@@ -214,7 +214,7 @@ protected:
       GlobalVariable* glbVal=module->getGlobalVariable(varName);
       glbVals.push_back(glbVal);
       glbVal->setLinkage(GlobalValue::ExternalLinkage);
-      Value *V = new LoadInst(glbVal->getType()->getNonOpaquePointerElementType(), glbVal, "L",
+      Value *V = new LoadInst(ty, glbVal, "L",
                             insertPoint);
       PT->push_back(V);
       res=V;
@@ -373,6 +373,10 @@ struct LoadModifier : public Modifier {
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue();
+    llvm::Type* ty=Ptr->getType();
+    if(ty->isOpaquePointerTy()){
+      return;
+    }
     Value *V = new LoadInst(Ptr->getType()-> getNonOpaquePointerElementType(), Ptr, "L",
                             insertPoint);
     PT->push_back(V);
