@@ -170,7 +170,7 @@ expr Pointer::isConstGlobal() const {
   auto generic = bid.uge(has_null_block) &&
                  expr(num_consts_src > 0) &&
                  bid.ule(num_consts_src + has_null_block - 1);
-  auto tgt = bid.uge(num_nonlocals_src) && bid.ule(num_nonlocals - 1);
+  auto tgt = num_nonlocals_src == 0 ? expr(true) : bid.ugt(num_nonlocals_src-1);
   return !isLocal() && (generic || tgt);
 }
 
