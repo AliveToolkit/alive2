@@ -35,7 +35,7 @@ struct Node {
 
 #ifdef DEBUG_FMF
   friend ostream& operator<<(ostream &os, const Node &n) {
-    const char *op;
+    const char *op = nullptr;
     switch (n.operation) {
       case Add:  op = "add "; break;
       case Sub:  op = "sub "; break;
