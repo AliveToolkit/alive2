@@ -1144,7 +1144,6 @@ StateValue UnaryReductionOp::toSMT(State &s) const {
     case SMin: res.value = res.value.smin(ith.value); break;
     case UMax: res.value = res.value.umax(ith.value); break;
     case UMin: res.value = res.value.umin(ith.value); break;
-    default:  UNREACHABLE();
     }
     // The result is non-poisonous if all lanes are non-poisonous.
     res.non_poison &= ith.non_poison;
@@ -2305,7 +2304,6 @@ StateValue FCmp::toSMT(State &s) const {
       case TRUE:  return expr(true);
       case FALSE: return expr(false);
       }
-      UNREACHABLE();
     };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
                                cmp, fmath, true);
