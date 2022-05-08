@@ -184,7 +184,7 @@ protected:
     return res;
   }
 
-  Value* getOrInsertFromGlobalValue(Type* ty){
+  Value* getOrInsertFromGlobalValue(Type* ty,bool createLoadInst=true){
     if(ty->isFunctionTy()){
       return getOrInsertFromGlobalFunction(ty);
     }
@@ -210,14 +210,16 @@ protected:
     if(shouldInsert||!found){
       std::string varName=std::string("aliveMutateGeneratedGlobalVariable")+std::to_string(glbVals.size());
       assert(nullptr==module->getGlobalVariable(varName)&&"The glb var already exists!");
-      module->getOrInsertGlobal(varName,ty);
+      res=module->getOrInsertGlobal(varName,ty);
       GlobalVariable* glbVal=module->getGlobalVariable(varName);
       glbVals.push_back(glbVal);
       glbVal->setLinkage(GlobalValue::ExternalLinkage);
-      Value *V = new LoadInst(ty, glbVal, "L",
-                            insertPoint);
-      PT->push_back(V);
-      res=V;
+      if(createLoadInst){
+        Value *V = new LoadInst(ty, glbVal, "L",
+                              insertPoint);
+        PT->push_back(V);
+        res=V;
+      }
     }
     return res;
   }
@@ -237,8 +239,14 @@ protected:
       if (getRandomFromLLVMStress() & 1)
         return ConstantFP::getAllOnesValue(Tp);
       return ConstantFP::getNullValue(Tp);
+    }else if(Tp->isPointerTy()){
+      assert(!Tp->isOpaquePointerTy()&&"Cannot create constant from an opaque pointer!");
+      llvm::Value* result=getOrInsertFromGlobalValue(Tp->getNonOpaquePointerElementType(),false);
+      assert(llvm::isa<llvm::Constant>(result)&&"should be a constant in getRandomConstant!");
+      return (Constant*)result;
+    }else{
+      return nullptr;
     }
-    return (Constant*)getOrInsertFromGlobalValue(Tp);
   }
 
   /// Return a RandomFromLLVMStress value with a known type.
@@ -264,12 +272,14 @@ protected:
 
       std::vector<Constant *> TempValues;
       TempValues.reserve(VTp->getNumElements());
-      for (unsigned i = 0; i < VTp->getNumElements(); ++i)
+      for (unsigned i = 0; i < VTp->getNumElements(); ++i){
         TempValues.push_back(
             getRandomFromLLVMStressConstant(VTp->getScalarType()));
+      }
 
       ArrayRef<Constant *> VectorValue(TempValues);
-      return ConstantVector::get(VectorValue);
+      llvm::Constant* vec=ConstantVector::get(VectorValue);
+      return vec;
     }
     return getOrInsertFromGlobalValue(Tp);
   }
