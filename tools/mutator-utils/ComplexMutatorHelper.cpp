@@ -78,7 +78,7 @@ varSetEnd:
 }
 
 bool ShuffleHelper::shouldMutate() {
-  return shuffleMap[mutator->fit->getName()][shuffleBasicBlockIndex].size() >
+  return !shuffleMap[mutator->fit->getName()].empty()&&shuffleMap[mutator->fit->getName()][shuffleBasicBlockIndex].size() >
          shuffleBlockIndex;
 }
 

@@ -205,7 +205,7 @@ void ComplexMutator::moveToNextFuction() {
   if (fit == pm->end())
     fit = pm->begin();
   while (fit->isDeclaration() || invalidFunctions.find(fit->getName().str()) !=
-                                     invalidFunctions.end()) {
+                                     invalidFunctions.end() || fit->getName().empty()) {
     ++fit;
     if (fit == pm->end())
       fit = pm->begin();
