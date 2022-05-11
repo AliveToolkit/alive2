@@ -81,8 +81,8 @@ TV_SMT_TO=""
 TV_SMT_STATS=""
 if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
   TV_REPORT_DIR=-tv-report-dir=@CMAKE_BINARY_DIR@/logs
-  TIMEOUT="timeout 2000"
-  TV_SMT_TO=-tv-smt-to=10000
+  TIMEOUT="timeout 4000"
+  TV_SMT_TO=-tv-smt-to=20000
   TV_SMT_STATS=-tv-smt-stats
 fi
 NPM_PLUGIN=""
