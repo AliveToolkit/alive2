@@ -19,7 +19,7 @@ if (MSVC)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2 /Oi /Zi ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
   set(CMAKE_EXE_LINKER_FLAGS         "/LTCG:INCREMENTAL ${CMAKE_EXE_LINKER_FLAGS}")
 else()
-  set(CMAKE_CXX_FLAGS                "-Wall -Werror -fPIC -fstrict-enums ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS                "-Wall -Wno-error=comment -fPIC -fstrict-enums ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS_DEBUG          "-g -Og ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_RELEASE        "-O3 ${CMAKE_CXX_FLAGS_RELEASE}")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} -g ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
@@ -119,6 +119,7 @@ add_library(smt STATIC ${SMT_SRCS})
 
 set(TOOLS_SRCS
   tools/transform.cpp
+  tools/LLVMOptimizer.cpp
 )
 
 add_library(tools STATIC ${TOOLS_SRCS})
@@ -225,7 +226,7 @@ add_executable(alive-jobserver
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
-  llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils)
+  llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils scalaropts coroutines objcarcopts vectorize instrumentation instcombine aggressiveinstcombine)
 #  target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
   target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
