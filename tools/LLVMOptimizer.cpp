@@ -189,7 +189,7 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs){
         StringRef argsRef(tmpArgs);      
         while(!argsRef.empty()){
             StringRef Name;
-            std::tie(Name, argsRef) = argsRef.split(';');
+            std::tie(Name, argsRef) = argsRef.split(',');
 #define MODULE_PASS(NAME, CREATE_PASS)                                         \
     if (Name == NAME) {                                                          \
         MPM.addPass(CREATE_PASS);                                                  \
