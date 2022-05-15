@@ -4,6 +4,7 @@
 #include "llvm_util/llvm2alive.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
+#include "tools/LLVMOptimizer.h"
 #include "util/version.h"
 
 #include "llvm/ADT/StringExtras.h"
@@ -57,6 +58,12 @@ llvm::cl::opt<std::string> opt_src_fn(LLVM_ARGS_PREFIX "src-fn",
 llvm::cl::opt<std::string> opt_tgt_fn(LLVM_ARGS_PREFIX"tgt-fn",
   llvm::cl::desc("Name of tgt function (without @)"),
   llvm::cl::cat(alive_cmdargs), llvm::cl::init("tgt"));
+
+llvm::cl::opt<string>
+    optPass(LLVM_ARGS_PREFIX "passes",
+            llvm::cl::value_desc("optmization passes"),
+            llvm::cl::desc("a parameter to specify optimization passes, seprated by comma"),
+            llvm::cl::cat(alive_cmdargs),llvm::cl::init("O2"));
 
 
 llvm::ExitOnError ExitOnErr;
@@ -238,7 +245,9 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 }
 
 void optimizeModule(llvm::Module *M) {
-  llvm::LoopAnalysisManager LAM;
+  LLVMOptimizer optimizer(optPass);
+  optimizer.optimizeModule(M);
+  /*llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
   llvm::ModuleAnalysisManager MAM;
@@ -254,7 +263,7 @@ void optimizeModule(llvm::Module *M) {
       llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
   llvm::ModulePassManager MPM;
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  MPM.run(*M, MAM);
+  MPM.run(*M, MAM);*/
 }
 
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
