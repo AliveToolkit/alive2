@@ -1,0 +1,44 @@
+Name: test1
+%res = umul_fix i8 16, i8 16, i32 4
+  =>
+%res = 16
+
+Name: test2
+%res = umul_fix i8 32, i8 32, i32 4
+  =>
+%res = 64
+
+Name: test3
+%res = umul_fix i8 127, i8 127, i32 4
+  =>
+%res = poison
+
+Name: test4
+%res = umul_fix i8 32, i8 64, i32 4
+  =>
+%res = 128
+
+Name: test5
+%res = umul_fix i8 16, i8 112, i32 4
+  =>
+%res = 112
+
+Name: test6
+%res = umul_fix i8 8, i8 8, i32 4
+  =>
+%res = 4
+
+Name: test7
+%res = umul_fix i8 2, i8 2, i32 4
+  =>
+%res = i8 0
+
+Name: test8
+%res = umul_fix i8 1, i8 1, i32 4
+  =>
+%res = i8 0
+
+Name: test7
+%res = umul_fix <6 x i8> <i8 16, i8 32, i8 127, i8 8, i8 2, i8 1>, <6 x i8> <i8 16, i8 32, i8 127, i8 8, i8 2, i8 1>, i32 4
+  =>
+%res = <6 x i8> <i8 16, i8 64, i8 poison, i8 4, i8 0, i8 0>

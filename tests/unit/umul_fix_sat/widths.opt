@@ -1,0 +1,11 @@
+; TEST-ARGS: -disable-undef-input
+
+Name: test1
+%res = umul_fix_sat 0, 0, i32 13
+  =>
+%res = 0
+
+Name: test2
+%res = umul_fix_sat 0, %in, i32 4
+  =>
+%res = 0

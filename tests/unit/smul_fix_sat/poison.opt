@@ -1,0 +1,24 @@
+Name: test1
+%res = smul_fix_sat i8 poison, i8 16, i32 4
+  =>
+%res = poison
+
+Name: test2
+%res = smul_fix_sat i8 16, i8 poison, i32 4
+  =>
+%res = poison
+
+Name: test3
+%res = smul_fix_sat i8 16, i8 16, i32 poison
+  =>
+%res = poison
+
+Name: test4
+%res = smul_fix_sat <6 x i8> <i8 16, i8 32, i8 poison, i8 8, i8 2, i8 1>, <6 x i8> <i8 16, i8 32, i8 0, i8 8, i8 2, i8 1>, i32 4
+  =>
+%res = <6 x i8> <i8 16, i8 64, i8 poison, i8 4, i8 0, i8 0>
+
+Name: test5
+%res = smul_fix_sat <6 x i8> <i8 16, i8 32, i8 0, i8 8, i8 2, i8 1>, <6 x i8> <i8 16, i8 32, i8 poison, i8 8, i8 2, i8 1>, i32 4
+  =>
+%res = <6 x i8> <i8 16, i8 64, i8 poison, i8 4, i8 0, i8 0>

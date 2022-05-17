@@ -1182,6 +1182,10 @@ void TernaryOp::print(ostream &os) const {
   switch (op) {
   case FShl: str = "fshl "; break;
   case FShr: str = "fshr "; break;
+  case SMulFix: str = "smul_fix "; break;
+  case UMulFix: str = "umul_fix "; break;
+  case SMulFixSat: str = "smul_fix_sat "; break;
+  case UMulFixSat: str = "umul_fix_sat "; break;
   }
 
   os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
@@ -1191,20 +1195,38 @@ StateValue TernaryOp::toSMT(State &s) const {
   auto &av = s[*a];
   auto &bv = s[*b];
   auto &cv = s[*c];
-  function<expr(const expr&, const expr&, const expr&)> fn;
-
-  switch (op) {
-  case FShl:
-    fn = expr::fshl;
-    break;
-  case FShr:
-    fn = expr::fshr;
-    break;
-  }
 
   auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
-    return { fn(a.value, b.value, c.value),
-             a.non_poison && b.non_poison && c.non_poison };
+  expr e, np;
+  switch (op) {
+  case FShl:
+    e = expr::fshl(a.value, b.value, c.value);
+    np = true;
+    break;
+  case FShr:
+    e = expr::fshr(a.value, b.value, c.value);
+    np = true;
+    break;
+  case SMulFix:
+    e = expr::smul_fix(a.value, b.value, c.value);
+    np = expr::smul_fix_no_soverflow(a.value, b.value, c.value);
+    break;
+  case UMulFix:
+    e = expr::umul_fix(a.value, b.value, c.value);
+    np = expr::umul_fix_no_uoverflow(a.value, b.value, c.value);
+    break;
+  case SMulFixSat:
+    e = expr::smul_fix_sat(a.value, b.value, c.value);
+    np = true;
+    break;
+  case UMulFixSat:
+    e = expr::umul_fix_sat(a.value, b.value, c.value);
+    np = true;
+    break;
+  default:
+    UNREACHABLE();
+  }
+  return { move(e), np && a.non_poison && b.non_poison && c.non_poison };
   };
 
   if (getType().isVectorType()) {
@@ -1213,7 +1235,8 @@ StateValue TernaryOp::toSMT(State &s) const {
 
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
       vals.emplace_back(scalar(ty->extract(av, i), ty->extract(bv, i),
-                               ty->extract(cv, i)));
+                               (op == FShl || op == FShr) ?
+                               ty->extract(cv, i) : cv));
     }
     return ty->aggregateVals(vals);
   }
@@ -1221,11 +1244,33 @@ StateValue TernaryOp::toSMT(State &s) const {
 }
 
 expr TernaryOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType() == a->getType() &&
-         getType() == b->getType() &&
-         getType() == c->getType() &&
-         getType().enforceIntOrVectorType();
+  expr instrconstr;
+  switch (op) {
+  case FShl:
+  case FShr:
+    instrconstr =
+      getType() == a->getType() &&
+      getType() == b->getType() &&
+      getType() == c->getType() &&
+      getType().enforceIntOrVectorType();
+    break;
+  case SMulFix:
+  case UMulFix:
+  case SMulFixSat:
+  case UMulFixSat:
+    // LangRef only says that the third argument has to be an integer,
+    // but the IR verifier seems to reject anything other than i32, so
+    // we'll keep things simple and go with that constraint here too
+    instrconstr =
+      getType() == a->getType() &&
+      getType() == b->getType() &&
+      c->getType().enforceIntType(32) &&
+      getType().enforceIntOrVectorType();
+    break;
+  default:
+    UNREACHABLE();
+  }
+  return Value::getTypeConstraints() && instrconstr;
 }
 
 unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {

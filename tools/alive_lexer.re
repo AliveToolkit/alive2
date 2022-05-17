@@ -232,6 +232,10 @@ space+ {
 "free" { return FREE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
+"smul_fix" { return SMULFIX; }
+"umul_fix" { return UMULFIX; }
+"smul_fix_sat" { return SMULFIXSAT; }
+"umul_fix_sat" { return UMULFIXSAT; }
 "fma" { return FMA; }
 "fmax" { return FMAX; }
 "fmin" { return FMIN; }
