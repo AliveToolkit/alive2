@@ -186,6 +186,7 @@ public:
 
   static expr fshl(const expr &a, const expr &b, const expr &c);
   static expr fshr(const expr &a, const expr &b, const expr &c);
+  static expr smul_fix(const expr &a, const expr &b, const expr &c);
 
   expr shl_no_soverflow(const expr &rhs) const;
   expr shl_no_uoverflow(const expr &rhs) const;

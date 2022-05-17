@@ -167,7 +167,7 @@ public:
 
 class TernaryOp final : public Instr {
 public:
-  enum Op { FShl, FShr };
+  enum Op { FShl, FShr, SMulFix };
 
 private:
   Value *a, *b, *c;

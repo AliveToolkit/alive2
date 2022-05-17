@@ -1,0 +1,31 @@
+Name: test1
+%res = smul_fix i8 16, i8 16, i32 4
+  =>
+%res = 16
+
+Name: test2
+%res = smul_fix i8 32, i8 32, i32 4
+  =>
+ret i8 64
+
+Name: test3
+%res = smul_fix i8 127, i8 127, i32 4
+  =>
+ret poison
+
+Name: test4
+%res = smul_fix i8 8, i8 8, i32 4
+  =>
+ret 4
+
+Name: test5
+%res = smul_fix i8 2, i8 2, i32 4
+  =>
+ret i8 0
+
+Name: test6
+%res = smul_fix i8 1, i8 1, i32 4
+  =>
+ret i8 0
+
+

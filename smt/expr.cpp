@@ -869,6 +869,18 @@ expr expr::fshr(const expr &a, const expr &b, const expr &c) {
   return a << (width - c_mod_width) | b.lshr(c_mod_width);
 }
 
+expr expr::smul_fix(const expr &a, const expr &b, const expr &c) {
+  C2(a);
+  auto width = a.bits();
+  expr a2 = a.sext(width);
+  expr b2 = b.sext(width);
+  expr mul = a2 * b2;
+  expr scale2 = c.trunc(2 * width);
+  expr r = mul.ashr(scale2);
+  expr result = r.trunc(width);
+  return result;
+}
+
 expr expr::shl_no_soverflow(const expr &rhs) const {
   return (*this << rhs).ashr(rhs) == *this;
 }

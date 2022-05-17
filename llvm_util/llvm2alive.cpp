@@ -886,12 +886,14 @@ public:
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
+    case llvm::Intrinsic::smul_fix:
     {
       PARSE_TRIOP();
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
       case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
+      case llvm::Intrinsic::smul_fix: op = TernaryOp::SMulFix; break;
       default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(
