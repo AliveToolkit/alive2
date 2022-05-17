@@ -5,7 +5,11 @@ using namespace llvm;
  // The following passes/analyses have custom names, otherwise their name will
  // include `(anonymous namespace)`. These are special since they are only for
  // testing purposes and don't live in a header file.
-  
+llvm::TargetMachine* TM=nullptr;
+
+ModuleInlinerWrapperPass buildInlinerPipeline (OptimizationLevel Level, ThinOrFullLTOPhase Phase){
+  assert(false&&"this is a PassBuilder Internal function, shouldn't reach there");
+}
  /// No-op module pass which does nothing.
  struct NoOpModulePass : PassInfoMixin<NoOpModulePass> {
    PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
@@ -172,7 +176,6 @@ using namespace llvm;
 
 LLVMOptimizer::LLVMOptimizer(std::string optArgs){
     this->optArgs = optArgs;
-    llvm::PassBuilder PB;
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
     PB.registerFunctionAnalyses(FAM);
@@ -184,14 +187,15 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs){
         llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
         MPM=PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
     }else{
-        using namespace llvm;
         std::string tmpArgs=optArgs;
         StringRef argsRef(tmpArgs);      
         while(!argsRef.empty()){
             StringRef Name;
             std::tie(Name, argsRef) = argsRef.split(',');
 #define MODULE_PASS(NAME, CREATE_PASS)                                         \
-    if (Name == NAME) {                                                          \
+    if(Name=="instrprof"){                                    \
+      MPM.addPass(InstrProfiling(InstrProfOptions()));             \
+    }else if (Name == NAME) {                                                          \
         MPM.addPass(CREATE_PASS);                                                  \
     }
  #define FUNCTION_PASS(NAME, CREATE_PASS)                                       \
@@ -205,7 +209,7 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs){
          createFunctionToLoopPassAdaptor(CREATE_PASS(PARSER(PARAMS)))));          \
         FPM.addPass(createFunctionToLoopPassAdaptor(CREATE_PASS(PARSER(PARAMS))));            \
     }
-#include "PassRegistry.def"
+#include "lib/Passes/PassRegistry.def"
         }
     }
 }
