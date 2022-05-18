@@ -1,6 +1,7 @@
 #pragma once
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/CFG.h"
@@ -14,19 +15,16 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/LICM.h"
-#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/FormatVariadic.h"
 
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Analysis/AliasAnalysisEvaluator.h"
 #include "llvm/Analysis/AliasSetTracker.h"
@@ -90,6 +88,7 @@
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/SafepointIRVerifier.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -261,7 +260,6 @@
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
 #include "llvm/Transforms/Vectorize/VectorCombine.h"
 
-
 #include <algorithm>
 #include <climits>
 #include <ctime>
@@ -270,19 +268,22 @@
 #include <string>
 #include <vector>
 
-class LLVMOptimizer{
-    std::string optArgs;
-    llvm::LoopAnalysisManager LAM;
-    llvm::FunctionAnalysisManager FAM;
-    llvm::CGSCCAnalysisManager CGAM;
-    llvm::ModuleAnalysisManager MAM;
-    llvm::PassBuilder PB;
-    
-    llvm::FunctionPassManager FPM;
-    llvm::ModulePassManager MPM;
+class LLVMOptimizer {
+  std::string optArgs;
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
+  llvm::PassBuilder PB;
+
+  llvm::FunctionPassManager FPM;
+  llvm::ModulePassManager MPM;
+
 public:
-    LLVMOptimizer(std::string optArgs);
-    llvm::Module* optimizeModule(llvm::Module* M);
-    llvm::Function* optimizeFunction(llvm::Function* func);
-    const std::string& getOptArgs()const{return optArgs;}
+  LLVMOptimizer(std::string optArgs);
+  llvm::Module *optimizeModule(llvm::Module *M);
+  llvm::Function *optimizeFunction(llvm::Function *func);
+  const std::string &getOptArgs() const {
+    return optArgs;
+  }
 };
