@@ -234,7 +234,7 @@ add_executable(alive-jobserver
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
-  llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils scalaropts coroutines objcarcopts vectorize instrumentation ipo instcombine aggressiveinstcombine)
+  llvm_map_components_to_libnames(llvm_libs support all core irreader analysis passes transformutils scalaropts coroutines objcarcopts vectorize instrumentation ipo instcombine aggressiveinstcombine)
 #  target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
   target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
