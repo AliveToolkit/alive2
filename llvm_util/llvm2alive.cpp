@@ -833,8 +833,7 @@ public:
       case llvm::Intrinsic::smin:     op = BinOp::SMin; break;
       case llvm::Intrinsic::smax:     op = BinOp::SMax; break;
       case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
-      default:
-        UNREACHABLE();
+      default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op));
     }
@@ -1028,12 +1027,21 @@ public:
       case llvm::Intrinsic::experimental_constrained_lround:
       case llvm::Intrinsic::llround:
       case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
-      default:
-        return error(i);
+      default: UNREACHABLE();
       }
       RETURN_IDENTIFIER(make_unique<FpConversionOp>(*ty, value_name(i), *val,
                                                     op, parse_rounding(i),
                                                     parse_exceptions(i)));
+    }
+    case llvm::Intrinsic::is_fpclass:
+    {
+      PARSE_BINOP();
+      TestOp::Op op;
+      switch (i.getOpcode()) {
+      case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
+      default: UNREACHABLE();
+      }
+      RETURN_IDENTIFIER(make_unique<TestOp>(*ty, value_name(i), *a, *b, op));
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:

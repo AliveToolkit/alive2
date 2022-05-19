@@ -211,6 +211,8 @@ public:
   expr isFPZero() const;
   expr isFPNegative() const;
   expr isFPNegZero() const;
+  expr isFPNormal() const;
+  expr isFPSubNormal() const;
 
   static expr rne();
   static expr rna();

@@ -1322,6 +1322,97 @@ unique_ptr<Instr> FpTernaryOp::dup(const string &suffix) const {
 }
 
 
+vector<Value*> TestOp::operands() const {
+  return { lhs, rhs };
+}
+
+bool TestOp::propagatesPoison() const {
+  return true;
+}
+
+void TestOp::rauw(const Value &what, Value &with) {
+  RAUW(lhs);
+  RAUW(rhs);
+}
+
+void TestOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case Is_FPClass: str = "is.fpclass "; break;
+  }
+
+  os << getName() << " = " << str << *lhs << ", " << *rhs;
+}
+
+StateValue TestOp::toSMT(State &s) const {
+  auto &a = s[*lhs];
+  auto &b = s[*rhs];
+  function<expr(const expr&)> fn;
+
+  switch (op) {
+  case Is_FPClass:
+    fn = [&](const expr &a) -> expr {
+      uint64_t n;
+      if (!b.value.isUInt(n) || !b.non_poison.isTrue()) {
+        s.addUB(expr(false));
+        return {};
+      }
+      OrExpr result;
+      // TODO: distinguish between quiet and signaling NaNs
+      if (n & (1 << 0))
+        result.add(a.isNaN());
+      if (n & (1 << 1))
+        result.add(a.isNaN());
+      if (n & (1 << 2))
+        result.add(a.isFPNegative() && a.isInf());
+      if (n & (1 << 3))
+        result.add(a.isFPNegative() && a.isFPNormal());
+      if (n & (1 << 4))
+        result.add(a.isFPNegative() && a.isFPSubNormal());
+      if (n & (1 << 5))
+        result.add(a.isFPNegZero());
+      if (n & (1 << 6))
+        result.add(a.isFPZero() && !a.isFPNegative());
+      if (n & (1 << 7))
+        result.add(!a.isFPNegative() && a.isFPSubNormal());
+      if (n & (1 << 8))
+        result.add(!a.isFPNegative() && a.isFPNormal());
+      if (n & (1 << 9))
+        result.add(!a.isFPNegative() && a.isInf());
+      return result().toBVBool();
+    };
+    break;
+  }
+
+  auto scalar = [&](const StateValue &v) -> StateValue {
+    return { fn(v.value), expr(v.non_poison) };
+  };
+
+  if (getType().isVectorType()) {
+    vector<StateValue> vals;
+    auto ty = lhs->getType().getAsAggregateType();
+
+    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(ty->extract(a, i)));
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  }
+  return scalar(a);
+}
+
+expr TestOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         lhs->getType().enforceFloatOrVectorType() &&
+         rhs->getType().enforceIntType(32) &&
+         getType().enforceIntOrVectorType(1) &&
+         getType().enforceVectorTypeEquiv(lhs->getType());
+}
+
+unique_ptr<Instr> TestOp::dup(const string &suffix) const {
+  return make_unique<TestOp>(getType(), getName() + suffix, *lhs, *rhs, op);
+}
+
+
 vector<Value*> ConversionOp::operands() const {
   return { val };
 }

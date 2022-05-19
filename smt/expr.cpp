@@ -1013,6 +1013,14 @@ expr expr::isFPNegZero() const {
   return isFPZero() && isFPNegative();
 }
 
+expr expr::isFPNormal() const {
+  return unop_fold(Z3_mk_fpa_is_normal);
+}
+
+expr expr::isFPSubNormal() const {
+  return unop_fold(Z3_mk_fpa_is_subnormal);
+}
+
 expr expr::rne() {
   return Z3_mk_fpa_rne(ctx());
 }
