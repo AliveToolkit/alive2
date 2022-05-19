@@ -267,6 +267,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <cassert>
 
 class LLVMOptimizer {
   std::string optArgs;

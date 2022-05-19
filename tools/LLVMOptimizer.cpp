@@ -3,7 +3,7 @@
 using namespace llvm;
 
 // member variable of PassBuilder
-static llvm::TargetMachine *TM = nullptr;
+/*static llvm::TargetMachine *TM = nullptr;
 
 // member function of PassBuilder
 static ModuleInlinerWrapperPass buildInlinerPipeline(OptimizationLevel Level,
@@ -16,7 +16,6 @@ static ModuleInlinerWrapperPass buildInlinerPipeline(OptimizationLevel Level,
 // testing purposes and don't live in a header file.
 
 namespace {
-
 /// No-op module pass which does nothing.
 struct NoOpModulePass : PassInfoMixin<NoOpModulePass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
@@ -396,7 +395,51 @@ bool parseMergedLoadStoreMotionOptions(StringRef Params) {
   }
   return Result;
 }
-} // namespace
+
+bool checkParametrizedPassName(StringRef Name, StringRef PassName) {
+   if (!Name.consume_front(PassName))
+     return false;
+   // normal pass name w/o parameters == default parameters
+   if (Name.empty())
+     return true;
+   return Name.startswith("<") && Name.endswith(">");
+ }
+
+  AddressSanitizerOptions parseASanPassOptions(StringRef Params) {
+   AddressSanitizerOptions Result;
+   while (!Params.empty()) {
+     StringRef ParamName;
+     std::tie(ParamName, Params) = Params.split(';');
+  
+     if (ParamName == "kernel") {
+       Result.CompileKernel = true;
+     } else {
+       assert(false&&formatv("invalid AddressSanitizer pass parameter '{0}' ", ParamName)
+               .str().c_str());
+     }
+   }
+   return Result;
+ }
+
+  HWAddressSanitizerOptions parseHWASanPassOptions(StringRef Params) {
+   HWAddressSanitizerOptions Result;
+   while (!Params.empty()) {
+     StringRef ParamName;
+     std::tie(ParamName, Params) = Params.split(';');
+  
+     if (ParamName == "recover") {
+       Result.Recover = true;
+     } else if (ParamName == "kernel") {
+       Result.CompileKernel = true;
+     } else {
+       assert(false&&formatv("invalid HWAddressSanitizer pass parameter '{0}' ", ParamName)
+               .str().c_str());
+     }
+   }
+   return Result;
+ }
+  
+} */ // namespace
 
 LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   this->optArgs = optArgs;
@@ -406,7 +449,16 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  if (optArgs == "O2") {
+  if(auto E=PB.parsePassPipeline(FPM,optArgs)){
+    llvm::errs()<<E<<"\n";
+    llvm::errs()<<"Cannot parse "<<optArgs<<" passes\n";
+  }
+  if(auto E=PB.parsePassPipeline(MPM,optArgs)){
+    llvm::errs()<<E<<"\n";
+    llvm::errs()<<"Cannot parse "<<optArgs<<" passes\n";
+  }
+
+  /*if (optArgs == "O2") {
     FPM = PB.buildFunctionSimplificationPipeline(
         llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
@@ -422,26 +474,52 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   } else if (Name == NAME) {                                                   \
     MPM.addPass(CREATE_PASS);                                                  \
   }
+ #define MODULE_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER, PARAMS)      \
+   if (checkParametrizedPassName(Name, NAME)) {                                 \
+     MPM.addPass(CREATE_PASS(PARSER(PARAMS)));                                    \
+   }
+    #define CGSCC_PASS(NAME, CREATE_PASS)                                          \
+   if (Name == NAME) {                                                          \
+     MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(CREATE_PASS));         \
+   }
+   #define CGSCC_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER, PARAMS)       \
+   if (checkParametrizedPassName(Name, NAME)) {                                 \
+     MPM.addPass(                                                               \
+         createModuleToPostOrderCGSCCPassAdaptor(CREATE_PASS(PARSER(PARAMS))));   \
+   }
 #define FUNCTION_PASS(NAME, CREATE_PASS)                                       \
   if (Name == NAME) {                                                          \
     MPM.addPass(createModuleToFunctionPassAdaptor(CREATE_PASS));               \
     FPM.addPass(CREATE_PASS);                                                  \
   }
 #define FUNCTION_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER, PARAMS)    \
-  if (Name == NAME) {                                                          \
+  if (checkParametrizedPassName(Name, NAME)) {                                                          \
     MPM.addPass(                                                               \
         createModuleToFunctionPassAdaptor(CREATE_PASS(PARSER(PARAMS))));       \
     FPM.addPass(CREATE_PASS(PARSER(PARAMS)));                                  \
   }
+ #define LOOPNEST_PASS(NAME, CREATE_PASS)                                       \
+   if (Name == NAME) {                                                          \
+     MPM.addPass(createModuleToFunctionPassAdaptor(                             \
+         createFunctionToLoopPassAdaptor(CREATE_PASS)));          \
+     FPM.addPass(createFunctionToLoopPassAdaptor(CREATE_PASS));  \
+   }
+ #define LOOP_PASS(NAME, CREATE_PASS)                                           \
+   if (Name == NAME) {                                                          \
+     MPM.addPass(createModuleToFunctionPassAdaptor(                             \
+         createFunctionToLoopPassAdaptor(CREATE_PASS)));          \
+     FPM.addPass(createFunctionToLoopPassAdaptor(CREATE_PASS));  \
+   }
 #define LOOP_PASS_WITH_PARAMS(NAME, CLASS, CREATE_PASS, PARSER, PARAMS)        \
-  if (Name == NAME) {                                                          \
+  if (checkParametrizedPassName(Name, NAME)) {                                                          \
     MPM.addPass(createModuleToFunctionPassAdaptor(                             \
         createFunctionToLoopPassAdaptor(CREATE_PASS(PARSER(PARAMS)))));        \
     FPM.addPass(createFunctionToLoopPassAdaptor(CREATE_PASS(PARSER(PARAMS)))); \
   }
+ 
 #include "lib/Passes/PassRegistry.def"
     }
-  }
+  }*/
 }
 
 llvm::Module *LLVMOptimizer::optimizeModule(llvm::Module *M) {
