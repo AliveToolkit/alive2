@@ -9,8 +9,9 @@ This category is for bugs that generating wrong codes from passes
 7. arm64 miscompile due to global isel (https://github.com/llvm/llvm-project/issues/55129)
 8. arm64, x86, and x86-64 miscompile from undef and urem (https://github.com/llvm/llvm-project/issues/55271)
 9. or+and miscompile with global isel on arm64 (https://github.com/llvm/llvm-project/issues/55284)
-10. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
-11. miscompile from multiple backends (https://github.com/llvm/llvm-project/issues/55484)
+10. [Open] urem+udiv miscompile with global isel on arm64(https://github.com/llvm/llvm-project/issues/55287)
+11. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
+12. miscompile from multiple backends (https://github.com/llvm/llvm-project/issues/55484)
 
 
 ## Category 2
