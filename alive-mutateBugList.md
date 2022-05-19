@@ -6,7 +6,8 @@ This category is for bugs that generating wrong codes from passes
 4. NewGVN miscompiles(https://github.com/llvm/llvm-project/issues/53218)
 5. arm64 backend bug (https://github.com/llvm/llvm-project/issues/55003 && https://github.com/llvm/llvm-project/issues/55178)
 6. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55201)
-7. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
+7. arm64 miscompile due to global isel (https://github.com/llvm/llvm-project/issues/55129)
+8. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
 
 
 ## Category 2
