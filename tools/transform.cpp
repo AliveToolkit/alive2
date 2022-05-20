@@ -1031,7 +1031,7 @@ static void calculateAndInitConstants(Transform &t) {
   // as an (unsound) optimization, we fix the first bit of the addr for
   // local/non-local if both exist (to reduce axiom fml size)
   bool has_local_bit = (num_locals_src || num_locals_tgt) && num_nonlocals;
-  bits_ptr_address = min(max(bits_size_t, bits_ptr_address + has_local_bit),
+  bits_ptr_address = min(max(bits_size_t, bits_ptr_address) + has_local_bit,
                          bits_program_pointer);
 
   bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
