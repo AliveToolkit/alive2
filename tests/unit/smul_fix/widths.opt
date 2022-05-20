@@ -1,0 +1,16 @@
+; TEST-ARGS: -disable-undef-input
+
+Name: test1
+%res = smul_fix 0, 0, i32 13
+  =>
+%res = 0
+
+Name: test2
+%res = smul_fix %a, %b, i32 7
+  =>
+%res = smul_fix_sat %a, %b, i32 7
+
+Name: test3
+%res = smul_fix %a, %b, i32 59
+  =>
+%res = smul_fix_sat %a, %b, i32 59

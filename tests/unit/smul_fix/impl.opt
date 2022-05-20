@@ -1,0 +1,10 @@
+%result = smul_fix i4 %a, i4 %b, i32 4
+  =>
+%a2 = freeze %a
+%b2 = freeze %b
+%a3 = sext i4 %a2 to i8
+%b3 = sext i4 %b2 to i8
+%mul = mul i8 %a3, %b3
+%scale2 = trunc i32 4 to i8
+%r = ashr i8 %mul, i8 %scale2
+%result = trunc i8 %r to i4

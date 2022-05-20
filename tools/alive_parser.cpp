@@ -847,6 +847,10 @@ static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
   switch (op_token) {
   case FSHL: op = TernaryOp::FShl; break;
   case FSHR: op = TernaryOp::FShr; break;
+  case SMULFIX: op = TernaryOp::SMulFix; break;
+  case UMULFIX: op = TernaryOp::UMulFix; break;
+  case SMULFIXSAT: op = TernaryOp::SMulFixSat; break;
+  case UMULFIXSAT: op = TernaryOp::UMulFixSat; break;
   default:
     UNREACHABLE();
   }
@@ -1213,6 +1217,10 @@ static unique_ptr<Instr> parse_instr(string_view name) {
     return parse_unary_reduction_op(name, t);
   case FSHL:
   case FSHR:
+  case SMULFIX:
+  case UMULFIX:
+  case SMULFIXSAT:
+  case UMULFIXSAT:
     return parse_ternary(name, t);
   case FMA:
     return parse_fp_ternary(name, t);
