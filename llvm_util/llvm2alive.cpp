@@ -1534,10 +1534,12 @@ public:
         // introduce a new BB even if not always needed.
         auto val = i->getIncomingValue(idx);
         if (has_constant_expr(val)) {
+          auto bridge  = predecessor(i, idx);
+          auto &pred   = getBB(i->getIncomingBlock(idx));
+          BB = &Fn.insertBBAfter(bridge, pred);
+
           auto &phi_bb = getBB(i->getParent());
-          auto bridge = predecessor(i, idx);
-          BB = &Fn.insertBBBefore(bridge, phi_bb);
-          getBB(i->getIncomingBlock(idx)).replaceTargetWith(&phi_bb, BB);
+          pred.replaceTargetWith(&phi_bb, BB);
           if (auto op = get_operand(val)) {
             phi->addValue(*op, std::move(bridge));
             BB->addInstr(make_unique<Branch>(phi_bb));

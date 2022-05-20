@@ -161,12 +161,12 @@ const BasicBlock& Function::bbOf(const Instr &i) const {
   UNREACHABLE();
 }
 
-BasicBlock& Function::insertBBBefore(string_view name, const BasicBlock &bb) {
+BasicBlock& Function::insertBBAfter(string_view name, const BasicBlock &bb) {
   auto p = BBs.try_emplace(string(name), name);
   if (p.second) {
     auto I = find(BB_order.begin(), BB_order.end(), &bb);
     assert(I != BB_order.end());
-    BB_order.insert(I, &p.first->second);
+    BB_order.insert(next(I), &p.first->second);
   }
   return p.first->second;
 }
