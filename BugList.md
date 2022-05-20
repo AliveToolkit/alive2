@@ -130,6 +130,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 
 
 ### Mutation bugs
+This section is outdated. All bugs are maintained at alive-mutateBuglist.md (under the same folder) instead
+
 #### Confirmed bugs
 1. InstCombine: 2 related logic bugs from over-generalizing "lshr" to "any shr" (https://llvm.org/PR51351)
 2. Inbounds: might cause problem in signed GEP instruction (https://bugs.llvm.org/show_bug.cgi?id=52429)
