@@ -879,16 +879,14 @@ static expr smul_fix_helper(const expr &a, const expr &b, const expr &c) {
   auto width = a.bits();
   expr a2 = a.sext(width), b2 = b.sext(width);
   expr mul = a2 * b2;
-  expr scale2 = (2 * width == 32) ? c :
-    (2 * width > 32) ? c.sext(2 * width - 32) : c.trunc(2 * width);
+  expr scale2 = c.zextOrTrunc(2 * width);
   return mul.ashr(scale2);
 }
 
 expr expr::smul_fix(const expr &a, const expr &b, const expr &c) {
   C2(a);
   expr r = smul_fix_helper(a, b, c);
-  expr result = r.trunc(a.bits());
-  return result;
+  return r.trunc(a.bits());
 }
 
 expr expr::smul_fix_no_soverflow(const expr &a, const expr &b, const expr &c) {
@@ -903,46 +901,36 @@ expr expr::smul_fix_sat(const expr &a, const expr &b, const expr &c) {
   C2(a);
   expr r = smul_fix_helper(a, b, c);
   auto width = a.bits();
-  expr result = r.trunc(width);
-  expr min = IntSMin(width);
-  expr max = IntSMax(width);
-  return mkIf(result.sext(width) == r, result,
-              mkIf(r.isNegative(), min, max));
+  return mkIf(smul_fix_no_soverflow(a, b, c),
+              smul_fix(a, b, c),
+              mkIf(r.isNegative(), IntSMin(width), IntSMax(width)));
 }
 
 static expr umul_fix_helper(const expr &a, const expr &b, const expr &c) {
   auto width = a.bits();
   expr a2 = a.zext(width), b2 = b.zext(width);
   expr mul = a2 * b2;
-  expr scale2 = (2 * width == 32) ? c :
-    (2 * width > 32) ? c.sext(2 * width - 32) : c.trunc(2 * width);
+  expr scale2 = c.zextOrTrunc(2 * width);
   return mul.lshr(scale2);
 }
 
 expr expr::umul_fix(const expr &a, const expr &b, const expr &c) {
   C2(a);
   expr r = umul_fix_helper(a, b, c);
-  expr result = r.trunc(a.bits());
-  return result;
+  return r.trunc(a.bits());
 }
 
 expr expr::umul_fix_no_uoverflow(const expr &a, const expr &b, const expr &c) {
   C2(a);
-  expr r = umul_fix_helper(a, b, c);
   auto width = a.bits();
-  expr result = r.trunc(width);
-  return result.zext(width) == r;
+  return umul_fix_helper(a, b, c).extract(width * 2 - 1, width) == 0;
 }
 
 expr expr::umul_fix_sat(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   auto width = a.bits();
-  expr r = umul_fix_helper(a, b, c);
-  expr result = r.trunc(width);
-  expr min = mkUInt(0, width);
-  expr max = IntUMax(width);
-  return mkIf(result.zext(width) == r, result,
-              mkIf(r.isNegative(), min, max));
+  return mkIf(umul_fix_no_uoverflow(a, b, c),
+              umul_fix(a, b, c),
+              IntUMax(width));
 }
 
 expr expr::shl_no_soverflow(const expr &rhs) const {
