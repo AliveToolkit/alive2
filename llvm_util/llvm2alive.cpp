@@ -1020,7 +1020,7 @@ public:
     {
       PARSE_UNOP();
       FpConversionOp::Op op;
-      switch (i.getOpcode()) {
+      switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::experimental_constrained_sitofp:  op = FpConversionOp::SIntToFP; break;
       case llvm::Intrinsic::experimental_constrained_uitofp:  op = FpConversionOp::UIntToFP; break;
       case llvm::Intrinsic::experimental_constrained_fptosi:  op = FpConversionOp::FPToSInt; break;
@@ -1045,7 +1045,7 @@ public:
     {
       PARSE_BINOP();
       TestOp::Op op;
-      switch (i.getOpcode()) {
+      switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
       default: UNREACHABLE();
       }
@@ -1055,7 +1055,7 @@ public:
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_BINOP();
-      switch(getLifetimeKind(i)) {
+      switch (getLifetimeKind(i)) {
       case LIFETIME_START:
         RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
       case LIFETIME_START_FILLPOISON:
