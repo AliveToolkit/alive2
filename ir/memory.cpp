@@ -7,6 +7,7 @@
 #include "ir/value.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <numeric>
 #include <string>
@@ -1047,11 +1048,21 @@ static expr mk_liveness_array() {
 }
 
 void Memory::mkNonlocalValAxioms(bool skip_consts) {
-  if (!does_ptr_mem_access)
-    return;
-
   expr offset
     = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+
+  // Users may request the initial memory to be non-poisonous
+  if (config::disable_poison_input && state->isSource()) {
+    for (auto &block : non_local_block_val) {
+      if (isInitialMemBlock(block.val))
+        state->addAxiom(
+          expr::mkForAll({ offset },
+                         !Byte(*this, block.val.load(offset)).isPoison()));
+    }
+  }
+
+  if (!does_ptr_mem_access)
+    return;
 
   for (unsigned i = has_null_block + skip_consts * num_consts_src,
        e = numNonlocals(); i != e; ++i) {
