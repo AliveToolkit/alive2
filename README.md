@@ -15,6 +15,9 @@ Included tools:
 * Translation validation plugins for clang and LLVM's `opt`
 * Standalone translation validation tool: `alive-tv` ([online](https://alive2.llvm.org))
 
+For a technical introduction to Alive2, please see [our paper from
+PLDI 2021](https://web.ist.utl.pt/nuno.lopes/pubs.php?id=alive2-pldi21).
+
 
 WARNING
 -------
