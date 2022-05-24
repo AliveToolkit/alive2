@@ -164,14 +164,6 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
 
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   include(AddLLVM)
-  
-  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_BUILD_MAIN_SRC_DIR} ${LLVM_BINARY_DIR}")
-  #set(CMAKE_CXX_FLAGS                "-I${LLVM_BUILD_MAIN_SRC_DIR} ${CMAKE_CXX_FLAGS}")
-  if (MSVC)
-    
-  else()
-    set(CMAKE_CXX_FLAGS                "-I${LLVM_BUILD_MAIN_SRC_DIR} ${CMAKE_CXX_FLAGS}")
-  endif()
 
   include_directories(${LLVM_INCLUDE_DIRS})
   add_definitions(${LLVM_DEFINITIONS})
@@ -234,7 +226,7 @@ add_executable(alive-jobserver
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
-  llvm_map_components_to_libnames(llvm_libs support all core irreader analysis passes transformutils scalaropts coroutines objcarcopts vectorize instrumentation ipo instcombine aggressiveinstcombine)
+  llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils)
 #  target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
   target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${llvm_libs})
@@ -274,3 +266,4 @@ add_custom_target("check"
 if (BUILD_TV)
   add_dependencies("check" "alive-tv" "tv")
 endif()
+
