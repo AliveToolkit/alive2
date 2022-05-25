@@ -602,7 +602,7 @@ public:
     if (!ty)
       return error(i);
 
-    auto phi = make_unique<Phi>(*ty, value_name(i));
+    auto phi = make_unique<Phi>(*ty, value_name(i), parse_fmath(i));
     todo_phis.emplace_back(phi.get(), &i);
     RETURN_IDENTIFIER(std::move(phi));
   }

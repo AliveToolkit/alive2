@@ -418,8 +418,11 @@ public:
 
 class Phi final : public Instr {
   std::vector<std::pair<Value*, std::string>> values;
+  FastMathFlags fmath;
+
 public:
-  Phi(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
+  Phi(Type &type, std::string &&name, FastMathFlags fmath = {})
+    : Instr(type, std::move(name)), fmath(fmath) {}
 
   void addValue(Value &val, std::string &&BB_name);
   void removeValue(const std::string &BB_name);
