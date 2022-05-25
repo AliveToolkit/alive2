@@ -22,17 +22,14 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/NewGVN.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/FunctionComparator.h"
 
-#include <algorithm>
+#include <cassert>
 #include <climits>
 #include <ctime>
 #include <memory>
 #include <random>
 #include <string>
 #include <vector>
-#include <cassert>
 
 class LLVMOptimizer {
   std::string optArgs;

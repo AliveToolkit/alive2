@@ -2,7 +2,6 @@
 
 using namespace llvm;
 
-
 LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   this->optArgs = optArgs;
   PB.registerModuleAnalyses(MAM);
@@ -10,15 +9,14 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   PB.registerFunctionAnalyses(FAM);
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-  
-  if(optArgs=="O2"){
+
+  if (optArgs == "O2") {
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
-  }else{
-    if(auto E=PB.parsePassPipeline(MPM,optArgs)){
-      llvm::errs()<<E<<"\n";
+  } else {
+    if (auto E = PB.parsePassPipeline(MPM, optArgs)) {
+      llvm::errs() << E << "\n";
     }
   }
-
 }
 
 llvm::Module *LLVMOptimizer::optimizeModule(llvm::Module *M) {
@@ -27,6 +25,6 @@ llvm::Module *LLVMOptimizer::optimizeModule(llvm::Module *M) {
 }
 
 llvm::Function *LLVMOptimizer::optimizeFunction(llvm::Function *func) {
-  MPM.run(*(func->getParent()),MAM);
+  MPM.run(*(func->getParent()), MAM);
   return func;
 }
