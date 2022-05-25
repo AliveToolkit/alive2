@@ -10,8 +10,18 @@ LLVMOptimizer::LLVMOptimizer(std::string optArgs) {
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  if (optArgs == "O2") {
+  if (optArgs == "O3") {
+    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
+  } else if (optArgs == "O2") {
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
+  } else if (optArgs == "O1") {
+    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O1);
+  } else if (optArgs == "O0") {
+    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
+  } else if (optArgs == "Os") {
+    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::Os);
+  } else if (optArgs == "Oz") {
+    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::Oz);
   } else {
     if (auto E = PB.parsePassPipeline(MPM, optArgs)) {
       llvm::errs() << E << "\n";
