@@ -266,4 +266,3 @@ add_custom_target("check"
 if (BUILD_TV)
   add_dependencies("check" "alive-tv" "tv")
 endif()
-
