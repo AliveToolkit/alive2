@@ -70,8 +70,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 63. NewGVN miscompiles with equal instructions modulo attributes (https://llvm.org/PR53218)
 64. InstCombine miscompiles combination of signed comparisons (https://llvm.org/PR53252)
 65. InstCombine propagates nsz flag from select to fneg incorrectly (https://llvm.org/PR54077)
-66. LoadStoreVectorizer wrong logic for zext gep offsets (https://llvm.org/PR55651)
-67. SLPVectorizer replaces add nsw undef with add poison (https://llvm.org/PR55653)
+66. SLPVectorizer replaces add nsw undef with add poison (https://llvm.org/PR55653)
+67. InstCombine swaps inbounds geps originating OOB pointer (https://llvm.org/PR55722)
 
 
 ### Bugs found in Z3
