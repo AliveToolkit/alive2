@@ -440,7 +440,7 @@ const StateValue& State::operator[](const Value &val) {
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
     uvars.clear();
-    return sval;
+    return simplify(sval, true);
   }
 
   for (auto &p : repls) {
