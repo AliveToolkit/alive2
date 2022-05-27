@@ -247,23 +247,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
 void optimizeModule(llvm::Module *M) {
   LLVMOptimizer optimizer(optPass);
   optimizer.optimizeModule(M);
-  /*llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
-      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  llvm::ModulePassManager MPM;
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  MPM.run(*M, MAM);*/
 }
 
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
