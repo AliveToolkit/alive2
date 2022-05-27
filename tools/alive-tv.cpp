@@ -244,11 +244,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return true;
 }
 
-void optimizeModule(llvm::Module *M) {
-  LLVMOptimizer optimizer(optPass);
-  optimizer.optimizeModule(M);
-}
-
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   for (auto &F : M) {
     if (F.isDeclaration())
@@ -322,7 +317,7 @@ convenient way to demonstrate an existing optimizer bug.
       goto end;
     } else {
       M2 = CloneModule(*M1);
-      optimizeModule(M2.get());
+      optimize_module(optPass, M2.get());
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
