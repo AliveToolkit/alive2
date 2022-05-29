@@ -119,7 +119,6 @@ add_library(smt STATIC ${SMT_SRCS})
 
 set(TOOLS_SRCS
   tools/transform.cpp
-  tools/LLVMOptimizer.cpp
 )
 
 add_library(tools STATIC ${TOOLS_SRCS})
@@ -172,6 +171,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
     "llvm_util/known_fns.cpp"
     "llvm_util/llvm2alive.cpp"
     "llvm_util/utils.cpp"
+    "llvm_util/LLVMOptimizer.cpp"
   )
 
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
