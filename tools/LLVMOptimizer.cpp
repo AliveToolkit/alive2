@@ -36,7 +36,3 @@ void optimize_module(llvm::StringRef optArgs, llvm::Module *M) {
   }
   MPM.run(*M, MAM);
 }
-
-void optimize_function(llvm::StringRef optArgs, llvm::Function *func) {
-  optimize_module(optArgs, func->getParent());
-}
