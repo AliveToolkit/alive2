@@ -2,7 +2,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
-#include "llvm_util/LLVMOptimizer.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
@@ -255,6 +254,8 @@ llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   return 0;
 }
 }
+
+extern void optimize_module(llvm::StringRef optArgs, llvm::Module *M);
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
