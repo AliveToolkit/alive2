@@ -12,7 +12,7 @@ This category is for bugs that generating wrong codes from passes
 10. fshl-related miscompile by arm64 and x86-64 backends(https://github.com/llvm/llvm-project/issues/55296)
 11. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
 12. miscompile from multiple backends (https://github.com/llvm/llvm-project/issues/55484)
-13. [Open] miscompile from arm64 backend with (icmp ult (sub -6, -8) 3) (https://github.com/llvm/llvm-project/issues/55490)
+13. miscompile from arm64 backend with (icmp ult (sub -6, -8) 3) (https://github.com/llvm/llvm-project/issues/55490)
 
 
 ## Category 2
