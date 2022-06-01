@@ -1,6 +1,6 @@
 ## Category 1
 This category is for bugs that generating wrong codes from passes
-1. miscompile due to instcombine(https://reviews.llvm.org/D119690)
+1. miscompile due to instcombine(https://github.com/llvm/llvm-project/issues/53252)
 2. Another miscompile due to instcombine(https://bugs.llvm.org/show_bug.cgi?id=51351)
 3. NewGVN miscompiles(https://github.com/llvm/llvm-project/issues/53218)
 4. arm64 backend bug (https://github.com/llvm/llvm-project/issues/55003 && https://github.com/llvm/llvm-project/issues/55178)
