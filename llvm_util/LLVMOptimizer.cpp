@@ -6,7 +6,7 @@
 
 using namespace llvm;
 
-void optimize_module(llvm::StringRef optArgs, llvm::Module *M) {
+void optimizeModule(llvm::Module *M, llvm::StringRef optArgs) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;

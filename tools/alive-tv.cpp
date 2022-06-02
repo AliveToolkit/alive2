@@ -255,7 +255,7 @@ llvm::Function *findFunction(llvm::Module &M, const string &FName) {
 }
 }
 
-extern void optimize_module(llvm::StringRef optArgs, llvm::Module *M);
+void optimizeModule(llvm::Module *M, llvm::StringRef optArgs);
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -318,7 +318,7 @@ convenient way to demonstrate an existing optimizer bug.
       goto end;
     } else {
       M2 = CloneModule(*M1);
-      optimize_module(optPass, M2.get());
+      optimizeModule(M2.get(), optPass);
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
