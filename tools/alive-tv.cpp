@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "llvm_util/llvm_optimizer.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
@@ -255,7 +256,6 @@ llvm::Function *findFunction(llvm::Module &M, const string &FName) {
 }
 }
 
-void optimizeModule(llvm::Module *M, llvm::StringRef optArgs);
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -318,7 +318,7 @@ convenient way to demonstrate an existing optimizer bug.
       goto end;
     } else {
       M2 = CloneModule(*M1);
-      optimizeModule(M2.get(), optPass);
+      optimize_module(M2.get(), optPass);
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
