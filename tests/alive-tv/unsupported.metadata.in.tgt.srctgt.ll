@@ -10,7 +10,7 @@ define i1 @tgt(i8* %a, i8* %b) {
   ret i1 true
 }
 
-; ERROR: Unsupported metadata: 7
+; ERROR: Value mismatch
 
 ; SKIP-IDENTITY
 
