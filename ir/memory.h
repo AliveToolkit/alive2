@@ -152,7 +152,7 @@ class Memory {
   }
 
   std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
-  unsigned next_nonlocal_bid;
+  unsigned next_nonlocal_bid = 0;
   unsigned nextNonlocalBid();
 
   static bool observesAddresses();
