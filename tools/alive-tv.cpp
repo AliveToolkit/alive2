@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "llvm_util/llvm_optimizer.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
@@ -57,6 +58,12 @@ llvm::cl::opt<std::string> opt_src_fn(LLVM_ARGS_PREFIX "src-fn",
 llvm::cl::opt<std::string> opt_tgt_fn(LLVM_ARGS_PREFIX"tgt-fn",
   llvm::cl::desc("Name of tgt function (without @)"),
   llvm::cl::cat(alive_cmdargs), llvm::cl::init("tgt"));
+
+llvm::cl::opt<string>
+    optPass(LLVM_ARGS_PREFIX "passes",
+            llvm::cl::value_desc("optimization passes"),
+            llvm::cl::desc("a parameter to specify optimization passes, separated by comma"),
+            llvm::cl::cat(alive_cmdargs),llvm::cl::init("O2"));
 
 
 llvm::ExitOnError ExitOnErr;
@@ -237,26 +244,6 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return true;
 }
 
-void optimizeModule(llvm::Module *M) {
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(
-      llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  llvm::ModulePassManager MPM;
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  MPM.run(*M, MAM);
-}
-
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   for (auto &F : M) {
     if (F.isDeclaration())
@@ -268,6 +255,7 @@ llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   return 0;
 }
 }
+
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -330,7 +318,7 @@ convenient way to demonstrate an existing optimizer bug.
       goto end;
     } else {
       M2 = CloneModule(*M1);
-      optimizeModule(M2.get());
+      optimize_module(M2.get(), optPass);
     }
   } else {
     M2 = openInputFile(Context, opt_file2);

@@ -169,6 +169,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
 
   set(LLVM_UTIL_SRCS
     "llvm_util/known_fns.cpp"
+    "llvm_util/llvm_optimizer.cpp"
     "llvm_util/llvm2alive.cpp"
     "llvm_util/utils.cpp"
   )
