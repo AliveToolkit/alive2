@@ -1,5 +1,4 @@
 #include "util.h"
-#include "llvm/Analysis/IntervalPartition.h"
 
 std::random_device Random::rd;
 std::uniform_int_distribution<int> Random::dist(0, 2147483647u);
@@ -115,12 +114,12 @@ float Random::getRandomLLVMFloat() {
   }
 }
 
-void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN,bool licm) {
+void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN, bool licm) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
   llvm::ModuleAnalysisManager MAM;
-  
+
   llvm::PassBuilder PB;
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
@@ -129,12 +128,13 @@ void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN,bool licm) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   llvm::FunctionPassManager FPM;
-  if (newGVN||licm) {
-    if(newGVN){
+  if (newGVN || licm) {
+    if (newGVN) {
       FPM.addPass(llvm::NewGVNPass());
     }
-    if(licm){
-      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(llvm::LICMPass(llvm::LICMOptions()),true));
+    if (licm) {
+      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(
+          llvm::LICMPass(llvm::LICMOptions()), true));
     }
   } else {
     FPM = PB.buildFunctionSimplificationPipeline(
@@ -159,12 +159,13 @@ void LLVMUtil::optimizeFunction(llvm::Function *f, bool newGVN, bool licm) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   llvm::FunctionPassManager FPM;
-  if (newGVN||licm) {
-    if(newGVN){
+  if (newGVN || licm) {
+    if (newGVN) {
       FPM.addPass(llvm::NewGVNPass());
     }
-    if(licm){
-      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(llvm::LICMPass(llvm::LICMOptions()),true));
+    if (licm) {
+      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(
+          llvm::LICMPass(llvm::LICMOptions()), true));
     }
   } else {
     FPM = PB.buildFunctionSimplificationPipeline(
@@ -243,7 +244,113 @@ void LLVMUtil::removeTBAAMetadata(llvm::Module *M) {
   }
 }
 
+const std::vector<llvm::Instruction::BinaryOps> LLVMUtil::integerBinaryOps{
+    llvm::Instruction::Add,  llvm::Instruction::Sub,  llvm::Instruction::Mul,
+    llvm::Instruction::SDiv, llvm::Instruction::UDiv, llvm::Instruction::SRem,
+    llvm::Instruction::URem, llvm::Instruction::Shl,  llvm::Instruction::LShr,
+    llvm::Instruction::AShr, llvm::Instruction::And,  llvm::Instruction::Xor,
+    llvm::Instruction::Or};
+
+const std::vector<llvm::Instruction::BinaryOps> LLVMUtil::floatBinaryOps{
+    llvm::Instruction::FAdd, llvm::Instruction::FSub, llvm::Instruction::FMul,
+    llvm::Instruction::FDiv, llvm::Instruction::FRem};
+
+const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerBinaryIntrinsic{
+    llvm::Intrinsic::smax,
+    llvm::Intrinsic::smin,
+    llvm::Intrinsic::umax,
+    llvm::Intrinsic::umin,
+    llvm::Intrinsic::sadd_sat,
+    llvm::Intrinsic::uadd_sat,
+    llvm::Intrinsic::ssub_sat,
+    llvm::Intrinsic::usub_sat,
+    llvm::Intrinsic::sshl_sat,
+    llvm::Intrinsic::ushl_sat
+
+};
+
+const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatBinaryIntrinsic{
+    llvm::Intrinsic::pow,     llvm::Intrinsic::minnum,
+    llvm::Intrinsic::maxnum,  llvm::Intrinsic::minimum,
+    llvm::Intrinsic::maximum, llvm::Intrinsic::copysign};
+
+const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerUnaryIntrinsic{
+    llvm::Intrinsic::bitreverse,
+    llvm::Intrinsic::bswap,
+    llvm::Intrinsic::ctpop,
+};
+
+const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatUnaryIntrinsic{
+    llvm::Intrinsic::sqrt,        llvm::Intrinsic::sin,
+    llvm::Intrinsic::cos,         llvm::Intrinsic::exp,
+    llvm::Intrinsic::exp2,        llvm::Intrinsic::log,
+    llvm::Intrinsic::log10,       llvm::Intrinsic::log2,
+    llvm::Intrinsic::fabs,        llvm::Intrinsic::floor,
+    llvm::Intrinsic::ceil,        llvm::Intrinsic::trunc,
+    llvm::Intrinsic::rint,        llvm::Intrinsic::nearbyint,
+    llvm::Intrinsic::round,       llvm::Intrinsic::roundeven,
+    llvm::Intrinsic::canonicalize};
+
 void LLVMUtil::insertRandomCodeBefore(llvm::Instruction *inst) {
   RandomCodePieceGenerator::insertCodeBefore(
       inst, 5 + (Random::getRandomUnsigned() & 15)); // last 4 binary bits
+}
+
+llvm::Instruction *
+LLVMUtil::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
+                                      llvm::Instruction *insertBefore) {
+  assert(val1->getType()->isIntegerTy() &&
+         "should be an integer to get an int instruction!");
+  assert(val2->getType()->isIntegerTy() &&
+         "should be an integer to get an int instruction!");
+  return Random::getRandomBool()
+             ? getRandomIntegerBinaryInstruction(val1, val2, insertBefore)
+             : getRandomIntegerIntrinsic(val1, val2, insertBefore);
+}
+
+llvm::Instruction *
+LLVMUtil::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
+                                    llvm::Instruction *insertBefore) {
+  assert(val1->getType()->isFloatingPointTy() &&
+         "should be a floating point to get a float instruction!");
+  assert(val2->getType()->isFloatingPointTy() &&
+         "should be a floating point to get a float instruction!");
+  return Random::getRandomBool()
+             ? getRandomFloatBinaryInstruction(val1, val2, insertBefore)
+             : getRandomFloatInstrinsic(val1, val2, insertBefore);
+}
+
+llvm::Instruction *LLVMUtil::getRandomIntegerBinaryInstruction(
+    llvm::Value *val1, llvm::Value *val2, llvm::Instruction *insertBefore) {
+  assert(val1->getType()->isIntegerTy() &&
+         "should be an integer to get an int instruction!");
+  assert(val2->getType()->isIntegerTy() &&
+         "should be an integer to get an int instruction!");
+  llvm::Instruction::BinaryOps Op =
+      integerBinaryOps[Random::getRandomUnsigned() % integerBinaryOps.size()];
+  return llvm::BinaryOperator::Create(Op, val1, val2, "", insertBefore);
+}
+
+llvm::Instruction *
+LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
+                                          llvm::Instruction *insertBefore) {
+  assert(val1->getType()->isFloatingPointTy() &&
+         "should be a floating point to get a float instruction!");
+  assert(val2->getType()->isFloatingPointTy() &&
+         "should be a floating point to get a float instruction!");
+  llvm::Instruction::BinaryOps Op =
+      floatBinaryOps[Random::getRandomUnsigned() % floatBinaryOps.size()];
+  return llvm::BinaryOperator::Create(Op, val1, val2, "", insertBefore);
+}
+
+llvm::Instruction *
+LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
+                                    llvm::Instruction *insertBefore) {
+  return nullptr;
+}
+
+llvm::Instruction *
+LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
+                                   llvm::Instruction *insertBefore) {
+  return nullptr;
 }

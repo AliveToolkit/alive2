@@ -1,30 +1,20 @@
 #pragma once
 #include "llvmStress.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/IR/CFG.h"
+#include "llvm/Analysis/MemorySSA.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Scalar/LICM.h"
-#include "llvm/Analysis/MemorySSA.h"
+#include "llvm/Transforms/Scalar/NewGVN.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
- 
+
 #include <algorithm>
 #include <climits>
 #include <ctime>
@@ -81,39 +71,73 @@ public:
   static float getRandomLLVMFloat();
 };
 
-class FunctionComparatorWrapper:public llvm::FunctionComparator{
+class FunctionComparatorWrapper : public llvm::FunctionComparator {
 public:
-  FunctionComparatorWrapper(const llvm::Function* func1, const llvm::Function* func2,  llvm::GlobalNumberState *GN):
-    llvm::FunctionComparator(func1, func2, GN){};
-  bool isSameSignature()const{
-    return  compareSignature()==0;
+  FunctionComparatorWrapper(const llvm::Function *func1,
+                            const llvm::Function *func2,
+                            llvm::GlobalNumberState *GN)
+      : llvm::FunctionComparator(func1, func2, GN){};
+  bool isSameSignature() const {
+    return compareSignature() == 0;
   }
 };
 
-class LLVMFunctionComparator{
+class LLVMFunctionComparator {
   llvm::GlobalNumberState gn;
   FunctionComparatorWrapper wrapper;
+
 public:
-  LLVMFunctionComparator():gn(llvm::GlobalNumberState()),wrapper(FunctionComparatorWrapper(nullptr,nullptr,nullptr)){}
-  bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
+  LLVMFunctionComparator()
+      : gn(llvm::GlobalNumberState()),
+        wrapper(FunctionComparatorWrapper(nullptr, nullptr, nullptr)) {}
+  bool compareSignature(const llvm::Function *func1,
+                        const llvm::Function *func2) {
     gn.clear();
-    wrapper=FunctionComparatorWrapper(func1,func2,&gn);
+    wrapper = FunctionComparatorWrapper(func1, func2, &gn);
     return wrapper.isSameSignature();
   }
 };
 
 class LLVMUtil {
   static LLVMFunctionComparator comparator;
+  const static std::vector<llvm::Instruction::BinaryOps> integerBinaryOps;
+  const static std::vector<llvm::Instruction::BinaryOps> floatBinaryOps;
+  const static std::vector<llvm::Intrinsic::ID> integerBinaryIntrinsic;
+  const static std::vector<llvm::Intrinsic::ID> floatBinaryIntrinsic;
+  const static std::vector<llvm::Intrinsic::ID> integerUnaryIntrinsic;
+  const static std::vector<llvm::Intrinsic::ID> floatUnaryIntrinsic;
+
 public:
-  static void optimizeModule(llvm::Module *M, bool newGVN = false, bool licm=false);
-  static void optimizeFunction(llvm::Function *f, bool newGVN = false,bool licm=false);
+  static void optimizeModule(llvm::Module *M, bool newGVN = false,
+                             bool licm = false);
+  static void optimizeFunction(llvm::Function *f, bool newGVN = false,
+                               bool licm = false);
   static void removeTBAAMetadata(llvm::Module *M);
   static llvm::Value *insertGlobalVariable(llvm::Module *m, llvm::Type *ty);
   static void insertFunctionArguments(llvm::Function *f,
                                       llvm::SmallVector<llvm::Type *> tys,
                                       llvm::ValueToValueMapTy &VMap);
   static void insertRandomCodeBefore(llvm::Instruction *inst);
-  static bool compareSignature(const llvm::Function* func1, const llvm::Function* func2){
+  static bool compareSignature(const llvm::Function *func1,
+                               const llvm::Function *func2) {
     return comparator.compareSignature(func1, func2);
   }
+  static llvm::Instruction *
+  getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
+                              llvm::Instruction *insertBefore = nullptr);
+  static llvm::Instruction *
+  getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
+                            llvm::Instruction *insertBefore = nullptr);
+  static llvm::Instruction *
+  getRandomIntegerBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
+                                    llvm::Instruction *insertBefore = nullptr);
+  static llvm::Instruction *
+  getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
+                                  llvm::Instruction *insertBefore = nullptr);
+  static llvm::Instruction *
+  getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
+                            llvm::Instruction *insertBefore = nullptr);
+  static llvm::Instruction *
+  getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
+                           llvm::Instruction *insertBefore = nullptr);
 };
