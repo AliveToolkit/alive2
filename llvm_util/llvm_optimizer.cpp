@@ -42,4 +42,5 @@ void optimize_module(llvm::Module *M, llvm::StringRef optArgs) {
   }
   MPM.run(*M, MAM);
 }
-} // namespace llvm_util
+
+}
