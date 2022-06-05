@@ -5,10 +5,11 @@
 #include "llvm/Passes/PassBuilder.h"
 
 using namespace llvm;
+using namespace std;
 
 namespace llvm_util {
 
-void optimize_module(llvm::Module *M, llvm::StringRef optArgs) {
+string optimize_module(llvm::Module *M, llvm::StringRef optArgs) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;
@@ -36,11 +37,11 @@ void optimize_module(llvm::Module *M, llvm::StringRef optArgs) {
   } else if (optArgs == "Oz") {
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::Oz);
   } else {
-    if (auto E = PB.parsePassPipeline(MPM, optArgs)) {
-      llvm::errs() << E << "\n";
-    }
+    if (auto Err = PB.parsePassPipeline(MPM, optArgs))
+      return toString(std::move(Err));
   }
   MPM.run(*M, MAM);
+  return {};
 }
 
 }

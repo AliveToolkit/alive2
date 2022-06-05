@@ -318,7 +318,11 @@ convenient way to demonstrate an existing optimizer bug.
       goto end;
     } else {
       M2 = CloneModule(*M1);
-      optimize_module(M2.get(), optPass);
+      auto err = optimize_module(M2.get(), optPass);
+      if (!err.empty()) {
+        *out << "Error parsing list of LLVM passes: " << err << '\n';
+        return -1;
+      }
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
