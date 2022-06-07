@@ -62,8 +62,10 @@ llvm::cl::opt<std::string> opt_tgt_fn(LLVM_ARGS_PREFIX"tgt-fn",
 llvm::cl::opt<string>
     optPass(LLVM_ARGS_PREFIX "passes",
             llvm::cl::value_desc("optimization passes"),
-            llvm::cl::desc("a parameter to specify optimization passes. The syntax is described at https://llvm.org/docs/NewPassManager.html#invoking-opt"),
-            llvm::cl::cat(alive_cmdargs),llvm::cl::init("O2"));
+            llvm::cl::desc("Specify which LLVM passes to run (default=O2). "
+                           "The syntax is described at "
+                           "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
+            llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
 
 llvm::ExitOnError ExitOnErr;
