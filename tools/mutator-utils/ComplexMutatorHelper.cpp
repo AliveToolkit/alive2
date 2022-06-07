@@ -205,70 +205,20 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
     return false;
   }
 
+  if(!ty->isFloatingPointTy()&&!ty->isIntegerTy()){
+    return false;
+  }
+
+  bool isFloat=ty->isFloatingPointTy();
+
   llvm::Value *val1 = mutator->getRandomValue(ty),
               *val2 = mutator->getRandomValue(ty);
-  llvm::Instruction::BinaryOps Op;
-
-  using llvm::Instruction;
-  switch (Random::getRandomUnsigned() % 13) {
-  default:
-    llvm_unreachable("Invalid BinOp");
-  case 0: {
-    Op = Instruction::Add;
-    break;
+  llvm::Instruction* newInst=nullptr;
+  if(isFloat){
+    newInst=LLVMUtil::getRandomFloatInstruction(val1,val2,inst);
+  }else{
+    newInst=LLVMUtil::getRandomIntegerInstruction(val1,val2,inst);
   }
-  case 1: {
-    Op = Instruction::Sub;
-    break;
-  }
-  case 2: {
-    Op = Instruction::Mul;
-    break;
-  }
-  case 3: {
-    Op = Instruction::SDiv;
-    break;
-  }
-  case 4: {
-    Op = Instruction::UDiv;
-    break;
-  }
-  case 5: {
-    Op = Instruction::SRem;
-    break;
-  }
-  case 6: {
-    Op = Instruction::URem;
-    break;
-  }
-  case 7: {
-    Op = Instruction::Shl;
-    break;
-  }
-  case 8: {
-    Op = Instruction::LShr;
-    break;
-  }
-  case 9: {
-    Op = Instruction::AShr;
-    break;
-  }
-  case 10: {
-    Op = Instruction::And;
-    break;
-  }
-  case 11: {
-    Op = Instruction::Or;
-    break;
-  }
-  case 12: {
-    Op = Instruction::Xor;
-    break;
-  }
-  }
-
-  llvm::Instruction *newInst =
-      llvm::BinaryOperator::Create(Op, val1, val2, "", inst);
   inst->setOperand(pos, newInst);
   return true;
 }
