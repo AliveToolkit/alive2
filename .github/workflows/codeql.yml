@@ -18,7 +18,7 @@ jobs:
         run: sudo apt-get install z3 re2c ninja-build g++-10
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v2
         with:
           languages: cpp
 
@@ -26,7 +26,7 @@ jobs:
         run: ./.github/scripts/build.sh
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v2
 
     env:
       CMAKE_BUILD_TYPE: Release
