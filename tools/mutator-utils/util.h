@@ -136,8 +136,8 @@ public:
                                   llvm::Instruction *insertBefore = nullptr);
   static llvm::Instruction *
   getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
-                            llvm::Instruction *insertBefore = nullptr);
+                            llvm::Instruction *insertBefore);
   static llvm::Instruction *
   getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
-                           llvm::Instruction *insertBefore = nullptr);
+                           llvm::Instruction *insertBefore);
 };

@@ -346,11 +346,41 @@ LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
 llvm::Instruction *
 LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
                                     llvm::Instruction *insertBefore) {
-  return nullptr;
+  std::vector<llvm::Type*> tys{val1->getType(),val2->getType()};
+  llvm::Module* M=insertBefore->getModule();
+  size_t pos=Random::getRandomUnsigned()%(integerUnaryIntrinsic.size()+integerBinaryIntrinsic.size());
+  bool isUnary=pos<integerUnaryIntrinsic.size();
+  llvm::Function* func=nullptr;
+  std::vector<llvm::Value*> args{val1};
+  if(isUnary) {
+    func=llvm::Intrinsic::getDeclaration(M,integerUnaryIntrinsic[pos],tys);
+  }else{
+    func=llvm::Intrinsic::getDeclaration(M,integerBinaryIntrinsic[pos],tys);
+    args.push_back(val2);
+  }
+  assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
+  llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
+  inst->print(llvm::errs());
+  return inst;
 }
 
 llvm::Instruction *
 LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                                    llvm::Instruction *insertBefore) {
-  return nullptr;
+  std::vector<llvm::Type*> tys{val1->getType(),val2->getType()};
+  llvm::Module* M=insertBefore->getModule();
+  size_t pos=Random::getRandomUnsigned()%(integerUnaryIntrinsic.size()+integerBinaryIntrinsic.size());
+  bool isUnary=pos<integerUnaryIntrinsic.size();
+  llvm::Function* func=nullptr;
+  std::vector<llvm::Value*> args{val1};
+  if(isUnary) {
+    func=llvm::Intrinsic::getDeclaration(M,floatUnaryIntrinsic[pos],tys);
+  }else{
+    func=llvm::Intrinsic::getDeclaration(M,floatBinaryIntrinsic[pos],tys);
+    args.push_back(val2);
+  }
+  assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
+  llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
+  inst->print(llvm::errs());
+  return inst;
 }
