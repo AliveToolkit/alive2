@@ -479,7 +479,7 @@ static Value& get_or_copy_instr(const string &name) {
 
   auto instr_src = dynamic_cast<Instr*>(val_src);
   assert(instr_src);
-  auto tgt_instr = instr_src->dup("");
+  auto tgt_instr = instr_src->dup(*fn, "");
 
   for (auto &op : instr_src->operands()) {
     if (dynamic_cast<Input*>(op)) {

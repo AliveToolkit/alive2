@@ -49,7 +49,7 @@ public:
   JumpInstr::it_helper targets() const;
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
 
-  std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
+  std::unique_ptr<BasicBlock> dup(Function &f, const std::string &suffix) const;
   void rauw(const Value &what, Value &with);
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);

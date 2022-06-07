@@ -34,6 +34,7 @@ public:
   auto& getType() const { return type; }
   bool isVoid() const;
 
+  virtual void rauw(const Value &what, Value &with);
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;
   virtual smt::expr getTypeConstraints() const;
@@ -102,6 +103,7 @@ class AggregateValue final : public Value {
 public:
   AggregateValue(Type &type, std::vector<Value*> &&vals);
   auto& getVals() const { return vals; }
+  void rauw(const Value &what, Value &with) override;
   smt::expr getTypeConstraints() const override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;

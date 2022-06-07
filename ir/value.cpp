@@ -21,6 +21,10 @@ bool Value::isVoid() const {
   return &getType() == &Type::voidTy;
 }
 
+void Value::rauw(const Value &what, Value &with) {
+  UNREACHABLE();
+}
+
 expr Value::getTypeConstraints() const {
   return getType().getTypeConstraints();
 }
@@ -136,6 +140,14 @@ StateValue AggregateValue::toSMT(State &s) const {
     state_vals.emplace_back(val->toSMT(s));
   }
   return getType().getAsAggregateType()->aggregateVals(state_vals);
+}
+
+void AggregateValue::rauw(const Value &what, Value &with) {
+  for (auto &val : vals) {
+    if (val == &what)
+      val = &with;
+  }
+  setName(agg_str(getType(), vals));
 }
 
 expr AggregateValue::getTypeConstraints() const {

@@ -83,10 +83,11 @@ void BasicBlock::replaceTargetWith(const BasicBlock *from,
   }
 }
 
-unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
+unique_ptr<BasicBlock>
+BasicBlock::dup(Function &f, const string &suffix) const {
   auto newbb = make_unique<BasicBlock>(name + suffix);
   for (auto &i : instrs()) {
-    newbb->addInstr(i.dup(suffix));
+    newbb->addInstr(i.dup(f, suffix));
   }
   return newbb;
 }
@@ -270,25 +271,31 @@ void Function::instr_iterator::operator++(void) {
   next_bb();
 }
 
+static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
+                      Value *val) {
+  if (auto *agg = dynamic_cast<AggregateValue*>(val)) {
+    for (auto elem : agg->getVals()) {
+      add_users(users, i, bb, elem);
+    }
+  }
+  users[val].emplace(i, bb);
+}
+
 Function::UsersTy Function::getUsers() const {
   UsersTy users;
   for (auto *bb : getBBs()) {
     for (auto &i : bb->instrs()) {
       for (auto op : i.operands()) {
-        users[op].emplace(const_cast<Instr*>(&i), bb);
+        add_users(users, const_cast<Instr*>(&i), bb, op);
       }
     }
   }
   for (auto &agg : aggregates) {
-    for (auto val : agg->getVals()) {
-      users[val].emplace(agg.get(), nullptr);
-    }
+    add_users(users, agg.get(), nullptr, agg.get());
   }
   for (auto &c : constants) {
     if (auto agg = dynamic_cast<AggregateValue*>(c.get())) {
-      for (auto val : agg->getVals()) {
-        users[val].emplace(agg, nullptr);
-      }
+      add_users(users, agg, nullptr, agg);
     }
   }
   return users;
@@ -359,6 +366,39 @@ void Function::topSort() {
   BB_order = top_sort(BB_order);
 }
 
+static void
+rauw_op(const unordered_map<const Value*,
+                            vector<pair<BasicBlock*, Value*>>> &vmap,
+        const unordered_set<const Value *> &phis_from_orig_bb,
+        Value *i, Value *op) {
+  auto it = vmap.find(op);
+  if (it != vmap.end()) {
+    // consider this case:
+    //   loop:
+    //     %op = phi ...
+    //     %k  = phi [%op, %loop], ...
+    //
+    // In iteration i, %k should point to iteration (i-1)'s %k.
+    // If is_phi_to_phi is true, %op is the phi in this block.
+    bool is_phi_to_phi = dynamic_cast<const Phi *>(i) &&
+                         phis_from_orig_bb.count(op);
+    if (is_phi_to_phi) {
+      if (it->second.size() >= 2) {
+        i->rauw(*op, *it->second[it->second.size()-2].second);
+      }
+    } else {
+      i->rauw(*op, *it->second.back().second);
+    }
+    return;
+  }
+
+  if (auto *agg = dynamic_cast<AggregateValue*>(op)) {
+    for (auto &v : agg->getVals()) {
+      rauw_op(vmap, phis_from_orig_bb, op, v);
+    }
+  }
+}
+
 static BasicBlock&
 cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
         const unordered_map<const BasicBlock*, vector<BasicBlock*>> &bbmap,
@@ -371,27 +411,9 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
     if (dynamic_cast<const Phi *>(&i))
       phis_from_orig_bb.insert(&i);
 
-    auto d = i.dup(suffix);
+    auto d = i.dup(F, suffix);
     for (auto &op : d->operands()) {
-      auto it = vmap.find(op);
-      if (it != vmap.end()) {
-        // consider this case:
-        //   loop:
-        //     %op = phi ...
-        //     %k  = phi [%op, %loop], ...
-        //
-        // In iteration i, %k should point to iteration (i-1)'s %k.
-        // If is_phi_to_phi is true, %op is the phi in this block.
-        bool is_phi_to_phi = dynamic_cast<const Phi *>(&i) &&
-                             phis_from_orig_bb.count(op);
-        if (is_phi_to_phi) {
-          if (it->second.size() >= 2) {
-            d->rauw(*op, *it->second[it->second.size()-2].second);
-          }
-        } else {
-          d->rauw(*op, *it->second.back().second);
-        }
-      }
+      rauw_op(vmap, phis_from_orig_bb, d.get(), op);
     }
     if (!i.isVoid())
       vmap[&i].emplace_back(&newbb, d.get());
@@ -659,16 +681,14 @@ void Function::unroll(unsigned k) {
             }
           }
 
-          auto *i = dynamic_cast<Instr*>(user);
-          assert(i);
-          if (auto phi = dynamic_cast<Phi*>(i)) {
+          if (auto phi = dynamic_cast<Phi*>(user)) {
             for (auto &[pv, pred] : phi->getValues()) {
               if (pv == val && dom_tree.dominates(dst, &getBB(pred))){
                 phi->replace(pred, *newphi);
               }
             }
-          } else {
-            i->rauw(*val, *newphi);
+          } else if (dynamic_cast<Instr*>(user)) {
+            user->rauw(*val, *newphi);
             added_phis.emplace(dst, newphi);
             if (!first_added_phi)
               first_added_phi = newphi;
