@@ -64,10 +64,13 @@ struct LoopLikeFunctionApproximator {
   // (value, nonpoison, UB)
   tuple<expr, expr, expr> _loop(IR::State &s, AndExpr &prefix, unsigned i,
                                 unsigned unroll_cnt) {
-    bool is_last = i == unroll_cnt - 1;
+    bool is_last = i >= unroll_cnt - 1;
     auto [res_i, np_i, ub_i, continue_i] = ith_exec(i, is_last);
     auto ub = ub_i();
     prefix.add(ub_i);
+
+    // Keep going if the function is being applied to a constant input
+    is_last &= !continue_i.isConst();
 
     if (is_last)
       s.addPre(prefix().implies(!continue_i));
