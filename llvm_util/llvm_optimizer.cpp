@@ -9,7 +9,7 @@ using namespace std;
 
 namespace llvm_util {
 
-string optimize_module(llvm::Module *M, llvm::StringRef optArgs) {
+string optimize_module(llvm::Module *M, string_view optArgs) {
   llvm::LoopAnalysisManager LAM;
   llvm::FunctionAnalysisManager FAM;
   llvm::CGSCCAnalysisManager CGAM;

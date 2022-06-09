@@ -10,6 +10,7 @@
 
 namespace llvm {
 class CallInst;
+class Function;
 class TargetLibraryInfo;
 }
 
@@ -20,6 +21,11 @@ class Value;
 }
 
 namespace llvm_util {
+
+// returned bool indicates whether it's a known function call
+std::pair<std::vector<IR::ParamAttrs>, bool>
+llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
+                   IR::FnAttrs &attrs);
 
 // returned bool indicates whether it's a known function call
 std::tuple<std::unique_ptr<IR::Instr>, IR::FnAttrs, std::vector<IR::ParamAttrs>,

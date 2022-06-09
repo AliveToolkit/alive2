@@ -1432,6 +1432,9 @@ public:
                 f.isVarArg());
     reset_state(Fn);
 
+    auto &attrs = Fn.getFnAttrs();
+    auto [param_attrs, approx] = llvm_implict_attrs(f, TLI, attrs);
+
     llvm::AttributeList attrlist = f.getAttributes();
 
     for (unsigned idx = 0; idx < f.arg_size(); ++idx) {
@@ -1440,7 +1443,8 @@ public:
           attrlist.getAttributes(llvm::AttributeList::FirstArgIndex + idx);
 
       auto ty = llvm_type2alive(arg.getType());
-      ParamAttrs attrs;
+      ParamAttrs attrs = idx < param_attrs.size() ? param_attrs[idx]
+                                                  : ParamAttrs();
       if (!ty || !handleParamAttrs(argattr, attrs, false))
         return {};
       auto val = make_unique<Input>(*ty, value_name(arg), std::move(attrs));
@@ -1454,7 +1458,6 @@ public:
       Fn.addInput(std::move(val));
     }
 
-    auto &attrs = Fn.getFnAttrs();
     const auto &ridx = llvm::AttributeList::ReturnIndex;
     const auto &fnidx = llvm::AttributeList::FunctionIndex;
     handleRetAttrs(attrlist.getAttributes(ridx), attrs);
