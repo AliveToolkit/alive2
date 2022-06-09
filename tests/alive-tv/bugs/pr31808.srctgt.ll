@@ -10,10 +10,10 @@
 define linkonce_odr void @src(%struct.SomeStruct*) local_unnamed_addr {
   %2 = getelementptr inbounds %struct.SomeStruct, %struct.SomeStruct* %0, i64 0, i32 0
   %3 = bitcast %struct.Array* %2 to i8**
-  %4 = load i8*, i8** %3, align 8, !tbaa !8
+  %4 = load i8*, i8** %3, align 8
   %5 = bitcast i8* %4 to i8*
   %6 = getelementptr inbounds %struct.Array, %struct.Array* %2, i64 0, i32 2
-  %7 = load i32, i32* %6, align 4, !tbaa !2
+  %7 = load i32, i32* %6, align 4
   %8 = zext i32 %7 to i64
   %9 = shl nuw nsw i64 %8, 3
   %10 = getelementptr inbounds i8, i8* %5, i64 %9
@@ -29,9 +29,9 @@ define linkonce_odr void @src(%struct.SomeStruct*) local_unnamed_addr {
 
 define linkonce_odr void @tgt(%struct.SomeStruct*) local_unnamed_addr {
   %2 = bitcast %struct.SomeStruct* %0 to i8**
-  %3 = load i8*, i8** %2, align 8, !tbaa !8
+  %3 = load i8*, i8** %2, align 8
   %4 = getelementptr inbounds %struct.SomeStruct, %struct.SomeStruct* %0, i64 0, i32 0, i32 2
-  %5 = load i32, i32* %4, align 4, !tbaa !2
+  %5 = load i32, i32* %4, align 4
   %6 = zext i32 %5 to i64
   %7 = shl nuw nsw i64 %6, 3
   %8 = bitcast i8* %3 to i8*
@@ -43,15 +43,5 @@ define linkonce_odr void @tgt(%struct.SomeStruct*) local_unnamed_addr {
 }
 
 declare i32 @f(i8* nocapture readonly, ...) local_unnamed_addr
-!0 = !{i32 1, !"PIC Level", i32 2}
-!1 = !{!"clang version 3.9.0 (tags/RELEASE_390/final)"}
-!2 = !{!3, !4, i64 0}
-!3 = !{!"_ZTS5Array", !4, i64 0, !7, i64 8, !7, i64 12}
-!4 = !{!"any pointer", !5, i64 0}
-!5 = !{!"omnipotent char", !6, i64 0}
-!6 = !{!"Simple C++ TBAA"}
-!7 = !{!"int", !5, i64 0}
-!8 = !{!3, !7, i64 12}
-!9 = !{!7, !7, i64 0}
 
 ; ERROR: Source is more defined than target

@@ -1,5 +1,3 @@
-; ModuleID = 'music_task_gvn.bc'
-source_filename = "music.i"
 target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
 target triple = "aarch64"
 
@@ -33,7 +31,7 @@ entry:
   %mapi = alloca %struct._MUSIC_OP_API_*, align 8
   %0 = bitcast %struct._MUSIC_OP_API_** %mapi to i8*
   call void @llvm.lifetime.start(i64 8, i8* %0) #4
-  store %struct._MUSIC_OP_API_* null, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  store %struct._MUSIC_OP_API_* null, %struct._MUSIC_OP_API_** %mapi, align 8
   %call = call i32 @music_decoder_init(%struct._MUSIC_OP_API_** nonnull %mapi) #5
   br label %while.cond
 
@@ -41,9 +39,9 @@ while.cond.loopexit:                              ; preds = %while.cond2
   br label %while.cond
 
 while.cond:                                       ; preds = %while.cond.loopexit, %entry
-  %1 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  %1 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8
   %dop_api = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %1, i64 0, i32 1
-  %2 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api, align 8, !tbaa !5
+  %2 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api, align 8
   %file_num = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %2, i64 0, i32 2
   %3 = bitcast i32* %file_num to i8*
   %call1 = call i32 @music_play_api(%struct._MUSIC_OP_API_* %1, i32 33, i32 0, i32 28, i8* %3) #5
@@ -51,12 +49,12 @@ while.cond:                                       ; preds = %while.cond.loopexit
 
 while.cond2:                                      ; preds = %while.cond2.backedge, %while.cond
   %err.0 = phi i32 [ %call1, %while.cond ], [ %err.0.be, %while.cond2.backedge ]
-  %4 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8, !tbaa !1
+  %4 = load %struct._MUSIC_OP_API_*, %struct._MUSIC_OP_API_** %mapi, align 8
   %dop_api8 = getelementptr inbounds %struct._MUSIC_OP_API_, %struct._MUSIC_OP_API_* %4, i64 0, i32 1
-  %5 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api8, align 8, !tbaa !5
+  %5 = load %struct.__MUSIC_API*, %struct.__MUSIC_API** %dop_api8, align 8
   %file_num9 = getelementptr inbounds %struct.__MUSIC_API, %struct.__MUSIC_API* %5, i64 0, i32 2
   %6 = bitcast i32* %file_num9 to i8*
-  store i32 1, i32* %file_num9, align 1, !tbaa !7
+  store i32 1, i32* %file_num9, align 1
   switch i32 %err.0, label %sw.default [
     i32 0, label %while.cond.loopexit
     i32 35, label %sw.bb
@@ -65,7 +63,7 @@ while.cond2:                                      ; preds = %while.cond2.backedg
   ]
 
 sw.bb:                                            ; preds = %while.cond2
-  %7 = load i32, i32* %file_num9, align 1, !tbaa !7
+  %7 = load i32, i32* %file_num9, align 1
   %call6 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %7) #6
   br label %while.cond2.backedge
 
@@ -86,16 +84,9 @@ while.cond2.backedge:                             ; preds = %sw.default, %sw.bb1
   br label %while.cond2
 }
 
-; Function Attrs: argmemonly nounwind
 declare void @llvm.lifetime.start(i64, i8* nocapture) #1
-
-; Function Attrs: minsize optsize
 declare i32 @music_decoder_init(%struct._MUSIC_OP_API_**) local_unnamed_addr #2
-
-; Function Attrs: minsize optsize
 declare i32 @music_play_api(%struct._MUSIC_OP_API_*, i32, i32, i32, i8*) local_unnamed_addr #2
-
-; Function Attrs: minsize nounwind optsize
 declare i32 @printf(i8* nocapture readonly, ...) local_unnamed_addr #3
 
 attributes #0 = { minsize noreturn nounwind optsize "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="generic" "target-features"="+neon" "unsafe-fp-math"="false" "use-soft-float"="false" }
@@ -105,18 +96,3 @@ attributes #3 = { minsize nounwind optsize "correctly-rounded-divide-sqrt-fp-mat
 attributes #4 = { nounwind }
 attributes #5 = { minsize nounwind optsize }
 attributes #6 = { minsize optsize }
-
-!llvm.ident = !{!0}
-
-!0 = !{!"clang version 4.0.0 "}
-!1 = !{!2, !2, i64 0}
-!2 = !{!"any pointer", !3, i64 0}
-!3 = !{!"omnipotent char", !4, i64 0}
-!4 = !{!"Simple C/C++ TBAA"}
-!5 = !{!6, !2, i64 8}
-!6 = !{!"_MUSIC_OP_API_", !2, i64 0, !2, i64 8}
-!7 = !{!8, !9, i64 16}
-!8 = !{!"__MUSIC_API", !2, i64 0, !2, i64 8, !9, i64 16, !10, i64 20, !2, i64 140, !2, i64 148}
-!9 = !{!"int", !3, i64 0}
-!10 = !{!"_DEC_API", !2, i64 0, !2, i64 8, !2, i64 16, !2, i64 24, !2, i64 32, !2, i64 40, !11, i64 48, !9, i64 60, !9, i64 64, !2, i64 72, !2, i64 80, !9, i64 88, !3, i64 92, !2, i64 96, !3, i64 104, !2, i64 112}
-!11 = !{!"_AAC_DEFAULT_SETTING", !9, i64 0, !9, i64 4, !9, i64 8}
