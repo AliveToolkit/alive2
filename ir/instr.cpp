@@ -2121,6 +2121,8 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
 
       ptr_inputs.emplace_back(std::move(value),
                               argflag.blockSize,
+                              argflag.has(ParamAttrs::NoRead),
+                              argflag.has(ParamAttrs::NoWrite),
                               argflag.has(ParamAttrs::NoCapture));
     } else {
       inputs.emplace_back(std::move(value));

@@ -1267,21 +1267,17 @@ public:
         continue;
 
       case llvm::Attribute::ReadOnly:
-        if (!is_callsite)
-          attrs.set(ParamAttrs::NoWrite);
+        attrs.set(ParamAttrs::NoWrite);
         continue;
 
       case llvm::Attribute::WriteOnly:
-        if (!is_callsite)
-          attrs.set(ParamAttrs::NoRead);
+        attrs.set(ParamAttrs::NoRead);
         continue;
 
       case llvm::Attribute::ReadNone:
-        if (!is_callsite) {
-          // TODO: can this pointer be freed?
-          attrs.set(ParamAttrs::NoRead);
-          attrs.set(ParamAttrs::NoWrite);
-        }
+        // TODO: can this pointer be freed?
+        attrs.set(ParamAttrs::NoRead);
+        attrs.set(ParamAttrs::NoWrite);
         continue;
 
       case llvm::Attribute::Dereferenceable:

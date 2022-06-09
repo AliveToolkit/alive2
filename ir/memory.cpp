@@ -1271,8 +1271,15 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
   return { p.release(), std::move(undef) };
 }
 
+bool Memory::PtrInput::eq_attrs(const PtrInput &rhs) const {
+  return byval == rhs.byval &&
+         noread == rhs.noread &&
+         nowrite == rhs.nowrite &&
+         nocapture == rhs.nocapture;
+}
+
 expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
-  if (byval != rhs.byval || nocapture != rhs.nocapture)
+  if (!eq_attrs(rhs))
     return false;
   return val == rhs.val;
 }
@@ -1435,6 +1442,9 @@ void Memory::setState(const Memory::CallState &st,
     for (unsigned bid = num_consts; bid < limit - has_write_fncall; ++bid) {
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
+        if (ptr_in.nowrite)
+          continue;
+
         if (!ptr_in.byval && bid < next_nonlocal_bid) {
           modifies |= ptr_in.val.non_poison &&
                       Pointer(*this, ptr_in.val.value).getBid() == bid;

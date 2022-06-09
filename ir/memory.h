@@ -238,12 +238,13 @@ public:
 
   struct PtrInput {
     StateValue val;
-    unsigned byval;
+    uint64_t byval;
+    bool noread;
+    bool nowrite;
     bool nocapture;
 
-    PtrInput(StateValue &&v, unsigned byval, bool nocapture) :
-      val(std::move(v)), byval(byval), nocapture(nocapture) {}
     smt::expr operator==(const PtrInput &rhs) const;
+    bool eq_attrs(const PtrInput &rhs) const;
     auto operator<=>(const PtrInput &rhs) const = default;
   };
 
