@@ -383,19 +383,6 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
                  const expr &fndom_a, const State::ValTy &ap,
                  const expr &fndom_b, const State::ValTy &bp,
                  bool check_each_var) {
-  if (check_expr(!src_state.sinkDomain()).isUnsat()) {
-    errs.add("The source program doesn't reach a return instruction.\n"
-             "Consider increasing the unroll factor if it has loops", false);
-    return;
-  }
-
-  auto sink_tgt = tgt_state.sinkDomain();
-  if (check_expr(!sink_tgt).isUnsat()) {
-    errs.add("The target program doesn't reach a return instruction.\n"
-             "Consider increasing the unroll factor if it has loops", false);
-    return;
-  }
-
   auto &dom_a = ap.domain;
   auto &dom_b = bp.domain;
   auto &a = ap.val;
@@ -409,6 +396,7 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
 
   AndExpr axioms = src_state.getAxioms();
   axioms.add(tgt_state.getAxioms());
+  expr axioms_expr = axioms();
 
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
@@ -423,12 +411,27 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
   expr pre_src = pre_src_and();
   expr pre_tgt = pre_tgt_and();
 
-  expr axioms_expr = axioms();
-  pre_tgt &= !sink_tgt;
-
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
     return;
+  }
+
+  {
+    auto sink_src = src_state.sinkDomain();
+    if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
+      errs.add("The source program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
+
+    auto sink_tgt = tgt_state.sinkDomain();
+    if (!sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
+      errs.add("The target program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
+
+    pre_tgt &= !sink_tgt;
   }
 
   expr pre_src_exists, pre_src_forall;
