@@ -1206,8 +1206,8 @@ public:
         break;
       }
 
-      case LLVMContext::MD_tbaa:
-        // skip this for now
+      case LLVMContext::MD_noundef:
+        BB->addInstr(make_unique<Assume>(i, Assume::WellDefined));
         break;
 
       // non-relevant for correctness
