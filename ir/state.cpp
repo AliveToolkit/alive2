@@ -717,8 +717,6 @@ expr State::FnCallInput::refinedBy(
   if (!inaccessiblememonly) {
     assert(args_ptr.size() == args_ptr2.size());
     for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
-      // TODO: needs to take read/read2 as input to control if mem blocks
-      // need to be compared
       auto &[ptr_in, byval, is_nocapture] = args_ptr[i];
       auto &[ptr_in2, byval2, is_nocapture2] = args_ptr2[i];
       if (byval != byval2 || is_nocapture != is_nocapture2)
@@ -726,7 +724,7 @@ expr State::FnCallInput::refinedBy(
 
       expr eq_val = Pointer(m, ptr_in.value)
                       .fninputRefined(Pointer(m2, ptr_in2.value),
-                                      undef_vars, byval2);
+                                      undef_vars, byval2, readsmem);
       refines.add(ptr_in.non_poison.implies(eq_val && ptr_in2.non_poison));
 
       if (!refines)

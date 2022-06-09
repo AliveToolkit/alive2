@@ -35,6 +35,18 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
+  smt::expr encodeLoadedByteRefined(const Pointer &other,
+                                    std::set<smt::expr> &undefs) const;
+  // Encode the refinement between
+  // (src ptr, tgt ptr) = (local, local) or (local, byval ptr)
+  smt::expr encodeLocalPtrRefinement(const Pointer &other,
+                                     std::set<smt::expr> &undefs,
+                                     bool readsbytes) const;
+  // Encode the refinement when two ptrs are given as byval args
+  smt::expr encodeByValArgRefinement(const Pointer &otherByval,
+                                     std::set<smt::expr> &undefs,
+                                     unsigned byval_size) const;
+
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
@@ -111,7 +123,7 @@ public:
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
-                           unsigned byval_bytes) const;
+                           unsigned byval_bytes, bool readsbytes) const;
 
   const Memory& getMemory() const { return m; }
 

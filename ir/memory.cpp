@@ -1914,11 +1914,12 @@ expr Memory::int2ptr(const expr &val) const {
   return expr::mkIf(val == 0, null, fn);
 }
 
-expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
+expr Memory::blockValRefined(const Memory &other, unsigned bid,
+                             optional<unsigned> another_localbid,
                              const expr &offset, set<expr> &undef) const {
-  assert(!local);
-  auto &mem1 = non_local_block_val[bid];
-  auto &mem2 = other.non_local_block_val[bid].val;
+  auto &mem1 = (another_localbid ? local_block_val : non_local_block_val)[bid];
+  auto &mem2 = another_localbid ? other.local_block_val[*another_localbid].val :
+                                  other.non_local_block_val[bid].val;
 
   if (mem1.val.eq(mem2))
     return true;
@@ -1949,7 +1950,24 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
   return val.refined(val2);
 }
 
+expr Memory::blockPropertiesRefined(const Pointer &src, const Pointer &tgt)
+    const {
+  expr aligned(true);
+  expr src_align = src.blockAlignment();
+  expr tgt_align = tgt.blockAlignment();
+  // if they are both non-const, then the condition holds per the precondition
+  if (src_align.isConst() || tgt_align.isConst())
+    aligned = src_align.ule(tgt_align);
+
+  return src.isBlockAlive().implies(tgt.isBlockAlive()) &&
+         src.blockSize() == tgt.blockSize() &&
+         ((src.isLocal() && tgt.isByval()) ||
+          src.getAllocType() == tgt.getAllocType()) &&
+         aligned;
+}
+
 expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
+                          optional<unsigned> bid_other,
                           set<expr> &undef) const {
   unsigned bytes_per_byte = bits_byte / 8;
 
@@ -1964,29 +1982,18 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
       expr off_expr = expr::mkUInt(off, Pointer::bitsShortOffset());
       val_refines
         &= (ptr_offset == off_expr).implies(
-             blockValRefined(tgt.getMemory(), bid, false, off_expr, undef));
+             blockValRefined(tgt.getMemory(), bid, bid_other, off_expr, undef));
     }
   } else {
     val_refines
       = src.getOffsetSizet().ult(src.blockSizeOffsetT()).implies(
-          blockValRefined(tgt.getMemory(), bid, false, ptr_offset, undef));
+          blockValRefined(tgt.getMemory(), bid, bid_other, ptr_offset, undef));
   }
 
   assert(src.isWritable().eq(tgt.isWritable()));
 
-  expr aligned(true);
-  expr src_align = src.blockAlignment();
-  expr tgt_align = tgt.blockAlignment();
-  // if they are both non-const, then the condition holds per the precondition
-  if (src_align.isConst() || tgt_align.isConst())
-    aligned = src_align.ule(tgt_align);
-
   expr alive = src.isBlockAlive();
-  return alive == tgt.isBlockAlive() &&
-         blk_size == tgt.blockSize() &&
-         src.getAllocType() == tgt.getAllocType() &&
-         aligned &&
-         alive.implies(val_refines);
+  return blockPropertiesRefined(src, tgt) && alive.implies(val_refines);
 }
 
 tuple<expr, Pointer, set<expr>>
@@ -2038,7 +2045,8 @@ Memory::refined(const Memory &other, bool fncall,
     Pointer q(other, p());
     if (p.isByval().isTrue() && q.isByval().isTrue())
       continue;
-    ret &= (ptr_bid == bid_expr).implies(blockRefined(p, q, bid, undef_vars));
+    ret &= (ptr_bid == bid_expr)
+        .implies(blockRefined(p, q, bid, nullopt, undef_vars));
   }
 
   // restrict refinement check to set of request blocks

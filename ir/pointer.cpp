@@ -485,35 +485,73 @@ expr Pointer::refined(const Pointer &other) const {
                       isBlockAlive().implies(other.isBlockAlive()));
 }
 
+expr Pointer::encodeLoadedByteRefined(
+    const Pointer &other, set<expr> &undef_vars) const {
+  // TODO: can we remove these const casts?
+  auto b1 = const_cast<Memory *>(&m)->raw_load(*this, undef_vars);
+  auto b2 = const_cast<Memory *>(&other.m)->raw_load(other, undef_vars);
+  return b1.refined(b2);
+}
+
+expr Pointer::encodeLocalPtrRefinement(
+    const Pointer &other, set<expr> &undefs, bool readsbytes) const {
+  expr tgt_bid = other.getShortBid();
+  expr ofs = expr::mkFreshVar("localblk_ofs", expr::mkUInt(0, bits_for_offset));
+  Pointer this_ofs = *this + ofs;
+  Pointer other_ofs = other + ofs;
+
+  uint64_t bid_const, bid_tgt_const;
+  bool is_const_bid = this_ofs.getShortBid().isUInt(bid_const) &&
+                      tgt_bid.isUInt(bid_tgt_const);
+  expr blkrefined;
+  if (readsbytes && is_const_bid && this->isByval().isFalse() &&
+      other.isByval().isFalse()) {
+    // Look into the bytes.
+    // If this or other pointer is byval, blockRefined cannot be used because
+    // it requires both bids to be local or nonlocal
+    // In the byval case, return the approximated result by simply checking
+    // the block properties in the else clause below
+    blkrefined = m.blockRefined(*this, other, (unsigned)bid_const,
+                                (unsigned)bid_tgt_const, undefs);
+  } else
+    blkrefined = m.blockPropertiesRefined(*this, other);
+
+  return (other.isLocal() || other.isByval()) &&
+      getOffset() == other.getOffset() && move(blkrefined);
+}
+
+expr Pointer::encodeByValArgRefinement(
+    const Pointer &other, set<expr> &undefs, unsigned size) const {
+  expr ofs = expr::mkFreshVar("localblk_ofs", expr::mkUInt(0, bits_for_offset));
+  Pointer this_ofs = *this + ofs;
+  Pointer other_ofs = other + ofs;
+
+  // Dereferenceability of this and other ptr is already encoded by
+  // ParamAttrs::encode.
+  return ofs.ugt(expr::mkUInt(size, ofs))
+      .implies(this_ofs.encodeLoadedByteRefined(other_ofs, undefs));
+}
+
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
-                             unsigned byval_bytes) const {
+                             unsigned byval_bytes, bool readsbytes) const {
   expr size = blockSizeOffsetT();
   expr off = getOffsetSizet();
   expr size2 = other.blockSizeOffsetT();
   expr off2 = other.getOffsetSizet();
 
-  // TODO: check block value for byval_bytes
-  if (byval_bytes)
-    return true;
+  if (byval_bytes) {
+    // If a value is passed as byval, it must be read.
+    assert(readsbytes);
+    return encodeByValArgRefinement(other, undef, byval_bytes);
+  }
 
-  expr local
-    = expr::mkIf(isHeapAllocated(),
-                 getAllocType() == other.getAllocType() &&
-                   off == off2 && size == size2,
+  expr islocal = isLocal();
+  expr local = false;
+  if (!islocal.isFalse() &&
+      (!other.isLocal().isFalse() || !other.isByval().isFalse()))
+    local = encodeLocalPtrRefinement(other, undef, readsbytes);
 
-                 expr::mkIf(off.sge(0),
-                            off2.sge(0) &&
-                              expr::mkIf(off.ule(size),
-                                         off2.ule(size2) && off2.uge(off) &&
-                                           (size2 - off2).uge(size - off),
-                                         off2.ugt(size2) && off == off2 &&
-                                           size2.uge(size)),
-                            // maintains same dereferenceability before/after
-                            off == off2 && size2.uge(size)));
   local = (other.isLocal() || other.isByval()) && local;
-
-  // TODO: this induces an infinite loop
-  // block_refined(other);
 
   return expr::mkIf(isNull(), other.isNull(),
                     expr::mkIf(isLocal(), local, *this == other) &&

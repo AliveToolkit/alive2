@@ -1,6 +1,3 @@
-; To support this test, escaped local blocks should have bytes updated after
-; unkown fn calls.
-
 target datalayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:128:128-n8:16:32"
 target triple = "i386-apple-darwin10"
 
@@ -10,7 +7,7 @@ target triple = "i386-apple-darwin10"
 define i32 @src() noinline {
   %x = alloca %struct1, align 8
   %y = alloca %struct2, align 8
-  call void @bar(%struct1* sret(%struct1) %x)
+  call void @bar(%struct1* %x)
 
   %gepn1 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 0
   store i32 0, i32* %gepn1, align 8
@@ -31,7 +28,7 @@ define i32 @tgt() noinline {
   %x = alloca %struct1, align 8
   %y = alloca %struct2, align 8
   %y1 = bitcast %struct2* %y to %struct1*
-  call void @bar(%struct1* sret(%struct1) %y1)
+  call void @bar(%struct1* %y1)
   %gepn1 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 0
   store i32 0, i32* %gepn1, align 8
   %gepn2 = getelementptr inbounds %struct2, %struct2* %y, i32 0, i32 0, i32 1
@@ -43,4 +40,6 @@ define i32 @tgt() noinline {
   ret i32 %ret
 }
 
-declare void @bar(%struct1* sret(%struct1))
+declare void @bar(%struct1*)
+
+; ERROR: Source is more defined than target

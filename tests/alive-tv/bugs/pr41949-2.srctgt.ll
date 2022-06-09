@@ -1,5 +1,4 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=41949
-; To detect a bug from this, bytes of escaped local blocks should be checked
 
 ;source_filename = "41949.ll"
 target datalayout = "E"
@@ -23,3 +22,5 @@ define void @tgt(i32* %p) {
 }
 
 declare void @test1(i32*)
+
+; ERROR: Source is more defined than target

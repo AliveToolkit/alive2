@@ -195,11 +195,17 @@ class Memory {
                    const smt::expr &bytes, const smt::expr &val,
                    const std::set<smt::expr> &undef, uint64_t align);
 
-  smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
+  // If bid_other == nullopt, it encodes the non-local block refinement
+  // Otherwise, it encodes the local block refinement between bid and *bid_other
+  smt::expr blockValRefined(const Memory &other, unsigned bid,
+                            std::optional<unsigned> another_local_bid,
                             const smt::expr &offset,
                             std::set<smt::expr> &undef) const;
   smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
+                         std::optional<unsigned> bid_other,
                          std::set<smt::expr> &undef) const;
+  smt::expr blockPropertiesRefined(const Pointer &src, const Pointer &tgt)
+                                   const;
 
   void mkLocalDisjAddrAxioms(const smt::expr &allocated,
                              const smt::expr &short_bid,
