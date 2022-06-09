@@ -243,6 +243,11 @@ public:
     bool nowrite;
     bool nocapture;
 
+    PtrInput(StateValue &&val, uint64_t byval, bool noread, bool nowrite,
+             bool nocapture) :
+      val(std::move(val)), byval(byval), noread(noread), nowrite(nowrite),
+      nocapture(nocapture) {}
+
     smt::expr operator==(const PtrInput &rhs) const;
     bool eq_attrs(const PtrInput &rhs) const;
     auto operator<=>(const PtrInput &rhs) const = default;

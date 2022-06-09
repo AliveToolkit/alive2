@@ -744,9 +744,11 @@ expr State::FnCallInput::refinedBy(
     auto restrict_ptrs2 = argmemonly ? &args_ptr2 : nullptr;
     if (modifies_bid != -1u) {
       dummy1.emplace_back(
-        StateValue(Pointer(m, modifies_bid, false).release(), true));
+        StateValue(Pointer(m, modifies_bid, false).release(), true), 0, false,
+        false, false);
       dummy2.emplace_back(
-        StateValue(Pointer(m2, modifies_bid, false).release(), true));
+        StateValue(Pointer(m2, modifies_bid, false).release(), true), 0, false,
+        false, false);
       restrict_ptrs = &dummy1;
       restrict_ptrs2 = &dummy2;
     }
