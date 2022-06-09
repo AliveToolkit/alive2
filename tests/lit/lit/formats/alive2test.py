@@ -34,7 +34,7 @@ def is_timeout(str):
   return str.find('ERROR: Timeout') > 0
 
 def id_check(fn, cmd, args):
-  out, err, exitCode = executeCommand(cmd + args + ["-always-verify"])
+  out, err, exitCode = executeCommand(cmd + args)
   str = out + err
   if not is_timeout(str) and (exitCode != 0 or str.find(ok_string) < 0):
     raise Exception(fn + ' identity check fail: ' + str)
@@ -76,13 +76,13 @@ class Alive2Test(TestFormat):
     alive_tv_2 = test.endswith('.src.ll')
     alive_tv_3 = test.endswith('.ident.ll')
     if alive_tv_1 or alive_tv_2 or alive_tv_3:
-      cmd = ['./alive-tv', '-smt-to=20000']
+      cmd = ['./alive-tv', '-smt-to=20000', '-always-verify']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
 
     opt_tv = test.endswith('.opt.ll')
     if opt_tv:
-      cmd = ['./opt-alive-test.sh', '-disable-output']
+      cmd = ['./opt-alive-test.sh', '-disable-output', '-tv-always-verify']
       if not os.path.isfile('opt-alive-test.sh'):
         return lit.Test.UNSUPPORTED, ''
 
@@ -128,7 +128,8 @@ class Alive2Test(TestFormat):
     if alive_tv_2:
       cmd.append(test.replace('.src.ll', '.tgt.ll'))
     elif alive_tv_3:
-      cmd = cmd + [test, '-always-verify']
+      cmd.append(test)
+
     out, err, exitCode = executeCommand(cmd)
     output = out + err
 
