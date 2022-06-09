@@ -75,7 +75,7 @@ struct LoopLikeFunctionApproximator {
     if (is_last)
       s.addPre(prefix().implies(!continue_i));
 
-    if (is_last || continue_i.isFalse() || ub.isFalse())
+    if (is_last || continue_i.isFalse() || ub.isFalse() || !s.isViablePath())
       return { std::move(res_i), std::move(np_i), std::move(ub) };
 
     prefix.add(continue_i);

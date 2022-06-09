@@ -213,6 +213,7 @@ public:
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
   void addNoReturn(const smt::expr &cond);
+  bool isViablePath() const { return domain.UB; }
 
   std::vector<StateValue>
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
