@@ -4242,7 +4242,7 @@ StateValue ShuffleVector::toSMT(State &s) const {
 
   for (auto m : mask) {
     if (m >= 2 * sz) {
-      vals.emplace_back(UndefValue(vty->getChild(0)).toSMT(s).value, true);
+      vals.emplace_back(vty->getChild(0).getDummyValue(false));
     } else {
       auto *vect = &s[m < sz ? *v1 : *v2];
       vals.emplace_back(vty->extract(*vect, m % sz));
