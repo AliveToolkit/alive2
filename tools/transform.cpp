@@ -209,6 +209,16 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
         }
       }
 
+      if (auto call = dynamic_cast<const FnCall*>(var)) {
+        if (m.eval(val.return_domain).isTrue()) {
+          s << *var << " = function did not return!\n";
+          break;
+        } else if (var->isVoid()) {
+          s << "Function " << call->getFnName() << " returned\n";
+          continue;
+        }
+      }
+
       if (!dynamic_cast<const Return*>(var) && // domain always false after exec
           !m.eval(val.domain).isTrue()) {
         s << *var << " = UB triggered!\n";
@@ -380,11 +390,12 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
 static void
 check_refinement(Errors &errs, const Transform &t, const State &src_state,
                  const State &tgt_state, const Value *var, const Type &type,
-                 const expr &fndom_a, const State::ValTy &ap,
-                 const expr &fndom_b, const State::ValTy &bp,
+                 const State::ValTy &ap, const State::ValTy &bp,
                  bool check_each_var) {
-  auto &dom_a = ap.domain;
-  auto &dom_b = bp.domain;
+  auto &fndom_a  = ap.domain;
+  auto &fndom_b  = bp.domain;
+  auto &retdom_a = ap.return_domain;
+  auto &retdom_b = bp.return_domain;
   auto &a = ap.val;
   auto &b = bp.val;
 
@@ -483,10 +494,10 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
   // 2. Check return domain (noreturn check)
   {
     expr dom_constr;
-    if (dom_a.eq(fndom_a) && dom_b.eq(fndom_b)) { // A /\ B /\ A != B
+    if (retdom_a.eq(fndom_a) && retdom_b.eq(fndom_b)) { // A /\ B /\ A != B
       dom_constr = false;
     } else {
-      dom_constr = (fndom_a && fndom_b) && dom_a != dom_b;
+      dom_constr = (fndom_a && fndom_b) && retdom_a != retdom_b;
     }
 
     CHECK(std::move(dom_constr),
@@ -503,7 +514,7 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
   };
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
-  expr dom = dom_a && dom_b;
+  expr dom = retdom_a && retdom_b;
 
   CHECK(dom && !poison_cnstr,
         print_value, "Target is more poisonous than source");
@@ -1194,16 +1205,14 @@ Errors TransformVerify::verify() const {
 
         auto &val_tgt = tgt_state->at(*tgt_instrs.at(name));
         check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
-                         val.domain, val, val_tgt.domain, val_tgt,
-                         check_each_var);
+                         val, val_tgt, check_each_var);
         if (errs)
           return errs;
       }
     }
 
     check_refinement(errs, t, *src_state, *tgt_state, nullptr, t.src.getType(),
-                     src_state->functionDomain()(), src_state->returnVal(),
-                     tgt_state->functionDomain()(), tgt_state->returnVal(),
+                     src_state->returnVal(), tgt_state->returnVal(),
                      check_each_var);
   } catch (AliveException e) {
     return std::move(e);

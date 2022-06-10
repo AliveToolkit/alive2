@@ -150,9 +150,11 @@ void State::resetGlobals() {
 
 const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
+  domain.noreturn = false;
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy{std::move(val), domain.UB(), std::move(undef_vars)});
+  values.emplace_back(&v, ValTy{std::move(val), domain.noreturn, domain.UB(),
+                                std::move(undef_vars)});
   analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
@@ -386,7 +388,7 @@ StateValue* State::no_more_tmp_slots() {
 
 const StateValue& State::operator[](const Value &val) {
   auto &[var, val_uvars] = values[values_map.at(&val)];
-  auto &[sval, _ub, uvars] = val_uvars;
+  auto &[sval, _retdom, _ub, uvars] = val_uvars;
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
@@ -661,6 +663,7 @@ void State::addUB(AndExpr &&ubs) {
 void State::addNoReturn(const expr &cond) {
   if (cond.isFalse())
     return;
+  domain.noreturn = cond;
   return_memory.add(memory, domain.path && cond);
   function_domain.add(domain() && cond);
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());

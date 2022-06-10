@@ -51,14 +51,16 @@ void sym_exec(State &s) {
     for (auto &i : bb->instrs()) {
       if (first && dynamic_cast<const JumpInstr *>(&i))
         s.finishInitializer();
-      auto &[val, ub, uvars] = s.exec(i);
+      auto &val = s.exec(i);
       auto &name = i.getName();
 
       if (config::symexec_print_each_value) {
         dbg() << name;
         if (name[0] == '%')
-          dbg() << " = " << val << " /";
-        dbg() << " UB=" << ub << '\n';
+          dbg() << " = " << val.val << " /";
+        dbg() << " UB=" << val.domain << '\n';
+        if (!val.return_domain.isFalse())
+          dbg() << " RET=" << val.return_domain  << '\n';
       }
     }
 
@@ -67,8 +69,8 @@ void sym_exec(State &s) {
 
   if (config::symexec_print_each_value) {
     auto ret = s.returnVal();
-    dbg() << "domain = " << s.functionDomain()
-          << "\nreturn domain = " << ret.domain
+    dbg() << "domain = " << ret.domain
+          << "\nreturn domain = " << ret.return_domain
           << "\nreturn = " << ret.val
           << s.returnMemory() << "\n\n";
   }

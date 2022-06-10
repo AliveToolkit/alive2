@@ -28,6 +28,7 @@ class State {
 public:
   struct ValTy {
     StateValue val;
+    smt::expr return_domain;
     smt::expr domain;
     std::set<smt::expr> undef_vars;
   };
@@ -36,6 +37,7 @@ private:
   struct CurrentDomain {
     smt::expr path = true; // path from fn entry
     smt::AndExpr UB;
+    smt::expr noreturn;
     std::set<smt::expr> undef_vars;
 
     smt::expr operator()() const;
@@ -250,12 +252,12 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
   const auto& getFnQuantVars() const { return fn_call_qvars; }
 
-  auto& functionDomain() const { return function_domain; }
   smt::expr sinkDomain() const;
   Memory returnMemory() const { return *return_memory(); }
 
   ValTy returnVal() const {
-    return { *return_val(), return_domain(), return_undef_vars };
+    return { *return_val(), return_domain(), function_domain(),
+             return_undef_vars };
   }
 
   smt::expr getJumpCond(const BasicBlock &src, const BasicBlock &dst) const;
