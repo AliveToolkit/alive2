@@ -150,7 +150,7 @@ void State::resetGlobals() {
 
 const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
-  domain.noreturn = false;
+  domain.noreturn = true;
   auto val = v.toSMT(*this);
   ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
   values.emplace_back(&v, ValTy{std::move(val), domain.noreturn, domain.UB(),
@@ -663,7 +663,7 @@ void State::addUB(AndExpr &&ubs) {
 void State::addNoReturn(const expr &cond) {
   if (cond.isFalse())
     return;
-  domain.noreturn = cond;
+  domain.noreturn = !cond;
   return_memory.add(memory, domain.path && cond);
   function_domain.add(domain() && cond);
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());

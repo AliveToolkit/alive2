@@ -59,7 +59,7 @@ void sym_exec(State &s) {
         if (name[0] == '%')
           dbg() << " = " << val.val << " /";
         dbg() << " UB=" << val.domain << '\n';
-        if (!val.return_domain.isFalse())
+        if (!val.return_domain.isTrue())
           dbg() << " RET=" << val.return_domain  << '\n';
       }
     }

@@ -210,7 +210,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       }
 
       if (auto call = dynamic_cast<const FnCall*>(var)) {
-        if (m.eval(val.return_domain).isTrue()) {
+        if (m.eval(val.return_domain).isFalse()) {
           s << *var << " = function did not return!\n";
           break;
         } else if (var->isVoid()) {
@@ -515,6 +515,8 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr dom = retdom_a && retdom_b;
+  if (check_each_var)
+    dom &= fndom_a && fndom_b;
 
   CHECK(dom && !poison_cnstr,
         print_value, "Target is more poisonous than source");
