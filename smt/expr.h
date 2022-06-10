@@ -339,6 +339,8 @@ public:
   expr simplify() const;
   expr simplifyNoTimeout() const;
 
+  expr foldTopLevel() const;
+
   // replace v1 -> v2
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
@@ -356,6 +358,7 @@ public:
   void printHexadecimal(std::ostream &os) const;
   std::string numeral_string() const;
   std::string fn_name() const; // empty if not a function
+  unsigned getFnNumArgs() const;
   expr getFnArg(unsigned i) const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);
 
