@@ -564,8 +564,7 @@ expr Pointer::isNoWrite() const {
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
-  // Null pointer exists if either source or target uses it.
-  assert(has_null_block);
+  assert(has_null_block || has_null_pointer);
   // A null pointer points to block 0 without any attribute.
   return { m, 0, false };
 }

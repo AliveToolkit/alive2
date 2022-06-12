@@ -1100,8 +1100,8 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   if (memory_unused())
     return;
 
-  next_nonlocal_bid
-    = has_null_block + num_globals_src + num_ptrinputs + has_fncall;
+  next_nonlocal_bid = (has_null_pointer || has_null_block) + num_globals_src +
+                      num_ptrinputs + has_fncall;
 
   if (has_null_block)
     non_local_block_val.emplace_back();
@@ -1233,7 +1233,8 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
-  unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
+  unsigned max_bid
+    = (has_null_pointer || has_null_block) + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
   Pointer p(*this, name, false, false, false, attrs);
   auto bid = p.getShortBid();

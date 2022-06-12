@@ -817,7 +817,6 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t max_access_size = 0;
   uint64_t min_global_size = UINT64_MAX;
 
-  bool nullptr_is_used = false;
   bool has_int2ptr     = false;
   bool has_ptr2int     = false;
   has_alloca       = false;
@@ -826,6 +825,7 @@ static void calculateAndInitConstants(Transform &t) {
   has_free         = false;
   has_fncall       = false;
   has_write_fncall = false;
+  has_null_pointer = false;
   has_null_block   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
@@ -863,8 +863,8 @@ static void calculateAndInitConstants(Transform &t) {
       }
       if (i->hasAttribute(ParamAttrs::DereferenceableOrNull)) {
         // Optimization: unless explicitly compared with a null pointer, don't
-        // set nullptr_is_used to true.
-        // Null constant pointer will set nullptr_is_used to true anyway.
+        // set has_null_pointer to true.
+        // Null constant pointer will set has_null_pointer to true anyway.
         // Note that dereferenceable_or_null implies num_ptrinputs > 0,
         // which may turn has_null_block on.
         does_mem_access = true;
@@ -894,7 +894,7 @@ static void calculateAndInitConstants(Transform &t) {
         ++cur_num_locals;
 
       for (auto op : i.operands()) {
-        nullptr_is_used |= has_nullptr(op);
+        has_null_pointer |= has_nullptr(op);
         update_min_vect_sz(op->getType());
       }
 
@@ -981,11 +981,13 @@ static void calculateAndInitConstants(Transform &t) {
 
   // check if null block is needed
   // Global variables cannot be null pointers
-  has_null_block = num_null_ptrinputs > 0 || nullptr_is_used || has_malloc ||
+  has_null_block = num_null_ptrinputs > 0 || has_null_pointer || has_malloc ||
                   has_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
                       num_inaccessiblememonly_fns + has_null_block;
+
+  has_null_block &= !t.src.getFnAttrs().has(FnAttrs::NullPointerIsValid);
 
   // Allow at least one non-const global for calls to change
   num_nonlocals_src += has_write_fncall;
@@ -1084,7 +1086,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nstrlen_unroll_cnt: " << strlen_unroll_cnt
                   << "\nmemcmp_unroll_cnt: " << memcmp_unroll_cnt
                   << "\nlittle_endian: " << little_endian
-                  << "\nnullptr_is_used: " << nullptr_is_used
+                  << "\nnullptr_is_used: " << has_null_pointer
                   << "\nobserves_addresses: " << observes_addresses
                   << "\nhas_malloc: " << has_malloc
                   << "\nhas_free: " << has_free

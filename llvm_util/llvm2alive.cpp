@@ -1390,6 +1390,10 @@ public:
         attrs.set(FnAttrs::WillReturn);
         break;
 
+      case llvm::Attribute::NullPointerIsValid:
+        attrs.set(FnAttrs::NullPointerIsValid);
+        break;
+
       default:
         break;
       }

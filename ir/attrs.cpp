@@ -70,6 +70,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " dereferenceable_or_null(" << attr.derefOrNullBytes << ')';
   if (attr.has(FnAttrs::InaccessibleMemOnly))
     os << " inaccessiblememonly";
+  if (attr.has(FnAttrs::NullPointerIsValid))
+    os << " null_pointer_is_valid";
   return os;
 }
 

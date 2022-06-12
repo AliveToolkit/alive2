@@ -58,7 +58,8 @@ public:
                    NoFree = 1 << 7, NoUndef = 1 << 8, Align = 1 << 9,
                    NoThrow = 1 << 10, NoAlias = 1 << 11, WillReturn = 1 << 12,
                    DereferenceableOrNull = 1 << 13,
-                   InaccessibleMemOnly = 1 << 14 };
+                   InaccessibleMemOnly = 1 << 14,
+                   NullPointerIsValid = 1 << 15 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 

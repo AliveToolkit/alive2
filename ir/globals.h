@@ -78,8 +78,11 @@ extern bool has_nowrite;
 /// Whether there are allocas that are initially dead (need start_lifetime)
 extern bool has_dead_allocas;
 
-/// Whether there is a pointer that can point to the null block
-/// ex) undef ptr constant, fn arg
+/// Whether there null pointers appear in the program
+extern bool has_null_pointer;
+
+/// Whether the null block should be allocated, i.e., null is not
+/// dereferenceable
 extern bool has_null_block;
 
 /// Whether the programs do memory accesses that load/store int/ptrs

@@ -39,6 +39,7 @@ bool has_nocapture;
 bool has_noread;
 bool has_nowrite;
 bool has_dead_allocas;
+bool has_null_pointer;
 bool has_null_block;
 bool does_int_mem_access;
 bool does_ptr_mem_access;
