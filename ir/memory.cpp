@@ -44,12 +44,13 @@ static bool is_globalvar(unsigned bid, bool include_tgt) {
   return srcglb || (include_tgt && tgtglb);
 }
 
-static bool is_constglb(unsigned bid) {
+static bool is_constglb(unsigned bid, bool src_only = false) {
   if (has_null_block <= bid && bid < num_consts_src + has_null_block) {
     // src constglb
     assert(is_globalvar(bid, false));
     return true;
-  } else if (num_nonlocals_src <= bid && bid < num_nonlocals) {
+  }
+  if (!src_only && num_nonlocals_src <= bid && bid < num_nonlocals) {
     // tgt constglb
     assert(!is_globalvar(bid, false) &&
             is_globalvar(bid, true));
@@ -89,13 +90,15 @@ static bool always_alive(unsigned bid) {
 }
 
 // bid: nonlocal block id
-static bool always_noread(unsigned bid) {
-  return bid < has_null_block || is_fncall_mem(bid);
+static bool always_noread(unsigned bid, bool is_fncall_accessible = false) {
+  return (!null_is_dereferenceable && bid < has_null_block) ||
+         (!is_fncall_accessible && is_fncall_mem(bid));
 }
 
 // bid: nonlocal block id
-static bool always_nowrite(unsigned bid) {
-  return always_noread(bid) || is_constglb(bid);
+static bool always_nowrite(unsigned bid, bool src_only = false,
+                           bool is_fncall_accessible = false) {
+  return always_noread(bid, is_fncall_accessible) || is_constglb(bid, src_only);
 }
 
 
@@ -726,7 +729,7 @@ unsigned Memory::numNonlocals() const {
 expr Memory::isBlockAlive(const expr &bid, bool local) const {
   return
     load_bv(local ? local_block_liveness : non_local_block_liveness, bid) &&
-      (!local && has_null_block ? bid != 0 : true);
+      (!local && has_null_block && !null_is_dereferenceable ? bid != 0 : true);
 }
 
 bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
@@ -809,12 +812,11 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
     for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
         continue;
-
-      unsigned i = 0;
-      if (!local)
-        i = has_null_block + write * num_consts_src;
-
-      for (unsigned e = local ? sz_local : sz_nonlocal; i < e; ++i) {
+      for (unsigned i = 0, e = local ? sz_local : sz_nonlocal; i < e; ++i) {
+        if (write && !local && always_nowrite(i))
+          continue;
+        if (!write && !local && always_noread(i))
+          continue;
         check_alias(this_alias, local, i, offset);
       }
     }
@@ -1064,8 +1066,10 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
   if (!does_ptr_mem_access)
     return;
 
-  for (unsigned i = has_null_block + skip_consts * num_consts_src,
-       e = numNonlocals(); i != e; ++i) {
+  for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
+    if (always_nowrite(i))
+      continue;
+
     Byte byte(*this, non_local_block_val[i].val.load(offset));
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
@@ -1100,14 +1104,15 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   if (memory_unused())
     return;
 
-  next_nonlocal_bid = (has_null_pointer || has_null_block) + num_globals_src +
-                      num_ptrinputs + has_fncall;
+  next_nonlocal_bid
+    = has_null_block + num_globals_src + num_ptrinputs + has_fncall;
 
-  if (has_null_block)
+  bool skip_null = has_null_block && !null_is_dereferenceable;
+  if (skip_null)
     non_local_block_val.emplace_back();
 
   // TODO: should skip initialization of fully initialized constants
-  for (unsigned bid = has_null_block, e = numNonlocals(); bid != e; ++bid) {
+  for (unsigned bid = skip_null, e = numNonlocals(); bid != e; ++bid) {
     non_local_block_val.emplace_back(mk_block_val_array(bid));
   }
 
@@ -1130,7 +1135,7 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   }
 
   // Initialize a memory block for null pointer.
-  if (has_null_block)
+  if (skip_null)
     alloc(expr::mkUInt(0, bits_size_t), bits_byte / 8, GLOBAL, false, false, 0);
 }
 
@@ -1140,6 +1145,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
     return;
 
   auto skip_bid = [&](unsigned bid) {
+    if (bid == 0 && has_null_block && !null_is_dereferenceable)
+      return true;
     if (is_globalvar(bid, true))
       return false;
     if (is_fncall_mem(bid))
@@ -1150,7 +1157,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
   // transformation can increase alignment
   expr align = expr::mkUInt(ilog2(heap_block_alignment), 6);
 
-  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+  for (unsigned bid = 0; bid < num_nonlocals_src; ++bid) {
     if (skip_bid(bid))
       continue;
     Pointer p(*this, bid, false);
@@ -1176,8 +1183,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(Pointer::mkNullPointer(*this).getAddress(false) == 0);
 
   // Non-local blocks are disjoint.
-  // Ignore null pointer block
-  for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
+  for (unsigned bid = 0; bid < num_nonlocals; ++bid) {
     if (skip_bid(bid))
       continue;
 
@@ -1186,7 +1192,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
-    state->addAxiom(addr != 0);
+    if (!has_null_block || bid != 0)
+      state->addAxiom(addr != 0);
 
     // Ensure block ptr doesn't overflow
     // Note: the aligned case is handled in alloc()
@@ -1233,8 +1240,7 @@ void Memory::markByVal(unsigned bid) {
 }
 
 expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
-  unsigned max_bid
-    = (has_null_pointer || has_null_block) + num_globals_src + next_ptr_input++;
+  unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
   Pointer p(*this, name, false, false, false, attrs);
   auto bid = p.getShortBid();
@@ -1403,9 +1409,10 @@ Memory::mkCallState(const string &fnname, bool nofree,
   if (inaccessiblememonly) {
     st.non_local_block_val.emplace_back(expr::mkFreshVar("blk_val", blk_type));
   } else {
-    unsigned num_consts = has_null_block + num_consts_src;
     unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
-    for (unsigned i = num_consts; i < limit; ++i) {
+    for (unsigned i = 0; i < limit; ++i) {
+      if (always_nowrite(i, true, true))
+        continue;
       st.non_local_block_val.emplace_back(
         expr::mkFreshVar("blk_val", blk_type));
     }
@@ -1424,7 +1431,6 @@ void Memory::setState(const Memory::CallState &st,
                       unsigned modifies_bid) {
   assert(has_fncall);
 
-  unsigned num_consts = has_null_block + num_consts_src;
   unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
 
   // 1) Havoc memory
@@ -1440,7 +1446,11 @@ void Memory::setState(const Memory::CallState &st,
   }
   // argmemonly fncall
   else if (ptr_inputs) {
-    for (unsigned bid = num_consts; bid < limit - has_write_fncall; ++bid) {
+    unsigned idx = 0;
+    for (unsigned bid = 0; bid < limit - has_write_fncall; ++bid) {
+      if (always_nowrite(bid, true, true))
+        continue;
+
       expr modifies(false);
       for (auto &ptr_in : *ptr_inputs) {
         if (ptr_in.nowrite)
@@ -1452,25 +1462,31 @@ void Memory::setState(const Memory::CallState &st,
         }
       }
 
-      auto &new_val = st.non_local_block_val[bid - num_consts];
+      auto &new_val = st.non_local_block_val[idx++];
       auto &cur_val = non_local_block_val[bid].val;
       cur_val = expr::mkIf(modifies, new_val, cur_val);
       if (modifies.isTrue())
         non_local_block_val[bid].undef.clear();
     }
+    assert(idx == st.non_local_block_val.size() - has_write_fncall);
+
   // generic fncall
   } else {
-    for (unsigned bid = num_consts; bid < limit; ++bid) {
-      non_local_block_val[bid].val = st.non_local_block_val[bid - num_consts];
+    unsigned idx = 0;
+    for (unsigned bid = 0; bid < limit; ++bid) {
+      if (always_nowrite(bid, true, true))
+        continue;
+      non_local_block_val[bid].val = st.non_local_block_val[idx++];
       non_local_block_val[bid].undef.clear();
     }
+    assert(idx == st.non_local_block_val.size());
   }
 
   if (!st.non_local_liveness.isAllOnes()) {
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
-    expr mask = has_null_block ? one : zero;
-    for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
+    expr mask = always_nowrite(0) ? one : zero;
+    for (unsigned bid = always_nowrite(0); bid < num_nonlocals; ++bid) {
       expr may_free = true;
       if (ptr_inputs) {
         may_free = false;
@@ -2004,7 +2020,7 @@ tuple<expr, Pointer, set<expr>>
 Memory::refined(const Memory &other, bool fncall,
                 const vector<PtrInput> *set_ptrs,
                 const vector<PtrInput> *set_ptrs2) const {
-  if (num_nonlocals <= has_null_block)
+  if (num_nonlocals == 0)
     return { true, Pointer(*this, expr()), {} };
 
   assert(!memory_unused());
@@ -2039,8 +2055,10 @@ Memory::refined(const Memory &other, bool fncall,
     }
   }
 
-  unsigned bid = has_null_block + fncall * num_consts_src;
-  for (; bid < num_nonlocals_src; ++bid) {
+  for (unsigned bid = 0; bid < num_nonlocals_src; ++bid) {
+    if ((fncall || bid == 0) && always_nowrite(bid, true, true))
+      continue;
+
     if (!block_alias.mayAlias(false, bid))
       continue;
 
@@ -2077,8 +2095,9 @@ expr Memory::checkNocapture() const {
   auto offset = expr::mkVar(name.c_str(), Pointer::bitsShortOffset());
   expr res(true);
 
-  for (unsigned bid = has_null_block + num_consts_src; bid < numNonlocals();
-       ++bid) {
+  for (unsigned bid = 0; bid < numNonlocals(); ++bid) {
+    if (always_nowrite(bid))
+      continue;
     Pointer p(*this, bid, false);
     Byte b(*this, non_local_block_val[bid].val.load(offset));
     Pointer loadp(*this, b.ptrValue());
@@ -2114,8 +2133,9 @@ void Memory::escapeLocalPtr(const expr &ptr) {
 Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   assert(then.state == els.state);
   Memory ret(then);
-  for (unsigned bid = has_null_block + num_consts_src, end = ret.numNonlocals();
-       bid < end; ++bid) {
+  for (unsigned bid = 0, end = ret.numNonlocals(); bid < end; ++bid) {
+    if (always_nowrite(bid, false, true))
+      continue;
     auto &other = els.non_local_block_val[bid];
     ret.non_local_block_val[bid].val
       = expr::mkIf(cond, then.non_local_block_val[bid].val, other.val);

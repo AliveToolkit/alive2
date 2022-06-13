@@ -443,7 +443,7 @@ void Pointer::isDisjointOrEqual(const expr &len1, const Pointer &ptr2,
 
 expr Pointer::isBlockAlive() const {
   // NULL block is dead
-  if (has_null_block && getBid().isZero())
+  if (has_null_block && !null_is_dereferenceable & getBid().isZero())
     return false;
 
   auto bid = getShortBid();
@@ -527,6 +527,8 @@ expr Pointer::isWritable() const {
         (num_consts_src ? bid.ugt(has_null_block + num_consts_src - 1) : true);
   if (m.numNonlocals() > num_nonlocals_src)
     non_local &= bid.ult(num_nonlocals_src);
+  if (has_null_block && null_is_dereferenceable)
+    non_local |= bid == 0;
   return isLocal() || non_local;
 }
 
@@ -564,7 +566,7 @@ expr Pointer::isNoWrite() const {
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {
-  assert(has_null_block || has_null_pointer);
+  assert(has_null_block);
   // A null pointer points to block 0 without any attribute.
   return { m, 0, false };
 }

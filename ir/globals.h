@@ -81,9 +81,10 @@ extern bool has_dead_allocas;
 /// Whether there null pointers appear in the program
 extern bool has_null_pointer;
 
-/// Whether the null block should be allocated, i.e., null is not
-/// dereferenceable
+/// Whether the null block should be allocated
 extern bool has_null_block;
+
+extern bool null_is_dereferenceable;
 
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;

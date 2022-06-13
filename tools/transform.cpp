@@ -817,6 +817,7 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t max_access_size = 0;
   uint64_t min_global_size = UINT64_MAX;
 
+  bool has_null_pointer = false;
   bool has_int2ptr     = false;
   bool has_ptr2int     = false;
   has_alloca       = false;
@@ -825,7 +826,6 @@ static void calculateAndInitConstants(Transform &t) {
   has_free         = false;
   has_fncall       = false;
   has_write_fncall = false;
-  has_null_pointer = false;
   has_null_block   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
@@ -987,7 +987,7 @@ static void calculateAndInitConstants(Transform &t) {
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
                       num_inaccessiblememonly_fns + has_null_block;
 
-  has_null_block &= !t.src.getFnAttrs().has(FnAttrs::NullPointerIsValid);
+  null_is_dereferenceable = t.src.getFnAttrs().has(FnAttrs::NullPointerIsValid);
 
   // Allow at least one non-const global for calls to change
   num_nonlocals_src += has_write_fncall;
