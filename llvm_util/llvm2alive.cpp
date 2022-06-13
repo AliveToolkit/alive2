@@ -117,13 +117,13 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
   template <typename T>
   uint64_t alignment(T &i, llvm::Type *ty) const {
-    auto a = i.getAlignment();
+    auto a = i.getAlign().value();
     return a != 0 ? a : DL().getABITypeAlignment(ty);
   }
 
   template <typename T>
   uint64_t pref_alignment(T &i, llvm::Type *ty) const {
-    auto a = i.getAlignment();
+    auto a = i.getAlign().value();
     return a != 0 ? a : DL().getPrefTypeAlignment(ty);
   }
 
