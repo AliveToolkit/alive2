@@ -39,6 +39,22 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
 }
 
 
+static ostream& operator<<(ostream &os, FPDenormalAttrs::Type t) {
+  const char *str = nullptr;
+  switch (t) {
+  case FPDenormalAttrs::IEEE:         str = "ieee"; break;
+  case FPDenormalAttrs::PreserveSign: str = "preserve-sign"; break;
+  case FPDenormalAttrs::PositiveZero: str = "positive-zero"; break;
+  }
+  return os << str;
+}
+
+void FPDenormalAttrs::print(ostream &os, bool is_fp32) const {
+  os << " denormal-fp-math" << (is_fp32 ? "-f32=" : "=")
+     << output << ',' << input;
+}
+
+
 ostream& operator<<(ostream &os, const FnAttrs &attr) {
   if (attr.has(FnAttrs::NoRead))
     os << " noread";
@@ -72,6 +88,10 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " inaccessiblememonly";
   if (attr.has(FnAttrs::NullPointerIsValid))
     os << " null_pointer_is_valid";
+
+  attr.fp_denormal.print(os);
+  if (attr.fp_denormal32)
+    attr.fp_denormal32->print(os, true);
   return os;
 }
 
@@ -168,6 +188,21 @@ bool FnAttrs::undefImpliesUB() const {
   bool ub = has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull);
   assert(!ub || poisonImpliesUB());
   return ub;
+}
+
+void FnAttrs::setFPDenormal(FPDenormalAttrs attr, unsigned bits) {
+  switch (bits) {
+  case 0:  fp_denormal = attr; break;
+  case 32: fp_denormal32 = attr; break;
+  default: UNREACHABLE();
+  }
+}
+
+FPDenormalAttrs FnAttrs::getFPDenormal(const Type &ty) const {
+  switch (ty.bits()) {
+  case 32: return fp_denormal32.value_or(fp_denormal);
+  default: return fp_denormal;
+  }
 }
 
 pair<AndExpr, expr>

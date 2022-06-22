@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "smt/exprs.h"
+#include <optional>
 #include <ostream>
 
 namespace IR {
@@ -47,8 +48,17 @@ public:
       encode(const State &s, const StateValue &val, const Type &ty) const;
 };
 
+struct FPDenormalAttrs {
+  enum Type { IEEE, PreserveSign, PositiveZero };
+  Type input = IEEE;
+  Type output = IEEE;
+
+  void print(std::ostream &os, bool is_fp32 = false) const;
+};
 
 class FnAttrs final {
+  FPDenormalAttrs fp_denormal;
+  std::optional<FPDenormalAttrs> fp_denormal32;
   unsigned bits;
 
 public:
@@ -76,11 +86,14 @@ public:
   // Returns true if returning (partially) undef is UB
   bool undefImpliesUB() const;
 
-  friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
+  void setFPDenormal(FPDenormalAttrs attr, unsigned bits = 0);
+  FPDenormalAttrs getFPDenormal(const Type &ty) const;
 
   // Encodes the semantics of attributes using UB and poison.
   std::pair<smt::AndExpr, smt::expr>
       encode(const State &s, const StateValue &val, const Type &ty) const;
+
+  friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };
 
 

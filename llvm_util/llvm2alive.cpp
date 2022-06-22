@@ -1348,8 +1348,37 @@ public:
     }
   }
 
+  static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
+    if (str == "ieee")          return FPDenormalAttrs::IEEE;
+    if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
+    if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;
+    UNREACHABLE();
+  }
+
+  static FPDenormalAttrs parse_fp_denormal(string_view str) {
+    FPDenormalAttrs attr;
+    auto comma = str.find(',');
+    if (comma == string_view::npos) {
+      attr.input = attr.output = parse_fp_denormal_str(str);
+    } else {
+      attr.output = parse_fp_denormal_str(string_view(str.data(), comma));
+      attr.input  = parse_fp_denormal_str(str.data() + comma + 1);
+    }
+    return attr;
+  }
+
   void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
     for (const llvm::Attribute &llvmattr : aset) {
+      if (llvmattr.isStringAttribute()) {
+        auto str = llvmattr.getKindAsString();
+        auto val = llvmattr.getValueAsString();
+        if (str == "denormal-fp-math") {
+          attrs.setFPDenormal(parse_fp_denormal(val));
+        } else if (str == "denormal-fp-math-f32") {
+          attrs.setFPDenormal(parse_fp_denormal(val), 32);
+        }
+      }
+
       if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
           !llvmattr.isTypeAttribute())
         continue;
