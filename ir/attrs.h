@@ -54,6 +54,7 @@ struct FPDenormalAttrs {
   Type output = IEEE;
 
   void print(std::ostream &os, bool is_fp32 = false) const;
+  auto operator<=>(const FPDenormalAttrs &rhs) const = default;
 };
 
 class FnAttrs final {
@@ -88,6 +89,8 @@ public:
 
   void setFPDenormal(FPDenormalAttrs attr, unsigned bits = 0);
   FPDenormalAttrs getFPDenormal(const Type &ty) const;
+
+  bool refinedBy(const FnAttrs &other) const;
 
   // Encodes the semantics of attributes using UB and poison.
   std::pair<smt::AndExpr, smt::expr>

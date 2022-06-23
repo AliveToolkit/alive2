@@ -205,6 +205,19 @@ FPDenormalAttrs FnAttrs::getFPDenormal(const Type &ty) const {
   }
 }
 
+bool FnAttrs::refinedBy(const FnAttrs &other) const {
+  // check attributes that can't be added, removed, or changed
+  unsigned attrs =
+    NullPointerIsValid
+  ;
+
+  if ((bits & attrs) != (other.bits & attrs))
+    return false;
+
+  return fp_denormal == other.fp_denormal &&
+         fp_denormal32 == other.fp_denormal32;
+}
+
 pair<AndExpr, expr>
 FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
   AndExpr UB;
