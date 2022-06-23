@@ -1131,6 +1131,9 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
 }
 
 Errors TransformVerify::verify() const {
+  if (!t.src.getFnAttrs().refinedBy(t.tgt.getFnAttrs()))
+    return { "Function attributes not refined", true };
+
   {
     auto src_inputs = t.src.getInputs();
     auto tgt_inputs = t.tgt.getInputs();
