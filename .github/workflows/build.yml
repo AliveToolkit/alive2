@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-22.04]
-        compiler:   [g++-11, clang++-13, clang++-14]
+        compiler:   [g++-11, clang++-14, clang++-15]
         build_type: [Release, Debug]
         include:
           - os: macos-latest
@@ -28,19 +28,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          if [[ ${{ matrix.compiler }} == "clang++-13" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-13 main"
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-14" ]]; then
             sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-14 main"
           fi
+          if [[ ${{ matrix.compiler }} == "clang++-15" ]]; then
+            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
+          fi
           sudo apt-get update
           sudo apt-get install z3 re2c ninja-build g++-12
-          if [[ ${{ matrix.compiler }} == "clang++-13" ]]; then
-            sudo apt-get install clang++-13
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-14" ]]; then
             sudo apt-get install clang++-14
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-15" ]]; then
+            sudo apt-get install clang++-15
           fi
 
       - name: Install dependencies (MacOS)

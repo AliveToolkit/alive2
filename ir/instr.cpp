@@ -1302,7 +1302,7 @@ StateValue TernaryOp::toSMT(State &s) const {
   default:
     UNREACHABLE();
   }
-  return { move(e), np && a.non_poison && b.non_poison && c.non_poison };
+  return { std::move(e), np && a.non_poison && b.non_poison && c.non_poison };
   };
 
   if (getType().isVectorType()) {
