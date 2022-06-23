@@ -1027,9 +1027,10 @@ static Value* dup_aggregate(Function &f, Value *val) {
     for (auto v : agg->getVals()) {
       elems.emplace_back(dup_aggregate(f, v));
     }
-    auto agg_new = make_unique<AggregateValue>(agg->getType(), move(elems));
+    auto agg_new
+      = make_unique<AggregateValue>(agg->getType(), std::move(elems));
     auto ret = agg_new.get();
-    f.addAggregate(move(agg_new));
+    f.addAggregate(std::move(agg_new));
     return ret;
   }
   return val;
