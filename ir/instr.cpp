@@ -764,11 +764,13 @@ static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
 
 static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
                               const State &s, const Type &ty,
-                              FpRoundingMode rm) {
+                              FpRoundingMode rm,
+                              bool enable_subnormal_flush = true) {
   auto [v, np] = round_value_(fn, s, rm);
-  return { handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
-                            std::move(v)),
-           std::move(np) };
+  if (enable_subnormal_flush)
+    v = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
+                         std::move(v));
+  return { std::move(v), std::move(np) };
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -1087,7 +1089,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
     break;
   case FNeg:
     fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, ty, fmath);
+      return
+        fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, ty, fmath, true);
     };
     break;
   case Ceil:
@@ -1135,9 +1138,10 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
+    // NOTE: fneg doesn't flush to zero on denormal numbers
     return
       round_value([&](auto rm) { return fn(v.value, v.non_poison, ty, rm); },
-                  s, ty, rm);
+                  s, ty, rm, op != FNeg);
   };
 
   auto &v = s[*val];
