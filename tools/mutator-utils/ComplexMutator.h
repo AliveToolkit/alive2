@@ -1,6 +1,7 @@
 #pragma once
 #include "ComplexMutatorHelper.h"
 #include "simpleMutator.h"
+#include "llvm/ADT/StringSet.h"
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -153,6 +154,82 @@ public:
     return -1;
   }
 };
+
+/*
+  This class is responsible for generating different function mutants.
+*/
+class FunctionMutant {
+  llvm::Function *currentFunction,*functionInTmp;
+  llvm::ValueToValueMapTy& vMap;
+  llvm::Function::iterator bit,bitInTmp;
+  llvm::BasicBlock::iterator iit,iitInTmp;
+  DominatedValueVector domVals;
+  llvm::SmallVector<llvm::Value *> extraValues;
+  const llvm::StringSet<> &filterSet;
+  const llvm::SmallVector<llvm::Value *> &globals;
+  llvm::DominatorTree DT;
+  std::shared_ptr<llvm::Module*> tmpCopy;
+  void moveToNextInstruction();
+  void moveToNextBasicBlock();
+  void moveToNextMutant();
+  void resetIterator();
+  void calcDomVals();
+  void resetTmpCopy(std::shared_ptr<llvm::Module*> copy);
+
+  llvm::SmallVector<std::unique_ptr<ComplexMutatorHelper>> helpers;
+  llvm::SmallVector<int> helpersPossbility;
+  llvm::SmallVector<size_t> whenMoveToNextInstFuncs;
+  llvm::SmallVector<size_t> whenMoveToNextBasicBlockFuncs;
+  llvm::SmallVector<size_t> whenMoveToNextFuncFuncs;
+
+  void initAtNewBasicBlock();
+  void initAtNewInstruction();
+  void initAtFunctionEntry();
+
+  llvm::SmallVector<llvm::Instruction *> lazyUpdateInsts;
+  llvm::SmallVector<size_t> lazyUpdateArgPos;
+  llvm::SmallVector<llvm::Type *> lazyUpdateArgTys;
+
+  void setOperandRandomValue(llvm::Instruction *inst, size_t pos);
+  void addFunctionArguments(const llvm::SmallVector<llvm::Type *> &tys,
+                            llvm::ValueToValueMapTy &VMap);
+  void fixAllValues(llvm::SmallVector<llvm::Value *> &vals);
+
+
+  llvm::Value *getRandomConstant(llvm::Type *ty);
+  llvm::Value *getRandomDominatedValue(llvm::Type *ty);
+  llvm::Value *getRandomValueFromExtraValue(llvm::Type *ty);
+  llvm::Value *getRandomPointerValue(llvm::Type *ty);
+  llvm::Value* getRandomFromGlobal(llvm::Type* ty);
+  llvm::SmallVector<llvm::Value *(FunctionMutant::*)(llvm::Type *)> valueFuncs;
+  llvm::Value* getRandomValue(llvm::Type* ty);
+public:
+  FunctionMutant(llvm::Function *currentFunction,
+                  llvm::ValueToValueMapTy& vMap,
+                 const llvm::StringSet<> &filterSet,
+                 const llvm::SmallVector<llvm::Value *>& globals)
+      : currentFunction(currentFunction),vMap(vMap), filterSet(filterSet),
+        globals(globals) {
+    bit = currentFunction->begin();
+    iit = bit->begin();
+    for (auto it = currentFunction->arg_begin();
+         it != currentFunction->arg_end(); ++it) {
+      domVals.push_back(&*it);
+    }
+    DT = llvm::DominatorTree(*currentFunction);
+  }
+  llvm::Function *getCurrentFunction() const {
+    return currentFunction;
+  }
+  static bool canMutate(const llvm::Instruction& inst,
+                        const llvm::StringSet<> &filterSet);
+  static bool canMutate(const llvm::BasicBlock &block,
+                        const llvm::StringSet<> &filterSet);
+  static bool canMutate(const llvm::Function *function,
+                        const llvm::StringSet<> &filterSet);
+  void mutate();
+};
+
 /*
   This class is used for doing complex mutations on a given file.
   Current supported operation:
@@ -185,6 +262,7 @@ class ComplexMutator : public Mutator {
   std::unique_ptr<llvm::Module> tmpCopy;
   llvm::ValueToValueMapTy vMap;
   llvm::StringMap<llvm::DominatorTree> dtMap;
+  llvm::SmallVector<llvm::Value *> globals;
 
   llvm::Module::iterator fit, tmpFit;
   llvm::Function::iterator bit, tmpBit;
@@ -215,17 +293,18 @@ class ComplexMutator : public Mutator {
   llvm::SmallVector<size_t> whenMoveToNextFuncFuncs;
   llvm::Value *getRandomValue(llvm::Type *ty);
   /**
-   * @brief Set the Operand with Random Value 
-   * 
-   * @param inst 
-   * @param pos 
-   * if the type could be found in the environment. It has a possibility to make a new one or use existent.
-   * it not, it would definitely make a new one.
-   * Need to call fixAllValues() after this function called.
+   * @brief Set the Operand with Random Value
+   *
+   * @param inst
+   * @param pos
+   * if the type could be found in the environment. It has a possibility to make
+   * a new one or use existent. if not, it would definitely make a new one. Need
+   * to call fixAllValues() after this function called.
    */
   void setOperandRandomValue(llvm::Instruction *inst, size_t pos);
-  void addFunctionArguments(const llvm::SmallVector<llvm::Type *> &tys,llvm::ValueToValueMapTy& VMap);
-  void fixAllValues(llvm::SmallVector<llvm::Value*>& vals);
+  void addFunctionArguments(const llvm::SmallVector<llvm::Type *> &tys,
+                            llvm::ValueToValueMapTy &VMap);
+  void fixAllValues(llvm::SmallVector<llvm::Value *> &vals);
 
 public:
   ComplexMutator(bool debug = false)
@@ -262,9 +341,9 @@ public:
   virtual void setModule(std::unique_ptr<llvm::Module> &&ptr) override {
     tmpCopy = std::move(ptr);
   }
-  virtual void eraseFunctionInModule(const std::string& funcName) override{
-    if(tmpCopy!=nullptr){
-      if(llvm::Function* func=pm->getFunction(funcName);func!=nullptr){
+  virtual void eraseFunctionInModule(const std::string &funcName) override {
+    if (tmpCopy != nullptr) {
+      if (llvm::Function *func = pm->getFunction(funcName); func != nullptr) {
         func->eraseFromParent();
       }
     }
