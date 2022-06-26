@@ -5,6 +5,8 @@
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include <cassert>
+#include <iomanip>
+#include <sstream>
 
 using namespace smt;
 using namespace std;
@@ -39,9 +41,19 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
+static string double_to_string(double val, unsigned bits) {
+  auto str = to_string(val);
+  // no loss of precision
+  if (strtod(str.c_str(), nullptr) == val)
+    return str;
+
+  ostringstream os;
+  os << "0x" << hex << setfill('0') << setw(bits/4) << bit_cast<uint64_t>(val);
+  return std::move(os).str();
+}
 
 FloatConst::FloatConst(Type &type, double val)
-  : Constant(type, to_string(val)), val(val) {}
+  : Constant(type, double_to_string(val, type.bits())), val(val) {}
 
 FloatConst::FloatConst(Type &type, string val, bool bit_value)
   : Constant(type, string(val)), val(std::move(val)), bit_value(bit_value) {}
