@@ -4,6 +4,7 @@
 #include "ir/constant.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
+#include <bit>
 #include <cassert>
 #include <iomanip>
 #include <sstream>
