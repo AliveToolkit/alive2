@@ -34,7 +34,7 @@ protected:
 
   llvm::LLVMContext context;
   llvm::ExitOnError ExitOnErr;
-  std::unique_ptr<llvm::Module> pm;
+  std::shared_ptr<llvm::Module> pm;
 
 public:
   Mutator(bool debug = false) : debug(debug), pm(nullptr){};
@@ -48,11 +48,11 @@ public:
   void setDebug(bool debug) {
     this->debug = debug;
   }
-  virtual std::unique_ptr<llvm::Module> getModule() {
-    return std::move(pm);
+  virtual std::shared_ptr<llvm::Module> getModule() {
+    return pm;
   }
-  virtual void setModule(std::unique_ptr<llvm::Module> &&ptr) {
-    pm = std::move(ptr);
+  virtual void setModule(std::shared_ptr<llvm::Module> ptr) {
+    pm = ptr;
   }
 
   virtual void eraseFunctionInModule(const std::string& funcName){

@@ -22,15 +22,15 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-class ComplexMutator;
+class FunctionMutant;
 
-class ComplexMutatorHelper {
+class MutationHelper {
 protected:
-  ComplexMutator *mutator;
+  std::shared_ptr<FunctionMutant> mutator;
 
 public:
-  ComplexMutatorHelper(ComplexMutator *mutator) : mutator(mutator){};
-  virtual ~ComplexMutatorHelper(){};
+  MutationHelper(std::shared_ptr<FunctionMutant> mutator) : mutator(mutator){};
+  virtual ~MutationHelper(){};
   virtual void init() = 0;
   virtual void reset() = 0;
   virtual void mutate() = 0;
@@ -44,40 +44,40 @@ public:
   }
 };
 
-class ShuffleHelper : public ComplexMutatorHelper {
-  using ShuffleBlock = llvm::SmallVector<llvm::Instruction *>;
-  using BasicBlockShuffleBlock = llvm::SmallVector<ShuffleBlock>;
-  using FunctionShuffleBlock = llvm::SmallVector<BasicBlockShuffleBlock>;
+class ShuffleHelper : public MutationHelper {
+  using ShuffleUnit = llvm::SmallVector<llvm::Instruction *>;
+  using ShuffleUnitInBasicBlock = llvm::SmallVector<ShuffleUnit>;
+  using ShuffleBlockInFunction = llvm::SmallVector<ShuffleUnitInBasicBlock>;
 
-  llvm::StringMap<FunctionShuffleBlock> shuffleMap;
-  size_t shuffleBasicBlockIndex, shuffleBlockIndex;
-  void shuffleBlock();
+  ShuffleBlockInFunction shuffleBlockInFunction;
+  size_t shuffleUnitInBasicBlockIndex, shuffleUnitIndex;
+  void shuffleCurrentBlock();
 
 public:
-  ShuffleHelper(ComplexMutator *mutator)
-      : ComplexMutatorHelper(mutator), shuffleBasicBlockIndex(0),
-        shuffleBlockIndex(0){};
+  ShuffleHelper(std::shared_ptr<FunctionMutant> mutator)
+      : MutationHelper(mutator), shuffleUnitInBasicBlockIndex(0),
+        shuffleUnitIndex(0){};
   virtual void init() override;
   virtual void reset() override {
-    shuffleBasicBlockIndex = shuffleBlockIndex = 0;
+    shuffleUnitInBasicBlockIndex = shuffleUnitIndex = 0;
   }
   virtual void mutate() override {
-    shuffleBlock();
-    ++shuffleBlockIndex;
+    shuffleCurrentBlock();
+    ++shuffleUnitIndex;
   };
   virtual bool shouldMutate() override;
   virtual void whenMoveToNextBasicBlock() override {
-    shuffleBlockIndex = 0;
+    shuffleUnitIndex = 0;
   };
   virtual void whenMoveToNextFunction() override {
-    shuffleBasicBlockIndex = 0;
+    shuffleUnitInBasicBlockIndex = 0;
   };
   virtual void debug() override {
     llvm::errs() << "\nInstructions shuffled\n";
   };
 };
 
-class MutateInstructionHelper : public ComplexMutatorHelper {
+class MutateInstructionHelper : public MutationHelper {
   bool mutated, newAdded;
   /** Try to insert new random binary instruction for int type
    *  return false if it fails to find one int parameter
@@ -86,8 +86,8 @@ class MutateInstructionHelper : public ComplexMutatorHelper {
   void replaceRandomUsage(llvm::Instruction *inst);
 
 public:
-  MutateInstructionHelper(ComplexMutator *mutator)
-      : ComplexMutatorHelper(mutator), mutated(false), newAdded(false){};
+  MutateInstructionHelper(std::shared_ptr<FunctionMutant>  mutator)
+      : MutationHelper(mutator), mutated(false), newAdded(false){};
   virtual void init() override {
     mutated = newAdded = false;
   };
@@ -109,15 +109,15 @@ public:
   }
 };
 
-class RandomMoveHelper : public ComplexMutatorHelper {
+class RandomMoveHelper : public MutationHelper {
   bool moved;
   void randomMoveInstruction(llvm::Instruction *inst);
   void randomMoveInstructionForward(llvm::Instruction *inst);
   void randomMoveInstructionBackward(llvm::Instruction *inst);
 
 public:
-  RandomMoveHelper(ComplexMutator *mutator)
-      : ComplexMutatorHelper(mutator), moved(false){};
+  RandomMoveHelper(std::shared_ptr<FunctionMutant>  mutator)
+      : MutationHelper(mutator), moved(false){};
   virtual void init() {
     moved = false;
   };
@@ -134,12 +134,12 @@ public:
   }
 };
 
-class RandomCodeInserterHelper : public ComplexMutatorHelper {
+class RandomCodeInserterHelper : public MutationHelper {
   bool generated;
 
 public:
-  RandomCodeInserterHelper(ComplexMutator *mutator)
-      : ComplexMutatorHelper(mutator), generated(false) {}
+  RandomCodeInserterHelper(std::shared_ptr<FunctionMutant>  mutator)
+      : MutationHelper(mutator), generated(false) {}
   virtual void init() {
     generated = false;
   }
@@ -156,14 +156,14 @@ public:
   }
 };
 
-class FunctionCallInlineHelper: public ComplexMutatorHelper{
+class FunctionCallInlineHelper: public MutationHelper{
   bool inlined;
   std::vector<std::vector<std::string>> idToFuncSet;
   llvm::StringMap<int> funcToId;
   std::string functionInlined;
 public:
-  FunctionCallInlineHelper(ComplexMutator* mutator):
-    ComplexMutatorHelper(mutator),inlined(false) {}
+  FunctionCallInlineHelper(std::shared_ptr<FunctionMutant>  mutator):
+    MutationHelper(mutator),inlined(false) {}
   virtual void init();
   virtual void reset(){
     inlined=false;
