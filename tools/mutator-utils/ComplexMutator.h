@@ -169,6 +169,12 @@ friend class FunctionCallInlineHelper;
   llvm::ValueToValueMapTy &vMap;
   llvm::Function::iterator bit, bitInTmp;
   llvm::BasicBlock::iterator iit, iitInTmp;
+
+  // domInst is used for maintain instructions which dominates current
+  // instruction. this vector would be updated when moveToNextBasicBlock,
+  // moveToNextInst and restoreBackup
+
+
   DominatedValueVector domVals;
   llvm::SmallVector<llvm::Value *> extraValues;
   const llvm::StringSet<> &filterSet;
@@ -253,20 +259,9 @@ public:
 */
 
 class ComplexMutator : public Mutator {
-  // domInst is used for maintain instructions which dominates current
-  // instruction. this vector would be updated when moveToNextBasicBlock,
-  // moveToNextInst and restoreBackup
-
-  llvm::StringSet<> invalidFunctions;
-  /**
-   * 1. time point of starting and deleting backup.
-   * 2. update those class updates domInst
-   */
-  DominatedValueVector domInst;
-
   // some functions contain 'immarg' in their arguments. Skip those function
   // calls.
-  llvm::StringSet<> filterSet;
+  llvm::StringSet<> filterSet,invalidFunctions;
   std::shared_ptr<llvm::Module> tmpCopy;
   llvm::ValueToValueMapTy vMap;
   llvm::SmallVector<llvm::Value *> globals;
@@ -278,13 +273,13 @@ class ComplexMutator : public Mutator {
 
 public:
   ComplexMutator(bool debug = false){};
-  ComplexMutator(std::unique_ptr<llvm::Module> pm_,
+  ComplexMutator(std::shared_ptr<llvm::Module> pm_,
                  const llvm::StringSet<> &invalidFunctions,
                  bool debug = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr) {
     pm = std::move(pm_);
   };
-  ComplexMutator(std::unique_ptr<llvm::Module> pm_, bool debug = false)
+  ComplexMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
       : Mutator(debug), tmpCopy(nullptr) {
     pm = std::move(pm_);
   }

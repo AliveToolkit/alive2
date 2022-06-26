@@ -329,7 +329,7 @@ void copyMode(), timeMode(), loggerInit(int ith), init(),
     runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator),
     programEnd(), deleteLog(int ith);
 StubMutator stubMutator(false);
-unordered_set<std::string> invalidFuncNameSet;
+llvm::StringSet<> invalidFuncNameSet;
 bool hasInvalidFunc = false;
 bool isValidInputPath(), isValidOutputPath(), inputVerify();
 string getOutputFile(int ith, bool isOptimized = false);
@@ -398,12 +398,12 @@ version )EOF";
 bool inputVerify() {
   if (stubMutator.openInputFile(testfile)) {
     if (onlyDump) {
-      std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
+      std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
       validFuncNum = M1->size();
       stubMutator.setModule(std::move(M1));
       return false;
     }
-    std::unique_ptr<llvm::Module> M1 = stubMutator.getModule();
+    std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
     LLVMUtil::removeTBAAMetadata(M1.get());
     auto &DL = M1.get()->getDataLayout();
     // llvm::Triple targetTriple(M1.get()->getTargetTriple());
@@ -569,7 +569,7 @@ string getOutputFile(int ith, bool isOptimized) {
  * LogIndex is updated here if find a value mismatch.
  */
 void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
-  std::unique_ptr<llvm::Module> M1 = nullptr;
+  std::shared_ptr<llvm::Module> M1 = nullptr;
   mutator.mutateModule(getOutputFile(ith));
   if (verbose || onlyDump) {
     mutator.saveModule(getOutputFile(ith));
@@ -667,7 +667,7 @@ end:
  */
 void copyMode() {
   llvm::LLVMContext context;
-  std::unique_ptr<llvm::Module> pm = stubMutator.getModule();
+  std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
   std::unique_ptr<Mutator> mutators[2]{
       std::make_unique<SimpleMutator>(invalidFuncNameSet, verbose),
       std::make_unique<ComplexMutator>(CloneModule(*pm), invalidFuncNameSet,
@@ -704,7 +704,7 @@ void copyMode() {
  */
 void timeMode() {
   llvm::LLVMContext context;
-  std::unique_ptr<llvm::Module> pm = stubMutator.getModule();
+  std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
   std::unique_ptr<Mutator> mutators[2]{
       std::make_unique<SimpleMutator>(invalidFuncNameSet, verbose),
       std::make_unique<ComplexMutator>(CloneModule(*pm), invalidFuncNameSet,
