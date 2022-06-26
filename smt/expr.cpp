@@ -2107,10 +2107,14 @@ set<expr> expr::leafs(unsigned max) const {
     if (!seen.emplace(val()).second)
       continue;
 
-    expr cond, then, els;
+    expr cond, then, els, e;
+    unsigned high, low;
     if (val.isIf(cond, then, els)) {
       worklist.emplace_back(std::move(then));
       worklist.emplace_back(std::move(els));
+    } else if (val.isExtract(e, high, low) && e.isIf(cond, then, els)) {
+      worklist.emplace_back(then.extract(high, low));
+      worklist.emplace_back(els.extract(high, low));
     } else {
       ret.emplace(std::move(val));
     }

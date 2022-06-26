@@ -818,8 +818,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   if (writes_memory) {
     for (auto &v : ptr_inputs) {
-      if (!v.byval && !v.nocapture && !v.val.non_poison.isFalse())
-        memory.escapeLocalPtr(v.val.value);
+      if (!v.byval && !v.nocapture)
+        memory.escapeLocalPtr(v.val.value, v.val.non_poison);
     }
   }
 

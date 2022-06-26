@@ -947,9 +947,7 @@ void Memory::store(const Pointer &ptr,
 
   for (auto &[offset, val] : data) {
     Byte byte(*this, expr(val));
-    // TODO: check impact of !byte.isPtr().isFalse()
-    if (byte.isPtr().isTrue())
-      escapeLocalPtr(byte.ptrValue());
+    escapeLocalPtr(byte.ptrValue(), byte.isPtr() && byte.ptrNonpoison());
   }
 
   unsigned bytes = data.size() * (bits_byte/8);
@@ -1067,7 +1065,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     return;
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
-    if (always_nowrite(i))
+    if (always_noread(i))
       continue;
 
     Byte byte(*this, non_local_block_val[i].val.load(offset));
@@ -2109,7 +2107,10 @@ expr Memory::checkNocapture() const {
   return res;
 }
 
-void Memory::escapeLocalPtr(const expr &ptr) {
+void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
+  if (is_ptr.isFalse())
+    return;
+
   if (next_local_bid == 0 ||
       escaped_local_blks.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;

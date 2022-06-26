@@ -322,7 +322,7 @@ public:
 
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
-  void escapeLocalPtr(const smt::expr &ptr);
+  void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
 
   static Memory mkIf(const smt::expr &cond, const Memory &then,
                      const Memory &els);
