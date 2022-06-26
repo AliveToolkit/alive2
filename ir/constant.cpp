@@ -6,6 +6,8 @@
 #include "util/compiler.h"
 #include <bit>
 #include <cassert>
+// TODO: remove cstring when migrated to std::bit_cast
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 
@@ -42,6 +44,15 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
+template <typename T>
+static uint64_t mbit_cast(T val) {
+  // FIXME: Apple's clang doesn't have std::bit_cast nor does gcc 10
+  uint64_t bits;
+  assert(sizeof(bits) == sizeof(T));
+  memcpy(&bits, &val, sizeof(T));
+  return bits;
+}
+
 static string double_to_string(double val, unsigned bits) {
   auto str = to_string(val);
   // no loss of precision
@@ -49,7 +60,7 @@ static string double_to_string(double val, unsigned bits) {
     return str;
 
   ostringstream os;
-  os << "0x" << hex << setfill('0') << setw(bits/4) << bit_cast<uint64_t>(val);
+  os << "0x" << hex << setfill('0') << setw(bits/4) << mbit_cast<uint64_t>(val);
   return std::move(os).str();
 }
 
