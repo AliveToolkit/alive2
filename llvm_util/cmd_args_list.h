@@ -44,6 +44,10 @@ llvm::cl::opt<bool> opt_error_fatal(LLVM_ARGS_PREFIX "exit-on-error",
   llvm::cl::desc("Exit on error"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> opt_save_ir(LLVM_ARGS_PREFIX "save-ir",
+  llvm::cl::desc("Save LLVM IR upon encountering a verification error"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 llvm::cl::opt<bool> opt_se_verbose(LLVM_ARGS_PREFIX "se-verbose",
   llvm::cl::desc("Symbolic execution verbose mode"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));

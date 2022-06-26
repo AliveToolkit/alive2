@@ -50,6 +50,18 @@ if (!report_dir_created && !opt_report_dir.empty()) {
     exit(1);
   }
 
+  if (opt_save_ir) {
+    auto irfname = path;
+    irfname.replace_extension(".bc");
+    std::ofstream ir_file;
+    ir_file.open(irfname);
+    if (!ir_file.is_open()) {
+      cerr << "Alive2: Couldn't open IR file!" << endl;
+      exit(1);
+    }
+    module.print(ir_file);
+  }
+  
   report_filename = path;
   *out << "Source: " << source_file << endl;
   report_dir_created = true;
