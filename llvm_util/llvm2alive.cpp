@@ -1620,8 +1620,8 @@ public:
     for (auto &gvname : gvnamesInSrc) {
       auto gv = getGlobalVariable(string(gvname));
       if (!gv) {
-        // global variable removed or renamed
-        *out << "ERROR: Unsupported interprocedural transformation\n";
+        *out << "ERROR: Unsupported interprocedural transformation: global "
+          "variable removed or renamed\n";
         return {};
       }
       // If gvname already exists in tgt, get_operand will immediately return
