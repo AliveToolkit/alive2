@@ -315,7 +315,7 @@ bool ComplexMutator::init() {
     }
   }
   for(auto fit=pm->begin();fit!=pm->end();++fit){
-    if(fit->isDeclaration()||fit->getName().empty()||!invalidFunctions.contains(fit->getName())){
+    if(fit->isDeclaration()||!fit->getName().empty()||!invalidFunctions.contains(fit->getName())){
       if(FunctionMutant::canMutate(&*fit,filterSet)){
         functionMutants.push_back(std::make_shared<FunctionMutant>(&*fit,vMap,filterSet,globals));
       }

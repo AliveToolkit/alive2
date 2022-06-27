@@ -278,11 +278,11 @@ public:
                  const llvm::StringSet<> &invalidFunctions,
                  bool debug = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),curFunction(0){
-    pm = std::move(pm_);
+    pm = pm_;
   };
   ComplexMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
       : Mutator(debug), tmpCopy(nullptr),curFunction(0) {
-    pm = std::move(pm_);
+    pm = pm_;
   }
   ~ComplexMutator(){};
   virtual bool init() override;

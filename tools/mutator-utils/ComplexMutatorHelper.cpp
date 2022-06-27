@@ -388,7 +388,7 @@ void FunctionCallInlineHelper::init(){
   if(funcToId.empty()){
     llvm::Module* module=mutator->currentFunction->getParent();
     for(auto fit=module->begin(); fit != module->end();++fit){
-      if(fit->isDeclaration()){
+      if(fit->isDeclaration()||fit->getName().empty()){
         continue;
       }
       bool shouldAdd=true;
@@ -439,7 +439,7 @@ llvm::Function* FunctionCallInlineHelper::getReplacedFunction(){
       functionInlined=func->getName();
     }
   }
-  return mutator->tmpCopy->getFunction(functionInlined);
+  return functionInlined.empty()?callInst->getCalledFunction():mutator->tmpCopy->getFunction(functionInlined);
 }
 
 void FunctionCallInlineHelper::mutate() {

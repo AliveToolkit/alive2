@@ -415,8 +415,12 @@ bool inputVerify() {
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     LLVMUtil::optimizeModule(M2.get(), newGVN,LICM);
     // bool changed=false;
-    for (auto fit = M1->begin(); !testMode&&fit != M1->end(); ++fit)
-      if (!fit->isDeclaration() && !fit->getName().empty()) {
+    //size_t unnamedFunction=0;
+    for (auto fit = M1->begin(); !testMode&&fit != M1->end(); ++fit){
+      //if(fit->getName().empty()){
+      //  fit->setName(std::string("resetUnnamedFunction")+std::to_string(unnamedFunction++));
+      //}
+      if (!fit->isDeclaration() &&!fit->getName().empty()) {
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
             f2 != nullptr) {
           llvm::TargetLibraryInfoWrapperPass TLI(
@@ -433,10 +437,11 @@ bool inputVerify() {
             }*/
             hasInvalidFunc = true;
             // changed=true;
-            invalidFuncNameSet.insert(fit->getName().str());
+            invalidFuncNameSet.insert(fit->getName());
           }
         }
       }
+    }
     if(testMode){
       validFuncNum=M1->getFunctionList().size();
     }
@@ -613,6 +618,8 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
       llvm::Function *pf2 = llvm::CloneFunction(pf1, vMap);
       LLVMUtil::optimizeFunction(pf2, newGVN,LICM);
       newFunc=pf2->getName();
+      pf1->print(llvm::errs());
+      pf2->print(llvm::errs());
       if (compareFunctions(*pf1, *pf2, TLI)) {
         shouldLog = true;
         if (opt_error_fatal)
