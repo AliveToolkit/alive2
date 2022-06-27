@@ -439,7 +439,7 @@ llvm::Function* FunctionCallInlineHelper::getReplacedFunction(){
       functionInlined=func->getName();
     }
   }
-  return functionInlined.empty()?callInst->getCalledFunction():mutator->tmpCopy->getFunction(functionInlined);
+  return mutator->tmpCopy->getFunction(functionInlined);
 }
 
 void FunctionCallInlineHelper::mutate() {
@@ -447,9 +447,17 @@ void FunctionCallInlineHelper::mutate() {
   llvm::InlineFunctionInfo ifi;
   llvm::Function* func=getReplacedFunction();
   llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->iitInTmp);
+  llvm::BasicBlock* block=callInst->getParent();
+  llvm::BasicBlock::iterator backupIt=callInst->getIterator()==block->begin()?block->end():--callInst->getIterator();
   callInst->setCalledFunction(func);
   llvm::InlineResult res=llvm::InlineFunction(*callInst,ifi);
   if(!res.isSuccess()){
     llvm::errs()<<res.getFailureReason()<<"\n";
+  }else{
+    if(backupIt==block->end()){
+      mutator->iitInTmp=block->begin();
+    }else{
+      mutator->iitInTmp=++backupIt;
+    }
   }
 }

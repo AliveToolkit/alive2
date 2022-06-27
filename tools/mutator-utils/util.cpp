@@ -382,6 +382,5 @@ LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
   }
   assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
   llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
-  inst->print(llvm::errs());
   return inst;
 }
