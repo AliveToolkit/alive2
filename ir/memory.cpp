@@ -474,6 +474,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     // A zero integer byte is considered as a null pointer byte with any byte
     // offset.
     expr non_poison = true;
+    AndExpr ptr_constrs, non_ptr_constrs;
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       auto &b = bytes[i];
@@ -486,12 +487,13 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       } else {
         non_poison &= is_ptr == b_is_ptr;
       }
-      non_poison &=
-        expr::mkIf(is_ptr,
-                   b.ptrByteoffset() == i && ptr_value == loaded_ptr,
-                   b.nonptrValue() == 0);
+      ptr_constrs.add(b.ptrByteoffset() == i);
+      ptr_constrs.add(ptr_value == loaded_ptr);
+      non_ptr_constrs.add(b.nonptrValue() == 0);
+
       non_poison &= !b.isPoison();
     }
+    non_poison &= expr::mkIf(is_ptr, ptr_constrs(), non_ptr_constrs());
 
     // if bits of loaded ptr are a subset of the non-ptr value,
     // we know they must be zero otherwise the value is poison.
@@ -1773,6 +1775,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
   // partial order reduction for fresh pointers
   // can alias [0, next_ptr++] U extra_tgt_consts
   if (is_ptr && !val.non_poison.isFalse()) {
+    AndExpr constr;
     optional<unsigned> max_bid;
     for (auto &p : all_leaf_ptrs(*this, val.value)) {
       auto islocal = p.isLocal();
@@ -1786,10 +1789,15 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
           for (unsigned i = num_nonlocals_src; i < numNonlocals(); ++i) {
             I->second.setMayAlias(false, i);
           }
-          state->addPre(!val.non_poison || islocal || bid.ule(*max_bid));
+
+          expr c = islocal || bid.ule(*max_bid);
+          if (numNonlocals() > num_nonlocals_src)
+            c |= bid.uge(num_nonlocals_src) && bid.ule(numNonlocals()-1);
+          constr.add(std::move(c));
         }
       }
     }
+    state->addPre(val.non_poison.implies(constr()));
   }
 
   return val;
