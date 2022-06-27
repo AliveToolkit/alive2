@@ -1,7 +1,7 @@
 #include "ComplexMutator.h"
 
 void FunctionMutant::debug(){
-  llvm::errs() << "Current function " << getCurrentFunction() << "\n";
+  llvm::errs() << "Current function " << getCurrentFunction()->getName() << "\n";
   llvm::errs() << "Current basic block:\n";
   bitInTmp->print(llvm::errs());
   llvm::errs() << "\nCurrent instruction:\n";
@@ -90,7 +90,12 @@ bool FunctionMutant::canMutate(
 }
 
 void FunctionMutant::mutate() {
-  
+  for(size_t i=0;i<helpers.size();++i){
+    if(helpers[i]->shouldMutate()){
+      helpers[i]->mutate();
+    }
+  }
+  moveToNextMutant();
 }
 
 void FunctionMutant::moveToNextInstruction(){
@@ -137,7 +142,7 @@ void FunctionMutant::moveToNextMutant(){
   while (!canMutate(*iit,filterSet))
     moveToNextInstruction();
   domVals.restoreBackup();
-
+  initAtNewInstruction();
 }
 
 void FunctionMutant::calcDomVals(){
@@ -164,6 +169,8 @@ void FunctionMutant::calcDomVals(){
 void FunctionMutant::resetTmpCopy(std::shared_ptr<llvm::Module> copy){
   extraValues.clear();
   tmpCopy = copy;
+  assert(vMap.find(currentFunction)!=vMap.end()&&vMap.find(&*bit)!=vMap.end()&&vMap.find(&*iit)!=vMap.end()&&
+    "vMap is invalid!");
   functionInTmp = &*llvm::Module::iterator((llvm::Function *)&*vMap[currentFunction]);
   bitInTmp = llvm::Function::iterator((llvm::BasicBlock *)&*vMap[&*bit]);
   iitInTmp = llvm::BasicBlock::iterator((llvm::Instruction *)&*vMap[&*iit]);  
@@ -308,7 +315,7 @@ bool ComplexMutator::init() {
     }
   }
   for(auto fit=pm->begin();fit!=pm->end();++fit){
-    if(fit->isDeclaration()||fit->getName().empty()||invalidFunctions.contains(fit->getName())){
+    if(fit->isDeclaration()||fit->getName().empty()||!invalidFunctions.contains(fit->getName())){
       if(FunctionMutant::canMutate(&*fit,filterSet)){
         functionMutants.push_back(std::make_shared<FunctionMutant>(&*fit,vMap,filterSet,globals));
       }
@@ -317,17 +324,21 @@ bool ComplexMutator::init() {
   for(size_t i=0;i<functionMutants.size();++i){
     functionMutants[i]->init(functionMutants[i]);
   }
-  for(auto git=pm->global_begin();git!=pm->global_end();++git){
-    globals.push_back(&*git);
-    for(auto oit=git->op_begin();oit!=git->op_end();++oit){
-      if(oit->get()!=nullptr&&llvm::isa<llvm::ConstantInt>(*oit)){
-        Random::addUsedInt(llvm::cast<llvm::ConstantInt>(*oit)->getLimitedValue());
+  if(!functionMutants.empty()){
+    for(auto git=pm->global_begin();git!=pm->global_end();++git){
+      globals.push_back(&*git);
+      for(auto oit=git->op_begin();oit!=git->op_end();++oit){
+        if(oit->get()!=nullptr&&llvm::isa<llvm::ConstantInt>(*oit)){
+          Random::addUsedInt(llvm::cast<llvm::ConstantInt>(*oit)->getLimitedValue());
+        }
+      }
+      if(llvm::isa<ConstantInt>(*git)){
+        Random::addUsedInt(llvm::cast<llvm::ConstantInt>(*git).getLimitedValue());
       }
     }
-    if(llvm::isa<ConstantInt>(*git)){
-      Random::addUsedInt(llvm::cast<llvm::ConstantInt>(*git).getLimitedValue());
-    }
+    return true;
   }
+  return false;
 }
 
 void ComplexMutator::resetTmpModule() {
@@ -340,6 +351,7 @@ void ComplexMutator::resetTmpModule() {
 
 void ComplexMutator::mutateModule(const std::string &outputFileName) {
   resetTmpModule();
+  assert(curFunction<functionMutants.size()&&"curFunction should be a valid function");
   if (debug) {
     functionMutants[curFunction]->debug();
   }

@@ -233,6 +233,7 @@ public:
       domVals.push_back(&*it);
     }
     DT = llvm::DominatorTree(*currentFunction);
+    calcDomVals();
     moveToNextMutant();
   }
   llvm::Function *getCurrentFunction() const {
@@ -276,11 +277,11 @@ public:
   ComplexMutator(std::shared_ptr<llvm::Module> pm_,
                  const llvm::StringSet<> &invalidFunctions,
                  bool debug = false)
-      : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr) {
+      : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),curFunction(0){
     pm = std::move(pm_);
   };
   ComplexMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
-      : Mutator(debug), tmpCopy(nullptr) {
+      : Mutator(debug), tmpCopy(nullptr),curFunction(0) {
     pm = std::move(pm_);
   }
   ~ComplexMutator(){};

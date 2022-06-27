@@ -2,6 +2,7 @@
 #include "tools/mutator-utils/util.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/CFG.h"
@@ -342,13 +343,13 @@ public:
 */
 class SimpleMutator : public Mutator {
   std::list<std::pair<std::unique_ptr<Mutant>, llvm::StringRef>> mutants;
-  std::unordered_set<std::string> invalidFunctions;
+  llvm::StringSet<> invalidFunctions;
   decltype(mutants.begin()) it;
   bool isFirstRun;
 
 public:
   SimpleMutator(bool debug = false) : Mutator(debug), isFirstRun(true){};
-  SimpleMutator(const std::unordered_set<std::string> &invalidFunctions,
+  SimpleMutator(const llvm::StringSet<> &invalidFunctions,
                 bool debug = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), isFirstRun(true){};
   virtual ~SimpleMutator() {

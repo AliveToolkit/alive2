@@ -256,40 +256,39 @@ const std::vector<llvm::Instruction::BinaryOps> LLVMUtil::floatBinaryOps{
     llvm::Instruction::FDiv, llvm::Instruction::FRem};
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerBinaryIntrinsic{
-    llvm::Intrinsic::smax,
-    llvm::Intrinsic::smin,
-    llvm::Intrinsic::umax,
-    llvm::Intrinsic::umin,
-    llvm::Intrinsic::sadd_sat,
-    llvm::Intrinsic::uadd_sat,
-    llvm::Intrinsic::ssub_sat,
-    llvm::Intrinsic::usub_sat,
-    llvm::Intrinsic::sshl_sat,
-    llvm::Intrinsic::ushl_sat
+    llvm::Intrinsic::IndependentIntrinsics::smax,
+    llvm::Intrinsic::IndependentIntrinsics::smin,
+    llvm::Intrinsic::IndependentIntrinsics::umax,
+    llvm::Intrinsic::IndependentIntrinsics::umin,
+    llvm::Intrinsic::IndependentIntrinsics::sadd_sat,
+    llvm::Intrinsic::IndependentIntrinsics::uadd_sat,
+    llvm::Intrinsic::IndependentIntrinsics::ssub_sat,
+    llvm::Intrinsic::IndependentIntrinsics::usub_sat,
+    llvm::Intrinsic::IndependentIntrinsics::sshl_sat,
+    llvm::Intrinsic::IndependentIntrinsics::ushl_sat
 
 };
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatBinaryIntrinsic{
-    llvm::Intrinsic::pow,     llvm::Intrinsic::minnum,
-    llvm::Intrinsic::maxnum,  llvm::Intrinsic::minimum,
-    llvm::Intrinsic::maximum, llvm::Intrinsic::copysign};
+    llvm::Intrinsic::IndependentIntrinsics::pow,     llvm::Intrinsic::IndependentIntrinsics::minnum,
+    llvm::Intrinsic::IndependentIntrinsics::maxnum,  llvm::Intrinsic::IndependentIntrinsics::minimum,
+    llvm::Intrinsic::IndependentIntrinsics::maximum, llvm::Intrinsic::IndependentIntrinsics::copysign};
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerUnaryIntrinsic{
-    llvm::Intrinsic::bitreverse,
-    llvm::Intrinsic::bswap,
-    llvm::Intrinsic::ctpop,
+    llvm::Intrinsic::IndependentIntrinsics::bitreverse,
+    llvm::Intrinsic::IndependentIntrinsics::ctpop,
 };
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatUnaryIntrinsic{
-    llvm::Intrinsic::sqrt,        llvm::Intrinsic::sin,
-    llvm::Intrinsic::cos,         llvm::Intrinsic::exp,
-    llvm::Intrinsic::exp2,        llvm::Intrinsic::log,
-    llvm::Intrinsic::log10,       llvm::Intrinsic::log2,
-    llvm::Intrinsic::fabs,        llvm::Intrinsic::floor,
-    llvm::Intrinsic::ceil,        llvm::Intrinsic::trunc,
-    llvm::Intrinsic::rint,        llvm::Intrinsic::nearbyint,
-    llvm::Intrinsic::round,       llvm::Intrinsic::roundeven,
-    llvm::Intrinsic::canonicalize};
+    llvm::Intrinsic::IndependentIntrinsics::sqrt,        llvm::Intrinsic::IndependentIntrinsics::sin,
+    llvm::Intrinsic::IndependentIntrinsics::cos,         llvm::Intrinsic::IndependentIntrinsics::exp,
+    llvm::Intrinsic::IndependentIntrinsics::exp2,        llvm::Intrinsic::IndependentIntrinsics::log,
+    llvm::Intrinsic::IndependentIntrinsics::log10,       llvm::Intrinsic::IndependentIntrinsics::log2,
+    llvm::Intrinsic::IndependentIntrinsics::fabs,        llvm::Intrinsic::IndependentIntrinsics::floor,
+    llvm::Intrinsic::IndependentIntrinsics::ceil,        llvm::Intrinsic::IndependentIntrinsics::trunc,
+    llvm::Intrinsic::IndependentIntrinsics::rint,        llvm::Intrinsic::IndependentIntrinsics::nearbyint,
+    llvm::Intrinsic::IndependentIntrinsics::round,       llvm::Intrinsic::IndependentIntrinsics::roundeven,
+    llvm::Intrinsic::IndependentIntrinsics::canonicalize};
 
 void LLVMUtil::insertRandomCodeBefore(llvm::Instruction *inst) {
   RandomCodePieceGenerator::insertCodeBefore(
@@ -346,7 +345,7 @@ LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
 llvm::Instruction *
 LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
                                     llvm::Instruction *insertBefore) {
-  std::vector<llvm::Type*> tys{val1->getType(),val2->getType()};
+  std::vector<llvm::Type*> tys{val1->getType()};
   llvm::Module* M=insertBefore->getModule();
   size_t pos=Random::getRandomUnsigned()%(integerUnaryIntrinsic.size()+integerBinaryIntrinsic.size());
   bool isUnary=pos<integerUnaryIntrinsic.size();
@@ -355,12 +354,13 @@ LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
   if(isUnary) {
     func=llvm::Intrinsic::getDeclaration(M,integerUnaryIntrinsic[pos],tys);
   }else{
+    pos-=integerUnaryIntrinsic.size();
+    tys.push_back(val2->getType());
     func=llvm::Intrinsic::getDeclaration(M,integerBinaryIntrinsic[pos],tys);
     args.push_back(val2);
   }
   assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
   llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
-  inst->print(llvm::errs());
   return inst;
 }
 
@@ -369,13 +369,14 @@ LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                                    llvm::Instruction *insertBefore) {
   std::vector<llvm::Type*> tys{val1->getType(),val2->getType()};
   llvm::Module* M=insertBefore->getModule();
-  size_t pos=Random::getRandomUnsigned()%(integerUnaryIntrinsic.size()+integerBinaryIntrinsic.size());
-  bool isUnary=pos<integerUnaryIntrinsic.size();
+  size_t pos=Random::getRandomUnsigned()%(floatUnaryIntrinsic.size()+floatBinaryIntrinsic.size());
+  bool isUnary=pos<floatUnaryIntrinsic.size();
   llvm::Function* func=nullptr;
   std::vector<llvm::Value*> args{val1};
   if(isUnary) {
     func=llvm::Intrinsic::getDeclaration(M,floatUnaryIntrinsic[pos],tys);
   }else{
+    pos-=floatUnaryIntrinsic.size();
     func=llvm::Intrinsic::getDeclaration(M,floatBinaryIntrinsic[pos],tys);
     args.push_back(val2);
   }
