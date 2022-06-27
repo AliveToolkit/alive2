@@ -652,7 +652,9 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             const expr &cp,
                             function<expr(expr&,expr&,expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
-                            bool only_input = false, int nary = 3) {
+                            bool only_input = false,
+                            bool flush_denormal = true,
+                            int nary = 3) {
   expr new_a, new_b, new_c;
   if (fmath.flags & FastMathFlags::NSZ) {
     new_a = any_fp_zero(s, a);
@@ -667,8 +669,8 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
     new_c = c;
   }
 
-  auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
-  if (!only_input) {
+  if (flush_denormal) {
+    auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
     new_a = handle_subnormal(fpdenormal, std::move(new_a));
     if (nary >= 2)
       new_b = handle_subnormal(fpdenormal, std::move(new_b));
@@ -730,18 +732,20 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             const expr &b, const expr &bp,
                             function<expr(expr&,expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
-                            bool only_input = false) {
+                            bool only_input = false,
+                            bool flush_denormal = true) {
   return fm_poison(s, a, ap, std::move(b), bp, expr(), expr(),
                    [&](expr &a, expr &b, expr &c) { return fn(a, b); },
-                   ty, fmath, only_input, 2);
+                   ty, fmath, only_input, flush_denormal, 2);
 }
 
 static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             function<expr(expr&)> fn, const Type &ty,
-                            FastMathFlags fmath, bool only_input = false) {
+                            FastMathFlags fmath, bool only_input = false,
+                            bool flush_denormal = true) {
   return fm_poison(s, a, ap, expr(), expr(), expr(), expr(),
                    [&](expr &a, expr &b, expr &c) { return fn(a); },
-                   ty, fmath, only_input, 1);
+                   ty, fmath, only_input, flush_denormal, 1);
 }
 
 static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
@@ -1091,7 +1095,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   case FNeg:
     fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
       return
-        fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, ty, fmath, true);
+        fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, ty, fmath, true,
+                  /*flush_denormal=*/false);
     };
     break;
   case Ceil:
@@ -1844,10 +1849,10 @@ StateValue Select::toSMT(State &s) const {
   auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
     auto cond = c.value == 1;
     auto identity = [](const expr &x) { return x; };
-    StateValue sva
-      = fm_poison(s, a.value, a.non_poison, identity, getType(), fmath, true);
-    StateValue svb
-      = fm_poison(s, b.value, b.non_poison, identity, getType(), fmath, true);
+    StateValue sva = fm_poison(s, a.value, a.non_poison, identity, getType(),
+                               fmath, true, false);
+    StateValue svb = fm_poison(s, b.value, b.non_poison, identity, getType(),
+                               fmath, true, false);
     return { expr::mkIf(cond, sva.value, svb.value),
              c.non_poison && expr::mkIf(cond, sva.non_poison, svb.non_poison) };
   };
@@ -2524,7 +2529,7 @@ StateValue FCmp::toSMT(State &s) const {
       }
     };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, getType(), fmath, true);
+                               cmp, getType(), fmath, true, true);
     return { val.toBVBool(), std::move(np) };
   };
 
@@ -2684,8 +2689,8 @@ StateValue Phi::toSMT(State &s) const {
 
   StateValue sv = *ret();
   auto identity = [](const expr &x) { return x; };
-  return
-    fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, true);
+  return fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, true,
+                   false);
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {
