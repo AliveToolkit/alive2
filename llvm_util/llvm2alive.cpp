@@ -1659,7 +1659,7 @@ public:
     else
       BB->addInstr(make_unique<Branch>(Fn.getBB(entry_name)));
 
-    return std::move(Fn);
+    return Fn;
   }
 };
 }
