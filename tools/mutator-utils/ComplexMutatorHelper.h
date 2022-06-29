@@ -180,3 +180,17 @@ public:
     llvm::errs()<<"Function call inline with "<<functionInlined<<"\n";
   }
 };
+
+class VoidFunctionCallRemoveHelper: public MutationHelper{
+  bool removed;  
+public:
+  VoidFunctionCallRemoveHelper(std::shared_ptr<FunctionMutant> mutator):
+    MutationHelper(mutator),removed(false){};
+  virtual void init() override;
+  virtual void reset()override{
+    removed=false;
+  }
+  virtual void mutate()override;
+  virtual bool shouldMutate() override;
+  virtual void debug() override;
+};
