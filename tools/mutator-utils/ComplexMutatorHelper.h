@@ -194,3 +194,42 @@ public:
   virtual bool shouldMutate() override;
   virtual void debug() override;
 };
+
+class FunctionAttributeHelper: public MutationHelper{
+  bool updated;
+public:
+  FunctionAttributeHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
+  virtual void init() override;
+  virtual void reset()override{
+    updated=false;
+  }
+  virtual void mutate()override;
+  virtual bool shouldMutate() override;
+  virtual void debug() override;
+};
+
+class GEPHelper:public MutationHelper{
+  bool updated;
+public:
+  GEPHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
+  virtual void init() override;
+  virtual void reset()override{
+    updated=false;
+  }
+  virtual void mutate()override;
+  virtual bool shouldMutate() override;
+  virtual void debug() override;
+};
+
+class BinaryInstructionHelper:public MutationHelper{
+  bool updated;
+public:
+  BinaryInstructionHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
+  virtual void init() override;
+  virtual void reset()override{
+    updated=false;
+  }
+  virtual void mutate()override;
+  virtual bool shouldMutate() override;
+  virtual void debug() override;
+};
