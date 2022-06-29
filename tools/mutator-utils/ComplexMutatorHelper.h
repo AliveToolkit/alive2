@@ -232,13 +232,51 @@ public:
 
 class BinaryInstructionHelper:public MutationHelper{
   bool updated;
+  const static std::vector<std::function<void(llvm::BinaryOperator *)>>
+      flagFunctions;
+  static void doNothing(llvm::BinaryOperator *){};
+  static void resetFastMathFlags(llvm::BinaryOperator *inst);
+  static void resetNUWNSWFlags(llvm::BinaryOperator *inst);
+  static void resetExactFlag(llvm::BinaryOperator *inst);
+  const static std::unordered_map<llvm::Instruction::BinaryOps, int>
+      operToIndex;
+  const static std::vector<std::vector<llvm::Instruction::BinaryOps>>
+      indexToOperSet;
+  static llvm::Instruction::BinaryOps getNewOperator(int opIndex) {
+    assert (opIndex >= 0 && opIndex < (int)indexToOperSet.size()&&"op index should in range when get a new operator"); 
+    const std::vector<llvm::Instruction::BinaryOps> &v = indexToOperSet[opIndex];
+    return v[Random::getRandomUnsigned() % v.size()];
+  }
+  
+  static void swapOperands(llvm::BinaryOperator* inst){
+    assert(llvm::isa<llvm::BinaryOperator>(*inst)&&"inst should be binary inst when swap operands");
+    llvm::Value* val1=inst->getOperand(0),* val2=inst->getOperand(1);
+    inst->setOperand(0, val2);
+    inst->setOperand(1, val1);
+  }
+
+  static void resetMathFlags(llvm::BinaryOperator* inst,int opIndex) {
+    assert(opIndex >= 0 && opIndex < (int)flagFunctions.size()&&"op index should be in range");
+    flagFunctions[opIndex](inst);
+  }
+
+  static int getOpIndex(llvm::BinaryOperator* inst){
+    llvm::Instruction::BinaryOps op=inst->getOpcode();
+    auto it=operToIndex.find(op);
+    assert(it!=operToIndex.end()&&"invalid op code");
+    return it->second;
+  }
+
 public:
   BinaryInstructionHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
-  virtual void init() override;
+  virtual void init() override{};
   virtual void reset()override{
     updated=false;
   }
   virtual void mutate()override;
   virtual bool shouldMutate() override;
   virtual void debug() override;
+  virtual void whenMoveToNextInst()override{
+    updated=false;
+  }
 };

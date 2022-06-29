@@ -508,3 +508,98 @@ void GEPHelper::debug(){
   mutator->iitInTmp->print(llvm::errs());
   llvm::errs() << "inbounds flag reversed.\n";
 }
+
+void BinaryInstructionHelper::resetFastMathFlags(llvm::BinaryOperator *inst) {
+  if (llvm::isa<llvm::FPMathOperator>(inst)) {
+    llvm::FastMathFlags flags;
+    flags.setAllowContract(Random::getRandomBool());
+    flags.setAllowReassoc(Random::getRandomBool());
+    flags.setAllowReciprocal(Random::getRandomBool());
+    flags.setApproxFunc(Random::getRandomBool());
+    flags.setNoInfs(Random::getRandomBool());
+    flags.setNoNaNs(Random::getRandomBool());
+    flags.setNoSignedZeros(Random::getRandomBool());
+    inst->setFastMathFlags(flags);
+  }
+}
+
+void BinaryInstructionHelper::resetNUWNSWFlags(llvm::BinaryOperator *inst) {
+  if (llvm::isa<llvm::OverflowingBinaryOperator>(inst)) {
+    inst->setHasNoSignedWrap(Random::getRandomBool());
+    inst->setHasNoUnsignedWrap(Random::getRandomBool());
+  }
+}
+
+void BinaryInstructionHelper::resetExactFlag(llvm::BinaryOperator *inst) {
+  inst->setIsExact(Random::getRandomBool());
+}
+
+const std::vector<std::function<void(llvm::BinaryOperator *)>>
+    BinaryInstructionHelper::flagFunctions(
+        {BinaryInstructionHelper::doNothing,
+         BinaryInstructionHelper::resetNUWNSWFlags,
+         BinaryInstructionHelper::resetFastMathFlags,
+         BinaryInstructionHelper::resetExactFlag,
+         BinaryInstructionHelper::resetNUWNSWFlags,
+         BinaryInstructionHelper::resetExactFlag,
+         BinaryInstructionHelper::doNothing});
+
+#define Ops llvm::Instruction::BinaryOps
+const std::unordered_map<llvm::Instruction::BinaryOps, int>
+    BinaryInstructionHelper::operToIndex({{Ops::URem, 0},
+                                          {Ops::SRem, 0},
+                                          {Ops::Add, 1},
+                                          {Ops::Sub, 1},
+                                          {Ops::Mul, 1},
+                                          {Ops::FAdd, 2},
+                                          {Ops::FSub, 2},
+                                          {Ops::FMul, 2},
+                                          {Ops::FDiv, 2},
+                                          {Ops::FRem, 2},
+                                          {Ops::UDiv, 3},
+                                          {Ops::SDiv, 3},
+                                          {Ops::Shl, 4},
+                                          {Ops::LShr, 5},
+                                          {Ops::AShr, 5},
+                                          {Ops::And, 6},
+                                          {Ops::Or, 6},
+                                          {Ops::Xor, 6}});
+
+const std::vector<std::vector<llvm::Instruction::BinaryOps>>
+    BinaryInstructionHelper::indexToOperSet({{
+                                                 Ops::URem,
+                                                 Ops::SRem,
+                                             },
+                                             {Ops::Add, Ops::Sub, Ops::Mul},
+                                             {Ops::FAdd, Ops::FSub, Ops::FMul,
+                                              Ops::FDiv, Ops::FRem},
+                                             {Ops::UDiv, Ops::SDiv},
+                                             {Ops::Shl},
+                                             {Ops::LShr, Ops::AShr},
+                                             {Ops::And, Ops::Or, Ops::Xor}});
+#undef attr
+
+void BinaryInstructionHelper::mutate(){
+  llvm::BinaryOperator* binInst=(llvm::BinaryOperator*)(&*mutator->iitInTmp);
+  if(Random::getRandomBool()){
+    swapOperands(binInst);
+  }
+  int opIndex=getOpIndex(binInst);
+  llvm::Instruction::BinaryOps op=getNewOperator(opIndex);
+  llvm::BinaryOperator* newInst=llvm::BinaryOperator::Create(op,binInst->getOperand(0),binInst->getOperand(1),"",binInst);
+  resetMathFlags(newInst,opIndex);
+  binInst->replaceAllUsesWith(newInst);
+  binInst->eraseFromParent();
+  mutator->iitInTmp=newInst->getIterator();
+}
+
+bool BinaryInstructionHelper::shouldMutate(){
+  return !updated&&llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp);
+}
+
+void BinaryInstructionHelper::debug(){
+    llvm::errs() << "\nCurrentbinary inst:\n";
+    mutator->iitInTmp->print(llvm::errs());
+    llvm::errs() << "\n";
+    mutator->iitInTmp->getParent()->print(llvm::errs());
+}
