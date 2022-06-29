@@ -164,6 +164,8 @@ friend class MutateInstructionHelper;
 friend class RandomMoveHelper;
 friend class RandomCodeInserterHelper;
 friend class FunctionCallInlineHelper;
+friend class VoidFunctionCallRemoveHelper;
+friend class GEPHelper;
 
   llvm::Function *currentFunction, *functionInTmp;
   llvm::ValueToValueMapTy &vMap;

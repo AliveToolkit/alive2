@@ -492,3 +492,19 @@ void VoidFunctionCallRemoveHelper::debug(){
   mutator->iitInTmp->getParent()->print(llvm::errs());
   llvm::errs() << "\n";
 }
+
+
+void GEPHelper::mutate(){
+  llvm::GetElementPtrInst* inst=(llvm::GetElementPtrInst *)&*mutator->iitInTmp;
+  inst->setIsInBounds(!inst->isInBounds());
+}
+
+bool GEPHelper::shouldMutate(){
+  return !updated&&llvm::isa<llvm::GetElementPtrInst>(&*mutator->iitInTmp);
+}
+
+void GEPHelper::debug(){
+  llvm::errs() << "Original GEP inst:\n";
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs() << "inbounds flag reversed.\n";
+}

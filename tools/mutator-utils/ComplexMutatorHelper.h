@@ -193,6 +193,10 @@ public:
     funcName.clear();
   }
   virtual void mutate()override;
+  virtual void whenMoveToNextInst(){
+    removed=false;
+    funcName.clear();
+  }
   virtual bool shouldMutate() override;
   virtual void debug() override;
 };
@@ -214,7 +218,10 @@ class GEPHelper:public MutationHelper{
   bool updated;
 public:
   GEPHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
-  virtual void init() override;
+  virtual void init() override{}
+  virtual void whenMoveToNextInst(){
+    updated=false;
+  }
   virtual void reset()override{
     updated=false;
   }
