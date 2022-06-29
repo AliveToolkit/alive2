@@ -461,3 +461,34 @@ void FunctionCallInlineHelper::mutate() {
     }
   }
 }
+
+void VoidFunctionCallRemoveHelper::mutate(){
+  llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
+  llvm::Instruction* nextInst=callInst->getNextNonDebugInstruction();
+  if(funcName.empty()){
+    funcName=callInst->getName().str();
+  }
+  callInst->eraseFromParent();
+  removed=true;
+  mutator->iitInTmp=nextInst->getIterator();
+}
+
+bool VoidFunctionCallRemoveHelper::shouldMutate(){
+  llvm::Instruction* inst=&*mutator->iitInTmp;
+  if(!removed&&llvm::isa<llvm::CallBase>(inst)){
+    llvm::CallBase *callInst = (llvm::CallBase *)inst;
+    return callInst->getType()->isVoidTy();
+  }
+  return false;
+}
+
+void VoidFunctionCallRemoveHelper::debug(){
+  if(funcName.empty()){
+    llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;   
+    funcName=callInst->getName().str();
+  }
+  llvm::errs() << "Removed function\n"<<funcName;
+  llvm::errs() << "\nBaisc block\n";
+  mutator->iitInTmp->getParent()->print(llvm::errs());
+  llvm::errs() << "\n";
+}

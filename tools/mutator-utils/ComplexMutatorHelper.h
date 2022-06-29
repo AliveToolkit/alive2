@@ -182,13 +182,15 @@ public:
 };
 
 class VoidFunctionCallRemoveHelper: public MutationHelper{
-  bool removed;  
+  bool removed;
+  std::string funcName;
 public:
   VoidFunctionCallRemoveHelper(std::shared_ptr<FunctionMutant> mutator):
     MutationHelper(mutator),removed(false){};
-  virtual void init() override;
+  virtual void init() override{}
   virtual void reset()override{
     removed=false;
+    funcName.clear();
   }
   virtual void mutate()override;
   virtual bool shouldMutate() override;
@@ -199,7 +201,7 @@ class FunctionAttributeHelper: public MutationHelper{
   bool updated;
 public:
   FunctionAttributeHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
-  virtual void init() override;
+  virtual void init() override{}
   virtual void reset()override{
     updated=false;
   }
