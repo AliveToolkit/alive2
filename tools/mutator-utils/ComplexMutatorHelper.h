@@ -57,6 +57,8 @@ public:
   ShuffleHelper(std::shared_ptr<FunctionMutant> mutator)
       : MutationHelper(mutator), shuffleUnitInBasicBlockIndex(0),
         shuffleUnitIndex(0){};
+  //we know this value after calculation in init, so return ture for now for every function
+  static bool canMutate(llvm::Function* func){return true;};
   virtual void init() override;
   virtual void reset() override {
     shuffleUnitInBasicBlockIndex = shuffleUnitIndex = 0;
@@ -68,6 +70,7 @@ public:
   virtual bool shouldMutate() override;
   virtual void whenMoveToNextBasicBlock() override {
     shuffleUnitIndex = 0;
+    ++shuffleUnitInBasicBlockIndex;
   };
   virtual void whenMoveToNextFunction() override {
     shuffleUnitInBasicBlockIndex = 0;
@@ -84,10 +87,26 @@ class MutateInstructionHelper : public MutationHelper {
    * */
   bool insertRandomBinaryInstruction(llvm::Instruction *inst);
   void replaceRandomUsage(llvm::Instruction *inst);
-
+  static bool isBasicBlockOrFunction(llvm::Value* val){
+    return llvm::isa<llvm::BasicBlock>(val) || llvm::isa<llvm::Function>(val);
+  }
+  static bool canMutate(llvm::Instruction* inst){
+    return 
+      //make sure at least one
+      std::any_of(inst->op_begin(), inst->op_end(),[](llvm::Value* val){return !isBasicBlockOrFunction(val);})&&
+      (inst->getNumOperands()-llvm::isa<CallBase>(*inst)>0)
+      && !llvm::isa<llvm::LandingPadInst>(inst)
+      //The ret value of CleanupRet Inst must be a CleanupPad, needs extra check so ignore for now.
+      && !llvm::isa<llvm::CleanupReturnInst>(inst)
+      //all catch related inst require the value has to be label
+      && !llvm::isa<llvm::CatchPadInst>(inst)
+      && !llvm::isa<llvm::CatchSwitchInst>(inst)
+      && !llvm::isa<llvm::CatchReturnInst>(inst);
+  }
 public:
   MutateInstructionHelper(std::shared_ptr<FunctionMutant>  mutator)
       : MutationHelper(mutator), mutated(false), newAdded(false){};
+  static bool canMutate(llvm::Function* func);
   virtual void init() override {
     mutated = newAdded = false;
   };
@@ -124,6 +143,7 @@ public:
   virtual void reset() {
     moved = false;
   };
+  static bool canMutate(llvm::Function* func);
   virtual void mutate();
   virtual bool shouldMutate();
   virtual void whenMoveToNextInst() {
@@ -149,6 +169,7 @@ public:
   virtual void whenMoveToNextInst(){
     generated= false;
   }
+  static bool canMutate(llvm::Function* func){return true;};
   virtual void mutate();
   virtual bool shouldMutate();
   virtual void debug() {
@@ -161,6 +182,14 @@ class FunctionCallInlineHelper: public MutationHelper{
   std::vector<std::vector<std::string>> idToFuncSet;
   llvm::StringMap<int> funcToId;
   std::string functionInlined;
+  static bool canMutate(llvm::Instruction* inst){
+    if(llvm::isa<llvm::CallInst>(inst)){
+      llvm::CallInst* callInst=(llvm::CallInst*)inst;
+      llvm::Function* func=callInst->getCalledFunction();
+      return func!=nullptr&&!func->isDeclaration();
+    }
+    return false;
+  }
 public:
   FunctionCallInlineHelper(std::shared_ptr<FunctionMutant>  mutator):
     MutationHelper(mutator),inlined(false) {}
@@ -173,6 +202,7 @@ public:
     inlined=false;
     functionInlined.clear();
   }
+  static bool canMutate(llvm::Function* func);
   virtual void mutate();
   virtual bool shouldMutate();
   llvm::Function* getReplacedFunction();
@@ -184,6 +214,14 @@ public:
 class VoidFunctionCallRemoveHelper: public MutationHelper{
   bool removed;
   std::string funcName;
+  static bool canMutate(llvm::Instruction* inst){
+    if(llvm::isa<llvm::CallBase>(inst)){
+      llvm::CallBase *callInst = (llvm::CallBase *)inst;
+      return callInst->getType()->isVoidTy();    
+    }
+    return false;
+  }
+
 public:
   VoidFunctionCallRemoveHelper(std::shared_ptr<FunctionMutant> mutator):
     MutationHelper(mutator),removed(false){};
@@ -197,6 +235,7 @@ public:
     removed=false;
     funcName.clear();
   }
+  static bool canMutate(llvm::Function* func);
   virtual bool shouldMutate() override;
   virtual void debug() override;
 };
@@ -212,6 +251,7 @@ public:
   virtual void mutate()override;
   virtual bool shouldMutate() override;
   virtual void debug() override;
+  static bool canMutate(llvm::Function* func);
 };
 
 class GEPHelper:public MutationHelper{
@@ -228,6 +268,7 @@ public:
   virtual void mutate()override;
   virtual bool shouldMutate() override;
   virtual void debug() override;
+  static bool canMutate(llvm::Function* func);
 };
 
 class BinaryInstructionHelper:public MutationHelper{
@@ -273,6 +314,7 @@ public:
   virtual void reset()override{
     updated=false;
   }
+  static bool canMutate(llvm::Function* func);
   virtual void mutate()override;
   virtual bool shouldMutate() override;
   virtual void debug() override;
