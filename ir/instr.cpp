@@ -778,115 +778,88 @@ static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
-  function<StateValue(const expr&, const expr&, const expr&, const expr&,
-                      const Type&, FpRoundingMode)> fn;
+  function<expr(const expr&, const expr&, FpRoundingMode)> fn;
+  bool flush_denormal = true;
 
   switch (op) {
   case FAdd:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      return fm_poison(s, a, ap, b, bp,
-                       [&](expr &a, expr &b) { return a.fadd(b, rm.toSMT()); },
-                       ty, fmath);
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return a.fadd(b, rm.toSMT());
     };
     break;
 
   case FSub:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      return fm_poison(s, a, ap, b, bp,
-                       [&](expr &a, expr &b) { return a.fsub(b, rm.toSMT()); },
-                       ty, fmath);
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return a.fsub(b, rm.toSMT());
     };
     break;
 
   case FMul:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      return fm_poison(s, a, ap, b, bp,
-                       [&](expr &a, expr &b) { return a.fmul(b, rm.toSMT()); },
-                       ty, fmath);
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return a.fmul(b, rm.toSMT());
     };
     break;
 
   case FDiv:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      return fm_poison(s, a, ap, b, bp,
-                       [&](expr &a, expr &b) { return a.fdiv(b, rm.toSMT()); },
-                       ty, fmath);
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return a.fdiv(b, rm.toSMT());
     };
     break;
 
   case FRem:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      return fm_poison(s, a, ap, b, bp,
-                       [&](expr &a, expr &b) {
-                         auto val = expr::mkUF("fmod", {a, b}, a);
-                         s.doesApproximation("frem", val);
-                         return val;
-                       },
-                       ty, fmath);
+      auto val = expr::mkUF("fmod", {a, b}, a);
+      s.doesApproximation("frem", val);
+      return val;
     };
     break;
 
   case FMin:
   case FMax:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addQuantVar(ndet);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
                             expr::mkNumber("-0", a));
 
-      auto v = [&](expr &a, expr &b) {
-        expr z = a.isFPZero() && b.isFPZero();
-        expr cmp = op == FMin ? a.fole(b) : a.foge(b);
-        return expr::mkIf(a.isNaN(), b,
-                          expr::mkIf(b.isNaN(), a,
-                                     expr::mkIf(z, ndz,
-                                                expr::mkIf(cmp, a, b))));
-      };
-      return fm_poison(s, a, ap, b, bp, v, ty, fmath);
+      expr z = a.isFPZero() && b.isFPZero();
+      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
+      return expr::mkIf(a.isNaN(), b,
+                        expr::mkIf(b.isNaN(), a,
+                                   expr::mkIf(z, ndz,
+                                              expr::mkIf(cmp, a, b))));
     };
     break;
 
   case FMinimum:
   case FMaximum:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      auto v = [&](expr &a, expr &b) {
-        expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-        expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
-        expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
-                                       : (a.isFPNegative() && b.isFPNegative());
-        expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
-                            expr::mkIf(neg_cond, zneg, zpos),
-                            expr::mkIf(cmp, a, b));
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
+      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+      expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
+      expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
+                                     : (a.isFPNegative() && b.isFPNegative());
+      expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
+                          expr::mkIf(neg_cond, zneg, zpos),
+                          expr::mkIf(cmp, a, b));
 
-        return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
-      };
-      return fm_poison(s, a, ap, b, bp, v, ty, fmath);
+      return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
     };
     break;
   case CopySign:
-    fn = [&](auto &a, auto &ap, auto &b, auto &bp, auto &ty,
-             auto rm) -> StateValue {
-      return fm_poison(s, a, ap, b, bp,
-                       [](expr &a, expr &b) {
-                         return expr::mkIf(a.isFPNegative() == b.isFPNegative(),
-                                           a, a.fneg()); },
-                       ty, fmath);
+    flush_denormal = false;
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return expr::mkIf(a.isFPNegative() == b.isFPNegative(), a, a.fneg());
     };
     break;
   }
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return round_value([&](auto rm) {
-      return fn(a.value, a.non_poison, b.value, b.non_poison, ty, rm);
-    }, s, ty, rm);
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                       [&](expr &a, expr &b){ return fn(a, b, rm); }, ty,
+                       fmath, !flush_denormal, flush_denormal);
+    }, s, ty, rm, flush_denormal);
   };
 
   auto &a = s[*lhs];
@@ -1083,71 +1056,50 @@ void FpUnaryOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
-  function<StateValue(const expr&, const expr&, const Type&,
-                      FpRoundingMode)> fn;
+  expr (*fn)(const expr&, FpRoundingMode);
+  bool flush_denormal = true;
 
   switch (op) {
   case FAbs:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.fabs();}, ty, fmath);
-    };
+    flush_denormal = false;
+    fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
     break;
   case FNeg:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return
-        fm_poison(s, v, np, [](expr &v){ return v.fneg(); }, ty, fmath, true,
-                  /*flush_denormal=*/false);
-    };
+    flush_denormal = false;
+    fn = [](const expr &v, FpRoundingMode rm){ return v.fneg(); };
     break;
   case Ceil:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.ceil();}, ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.ceil(); };
     break;
   case Floor:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.floor(); }, ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.floor(); };
     break;
   case RInt:
   case NearbyInt:
     // TODO: they differ in exception behavior
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [&](expr &v) { return v.round(rm.toSMT()); },
-                       ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.round(rm.toSMT()); };
     break;
   case Round:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.round(expr::rna()); },
-                       ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rna()); };
     break;
   case RoundEven:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.round(expr::rne()); },
-                       ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rne()); };
     break;
   case Trunc:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [](expr &v) { return v.round(expr::rtz()); },
-                       ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rtz()); };
     break;
   case Sqrt:
-    fn = [&](auto &v, auto &np, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, v, np, [&](expr &v){ return v.sqrt(rm.toSMT()); },
-                       ty, fmath);
-    };
+    fn = [](const expr &v, FpRoundingMode rm) { return v.sqrt(rm.toSMT()); };
     break;
   }
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
-    // NOTE: fneg doesn't flush to zero on denormal numbers
     return
-      round_value([&](auto rm) { return fn(v.value, v.non_poison, ty, rm); },
-                  s, ty, rm, op != FNeg);
+      round_value([&](auto rm) {
+        return fm_poison(s, v.value, v.non_poison,
+                         [&](expr &v){ return fn(v, rm); }, ty, fmath,
+                         !flush_denormal, flush_denormal);
+      },  s, ty, rm, flush_denormal);
   };
 
   auto &v = s[*val];
@@ -1388,39 +1340,37 @@ void FpTernaryOp::print(ostream &os) const {
 }
 
 StateValue FpTernaryOp::toSMT(State &s) const {
-  auto &av = s[*a];
-  auto &bv = s[*b];
-  auto &cv = s[*c];
-  function<StateValue(const StateValue&, const StateValue&, const StateValue&,
-                      const Type&, FpRoundingMode)> fn;
+  function<expr(const expr&, const expr&, const expr&, FpRoundingMode)> fn;
 
   switch (op) {
   case FMA:
-    fn = [&](auto &a, auto &b, auto &c, auto &ty, auto rm) -> StateValue {
-      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison, c.value,
-                       c.non_poison, [&](expr &a, expr &b, expr &c) {
-                         return expr::fma(a, b, c, rm.toSMT());
-                       }, ty, fmath);
+    fn = [](const expr &a, const expr &b, const expr &c, FpRoundingMode rm) {
+      return expr::fma(a, b, c, rm.toSMT());
     };
     break;
   case MulAdd:
-    fn = [&](auto &a, auto &b, auto &c, auto &ty, auto rm0) -> StateValue {
+    fn = [&](const expr &a, const expr &b, const expr &c, FpRoundingMode rm0) {
       auto rm = rm0.toSMT();
       expr var = expr::mkFreshVar("nondet", expr(false));
       s.addQuantVar(var);
-      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison, c.value,
-                       c.non_poison, [&](expr &a, expr &b, expr &c) {
-                         return expr::mkIf(var, expr::fma(a, b, c, rm),
-                                           a.fmul(b, rm).fadd(c, rm));
-                       }, ty, fmath);
+      return expr::mkIf(var, expr::fma(a, b, c, rm), a.fmul(b, rm).fadd(c, rm));
     };
     break;
   }
 
   auto scalar = [&](const StateValue &a, const StateValue &b,
                     const StateValue &c, const Type &ty) {
-    return round_value([&](auto rm) { return fn(a, b, c, ty, rm); }, s, ty, rm);
+    return round_value([&](auto rm) {
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                       c.value, c.non_poison,
+                       [&](expr &a, expr &b, expr &c){ return fn(a, b, c, rm);},
+                       ty, fmath);
+    }, s, ty, rm);
   };
+
+  auto &av = s[*a];
+  auto &bv = s[*b];
+  auto &cv = s[*c];
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
