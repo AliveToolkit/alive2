@@ -164,6 +164,7 @@ friend class MutateInstructionHelper;
 friend class RandomMoveHelper;
 friend class RandomCodeInserterHelper;
 friend class FunctionCallInlineHelper;
+friend class FunctionAttributeHelper;
 friend class VoidFunctionCallRemoveHelper;
 friend class GEPHelper;
 friend class BinaryInstructionHelper;

@@ -242,16 +242,22 @@ public:
 
 class FunctionAttributeHelper: public MutationHelper{
   bool updated;
+  llvm::SmallVector<size_t> ptrPos;
 public:
   FunctionAttributeHelper(std::shared_ptr<FunctionMutant> mutator):MutationHelper(mutator),updated(false){};
-  virtual void init() override{}
+  virtual void init() override;
   virtual void reset()override{
     updated=false;
   }
   virtual void mutate()override;
-  virtual bool shouldMutate() override;
+  virtual bool shouldMutate() override{
+    return !updated;
+  }
   virtual void debug() override;
-  static bool canMutate(llvm::Function* func);
+  static bool canMutate(llvm::Function* func){return true;};
+  virtual void whenMoveToNextFunction()override{
+    updated=false;
+  }
 };
 
 class GEPHelper:public MutationHelper{

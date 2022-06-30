@@ -503,6 +503,50 @@ void VoidFunctionCallRemoveHelper::debug(){
   llvm::errs() << "\n";
 }
 
+void FunctionAttributeHelper::init(){
+  llvm::Function* func=mutator->currentFunction;
+  size_t index=0;
+  for(auto ait=func->arg_begin();ait!=func->arg_end();ait++,index++){
+    if(ait->getType()->isPointerTy()){
+      ptrPos.push_back(index);
+    }    
+  }
+}
+
+#define setFuncAttr(attrName, value)                                            \
+  if (func->hasFnAttribute(attrName)) {                                        \
+    func->removeFnAttr(attrName);                                              \
+  }                                                                            \
+  if (value) {                                                                  \
+    func->addFnAttr(attrName);                                                 \
+  }
+#define setFuncParamAttr(index, attrName, value)                                \
+  if (func->hasParamAttribute(index, attrName)) {                              \
+    func->removeParamAttr(index, attrName);                                    \
+  }                                                                            \
+  if (value) {                                                                  \
+    func->addParamAttr(index, attrName);                                       \
+  }
+
+
+void FunctionAttributeHelper::mutate(){
+  updated=true;
+  llvm::Function* func=mutator->currentFunction;
+  setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
+  for(size_t index: ptrPos){
+    setFuncParamAttr(index,llvm::Attribute::AttrKind::NoCapture, Random::getRandomBool());    
+      func->removeParamAttr(index, llvm::Attribute::AttrKind::Dereferenceable);
+      func->addDereferenceableParamAttr(index, 1<<(Random::getRandomUnsigned()%4));
+  }
+}
+
+#undef setFuncAttr
+#undef setFuncParamAttr
+
+
+void FunctionAttributeHelper::debug(){
+  llvm::errs()<<"Function attributes updated\n";
+}
 
 void GEPHelper::mutate(){
   llvm::GetElementPtrInst* inst=(llvm::GetElementPtrInst *)&*mutator->iitInTmp;
@@ -510,7 +554,7 @@ void GEPHelper::mutate(){
   updated=true;
 }
 
-bool canMutate(llvm::Function* func){
+bool GEPHelper::canMutate(llvm::Function* func){
   for(auto it=inst_begin(func); it!=inst_end(func); it++){
     if(llvm::isa<llvm::GetElementPtrInst>(&*it)){
       return true;
