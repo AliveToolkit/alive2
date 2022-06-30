@@ -1,60 +1,61 @@
 #include "ComplexMutator.h"
 
 void ShuffleHelper::init() {
-    shuffleUnitInBasicBlockIndex = 0;
-    /**
-     * find the same location as iit,bit,fit, and set shuffleBasicBlock
-     *
-     */
-    for (auto bit = mutator->currentFunction->begin(); bit != mutator->currentFunction->end();
-         ++bit, ++shuffleUnitInBasicBlockIndex) {
-      for (auto iit = bit->begin(); iit != bit->end(); ++iit) {
-        if (&*iit == (&*(mutator->iit))) {
-          goto varSetEnd;
-        }
+  shuffleUnitInBasicBlockIndex = 0;
+  /**
+   * find the same location as iit,bit,fit, and set shuffleBasicBlock
+   *
+   */
+  for (auto bit = mutator->currentFunction->begin();
+       bit != mutator->currentFunction->end();
+       ++bit, ++shuffleUnitInBasicBlockIndex) {
+    for (auto iit = bit->begin(); iit != bit->end(); ++iit) {
+      if (&*iit == (&*(mutator->iit))) {
+        goto varSetEnd;
       }
     }
+  }
 varSetEnd:
-  llvm::Function* func=mutator->currentFunction;
-    shuffleBlockInFunction.resize(func->size());
-    size_t idx = 0;
-    for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt, ++idx) {
-      ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[idx];
-      ShuffleUnit tmp;
-      std::unordered_set<llvm::Value *> us;
-      auto instIt = bbIt->begin();
-      /**
-       * handle phi instructions at beginning.
-       */
-      while (!instIt->isTerminator() && llvm::isa<llvm::PHINode>(&*instIt)) {
-        tmp.push_back(&*instIt);
-        ++instIt;
-      }
-      if (tmp.size() >= 2) {
-        bSBlock.push_back(tmp);
-      }
-      tmp.clear();
-      for (; !instIt->isTerminator(); ++instIt) {
-        bool flag = true;
-        for (size_t op = 0; flag && op < instIt->getNumOperands(); ++op) {
-          if (us.find(instIt->getOperand(op)) != us.end()) {
-            flag = false;
-          }
-        }
-        if (!flag) {
-          if (tmp.size() >= 2) {
-            bSBlock.push_back(tmp);
-          }
-          tmp.clear();
-          us.clear();
-        }
-        tmp.push_back(&*instIt);
-        us.insert(&*instIt);
-      }
-      if (tmp.size() >= 2) {
-        bSBlock.push_back(tmp);
-      }
+  llvm::Function *func = mutator->currentFunction;
+  shuffleBlockInFunction.resize(func->size());
+  size_t idx = 0;
+  for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt, ++idx) {
+    ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[idx];
+    ShuffleUnit tmp;
+    std::unordered_set<llvm::Value *> us;
+    auto instIt = bbIt->begin();
+    /**
+     * handle phi instructions at beginning.
+     */
+    while (!instIt->isTerminator() && llvm::isa<llvm::PHINode>(&*instIt)) {
+      tmp.push_back(&*instIt);
+      ++instIt;
     }
+    if (tmp.size() >= 2) {
+      bSBlock.push_back(tmp);
+    }
+    tmp.clear();
+    for (; !instIt->isTerminator(); ++instIt) {
+      bool flag = true;
+      for (size_t op = 0; flag && op < instIt->getNumOperands(); ++op) {
+        if (us.find(instIt->getOperand(op)) != us.end()) {
+          flag = false;
+        }
+      }
+      if (!flag) {
+        if (tmp.size() >= 2) {
+          bSBlock.push_back(tmp);
+        }
+        tmp.clear();
+        us.clear();
+      }
+      tmp.push_back(&*instIt);
+      us.insert(&*instIt);
+    }
+    if (tmp.size() >= 2) {
+      bSBlock.push_back(tmp);
+    }
+  }
 }
 
 bool ShuffleHelper::shouldMutate() {
@@ -63,8 +64,8 @@ bool ShuffleHelper::shouldMutate() {
 }
 
 void ShuffleHelper::shuffleCurrentBlock() {
-  ShuffleUnit &sblock = shuffleBlockInFunction[shuffleUnitInBasicBlockIndex]
-                                   [shuffleUnitIndex];
+  ShuffleUnit &sblock =
+      shuffleBlockInFunction[shuffleUnitInBasicBlockIndex][shuffleUnitIndex];
   llvm::SmallVector<llvm::Instruction *> sv;
   for (const auto &p : sblock) {
     sv.push_back(p);
@@ -80,7 +81,8 @@ void ShuffleHelper::shuffleCurrentBlock() {
     }
   }
   while (sv == sblock) {
-    std::random_shuffle(sv.begin(), sv.end(),[](int i){return Random::getRandomUnsigned()%i;});
+    std::random_shuffle(sv.begin(), sv.end(),
+                        [](int i) { return Random::getRandomUnsigned() % i; });
   }
 
   /**
@@ -118,9 +120,9 @@ void ShuffleHelper::shuffleCurrentBlock() {
       (llvm::Instruction *)&*mutator->vMap[&*mutator->iit]);
 }
 
-bool MutateInstructionHelper::canMutate(llvm::Function* func){
-  for(auto it=inst_begin(func); it != inst_end(func);++it){
-    if(canMutate(&*it)){
+bool MutateInstructionHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); ++it) {
+    if (canMutate(&*it)) {
       return true;
     }
   }
@@ -132,8 +134,8 @@ bool MutateInstructionHelper::shouldMutate() {
 }
 
 void MutateInstructionHelper::mutate() {
-  //do extra handling for br insts
-  if(llvm::isa<llvm::BranchInst>(mutator->iitInTmp)){
+  // do extra handling for br insts
+  if (llvm::isa<llvm::BranchInst>(mutator->iitInTmp)) {
     /*llvm::BranchInst* brInst=(llvm::BranchInst*)&*mutator->tmpIit;
     unsigned sz=brInst->getNumSuccessors();
     llvm::SmallVector<llvm::BasicBlock*> bbs;
@@ -150,11 +152,11 @@ void MutateInstructionHelper::mutate() {
   }
   // 75% chances to add a new inst, 25% chances to replace with a existent usage
   else if ((Random::getRandomUnsigned() & 3) != 0) {
-    bool res=insertRandomBinaryInstruction(&*(mutator->iitInTmp));
-    if(!res){
+    bool res = insertRandomBinaryInstruction(&*(mutator->iitInTmp));
+    if (!res) {
       replaceRandomUsage(&*(mutator->iitInTmp));
     }
-    newAdded=res;
+    newAdded = res;
   } else {
     replaceRandomUsage(&*(mutator->iitInTmp));
   }
@@ -174,42 +176,44 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
     }
   }
 
-  if(ty==nullptr){
+  if (ty == nullptr) {
     return false;
   }
 
-  if(!ty->isFloatingPointTy()&&!ty->isIntegerTy()){
+  if (!ty->isFloatingPointTy() && !ty->isIntegerTy()) {
     return false;
   }
 
-  bool isFloat=ty->isFloatingPointTy();
+  bool isFloat = ty->isFloatingPointTy();
 
   llvm::Value *val1 = mutator->getRandomValue(ty),
               *val2 = mutator->getRandomValue(ty);
-  llvm::Instruction* newInst=nullptr;
-  if(isFloat){
-    newInst=LLVMUtil::getRandomFloatInstruction(val1,val2,inst);
-  }else{
-    newInst=LLVMUtil::getRandomIntegerInstruction(val1,val2,inst);
+  llvm::Instruction *newInst = nullptr;
+  if (isFloat) {
+    newInst = LLVMUtil::getRandomFloatInstruction(val1, val2, inst);
+  } else {
+    newInst = LLVMUtil::getRandomIntegerInstruction(val1, val2, inst);
   }
   inst->setOperand(pos, newInst);
   return true;
 }
 
 void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
-  bool found=false;
-  size_t pos=Random::getRandomUnsigned() % inst->getNumOperands();
-  //make sure at least one 
-  for(size_t i=0;!found&&i<mutator->iitInTmp->getNumOperands();i++,pos++){
-    if(pos==mutator->iitInTmp->getNumOperands()){
-      pos=0;
+  bool found = false;
+  size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
+  // make sure at least one
+  for (size_t i = 0; !found && i < mutator->iitInTmp->getNumOperands();
+       i++, pos++) {
+    if (pos == mutator->iitInTmp->getNumOperands()) {
+      pos = 0;
     }
-    if(!isBasicBlockOrFunction(mutator->iitInTmp->getOperand(pos))){
-      found=true;
+    if (!isBasicBlockOrFunction(mutator->iitInTmp->getOperand(pos))) {
+      found = true;
       break;
     }
   }
-  assert(found && "at least should find a location which is not a basic block and function!");
+  assert(found && "at least should find a location which is not a basic block "
+                  "and function!");
   /*llvm::Type *ty = nullptr;
   for (size_t i = 0; i < inst->getNumOperands(); ++i, ++pos) {
     if (pos == inst->getNumOperands())
@@ -221,10 +225,9 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
   }
   llvm::Value *val = mutator->getRandomValue(ty);
   inst->setOperand(pos, val);*/
-  mutator->setOperandRandomValue(inst,pos);
-  llvm::SmallVector<llvm::Value*> vals;
+  mutator->setOperandRandomValue(inst, pos);
+  llvm::SmallVector<llvm::Value *> vals;
   mutator->fixAllValues(vals);
-
 }
 
 bool RandomMoveHelper::shouldMutate() {
@@ -232,9 +235,9 @@ bool RandomMoveHelper::shouldMutate() {
          !mutator->iitInTmp->isTerminator();
 }
 
-bool RandomMoveHelper::canMutate(llvm::Function* func){
-  for(auto bit=func->begin(); bit != func->end();++bit){
-    if(bit->size()>2){
+bool RandomMoveHelper::canMutate(llvm::Function *func) {
+  for (auto bit = func->begin(); bit != func->end(); ++bit) {
+    if (bit->size() > 2) {
       return true;
     }
   }
@@ -307,7 +310,7 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     }
   }
   inst->moveBefore(newPosInst);
-  llvm::SmallVector<llvm::Value*> vals;
+  llvm::SmallVector<llvm::Value *> vals;
   mutator->fixAllValues(vals);
   // restore domInst
 }
@@ -338,7 +341,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   // need fix all insts used current inst in [pos,newPos]
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
-  llvm::SmallVector<llvm::Value*> extraVals;
+  llvm::SmallVector<llvm::Value *> extraVals;
   extraVals.push_back(inst);
   extraVals.push_back(newPosInst);
   for (size_t i = pos; i != newPos; ++i) {
@@ -350,14 +353,14 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
         mutator->setOperandRandomValue(newPosInst, op);
       }
     }
-    //llvm::errs()<<"\nAAAAAAAAAAAAAA\n";
-    //mutator->domInst.back()->print(llvm::errs());
+    // llvm::errs()<<"\nAAAAAAAAAAAAAA\n";
+    // mutator->domInst.back()->print(llvm::errs());
     mutator->fixAllValues(extraVals);
-    newPosInst=(llvm::Instruction*)extraVals[1];
-    newPosIt=newPosInst->getIterator();
+    newPosInst = (llvm::Instruction *)extraVals[1];
+    newPosIt = newPosInst->getIterator();
     mutator->extraValues.push_back(newPosInst);
   }
-  inst=(llvm::Instruction*)extraVals[0];
+  inst = (llvm::Instruction *)extraVals[0];
   inst->moveBefore(newPosInst);
 }
 
@@ -370,204 +373,213 @@ void RandomCodeInserterHelper::mutate() {
   // if not the first inst of this block, we can do a split
   llvm::Instruction *insertPoint = &*mutator->iitInTmp;
   if (mutator->bitInTmp->getFirstNonPHIOrDbg() != insertPoint) {
-    llvm::BasicBlock* oldBB=&*mutator->bitInTmp;
-    llvm::Instruction* inst=oldBB->getTerminator();
-    llvm::SmallVector<llvm::BasicBlock*> succs;
-    for(size_t i=0;i<inst->getNumOperands();++i){
-      if(llvm::Value* val=inst->getOperand(i);llvm::isa<BasicBlock>(val)){
-        succs.push_back((llvm::BasicBlock*)val);
+    llvm::BasicBlock *oldBB = &*mutator->bitInTmp;
+    llvm::Instruction *inst = oldBB->getTerminator();
+    llvm::SmallVector<llvm::BasicBlock *> succs;
+    for (size_t i = 0; i < inst->getNumOperands(); ++i) {
+      if (llvm::Value *val = inst->getOperand(i); llvm::isa<BasicBlock>(val)) {
+        succs.push_back((llvm::BasicBlock *)val);
       }
     }
-    llvm::BasicBlock* newBB=mutator->bitInTmp->splitBasicBlock(mutator->iitInTmp);
-    for(auto bb:succs){
-      bb->replacePhiUsesWith(oldBB,newBB);
+    llvm::BasicBlock *newBB =
+        mutator->bitInTmp->splitBasicBlock(mutator->iitInTmp);
+    for (auto bb : succs) {
+      bb->replacePhiUsesWith(oldBB, newBB);
     }
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
 
-void FunctionCallInlineHelper::init(){
-  if(funcToId.empty()){
-    llvm::Module* module=mutator->currentFunction->getParent();
-    for(auto fit=module->begin(); fit != module->end();++fit){
-      if(fit->isDeclaration()||fit->getName().empty()){
+void FunctionCallInlineHelper::init() {
+  if (funcToId.empty()) {
+    llvm::Module *module = mutator->currentFunction->getParent();
+    for (auto fit = module->begin(); fit != module->end(); ++fit) {
+      if (fit->isDeclaration() || fit->getName().empty()) {
         continue;
       }
-      bool shouldAdd=true;
-      for(size_t i=0;i<idToFuncSet.size()&&shouldAdd;++i){
-        if(LLVMUtil::compareSignature(&*fit,module->getFunction(idToFuncSet[i][0]))){
-          funcToId.insert(std::make_pair(fit->getName(),funcToId[idToFuncSet[i][0]]));
+      bool shouldAdd = true;
+      for (size_t i = 0; i < idToFuncSet.size() && shouldAdd; ++i) {
+        if (LLVMUtil::compareSignature(
+                &*fit, module->getFunction(idToFuncSet[i][0]))) {
+          funcToId.insert(
+              std::make_pair(fit->getName(), funcToId[idToFuncSet[i][0]]));
           idToFuncSet[i].push_back(fit->getName().str());
-          shouldAdd=false;
+          shouldAdd = false;
         }
       }
-      if(shouldAdd){
-        funcToId.insert(std::make_pair(fit->getName(),idToFuncSet.size()));
+      if (shouldAdd) {
+        funcToId.insert(std::make_pair(fit->getName(), idToFuncSet.size()));
         idToFuncSet.push_back(std::vector<std::string>());
         idToFuncSet.back().push_back(fit->getName().str());
       }
     }
   }
-  inlined=false;
+  inlined = false;
 }
 
 /*
-* Not inlined. 
-* is a function call
-* could find replacement
-*/
+ * Not inlined.
+ * is a function call
+ * could find replacement
+ */
 bool FunctionCallInlineHelper::shouldMutate() {
-  return !inlined&&canMutate(&*mutator->iitInTmp);
+  return !inlined && canMutate(&*mutator->iitInTmp);
 }
 
-llvm::Function* FunctionCallInlineHelper::getReplacedFunction(){
-  assert(llvm::isa<llvm::CallInst>(mutator->iitInTmp)&&"function inline should be a call inst");
-  llvm::CallInst* callInst=(llvm::CallInst*)&*mutator->iitInTmp;
-  llvm::Function* func=callInst->getCalledFunction();
-  functionInlined=func->getName();
-  auto it=funcToId.find(func->getName());
-  if(it!=funcToId.end()&&!idToFuncSet[it->second].empty()){
-    //make sure there is a replacement
-    size_t idx=Random::getRandomUnsigned()%idToFuncSet[it->second].size();
-    functionInlined=idToFuncSet[it->second][idx];
-    //final check the inlined function must have the same type with called function
-    //because of the pre-calculated function signature might be added with more args
-    if(mutator->tmpCopy->getFunction(functionInlined)->getFunctionType()!=func->getFunctionType()){
-      functionInlined=func->getName();
+llvm::Function *FunctionCallInlineHelper::getReplacedFunction() {
+  assert(llvm::isa<llvm::CallInst>(mutator->iitInTmp) &&
+         "function inline should be a call inst");
+  llvm::CallInst *callInst = (llvm::CallInst *)&*mutator->iitInTmp;
+  llvm::Function *func = callInst->getCalledFunction();
+  functionInlined = func->getName();
+  auto it = funcToId.find(func->getName());
+  if (it != funcToId.end() && !idToFuncSet[it->second].empty()) {
+    // make sure there is a replacement
+    size_t idx = Random::getRandomUnsigned() % idToFuncSet[it->second].size();
+    functionInlined = idToFuncSet[it->second][idx];
+    // final check the inlined function must have the same type with called
+    // function because of the pre-calculated function signature might be added
+    // with more args
+    if (mutator->tmpCopy->getFunction(functionInlined)->getFunctionType() !=
+        func->getFunctionType()) {
+      functionInlined = func->getName();
     }
   }
   return mutator->tmpCopy->getFunction(functionInlined);
 }
 
-bool FunctionCallInlineHelper::canMutate(llvm::Function* func){
-  for(auto it=inst_begin(func); it!=inst_end(func); it++){
-    if(canMutate(&*it)){
-      return true;
-    }
-  } 
-  return false; 
-}
-
-void FunctionCallInlineHelper::mutate() {
-  inlined = true;
-  llvm::InlineFunctionInfo ifi;
-  llvm::Function* func=getReplacedFunction();
-  llvm::CallInst* callInst=(llvm::CallInst*)(&*mutator->iitInTmp);
-  llvm::BasicBlock* block=callInst->getParent();
-  llvm::BasicBlock::iterator backupIt=callInst->getIterator()==block->begin()?block->end():--callInst->getIterator();
-  callInst->setCalledFunction(func);
-  llvm::InlineResult res=llvm::InlineFunction(*callInst,ifi);
-  if(!res.isSuccess()){
-    llvm::errs()<<res.getFailureReason()<<"\n";
-  }else{
-    if(backupIt==block->end()){
-      mutator->iitInTmp=block->begin();
-    }else{
-      mutator->iitInTmp=++backupIt;
-    }
-  }
-}
-
-bool VoidFunctionCallRemoveHelper::canMutate(llvm::Function* func){
-  for(auto it=inst_begin(func); it!=inst_end(func); it++){
-    if(canMutate(&*it)){
-      return true;
-    }
-  } 
-  return false;   
-}
-
-void VoidFunctionCallRemoveHelper::mutate(){
-  llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
-  llvm::Instruction* nextInst=callInst->getNextNonDebugInstruction();
-  if(funcName.empty()){
-    funcName=callInst->getName().str();
-  }
-  callInst->eraseFromParent();
-  removed=true;
-  mutator->iitInTmp=nextInst->getIterator();
-}
-
-bool VoidFunctionCallRemoveHelper::shouldMutate(){
-  return !removed&&canMutate(&*mutator->iitInTmp);
-}
-
-void VoidFunctionCallRemoveHelper::debug(){
-  if(funcName.empty()){
-    llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;   
-    funcName=callInst->getName().str();
-  }
-  llvm::errs() << "Removed function\n"<<funcName;
-  llvm::errs() << "\nBaisc block\n";
-  mutator->iitInTmp->getParent()->print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
-void FunctionAttributeHelper::init(){
-  llvm::Function* func=mutator->currentFunction;
-  size_t index=0;
-  for(auto ait=func->arg_begin();ait!=func->arg_end();ait++,index++){
-    if(ait->getType()->isPointerTy()){
-      ptrPos.push_back(index);
-    }    
-  }
-}
-
-#define setFuncAttr(attrName, value)                                            \
-  if (func->hasFnAttribute(attrName)) {                                        \
-    func->removeFnAttr(attrName);                                              \
-  }                                                                            \
-  if (value) {                                                                  \
-    func->addFnAttr(attrName);                                                 \
-  }
-#define setFuncParamAttr(index, attrName, value)                                \
-  if (func->hasParamAttribute(index, attrName)) {                              \
-    func->removeParamAttr(index, attrName);                                    \
-  }                                                                            \
-  if (value) {                                                                  \
-    func->addParamAttr(index, attrName);                                       \
-  }
-
-
-void FunctionAttributeHelper::mutate(){
-  updated=true;
-  llvm::Function* func=mutator->currentFunction;
-  setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
-  for(size_t index: ptrPos){
-    setFuncParamAttr(index,llvm::Attribute::AttrKind::NoCapture, Random::getRandomBool());    
-      func->removeParamAttr(index, llvm::Attribute::AttrKind::Dereferenceable);
-      func->addDereferenceableParamAttr(index, 1<<(Random::getRandomUnsigned()%4));
-  }
-}
-
-#undef setFuncAttr
-#undef setFuncParamAttr
-
-
-void FunctionAttributeHelper::debug(){
-  llvm::errs()<<"Function attributes updated\n";
-}
-
-void GEPHelper::mutate(){
-  llvm::GetElementPtrInst* inst=(llvm::GetElementPtrInst *)&*mutator->iitInTmp;
-  inst->setIsInBounds(!inst->isInBounds());
-  updated=true;
-}
-
-bool GEPHelper::canMutate(llvm::Function* func){
-  for(auto it=inst_begin(func); it!=inst_end(func); it++){
-    if(llvm::isa<llvm::GetElementPtrInst>(&*it)){
+bool FunctionCallInlineHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); it++) {
+    if (canMutate(&*it)) {
       return true;
     }
   }
   return false;
 }
 
-bool GEPHelper::shouldMutate(){
-  return !updated&&llvm::isa<llvm::GetElementPtrInst>(&*mutator->iitInTmp);
+void FunctionCallInlineHelper::mutate() {
+  inlined = true;
+  llvm::InlineFunctionInfo ifi;
+  llvm::Function *func = getReplacedFunction();
+  llvm::CallInst *callInst = (llvm::CallInst *)(&*mutator->iitInTmp);
+  llvm::BasicBlock *block = callInst->getParent();
+  llvm::BasicBlock::iterator backupIt =
+      callInst->getIterator() == block->begin() ? block->end()
+                                                : --callInst->getIterator();
+  callInst->setCalledFunction(func);
+  llvm::InlineResult res = llvm::InlineFunction(*callInst, ifi);
+  if (!res.isSuccess()) {
+    llvm::errs() << res.getFailureReason() << "\n";
+  } else {
+    if (backupIt == block->end()) {
+      mutator->iitInTmp = block->begin();
+    } else {
+      mutator->iitInTmp = ++backupIt;
+    }
+  }
 }
 
-void GEPHelper::debug(){
+bool VoidFunctionCallRemoveHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); it++) {
+    if (canMutate(&*it)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void VoidFunctionCallRemoveHelper::mutate() {
+  llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
+  llvm::Instruction *nextInst = callInst->getNextNonDebugInstruction();
+  if (funcName.empty()) {
+    funcName = callInst->getName().str();
+  }
+  callInst->eraseFromParent();
+  removed = true;
+  mutator->iitInTmp = nextInst->getIterator();
+}
+
+bool VoidFunctionCallRemoveHelper::shouldMutate() {
+  return !removed && canMutate(&*mutator->iitInTmp);
+}
+
+void VoidFunctionCallRemoveHelper::debug() {
+  if (funcName.empty()) {
+    llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
+    funcName = callInst->getName().str();
+  }
+  llvm::errs() << "Removed function\n" << funcName;
+  llvm::errs() << "\nBaisc block\n";
+  mutator->iitInTmp->getParent()->print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void FunctionAttributeHelper::init() {
+  llvm::Function *func = mutator->currentFunction;
+  size_t index = 0;
+  for (auto ait = func->arg_begin(); ait != func->arg_end(); ait++, index++) {
+    if (ait->getType()->isPointerTy()) {
+      ptrPos.push_back(index);
+    }
+  }
+}
+
+#define setFuncAttr(attrName, value)                                           \
+  if (func->hasFnAttribute(attrName)) {                                        \
+    func->removeFnAttr(attrName);                                              \
+  }                                                                            \
+  if (value) {                                                                 \
+    func->addFnAttr(attrName);                                                 \
+  }
+#define setFuncParamAttr(index, attrName, value)                               \
+  if (func->hasParamAttribute(index, attrName)) {                              \
+    func->removeParamAttr(index, attrName);                                    \
+  }                                                                            \
+  if (value) {                                                                 \
+    func->addParamAttr(index, attrName);                                       \
+  }
+
+void FunctionAttributeHelper::mutate() {
+  updated = true;
+  llvm::Function *func = mutator->currentFunction;
+  setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
+  for (size_t index : ptrPos) {
+    setFuncParamAttr(index, llvm::Attribute::AttrKind::NoCapture,
+                     Random::getRandomBool());
+    func->removeParamAttr(index, llvm::Attribute::AttrKind::Dereferenceable);
+    func->addDereferenceableParamAttr(index,
+                                      1 << (Random::getRandomUnsigned() % 4));
+  }
+}
+
+#undef setFuncAttr
+#undef setFuncParamAttr
+
+void FunctionAttributeHelper::debug() {
+  llvm::errs() << "Function attributes updated\n";
+}
+
+void GEPHelper::mutate() {
+  llvm::GetElementPtrInst *inst =
+      (llvm::GetElementPtrInst *)&*mutator->iitInTmp;
+  inst->setIsInBounds(!inst->isInBounds());
+  updated = true;
+}
+
+bool GEPHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); it++) {
+    if (llvm::isa<llvm::GetElementPtrInst>(&*it)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool GEPHelper::shouldMutate() {
+  return !updated && llvm::isa<llvm::GetElementPtrInst>(&*mutator->iitInTmp);
+}
+
+void GEPHelper::debug() {
   llvm::errs() << "Original GEP inst:\n";
   mutator->iitInTmp->print(llvm::errs());
   llvm::errs() << "inbounds flag reversed.\n";
@@ -643,36 +655,37 @@ const std::vector<std::vector<llvm::Instruction::BinaryOps>>
                                              {Ops::And, Ops::Or, Ops::Xor}});
 #undef attr
 
-void BinaryInstructionHelper::mutate(){
-  llvm::BinaryOperator* binInst=(llvm::BinaryOperator*)(&*mutator->iitInTmp);
-  if(Random::getRandomBool()){
+void BinaryInstructionHelper::mutate() {
+  llvm::BinaryOperator *binInst = (llvm::BinaryOperator *)(&*mutator->iitInTmp);
+  if (Random::getRandomBool()) {
     swapOperands(binInst);
   }
-  int opIndex=getOpIndex(binInst);
-  llvm::Instruction::BinaryOps op=getNewOperator(opIndex);
-  llvm::BinaryOperator* newInst=llvm::BinaryOperator::Create(op,binInst->getOperand(0),binInst->getOperand(1),"",binInst);
-  resetMathFlags(newInst,opIndex);
+  int opIndex = getOpIndex(binInst);
+  llvm::Instruction::BinaryOps op = getNewOperator(opIndex);
+  llvm::BinaryOperator *newInst = llvm::BinaryOperator::Create(
+      op, binInst->getOperand(0), binInst->getOperand(1), "", binInst);
+  resetMathFlags(newInst, opIndex);
   binInst->replaceAllUsesWith(newInst);
   binInst->eraseFromParent();
-  mutator->iitInTmp=newInst->getIterator();
+  mutator->iitInTmp = newInst->getIterator();
 }
 
-bool BinaryInstructionHelper::canMutate(llvm::Function* func){
-  for(auto it=inst_begin(func); it!=inst_end(func);++it){
-    if(llvm::isa<llvm::BinaryOperator>(&*it)){
+bool BinaryInstructionHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); ++it) {
+    if (llvm::isa<llvm::BinaryOperator>(&*it)) {
       return true;
     }
   }
   return false;
 }
 
-bool BinaryInstructionHelper::shouldMutate(){
-  return !updated&&llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp);
+bool BinaryInstructionHelper::shouldMutate() {
+  return !updated && llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp);
 }
 
-void BinaryInstructionHelper::debug(){
-    llvm::errs() << "\nCurrentbinary inst:\n";
-    mutator->iitInTmp->print(llvm::errs());
-    llvm::errs() << "\n";
-    mutator->iitInTmp->getParent()->print(llvm::errs());
+void BinaryInstructionHelper::debug() {
+  llvm::errs() << "\nCurrentbinary inst:\n";
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs() << "\n";
+  mutator->iitInTmp->getParent()->print(llvm::errs());
 }

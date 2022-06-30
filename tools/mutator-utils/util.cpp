@@ -270,9 +270,12 @@ const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerBinaryIntrinsic{
 };
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatBinaryIntrinsic{
-    llvm::Intrinsic::IndependentIntrinsics::pow,     llvm::Intrinsic::IndependentIntrinsics::minnum,
-    llvm::Intrinsic::IndependentIntrinsics::maxnum,  llvm::Intrinsic::IndependentIntrinsics::minimum,
-    llvm::Intrinsic::IndependentIntrinsics::maximum, llvm::Intrinsic::IndependentIntrinsics::copysign};
+    llvm::Intrinsic::IndependentIntrinsics::pow,
+    llvm::Intrinsic::IndependentIntrinsics::minnum,
+    llvm::Intrinsic::IndependentIntrinsics::maxnum,
+    llvm::Intrinsic::IndependentIntrinsics::minimum,
+    llvm::Intrinsic::IndependentIntrinsics::maximum,
+    llvm::Intrinsic::IndependentIntrinsics::copysign};
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerUnaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::bitreverse,
@@ -280,14 +283,22 @@ const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerUnaryIntrinsic{
 };
 
 const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatUnaryIntrinsic{
-    llvm::Intrinsic::IndependentIntrinsics::sqrt,        llvm::Intrinsic::IndependentIntrinsics::sin,
-    llvm::Intrinsic::IndependentIntrinsics::cos,         llvm::Intrinsic::IndependentIntrinsics::exp,
-    llvm::Intrinsic::IndependentIntrinsics::exp2,        llvm::Intrinsic::IndependentIntrinsics::log,
-    llvm::Intrinsic::IndependentIntrinsics::log10,       llvm::Intrinsic::IndependentIntrinsics::log2,
-    llvm::Intrinsic::IndependentIntrinsics::fabs,        llvm::Intrinsic::IndependentIntrinsics::floor,
-    llvm::Intrinsic::IndependentIntrinsics::ceil,        llvm::Intrinsic::IndependentIntrinsics::trunc,
-    llvm::Intrinsic::IndependentIntrinsics::rint,        llvm::Intrinsic::IndependentIntrinsics::nearbyint,
-    llvm::Intrinsic::IndependentIntrinsics::round,       llvm::Intrinsic::IndependentIntrinsics::roundeven,
+    llvm::Intrinsic::IndependentIntrinsics::sqrt,
+    llvm::Intrinsic::IndependentIntrinsics::sin,
+    llvm::Intrinsic::IndependentIntrinsics::cos,
+    llvm::Intrinsic::IndependentIntrinsics::exp,
+    llvm::Intrinsic::IndependentIntrinsics::exp2,
+    llvm::Intrinsic::IndependentIntrinsics::log,
+    llvm::Intrinsic::IndependentIntrinsics::log10,
+    llvm::Intrinsic::IndependentIntrinsics::log2,
+    llvm::Intrinsic::IndependentIntrinsics::fabs,
+    llvm::Intrinsic::IndependentIntrinsics::floor,
+    llvm::Intrinsic::IndependentIntrinsics::ceil,
+    llvm::Intrinsic::IndependentIntrinsics::trunc,
+    llvm::Intrinsic::IndependentIntrinsics::rint,
+    llvm::Intrinsic::IndependentIntrinsics::nearbyint,
+    llvm::Intrinsic::IndependentIntrinsics::round,
+    llvm::Intrinsic::IndependentIntrinsics::roundeven,
     llvm::Intrinsic::IndependentIntrinsics::canonicalize};
 
 void LLVMUtil::insertRandomCodeBefore(llvm::Instruction *inst) {
@@ -345,42 +356,46 @@ LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
 llvm::Instruction *
 LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
                                     llvm::Instruction *insertBefore) {
-  std::vector<llvm::Type*> tys{val1->getType()};
-  llvm::Module* M=insertBefore->getModule();
-  size_t pos=Random::getRandomUnsigned()%(integerUnaryIntrinsic.size()+integerBinaryIntrinsic.size());
-  bool isUnary=pos<integerUnaryIntrinsic.size();
-  llvm::Function* func=nullptr;
-  std::vector<llvm::Value*> args{val1};
-  if(isUnary) {
-    func=llvm::Intrinsic::getDeclaration(M,integerUnaryIntrinsic[pos],tys);
-  }else{
-    pos-=integerUnaryIntrinsic.size();
+  std::vector<llvm::Type *> tys{val1->getType()};
+  llvm::Module *M = insertBefore->getModule();
+  size_t pos = Random::getRandomUnsigned() %
+               (integerUnaryIntrinsic.size() + integerBinaryIntrinsic.size());
+  bool isUnary = pos < integerUnaryIntrinsic.size();
+  llvm::Function *func = nullptr;
+  std::vector<llvm::Value *> args{val1};
+  if (isUnary) {
+    func = llvm::Intrinsic::getDeclaration(M, integerUnaryIntrinsic[pos], tys);
+  } else {
+    pos -= integerUnaryIntrinsic.size();
     tys.push_back(val2->getType());
-    func=llvm::Intrinsic::getDeclaration(M,integerBinaryIntrinsic[pos],tys);
+    func = llvm::Intrinsic::getDeclaration(M, integerBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
-  assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
-  llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
+  assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
+  llvm::CallInst *inst = llvm::CallInst::Create(func->getFunctionType(), func,
+                                                args, "", insertBefore);
   return inst;
 }
 
 llvm::Instruction *
 LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                                    llvm::Instruction *insertBefore) {
-  std::vector<llvm::Type*> tys{val1->getType(),val2->getType()};
-  llvm::Module* M=insertBefore->getModule();
-  size_t pos=Random::getRandomUnsigned()%(floatUnaryIntrinsic.size()+floatBinaryIntrinsic.size());
-  bool isUnary=pos<floatUnaryIntrinsic.size();
-  llvm::Function* func=nullptr;
-  std::vector<llvm::Value*> args{val1};
-  if(isUnary) {
-    func=llvm::Intrinsic::getDeclaration(M,floatUnaryIntrinsic[pos],tys);
-  }else{
-    pos-=floatUnaryIntrinsic.size();
-    func=llvm::Intrinsic::getDeclaration(M,floatBinaryIntrinsic[pos],tys);
+  std::vector<llvm::Type *> tys{val1->getType(), val2->getType()};
+  llvm::Module *M = insertBefore->getModule();
+  size_t pos = Random::getRandomUnsigned() %
+               (floatUnaryIntrinsic.size() + floatBinaryIntrinsic.size());
+  bool isUnary = pos < floatUnaryIntrinsic.size();
+  llvm::Function *func = nullptr;
+  std::vector<llvm::Value *> args{val1};
+  if (isUnary) {
+    func = llvm::Intrinsic::getDeclaration(M, floatUnaryIntrinsic[pos], tys);
+  } else {
+    pos -= floatUnaryIntrinsic.size();
+    func = llvm::Intrinsic::getDeclaration(M, floatBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
-  assert(func!=nullptr &&"intrinsic function shouldn't be nullptr!");
-  llvm::CallInst* inst=llvm::CallInst::Create(func->getFunctionType(),func,args,"",insertBefore);
+  assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
+  llvm::CallInst *inst = llvm::CallInst::Create(func->getFunctionType(), func,
+                                                args, "", insertBefore);
   return inst;
 }

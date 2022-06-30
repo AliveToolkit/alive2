@@ -159,15 +159,15 @@ public:
   This class is responsible for generating different function mutants.
 */
 class FunctionMutant {
-friend class ShuffleHelper;
-friend class MutateInstructionHelper;
-friend class RandomMoveHelper;
-friend class RandomCodeInserterHelper;
-friend class FunctionCallInlineHelper;
-friend class FunctionAttributeHelper;
-friend class VoidFunctionCallRemoveHelper;
-friend class GEPHelper;
-friend class BinaryInstructionHelper;
+  friend class ShuffleHelper;
+  friend class MutateInstructionHelper;
+  friend class RandomMoveHelper;
+  friend class RandomCodeInserterHelper;
+  friend class FunctionCallInlineHelper;
+  friend class FunctionAttributeHelper;
+  friend class VoidFunctionCallRemoveHelper;
+  friend class GEPHelper;
+  friend class BinaryInstructionHelper;
 
   llvm::Function *currentFunction, *functionInTmp;
   llvm::ValueToValueMapTy &vMap;
@@ -177,7 +177,6 @@ friend class BinaryInstructionHelper;
   // domInst is used for maintain instructions which dominates current
   // instruction. this vector would be updated when moveToNextBasicBlock,
   // moveToNextInst and restoreBackup
-
 
   DominatedValueVector domVals;
   llvm::SmallVector<llvm::Value *> extraValues;
@@ -251,7 +250,7 @@ public:
                         const llvm::StringSet<> &filterSet);
   void mutate();
   void debug();
-  //should pass the pointer itself.
+  // should pass the pointer itself.
   void init(std::shared_ptr<FunctionMutant> self);
 };
 
@@ -266,7 +265,7 @@ public:
 class ComplexMutator : public Mutator {
   // some functions contain 'immarg' in their arguments. Skip those function
   // calls.
-  llvm::StringSet<> filterSet,invalidFunctions;
+  llvm::StringSet<> filterSet, invalidFunctions;
   std::shared_ptr<llvm::Module> tmpCopy;
   llvm::ValueToValueMapTy vMap;
   llvm::SmallVector<llvm::Value *> globals;
@@ -279,13 +278,13 @@ class ComplexMutator : public Mutator {
 public:
   ComplexMutator(bool debug = false){};
   ComplexMutator(std::shared_ptr<llvm::Module> pm_,
-                 const llvm::StringSet<> &invalidFunctions,
-                 bool debug = false)
-      : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),curFunction(0){
+                 const llvm::StringSet<> &invalidFunctions, bool debug = false)
+      : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),
+        curFunction(0) {
     pm = pm_;
   };
   ComplexMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
-      : Mutator(debug), tmpCopy(nullptr),curFunction(0) {
+      : Mutator(debug), tmpCopy(nullptr), curFunction(0) {
     pm = pm_;
   }
   ~ComplexMutator(){};

@@ -141,17 +141,19 @@ public:
   getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                            llvm::Instruction *insertBefore);
 
-  template<typename EleTy,typename T>
-  static 
-  EleTy findRandomInArray(llvm::ArrayRef<EleTy> array,T val,std::function<bool(EleTy,T)> predicate, EleTy failed){
-  for(size_t i=0,pos=Random::getRandomUnsigned()%array.size();i<array.size();++i,++pos){
-    if(pos==array.size()){
-      pos=0;
+  template <typename EleTy, typename T>
+  static EleTy findRandomInArray(llvm::ArrayRef<EleTy> array, T val,
+                                 std::function<bool(EleTy, T)> predicate,
+                                 EleTy failed) {
+    for (size_t i = 0, pos = Random::getRandomUnsigned() % array.size();
+         i < array.size(); ++i, ++pos) {
+      if (pos == array.size()) {
+        pos = 0;
+      }
+      if (predicate(array[pos], val)) {
+        return array[pos];
+      }
     }
-    if(predicate(array[pos],val)){
-      return array[pos];
-    }
+    return failed;
   }
-  return failed;
-}
 };
