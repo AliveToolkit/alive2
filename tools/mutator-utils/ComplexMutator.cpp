@@ -21,25 +21,56 @@ void FunctionMutant::init(std::shared_ptr<FunctionMutant> self) {
     }
   }
 
-  helpers.push_back(std::make_unique<ShuffleHelper>(self));
-  whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
-  whenMoveToNextBasicBlockFuncs.push_back(helpers.size() - 1);
+  if(ShuffleHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<ShuffleHelper>(self));
+    whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
+    whenMoveToNextBasicBlockFuncs.push_back(helpers.size() - 1);
+  }
 
-  helpers.push_back(std::make_unique<RandomMoveHelper>(self));
-  whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  if(RandomMoveHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<RandomMoveHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
 
-  helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
-  whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  if(MutateInstructionHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
 
-  helpers.push_back(std::make_unique<RandomCodeInserterHelper>(self));
-  whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  if(RandomCodeInserterHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<RandomCodeInserterHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
 
-  helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
-  whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  if(FunctionCallInlineHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
+
+  if(VoidFunctionCallRemoveHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+  }
+
+  if(FunctionAttributeHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<FunctionAttributeHelper>(self));
+    whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
+  }
+
+  if(GEPHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<GEPHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+  }
+
+  if(BinaryInstructionHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+  }
 
   for (size_t i = 0; i < helpers.size(); ++i) {
     helpers[i]->init();
   }
+
 }
 
 void FunctionMutant::resetIterator() {
@@ -129,13 +160,13 @@ void FunctionMutant::initAtFunctionEntry() {
 
 void FunctionMutant::moveToNextBasicBlock() {
   ++bit;
+  initAtNewBasicBlock();
   if (bit == currentFunction->end()) {
     resetIterator();
   } else {
     iit = bit->begin();
   }
   calcDomVals();
-  initAtNewBasicBlock();
 }
 
 void FunctionMutant::moveToNextMutant() {

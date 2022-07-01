@@ -17,7 +17,7 @@ void ShuffleHelper::init() {
   }
 varSetEnd:
   llvm::Function *func = mutator->currentFunction;
-  shuffleBlockInFunction.resize(func->size());
+  shuffleBlockInFunction.resize(func->getBasicBlockList().size());
   size_t idx = 0;
   for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt, ++idx) {
     ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[idx];
