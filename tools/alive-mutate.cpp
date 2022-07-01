@@ -673,25 +673,19 @@ end:
 void copyMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
-  std::unique_ptr<Mutator> mutators[2]{
-      std::make_unique<SimpleMutator>(invalidFuncNameSet, verbose),
-      std::make_unique<ComplexMutator>(CloneModule(*pm), invalidFuncNameSet,
-                                       verbose)};
+  std::unique_ptr<Mutator> mutator=
+            std::make_unique<ComplexMutator>(CloneModule(*pm), invalidFuncNameSet,
+                                       verbose);
   // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-  mutators[0]->setModule(CloneModule(*pm));
   stubMutator.setModule(std::move(pm));
-  if (bool sInit = mutators[0]->init(), cInit = mutators[1]->init();
-      sInit || cInit) {
+  if (bool init = mutator->init(); init) {
         
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
       }
-      if (sInit ^ cInit) {
-        runOnce(i, context, *mutators[sInit ? 0 : 1]);
-      } else {
-        runOnce(i, context, *mutators[Random::getRandomUnsigned() & 1]);
-      }
+      runOnce(i, context, *mutator);
+
       if (tot_num_unsound > (unsigned long long)exitNum) {
         cerr << "Total unsound number exceeds the number of threshold.\n";
         // programEnd();
@@ -710,17 +704,13 @@ void copyMode() {
 void timeMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
-  std::unique_ptr<Mutator> mutators[2]{
-      std::make_unique<SimpleMutator>(invalidFuncNameSet, verbose),
+  std::unique_ptr<Mutator> mutator=
       std::make_unique<ComplexMutator>(CloneModule(*pm), invalidFuncNameSet,
-                                       verbose)};
-  mutators[0]->setModule(CloneModule(*pm));
+                                       verbose);
   stubMutator.setModule(std::move(pm));
   // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-  bool sInit = mutators[0]->init();
-  bool cInit = mutators[1]->init();
-  if (!sInit && !cInit) {
-
+  bool init = mutator->init();
+  if (!init) {
     cerr << "Cannot find any lotaion to mutate, " + testfile + " skipped\n";
     return;
   }
@@ -728,11 +718,7 @@ void timeMode() {
   int cnt = 1;
   while (sum.count() < timeElapsed) {
     auto t_start = std::chrono::high_resolution_clock::now();
-    if (sInit ^ cInit) {
-      runOnce(cnt, context, *mutators[sInit ? 0 : 1]);
-    } else {
-      runOnce(cnt, context, *mutators[Random::getRandomUnsigned() & 1]);
-    }
+    runOnce(cnt, context, *mutator);
 
     auto t_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> cur = t_end - t_start;
