@@ -1,5 +1,5 @@
-#include "mutator.h"
 #include "mutator_helper.h"
+#include "mutator.h"
 
 void ShuffleHelper::init() {
   shuffleUnitInBasicBlockIndex = 0;
@@ -232,21 +232,21 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
 }
 
 bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
-    return
-        // make sure at least one
-        std::any_of(
-            inst->op_begin(), inst->op_end(),
-            [](llvm::Value *val) { return !isBasicBlockOrFunction(val); }) &&
-        (inst->getNumOperands() - llvm::isa<CallBase>(*inst) > 0) &&
-        !llvm::isa<llvm::LandingPadInst>(inst)
-        // The ret value of CleanupRet Inst must be a CleanupPad, needs extra
-        // check so ignore for now.
-        && !llvm::isa<llvm::CleanupReturnInst>(inst)
-        // all catch related inst require the value has to be label
-        && !llvm::isa<llvm::CatchPadInst>(inst) &&
-        !llvm::isa<llvm::CatchSwitchInst>(inst) &&
-        !llvm::isa<llvm::CatchReturnInst>(inst);
-  }
+  return
+      // make sure at least one
+      std::any_of(
+          inst->op_begin(), inst->op_end(),
+          [](llvm::Value *val) { return !isBasicBlockOrFunction(val); }) &&
+      (inst->getNumOperands() - llvm::isa<CallBase>(*inst) > 0) &&
+      !llvm::isa<llvm::LandingPadInst>(inst)
+      // The ret value of CleanupRet Inst must be a CleanupPad, needs extra
+      // check so ignore for now.
+      && !llvm::isa<llvm::CleanupReturnInst>(inst)
+      // all catch related inst require the value has to be label
+      && !llvm::isa<llvm::CatchPadInst>(inst) &&
+      !llvm::isa<llvm::CatchSwitchInst>(inst) &&
+      !llvm::isa<llvm::CatchReturnInst>(inst);
+}
 
 bool RandomMoveHelper::shouldMutate() {
   return !moved && mutator->bitInTmp->size() > 2 &&

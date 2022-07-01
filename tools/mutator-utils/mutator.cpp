@@ -115,56 +115,55 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     }
   }
 
-  if(ShuffleHelper::canMutate(currentFunction)){
+  if (ShuffleHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<ShuffleHelper>(self));
     whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
     whenMoveToNextBasicBlockFuncs.push_back(helpers.size() - 1);
   }
 
-  if(RandomMoveHelper::canMutate(currentFunction)){
+  if (RandomMoveHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<RandomMoveHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(MutateInstructionHelper::canMutate(currentFunction)){
+  if (MutateInstructionHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(RandomCodeInserterHelper::canMutate(currentFunction)){
+  if (RandomCodeInserterHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<RandomCodeInserterHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(FunctionCallInlineHelper::canMutate(currentFunction)){
+  if (FunctionCallInlineHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(VoidFunctionCallRemoveHelper::canMutate(currentFunction)){
+  if (VoidFunctionCallRemoveHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(FunctionAttributeHelper::canMutate(currentFunction)){
+  if (FunctionAttributeHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<FunctionAttributeHelper>(self));
-    whenMoveToNextFuncFuncs.push_back(helpers.size()-1);
+    whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
   }
 
-  if(GEPHelper::canMutate(currentFunction)){
+  if (GEPHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<GEPHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(BinaryInstructionHelper::canMutate(currentFunction)){
+  if (BinaryInstructionHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size()-1);
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
   for (size_t i = 0; i < helpers.size(); ++i) {
     helpers[i]->init();
   }
-
 }
 
 void FunctionMutator::resetIterator() {
@@ -174,7 +173,7 @@ void FunctionMutator::resetIterator() {
 }
 
 bool FunctionMutator::canMutate(const llvm::Instruction &inst,
-                               const llvm::StringSet<> &filterSet) {
+                                const llvm::StringSet<> &filterSet) {
   // contain immarg attributes
   if (llvm::isa<llvm::CallBase>(&inst)) {
     // in case of cannot find function name
@@ -199,7 +198,7 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
 }
 
 bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
-                               const llvm::StringSet<> &filterSet) {
+                                const llvm::StringSet<> &filterSet) {
   return !block.getInstList().empty() &&
          std::all_of(block.begin(), block.end(),
                      [&filterSet](const llvm::Instruction &inst) {
@@ -208,7 +207,7 @@ bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
 }
 
 bool FunctionMutator::canMutate(const llvm::Function *function,
-                               const llvm::StringSet<> &filterSet) {
+                                const llvm::StringSet<> &filterSet) {
   return !function->getBasicBlockList().empty() &&
          std::all_of(function->begin(), function->end(),
                      [&filterSet](const llvm::BasicBlock &bb) {
@@ -304,7 +303,7 @@ void FunctionMutator::resetTmpCopy(std::shared_ptr<llvm::Module> copy) {
 }
 
 void FunctionMutator::setOperandRandomValue(llvm::Instruction *inst,
-                                           size_t pos) {
+                                            size_t pos) {
   if (llvm::Type *ty = inst->getOperand(pos)->getType(); ty != nullptr) {
     if (llvm::Value *val = getRandomValue(ty);
         Random::getRandomBool() || val == nullptr ||

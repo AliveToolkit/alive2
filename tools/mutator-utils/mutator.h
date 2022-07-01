@@ -1,18 +1,19 @@
 #pragma once
+#include "mutator_helper.h"
 #include "tools/mutator-utils/util.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/IR/Dominators.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -28,7 +29,6 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include "mutator_helper.h"
 
 class Mutator {
 protected:
@@ -57,9 +57,9 @@ public:
     pm = ptr;
   }
 
-  virtual void eraseFunctionInModule(const std::string& funcName){
-    if(pm!=nullptr){
-      if(llvm::Function* func=pm->getFunction(funcName);func!=nullptr){
+  virtual void eraseFunctionInModule(const std::string &funcName) {
+    if (pm != nullptr) {
+      if (llvm::Function *func = pm->getFunction(funcName); func != nullptr) {
         func->eraseFromParent();
       }
     }
@@ -84,7 +84,6 @@ public:
   virtual void saveModule(const std::string &outputFileName) override;
   virtual std::string getCurrentFunction() const override;
 };
-
 
 /*class MutationHelper;
 class ShuffleHelper;
@@ -163,9 +162,10 @@ public:
     return currentFunction;
   }
   void resetTmpCopy(std::shared_ptr<llvm::Module> copy);
-  FunctionMutator(llvm::Function *currentFunction, llvm::ValueToValueMapTy &vMap,
-                 const llvm::StringSet<> &filterSet,
-                 const llvm::SmallVector<llvm::Value *> &globals)
+  FunctionMutator(llvm::Function *currentFunction,
+                  llvm::ValueToValueMapTy &vMap,
+                  const llvm::StringSet<> &filterSet,
+                  const llvm::SmallVector<llvm::Value *> &globals)
       : currentFunction(currentFunction), vMap(vMap), filterSet(filterSet),
         globals(globals),
         valueFuncs({&FunctionMutator::getRandomConstant,
@@ -197,7 +197,8 @@ public:
 };
 
 /*
-  This class is responsible for doing mutations on one module; it contains lots of function mutant
+  This class is responsible for doing mutations on one module; it contains lots
+  of function mutant
 */
 
 class ComplexMutator : public Mutator {
