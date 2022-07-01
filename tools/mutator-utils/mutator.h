@@ -28,6 +28,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include "mutator_helper.h"
 
 class Mutator {
 protected:
@@ -83,6 +84,18 @@ public:
   virtual void saveModule(const std::string &outputFileName) override;
   virtual std::string getCurrentFunction() const override;
 };
+
+
+/*class MutationHelper;
+class ShuffleHelper;
+class MutateInstructionHelper;
+class RandomMoveHelper;
+class RandomCodeInserterHelper;
+class FunctionCallInlineHelper;
+class FunctionAttributeHelper;
+class VoidFunctionCallRemoveHelper;
+class GEPHelper;
+class BinaryInstructionHelper;*/
 
 /*
   This class is responsible for generating different function mutants.

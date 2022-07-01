@@ -23,11 +23,9 @@
 
 #include "llvm_util/llvm2alive.h"
 #include "smt/smt.h"
-#include "tools/mutator-utils/ComplexMutator.h"
-#include "tools/mutator-utils/simpleMutator.h"
+#include "tools/mutator-utils/mutator.h"
 #include "tools/transform.h"
 #include "util/version.h"
-
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"

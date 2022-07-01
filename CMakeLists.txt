@@ -122,9 +122,8 @@ add_library(smt STATIC ${SMT_SRCS})
 set(TOOLS_SRCS
   tools/transform.cpp
   tools/mutator-utils/util.cpp
-  tools/mutator-utils/ComplexMutator.cpp
-  tools/mutator-utils/simpleMutator.cpp
-  tools/mutator-utils/ComplexMutatorHelper.cpp
+  tools/mutator-utils/mutator.cpp
+  tools/mutator-utils/mutator_helper.cpp
 )
 
 add_library(tools STATIC ${TOOLS_SRCS})
