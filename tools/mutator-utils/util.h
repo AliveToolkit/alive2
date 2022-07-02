@@ -256,10 +256,6 @@ class LLVMUtil {
   const static std::vector<llvm::Intrinsic::ID> floatUnaryIntrinsic;
 
 public:
-  static void optimizeModule(llvm::Module *M, bool newGVN = false,
-                             bool licm = false);
-  static void optimizeFunction(llvm::Function *f, bool newGVN = false,
-                               bool licm = false);
   static void removeTBAAMetadata(llvm::Module *M);
   static llvm::Value *insertGlobalVariable(llvm::Module *m, llvm::Type *ty);
   static void insertFunctionArguments(llvm::Function *f,

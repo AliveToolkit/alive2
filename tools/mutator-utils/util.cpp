@@ -114,66 +114,6 @@ float Random::getRandomLLVMFloat() {
   }
 }
 
-void LLVMUtil::optimizeModule(llvm::Module *M, bool newGVN, bool licm) {
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM;
-  if (newGVN || licm) {
-    if (newGVN) {
-      FPM.addPass(llvm::NewGVNPass());
-    }
-    if (licm) {
-      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(
-          llvm::LICMPass(llvm::LICMOptions()), true));
-    }
-  } else {
-    FPM = PB.buildFunctionSimplificationPipeline(
-        llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  }
-  llvm::ModulePassManager MPM;
-  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
-  MPM.run(*M, MAM);
-}
-
-void LLVMUtil::optimizeFunction(llvm::Function *f, bool newGVN, bool licm) {
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-
-  llvm::PassBuilder PB;
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  llvm::FunctionPassManager FPM;
-  if (newGVN || licm) {
-    if (newGVN) {
-      FPM.addPass(llvm::NewGVNPass());
-    }
-    if (licm) {
-      FPM.addPass(llvm::createFunctionToLoopPassAdaptor(
-          llvm::LICMPass(llvm::LICMOptions()), true));
-    }
-  } else {
-    FPM = PB.buildFunctionSimplificationPipeline(
-        llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
-  }
-  FPM.run(*f, FAM);
-}
-
 llvm::Value *LLVMUtil::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
   static const std::string GLOBAL_VAR_NAME_PREFIX = "aliveMutateGlobalVar";
   static int varCount = 0;
