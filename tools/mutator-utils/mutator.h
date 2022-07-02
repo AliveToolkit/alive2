@@ -201,7 +201,7 @@ public:
   of function mutant
 */
 
-class ComplexMutator : public Mutator {
+class ModuleMutator : public Mutator {
   // some functions contain 'immarg' in their arguments. Skip those function
   // calls.
   llvm::StringSet<> filterSet, invalidFunctions;
@@ -210,28 +210,28 @@ class ComplexMutator : public Mutator {
   llvm::SmallVector<llvm::Value *> globals;
 
   size_t curFunction;
+  llvm::StringRef curFunctionName;
   std::vector<std::shared_ptr<FunctionMutator>> functionMutants;
 
   void resetTmpModule();
 
 public:
-  ComplexMutator(bool debug = false){};
-  ComplexMutator(std::shared_ptr<llvm::Module> pm_,
+  ModuleMutator(bool debug = false){};
+  ModuleMutator(std::shared_ptr<llvm::Module> pm_,
                  const llvm::StringSet<> &invalidFunctions, bool debug = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),
         curFunction(0) {
     pm = pm_;
   };
-  ComplexMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
+  ModuleMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
       : Mutator(debug), tmpCopy(nullptr), curFunction(0) {
     pm = pm_;
   }
-  ~ComplexMutator(){};
+  ~ModuleMutator(){};
   virtual bool init() override;
   virtual void mutateModule(const std::string &outputFileName) override;
   virtual std::string getCurrentFunction() const override {
-    return std::string(
-        functionMutants[curFunction]->getCurrentFunction()->getName());
+    return curFunctionName.str();
   }
   virtual void saveModule(const std::string &outputFileName) override;
   virtual std::shared_ptr<llvm::Module> getModule() override {

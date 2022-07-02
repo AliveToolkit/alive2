@@ -437,7 +437,7 @@ llvm::Value *FunctionMutator::getRandomFromGlobal(llvm::Type *ty) {
   }
   return nullptr;
 }
-bool ComplexMutator::init() {
+bool ModuleMutator::init() {
   for (auto fit = pm->begin(); fit != pm->end(); ++fit) {
     for (auto ait = fit->arg_begin(); ait != fit->arg_end(); ++ait) {
       if (ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)) {
@@ -476,7 +476,7 @@ bool ComplexMutator::init() {
   return false;
 }
 
-void ComplexMutator::resetTmpModule() {
+void ModuleMutator::resetTmpModule() {
   vMap.clear();
   tmpCopy = llvm::CloneModule(*pm, vMap);
   for (size_t i = 0; i < functionMutants.size(); ++i) {
@@ -484,7 +484,7 @@ void ComplexMutator::resetTmpModule() {
   }
 }
 
-void ComplexMutator::mutateModule(const std::string &outputFileName) {
+void ModuleMutator::mutateModule(const std::string &outputFileName) {
   resetTmpModule();
   assert(curFunction < functionMutants.size() &&
          "curFunction should be a valid function");
@@ -492,6 +492,7 @@ void ComplexMutator::mutateModule(const std::string &outputFileName) {
     functionMutants[curFunction]->debug();
   }
   functionMutants[curFunction]->mutate();
+  curFunctionName=functionMutants[curFunction]->getCurrentFunction()->getName();
 
   if (debug) {
     functionMutants[curFunction]->debug();
@@ -502,7 +503,7 @@ void ComplexMutator::mutateModule(const std::string &outputFileName) {
   }
 }
 
-void ComplexMutator::saveModule(const std::string &outputFileName) {
+void ModuleMutator::saveModule(const std::string &outputFileName) {
   std::error_code ec;
   llvm::raw_fd_ostream fout(outputFileName, ec);
   fout << *tmpCopy;
