@@ -489,13 +489,33 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
   assert(curFunction < functionMutants.size() &&
          "curFunction should be a valid function");
   if (debug) {
-    functionMutants[curFunction]->debug();
+    if (onEveryFunction) {
+      for (size_t i = 0; i < functionMutants.size(); ++i) {
+        functionMutants[i]->debug();
+      }
+    } else {
+      functionMutants[curFunction]->debug();
+    }
   }
-  functionMutants[curFunction]->mutate();
-  curFunctionName=functionMutants[curFunction]->getCurrentFunction()->getName();
+
+  if (onEveryFunction) {
+    for (size_t i = 0; i < functionMutants.size(); ++i) {
+      functionMutants[i]->mutate();
+    }
+  } else {
+    functionMutants[curFunction]->mutate();
+    curFunctionName =
+        functionMutants[curFunction]->getCurrentFunction()->getName();
+  }
 
   if (debug) {
-    functionMutants[curFunction]->debug();
+    if (onEveryFunction) {
+      for (size_t i = 0; i < functionMutants.size(); ++i) {
+        functionMutants[i]->debug();
+      }
+    } else {
+      functionMutants[curFunction]->debug();
+    }
   }
   ++curFunction;
   if (curFunction == functionMutants.size()) {

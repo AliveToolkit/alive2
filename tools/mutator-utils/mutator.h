@@ -206,6 +206,7 @@ class ModuleMutator : public Mutator {
   // calls.
   llvm::StringSet<> filterSet, invalidFunctions;
   std::shared_ptr<llvm::Module> tmpCopy;
+  bool onEveryFunction;
   llvm::ValueToValueMapTy vMap;
   llvm::SmallVector<llvm::Value *> globals;
 
@@ -216,21 +217,27 @@ class ModuleMutator : public Mutator {
   void resetTmpModule();
 
 public:
-  ModuleMutator(bool debug = false){};
+  ModuleMutator(bool debug = false) : Mutator(debug){};
   ModuleMutator(std::shared_ptr<llvm::Module> pm_,
-                 const llvm::StringSet<> &invalidFunctions, bool debug = false)
+                const llvm::StringSet<> &invalidFunctions, bool debug = false,
+                bool onEveryFunction = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),
-        curFunction(0) {
+        onEveryFunction(onEveryFunction), curFunction(0) {
     pm = pm_;
   };
-  ModuleMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false)
-      : Mutator(debug), tmpCopy(nullptr), curFunction(0) {
+  ModuleMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false,
+                bool onEveryFunction = false)
+      : Mutator(debug), tmpCopy(nullptr), onEveryFunction(onEveryFunction),
+        curFunction(0) {
     pm = pm_;
   }
   ~ModuleMutator(){};
   virtual bool init() override;
   virtual void mutateModule(const std::string &outputFileName) override;
   virtual std::string getCurrentFunction() const override {
+    if (onEveryFunction) {
+      assert("cannot get current function under onEveryFunction mode!");
+    }
     return curFunctionName.str();
   }
   virtual void saveModule(const std::string &outputFileName) override;

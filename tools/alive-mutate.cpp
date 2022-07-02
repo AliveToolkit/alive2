@@ -107,19 +107,26 @@ llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
                             llvm::cl::desc("specify if verbose mode is on"),
                             llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<string>
-    optPass(LLVM_ARGS_PREFIX "passes",
-            llvm::cl::value_desc("optimization passes"),
-            llvm::cl::desc("Specify which LLVM passes to run (default=O2). "
-                           "The syntax is described at "
-                           "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
-            llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
+llvm::cl::opt<string> optPass(
+    LLVM_ARGS_PREFIX "passes", llvm::cl::value_desc("optimization passes"),
+    llvm::cl::desc("Specify which LLVM passes to run (default=O2). "
+                   "The syntax is described at "
+                   "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
+    llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
 llvm::cl::opt<bool>
     onlyDump(LLVM_ARGS_PREFIX "onlyDump",
              llvm::cl::value_desc("only dump IR files without mutation"),
              llvm::cl::desc("only dump IR files without"),
              llvm::cl::cat(mutatorArgs));
+
+llvm::cl::opt<bool> onEveryFunction(
+    LLVM_ARGS_PREFIX "onEveryFunction",
+    llvm::cl::value_desc("instead of mutating a single function, all function "
+                         "in the module would be mutated"),
+    llvm::cl::desc("instead of mutating a single function, all function in the "
+                   "module would be mutated"),
+    llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool>
     testMode(LLVM_ARGS_PREFIX "test",
@@ -412,7 +419,7 @@ bool inputVerify() {
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-    llvm_util::optimize_module(M2.get(),optPass);
+    llvm_util::optimize_module(M2.get(), optPass);
     size_t unnamedFunction = 0;
     for (auto fit = M1->begin(); !testMode && fit != M1->end(); ++fit) {
       if (fit->getName().empty()) {
@@ -420,7 +427,7 @@ bool inputVerify() {
                      std::to_string(unnamedFunction++));
       }
       if (!fit->isDeclaration() && !fit->getName().empty()) {
-        bool valid=false;
+        bool valid = false;
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
             f2 != nullptr) {
           llvm::TargetLibraryInfoWrapperPass TLI(
@@ -431,10 +438,10 @@ bool inputVerify() {
           if (r.status == Results::CORRECT ||
               r.status == Results::SYNTACTIC_EQ) {
             ++validFuncNum;
-            valid=true;
-          } 
+            valid = true;
+          }
         }
-        if(!valid){
+        if (!valid) {
           hasInvalidFunc = true;
           invalidFuncNameSet.insert(fit->getName());
         }
@@ -596,8 +603,8 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
 
   if (testMode) {
     llvm::Function *pf1 = M1->getFunction(optFunc);
-    std::unique_ptr<llvm::Module> M2=llvm::CloneModule(*(pf1->getParent()));
-    llvm_util::optimize_module(M2.get(),optPass);
+    std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*(pf1->getParent()));
+    llvm_util::optimize_module(M2.get(), optPass);
     goto end;
   }
 
@@ -605,10 +612,10 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
 
   if (llvm::Function *pf1 = M1->getFunction(optFunc); pf1 != nullptr) {
     if (!pf1->isDeclaration()) {
-      std::unique_ptr<llvm::Module> M2=llvm::CloneModule(*M1);
-      llvm_util::optimize_module(M2.get(),optPass);
-      llvm::Function* pf2=M2->getFunction(pf1->getName());
-      assert(pf2!=nullptr&&"pf2 clone failed");
+      std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*M1);
+      llvm_util::optimize_module(M2.get(), optPass);
+      llvm::Function *pf2 = M2->getFunction(pf1->getName());
+      assert(pf2 != nullptr && "pf2 clone failed");
       if (compareFunctions(*pf1, *pf2, TLI)) {
         shouldLog = true;
         if (opt_error_fatal)
@@ -664,7 +671,7 @@ void copyMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      CloneModule(*pm), invalidFuncNameSet, verbose);
+      CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
   // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   stubMutator.setModule(std::move(pm));
   if (bool init = mutator->init(); init) {
@@ -694,7 +701,7 @@ void timeMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      CloneModule(*pm), invalidFuncNameSet, verbose);
+      CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
   stubMutator.setModule(std::move(pm));
   // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   bool init = mutator->init();
