@@ -404,6 +404,7 @@ void RandomCodeInserterHelper::mutate() {
     for (auto bb : succs) {
       bb->replacePhiUsesWith(oldBB, newBB);
     }
+    mutator->bitInTmp=newBB->getIterator();
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
