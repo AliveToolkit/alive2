@@ -126,6 +126,24 @@ llvm::Value *LLVMUtil::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
   return val;
 }
 
+void LLVMUtil::propagateFunctionsInModule(llvm::Module* M, size_t num){
+  llvm::SmallVector<llvm::StringRef> funcNames;  
+  for(auto fit= M->begin(); fit != M->end(); ++fit){
+    if(!fit->isDeclaration()){
+      funcNames.push_back(fit->getName());
+    }
+  }
+  for(size_t i=0;i<funcNames.size();++i){
+    llvm::Function* func=M->getFunction(funcNames[i]);
+    assert(func!=nullptr&&"cannot find function when propagate functions");
+    llvm::ValueToValueMapTy vMap;
+    for(size_t times=0;times<num;++times){
+      CloneFunction(func,vMap);
+      vMap.clear();
+    }
+  }
+}
+
 void LLVMUtil::insertFunctionArguments(llvm::Function *F,
                                        llvm::SmallVector<llvm::Type *> tys,
                                        llvm::ValueToValueMapTy &VMap) {
@@ -166,9 +184,9 @@ void LLVMUtil::insertFunctionArguments(llvm::Function *F,
   CloneFunctionInto(NewF, F, VMap,
                     llvm::CloneFunctionChangeType::LocalChangesOnly, Returns,
                     "", nullptr);
+  NewF->setName("aliveMutateGeneratedTmpFunction");
   std::string oldFuncName = F->getName().str(),
-              newFuncName = NewF->getName().str();
-  NewF->setName("tmpFunctionNameQuinella");
+              newFuncName = NewF->getName().str();  
   F->setName(newFuncName);
   NewF->setName(oldFuncName);
 }

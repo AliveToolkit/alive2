@@ -120,6 +120,12 @@ llvm::cl::opt<bool>
              llvm::cl::desc("only dump IR files without"),
              llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<int> copyFunctions(
+    LLVM_ARGS_PREFIX "copy", llvm::cl::value_desc("number of function copies generated"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("it describes number of copies for every function in the module"),
+    llvm::cl::init(0));
+
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
@@ -412,9 +418,6 @@ bool inputVerify() {
     std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
     LLVMUtil::removeTBAAMetadata(M1.get());
     auto &DL = M1.get()->getDataLayout();
-    // llvm::Triple targetTriple(M1.get()->getTargetTriple());
-    // llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-    // int unsoundCases=-1;
     loggerInit(0);
     deleteLog(0);
     llvm_util::initializer llvm_util_init(*out, DL);
@@ -520,10 +523,6 @@ void deleteLog(int ith) {
  */
 void loggerInit(int ith) {
   static std::ofstream nout("/dev/null");
-  // if(verbose){
-  // out=&nout;
-  // out=&cout;
-  //}else{
   fs::path fname = getOutputFile(ith) + "-log" + ".txt";
   fs::path path = fs::path(outputFolder.getValue()) / fname.filename();
   if (out_file.is_open()) {
@@ -547,7 +546,6 @@ void loggerInit(int ith) {
     path_z3log.replace_extension("z3_log.txt");
     smt::start_logging(path_z3log.c_str());
   }
-  //}
   util::config::set_debug(*out);
 }
 
@@ -655,7 +653,6 @@ end:
   tot_num_errors += num_errors;
 
   num_correct = num_unsound = num_failed = num_errors = 0;
-  mutator.setModule(std::move(M1));
   if (testMode || (!verbose && !shouldLog)) {
     deleteLog(ith);
   }
@@ -670,10 +667,11 @@ end:
 void copyMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
+  if(copyFunctions!=0){
+    LLVMUtil::propagateFunctionsInModule(pm.get(),copyFunctions);
+  }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
       CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
-  // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
-  stubMutator.setModule(std::move(pm));
   if (bool init = mutator->init(); init) {
 
     for (int i = 0; i < numCopy; ++i) {
@@ -700,10 +698,11 @@ void copyMode() {
 void timeMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
+  if(copyFunctions!=0){
+    LLVMUtil::propagateFunctionsInModule(pm.get(),copyFunctions);
+  }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
       CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
-  stubMutator.setModule(std::move(pm));
-  // if(mutators[0]->openInputFile(testfile)&&mutators[1]->openInputFile(testfile)){
   bool init = mutator->init();
   if (!init) {
     cerr << "Cannot find any lotaion to mutate, " + testfile + " skipped\n";

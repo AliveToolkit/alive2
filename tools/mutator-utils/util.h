@@ -262,6 +262,7 @@ public:
                                       llvm::SmallVector<llvm::Type *> tys,
                                       llvm::ValueToValueMapTy &VMap);
   static void insertRandomCodeBefore(llvm::Instruction *inst);
+  static void propagateFunctionsInModule(llvm::Module* M, size_t num);
   static bool compareSignature(const llvm::Function *func1,
                                const llvm::Function *func2) {
     return comparator.compareSignature(func1, func2);

@@ -115,6 +115,11 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     }
   }
 
+  if (FunctionAttributeHelper::canMutate(currentFunction)) {
+    helpers.push_back(std::make_unique<FunctionAttributeHelper>(self));
+    whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
+  }
+
   if (ShuffleHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<ShuffleHelper>(self));
     whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
@@ -136,21 +141,6 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if (FunctionCallInlineHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
-  }
-
-  if (VoidFunctionCallRemoveHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
-  }
-
-  if (FunctionAttributeHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<FunctionAttributeHelper>(self));
-    whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
-  }
-
   if (GEPHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<GEPHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
@@ -158,6 +148,16 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
 
   if (BinaryInstructionHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
+
+  if (FunctionCallInlineHelper::canMutate(currentFunction)) {
+    helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }  
+  
+  if (VoidFunctionCallRemoveHelper::canMutate(currentFunction)) {
+    helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
@@ -200,7 +200,7 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
 bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
                                 const llvm::StringSet<> &filterSet) {
   return !block.getInstList().empty() &&
-         std::all_of(block.begin(), block.end(),
+         std::any_of(block.begin(), block.end(),
                      [&filterSet](const llvm::Instruction &inst) {
                        return canMutate(inst, filterSet);
                      });
@@ -209,7 +209,7 @@ bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
 bool FunctionMutator::canMutate(const llvm::Function *function,
                                 const llvm::StringSet<> &filterSet) {
   return !function->getBasicBlockList().empty() &&
-         std::all_of(function->begin(), function->end(),
+         std::any_of(function->begin(), function->end(),
                      [&filterSet](const llvm::BasicBlock &bb) {
                        return canMutate(bb, filterSet);
                      });
