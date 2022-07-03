@@ -154,8 +154,8 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
   if (FunctionCallInlineHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<FunctionCallInlineHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
-  }  
-  
+  }
+
   if (VoidFunctionCallRemoveHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
@@ -373,12 +373,17 @@ llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
 
 llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
   if (ty != nullptr && !domVals.empty()) {
+    bool isIntTy = ty->isIntegerTy();
     for (size_t i = 0, pos = Random::getRandomUnsigned() % domVals.size();
          i < domVals.size(); ++i, ++pos) {
       if (pos == domVals.size())
         pos = 0;
       if (domVals[pos]->getType() == ty) {
         return &*vMap[domVals[pos]];
+      } else if (isIntTy && domVals[pos]->getType()->isIntegerTy()) {
+        llvm::Value *valInTmp = &*vMap[domVals[pos]];
+        return LLVMUtil::updateIntegerSize(valInTmp, (llvm::IntegerType *)ty,
+                                           &*iitInTmp);
       }
     }
   }

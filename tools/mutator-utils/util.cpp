@@ -126,19 +126,19 @@ llvm::Value *LLVMUtil::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
   return val;
 }
 
-void LLVMUtil::propagateFunctionsInModule(llvm::Module* M, size_t num){
-  llvm::SmallVector<llvm::StringRef> funcNames;  
-  for(auto fit= M->begin(); fit != M->end(); ++fit){
-    if(!fit->isDeclaration()){
+void LLVMUtil::propagateFunctionsInModule(llvm::Module *M, size_t num) {
+  llvm::SmallVector<llvm::StringRef> funcNames;
+  for (auto fit = M->begin(); fit != M->end(); ++fit) {
+    if (!fit->isDeclaration()) {
       funcNames.push_back(fit->getName());
     }
   }
-  for(size_t i=0;i<funcNames.size();++i){
-    llvm::Function* func=M->getFunction(funcNames[i]);
-    assert(func!=nullptr&&"cannot find function when propagate functions");
+  for (size_t i = 0; i < funcNames.size(); ++i) {
+    llvm::Function *func = M->getFunction(funcNames[i]);
+    assert(func != nullptr && "cannot find function when propagate functions");
     llvm::ValueToValueMapTy vMap;
-    for(size_t times=0;times<num;++times){
-      CloneFunction(func,vMap);
+    for (size_t times = 0; times < num; ++times) {
+      CloneFunction(func, vMap);
       vMap.clear();
     }
   }
@@ -186,9 +186,27 @@ void LLVMUtil::insertFunctionArguments(llvm::Function *F,
                     "", nullptr);
   NewF->setName("aliveMutateGeneratedTmpFunction");
   std::string oldFuncName = F->getName().str(),
-              newFuncName = NewF->getName().str();  
+              newFuncName = NewF->getName().str();
   F->setName(newFuncName);
   NewF->setName(oldFuncName);
+}
+
+llvm::Value *LLVMUtil::updateIntegerSize(llvm::Value *integer,
+                                         llvm::IntegerType *newIntTy,
+                                         llvm::Instruction *insertBefore) {
+  assert(integer->getType()->isIntegerTy() &&
+         "should be a integer type to update the size");
+  llvm::IntegerType *oldIntTy = (llvm::IntegerType *)integer->getType();
+  size_t oldSize = oldIntTy->getBitWidth(), newSize = newIntTy->getBitWidth();
+  if (oldSize < newSize) {
+    return llvm::CastInst::Create(llvm::Instruction::CastOps::ZExt, integer,
+                                  newIntTy, "", insertBefore);
+  } else if (oldSize > newSize) {
+    return llvm::CastInst::Create(llvm::Instruction::CastOps::Trunc, integer,
+                                  newIntTy, "", insertBefore);
+  } else {
+    return integer;
+  }
 }
 
 void LLVMUtil::removeTBAAMetadata(llvm::Module *M) {
