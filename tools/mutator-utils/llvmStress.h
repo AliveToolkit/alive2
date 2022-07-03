@@ -185,6 +185,10 @@ protected:
   }
 
   Value* getOrInsertFromGlobalValue(Type* ty,bool createLoadInst=true){
+    //scalable vectors cannot be global variables
+    if(llvm::isa<llvm::ScalableVectorType>(ty)){
+      return nullptr;      
+    }
     if(ty->isFunctionTy()){
       return getOrInsertFromGlobalFunction(ty);
     }
@@ -268,6 +272,9 @@ protected:
         return ConstantFP::getAllOnesValue(Tp);
       return ConstantFP::getNullValue(Tp);
     } else if (Tp->isVectorTy()) {
+      if(llvm::isa<ScalableVectorType>(Tp)){
+        return ConstantAggregateZero::get(Tp);
+      }
       auto *VTp = cast<FixedVectorType>(Tp);
 
       std::vector<Constant *> TempValues;
