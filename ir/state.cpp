@@ -999,8 +999,10 @@ void State::finishInitializer() {
 
 void State::saveReturnedInput() {
   assert(isSource());
-  if (auto *ret = getFn().getReturnedInput())
+  if (auto *ret = getFn().getReturnedInput()) {
     returned_input = (*this)[*ret];
+    resetUndefVars();
+  }
 }
 
 expr State::sinkDomain() const {
