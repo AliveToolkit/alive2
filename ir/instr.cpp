@@ -2836,6 +2836,19 @@ check_ret_attributes(State &s, StateValue &&sv, const Type &t,
   return check_return_value(s, std::move(sv), t, attrs, true);
 }
 
+static void eq_val_rec(State &s, const Type &t, const StateValue &a,
+                       const StateValue &b) {
+  if (auto agg = t.getAsAggregateType()) {
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (agg->isPadding(i))
+        continue;
+      eq_val_rec(s, agg->getChild(i), agg->extract(a, i), agg->extract(b, i));
+    }
+    return;
+  }
+  s.addUB(a == b);
+}
+
 StateValue Return::toSMT(State &s) const {
   StateValue retval;
 
@@ -2851,12 +2864,8 @@ StateValue Return::toSMT(State &s) const {
   if (attrs.has(FnAttrs::NoReturn))
     s.addUB(expr(false));
 
-  if (auto *val_returned = s.getFn().getReturnedInput()) {
-    // LangRef states that return type must be valid operands for bitcasts,
-    // which cannot be aggregate type.
-    assert(!dynamic_cast<AggregateType *>(&val->getType()));
-    s.addUB(retval == s[*val_returned]);
-  }
+  if (auto &val_returned = s.getReturnedInput())
+    eq_val_rec(s, getType(), retval, *val_returned);
 
   s.addReturn(std::move(retval));
   return {};

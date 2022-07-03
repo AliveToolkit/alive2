@@ -997,6 +997,12 @@ void State::finishInitializer() {
   is_initialization_phase = false;
 }
 
+void State::saveReturnedInput() {
+  assert(isSource());
+  if (auto *ret = getFn().getReturnedInput())
+    returned_input = (*this)[*ret];
+}
+
 expr State::sinkDomain() const {
   auto I = predecessor_data.find(&f.getSinkBB());
   if (I == predecessor_data.end())
@@ -1046,6 +1052,8 @@ void State::syncSEdataWithSrc(const State &src) {
   glbvar_bids = src.glbvar_bids;
   for (auto &itm : glbvar_bids)
     itm.second.second = false;
+
+  returned_input = src.returned_input;
 
   fn_call_data = src.fn_call_data;
   inaccessiblemem_bids = src.inaccessiblemem_bids;

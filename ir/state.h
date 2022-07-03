@@ -123,6 +123,9 @@ private:
   // Global variables' memory block ids & Memory::alloc has been called?
   std::unordered_map<std::string, std::pair<unsigned, bool>> glbvar_bids;
 
+  // The value of a 'returned' input
+  std::optional<StateValue> returned_input;
+
   // temp state
   const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
@@ -251,6 +254,11 @@ public:
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
   const auto& getFnQuantVars() const { return fn_call_qvars; }
+
+  void saveReturnedInput();
+  const std::optional<StateValue>& getReturnedInput() const {
+    return returned_input;
+  }
 
   smt::expr sinkDomain() const;
   Memory returnMemory() const { return *return_memory(); }
