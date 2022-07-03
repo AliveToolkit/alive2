@@ -2518,34 +2518,31 @@ void Freeze::print(ostream &os) const {
   os << getName() << " = freeze " << print_type(getType()) << val->getName();
 }
 
+static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
+  if (auto agg = ty.getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (agg->isPadding(i))
+        continue;
+      vals.emplace_back(freeze_elems(s, agg->getChild(i), agg->extract(v, i)));
+    }
+    return agg->aggregateVals(vals);
+  }
+
+  if (v.non_poison.isTrue())
+    return v;
+
+  StateValue ret_type = ty.getDummyValue(true);
+  expr nondet = expr::mkFreshVar("nondet", ret_type.value);
+  s.addQuantVar(nondet);
+  return { expr::mkIf(v.non_poison, v.value, nondet),
+           std::move(ret_type.non_poison) };
+}
+
 StateValue Freeze::toSMT(State &s) const {
   auto &v = s[*val];
   s.resetUndefVars();
-
-  auto scalar = [&](auto &v, auto &np, auto &ty) -> StateValue {
-    if (np.isTrue())
-      return { expr(v), expr(np) };
-
-    StateValue ret_type = ty.getDummyValue(true);
-    expr nondet = expr::mkFreshVar("nondet", ret_type.value);
-    s.addQuantVar(nondet);
-    return { expr::mkIf(np, v, std::move(nondet)), std::move(ret_type.non_poison) };
-  };
-
-  // TODO: support recursive aggregates
-
-  if (getType().isAggregateType()) {
-    vector<StateValue> vals;
-    auto ty = getType().getAsAggregateType();
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      if (ty->isPadding(i))
-        continue;
-      auto vi = ty->extract(v, i);
-      vals.emplace_back(scalar(vi.value, vi.non_poison, ty->getChild(i)));
-    }
-    return ty->aggregateVals(vals);
-  }
-  return scalar(v.value, v.non_poison, getType());
+  return freeze_elems(s, getType(), v);
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {
