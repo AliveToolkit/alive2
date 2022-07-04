@@ -328,6 +328,7 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     }
   }
   inst->moveBefore(newPosInst);
+  mutator->iitInTmp=inst->getIterator();
   llvm::SmallVector<llvm::Value *> vals;
   mutator->fixAllValues(vals);
   // restore domInst
@@ -359,15 +360,17 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   // need fix all insts used current inst in [pos,newPos]
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
+  //[0] keeps pointing to inst, [1] keeps pointing to iterator inst.
   llvm::SmallVector<llvm::Value *> extraVals;
   extraVals.push_back(inst);
   extraVals.push_back(newPosInst);
   for (size_t i = pos; i != newPos; ++i) {
     ++newPosIt;
     newPosInst = &*newPosIt;
+    extraVals[1]=newPosInst;
     for (size_t op = 0; op < newPosInst->getNumOperands(); ++op) {
       if (llvm::Value *opP = newPosInst->getOperand(op);
-          opP != nullptr && opP == inst) {
+          opP != nullptr && opP == extraVals[0]) {
         mutator->setOperandRandomValue(newPosInst, op);
       }
     }
@@ -380,6 +383,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   }
   inst = (llvm::Instruction *)extraVals[0];
   inst->moveBefore(newPosInst);
+  mutator->iitInTmp=inst->getIterator();
 }
 
 bool RandomCodeInserterHelper::shouldMutate() {
@@ -523,14 +527,12 @@ bool VoidFunctionCallRemoveHelper::shouldMutate() {
 }
 
 void VoidFunctionCallRemoveHelper::debug() {
-  if (funcName.empty()) {
-    llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
-    funcName = callInst->getName().str();
+  if(removed){
+    llvm::errs() << "VoidFunctionCallRemoveHelper: Removed function\n" << funcName;
+    llvm::errs() << "\nBaisc block\n";
+    mutator->iitInTmp->getParent()->print(llvm::errs());
+    llvm::errs() << "\n";
   }
-  llvm::errs() << "Removed function\n" << funcName;
-  llvm::errs() << "\nBaisc block\n";
-  mutator->iitInTmp->getParent()->print(llvm::errs());
-  llvm::errs() << "\n";
 }
 
 void FunctionAttributeHelper::init() {
@@ -575,7 +577,7 @@ void FunctionAttributeHelper::mutate() {
 #undef setFuncParamAttr
 
 void FunctionAttributeHelper::debug() {
-  llvm::errs() << "Function attributes updated\n";
+  llvm::errs() << "FunctionAttributeHelper: Function attributes updated\n";
 }
 
 void GEPHelper::mutate() {
@@ -599,7 +601,7 @@ bool GEPHelper::shouldMutate() {
 }
 
 void GEPHelper::debug() {
-  llvm::errs() << "Original GEP inst:\n";
+  llvm::errs() << "GEPHelper: Original GEP inst:\n";
   mutator->iitInTmp->print(llvm::errs());
   llvm::errs() << "inbounds flag reversed.\n";
 }
@@ -703,7 +705,7 @@ bool BinaryInstructionHelper::shouldMutate() {
 }
 
 void BinaryInstructionHelper::debug() {
-  llvm::errs() << "\nCurrentbinary inst:\n";
+  llvm::errs() << "\nBinaryInstructionHelper: Current binary inst:\n";
   mutator->iitInTmp->print(llvm::errs());
   llvm::errs() << "\n";
   mutator->iitInTmp->getParent()->print(llvm::errs());
