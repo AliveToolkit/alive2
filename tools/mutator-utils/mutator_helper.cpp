@@ -122,9 +122,9 @@ void ShuffleHelper::shuffleCurrentBlock() {
 }
 
 void ShuffleHelper::debug() {
-    llvm::errs() << "\nInstructions shuffled\n";
-    mutator->iitInTmp->print(llvm::errs());
-    llvm::errs()<<"\n";
+  llvm::errs() << "\nInstructions shuffled\n";
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs() << "\n";
 };
 
 bool MutateInstructionHelper::canMutate(llvm::Function *func) {
@@ -328,14 +328,14 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
   newPosInst = &*newPosIt;
 
   inst->moveBefore(newPosInst);
-  mutator->iitInTmp=inst->getIterator();
-  
+  mutator->iitInTmp = inst->getIterator();
+
   for (size_t i = 0; i < inst->getNumOperands(); ++i) {
     if (llvm::Value *op = inst->getOperand(i);
         std::find(v.begin(), v.end(), op) != v.end()) {
       mutator->setOperandRandomValue(inst, i);
     }
-  }  
+  }
   llvm::SmallVector<llvm::Value *> vals;
   mutator->fixAllValues(vals);
   // restore domInst
@@ -374,7 +374,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   for (size_t i = pos; i != newPos; ++i) {
     ++newPosIt;
     newPosInst = &*newPosIt;
-    extraVals[1]=newPosInst;
+    extraVals[1] = newPosInst;
     for (size_t op = 0; op < newPosInst->getNumOperands(); ++op) {
       if (llvm::Value *opP = newPosInst->getOperand(op);
           opP != nullptr && opP == extraVals[0]) {
@@ -390,13 +390,13 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   }
   inst = (llvm::Instruction *)extraVals[0];
   inst->moveBefore(newPosInst);
-  mutator->iitInTmp=inst->getIterator();
+  mutator->iitInTmp = inst->getIterator();
 }
 
-void RandomMoveHelper::debug(){
+void RandomMoveHelper::debug() {
   llvm::errs() << "Instruction was moved around\n";
   mutator->iitInTmp->print(llvm::errs());
-  llvm::errs()<<"\n";
+  llvm::errs() << "\n";
 }
 
 bool RandomCodeInserterHelper::shouldMutate() {
@@ -421,7 +421,7 @@ void RandomCodeInserterHelper::mutate() {
     for (auto bb : succs) {
       bb->replacePhiUsesWith(oldBB, newBB);
     }
-    mutator->bitInTmp=newBB->getIterator();
+    mutator->bitInTmp = newBB->getIterator();
   }
   LLVMUtil::insertRandomCodeBefore(insertPoint);
 }
@@ -540,8 +540,9 @@ bool VoidFunctionCallRemoveHelper::shouldMutate() {
 }
 
 void VoidFunctionCallRemoveHelper::debug() {
-  if(removed){
-    llvm::errs() << "VoidFunctionCallRemoveHelper: Removed function\n" << funcName;
+  if (removed) {
+    llvm::errs() << "VoidFunctionCallRemoveHelper: Removed function\n"
+                 << funcName;
     llvm::errs() << "\nBaisc block\n";
     mutator->iitInTmp->getParent()->print(llvm::errs());
     llvm::errs() << "\n";

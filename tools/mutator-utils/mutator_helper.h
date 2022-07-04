@@ -127,10 +127,10 @@ class RandomMoveHelper : public MutationHelper {
 public:
   RandomMoveHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), moved(false){};
-  virtual void init() override{
+  virtual void init() override {
     moved = false;
   };
-  virtual void reset() override{
+  virtual void reset() override {
     moved = false;
   };
   static bool canMutate(llvm::Function *func);

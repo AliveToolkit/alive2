@@ -102,7 +102,7 @@ void FunctionMutator::debug() {
   llvm::errs() << "\nCurrent instruction:\n";
   iitInTmp->print(llvm::errs());
   llvm::errs() << "\n";
-  for(size_t i=0;i<helpers.size();i++){
+  for (size_t i = 0; i < helpers.size(); i++) {
     helpers[i]->debug();
   }
 }
@@ -497,7 +497,7 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
   assert(curFunction < functionMutants.size() &&
          "curFunction should be a valid function");
   if (debug) {
-    llvm::errs()<<"Before mutate:\n";
+    llvm::errs() << "Before mutate:\n";
     if (onEveryFunction) {
       for (size_t i = 0; i < functionMutants.size(); ++i) {
         functionMutants[i]->debug();
@@ -518,7 +518,7 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
   }
 
   if (debug) {
-    llvm::errs()<<"after mutate:\n";
+    llvm::errs() << "after mutate:\n";
     if (onEveryFunction) {
       for (size_t i = 0; i < functionMutants.size(); ++i) {
         functionMutants[i]->debug();

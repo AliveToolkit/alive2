@@ -121,9 +121,11 @@ llvm::cl::opt<bool>
              llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<int> copyFunctions(
-    LLVM_ARGS_PREFIX "copy", llvm::cl::value_desc("number of function copies generated"),
+    LLVM_ARGS_PREFIX "copy",
+    llvm::cl::value_desc("number of function copies generated"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc("it describes number of copies for every function in the module"),
+    llvm::cl::desc(
+        "it describes number of copies for every function in the module"),
     llvm::cl::init(0));
 
 llvm::cl::opt<bool> onEveryFunction(
@@ -387,8 +389,8 @@ version )EOF";
               "skipped during mutation phrase.\n";
     }
   }
-  //if (verbose) {
-    cerr << "Current seed" << Random::getSeed() << "\n";
+  // if (verbose) {
+  cerr << "Current seed" << Random::getSeed() << "\n";
   //}
   if (numCopy > 0) {
     copyMode();
@@ -667,8 +669,8 @@ end:
 void copyMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
-  if(copyFunctions!=0){
-    LLVMUtil::propagateFunctionsInModule(pm.get(),copyFunctions);
+  if (copyFunctions != 0) {
+    LLVMUtil::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
       CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
@@ -698,8 +700,8 @@ void copyMode() {
 void timeMode() {
   llvm::LLVMContext context;
   std::shared_ptr<llvm::Module> pm = stubMutator.getModule();
-  if(copyFunctions!=0){
-    LLVMUtil::propagateFunctionsInModule(pm.get(),copyFunctions);
+  if (copyFunctions != 0) {
+    LLVMUtil::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
       CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);

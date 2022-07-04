@@ -1,6 +1,6 @@
 #pragma once
 //===- llvm-stress.cpp - Generate RandomFromLLVMStress LL files to stress-test
-//LLVM -----===//
+// LLVM -----===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -118,7 +118,7 @@ struct Modifier {
 
 public:
   /// C'tor
-  Modifier(PieceTable *PT, RandomFromLLVMStress *R, Module* module)
+  Modifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : PT(PT), Ran(R), module(module) {}
 
   /// virtual D'tor to silence warnings.
@@ -139,8 +139,8 @@ public:
   static Instruction *getInsertPoint() {
     return insertPoint;
   }
-  //clear both glbVars and glbFuncs;
-  static void init(){
+  // clear both glbVars and glbFuncs;
+  static void init() {
     glbVals.clear();
     glbFuncs.clear();
   }
@@ -152,77 +152,82 @@ protected:
     return Ran->Rand();
   }
 
-  Value* getOrInsertFromGlobalFunction(Type* ty){ 
-    assert(ty->isFunctionTy()&& "getOrInsertFromGlobalFunction should be a function!");
-    if(glbFuncs.empty()){
-      for(auto it=module->begin();it!=module->end();++it){
+  Value *getOrInsertFromGlobalFunction(Type *ty) {
+    assert(ty->isFunctionTy() &&
+           "getOrInsertFromGlobalFunction should be a function!");
+    if (glbFuncs.empty()) {
+      for (auto it = module->begin(); it != module->end(); ++it) {
         glbFuncs.push_back(&*it);
       }
     }
-    bool shouldInsert=getRandomFromLLVMStress()&1,found=false;
-    Value* res=nullptr;
-    if(!shouldInsert&&!glbFuncs.empty()){
-      for(size_t i=0,pos=getRandomFromLLVMStress()%glbFuncs.size();i<glbFuncs.size();++i,++pos){
-        if(pos==glbFuncs.size()){
-          pos=0;
+    bool shouldInsert = getRandomFromLLVMStress() & 1, found = false;
+    Value *res = nullptr;
+    if (!shouldInsert && !glbFuncs.empty()) {
+      for (size_t i = 0, pos = getRandomFromLLVMStress() % glbFuncs.size();
+           i < glbFuncs.size(); ++i, ++pos) {
+        if (pos == glbFuncs.size()) {
+          pos = 0;
         }
-        if(glbFuncs[pos]->getType()==ty){
-          found=true;
-          res=glbFuncs[pos];
+        if (glbFuncs[pos]->getType() == ty) {
+          found = true;
+          res = glbFuncs[pos];
           break;
         }
       }
     }
-    if(shouldInsert||!found){
-      std::string varName=std::string("aliveMutateGeneratedFunc")+std::to_string(glbFuncs.size());
-      module->getOrInsertFunction(varName,ty);
-      Function* glbFunc=module->getFunction(varName);
+    if (shouldInsert || !found) {
+      std::string varName = std::string("aliveMutateGeneratedFunc") +
+                            std::to_string(glbFuncs.size());
+      module->getOrInsertFunction(varName, ty);
+      Function *glbFunc = module->getFunction(varName);
       glbFuncs.push_back(glbFunc);
       glbFunc->setLinkage(GlobalValue::ExternalLinkage);
-      res=glbFunc;
+      res = glbFunc;
     }
     return res;
   }
 
-  Value* getOrInsertFromGlobalValue(Type* ty,bool createLoadInst=true){
-    //scalable vectors cannot be global variables
-    if(llvm::isa<llvm::ScalableVectorType>(ty)){
-      return nullptr;      
+  Value *getOrInsertFromGlobalValue(Type *ty, bool createLoadInst = true) {
+    // scalable vectors cannot be global variables
+    if (llvm::isa<llvm::ScalableVectorType>(ty)) {
+      return nullptr;
     }
-    if(ty->isFunctionTy()){
+    if (ty->isFunctionTy()) {
       return getOrInsertFromGlobalFunction(ty);
     }
-    if(glbVals.empty()){
-      for(auto it=module->global_begin();it!=module->global_end();++it){
+    if (glbVals.empty()) {
+      for (auto it = module->global_begin(); it != module->global_end(); ++it) {
         glbVals.push_back(&*it);
       }
     }
-    bool shouldInsert=getRandomFromLLVMStress()&1,found=false;
-    Value* res=nullptr;
-    if(!shouldInsert&&!glbVals.empty()){
-      for(size_t i=0,pos=getRandomFromLLVMStress()%glbVals.size();i<glbVals.size();++i,++pos){
-        if(pos==glbVals.size()){
-          pos=0;
+    bool shouldInsert = getRandomFromLLVMStress() & 1, found = false;
+    Value *res = nullptr;
+    if (!shouldInsert && !glbVals.empty()) {
+      for (size_t i = 0, pos = getRandomFromLLVMStress() % glbVals.size();
+           i < glbVals.size(); ++i, ++pos) {
+        if (pos == glbVals.size()) {
+          pos = 0;
         }
-        if(glbVals[pos]->getType()==ty){
-          found=true;
-          res=glbVals[pos];
+        if (glbVals[pos]->getType() == ty) {
+          found = true;
+          res = glbVals[pos];
           break;
         }
       }
     }
-    if(shouldInsert||!found){
-      std::string varName=std::string("aliveMutateGeneratedGlobalVariable")+std::to_string(glbVals.size());
-      assert(nullptr==module->getGlobalVariable(varName)&&"The glb var already exists!");
-      res=module->getOrInsertGlobal(varName,ty);
-      GlobalVariable* glbVal=module->getGlobalVariable(varName);
+    if (shouldInsert || !found) {
+      std::string varName = std::string("aliveMutateGeneratedGlobalVariable") +
+                            std::to_string(glbVals.size());
+      assert(nullptr == module->getGlobalVariable(varName) &&
+             "The glb var already exists!");
+      res = module->getOrInsertGlobal(varName, ty);
+      GlobalVariable *glbVal = module->getGlobalVariable(varName);
       glbVals.push_back(glbVal);
       glbVal->setLinkage(GlobalValue::ExternalLinkage);
-      if(createLoadInst){
-        Value *V = new LoadInst(ty, glbVal, "L",
-                              insertPoint);
+      if (createLoadInst) {
+        Value *V = new LoadInst(ty, glbVal, "L", insertPoint);
         PT->push_back(V);
-        res=V;
+        res = V;
       }
     }
     return res;
@@ -243,12 +248,15 @@ protected:
       if (getRandomFromLLVMStress() & 1)
         return ConstantFP::getAllOnesValue(Tp);
       return ConstantFP::getNullValue(Tp);
-    }else if(Tp->isPointerTy()){
-      assert(!Tp->isOpaquePointerTy()&&"Cannot create constant from an opaque pointer!");
-      llvm::Value* result=getOrInsertFromGlobalValue(Tp->getNonOpaquePointerElementType(),false);
-      assert(llvm::isa<llvm::Constant>(result)&&"should be a constant in getRandomConstant!");
-      return (Constant*)result;
-    }else{
+    } else if (Tp->isPointerTy()) {
+      assert(!Tp->isOpaquePointerTy() &&
+             "Cannot create constant from an opaque pointer!");
+      llvm::Value *result = getOrInsertFromGlobalValue(
+          Tp->getNonOpaquePointerElementType(), false);
+      assert(llvm::isa<llvm::Constant>(result) &&
+             "should be a constant in getRandomConstant!");
+      return (Constant *)result;
+    } else {
       return nullptr;
     }
   }
@@ -272,40 +280,41 @@ protected:
         return ConstantFP::getAllOnesValue(Tp);
       return ConstantFP::getNullValue(Tp);
     } else if (Tp->isVectorTy()) {
-      if(llvm::isa<ScalableVectorType>(Tp)){
+      if (llvm::isa<ScalableVectorType>(Tp)) {
         return ConstantAggregateZero::get(Tp);
       }
       auto *VTp = cast<FixedVectorType>(Tp);
 
       std::vector<Constant *> TempValues;
       TempValues.reserve(VTp->getNumElements());
-      for (unsigned i = 0; i < VTp->getNumElements(); ++i){
+      for (unsigned i = 0; i < VTp->getNumElements(); ++i) {
         TempValues.push_back(
             getRandomFromLLVMStressConstant(VTp->getScalarType()));
       }
 
       ArrayRef<Constant *> VectorValue(TempValues);
-      llvm::Constant* vec=ConstantVector::get(VectorValue);
+      llvm::Constant *vec = ConstantVector::get(VectorValue);
       return vec;
     }
     return getOrInsertFromGlobalValue(Tp);
   }
 
   /// Return a RandomFromLLVMStress value of any pointer type.
-  Value *getRandomFromLLVMStressPointerValue(bool canBeFuncTy=true) {
+  Value *getRandomFromLLVMStressPointerValue(bool canBeFuncTy = true) {
     unsigned index = getRandomFromLLVMStress();
     for (unsigned i = 0; i < PT->size(); ++i) {
       Value *V = PT->at((index + i) % PT->size());
-      if (V->getType()->isPointerTy()){
-        //should not be a opaque pointer if we want to access its internal type
-        if(!canBeFuncTy&&!V->getType()->isOpaquePointerTy()&&V->getType()->getNonOpaquePointerElementType()->isFunctionTy()){
+      if (V->getType()->isPointerTy()) {
+        // should not be a opaque pointer if we want to access its internal type
+        if (!canBeFuncTy && !V->getType()->isOpaquePointerTy() &&
+            V->getType()->getNonOpaquePointerElementType()->isFunctionTy()) {
           continue;
         }
         return V;
       }
     }
-    llvm::Type* ty=pickPointerType();
-    if(ty==nullptr||!ty->isSized()){
+    llvm::Type *ty = pickPointerType();
+    if (ty == nullptr || !ty->isSized()) {
       return nullptr;
     }
     return getOrInsertFromGlobalValue(ty);
@@ -319,7 +328,7 @@ protected:
       if (isa<FixedVectorType>(V->getType()))
         return V;
     }
-    llvm::Type* ty=pickVectorType();
+    llvm::Type *ty = pickVectorType();
     return getOrInsertFromGlobalValue(ty);
   }
 
@@ -358,7 +367,7 @@ protected:
   Type *pickScalarType() {
     static std::vector<Type *> ScalarTypes;
     if (ScalarTypes.empty()) {
-      LLVMContext& Context=module->getContext();
+      LLVMContext &Context = module->getContext();
       ScalarTypes.assign({Type::getInt1Ty(Context), Type::getInt8Ty(Context),
                           Type::getInt16Ty(Context), Type::getInt32Ty(Context),
                           Type::getInt64Ty(Context), Type::getFloatTy(Context),
@@ -374,66 +383,65 @@ protected:
   RandomFromLLVMStress *Ran;
 
   /// Module
-  Module* module;
-  static SmallVector<Value*> glbVals;
-  static SmallVector<Value*> glbFuncs;
+  Module *module;
+  static SmallVector<Value *> glbVals;
+  static SmallVector<Value *> glbFuncs;
 };
 Instruction *Modifier::insertPoint = nullptr;
-SmallVector<Value*> Modifier::glbVals;
-SmallVector<Value*> Modifier::glbFuncs;
-
+SmallVector<Value *> Modifier::glbVals;
+SmallVector<Value *> Modifier::glbFuncs;
 
 struct LoadModifier : public Modifier {
-  LoadModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  LoadModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue();
-    llvm::Type* ty=Ptr->getType();
-    if(ty->isOpaquePointerTy()){
+    llvm::Type *ty = Ptr->getType();
+    if (ty->isOpaquePointerTy()) {
       return;
     }
-    llvm::Type* eleTy=ty->getNonOpaquePointerElementType();
-    if(eleTy==nullptr||!eleTy->isSized()){
+    llvm::Type *eleTy = ty->getNonOpaquePointerElementType();
+    if (eleTy == nullptr || !eleTy->isSized()) {
       return;
     }
-    Value *V = new LoadInst(eleTy, Ptr, "L",
-                            insertPoint);
+    Value *V = new LoadInst(eleTy, Ptr, "L", insertPoint);
     PT->push_back(V);
   }
 };
 
 struct StoreModifier : public Modifier {
-  StoreModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  StoreModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try to use predefined pointers. If non-exist, use undef pointer value;
     Value *Ptr = getRandomFromLLVMStressPointerValue(false);
-    //The ptr should have a size 
-    if(Ptr==nullptr||Ptr->getType()->isOpaquePointerTy()||
-      !Ptr->getType()->isSized()||!Ptr->getType()->getNonOpaquePointerElementType()->isSized()){
+    // The ptr should have a size
+    if (Ptr == nullptr || Ptr->getType()->isOpaquePointerTy() ||
+        !Ptr->getType()->isSized() ||
+        !Ptr->getType()->getNonOpaquePointerElementType()->isSized()) {
       return;
     }
-    Value *Val =
-        getRandomFromLLVMStressValue(Ptr->getType()->getNonOpaquePointerElementType());
+    Value *Val = getRandomFromLLVMStressValue(
+        Ptr->getType()->getNonOpaquePointerElementType());
     Type *ValTy = Val->getType();
-    
 
     // Do not store vectors of i1s because they are unsupported
     // by the codegen.
     if (ValTy->isVectorTy() && ValTy->getScalarSizeInBits() == 1)
       return;
 
-    assert(ValTy==Ptr->getType()->getNonOpaquePointerElementType() && "type should be equal");
+    assert(ValTy == Ptr->getType()->getNonOpaquePointerElementType() &&
+           "type should be equal");
 
     new StoreInst(Val, Ptr, insertPoint);
   }
 };
 
 struct BinModifier : public Modifier {
-  BinModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  BinModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -441,7 +449,8 @@ struct BinModifier : public Modifier {
     Value *Val1 = getRandomFromLLVMStressValue(Val0->getType());
 
     // Don't handle pointer types.
-    if (!(Val0->getType()->isIntegerTy() || Val0->getType()->isFloatingPointTy()))
+    if (!(Val0->getType()->isIntegerTy() ||
+          Val0->getType()->isFloatingPointTy()))
       return;
 
     // Don't handle i1 types.
@@ -516,7 +525,7 @@ struct BinModifier : public Modifier {
 
 /// Generate constant values.
 struct ConstModifier : public Modifier {
-  ConstModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  ConstModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -572,7 +581,7 @@ struct ConstModifier : public Modifier {
 };
 
 struct AllocaModifier : public Modifier {
-  AllocaModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  AllocaModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -585,7 +594,7 @@ struct AllocaModifier : public Modifier {
 
 struct ExtractElementModifier : public Modifier {
   ExtractElementModifier(PieceTable *PT, RandomFromLLVMStress *R,
-                          Module* module)
+                         Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -595,14 +604,14 @@ struct ExtractElementModifier : public Modifier {
         ConstantInt::get(
             Type::getInt32Ty(module->getContext()),
             getRandomFromLLVMStress() %
-                (((FixedVectorType*)(Val0->getType()))->getNumElements())),
+                (((FixedVectorType *)(Val0->getType()))->getNumElements())),
         "E", insertPoint);
     PT->push_back(V);
   }
 };
 
 struct ShuffModifier : public Modifier {
-  ShuffModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  ShuffModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -617,8 +626,8 @@ struct ShuffModifier : public Modifier {
       Constant *CI =
           ConstantInt::get(I32, getRandomFromLLVMStress() % (Width * 2));
       // Pick some undef values.
-      //if (!(getRandomFromLLVMStress() % 5))
-        //CI = UndefValue::get(I32);
+      // if (!(getRandomFromLLVMStress() % 5))
+      // CI = UndefValue::get(I32);
       Idxs.push_back(CI);
     }
 
@@ -630,8 +639,7 @@ struct ShuffModifier : public Modifier {
 };
 
 struct InsertElementModifier : public Modifier {
-  InsertElementModifier(PieceTable *PT, RandomFromLLVMStress *R,
-                         Module* module)
+  InsertElementModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
@@ -651,15 +659,15 @@ struct InsertElementModifier : public Modifier {
 };
 
 struct CastModifier : public Modifier {
-  CastModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  CastModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *V = getRandomFromLLVMStressVal();
     Type *VTy = V->getType();
     Type *DestTy = pickScalarType();
-    
-    if(!VTy->isIntegerTy()&&!VTy->isFloatingPointTy()){
+
+    if (!VTy->isIntegerTy() && !VTy->isFloatingPointTy()) {
       return;
     }
     // Handle vector casts vectors.
@@ -727,16 +735,16 @@ struct CastModifier : public Modifier {
 };
 
 struct SelectModifier : public Modifier {
-  SelectModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  SelectModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
     // Try a bunch of different select configuration until a valid one is found.
     Value *Val0 = getRandomFromLLVMStressVal();
     Value *Val1 = getRandomFromLLVMStressValue(Val0->getType());
-    //both operands have to be first calss type according to specification.
-    //Token ty aren't applied to select and phi as well
-    if(!Val0->getType()->isFirstClassType()||Val0->getType()->isTokenTy()){
+    // both operands have to be first calss type according to specification.
+    // Token ty aren't applied to select and phi as well
+    if (!Val0->getType()->isFirstClassType() || Val0->getType()->isTokenTy()) {
       return;
     }
     Type *CondTy = Type::getInt1Ty(module->getContext());
@@ -756,14 +764,15 @@ struct SelectModifier : public Modifier {
 };
 
 struct CmpModifier : public Modifier {
-  CmpModifier(PieceTable *PT, RandomFromLLVMStress *R,  Module* module)
+  CmpModifier(PieceTable *PT, RandomFromLLVMStress *R, Module *module)
       : Modifier(PT, R, module) {}
 
   void Act() override {
     Value *Val0 = getRandomFromLLVMStressVal();
     Value *Val1 = getRandomFromLLVMStressValue(Val0->getType());
 
-    if (!Val0->getType()->isIntegerTy()&&!Val0->getType()->isFloatingPointTy())
+    if (!Val0->getType()->isIntegerTy() &&
+        !Val0->getType()->isFloatingPointTy())
       return;
     bool fp = Val0->getType()->getScalarType()->isFloatingPointTy();
 
@@ -805,7 +814,7 @@ public:
     // Consider arguments as legal values.
     for (auto &arg : insertPoint->getParent()->getParent()->args())
       PT.push_back(&arg);
-    Module* module=insertPoint->getModule();
+    Module *module = insertPoint->getModule();
     // List of modifiers which add new RandomFromLLVMStress instructions.
     std::vector<std::unique_ptr<Modifier>> Modifiers;
     Modifiers.emplace_back(new LoadModifier(&PT, &R, module));
