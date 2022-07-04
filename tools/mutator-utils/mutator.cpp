@@ -134,6 +134,11 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
+  if (BinaryInstructionHelper::canMutate(currentFunction)) {
+    helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
+
   if (MutateInstructionHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
@@ -146,11 +151,6 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
 
   if (GEPHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<GEPHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
-  }
-
-  if (BinaryInstructionHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
