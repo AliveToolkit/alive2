@@ -394,7 +394,11 @@ struct LoadModifier : public Modifier {
     if(ty->isOpaquePointerTy()){
       return;
     }
-    Value *V = new LoadInst(Ptr->getType()-> getNonOpaquePointerElementType(), Ptr, "L",
+    llvm::Type* eleTy=ty->getNonOpaquePointerElementType();
+    if(eleTy==nullptr||!eleTy->isSized()){
+      return;
+    }
+    Value *V = new LoadInst(eleTy, Ptr, "L",
                             insertPoint);
     PT->push_back(V);
   }
