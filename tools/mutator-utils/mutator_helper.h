@@ -78,9 +78,7 @@ public:
   virtual void whenMoveToNextFunction() override {
     shuffleUnitInBasicBlockIndex = 0;
   };
-  virtual void debug() override {
-    llvm::errs() << "\nInstructions shuffled\n";
-  };
+  virtual void debug() override;
 };
 
 class MutateInstructionHelper : public MutationHelper {
@@ -129,10 +127,10 @@ class RandomMoveHelper : public MutationHelper {
 public:
   RandomMoveHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), moved(false){};
-  virtual void init() {
+  virtual void init() override{
     moved = false;
   };
-  virtual void reset() {
+  virtual void reset() override{
     moved = false;
   };
   static bool canMutate(llvm::Function *func);
@@ -141,9 +139,7 @@ public:
   virtual void whenMoveToNextInst() {
     moved = false;
   };
-  virtual void debug() {
-    llvm::errs() << "Inst was moved around";
-  }
+  virtual void debug() override;
 };
 
 class RandomCodeInserterHelper : public MutationHelper {

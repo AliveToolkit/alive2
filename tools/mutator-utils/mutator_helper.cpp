@@ -121,6 +121,12 @@ void ShuffleHelper::shuffleCurrentBlock() {
       (llvm::Instruction *)&*mutator->vMap[&*mutator->iit]);
 }
 
+void ShuffleHelper::debug() {
+    llvm::errs() << "\nInstructions shuffled\n";
+    mutator->iitInTmp->print(llvm::errs());
+    llvm::errs()<<"\n";
+};
+
 bool MutateInstructionHelper::canMutate(llvm::Function *func) {
   for (auto it = inst_begin(func); it != inst_end(func); ++it) {
     if (canMutate(&*it)) {
@@ -321,14 +327,15 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
   }
   newPosInst = &*newPosIt;
 
+  inst->moveBefore(newPosInst);
+  mutator->iitInTmp=inst->getIterator();
+  
   for (size_t i = 0; i < inst->getNumOperands(); ++i) {
     if (llvm::Value *op = inst->getOperand(i);
         std::find(v.begin(), v.end(), op) != v.end()) {
       mutator->setOperandRandomValue(inst, i);
     }
-  }
-  inst->moveBefore(newPosInst);
-  mutator->iitInTmp=inst->getIterator();
+  }  
   llvm::SmallVector<llvm::Value *> vals;
   mutator->fixAllValues(vals);
   // restore domInst
@@ -384,6 +391,12 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   inst = (llvm::Instruction *)extraVals[0];
   inst->moveBefore(newPosInst);
   mutator->iitInTmp=inst->getIterator();
+}
+
+void RandomMoveHelper::debug(){
+  llvm::errs() << "Instruction was moved around\n";
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs()<<"\n";
 }
 
 bool RandomCodeInserterHelper::shouldMutate() {
