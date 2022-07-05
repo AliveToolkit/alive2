@@ -109,13 +109,7 @@ public:
   virtual void whenMoveToNextInst() override {
     mutated = newAdded = false;
   }
-  virtual void debug() override {
-    if (!newAdded) {
-      llvm::errs() << "\nReplaced with a existant usage\n";
-    } else {
-      llvm::errs() << "\nNew Inst added\n";
-    }
-  }
+  virtual void debug() override;
 };
 
 class RandomMoveHelper : public MutationHelper {
@@ -162,9 +156,7 @@ public:
   };
   virtual void mutate();
   virtual bool shouldMutate();
-  virtual void debug() {
-    llvm::errs() << "Code piece generated";
-  }
+  virtual void debug() override;
 };
 
 class FunctionCallInlineHelper : public MutationHelper {
@@ -206,8 +198,8 @@ class VoidFunctionCallRemoveHelper : public MutationHelper {
   bool removed;
   std::string funcName;
   static bool canMutate(llvm::Instruction *inst) {
-    if (llvm::isa<llvm::CallBase>(inst)) {
-      llvm::CallBase *callInst = (llvm::CallBase *)inst;
+    if (llvm::isa<llvm::CallInst>(inst)) {
+      llvm::CallBase *callInst = (llvm::CallInst *)inst;
       return callInst->getType()->isVoidTy();
     }
     return false;

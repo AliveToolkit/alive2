@@ -156,6 +156,7 @@ class FunctionMutator {
   llvm::Value *getRandomFromGlobal(llvm::Type *ty);
   llvm::SmallVector<llvm::Value *(FunctionMutator::*)(llvm::Type *)> valueFuncs;
   llvm::Value *getRandomValue(llvm::Type *ty);
+  bool debug;
 
 public:
   llvm::Function *getCurrentFunction() {
@@ -165,12 +166,12 @@ public:
   FunctionMutator(llvm::Function *currentFunction,
                   llvm::ValueToValueMapTy &vMap,
                   const llvm::StringSet<> &filterSet,
-                  const llvm::SmallVector<llvm::Value *> &globals)
+                  const llvm::SmallVector<llvm::Value *> &globals, bool debug=false)
       : currentFunction(currentFunction), vMap(vMap), filterSet(filterSet),
         globals(globals),
         valueFuncs({&FunctionMutator::getRandomConstant,
                     &FunctionMutator::getRandomDominatedValue,
-                    &FunctionMutator::getRandomValueFromExtraValue}) {
+                    &FunctionMutator::getRandomValueFromExtraValue}),debug(debug) {
     bit = currentFunction->begin();
     iit = bit->begin();
     for (auto it = currentFunction->arg_begin();
@@ -191,7 +192,8 @@ public:
   static bool canMutate(const llvm::Function *function,
                         const llvm::StringSet<> &filterSet);
   void mutate();
-  void debug();
+  void print();
+  void setDebug(bool debug){this->debug=debug;}
   // should pass the pointer itself.
   void init(std::shared_ptr<FunctionMutator> self);
 };

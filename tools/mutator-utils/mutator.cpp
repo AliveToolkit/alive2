@@ -94,7 +94,7 @@ bool Mutator::openInputFile(const string &inputFile) {
   return true;
 }
 
-void FunctionMutator::debug() {
+void FunctionMutator::print() {
   llvm::errs() << "Current function " << getCurrentFunction()->getName()
                << "\n";
   llvm::errs() << "Current basic block:\n";
@@ -219,10 +219,19 @@ bool FunctionMutator::canMutate(const llvm::Function *function,
 }
 
 void FunctionMutator::mutate() {
+  if(debug){
+    print();
+  }
   for (size_t i = 0; i < helpers.size(); ++i) {
     if (helpers[i]->shouldMutate()) {
       helpers[i]->mutate();
+      if(debug){
+        helpers[i]->debug();
+      }
     }
+  }
+  if(debug){
+    print();
   }
   moveToNextMutant();
 }
@@ -458,7 +467,7 @@ bool ModuleMutator::init() {
         !invalidFunctions.contains(fit->getName())) {
       if (FunctionMutator::canMutate(&*fit, filterSet)) {
         functionMutants.push_back(
-            std::make_shared<FunctionMutator>(&*fit, vMap, filterSet, globals));
+            std::make_shared<FunctionMutator>(&*fit, vMap, filterSet, globals,debug));
       }
     }
   }
@@ -496,16 +505,6 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
   resetTmpModule();
   assert(curFunction < functionMutants.size() &&
          "curFunction should be a valid function");
-  if (debug) {
-    llvm::errs() << "Before mutate:\n";
-    if (onEveryFunction) {
-      for (size_t i = 0; i < functionMutants.size(); ++i) {
-        functionMutants[i]->debug();
-      }
-    } else {
-      functionMutants[curFunction]->debug();
-    }
-  }
 
   if (onEveryFunction) {
     for (size_t i = 0; i < functionMutants.size(); ++i) {
@@ -517,16 +516,6 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
         functionMutants[curFunction]->getCurrentFunction()->getName();
   }
 
-  if (debug) {
-    llvm::errs() << "after mutate:\n";
-    if (onEveryFunction) {
-      for (size_t i = 0; i < functionMutants.size(); ++i) {
-        functionMutants[i]->debug();
-      }
-    } else {
-      functionMutants[curFunction]->debug();
-    }
-  }
   ++curFunction;
   if (curFunction == functionMutants.size()) {
     curFunction = 0;

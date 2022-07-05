@@ -36,6 +36,12 @@ varSetEnd:
       bSBlock.push_back(tmp);
     }
     tmp.clear();
+
+    //landingPad has to be the first instruction in the block
+    while(!instIt->isTerminator() && llvm::isa<LandingPadInst>(&*instIt)){
+      ++instIt;
+    }    
+
     for (; !instIt->isTerminator(); ++instIt) {
       bool flag = true;
       for (size_t op = 0; flag && op < instIt->getNumOperands(); ++op) {
@@ -138,6 +144,16 @@ bool MutateInstructionHelper::canMutate(llvm::Function *func) {
 
 bool MutateInstructionHelper::shouldMutate() {
   return !mutated && canMutate(&*mutator->iitInTmp);
+}
+
+void MutateInstructionHelper::debug(){
+  if (!newAdded) {
+    llvm::errs() << "\nReplaced with a existant usage\n";
+  } else {
+    llvm::errs() << "\nNew Inst added\n";
+  }
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs()<<"\n";
 }
 
 void MutateInstructionHelper::mutate() {
@@ -256,7 +272,8 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
 
 bool RandomMoveHelper::shouldMutate() {
   return !moved && mutator->bitInTmp->size() > 2 &&
-         !mutator->iitInTmp->isTerminator();
+         !mutator->iitInTmp->isTerminator() &&
+         !llvm::isa<llvm::LandingPadInst>(&*mutator->iitInTmp);
 }
 
 bool RandomMoveHelper::canMutate(llvm::Function *func) {
@@ -291,18 +308,26 @@ void RandomMoveHelper::randomMoveInstruction(llvm::Instruction *inst) {
 
 void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
   size_t pos = 0, newPos, beginPos = 0;
+  auto beginIt=inst->getParent()->begin();
   for (auto it = inst->getParent()->begin(); &*it != inst; ++it, ++pos)
     ;
   /**
    * PHINode must be the first inst in the basic block.
-   *
+   * LandingPad must be the first inst in the block
    */
   if (!llvm::isa<llvm::PHINode>(inst)) {
-    for (llvm::Instruction *phiInst = &*inst->getParent()->begin();
+    for (llvm::Instruction *phiInst = &*beginIt;
          llvm::isa<llvm::PHINode>(phiInst);
          phiInst = phiInst->getNextNonDebugInstruction()) {
-      ++beginPos;
+      ++beginPos,++beginIt;
     }
+  }
+  if(!llvm::isa<llvm::LandingPadInst>(inst)){
+  for (llvm::Instruction *landingPad = &*beginIt;
+         llvm::isa<llvm::LandingPadInst>(landingPad);
+         landingPad = landingPad->getNextNonDebugInstruction()) {
+      ++beginPos,++beginIt;
+    }    
   }
   /*
    *  Current inst cannot move forward because current inst is not PHI inst,
@@ -399,8 +424,15 @@ void RandomMoveHelper::debug() {
   llvm::errs() << "\n";
 }
 
+// don't allow insert code at the first instruciton. (LandPadInst)
 bool RandomCodeInserterHelper::shouldMutate() {
-  return !generated && !llvm::isa<llvm::PHINode>(mutator->iitInTmp);
+  return !generated && !llvm::isa<llvm::PHINode>(mutator->iitInTmp) && mutator->iitInTmp != mutator->bitInTmp->begin();
+}
+
+void RandomCodeInserterHelper::debug() {
+  llvm::errs() << "Code piece generated\n";
+  mutator->iitInTmp->print(llvm::errs());
+  llvm::errs()<<"\n";
 }
 
 void RandomCodeInserterHelper::mutate() {
@@ -525,7 +557,8 @@ bool VoidFunctionCallRemoveHelper::canMutate(llvm::Function *func) {
 }
 
 void VoidFunctionCallRemoveHelper::mutate() {
-  llvm::CallBase *callInst = (llvm::CallBase *)&*mutator->iitInTmp;
+  assert(llvm::isa<CallInst>(&*mutator->iitInTmp)&&"the void call has to be a call inst to be removed");
+  llvm::CallInst *callInst = (llvm::CallInst *)&*mutator->iitInTmp;
   llvm::Instruction *nextInst = callInst->getNextNonDebugInstruction();
   if (funcName.empty()) {
     funcName = callInst->getName().str();
