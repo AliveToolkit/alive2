@@ -17,7 +17,7 @@ This category is for bugs that generating wrong codes from passes
 
 ## Category 2
 This category is for bugs that crashes
-1. Instcombine crashes(https://reviews.llvm.org/D116322)
+1. Instcombine crashes(https://github.com/llvm/llvm-project/issues/52884)
 2. newGVN crashes (https://bugs.llvm.org/show_bug.cgi?id=51618)
 
 ## Category 3
