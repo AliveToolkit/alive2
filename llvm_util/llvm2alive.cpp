@@ -55,10 +55,6 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   }
 }
 
-bool has_constant_expr(llvm::Value *val) {
-  return isa<llvm::ConstantExpr, llvm::ConstantAggregate>(val);
-}
-
 unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
@@ -106,6 +102,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   vector<llvm::Instruction*> i_constexprs;
   const vector<string_view> &gvnamesInSrc;
   vector<pair<Phi*, llvm::PHINode*>> todo_phis;
+  const Instr *insert_constexpr_before = nullptr;
   ostream *out;
   // (LLVM alloca, (Alive2 alloc, has lifetime.start?))
   map<const llvm::AllocaInst *, std::pair<Alloc *, bool>> allocs;
@@ -137,7 +134,10 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
       return nullptr;
 
     auto i = ptr.get();
-    BB->addInstr(std::move(ptr));
+    if (insert_constexpr_before)
+      BB->addInstrAt(std::move(ptr), insert_constexpr_before, true);
+    else
+      BB->addInstr(std::move(ptr));
     return i;
   }
 
@@ -1540,49 +1540,12 @@ public:
       }
     }
 
-    // BB -> BB edge
-    set<pair<llvm::BasicBlock*, llvm::BasicBlock*>> split_edges;
-    for (auto &[phi, i] : todo_phis) {
-      for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
-        if (has_constant_expr(i->getIncomingValue(idx))) {
-          split_edges.emplace(i->getParent(), i->getIncomingBlock(idx));
-          break;
-        }
-      }
-    }
-
-    auto predecessor = [&](llvm::PHINode *phi, unsigned idx) {
-      auto pred = phi->getIncomingBlock(idx);
-      auto name = value_name(*pred);
-      if (!split_edges.count({phi->getParent(), pred}))
-        return name;
-      return std::move(name) + "_" +  getBB(phi->getParent()).getName();
-    };
-
     // patch phi nodes for recursive defs
     for (auto &[phi, i] : todo_phis) {
       for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
-        // evaluation of constexprs in phi nodes is done "in the edge", thus we
-        // introduce a new BB even if not always needed.
-        auto val = i->getIncomingValue(idx);
-        if (has_constant_expr(val)) {
-          auto bridge  = predecessor(i, idx);
-          auto &pred   = getBB(i->getIncomingBlock(idx));
-          BB = &Fn.insertBBAfter(bridge, pred);
-
-          auto &phi_bb = getBB(i->getParent());
-          pred.replaceTargetWith(&phi_bb, BB);
-          if (auto op = get_operand(val)) {
-            phi->addValue(*op, std::move(bridge));
-            BB->addInstr(make_unique<Branch>(phi_bb));
-            continue;
-          }
-          error(*i);
-          return {};
-        }
-
-        if (auto op = get_operand(val)) {
-          phi->addValue(*op, predecessor(i, idx));
+        insert_constexpr_before = phi;
+        if (auto op = get_operand(i->getIncomingValue(idx))) {
+          phi->addValue(*op, value_name(*i->getIncomingBlock(idx)));
         } else {
           error(*i);
           return {};
