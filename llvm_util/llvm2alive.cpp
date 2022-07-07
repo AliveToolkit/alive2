@@ -1542,8 +1542,9 @@ public:
 
     // patch phi nodes for recursive defs
     for (auto &[phi, i] : todo_phis) {
+      insert_constexpr_before = phi;
+      BB = const_cast<BasicBlock*>(&Fn.bbOf(*phi));
       for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
-        insert_constexpr_before = phi;
         if (auto op = get_operand(i->getIncomingValue(idx))) {
           phi->addValue(*op, value_name(*i->getIncomingBlock(idx)));
         } else {
