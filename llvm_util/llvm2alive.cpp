@@ -146,7 +146,10 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
                                   "%__copy_" + to_string(copy_idx++), *ag,
                                   UnaryOp::Copy);
     auto val = v.get();
-    BB->addInstr(std::move(v));
+    if (insert_constexpr_before)
+      BB->addInstrAt(std::move(v), insert_constexpr_before, true);
+    else
+      BB->addInstr(std::move(v));
     return val;
   }
 
