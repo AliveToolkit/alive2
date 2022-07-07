@@ -389,9 +389,9 @@ version )EOF";
               "skipped during mutation phrase.\n";
     }
   }
-  // if (verbose) {
+  if (verbose) {
   cerr << "Current seed" << Random::getSeed() << "\n";
-  //}
+  }
   if (numCopy > 0) {
     copyMode();
   } else if (timeElapsed > 0) {
