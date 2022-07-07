@@ -12,7 +12,7 @@ extern bool symexec_print_each_value;
 
 extern bool skip_smt;
 
-// don't dumo if empty
+// don't dump if empty
 extern std::string smt_benchmark_dir;
 
 extern bool disable_poison_input;
@@ -29,6 +29,10 @@ extern unsigned tgt_unroll_cnt;
 // impact correctness, if values involved in offset computations exceed the
 // maximum.
 extern unsigned max_offset_bits;
+
+// Max bits for size_t. This limits the internal address space, like max block
+// size and size of pointers (not to be confused with program pointer size).
+extern unsigned max_sizet_bits;
 
 std::ostream &dbg();
 void set_debug(std::ostream &os);

@@ -1038,6 +1038,7 @@ static void calculateAndInitConstants(Transform &t) {
   // We need this assumption to support negative offsets.
   bits_size_t = bit_width(max_alloc_size);
   bits_size_t = min(max(bits_for_offset, bits_size_t), bits_program_pointer-1);
+  bits_size_t = min(bits_size_t, config::max_sizet_bits);
 
   // +1 because the pointer after the object must be valid (can't overflow)
   uint64_t loc_alloc_aligned_size
