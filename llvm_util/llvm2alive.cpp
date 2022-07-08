@@ -1583,6 +1583,7 @@ public:
     // If there is a global variable with initializer, put them at init block.
     auto &entry_name = Fn.getFirstBB().getName();
     BB = &Fn.getBB("#init", true);
+    insert_constexpr_before = nullptr;
 
     // Ensure all src globals exist in target as well
     for (auto &gvname : gvnamesInSrc) {
