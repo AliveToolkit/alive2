@@ -13,6 +13,7 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -108,6 +109,22 @@ static void showStats() {
     IR::Memory::printAliasStats(*out);
 }
 
+static void writeBitcodeAtomically(llvm::Module &M,
+                                   const std::string &report_filename) {
+  std::string tmp_filename = std::tmpnam(nullptr);
+  std::error_code EC;
+  llvm::raw_fd_ostream tmp_file(tmp_filename, EC);
+  if (EC) {
+    cerr << "Alive2: Couldn't open temporary bitcode file" << endl;
+    exit(1);
+  }
+  llvm::WriteBitcodeToFile(M, tmp_file);
+  tmp_file.close();
+
+  fs::path bc_filename = report_filename;
+  bc_filename.replace_extension(".bc");
+  std::rename(tmp_filename.c_str(), bc_filename.c_str());
+}
 
 struct TVLegacyPass final : public llvm::ModulePass {
   static char ID;
@@ -120,11 +137,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   bool runOnModule(llvm::Module &M) override {
     for (auto &F: M)
-      runOnFunction(F);
+      runOnFunction(F, M);
     return false;
   }
 
-  bool runOnFunction(llvm::Function &F) {
+  bool runOnFunction(llvm::Function &F, llvm::Module &M) {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
       return false;
@@ -175,7 +192,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.src = std::move(I->second.fn);
     t.tgt = std::move(*fn);
 
-    bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr);
+    bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr, M);
 
     if (regenerate_tgt) {
       I->second.fn = *llvm2alive(F, *TLI);
@@ -191,7 +208,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   // If it returns true, the caller should regenerate tgt using llvm2alive().
   // If it returns false, the caller can simply move t.tgt to info.fn
-  static bool verify(Transform &t, int n, const string &src_tostr) {
+  static bool verify(Transform &t, int n, const string &src_tostr,
+                     llvm::Module &M) {
     printDot(t.tgt, n);
 
     if (!opt_always_verify) {
@@ -263,8 +281,12 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (Errors errs = verifier.verify()) {
+      if (errs.isUnsound()) {
+        has_failure = true;
+        if (opt_save_ir && !report_filename.empty())
+          writeBitcodeAtomically(M, report_filename);
+      }
       *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
       if (opt_error_fatal && has_failure)
         finalize();
     } else {
