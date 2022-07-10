@@ -110,20 +110,16 @@ static void showStats() {
 
 static void emitCommandLine(ostream *out) {
 #ifdef __linux__
-  ifstream cmd_args;
-  cmd_args.open("/proc/self/cmdline");
+  ifstream cmd_args("/proc/self/cmdline");
   if (!cmd_args.is_open()) {
-    cerr << "Alive2: Couldn't open /proc/self/cmdline" << endl;
-    exit(1);
+    return;
   }
-  *out << "Command line: ";
+  *out << "Command line:";
   std::string arg;
   while (std::getline(cmd_args, arg, '\0'))
-    *out << "'" << arg << "' ";
-#else
-  *out << "Command line: not available on this platform";
-#endif
+    *out << " '" << arg << "'";
   *out << "\n\n";
+#endif
 }
 
 struct TVLegacyPass final : public llvm::ModulePass {
