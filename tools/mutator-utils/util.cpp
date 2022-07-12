@@ -343,7 +343,6 @@ LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
     func = llvm::Intrinsic::getDeclaration(M, integerUnaryIntrinsic[pos], tys);
   } else {
     pos -= integerUnaryIntrinsic.size();
-    tys.push_back(val2->getType());
     func = llvm::Intrinsic::getDeclaration(M, integerBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
@@ -356,7 +355,7 @@ LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
 llvm::Instruction *
 LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                                    llvm::Instruction *insertBefore) {
-  std::vector<llvm::Type *> tys{val1->getType(), val2->getType()};
+  std::vector<llvm::Type *> tys{val1->getType()};
   llvm::Module *M = insertBefore->getModule();
   size_t pos = Random::getRandomUnsigned() %
                (floatUnaryIntrinsic.size() + floatBinaryIntrinsic.size());
