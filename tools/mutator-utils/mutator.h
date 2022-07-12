@@ -121,6 +121,7 @@ class FunctionMutator {
 
   DominatedValueVector domVals;
   llvm::SmallVector<llvm::Value *> extraValues;
+  llvm::SmallVector<std::string> tmpFuncs;
   const llvm::StringSet<> &filterSet;
   const llvm::SmallVector<llvm::Value *> &globals;
   llvm::DominatorTree DT;
@@ -196,6 +197,7 @@ public:
   void setDebug(bool debug){this->debug=debug;}
   // should pass the pointer itself.
   void init(std::shared_ptr<FunctionMutator> self);
+  void removeTmpFunction();
 };
 
 /*

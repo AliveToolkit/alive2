@@ -213,9 +213,9 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
               *val2 = mutator->getRandomValue(ty);
   llvm::Instruction *newInst = nullptr;
   if (isFloat) {
-    newInst = LLVMUtil::getRandomFloatInstruction(val1, val2, inst);
+    newInst = mutator_util::getRandomFloatInstruction(val1, val2, inst);
   } else {
-    newInst = LLVMUtil::getRandomIntegerInstruction(val1, val2, inst);
+    newInst = mutator_util::getRandomIntegerInstruction(val1, val2, inst);
   }
   inst->setOperand(pos, newInst);
   return true;
@@ -230,7 +230,7 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
     if (pos == mutator->iitInTmp->getNumOperands()) {
       pos = 0;
     }
-    if (!isBasicBlockOrFunction(mutator->iitInTmp->getOperand(pos))) {
+    if (canMutate(mutator->iitInTmp->getOperand(pos))) {
       found = true;
       break;
     }
@@ -258,7 +258,7 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
       // make sure at least one
       std::any_of(
           inst->op_begin(), inst->op_end(),
-          [](llvm::Value *val) { return !isBasicBlockOrFunction(val); }) &&
+          [](llvm::Use& use) { return canMutate(use.get()); }) &&
       (inst->getNumOperands() - llvm::isa<CallBase>(*inst) > 0) &&
       !llvm::isa<llvm::LandingPadInst>(inst)
       // The ret value of CleanupRet Inst must be a CleanupPad, needs extra
@@ -396,7 +396,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   llvm::SmallVector<llvm::Value *> extraVals;
   extraVals.push_back(inst);
   extraVals.push_back(newPosInst);
-  for (size_t i = pos; i != newPos; ++i) {
+  for (size_t i = pos+1; i != newPos; ++i) {
     ++newPosIt;
     newPosInst = &*newPosIt;
     extraVals[1] = newPosInst;
@@ -424,9 +424,15 @@ void RandomMoveHelper::debug() {
   llvm::errs() << "\n";
 }
 
-// don't allow insert code at the first instruciton. (LandPadInst)
+// don't allow insert code at LandPadInst.
+// don't allow insert code at CatchPadInst.
+// don't allow insert code at CleanupPadInst.
 bool RandomCodeInserterHelper::shouldMutate() {
-  return !generated && !llvm::isa<llvm::PHINode>(mutator->iitInTmp) && mutator->iitInTmp != mutator->bitInTmp->begin();
+  llvm::Instruction* inst= &*mutator->iitInTmp;
+  return !generated && !llvm::isa<llvm::PHINode>(inst) &&
+      !llvm::isa<llvm::LandingPadInst>(inst)
+      && !llvm::isa<llvm::CatchPadInst>(inst) 
+      && !llvm::isa<llvm::CleanupPadInst>(inst);
 }
 
 void RandomCodeInserterHelper::debug() {
@@ -455,7 +461,7 @@ void RandomCodeInserterHelper::mutate() {
     }
     mutator->bitInTmp = newBB->getIterator();
   }
-  LLVMUtil::insertRandomCodeBefore(insertPoint);
+  mutator_util::insertRandomCodeBefore(insertPoint);
 }
 
 void FunctionCallInlineHelper::init() {
@@ -467,7 +473,7 @@ void FunctionCallInlineHelper::init() {
       }
       bool shouldAdd = true;
       for (size_t i = 0; i < idToFuncSet.size() && shouldAdd; ++i) {
-        if (LLVMUtil::compareSignature(
+        if (mutator_util::compareSignature(
                 &*fit, module->getFunction(idToFuncSet[i][0]))) {
           funcToId.insert(
               std::make_pair(fit->getName(), funcToId[idToFuncSet[i][0]]));

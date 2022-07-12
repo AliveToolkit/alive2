@@ -246,7 +246,7 @@ public:
   }
 };
 
-class LLVMUtil {
+class mutator_util {
   static LLVMFunctionComparator comparator;
   const static std::vector<llvm::Instruction::BinaryOps> integerBinaryOps;
   const static std::vector<llvm::Instruction::BinaryOps> floatBinaryOps;
@@ -258,7 +258,7 @@ class LLVMUtil {
 public:
   static void removeTBAAMetadata(llvm::Module *M);
   static llvm::Value *insertGlobalVariable(llvm::Module *m, llvm::Type *ty);
-  static void insertFunctionArguments(llvm::Function *f,
+  static std::string insertFunctionArguments(llvm::Function *f,
                                       llvm::SmallVector<llvm::Type *> tys,
                                       llvm::ValueToValueMapTy &VMap);
   static void insertRandomCodeBefore(llvm::Instruction *inst);

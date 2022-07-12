@@ -102,9 +102,6 @@ void FunctionMutator::print() {
   llvm::errs() << "\nCurrent instruction:\n";
   iitInTmp->print(llvm::errs());
   llvm::errs() << "\n";
-  for (size_t i = 0; i < helpers.size(); i++) {
-    helpers[i]->debug();
-  }
 }
 
 void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
@@ -304,6 +301,7 @@ void FunctionMutator::calcDomVals() {
 
 void FunctionMutator::resetTmpCopy(std::shared_ptr<llvm::Module> copy) {
   extraValues.clear();
+  tmpFuncs.clear();
   tmpCopy = copy;
   assert(vMap.find(currentFunction) != vMap.end() &&
          vMap.find(&*bit) != vMap.end() && vMap.find(&*iit) != vMap.end() &&
@@ -334,7 +332,8 @@ void FunctionMutator::addFunctionArguments(
     const llvm::SmallVector<llvm::Type *> &tys, llvm::ValueToValueMapTy &VMap) {
   if (!lazyUpdateInsts.empty()) {
     size_t oldArgSize = functionInTmp->arg_size();
-    LLVMUtil::insertFunctionArguments(functionInTmp, tys, VMap);
+    std::string oldFuncName=mutator_util::insertFunctionArguments(functionInTmp, tys, VMap);
+    tmpFuncs.push_back(std::move(oldFuncName));
     iitInTmp = ((llvm::Instruction *)&*VMap[&*iitInTmp])->getIterator();
     bitInTmp = ((llvm::BasicBlock *)&*VMap[&*bitInTmp])->getIterator();
     functionInTmp = bitInTmp->getParent();
@@ -394,7 +393,7 @@ llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
         return &*vMap[domVals[pos]];
       } else if (isIntTy && domVals[pos]->getType()->isIntegerTy()) {
         llvm::Value *valInTmp = &*vMap[domVals[pos]];
-        return LLVMUtil::updateIntegerSize(valInTmp, (llvm::IntegerType *)ty,
+        return mutator_util::updateIntegerSize(valInTmp, (llvm::IntegerType *)ty,
                                            &*iitInTmp);
       }
     }
@@ -404,7 +403,7 @@ llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
 
 llvm::Value *FunctionMutator::getRandomValueFromExtraValue(llvm::Type *ty) {
   if (ty != nullptr && !extraValues.empty()) {
-    return LLVMUtil::findRandomInArray<llvm::Value *, llvm::Type *>(
+    return mutator_util::findRandomInArray<llvm::Value *, llvm::Type *>(
         extraValues, ty,
         [](llvm::Value *v, llvm::Type *ty) { return v->getType() == ty; },
         nullptr);
@@ -447,13 +446,22 @@ llvm::Value *FunctionMutator::getRandomValue(llvm::Type *ty) {
 
 llvm::Value *FunctionMutator::getRandomFromGlobal(llvm::Type *ty) {
   if (ty != nullptr && !globals.empty()) {
-    return LLVMUtil::findRandomInArray<llvm::Value *, llvm::Type *>(
+    return mutator_util::findRandomInArray<llvm::Value *, llvm::Type *>(
         extraValues, ty,
         [](llvm::Value *v, llvm::Type *ty) { return v->getType() == ty; },
         nullptr);
   }
   return nullptr;
 }
+
+void FunctionMutator::removeTmpFunction(){
+  for(const auto& funcName:tmpFuncs){
+      if(llvm::Function* func=tmpCopy->getFunction(funcName);func!=nullptr&&func->use_empty()){
+        func->eraseFromParent();
+      }
+  }
+}
+
 bool ModuleMutator::init() {
   for (auto fit = pm->begin(); fit != pm->end(); ++fit) {
     for (auto ait = fit->arg_begin(); ait != fit->arg_end(); ++ait) {
@@ -509,11 +517,13 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
   if (onEveryFunction) {
     for (size_t i = 0; i < functionMutants.size(); ++i) {
       functionMutants[i]->mutate();
+      functionMutants[i]->removeTmpFunction();
     }
   } else {
     functionMutants[curFunction]->mutate();
     curFunctionName =
         functionMutants[curFunction]->getCurrentFunction()->getName();
+    functionMutants[curFunction]->removeTmpFunction();
   }
 
   ++curFunction;

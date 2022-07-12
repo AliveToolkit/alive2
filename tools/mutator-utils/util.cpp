@@ -8,7 +8,7 @@ std::mt19937 Random::mt(Random::seed);
 llvm::SmallVector<unsigned> Random::usedInts;
 llvm::SmallVector<double> Random::usedDoubles;
 llvm::SmallVector<float> Random::usedFloats;
-LLVMFunctionComparator LLVMUtil::comparator;
+LLVMFunctionComparator mutator_util::comparator;
 
 unsigned Random::getExtremeInt(llvm::IntegerType *ty) {
   unsigned size = ty->getBitWidth();
@@ -114,7 +114,7 @@ float Random::getRandomLLVMFloat() {
   }
 }
 
-llvm::Value *LLVMUtil::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
+llvm::Value *mutator_util::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
   static const std::string GLOBAL_VAR_NAME_PREFIX = "aliveMutateGlobalVar";
   static int varCount = 0;
   m->getOrInsertGlobal(GLOBAL_VAR_NAME_PREFIX + std::to_string(varCount), ty);
@@ -126,7 +126,7 @@ llvm::Value *LLVMUtil::insertGlobalVariable(llvm::Module *m, llvm::Type *ty) {
   return val;
 }
 
-void LLVMUtil::propagateFunctionsInModule(llvm::Module *M, size_t num) {
+void mutator_util::propagateFunctionsInModule(llvm::Module *M, size_t num) {
   llvm::SmallVector<llvm::StringRef> funcNames;
   for (auto fit = M->begin(); fit != M->end(); ++fit) {
     if (!fit->isDeclaration()) {
@@ -144,7 +144,7 @@ void LLVMUtil::propagateFunctionsInModule(llvm::Module *M, size_t num) {
   }
 }
 
-void LLVMUtil::insertFunctionArguments(llvm::Function *F,
+std::string mutator_util::insertFunctionArguments(llvm::Function *F,
                                        llvm::SmallVector<llvm::Type *> tys,
                                        llvm::ValueToValueMapTy &VMap) {
   // uptated from llvm CloneFunction
@@ -189,9 +189,10 @@ void LLVMUtil::insertFunctionArguments(llvm::Function *F,
               newFuncName = NewF->getName().str();
   F->setName(newFuncName);
   NewF->setName(oldFuncName);
+  return F->getName().str();
 }
 
-llvm::Value *LLVMUtil::updateIntegerSize(llvm::Value *integer,
+llvm::Value *mutator_util::updateIntegerSize(llvm::Value *integer,
                                          llvm::IntegerType *newIntTy,
                                          llvm::Instruction *insertBefore) {
   assert(integer->getType()->isIntegerTy() &&
@@ -209,7 +210,7 @@ llvm::Value *LLVMUtil::updateIntegerSize(llvm::Value *integer,
   }
 }
 
-void LLVMUtil::removeTBAAMetadata(llvm::Module *M) {
+void mutator_util::removeTBAAMetadata(llvm::Module *M) {
   for (auto fit = M->begin(); fit != M->end(); fit++) {
     if (!fit->isDeclaration() && !fit->getName().empty()) {
       for (auto iit = llvm::inst_begin(*fit); iit != llvm::inst_end(*fit);
@@ -220,18 +221,18 @@ void LLVMUtil::removeTBAAMetadata(llvm::Module *M) {
   }
 }
 
-const std::vector<llvm::Instruction::BinaryOps> LLVMUtil::integerBinaryOps{
+const std::vector<llvm::Instruction::BinaryOps> mutator_util::integerBinaryOps{
     llvm::Instruction::Add,  llvm::Instruction::Sub,  llvm::Instruction::Mul,
     llvm::Instruction::SDiv, llvm::Instruction::UDiv, llvm::Instruction::SRem,
     llvm::Instruction::URem, llvm::Instruction::Shl,  llvm::Instruction::LShr,
     llvm::Instruction::AShr, llvm::Instruction::And,  llvm::Instruction::Xor,
     llvm::Instruction::Or};
 
-const std::vector<llvm::Instruction::BinaryOps> LLVMUtil::floatBinaryOps{
+const std::vector<llvm::Instruction::BinaryOps> mutator_util::floatBinaryOps{
     llvm::Instruction::FAdd, llvm::Instruction::FSub, llvm::Instruction::FMul,
     llvm::Instruction::FDiv, llvm::Instruction::FRem};
 
-const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerBinaryIntrinsic{
+const std::vector<llvm::Intrinsic::ID> mutator_util::integerBinaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::smax,
     llvm::Intrinsic::IndependentIntrinsics::smin,
     llvm::Intrinsic::IndependentIntrinsics::umax,
@@ -245,7 +246,7 @@ const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerBinaryIntrinsic{
 
 };
 
-const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatBinaryIntrinsic{
+const std::vector<llvm::Intrinsic::ID> mutator_util::floatBinaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::pow,
     llvm::Intrinsic::IndependentIntrinsics::minnum,
     llvm::Intrinsic::IndependentIntrinsics::maxnum,
@@ -253,12 +254,12 @@ const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatBinaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::maximum,
     llvm::Intrinsic::IndependentIntrinsics::copysign};
 
-const std::vector<llvm::Intrinsic::ID> LLVMUtil::integerUnaryIntrinsic{
+const std::vector<llvm::Intrinsic::ID> mutator_util::integerUnaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::bitreverse,
     llvm::Intrinsic::IndependentIntrinsics::ctpop,
 };
 
-const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatUnaryIntrinsic{
+const std::vector<llvm::Intrinsic::ID> mutator_util::floatUnaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::sqrt,
     llvm::Intrinsic::IndependentIntrinsics::sin,
     llvm::Intrinsic::IndependentIntrinsics::cos,
@@ -277,13 +278,13 @@ const std::vector<llvm::Intrinsic::ID> LLVMUtil::floatUnaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::roundeven,
     llvm::Intrinsic::IndependentIntrinsics::canonicalize};
 
-void LLVMUtil::insertRandomCodeBefore(llvm::Instruction *inst) {
+void mutator_util::insertRandomCodeBefore(llvm::Instruction *inst) {
   RandomCodePieceGenerator::insertCodeBefore(
       inst, 5 + (Random::getRandomUnsigned() & 15)); // last 4 binary bits
 }
 
 llvm::Instruction *
-LLVMUtil::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
                                       llvm::Instruction *insertBefore) {
   assert(val1->getType()->isIntegerTy() &&
          "should be an integer to get an int instruction!");
@@ -295,7 +296,7 @@ LLVMUtil::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
 }
 
 llvm::Instruction *
-LLVMUtil::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
                                     llvm::Instruction *insertBefore) {
   assert(val1->getType()->isFloatingPointTy() &&
          "should be a floating point to get a float instruction!");
@@ -306,7 +307,7 @@ LLVMUtil::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
              : getRandomFloatInstrinsic(val1, val2, insertBefore);
 }
 
-llvm::Instruction *LLVMUtil::getRandomIntegerBinaryInstruction(
+llvm::Instruction *mutator_util::getRandomIntegerBinaryInstruction(
     llvm::Value *val1, llvm::Value *val2, llvm::Instruction *insertBefore) {
   assert(val1->getType()->isIntegerTy() &&
          "should be an integer to get an int instruction!");
@@ -318,7 +319,7 @@ llvm::Instruction *LLVMUtil::getRandomIntegerBinaryInstruction(
 }
 
 llvm::Instruction *
-LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
                                           llvm::Instruction *insertBefore) {
   assert(val1->getType()->isFloatingPointTy() &&
          "should be a floating point to get a float instruction!");
@@ -330,7 +331,7 @@ LLVMUtil::getRandomFloatBinaryInstruction(llvm::Value *val1, llvm::Value *val2,
 }
 
 llvm::Instruction *
-LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
                                     llvm::Instruction *insertBefore) {
   std::vector<llvm::Type *> tys{val1->getType()};
   llvm::Module *M = insertBefore->getModule();
@@ -353,7 +354,7 @@ LLVMUtil::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
 }
 
 llvm::Instruction *
-LLVMUtil::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
                                    llvm::Instruction *insertBefore) {
   std::vector<llvm::Type *> tys{val1->getType()};
   llvm::Module *M = insertBefore->getModule();

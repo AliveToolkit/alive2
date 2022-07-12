@@ -88,8 +88,14 @@ class MutateInstructionHelper : public MutationHelper {
    * */
   bool insertRandomBinaryInstruction(llvm::Instruction *inst);
   void replaceRandomUsage(llvm::Instruction *inst);
-  static bool isBasicBlockOrFunction(llvm::Value *val) {
-    return llvm::isa<llvm::BasicBlock>(val) || llvm::isa<llvm::Function>(val);
+  static bool canMutate(llvm::Value *val) {
+    bool bbOrFunc= llvm::isa<llvm::BasicBlock>(val) || llvm::isa<llvm::Function>(val);
+    if(!bbOrFunc){
+      llvm::LLVMContext& context=val->getContext();
+      llvm::Type* ty=val->getType();
+      return ty!=llvm::Type::getLabelTy(context)&&ty!=llvm::Type::getTokenTy(context);
+    }
+    return false;
   }
   static bool canMutate(llvm::Instruction *inst);
 
