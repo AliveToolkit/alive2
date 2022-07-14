@@ -20,6 +20,8 @@ This category is for bugs that crashes
 1. Instcombine crashes(https://github.com/llvm/llvm-project/issues/52884)
 2. newGVN crashes (https://bugs.llvm.org/show_bug.cgi?id=51618)
 3. VectorCombine crashes(https://github.com/llvm/llvm-project/issues/56377)
+4. InstCombine Crashes(https://github.com/llvm/llvm-project/issues/56463)
+5. CoroInst crashes (https://github.com/llvm/llvm-project/issues/56525)
 
 ## Category 3
 This category is for that the test file is originaly wrong
