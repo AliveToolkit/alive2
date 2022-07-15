@@ -210,7 +210,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (hasAttribute(ParamAttrs::ByVal)) {
     unsigned bid;
     expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
-    val = get_global(s, getName(), size, attrs.align, false, bid);
+    val = get_global(s, smt_name, size, attrs.align, false, bid);
     s.getMemory().markByVal(bid);
   } else {
     auto name = getSMTName(child);
