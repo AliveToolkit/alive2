@@ -1,0 +1,45 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+# run this script in a log directory where Alive2 has been asked to
+# save IR files that result in unsoundness
+
+sub repro($$) {
+    (my $logfn, my $cmd) = @_;
+    my $bcfn = $logfn;
+    die unless $bcfn =~ s/\.txt$/.bc/;
+    die unless $cmd =~ s/\'\-tv\-report\-dir\=(.*?)\' //;
+    my $command = "$cmd < $bcfn 2>&1 |";
+    print "$command\n";
+    open my $OUTPUT, "$command" or die;
+    while (my $line = <$OUTPUT>) {
+        if ($line =~ /\(unsound\)/) {
+            print $line;
+        }
+    }
+    print "\n";
+}
+
+sub process($) {
+    (my $fn) = @_;
+    open my $INF, "<$fn" or die;
+    my $unsound = 0;
+    my $cmd = "";
+    while (my $line = <$INF>) {
+        $unsound = 1 if ($line =~ /\(unsound\)/);
+        if ($unsound && $line =~ /^Command line: (.*)$/) {
+            $cmd = $1;
+        }
+    }
+    close $INF;
+    if ($unsound) {
+        repro($fn, $cmd);
+    }
+}
+
+my @logfiles = glob "*.txt";
+
+foreach my $fn (@logfiles) {
+    process($fn);
+}

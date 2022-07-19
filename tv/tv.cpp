@@ -13,12 +13,14 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -81,6 +83,7 @@ bool has_failure = false;
 bool is_clangtv = false;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
+std::unique_ptr<llvm::Module> MClone;
 
 void sigalarm_handler(int) {
   parallelMgr->finishChild(/*is_timeout=*/true);
@@ -108,6 +111,28 @@ static void showStats() {
     IR::Memory::printAliasStats(*out);
 }
 
+static void writeBitcodeAtomically(const fs::path report_filename) {
+  assert(!report_filename.empty());
+  fs::path tmp_path;
+  do {
+    auto newname = report_filename.stem();
+    newname += "_tmp_" + get_random_str(8) + ".bc";
+    tmp_path.replace_filename(newname);
+  } while (fs::exists(tmp_path));
+  std::error_code EC;
+  llvm::raw_fd_ostream tmp_file(tmp_path.string(), EC);
+  if (EC) {
+    cerr << "Alive2: Couldn't open temporary bitcode file" << endl;
+    exit(1);
+  }
+  llvm::WriteBitcodeToFile(*MClone, tmp_file);
+  tmp_file.close();
+
+  fs::path bc_filename = report_filename;
+  bc_filename.replace_extension(".bc");
+  std::rename(tmp_path.c_str(), bc_filename.c_str());
+}
+
 static void emitCommandLine(ostream *out) {
 #ifdef __linux__
   ifstream cmd_args("/proc/self/cmdline");
@@ -133,11 +158,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   bool runOnModule(llvm::Module &M) override {
     for (auto &F: M)
-      runOnFunction(F);
+      runOnFunction(F, M);
     return false;
   }
 
-  bool runOnFunction(llvm::Function &F) {
+  bool runOnFunction(llvm::Function &F, llvm::Module &M) {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
       return false;
@@ -174,6 +199,9 @@ struct TVLegacyPass final : public llvm::ModulePass {
       fns.erase(I);
       return false;
     }
+
+    if (!MClone && first && opt_save_ir && !report_filename.empty())
+      MClone = llvm::CloneModule(M);
 
     if (first || skip_verify) {
       I->second.fn = std::move(*fn);
@@ -276,12 +304,17 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (Errors errs = verifier.verify()) {
-      *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
+      *out << "Transformation doesn't verify!" <<
+        (errs.isUnsound() ? " (unsound)" : " (not unsound)") <<
+        "\n" << errs;
+      if (errs.isUnsound()) {
+        has_failure = true;
+        emitCommandLine(out);
+        if (MClone)
+          writeBitcodeAtomically(report_filename);
+      }
       if (opt_error_fatal && has_failure)
         finalize();
-      if (errs.isUnsound())
-        emitCommandLine(out);
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -349,6 +382,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
   }
 
   static void finalize() {
+    MClone = nullptr;
     if (parallelMgr) {
       parallelMgr->finishParent();
       out = out_file.is_open() ? &out_file : &cout;

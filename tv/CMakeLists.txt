@@ -6,6 +6,11 @@ else()
 endif()
 
 configure_file(
+  ${CMAKE_SOURCE_DIR}/scripts/repro.in
+  ${CMAKE_BINARY_DIR}/repro
+  @ONLY
+)
+configure_file(
   ${CMAKE_SOURCE_DIR}/scripts/alivecc.in
   ${CMAKE_BINARY_DIR}/alivecc
   @ONLY
