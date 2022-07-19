@@ -13,12 +13,14 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -81,6 +83,7 @@ bool has_failure = false;
 bool is_clangtv = false;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
+std::unique_ptr<llvm::Module> MClone;
 
 void sigalarm_handler(int) {
   parallelMgr->finishChild(/*is_timeout=*/true);
@@ -108,6 +111,29 @@ static void showStats() {
     IR::Memory::printAliasStats(*out);
 }
 
+static void writeBitcodeAtomically(llvm::Module *MClone,
+                                   const fs::path report_filename) {
+  assert(!report_filename.empty());
+  fs::path tmp_path;
+  do {
+    auto newname = report_filename.stem();
+    newname += "_tmp_" + get_random_str(8) + ".bc";
+    tmp_path.replace_filename(newname);
+  } while (fs::exists(tmp_path));
+  std::error_code EC;
+  llvm::raw_fd_ostream tmp_file(tmp_path.string(), EC);
+  if (EC) {
+    cerr << "Alive2: Couldn't open temporary bitcode file" << endl;
+    exit(1);
+  }
+  llvm::WriteBitcodeToFile(*MClone, tmp_file);
+  tmp_file.close();
+
+  fs::path bc_filename = report_filename;
+  bc_filename.replace_extension(".bc");
+  std::rename(tmp_path.c_str(), bc_filename.c_str());
+}
+
 static void emitCommandLine(ostream *out) {
 #ifdef __linux__
   ifstream cmd_args("/proc/self/cmdline");
@@ -133,11 +159,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   bool runOnModule(llvm::Module &M) override {
     for (auto &F: M)
-      runOnFunction(F);
+      runOnFunction(F, M);
     return false;
   }
 
-  bool runOnFunction(llvm::Function &F) {
+  bool runOnFunction(llvm::Function &F, llvm::Module &M) {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
       return false;
@@ -168,6 +194,9 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
+    if (!MClone && first && opt_save_ir && !report_filename.empty())
+      MClone = llvm::CloneModule(M);
+
     auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
                                         : I->second.fn.getGlobalVarNames());
     if (!fn) {
@@ -188,7 +217,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.src = std::move(I->second.fn);
     t.tgt = std::move(*fn);
 
-    bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr);
+    bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr, &*MClone);
 
     if (regenerate_tgt) {
       I->second.fn = *llvm2alive(F, *TLI);
@@ -204,7 +233,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   // If it returns true, the caller should regenerate tgt using llvm2alive().
   // If it returns false, the caller can simply move t.tgt to info.fn
-  static bool verify(Transform &t, int n, const string &src_tostr) {
+  static bool verify(Transform &t, int n, const string &src_tostr,
+                     llvm::Module *MClone) {
     printDot(t.tgt, n);
 
     if (!opt_always_verify) {
@@ -276,12 +306,15 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (Errors errs = verifier.verify()) {
+      if (errs.isUnsound()) {
+        has_failure = true;
+        emitCommandLine(out);
+        if (MClone)
+          writeBitcodeAtomically(MClone, report_filename);
+      }
       *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
       if (opt_error_fatal && has_failure)
         finalize();
-      if (errs.isUnsound())
-        emitCommandLine(out);
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
