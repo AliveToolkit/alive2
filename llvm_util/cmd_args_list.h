@@ -128,7 +128,12 @@ llvm::cl::opt<string> opt_report_dir(LLVM_ARGS_PREFIX "report-dir",
   llvm::cl::cat(alive_cmdargs));
 
 bool report_dir_created = false;
-string report_filename;
+fs::path report_filename;
+
+llvm::cl::opt<bool> opt_save_ir(LLVM_ARGS_PREFIX "save-ir",
+  llvm::cl::desc("Save LLVM IR into the report directory upon encountering a "
+                 "verification error"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<bool> opt_overwrite_reports(LLVM_ARGS_PREFIX "overwrite-reports",
   llvm::cl::desc("Overwrite existing report files"),

@@ -39,6 +39,8 @@ if (!report_dir_created && !opt_report_dir.empty()) {
   if (!opt_overwrite_reports) {
     do {
       auto newname = fname.stem();
+      if (newname.compare("-") == 0 || newname.compare("<stdin>") == 0)
+        newname = "";
       newname += "_" + get_random_str(8) + ".txt";
       path.replace_filename(newname);
     } while (fs::exists(path));

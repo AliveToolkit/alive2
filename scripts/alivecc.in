@@ -80,6 +80,10 @@ if (compiling()) {
         push @ARGV, ("-mllvm", "-tv-report-dir=".$dir);
     }
 
+    if (my $logir = getenv("ALIVECC_SAVE_IR")) {
+        push @ARGV, ("-mllvm", "-tv-save-ir");
+    }
+
     # sanity check: make sure we intercepted all environment variables
     # of the form ALIVECC_*
     foreach my $e (keys %ENV) {
