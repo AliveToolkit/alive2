@@ -13,10 +13,10 @@ jobs:
         compiler:   [g++-11, clang++-14, clang++-15]
         build_type: [Release, Debug]
         include:
-          - os: macos-latest
+          - os: macos-12
             compiler: clang++
             build_type: Release
-          - os: macos-latest
+          - os: macos-12
             compiler: clang++
             build_type: Debug
 
