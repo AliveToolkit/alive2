@@ -136,6 +136,12 @@ llvm::cl::opt<bool> onEveryFunction(
                    "module would be mutated"),
     llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<bool> removeUndef(
+    LLVM_ARGS_PREFIX "removeUndef",
+    llvm::cl::value_desc("a flag for turning on removeUndef"),
+    llvm::cl::desc("remove all undef in all functions in the input module"),
+    llvm::cl::cat(mutatorArgs));
+
 llvm::cl::opt<bool>
     testMode(LLVM_ARGS_PREFIX "test",
              llvm::cl::value_desc(
