@@ -417,14 +417,20 @@ version )EOF";
 
 bool inputVerify() {
   if (stubMutator.openInputFile(testfile)) {
+    std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
+    mutator_util::removeTBAAMetadata(M1.get());
+    if(removeUndef){
+      ModuleMutator mutator(M1,verbose,onEveryFunction);
+      std::shared_ptr<llvm::Module> newM1=CloneModule(*M1);
+      mutator.init();      
+      mutator.removeAllUndefInFunctions();
+      M1=mutator.getModule();
+    }
     if (onlyDump) {
-      std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
       validFuncNum = M1->size();
       stubMutator.setModule(std::move(M1));
       return false;
     }
-    std::shared_ptr<llvm::Module> M1 = stubMutator.getModule();
-    mutator_util::removeTBAAMetadata(M1.get());
     auto &DL = M1.get()->getDataLayout();
     loggerInit(0);
     deleteLog(0);
@@ -682,7 +688,7 @@ void copyMode() {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
+      pm, invalidFuncNameSet, verbose, onEveryFunction);
   if (bool init = mutator->init(); init) {
 
     for (int i = 0; i < numCopy; ++i) {
@@ -713,7 +719,7 @@ void timeMode() {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      CloneModule(*pm), invalidFuncNameSet, verbose, onEveryFunction);
+      pm, invalidFuncNameSet, verbose, onEveryFunction);
   bool init = mutator->init();
   if (!init) {
     cerr << "Cannot find any lotaion to mutate, " + testfile + " skipped\n";

@@ -468,7 +468,27 @@ static bool hasUndefOperand(llvm::Instruction* inst){
 }
 
 void FunctionMutator::removeAllUndef(){
-
+  llvm::SmallVector<llvm::Value*> vec;
+  for(auto it=inst_begin(functionInTmp);it!=inst_end(functionInTmp);++it){
+    if(hasUndefOperand(&*it)){
+      vec.push_back(&*it);      
+    }
+  }
+  std::reverse(vec.begin(),vec.end());
+  while(!vec.empty()){
+    llvm::Instruction* inst=(llvm::Instruction*)vec.back();    
+    vec.pop_back();
+    llvm::SmallVector<size_t> pos;
+    for(size_t i=0;i<inst->getNumOperands();++i){
+      if(llvm::isa<llvm::UndefValue>(inst->getOperand(i))){
+        pos.push_back(i);
+      }
+    }
+    for(size_t i: pos){
+      setOperandRandomValue(inst,i);
+    }
+    fixAllValues(vec);
+  }
 }
 
 bool ModuleMutator::init() {

@@ -261,8 +261,10 @@ public:
     }
   }
   void removeAllUndefInFunctions(){
+    resetTmpModule();
     for(size_t i=0;i<functionMutants.size();++i){
       functionMutants[i]->removeAllUndef();
+      functionMutants[i]->removeTmpFunction();
     }
   }
 };
