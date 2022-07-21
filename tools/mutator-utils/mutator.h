@@ -109,6 +109,7 @@ class FunctionMutator {
   friend class VoidFunctionCallRemoveHelper;
   friend class GEPHelper;
   friend class BinaryInstructionHelper;
+  friend class EliminateUndefHelper;
 
   llvm::Function *currentFunction, *functionInTmp;
   llvm::ValueToValueMapTy &vMap;
@@ -198,6 +199,7 @@ public:
   // should pass the pointer itself.
   void init(std::shared_ptr<FunctionMutator> self);
   void removeTmpFunction();
+  void removeAllUndef();
 };
 
 /*
@@ -256,6 +258,11 @@ public:
       if (llvm::Function *func = pm->getFunction(funcName); func != nullptr) {
         func->eraseFromParent();
       }
+    }
+  }
+  void removeAllUndefInFunctions(){
+    for(size_t i=0;i<functionMutants.size();++i){
+      functionMutants[i]->removeAllUndef();
     }
   }
 };

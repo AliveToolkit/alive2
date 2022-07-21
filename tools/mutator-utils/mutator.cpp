@@ -462,6 +462,15 @@ void FunctionMutator::removeTmpFunction(){
   }
 }
 
+static bool hasUndefOperand(llvm::Instruction* inst){
+  return std::any_of(inst->op_begin(),inst->op_end(),
+    [](llvm::Use& use){return llvm::isa<llvm::UndefValue>(use.get());});
+}
+
+void FunctionMutator::removeAllUndef(){
+
+}
+
 bool ModuleMutator::init() {
   for (auto fit = pm->begin(); fit != pm->end(); ++fit) {
     for (auto ait = fit->arg_begin(); ait != fit->arg_end(); ++ait) {
