@@ -3,6 +3,7 @@
 
 #include "ir/fast_math.h"
 #include "ir/attrs.h"
+#include "util/spaceship.h"
 #include "util/unionfind.h"
 #include <map>
 #include <vector>

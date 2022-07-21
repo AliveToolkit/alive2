@@ -7,6 +7,12 @@
 
 #include <compare>
 
+#ifdef __APPLE__
+namespace std {
+inline bool is_neq(std::weak_ordering o) { return o != 0; }
+}
+#endif
+
 namespace {
 
 inline
