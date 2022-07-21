@@ -134,9 +134,9 @@ public:
     moved = false;
   };
   static bool canMutate(llvm::Function *func);
-  virtual void mutate();
-  virtual bool shouldMutate();
-  virtual void whenMoveToNextInst() {
+  virtual void mutate() override;
+  virtual bool shouldMutate() override;
+  virtual void whenMoveToNextInst() override{
     moved = false;
   };
   virtual void debug() override;
@@ -148,20 +148,20 @@ class RandomCodeInserterHelper : public MutationHelper {
 public:
   RandomCodeInserterHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), generated(false) {}
-  virtual void init() {
+  virtual void init() override{
     generated = false;
   }
-  virtual void reset() {
+  virtual void reset() override{
     generated = false;
   }
-  virtual void whenMoveToNextInst() {
+  virtual void whenMoveToNextInst() override{
     generated = false;
   }
   static bool canMutate(llvm::Function *func) {
     return true;
   };
-  virtual void mutate();
-  virtual bool shouldMutate();
+  virtual void mutate() override;
+  virtual bool shouldMutate() override;
   virtual void debug() override;
 };
 
@@ -182,20 +182,20 @@ class FunctionCallInlineHelper : public MutationHelper {
 public:
   FunctionCallInlineHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), inlined(false) {}
-  virtual void init();
-  virtual void reset() {
+  virtual void init() override;
+  virtual void reset() override{
     inlined = false;
     functionInlined.clear();
   }
-  virtual void whenMoveToNextInst() {
+  virtual void whenMoveToNextInst() override{
     inlined = false;
     functionInlined.clear();
   }
   static bool canMutate(llvm::Function *func);
-  virtual void mutate();
-  virtual bool shouldMutate();
+  virtual void mutate() override;
+  virtual bool shouldMutate() override;
   llvm::Function *getReplacedFunction();
-  virtual void debug() {
+  virtual void debug() override{
     llvm::errs() << "Function call inline with " << functionInlined << "\n";
   }
 };
@@ -220,7 +220,7 @@ public:
     funcName.clear();
   }
   virtual void mutate() override;
-  virtual void whenMoveToNextInst() {
+  virtual void whenMoveToNextInst() override{
     removed = false;
     funcName.clear();
   }
@@ -260,7 +260,7 @@ public:
   GEPHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), updated(false){};
   virtual void init() override {}
-  virtual void whenMoveToNextInst() {
+  virtual void whenMoveToNextInst() override{
     updated = false;
   }
   virtual void reset() override {
