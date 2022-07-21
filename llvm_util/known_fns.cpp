@@ -447,12 +447,12 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
   }
-  if (llvm::isReallocLikeFn(&i, &TLI)) {
+  if (llvm::getReallocatedOperand(&i, &TLI)) {
     bool isNonNull = i.hasRetAttr(llvm::Attribute::NonNull);
     RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
                                    isNonNull, align(i)));
   }
-  if (llvm::isFreeCall(&i, &TLI)) {
+  if (llvm::getFreedOperand(&i, &TLI)) {
     if (i.hasFnAttr(llvm::Attribute::NoFree)) {
       auto zero = make_intconst(0, 1);
       RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
