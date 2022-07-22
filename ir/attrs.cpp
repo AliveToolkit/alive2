@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include "ir/globals.h"
 #include "ir/memory.h"
 #include "ir/state.h"
 #include "ir/state_value.h"
@@ -88,6 +89,12 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " inaccessiblememonly";
   if (attr.has(FnAttrs::NullPointerIsValid))
     os << " null_pointer_is_valid";
+  if (attr.has(FnAttrs::AllocSize)) {
+    os << " allocsize(" << attr.allocsize_0;
+    if (attr.allocsize_1 != -1u)
+      os << ", " << attr.allocsize_1;
+    os << ')';
+  }
 
   attr.fp_denormal.print(os);
   if (attr.fp_denormal32)
@@ -142,7 +149,7 @@ static void
 encodePtrAttrs(const State &s, const expr &ptrvalue,
                AndExpr &UB, expr &non_poison,
                uint64_t derefBytes, uint64_t derefOrNullBytes, uint64_t align,
-               bool nonnull, bool nocapture) {
+               bool nonnull, bool nocapture, const expr &deref_expr) {
   Pointer p(s.getMemory(), ptrvalue);
 
   if (nonnull)
@@ -150,12 +157,14 @@ encodePtrAttrs(const State &s, const expr &ptrvalue,
 
   non_poison &= p.isNocapture().implies(nocapture);
 
-  if (derefBytes || derefOrNullBytes) {
+  if (derefBytes || derefOrNullBytes || deref_expr.isValid()) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
       UB.add(p.isDereferenceable(derefBytes, align));
     if (derefOrNullBytes)
       UB.add(p.isDereferenceable(derefOrNullBytes, align)() || p.isNull());
+    if (deref_expr.isValid())
+      UB.add(p.isDereferenceable(deref_expr, align, false)() || p.isNull());
   } else if (align > 1)
     non_poison &= p.isAligned(align);
 }
@@ -167,7 +176,7 @@ ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const 
 
   if (ty.isPtrType())
     encodePtrAttrs(s, val.value, UB, new_non_poison, getDerefBytes(),
-                   derefOrNullBytes, align, has(NonNull), has(NoCapture));
+                   derefOrNullBytes, align, has(NonNull), has(NoCapture), {});
 
   if (poisonImpliesUB()) {
     UB.add(std::move(new_non_poison));
@@ -185,11 +194,12 @@ bool FnAttrs::isNonNull() const {
 
 bool FnAttrs::poisonImpliesUB() const {
   return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||
-         has(DereferenceableOrNull);
+         has(DereferenceableOrNull) || has(AllocSize);
 }
 
 bool FnAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull);
+  bool ub = has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull)||
+            has(AllocSize);
   assert(!ub || poisonImpliesUB());
   return ub;
 }
@@ -223,7 +233,8 @@ bool FnAttrs::refinedBy(const FnAttrs &other) const {
 }
 
 pair<AndExpr, expr>
-FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
+FnAttrs::encode(State &s, const StateValue &val, const Type &ty,
+                const vector<pair<Value*, ParamAttrs>> &args) const {
   AndExpr UB;
   expr new_non_poison = val.non_poison;
 
@@ -232,9 +243,22 @@ FnAttrs::encode(const State &s, const StateValue &val, const Type &ty) const {
     new_non_poison &= !val.value.isNaN();
   }
 
-  if (ty.isPtrType())
+  if (ty.isPtrType()) {
+    expr deref;
+    if (has(AllocSize)) {
+      auto &arg0 = s[*args[allocsize_0].first];
+      UB.add(arg0.non_poison);
+      deref = arg0.value.zextOrTrunc(bits_size_t);
+
+      if (allocsize_1 != -1u) {
+        auto &arg1 = s[*args[allocsize_1].first];
+        UB.add(arg1.non_poison);
+        deref = deref * arg1.value.zextOrTrunc(bits_size_t);
+      }
+    }
     encodePtrAttrs(s, val.value, UB, new_non_poison, derefBytes,
-                   derefOrNullBytes, align, has(NonNull), false);
+                   derefOrNullBytes, align, has(NonNull), false, deref);
+  }
 
   if (poisonImpliesUB()) {
     UB.add(std::move(new_non_poison));

@@ -2157,31 +2157,27 @@ static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
 
 static StateValue
 check_return_value(State &s, StateValue &&val, const Type &ty,
-                   const FnAttrs &attrs, bool is_ret_instr) {
-  if (ty.isPtrType() && is_ret_instr) {
-    Pointer p(s.getMemory(), val.value);
-    val.non_poison &= !p.isStackAllocated();
-    val.non_poison &= !p.isNocapture();
-  }
-
-  auto [UB, new_non_poison] = attrs.encode(s, val, ty);
+                   const FnAttrs &attrs,
+                   const vector<pair<Value*, ParamAttrs>> &args) {
+  auto [UB, new_non_poison] = attrs.encode(s, val, ty, args);
   s.addUB(std::move(UB));
   return { std::move(val.value), std::move(new_non_poison) };
 }
 
 static StateValue
 pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
-            unsigned &idx) {
+            unsigned &idx, const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (!agg->isPadding(i))
-        vs.emplace_back(pack_return(s, agg->getChild(i), vals, attrs, idx));
+        vs.emplace_back(
+          pack_return(s, agg->getChild(i), vals, attrs, idx, args));
     }
     return agg->aggregateVals(vs);
   }
 
-  return check_return_value(s, std::move(vals[idx++]), ty, attrs, false);
+  return check_return_value(s, std::move(vals[idx++]), ty, attrs, args);
 }
 
 StateValue FnCall::toSMT(State &s) const {
@@ -2256,10 +2252,11 @@ StateValue FnCall::toSMT(State &s) const {
     s.addUB(expr(false));
 
   unsigned idx = 0;
-  auto ret = s.addFnCall(fnName_mangled.str(), std::move(inputs), std::move(ptr_inputs),
-                         out_types, attrs);
+  auto ret = s.addFnCall(fnName_mangled.str(), std::move(inputs),
+                         std::move(ptr_inputs), out_types, attrs);
 
-  return isVoid() ? StateValue() : pack_return(s, getType(), ret, attrs, idx);
+  return isVoid() ? StateValue()
+                  : pack_return(s, getType(), ret, attrs, idx, args);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
@@ -2830,7 +2827,14 @@ check_ret_attributes(State &s, StateValue &&sv, const Type &t,
     }
     return agg->aggregateVals(vals);
   }
-  return check_return_value(s, std::move(sv), t, attrs, true);
+
+  if (t.isPtrType()) {
+    Pointer p(s.getMemory(), sv.value);
+    sv.non_poison &= !p.isStackAllocated();
+    sv.non_poison &= !p.isNocapture();
+  }
+
+  return check_return_value(s, std::move(sv), t, attrs, {});
 }
 
 static void eq_val_rec(State &s, const Type &t, const StateValue &a,

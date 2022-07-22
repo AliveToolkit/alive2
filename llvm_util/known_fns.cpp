@@ -412,6 +412,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
       if (auto algnint = dyn_cast<llvm::ConstantInt>(algn)) {
         attrs.align = algnint->getZExtValue();
+        attrs.allocsize_0 = 0;
         RETURN_VAL(
           make_unique<Malloc>(*ty, value_name(i), *args[1], std::move(attrs)));
       } else {

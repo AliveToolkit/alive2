@@ -6,12 +6,15 @@
 #include "smt/exprs.h"
 #include <optional>
 #include <ostream>
+#include <vector>
 
 namespace IR {
 
+class ParamAttrs;
 class State;
 struct StateValue;
 class Type;
+class Value;
 
 class ParamAttrs final {
   unsigned bits;
@@ -70,7 +73,8 @@ public:
                    NoThrow = 1 << 10, NoAlias = 1 << 11, WillReturn = 1 << 12,
                    DereferenceableOrNull = 1 << 13,
                    InaccessibleMemOnly = 1 << 14,
-                   NullPointerIsValid = 1 << 15 };
+                   NullPointerIsValid = 1 << 15,
+                   AllocSize = 1 << 16 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -80,6 +84,9 @@ public:
   uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   unsigned align = 0;
+
+  unsigned allocsize_0;
+  unsigned allocsize_1 = -1u;
 
   bool isNonNull() const;
 
@@ -96,7 +103,8 @@ public:
 
   // Encodes the semantics of attributes using UB and poison.
   std::pair<smt::AndExpr, smt::expr>
-      encode(const State &s, const StateValue &val, const Type &ty) const;
+      encode(State &s, const StateValue &val, const Type &ty,
+             const std::vector<std::pair<Value*, ParamAttrs>> &args) const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };
