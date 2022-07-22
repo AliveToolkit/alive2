@@ -79,7 +79,9 @@ public:
 
   uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
-  unsigned align = 1;
+  unsigned align = 0;
+
+  bool isNonNull() const;
 
   // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const;

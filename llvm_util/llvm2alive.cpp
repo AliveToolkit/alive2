@@ -283,14 +283,20 @@ public:
 
     FnAttrs attrs;
     vector<ParamAttrs> param_attrs;
+
+    parse_fn_attrs(i, attrs);
+
+    if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
+      if (op->hasNoNaNs())
+        attrs.set(FnAttrs::NNaN);
+    }
+
     if (!approx) {
-      auto [known, attrs0, params0, approx0] = known_call(i, TLI, *BB, args);
+      auto [known, approx0]
+        = known_call(i, TLI, *BB, args, std::move(attrs), param_attrs);
+      approx = approx0;
       if (known)
         RETURN_IDENTIFIER(std::move(known));
-
-      attrs       = std::move(attrs0);
-      param_attrs = std::move(params0);
-      approx      = approx0;
     }
 
     auto ty = llvm_type2alive(i.getType());
@@ -305,7 +311,8 @@ public:
       if (!iasm->canThrow())
         attrs.set(FnAttrs::NoThrow);
       call = make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
-                                    iasm->getConstraintString(), std::move(attrs));
+                                    iasm->getConstraintString(),
+                                    std::move(attrs));
     } else {
       if (!fn) // TODO: support indirect calls
         return error(i);
@@ -317,13 +324,6 @@ public:
     llvm::AttributeList attrs_callsite = i.getAttributes();
     llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
                                          : llvm::AttributeList();
-
-    parse_fn_attrs(i, attrs);
-
-    if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
-      if (op->hasNoNaNs())
-        attrs.set(FnAttrs::NNaN);
-    }
 
     if (fn)
       call = make_unique<FnCall>(*ty, value_name(i),
@@ -1469,7 +1469,8 @@ public:
     reset_state(Fn);
 
     auto &attrs = Fn.getFnAttrs();
-    auto [param_attrs, approx] = llvm_implict_attrs(f, TLI, attrs);
+    vector<ParamAttrs> param_attrs;
+    (void)llvm_implict_attrs(f, TLI, attrs, param_attrs);
 
     llvm::AttributeList attrlist = f.getAttributes();
 

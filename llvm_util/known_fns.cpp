@@ -13,23 +13,14 @@
 using namespace IR;
 using namespace std;
 
-static unsigned align(llvm::CallInst &i) {
-  auto a = i.getRetAlign();
-  return a.hasValue() ? a.getValue().value() : 0;
-}
-
 namespace llvm_util {
 
-#define RETURN_EXACT() \
-  return { std::move(param_attrs), false }
-#define RETURN_APPROX() \
-  return { std::move(param_attrs), true }
+#define RETURN_EXACT()  return false
+#define RETURN_APPROX() return true
 
-static pair<vector<ParamAttrs>, bool>
-implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs, bool is_void,
-               unsigned num_args) {
-  vector<ParamAttrs> param_attrs;
-
+bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
+                    vector<ParamAttrs> &param_attrs, bool is_void,
+                    unsigned num_args) {
   auto set_param = [&](unsigned i, ParamAttrs::Attribute attr) {
     if (param_attrs.size() <= i)
       param_attrs.resize(i+1);
@@ -390,31 +381,26 @@ implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs, bool is_void,
   }
 }
 
-pair<vector<ParamAttrs>, bool>
-llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
-                   FnAttrs &attrs) {
+bool llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
+                        FnAttrs &attrs, vector<ParamAttrs> &param_attrs) {
   llvm::LibFunc libfn;
   if (!TLI.getLibFunc(f, libfn) || !TLI.has(libfn))
-    return { {}, false };
-  return
-    implict_attrs_(libfn, attrs, f.getReturnType()->isVoidTy(), f.arg_size());
+    return false;
+  return implict_attrs_(libfn, attrs, param_attrs,
+                        f.getReturnType()->isVoidTy(), f.arg_size());
 }
 
 #undef RETURN_EXACT
 #undef RETURN_APPROX
 
-#define RETURN_VAL(op) \
-  return { op, std::move(attrs), std::move(param_attrs), false }
-#define RETURN_EXACT() \
-  return { nullptr, std::move(attrs), std::move(param_attrs), false }
-#define RETURN_APPROX() \
-  return { nullptr, std::move(attrs), std::move(param_attrs), true }
+#define RETURN_VAL(op)  return { op, false }
+#define RETURN_EXACT()  return { nullptr, false }
+#define RETURN_APPROX() return { nullptr, true }
 
-tuple<unique_ptr<Instr>, FnAttrs, vector<ParamAttrs>, bool>
+pair<unique_ptr<Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
-           BasicBlock &BB, const vector<Value*> &args) {
-  FnAttrs attrs;
-  vector<ParamAttrs> param_attrs;
+           BasicBlock &BB, const vector<Value*> &args, FnAttrs &&attrs,
+           vector<ParamAttrs> &param_attrs) {
 
   auto ty = llvm_type2alive(i.getType());
   if (!ty)
@@ -422,15 +408,12 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
-    bool isNonNull = i.hasRetAttr(llvm::Attribute::NonNull);
-    //TODO: also null for C++'s new throwing operator
-
     // aligned malloc
     if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
       if (auto algnint = dyn_cast<llvm::ConstantInt>(algn)) {
+        attrs.align = algnint->getZExtValue();
         RETURN_VAL(
-          make_unique<Malloc>(*ty, value_name(i), *args[1], isNonNull,
-                              algnint->getZExtValue()));
+          make_unique<Malloc>(*ty, value_name(i), *args[1], std::move(attrs)));
       } else {
         // TODO: add support for non-const alignments
         RETURN_APPROX();
@@ -440,23 +423,24 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     // calloc
     if (auto *init = llvm::getInitialValueOfAllocation(&i, &TLI, i.getType());
         init && init->isNullValue())
-      RETURN_VAL(
-        make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1], align(i)));
+      RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1],
+                                     std::move(attrs)));
 
     // malloc or new
     RETURN_VAL(
-      make_unique<Malloc>(*ty, value_name(i), *args[0], isNonNull, align(i)));
+      make_unique<Malloc>(*ty, value_name(i), *args[0], std::move(attrs)));
   }
   if (llvm::getReallocatedOperand(&i, &TLI)) {
-    bool isNonNull = i.hasRetAttr(llvm::Attribute::NonNull);
+    // TODO: allow other args
     RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
-                                   isNonNull, align(i)));
+                                   std::move(attrs)));
   }
   if (llvm::getFreedOperand(&i, &TLI)) {
     if (i.hasFnAttr(llvm::Attribute::NoFree)) {
       auto zero = make_intconst(0, 1);
       RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
     }
+    // TODO: allow other args
     RETURN_VAL(make_unique<Free>(*args[0]));
   }
 
@@ -564,8 +548,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       // (void)fwrite(const void *ptr, 1, 1, FILE *stream) ->
       //   (void)fputc(int c, FILE *stream))
       if (bytes == 1 && i.use_empty() && TLI.has(llvm::LibFunc_fputc)) {
-        auto [param_attrs, _]
-          = implict_attrs_(llvm::LibFunc_fputc, attrs, false, 2);
+        (void)implict_attrs_(llvm::LibFunc_fputc, attrs, param_attrs, false, 2);
         auto &byteTy = get_int_type(8); // FIXME
         auto &i32 = get_int_type(32);
         auto call
@@ -588,8 +571,7 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     break;
   }
 
-  auto [params, approx] = llvm_implict_attrs(*decl, TLI, attrs);
-  return { nullptr, std::move(attrs), std::move(params), approx };
+  return { nullptr, llvm_implict_attrs(*decl, TLI, attrs, param_attrs) };
 }
 
 }

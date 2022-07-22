@@ -3,9 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "ir/attrs.h"
 #include <memory>
-#include <tuple>
 #include <vector>
 
 namespace llvm {
@@ -16,21 +14,23 @@ class TargetLibraryInfo;
 
 namespace IR {
 class BasicBlock;
+class FnAttrs;
 class Instr;
+class ParamAttrs;
 class Value;
 }
 
 namespace llvm_util {
 
-// returned bool indicates whether it's a known function call
-std::pair<std::vector<IR::ParamAttrs>, bool>
-llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
-                   IR::FnAttrs &attrs);
+// returns true if it's a known function call
+bool llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
+                        IR::FnAttrs &attrs,
+                        std::vector<IR::ParamAttrs> &param_attrs);
 
-// returned bool indicates whether it's a known function call
-std::tuple<std::unique_ptr<IR::Instr>, IR::FnAttrs, std::vector<IR::ParamAttrs>,
-           bool>
+// returns true if it's a known function call
+std::pair<std::unique_ptr<IR::Instr>, bool>
 known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
-           IR::BasicBlock &BB, const std::vector<IR::Value*> &args);
+           IR::BasicBlock &BB, const std::vector<IR::Value*> &args,
+           IR::FnAttrs &&attrs, std::vector<IR::ParamAttrs> &param_attr);
 
 }

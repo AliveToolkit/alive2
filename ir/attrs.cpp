@@ -156,8 +156,7 @@ encodePtrAttrs(const State &s, const expr &ptrvalue,
       UB.add(p.isDereferenceable(derefBytes, align));
     if (derefOrNullBytes)
       UB.add(p.isDereferenceable(derefOrNullBytes, align)() || p.isNull());
-  } else if (align != 1)
-    // align
+  } else if (align > 1)
     non_poison &= p.isAligned(align);
 }
 
@@ -178,6 +177,11 @@ ParamAttrs::encode(const State &s, const StateValue &val, const Type &ty) const 
   return { std::move(UB), std::move(new_non_poison) };
 }
 
+
+bool FnAttrs::isNonNull() const {
+  return has(NonNull) ||
+         (!has(NullPointerIsValid) && derefBytes > 0);
+}
 
 bool FnAttrs::poisonImpliesUB() const {
   return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||

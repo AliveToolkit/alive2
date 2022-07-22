@@ -654,19 +654,16 @@ public:
 
 class Malloc final : public MemInstr {
   Value *ptr = nullptr, *size;
-  uint64_t align;
-  bool isNonNull = false;
+  FnAttrs attrs;
 
 public:
-  Malloc(Type &type, std::string &&name, Value &size, bool isNonNull,
-         uint64_t align)
-    : MemInstr(type, std::move(name)), size(&size), align(align),
-      isNonNull(isNonNull) {}
+  Malloc(Type &type, std::string &&name, Value &size, FnAttrs &&attrs)
+    : MemInstr(type, std::move(name)), size(&size), attrs(std::move(attrs)) {}
 
   Malloc(Type &type, std::string &&name, Value &ptr, Value &size,
-         bool isNonNull, uint64_t align)
-    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size), align(align),
-      isNonNull(isNonNull) {}
+         FnAttrs &&attrs)
+    : MemInstr(type, std::move(name)), ptr(&ptr), size(&size),
+      attrs(std::move(attrs)) {}
 
   Value& getSize() const { return *size; }
   uint64_t getAlign() const;
@@ -690,11 +687,12 @@ public:
 
 class Calloc final : public MemInstr {
   Value *num, *size;
-  uint64_t align;
+  FnAttrs attrs;
 public:
   Calloc(Type &type, std::string &&name, Value &num, Value &size,
-         uint64_t align = 0)
-    : MemInstr(type, std::move(name)), num(&num), size(&size), align(align) {}
+         FnAttrs &&attrs)
+    : MemInstr(type, std::move(name)), num(&num), size(&size),
+      attrs(std::move(attrs)) {}
 
   Value& getNum() const { return *num; }
   Value& getSize() const { return *size; }

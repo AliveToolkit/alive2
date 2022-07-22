@@ -327,7 +327,7 @@ expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
 }
 
 expr Pointer::isAligned(uint64_t align) {
-  if (align == 1)
+  if (align <= 1)
     return true;
 
   auto offset = getOffset();

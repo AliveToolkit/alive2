@@ -2013,7 +2013,7 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
     if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull))  \
       sz = gcd(sz, attr.derefOrNullBytes);                             \
     /* Without align, nothing is guaranteed about the bytesize */      \
-    sz = gcd(sz, retattr.align);                                       \
+    sz = gcd(sz, retattr.align ? retattr.align : 1);                                       \
     bytesize = bytesize ? gcd(bytesize, sz) : sz;                      \
   } while (0)
 
@@ -3124,7 +3124,7 @@ bool Malloc::canFree() const {
 }
 
 uint64_t Malloc::getAlign() const {
-  return align ? align : heap_block_alignment;
+  return attrs.align ? attrs.align : heap_block_alignment;
 }
 
 vector<Value*> Malloc::operands() const {
@@ -3145,11 +3145,7 @@ void Malloc::print(ostream &os) const {
     os << " = malloc ";
   else
     os << " = realloc " << *ptr << ", ";
-  os << *size;
-  if (align)
-    os << ", align " << align;
-  if (isNonNull)
-    os << ", nonnull";
+  os << *size << ',' << attrs;
 }
 
 StateValue Malloc::toSMT(State &s) const {
@@ -3163,13 +3159,14 @@ StateValue Malloc::toSMT(State &s) const {
   expr nullp = Pointer::mkNullPointer(m)();
   expr ret = expr::mkIf(allocated, p_new, nullp);
 
-  if (!ptr) {
-    if (isNonNull) {
-      s.addPre(std::move(allocated));
-      ret = p_new;
-    }
+  if (attrs.isNonNull()) {
     // TODO: In C++ we need to throw an exception if the allocation fails.
-  } else {
+    s.addPre(std::move(allocated));
+    allocated = true;
+    ret = p_new;
+  }
+
+  if (ptr) {
     auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
     s.addUB(np_ptr);
     check_can_store(s, p);
@@ -3196,10 +3193,9 @@ expr Malloc::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Malloc::dup(Function &f, const string &suffix) const {
   return ptr
-    ? make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size, isNonNull,
-                          align)
-    : make_unique<Malloc>(getType(), getName() + suffix, *size, isNonNull,
-                          align);
+    ? make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size,
+                          FnAttrs(attrs))
+    : make_unique<Malloc>(getType(), getName() + suffix, *size, FnAttrs(attrs));
 }
 
 
@@ -3225,7 +3221,7 @@ Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
 }
 
 uint64_t Calloc::getAlign() const {
-  return align ? align : heap_block_alignment;
+  return attrs.align ? attrs.align : heap_block_alignment;
 }
 
 vector<Value*> Calloc::operands() const {
@@ -3254,6 +3250,11 @@ StateValue Calloc::toSMT(State &s) const {
   auto [p, allocated] = m.alloc(size, getAlign(), Memory::MALLOC,
                                 np && nm.mul_no_uoverflow(sz), nonnull);
 
+  if (attrs.isNonNull()) {
+    s.addPre(std::move(allocated));
+    allocated = true;
+  }
+
   m.memset(p, { expr::mkUInt(0, 8), true }, size, getAlign(), {}, false);
 
   return { expr::mkIf(allocated, p, Pointer::mkNullPointer(m)()), true };
@@ -3268,7 +3269,8 @@ expr Calloc::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Calloc::dup(Function &f, const string &suffix) const {
-  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size);
+  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size,
+                             FnAttrs(attrs));
 }
 
 
