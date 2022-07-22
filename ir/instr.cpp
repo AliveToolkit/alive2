@@ -3234,9 +3234,7 @@ void Calloc::rauw(const Value &what, Value &with) {
 }
 
 void Calloc::print(ostream &os) const {
-  os << getName() << " = calloc " << *num << ", " << *size;
-  if (align)
-    os << ", align " << align;
+  os << getName() << " = calloc " << *num << ", " << *size << ',' << attrs;
 }
 
 StateValue Calloc::toSMT(State &s) const {
