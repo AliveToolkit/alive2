@@ -321,9 +321,10 @@ class mutator_util {
 public:
   static void removeTBAAMetadata(llvm::Module *M);
   static llvm::Value *insertGlobalVariable(llvm::Module *m, llvm::Type *ty);
-  static std::string insertFunctionArguments(llvm::Function *f,
-                                      llvm::SmallVector<llvm::Type *> tys,
-                                      llvm::ValueToValueMapTy &VMap);
+  static std::string
+  insertFunctionArguments(llvm::Function *f,
+                          llvm::SmallVector<llvm::Type *> tys,
+                          llvm::ValueToValueMapTy &VMap);
   static void insertRandomCodeBefore(llvm::Instruction *inst);
   static void propagateFunctionsInModule(llvm::Module *M, size_t num);
   static llvm::Value *

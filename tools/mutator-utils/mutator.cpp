@@ -216,18 +216,24 @@ bool FunctionMutator::canMutate(const llvm::Function *function,
 }
 
 void FunctionMutator::mutate() {
-  if(debug){
+  if (debug) {
     print();
   }
-  for (size_t i = 0; i < helpers.size(); ++i) {
-    if (helpers[i]->shouldMutate()) {
-      helpers[i]->mutate();
-      if(debug){
-        helpers[i]->debug();
+
+  bool mutated = false;
+  do {
+    for (size_t i = 0; i < helpers.size(); ++i) {
+      if (helpers[i]->shouldMutate() && Random::getRandomBool()) {
+        helpers[i]->mutate();
+        mutated = true;
+        if (debug) {
+          helpers[i]->debug();
+        }
       }
     }
-  }
-  if(debug){
+  } while (!mutated);
+
+  if (debug) {
     print();
   }
   moveToNextMutant();
@@ -332,7 +338,8 @@ void FunctionMutator::addFunctionArguments(
     const llvm::SmallVector<llvm::Type *> &tys, llvm::ValueToValueMapTy &VMap) {
   if (!lazyUpdateInsts.empty()) {
     size_t oldArgSize = functionInTmp->arg_size();
-    std::string oldFuncName=mutator_util::insertFunctionArguments(functionInTmp, tys, VMap);
+    std::string oldFuncName =
+        mutator_util::insertFunctionArguments(functionInTmp, tys, VMap);
     tmpFuncs.push_back(std::move(oldFuncName));
     iitInTmp = ((llvm::Instruction *)&*VMap[&*iitInTmp])->getIterator();
     bitInTmp = ((llvm::BasicBlock *)&*VMap[&*bitInTmp])->getIterator();
@@ -393,8 +400,8 @@ llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
         return &*vMap[domVals[pos]];
       } else if (isIntTy && domVals[pos]->getType()->isIntegerTy()) {
         llvm::Value *valInTmp = &*vMap[domVals[pos]];
-        return mutator_util::updateIntegerSize(valInTmp, (llvm::IntegerType *)ty,
-                                           &*iitInTmp);
+        return mutator_util::updateIntegerSize(
+            valInTmp, (llvm::IntegerType *)ty, &*iitInTmp);
       }
     }
   }
@@ -454,38 +461,41 @@ llvm::Value *FunctionMutator::getRandomFromGlobal(llvm::Type *ty) {
   return nullptr;
 }
 
-void FunctionMutator::removeTmpFunction(){
-  for(const auto& funcName:tmpFuncs){
-      if(llvm::Function* func=tmpCopy->getFunction(funcName);func!=nullptr&&func->use_empty()){
-        func->eraseFromParent();
-      }
-  }
-}
-
-static bool hasUndefOperand(llvm::Instruction* inst){
-  return std::any_of(inst->op_begin(),inst->op_end(),
-    [](llvm::Use& use){return llvm::isa<llvm::UndefValue>(use.get());});
-}
-
-void FunctionMutator::removeAllUndef(){
-  llvm::SmallVector<llvm::Value*> vec;
-  for(auto it=inst_begin(functionInTmp);it!=inst_end(functionInTmp);++it){
-    if(hasUndefOperand(&*it)){
-      vec.push_back(&*it);      
+void FunctionMutator::removeTmpFunction() {
+  for (const auto &funcName : tmpFuncs) {
+    if (llvm::Function *func = tmpCopy->getFunction(funcName);
+        func != nullptr && func->use_empty()) {
+      func->eraseFromParent();
     }
   }
-  std::reverse(vec.begin(),vec.end());
-  while(!vec.empty()){
-    llvm::Instruction* inst=(llvm::Instruction*)vec.back();    
+}
+
+static bool hasUndefOperand(llvm::Instruction *inst) {
+  return std::any_of(inst->op_begin(), inst->op_end(), [](llvm::Use &use) {
+    return llvm::isa<llvm::UndefValue>(use.get());
+  });
+}
+
+void FunctionMutator::removeAllUndef() {
+  llvm::SmallVector<llvm::Value *> vec;
+  for (auto it = inst_begin(functionInTmp); it != inst_end(functionInTmp);
+       ++it) {
+    if (hasUndefOperand(&*it)) {
+      vec.push_back(&*it);
+    }
+  }
+  std::reverse(vec.begin(), vec.end());
+  while (!vec.empty()) {
+    llvm::Instruction *inst = (llvm::Instruction *)vec.back();
     vec.pop_back();
     llvm::SmallVector<size_t> pos;
-    for(size_t i=0;i<inst->getNumOperands();++i){
-      if(llvm::isa<llvm::UndefValue>(inst->getOperand(i))){
+    for (size_t i = 0; i < inst->getNumOperands(); ++i) {
+      if (llvm::isa<llvm::UndefValue>(inst->getOperand(i))) {
         pos.push_back(i);
       }
     }
-    for(size_t i: pos){
-      setOperandRandomValue(inst,i);
+    for (size_t i : pos) {
+      setOperandRandomValue(inst, i);
     }
     fixAllValues(vec);
   }
@@ -503,8 +513,8 @@ bool ModuleMutator::init() {
     if (!fit->isDeclaration() && !fit->getName().empty() &&
         !invalidFunctions.contains(fit->getName())) {
       if (FunctionMutator::canMutate(&*fit, filterSet)) {
-        functionMutants.push_back(
-            std::make_shared<FunctionMutator>(&*fit, vMap, filterSet, globals,debug));
+        functionMutants.push_back(std::make_shared<FunctionMutator>(
+            &*fit, vMap, filterSet, globals, debug));
       }
     }
   }
