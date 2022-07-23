@@ -2816,14 +2816,15 @@ void Return::print(ostream &os) const {
 
 static StateValue
 check_ret_attributes(State &s, StateValue &&sv, const Type &t,
-                     const FnAttrs &attrs) {
+                     const FnAttrs &attrs,
+                     const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = t.getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (agg->isPadding(i))
         continue;
-      vals.emplace_back(
-        check_ret_attributes(s, agg->extract(sv, i), agg->getChild(i), attrs));
+      vals.emplace_back(check_ret_attributes(s, agg->extract(sv, i),
+                                             agg->getChild(i), attrs, args));
     }
     return agg->aggregateVals(vals);
   }
@@ -2834,7 +2835,7 @@ check_ret_attributes(State &s, StateValue &&sv, const Type &t,
     sv.non_poison &= !p.isNocapture();
   }
 
-  return check_return_value(s, std::move(sv), t, attrs, {});
+  return check_return_value(s, std::move(sv), t, attrs, args);
 }
 
 static void eq_val_rec(State &s, const Type &t, const StateValue &a,
@@ -2860,7 +2861,13 @@ StateValue Return::toSMT(State &s) const {
     retval = s[*val];
 
   s.addUB(s.getMemory().checkNocapture());
-  retval = check_ret_attributes(s, std::move(retval), getType(), attrs);
+
+  vector<pair<Value*, ParamAttrs>> args;
+  for (auto &arg : s.getFn().getInputs()) {
+    args.emplace_back(const_cast<Value*>(&arg), ParamAttrs());
+  }
+
+  retval = check_ret_attributes(s, std::move(retval), getType(), attrs, args);
 
   if (attrs.has(FnAttrs::NoReturn))
     s.addUB(expr(false));

@@ -42,6 +42,9 @@ bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   switch (libfn) {
   case llvm::LibFunc_calloc:
+    attrs.allocsize_1 = 1;
+    [[fallthrough]];
+
   case llvm::LibFunc_malloc:
   case llvm::LibFunc_vec_calloc:
     ret_and_args_no_undef();
@@ -50,6 +53,8 @@ bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::WillReturn);
+    attrs.set(FnAttrs::AllocSize);
+    attrs.allocsize_0 = 0;
     RETURN_EXACT();
 
   case llvm::LibFunc_fwrite:
@@ -406,6 +411,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   if (!ty)
     RETURN_EXACT();
 
+  auto decl = i.getCalledFunction();
+
   // TODO: add support for checking mismatch of C vs C++ alloc fns
   if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
     // aligned malloc
@@ -422,11 +429,11 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     }
 
     // calloc
-    if (auto *init = llvm::getInitialValueOfAllocation(&i, &TLI, i.getType());
-        init && init->isNullValue())
+    if (decl && decl->getName() == "calloc") {
+
       RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1],
                                      std::move(attrs)));
-
+    }
     // malloc or new
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], std::move(attrs)));
@@ -445,7 +452,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_VAL(make_unique<Free>(*args[0]));
   }
 
-  auto decl = i.getCalledFunction();
   llvm::LibFunc libfn;
   if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
     RETURN_EXACT();
