@@ -117,19 +117,31 @@ version )EOF";
   return 0;
 }
 
-llvm::Constant* updateIntegerSize(llvm::ConstantInt* constInt,llvm::IntegerType* newTy){
+llvm::Constant* updateIntegerSize(llvm::Instruction* parent,llvm::ConstantInt* constInt,llvm::IntegerType* newTy){
   return llvm::ConstantInt::get(newTy,constInt->getValue());  
 }
 
-llvm::BinaryOperator* updateIntegerSize(llvm::BinaryOperator* oper, llvm::IntegerType* newTy){
+llvm::BinaryOperator* updateIntegerSize(llvm::Instruction* parent,llvm::BinaryOperator* oper, llvm::IntegerType* newTy){
   return nullptr;
 }
 
-llvm::Instruction* updateIntegerSize(llvm::Instruction* inst, llvm::IntegerType* newTy){
+llvm::Instruction* updateIntegerSize(llvm::Instruction* parent, llvm::Instruction* inst, llvm::IntegerType* newTy){
   return nullptr;
+}
+
+llvm::IntegerType* getNewIntegerTy(llvm::LLVMContext& context){
+  return llvm::IntegerType::get(context,1+Random::getRandomUnsigned()%128);
 }
 
 void handle(std::shared_ptr<llvm::Module> ptr) {
 
+  llvm::Function* func=ptr->getFunction("_Z3fn1s");
+  llvm::BasicBlock* block=&*func->begin();
+  auto iit=block->begin();
+  llvm::LLVMContext& context=ptr->getContext();
+  for(size_t i=0;i<7;++i,++iit);
+  //handle use-def chain
+  llvm::Value* val=updateIntegerSize(nullptr,&*iit,getNewIntegerTy(context));
+  //handle def-use chain
   
 }
