@@ -429,11 +429,10 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     }
 
     // calloc
-    if (decl && decl->getName() == "calloc") {
-
+    if (decl && decl->getName() == "calloc")
       RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1],
                                      std::move(attrs)));
-    }
+
     // malloc or new
     RETURN_VAL(
       make_unique<Malloc>(*ty, value_name(i), *args[0], std::move(attrs)));

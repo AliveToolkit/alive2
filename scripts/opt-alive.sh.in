@@ -28,9 +28,22 @@ done
 
 # opt enables NPM by default.
 NPM_TV=1
+SKIP_ARG=0
+
 for arg in $@; do
   # update the -passes argument only.
   shift
+
+  if [[ $SKIP_ARG == 1 ]]; then
+    SKIP_ARG=0
+    continue
+  fi
+
+  if [[ $arg == "-passes" || $arg == "--passes" ]]; then
+    arg="-passes=$1"
+    SKIP_ARG=1
+  fi
+
   if [[ $arg == "-passes="* || $arg == "--passes="* ]]; then
     TV=""
     passes=${arg/-*passes=/}
