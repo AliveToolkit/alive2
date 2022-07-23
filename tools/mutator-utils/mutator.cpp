@@ -224,12 +224,13 @@ void FunctionMutator::mutate() {
   if (debug) {
     print();
   }
+
   bool mutated = false, canMutate = false;
   do {
     for (size_t i = 0; i < helpers.size(); ++i) {
       if (helpers[i]->shouldMutate()) {
         canMutate = true;
-        if (true||Random::getRandomBool()) {
+        if (Random::getRandomBool()) {
           helpers[i]->mutate();
           mutated = true;
           if (debug) {
