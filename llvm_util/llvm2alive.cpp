@@ -1414,7 +1414,6 @@ public:
         attrs.set(FnAttrs::NoFree);
         break;
 
-
       case llvm::Attribute::AllocSize: {
         attrs.set(FnAttrs::AllocSize);
         auto args = llvmattr.getAllocSizeArgs();
