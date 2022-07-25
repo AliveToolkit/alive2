@@ -13,12 +13,14 @@
 #include "llvm/ADT/Any.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -81,6 +83,8 @@ bool has_failure = false;
 bool is_clangtv = false;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
+std::unique_ptr<llvm::Module> MClone;
+string pass_name;
 
 void sigalarm_handler(int) {
   parallelMgr->finishChild(/*is_timeout=*/true);
@@ -108,6 +112,29 @@ static void showStats() {
     IR::Memory::printAliasStats(*out);
 }
 
+static void writeBitcodeAtomically(const fs::path report_filename) {
+  assert(!report_filename.empty());
+  fs::path tmp_path;
+  do {
+    auto newname = report_filename.stem();
+    newname += "_tmp_" + get_random_str(8) + ".bc";
+    tmp_path.replace_filename(newname);
+  } while (fs::exists(tmp_path));
+  std::error_code EC;
+  llvm::raw_fd_ostream tmp_file(tmp_path.string(), EC);
+  if (EC) {
+    cerr << "Alive2: Couldn't open temporary bitcode file" << endl;
+    exit(1);
+  }
+  llvm::WriteBitcodeToFile(*MClone, tmp_file);
+  tmp_file.close();
+
+  fs::path bc_filename = report_filename;
+  bc_filename.replace_extension(".bc");
+  std::rename(tmp_path.c_str(), bc_filename.c_str());
+  *out << "Wrote bitcode to: " << bc_filename << "\n";
+}
+
 static void emitCommandLine(ostream *out) {
 #ifdef __linux__
   ifstream cmd_args("/proc/self/cmdline");
@@ -118,7 +145,7 @@ static void emitCommandLine(ostream *out) {
   std::string arg;
   while (std::getline(cmd_args, arg, '\0'))
     *out << " '" << arg << "'";
-  *out << "\n\n";
+  *out << "\n";
 #endif
 }
 
@@ -276,12 +303,19 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
 
     if (Errors errs = verifier.verify()) {
-      *out << "Transformation doesn't verify!\n" << errs << endl;
-      has_failure |= errs.isUnsound();
+      *out << "Transformation doesn't verify!" <<
+        (errs.isUnsound() ? " (unsound)" : " (not unsound)") <<
+        "\n" << errs;
+      if (errs.isUnsound()) {
+        has_failure = true;
+        *out << "Pass: " << pass_name << "\n";
+        emitCommandLine(out);
+        if (MClone)
+          writeBitcodeAtomically(report_filename);
+        *out << "\n";
+      }
       if (opt_error_fatal && has_failure)
         finalize();
-      if (errs.isUnsound())
-        emitCommandLine(out);
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -349,6 +383,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
   }
 
   static void finalize() {
+    MClone = nullptr;
     if (parallelMgr) {
       parallelMgr->finishParent();
       out = out_file.is_open() ? &out_file : &cout;
@@ -439,7 +474,6 @@ bool do_skip(const llvm::StringRef &pass0) {
 
 
 struct TVPass : public llvm::PassInfoMixin<TVPass> {
-  static string pass_name;
   static string batched_pass_begin_name;
   static bool batch_started;
   // # of run passes when batching is enabled
@@ -539,7 +573,6 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
   }
 };
 
-string TVPass::pass_name;
 string TVPass::batched_pass_begin_name;
 bool TVPass::batch_started;
 unsigned TVPass::batched_pass_count;
@@ -616,16 +649,19 @@ llvmGetPassPluginInfo() {
             return;
 
           // Run only when it is at the boundary
-          bool is_first = TVPass::pass_name.empty();
-          bool do_start = !TVPass::batch_started && do_skip(TVPass::pass_name)
+          bool is_first = pass_name.empty();
+          bool do_start = !TVPass::batch_started && do_skip(pass_name)
               && !do_skip(P);
-          bool do_finish = TVPass::batch_started && !do_skip(TVPass::pass_name)
+          bool do_finish = TVPass::batch_started && !do_skip(pass_name)
               && do_skip(P);
 
           if (do_start)
-            TVPass::batched_pass_begin_name = TVPass::pass_name;
+            TVPass::batched_pass_begin_name = pass_name;
           else if (is_first)
             TVPass::batched_pass_begin_name = "beginning";
+
+          if ((is_first || do_start) && opt_save_ir && !report_filename.empty())
+              MClone = llvm::CloneModule(*unwrapModule(IR));
 
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
@@ -633,15 +669,20 @@ llvmGetPassPluginInfo() {
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback([&](
             llvm::StringRef P, llvm::Any, const llvm::PreservedAnalyses &) {
           TVPass::batched_pass_count++;
-          TVPass::pass_name = P.str();
+          pass_name = P.str();
         });
 
       } else {
         // For non-batched clang tv, manually run TVPass after each pass
+        PB.getPassInstrumentationCallbacks()->registerBeforeNonSkippedPassCallback(
+            [](llvm::StringRef P, llvm::Any IR) {
+              if (opt_save_ir && !report_filename.empty())
+                MClone = llvm::CloneModule(*unwrapModule(IR));
+        });
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
             [](llvm::StringRef P, llvm::Any IR,
                     const llvm::PreservedAnalyses &PA) {
-          TVPass::pass_name = P.str();
+          pass_name = P.str();
           if (!is_clangtv || is_clangtv_done)
             return;
 
