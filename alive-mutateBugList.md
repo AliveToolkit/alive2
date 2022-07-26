@@ -8,7 +8,7 @@ This category is for bugs that generating wrong codes from passes
 6. arm64 miscompile due to global isel (https://github.com/llvm/llvm-project/issues/55129)
 7. arm64, x86, and x86-64 miscompile from undef and urem (https://github.com/llvm/llvm-project/issues/55271)
 8. or+and miscompile with global isel on arm64 (https://github.com/llvm/llvm-project/issues/55284)
-9. [Open] urem+udiv miscompile with global isel on arm64(https://github.com/llvm/llvm-project/issues/55287)
+9. urem+udiv miscompile with global isel on arm64(https://github.com/llvm/llvm-project/issues/55287)
 10. fshl-related miscompile by arm64 and x86-64 backends(https://github.com/llvm/llvm-project/issues/55296)
 11. arm64 miscompile (https://github.com/llvm/llvm-project/issues/55342)
 12. miscompile from multiple backends (https://github.com/llvm/llvm-project/issues/55484)
