@@ -627,11 +627,13 @@ void FunctionAttributeHelper::mutate() {
   updated = true;
   llvm::Function *func = mutator->currentFunction;
   setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
-  setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
-  setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
-  setFuncRetAttr(Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
-                                         : llvm::Attribute::AttrKind::SExt,
-                 Random::getRandomBool());
+  if(func->getReturnType()->isIntegerTy()){
+    setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
+    setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
+    setFuncRetAttr(Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
+                                          : llvm::Attribute::AttrKind::SExt,
+                  Random::getRandomBool());
+  }
   for (size_t index : ptrPos) {
     setFuncParamAttr(index, llvm::Attribute::AttrKind::NoCapture,
                      Random::getRandomBool());
