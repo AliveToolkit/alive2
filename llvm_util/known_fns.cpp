@@ -40,21 +40,58 @@ bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     }
   };
 
-  switch (libfn) {
-  case llvm::LibFunc_calloc:
-    attrs.allocsize_1 = 1;
-    [[fallthrough]];
-
-  case llvm::LibFunc_malloc:
-  case llvm::LibFunc_vec_calloc:
+  auto alloc_fns = [&]() {
     ret_and_args_no_undef();
     attrs.set(FnAttrs::InaccessibleMemOnly);
     attrs.set(FnAttrs::NoAlias);
     attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::WillReturn);
     attrs.set(FnAttrs::AllocSize);
     attrs.allocsize_0 = 0;
+  };
+
+  switch (libfn) {
+  case llvm::LibFunc_malloc:
+    alloc_fns();
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocfamily = "malloc";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Uninitialized);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_calloc:
+    alloc_fns();
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocsize_1 = 1;
+    attrs.allocfamily = "malloc";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Zeroed);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_realloc:
+    alloc_fns();
+    attrs.allocfamily = "malloc";
+    attrs.add(AllocKind::Realloc);
+    attrs.add(AllocKind::Uninitialized);
+    set_param(0, ParamAttrs::AllocPtr);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_free:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::InaccessibleMemOnly);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::WillReturn);
+    attrs.allocfamily = "malloc";
+    attrs.add(AllocKind::Free);
+    set_param(0, ParamAttrs::AllocPtr);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_Znwm:
+    alloc_fns();
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocfamily = "_Znwm";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Uninitialized);
     RETURN_EXACT();
 
   case llvm::LibFunc_fwrite:
@@ -412,45 +449,6 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_EXACT();
 
   auto decl = i.getCalledFunction();
-
-  // TODO: add support for checking mismatch of C vs C++ alloc fns
-  if (llvm::isMallocOrCallocLikeFn(&i, &TLI)) {
-    // aligned malloc
-    if (auto *algn = llvm::getAllocAlignment(&i, &TLI)) {
-      if (auto algnint = dyn_cast<llvm::ConstantInt>(algn)) {
-        attrs.align = algnint->getZExtValue();
-        attrs.allocsize_0 = 0;
-        RETURN_VAL(
-          make_unique<Malloc>(*ty, value_name(i), *args[1], std::move(attrs)));
-      } else {
-        // TODO: add support for non-const alignments
-        RETURN_APPROX();
-      }
-    }
-
-    // calloc
-    if (decl && decl->getName() == "calloc")
-      RETURN_VAL(make_unique<Calloc>(*ty, value_name(i), *args[0], *args[1],
-                                     std::move(attrs)));
-
-    // malloc or new
-    RETURN_VAL(
-      make_unique<Malloc>(*ty, value_name(i), *args[0], std::move(attrs)));
-  }
-  if (llvm::getReallocatedOperand(&i, &TLI)) {
-    // TODO: allow other args
-    RETURN_VAL(make_unique<Malloc>(*ty, value_name(i), *args[0], *args[1],
-                                   std::move(attrs)));
-  }
-  if (llvm::getFreedOperand(&i, &TLI)) {
-    if (i.hasFnAttr(llvm::Attribute::NoFree)) {
-      auto zero = make_intconst(0, 1);
-      RETURN_VAL(make_unique<Assume>(*zero, Assume::AndNonPoison));
-    }
-    // TODO: allow other args
-    RETURN_VAL(make_unique<Free>(*args[0]));
-  }
-
   llvm::LibFunc libfn;
   if (!decl || !TLI.getLibFunc(*decl, libfn) || !TLI.has(libfn))
     RETURN_EXACT();

@@ -6,6 +6,7 @@
 #include "smt/exprs.h"
 #include <optional>
 #include <ostream>
+#include <string>
 #include <vector>
 
 namespace IR {
@@ -23,7 +24,8 @@ public:
   enum Attribute { None = 0, NonNull = 1<<0, ByVal = 1<<1, NoCapture = 1<<2,
                    NoRead = 1<<3, NoWrite = 1<<4, Dereferenceable = 1<<5,
                    NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8,
-                   NoAlias = 1<<9, DereferenceableOrNull = 1<<10 };
+                   NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
+                   AllocPtr = 1<<11, AllocAlign = 1<<12 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -47,8 +49,7 @@ public:
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 
   // Encodes the semantics of attributes using UB and poison.
-  std::pair<smt::AndExpr, smt::expr>
-      encode(const State &s, const StateValue &val, const Type &ty) const;
+  StateValue encode(State &s, StateValue &&val, const Type &ty) const;
 };
 
 struct FPDenormalAttrs {
@@ -60,10 +61,20 @@ struct FPDenormalAttrs {
   auto operator<=>(const FPDenormalAttrs &rhs) const = default;
 };
 
+enum class AllocKind {
+  Alloc         = 1 << 0,
+  Realloc       = 1 << 1,
+  Free          = 1 << 2,
+  Uninitialized = 1 << 3,
+  Zeroed        = 1 << 4,
+  Aligned       = 1 << 5
+};
+
 class FnAttrs final {
   FPDenormalAttrs fp_denormal;
   std::optional<FPDenormalAttrs> fp_denormal32;
   unsigned bits;
+  uint8_t allockind = 0;
 
 public:
   enum Attribute { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1,
@@ -88,6 +99,15 @@ public:
   unsigned allocsize_0;
   unsigned allocsize_1 = -1u;
 
+  std::string allocfamily;
+
+  void add(AllocKind k) { allockind |= (uint8_t)k; }
+  bool has(AllocKind k) const { return allockind & (uint8_t)k; }
+
+  std::pair<smt::expr,smt::expr>
+  computeAllocSize(State &s,
+                   const std::vector<std::pair<Value*, ParamAttrs>> &args) const;
+
   bool isNonNull() const;
 
   // Returns true if returning poison or an aggregate having a poison is UB
@@ -102,9 +122,8 @@ public:
   bool refinedBy(const FnAttrs &other) const;
 
   // Encodes the semantics of attributes using UB and poison.
-  std::pair<smt::AndExpr, smt::expr>
-      encode(State &s, const StateValue &val, const Type &ty,
-             const std::vector<std::pair<Value*, ParamAttrs>> &args) const;
+  StateValue encode(State &s, StateValue &&val, const Type &ty,
+                    const smt::expr &allocsize) const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };

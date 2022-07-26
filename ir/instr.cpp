@@ -23,7 +23,7 @@ using namespace std;
 #define DEFINE_AS_RETZERO(cls, method) \
   uint64_t cls::method() const { return 0; }
 #define DEFINE_AS_RETZEROALIGN(cls, method) \
-  pair<uint64_t, unsigned> cls::method() const { return { 0, 1 }; }
+  pair<uint64_t, uint64_t> cls::method() const { return { 0, 1 }; }
 #define DEFINE_AS_RETFALSE(cls, method) \
   bool cls::method() const { return false; }
 #define DEFINE_AS_EMPTYACCESS(cls) \
@@ -1980,11 +1980,29 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
   return ret;
 }
 
-DEFINE_AS_RETZEROALIGN(FnCall, getMaxAllocSize);
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
 
+pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
+  if (!hasAttribute(FnAttrs::AllocSize))
+    return { 0, 1 };
+
+  if (auto sz = getInt(*args[attrs.allocsize_0].first)) {
+    if (attrs.allocsize_1 == -1u)
+      return { *sz, getAlign() };
+
+    if (auto n = getInt(*args[attrs.allocsize_1].first))
+      return { mul_saturate(*sz, *n), getAlign() };
+  }
+  return { UINT64_MAX, getAlign() };
+}
+
 bool FnCall::canFree() const {
-  return !getAttributes().has(FnAttrs::NoFree);
+  return !hasAttribute(FnAttrs::NoFree);
+}
+
+uint64_t FnCall::getAlign() const {
+  // FIXME: needs to query allocalign param attr
+  return attrs.align ? attrs.align : heap_block_alignment;
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -2002,6 +2020,19 @@ uint64_t FnCall::getMaxAccessSize() const {
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
+  /* TODO: update to consider alloc function. e.g. old code:
+  DEFINE_AS_EMPTYACCESS(Malloc);
+
+  Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
+  auto info = ByteAccessInfo::intOnly(1);
+  if (auto n = getInt(*num))
+    if (auto sz = getInt(*size)) {
+      info.byteSize = gcd(getAlign(), *n * *sz);
+    }
+  return info;
+}
+  */
+
   // If bytesize is zero, this call does not participate in byte encoding.
   uint64_t bytesize = 0;
 
@@ -2105,6 +2136,29 @@ static expr ptr_only_args(State &s, const Pointer &p) {
   return e();
 }
 
+static void check_can_load(State &s, const expr &p0) {
+  auto &attrs = s.getFn().getFnAttrs();
+  Pointer p(s.getMemory(), p0);
+
+  if (attrs.has(FnAttrs::NoRead))
+    s.addUB(p.isLocal() || p.isConstGlobal());
+  else if (attrs.has(FnAttrs::ArgMemOnly))
+    s.addUB(p.isLocal() || ptr_only_args(s, p));
+}
+
+static void check_can_store(State &s, const expr &p0) {
+  if (s.isInitializationPhase())
+    return;
+
+  auto &attrs = s.getFn().getFnAttrs();
+  Pointer p(s.getMemory(), p0);
+
+  if (attrs.has(FnAttrs::NoWrite))
+    s.addUB(p.isLocal());
+  else if (attrs.has(FnAttrs::ArgMemOnly))
+    s.addUB(p.isLocal() || ptr_only_args(s, p));
+}
+
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag, bool argmemonly,
                           StateValue value, StateValue value2,
@@ -2120,9 +2174,7 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   }
 
   auto unpack = [&](StateValue &&value) {
-    auto [UB, new_non_poison] = argflag.encode(s, value, ty);
-    s.addUB(std::move(UB));
-    value.non_poison = std::move(new_non_poison);
+    value = argflag.encode(s, std::move(value), ty);
 
     if (ty.isPtrType()) {
       if (argmemonly)
@@ -2159,9 +2211,9 @@ static StateValue
 check_return_value(State &s, StateValue &&val, const Type &ty,
                    const FnAttrs &attrs,
                    const vector<pair<Value*, ParamAttrs>> &args) {
-  auto [UB, new_non_poison] = attrs.encode(s, val, ty, args);
-  s.addUB(std::move(UB));
-  return { std::move(val.value), std::move(new_non_poison) };
+  auto [allocsize, np] = attrs.computeAllocSize(s, args);
+  s.addUB(std::move(np));
+  return attrs.encode(s, std::move(val), ty, allocsize);
 }
 
 static StateValue
@@ -2183,6 +2235,8 @@ pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
 StateValue FnCall::toSMT(State &s) const {
   if (approx)
     s.doesApproximation("Unknown libcall: " + fnName);
+
+  auto &m = s.getMemory();
 
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
@@ -2226,7 +2280,7 @@ StateValue FnCall::toSMT(State &s) const {
     if (argmemonly_call) {
       for (auto &p : ptr_inputs) {
         if (!p.byval) {
-          Pointer ptr(s.getMemory(), p.val.value);
+          Pointer ptr(m, p.val.value);
           s.addUB(p.val.non_poison.implies(
                     ptr.isLocal() || ptr.isConstGlobal()));
         }
@@ -2238,7 +2292,6 @@ StateValue FnCall::toSMT(State &s) const {
 
   check_implies(FnAttrs::NoRead);
   check_implies(FnAttrs::NoWrite);
-  check_implies(FnAttrs::NoFree);
 
   // Check attributes that calles must have if caller has them
   if (check(FnAttrs::ArgMemOnly) ||
@@ -2250,6 +2303,70 @@ StateValue FnCall::toSMT(State &s) const {
   // can't have both!
   if (attrs.has(FnAttrs::ArgMemOnly) && attrs.has(FnAttrs::InaccessibleMemOnly))
     s.addUB(expr(false));
+
+  auto get_alloc_ptr = [&]() -> Value& {
+    for (auto &[arg, flags] : args) {
+      if (flags.has(ParamAttrs::AllocPtr))
+        return *arg;
+    }
+    UNREACHABLE();
+  };
+
+  if (attrs.has(AllocKind::Alloc) || attrs.has(AllocKind::Realloc)) {
+    auto [size, np_size] = attrs.computeAllocSize(s, args);
+    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    // FIXME: alloc-family below
+    auto [p_new, allocated]
+      = m.alloc(size, getAlign(), Memory::MALLOC, np_size, nonnull);
+
+    expr nullp = Pointer::mkNullPointer(m)();
+    expr ret = expr::mkIf(allocated, p_new, nullp);
+
+    if (attrs.isNonNull()) {
+      // TODO: In C++ we need to throw an exception if the allocation fails.
+      s.addPre(std::move(allocated));
+      allocated = true;
+      ret = p_new;
+    }
+
+    if (attrs.has(AllocKind::Realloc)) {
+      auto &[allocptr, np_ptr] = s.getAndAddUndefs(get_alloc_ptr());
+      s.addUB(np_ptr);
+
+      check_can_store(s, allocptr);
+
+      Pointer ptr_old(m, allocptr);
+      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
+        s.addUB(ptr_old.isNull() || ptr_old.isLocal());
+
+      m.copy(ptr_old, Pointer(m, p_new));
+
+      // 1) realloc(ptr, 0) always free the ptr.
+      // 2) If allocation failed, we should not free previous ptr.
+      m.free(expr::mkIf(size == 0 || allocated, allocptr, nullp), false);
+    }
+
+    // FIXME: for a realloc that zeroes the new stuff
+    if (attrs.has(AllocKind::Zeroed))
+      m.memset(p_new, { expr::mkUInt(0, 8), true }, size, getAlign(), {},
+               false);
+
+    assert(getType().isPtrType());
+    return attrs.encode(s, {std::move(ret), true}, getType(), size);
+  }
+  else if (attrs.has(AllocKind::Free)) {
+    auto &allocptr = s.getAndAddPoisonUB(get_alloc_ptr()).value;
+    m.free(allocptr, false);
+
+    if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
+      Pointer ptr(m, allocptr);
+      s.addUB(ptr.isNull() || ptr.isLocal());
+    }
+    assert(isVoid());
+    return {};
+  }
+
+  check_implies(FnAttrs::NoFree);
 
   unsigned idx = 0;
   auto ret = s.addFnCall(fnName_mangled.str(), std::move(inputs),
@@ -3023,36 +3140,12 @@ MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
 }
 
 
-static void check_can_load(State &s, const expr &p0) {
-  auto &attrs = s.getFn().getFnAttrs();
-  Pointer p(s.getMemory(), p0);
-
-  if (attrs.has(FnAttrs::NoRead))
-    s.addUB(p.isLocal() || p.isConstGlobal());
-  else if (attrs.has(FnAttrs::ArgMemOnly))
-    s.addUB(p.isLocal() || ptr_only_args(s, p));
-}
-
-static void check_can_store(State &s, const expr &p0) {
-  if (s.isInitializationPhase())
-    return;
-
-  auto &attrs = s.getFn().getFnAttrs();
-  Pointer p(s.getMemory(), p0);
-
-  if (attrs.has(FnAttrs::NoWrite))
-    s.addUB(p.isLocal());
-  else if (attrs.has(FnAttrs::ArgMemOnly))
-    s.addUB(p.isLocal() || ptr_only_args(s, p));
-}
-
-
 DEFINE_AS_RETZERO(Alloc, getMaxAccessSize);
 DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Alloc);
 DEFINE_AS_RETFALSE(Alloc, canFree);
 
-pair<uint64_t, unsigned> Alloc::getMaxAllocSize() const {
+pair<uint64_t, uint64_t> Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
     if (*bytes && mul) {
       if (auto n = getInt(*mul))
@@ -3122,167 +3215,6 @@ unique_ptr<Instr> Alloc::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(Malloc, getMaxAccessSize);
-DEFINE_AS_RETZERO(Malloc, getMaxGEPOffset);
-DEFINE_AS_EMPTYACCESS(Malloc);
-
-pair<uint64_t, unsigned> Malloc::getMaxAllocSize() const {
-  return { getIntOr(*size, UINT64_MAX), getAlign() };
-}
-
-bool Malloc::canFree() const {
-  return ptr != nullptr;
-}
-
-uint64_t Malloc::getAlign() const {
-  return attrs.align ? attrs.align : heap_block_alignment;
-}
-
-vector<Value*> Malloc::operands() const {
-  if (!ptr)
-    return { size };
-  else
-    return { ptr, size };
-}
-
-void Malloc::rauw(const Value &what, Value &with) {
-  RAUW(size);
-  RAUW(ptr);
-}
-
-void Malloc::print(ostream &os) const {
-  os << getName();
-  if (!ptr)
-    os << " = malloc ";
-  else
-    os << " = realloc " << *ptr << ", ";
-  os << *size << ',' << attrs;
-}
-
-StateValue Malloc::toSMT(State &s) const {
-  auto &m = s.getMemory();
-  auto &[sz, np_size] = s.getAndAddPoisonUB(*size, true);
-
-  expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto [p_new, allocated]
-    = m.alloc(sz, getAlign(), Memory::MALLOC, np_size, nonnull);
-
-  expr nullp = Pointer::mkNullPointer(m)();
-  expr ret = expr::mkIf(allocated, p_new, nullp);
-
-  if (attrs.isNonNull()) {
-    // TODO: In C++ we need to throw an exception if the allocation fails.
-    s.addPre(std::move(allocated));
-    allocated = true;
-    ret = p_new;
-  }
-
-  if (ptr) {
-    auto &[p, np_ptr] = s.getAndAddUndefs(*ptr);
-    s.addUB(np_ptr);
-    check_can_store(s, p);
-
-    Pointer ptr_old(m, p);
-    if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
-      s.addUB(ptr_old.isNull() || ptr_old.isLocal());
-
-    m.copy(ptr_old, Pointer(m, p_new));
-
-    // 1) realloc(ptr, 0) always free the ptr.
-    // 2) If allocation failed, we should not free previous ptr.
-    m.free(expr::mkIf(sz == 0 || allocated, p, nullp), false);
-  }
-  return { std::move(ret), true };
-}
-
-expr Malloc::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforcePtrType() &&
-         size->getType().enforceIntType() &&
-         (ptr ? ptr->getType().enforcePtrType() : true);
-}
-
-unique_ptr<Instr> Malloc::dup(Function &f, const string &suffix) const {
-  return ptr
-    ? make_unique<Malloc>(getType(), getName() + suffix, *ptr, *size,
-                          FnAttrs(attrs))
-    : make_unique<Malloc>(getType(), getName() + suffix, *size, FnAttrs(attrs));
-}
-
-
-DEFINE_AS_RETZERO(Calloc, getMaxAccessSize);
-DEFINE_AS_RETZERO(Calloc, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Calloc, canFree);
-
-pair<uint64_t, unsigned> Calloc::getMaxAllocSize() const {
-  if (auto sz = getInt(*size)) {
-    if (auto n = getInt(*num))
-      return { *sz * *n, getAlign() };
-  }
-  return { UINT64_MAX, getAlign() };
-}
-
-Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
-  auto info = ByteAccessInfo::intOnly(1);
-  if (auto n = getInt(*num))
-    if (auto sz = getInt(*size)) {
-      info.byteSize = gcd(getAlign(), *n * *sz);
-    }
-  return info;
-}
-
-uint64_t Calloc::getAlign() const {
-  return attrs.align ? attrs.align : heap_block_alignment;
-}
-
-vector<Value*> Calloc::operands() const {
-  return { num, size };
-}
-
-void Calloc::rauw(const Value &what, Value &with) {
-  RAUW(num);
-  RAUW(size);
-}
-
-void Calloc::print(ostream &os) const {
-  os << getName() << " = calloc " << *num << ", " << *size << ',' << attrs;
-}
-
-StateValue Calloc::toSMT(State &s) const {
-  auto &[nm, np_num] = s.getAndAddPoisonUB(*num, true);
-  auto &[sz, np_sz] = s.getAndAddPoisonUB(*size, true);
-
-  auto np = np_num && np_sz;
-  expr size = nm * sz;
-  expr nonnull = expr::mkBoolVar("malloc_never_fails");
-  auto &m = s.getMemory();
-  auto [p, allocated] = m.alloc(size, getAlign(), Memory::MALLOC,
-                                np && nm.mul_no_uoverflow(sz), nonnull);
-
-  if (attrs.isNonNull()) {
-    s.addPre(std::move(allocated));
-    allocated = true;
-  }
-
-  m.memset(p, { expr::mkUInt(0, 8), true }, size, getAlign(), {}, false);
-
-  return { expr::mkIf(allocated, p, Pointer::mkNullPointer(m)()), true };
-}
-
-expr Calloc::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforcePtrType() &&
-         num->getType().enforceIntType() &&
-         size->getType().enforceIntType() &&
-         num->getType() == size->getType();
-}
-
-unique_ptr<Instr> Calloc::dup(Function &f, const string &suffix) const {
-  return make_unique<Calloc>(getType(), getName() + suffix, *num, *size,
-                             FnAttrs(attrs));
-}
-
-
 DEFINE_AS_RETZEROALIGN(StartLifetime, getMaxAllocSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset);
@@ -3316,46 +3248,39 @@ unique_ptr<Instr> StartLifetime::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Free, getMaxAllocSize);
-DEFINE_AS_RETZERO(Free, getMaxAccessSize);
-DEFINE_AS_RETZERO(Free, getMaxGEPOffset);
-DEFINE_AS_EMPTYACCESS(Free);
+DEFINE_AS_RETZEROALIGN(EndLifetime, getMaxAllocSize);
+DEFINE_AS_RETZERO(EndLifetime, getMaxAccessSize);
+DEFINE_AS_RETZERO(EndLifetime, getMaxGEPOffset);
+DEFINE_AS_EMPTYACCESS(EndLifetime);
 
-vector<Value*> Free::operands() const {
+vector<Value*> EndLifetime::operands() const {
   return { ptr };
 }
 
-bool Free::canFree() const {
+bool EndLifetime::canFree() const {
   return true;
 }
 
-void Free::rauw(const Value &what, Value &with) {
+void EndLifetime::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
 
-void Free::print(ostream &os) const {
-  os << "free " << *ptr << (heaponly ? "" : " unconstrained");
+void EndLifetime::print(ostream &os) const {
+  os << "start_lifetime " << *ptr;
 }
 
-StateValue Free::toSMT(State &s) const {
+StateValue EndLifetime::toSMT(State &s) const {
   auto &p = s.getAndAddPoisonUB(*ptr, true).value;
-  // If not heaponly, don't encode constraints
-  s.getMemory().free(p, !heaponly);
-
-  if (s.getFn().getFnAttrs().has(FnAttrs::NoFree) && heaponly) {
-    Pointer ptr(s.getMemory(), p);
-    s.addUB(ptr.isNull() || ptr.isLocal());
-  }
-
+  s.getMemory().free(p, true);
   return {};
 }
 
-expr Free::getTypeConstraints(const Function &f) const {
+expr EndLifetime::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> Free::dup(Function &f, const string &suffix) const {
-  return make_unique<Free>(*ptr, heaponly);
+unique_ptr<Instr> EndLifetime::dup(Function &f, const string &suffix) const {
+  return make_unique<EndLifetime>(*ptr);
 }
 
 

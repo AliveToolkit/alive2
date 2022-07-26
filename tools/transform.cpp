@@ -579,9 +579,10 @@ static bool returns_local(const Value &v) {
   if (auto call = dynamic_cast<const FnCall*>(&v))
     return call->getAttributes().has(FnAttrs::NoAlias);
 
-  return dynamic_cast<const Alloc*>(&v) ||
+// FIXME
+  return dynamic_cast<const Alloc*>(&v) /*||
          dynamic_cast<const Malloc*>(&v) ||
-         dynamic_cast<const Calloc*>(&v);
+         dynamic_cast<const Calloc*>(&v)*/;
 }
 
 static Value *get_base_ptr(Value *ptr) {
@@ -934,8 +935,9 @@ static void calculateAndInitConstants(Transform &t) {
           has_alloca = true;
           has_dead_allocas |= alloc->initDead();
         } else {
-          has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
-                        dynamic_cast<const Calloc*>(&i) != nullptr;
+          // FIXME
+       //   has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
+         //               dynamic_cast<const Calloc*>(&i) != nullptr;
         }
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||

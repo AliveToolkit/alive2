@@ -675,9 +675,9 @@ public:
     if (llvm::all_of(Objs, [this](const llvm::Value *V) {
         // Stack coloring algorithm doesn't assign slots for global variables
         // or objects passed as pointer arguments
-        return llvm::isa<llvm::Argument>(V) ||
-               llvm::isa<llvm::GlobalVariable>(V) ||
-               llvm::isAllocLikeFn(V, &TLI); }))
+        return llvm::isa<llvm::Argument,
+                         llvm::GlobalVariable,
+                         llvm::CallInst>(V); }))
       return LIFETIME_FILLPOISON;
 
     Objs.clear();
@@ -1065,7 +1065,7 @@ public:
         BB->addInstr(make_unique<StartLifetime>(*b));
         RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
       case LIFETIME_FREE:
-        RETURN_IDENTIFIER(make_unique<Free>(*b, false));
+        RETURN_IDENTIFIER(make_unique<EndLifetime>(*b));
       case LIFETIME_FILLPOISON:
         RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
       case LIFETIME_NOP:
@@ -1080,7 +1080,8 @@ public:
       attrs.set(FnAttrs::InaccessibleMemOnly);
       attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
-      return make_unique<FnCall>(Type::voidTy, "", "#sideeffect", std::move(attrs));
+      return
+        make_unique<FnCall>(Type::voidTy, "", "#sideeffect", std::move(attrs));
     }
     case llvm::Intrinsic::trap: {
       FnAttrs attrs;
@@ -1308,6 +1309,14 @@ public:
         attrs.set(ParamAttrs::Returned);
         break;
 
+      case llvm::Attribute::AllocatedPointer:
+        attrs.set(ParamAttrs::AllocPtr);
+        break;
+
+      case llvm::Attribute::AllocAlign:
+        attrs.set(ParamAttrs::AllocAlign);
+        break;
+
       default:
         // If it is call site, it should be added at approximation list
         if (!is_callsite)
@@ -1379,6 +1388,8 @@ public:
           attrs.setFPDenormal(parse_fp_denormal(val));
         } else if (str == "denormal-fp-math-f32") {
           attrs.setFPDenormal(parse_fp_denormal(val), 32);
+        } else if (str == "alloc-family") {
+          attrs.allocfamily = val;
         }
       }
 

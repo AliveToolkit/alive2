@@ -228,8 +228,6 @@ space+ {
 "noreturn" { return NORETURN; }
 "willreturn" { return WILLRETURN; }
 "freeze" { return FREEZE; }
-"malloc" { return MALLOC; }
-"free" { return FREE; }
 "fshl" { return FSHL; }
 "fshr" { return FSHR; }
 "smul_fix" { return SMULFIX; }

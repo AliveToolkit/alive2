@@ -380,10 +380,9 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
   return e;
 }
 
-StateValue* State::no_more_tmp_slots() {
-  if (i_tmp_values < tmp_values.size())
-    return nullptr;
-  throw AliveException("Too many temporaries", false);
+void State::check_enough_tmp_slots() {
+  if (i_tmp_values >= tmp_values.size())
+    throw AliveException("Too many temporaries", false);
 }
 
 const StateValue& State::operator[](const Value &val) {
@@ -399,9 +398,7 @@ const StateValue& State::operator[](const Value &val) {
       return sv0;
 
     if (use_new_slot) {
-      if (auto ret = no_more_tmp_slots())
-        return *ret;
-      assert(i_tmp_values < tmp_values.size());
+      check_enough_tmp_slots();
       tmp_values[i_tmp_values++] = sv0;
     }
     assert(i_tmp_values > 0);
@@ -449,10 +446,8 @@ const StateValue& State::operator[](const Value &val) {
     undef_vars.emplace(std::move(p.second));
   }
 
-  if (auto ret = no_more_tmp_slots())
-    return *ret;
+  check_enough_tmp_slots();
 
-  assert(i_tmp_values < tmp_values.size());
   tmp_values[i_tmp_values++] = std::move(sval_new);
   return simplify(tmp_values[i_tmp_values - 1], false);
 }
@@ -528,10 +523,8 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     addUB(not_poison_except_padding(val.getType(), sv.non_poison));
   }
 
-  if (auto ret = no_more_tmp_slots())
-    return *ret;
+  check_enough_tmp_slots();
 
-  assert(i_tmp_values < tmp_values.size());
   return tmp_values[i_tmp_values++] = { std::move(v),
            sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
 }
