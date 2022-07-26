@@ -594,6 +594,8 @@ void FunctionAttributeHelper::init() {
   for (auto ait = func->arg_begin(); ait != func->arg_end(); ait++, index++) {
     if (ait->getType()->isPointerTy()) {
       ptrPos.push_back(index);
+    } else if (ait->getType()->isIntegerTy()) {
+      intPos.push_back(index);
     }
   }
 }
@@ -613,10 +615,23 @@ void FunctionAttributeHelper::init() {
     func->addParamAttr(index, attrName);                                       \
   }
 
+#define setFuncRetAttr(attrName, value)                                        \
+  if (func->hasRetAttribute(attrName)) {                                       \
+    func->removeRetAttr(attrName);                                             \
+  }                                                                            \
+  if (value) {                                                                 \
+    func->addRetAttr(attrName);                                                \
+  }
+
 void FunctionAttributeHelper::mutate() {
   updated = true;
   llvm::Function *func = mutator->currentFunction;
   setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
+  setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
+  setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
+  setFuncRetAttr(Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
+                                         : llvm::Attribute::AttrKind::SExt,
+                 Random::getRandomBool());
   for (size_t index : ptrPos) {
     setFuncParamAttr(index, llvm::Attribute::AttrKind::NoCapture,
                      Random::getRandomBool());
@@ -624,10 +639,19 @@ void FunctionAttributeHelper::mutate() {
     func->addDereferenceableParamAttr(index,
                                       1 << (Random::getRandomUnsigned() % 4));
   }
+  for (size_t index : intPos) {
+    setFuncParamAttr(index, llvm::Attribute::AttrKind::ZExt, false);
+    setFuncParamAttr(index, llvm::Attribute::AttrKind::SExt, false);
+    setFuncParamAttr(index,
+                     Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
+                                             : llvm::Attribute::AttrKind::SExt,
+                     Random::getRandomBool());
+  }
 }
 
 #undef setFuncAttr
 #undef setFuncParamAttr
+#undef setFuncRetAttr
 
 void FunctionAttributeHelper::debug() {
   llvm::errs() << "FunctionAttributeHelper: Function attributes updated\n";

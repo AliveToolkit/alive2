@@ -233,7 +233,7 @@ public:
 
 class FunctionAttributeHelper : public MutationHelper {
   bool updated;
-  llvm::SmallVector<size_t> ptrPos;
+  llvm::SmallVector<size_t> ptrPos, intPos;
 
 public:
   FunctionAttributeHelper(std::shared_ptr<FunctionMutator> mutator)
