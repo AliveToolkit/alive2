@@ -1,9 +1,0 @@
-Name: doublefree_incorrect_if_p_null
-free * %p
-free * %p
-ret 0
-  =>
-free * %p
-ret 1
-
-; ERROR: Value mismatch
