@@ -2020,18 +2020,17 @@ uint64_t FnCall::getMaxAccessSize() const {
 }
 
 FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
-  /* TODO: update to consider alloc function. e.g. old code:
-  DEFINE_AS_EMPTYACCESS(Malloc);
+  if (attrs.has(AllocKind::Uninitialized) || attrs.has(AllocKind::Free))
+    return {};
 
-  Calloc::ByteAccessInfo Calloc::getByteAccessInfo() const {
-  auto info = ByteAccessInfo::intOnly(1);
-  if (auto n = getInt(*num))
-    if (auto sz = getInt(*size)) {
-      info.byteSize = gcd(getAlign(), *n * *sz);
-    }
-  return info;
-}
-  */
+  // calloc style
+  if (attrs.has(AllocKind::Zeroed)) {
+    auto info = ByteAccessInfo::intOnly(1);
+    auto [alloc, align] = getMaxAllocSize();
+    if (alloc)
+      info.byteSize = gcd(alloc, align);
+    return info;
+  }
 
   // If bytesize is zero, this call does not participate in byte encoding.
   uint64_t bytesize = 0;
@@ -2051,11 +2050,11 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
   auto &retattr = getAttributes();
   UPDATE(retattr);
 
-  for (auto &arg : args) {
-    if (!arg.first->getType().isPtrType())
+  for (auto &[arg, attrs] : args) {
+    if (!arg->getType().isPtrType())
       continue;
 
-    UPDATE(arg.second);
+    UPDATE(attrs);
     // Pointer arguments without dereferenceable attr don't contribute to the
     // byte size.
     // call f(* dereferenceable(n) align m %p, * %q) is equivalent to a dummy

@@ -579,10 +579,7 @@ static bool returns_local(const Value &v) {
   if (auto call = dynamic_cast<const FnCall*>(&v))
     return call->getAttributes().has(FnAttrs::NoAlias);
 
-// FIXME
-  return dynamic_cast<const Alloc*>(&v) /*||
-         dynamic_cast<const Malloc*>(&v) ||
-         dynamic_cast<const Calloc*>(&v)*/;
+  return dynamic_cast<const Alloc*>(&v);
 }
 
 static Value *get_base_ptr(Value *ptr) {
@@ -822,9 +819,6 @@ static void calculateAndInitConstants(Transform &t) {
   bool has_int2ptr     = false;
   bool has_ptr2int     = false;
   has_alloca       = false;
-  has_dead_allocas = false;
-  has_malloc       = false;
-  has_free         = false;
   has_fncall       = false;
   has_write_fncall = false;
   has_null_block   = false;
@@ -918,7 +912,6 @@ static void calculateAndInitConstants(Transform &t) {
                                               aligned_alloc_size(alloc, align));
         max_access_size  = max(max_access_size, mi->getMaxAccessSize());
         cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
-        has_free        |= mi->canFree();
 
         auto info = mi->getByteAccessInfo();
         has_ptr_load         |= info.doesPtrLoad;
@@ -931,14 +924,7 @@ static void calculateAndInitConstants(Transform &t) {
             !info.doesPtrLoad && !info.doesPtrStore)
           does_any_byte_access = true;
 
-        if (auto alloc = dynamic_cast<const Alloc*>(&i)) {
-          has_alloca = true;
-          has_dead_allocas |= alloc->initDead();
-        } else {
-          // FIXME
-       //   has_malloc |= dynamic_cast<const Malloc*>(&i) != nullptr ||
-         //               dynamic_cast<const Calloc*>(&i) != nullptr;
-        }
+        has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
                   isCast(ConversionOp::Ptr2Int, i)) {
@@ -983,7 +969,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   // check if null block is needed
   // Global variables cannot be null pointers
-  has_null_block = num_null_ptrinputs > 0 || has_null_pointer || has_malloc ||
+  has_null_block = num_null_ptrinputs > 0 || has_null_pointer ||
                   has_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
@@ -1091,8 +1077,6 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nlittle_endian: " << little_endian
                   << "\nnullptr_is_used: " << has_null_pointer
                   << "\nobserves_addresses: " << observes_addresses
-                  << "\nhas_malloc: " << has_malloc
-                  << "\nhas_free: " << has_free
                   << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_mem_access: " << does_mem_access
@@ -1401,8 +1385,16 @@ static void optimize_ptrcmp(Function &f) {
     if (auto *gep = dynamic_cast<const GEP*>(&v))
       return gep->isInBounds();
 
-    // noalias functions aren't required to return an inbounds ptr
-    return returns_local(v) && !dynamic_cast<const FnCall*>(&v);
+    if (!returns_local(v))
+      return false;
+
+    if (auto *call = dynamic_cast<const FnCall*>(&v)) {
+      auto &attrs = call->getAttributes();
+      if (attrs.derefBytes > 0 || attrs.derefOrNullBytes > 0)
+        return true;
+      return false;
+    }
+    return true;
   };
 
   for (auto &i : f.instrs()) {

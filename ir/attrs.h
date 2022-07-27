@@ -46,6 +46,8 @@ public:
 
   uint64_t getDerefBytes() const;
 
+  void merge(const ParamAttrs &other);
+
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 
   // Encodes the semantics of attributes using UB and poison.

@@ -59,9 +59,6 @@ extern bool little_endian;
 /// Whether pointer addresses are observed
 extern bool observes_addresses;
 
-/// Whether malloc or free/delete is used in either function
-extern bool has_malloc;
-extern bool has_free;
 /// Whether there is an alloca
 extern bool has_alloca;
 
@@ -74,9 +71,6 @@ extern bool has_write_fncall;
 extern bool has_nocapture;
 extern bool has_noread;
 extern bool has_nowrite;
-
-/// Whether there are allocas that are initially dead (need start_lifetime)
-extern bool has_dead_allocas;
 
 /// Whether there null pointers appear in the program
 extern bool has_null_pointer;

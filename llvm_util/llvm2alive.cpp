@@ -1489,8 +1489,6 @@ public:
 
     auto &attrs = Fn.getFnAttrs();
     vector<ParamAttrs> param_attrs;
-    (void)llvm_implict_attrs(f, TLI, attrs, param_attrs);
-
     llvm::AttributeList attrlist = f.getAttributes();
 
     for (unsigned idx = 0; idx < f.arg_size(); ++idx) {
@@ -1499,8 +1497,7 @@ public:
           attrlist.getAttributes(llvm::AttributeList::FirstArgIndex + idx);
 
       auto ty = llvm_type2alive(arg.getType());
-      ParamAttrs attrs = idx < param_attrs.size() ? param_attrs[idx]
-                                                  : ParamAttrs();
+      ParamAttrs attrs;
       if (!ty || !handleParamAttrs(argattr, attrs, false))
         return {};
       auto val = make_unique<Input>(*ty, value_name(arg), std::move(attrs));
@@ -1513,7 +1510,20 @@ public:
       }
       Fn.addInput(std::move(val));
     }
+    {
+      vector<Value*> args;
+      for (auto &in : Fn.getInputs()) {
+        args.emplace_back(const_cast<Value*>(&in));
+      }
+      vector<ParamAttrs> param_attrs;
+      (void)llvm_implict_attrs(f, TLI, attrs, param_attrs, args);
 
+      // merge param attrs computed above
+      unsigned idx = 0;
+      for (auto *in : args) {
+        static_cast<Input*>(in)->merge(param_attrs[idx++]);
+      }
+    }
     const auto &ridx = llvm::AttributeList::ReturnIndex;
     const auto &fnidx = llvm::AttributeList::FunctionIndex;
     handleRetAttrs(attrlist.getAttributes(ridx), attrs);

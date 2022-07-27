@@ -169,6 +169,14 @@ uint64_t ParamAttrs::getDerefBytes() const {
   return bytes;
 }
 
+void ParamAttrs::merge(const ParamAttrs &other) {
+  bits            |= other.bits;
+  derefBytes       = max(derefBytes, other.derefBytes);
+  derefOrNullBytes = max(derefOrNullBytes, other.derefOrNullBytes);
+  blockSize        = max(blockSize, other.blockSize);
+  align            = max(align, other.align);
+}
+
 static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,

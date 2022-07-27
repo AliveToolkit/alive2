@@ -25,7 +25,8 @@ namespace llvm_util {
 // returns true if it's a known function call
 bool llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
                         IR::FnAttrs &attrs,
-                        std::vector<IR::ParamAttrs> &param_attrs);
+                        std::vector<IR::ParamAttrs> &param_attrs,
+                        const std::vector<IR::Value*> &args);
 
 // returns true if it's a known function call
 std::pair<std::unique_ptr<IR::Instr>, bool>

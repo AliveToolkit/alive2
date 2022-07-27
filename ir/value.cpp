@@ -248,6 +248,11 @@ StateValue Input::toSMT(State &s) const {
   return mkInput(s, getType(), 0);
 }
 
+void Input::merge(const ParamAttrs &other) {
+  attrs.merge(other);
+  setName(attr_str(attrs) + smt_name);
+}
+
 expr Input::getUndefVar(const Type &ty, unsigned child) const {
   if (config::disable_undef_input || attrs.undefImpliesUB())
     return {};

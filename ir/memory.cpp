@@ -1667,7 +1667,7 @@ void Memory::startLifetime(const expr &ptr_local) {
 }
 
 void Memory::free(const expr &ptr, bool unconstrained) {
-  assert(!memory_unused() && (has_free || has_dead_allocas));
+  assert(!memory_unused());
   Pointer p(*this, ptr);
   expr isnnull = p.isNull();
 
