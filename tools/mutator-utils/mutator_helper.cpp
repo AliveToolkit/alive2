@@ -37,10 +37,10 @@ varSetEnd:
     }
     tmp.clear();
 
-    //landingPad has to be the first instruction in the block
-    while(!instIt->isTerminator() && llvm::isa<LandingPadInst>(&*instIt)){
+    // landingPad has to be the first instruction in the block
+    while (!instIt->isTerminator() && llvm::isa<LandingPadInst>(&*instIt)) {
       ++instIt;
-    }    
+    }
 
     for (; !instIt->isTerminator(); ++instIt) {
       bool flag = true;
@@ -146,14 +146,14 @@ bool MutateInstructionHelper::shouldMutate() {
   return !mutated && canMutate(&*mutator->iitInTmp);
 }
 
-void MutateInstructionHelper::debug(){
+void MutateInstructionHelper::debug() {
   if (!newAdded) {
     llvm::errs() << "\nReplaced with a existant usage\n";
   } else {
     llvm::errs() << "\nNew Inst added\n";
   }
   mutator->iitInTmp->print(llvm::errs());
-  llvm::errs()<<"\n";
+  llvm::errs() << "\n";
 }
 
 void MutateInstructionHelper::mutate() {
@@ -256,9 +256,8 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
 bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
   return
       // make sure at least one
-      std::any_of(
-          inst->op_begin(), inst->op_end(),
-          [](llvm::Use& use) { return canMutate(use.get()); }) &&
+      std::any_of(inst->op_begin(), inst->op_end(),
+                  [](llvm::Use &use) { return canMutate(use.get()); }) &&
       (inst->getNumOperands() - llvm::isa<CallBase>(*inst) > 0) &&
       !llvm::isa<llvm::LandingPadInst>(inst)
       // The ret value of CleanupRet Inst must be a CleanupPad, needs extra
@@ -308,7 +307,7 @@ void RandomMoveHelper::randomMoveInstruction(llvm::Instruction *inst) {
 
 void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
   size_t pos = 0, newPos, beginPos = 0;
-  auto beginIt=inst->getParent()->begin();
+  auto beginIt = inst->getParent()->begin();
   for (auto it = inst->getParent()->begin(); &*it != inst; ++it, ++pos)
     ;
   /**
@@ -319,15 +318,15 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     for (llvm::Instruction *phiInst = &*beginIt;
          llvm::isa<llvm::PHINode>(phiInst);
          phiInst = phiInst->getNextNonDebugInstruction()) {
-      ++beginPos,++beginIt;
+      ++beginPos, ++beginIt;
     }
   }
-  if(!llvm::isa<llvm::LandingPadInst>(inst)){
-  for (llvm::Instruction *landingPad = &*beginIt;
+  if (!llvm::isa<llvm::LandingPadInst>(inst)) {
+    for (llvm::Instruction *landingPad = &*beginIt;
          llvm::isa<llvm::LandingPadInst>(landingPad);
          landingPad = landingPad->getNextNonDebugInstruction()) {
-      ++beginPos,++beginIt;
-    }    
+      ++beginPos, ++beginIt;
+    }
   }
   /*
    *  Current inst cannot move forward because current inst is not PHI inst,
@@ -396,7 +395,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   llvm::SmallVector<llvm::Value *> extraVals;
   extraVals.push_back(inst);
   extraVals.push_back(newPosInst);
-  for (size_t i = pos+1; i != newPos; ++i) {
+  for (size_t i = pos + 1; i != newPos; ++i) {
     ++newPosIt;
     newPosInst = &*newPosIt;
     extraVals[1] = newPosInst;
@@ -428,17 +427,17 @@ void RandomMoveHelper::debug() {
 // don't allow insert code at CatchPadInst.
 // don't allow insert code at CleanupPadInst.
 bool RandomCodeInserterHelper::shouldMutate() {
-  llvm::Instruction* inst= &*mutator->iitInTmp;
+  llvm::Instruction *inst = &*mutator->iitInTmp;
   return !generated && !llvm::isa<llvm::PHINode>(inst) &&
-      !llvm::isa<llvm::LandingPadInst>(inst)
-      && !llvm::isa<llvm::CatchPadInst>(inst) 
-      && !llvm::isa<llvm::CleanupPadInst>(inst);
+         !llvm::isa<llvm::LandingPadInst>(inst) &&
+         !llvm::isa<llvm::CatchPadInst>(inst) &&
+         !llvm::isa<llvm::CleanupPadInst>(inst);
 }
 
 void RandomCodeInserterHelper::debug() {
   llvm::errs() << "Code piece generated\n";
   mutator->iitInTmp->print(llvm::errs());
-  llvm::errs()<<"\n";
+  llvm::errs() << "\n";
 }
 
 void RandomCodeInserterHelper::mutate() {
@@ -563,7 +562,8 @@ bool VoidFunctionCallRemoveHelper::canMutate(llvm::Function *func) {
 }
 
 void VoidFunctionCallRemoveHelper::mutate() {
-  assert(llvm::isa<CallInst>(&*mutator->iitInTmp)&&"the void call has to be a call inst to be removed");
+  assert(llvm::isa<CallInst>(&*mutator->iitInTmp) &&
+         "the void call has to be a call inst to be removed");
   llvm::CallInst *callInst = (llvm::CallInst *)&*mutator->iitInTmp;
   llvm::Instruction *nextInst = callInst->getNextNonDebugInstruction();
   if (funcName.empty()) {
@@ -762,4 +762,159 @@ void BinaryInstructionHelper::debug() {
   mutator->iitInTmp->print(llvm::errs());
   llvm::errs() << "\n";
   mutator->iitInTmp->getParent()->print(llvm::errs());
+}
+
+bool ResizeIntegerHelper::isValidNode(llvm::Value *val) {
+  if (llvm::isa<llvm::BinaryOperator>(val)) {
+    return llvm::isa<llvm::IntegerType>(val->getType());
+  }
+  return false;
+}
+
+bool ResizeIntegerHelper::canMutate(llvm::Function *func) {
+  for (auto it = inst_begin(func); it != inst_end(func); ++it) {
+    if (isValidNode(&*it)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ResizeIntegerHelper::shouldMutate() {
+  return !updated && isValidNode(&*mutator->iitInTmp);
+}
+
+// 1, 8, 16, 32, 64 50%
+// 1....64 50%
+llvm::IntegerType *
+ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context) {
+  static llvm::SmallVector<size_t> defaultWidth{1, 8, 16, 32, 64};
+  if (Random::getRandomBool()) {
+    return llvm::IntegerType::get(
+        context,
+        defaultWidth[Random::getRandomUnsigned() % defaultWidth.size()]);
+  } else {
+    return llvm::IntegerType::get(context,
+                                  1 + Random::getRandomUnsigned() % 64);
+  }
+}
+
+std::vector<llvm::Instruction *>
+ResizeIntegerHelper::constructUseChain(llvm::Instruction *startPoint) {
+  std::vector<llvm::Instruction *> res;
+  llvm::Instruction *cur = startPoint;
+  bool hasNext = false;
+  do {
+    hasNext = false;
+    size_t i = 0;
+    auto use_it = cur->use_begin();
+    // reset use_it at random pos
+    for (size_t tmp = Random::getRandomUnsigned() % cur->getNumUses(); tmp != 0;
+         --tmp, ++use_it)
+      ;
+    // reset end
+
+    for (; i < cur->getNumUses(); ++use_it, ++i) {
+      if (use_it == cur->use_end()) {
+        use_it = cur->use_begin();
+      }
+      llvm::Value *val = use_it->getUser();
+      if (isValidNode(val)) {
+        hasNext = true;
+        res.push_back(cur);
+        cur = (llvm::Instruction *)val;
+        break;
+      }
+    }
+  } while (hasNext);
+  res.push_back(cur);
+  return res;
+}
+
+llvm::Instruction *
+ResizeIntegerHelper::updateNode(llvm::Instruction *val,
+                                llvm::ArrayRef<llvm::Value *> args) {
+  assert(args.size() == 2);
+  if (llvm::isa<llvm::BinaryOperator>(val)) {
+    llvm::BinaryOperator *op = (llvm::BinaryOperator *)val;
+    llvm::Instruction *nextInst = op->getNextNonDebugInstruction();
+    llvm::BinaryOperator *newOp = llvm::BinaryOperator::Create(
+        op->getOpcode(), args[0], args[1], "", nextInst);
+    assert(newOp->getType()->isIntegerTy());
+    llvm::IntegerType *newIntTy = (llvm::IntegerType *)newOp->getType();
+    for (size_t i = 0; i < newOp->getNumOperands(); ++i) {
+      if (llvm::isa<llvm::UndefValue>(newOp->getOperand(i))) {
+        llvm::Value *resizedVal =
+            mutator_util::updateIntegerSize(op->getOperand(i), newIntTy, newOp);
+        newOp->setOperand(i, resizedVal);
+      }
+    }
+    return newOp;
+  }
+  return nullptr;
+}
+
+void ResizeIntegerHelper::updateChain(std::vector<llvm::Instruction *> &chain,
+                                      llvm::IntegerType *newIntTy) {
+  std::vector<llvm::Instruction *> newChain;
+  if (!chain.empty()) {
+    llvm::Value *undef = llvm::UndefValue::get(newIntTy);
+    llvm::SmallVector<llvm::Value *> args;
+    // head
+    args.push_back(undef);
+    args.push_back(undef);
+    llvm::Instruction *headInst = updateNode(chain.front(), args);
+    chain.front()->setName("old0");
+    headInst->setName("new" + std::to_string(newChain.size()));
+    newChain.push_back(headInst);
+    args.clear();
+    // mid + tail
+    for (size_t i = 1; i < chain.size(); ++i) {
+      for (size_t pos = 0; pos < chain[i]->getNumOperands(); ++pos) {
+        if (chain[i]->getOperand(pos) == chain[i - 1]) {
+          args.push_back(newChain[i - 1]);
+        } else {
+          args.push_back(undef);
+        }
+      }
+      llvm::Instruction *inst = updateNode(chain[i], args);
+      inst->setName("new" + std::to_string(newChain.size()));
+      chain[i]->setName("old" + std::to_string(newChain.size()));
+      newChain.push_back(inst);
+      args.clear();
+    }
+    llvm::Instruction *nextInst = newChain.back()->getNextNonDebugInstruction();
+    llvm::Value *extBack = mutator_util::updateIntegerSize(
+        newChain.back(), (llvm::IntegerType *)chain.back()->getType(),
+        nextInst);
+    extBack->setName("last");
+    chain.back()->replaceAllUsesWith(extBack);
+  }
+}
+
+void ResizeIntegerHelper::resizeOperand(llvm::Instruction *inst, size_t index,
+                                        llvm::IntegerType *newTy) {
+  assert(inst->getNumOperands() > index);
+  llvm::Value *val = inst->getOperand(index);
+  assert(llvm::isa<llvm::IntegerType>(val->getType()));
+
+  llvm::Value *newOp = mutator_util::updateIntegerSize(val, newTy, inst);
+  inst->setOperand(index, newOp);
+}
+
+void ResizeIntegerHelper::mutate(){
+  llvm::Instruction* inst=&*mutator->iitInTmp;
+  std::vector<llvm::Instruction*> useChain=constructUseChain(inst);
+  llvm::IntegerType * oldIntTy=(llvm::IntegerType*)inst->getType(),*newIntTy=oldIntTy;
+  do{
+    newIntTy=getNewIntegerTy(inst->getContext());
+  }while(newIntTy==oldIntTy);
+  updateChain(useChain,newIntTy);
+  updated=true;
+}
+
+void ResizeIntegerHelper::debug(){
+  llvm::errs()<<"integer resized\n";
+  mutator->iitInTmp->getParent()->print(llvm::errs());
+  llvm::errs()<<"\n";
 }

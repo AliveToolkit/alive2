@@ -110,6 +110,7 @@ class FunctionMutator {
   friend class GEPHelper;
   friend class BinaryInstructionHelper;
   friend class EliminateUndefHelper;
+  friend class ResizeIntegerHelper;
 
   llvm::Function *currentFunction, *functionInTmp;
   llvm::ValueToValueMapTy &vMap;
@@ -168,12 +169,14 @@ public:
   FunctionMutator(llvm::Function *currentFunction,
                   llvm::ValueToValueMapTy &vMap,
                   const llvm::StringSet<> &filterSet,
-                  const llvm::SmallVector<llvm::Value *> &globals, bool debug=false)
+                  const llvm::SmallVector<llvm::Value *> &globals,
+                  bool debug = false)
       : currentFunction(currentFunction), vMap(vMap), filterSet(filterSet),
         globals(globals),
         valueFuncs({&FunctionMutator::getRandomConstant,
                     &FunctionMutator::getRandomDominatedValue,
-                    &FunctionMutator::getRandomValueFromExtraValue}),debug(debug) {
+                    &FunctionMutator::getRandomValueFromExtraValue}),
+        debug(debug) {
     bit = currentFunction->begin();
     iit = bit->begin();
     for (auto it = currentFunction->arg_begin();
@@ -195,7 +198,9 @@ public:
                         const llvm::StringSet<> &filterSet);
   void mutate();
   void print();
-  void setDebug(bool debug){this->debug=debug;}
+  void setDebug(bool debug) {
+    this->debug = debug;
+  }
   // should pass the pointer itself.
   void init(std::shared_ptr<FunctionMutator> self);
   void removeTmpFunction();
@@ -260,9 +265,9 @@ public:
       }
     }
   }
-  void removeAllUndefInFunctions(){
+  void removeAllUndefInFunctions() {
     resetTmpModule();
-    for(size_t i=0;i<functionMutants.size();++i){
+    for (size_t i = 0; i < functionMutants.size(); ++i) {
       functionMutants[i]->removeAllUndef();
       functionMutants[i]->removeTmpFunction();
     }

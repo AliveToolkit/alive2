@@ -89,11 +89,13 @@ class MutateInstructionHelper : public MutationHelper {
   bool insertRandomBinaryInstruction(llvm::Instruction *inst);
   void replaceRandomUsage(llvm::Instruction *inst);
   static bool canMutate(llvm::Value *val) {
-    bool bbOrFunc= llvm::isa<llvm::BasicBlock>(val) || llvm::isa<llvm::Function>(val);
-    if(!bbOrFunc){
-      llvm::LLVMContext& context=val->getContext();
-      llvm::Type* ty=val->getType();
-      return ty!=llvm::Type::getLabelTy(context)&&ty!=llvm::Type::getTokenTy(context);
+    bool bbOrFunc =
+        llvm::isa<llvm::BasicBlock>(val) || llvm::isa<llvm::Function>(val);
+    if (!bbOrFunc) {
+      llvm::LLVMContext &context = val->getContext();
+      llvm::Type *ty = val->getType();
+      return ty != llvm::Type::getLabelTy(context) &&
+             ty != llvm::Type::getTokenTy(context);
     }
     return false;
   }
@@ -136,7 +138,7 @@ public:
   static bool canMutate(llvm::Function *func);
   virtual void mutate() override;
   virtual bool shouldMutate() override;
-  virtual void whenMoveToNextInst() override{
+  virtual void whenMoveToNextInst() override {
     moved = false;
   };
   virtual void debug() override;
@@ -148,13 +150,13 @@ class RandomCodeInserterHelper : public MutationHelper {
 public:
   RandomCodeInserterHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), generated(false) {}
-  virtual void init() override{
+  virtual void init() override {
     generated = false;
   }
-  virtual void reset() override{
+  virtual void reset() override {
     generated = false;
   }
-  virtual void whenMoveToNextInst() override{
+  virtual void whenMoveToNextInst() override {
     generated = false;
   }
   static bool canMutate(llvm::Function *func) {
@@ -183,11 +185,11 @@ public:
   FunctionCallInlineHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), inlined(false) {}
   virtual void init() override;
-  virtual void reset() override{
+  virtual void reset() override {
     inlined = false;
     functionInlined.clear();
   }
-  virtual void whenMoveToNextInst() override{
+  virtual void whenMoveToNextInst() override {
     inlined = false;
     functionInlined.clear();
   }
@@ -195,7 +197,7 @@ public:
   virtual void mutate() override;
   virtual bool shouldMutate() override;
   llvm::Function *getReplacedFunction();
-  virtual void debug() override{
+  virtual void debug() override {
     llvm::errs() << "Function call inline with " << functionInlined << "\n";
   }
 };
@@ -220,7 +222,7 @@ public:
     funcName.clear();
   }
   virtual void mutate() override;
-  virtual void whenMoveToNextInst() override{
+  virtual void whenMoveToNextInst() override {
     removed = false;
     funcName.clear();
   }
@@ -260,7 +262,7 @@ public:
   GEPHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), updated(false){};
   virtual void init() override {}
-  virtual void whenMoveToNextInst() override{
+  virtual void whenMoveToNextInst() override {
     updated = false;
   }
   virtual void reset() override {
@@ -315,6 +317,35 @@ class BinaryInstructionHelper : public MutationHelper {
 
 public:
   BinaryInstructionHelper(std::shared_ptr<FunctionMutator> mutator)
+      : MutationHelper(mutator), updated(false){};
+  virtual void init() override{};
+  virtual void reset() override {
+    updated = false;
+  }
+  static bool canMutate(llvm::Function *func);
+  virtual void mutate() override;
+  virtual bool shouldMutate() override;
+  virtual void debug() override;
+  virtual void whenMoveToNextInst() override {
+    updated = false;
+  }
+};
+
+class ResizeIntegerHelper : public MutationHelper {
+  bool updated;
+  static bool isValidNode(llvm::Value *val);
+  std::vector<llvm::Instruction *>
+  constructUseChain(llvm::Instruction *startPoint);
+  static llvm::IntegerType *getNewIntegerTy(llvm::LLVMContext &context);
+  llvm::Instruction *updateNode(llvm::Instruction *val,
+                                llvm::ArrayRef<llvm::Value *> args);
+  void updateChain(std::vector<llvm::Instruction *> &chain,
+                   llvm::IntegerType *newIntTy);
+  void resizeOperand(llvm::Instruction *inst, size_t index,
+                     llvm::IntegerType *newTy);
+
+public:
+  ResizeIntegerHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), updated(false){};
   virtual void init() override{};
   virtual void reset() override {
