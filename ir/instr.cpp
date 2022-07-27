@@ -1996,10 +1996,6 @@ pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   return { UINT64_MAX, getAlign() };
 }
 
-bool FnCall::canFree() const {
-  return !hasAttribute(FnAttrs::NoFree);
-}
-
 uint64_t FnCall::getAlign() const {
   // FIXME: needs to query allocalign param attr
   return attrs.align ? attrs.align : heap_block_alignment;
@@ -3142,7 +3138,6 @@ MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
 DEFINE_AS_RETZERO(Alloc, getMaxAccessSize);
 DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(Alloc);
-DEFINE_AS_RETFALSE(Alloc, canFree);
 
 pair<uint64_t, uint64_t> Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
@@ -3218,7 +3213,6 @@ DEFINE_AS_RETZEROALIGN(StartLifetime, getMaxAllocSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize);
 DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset);
 DEFINE_AS_EMPTYACCESS(StartLifetime);
-DEFINE_AS_RETFALSE(StartLifetime, canFree);
 
 vector<Value*> StartLifetime::operands() const {
   return { ptr };
@@ -3256,10 +3250,6 @@ vector<Value*> EndLifetime::operands() const {
   return { ptr };
 }
 
-bool EndLifetime::canFree() const {
-  return true;
-}
-
 void EndLifetime::rauw(const Value &what, Value &with) {
   RAUW(ptr);
 }
@@ -3290,7 +3280,6 @@ void GEP::addIdx(uint64_t obj_size, Value &idx) {
 DEFINE_AS_RETZEROALIGN(GEP, getMaxAllocSize);
 DEFINE_AS_RETZERO(GEP, getMaxAccessSize);
 DEFINE_AS_EMPTYACCESS(GEP);
-DEFINE_AS_RETFALSE(GEP, canFree);
 
 static unsigned off_used_bits(const Value &v) {
   if (auto c = isCast(ConversionOp::SExt, v))
@@ -3432,7 +3421,6 @@ unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize);
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Load, canFree);
 
 uint64_t Load::getMaxAccessSize() const {
   return Memory::getStoreByteSize(getType());
@@ -3475,7 +3463,6 @@ unique_ptr<Instr> Load::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize);
 DEFINE_AS_RETZERO(Store, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Store, canFree);
 
 uint64_t Store::getMaxAccessSize() const {
   return Memory::getStoreByteSize(val->getType());
@@ -3525,7 +3512,6 @@ unique_ptr<Instr> Store::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Memset, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Memset, canFree);
 
 uint64_t Memset::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -3587,7 +3573,6 @@ unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(FillPoison, getMaxAllocSize);
 DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(FillPoison, canFree);
 
 uint64_t FillPoison::getMaxAccessSize() const {
   return getGlobalVarSize(ptr);
@@ -3627,7 +3612,6 @@ unique_ptr<Instr> FillPoison::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Memcpy, canFree);
 
 uint64_t Memcpy::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -3704,7 +3688,6 @@ unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Memcmp, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcmp, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Memcmp, canFree);
 
 uint64_t Memcmp::getMaxAccessSize() const {
   return getIntOr(*num, UINT64_MAX);
@@ -3819,7 +3802,6 @@ unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZEROALIGN(Strlen, getMaxAllocSize);
 DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset);
-DEFINE_AS_RETFALSE(Strlen, canFree);
 
 uint64_t Strlen::getMaxAccessSize() const {
   return getGlobalVarSize(ptr);

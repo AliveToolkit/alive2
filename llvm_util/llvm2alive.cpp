@@ -1521,6 +1521,8 @@ public:
       // merge param attrs computed above
       unsigned idx = 0;
       for (auto *in : args) {
+        if (idx == param_attrs.size())
+          break;
         static_cast<Input*>(in)->merge(param_attrs[idx++]);
       }
     }

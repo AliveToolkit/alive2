@@ -42,7 +42,6 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     ret_and_args_no_undef();
     attrs.set(FnAttrs::InaccessibleMemOnly);
     attrs.set(FnAttrs::NoAlias);
-    attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::WillReturn);
     attrs.set(FnAttrs::AllocSize);
     attrs.allocsize_0 = idx1;
@@ -57,6 +56,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   switch (libfn) {
   case llvm::LibFunc_malloc:
     alloc_fns(0);
+    attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     attrs.allocfamily = "malloc";
     attrs.add(AllocKind::Alloc);
@@ -65,6 +65,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   case llvm::LibFunc_calloc:
     alloc_fns(0, 1);
+    attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     attrs.allocfamily = "malloc";
     attrs.add(AllocKind::Alloc);
@@ -73,6 +74,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   case llvm::LibFunc_realloc:
     alloc_fns(0);
+    attrs.set(FnAttrs::NoThrow);
     attrs.allocfamily = "malloc";
     attrs.add(AllocKind::Realloc);
     attrs.add(AllocKind::Uninitialized);

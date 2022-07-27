@@ -231,6 +231,12 @@ FnAttrs::computeAllocSize(State &s,
   expr allocsize = arg0.value.zextOrTrunc(bits_size_t);
   expr np_size   = arg0.non_poison;
 
+  auto check_trunc = [&](const expr &var) {
+    if (var.bits() > bits_size_t)
+      np_size &= var.extract(var.bits()-1, bits_size_t) == 0;
+  };
+  check_trunc(arg0.value);
+
   if (allocsize_1 != -1u) {
     auto &arg1 = s[*args[allocsize_1].first];
     s.addUB(arg1.non_poison);
@@ -239,6 +245,7 @@ FnAttrs::computeAllocSize(State &s,
     np_size  &= arg1.non_poison;
     np_size  &= allocsize.mul_no_uoverflow(v);
     allocsize = allocsize * v;
+    check_trunc(arg1.value);
   }
   return { std::move(allocsize), std::move(np_size) };
 }

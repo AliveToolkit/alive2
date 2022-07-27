@@ -597,9 +597,6 @@ public:
   // already contains the offset.
   virtual uint64_t getMaxGEPOffset() const = 0;
 
-  // Can this instruction free allocated objects?
-  virtual bool canFree() const = 0;
-
   struct ByteAccessInfo {
     bool hasIntByteAccess = false;
     bool doesPtrLoad = false;
@@ -639,7 +636,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -661,7 +657,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -682,7 +677,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -711,7 +705,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -737,7 +730,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -765,7 +757,6 @@ public:
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxAccessStride() const;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -792,7 +783,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -813,7 +803,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -843,7 +832,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -869,7 +857,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -893,7 +880,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
@@ -928,7 +914,6 @@ public:
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
-  bool canFree() const override;
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
