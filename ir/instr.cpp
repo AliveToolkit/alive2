@@ -2309,7 +2309,8 @@ StateValue FnCall::toSMT(State &s) const {
 
   if (attrs.has(AllocKind::Alloc) || attrs.has(AllocKind::Realloc)) {
     auto [size, np_size] = attrs.computeAllocSize(s, args);
-    expr nonnull = expr::mkBoolVar("malloc_never_fails");
+    expr nonnull = attrs.isNonNull() ? expr(true)
+                                     : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
     auto [p_new, allocated]
       = m.alloc(size, getAlign(), Memory::MALLOC, np_size, nonnull);
@@ -2317,12 +2318,7 @@ StateValue FnCall::toSMT(State &s) const {
     expr nullp = Pointer::mkNullPointer(m)();
     expr ret = expr::mkIf(allocated, p_new, nullp);
 
-    if (attrs.isNonNull()) {
-      // TODO: In C++ we need to throw an exception if the allocation fails.
-      s.addPre(std::move(allocated));
-      allocated = true;
-      ret = p_new;
-    }
+    // TODO: In C++ we need to throw an exception if the allocation fails.
 
     if (attrs.has(AllocKind::Realloc)) {
       auto &[allocptr, np_ptr] = s.getAndAddUndefs(get_alloc_ptr());

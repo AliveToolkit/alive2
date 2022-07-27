@@ -181,7 +181,8 @@ static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
                bool nocapture, const expr &deref_expr) {
-  Pointer p(s.getMemory(), ptrvalue);
+  auto &m = s.getMemory();
+  Pointer p(m, ptrvalue);
   expr non_poison(true);
 
   if (nonnull)
@@ -192,13 +193,17 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   if (derefBytes || derefOrNullBytes || deref_expr.isValid()) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
-      s.addUB(p.isDereferenceable(derefBytes, align));
+      s.addUB(Pointer(m, ptrvalue).isDereferenceable(derefBytes, align));
     if (derefOrNullBytes)
-      s.addUB(p.isDereferenceable(derefOrNullBytes, align)() || p.isNull());
+      s.addUB(
+        Pointer(m, ptrvalue).isDereferenceable(derefOrNullBytes, align)() ||
+        p.isNull());
     if (deref_expr.isValid())
-      s.addUB(p.isDereferenceable(deref_expr, align, false)() || p.isNull());
+      s.addUB(
+        Pointer(m, ptrvalue).isDereferenceable(deref_expr, align, false)() ||
+        p.isNull());
   } else if (align > 1)
-    non_poison &= p.isAligned(align);
+    non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
   // TODO: handle alloc align
 
