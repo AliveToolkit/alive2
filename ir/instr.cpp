@@ -1996,9 +1996,25 @@ pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   return { UINT64_MAX, getAlign() };
 }
 
+static Value* get_align_arg(const vector<pair<Value*, ParamAttrs>> args) {
+  for (auto &[arg, attrs] : args) {
+    if (attrs.has(ParamAttrs::AllocAlign))
+      return arg;
+  }
+  return nullptr;
+}
+
+Value* FnCall::getAlignArg() const {
+  return get_align_arg(args);
+}
+
 uint64_t FnCall::getAlign() const {
-  // FIXME: needs to query allocalign param attr
-  return attrs.align ? attrs.align : heap_block_alignment;
+  uint64_t align = 0;
+  // TODO: add support for non constant alignments
+  if (auto *arg = getAlignArg())
+    align = getIntOr(*arg, 0);
+
+  return max(align, attrs.align ? attrs.align : heap_block_alignment);
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -2006,11 +2022,11 @@ uint64_t FnCall::getMaxAccessSize() const {
   if (attrs.has(FnAttrs::DereferenceableOrNull))
     sz = max(sz, attrs.derefOrNullBytes);
 
-  for (auto &arg : args) {
-    if (arg.second.has(ParamAttrs::Dereferenceable))
-      sz = max(sz, arg.second.derefBytes);
-    if (arg.second.has(ParamAttrs::DereferenceableOrNull))
-      sz = max(sz, arg.second.derefOrNullBytes);
+  for (auto &[arg, attrs] : args) {
+    if (attrs.has(ParamAttrs::Dereferenceable))
+      sz = max(sz, attrs.derefBytes);
+    if (attrs.has(ParamAttrs::DereferenceableOrNull))
+      sz = max(sz, attrs.derefOrNullBytes);
   }
   return sz;
 }
@@ -2208,7 +2224,7 @@ check_return_value(State &s, StateValue &&val, const Type &ty,
                    const vector<pair<Value*, ParamAttrs>> &args) {
   auto [allocsize, np] = attrs.computeAllocSize(s, args);
   s.addUB(std::move(np));
-  return attrs.encode(s, std::move(val), ty, allocsize);
+  return attrs.encode(s, std::move(val), ty, allocsize, get_align_arg(args));
 }
 
 static StateValue
@@ -2343,7 +2359,8 @@ StateValue FnCall::toSMT(State &s) const {
                false);
 
     assert(getType().isPtrType());
-    return attrs.encode(s, {std::move(ret), true}, getType(), size);
+    return attrs.encode(s, {std::move(ret), true}, getType(), size,
+                        getAlignArg());
   }
   else if (attrs.has(AllocKind::Free)) {
     auto &allocptr = s.getAndAddPoisonUB(get_alloc_ptr()).value;

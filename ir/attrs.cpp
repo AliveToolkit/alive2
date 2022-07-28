@@ -180,7 +180,7 @@ void ParamAttrs::merge(const ParamAttrs &other) {
 static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
-               bool nocapture, const expr &deref_expr) {
+               bool nocapture, const expr &deref_expr, Value *allocalign) {
   auto &m = s.getMemory();
   Pointer p(m, ptrvalue);
   expr non_poison(true);
@@ -205,8 +205,14 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   } else if (align > 1)
     non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
-  // TODO: handle alloc align
-
+  // TODO: handle non-constant allocalign
+  if (allocalign) {
+    StateValue align = s[*allocalign];
+    non_poison &= align.non_poison;
+    uint64_t val;
+    if (align.value.isUInt(val))
+      non_poison &= Pointer(m, ptrvalue).isAligned(val);
+  }
   return non_poison;
 }
 
@@ -214,7 +220,7 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty) const{
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                     has(NonNull), has(NoCapture), {});
+                     has(NonNull), has(NoCapture), {}, nullptr);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
@@ -301,7 +307,8 @@ bool FnAttrs::refinedBy(const FnAttrs &other) const {
 }
 
 StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
-                           const expr &allocsize) const {
+                           const expr &allocsize,
+                           Value *allocalign) const {
   if (has(FnAttrs::NNaN)) {
     assert(ty.isFloatType());
     val.non_poison &= !val.value.isNaN();
@@ -310,7 +317,7 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
-                     has(NonNull), false, allocsize);
+                     has(NonNull), false, allocsize, allocalign);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));

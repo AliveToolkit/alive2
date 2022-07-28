@@ -1351,8 +1351,7 @@ public:
 
       case llvm::Attribute::Alignment:
         attrs.set(FnAttrs::Align);
-        attrs.align = max(attrs.align,
-                          (unsigned)llvmattr.getAlignment()->value());
+        attrs.align = max(attrs.align, llvmattr.getAlignment()->value());
         break;
 
       default: break;
@@ -1431,6 +1430,23 @@ public:
         attrs.allocsize_0 = args.first;
         if (args.second)
           attrs.allocsize_1 = *args.second;
+        break;
+      }
+      case llvm::Attribute::AllocKind: {
+        auto kind = llvmattr.getAllocKind();
+        if ((kind & llvm::AllocFnKind::Alloc) != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Alloc);
+        if ((kind & llvm::AllocFnKind::Realloc) != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Realloc);
+        if ((kind & llvm::AllocFnKind::Free) != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Free);
+        if ((kind & llvm::AllocFnKind::Uninitialized)
+              != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Uninitialized);
+        if ((kind & llvm::AllocFnKind::Zeroed) != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Zeroed);
+        if ((kind & llvm::AllocFnKind::Aligned) != llvm::AllocFnKind::Unknown)
+          attrs.add(AllocKind::Aligned);
         break;
       }
       case llvm::Attribute::NoReturn:

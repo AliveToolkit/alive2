@@ -96,7 +96,7 @@ public:
 
   uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
-  unsigned align = 0;
+  uint64_t align = 0;
 
   unsigned allocsize_0;
   unsigned allocsize_1 = -1u;
@@ -125,7 +125,8 @@ public:
 
   // Encodes the semantics of attributes using UB and poison.
   StateValue encode(State &s, StateValue &&val, const Type &ty,
-                    const smt::expr &allocsize) const;
+                    const smt::expr &allocsize,
+                    Value *allocalign) const;
 
   friend std::ostream& operator<<(std::ostream &os, const FnAttrs &attr);
 };

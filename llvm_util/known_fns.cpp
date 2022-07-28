@@ -38,6 +38,10 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     }
   };
 
+  auto set_align = [&](uint64_t align) {
+    attrs.align = max(attrs.align, align);
+  };
+
   auto alloc_fns = [&](unsigned idx1, unsigned idx2 = -1u) {
     ret_and_args_no_undef();
     attrs.set(FnAttrs::InaccessibleMemOnly);
@@ -54,6 +58,9 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   };
 
   switch (libfn) {
+  case llvm::LibFunc_valloc:
+    set_align(4096); // page size
+    [[fallthrough]];
   case llvm::LibFunc_malloc:
     alloc_fns(0);
     attrs.set(FnAttrs::NoThrow);
@@ -73,12 +80,13 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     RETURN_EXACT();
 
   case llvm::LibFunc_realloc:
-    alloc_fns(0);
+    alloc_fns(1);
     attrs.set(FnAttrs::NoThrow);
     attrs.allocfamily = "malloc";
     attrs.add(AllocKind::Realloc);
     attrs.add(AllocKind::Uninitialized);
     set_param(0, ParamAttrs::AllocPtr);
+    set_param(0, ParamAttrs::NoCapture);
     RETURN_EXACT();
 
   case llvm::LibFunc_free:

@@ -898,6 +898,9 @@ private:
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
   bool approx = false;
+
+  Value* getAlignArg() const;
+
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
          FnAttrs &&attrs = FnAttrs::None)
