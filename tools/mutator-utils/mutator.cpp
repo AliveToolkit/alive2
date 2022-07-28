@@ -131,17 +131,17 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
+  if(ResizeIntegerHelper::canMutate(currentFunction)){
+    helpers.push_back(std::make_unique<ResizeIntegerHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
+
   if (BinaryInstructionHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<BinaryInstructionHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
   if (MutateInstructionHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
-    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
-  }
-
-  if(ResizeIntegerHelper::canMutate(currentFunction)){
     helpers.push_back(std::make_unique<MutateInstructionHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
@@ -224,19 +224,21 @@ void FunctionMutator::mutate() {
   if (debug) {
     print();
   }
-
-  bool mutated = false;
+  bool mutated = false, canMutate = false;
   do {
     for (size_t i = 0; i < helpers.size(); ++i) {
-      if (helpers[i]->shouldMutate() && Random::getRandomBool()) {
-        helpers[i]->mutate();
-        mutated = true;
-        if (debug) {
-          helpers[i]->debug();
+      if (helpers[i]->shouldMutate()) {
+        canMutate = true;
+        if (true||Random::getRandomBool()) {
+          helpers[i]->mutate();
+          mutated = true;
+          if (debug) {
+            helpers[i]->debug();
+          }
         }
       }
     }
-  } while (!mutated);
+  } while (!mutated && canMutate);
 
   if (debug) {
     print();

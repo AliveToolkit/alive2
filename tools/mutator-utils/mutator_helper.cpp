@@ -806,24 +806,26 @@ ResizeIntegerHelper::constructUseChain(llvm::Instruction *startPoint) {
   bool hasNext = false;
   do {
     hasNext = false;
-    size_t i = 0;
-    auto use_it = cur->use_begin();
-    // reset use_it at random pos
-    for (size_t tmp = Random::getRandomUnsigned() % cur->getNumUses(); tmp != 0;
-         --tmp, ++use_it)
-      ;
-    // reset end
+    if(!cur->use_empty()){
+      size_t i = 0;
+      auto use_it = cur->use_begin();
+      // reset use_it at random pos
+      for (size_t tmp = Random::getRandomUnsigned() % cur->getNumUses(); tmp != 0;
+          --tmp, ++use_it)
+        ;
+      // reset end
 
-    for (; i < cur->getNumUses(); ++use_it, ++i) {
-      if (use_it == cur->use_end()) {
-        use_it = cur->use_begin();
-      }
-      llvm::Value *val = use_it->getUser();
-      if (isValidNode(val)) {
-        hasNext = true;
-        res.push_back(cur);
-        cur = (llvm::Instruction *)val;
-        break;
+      for (; i < cur->getNumUses(); ++use_it, ++i) {
+        if (use_it == cur->use_end()) {
+          use_it = cur->use_begin();
+        }
+        llvm::Value *val = use_it->getUser();
+        if (isValidNode(val)) {
+          hasNext = true;
+          res.push_back(cur);
+          cur = (llvm::Instruction *)val;
+          break;
+        }
       }
     }
   } while (hasNext);
