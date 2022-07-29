@@ -105,6 +105,7 @@ public:
 
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
+  bool isAlloc() const { return allockind != 0; }
 
   std::pair<smt::expr,smt::expr>
   computeAllocSize(State &s,

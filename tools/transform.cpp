@@ -577,7 +577,8 @@ static unsigned num_ptrs(const Type &ty) {
 static bool returns_local(const Value &v) {
   // no alias fns return local block
   if (auto call = dynamic_cast<const FnCall*>(&v))
-    return call->getAttributes().has(FnAttrs::NoAlias);
+    return call->hasAttribute(FnAttrs::NoAlias) ||
+           call->getAttributes().isAlloc();
 
   return dynamic_cast<const Alloc*>(&v);
 }
@@ -897,11 +898,13 @@ static void calculateAndInitConstants(Transform &t) {
 
       if (auto fn = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
-        if (fn->hasAttribute(FnAttrs::InaccessibleMemOnly)) {
-          if (inaccessiblememonly_fns.emplace(fn->getName()).second)
-            ++num_inaccessiblememonly_fns;
-        } else {
-          has_write_fncall |= !fn->hasAttribute(FnAttrs::NoWrite);
+        if (!fn->getAttributes().isAlloc()) {
+          if (fn->hasAttribute(FnAttrs::InaccessibleMemOnly)) {
+            if (inaccessiblememonly_fns.emplace(fn->getName()).second)
+              ++num_inaccessiblememonly_fns;
+          } else {
+            has_write_fncall |= !fn->hasAttribute(FnAttrs::NoWrite);
+          }
         }
       }
 
