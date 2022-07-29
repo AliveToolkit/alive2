@@ -70,6 +70,17 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     attrs.add(AllocKind::Uninitialized);
     RETURN_EXACT();
 
+  case llvm::LibFunc_aligned_alloc:
+  case llvm::LibFunc_memalign:
+    alloc_fns(1);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocfamily = "malloc";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Uninitialized);
+    set_param(0, ParamAttrs::AllocAlign);
+    RETURN_EXACT();
+
   case llvm::LibFunc_calloc:
     alloc_fns(0, 1);
     attrs.set(FnAttrs::NoThrow);
@@ -80,6 +91,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     RETURN_EXACT();
 
   case llvm::LibFunc_realloc:
+  case llvm::LibFunc_reallocf:
     alloc_fns(1);
     attrs.set(FnAttrs::NoThrow);
     attrs.allocfamily = "malloc";
@@ -99,12 +111,54 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     set_param(0, ParamAttrs::AllocPtr);
     RETURN_EXACT();
 
-  case llvm::LibFunc_Znwm:
+  case llvm::LibFunc_Znwj: // new(unsigned int)
+  case llvm::LibFunc_Znwm: // new(unsigned long)
     alloc_fns(0);
     attrs.set(FnAttrs::NoFree);
     attrs.allocfamily = "_Znwm";
     attrs.add(AllocKind::Alloc);
     attrs.add(AllocKind::Uninitialized);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_vec_malloc:
+    alloc_fns(0);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocfamily = "vecmalloc";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Uninitialized);
+    set_align(16);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_vec_calloc:
+    alloc_fns(0, 1);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    attrs.allocfamily = "vecmalloc";
+    attrs.add(AllocKind::Alloc);
+    attrs.add(AllocKind::Zeroed);
+    set_align(16);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_vec_realloc:
+    alloc_fns(1);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.allocfamily = "vecmalloc";
+    attrs.add(AllocKind::Realloc);
+    attrs.add(AllocKind::Uninitialized);
+    set_param(0, ParamAttrs::AllocPtr);
+    set_param(0, ParamAttrs::NoCapture);
+    set_align(16);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_vec_free:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::InaccessibleMemOnly);
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::WillReturn);
+    attrs.allocfamily = "vecmalloc";
+    attrs.add(AllocKind::Free);
+    set_param(0, ParamAttrs::AllocPtr);
     RETURN_EXACT();
 
   case llvm::LibFunc_fwrite:
