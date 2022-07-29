@@ -2351,7 +2351,7 @@ StateValue FnCall::toSMT(State &s) const {
       // 1) realloc(ptr, 0) always free the ptr.
       // 2) If allocation failed, we should not free previous ptr, unless it's
       // reallocf (always frees the pointer)
-      expr freeptr = getName() == "reallocf"
+      expr freeptr = fnName == "@reallocf"
                        ? allocptr
                        : expr::mkIf(size == 0 || allocated, allocptr, nullp);
       m.free(freeptr, false);
