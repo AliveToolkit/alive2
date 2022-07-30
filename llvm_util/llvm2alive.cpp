@@ -672,7 +672,7 @@ public:
     llvm::SmallVector<const llvm::Value *> Objs;
     llvm::getUnderlyingObjects(Ptr, Objs);
 
-    if (llvm::all_of(Objs, [this](const llvm::Value *V) {
+    if (llvm::all_of(Objs, [](const llvm::Value *V) {
         // Stack coloring algorithm doesn't assign slots for global variables
         // or objects passed as pointer arguments
         return llvm::isa<llvm::Argument,
