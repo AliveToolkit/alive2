@@ -674,13 +674,11 @@ llvmGetPassPluginInfo() {
 
       } else {
         // For non-batched clang tv, manually run TVPass after each pass
-        if (opt_save_ir && !report_filename.empty()) {
-          PB.getPassInstrumentationCallbacks()
-            ->registerBeforeNonSkippedPassCallback(
-              [](llvm::StringRef P, llvm::Any IR) {
+        PB.getPassInstrumentationCallbacks()->registerBeforeNonSkippedPassCallback(
+            [](llvm::StringRef P, llvm::Any IR) {
+              if (opt_save_ir && !report_filename.empty())
                 MClone = llvm::CloneModule(*unwrapModule(IR));
-          });
-        }
+        });
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
             [](llvm::StringRef P, llvm::Any IR,
                     const llvm::PreservedAnalyses &PA) {
