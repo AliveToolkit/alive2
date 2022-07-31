@@ -113,13 +113,13 @@ static void showStats() {
 }
 
 static void writeBitcodeAtomically(const fs::path report_filename) {
-  assert(!report_filename.empty());
   fs::path tmp_path;
   do {
     auto newname = report_filename.stem();
-    newname += "_tmp_" + get_random_str(8) + ".bc";
+    newname += "_" + get_random_str(8) + ".bc";
     tmp_path.replace_filename(newname);
   } while (fs::exists(tmp_path));
+
   std::error_code EC;
   llvm::raw_fd_ostream tmp_file(tmp_path.string(), EC);
   if (EC) {
@@ -129,10 +129,13 @@ static void writeBitcodeAtomically(const fs::path report_filename) {
   llvm::WriteBitcodeToFile(*MClone, tmp_file);
   tmp_file.close();
 
-  fs::path bc_filename = report_filename;
-  bc_filename.replace_extension(".bc");
-  std::rename(tmp_path.c_str(), bc_filename.c_str());
-  *out << "Wrote bitcode to: " << bc_filename << "\n";
+  fs::path bc_filename = tmp_path;
+  if (!report_filename.empty()) {
+    bc_filename = report_filename;
+    bc_filename.replace_extension(".bc");
+    std::rename(tmp_path.c_str(), bc_filename.c_str());
+  }
+  *out << "Wrote bitcode to: " << bc_filename << '\n';
 }
 
 static void emitCommandLine(ostream *out) {
@@ -308,7 +311,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
         "\n" << errs;
       if (errs.isUnsound()) {
         has_failure = true;
-        *out << "Pass: " << pass_name << "\n";
+        *out << "\nPass: " << pass_name << '\n';
         emitCommandLine(out);
         if (MClone)
           writeBitcodeAtomically(report_filename);
@@ -660,7 +663,7 @@ llvmGetPassPluginInfo() {
           else if (is_first)
             TVPass::batched_pass_begin_name = "beginning";
 
-          if ((is_first || do_start) && opt_save_ir && !report_filename.empty())
+          if ((is_first || do_start) && opt_save_ir)
               MClone = llvm::CloneModule(*unwrapModule(IR));
 
           if (is_first || do_start || do_finish)
@@ -674,11 +677,13 @@ llvmGetPassPluginInfo() {
 
       } else {
         // For non-batched clang tv, manually run TVPass after each pass
-        PB.getPassInstrumentationCallbacks()->registerBeforeNonSkippedPassCallback(
-            [](llvm::StringRef P, llvm::Any IR) {
-              if (opt_save_ir && !report_filename.empty())
+        if (opt_save_ir) {
+          PB.getPassInstrumentationCallbacks()
+            ->registerBeforeNonSkippedPassCallback(
+              [](llvm::StringRef P, llvm::Any IR) {
                 MClone = llvm::CloneModule(*unwrapModule(IR));
-        });
+          });
+        }
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
             [](llvm::StringRef P, llvm::Any IR,
                     const llvm::PreservedAnalyses &PA) {

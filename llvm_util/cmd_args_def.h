@@ -40,7 +40,7 @@ if (!report_dir_created && !opt_report_dir.empty()) {
     do {
       auto newname = fname.stem();
       if (newname.compare("-") == 0 || newname.compare("<stdin>") == 0)
-        newname = "";
+        newname = "in";
       newname += "_" + get_random_str(8) + ".txt";
       path.replace_filename(newname);
     } while (fs::exists(path));
