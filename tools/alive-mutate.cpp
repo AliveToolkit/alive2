@@ -446,7 +446,7 @@ bool inputVerify() {
       if (!fit->isDeclaration() && !fit->getName().empty()) {
         bool valid = false;
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
-            f2 != nullptr) {
+            f2 != nullptr && !f2->isDeclaration()) {
           llvm::TargetLibraryInfoWrapperPass TLI(
               llvm::Triple(M1.get()->getTargetTriple()));
           smt_init.emplace();
