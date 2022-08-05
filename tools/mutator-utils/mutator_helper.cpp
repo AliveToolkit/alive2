@@ -37,8 +37,8 @@ varSetEnd:
     }
     tmp.clear();
 
-    // landingPad has to be the first instruction in the block
-    while (!instIt->isTerminator() && llvm::isa<LandingPadInst>(&*instIt)) {
+    // pad inst has to be the first instruction in the block
+    while (!instIt->isTerminator() && mutator_util::isPadInstruction(&*instIt)) {
       ++instIt;
     }
 
@@ -272,7 +272,7 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
 bool RandomMoveHelper::shouldMutate() {
   return !moved && mutator->bitInTmp->size() > 2 &&
          !mutator->iitInTmp->isTerminator() &&
-         !llvm::isa<llvm::LandingPadInst>(&*mutator->iitInTmp);
+         !mutator_util::isPadInstruction(&*mutator->iitInTmp);
 }
 
 bool RandomMoveHelper::canMutate(llvm::Function *func) {
@@ -312,7 +312,7 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     ;
   /**
    * PHINode must be the first inst in the basic block.
-   * LandingPad must be the first inst in the block
+   * pad inst must be the first inst in the block
    */
   if (!llvm::isa<llvm::PHINode>(inst)) {
     for (llvm::Instruction *phiInst = &*beginIt;
@@ -321,10 +321,10 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
       ++beginPos, ++beginIt;
     }
   }
-  if (!llvm::isa<llvm::LandingPadInst>(inst)) {
-    for (llvm::Instruction *landingPad = &*beginIt;
-         llvm::isa<llvm::LandingPadInst>(landingPad);
-         landingPad = landingPad->getNextNonDebugInstruction()) {
+  if (!mutator_util::isPadInstruction(inst)) {
+    for (llvm::Instruction *padInst = &*beginIt;
+         mutator_util::isPadInstruction(padInst);
+         padInst = padInst->getNextNonDebugInstruction()) {
       ++beginPos, ++beginIt;
     }
   }
@@ -429,9 +429,7 @@ void RandomMoveHelper::debug() {
 bool RandomCodeInserterHelper::shouldMutate() {
   llvm::Instruction *inst = &*mutator->iitInTmp;
   return !generated && !llvm::isa<llvm::PHINode>(inst) &&
-         !llvm::isa<llvm::LandingPadInst>(inst) &&
-         !llvm::isa<llvm::CatchPadInst>(inst) &&
-         !llvm::isa<llvm::CleanupPadInst>(inst);
+         !mutator_util::isPadInstruction(inst);
 }
 
 void RandomCodeInserterHelper::debug() {

@@ -368,4 +368,8 @@ public:
     }
     return failed;
   }
+
+  static bool isPadInstruction(llvm::Instruction* inst){
+    return llvm::isa<llvm::LandingPadInst>(inst) || llvm::isa<CleanupPadInst>(inst) || llvm::isa<llvm::CatchPadInst>(inst);
+  }
 };
