@@ -38,7 +38,8 @@ varSetEnd:
     tmp.clear();
 
     // pad inst has to be the first instruction in the block
-    while (!instIt->isTerminator() && mutator_util::isPadInstruction(&*instIt)) {
+    while (!instIt->isTerminator() &&
+           mutator_util::isPadInstruction(&*instIt)) {
       ++instIt;
     }
 
@@ -625,12 +626,12 @@ void FunctionAttributeHelper::mutate() {
   updated = true;
   llvm::Function *func = mutator->currentFunction;
   setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
-  if(func->getReturnType()->isIntegerTy()){
+  if (func->getReturnType()->isIntegerTy()) {
     setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
     setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
     setFuncRetAttr(Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
-                                          : llvm::Attribute::AttrKind::SExt,
-                  Random::getRandomBool());
+                                           : llvm::Attribute::AttrKind::SExt,
+                   Random::getRandomBool());
   }
   for (size_t index : ptrPos) {
     setFuncParamAttr(index, llvm::Attribute::AttrKind::NoCapture,
