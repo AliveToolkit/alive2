@@ -196,7 +196,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     string name = F.getName().str();
     if (name.empty())
       name = "anon$" + std::to_string(++anon_count);
-    auto [I, first] = fns.try_emplace(name);
+    auto [I, first] = fns.try_emplace(std::move(name));
     if (onlyif_src_exists && first) {
       // src does not exist; skip this fn
       fns.erase(I);
