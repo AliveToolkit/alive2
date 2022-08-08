@@ -444,9 +444,15 @@ bool inputVerify() {
                      std::to_string(unnamedFunction++));
       }
       if (!fit->isDeclaration() && !fit->getName().empty()) {
-        bool valid = false;
+        bool valid = false, hasStoreInst=false;
+        for(auto use_it=fit->use_begin();!hasStoreInst&&use_it!=fit->use_end();use_it++) {
+          llvm::Value* user=use_it->getUser();
+          if(llvm::isa<llvm::StoreInst>(user)){
+            hasStoreInst = true;
+          }
+        }
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
-            f2 != nullptr && !f2->isDeclaration()) {
+            !hasStoreInst && f2 != nullptr && !f2->isDeclaration()) {
           llvm::TargetLibraryInfoWrapperPass TLI(
               llvm::Triple(M1.get()->getTargetTriple()));
           smt_init.emplace();
