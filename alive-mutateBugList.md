@@ -23,6 +23,8 @@ This category is for bugs that crashes
 3. VectorCombine crashes(https://github.com/llvm/llvm-project/issues/56377)
 4. InstCombine Crashes(https://github.com/llvm/llvm-project/issues/56463)
 5. InstCombine crashes (https://github.com/llvm/llvm-project/issues/56945)
+6. InstSimplify Bug (https://github.com/llvm/llvm-project/issues/56968)
+7. InstCombine Crash (https://github.com/llvm/llvm-project/issues/56981)
 
 ## Category 3
 This category is for that the test file is originaly wrong
