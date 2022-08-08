@@ -845,7 +845,7 @@ ResizeIntegerHelper::constructUseChain(llvm::Instruction *startPoint) {
           use_it = cur->use_begin();
         }
         llvm::Value *val = use_it->getUser();
-        if (isValidNode(val)) {
+        if (isValidNode(val) && std::find(res.begin(),res.end(),val)==res.end()) {
           hasNext = true;
           res.push_back(cur);
           cur = (llvm::Instruction *)val;
