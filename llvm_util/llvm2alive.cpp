@@ -30,9 +30,9 @@ namespace {
 
 FpRoundingMode parse_rounding(llvm::Instruction &i) {
   auto *fp = dyn_cast<llvm::ConstrainedFPIntrinsic>(&i);
-  if (!fp || !fp->getRoundingMode().hasValue())
+  if (!fp || !fp->getRoundingMode().has_value())
     return {};
-  switch (fp->getRoundingMode().getValue()) {
+  switch (*fp->getRoundingMode()) {
   case llvm::RoundingMode::Dynamic:           return FpRoundingMode::Dynamic;
   case llvm::RoundingMode::NearestTiesToAway: return FpRoundingMode::RNA;
   case llvm::RoundingMode::NearestTiesToEven: return FpRoundingMode::RNE;
@@ -45,9 +45,9 @@ FpRoundingMode parse_rounding(llvm::Instruction &i) {
 
 FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   auto *fp = dyn_cast<llvm::ConstrainedFPIntrinsic>(&i);
-  if (!fp || !fp->getExceptionBehavior().hasValue())
+  if (!fp || !fp->getExceptionBehavior().has_value())
     return {};
-  switch (fp->getExceptionBehavior().getValue()) {
+  switch (*fp->getExceptionBehavior()) {
   case llvm::fp::ebIgnore:  return FpExceptionMode::Ignore;
   case llvm::fp::ebMayTrap: return FpExceptionMode::MayTrap;
   case llvm::fp::ebStrict:  return FpExceptionMode::Strict;
