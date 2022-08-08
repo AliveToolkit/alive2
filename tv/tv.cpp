@@ -158,10 +158,12 @@ struct TVLegacyPass final : public llvm::ModulePass {
   bool onlyif_src_exists = false; // Verify this pair only if src exists
   const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override
     = nullptr;
+  unsigned anon_count;
 
   TVLegacyPass() : ModulePass(ID) {}
 
   bool runOnModule(llvm::Module &M) override {
+    anon_count = 0;
     for (auto &F: M)
       runOnFunction(F);
     return false;
@@ -191,7 +193,10 @@ struct TVLegacyPass final : public llvm::ModulePass {
       TLI = &getAnalysis<llvm::TargetLibraryInfoWrapperPass>().getTLI(F);
     }
 
-    auto [I, first] = fns.try_emplace(F.getName().str());
+    string name = F.getName().str();
+    if (name.empty())
+      name = "anon$" + std::to_string(++anon_count);
+    auto [I, first] = fns.try_emplace(name);
     if (onlyif_src_exists && first) {
       // src does not exist; skip this fn
       fns.erase(I);

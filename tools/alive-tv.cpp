@@ -265,6 +265,7 @@ int main(int argc, char **argv) {
   llvm::EnableDebugBuffering = true;
   llvm::llvm_shutdown_obj llvm_shutdown; // Call llvm_shutdown() on exit.
   llvm::LLVMContext Context;
+  unsigned M1_anon_count = 0;
 
   std::string Usage =
       R"EOF(Alive2 stand-alone translation validator:
@@ -344,15 +345,23 @@ convenient way to demonstrate an existing optimizer bug.
   for (auto &F1 : *M1.get()) {
     if (F1.isDeclaration())
       continue;
+    if (F1.getName().empty())
+      M1_anon_count++;
     if (!func_names.empty() && !func_names.count(F1.getName().str()))
       continue;
+    unsigned M2_anon_count = 0;
     for (auto &F2 : *M2.get()) {
-      if (F2.isDeclaration() || F1.getName() != F2.getName())
+      if (F2.isDeclaration())
         continue;
-      if (!compareFunctions(F1, F2, TLI))
-        if (opt_error_fatal)
-          goto end;
-      break;
+      if (F2.getName().empty())
+        M2_anon_count++;
+      if ((F1.getName().empty() && (M1_anon_count == M2_anon_count)) ||
+          (F1.getName() == F2.getName())) {
+        if (!compareFunctions(F1, F2, TLI))
+          if (opt_error_fatal)
+            goto end;
+        break;
+      }
     }
   }
 
