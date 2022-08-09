@@ -205,6 +205,7 @@ public:
   void init(std::shared_ptr<FunctionMutator> self);
   void removeTmpFunction();
   void removeAllUndef();
+  bool checkValid();
 };
 
 /*

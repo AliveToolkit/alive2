@@ -131,7 +131,7 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
-  if(ResizeIntegerHelper::canMutate(currentFunction)){
+  if (ResizeIntegerHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<ResizeIntegerHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
@@ -220,6 +220,49 @@ bool FunctionMutator::canMutate(const llvm::Function *function,
                      });
 }
 
+bool FunctionMutator::checkValid() {
+  std::string str;
+  llvm::raw_string_ostream sout(str);
+  if (llvm::verifyFunction(*functionInTmp, (llvm::raw_ostream *)&sout)) {
+    // fix mustfail
+    if (sout.str().find("musttail") != std::string::npos) {
+      for (auto bb_it = functionInTmp->begin(); bb_it != functionInTmp->end();
+           ++bb_it) {
+        if (llvm::isa<llvm::ReturnInst>(bb_it->getTerminator())) {
+          llvm::ReturnInst *ret = (llvm::ReturnInst *)bb_it->getTerminator();
+          llvm::Value *retVal = ret->getReturnValue();
+          if (retVal == nullptr) {
+            continue;
+          }
+          llvm::Value *musttailCall = nullptr;
+          if (llvm::isa<llvm::Instruction>(retVal)) {
+            if (llvm::isa<llvm::BitCastInst>(retVal)) {
+              llvm::BitCastInst *bitcast = (llvm::BitCastInst *)retVal;
+              retVal = bitcast->getOperand(0);
+            }
+            if (llvm::isa<llvm::CallInst>(retVal)) {
+              musttailCall = retVal;
+            }
+          }
+          for (auto inst_it = bb_it->begin(); inst_it != bb_it->end();
+               ++inst_it) {
+            if (llvm::isa<llvm::CallInst>(*inst_it)) {
+              llvm::CallInst *callInst = (llvm::CallInst *)&*inst_it;
+              if (callInst != musttailCall &&
+                  callInst->getTailCallKind() ==
+                      llvm::CallInst::TailCallKind::TCK_MustTail) {
+                callInst->setTailCallKind(
+                    llvm::CallInst::TailCallKind::TCK_None);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 void FunctionMutator::mutate() {
   if (debug) {
     print();
@@ -241,6 +284,7 @@ void FunctionMutator::mutate() {
     }
   } while (!mutated && canMutate);
 
+  llvm::errs() << "verify result: " << checkValid() << "\n";
   if (debug) {
     print();
   }
@@ -408,11 +452,11 @@ llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
         return &*vMap[domVals[pos]];
       } else if (isIntTy && domVals[pos]->getType()->isIntegerTy()) {
         llvm::Value *valInTmp = &*vMap[domVals[pos]];
-        llvm::Instruction* insertBefore=nullptr;
-        if(llvm::isa<llvm::Argument>(valInTmp)){
-          insertBefore=&*functionInTmp->begin()->begin();
-        }else{
-          insertBefore=&*iitInTmp;
+        llvm::Instruction *insertBefore = nullptr;
+        if (llvm::isa<llvm::Argument>(valInTmp)) {
+          insertBefore = &*functionInTmp->begin()->begin();
+        } else {
+          insertBefore = &*iitInTmp;
         }
         return mutator_util::updateIntegerSize(
             valInTmp, (llvm::IntegerType *)ty, &*insertBefore);
