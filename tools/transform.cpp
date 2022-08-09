@@ -840,6 +840,14 @@ static void calculateAndInitConstants(Transform &t) {
   bool does_mem_access = false;
   bool has_ptr_load = false;
 
+  auto update_min_vect_sz = [&](const Type &ty) {
+    auto elemsz = minVectorElemSize(ty);
+    if (min_vect_elem_sz && elemsz)
+      min_vect_elem_sz = gcd(min_vect_elem_sz, elemsz);
+    else if (elemsz)
+      min_vect_elem_sz = elemsz;
+  };
+
   for (auto fn : { &t.src, &t.tgt }) {
     bool is_src = fn == &t.src;
     unsigned &cur_num_locals = is_src ? num_locals_src : num_locals_tgt;
@@ -851,6 +859,8 @@ static void calculateAndInitConstants(Transform &t) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (!i)
         continue;
+
+      update_min_vect_sz(i->getType());
 
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
@@ -876,14 +886,6 @@ static void calculateAndInitConstants(Transform &t) {
                             : sz;
       }
     }
-
-    auto update_min_vect_sz = [&](const Type &ty) {
-      auto elemsz = minVectorElemSize(ty);
-      if (min_vect_elem_sz && elemsz)
-        min_vect_elem_sz = gcd(min_vect_elem_sz, elemsz);
-      else if (elemsz)
-        min_vect_elem_sz = elemsz;
-    };
 
     for (auto &i : fn->instrs()) {
       if (returns_local(i))
