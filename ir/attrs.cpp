@@ -193,15 +193,16 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   if (derefBytes || derefOrNullBytes || deref_expr.isValid()) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
-      s.addUB(Pointer(m, ptrvalue).isDereferenceable(derefBytes, align));
+      s.addUB(
+        Pointer(m, ptrvalue).isDereferenceable(derefBytes, align, false, true));
     if (derefOrNullBytes)
-      s.addUB(
-        Pointer(m, ptrvalue).isDereferenceable(derefOrNullBytes, align)() ||
-        p.isNull());
+      s.addUB(p.isNull() ||
+              Pointer(m, ptrvalue).isDereferenceable(derefOrNullBytes, align,
+                                                     false, true)());
     if (deref_expr.isValid())
-      s.addUB(
-        Pointer(m, ptrvalue).isDereferenceable(deref_expr, align, false)() ||
-        p.isNull());
+      s.addUB(p.isNull() ||
+              Pointer(m, ptrvalue).isDereferenceable(deref_expr, align, false,
+                                                     true)());
   } else if (align > 1)
     non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
