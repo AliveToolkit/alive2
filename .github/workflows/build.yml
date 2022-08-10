@@ -45,7 +45,9 @@ jobs:
 
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
-        run: brew install z3 re2c ninja
+        run: |
+          sudo xcode-select -s /Applications/Xcode_14.0.app
+          brew install z3 re2c ninja
 
       - name: Compile
         run: ./.github/scripts/build.sh
