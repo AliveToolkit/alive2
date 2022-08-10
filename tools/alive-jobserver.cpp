@@ -95,7 +95,8 @@ int main(int argc, char *const argv[]) {
 
   srand(getpid() + time(nullptr));
   do {
-    sprintf(fifo_filename, "/tmp/alive2_fifo_%lx", (unsigned long)rand());
+    snprintf(fifo_filename, sizeof(fifo_filename), "/tmp/alive2_fifo_%lx",
+             (unsigned long)rand());
   } while (access(fifo_filename, F_OK) == 0);
 
   int res = mkfifo(fifo_filename, 0666);
