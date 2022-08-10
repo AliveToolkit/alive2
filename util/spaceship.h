@@ -3,15 +3,13 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#if defined(__clang__) && __clang_major__ < 14
+#if defined(__clang__) && __clang_major__ < 15 && defined(__APPLE__)
 
 #include <compare>
 
-#ifdef __APPLE__
 namespace std {
 inline bool is_neq(std::weak_ordering o) { return o != 0; }
 }
-#endif
 
 namespace {
 
@@ -24,21 +22,7 @@ std::weak_ordering operator<=>(const std::string &lhs, const std::string &rhs) {
 }
 
 template <typename T>
-#ifdef __APPLE__
 std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE);
-#else
-std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
-  while (I != E && II != EE) {
-    auto cmp = *I <=> *II;
-    if (std::is_neq(cmp))
-      return cmp;
-    ++I, ++II;
-  }
-  if (I == E)
-    return II == EE ? std::weak_ordering::equivalent : std::weak_ordering::less;
-  return std::weak_ordering::greater;
-}
-#endif
 
 template <typename T>
 std::weak_ordering operator<=>(const std::vector<T> &lhs,
@@ -66,7 +50,6 @@ std::weak_ordering operator<=>(const std::pair<X,Y> &lhs,
   return lhs.second <=> rhs.second;
 }
 
-#ifdef __APPLE__
 template <typename T>
 std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
   while (I != E && II != EE) {
@@ -79,7 +62,6 @@ std::weak_ordering compare_iterators(T &&I, const T &E, T &&II, const T &EE) {
     return II == EE ? std::weak_ordering::equivalent : std::weak_ordering::less;
   return std::weak_ordering::greater;
 }
-#endif
 
 }
 
