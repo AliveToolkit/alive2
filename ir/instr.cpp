@@ -2054,9 +2054,10 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
       sz = attr.derefBytes;                                            \
     if (attr.has(decay<decltype(attr)>::type::DereferenceableOrNull))  \
       sz = gcd(sz, attr.derefOrNullBytes);                             \
-    /* Without align, nothing is guaranteed about the bytesize */      \
-    sz = gcd(sz, retattr.align ? retattr.align : 1);                                       \
-    bytesize = bytesize ? gcd(bytesize, sz) : sz;                      \
+    if (sz) {                                                          \
+      sz = gcd(sz, retattr.align ? retattr.align : 1);                 \
+      bytesize = bytesize ? gcd(bytesize, sz) : sz;                    \
+    }                                                                  \
   } while (0)
 
   auto &retattr = getAttributes();
@@ -2076,12 +2077,11 @@ FnCall::ByteAccessInfo FnCall::getByteAccessInfo() const {
     // f(%p, %q) does not contribute to the bytesize. After bytesize is fixed,
     // function calls update a memory with the granularity.
   }
-  if (bytesize == 0) {
-    // No dereferenceable attribute
-    return {};
-  }
-
 #undef UPDATE
+
+  // No dereferenceable attribute
+  if (bytesize == 0)
+    return {};
 
   return ByteAccessInfo::anyType(bytesize);
 }
