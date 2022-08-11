@@ -2030,12 +2030,13 @@ Memory::refined(const Memory &other, bool fncall,
   set<expr> undef_vars;
 
   AliasSet block_alias(other);
+  auto min_read_sz = bits_byte / 8;
   for (auto &[mem, set]
          : { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2)}) {
     if (set) {
       for (auto &it: *set_ptrs) {
-        block_alias.unionWith(
-          computeAliasing(Pointer(*mem, it.val.value), 1, 1, false));
+        block_alias.unionWith(computeAliasing(Pointer(*mem, it.val.value),
+                                              min_read_sz, min_read_sz, false));
       }
     } else {
       if (mem->next_nonlocal_bid > 0)
