@@ -1066,7 +1066,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     return;
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
-    if (always_noread(i))
+    if (always_noread(i, true))
       continue;
 
     Byte byte(*this, non_local_block_val[i].val.load(offset));

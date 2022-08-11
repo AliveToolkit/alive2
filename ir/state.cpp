@@ -663,7 +663,7 @@ void State::addNoReturn(const expr &cond) {
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
   if (cond.isTrue())
     undef_vars.clear();
-  addUB(!cond);
+  domain.path &= !cond;
 }
 
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
