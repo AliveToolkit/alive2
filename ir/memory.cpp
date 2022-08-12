@@ -390,6 +390,17 @@ bool Memory::observesAddresses() {
   return observes_addresses;
 }
 
+static bool isFnReturnValue(const expr &e) {
+  string name;
+  expr val;
+  unsigned hi, lo;
+  if (e.isExtract(val, hi, lo))
+    name = val.fn_name();
+  else
+    name = e.fn_name();
+  return name.starts_with("#fnret_");
+}
+
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
   string name;
   expr load, blk, idx;
@@ -399,10 +410,10 @@ int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
   else
     name = e.fn_name();
 
-  if (string_view(name).substr(0, 9) == "init_mem_")
+  if (name.starts_with("init_mem_"))
     return 1;
 
-  return match_any_init && string_view(name).substr(0, 8) == "blk_val!" ? 2 : 0;
+  return match_any_init && name.starts_with("blk_val!") ? 2 : 0;
 }
 }
 
@@ -1298,9 +1309,10 @@ Memory::FnRetData Memory::FnRetData::mkIf(const expr &cond, const FnRetData &a,
 }
 
 pair<expr,Memory::FnRetData>
-Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
+Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
                 bool is_local, const FnRetData *data) {
   assert(has_fncall);
+  string name = string("#fnret_") + name0;
 
   // can return local block or null (on address space 0 only FIXME)
   if (is_local) {
@@ -1316,7 +1328,8 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
 
     expr var
       = data ? data->var
-             : expr::mkFreshVar(name, expr::mkUInt(0, 2 + bits_for_offset));
+             : expr::mkFreshVar(name.c_str(),
+                                expr::mkUInt(0, 2 + bits_for_offset));
     auto is_null = var.extract(0, 0) == 0;
     auto alloc_ty = var.extract(1, 1);
     auto offset = var.extract(bits_for_offset+2-1, 2);
@@ -1342,8 +1355,8 @@ Memory::mkFnRet(const char *name, const vector<PtrInput> &ptr_inputs,
   bool has_local = hasEscapedLocals();
 
   unsigned bits_bid = has_local ? bits_for_bid : Pointer::bitsShortBid();
-  expr var
-    = expr::mkFreshVar(name, expr::mkUInt(0, bits_bid + bits_for_offset));
+  expr var = expr::mkFreshVar(name.c_str(),
+                              expr::mkUInt(0, bits_bid + bits_for_offset));
   auto p_bid = var.extract(bits_bid + bits_for_offset - 1, bits_for_offset);
   if (!has_local)
     p_bid = Pointer::mkLongBid(p_bid, false);
@@ -2124,7 +2137,8 @@ void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
         escaped_local_blks.setMayAlias(true, bid);
     } else if (isInitialMemBlock(bid_expr)) {
       // initial non local block bytes don't contain local pointers.
-      continue;
+    } else if (isFnReturnValue(bid_expr)) {
+      // Function calls have already escaped whatever they needed to.
     } else {
       // may escape a local ptr, but we don't know which one
       escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
