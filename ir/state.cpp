@@ -575,6 +575,7 @@ bool State::startBB(const BasicBlock &bb) {
       analysis.meet_with(data.analysis);
     isFirst = false;
   }
+  assert(!isFirst);
 
   domain.path = path();
   domain.UB = *UB();
@@ -585,6 +586,7 @@ bool State::startBB(const BasicBlock &bb) {
 }
 
 void State::addJump(const BasicBlock &dst0, expr &&cond) {
+  cond &= domain.path;
   if (cond.isFalse())
     return;
 
@@ -593,7 +595,6 @@ void State::addJump(const BasicBlock &dst0, expr &&cond) {
     dst = &f.getSinkBB();
   }
 
-  cond &= domain.path;
   auto &data = predecessor_data[dst][current_bb];
   data.mem.add(memory, cond);
   data.UB.add(domain.UB(), cond);
