@@ -1631,8 +1631,7 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
   } else {
     state->addAxiom(p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));
-    if (!is_null)
-      state->addAxiom(p.getAllocType() == alloc_ty);
+    state->addAxiom(p.getAllocType() == alloc_ty);
 
     if (align_bits && observesAddresses()) {
       auto addr = p.getAddress();
