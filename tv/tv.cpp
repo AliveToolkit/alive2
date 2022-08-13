@@ -102,7 +102,7 @@ void printDot(const Function &tgt, int n) {
 string toString(const Function &fn) {
   stringstream ss;
   fn.print(ss);
-  return ss.str();
+  return std::move(ss).str();
 }
 
 static void showStats() {
