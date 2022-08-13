@@ -20,13 +20,9 @@ file_reader::file_reader(const char *filename, unsigned padding) {
   f.seekg(0, ios::end);
   sz = f.tellg();
   f.seekg(0, ios::beg);
-  buf = new char[sz + padding];
-  f.read(buf, sz);
-  memset(buf + sz, 0, padding);
-}
-
-file_reader::~file_reader() {
-  delete[] buf;
+  buf = make_unique<char[]>(sz + padding);
+  f.read(buf.get(), sz);
+  memset(buf.get() + sz, 0, padding);
 }
 
 
