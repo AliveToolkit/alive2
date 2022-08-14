@@ -476,7 +476,8 @@ expr Pointer::isHeapAllocated() const {
 
 expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
-  expr local = getAllocType() == other.getAllocType();
+  expr local = other.isLocal();
+  local &= getAllocType() == other.getAllocType();
   local &= blockSize() == other.blockSize();
   local &= getOffset() == other.getOffset();
   // Attributes are ignored at refinement.
