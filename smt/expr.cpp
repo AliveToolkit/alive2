@@ -1487,6 +1487,14 @@ expr expr::operator||(const expr &rhs) const {
       (rhs.isNot(n) && eq(n)))
     return true;
 
+  // (a & b) | (!a & b) -> b
+  expr a, b, c, d;
+  if (isAnd(a, b) && rhs.isAnd(c, d) && b.eq(d)) {
+    if ((a.isNot(n) && n.eq(c)) ||
+        (c.isNot(n) && n.eq(a)))
+      return b;
+  }
+
   C(rhs);
   Z3_ast args[] = { ast(), rhs() };
   return Z3_mk_or(ctx(), 2, args);
@@ -1933,6 +1941,11 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
     if (rhs.isOne())
       return lhs;
   }
+
+  // (ite c a (ite c2 a b)) -> (ite (or c c2) a b)
+  expr cond2, then2, else2;
+  if (els.isIf(cond2, then2, else2) && then.eq(then2))
+    return mkIf(cond || cond2, then, else2);
 
   return Z3_mk_ite(ctx(), cond(), then(), els());
 }

@@ -1345,7 +1345,7 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
     local_blk_size.add(short_bid, expr(size));
     local_blk_align.add(short_bid, expr(align));
 
-    assert((Pointer::MALLOC & 2) == 2 && (Pointer::CXX_NEW & 2) == 2);
+    static_assert((Pointer::MALLOC & 2) == 2 && (Pointer::CXX_NEW & 2) == 2);
     local_blk_kind.add(short_bid, expr::mkUInt(1, 1).concat(alloc_ty));
 
     return { expr::mkIf(is_null, Pointer::mkNullPointer(*this)(), ptr()),
