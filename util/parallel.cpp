@@ -180,6 +180,12 @@ static ssize_t safe_write(int fd, const void *void_buf, size_t count) {
  */
 void parallel::finishChild(bool is_timeout) {
   ensureChild();
+  /*
+   * return the token before performing writes that may block. this
+   * results in a short-term load violation but also it prevents a
+   * deadlock
+   */
+  putToken();
   if (is_timeout) {
     const char *msg = "ERROR: Timeout asynchronous\n\n";
     safe_write(fd_to_parent, msg, std::strlen(msg));
@@ -189,7 +195,6 @@ void parallel::finishChild(bool is_timeout) {
     auto size = data.size();
     ENSURE(safe_write(me.pipe[1], data.c_str(), size) == (ssize_t)size);
   }
-  putToken();
 }
 
 void parallel::finishParent() {
