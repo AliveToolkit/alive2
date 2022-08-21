@@ -8,9 +8,11 @@
 #include "smt/solver.h"
 #include "util/errors.h"
 #include <memory>
-#include <string>
 #include <ostream>
+#include <string>
 #include <unordered_map>
+
+class Cache;
 
 namespace tools {
 
@@ -51,9 +53,10 @@ class TransformVerify {
   Transform &t;
   std::unordered_map<std::string, const IR::Instr*> tgt_instrs;
   bool check_each_var;
+  Cache *cache;
 
 public:
-  TransformVerify(Transform &t, bool check_each_var);
+  TransformVerify(Transform &t, bool check_each_var, Cache *cache);
   std::pair<std::unique_ptr<IR::State>,std::unique_ptr<IR::State>> exec() const;
   util::Errors verify() const;
   TypingAssignments getTypings() const;

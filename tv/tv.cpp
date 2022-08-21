@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/memory.h"
+#include "llvm_util/cache.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/utils.h"
 #include "smt/smt.h"
@@ -81,6 +82,7 @@ bool showed_stats = false;
 bool has_failure = false;
 // If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
+unique_ptr<Cache> cache;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
 std::unique_ptr<llvm::Module> MClone;
@@ -242,14 +244,22 @@ struct TVLegacyPass final : public llvm::ModulePass {
   static bool verify(Transform &t, int n, const string &src_tostr) {
     printDot(t.tgt, n);
 
+    auto tgt_tostr = toString(t.tgt);
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
-      if (src_tostr == toString(t.tgt)) {
+      if (src_tostr == tgt_tostr) {
         if (!opt_quiet)
           t.print(*out, print_opts);
         *out << "Transformation seems to be correct! (syntactically equal)\n\n";
         return false;
       }
+    }
+
+    // Since we have an open connection to the Redis server, we have
+    // to do this before forking. Anyway, this is fast.
+    if (cache && cache->lookup(src_tostr + "===\n" + tgt_tostr)) {
+      *out << "Skipping repeated query\n\n";
+      return false;
     }
 
     if (parallelMgr) {
@@ -296,7 +306,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
     smt_init->reset();
     t.preprocess();
-    TransformVerify verifier(t, false);
+    TransformVerify verifier(t, false, &*cache);
     if (!opt_quiet)
       t.print(*out, print_opts);
 
@@ -344,11 +354,6 @@ struct TVLegacyPass final : public llvm::ModulePass {
     return false;
   }
 
-  bool doInitialization(llvm::Module &module) override {
-    initialize(module);
-    return false;
-  }
-
   static void initialize(llvm::Module &module) {
     if (initialized++)
       return;
@@ -378,6 +383,10 @@ struct TVLegacyPass final : public llvm::ModulePass {
         parallelMgr.reset();
       }
     }
+
+    if (opt_cache)
+      cache = make_unique<Cache>(opt_cache_port,
+                                 opt_cache_allow_version_mismatch);
 
     showed_stats = false;
     llvm_util_init.emplace(*out, module.getDataLayout());

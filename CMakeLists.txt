@@ -167,7 +167,12 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   include_directories(${LLVM_INCLUDE_DIRS})
   add_definitions(${LLVM_DEFINITIONS})
 
+  find_package(hiredis REQUIRED)
+  include_directories(${HIREDIS_INCLUDE_DIR})
+
   set(LLVM_UTIL_SRCS
+    "llvm_util/cache.cpp"
+    "llvm_util/crc.cpp"
     "llvm_util/known_fns.cpp"
     "llvm_util/llvm_optimizer.cpp"
     "llvm_util/llvm2alive.cpp"
@@ -235,15 +240,16 @@ endif()
 if (CYGWIN)
   # cmake on cygwin doesn't seem to know about dlls..
   get_filename_component(Z3_LIB_DIR "${Z3_LIBRARIES}" DIRECTORY)
-  set(CMAKE_EXE_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
-  set(CMAKE_SHARED_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3")
-  file(COPY "${Z3_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
+  get_filename_component(HIREDIS_LIB_DIR "${HIREDIS_LIBRARIES}" DIRECTORY)
+  set(CMAKE_EXE_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3 -L${HIREDIS_LIB_DIR} -lhiredis")
+  set(CMAKE_SHARED_LINKER_FLAGS "-L${Z3_LIB_DIR} -lz3 -L${HIREDIS_LIB_DIR} -lhiredis")
+  file(COPY "${Z3_LIBRARIES} ${HIREDIS_LIBRARIES}" DESTINATION "${PROJECT_BINARY_DIR}")
 else()
-  target_link_libraries(alive PRIVATE ${Z3_LIBRARIES})
-  #target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES})
+  target_link_libraries(alive PRIVATE ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})
+  #target_link_libraries(alive2 PRIVATE ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})
   if (BUILD_LLVM_UTILS OR BUILD_TV)
-    target_link_libraries(alive-tv PRIVATE ${Z3_LIBRARIES})
-    target_link_libraries(alive-exec PRIVATE ${Z3_LIBRARIES})
+    target_link_libraries(alive-tv PRIVATE ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})
+    target_link_libraries(alive-exec PRIVATE ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})
   endif()
 endif()
 

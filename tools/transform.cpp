@@ -29,7 +29,6 @@ using namespace util;
 using namespace std;
 using util::config::dbg;
 
-
 static void print_single_varval(ostream &os, const State &st, const Model &m,
                                 const Value *var, const Type &type,
                                 const StateValue &val, unsigned child) {
@@ -1093,8 +1092,9 @@ static void calculateAndInitConstants(Transform &t) {
 
 namespace tools {
 
-TransformVerify::TransformVerify(Transform &t, bool check_each_var) :
-  t(t), check_each_var(check_each_var) {
+TransformVerify::TransformVerify(Transform &t, bool check_each_var,
+                                 Cache *cache) :
+  t(t), check_each_var(check_each_var), cache(cache) {
   if (check_each_var) {
     for (auto &i : t.tgt.instrs()) {
       tgt_instrs.emplace(i.getName(), &i);
