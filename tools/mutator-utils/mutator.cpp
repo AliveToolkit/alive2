@@ -193,7 +193,6 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
   // don't update an alloca inst
   // don't do operations on Switch inst for now.
   if (llvm::isa<llvm::PHINode>(inst) ||
-      llvm::isa<llvm::GetElementPtrInst>(inst) ||
       llvm::isa<llvm::AllocaInst>(inst) || llvm::isa<llvm::SwitchInst>(inst)) {
 
     return false;
