@@ -1,5 +1,6 @@
 #include "mutator.h"
 #include "mutator_helper.h"
+#include "llvm/Support/CommandLine.h"
 
 void StubMutator::moveToNextInst() {
   ++iit;
@@ -104,6 +105,10 @@ void FunctionMutator::print() {
   llvm::errs() << "\n";
 }
 
+extern cl::list<size_t> disableSEXT;
+extern cl::list<size_t> disableZEXT;
+extern cl::list<size_t> disableEXT;
+
 void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
   for (llvm::inst_iterator it = inst_begin(*currentFunction);
        it != inst_end(*currentFunction); ++it) {
@@ -116,7 +121,18 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
   }
 
   if (FunctionAttributeHelper::canMutate(currentFunction)) {
-    helpers.push_back(std::make_unique<FunctionAttributeHelper>(self));
+    std::unordered_set<size_t> disableSEXTset, disableZEXTset, disableEXTset;
+    for (size_t bitWidth : disableSEXT) {
+      disableSEXTset.insert(bitWidth);
+    }
+    for (size_t bitWidth : disableZEXT) {
+      disableZEXTset.insert(bitWidth);
+    }
+    for (size_t bitWidth : disableEXT) {
+      disableEXTset.insert(bitWidth);
+    }
+    helpers.push_back(std::make_unique<FunctionAttributeHelper>(
+        self, disableSEXTset, disableZEXTset, disableEXTset));
     whenMoveToNextFuncFuncs.push_back(helpers.size() - 1);
   }
 
@@ -192,8 +208,8 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
   // don't do replacement on PHI node
   // don't update an alloca inst
   // don't do operations on Switch inst for now.
-  if (llvm::isa<llvm::PHINode>(inst) ||
-      llvm::isa<llvm::AllocaInst>(inst) || llvm::isa<llvm::SwitchInst>(inst)) {
+  if (llvm::isa<llvm::PHINode>(inst) || llvm::isa<llvm::AllocaInst>(inst) ||
+      llvm::isa<llvm::SwitchInst>(inst)) {
 
     return false;
   }

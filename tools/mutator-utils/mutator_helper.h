@@ -1,5 +1,6 @@
 #pragma once
 #include "tools/mutator-utils/util.h"
+#include "unordered_set"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -233,11 +234,16 @@ public:
 
 class FunctionAttributeHelper : public MutationHelper {
   bool updated;
-  llvm::SmallVector<size_t> ptrPos, intPos;
+  llvm::SmallVector<size_t> ptrPos, onlySEXTPos, onlyZEXTPos, bothEXTPos;
+  std::unordered_set<size_t> disableSEXT, disableZEXT, disableEXT;
 
 public:
-  FunctionAttributeHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), updated(false){};
+  FunctionAttributeHelper(std::shared_ptr<FunctionMutator> mutator,
+                          const std::unordered_set<size_t> &disableSEXT,
+                          const std::unordered_set<size_t> &disableZEXT,
+                          const std::unordered_set<size_t> &disableEXT)
+      : MutationHelper(mutator), updated(false), disableSEXT(disableSEXT),
+        disableZEXT(disableZEXT), disableEXT(disableEXT){};
   virtual void init() override;
   virtual void reset() override {
     updated = false;

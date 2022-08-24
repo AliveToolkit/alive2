@@ -150,24 +150,6 @@ llvm::cl::opt<bool>
                  "mutation file and verify its syntax, without calling alive2"),
              llvm::cl::cat(mutatorArgs));
 
-cl::list<int>
-    disableSEXT(LLVM_ARGS_PREFIX "disable-sigext",
-                cl::desc("option list -- This option would disable adding or "
-                         "removing sigext on integer type you specified"),
-                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
-
-cl::list<int>
-    disableZEXT(LLVM_ARGS_PREFIX "disable-zeroext",
-                cl::desc("option list -- This option would disable adding or "
-                         "removing sigext on integer type you specified"),
-                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
-
-cl::list<int>
-    disableEXT(LLVM_ARGS_PREFIX "disable-ext",
-               cl::desc("option list -- This option would disable all ext "
-                        "instructions on integer type you specified"),
-               cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
-
 filesystem::path inputPath, outputPath;
 
 optional<smt::smt_initializer> smt_init;
@@ -361,6 +343,24 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return shouldLog;
 }
 } // namespace
+
+cl::list<size_t>
+    disableSEXT(LLVM_ARGS_PREFIX "disable-sigext",
+                cl::desc("option list -- This option would disable adding or "
+                         "removing sigext on integer type you specified"),
+                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
+cl::list<size_t>
+    disableZEXT(LLVM_ARGS_PREFIX "disable-zeroext",
+                cl::desc("option list -- This option would disable adding or "
+                         "removing sigext on integer type you specified"),
+                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
+cl::list<size_t>
+    disableEXT(LLVM_ARGS_PREFIX "disable-ext",
+               cl::desc("option list -- This option would disable all ext "
+                        "instructions on integer type you specified"),
+               cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 int logIndex, validFuncNum;
 void copyMode(), timeMode(), loggerInit(int ith), init(),
