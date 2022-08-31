@@ -225,7 +225,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.tgt = std::move(*fn);
 
     verify(t, I->second.n++, I->second.fn_tostr);
-    I->second.fn = *llvm2alive(F, *TLI, false);
+    I->second.fn = *llvm2alive(F, *TLI, true);
     I->second.fn_tostr = toString(I->second.fn);
     return false;
   }
