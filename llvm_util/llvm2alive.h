@@ -21,7 +21,7 @@ struct initializer {
   initializer(std::ostream &os, const llvm::DataLayout &DL);
 };
 
-std::optional<IR::Function> llvm2alive(llvm::Function &F,
-    const llvm::TargetLibraryInfo &TLI,
-    const std::vector<std::string_view> &gvnamesInSrc = {});
+std::optional<IR::Function>
+llvm2alive(llvm::Function &F, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
+           const std::vector<std::string_view> &gvnamesInSrc = {});
 }

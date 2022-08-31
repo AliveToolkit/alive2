@@ -203,8 +203,9 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
-    auto fn = llvm2alive(F, *TLI, first ? vector<string_view>()
-                                        : I->second.fn.getGlobalVarNames());
+    auto fn = llvm2alive(F, *TLI, first,
+                         first ? vector<string_view>()
+                               : I->second.fn.getGlobalVarNames());
     if (!fn) {
       fns.erase(I);
       return false;
@@ -223,17 +224,9 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.src = std::move(I->second.fn);
     t.tgt = std::move(*fn);
 
-    bool regenerate_tgt = verify(t, I->second.n++, I->second.fn_tostr);
-
-    if (regenerate_tgt) {
-      I->second.fn = *llvm2alive(F, *TLI);
-      I->second.fn_tostr = toString(I->second.fn);
-    } else {
-      I->second.fn = std::move(t.tgt);
-      // updating I->second.fn_tostr isn't necessary because the two functions
-      // are equal or some error occurred.
-    }
-
+    verify(t, I->second.n++, I->second.fn_tostr);
+    I->second.fn = *llvm2alive(F, *TLI, true);
+    I->second.fn_tostr = toString(I->second.fn);
     return false;
   }
 

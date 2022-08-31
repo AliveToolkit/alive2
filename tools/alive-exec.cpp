@@ -68,7 +68,7 @@ optional<smt::smt_initializer> smt_init;
 
 void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
                   unsigned &successCount, unsigned &errorCount) {
-  auto Func = llvm2alive(F, TLI.getTLI(F));
+  auto Func = llvm2alive(F, TLI.getTLI(F), true);
   if (!Func) {
     cerr << "ERROR: Could not translate '" << F.getName().str()
          << "' to Alive IR\n";
@@ -81,7 +81,7 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
 
   Transform t;
   t.src = std::move(*Func);
-  t.tgt = *llvm2alive(F, TLI.getTLI(F));
+  t.tgt = *llvm2alive(F, TLI.getTLI(F), false);
   t.preprocess();
   TransformVerify verifier(t, false);
   if (!opt_quiet)
