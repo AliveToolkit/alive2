@@ -237,8 +237,6 @@ struct TVLegacyPass final : public llvm::ModulePass {
     return false;
   }
 
-  // If it returns true, the caller should regenerate tgt using llvm2alive().
-  // If it returns false, the caller can simply move t.tgt to info.fn
   static void verify(Transform &t, int n, const string &src_tostr) {
     printDot(t.tgt, n);
 
