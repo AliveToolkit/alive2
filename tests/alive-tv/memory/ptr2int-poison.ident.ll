@@ -1,4 +1,4 @@
-define void @fn() {
-  %i7 = ptrtoint i8* poison to i8
-  ret void
+define i8 @fn() {
+  %i = ptrtoint ptr poison to i8
+  ret i8 %i
 }
