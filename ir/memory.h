@@ -90,6 +90,7 @@ class Memory {
 
   public:
     AliasSet(const Memory &m); // no alias
+    AliasSet(const Memory &m1, const Memory &m2); // no alias
     size_t size(bool local) const;
 
     int isFullUpToAlias(bool local) const; // >= 0 if up to

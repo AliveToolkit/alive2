@@ -542,6 +542,10 @@ namespace IR {
 Memory::AliasSet::AliasSet(const Memory &m)
   : local(m.numLocals(), false), non_local(m.numNonlocals(), false) {}
 
+Memory::AliasSet::AliasSet(const Memory &m1, const Memory &m2)
+  : local(max(m1.numLocals(), m2.numLocals()), false),
+    non_local(max(m1.numNonlocals(), m2.numNonlocals()), false) {}
+
 size_t Memory::AliasSet::size(bool islocal) const {
   return (islocal ? local : non_local).size();
 }
@@ -598,8 +602,8 @@ void Memory::AliasSet::setNoAlias(bool islocal, unsigned bid) {
 
 void Memory::AliasSet::intersectWith(const AliasSet &other) {
   auto intersect = [](auto &a, const auto &b) {
-    auto I2 = b.begin();
-    for (auto I = a.begin(), E = a.end(); I != E; ++I, ++I2) {
+    auto I2 = b.begin(), E2 = b.end();
+    for (auto I = a.begin(), E = a.end(); I != E && I2 != E2; ++I, ++I2) {
       *I = *I && *I2;
     }
   };
@@ -609,8 +613,8 @@ void Memory::AliasSet::intersectWith(const AliasSet &other) {
 
 void Memory::AliasSet::unionWith(const AliasSet &other) {
   auto unionfn = [](auto &a, const auto &b) {
-    auto I2 = b.begin();
-    for (auto I = a.begin(), E = a.end(); I != E; ++I, ++I2) {
+    auto I2 = b.begin(), E2 = b.end();
+    for (auto I = a.begin(), E = a.end(); I != E && I2 != E2; ++I, ++I2) {
       *I = *I || *I2;
     }
   };
@@ -2041,7 +2045,7 @@ Memory::refined(const Memory &other, bool fncall,
   expr ret(true);
   set<expr> undef_vars;
 
-  AliasSet block_alias(other);
+  AliasSet block_alias(*this, other);
   auto min_read_sz = bits_byte / 8;
   for (auto &[mem, set]
          : { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2)}) {

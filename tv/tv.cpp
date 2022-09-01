@@ -305,8 +305,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
     if (Errors errs = verifier.verify()) {
       *out << "Transformation doesn't verify!" <<
-        (errs.isUnsound() ? " (unsound)" : " (not unsound)") <<
-        "\n" << errs;
+              (errs.isUnsound() ? " (unsound)\n" : " (not unsound)\n")
+           << errs;
       if (errs.isUnsound()) {
         has_failure = true;
         *out << "\nPass: " << pass_name << '\n';
