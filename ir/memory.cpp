@@ -1209,16 +1209,12 @@ void Memory::mkAxioms(const Memory &tgt) const {
     if (!has_null_block || bid != 0)
       state->addAxiom(addr != 0);
 
-    // Ensure block ptr doesn't overflow
-    // Note: the aligned case is handled in alloc()
-    if (!align_ge_size(align, sz)) {
-      auto msb_bit = bits_ptr_address - 1;
-      state->addAxiom(
-        Pointer::hasLocalBit()
-          // don't spill to local addr section
-          ? (addr + sz).extract(msb_bit, msb_bit) == 0
-          : addr.add_no_uoverflow(sz));
-    }
+    auto msb_bit = bits_ptr_address - 1;
+    state->addAxiom(
+      Pointer::hasLocalBit()
+        // don't spill to local addr section
+        ? (addr + sz).extract(msb_bit, msb_bit) == 0
+        : addr.add_no_uoverflow(sz));
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
@@ -1637,15 +1633,8 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 
-    if (align_bits && observesAddresses()) {
-      auto addr = p.getAddress();
-      state->addAxiom(addr.extract(align_bits - 1, 0) == 0);
-      if (size.ule(align).isTrue()) {
-        expr msb = addr.extract(bits_ptr_address - 1 - Pointer::hasLocalBit(),
-                                align_bits);
-        state->addAxiom(msb != expr::mkInt(-1, msb));
-      }
-    }
+    if (align_bits && observesAddresses())
+      state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
     bool nonconst = (has_null_block && bid == 0) || !is_constglb(bid);
     if (blockKind == CONSTGLOBAL) assert(!nonconst); else assert(nonconst);
