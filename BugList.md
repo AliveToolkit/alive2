@@ -73,6 +73,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 66. SLPVectorizer replaces add nsw undef with add poison (https://llvm.org/PR55653)
 67. InstCombine swaps inbounds geps originating OOB pointer (https://llvm.org/PR55722)
 68. SLP vectorizer's reduce_and formation introduces poison (https://llvm.org/PR55734)
+69. IRCE introduces UB by changing order of condition checks (https://llvm.org/PR57523)
 
 
 ### Bugs found in Z3
