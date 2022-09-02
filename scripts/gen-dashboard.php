@@ -35,7 +35,7 @@ foreach ($test_failures as $test) {
   $stderr = store_log(preg_replace('/Report written to \S+/S', '', $err));
   $func = null;
 
-  preg_match('/Report written to (\S+)/S', $err, $m);
+  preg_match('/Report written to "(\S+)"/S', $err, $m);
   if (empty($m[1])) {
     if (strstr($err, '(core dumped)') !== false) {
       $error = 'Crash';
