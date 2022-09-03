@@ -90,3 +90,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 11. Assertion violation in SMT equality propagation (https://github.com/Z3Prover/z3/issues/2879)
 12. Assertion violation in qe_lite (https://github.com/Z3Prover/z3/commit/bb5edb7c653f9351fe674630d63cdd2b10338277)
 13. SMT internalize doesn't respect the timeout (https://github.com/Z3Prover/z3/issues/4192)
+14. Unsoundness with smt.bv.size_reduce=true (https://github.com/Z3Prover/z3/issues/6314)
