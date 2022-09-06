@@ -12,6 +12,10 @@ using namespace smt;
 using namespace util;
 using namespace std;
 
+static void throw_oom_exception() {
+  throw AliveException("Out of memory; skipping function.", false);
+}
+
 namespace IR {
 
 expr State::CurrentDomain::operator()() const {
@@ -434,7 +438,7 @@ const StateValue& State::operator[](const Value &val) {
   }
 
   if (hit_half_memory_limit())
-    throw AliveException("Out of memory; skipping function.", false);
+    throw_oom_exception();
 
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
@@ -555,6 +559,9 @@ bool State::startBB(const BasicBlock &bb) {
   if (I == predecessor_data.end())
     return false;
 
+  if (hit_memory_limit())
+    throw_oom_exception();
+
   DisjointExpr<Memory> in_memory;
   DisjointExpr<expr> UB;
   DisjointExpr<VarArgsData> var_args_in;
@@ -565,14 +572,19 @@ bool State::startBB(const BasicBlock &bb) {
     path.add(data.path);
     expr p = data.path();
     UB.add_disj(data.UB, p);
-    in_memory.add_disj(data.mem, p);
-    var_args_in.add(data.var_args, std::move(p));
+
+    // This data is never used again, so clean it up to reduce mem consumption
+    in_memory.add_disj(std::move(data.mem), p);
+    var_args_in.add(std::move(data.var_args), std::move(p));
     domain.undef_vars.insert(data.undef_vars.begin(), data.undef_vars.end());
+    data.undef_vars.clear();
 
     if (isFirst)
-      analysis = data.analysis;
-    else
+      analysis = std::move(data.analysis);
+    else {
       analysis.meet_with(data.analysis);
+      data.analysis = {};
+    }
     isFirst = false;
   }
   assert(!isFirst);
@@ -972,7 +984,7 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
   if (undef_vars.empty())
     return std::move(val);
   if (hit_half_memory_limit())
-    throw AliveException("Out of memory; skipping function.", false);
+    throw_oom_exception();
 
   vector<pair<expr, expr>> repls;
   for (auto &var : undef_vars) {

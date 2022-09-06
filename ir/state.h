@@ -73,7 +73,7 @@ private:
     smt::expr is_va_start;
     smt::expr active; // false if this entry is repeated
 
-    VarArgsEntry() {}
+    VarArgsEntry() = default;
     VarArgsEntry(smt::expr &&alive, smt::expr &&next_arg, smt::expr &&num_args,
                  smt::expr &&is_va_start, smt::expr &&active)
       : alive(std::move(alive)), next_arg(std::move(next_arg)),
