@@ -725,10 +725,12 @@ static set<expr> extract_possible_local_bids(Memory &m, const expr &eptr) {
   return ret;
 }
 
+static unsigned max_program_nonlocal_bid() {
+  return num_nonlocals_src-1 - num_inaccessiblememonly_fns - has_write_fncall;
+}
+
 unsigned Memory::nextNonlocalBid() {
-  unsigned next
-    = min(next_nonlocal_bid++,
-          num_nonlocals_src-1 - num_inaccessiblememonly_fns - has_write_fncall);
+  unsigned next = min(next_nonlocal_bid++, max_program_nonlocal_bid());
   assert(!is_fncall_mem(next));
   return next;
 }
@@ -1783,7 +1785,11 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
     for (auto &p : all_leaf_ptrs(*this, val.value)) {
       auto islocal = p.isLocal();
       auto bid = p.getShortBid();
-      if (!islocal.isTrue() && !bid.isConst()) {
+      // Note that if we reached the max number of bids, it's pointless to
+      // remember that the pointer must be within [0, max], so skip this
+      // in that case to save memory
+      if (!islocal.isTrue() && !bid.isConst() &&
+          (max_bid || next_nonlocal_bid <= max_program_nonlocal_bid())) {
         auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
         if (inserted) {
           if (!max_bid)
