@@ -1780,16 +1780,16 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
 
   // partial order reduction for fresh pointers
   // can alias [0, next_ptr++] U extra_tgt_consts
-  if (is_ptr && !val.non_poison.isFalse()) {
+  // Note that if we reached the max number of bids, it's pointless to
+  // remember that the pointer must be within [0, max], so skip this code
+  // in that case to save memory.
+  if (is_ptr && !val.non_poison.isFalse() &&
+      next_nonlocal_bid <= max_program_nonlocal_bid()) {
     optional<unsigned> max_bid;
     for (auto &p : all_leaf_ptrs(*this, val.value)) {
       auto islocal = p.isLocal();
       auto bid = p.getShortBid();
-      // Note that if we reached the max number of bids, it's pointless to
-      // remember that the pointer must be within [0, max], so skip this
-      // in that case to save memory
-      if (!islocal.isTrue() && !bid.isConst() &&
-          (max_bid || next_nonlocal_bid <= max_program_nonlocal_bid())) {
+      if (!islocal.isTrue() && !bid.isConst()) {
         auto [I, inserted] = ptr_alias.try_emplace(p.getBid(), *this);
         if (inserted) {
           if (!max_bid)
