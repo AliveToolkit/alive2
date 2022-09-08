@@ -268,7 +268,7 @@ public:
       if (!has_all)
         continue;
 
-      auto [val, domain, qvar, pre] = vals();
+      auto [val, domain, qvar, pre] = std::move(vals)();
       assert(domain.isTrue());
       exprs[node_id] = std::move(val);
       // TODO: handle qvar, pre

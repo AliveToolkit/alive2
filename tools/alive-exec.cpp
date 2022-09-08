@@ -120,7 +120,7 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
   smt_init->reset();
   try {
     auto p = verifier.exec();
-    const auto &state = *p.first;
+    auto &state = *p.first;
     const auto &fn = t.src;
     const auto *bb = &fn.getFirstBB();
 

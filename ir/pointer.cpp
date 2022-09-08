@@ -304,12 +304,12 @@ expr Pointer::inbounds(bool simplify_ptr, bool strict) {
   }
 
   // trim set of valid ptrs
-  if (auto ptrs = all_ptrs())
+  if (auto ptrs = std::move(all_ptrs)())
     p = *ptrs;
   else
     p = expr::mkUInt(0, totalBits());
 
-  return *ret();
+  return *std::move(ret)();
 }
 
 expr Pointer::blockAlignment() const {
@@ -409,17 +409,17 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   }
 
   AndExpr exprs;
-  exprs.add(bytes == 0 || *UB());
+  exprs.add(bytes == 0 || *std::move(UB)());
 
   // cannot store more bytes than address space
   if (bytes0.bits() > bits_size_t)
     exprs.add(bytes0.extract(bytes0.bits() - 1, bits_size_t) == 0);
 
   // address must be always aligned regardless of access size
-  exprs.add(*is_aligned());
+  exprs.add(*std::move(is_aligned)());
 
   // trim set of valid ptrs
-  if (auto ptrs = all_ptrs())
+  if (auto ptrs = std::move(all_ptrs)())
     p = *ptrs;
   else
     p = expr::mkUInt(0, totalBits());

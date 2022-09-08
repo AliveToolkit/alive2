@@ -388,8 +388,8 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
 }
 
 static void
-check_refinement(Errors &errs, const Transform &t, const State &src_state,
-                 const State &tgt_state, const Value *var, const Type &type,
+check_refinement(Errors &errs, const Transform &t, State &src_state,
+                 State &tgt_state, const Value *var, const Type &type,
                  const State::ValTy &ap, const State::ValTy &bp,
                  bool check_each_var) {
   auto &fndom_a  = ap.domain;
@@ -529,8 +529,8 @@ check_refinement(Errors &errs, const Transform &t, const State &src_state,
   CHECK(dom && !value_cnstr, print_value, "Value mismatch");
 
   // 6. Check memory
-  auto src_mem = src_state.returnMemory();
-  auto tgt_mem = tgt_state.returnMemory();
+  auto &src_mem = src_state.returnMemory();
+  auto &tgt_mem = tgt_state.returnMemory();
   auto [memory_cnstr0, ptr_refinement0, mem_undef]
     = src_mem.refined(tgt_mem, false);
   auto &ptr_refinement = ptr_refinement0;

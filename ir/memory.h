@@ -325,8 +325,7 @@ public:
   smt::expr checkNocapture() const;
   void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
 
-  static Memory mkIf(const smt::expr &cond, const Memory &then,
-                     const Memory &els);
+  static Memory mkIf(const smt::expr &cond, Memory &&then, Memory &&els);
 
   auto operator<=>(const Memory &rhs) const = default;
 

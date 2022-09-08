@@ -115,15 +115,16 @@ State::ValueAnalysis::FnCallRanges::project(const string &name) const {
 }
 
 State::VarArgsData
-State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
-                         const VarArgsData &els) {
+State::VarArgsData::mkIf(const expr &cond, VarArgsData &&then,
+                         VarArgsData &&els) {
   VarArgsData ret;
   for (auto &[ptr, entry] : then.data) {
     auto other = els.data.find(ptr);
     if (other == els.data.end()) {
-      ret.data.try_emplace(ptr, cond && entry.alive, expr(entry.next_arg),
-                           expr(entry.num_args), expr(entry.is_va_start),
-                           expr(entry.active));
+      ret.data.try_emplace(ptr, cond && entry.alive, std::move(entry.next_arg),
+                           std::move(entry.num_args),
+                           std::move(entry.is_va_start),
+                           std::move(entry.active));
     } else {
 #define C(f) expr::mkIf(cond, entry.f, other->second.f)
       ret.data.try_emplace(ptr, C(alive), C(next_arg), C(num_args),
@@ -135,9 +136,9 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
   for (auto &[ptr, entry] : els.data) {
     if (then.data.count(ptr))
       continue;
-    ret.data.try_emplace(ptr, !cond && entry.alive, expr(entry.next_arg),
-                         expr(entry.num_args), expr(entry.is_va_start),
-                         expr(entry.active));
+    ret.data.try_emplace(ptr, !cond && entry.alive, std::move(entry.next_arg),
+                         std::move(entry.num_args),
+                         std::move(entry.is_va_start), std::move(entry.active));
   }
 
   return ret;
@@ -146,7 +147,8 @@ State::VarArgsData::mkIf(const expr &cond, const VarArgsData &then,
 State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
-    return_val(f.getType().getDummyValue(false)), return_memory(memory) {}
+    return_val(DisjointExpr(f.getType().getDummyValue(false))),
+    return_memory(DisjointExpr(memory)) {}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -589,10 +591,10 @@ bool State::startBB(const BasicBlock &bb) {
   }
   assert(!isFirst);
 
-  domain.path = path();
-  domain.UB = *UB();
-  memory = *in_memory();
-  var_args_data = *var_args_in();
+  domain.path   = std::move(path)();
+  domain.UB     = *std::move(UB)();
+  memory        = *std::move(in_memory)();
+  var_args_data = *std::move(var_args_in)();
 
   return domain;
 }
@@ -635,8 +637,8 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 }
 
 void State::addReturn(StateValue &&val) {
-  return_val.add(std::move(val), domain.path);
-  return_memory.add(memory, domain.path);
+  get<0>(return_val).add(std::move(val), domain.path);
+  get<0>(return_memory).add(memory, domain.path);
   auto dom = domain();
   return_domain.add(expr(dom));
   function_domain.add(std::move(dom));
@@ -670,7 +672,7 @@ void State::addNoReturn(const expr &cond) {
   if (cond.isFalse())
     return;
   domain.noreturn = !cond;
-  return_memory.add(memory, domain.path && cond);
+  get<0>(return_memory).add(memory, domain.path && cond);
   function_domain.add(domain() && cond);
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
@@ -916,7 +918,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     if (data) {
-      auto [d, domain, qvar, pre] = data();
+      auto [d, domain, qvar, pre] = std::move(data)();
       addUB(std::move(domain));
       addUB(std::move(d.ub));
       addNoReturn(std::move(d.noreturns));
@@ -1023,6 +1025,18 @@ expr State::sinkDomain() const {
   return ret();
 }
 
+const StateValue& State::returnValCached() {
+  if (auto *v = get_if<DisjointExpr<StateValue>>(&return_val))
+    return_val = *std::move(*v)();
+  return get<StateValue>(return_val);
+}
+
+Memory& State::returnMemory() {
+  if (auto *m = get_if<DisjointExpr<Memory>>(&return_memory))
+    return_memory = *std::move(*m)();
+  return get<Memory>(return_memory);
+}
+
 expr State::getJumpCond(const BasicBlock &src, const BasicBlock &dst) const {
   auto I = predecessor_data.find(&dst);
   if (I == predecessor_data.end())
@@ -1054,7 +1068,7 @@ void State::markGlobalAsAllocated(const string &glbvar) {
   itr->second.second = true;
 }
 
-void State::syncSEdataWithSrc(const State &src) {
+void State::syncSEdataWithSrc(State &src) {
   assert(glbvar_bids.empty());
   assert(src.isSource() && !isSource());
   glbvar_bids = src.glbvar_bids;

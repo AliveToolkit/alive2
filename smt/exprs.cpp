@@ -198,7 +198,7 @@ optional<expr> FunctionExpr::operator()(const expr &key) const {
   for (auto &[k, v] : fn) {
     disj.add(v, k == key);
   }
-  return disj();
+  return std::move(disj)();
 }
 
 const expr* FunctionExpr::lookup(const expr &key) const {

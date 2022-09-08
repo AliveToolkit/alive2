@@ -926,7 +926,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
 
   vector<Byte> ret;
   for (auto &disj : loaded) {
-    ret.emplace_back(*this, *disj());
+    ret.emplace_back(*this, *std::move(disj)());
   }
   return ret;
 }
@@ -1925,7 +1925,7 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
     dst_blk.type |= blk.type;
   };
   access(src, bits_byte/8, bits_byte/8, false, fn);
-  dst_blk.val = *val();
+  dst_blk.val = *std::move(val)();
 }
 
 void Memory::fillPoison(const expr &bid) {
@@ -2145,9 +2145,9 @@ void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
   }
 }
 
-Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
+Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   assert(then.state == els.state);
-  Memory ret(then);
+  Memory &ret = then;
   for (unsigned bid = 0, end = ret.numNonlocals(); bid < end; ++bid) {
     if (always_nowrite(bid, false, true))
       continue;
@@ -2185,7 +2185,7 @@ Memory Memory::mkIf(const expr &cond, const Memory &then, const Memory &els) {
   }
 
   ret.next_nonlocal_bid = max(then.next_nonlocal_bid, els.next_nonlocal_bid);
-  return ret;
+  return std::move(ret);
 }
 
 #define P(name, expr) do {      \

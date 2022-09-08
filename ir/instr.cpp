@@ -2760,7 +2760,7 @@ StateValue Phi::toSMT(State &s) const {
     }
   }
 
-  StateValue sv = *ret();
+  StateValue sv = *std::move(ret)();
   auto identity = [](const expr &x) { return x; };
   return fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, true,
                    false);
@@ -4033,7 +4033,8 @@ StateValue VaCopy::toSMT(State &s) const {
 
   // FIXME: dst should be empty or we have a mem leak
   // alive, next_arg, num_args, is_va_start, active
-  data[dst_raw] = { true, *next_arg(), *num_args(), *is_va_start(), true };
+  data[dst_raw] = { true, *std::move(next_arg)(), *std::move(num_args)(),
+                    *std::move(is_va_start)(), true };
 
   return {};
 }
@@ -4094,7 +4095,7 @@ StateValue VaArg::toSMT(State &s) const {
     entry.next_arg = expr::mkIf(eq, next_arg, entry.next_arg);
   }
 
-  return *ret();
+  return *std::move(ret)();
 }
 
 expr VaArg::getTypeConstraints(const Function &f) const {

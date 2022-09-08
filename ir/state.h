@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace IR {
@@ -85,8 +86,8 @@ private:
 
   struct VarArgsData {
     std::map<smt::expr, VarArgsEntry> data;
-    static VarArgsData mkIf(const smt::expr &cond, const VarArgsData &then,
-                            const VarArgsData &els);
+    static VarArgsData mkIf(const smt::expr &cond, VarArgsData &&then,
+                            VarArgsData &&els);
     auto operator<=>(const VarArgsData &rhs) const = default;
   };
 
@@ -142,8 +143,8 @@ private:
   smt::OrExpr return_domain;
   // function_domain: a condition for function having well-defined behavior
   smt::OrExpr function_domain;
-  smt::DisjointExpr<StateValue> return_val;
-  smt::DisjointExpr<Memory> return_memory;
+  std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
+  std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
 
   struct FnCallInput {
@@ -183,6 +184,8 @@ private:
   std::unordered_map<std::string, unsigned> inaccessiblemem_bids;
 
   VarArgsData var_args_data;
+
+  const StateValue& returnValCached();
 
 public:
   State(const Function &f, bool source);
@@ -261,10 +264,10 @@ public:
   }
 
   smt::expr sinkDomain() const;
-  Memory returnMemory() const { return *return_memory(); }
+  Memory& returnMemory();
 
-  ValTy returnVal() const {
-    return { *return_val(), return_domain(), function_domain(),
+  ValTy returnVal() {
+    return { returnValCached(), return_domain(), function_domain(),
              return_undef_vars };
   }
 
@@ -281,7 +284,7 @@ public:
   bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid,
                        bool &allocated) const;
   void markGlobalAsAllocated(const std::string &glbvar);
-  void syncSEdataWithSrc(const State &src);
+  void syncSEdataWithSrc(State &src);
 
   void mkAxioms(State &tgt);
 

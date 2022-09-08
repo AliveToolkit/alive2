@@ -107,7 +107,7 @@ public:
 
   // returns pair of refinement constraints for <poison, !poison && value>
   virtual std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const = 0;
 
   virtual StateValue mkUndef(State &s) const;
@@ -137,7 +137,7 @@ public:
   smt::expr getTypeConstraints() const override;
   void fixup(const smt::Model &m) override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
@@ -165,7 +165,7 @@ public:
   bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
@@ -211,7 +211,7 @@ public:
   smt::expr fromInt(smt::expr v) const override;
   IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   smt::expr
     mkInput(State &s, const char *name, const ParamAttrs &attrs) const override;
@@ -244,7 +244,7 @@ public:
   smt::expr fromInt(smt::expr v) const override;
   IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   StateValue mkUndef(State &s) const override;
   smt::expr
@@ -302,7 +302,7 @@ public:
   smt::expr fromInt(smt::expr v) const override;
   IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   StateValue mkUndef(State &s) const override;
   smt::expr
@@ -410,7 +410,7 @@ public:
   smt::expr fromInt(smt::expr v) const override;
   IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
-    refines(const State &src_s, const State &tgt_s, const StateValue &src,
+    refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
   StateValue mkUndef(State &s) const override;
   smt::expr
