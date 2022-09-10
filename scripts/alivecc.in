@@ -30,7 +30,21 @@ if ($0 =~ /alivecc$/) {
     die "Unexpected invocation as '$0'";
 }
 
+my $print_cmd = 0;
+
 if (compiling()) {
+
+    if (getenv("ALIVECC_CACHE")) {
+        push @ARGV, ("-mllvm", "-tv-cache=true");
+    }
+
+    if (getenv("ALIVECC_CACHE_ALLOW_VERSION_MISMATCH")) {
+        push @ARGV, ("-mllvm", "-tv-cache-allow-version-mismatch=true");
+    }
+
+    if (getenv("ALIVECC_PRINT_COMMAND")) {
+        $print_cmd = 1;
+    }
 
     if (getenv("ALIVECC_QUIET")) {
         push @ARGV, ("-mllvm", "-tv-quiet");
@@ -106,6 +120,13 @@ if (compiling()) {
 
     push @ARGV, "-fpass-plugin=@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}";
     push @ARGV, ("-Xclang", "-load", "-Xclang", "@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}");
+}
+
+if ($print_cmd) {
+    foreach my $arg (@ARGV) {
+        print "$arg ";
+    }
+    print "\n\n";
 }
 
 exec @ARGV;

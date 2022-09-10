@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "llvm_util/cache.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
 #include "smt/smt.h"
@@ -109,6 +110,8 @@ struct Results {
   }
 };
 
+static unique_ptr<Cache> cache;
+
 Results verify(llvm::Function &F1, llvm::Function &F2,
                llvm::TargetLibraryInfoWrapperPass &TLI,
                bool print_transform = false,
@@ -141,7 +144,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
 
   smt_init->reset();
   r.t.preprocess();
-  TransformVerify verifier(r.t, false);
+  TransformVerify verifier(r.t, false, &*cache);
 
   if (print_transform)
     r.t.print(*out, {});
@@ -295,6 +298,10 @@ convenient way to demonstrate an existing optimizer bug.
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
+
+  if (opt_cache)
+    cache = make_unique<Cache>(opt_cache_port,
+                               opt_cache_allow_version_mismatch);
 
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get()) {
