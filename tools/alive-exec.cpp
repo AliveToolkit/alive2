@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "cache/cache.h"
 #include "ir/type.h"
 #include "llvm_util/llvm2alive.h"
 #include "smt/expr.h"
@@ -65,6 +66,7 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
 }
 
 optional<smt::smt_initializer> smt_init;
+unique_ptr<Cache> cache;
 
 void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
                   unsigned &successCount, unsigned &errorCount) {
