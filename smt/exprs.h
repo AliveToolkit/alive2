@@ -73,19 +73,17 @@ public:
       I->second |= std::forward<D>(domain);
   }
 
-  template <typename D>
-  void add_disj(const DisjointExpr<T> &other, D &&domain) {
+  void add_disj(const DisjointExpr<T> &other, const expr &domain) {
     assert(!default_val && !other.default_val);
     for (auto &[v, d] : other.vals) {
-      add(v, d && std::forward<D>(domain));
+      add(v, d && domain);
     }
   }
 
-  template <typename D>
-  void add_disj(DisjointExpr<T> &&other, D &&domain) {
+  void add_disj(DisjointExpr<T> &&other, const expr &domain) {
     assert(!default_val && !other.default_val);
     for (auto &[v, d] : other.vals) {
-      add(std::move(const_cast<T&>(v)), d && std::forward<D>(domain));
+      add(std::move(const_cast<T&>(v)), d && domain);
     }
   }
 
