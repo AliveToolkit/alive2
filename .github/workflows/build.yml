@@ -12,7 +12,16 @@ jobs:
         os:         [ubuntu-22.04]
         compiler:   [g++-11, clang++-15, clang++-16]
         build_type: [Release, Debug]
+        redis:      false
         include:
+          - os: ubuntu-22.04
+            compiler: g++-11
+            build_type: Release
+            redis: true
+          - os: ubuntu-22.04
+            compiler: g++-11
+            build_type: Debug
+            redis: true
           - os: macos-12
             compiler: clang++
             build_type: Release
@@ -41,6 +50,9 @@ jobs:
           fi
           if [[ ${{ matrix.compiler }} == "clang++-16" ]]; then
             sudo apt-get install clang++-16
+          fi
+          if [[ ${{ matrix.redis }} == "true" ]]; then
+            sudo apt-get install hiredis
           fi
 
       - name: Install dependencies (MacOS)

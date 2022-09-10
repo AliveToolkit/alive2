@@ -33,7 +33,7 @@ To build Alive2 you need recent versions of:
 * re2c
 * Z3
 * LLVM (optional)
-* hiredis (required if building with LLVM)
+* hiredis (optional, needed for caching)
 
 
 Building
