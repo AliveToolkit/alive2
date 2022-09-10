@@ -133,7 +133,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
     stringstream ss1, ss2;
     r.t.src.print(ss1);
     r.t.tgt.print(ss2);
-    if (ss1.str() == ss2.str()) {
+    if (std::move(ss1).str() == std::move(ss2).str()) {
       if (print_transform)
         r.t.print(*out, {});
       r.status = Results::SYNTACTIC_EQ;
@@ -143,7 +143,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
 
   smt_init->reset();
   r.t.preprocess();
-  TransformVerify verifier(r.t, cache.get(), false);
+  TransformVerify verifier(r.t, false);
 
   if (print_transform)
     r.t.print(*out, {});

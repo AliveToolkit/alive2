@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
         t.print(cout, print_opts);
         cout << '\n';
 
-        TransformVerify tv(t, nullptr, !root_only);
+        TransformVerify tv(t, !root_only);
         auto types = tv.getTypings();
         if (!types) {
           cerr << "Doesn't type check!\n";

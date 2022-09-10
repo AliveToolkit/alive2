@@ -304,7 +304,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
     smt_init->reset();
     t.preprocess();
-    TransformVerify verifier(t, cache.get(), false);
+    TransformVerify verifier(t, false);
     if (!opt_quiet)
       t.print(*out, print_opts);
 
