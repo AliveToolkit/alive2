@@ -1,17 +1,17 @@
-#include "cache.h"
-#include "crc.h"
-#include "util/errors.h"
-#include "util/version.h"
+// Copyright (c) 2018-present The Alive2 Authors.
+// Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "cache.h"
+#include "util/crc.h"
+#include "util/version.h"
 #include <cassert>
+#include <hiredis/hiredis.h>
 #include <iostream>
-#include <sstream>
 #include <string>
-#include <vector>
 
 using namespace std;
 
-static string redis_reply_string(int reply_type) {
+static const char* redis_reply_string(int reply_type) {
   switch (reply_type) {
   case REDIS_REPLY_STRING:
     return "STRING";
@@ -97,15 +97,15 @@ Cache::Cache(unsigned port, bool allow_version_mismatch) {
     exit(-1);
   }
   if (ctx->err) {
-    cerr << "Redis connection error: " << ctx->errstr << "\n";
+    cerr << "Redis connection error: " << ctx->errstr << '\n';
     exit(-1);
   }
   string version;
   if (remote_get("Alive2_version", version, ctx)) {
     if (version != util::alive_version) {
-      cerr << "Cache version mismatch!\n";
-      cerr << "This version of Alive2 is " << util::alive_version << "\n";
-      cerr << "But the cache was created by version " << version << "\n";
+      cerr << "Cache version mismatch!\n"
+              "This version of Alive2 is " << util::alive_version << "\n"
+              "But the cache was created by version " << version << '\n';
       if (!allow_version_mismatch)
         exit(-1);
     }
@@ -113,7 +113,6 @@ Cache::Cache(unsigned port, bool allow_version_mismatch) {
     remote_set("Alive2_version", util::alive_version, ctx);
   }
 }
-
 
 Cache::~Cache() {
   redisFree(ctx);

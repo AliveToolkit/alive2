@@ -83,7 +83,7 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
   t.src = std::move(*Func);
   t.tgt = *llvm2alive(F, TLI.getTLI(F), false);
   t.preprocess();
-  TransformVerify verifier(t, false, nullptr);
+  TransformVerify verifier(t, nullptr, false);
   if (!opt_quiet)
     t.src.print(cout << "\n----------------------------------------\n");
 

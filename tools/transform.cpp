@@ -1094,9 +1094,9 @@ static void calculateAndInitConstants(Transform &t) {
 
 namespace tools {
 
-TransformVerify::TransformVerify(Transform &t, bool check_each_var,
-                                 Cache *cache) :
-  t(t), check_each_var(check_each_var), cache(cache) {
+TransformVerify::TransformVerify(Transform &t, Cache *cache,
+                                 bool check_each_var)
+  : t(t), cache(cache), check_each_var(check_each_var) {
   if (check_each_var) {
     for (auto &i : t.tgt.instrs()) {
       tgt_instrs.emplace(i.getName(), &i);

@@ -78,3 +78,13 @@ if (!opt_outputfile.empty()) {
 }
 
 util::config::set_debug(*out);
+
+
+if (opt_cache) {
+#ifdef NO_REDIS_SUPPORT
+  cerr << "REDIS support not compiled in!\n";
+  exit(1);
+#else
+  cache = make_unique<Cache>(opt_cache_port, opt_cache_allow_version_mismatch);
+#endif
+}

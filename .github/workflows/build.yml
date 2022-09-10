@@ -17,11 +17,11 @@ jobs:
           - os: ubuntu-22.04
             compiler: g++-11
             build_type: Release
-            cache: redis
+            cache: Redis
           - os: ubuntu-22.04
             compiler: g++-11
             build_type: Debug
-            cache: redis
+            cache: Redis
           - os: macos-12
             compiler: clang++
             build_type: Release
@@ -51,7 +51,7 @@ jobs:
           if [[ ${{ matrix.compiler }} == "clang++-16" ]]; then
             sudo apt-get install clang++-16
           fi
-          if [[ ${{ matrix.cache }} == "redis" ]]; then
+          if [[ ${{ matrix.cache }} == "Redis" ]]; then
             sudo apt-get install libhiredis-dev
           fi
 

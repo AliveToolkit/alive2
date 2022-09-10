@@ -52,11 +52,11 @@ public:
 class TransformVerify {
   Transform &t;
   std::unordered_map<std::string, const IR::Instr*> tgt_instrs;
-  bool check_each_var;
   Cache *cache;
+  bool check_each_var;
 
 public:
-  TransformVerify(Transform &t, bool check_each_var, Cache *cache);
+  TransformVerify(Transform &t, Cache *cache, bool check_each_var);
   std::pair<std::unique_ptr<IR::State>,std::unique_ptr<IR::State>> exec() const;
   util::Errors verify() const;
   TypingAssignments getTypings() const;

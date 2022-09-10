@@ -1,8 +1,8 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "cache/cache.h"
 #include "ir/memory.h"
-#include "llvm_util/cache.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/utils.h"
 #include "smt/smt.h"
@@ -257,7 +257,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     // to do this before forking. Anyway, this is fast.
     if (cache && cache->lookup(src_tostr + "===\n" + tgt_tostr)) {
       *out << "Skipping repeated query\n\n";
-      return false;
+      return;
     }
 
     if (parallelMgr) {
@@ -304,7 +304,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
     smt_init->reset();
     t.preprocess();
-    TransformVerify verifier(t, false, &*cache);
+    TransformVerify verifier(t, cache.get(), false);
     if (!opt_quiet)
       t.print(*out, print_opts);
 
@@ -376,10 +376,6 @@ struct TVLegacyPass final : public llvm::ModulePass {
         parallelMgr.reset();
       }
     }
-
-    if (opt_cache)
-      cache = make_unique<Cache>(opt_cache_port,
-                                 opt_cache_allow_version_mismatch);
 
     showed_stats = false;
     llvm_util_init.emplace(*out, module.getDataLayout());
