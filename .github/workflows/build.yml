@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
+    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }} ${{ matrix.cache }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -12,16 +12,16 @@ jobs:
         os:         [ubuntu-22.04]
         compiler:   [g++-11, clang++-15, clang++-16]
         build_type: [Release, Debug]
-        redis:      false
+        cache:      ['']
         include:
           - os: ubuntu-22.04
             compiler: g++-11
             build_type: Release
-            redis: true
+            cache: redis
           - os: ubuntu-22.04
             compiler: g++-11
             build_type: Debug
-            redis: true
+            cache: redis
           - os: macos-12
             compiler: clang++
             build_type: Release
@@ -51,8 +51,8 @@ jobs:
           if [[ ${{ matrix.compiler }} == "clang++-16" ]]; then
             sudo apt-get install clang++-16
           fi
-          if [[ ${{ matrix.redis }} == "true" ]]; then
-            sudo apt-get install hiredis
+          if [[ ${{ matrix.cache }} == "redis" ]]; then
+            sudo apt-get install libhiredis-dev
           fi
 
       - name: Install dependencies (MacOS)
