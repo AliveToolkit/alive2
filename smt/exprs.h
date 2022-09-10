@@ -81,6 +81,14 @@ public:
     }
   }
 
+  template <typename D>
+  void add_disj(DisjointExpr<T> &&other, D &&domain) {
+    assert(!default_val && !other.default_val);
+    for (auto &[v, d] : other.vals) {
+      add(std::move(const_cast<T&>(v)), d && std::forward<D>(domain));
+    }
+  }
+
   std::optional<T> operator()() const& {
     std::optional<T> ret;
     for (auto &[val, domain] : vals) {

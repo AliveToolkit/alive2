@@ -207,6 +207,8 @@ class Memory {
                              const smt::expr &size, const smt::expr &align,
                              unsigned align_bits);
 
+  Memory(const Memory&) = default;
+
 public:
   enum BlockKind {
     MALLOC, CXX_NEW, STACK, GLOBAL, CONSTGLOBAL
@@ -227,6 +229,10 @@ public:
   };
 
   Memory(State &state);
+  Memory(Memory&&) = default;
+  Memory& operator=(Memory&&) = default;
+
+  Memory dup() const { return *this; }
 
   void mkAxioms(const Memory &other) const;
 

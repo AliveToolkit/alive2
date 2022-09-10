@@ -148,7 +148,7 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     return_val(DisjointExpr(f.getType().getDummyValue(false))),
-    return_memory(DisjointExpr(memory)) {}
+    return_memory(DisjointExpr(memory.dup())) {}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -617,7 +617,7 @@ void State::addJump(const BasicBlock &dst0, expr &&cond, bool always_jump) {
     data.analysis = std::move(analysis);
     data.var_args = std::move(var_args_data);
   } else {
-    data.mem.add(memory, cond);
+    data.mem.add(memory.dup(), cond);
     data.analysis = analysis;
     data.var_args = var_args_data;
   }
@@ -680,7 +680,7 @@ void State::addNoReturn(const expr &cond) {
   if (cond.isFalse())
     return;
   domain.noreturn = !cond;
-  get<0>(return_memory).add(memory, domain.path && cond);
+  get<0>(return_memory).add(memory.dup(), domain.path && cond);
   function_domain.add(domain() && cond);
   return_undef_vars.insert(undef_vars.begin(), undef_vars.end());
   return_undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
@@ -858,7 +858,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     auto call_data_pair
       = calls_fn.try_emplace(
           { std::move(inputs), std::move(ptr_inputs), std::move(call_ranges),
-            reads_memory ? memory : Memory(*this),
+            reads_memory ? memory.dup() : Memory(*this),
             reads_memory, argmemonly, inaccessiblememonly, noret, willret });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
@@ -1085,8 +1085,8 @@ void State::syncSEdataWithSrc(State &src) {
 
   returned_input = src.returned_input;
 
-  fn_call_data = src.fn_call_data;
-  inaccessiblemem_bids = src.inaccessiblemem_bids;
+  fn_call_data = std::move(src.fn_call_data);
+  inaccessiblemem_bids = std::move(src.inaccessiblemem_bids);
   memory.syncWithSrc(src.returnMemory());
 }
 
