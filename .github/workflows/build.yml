@@ -51,7 +51,7 @@ jobs:
           if [[ ${{ matrix.compiler }} == "clang++-16" ]]; then
             sudo apt-get install clang++-16
           fi
-          if [[ ${{ matrix.cache }} == "Redis" ]]; then
+          if [[ "${{ matrix.cache }}" == "Redis" ]]; then
             sudo apt-get install libhiredis-dev
           fi
 

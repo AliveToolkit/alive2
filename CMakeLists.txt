@@ -155,7 +155,7 @@ if (HIREDIS_LIBRARIES)
     cache/cache.cpp
   )
   add_library(cache STATIC ${CACHE_SRCS})
-  string(APPEND ALIVE_LIBS cache)
+  set(ALIVE_LIBS ${ALIVE_LIBS} cache)
 else()
   set(HIREDIS_LIBRARIES $<0:''>)
   add_compile_definitions(NO_REDIS_SUPPORT)
