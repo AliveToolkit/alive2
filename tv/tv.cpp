@@ -347,6 +347,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
     }
   }
 
+ bool doInitialization(llvm::Module &module) override {
+    initialize(module);
+    return false;
+  }
+
   static void initialize(llvm::Module &module) {
     if (initialized++)
       return;
