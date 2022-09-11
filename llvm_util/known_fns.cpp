@@ -528,6 +528,14 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
     RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
                                     UnaryOp::Copy));
+
+  // void memset_pattern4(void *ptr, void *pattern, size_t bytes)
+  case llvm::LibFunc_memset_pattern4:
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 4));
+  case llvm::LibFunc_memset_pattern8:
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 8));
+  case llvm::LibFunc_memset_pattern16:
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 16));
   case llvm::LibFunc_strlen:
     RETURN_VAL(make_unique<Strlen>(*ty, value_name(i), *args[0]));
   case llvm::LibFunc_memcmp:

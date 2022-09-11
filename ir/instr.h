@@ -795,6 +795,28 @@ public:
 };
 
 
+class MemsetPattern final : public MemInstr {
+  Value *ptr, *pattern, *bytes;
+  unsigned pattern_length;
+public:
+  MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
+                unsigned pattern_length);
+
+  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 class FillPoison final : public MemInstr {
   Value *ptr;
 public:

@@ -1010,22 +1010,30 @@ void Memory::store(const Pointer &ptr,
 }
 
 void Memory::storeLambda(const Pointer &ptr, const expr &offset,
-                         const expr &bytes, const expr &val,
+                         const expr &bytes,
+                         const vector<pair<unsigned, expr>> &data,
                          const set<expr> &undef, uint64_t align) {
   assert(!state->isInitializationPhase());
   // offset in [ptr, ptr+sz)
   auto offset_cond = offset.uge(ptr.getShortOffset()) &&
                      offset.ult((ptr + bytes).getShortOffset());
 
-  bool val_no_offset = !val.vars().count(offset);
-  auto stored_ty = data_type({{ 0, val }}, false);
+  bool val_no_offset = data.size() == 1 && !data[0].second.vars().count(offset);
+  auto stored_ty = data_type(data, false);
+
+  expr val = data.back().second;
+  expr mod = expr::mkUInt(data.size(), offset);
+  for (auto I = next(data.rbegin()), E = data.rend(); I != E; ++I) {
+    val = expr::mkIf(offset.urem(mod) == I->first, I->second, val);
+  }
 
   auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
     // optimization: full rewrite
     if (bytes.eq(Pointer(*this, bid, local).blockSize())) {
-      blk.val = val_no_offset
+      blk.val = val_no_offset && data.size() == 1
         ? expr::mkIf(cond, expr::mkConstArray(offset, val), blk.val)
         : expr::mkLambda(offset, expr::mkIf(cond, val, blk.val.load(offset)));
+
       if (cond.isTrue()) {
         blk.undef.clear();
         blk.type = stored_ty;
@@ -1857,7 +1865,39 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   } else {
     expr offset
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
-    storeLambda(ptr, offset, bytesize, raw_byte, undef_vars, align);
+    storeLambda(ptr, offset, bytesize, {{0, raw_byte}}, undef_vars, align);
+  }
+}
+
+void Memory::memset_pattern(const expr &ptr0, const expr &pattern0,
+                            const expr &bytesize, unsigned pattern_length) {
+  assert(!memory_unused());
+  unsigned bytesz = bits_byte / 8;
+  Pointer ptr(*this, ptr0);
+  state->addUB(ptr.isDereferenceable(bytesize, 1, true));
+
+  Pointer pattern(*this, pattern0);
+  expr length = bytesize.umin(expr::mkUInt(pattern_length, bytesize));
+  state->addUB(pattern.isDereferenceable(length, 1, false));
+
+  set<expr> undef_vars;
+  auto bytes
+    = load(pattern, pattern_length, undef_vars, 1, little_endian, DATA_ANY);
+
+  vector<pair<unsigned, expr>> to_store;
+  uint64_t n;
+  if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
+    for (unsigned i = 0; i < n; i += bytesz) {
+      to_store.emplace_back(i, std::move(bytes[i/bytesz])());
+    }
+    store(ptr, to_store, undef_vars, 1);
+  } else {
+    for (unsigned i = 0; i < pattern_length; ++i) {
+      to_store.emplace_back(i * bytesz, std::move(bytes[i])());
+    }
+    expr offset
+      = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+    storeLambda(ptr, offset, bytesize, to_store, undef_vars, 1);
   }
 }
 
@@ -1891,7 +1931,8 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     Pointer ptr_src = src + (offset - dst.getShortOffset());
     set<expr> undef;
     auto val = raw_load(ptr_src, undef);
-    storeLambda(dst, offset, bytesize, std::move(val)(), undef, align_dst);
+    storeLambda(dst, offset, bytesize, {{0, std::move(val)()}}, undef,
+                align_dst);
   }
 }
 
