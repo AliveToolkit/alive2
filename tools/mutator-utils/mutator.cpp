@@ -302,6 +302,7 @@ void FunctionMutator::mutate() {
 
   if(!checkValid()){
     llvm::errs()<<"Invalid LLVM IR generated. Current seed: "<<Random::getSeed()<<"\n";
+    llvm::errs()<<"Current Module Identifier: "<<currentFunction->getParent()->getModuleIdentifier()<<"\n";
     print();
     llvm::errs()<<"End\n";
   }
