@@ -160,23 +160,15 @@ void MutateInstructionHelper::debug() {
 void MutateInstructionHelper::mutate() {
   // do extra handling for br insts
   if (llvm::isa<llvm::BranchInst>(mutator->iitInTmp)) {
-    /*llvm::BranchInst* brInst=(llvm::BranchInst*)&*mutator->tmpIit;
-    unsigned sz=brInst->getNumSuccessors();
-    llvm::SmallVector<llvm::BasicBlock*> bbs;
-    if(sz>0){
-      for(auto it=mutator->tmpFit->begin();it!=mutator->tmpFit->end();++it){
-        bbs.push_back(&*it);
-      }
-    }
-    for(unsigned i=0;i<sz;++i){
-      if(Random::getRandomBool()){
-        brInst->setSuccessor(i,bbs[Random::getRandomUnsigned()%bbs.size()]);
-      }
-    }*/
+    //empty for now
   }
   // 75% chances to add a new inst, 25% chances to replace with a existent usage
   else if ((Random::getRandomUnsigned() & 3) != 0) {
-    bool res = insertRandomBinaryInstruction(&*(mutator->iitInTmp));
+    //indices in GEP point to its member variabls, shouldn't be random changed.
+    bool isGEPInst=llvm::isa<llvm::GetElementPtrInst>(*mutator->iitInTmp),res=false;
+    if(!isGEPInst){
+      res = insertRandomBinaryInstruction(&*(mutator->iitInTmp));
+    }
     if (!res) {
       replaceRandomUsage(&*(mutator->iitInTmp));
     }
@@ -225,6 +217,7 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
 void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
   bool found = false;
   size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
+  bool isGEP=llvm::isa<llvm::GetElementPtrInst>(inst);
   // make sure at least one
   for (size_t i = 0; !found && i < mutator->iitInTmp->getNumOperands();
        i++, pos++) {
@@ -232,6 +225,9 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
       pos = 0;
     }
     if (canMutate(mutator->iitInTmp->getOperand(pos))) {
+      if(isGEP && mutator->iitInTmp->getOperand(pos)->getType()->isIntegerTy()){
+        continue;
+      }
       found = true;
       break;
     }
