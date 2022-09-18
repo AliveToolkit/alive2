@@ -10,18 +10,10 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-22.04]
-        compiler:   [g++-11, clang++-15, clang++-16]
+        compiler:   [g++-11, g++12, clang++-15, clang++-16]
         build_type: [Release, Debug]
-        cache:      ['']
+        cache:      ['', Redis]
         include:
-          - os: ubuntu-22.04
-            compiler: g++-11
-            build_type: Release
-            cache: Redis
-          - os: ubuntu-22.04
-            compiler: g++-11
-            build_type: Debug
-            cache: Redis
           - os: macos-12
             compiler: clang++
             build_type: Release
@@ -58,7 +50,6 @@ jobs:
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
         run: |
-          sudo xcode-select -s /Applications/Xcode_14.0.app
           brew install z3 re2c ninja
 
       - name: Compile
