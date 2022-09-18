@@ -258,9 +258,10 @@ bool FunctionMutator::checkValid() {
           }
         }
       }
+      return true;
     }
   }
-  return false;
+  return sout.str().empty();
 }
 
 void FunctionMutator::mutate() {
@@ -284,7 +285,11 @@ void FunctionMutator::mutate() {
     }
   } while (!mutated && canMutate);
 
-  llvm::errs() << "verify result: " << checkValid() << "\n";
+  if(!checkValid()){
+    llvm::errs()<<"Invalid LLVM IR generated. Current seed: "<<Random::getSeed()<<"\n";
+    print();
+    llvm::errs()<<"End\n";
+  }
   if (debug) {
     print();
   }
