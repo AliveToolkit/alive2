@@ -462,16 +462,24 @@ bool inputVerify() {
                      std::to_string(unnamedFunction++));
       }
       if (!fit->isDeclaration() && !fit->getName().empty()) {
-        bool valid = false, hasStoreInst = false;
+        //skip those function cannot pass verifier.
+        if(llvm::verifyFunction(*fit, nullptr)){
+          hasInvalidFunc = true;
+          invalidFuncNameSet.insert(fit->getName());          
+          continue;
+        }
+        //Skip those functions stored in some function pointer
+        //It would invalidate our mutation (adding parameter)
+        bool valid = false, usedInFunctionPointer = false;
         for (auto use_it = fit->use_begin();
-             !hasStoreInst && use_it != fit->use_end(); use_it++) {
+             !usedInFunctionPointer && use_it != fit->use_end(); use_it++) {
           llvm::Value *user = use_it->getUser();
           if (llvm::isa<llvm::StoreInst>(user)) {
-            hasStoreInst = true;
+            usedInFunctionPointer = true;
           }
         }
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
-            !hasStoreInst && f2 != nullptr && !f2->isDeclaration()) {
+            !usedInFunctionPointer && f2 != nullptr && !f2->isDeclaration()) {
           llvm::TargetLibraryInfoWrapperPass TLI(
               llvm::Triple(M1.get()->getTargetTriple()));
           smt_init.emplace();
