@@ -491,7 +491,7 @@ bool inputVerify() {
             valid = true;
             if (fit->getLinkage() ==
                 llvm::GlobalValue::LinkageTypes::InternalLinkage) {
-              fit->setLinkage(llvm::GlobalValue::CommonLinkage);
+              fit->setLinkage(llvm::GlobalValue::ExternalLinkage);
             }
           }
         }
