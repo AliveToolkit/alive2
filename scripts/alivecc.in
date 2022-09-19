@@ -109,6 +109,9 @@ if (compiling()) {
     # Alive2 doesn't yet understand TBAA info
     push @ARGV, "-fno-strict-aliasing";
 
+    # Alive2 doesn't support global analyses
+    push @ARGV, ("-mllvm", "-enable-global-analyses=0");
+
     my $TV_SHAREDLIB;
     if ($^O =~ /darwin*/) {
         # Mac
