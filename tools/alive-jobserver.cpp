@@ -14,40 +14,14 @@
 
 using namespace std;
 
-// max_procs = min(Linux default fifo buffer size, OS X default fifo buffer size)
+// max_procs = min(Linux default fifo buffer size, OS X default fifo buffer
+// size)
 static const int max_procs = 16384;
 
 static char fifo_filename[1024];
 
-static void count_tokens(int fd, int nprocs) {
-  int flags = fcntl(fd, F_GETFL, 0);
-  if (flags == -1) {
-    perror("alive-jobserver: fcntl");
-    exit(-1);
-  }
-  flags |= O_NONBLOCK;
-  int res = fcntl(fd, F_SETFL, flags);
-  if (res != 0) {
-    perror("alive-jobserver: fcntl");
-    exit(-1);
-  }
-  int toks = 0;
-  char c;
-  while (read(fd, &c, 1) != -1)
-    ++toks;
-  assert(errno == EWOULDBLOCK);
-  if (toks != nprocs) {
-    cerr << "alive-jobserver: expected " << nprocs
-         << " jobserver tokens "
-            "but instead it found "
-         << toks << "\n";
-    exit(-1);
-  }
-}
-
 static void remove_fifo() {
-  int res = unlink(fifo_filename);
-  if (res != 0) {
+  if (unlink(fifo_filename) != 0) {
     perror("unlink");
     exit(-1);
   }
@@ -58,20 +32,91 @@ static void sigint_handler(int) {
   exit(-1);
 }
 
+static void add_token(int pipefd) {
+  char c = 0;
+  if (write(pipefd, &c, 1) != 1) {
+    perror("alive-jobserver: write");
+    exit(-1);
+  }
+}
+
+#ifdef __linux__
+static int count_runnable() {
+  const int BUFSIZE = 1024;
+  char buf[BUFSIZE];
+  int fd = open("/proc/loadavg", O_RDONLY);
+  if (fd == -1) {
+    perror("open");
+    exit(-1);
+  }
+  int len = read(fd, buf, BUFSIZE);
+  if (len == -1) {
+    perror("read");
+    exit(-1);
+  }
+  int spaces = 0, pos;
+  for (pos = 0; pos < len; ++pos) {
+    if (buf[pos] == ' ')
+      ++spaces;
+    if (spaces == 3)
+      break;
+  }
+  assert(spaces == 3);
+  ++pos;
+  char *endp;
+  int runnable = strtol(&buf[pos], &endp, 10);
+  assert(*endp == '/');
+  return runnable - 1;
+}
+
+static int count_tokens(int pipefd) {
+  int flags = fcntl(pipefd, F_GETFL, 0);
+  if (flags == -1) {
+    perror("alive-jobserver: fcntl");
+    exit(-1);
+  }
+  flags |= O_NONBLOCK;
+  if (fcntl(pipefd, F_SETFL, flags) != 0) {
+    perror("alive-jobserver: fcntl");
+    exit(-1);
+  }
+  int toks = 0;
+  char c;
+  while (read(pipefd, &c, 1) != -1)
+    ++toks;
+  assert(errno == EWOULDBLOCK);
+  for (int i = 0; i < toks; ++i)
+    add_token(pipefd);
+  return toks;
+}
+#endif
+
+static void refill_tokens(int nprocs, int pipefd) {
+#ifdef __linux__
+  /*
+   * so we end up sometimes leaking tokens; here we fill them back
+   * in, with the goal of there always being a number of tokens in
+   * the FIFO that's at least as many as the gap between the current
+   * number of runnable processes and the desired concurrency
+   * level. this would be a really bad strategy for non-CPU-bound
+   * workloads, but it works well enough here
+   */
+  int runnable = count_runnable();
+  int desired_tokens = nprocs - runnable;
+  if (desired_tokens > 0) {
+    int current_tokens = count_tokens(pipefd);
+    int tokens_to_add = desired_tokens - current_tokens;
+    if (tokens_to_add > 0)
+      for (int i = 0; i < tokens_to_add; ++i)
+        add_token(pipefd);
+  }
+#endif
+}
+
 static void usage() {
   cerr << "usage: alive-jobserver -jN [command [args]]\n"
           "where N is in 1.."
-       << max_procs
-       << "\n"
-          "\n"
-          "alive-jobserver supports two modes of operation:\n"
-          "\n"
-          "if a command is specified, the jobserver executes it, passing it\n"
-          "information about the jobserver fifo in an environment variable.\n"
-          "\n"
-          "if no command is specified, the jobserver hangs forever, and you\n"
-          "must manually use the ALIVE_JOBSERVER_FIFO environment variable\n"
-          "to pass this information to the Alive2 LLVM plugin.\n";
+       << max_procs << "\n";
   exit(-1);
 }
 
@@ -99,8 +144,7 @@ int main(int argc, char *const argv[]) {
              (unsigned long)rand());
   } while (access(fifo_filename, F_OK) == 0);
 
-  int res = mkfifo(fifo_filename, 0666);
-  if (res != 0) {
+  if (mkfifo(fifo_filename, 0666) != 0) {
     perror("alive-jobserver: mkfifo");
     exit(-1);
   }
@@ -111,52 +155,37 @@ int main(int argc, char *const argv[]) {
     exit(-1);
   }
 
-  for (int i = 0; i < nprocs; ++i) {
-    char c = 0;
-    res = write(pipefd, &c, 1);
-    if (res != 1) {
-      perror("alive-jobserver: write");
+  for (int i = 0; i < nprocs; ++i)
+    add_token(pipefd);
+
+  std::fflush(nullptr);
+  pid_t pid = fork();
+  if (pid == -1) {
+    perror("alive-jobserver: fork");
+    exit(-1);
+  }
+  if (pid == 0) {
+    std::signal(SIGINT, SIG_DFL);
+    if (setenv("ALIVE_JOBSERVER_FIFO", fifo_filename, true) != 0) {
+      perror("setenv");
       exit(-1);
     }
+    if (setenv("ALIVECC_PARALLEL_FIFO", "1", true) != 0) {
+      perror("setenv");
+      exit(-1);
+    }
+    execvp(argv[2], &argv[2]);
+    perror("alive-jobserver: exec");
+    exit(-1);
   }
 
-  if (argc == 2) {
-    cerr << "Alive2 jobserver is running.\n";
-    cerr << "to use it from a different shell:\n";
-    cerr << "\n";
-    cerr << "export ALIVE_JOBSERVER_FIFO=" << fifo_filename << "\n";
-    cerr << "export ALIVECC_PARALLEL_FIFO=1\n";
-    cerr << "\n";
-    cerr << "kill this jobserver using ^C when finished.\n";
-    while (true)
-      sleep(1000000);
-  } else {
-    std::fflush(nullptr);
-    pid_t pid = fork();
-    if (pid == -1) {
-      perror("alive-jobserver: fork");
-      exit(-1);
-    }
-    if (pid == 0) {
-      std::signal(SIGINT, SIG_DFL);
-      res = setenv("ALIVE_JOBSERVER_FIFO", fifo_filename, true);
-      if (res != 0) {
-        perror("setenv");
-        exit(-1);
-      }
-      res = setenv("ALIVECC_PARALLEL_FIFO", "1", true);
-      if (res != 0) {
-        perror("setenv");
-        exit(-1);
-      }
-      execvp(argv[2], &argv[2]);
-      perror("alive-jobserver: exec");
-      exit(-1);
-    }
-    wait(nullptr);
+  while (true) {
+    if (waitpid(-1, nullptr, WNOHANG) != 0)
+      break;
+    refill_tokens(nprocs, pipefd);
+    sleep(1);
   }
 
-  count_tokens(pipefd, nprocs);
   remove_fifo();
 
   return 0;
