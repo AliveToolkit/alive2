@@ -22,7 +22,7 @@ static char fifo_filename[1024];
 
 static void remove_fifo() {
   if (unlink(fifo_filename) != 0) {
-    perror("unlink");
+    perror("alive-jobserver: unlink");
     exit(-1);
   }
 }
@@ -46,14 +46,15 @@ static int count_runnable() {
   char buf[BUFSIZE];
   int fd = open("/proc/loadavg", O_RDONLY);
   if (fd == -1) {
-    perror("open");
+    perror("alive-jobserver: open");
     exit(-1);
   }
   int len = read(fd, buf, BUFSIZE);
   if (len == -1) {
-    perror("read");
+    perror("alive-jobserver: read");
     exit(-1);
   }
+  close(fd);
   int spaces = 0, pos;
   for (pos = 0; pos < len; ++pos) {
     if (buf[pos] == ' ')
@@ -103,13 +104,13 @@ static void refill_tokens(int nprocs, int pipefd) {
    */
   int runnable = count_runnable();
   int desired_tokens = nprocs - runnable;
-  if (desired_tokens > 0) {
-    int current_tokens = count_tokens(pipefd);
-    int tokens_to_add = desired_tokens - current_tokens;
-    if (tokens_to_add > 0)
-      for (int i = 0; i < tokens_to_add; ++i)
-        add_token(pipefd);
-  }
+  if (desired_tokens <= 0)
+    return;
+  int current_tokens = count_tokens(pipefd);
+  int tokens_to_add = desired_tokens - current_tokens;
+  if (tokens_to_add > 0)
+    for (int i = 0; i < tokens_to_add; ++i)
+      add_token(pipefd);
 #endif
 }
 
@@ -167,11 +168,11 @@ int main(int argc, char *const argv[]) {
   if (pid == 0) {
     std::signal(SIGINT, SIG_DFL);
     if (setenv("ALIVE_JOBSERVER_FIFO", fifo_filename, true) != 0) {
-      perror("setenv");
+      perror("alive-jobserver: setenv");
       exit(-1);
     }
     if (setenv("ALIVECC_PARALLEL_FIFO", "1", true) != 0) {
-      perror("setenv");
+      perror("alive-jobserver: setenv");
       exit(-1);
     }
     execvp(argv[2], &argv[2]);
@@ -180,7 +181,7 @@ int main(int argc, char *const argv[]) {
   }
 
   while (true) {
-    if (waitpid(-1, nullptr, WNOHANG) != 0)
+    if (waitpid(-1, nullptr, WNOHANG) == -1)
       break;
     refill_tokens(nprocs, pipefd);
     sleep(1);
