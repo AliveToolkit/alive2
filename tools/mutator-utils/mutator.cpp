@@ -276,6 +276,9 @@ bool FunctionMutator::checkValid() {
       return true;
     }
   }
+  if(!sout.str().empty()){
+    llvm::errs()<<"Verify message: "<<sout.str()<<"\n";
+  }
   return sout.str().empty();
 }
 
@@ -303,6 +306,9 @@ void FunctionMutator::mutate() {
   if(!checkValid()){
     llvm::errs()<<"Invalid LLVM IR generated. Current seed: "<<Random::getSeed()<<"\n";
     llvm::errs()<<"Current Module Identifier: "<<currentFunction->getParent()->getModuleIdentifier()<<"\n";
+    llvm::errs()<<"Current Function:\n";
+    functionInTmp->print(llvm::errs());
+    llvm::errs()<<"\n";
     print();
     llvm::errs()<<"End\n";
   }
