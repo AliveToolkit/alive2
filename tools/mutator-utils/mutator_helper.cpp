@@ -259,6 +259,15 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
     }
   }
 
+  if(llvm::isa<llvm::GetElementPtrInst>(inst)){
+    for(auto it=inst->op_begin();it!=inst->op_end();++it){
+      if(!canMutate(it->get())&&!llvm::isa<llvm::Constant>(it->get())){
+        return true;
+      }
+    }
+    return false;
+  }
+
   return
       // make sure at least one
       std::any_of(inst->op_begin(), inst->op_end(),
