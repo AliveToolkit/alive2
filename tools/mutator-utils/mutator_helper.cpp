@@ -225,7 +225,7 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
       pos = 0;
     }
     if (canMutate(mutator->iitInTmp->getOperand(pos))) {
-      if(isGEP && mutator->iitInTmp->getOperand(pos)->getType()->isIntegerTy()){
+      if(isGEP && llvm::isa<llvm::Constant>(mutator->iitInTmp->getOperand(pos))){
         continue;
       }
       found = true;
@@ -251,6 +251,14 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
 }
 
 bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
+  //skip those call base with inlning asm.
+  if(llvm::isa<llvm::CallBase>(inst)){
+    llvm::CallBase * callBase=(llvm::CallBase *)inst;
+    if(callBase->isInlineAsm()){
+      return false;
+    }
+  }
+
   return
       // make sure at least one
       std::any_of(inst->op_begin(), inst->op_end(),
