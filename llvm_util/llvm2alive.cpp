@@ -176,8 +176,8 @@ public:
         out(&get_outs()) {}
 
   ~llvm2alive_() {
+    reset_state();
     for (auto &inst : i_constexprs) {
-      remove_value_name(*inst); // otherwise value_names maintain freed pointers
       inst->deleteValue();
     }
   }

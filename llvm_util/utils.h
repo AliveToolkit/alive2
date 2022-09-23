@@ -32,7 +32,6 @@ IR::FastMathFlags parse_fmath(llvm::Instruction &i);
 IR::BasicBlock& getBB(const llvm::BasicBlock *bb);
 
 std::string value_name(const llvm::Value &v);
-void remove_value_name(const llvm::Value &v);
 
 IR::Type& get_int_type(unsigned bits);
 IR::Type* llvm_type2alive(const llvm::Type *ty);
@@ -54,5 +53,6 @@ void init_llvm_utils(std::ostream &os, const llvm::DataLayout &DL);
 std::ostream& get_outs();
 void set_outs(std::ostream &os);
 
+void reset_state();
 void reset_state(IR::Function &f);
 }

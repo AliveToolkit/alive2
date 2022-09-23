@@ -24,7 +24,7 @@ namespace {
 
 // cache Value*'s names
 unordered_map<const llvm::Value*, string> value_names;
-unsigned value_id_counter; // for %0, %1, etc..
+unsigned value_id_counter = 0; // for %0, %1, etc..
 
 vector<unique_ptr<IntType>> int_types;
 vector<unique_ptr<PtrType>> ptr_types;
@@ -99,10 +99,6 @@ string value_name(const llvm::Value &v) {
     return name = '%' + v.getName().str();
   return name = v.getType()->isVoidTy() ? "<void>"
                                         : '%' + to_string(value_id_counter++);
-}
-
-void remove_value_name(const llvm::Value &v) {
-  value_names.erase(&v);
 }
 
 Type& get_int_type(unsigned bits) {
@@ -439,11 +435,14 @@ void set_outs(ostream &os) {
   out = &os;
 }
 
-void reset_state(Function &f) {
-  current_fn = &f;
+void reset_state() {
   value_cache.clear();
   value_names.clear();
   value_id_counter = 0;
+}
+
+void reset_state(Function &f) {
+  current_fn = &f;
 }
 
 }
