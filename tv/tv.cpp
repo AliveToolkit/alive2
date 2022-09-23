@@ -671,8 +671,10 @@ llvmGetPassPluginInfo() {
           else if (is_first)
             TVPass::batched_pass_begin_name = "beginning";
 
-          if ((is_first || do_start) && opt_save_ir)
-              MClone = llvm::CloneModule(*unwrapModule(IR));
+          if ((is_first || do_start) && opt_save_ir) {
+            MClone.reset();
+            MClone = llvm::CloneModule(*unwrapModule(IR));
+          }
 
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
@@ -689,6 +691,7 @@ llvmGetPassPluginInfo() {
           PB.getPassInstrumentationCallbacks()
             ->registerBeforeNonSkippedPassCallback(
               [](llvm::StringRef P, llvm::Any IR) {
+                MClone.reset();
                 MClone = llvm::CloneModule(*unwrapModule(IR));
           });
         }
