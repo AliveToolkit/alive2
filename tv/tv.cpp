@@ -21,7 +21,6 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -85,7 +84,7 @@ bool is_clangtv = false;
 unique_ptr<Cache> cache;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
-std::unique_ptr<llvm::Module> MClone;
+std::string SavedBitcode;
 string pass_name;
 
 void sigalarm_handler(int) {
@@ -114,30 +113,30 @@ static void showStats() {
     IR::Memory::printAliasStats(*out);
 }
 
-static void writeBitcodeAtomically(const fs::path report_filename) {
-  fs::path tmp_path;
-  do {
-    auto newname = report_filename.stem();
-    newname += "_" + get_random_str(8) + ".bc";
-    tmp_path.replace_filename(newname);
-  } while (fs::exists(tmp_path));
-
-  std::error_code EC;
-  llvm::raw_fd_ostream tmp_file(tmp_path.string(), EC);
-  if (EC) {
-    cerr << "Alive2: Couldn't open temporary bitcode file" << endl;
-    exit(1);
-  }
-  llvm::WriteBitcodeToFile(*MClone, tmp_file);
-  tmp_file.close();
-
-  fs::path bc_filename = tmp_path;
-  if (!report_filename.empty()) {
+static void writeBitcode(const fs::path &report_filename) {
+  fs::path bc_filename;
+  if (report_filename.empty()) {
+    bc_filename = get_random_str(8) + ".bc";
+  } else {
     bc_filename = report_filename;
     bc_filename.replace_extension(".bc");
-    std::rename(tmp_path.c_str(), bc_filename.c_str());
   }
+
+  std::error_code EC;
+  llvm::raw_fd_ostream bc_file(bc_filename.string(), EC);
+  if (EC) {
+    cerr << "Alive2: Couldn't open bitcode file" << endl;
+    exit(1);
+  }
+  bc_file.write(SavedBitcode.data(), SavedBitcode.size());
+  bc_file.close();
   *out << "Wrote bitcode to: " << bc_filename << '\n';
+}
+
+static void saveBitcode(const llvm::Module *M) {
+  SavedBitcode.resize(0);
+  llvm::raw_string_ostream OS(SavedBitcode);
+  WriteBitcodeToFile(*M, OS);
 }
 
 static void emitCommandLine(ostream *out) {
@@ -326,8 +325,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
         has_failure = true;
         *out << "\nPass: " << pass_name << '\n';
         emitCommandLine(out);
-        if (MClone)
-          writeBitcodeAtomically(report_filename);
+	if (SavedBitcode.size() > 0)
+	  writeBitcode(report_filename);
         *out << "\n";
       }
       if (opt_error_fatal && has_failure)
@@ -394,7 +393,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
   }
 
   static void finalize() {
-    MClone = nullptr;
+    SavedBitcode.resize(0);
     if (parallelMgr) {
       parallelMgr->finishParent();
       out = out_file.is_open() ? &out_file : &cout;
@@ -671,10 +670,8 @@ llvmGetPassPluginInfo() {
           else if (is_first)
             TVPass::batched_pass_begin_name = "beginning";
 
-          if ((is_first || do_start) && opt_save_ir) {
-            MClone.reset();
-            MClone = llvm::CloneModule(*unwrapModule(IR));
-          }
+          if ((is_first || do_start) && opt_save_ir)
+	    saveBitcode(unwrapModule(IR));
 
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
@@ -691,8 +688,7 @@ llvmGetPassPluginInfo() {
           PB.getPassInstrumentationCallbacks()
             ->registerBeforeNonSkippedPassCallback(
               [](llvm::StringRef P, llvm::Any IR) {
-                MClone.reset();
-                MClone = llvm::CloneModule(*unwrapModule(IR));
+		saveBitcode(unwrapModule(IR));
           });
         }
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
