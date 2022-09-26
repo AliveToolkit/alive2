@@ -478,6 +478,12 @@ bool inputVerify() {
             usedInFunctionPointer = true;
           }
         }
+
+        if (testMode) {
+          ++validFuncNum;
+          continue;
+        }
+
         if (llvm::Function *f2 = M2->getFunction(fit->getName());
             !usedInFunctionPointer && f2 != nullptr && !f2->isDeclaration()) {
           llvm::TargetLibraryInfoWrapperPass TLI(
@@ -500,9 +506,6 @@ bool inputVerify() {
           invalidFuncNameSet.insert(fit->getName());
         }
       }
-    }
-    if (testMode) {
-      validFuncNum = M1->getFunctionList().size();
     }
 
     stubMutator.setModule(std::move(M1));
