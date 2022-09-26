@@ -30,6 +30,12 @@ if ($0 =~ /alivecc$/) {
     die "Unexpected invocation as '$0'";
 }
 
+# there's a bug in LLVM's CloneModule that causes, over time, a severe
+# memory leak; we can work around it by dropping debug info, which
+# should never have any effect on translation validation
+my @keepers = grep(!/^\-g/, @ARGV);
+@ARGV = @keepers;
+
 my $print_cmd = 0;
 
 if (compiling()) {
