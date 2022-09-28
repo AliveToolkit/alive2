@@ -106,14 +106,14 @@ string toString(const Function &fn) {
   return std::move(ss).str();
 }
 
-static void showStats() {
+void showStats() {
   if (opt_smt_stats)
     smt::solver_print_stats(*out);
   if (opt_alias_stats)
     IR::Memory::printAliasStats(*out);
 }
 
-static void writeBitcode(const fs::path &report_filename) {
+void writeBitcode(const fs::path &report_filename) {
   fs::path bc_filename;
   if (report_filename.empty()) {
     bc_filename = get_random_str(8) + ".bc";
@@ -133,13 +133,13 @@ static void writeBitcode(const fs::path &report_filename) {
   *out << "Wrote bitcode to: " << bc_filename << '\n';
 }
 
-static void saveBitcode(const llvm::Module *M) {
-  SavedBitcode.resize(0);
+void saveBitcode(const llvm::Module *M) {
+  SavedBitcode.clear();
   llvm::raw_string_ostream OS(SavedBitcode);
   WriteBitcodeToFile(*M, OS);
 }
 
-static void emitCommandLine(ostream *out) {
+void emitCommandLine(ostream *out) {
 #ifdef __linux__
   ifstream cmd_args("/proc/self/cmdline");
   if (!cmd_args.is_open()) {
@@ -325,7 +325,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
         has_failure = true;
         *out << "\nPass: " << pass_name << '\n';
         emitCommandLine(out);
-	if (SavedBitcode.size() > 0)
+	if (!SavedBitcode.empty())
 	  writeBitcode(report_filename);
         *out << "\n";
       }
