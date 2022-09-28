@@ -16,11 +16,9 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -122,13 +120,12 @@ void writeBitcode(const fs::path &report_filename) {
     bc_filename.replace_extension(".bc");
   }
 
-  std::error_code EC;
-  llvm::raw_fd_ostream bc_file(bc_filename.string(), EC);
-  if (EC) {
+  ofstream bc_file(bc_filename);
+  if (!bc_file.is_open()) {
     cerr << "Alive2: Couldn't open bitcode file" << endl;
     exit(1);
   }
-  bc_file.write(SavedBitcode.data(), SavedBitcode.size());
+  bc_file << SavedBitcode;
   bc_file.close();
   *out << "Wrote bitcode to: " << bc_filename << '\n';
 }
