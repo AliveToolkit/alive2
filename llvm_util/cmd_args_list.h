@@ -143,6 +143,10 @@ llvm::cl::opt<bool> opt_cache(LLVM_ARGS_PREFIX "cache",
   llvm::cl::init(false),
   llvm::cl::desc("Use external cache (default=false)"));
 
+llvm::cl::opt<bool> opt_assume_cache_hit(LLVM_ARGS_PREFIX "assume-cache-hit",
+  llvm::cl::init(false),
+  llvm::cl::desc("Assume cache hits every time (for debugging only, default=false)"));
+
 llvm::cl::opt<unsigned> opt_cache_port(LLVM_ARGS_PREFIX "cache-port",
   llvm::cl::init(6379),
   llvm::cl::desc("Port to connect to Redis server (default=6379"));

@@ -117,7 +117,8 @@ void writeBitcode(const fs::path &report_filename) {
     bc_filename = get_random_str(8) + ".bc";
   } else {
     bc_filename = report_filename;
-    bc_filename.replace_extension(".bc");
+    bc_filename.replace_extension("");
+    bc_filename += "_" + get_random_str(4) + ".bc";
   }
 
   ofstream bc_file(bc_filename);
@@ -251,7 +252,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
     // Since we have an open connection to the Redis server, we have
     // to do this before forking. Anyway, this is fast.
-    if (cache && cache->lookup(src_tostr + "===\n" + tgt_tostr)) {
+    if (opt_assume_cache_hit ||
+	(cache && cache->lookup(src_tostr + "===\n" + tgt_tostr))) {
       *out << "Skipping repeated query\n\n";
       return;
     }
