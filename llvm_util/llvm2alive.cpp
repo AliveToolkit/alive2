@@ -1666,13 +1666,14 @@ public:
 
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
-	std::stringstream s;
-	s << *gv->getInitializer();
         *out << "ERROR: Unsupported constant: ";
-	if (s.str().size() > 250)
-	  *out << "[too large]\n";
-	else
-	  *out << s.str() << '\n';
+        stringstream s;
+        s << *gv->getInitializer();
+        auto str = std::move(s).str();
+        if (str.size() > 250)
+          *out << "[too large]\n";
+        else
+          *out << str << '\n';
         return {};
       }
 

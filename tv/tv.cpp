@@ -253,7 +253,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     // Since we have an open connection to the Redis server, we have
     // to do this before forking. Anyway, this is fast.
     if (opt_assume_cache_hit ||
-	(cache && cache->lookup(src_tostr + "===\n" + tgt_tostr))) {
+        (cache && cache->lookup(src_tostr + "===\n" + tgt_tostr))) {
       *out << "Skipping repeated query\n\n";
       return;
     }
