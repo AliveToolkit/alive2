@@ -14,6 +14,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
+#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1665,8 +1666,13 @@ public:
 
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
-        *out << "ERROR: Unsupported constant: " << *gv->getInitializer()
-             << '\n';
+	std::stringstream s;
+	s << *gv->getInitializer();
+        *out << "ERROR: Unsupported constant: ";
+	if (s.str().size() > 250)
+	  *out << "[too large]\n";
+	else
+	  *out << s.str() << '\n';
         return {};
       }
 
