@@ -2686,10 +2686,11 @@ void Phi::addValue(Value &val, string &&BB_name) {
 }
 
 void Phi::removeValue(const string &BB_name) {
-  for (auto I = values.begin(), E = values.end(); I != E; ++I) {
+  for (auto I = values.begin(); I != values.end(); ) {
     if (I->second == BB_name) {
-      values.erase(I);
-      break;
+      I = values.erase(I);
+    } else {
+      ++I;
     }
   }
 }
