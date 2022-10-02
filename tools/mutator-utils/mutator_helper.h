@@ -342,13 +342,13 @@ class ResizeIntegerHelper : public MutationHelper {
   static bool isValidNode(llvm::Value *val);
   std::vector<llvm::Instruction *>
   constructUseChain(llvm::Instruction *startPoint);
-  static llvm::IntegerType *getNewIntegerTy(llvm::LLVMContext &context);
+  static llvm::Type *getNewIntegerTy(llvm::LLVMContext &context, llvm::Type* intTy);
   llvm::Instruction *updateNode(llvm::Instruction *val,
                                 llvm::ArrayRef<llvm::Value *> args);
   void updateChain(std::vector<llvm::Instruction *> &chain,
-                   llvm::IntegerType *newIntTy);
+                   llvm::Type *newIntTy);
   void resizeOperand(llvm::Instruction *inst, size_t index,
-                     llvm::IntegerType *newTy);
+                     llvm::Type *newTy);
 
 public:
   ResizeIntegerHelper(std::shared_ptr<FunctionMutator> mutator)

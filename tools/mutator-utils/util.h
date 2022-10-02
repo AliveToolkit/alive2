@@ -328,7 +328,7 @@ public:
   static void insertRandomCodeBefore(llvm::Instruction *inst);
   static void propagateFunctionsInModule(llvm::Module *M, size_t num);
   static llvm::Value *
-  updateIntegerSize(llvm::Value *integer, llvm::IntegerType *newIntTy,
+  updateIntegerSize(llvm::Value *integer, llvm::Type *newIntTy,
                     llvm::Instruction *insertBefore = nullptr);
   static bool compareSignature(const llvm::Function *func1,
                                const llvm::Function *func2) {

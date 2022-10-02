@@ -193,18 +193,28 @@ std::string mutator_util::insertFunctionArguments(llvm::Function *F,
 }
 
 llvm::Value *mutator_util::updateIntegerSize(llvm::Value *integer,
-                                         llvm::IntegerType *newIntTy,
+                                         llvm::Type *newIntOrVecTy,
                                          llvm::Instruction *insertBefore) {
-  assert(integer->getType()->isIntegerTy() &&
+  assert(integer->getType()->isIntOrIntVectorTy() &&
          "should be a integer type to update the size");
-  llvm::IntegerType *oldIntTy = (llvm::IntegerType *)integer->getType();
-  size_t oldSize = oldIntTy->getBitWidth(), newSize = newIntTy->getBitWidth();
+  assert(newIntOrVecTy->isIntOrIntVectorTy() && "should be an int or intVector type");
+  bool isVec=newIntOrVecTy->isVectorTy();
+  size_t oldSize = -1, newSize = -1;
+
+  if(isVec){
+    oldSize = ((llvm::VectorType*)integer->getType())->getElementType()->getIntegerBitWidth();
+    newSize = ((llvm::VectorType*)newIntOrVecTy)->getElementType()->getIntegerBitWidth();
+  }else{
+    oldSize = integer->getType()->getIntegerBitWidth();
+    newSize = newIntOrVecTy->getIntegerBitWidth();
+  }
+  
   if (oldSize < newSize) {
     return llvm::CastInst::Create(llvm::Instruction::CastOps::ZExt, integer,
-                                  newIntTy, "", insertBefore);
+                                  newIntOrVecTy, "", insertBefore);
   } else if (oldSize > newSize) {
     return llvm::CastInst::Create(llvm::Instruction::CastOps::Trunc, integer,
-                                  newIntTy, "", insertBefore);
+                                  newIntOrVecTy, "", insertBefore);
   } else {
     return integer;
   }

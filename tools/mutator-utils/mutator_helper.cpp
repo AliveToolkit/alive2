@@ -836,7 +836,8 @@ void BinaryInstructionHelper::debug() {
 
 bool ResizeIntegerHelper::isValidNode(llvm::Value *val) {
   if (llvm::isa<llvm::BinaryOperator>(val)) {
-    return llvm::isa<llvm::IntegerType>(val->getType());
+    llvm::Type* ty=val->getType();
+    return ty->isIntOrIntVectorTy();
   }
   return false;
 }
@@ -856,17 +857,26 @@ bool ResizeIntegerHelper::shouldMutate() {
 
 // 1, 8, 16, 32, 64 50%
 // 1....64 50%
-llvm::IntegerType *
-ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context) {
+llvm::Type *
+ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context, llvm::Type* intTy) {
   static llvm::SmallVector<size_t> defaultWidth{1, 8, 16, 32, 64};
+  assert(intTy->isIntOrIntVectorTy() && "ty should be an int or int vector ty");
+  llvm::Type* result=nullptr;
   if (Random::getRandomBool()) {
-    return llvm::IntegerType::get(
+    result = llvm::IntegerType::get(
         context,
         defaultWidth[Random::getRandomUnsigned() % defaultWidth.size()]);
   } else {
-    return llvm::IntegerType::get(context,
+    result = llvm::IntegerType::get(context,
                                   1 + Random::getRandomUnsigned() % 64);
   }
+
+  
+  if(intTy->isVectorTy()) {
+    llvm::VectorType* vecTy=(llvm::VectorType*)intTy;    
+    result = llvm::VectorType::get(result, vecTy->getElementCount());
+  }
+  return result;
 }
 
 std::vector<llvm::Instruction *>
@@ -913,7 +923,7 @@ ResizeIntegerHelper::updateNode(llvm::Instruction *val,
     llvm::Instruction *nextInst = op->getNextNonDebugInstruction();
     llvm::BinaryOperator *newOp = llvm::BinaryOperator::Create(
         op->getOpcode(), args[0], args[1], "", nextInst);
-    assert(newOp->getType()->isIntegerTy());
+    assert(newOp->getType()->isIntOrIntVectorTy());
     llvm::IntegerType *newIntTy = (llvm::IntegerType *)newOp->getType();
     for (size_t i = 0; i < newOp->getNumOperands(); ++i) {
       if (llvm::isa<llvm::UndefValue>(newOp->getOperand(i))) {
@@ -928,7 +938,7 @@ ResizeIntegerHelper::updateNode(llvm::Instruction *val,
 }
 
 void ResizeIntegerHelper::updateChain(std::vector<llvm::Instruction *> &chain,
-                                      llvm::IntegerType *newIntTy) {
+                                      llvm::Type *newIntTy) {
   std::vector<llvm::Instruction *> newChain;
   if (!chain.empty()) {
     llvm::Value *undef = llvm::UndefValue::get(newIntTy);
@@ -966,7 +976,7 @@ void ResizeIntegerHelper::updateChain(std::vector<llvm::Instruction *> &chain,
 }
 
 void ResizeIntegerHelper::resizeOperand(llvm::Instruction *inst, size_t index,
-                                        llvm::IntegerType *newTy) {
+                                        llvm::Type *newTy) {
   assert(inst->getNumOperands() > index);
   llvm::Value *val = inst->getOperand(index);
   assert(llvm::isa<llvm::IntegerType>(val->getType()));
@@ -978,10 +988,10 @@ void ResizeIntegerHelper::resizeOperand(llvm::Instruction *inst, size_t index,
 void ResizeIntegerHelper::mutate() {
   llvm::Instruction *inst = &*mutator->iitInTmp;
   std::vector<llvm::Instruction *> useChain = constructUseChain(inst);
-  llvm::IntegerType *oldIntTy = (llvm::IntegerType *)inst->getType(),
+  llvm::Type *oldIntTy = inst->getType(),
                     *newIntTy = oldIntTy;
   do {
-    newIntTy = getNewIntegerTy(inst->getContext());
+    newIntTy = getNewIntegerTy(inst->getContext(), oldIntTy);
   } while (newIntTy == oldIntTy);
   updateChain(useChain, newIntTy);
   updated = true;
