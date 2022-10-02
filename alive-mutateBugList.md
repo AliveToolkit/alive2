@@ -16,6 +16,8 @@ This category is for bugs that generating wrong codes from passes
 14. miscompile of non-canonical add+icmp by arm64 backend (https://github.com/llvm/llvm-project/issues/55627)
 15. shift/zext-related miscompile by aarch64 backend (https://github.com/llvm/llvm-project/issues/55833)
 16. possible zext-related miscompile with global isel on AArch64 (https://github.com/llvm/llvm-project/issues/56733)
+17. miscompile a usub.sat on AArch64 (https://github.com/llvm/llvm-project/issues/58109)
+
 
 ## Category 2
 This category is for bugs that crashes
