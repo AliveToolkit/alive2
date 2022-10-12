@@ -14,7 +14,7 @@ PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipscc
 PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 
 # see opt.cpp: shouldForceLegacyPM()
-FORCE_OLD_NPM="safe-stack codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem"
+FORCE_OLD_NPM="safe-stack codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
 
 TV="-tv"
 SKIP_TV=0
