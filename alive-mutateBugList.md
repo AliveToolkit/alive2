@@ -17,6 +17,7 @@ This category is for bugs that generating wrong codes from passes
 15. shift/zext-related miscompile by aarch64 backend (https://github.com/llvm/llvm-project/issues/55833)
 16. possible zext-related miscompile with global isel on AArch64 (https://github.com/llvm/llvm-project/issues/56733)
 17. miscompile a usub.sat on AArch64 (https://github.com/llvm/llvm-project/issues/58109)
+18. miscompile of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
 
 
 ## Category 2
