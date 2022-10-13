@@ -1892,8 +1892,9 @@ void Memory::memset_pattern(const expr &ptr0, const expr &pattern0,
     }
     store(ptr, to_store, undef_vars, 1);
   } else {
-    for (unsigned i = 0; i < pattern_length; ++i) {
-      to_store.emplace_back(i * bytesz, std::move(bytes[i])());
+    assert(bytes.size() * bytesz == pattern_length);
+    for (unsigned i = 0; i < pattern_length; i += bytesz) {
+      to_store.emplace_back(i * bytesz, std::move(bytes[i/bytesz])());
     }
     expr offset
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
