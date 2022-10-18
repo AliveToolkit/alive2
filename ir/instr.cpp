@@ -3116,7 +3116,7 @@ expr Assume::getTypeConstraints(const Function &f) const {
   case NonNull:
     return args[0]->getType().enforcePtrType();
   }
-  return {};
+  UNREACHABLE();
 }
 
 unique_ptr<Instr> Assume::dup(Function &f, const string &suffix) const {
