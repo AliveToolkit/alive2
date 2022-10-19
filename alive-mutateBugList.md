@@ -18,9 +18,7 @@ This category is for bugs that generating wrong codes from passes
 16. possible zext-related miscompile with global isel on AArch64 (https://github.com/llvm/llvm-project/issues/56733)
 17. miscompile a usub.sat on AArch64 (https://github.com/llvm/llvm-project/issues/58109)
 18. miscompile of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
-19. aarch64 global isel backend crashes on valid input (https://github.com/llvm/llvm-project/issues/58423)
-20. aarch64 global isel backend assertion violation when translating udiv of i1 (https://github.com/llvm/llvm-project/issues/58425)
-21. miscompile from aarch64 backend with global isel (https://github.com/llvm/llvm-project/issues/58431)
+19. miscompile from aarch64 backend with global isel (https://github.com/llvm/llvm-project/issues/58431)
 
 
 ## Category 2
@@ -32,6 +30,8 @@ This category is for bugs that crashes
 5. InstCombine crashes (https://github.com/llvm/llvm-project/issues/56945)
 6. InstSimplify Bug (https://github.com/llvm/llvm-project/issues/56968)
 7. InstCombine Crash (https://github.com/llvm/llvm-project/issues/56981)
+8. aarch64 global isel backend crashes on valid input (https://github.com/llvm/llvm-project/issues/58423)
+9. aarch64 global isel backend assertion violation when translating udiv of i1 (https://github.com/llvm/llvm-project/issues/58425)
 
 ## Category 3
 This category is for that the test file is originaly wrong
