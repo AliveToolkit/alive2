@@ -93,3 +93,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 13. SMT internalize doesn't respect the timeout (https://github.com/Z3Prover/z3/issues/4192)
 14. Unsoundness with smt.bv.size_reduce=true (https://github.com/Z3Prover/z3/issues/6314)
 15. Incorrect sort after lambda rewrite (https://github.com/Z3Prover/z3/issues/6340)
+16. Incorrect BV rewrite (https://github.com/Z3Prover/z3/issues/6426)
