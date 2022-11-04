@@ -1426,14 +1426,6 @@ public:
         attrs.set(FnAttrs::NoRead);
         break;
 
-      case llvm::Attribute::ArgMemOnly:
-        attrs.set(FnAttrs::ArgMemOnly);
-        break;
-
-      case llvm::Attribute::InaccessibleMemOnly:
-        attrs.set(FnAttrs::InaccessibleMemOnly);
-        break;
-
       case llvm::Attribute::NoFree:
         attrs.set(FnAttrs::NoFree);
         break;
