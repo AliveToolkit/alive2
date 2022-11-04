@@ -1568,7 +1568,7 @@ expr expr::ugt(const expr &rhs) const {
     return false;
 
   uint64_t n;
-  if (rhs.isUInt(n))
+  if (rhs.isUInt(n) && n < numeric_limits<uint64_t>::max())
     return uge(mkUInt(n + 1, sort()));
 
   return !ule(rhs);
