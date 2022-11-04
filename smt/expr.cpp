@@ -1568,9 +1568,10 @@ expr expr::ugt(const expr &rhs) const {
     return false;
 
   uint64_t n;
-  if (rhs.isUInt(n))
-    return uge(mkUInt(n + 1, sort()));
-
+  if (rhs.isUInt(n)) {
+    auto ty = sort();
+    return uge(mkUInt(n, ty) + mkUInt(1, ty));
+  }
   return !ule(rhs);
 }
 
