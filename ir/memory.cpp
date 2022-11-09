@@ -107,7 +107,7 @@ static unsigned next_global_bid;
 static unsigned next_ptr_input;
 
 static bool byte_has_ptr_bit() {
-  return does_int_mem_access && does_ptr_mem_access;
+  return true;
 }
 
 static unsigned bits_ptr_byte_offset() {
@@ -116,13 +116,13 @@ static unsigned bits_ptr_byte_offset() {
 }
 
 static unsigned padding_ptr_byte() {
-  return Byte::bitsByte() - does_int_mem_access - 1 - Pointer::totalBits()
+  return Byte::bitsByte() - byte_has_ptr_bit() - 1 - Pointer::totalBits()
                           - bits_ptr_byte_offset();
 }
 
 static unsigned padding_nonptr_byte() {
   return
-    Byte::bitsByte() - does_ptr_mem_access - bits_byte - bits_poison_per_byte;
+    Byte::bitsByte() - byte_has_ptr_bit() - bits_byte - bits_poison_per_byte;
 }
 
 static expr concat_if(const expr &ifvalid, expr &&e) {
@@ -235,17 +235,11 @@ Byte Byte::mkPoisonByte(const Memory &m) {
 }
 
 expr Byte::isPtr() const {
-  if (!does_ptr_mem_access)
-    return false;
-  if (!does_int_mem_access)
-    return true;
   auto bit = p.bits() - 1;
   return p.extract(bit, bit) == 1;
 }
 
 expr Byte::ptrNonpoison() const {
-  if (!does_ptr_mem_access)
-    return true;
   auto bit = p.bits() - 1 - byte_has_ptr_bit();
   return p.extract(bit, bit) == 1;
 }
@@ -273,8 +267,6 @@ expr Byte::ptrByteoffset() const {
 }
 
 expr Byte::nonptrNonpoison() const {
-  if (!does_int_mem_access)
-    return expr::mkUInt(0, bits_poison_per_byte);
   unsigned start = padding_nonptr_byte() + bits_byte;
   return p.extract(start + bits_poison_per_byte - 1, start);
 }
