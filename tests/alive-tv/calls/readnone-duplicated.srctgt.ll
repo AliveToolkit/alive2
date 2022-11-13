@@ -15,4 +15,4 @@ define void @tgt() {
   ret void
 }
 
-declare i32* @__errno_location() readnone
+declare i32* @__errno_location() memory(none)

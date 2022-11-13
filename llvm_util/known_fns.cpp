@@ -44,7 +44,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   auto alloc_fns = [&](unsigned idx1, unsigned idx2 = -1u) {
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::InaccessibleMemOnly);
+    attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
     attrs.set(FnAttrs::NoAlias);
     attrs.set(FnAttrs::WillReturn);
     attrs.set(FnAttrs::AllocSize);
@@ -103,7 +103,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   case llvm::LibFunc_free:
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::InaccessibleMemOnly);
+    attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::WillReturn);
     attrs.allocfamily = "malloc";
@@ -153,7 +153,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
 
   case llvm::LibFunc_vec_free:
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::InaccessibleMemOnly);
+    attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::WillReturn);
     attrs.allocfamily = "vecmalloc";
@@ -342,8 +342,8 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   case llvm::LibFunc_getenv:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
-    attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::NoFree);
+    attrs.mem.setCanOnlyRead();
     set_param(0, ParamAttrs::NoCapture);
     RETURN_EXACT();
 
@@ -365,7 +365,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    attrs.set(FnAttrs::NoRead);
+    attrs.mem.setCanOnlyWrite(MemoryAccess::Errno);
     attrs.set(FnAttrs::WillReturn);
     RETURN_EXACT();
 
@@ -378,7 +378,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    attrs.set(FnAttrs::NoWrite);
+    attrs.mem.setCanOnlyRead(MemoryAccess::Args);
     attrs.set(FnAttrs::WillReturn);
     set_param(0, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::NoCapture);
@@ -425,7 +425,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   case llvm::LibFunc_strncat:
   case llvm::LibFunc_strncpy:
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.mem.setCanOnlyAccess(MemoryAccess::Args);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     attrs.set(FnAttrs::WillReturn);
@@ -444,10 +444,9 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     [[fallthrough]];
   case llvm::LibFunc_strncmp:
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.mem.setCanOnlyRead(MemoryAccess::Args);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::WillReturn);
     set_param(0, ParamAttrs::NoCapture);
     set_param(1, ParamAttrs::NoCapture);
@@ -466,19 +465,17 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   case llvm::LibFunc_memchr:
   case llvm::LibFunc_memrchr:
     ret_and_args_no_undef();
-    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.mem.setCanOnlyRead(MemoryAccess::Args);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::WillReturn);
     RETURN_APPROX();
 
   case llvm::LibFunc_strstr:
   case llvm::LibFunc_strpbrk:
-    attrs.set(FnAttrs::ArgMemOnly);
+    attrs.mem.setCanOnlyRead(MemoryAccess::Args);
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
-    attrs.set(FnAttrs::NoWrite);
     attrs.set(FnAttrs::WillReturn);
     set_param_deref(0, 1);
     set_param_deref(1, 1);

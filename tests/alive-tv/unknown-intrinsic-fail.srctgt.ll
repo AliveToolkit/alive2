@@ -1,11 +1,11 @@
 ; ERROR: Couldn't prove the correctness of the transformation
 
-declare i8* @llvm.thread.pointer()
+declare ptr @llvm.objc.loadWeak(ptr)
 
-define i8* @src() {
-  %call = call i8* @llvm.thread.pointer()
-  ret i8* %call
+define ptr @src() {
+  %call = call ptr @llvm.objc.loadWeak(ptr null)
+  ret ptr %call
 }
-define i8* @tgt() {
-  ret i8* null
+define ptr @tgt() {
+  ret ptr null
 }

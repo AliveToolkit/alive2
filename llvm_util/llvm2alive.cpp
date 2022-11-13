@@ -13,6 +13,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/ModRef.h"
 #include "llvm/IR/Operator.h"
 #include <sstream>
 #include <unordered_map>
@@ -1082,7 +1083,7 @@ public:
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
-      attrs.set(FnAttrs::InaccessibleMemOnly);
+      attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
       attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
       return
@@ -1411,21 +1412,6 @@ public:
         continue;
 
       switch (llvmattr.getKindAsEnum()) {
-      case llvm::Attribute::ReadOnly:
-        attrs.set(FnAttrs::NoWrite);
-        attrs.set(FnAttrs::NoFree);
-        break;
-
-      case llvm::Attribute::ReadNone:
-        attrs.set(FnAttrs::NoRead);
-        attrs.set(FnAttrs::NoWrite);
-        attrs.set(FnAttrs::NoFree);
-        break;
-
-      case llvm::Attribute::WriteOnly:
-        attrs.set(FnAttrs::NoRead);
-        break;
-
       case llvm::Attribute::NoFree:
         attrs.set(FnAttrs::NoFree);
         break;
@@ -1473,6 +1459,29 @@ public:
     }
   }
 
+  MemoryAccess handleMemAttrs(const llvm::MemoryEffects &e) {
+    MemoryAccess attrs;
+    attrs.setNoAccess();
+
+    array<pair<llvm::MemoryEffects::Location, MemoryAccess::AccessType>, 4> tys
+    {
+      make_pair(llvm::MemoryEffects::ArgMem,          MemoryAccess::Args),
+      make_pair(llvm::MemoryEffects::InaccessibleMem,
+                MemoryAccess::Inaccessible),
+      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Other),
+      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Errno),
+    };
+
+    for (auto &[ef, ty] : tys) {
+      auto modref = e.getModRef(ef);
+      if (isModSet(modref))
+        attrs.setCanAlsoWrite(ty);
+      if (isRefSet(modref))
+        attrs.setCanAlsoRead(ty);
+    }
+    return attrs;
+  }
+
   void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs) {
     auto fn = i.getCalledFunction();
     llvm::AttributeList attrs_callsite = i.getAttributes();
@@ -1485,6 +1494,10 @@ public:
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
     handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
+    attrs.mem  = handleMemAttrs(i.getMemoryEffects());
+    if (fn)
+      attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
+    attrs.inferImpliedAttributes();
   }
 
 
@@ -1552,6 +1565,8 @@ public:
     const auto &fnidx = llvm::AttributeList::FunctionIndex;
     handleRetAttrs(attrlist.getAttributes(ridx), attrs);
     handleFnAttrs(attrlist.getAttributes(fnidx), attrs);
+    attrs.mem = handleMemAttrs(f.getMemoryEffects());
+    attrs.inferImpliedAttributes();
 
     // create all BBs upfront in topological order
     vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;

@@ -24,5 +24,5 @@ false:
   ret i32 0
 }
 
-declare i32 @f_load_arg(i32*) nounwind willreturn readonly argmemonly
-declare void @f_readonly_arg(i32* readonly, i32*) nounwind willreturn argmemonly
+declare i32 @f_load_arg(ptr) nounwind willreturn memory(argmem: read)
+declare void @f_readonly_arg(ptr readonly, ptr) nounwind willreturn memory(argmem: readwrite)

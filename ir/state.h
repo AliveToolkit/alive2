@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "ir/memory.h"
 #include "ir/state_value.h"
 #include "smt/expr.h"
@@ -55,9 +56,9 @@ private:
     // Possible number of calls per function name that occurred so far
     // This is an over-approximation, union over all predecessors
     struct FnCallRanges
-      // bool records whether fn only accesses inaccessible/args memory only
-      : public std::map<std::string, std::pair<std::set<unsigned>, bool>> {
-      void inc(const std::string &name, bool inaccessible_or_args_memonly);
+      : public std::map<std::string, std::pair<std::set<unsigned>,
+                        MemoryAccess>> {
+      void inc(const std::string &name, MemoryAccess access);
       bool overlaps(const FnCallRanges &other) const;
       // remove all ranges but name
       FnCallRanges project(const std::string &name) const;
@@ -152,15 +153,15 @@ private:
     std::vector<Memory::PtrInput> args_ptr;
     ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
-    bool readsmem, argmemonly, inaccessiblememonly, noret, willret;
+    MemoryAccess memaccess;
+    bool noret, willret;
 
     smt::expr operator==(const FnCallInput &rhs) const;
-    smt::expr refinedBy(State &s, unsigned modifies_bid,
+    smt::expr refinedBy(State &s, unsigned inaccessible_bid,
                         const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
-                        const Memory &m, bool readsmem, bool argmemonly,
-                        bool inaccessiblememonly, bool noret,
+                        const Memory &m, MemoryAccess memaccess, bool noret,
                         bool willret) const;
 
     auto operator<=>(const FnCallInput &rhs) const = default;

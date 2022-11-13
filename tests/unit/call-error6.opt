@@ -1,13 +1,13 @@
 ; TEST-ARGS: -root-only
 
-%f3 = call i8 @f(i8 3) nowrite noread
-%f4 = call i8 @f(i8 4) nowrite noread
+%f3 = call i8 @f(i8 3) memory(none)
+%f4 = call i8 @f(i8 4) memory(none)
 %eq1 = icmp eq i8 %f3, 3
 %eq2 = icmp eq i8 %f4, 4
 assume(%eq1)
 assume(%eq2)
-%c1 = call i8 @f(i8 poison) nowrite noread
-%c2 = call i8 @f(i8 poison) nowrite noread
+%c1 = call i8 @f(i8 poison) memory(none)
+%c2 = call i8 @f(i8 poison) memory(none)
 
 %eq3 = icmp ule i8 %c1, 9
 %eq4 = icmp ule i8 %c2, 9

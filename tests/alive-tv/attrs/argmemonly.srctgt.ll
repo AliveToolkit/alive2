@@ -1,12 +1,12 @@
-define i8 @src(i8 *%p) argmemonly {
-  %p2 = getelementptr i8, i8* %p, i32 0
-  %v = call i8 @f(i8* %p2)
+define i8 @src(i8 *%p) memory(argmem: readwrite) {
+  %p2 = getelementptr i8, ptr %p, i32 0
+  %v = call i8 @f(ptr %p2)
   ret i8 %v
 }
 
-define i8 @tgt(i8 *%p) argmemonly {
-  %v = call i8 @f(i8* %p)
+define i8 @tgt(i8 *%p) memory(argmem: readwrite) {
+  %v = call i8 @f(ptr %p)
   ret i8 %v
 }
 
-declare i8 @f(i8*) argmemonly
+declare i8 @f(ptr) memory(argmem: readwrite)

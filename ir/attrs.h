@@ -17,6 +17,47 @@ struct StateValue;
 class Type;
 class Value;
 
+class MemoryAccess final {
+  unsigned val = 0;
+  MemoryAccess(unsigned val) : val(val) {}
+
+public:
+  enum AccessType { Args, Inaccessible, Errno, Other, NumTypes };
+  MemoryAccess() = default;
+
+  bool canRead(AccessType ty) const;
+  bool canWrite(AccessType ty) const;
+  bool canOnlyRead(AccessType ty) const;
+  bool canOnlyWrite(AccessType ty) const;
+  bool canReadAnything() const;
+  bool canWriteAnything() const;
+  bool canReadSomething() const;
+  bool canWriteSomething() const;
+  bool canReadWriteSame(bool skip_args) const;
+
+  void setNoAccess() { val = 0; }
+  void setFullAccess();
+  void setCanOnlyRead();
+  void setCanOnlyWrite();
+  void setCanOnlyRead(AccessType ty);
+  void setCanOnlyWrite(AccessType ty);
+  void setCanOnlyAccess(AccessType ty);
+
+  void setCanAlsoRead(AccessType ty);
+  void setCanAlsoWrite(AccessType ty);
+  void setCanAlsoAccess(AccessType ty);
+
+  void operator&=(MemoryAccess rhs) { val &= rhs.val; }
+  void operator|=(MemoryAccess rhs) { val |= rhs.val; }
+  MemoryAccess operator|(MemoryAccess rhs) const { return val | rhs.val; }
+
+  bool refinedBy(MemoryAccess rhs) const;
+
+  auto operator<=>(const MemoryAccess &rhs) const = default;
+  friend std::ostream& operator<<(std::ostream &os, const MemoryAccess &a);
+};
+
+
 class ParamAttrs final {
   unsigned bits;
 
@@ -79,15 +120,13 @@ class FnAttrs final {
   uint8_t allockind = 0;
 
 public:
-  enum Attribute { None = 0, NoRead = 1 << 0, NoWrite = 1 << 1,
-                   ArgMemOnly = 1 << 2, NNaN = 1 << 3, NoReturn = 1 << 4,
-                   Dereferenceable = 1 << 5, NonNull = 1 << 6,
-                   NoFree = 1 << 7, NoUndef = 1 << 8, Align = 1 << 9,
-                   NoThrow = 1 << 10, NoAlias = 1 << 11, WillReturn = 1 << 12,
-                   DereferenceableOrNull = 1 << 13,
-                   InaccessibleMemOnly = 1 << 14,
-                   NullPointerIsValid = 1 << 15,
-                   AllocSize = 1 << 16 };
+  enum Attribute { None = 0, NNaN = 1 << 0, NoReturn = 1 << 1,
+                   Dereferenceable = 1 << 2, NonNull = 1 << 3,
+                   NoFree = 1 << 4, NoUndef = 1 << 5, Align = 1 << 6,
+                   NoThrow = 1 << 7, NoAlias = 1 << 8, WillReturn = 1 << 9,
+                   DereferenceableOrNull = 1 << 10,
+                   NullPointerIsValid = 1 << 11,
+                   AllocSize = 1 << 12 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -101,11 +140,15 @@ public:
   unsigned allocsize_0;
   unsigned allocsize_1 = -1u;
 
+  MemoryAccess mem;
+
   std::string allocfamily;
 
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
   bool isAlloc() const { return allockind != 0; }
+
+  void inferImpliedAttributes();
 
   std::pair<smt::expr,smt::expr>
   computeAllocSize(State &s,

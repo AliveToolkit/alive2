@@ -900,11 +900,16 @@ static void calculateAndInitConstants(Transform &t) {
       if (auto fn = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
         if (!fn->getAttributes().isAlloc()) {
-          if (fn->hasAttribute(FnAttrs::InaccessibleMemOnly)) {
+          if (fn->getAttributes().mem.canOnlyWrite(MemoryAccess::Inaccessible)) {
             if (inaccessiblememonly_fns.emplace(fn->getName()).second)
               ++num_inaccessiblememonly_fns;
           } else {
-            has_write_fncall |= !fn->hasAttribute(FnAttrs::NoWrite);
+            if (fn->getAttributes().mem
+                                   .canOnlyRead(MemoryAccess::Inaccessible)) {
+              if (inaccessiblememonly_fns.emplace(fn->getName()).second)
+                ++num_inaccessiblememonly_fns;
+            }
+            has_write_fncall |= fn->getAttributes().mem.canWriteSomething();
           }
         }
       }

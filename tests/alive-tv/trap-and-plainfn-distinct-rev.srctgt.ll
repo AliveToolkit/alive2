@@ -1,6 +1,6 @@
 define void @src() {
 ; trap and any readnone noreturn function should not be considered equivalent
-  call void @plain_fn() noreturn readnone
+  call void @plain_fn() noreturn memory(none)
   unreachable
 }
 

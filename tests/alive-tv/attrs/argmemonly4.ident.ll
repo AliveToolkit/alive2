@@ -1,7 +1,7 @@
-define void @fn(i8* %p, i8* %q) {
-  call void @f(i8* %p)
-  call void @f(i8* %q) argmemonly
+define void @fn(ptr %p, ptr %q) {
+  call void @f(ptr %p)
+  call void @f(ptr %q) memory(argmem: readwrite)
   ret void
 }
 
-declare void @f(i8*)
+declare void @f(ptr)

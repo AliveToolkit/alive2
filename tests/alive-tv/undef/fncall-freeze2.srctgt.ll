@@ -1,6 +1,6 @@
 ; ERROR: Value mismatch
 
-declare i8 @foo_i8(i8) readonly
+declare i8 @foo_i8(i8) memory(read)
 
 define i8 @src(i8 %x, i8 %y) {
   %cond.fr = freeze i1 undef

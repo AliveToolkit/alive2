@@ -14,10 +14,10 @@ define void @src() {
   ret void
 }
 
-declare float @llvm.ceil.f32(float) nounwind readnone
-declare float @llvm.floor.f32(float) nounwind readnone
-declare float @llvm.round.f32(float) nounwind readnone
-declare float @llvm.roundeven.f32(float) nounwind readnone
-declare float @llvm.trunc.f32(float) nounwind readnone
+declare float @llvm.ceil.f32(float) nounwind memory(none)
+declare float @llvm.floor.f32(float) nounwind memory(none)
+declare float @llvm.round.f32(float) nounwind memory(none)
+declare float @llvm.roundeven.f32(float) nounwind memory(none)
+declare float @llvm.trunc.f32(float) nounwind memory(none)
 
 declare void @test(...)

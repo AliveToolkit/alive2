@@ -1,7 +1,7 @@
 ; TEST-ARGS: -root-only
 
-  %c = call i32 @f(i32 3) nowrite willreturn
-  %d = call i32 @f(i32 3) nowrite willreturn
+  %c = call i32 @f(i32 3) memory(read) willreturn
+  %d = call i32 @f(i32 3) memory(read) willreturn
   %r = icmp eq i32 %c, %d
   ret %r
 =>

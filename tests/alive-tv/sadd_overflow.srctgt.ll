@@ -1,4 +1,4 @@
-declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32) nounwind readnone
+declare { i32, i1 } @llvm.sadd.with.overflow.i32(i32, i32) nounwind memory(none)
 
 define { i32, i1 } @src(i8 %a, i8 %b) {
   %aa = sext i8 %a to i32

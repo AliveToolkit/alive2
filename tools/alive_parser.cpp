@@ -1050,6 +1050,35 @@ static unique_ptr<Instr> parse_freeze(string_view name) {
   return make_unique<Freeze>(ty, string(name), op);
 }
 
+static void parse_memory_access(MemoryAccess &mem) {
+  mem.setNoAccess();
+  tokenizer.ensure(LPAREN);
+
+  switch (tokenizer.peek()) {
+  case NONE:
+    *tokenizer;
+    break;
+  case READ:
+    *tokenizer;
+    mem.setCanOnlyRead();
+    break;
+  case WRITE:
+    *tokenizer;
+    mem.setCanOnlyWrite();
+    break;
+  default: {
+    bool first = true;
+    while (tokenizer.peek() != RPAREN) {
+      if (!first)
+        tokenizer.ensure(COMMA);
+      first = false;
+      // TODO
+    }
+  }
+  }
+  tokenizer.ensure(RPAREN);
+}
+
 static unique_ptr<Instr> parse_call(string_view name) {
   // call ty name(ty_1 %op_1, ..., ty_n %op_n)
   auto &ret_ty = parse_type();
@@ -1069,10 +1098,11 @@ static unique_ptr<Instr> parse_call(string_view name) {
   tokenizer.ensure(RPAREN);
 
   FnAttrs attrs;
+  attrs.mem.setFullAccess();
+
   while (true) {
     switch (auto t = *tokenizer) {
-    case NOREAD:     attrs.set(FnAttrs::NoRead); break;
-    case NOWRITE:    attrs.set(FnAttrs::NoWrite); break;
+    case MEMORY:     parse_memory_access(attrs.mem); break;
     case NORETURN:   attrs.set(FnAttrs::NoReturn); break;
     case WILLRETURN: attrs.set(FnAttrs::WillReturn); break;
     default:
@@ -1081,6 +1111,7 @@ static unique_ptr<Instr> parse_call(string_view name) {
     }
   }
 exit:
+  attrs.inferImpliedAttributes();
   auto call = make_unique<FnCall>(ret_ty, string(name), std::move(fn_name),
                                   std::move(attrs));
 

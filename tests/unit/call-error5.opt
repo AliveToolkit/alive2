@@ -1,5 +1,5 @@
-%c1 = call i8 @f(i8 poison) nowrite noread
-%c2 = call i8 @f(i8 poison) nowrite noread
+%c1 = call i8 @f(i8 poison) memory(none)
+%c2 = call i8 @f(i8 poison) memory(none)
 %d = add i8 %c1, %c2
 ret i8 %d
   =>

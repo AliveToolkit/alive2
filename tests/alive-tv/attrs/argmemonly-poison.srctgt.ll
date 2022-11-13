@@ -1,34 +1,34 @@
 @glb = external global i8
 
-define void @src(i8 *%p) argmemonly {
-  load i8, i8* %p
-  %c = icmp eq i8* %p, @glb
+define void @src(ptr %p) memory(argmem: readwrite) {
+  load i8, ptr %p
+  %c = icmp eq ptr %p, @glb
   br i1 %c, label %true, label %false
 
 true:
   br label %end
 
 false:
-  call void @f(i8* @glb)
+  call void @f(ptr @glb)
   br label %end
 
 end:
   ret void
 }
 
-define void @tgt(i8 *%p) argmemonly {
-  %c = icmp eq i8* %p, @glb
+define void @tgt(ptr %p) memory(argmem: readwrite) {
+  %c = icmp eq ptr %p, @glb
   br i1 %c, label %true, label %false
 
 true:
   br label %end
 
 false:
-  call void @f(i8* poison)
+  call void @f(ptr poison)
   br label %end
 
 end:
   ret void
 }
 
-declare void @f(i8*) argmemonly
+declare void @f(ptr) memory(argmem: readwrite)

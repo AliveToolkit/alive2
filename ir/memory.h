@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "ir/pointer.h"
 #include "ir/state_value.h"
 #include "ir/type.h"
@@ -275,9 +276,10 @@ public:
   mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs,
           bool is_local, const FnRetData *data = nullptr);
   CallState mkCallState(const std::string &fnname, bool nofree,
-                        bool inaccessiblememonly);
-  void setState(const CallState &st, const std::vector<PtrInput> *ptr_inputs,
-                unsigned modifies_bid);
+                        MemoryAccess access);
+  void setState(const CallState &st, MemoryAccess access,
+                const std::vector<PtrInput> &ptr_inputs,
+                unsigned inaccessible_bid);
 
   // Allocates a new memory block and returns (pointer expr, allocated).
   // If bid is not specified, it creates a fresh block id by increasing

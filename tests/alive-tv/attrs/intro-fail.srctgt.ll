@@ -1,11 +1,11 @@
 ; ERROR: Source is more defined than target
 
-define void @src(i8* %p) {
-  store i8 1, i8* %p
+define void @src(ptr %p) {
+  store i8 1, ptr %p
   ret void
 }
 
-define void @tgt(i8* %p) readonly {
-  store i8 1, i8* %p
+define void @tgt(ptr %p) memory(read) {
+  store i8 1, ptr %p
   ret void
 }
