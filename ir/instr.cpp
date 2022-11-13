@@ -3242,7 +3242,7 @@ void EndLifetime::rauw(const Value &what, Value &with) {
 }
 
 void EndLifetime::print(ostream &os) const {
-  os << "start_lifetime " << *ptr;
+  os << "end_lifetime " << *ptr;
 }
 
 StateValue EndLifetime::toSMT(State &s) const {
