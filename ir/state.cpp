@@ -100,6 +100,12 @@ State::ValueAnalysis::FnCallRanges::overlaps(const string &callee,
       if (!access.canWrite(MemoryAccess::Inaccessible))
         return true;
     }
+
+    // These may be calls that take allocas as arguments that aren't read by
+    // anyone else
+    if (access.canOnlyWrite(MemoryAccess::Args))
+      return true;
+
     return false;
   };
 
