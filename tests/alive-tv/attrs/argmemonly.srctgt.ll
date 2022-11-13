@@ -1,10 +1,10 @@
-define i8 @src(i8 *%p) memory(argmem: readwrite) {
+define i8 @src(ptr %p) memory(argmem: readwrite) {
   %p2 = getelementptr i8, ptr %p, i32 0
   %v = call i8 @f(ptr %p2)
   ret i8 %v
 }
 
-define i8 @tgt(i8 *%p) memory(argmem: readwrite) {
+define i8 @tgt(ptr %p) memory(argmem: readwrite) {
   %v = call i8 @f(ptr %p)
   ret i8 %v
 }

@@ -33,7 +33,6 @@ public:
   bool canWriteAnything() const;
   bool canReadSomething() const;
   bool canWriteSomething() const;
-  bool canReadWriteSame(bool skip_args) const;
 
   void setNoAccess() { val = 0; }
   void setFullAccess();
@@ -50,8 +49,6 @@ public:
   void operator&=(MemoryAccess rhs) { val &= rhs.val; }
   void operator|=(MemoryAccess rhs) { val |= rhs.val; }
   MemoryAccess operator|(MemoryAccess rhs) const { return val | rhs.val; }
-
-  bool refinedBy(MemoryAccess rhs) const;
 
   auto operator<=>(const MemoryAccess &rhs) const = default;
   friend std::ostream& operator<<(std::ostream &os, const MemoryAccess &a);

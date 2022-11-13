@@ -59,7 +59,8 @@ private:
       : public std::map<std::string, std::pair<std::set<unsigned>,
                         MemoryAccess>> {
       void inc(const std::string &name, MemoryAccess access);
-      bool overlaps(const FnCallRanges &other) const;
+      bool overlaps(const std::string &callee, MemoryAccess call_access,
+                    const FnCallRanges &other) const;
       // remove all ranges but name
       FnCallRanges project(const std::string &name) const;
     };
@@ -157,7 +158,8 @@ private:
     bool noret, willret;
 
     smt::expr operator==(const FnCallInput &rhs) const;
-    smt::expr refinedBy(State &s, unsigned inaccessible_bid,
+    smt::expr refinedBy(State &s, const std::string &callee,
+                        unsigned inaccessible_bid,
                         const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,

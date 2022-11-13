@@ -178,16 +178,6 @@ bool MemoryAccess::canWriteSomething() const {
   return false;
 }
 
-bool MemoryAccess::canReadWriteSame(bool skip_args) const {
-  for (unsigned i = 0; i < NumTypes; ++i) {
-    if (skip_args && i == Args)
-      continue;
-    if (canRead(AccessType(i)) && canWrite(AccessType(i)))
-      return true;
-  }
-  return false;
-}
-
 void MemoryAccess::setFullAccess() {
   for (unsigned i = 0; i < NumTypes; ++i) {
     setCanAlsoAccess(AccessType(i));
@@ -234,10 +224,6 @@ void MemoryAccess::setCanAlsoWrite(AccessType ty) {
 void MemoryAccess::setCanAlsoAccess(AccessType ty) {
   setCanAlsoRead(ty);
   setCanAlsoWrite(ty);
-}
-
-bool MemoryAccess::refinedBy(MemoryAccess rhs) const {
-  return (val & rhs.val) == rhs.val;
 }
 
 ostream& operator<<(ostream &os, const MemoryAccess &a) {
@@ -462,8 +448,10 @@ bool FnAttrs::refinedBy(const FnAttrs &other) const {
   if ((bits & attrs) != (other.bits & attrs))
     return false;
 
-  return mem.refinedBy(other.mem) &&
-         fp_denormal == other.fp_denormal &&
+  if (has(NoReturn) && other.has(WillReturn))
+    return false;
+
+  return fp_denormal == other.fp_denormal &&
          fp_denormal32 == other.fp_denormal32;
 }
 

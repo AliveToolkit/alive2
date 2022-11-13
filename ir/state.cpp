@@ -59,6 +59,9 @@ void State::ValueAnalysis::meet_with(const State::ValueAnalysis &other) {
 
 void State::ValueAnalysis::FnCallRanges::inc(const string &name,
                                              MemoryAccess access) {
+  if (!access.canWriteSomething())
+    return;
+
   auto [I, inserted] = try_emplace(name);
   if (inserted) {
     I->second.first.emplace(1);
@@ -74,10 +77,37 @@ void State::ValueAnalysis::FnCallRanges::inc(const string &name,
 }
 
 bool
-State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
+State::ValueAnalysis::FnCallRanges::overlaps(const string &callee,
+                                             MemoryAccess call_access,
+                                             const FnCallRanges &other) const {
+  if (!call_access.canReadSomething())
+    return true;
+
+  auto skip = [call_access, &callee](const auto &fn, MemoryAccess access) {
+    if (access.canOnlyWrite(MemoryAccess::Inaccessible)) {
+      // If this fn can only write to inaccessible memory, ignore if it's not
+      // our callee as callee can't read from that memory
+      if (fn != callee)
+        return true;
+
+      // If the trace only writes to inaccessible memory, but the callee can't
+      // read it, any mismatch in the number of calls is irrelevant
+      if (!call_access.canRead(MemoryAccess::Inaccessible))
+        return true;
+    }
+
+    if (call_access.canOnlyRead(MemoryAccess::Inaccessible) && fn == callee) {
+      if (!access.canWrite(MemoryAccess::Inaccessible))
+        return true;
+    }
+    return false;
+  };
+
   for (auto &[fn, pair] : *this) {
     auto &[calls, access] = pair;
-    if (access.canOnlyWrite(MemoryAccess::Args))
+    assert(access.canWriteSomething());
+
+    if (skip(fn, access))
       continue;
 
     auto I = other.find(fn);
@@ -86,7 +116,10 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
         continue;
       return false;
     }
-    if (!(access | I->second.second).canReadWriteSame(/*skip_args=*/true))
+
+    // A function that doesn't read anything, may write the same thing on
+    // every call. So a mismatch in the number of calls must be ignored.
+    if (!(access | I->second.second).canReadSomething())
       continue;
 
     if (intersect_set(calls, I->second.first).empty())
@@ -95,7 +128,7 @@ State::ValueAnalysis::FnCallRanges::overlaps(const FnCallRanges &other) const {
 
   for (auto &[fn, pair] : other) {
     auto &[calls, access] = pair;
-    if (access.canOnlyWrite(MemoryAccess::Args))
+    if (skip(fn, access))
       continue;
 
     if (!calls.count(0) && !count(fn))
@@ -709,7 +742,8 @@ expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
 }
 
 expr State::FnCallInput::refinedBy(
-  State &s, unsigned inaccessible_bid, const vector<StateValue> &args_nonptr2,
+  State &s, const string &callee, unsigned inaccessible_bid,
+  const vector<StateValue> &args_nonptr2,
   const vector<Memory::PtrInput> &args_ptr2,
   const ValueAnalysis::FnCallRanges &fncall_ranges2,
   const Memory &m2, MemoryAccess memaccess2, bool noret2, bool willret2) const {
@@ -717,7 +751,7 @@ expr State::FnCallInput::refinedBy(
   if (memaccess != memaccess2 ||
       noret != noret2 ||
       willret != willret2 ||
-      (memaccess.canReadSomething() && !fncall_ranges.overlaps(fncall_ranges2)))
+      !fncall_ranges.overlaps(callee, memaccess2, fncall_ranges2))
     return false;
 
   AndExpr refines;
@@ -916,9 +950,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     ChoiceExpr<FnCallOutput> data;
 
     for (auto &[in, out] : fn_call_data[name]) {
-      auto refined = in.refinedBy(*this, inaccessible_bid, inputs, ptr_inputs,
-                                  call_ranges, memory, attrs.mem, noret,
-                                  willret);
+      auto refined = in.refinedBy(*this, name, inaccessible_bid, inputs,
+                                  ptr_inputs, call_ranges, memory, attrs.mem,
+                                  noret, willret);
       data.add(out, std::move(refined));
     }
 
@@ -958,8 +992,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
   }
 
-  if (attrs.mem.canWriteSomething())
-    analysis.ranges_fn_calls.inc(name, attrs.mem);
+  analysis.ranges_fn_calls.inc(name, attrs.mem);
 
   return retval;
 }

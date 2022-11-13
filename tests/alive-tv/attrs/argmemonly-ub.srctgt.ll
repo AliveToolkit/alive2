@@ -1,11 +1,13 @@
+; ERROR: Source is more defined than target
+
 @glb = external global i8
 
-define void @src(i8 *%p) memory(argmem: readwrite) {
+define void @src(ptr %p) memory(argmem: readwrite) {
   call void @f(ptr %p)
   ret void
 }
 
-define void @tgt(i8 *%p) memory(argmem: readwrite) {
+define void @tgt(ptr %p) memory(argmem: readwrite) {
   unreachable
 }
 

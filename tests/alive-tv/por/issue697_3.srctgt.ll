@@ -10,7 +10,7 @@ if.then:
   br label %if.end
 
 if.end:
-  %q = load ptr, ptr* @glb, align 8
+  %q = load ptr, ptr @glb, align 8
   ret void
 }
 

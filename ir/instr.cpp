@@ -2159,7 +2159,7 @@ static void check_can_load(State &s, const expr &p0) {
   (attrs.mem.canRead(MemoryAccess::Args) ? readable : nonreadable)
     |= ptr_only_args(s, p);
 
-  s.addUB(readable & !nonreadable);
+  s.addUB(readable && !nonreadable);
 }
 
 static void check_can_store(State &s, const expr &p0) {
@@ -2177,7 +2177,7 @@ static void check_can_store(State &s, const expr &p0) {
   (attrs.mem.canWrite(MemoryAccess::Args) ? writable : nonwritable)
     |= ptr_only_args(s, p);
 
-  s.addUB(writable & !nonwritable);
+  s.addUB(writable && !nonwritable);
 }
 
 static void unpack_inputs(State &s, Value &argv, Type &ty,
@@ -2282,14 +2282,8 @@ StateValue FnCall::toSMT(State &s) const {
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
 
-  auto check = [&](FnAttrs::Attribute attr) {
-    return s.getFn().getFnAttrs().has(attr) && !hasAttribute(attr);
-  };
-
   // Check attributes that calles must have if caller has them
-  if (check(FnAttrs::NoThrow) ||
-      check(FnAttrs::WillReturn) ||
-      !attrs.mem.refinedBy(s.getFn().getFnAttrs().mem))
+  if (!attrs.refinedBy(s.getFn().getFnAttrs()))
     s.addUB(expr(false));
 
   auto get_alloc_ptr = [&]() -> Value& {
@@ -2353,22 +2347,6 @@ StateValue FnCall::toSMT(State &s) const {
     }
     assert(isVoid());
     return {};
-  }
-
-  // fn has nofree but callsite hasn't
-  if (check(FnAttrs::NoFree)) {
-    if (attrs.mem.canWrite(MemoryAccess::Other)) {
-      s.addUB(expr(false));
-    }
-    if (attrs.mem.canWrite(MemoryAccess::Args)) {
-      for (auto &p : ptr_inputs) {
-        if (!p.byval) {
-          Pointer ptr(m, p.val.value);
-          s.addUB(p.val.non_poison.implies(
-                    ptr.isLocal() || ptr.isConstGlobal()));
-        }
-      }
-    }
   }
 
   unsigned idx = 0;

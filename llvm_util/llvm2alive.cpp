@@ -1083,7 +1083,6 @@ public:
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
-      attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
       attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
       return
@@ -1494,7 +1493,7 @@ public:
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
     handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
-    attrs.mem  = handleMemAttrs(i.getMemoryEffects());
+    attrs.mem = handleMemAttrs(i.getMemoryEffects());
     if (fn)
       attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
     attrs.inferImpliedAttributes();
