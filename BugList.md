@@ -75,6 +75,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 68. SLP vectorizer's reduce_and formation introduces poison (https://llvm.org/PR55734)
 69. IRCE introduces UB by changing order of condition checks (https://llvm.org/PR57523)
 70. LoopIdiomRecognizer creates memset_pattern16 with incorrect size type with custom dl (https://llvm.org/PR57679)
+71. InstSimplify: xor pattern miscompiles undef lane (https://llvm.org/PR58977)
 
 
 ### Bugs found in Z3
