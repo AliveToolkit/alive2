@@ -13,8 +13,8 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstVisitor.h"
-#include "llvm/IR/ModRef.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/Support/ModRef.h"
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
