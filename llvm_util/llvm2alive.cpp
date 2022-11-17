@@ -849,6 +849,7 @@ public:
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
     case llvm::Intrinsic::ctpop:
+    case llvm::Intrinsic::arithmetic_fence:
     case llvm::Intrinsic::expect:
     case llvm::Intrinsic::expect_with_probability:
     case llvm::Intrinsic::is_constant: {
@@ -858,6 +859,7 @@ public:
       case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
       case llvm::Intrinsic::bswap:       op = UnaryOp::BSwap; break;
       case llvm::Intrinsic::ctpop:       op = UnaryOp::Ctpop; break;
+      case llvm::Intrinsic::arithmetic_fence:
       case llvm::Intrinsic::expect:
       case llvm::Intrinsic::expect_with_probability:
         op = UnaryOp::Copy; break;
