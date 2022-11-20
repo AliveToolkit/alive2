@@ -308,7 +308,8 @@ expr VoidType::mkInput(State &s, const char *name,
   UNREACHABLE();
 }
 
-void VoidType::printVal(ostream &os, const State &s, const expr &e) const {
+void VoidType::printVal(ostream &os, const State &s, const Model &m,
+                        const expr &e) const {
   UNREACHABLE();
 }
 
@@ -367,7 +368,8 @@ expr IntType::mkInput(State &s, const char *name,
   return expr::mkVar(name, bits());
 }
 
-void IntType::printVal(ostream &os, const State &s, const expr &e) const {
+void IntType::printVal(ostream &os, const State &s, const Model &m,
+                       const expr &e) const {
   e.printHexadecimal(os);
   os << " (";
   e.printUnsigned(os);
@@ -551,19 +553,18 @@ expr FloatType::mkInput(State &s, const char *name,
   return expr::mkVar(name, bits());
 }
 
-void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
-  if (isNaN(e, true).isTrue()) {
-    os << "SNaN";
-    return;
-  }
-  if (isNaN(e, false).isTrue()) {
-    os << "QNaN";
-    return;
-  }
+void FloatType::printVal(ostream &os, const State &s, const Model &m,
+                         const expr &e) const {
   e.printHexadecimal(os);
-  os << " (";
   auto f = getFloat(e);
-  if (f.isFPZero().isTrue()) {
+  os << " (";
+  if (m.eval(isNaN(e, true)).isTrue()) {
+    os << "SNaN";
+  } else if (m.eval(isNaN(e, false)).isTrue()) {
+    os << "QNaN";
+  } else if (f.isNaN().isTrue()) {
+    os << "NaN";
+  } else if (f.isFPZero().isTrue()) {
     os << (f.isFPNegative().isTrue() ? "-0.0" : "+0.0");
   } else if (f.isInf().isTrue()) {
     os << (f.isFPNegative().isTrue() ? "-oo" : "+oo");
@@ -675,7 +676,8 @@ PtrType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
   return s.getMemory().mkUndefInput(attrs);
 }
 
-void PtrType::printVal(ostream &os, const State &s, const expr &e) const {
+void PtrType::printVal(ostream &os, const State &s, const Model &m,
+                       const expr &e) const {
   os << Pointer(s.getMemory(), e);
 }
 
@@ -965,7 +967,8 @@ unsigned AggregateType::numPointerElements() const {
   return count;
 }
 
-void AggregateType::printVal(ostream &os, const State &s, const expr &e) const {
+void AggregateType::printVal(ostream &os, const State &s, const Model &m,
+                             const expr &e) const {
   UNREACHABLE();
 }
 
@@ -1390,8 +1393,9 @@ SymbolicType::mkUndefInput(State &st, const ParamAttrs &attrs) const {
   DISPATCH(mkUndefInput(st, attrs), UNREACHABLE());
 }
 
-void SymbolicType::printVal(ostream &os, const State &st, const expr &e) const {
-  DISPATCH(printVal(os, st, e), UNREACHABLE());
+void SymbolicType::printVal(ostream &os, const State &st, const Model &m,
+                            const expr &e) const {
+  DISPATCH(printVal(os, st, m, e), UNREACHABLE());
 }
 
 void SymbolicType::print(ostream &os) const {

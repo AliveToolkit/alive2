@@ -61,7 +61,7 @@ static void print_single_varval(ostream &os, const State &st, const Model &m,
 
   expr partial = m.eval(val.value);
 
-  type.printVal(os, st, m.eval(val.value, true));
+  type.printVal(os, st, m, m.eval(val.value, true));
 
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
