@@ -664,10 +664,10 @@ static StateValue fm_poison(State &s, const expr &a0, const expr &ap,
   if (nary >= 3)
     non_poison.add(cp);
 
-  auto fpty = ty.getAsFloatType();
-  if (!fpty)
+  if (!ty.isFloatType())
     return { fn(a0, b0, c0), non_poison() };
 
+  auto fpty = ty.getAsFloatType();
   expr a = fpty->getFloat(a0);
   expr b = fpty->getFloat(b0);
   expr c = fpty->getFloat(c0);
@@ -789,8 +789,8 @@ static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
   if (enable_subnormal_flush)
     v = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                          std::move(v));
-  if (auto *fpty = ty.getAsFloatType())
-    v = fpty->fromFloat(s, v);
+  if (ty.isFloatType())
+    v = ty.getAsFloatType()->fromFloat(s, v);
   return { std::move(v), std::move(np) };
 }
 
@@ -1743,8 +1743,8 @@ StateValue FpConversionOp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &sv, const Type &from_type,
                     const Type &to_type) -> StateValue {
     auto val = sv.value;
-    if (auto *ty = from_type.getAsFloatType())
-      val = ty->getFloat(val);
+    if (from_type.isFloatType())
+      val = from_type.getAsFloatType()->getFloat(val);
     auto [v, np]
       = round_value([&](auto rm) { return fn(val, to_type, rm); }, s,
                     to_type, rm);
