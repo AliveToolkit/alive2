@@ -382,6 +382,11 @@ bool expr::isBool() const {
   return Z3_get_sort_kind(ctx(), sort()) == Z3_BOOL_SORT;
 }
 
+bool expr::isFloat() const {
+  C();
+  return Z3_get_sort_kind(ctx(), sort()) == Z3_FLOATING_POINT_SORT;
+}
+
 bool expr::isTrue() const {
   C();
   return Z3_get_bool_value(ctx(), ast()) == Z3_L_TRUE;

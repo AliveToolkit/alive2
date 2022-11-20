@@ -194,6 +194,11 @@ public:
   unsigned bits() const override;
   FpType getFpType() const { return fpType; };
 
+  smt::expr getDummyFloat() const;
+  smt::expr getFloat(const smt::expr &v) const;
+  smt::expr fromFloat(State &s, const smt::expr &fp) const;
+  smt::expr isNaN(const smt::expr &v, bool signalling) const;
+
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
@@ -202,14 +207,6 @@ public:
   bool isFloatType() const override;
   smt::expr enforceFloatType() const override;
   const FloatType* getAsFloatType() const override;
-  smt::expr toBV(smt::expr e) const override;
-  IR::StateValue toBV(IR::StateValue v) const override;
-  smt::expr fromBV(smt::expr e) const override;
-  IR::StateValue fromBV(IR::StateValue v) const override;
-  smt::expr toInt(State &s, smt::expr v) const override;
-  IR::StateValue toInt(State &s, IR::StateValue v) const override;
-  smt::expr fromInt(smt::expr v) const override;
-  IR::StateValue fromInt(IR::StateValue v) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;

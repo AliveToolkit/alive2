@@ -393,32 +393,38 @@ static array<pair<unsigned, unsigned>, 5> float_sizes = {
   /* BFloat */ make_pair(16, 8),
 };
 
-unsigned FloatType::bits() const {
-  assert(fpType != Unknown);
-  return float_sizes[fpType].first;
+expr FloatType::getDummyFloat() const {
+  expr ty;
+  switch (fpType) {
+  case Half:    ty = expr::mkHalf(0); break;
+  case Float:   ty = expr::mkFloat(0); break;
+  case Double:  ty = expr::mkDouble(0); break;
+  case Quad:    ty = expr::mkQuad(0); break;
+  case BFloat:  ty = expr::mkBFloat(0); break;
+  case Unknown: UNREACHABLE();
+  }
+  return ty;
 }
 
-const FloatType* FloatType::getAsFloatType() const {
-  return this;
+expr FloatType::getFloat(const expr &v) const {
+  expr ty = getDummyFloat();
+
+  if (isNaNInt(v))
+    return expr::mkNaN(ty);
+
+  expr cond, then, els, n, n2;
+  // match (ite (isNaN x) int_nan (fp.to_ieee_bv x))
+  if (v.isIf(cond, then, els) &&
+      cond.isNaNCheck(n) &&
+      isNaNInt(then) &&
+      els.isfloat2BV(n2) &&
+      n.eq(n2))
+    return n;
+
+  return v.BV2float(ty);
 }
 
-expr FloatType::toBV(expr e) const {
-  return e.float2BV();
-}
-
-StateValue FloatType::toBV(StateValue v) const {
-  return Type::toBV(std::move(v));
-}
-
-expr FloatType::fromBV(expr e) const {
-  return e.BV2float(getDummyValue(true).value);
-}
-
-StateValue FloatType::fromBV(StateValue v) const {
-  return Type::fromBV(std::move(v));
-}
-
-expr FloatType::toInt(State &s, expr fp) const {
+expr FloatType::fromFloat(State &s, const expr &fp) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
@@ -429,6 +435,7 @@ expr FloatType::toInt(State &s, expr fp) const {
   unsigned fraction_bits = bits() - exp_bits - 1;
   unsigned var_bits = fraction_bits + 1;
 
+  // NaN has a non-deterministic non-zero fraction bit pattern
   expr var = expr::mkFreshVar("NaN", expr::mkUInt(0, var_bits));
   expr fraction = var.extract(fraction_bits - 1, 0);
 
@@ -442,8 +449,25 @@ expr FloatType::toInt(State &s, expr fp) const {
   return expr::mkIf(isnan, nan, val);
 }
 
-StateValue FloatType::toInt(State &s, StateValue v) const {
-  return Type::toInt(s, std::move(v));
+expr FloatType::isNaN(const expr &v, bool signalling) const {
+  unsigned exp_bits = float_sizes[fpType].second;
+  unsigned fraction_bits = bits() - exp_bits - 1;
+
+  expr exponent = v.extract(fraction_bits + exp_bits - 1, fraction_bits);
+  expr fraction = v.extract(fraction_bits - 1, 0);
+  expr isqnan = expr::mkUF("isQNaN", { fraction }, false);
+  if (signalling)
+    isqnan = !isqnan;
+  return exponent == -1u && fraction != 0 && isqnan;
+}
+
+unsigned FloatType::bits() const {
+  assert(fpType != Unknown);
+  return float_sizes[fpType].first;
+}
+
+const FloatType* FloatType::getAsFloatType() const {
+  return this;
 }
 
 bool FloatType::isNaNInt(const expr &e) const {
@@ -469,41 +493,12 @@ bool FloatType::isNaNInt(const expr &e) const {
   return ok && exponent.isAllOnes();
 }
 
-expr FloatType::fromInt(expr e) const {
-  if (isNaNInt(e))
-    return expr::mkNaN(getDummyValue(true).value);
-
-  expr cond, then, els, n, n2;
-  // match (ite (isNaN x) int_nan (fp.to_ieee_bv x))
-  if (e.isIf(cond, then, els) &&
-      cond.isNaNCheck(n) &&
-      isNaNInt(then) &&
-      els.isfloat2BV(n2) &&
-      n.eq(n2))
-    return n;
-
-  return fromBV(std::move(e));
-}
-
-StateValue FloatType::fromInt(StateValue v) const {
-  return Type::fromInt(std::move(v));
-}
-
 expr FloatType::sizeVar() const {
   return defined ? expr::mkUInt(bits(), var_bw_bits) : Type::sizeVar();
 }
 
 StateValue FloatType::getDummyValue(bool non_poison) const {
-  expr e;
-  switch (fpType) {
-  case Half:    e = expr::mkHalf(0); break;
-  case Float:   e = expr::mkFloat(0); break;
-  case Double:  e = expr::mkDouble(0); break;
-  case Quad:    e = expr::mkQuad(0); break;
-  case BFloat:  e = expr::mkBFloat(0); break;
-  case Unknown: UNREACHABLE();
-  }
-  return { std::move(e), non_poison };
+  return { expr::mkUInt(0, bits()), non_poison };
 }
 
 expr FloatType::getTypeConstraints() const {
@@ -553,30 +548,27 @@ FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
 
 expr FloatType::mkInput(State &s, const char *name,
                         const ParamAttrs &attrs) const {
-  switch (fpType) {
-  case Half:    return expr::mkHalfVar(name);
-  case Float:   return expr::mkFloatVar(name);
-  case Double:  return expr::mkDoubleVar(name);
-  case Quad:    return expr::mkQuadVar(name);
-  case BFloat:  return expr::mkBFloatVar(name);
-  case Unknown: UNREACHABLE();
-  }
-  UNREACHABLE();
+  return expr::mkVar(name, bits());
 }
 
 void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
-  if (e.isNaN().isTrue()) {
-    os << "NaN";
+  if (isNaN(e, true).isTrue()) {
+    os << "SNaN";
     return;
   }
-  e.float2BV().printHexadecimal(os);
+  if (isNaN(e, false).isTrue()) {
+    os << "QNaN";
+    return;
+  }
+  e.printHexadecimal(os);
   os << " (";
-  if (e.isFPZero().isTrue()) {
-    os << (e.isFPNegative().isTrue() ? "-0.0" : "+0.0");
-  } else if (e.isInf().isTrue()) {
-    os << (e.isFPNegative().isTrue() ? "-oo" : "+oo");
+  auto f = getFloat(e);
+  if (f.isFPZero().isTrue()) {
+    os << (f.isFPNegative().isTrue() ? "-0.0" : "+0.0");
+  } else if (f.isInf().isTrue()) {
+    os << (f.isFPNegative().isTrue() ? "-oo" : "+oo");
   } else {
-    os << e.float2Real().numeral_string();
+    os << f.float2Real().numeral_string();
   }
   os << ')';
 }

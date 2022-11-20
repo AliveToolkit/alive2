@@ -78,10 +78,11 @@ expr FloatConst::getTypeConstraints() const {
 StateValue FloatConst::toSMT(State &s) const {
   if (auto n = get_if<string>(&val)) {
     if (!bit_value)
-      return { expr::mkNumber(n->c_str(), getType().getDummyValue(true).value),
+      return { expr::mkNumber(n->c_str(),
+                              getType().getAsFloatType()->getDummyFloat())
+                 .float2BV(),
                true };
-    return { expr::mkNumber(n->c_str(), expr::mkUInt(0, getType().bits()))
-               .BV2float(getType().getDummyValue(true).value),
+    return { expr::mkNumber(n->c_str(), expr::mkUInt(0, getType().bits())),
              true };
   }
 
@@ -95,7 +96,7 @@ StateValue FloatConst::toSMT(State &s) const {
   case FloatType::Quad:
   case FloatType::Unknown: UNREACHABLE();
   }
-  return { std::move(e), true };
+  return { e.float2BV(), true };
 }
 
 

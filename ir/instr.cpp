@@ -647,14 +647,31 @@ static expr handle_subnormal(FPDenormalAttrs::Type attr, expr &&v) {
   return std::move(v);
 }
 
-static StateValue fm_poison(State &s, const expr &a, const expr &ap,
-                            const expr &b, const expr &bp, const expr &c,
+static StateValue fm_poison(State &s, const expr &a0, const expr &ap,
+                            const expr &b0, const expr &bp, const expr &c0,
                             const expr &cp,
-                            function<expr(expr&,expr&,expr&)> fn,
+                            function<expr(const expr&, const expr&,
+                                          const expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
                             bool only_input = false,
                             bool flush_denormal = true,
+                            bool convert_output_bv = true,
                             int nary = 3) {
+  AndExpr non_poison;
+  non_poison.add(ap);
+  if (nary >= 2)
+    non_poison.add(bp);
+  if (nary >= 3)
+    non_poison.add(cp);
+
+  auto fpty = ty.getAsFloatType();
+  if (!fpty)
+    return { fn(a0, b0, c0), non_poison() };
+
+  expr a = fpty->getFloat(a0);
+  expr b = fpty->getFloat(b0);
+  expr c = fpty->getFloat(c0);
+
   expr new_a, new_b, new_c;
   if (fmath.flags & FastMathFlags::NSZ) {
     new_a = any_fp_zero(s, a);
@@ -679,12 +696,6 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
   }
 
   expr val = fn(new_a, new_b, new_c);
-  AndExpr non_poison;
-  non_poison.add(ap);
-  if (nary >= 2)
-    non_poison.add(bp);
-  if (nary >= 3)
-    non_poison.add(cp);
 
   if (fmath.flags & FastMathFlags::NNaN) {
     non_poison.add(!a.isNaN());
@@ -725,27 +736,32 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
   if (fmath.flags & FastMathFlags::NSZ && !only_input)
     val = any_fp_zero(s, std::move(val));
 
-  return { std::move(val), non_poison() };
+  return { convert_output_bv && val.isFloat() ? fpty->fromFloat(s, val)
+                                              : std::move(val),
+           non_poison() };
 }
 
 static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             const expr &b, const expr &bp,
-                            function<expr(expr&,expr&)> fn,
+                            function<expr(const expr&, const expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
                             bool only_input = false,
-                            bool flush_denormal = true) {
+                            bool flush_denormal = true,
+                            bool convert_output_bv = true) {
   return fm_poison(s, a, ap, std::move(b), bp, expr(), expr(),
-                   [&](expr &a, expr &b, expr &c) { return fn(a, b); },
-                   ty, fmath, only_input, flush_denormal, 2);
+                   [&](auto &a, auto &b, auto &c) { return fn(a, b); },
+                   ty, fmath, only_input, flush_denormal, convert_output_bv, 2);
 }
 
 static StateValue fm_poison(State &s, const expr &a, const expr &ap,
-                            function<expr(expr&)> fn, const Type &ty,
+                            function<expr(const expr&)> fn, const Type &ty,
                             FastMathFlags fmath, bool only_input = false,
-                            bool flush_denormal = true) {
+                            bool flush_denormal = true,
+                            bool convert_output_bv = true) {
   return fm_poison(s, a, ap, expr(), expr(), expr(), expr(),
-                   [&](expr &a, expr &b, expr &c) { return fn(a); },
-                   ty, fmath, only_input, flush_denormal, 1);
+                   [&](auto &a, auto &b, auto &c) { return fn(a); },
+                   ty, fmath, only_input, flush_denormal,
+                   convert_output_bv, 1);
 }
 
 static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
@@ -767,13 +783,14 @@ static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
 }
 
 static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
-                              const State &s, const Type &ty,
-                              FpRoundingMode rm,
+                              State &s, const Type &ty, FpRoundingMode rm,
                               bool enable_subnormal_flush = true) {
   auto [v, np] = round_value_(fn, s, rm);
   if (enable_subnormal_flush)
     v = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                          std::move(v));
+  if (auto *fpty = ty.getAsFloatType())
+    v = fpty->fromFloat(s, v);
   return { std::move(v), std::move(np) };
 }
 
@@ -857,8 +874,8 @@ StateValue FpBinOp::toSMT(State &s) const {
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return round_value([&](auto rm) {
       return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                       [&](expr &a, expr &b){ return fn(a, b, rm); }, ty,
-                       fmath, !flush_denormal, flush_denormal);
+                       [&](auto &a, auto &b){ return fn(a, b, rm); }, ty,
+                       fmath, !flush_denormal, flush_denormal, false);
     }, s, ty, rm, flush_denormal);
   };
 
@@ -1097,8 +1114,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
     return
       round_value([&](auto rm) {
         return fm_poison(s, v.value, v.non_poison,
-                         [&](expr &v){ return fn(v, rm); }, ty, fmath,
-                         !flush_denormal, flush_denormal);
+                         [&](auto &v){ return fn(v, rm); }, ty, fmath,
+                         !flush_denormal, flush_denormal, false);
       },  s, ty, rm, flush_denormal);
   };
 
@@ -1363,8 +1380,8 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     return round_value([&](auto rm) {
       return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
                        c.value, c.non_poison,
-                       [&](expr &a, expr &b, expr &c){ return fn(a, b, c, rm);},
-                       ty, fmath);
+                       [&](auto &a, auto &b, auto &c) {return fn(a, b, c, rm);},
+                       ty, fmath, false, true, false);
     }, s, ty, rm);
   };
 
@@ -1424,22 +1441,23 @@ void TestOp::print(ostream &os) const {
 StateValue TestOp::toSMT(State &s) const {
   auto &a = s[*lhs];
   auto &b = s[*rhs];
-  function<expr(const expr&)> fn;
+  function<expr(const expr&, const Type&)> fn;
 
   switch (op) {
   case Is_FPClass:
-    fn = [&](const expr &a) -> expr {
+    fn = [&](const expr &v, const Type &ty) -> expr {
       uint64_t n;
       if (!b.value.isUInt(n) || !b.non_poison.isTrue()) {
         s.addUB(expr(false));
         return {};
       }
+      auto *fpty = ty.getAsFloatType();
+      auto a = fpty->getFloat(v);
       OrExpr result;
-      // TODO: distinguish between quiet and signaling NaNs
       if (n & (1 << 0))
-        result.add(a.isNaN());
+        result.add(fpty->isNaN(v, true));
       if (n & (1 << 1))
-        result.add(a.isNaN());
+        result.add(fpty->isNaN(v, false));
       if (n & (1 << 2))
         result.add(a.isFPNegative() && a.isInf());
       if (n & (1 << 3))
@@ -1461,8 +1479,8 @@ StateValue TestOp::toSMT(State &s) const {
     break;
   }
 
-  auto scalar = [&](const StateValue &v) -> StateValue {
-    return { fn(v.value), expr(v.non_poison) };
+  auto scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
+    return { fn(v.value, ty), expr(v.non_poison) };
   };
 
   if (getType().isVectorType()) {
@@ -1470,11 +1488,11 @@ StateValue TestOp::toSMT(State &s) const {
     auto ty = lhs->getType().getAsAggregateType();
 
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(a, i)));
+      vals.emplace_back(scalar(ty->extract(a, i), ty->getChild(i)));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return scalar(a);
+  return scalar(a, lhs->getType());
 }
 
 expr TestOp::getTypeConstraints(const Function &f) const {
@@ -1669,14 +1687,14 @@ StateValue FpConversionOp::toSMT(State &s) const {
   switch (op) {
   case SIntToFP:
     fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
-      return
-        { val.sint2fp(to_type.getDummyValue(false).value, rm.toSMT()), true };
+      return { val.sint2fp(to_type.getAsFloatType()->getDummyFloat(),
+                           rm.toSMT()), true };
     };
     break;
   case UIntToFP:
     fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
-      return
-        { val.uint2fp(to_type.getDummyValue(false).value, rm.toSMT()), true };
+      return { val.uint2fp(to_type.getAsFloatType()->getDummyFloat(),
+                           rm.toSMT()), true };
     };
     break;
   case FPToSInt:
@@ -1716,15 +1734,19 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case FPExt:
   case FPTrunc:
     fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
-      return { val.float2Float(to_type.getDummyValue(false).value, rm.toSMT()),
-               true };
+      return { val.float2Float(to_type.getAsFloatType()->getDummyFloat(),
+                               rm.toSMT()), true };
     };
     break;
   }
 
-  auto scalar = [&](const StateValue &sv, const Type &to_type) -> StateValue {
+  auto scalar = [&](const StateValue &sv, const Type &from_type,
+                    const Type &to_type) -> StateValue {
+    auto val = sv.value;
+    if (auto *ty = from_type.getAsFloatType())
+      val = ty->getFloat(val);
     auto [v, np]
-      = round_value([&](auto rm) { return fn(sv.value, to_type, rm); }, s,
+      = round_value([&](auto rm) { return fn(val, to_type, rm); }, s,
                     to_type, rm);
     return { std::move(v), sv.non_poison && np };
   };
@@ -1735,11 +1757,12 @@ StateValue FpConversionOp::toSMT(State &s) const {
     auto retty = getType().getAsAggregateType();
 
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(v, i), retty->getChild(i)));
+      vals.emplace_back(scalar(ty->extract(v, i), ty->getChild(i),
+                               retty->getChild(i)));
     }
     return retty->aggregateVals(vals);
   }
-  return scalar(v, getType());
+  return scalar(v, val->getType(), getType());
 }
 
 expr FpConversionOp::getTypeConstraints(const Function &f) const {
@@ -2552,7 +2575,7 @@ StateValue FCmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  auto fn = [&](const auto &a, const auto &b) -> StateValue {
+  auto fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
     auto cmp = [&](const expr &a, const expr &b) {
       switch (cond) {
       case OEQ: return a.foeq(b);
@@ -2574,18 +2597,19 @@ StateValue FCmp::toSMT(State &s) const {
       }
     };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, getType(), fmath, true, true);
+                               cmp, ty, fmath, true, true, false);
     return { val.toBVBool(), std::move(np) };
   };
 
   if (auto agg = a->getType().getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(fn(agg->extract(a_eval, i), agg->extract(b_eval, i)));
+      vals.emplace_back(fn(agg->extract(a_eval, i), agg->extract(b_eval, i),
+                           agg->getChild(i)));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return fn(a_eval, b_eval);
+  return fn(a_eval, b_eval, a->getType());
 }
 
 expr FCmp::getTypeConstraints(const Function &f) const {

@@ -113,6 +113,7 @@ public:
   bool isVar() const;
   bool isBV() const;
   bool isBool() const;
+  bool isFloat() const;
   bool isTrue() const;
   bool isFalse() const;
   bool isZero() const;
