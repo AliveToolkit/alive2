@@ -460,7 +460,7 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
                            Value *allocalign) const {
   if (has(FnAttrs::NNaN)) {
     assert(ty.isFloatType());
-    val.non_poison &= !val.value.isNaN();
+    val.non_poison &= !ty.getAsFloatType()->getFloat(val.value).isNaN();
   }
 
   if (ty.isPtrType())
