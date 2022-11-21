@@ -438,7 +438,7 @@ expr FloatType::fromFloat(State &s, const expr &fp) const {
   unsigned var_bits = fraction_bits + 1;
 
   // NaN has a non-deterministic non-zero fraction bit pattern
-  expr var = expr::mkFreshVar("NaN", expr::mkUInt(0, var_bits));
+  expr var = expr::mkVar("#NaN", var_bits);
   expr fraction = var.extract(fraction_bits - 1, 0);
 
   // sign bit, exponent (-1), fraction (non-zero)
@@ -446,7 +446,6 @@ expr FloatType::fromFloat(State &s, const expr &fp) const {
                 .concat(expr::mkInt(-1, exp_bits))
                 .concat(fraction);
   s.addPre(fraction != 0);
-  s.addQuantVar(var);
 
   return expr::mkIf(isnan, nan, val);
 }
@@ -487,10 +486,10 @@ bool FloatType::isNaNInt(const expr &e) const {
 
   expr nan, nan2;
   unsigned h, l;
-  bool ok = sign.isExtract(nan, h, l) && fraction.isExtract(nan2, h, l) &&
-            nan.eq(nan2);
-  auto nan_name = nan.fn_name();
-  ok &= nan_name.starts_with("NaN!");
+  bool ok = sign.isExtract(nan, h, l) &&
+            fraction.isExtract(nan2, h, l) &&
+            nan.eq(nan2) &&
+            nan.fn_name() == "#NaN";
 
   return ok && exponent.isAllOnes();
 }

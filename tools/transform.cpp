@@ -381,10 +381,6 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
     for (auto &v : val.undef_vars) {
       repls.emplace_back(v, expr::some(v));
     }
-    for (auto &v : val.val.value.vars()) {
-      if (v.fn_name().starts_with("NaN!"))
-        repls.emplace_back(v, expr::some(v));
-    }
     return val.val.value.subst(repls);
   };
 

@@ -970,6 +970,7 @@ public:
         make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
                              parse_rounding(i), parse_exceptions(i)));
     }
+    case llvm::Intrinsic::canonicalize:
     case llvm::Intrinsic::fabs:
     case llvm::Intrinsic::ceil:
     case llvm::Intrinsic::experimental_constrained_ceil:
@@ -991,6 +992,7 @@ public:
       PARSE_UNOP();
       FpUnaryOp::Op op;
       switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::canonicalize:                       op = FpUnaryOp::Canonicalize; break;
       case llvm::Intrinsic::fabs:                               op = FpUnaryOp::FAbs; break;
       case llvm::Intrinsic::ceil:
       case llvm::Intrinsic::experimental_constrained_ceil:      op = FpUnaryOp::Ceil; break;

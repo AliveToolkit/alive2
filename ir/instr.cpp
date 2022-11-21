@@ -784,11 +784,15 @@ static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
 
 static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
                               State &s, const Type &ty, FpRoundingMode rm,
-                              bool enable_subnormal_flush = true) {
+                              bool enable_subnormal_flush = true,
+                              optional<FPDenormalAttrs::Type>
+                                denormal_type = {}) {
   auto [v, np] = round_value_(fn, s, rm);
   if (enable_subnormal_flush)
-    v = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
-                         std::move(v));
+    v = handle_subnormal(
+      denormal_type.value_or(s.getFn().getFnAttrs().getFPDenormal(ty).output),
+      std::move(v));
+
   if (ty.isFloatType())
     v = ty.getAsFloatType()->fromFloat(s, v);
   return { std::move(v), std::move(np) };
@@ -1054,16 +1058,17 @@ void FpUnaryOp::rauw(const Value &what, Value &with) {
 void FpUnaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case FAbs:      str = "fabs "; break;
-  case FNeg:      str = "fneg "; break;
-  case Ceil:      str = "ceil "; break;
-  case Floor:     str = "floor "; break;
-  case RInt:      str = "rint "; break;
-  case NearbyInt: str = "nearbyint "; break;
-  case Round:     str = "round "; break;
-  case RoundEven: str = "roundeven "; break;
-  case Trunc:     str = "trunc "; break;
-  case Sqrt:      str = "sqrt "; break;
+  case FAbs:         str = "fabs "; break;
+  case FNeg:         str = "fneg "; break;
+  case Canonicalize: str = "canonicalize "; break;
+  case Ceil:         str = "ceil "; break;
+  case Floor:        str = "floor "; break;
+  case RInt:         str = "rint "; break;
+  case NearbyInt:    str = "nearbyint "; break;
+  case Round:        str = "round "; break;
+  case RoundEven:    str = "roundeven "; break;
+  case Trunc:        str = "trunc "; break;
+  case Sqrt:         str = "sqrt "; break;
   }
 
   os << getName() << " = " << str << fmath << *val;
@@ -1074,16 +1079,23 @@ void FpUnaryOp::print(ostream &os) const {
 
 StateValue FpUnaryOp::toSMT(State &s) const {
   expr (*fn)(const expr&, FpRoundingMode);
-  bool flush_denormal = true;
+  bool flush_denormal_in = true;
+  bool flush_denormal_out = true;
+  optional<FPDenormalAttrs::Type> denormal_type;
 
   switch (op) {
   case FAbs:
-    flush_denormal = false;
+    flush_denormal_in = flush_denormal_out = false;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
     break;
   case FNeg:
-    flush_denormal = false;
-    fn = [](const expr &v, FpRoundingMode rm){ return v.fneg(); };
+    flush_denormal_in = flush_denormal_out = false;
+    fn = [](const expr &v, FpRoundingMode rm) { return v.fneg(); };
+    break;
+  case Canonicalize:
+    flush_denormal_in = false;
+    fn = [](const expr &v, FpRoundingMode rm) { return v; };
+    denormal_type = FPDenormalAttrs::PreserveSign;
     break;
   case Ceil:
     fn = [](const expr &v, FpRoundingMode rm) { return v.ceil(); };
@@ -1115,8 +1127,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
       round_value([&](auto rm) {
         return fm_poison(s, v.value, v.non_poison,
                          [&](auto &v){ return fn(v, rm); }, ty, fmath,
-                         !flush_denormal, flush_denormal, false);
-      },  s, ty, rm, flush_denormal);
+                         !flush_denormal_in, flush_denormal_in, false);
+      },  s, ty, rm, flush_denormal_out, denormal_type);
   };
 
   auto &v = s[*val];
