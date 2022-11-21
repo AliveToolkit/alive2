@@ -490,7 +490,7 @@ bool FloatType::isNaNInt(const expr &e) const {
   bool ok = sign.isExtract(nan, h, l) && fraction.isExtract(nan2, h, l) &&
             nan.eq(nan2);
   auto nan_name = nan.fn_name();
-  ok &= string_view(nan_name).substr(0, 4) == "NaN!";
+  ok &= nan_name.starts_with("NaN!");
 
   return ok && exponent.isAllOnes();
 }

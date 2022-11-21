@@ -367,6 +367,8 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
   //   forall I .
   //    (forall N . src_nonpoison(I, N) /\ retval_src(I, N) == retval_src(I, 0))
   //      -> (forall N . retval_tgt(I, N) == retval_tgt(I, 0)
+  // FIXME? this is an approximation. Instead of 0, it should be N' because
+  // 0 may fail a precondition.
 
   if (dynamic_cast<const VoidType *>(&type))
     return false;
@@ -378,6 +380,10 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
     vector<pair<expr, expr>> repls;
     for (auto &v : val.undef_vars) {
       repls.emplace_back(v, expr::some(v));
+    }
+    for (auto &v : val.val.value.vars()) {
+      if (v.fn_name().starts_with("NaN!"))
+        repls.emplace_back(v, expr::some(v));
     }
     return val.val.value.subst(repls);
   };
