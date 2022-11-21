@@ -1057,6 +1057,8 @@ expr expr::abs() const {
   expr cond, neg, v, v2;                                 \
   if (isIf(cond, neg, v) && neg.isFPNeg(v2) && v.eq(v2)) \
     return v.fn();                                       \
+  if (isFPNeg(v))                                        \
+    return v.fn();                                       \
 } while (0)
 
 expr expr::isNaN() const {
@@ -1070,7 +1072,6 @@ expr expr::isInf() const {
 }
 
 expr expr::isFPZero() const {
-  fold_fp_neg(isFPZero);
   return unop_fold(Z3_mk_fpa_is_zero);
 }
 

@@ -748,8 +748,8 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             bool only_input = false,
                             bool flush_denormal = true,
                             bool convert_output_bv = true) {
-  return fm_poison(s, a, ap, std::move(b), bp, expr(), expr(),
-                   [&](auto &a, auto &b, auto &c) { return fn(a, b); },
+  return fm_poison(s, a, ap, b, bp, expr(), expr(),
+                   [fn](auto &a, auto &b, auto &c) { return fn(a, b); },
                    ty, fmath, only_input, flush_denormal, convert_output_bv, 2);
 }
 
@@ -759,7 +759,7 @@ static StateValue fm_poison(State &s, const expr &a, const expr &ap,
                             bool flush_denormal = true,
                             bool convert_output_bv = true) {
   return fm_poison(s, a, ap, expr(), expr(), expr(), expr(),
-                   [&](auto &a, auto &b, auto &c) { return fn(a); },
+                   [fn](auto &a, auto &b, auto &c) { return fn(a); },
                    ty, fmath, only_input, flush_denormal,
                    convert_output_bv, 1);
 }
