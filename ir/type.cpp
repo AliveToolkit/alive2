@@ -446,6 +446,7 @@ expr FloatType::fromFloat(State &s, const expr &fp) const {
                 .concat(expr::mkInt(-1, exp_bits))
                 .concat(fraction);
   s.addPre(fraction != 0);
+  s.addPre(expr::mkUF("isQNaN", { fraction }, false));
 
   return expr::mkIf(isnan, nan, val);
 }
