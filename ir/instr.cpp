@@ -1093,7 +1093,7 @@ void FpUnaryOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
-  expr (*fn)(const expr&, FpRoundingMode);
+  expr (*fn)(const expr&, FpRoundingMode) = nullptr;
   bool bitwise = false;
   optional<FPDenormalAttrs::Type> denormal_type;
 
