@@ -195,6 +195,7 @@ public:
   FpType getFpType() const { return fpType; };
 
   smt::expr getDummyFloat() const;
+  smt::expr mkNaN(State &s, bool canonical) const;
   smt::expr getFloat(const smt::expr &v) const;
   smt::expr fromFloat(State &s, const smt::expr &fp) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;

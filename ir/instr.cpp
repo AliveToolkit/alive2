@@ -647,12 +647,34 @@ static expr handle_subnormal(FPDenormalAttrs::Type attr, expr &&v) {
   return std::move(v);
 }
 
+template <typename T>
+static T round_value(const State &s, FpRoundingMode rm, AndExpr &non_poison,
+                     const function<T(FpRoundingMode)> &fn) {
+  if (rm.isDefault())
+    return fn(FpRoundingMode::RNE);
+
+  auto &var = s.getFpRoundingMode();
+  if (!rm.isDynamic()) {
+    non_poison.add(var == rm.getMode());
+    return fn(rm);
+  }
+
+  return T::mkIf(var == FpRoundingMode::RNE, fn(FpRoundingMode::RNE),
+         T::mkIf(var == FpRoundingMode::RNA, fn(FpRoundingMode::RNA),
+         T::mkIf(var == FpRoundingMode::RTP, fn(FpRoundingMode::RTP),
+         T::mkIf(var == FpRoundingMode::RTN, fn(FpRoundingMode::RTN),
+                 fn(FpRoundingMode::RTZ)))));
+}
+
 static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             const expr &bp, expr c, const expr &cp,
                             function<expr(const expr&, const expr&,
-                                          const expr&)> fn,
+                                          const expr&, FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
-                            bool bitwise, int nary = 3) {
+                            FpRoundingMode rm, bool bitwise,
+                            optional<FPDenormalAttrs::Type>
+                              denormal_type = {},
+                            int nary = 3) {
   AndExpr non_poison;
   non_poison.add(ap);
   if (nary >= 2)
@@ -661,7 +683,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     non_poison.add(cp);
 
   if (!ty.isFloatType())
-    return { fn(a, b, c), non_poison() };
+    return { fn(a, b, c, {}), non_poison() };
 
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
@@ -684,7 +706,9 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     fp_c = handle_subnormal(fpdenormal, std::move(fp_c));
   }
 
-  expr val = fn(bitwise ? a : fp_a, bitwise ? b : fp_b, bitwise ? c : fp_c);
+  function<expr(FpRoundingMode)> fn_rm
+    = [&](auto rm) { return fn(fp_a, fp_b, fp_c, rm); };
+  expr val = bitwise ? fn(a, b, c, {}) : round_value(s, rm, non_poison, fn_rm);
 
   if (fmath.flags & FastMathFlags::NNaN) {
     non_poison.add(!fp_a.isNaN());
@@ -725,29 +749,41 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (fmath.flags & FastMathFlags::NSZ && !bitwise)
     val = any_fp_zero(s, std::move(val));
 
-  if (val.isFloat()) {
+  if (val.isFloat() && !bitwise) {
+    val = handle_subnormal(
+      denormal_type.value_or(s.getFn().getFnAttrs().getFPDenormal(ty).output),
+      std::move(val));
+
+    // optimization to prevent variables from NaN conversion
+    if (fp_a.isNaN().isTrue() || fp_b.isNaN().isTrue() || fp_c.isNaN().isTrue())
+      val = expr::mkNumber("0", val);
+
     val = fpty->fromFloat(s, val);
+
     // if any of the inputs is NaN, pick one of the NaN bit-patterns
     // non-deterministically
-    if (!bitwise && !(fmath.flags & FastMathFlags::NNaN)) {
+
+    // TODO: must be a quiet nan, otherwise gets "quieted" somehow
+    if (!(fmath.flags & FastMathFlags::NNaN)) {
+      auto canonical_nan = fpty->mkNaN(s, true);
+      expr var;
       if (nary == 1) {
-        val = expr::mkIf(fp_a.isNaN(), a, val);
+        var = expr::mkFreshVar("#picknan", false);
+        val = expr::mkIf(fp_a.isNaN(), expr::mkIf(var, a, canonical_nan), val);
       } else if (nary == 2) {
-        auto var = expr::mkFreshVar("#picknan", false);
-        s.addQuantVar(var);
+        var = expr::mkFreshVar("#picknan", expr::mkUInt(0, 2));
         val = expr::mkIf(!fp_a.isNaN() && !fp_b.isNaN(), val,
-                expr::mkIf(fp_a.isNaN() && (var || !fp_b.isNaN()), a, b));
+                expr::mkIf(fp_a.isNaN() && var == 0, a,
+                  expr::mkIf(fp_b.isNaN() && var == 1, b, canonical_nan)));
       } else {
         assert(nary == 3);
-        auto var = expr::mkFreshVar("#picknan", false);
-        auto var2 = expr::mkFreshVar("#picknan", false);
-        s.addQuantVar(var);
-        s.addQuantVar(var2);
+        var = expr::mkFreshVar("#picknan", expr::mkUInt(0, 2));
         val = expr::mkIf(!fp_a.isNaN() && !fp_b.isNaN() && !fp_c.isNaN(), val,
-                expr::mkIf(fp_a.isNaN() &&
-                             (var || (!fp_b.isNaN() && !fp_c.isNaN())), a,
-                  expr::mkIf(fp_b.isNaN() && (var2 || !fp_c.isNaN()), b, c)));
+                expr::mkIf(fp_a.isNaN() && var == 0, a,
+                  expr::mkIf(fp_b.isNaN() && var == 1, b,
+                    expr::mkIf(fp_c.isNaN() && var == 2, c, canonical_nan))));
       }
+      s.addQuantVar(var);
     }
   }
 
@@ -756,54 +792,27 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
 
 static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             const expr &bp,
-                            function<expr(const expr&, const expr&)> fn,
+                            function<expr(const expr&, const expr&,
+                                          FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
-                            bool bitwise_op) {
+                            FpRoundingMode rm, bool bitwise,
+                            optional<FPDenormalAttrs::Type>
+                              denormal_type = {}) {
   return fm_poison(s, std::move(a), ap, std::move(b), bp, expr(), expr(),
-                   [fn](auto &a, auto &b, auto &c) { return fn(a, b); },
-                   ty, fmath, bitwise_op, 2);
+                   [fn](auto &a, auto &b, auto &c, auto rm) {
+                    return fn(a, b, rm);
+                   }, ty, fmath, rm, bitwise, denormal_type, 2);
 }
 
 static StateValue fm_poison(State &s, expr a, const expr &ap,
-                            function<expr(const expr&)> fn, const Type &ty,
-                            FastMathFlags fmath, bool bitwise_op) {
+                            function<expr(const expr&, FpRoundingMode)> fn,
+                            const Type &ty, FastMathFlags fmath,
+                            FpRoundingMode rm, bool bitwise,
+                            optional<FPDenormalAttrs::Type>
+                              denormal_type = {}) {
   return fm_poison(s, std::move(a), ap, expr(), expr(), expr(), expr(),
-                   [fn](auto &a, auto &b, auto &c) { return fn(a); },
-                   ty, fmath, bitwise_op, 1);
-}
-
-static StateValue round_value_(const function<StateValue(FpRoundingMode)> &fn,
-                               const State &s, FpRoundingMode rm) {
-  if (rm.isDefault())
-    return fn(FpRoundingMode::RNE);
-
-  auto &var = s.getFpRoundingMode();
-  if (!rm.isDynamic()) {
-    auto [v, np] = fn(rm);
-    return { std::move(v), np && var == rm.getMode() };
-  }
-
-  return StateValue::mkIf(var == FpRoundingMode::RNE, fn(FpRoundingMode::RNE),
-         StateValue::mkIf(var == FpRoundingMode::RNA, fn(FpRoundingMode::RNA),
-         StateValue::mkIf(var == FpRoundingMode::RTP, fn(FpRoundingMode::RTP),
-         StateValue::mkIf(var == FpRoundingMode::RTN, fn(FpRoundingMode::RTN),
-                          fn(FpRoundingMode::RTZ)))));
-}
-
-static StateValue round_value(const function<StateValue(FpRoundingMode)> &fn,
-                              State &s, const Type &ty, FpRoundingMode rm,
-                              bool enable_subnormal_flush = true,
-                              optional<FPDenormalAttrs::Type>
-                                denormal_type = {}) {
-  auto [v, np] = round_value_(fn, s, rm);
-  if (enable_subnormal_flush)
-    v = handle_subnormal(
-      denormal_type.value_or(s.getFn().getFnAttrs().getFPDenormal(ty).output),
-      std::move(v));
-
-  if (ty.isFloatType())
-    v = ty.getAsFloatType()->fromFloat(s, v);
-  return { std::move(v), std::move(np) };
+                   [fn](auto &a, auto &b, auto &c, auto rm) {return fn(a, rm);},
+                   ty, fmath, rm, bitwise, denormal_type, 1);
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -884,11 +893,9 @@ StateValue FpBinOp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
-    return round_value([&](auto rm) {
-      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                       [&](auto &a, auto &b){ return fn(a, b, rm); }, ty,
-                       fmath, bitwise);
-    }, s, ty, rm, !bitwise);
+    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                     [fn](auto &a, auto &b, auto rm){ return fn(a, b, rm); },
+                     ty, fmath, rm, bitwise);
   };
 
   auto &a = s[*lhs];
@@ -1129,12 +1136,9 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
-    return
-      round_value([&](auto rm) {
-        return fm_poison(s, v.value, v.non_poison,
-                         [&](auto &v){ return fn(v, rm); }, ty, fmath,
-                         bitwise);
-      },  s, ty, rm, !bitwise, denormal_type);
+    return fm_poison(s, v.value, v.non_poison,
+                     [fn](auto &v, auto rm){ return fn(v, rm); }, ty, fmath, rm,
+                     bitwise, denormal_type);
   };
 
   auto &v = s[*val];
@@ -1395,12 +1399,8 @@ StateValue FpTernaryOp::toSMT(State &s) const {
 
   auto scalar = [&](const StateValue &a, const StateValue &b,
                     const StateValue &c, const Type &ty) {
-    return round_value([&](auto rm) {
-      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                       c.value, c.non_poison,
-                       [&](auto &a, auto &b, auto &c) {return fn(a, b, c, rm);},
-                       ty, fmath, false);
-    }, s, ty, rm);
+    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                     c.value, c.non_poison, fn, ty, fmath, rm, false);
   };
 
   auto &av = s[*a];
@@ -1763,10 +1763,16 @@ StateValue FpConversionOp::toSMT(State &s) const {
     auto val = sv.value;
     if (from_type.isFloatType())
       val = from_type.getAsFloatType()->getFloat(val);
-    auto [v, np]
-      = round_value([&](auto rm) { return fn(val, to_type, rm); }, s,
-                    to_type, rm);
-    return { std::move(v), sv.non_poison && np };
+
+    if (!to_type.isFloatType())
+      return fn(val, to_type, {});
+
+    function<StateValue(FpRoundingMode)> fn_rm
+      = [&](auto rm) { return fn(val, to_type, rm); };
+    AndExpr np;
+    np.add(sv.non_poison);
+    auto [v, np2] = round_value(s, rm, np, fn_rm);
+    return { to_type.getAsFloatType()->fromFloat(s, v), np() && np2 };
   };
 
   if (getType().isVectorType()) {
@@ -1839,11 +1845,11 @@ StateValue Select::toSMT(State &s) const {
 
   auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
     auto cond = c.value == 1;
-    auto identity = [](const expr &x) { return x; };
+    auto identity = [](const expr &x, auto rm) { return x; };
     return fm_poison(s, expr::mkIf(cond, a.value, b.value),
                      c.non_poison &&
                        expr::mkIf(cond, a.non_poison, b.non_poison),
-                     identity, getType(), fmath, true);
+                     identity, getType(), fmath, {}, true);
   };
 
   if (auto agg = getType().getAsAggregateType()) {
@@ -2592,7 +2598,7 @@ StateValue FCmp::toSMT(State &s) const {
   auto &b_eval = s[*b];
 
   auto fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
-    auto cmp = [&](const expr &a, const expr &b) {
+    auto cmp = [&](const expr &a, const expr &b, auto rm) {
       switch (cond) {
       case OEQ: return a.foeq(b);
       case OGT: return a.fogt(b);
@@ -2613,7 +2619,7 @@ StateValue FCmp::toSMT(State &s) const {
       }
     };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, ty, fmath, false);
+                               cmp, ty, fmath, {}, false);
     return { val.toBVBool(), std::move(np) };
   };
 
@@ -2771,9 +2777,9 @@ StateValue Phi::toSMT(State &s) const {
   }
 
   StateValue sv = *std::move(ret)();
-  auto identity = [](const expr &x) { return x; };
+  auto identity = [](const expr &x, auto rm) { return x; };
   return
-    fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, true);
+    fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, {}, true);
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {

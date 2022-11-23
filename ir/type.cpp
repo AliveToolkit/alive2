@@ -426,29 +426,33 @@ expr FloatType::getFloat(const expr &v) const {
   return v.BV2float(ty);
 }
 
+expr FloatType::mkNaN(State &s, bool canonical) const {
+  unsigned exp_bits = float_sizes[fpType].second;
+  unsigned fraction_bits = bits() - exp_bits - 1;
+  unsigned var_bits = fraction_bits + 1;
+
+  // NaN has a non-deterministic non-zero fraction bit pattern
+  expr zero = expr::mkUInt(0, var_bits);
+  expr var = canonical ? expr::mkVar("#NaN_canonical", zero)
+                       : expr::mkFreshVar("#NaN", zero);
+  expr fraction = var.extract(fraction_bits - 1, 0);
+
+  s.addPre(fraction != 0);
+  s.addPre(expr::mkUF("isQNaN", { fraction }, false));
+
+  // sign bit, exponent (-1), fraction (non-zero)
+  return var.extract(fraction_bits, fraction_bits)
+            .concat(expr::mkInt(-1, exp_bits))
+            .concat(fraction);
+}
+
 expr FloatType::fromFloat(State &s, const expr &fp) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
   if (isnan.isFalse())
     return val;
-
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1;
-  unsigned var_bits = fraction_bits + 1;
-
-  // NaN has a non-deterministic non-zero fraction bit pattern
-  expr var = expr::mkVar("#NaN", var_bits);
-  expr fraction = var.extract(fraction_bits - 1, 0);
-
-  // sign bit, exponent (-1), fraction (non-zero)
-  expr nan = var.extract(fraction_bits, fraction_bits)
-                .concat(expr::mkInt(-1, exp_bits))
-                .concat(fraction);
-  s.addPre(fraction != 0);
-  s.addPre(expr::mkUF("isQNaN", { fraction }, false));
-
-  return expr::mkIf(isnan, nan, val);
+  return expr::mkIf(isnan, mkNaN(s, false), val);
 }
 
 expr FloatType::isNaN(const expr &v, bool signalling) const {
@@ -490,7 +494,7 @@ bool FloatType::isNaNInt(const expr &e) const {
   bool ok = sign.isExtract(nan, h, l) &&
             fraction.isExtract(nan2, h, l) &&
             nan.eq(nan2) &&
-            nan.fn_name() == "#NaN";
+            nan.fn_name().starts_with("#NaN");
 
   return ok && exponent.isAllOnes();
 }
