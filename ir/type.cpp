@@ -439,6 +439,8 @@ expr FloatType::mkNaN(State &s, bool canonical) const {
 
   s.addPre(fraction != 0);
   s.addPre(expr::mkUF("isQNaN", { fraction }, false));
+  if (!canonical)
+    s.addQuantVar(var);
 
   // sign bit, exponent (-1), fraction (non-zero)
   return var.extract(fraction_bits, fraction_bits)
