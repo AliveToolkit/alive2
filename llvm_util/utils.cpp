@@ -140,11 +140,16 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return ptr_types[as].get();
   }
   case llvm::Type::StructTyID: {
+    auto strty = cast<llvm::StructType>(ty);
+    // 8 bits should be plenty to represent all unique values of this type
+    // in the program
+    if (strty->isOpaque())
+      return &get_int_type(8);
+
     auto &cache = type_cache[ty];
     if (!cache) {
       vector<Type*> elems;
       vector<bool> is_padding;
-      auto strty = cast<llvm::StructType>(ty);
       auto layout = DL->getStructLayout(const_cast<llvm::StructType *>(strty));
       for (unsigned i = 0; i < strty->getNumElements(); ++i) {
         auto e = strty->getElementType(i);
