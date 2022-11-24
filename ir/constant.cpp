@@ -6,6 +6,7 @@
 #include "util/compiler.h"
 #include <bit>
 #include <cassert>
+#include <cmath>
 // TODO: remove cstring when migrated to std::bit_cast
 #include <cstring>
 #include <iomanip>
@@ -44,31 +45,44 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
-template <typename T>
-static uint64_t mbit_cast(T val) {
+template <typename TO, typename TI>
+static TO mbit_cast(TI bits) {
   // FIXME: Apple's clang doesn't have std::bit_cast nor does gcc 10
-  uint64_t bits;
-  assert(sizeof(bits) == sizeof(T));
-  memcpy(&bits, &val, sizeof(T));
-  return bits;
+  TO fp;
+  assert(sizeof(fp) == sizeof(bits));
+  memcpy(&fp, &bits, sizeof(fp));
+  return fp;
 }
 
-static string double_to_string(double val, unsigned bits) {
-  auto str = to_string(val);
-  // no loss of precision
-  if (strtod(str.c_str(), nullptr) == val)
-    return str;
-
+static string to_hex(Type &type, const string &val) {
+  uint64_t num = strtoull(val.c_str(), nullptr, 10);
   ostringstream os;
-  os << "0x" << hex << setfill('0') << setw(bits/4) << mbit_cast<uint64_t>(val);
+  os << "0x" << hex << setfill('0') << setw(type.bits()/4) << num;
   return std::move(os).str();
 }
 
-FloatConst::FloatConst(Type &type, double val)
-  : Constant(type, double_to_string(val, type.bits())), val(val) {}
+template <typename TO, typename TI>
+static string bits_to_float(Type &type, const string &val) {
+  uint64_t num = strtoull(val.c_str(), nullptr, 10);
+  TO fp = mbit_cast<TO, TI>((TI)num);
+  return isnan(fp) ? to_hex(type, val) : to_string(fp);
+}
+
+static string int_to_readable_float(Type &type, const string &val) {
+  switch (type.getAsFloatType()->getFpType()) {
+  case FloatType::Float:  return bits_to_float<float, unsigned>(type, val);
+  case FloatType::Double: return bits_to_float<double, uint64_t>(type, val);
+  case FloatType::Quad:   return val;
+  case FloatType::Half:
+  case FloatType::BFloat: return to_hex(type, val);
+  case FloatType::Unknown: UNREACHABLE();
+  }
+  UNREACHABLE();
+}
 
 FloatConst::FloatConst(Type &type, string val, bool bit_value)
-  : Constant(type, string(val)), val(std::move(val)), bit_value(bit_value) {}
+  : Constant(type, int_to_readable_float(type, val)), val(std::move(val)),
+  bit_value(bit_value) {}
 
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
@@ -76,27 +90,14 @@ expr FloatConst::getTypeConstraints() const {
 }
 
 StateValue FloatConst::toSMT(State &s) const {
-  if (auto n = get_if<string>(&val)) {
-    if (!bit_value)
-      return { expr::mkNumber(n->c_str(),
-                              getType().getAsFloatType()->getDummyFloat())
-                 .float2BV(),
-               true };
-    return { expr::mkNumber(n->c_str(), expr::mkUInt(0, getType().bits())),
+  if (bit_value)
+    return { expr::mkNumber(val.c_str(), expr::mkUInt(0, getType().bits())),
              true };
-  }
 
-  expr e;
-  double v = get<double>(val);
-  switch (getType().getAsFloatType()->getFpType()) {
-  case FloatType::Half:    e = expr::mkHalf((float)v); break;
-  case FloatType::Float:   e = expr::mkFloat((float)v); break;
-  case FloatType::Double:  e = expr::mkDouble(v); break;
-  case FloatType::BFloat:  e = expr::mkBFloat((float)v); break;
-  case FloatType::Quad:
-  case FloatType::Unknown: UNREACHABLE();
-  }
-  return { e.float2BV(), true };
+  return { expr::mkNumber(val.c_str(),
+                          getType().getAsFloatType()->getDummyFloat())
+             .float2BV(),
+           true };
 }
 
 

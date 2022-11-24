@@ -264,24 +264,10 @@ Value* get_operand(llvm::Value *v,
 
   if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
     auto &apfloat = cnst->getValueAPF();
-    unique_ptr<FloatConst> c;
-    switch (ty->getAsFloatType()->getFpType()) {
-    case FloatType::Float:
-    case FloatType::BFloat:
-      c = make_unique<FloatConst>(*ty, apfloat.convertToFloat());
-      break;
-    case FloatType::Double:
-      c = make_unique<FloatConst>(*ty, apfloat.convertToDouble());
-      break;
-    case FloatType::Half:
-    case FloatType::Quad:
-      c = make_unique<FloatConst>(*ty,
-                                  toString(apfloat.bitcastToAPInt(), 10, false),
-                                  true);
-      break;
-    case FloatType::Unknown:
-      UNREACHABLE();
-    }
+    auto c
+     = make_unique<FloatConst>(*ty,
+                               toString(apfloat.bitcastToAPInt(), 10, false),
+                               true);
     auto ret = c.get();
     current_fn->addConstant(std::move(c));
     RETURN_CACHE(ret);

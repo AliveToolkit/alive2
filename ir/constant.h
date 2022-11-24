@@ -32,10 +32,9 @@ public:
 
 
 class FloatConst final : public Constant {
-  std::variant<double, std::string> val;
+  std::string val;
   bool bit_value;
 public:
-  FloatConst(Type &type, double val);
   FloatConst(Type &type, std::string val, bool bit_value);
 
   StateValue toSMT(State &s) const override;
