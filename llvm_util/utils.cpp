@@ -402,6 +402,15 @@ Value* get_operand(llvm::Value *v,
     return constexpr_conv(cexpr);
   }
 
+  // This must be an operand of an unreachable instruction as the operand
+  // hasn't been seen yet
+  if (isa<llvm::Instruction>(v)) {
+    auto val = make_unique<PoisonValue>(*ty);
+    auto ret = val.get();
+    current_fn->addConstant(std::move(val));
+    return ret;
+  }
+
   return nullptr;
 }
 
