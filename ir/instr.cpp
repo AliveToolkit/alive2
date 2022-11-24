@@ -1764,15 +1764,18 @@ StateValue FpConversionOp::toSMT(State &s) const {
     if (from_type.isFloatType())
       val = from_type.getAsFloatType()->getFloat(val);
 
-    if (!to_type.isFloatType())
-      return fn(val, to_type, {});
-
     function<StateValue(FpRoundingMode)> fn_rm
       = [&](auto rm) { return fn(val, to_type, rm); };
     AndExpr np;
     np.add(sv.non_poison);
-    auto [v, np2] = round_value(s, rm, np, fn_rm);
-    return { to_type.getAsFloatType()->fromFloat(s, v), np() && np2 };
+
+    StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
+                                           : fn(val, to_type, {});
+
+    return { to_type.isFloatType()
+               ? to_type.getAsFloatType()->fromFloat(s, ret.value)
+               : std::move(ret.value),
+             np() && ret.non_poison};
   };
 
   if (getType().isVectorType()) {
