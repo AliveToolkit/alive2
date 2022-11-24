@@ -212,6 +212,9 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
         if (m.eval(val.return_domain).isFalse()) {
           s << *var << " = function did not return!\n";
           break;
+        } else if (m.eval(val.domain).isFalse()) {
+          s << "Function " << call->getFnName() << " triggered UB\n";
+          continue;
         } else if (var->isVoid()) {
           s << "Function " << call->getFnName() << " returned\n";
           continue;
