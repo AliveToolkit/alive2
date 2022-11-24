@@ -717,7 +717,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
       if (nary == 3)
         non_poison.add(!fp_c.isNaN());
     }
-    if (!bitwise)
+    if (!bitwise && val.isFloat())
       non_poison.add(!val.isNaN());
   }
   if (fmath.flags & FastMathFlags::NInf) {
@@ -727,7 +727,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
       if (nary == 3)
         non_poison.add(!fp_c.isInf());
     }
-    if (!bitwise)
+    if (!bitwise && val.isFloat())
       non_poison.add(!val.isInf());
   }
   if (fmath.flags & FastMathFlags::ARCP) {
@@ -746,10 +746,10 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = expr::mkUF("afn", { val }, val);
     s.doesApproximation("afn", val);
   }
-  if (fmath.flags & FastMathFlags::NSZ && !bitwise)
+  if (fmath.flags & FastMathFlags::NSZ && !bitwise && val.isFloat())
     val = any_fp_zero(s, std::move(val));
 
-  if (val.isFloat() && !bitwise) {
+  if (!bitwise && val.isFloat()) {
     val = handle_subnormal(
       denormal_type.value_or(s.getFn().getFnAttrs().getFPDenormal(ty).output),
       std::move(val));
