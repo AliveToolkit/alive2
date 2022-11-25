@@ -65,7 +65,7 @@ template <typename TO, typename TI>
 static string bits_to_float(Type &type, const string &val) {
   uint64_t num = strtoull(val.c_str(), nullptr, 10);
   TO fp = mbit_cast<TO, TI>((TI)num);
-  return isnan(fp) ? to_hex(type, val) : to_string(fp);
+  return isnan(fp) || issubnormal(fp) ? to_hex(type, val) : to_string(fp);
 }
 
 static string int_to_readable_float(Type &type, const string &val) {
