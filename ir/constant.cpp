@@ -70,19 +70,19 @@ static string bits_to_float(Type &type, const string &val) {
 
 static string int_to_readable_float(Type &type, const string &val) {
   switch (type.getAsFloatType()->getFpType()) {
-  case FloatType::Float:  return bits_to_float<float, unsigned>(type, val);
-  case FloatType::Double: return bits_to_float<double, uint64_t>(type, val);
-  case FloatType::Quad:   return val;
+  case FloatType::Float:   return bits_to_float<float, unsigned>(type, val);
+  case FloatType::Double:  return bits_to_float<double, uint64_t>(type, val);
+  case FloatType::Quad:    return val;
   case FloatType::Half:
-  case FloatType::BFloat: return to_hex(type, val);
+  case FloatType::BFloat:  return to_hex(type, val);
   case FloatType::Unknown: UNREACHABLE();
   }
   UNREACHABLE();
 }
 
 FloatConst::FloatConst(Type &type, string val, bool bit_value)
-  : Constant(type, int_to_readable_float(type, val)), val(std::move(val)),
-  bit_value(bit_value) {}
+  : Constant(type, bit_value ? int_to_readable_float(type, val) : val),
+  val(std::move(val)), bit_value(bit_value) {}
 
 expr FloatConst::getTypeConstraints() const {
   return Value::getTypeConstraints() &&
