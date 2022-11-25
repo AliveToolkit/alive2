@@ -1871,7 +1871,8 @@ expr expr::BV2float(const expr &type) const {
 
 expr expr::float2Float(const expr &type, const expr &rm) const {
   C(type, rm);
-  return Z3_mk_fpa_to_fp_float(ctx(), rm(), ast(), type.sort());
+  return simplify_const(Z3_mk_fpa_to_fp_float(ctx(), rm(), ast(), type.sort()),
+                        *this);
 }
 
 expr expr::fp2sint(unsigned bits, const expr &rm) const {
