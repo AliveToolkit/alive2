@@ -672,7 +672,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                                           const expr&, FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_out_only = false, int nary = 3) {
+                            bool flags_in_only = false, int nary = 3) {
   AndExpr non_poison;
   non_poison.add(ap);
   if (nary >= 2)
@@ -683,7 +683,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!ty.isFloatType())
     return { fn(a, b, c, {}), non_poison() };
 
-  if (!flags_out_only && fmath.flags & FastMathFlags::NSZ) {
+  if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
     if (nary >= 2) {
       b = any_fp_zero(s, b);
@@ -709,25 +709,21 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   expr val = bitwise ? fn(a, b, c, {}) : round_value(s, rm, non_poison, fn_rm);
 
   if (fmath.flags & FastMathFlags::NNaN) {
-    if (!flags_out_only) {
-      non_poison.add(!fp_a.isNaN());
-      if (nary >= 2)
-        non_poison.add(!fp_b.isNaN());
-      if (nary >= 3)
-        non_poison.add(!fp_c.isNaN());
-    }
-    if (val.isFloat())
+    non_poison.add(!fp_a.isNaN());
+    if (nary >= 2)
+      non_poison.add(!fp_b.isNaN());
+    if (nary >= 3)
+      non_poison.add(!fp_c.isNaN());
+    if (!flags_in_only && val.isFloat())
       non_poison.add(!val.isNaN());
   }
   if (fmath.flags & FastMathFlags::NInf) {
-    if (!flags_out_only) {
-      non_poison.add(!fp_a.isInf());
-      if (nary >= 2)
-        non_poison.add(!fp_b.isInf());
-      if (nary >= 3)
-        non_poison.add(!fp_c.isInf());
-    }
-    if (val.isFloat())
+    non_poison.add(!fp_a.isInf());
+    if (nary >= 2)
+      non_poison.add(!fp_b.isInf());
+    if (nary >= 3)
+      non_poison.add(!fp_c.isInf());
+    if (!flags_in_only && val.isFloat())
       non_poison.add(!val.isInf());
   }
   if (fmath.flags & FastMathFlags::ARCP) {
@@ -746,7 +742,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = expr::mkUF("afn", { val }, val);
     s.doesApproximation("afn", val);
   }
-  if (fmath.flags & FastMathFlags::NSZ)
+  if (!flags_in_only && fmath.flags & FastMathFlags::NSZ)
     val = any_fp_zero(s, std::move(val));
 
   if (!bitwise && val.isFloat()) {
@@ -795,21 +791,21 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                                           FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_out_only = false) {
+                            bool flags_in_only = false) {
   return fm_poison(s, std::move(a), ap, std::move(b), bp, expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto rm) {
                     return fn(a, b, rm);
-                   }, ty, fmath, rm, bitwise, flags_out_only, 2);
+                   }, ty, fmath, rm, bitwise, flags_in_only, 2);
 }
 
 static StateValue fm_poison(State &s, expr a, const expr &ap,
                             function<expr(const expr&, FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_out_only = false) {
+                            bool flags_in_only = false) {
   return fm_poison(s, std::move(a), ap, expr(), expr(), expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto rm) {return fn(a, rm);},
-                   ty, fmath, rm, bitwise, flags_out_only, 1);
+                   ty, fmath, rm, bitwise, flags_in_only, 1);
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
