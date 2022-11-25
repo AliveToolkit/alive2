@@ -63,7 +63,9 @@ static string to_hex(Type &type, const string &val) {
 static string bits_to_float(Type &type, const string &val) {
   uint64_t num = strtoull(val.c_str(), nullptr, 10);
   double fp = mbit_cast(num);
-  return isnan(fp) || issubnormal(fp) ? to_hex(type, val) : to_string(fp);
+  auto fpclass = fpclassify(fp);
+  return fpclass == FP_NAN || fpclass == FP_SUBNORMAL ? to_hex(type, val)
+                                                      : to_string(fp);
 }
 
 static string int_to_readable_float(Type &type, const string &val) {
