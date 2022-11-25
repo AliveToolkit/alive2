@@ -2620,7 +2620,7 @@ StateValue FCmp::toSMT(State &s) const {
       }
     };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, ty, fmath, {}, false);
+                               cmp, ty, fmath, {}, false, true);
     return { val.toBVBool(), std::move(np) };
   };
 
