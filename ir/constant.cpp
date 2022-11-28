@@ -45,9 +45,10 @@ expr IntConst::getTypeConstraints() const {
          getType().sizeVar().uge(min_bits);
 }
 
-static double mbit_cast(uint64_t bits) {
+template <typename TI, typename TO>
+static TO mbit_cast(TI bits) {
   // FIXME: Apple's clang doesn't have std::bit_cast nor does gcc 10
-  double fp;
+  TO fp;
   assert(sizeof(fp) == sizeof(bits));
   memcpy(&fp, &bits, sizeof(fp));
   return fp;
@@ -60,9 +61,10 @@ static string to_hex(Type &type, const string &val) {
   return std::move(os).str();
 }
 
+template <typename TI, typename TO>
 static string bits_to_float(Type &type, const string &val) {
   uint64_t num = strtoull(val.c_str(), nullptr, 10);
-  double fp = mbit_cast(num);
+  TO fp = mbit_cast<TI, TO>(num);
   auto fpclass = fpclassify(fp);
   return fpclass == FP_NAN || fpclass == FP_SUBNORMAL ? to_hex(type, val)
                                                       : to_string(fp);
@@ -70,8 +72,8 @@ static string bits_to_float(Type &type, const string &val) {
 
 static string int_to_readable_float(Type &type, const string &val) {
   switch (type.getAsFloatType()->getFpType()) {
-  case FloatType::Float:   return bits_to_float(type, val);
-  case FloatType::Double:  return bits_to_float(type, val);
+  case FloatType::Float:   return bits_to_float<unsigned, float>(type, val);
+  case FloatType::Double:  return bits_to_float<uint64_t, double>(type, val);
   case FloatType::Quad:    return val;
   case FloatType::Half:
   case FloatType::BFloat:  return to_hex(type, val);
