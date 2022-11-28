@@ -1,4 +1,4 @@
-; Found by Alive
+; not a bug after all
 
 @Q = internal unnamed_addr global double 1.000000e+00, align 8
 
@@ -33,5 +33,3 @@ end:                                              ; preds = %if, %entry
   store double %0, double* %1, align 8
   ret double %0
 }
-
-; ERROR: Mismatch in memory
