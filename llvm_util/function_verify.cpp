@@ -2,6 +2,10 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "function_verify.h"
+#include "llvm_util/llvm2alive.h"
+#include "tools/transform.h"
+#include <iostream>
+#include <sstream>
 
 using namespace tools;
 using namespace util;
@@ -14,7 +18,7 @@ bool opt_always_verify = false;
 bool opt_print_dot = false;
 bool opt_bidirectional = false;
 
-ostream* out = &cout;
+ostream *out = &cout;
 
 struct Results {
   tools::Transform t;
@@ -92,7 +96,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
 }
 }
 
-namespace verifier {
+namespace llvm_util::verifier {
 
 std::optional<smt::smt_initializer> smt_init;
 std::unique_ptr<Cache> cache;
@@ -103,9 +107,9 @@ unsigned num_failed = 0;
 unsigned num_errors = 0;
 
 
-void initialize_verifier(bool set_opt_quiet, bool set_opt_always_verify,
-                        bool set_opt_print_dot, bool set_opt_bidirectional,
-                        std::ostream* set_out) {
+void initialize(bool set_opt_quiet, bool set_opt_always_verify,
+                bool set_opt_print_dot, bool set_opt_bidirectional,
+                std::ostream* set_out) {
   opt_quiet = set_opt_quiet;
   opt_always_verify = set_opt_always_verify;
   opt_print_dot = set_opt_print_dot;
@@ -191,4 +195,3 @@ bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
   return true;
 }
 }
-

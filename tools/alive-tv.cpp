@@ -82,7 +82,7 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   return M;
 }
 
-llvm::Function *findFunction(llvm::Module &M, const std::string &FName) {
+llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   for (auto &F : M) {
     if (F.isDeclaration())
       continue;
@@ -93,6 +93,7 @@ llvm::Function *findFunction(llvm::Module &M, const std::string &FName) {
   return 0;
 }
 }
+
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -147,8 +148,8 @@ convenient way to demonstrate an existing optimizer bug.
   llvm_util::initializer llvm_util_init(*out, DL);
   smt_init.emplace();
 
-  initialize_verifier(opt_quiet, opt_always_verify, opt_print_dot,
-                      opt_bidirectional, out);
+  initialize(opt_quiet, opt_always_verify, opt_print_dot, opt_bidirectional,
+             out);
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {

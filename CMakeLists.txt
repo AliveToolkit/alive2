@@ -183,11 +183,11 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_definitions(${LLVM_DEFINITIONS})
 
   set(LLVM_UTIL_SRCS
+    "llvm_util/function_verify.cpp"
     "llvm_util/known_fns.cpp"
     "llvm_util/llvm_optimizer.cpp"
     "llvm_util/llvm2alive.cpp"
     "llvm_util/utils.cpp"
-    "llvm_util/function_verify.cpp"
   )
 
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
