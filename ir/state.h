@@ -112,6 +112,7 @@ private:
   std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
 
   std::set<smt::expr> quantified_vars;
+  std::set<smt::expr> freeze_vars;
 
   // var -> ((value, not_poison), ub, undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
@@ -237,6 +238,7 @@ public:
   auto& getApproximations() const { return used_approximations; }
 
   void addQuantVar(const smt::expr &var);
+  void addFreezeVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
@@ -259,6 +261,7 @@ public:
   auto& getFnPre() const { return fn_call_pre; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
+  const auto& getFreezeVars() const { return freeze_vars; }
   const auto& getFnQuantVars() const { return fn_call_qvars; }
 
   void saveReturnedInput();

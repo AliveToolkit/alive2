@@ -362,7 +362,10 @@ encode_undef_refinement_per_elem(const Type &ty, const StateValue &sva,
 }
 
 // Returns negation of refinement
-static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
+static expr encode_undef_refinement(const State &src_state,
+                                    const State &tgt_state,
+                                    const Type &type,
+                                    const State::ValTy &a,
                                     const State::ValTy &b) {
   // Undef refinement: (src-nonpoison /\ src-nonundef) -> tgt-nonundef
   //
@@ -379,7 +382,7 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
     // target is never undef
     return false;
 
-  auto subst = [](const auto &val) {
+  auto subst = [](const State &state, const auto &val) {
     vector<pair<expr, expr>> repls;
     for (auto &v : val.undef_vars) {
       repls.emplace_back(v, expr::some(v));
@@ -387,18 +390,18 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
 
     // We need to consider fresh variables that are produced for specific
     // expressions. Since we are now rewriting those expressions, those
-    // variables *may* need to be refreshed. For now consider just NaNs.
+    // variables *may* need to be refreshed.
     if (!repls.empty()) {
-      for (auto &v : val.val.vars()) {
-        if (v.fn_name().starts_with("#NaN!"))
-          repls.emplace_back(v, expr::some(v));
+      for (auto &v : state.getQuantVars()) {
+        repls.emplace_back(v, expr::some(v));
       }
     }
     return val.val.value.subst(repls);
   };
 
-  return encode_undef_refinement_per_elem(type, a.val, subst(a),
-                                          expr(b.val.value), subst(b));
+  return encode_undef_refinement_per_elem(type, a.val, subst(src_state, a),
+                                          expr(b.val.value),
+                                          subst(tgt_state, b));
 }
 
 static void
@@ -416,6 +419,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   auto &uvars = ap.undef_vars;
   auto qvars = src_state.getQuantVars();
   qvars.insert(ap.undef_vars.begin(), ap.undef_vars.end());
+  auto &src_freeze_vars = src_state.getFreezeVars();
+  qvars.insert(src_freeze_vars.begin(), src_freeze_vars.end());
   auto &fn_qvars = tgt_state.getFnQuantVars();
   qvars.insert(fn_qvars.begin(), fn_qvars.end());
 
@@ -536,7 +541,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
         print_value, "Target is more poisonous than source");
 
   // 4. Check undef
-  CHECK(dom && encode_undef_refinement(type, ap, bp),
+  CHECK(dom && encode_undef_refinement(src_state, tgt_state, type, ap, bp),
         print_value, "Target's return value is more undefined");
 
   // 5. Check value

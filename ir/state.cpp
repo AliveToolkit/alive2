@@ -461,7 +461,7 @@ const StateValue& State::operator[](const Value &val) {
 
   if (is_non_undef) {
     // We don't need to add uvar to undef_vars
-    quantified_vars.insert(uvars.begin(), uvars.end());
+    freeze_vars.insert(uvars.begin(), uvars.end());
     return simplify(sval, true);
   }
 
@@ -1011,6 +1011,10 @@ void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
 
+void State::addFreezeVar(const expr &var) {
+  freeze_vars.emplace(var);
+}
+
 void State::addFnQuantVar(const expr &var) {
   fn_call_qvars.emplace(var);
 }
@@ -1020,7 +1024,7 @@ void State::addUndefVar(expr &&var) {
 }
 
 void State::resetUndefVars() {
-  quantified_vars.insert(undef_vars.begin(), undef_vars.end());
+  freeze_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
 }
 

@@ -2686,7 +2686,7 @@ static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
 
   StateValue ret_type = ty.getDummyValue(true);
   expr nondet = expr::mkFreshVar("nondet", ret_type.value);
-  s.addQuantVar(nondet);
+  s.addFreezeVar(nondet);
   return { expr::mkIf(v.non_poison, v.value, nondet),
            std::move(ret_type.non_poison) };
 }
