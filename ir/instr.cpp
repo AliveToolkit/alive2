@@ -672,7 +672,8 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                                           const expr&, FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false, int nary = 3) {
+                            bool flags_in_only = false, bool normalize = true,
+                            int nary = 3) {
   AndExpr non_poison;
   non_poison.add(ap);
   if (nary >= 2)
@@ -697,7 +698,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   expr fp_b = fpty->getFloat(b);
   expr fp_c = fpty->getFloat(c);
 
-  if (!bitwise) {
+  if (normalize) {
     auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
     fp_a = handle_subnormal(fpdenormal, std::move(fp_a));
     fp_b = handle_subnormal(fpdenormal, std::move(fp_b));
@@ -745,10 +746,11 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!flags_in_only && fmath.flags & FastMathFlags::NSZ)
     val = any_fp_zero(s, std::move(val));
 
-  if (!bitwise && val.isFloat()) {
+  if (normalize)
     val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
 
+  if (!bitwise && val.isFloat()) {
 #if 0
     // optimization to prevent variables from NaN conversion
     if (fp_a.isNaN().isTrue() || fp_b.isNaN().isTrue() || fp_c.isNaN().isTrue())
@@ -796,21 +798,21 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                                           FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false) {
+                            bool flags_in_only = false, bool normalize = true) {
   return fm_poison(s, std::move(a), ap, std::move(b), bp, expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto rm) {
                     return fn(a, b, rm);
-                   }, ty, fmath, rm, bitwise, flags_in_only, 2);
+                   }, ty, fmath, rm, bitwise, flags_in_only, normalize, 2);
 }
 
 static StateValue fm_poison(State &s, expr a, const expr &ap,
                             function<expr(const expr&, FpRoundingMode)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false) {
+                            bool flags_in_only = false, bool normalize = true) {
   return fm_poison(s, std::move(a), ap, expr(), expr(), expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto rm) {return fn(a, rm);},
-                   ty, fmath, rm, bitwise, flags_in_only, 1);
+                   ty, fmath, rm, bitwise, flags_in_only, normalize, 1);
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -1098,14 +1100,17 @@ void FpUnaryOp::print(ostream &os) const {
 StateValue FpUnaryOp::toSMT(State &s) const {
   expr (*fn)(const expr&, FpRoundingMode) = nullptr;
   bool bitwise = false;
+  bool normalize = true;
 
   switch (op) {
   case FAbs:
     //TODO: enable in some strict FP mode: bitwise = true;
+    normalize = false;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
     break;
   case FNeg:
     // TODO: enable in some strict FP mode: bitwise = true;
+    normalize = false;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fneg(); };
     break;
   case Canonicalize:
@@ -1139,7 +1144,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &v, const Type &ty) {
     return fm_poison(s, v.value, v.non_poison,
                      [fn](auto &v, auto rm){ return fn(v, rm); }, ty, fmath, rm,
-                     bitwise);
+                     bitwise, false, normalize);
   };
 
   auto &v = s[*val];

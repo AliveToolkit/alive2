@@ -1,3 +1,6 @@
+; XFAIL: Value mismatch
+; TODO: only works in some strict FP mode
+
 define i1 @src(float %x) {
   %y = call float @llvm.canonicalize(float %x)
   %quiet = call i1 @llvm.is.fpclass(float %y, i32 2)
