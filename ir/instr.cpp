@@ -749,12 +749,16 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
 
+#if 0
     // optimization to prevent variables from NaN conversion
     if (fp_a.isNaN().isTrue() || fp_b.isNaN().isTrue() || fp_c.isNaN().isTrue())
       val = expr::mkNumber("0", val);
+#endif
 
     val = fpty->fromFloat(s, val);
 
+#if 0
+    // TODO: enable this stuff just in some strict FP mode
     // if any of the inputs is NaN, pick one of the NaN bit-patterns
     // non-deterministically
 
@@ -780,6 +784,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
       }
       s.addQuantVar(var);
     }
+#endif
   }
 
   return { std::move(val), non_poison() };
@@ -1096,11 +1101,11 @@ StateValue FpUnaryOp::toSMT(State &s) const {
 
   switch (op) {
   case FAbs:
-    bitwise = true;
+    //TODO: enable in some strict FP mode: bitwise = true;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
     break;
   case FNeg:
-    bitwise = true;
+    // TODO: enable in some strict FP mode: bitwise = true;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fneg(); };
     break;
   case Canonicalize:
