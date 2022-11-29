@@ -572,6 +572,10 @@ bool expr::isFPNeg(expr &val) const {
   return isUnOp(val, Z3_OP_FPA_NEG);
 }
 
+bool expr::isFAbs(expr &val) const {
+  return isUnOp(val, Z3_OP_FPA_ABS);
+}
+
 bool expr::isIsFPZero() const {
   if (isBV()) {
     // extract(bits()-2, 0) == 0
@@ -1087,7 +1091,7 @@ expr expr::isNaN() const {
   fold_fp_neg(isNaN);
 
   expr v;
-  if (isFPNeg(v))
+  if (isFPNeg(v) || isFAbs(v))
     return v.isNaN();
 
   return unop_fold(Z3_mk_fpa_is_nan);

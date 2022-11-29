@@ -148,6 +148,7 @@ public:
   bool isFPMul(expr &rounding, expr &lhs, expr &rhs) const;
   bool isFPDiv(expr &rounding, expr &lhs, expr &rhs) const;
   bool isFPNeg(expr &neg) const;
+  bool isFAbs(expr &val) const;
   bool isIsFPZero() const;
   bool isNaNCheck(expr &fp) const;
   bool isfloat2BV(expr &fp) const;
