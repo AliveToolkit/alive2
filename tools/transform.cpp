@@ -384,6 +384,16 @@ static expr encode_undef_refinement(const Type &type, const State::ValTy &a,
     for (auto &v : val.undef_vars) {
       repls.emplace_back(v, expr::some(v));
     }
+
+    // We need to consider fresh variables that are produced for specific
+    // expressions. Since we are now rewriting those expressions, those
+    // variables *may* need to be refreshed. For now consider just NaNs.
+    if (!repls.empty()) {
+      for (auto &v : val.val.vars()) {
+        if (v.fn_name().starts_with("#NaN!"))
+          repls.emplace_back(v, expr::some(v));
+      }
+    }
     return val.val.value.subst(repls);
   };
 
