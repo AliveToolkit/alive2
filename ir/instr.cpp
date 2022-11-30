@@ -816,36 +816,35 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
-  function<expr(const expr&, const expr&, const Type&, FpRoundingMode)> fn;
-  bool bitwise = false;
+  function<expr(const expr&, const expr&, FpRoundingMode)> fn;
 
   switch (op) {
   case FAdd:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fadd(b, rm.toSMT());
     };
     break;
 
   case FSub:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fsub(b, rm.toSMT());
     };
     break;
 
   case FMul:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fmul(b, rm.toSMT());
     };
     break;
 
   case FDiv:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fdiv(b, rm.toSMT());
     };
     break;
 
   case FRem:
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       auto val = expr::mkUF("fmod", {a, b}, a);
       s.doesApproximation("frem", val);
@@ -855,21 +854,16 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMin:
   case FMax:
-    bitwise = true;
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
-      auto fpty = ty.getAsFloatType();
-      expr fp_a = fpty->getFloat(a);
-      expr fp_b = fpty->getFloat(b);
-
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addQuantVar(ndet);
-      auto ndz = expr::mkIf(ndet, expr::mkNumber("0", fp_a).float2BV(),
-                            expr::mkNumber("-0", fp_a).float2BV());
+      auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
+                            expr::mkNumber("-0", a));
 
       expr z = a.isFPZero() && b.isFPZero();
-      expr cmp = op == FMin ? fp_a.fole(fp_b) : fp_a.foge(fp_b);
-      return expr::mkIf(fp_a.isNaN(), b,
-                        expr::mkIf(fp_b.isNaN(), a,
+      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
+      return expr::mkIf(a.isNaN(), b,
+                        expr::mkIf(b.isNaN(), a,
                                    expr::mkIf(z, ndz,
                                               expr::mkIf(cmp, a, b))));
     };
@@ -877,7 +871,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMinimum:
   case FMaximum:
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
       expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
       expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
@@ -889,9 +883,9 @@ StateValue FpBinOp::toSMT(State &s) const {
       return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
     };
     break;
+
   case CopySign:
-    bitwise = true;
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return expr::mkIf(a.isFPNegative() == b.isFPNegative(), a, a.fneg());
     };
     break;
@@ -899,8 +893,8 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto rm){ return fn(a, b, ty, rm); },
-                     ty, fmath, rm, bitwise);
+                     [&](auto &a, auto &b, auto rm){ return fn(a, b, rm); },
+                     ty, fmath, rm, false);
   };
 
   auto &a = s[*lhs];
