@@ -2206,6 +2206,10 @@ static void check_can_load(State &s, const expr &p0) {
   expr readable    = p.isLocal() || p.isConstGlobal();
   expr nonreadable = false;
 
+  if (attrs.has(FnAttrs::NullPointerIsValid) &&
+      attrs.mem.canRead(MemoryAccess::Other))
+    readable |= p.isNull();
+
   (attrs.mem.canRead(MemoryAccess::Args) ? readable : nonreadable)
     |= ptr_only_args(s, p);
 
