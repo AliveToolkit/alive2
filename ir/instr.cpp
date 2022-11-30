@@ -746,7 +746,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!flags_in_only && fmath.flags & FastMathFlags::NSZ)
     val = any_fp_zero(s, std::move(val));
 
-  if (normalize)
+  if (normalize && val.isFloat())
     val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
 
