@@ -3277,7 +3277,7 @@ void StartLifetime::print(ostream &os) const {
 }
 
 StateValue StartLifetime::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getWellDefinedPtr(*ptr);
   s.getMemory().startLifetime(p);
   return {};
 }
@@ -3309,7 +3309,7 @@ void EndLifetime::print(ostream &os) const {
 }
 
 StateValue EndLifetime::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getWellDefinedPtr(*ptr);
   s.getMemory().free(p, true);
   return {};
 }
@@ -3494,7 +3494,7 @@ void Load::print(ostream &os) const {
 }
 
 StateValue Load::toSMT(State &s) const {
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getWellDefinedPtr(*ptr);
   check_can_load(s, p);
   auto [sv, ub] = s.getMemory().load(p, getType(), align);
   s.addUB(std::move(ub));
@@ -3544,7 +3544,7 @@ StateValue Store::toSMT(State &s) const {
     return {};
   }
 
-  auto &p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &p = s.getWellDefinedPtr(*ptr);
   check_can_store(s, p);
   auto &v = s[*val];
   s.getMemory().store(p, v, val->getType(), align, s.getUndefVars());
@@ -3595,7 +3595,7 @@ StateValue Memset::toSMT(State &s) const {
   uint64_t n;
   expr vptr;
   if (vbytes.isUInt(n) && n > 0) {
-    vptr = s.getAndAddPoisonUB(*ptr, true).value;
+    vptr = s.getWellDefinedPtr(*ptr);
   } else {
     auto &sv_ptr = s[*ptr];
     auto &sv_ptr2 = s[*ptr];
@@ -3656,7 +3656,7 @@ void MemsetPattern::print(ostream &os) const {
 }
 
 StateValue MemsetPattern::toSMT(State &s) const {
-  auto &vptr = s.getAndAddPoisonUB(*ptr, false).value;
+  auto &vptr = s.getWellDefinedPtr(*ptr);
   auto &vpattern = s.getAndAddPoisonUB(*pattern, false).value;
   auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
   check_can_store(s, vptr);
@@ -3700,7 +3700,7 @@ void FillPoison::print(ostream &os) const {
 }
 
 StateValue FillPoison::toSMT(State &s) const {
-  auto &vptr = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &vptr = s.getWellDefinedPtr(*ptr);
   Memory &m = s.getMemory();
   m.fillPoison(Pointer(m, vptr).getBid());
   return {};
@@ -3756,7 +3756,7 @@ StateValue Memcpy::toSMT(State &s) const {
   uint64_t n;
   expr vsrc, vdst;
   if (align_dst || (vbytes.isUInt(n) && n > 0)) {
-    vdst = s.getAndAddPoisonUB(*dst, true).value;
+    vdst = s.getWellDefinedPtr(*dst);
   } else {
     auto &sv_dst = s[*dst];
     auto &sv_dst2 = s[*dst];
@@ -3766,7 +3766,7 @@ StateValue Memcpy::toSMT(State &s) const {
   }
 
   if (align_src || (vbytes.isUInt(n) && n > 0)) {
-    vsrc = s.getAndAddPoisonUB(*src, true).value;
+    vsrc = s.getWellDefinedPtr(*src);
   } else {
     auto &sv_src = s[*src];
     auto &sv_src2 = s[*src];
@@ -3935,7 +3935,7 @@ void Strlen::print(ostream &os) const {
 }
 
 StateValue Strlen::toSMT(State &s) const {
-  auto &eptr = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &eptr = s.getWellDefinedPtr(*ptr);
   check_can_load(s, eptr);
 
   Pointer p(s.getMemory(), eptr);
@@ -3982,7 +3982,7 @@ StateValue VaStart::toSMT(State &s) const {
   s.addUB(expr(s.getFn().isVarArgs()));
 
   auto &data  = s.getVarArgsData();
-  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &raw_p = s.getWellDefinedPtr(*ptr);
 
   expr zero     = expr::mkUInt(0, VARARG_BITS);
   expr num_args = expr::mkVar("num_va_args", VARARG_BITS);
@@ -4057,7 +4057,7 @@ static void ensure_varargs_ptr(D &data, State &s, const expr &arg_ptr) {
 
 StateValue VaEnd::toSMT(State &s) const {
   auto &data  = s.getVarArgsData();
-  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &raw_p = s.getWellDefinedPtr(*ptr);
 
   s.addUB(Pointer(s.getMemory(), raw_p).isBlockAlive());
 
@@ -4095,8 +4095,8 @@ void VaCopy::print(ostream &os) const {
 
 StateValue VaCopy::toSMT(State &s) const {
   auto &data = s.getVarArgsData();
-  auto &dst_raw = s.getAndAddPoisonUB(*dst, true).value;
-  auto &src_raw = s.getAndAddPoisonUB(*src, true).value;
+  auto &dst_raw = s.getWellDefinedPtr(*dst);
+  auto &src_raw = s.getWellDefinedPtr(*src);
   Pointer dst(s.getMemory(), dst_raw);
   Pointer src(s.getMemory(), src_raw);
 
@@ -4151,7 +4151,7 @@ void VaArg::print(ostream &os) const {
 
 StateValue VaArg::toSMT(State &s) const {
   auto &data  = s.getVarArgsData();
-  auto &raw_p = s.getAndAddPoisonUB(*ptr, true).value;
+  auto &raw_p = s.getWellDefinedPtr(*ptr);
 
   s.addUB(Pointer(s.getMemory(), raw_p).isBlockAlive());
 

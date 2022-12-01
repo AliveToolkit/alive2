@@ -201,7 +201,9 @@ public:
   const StateValue& operator[](const Value &val);
   const StateValue& getAndAddUndefs(const Value &val);
   // If undef_ub is true, UB is also added when val was undef
-  const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false);
+  const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false,
+                                      bool ptr_compare = false);
+  const smt::expr& getWellDefinedPtr(const Value &val);
 
   const ValTy& at(const Value &val) const;
   bool isUndef(const smt::expr &e) const;
@@ -295,7 +297,8 @@ public:
   void mkAxioms(State &tgt);
 
 private:
-  smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e);
+  smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e,
+                                   bool isptr);
   void addJump(const BasicBlock &dst, smt::expr &&cond, bool last_jump = false);
 };
 

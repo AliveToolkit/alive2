@@ -211,7 +211,11 @@ const State::ValTy& State::exec(const Value &v) {
   return get<1>(values.back());
 }
 
-static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
+static expr eq_except_padding(const Memory &m, const Type &ty, const expr &e1,
+                              const expr &e2, bool ptr_compare) {
+  if (ptr_compare && ty.isPtrType())
+    return Pointer(m, e1) == Pointer(m, e2);
+
   const auto *aty = ty.getAsAggregateType();
   if (!aty)
     return e1 == e2;
@@ -224,13 +228,14 @@ static expr eq_except_padding(const Type &ty, const expr &e1, const expr &e2) {
     if (aty->isPadding(i))
       continue;
 
-    result &= eq_except_padding(aty->getChild(i), aty->extract(sv1, i).value,
-                                aty->extract(sv2, i).value);
+    result &= eq_except_padding(m, aty->getChild(i), aty->extract(sv1, i).value,
+                                aty->extract(sv2, i).value, ptr_compare);
   }
   return result;
 }
 
-expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
+expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
+                                   bool ptr_compare) {
   if (isUndef(e)) {
     addUB(expr(false));
     return expr::mkUInt(0, e);
@@ -422,7 +427,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e) {
     addQuantVar(newv);
     repls.emplace_back(undef, std::move(newv));
   }
-  addUB(eq_except_padding(val.getType(), e, e.subst(repls)));
+  addUB(eq_except_padding(getMemory(), val.getType(), e, e.subst(repls),
+                          ptr_compare));
   return e;
 }
 
@@ -526,7 +532,8 @@ static expr not_poison_except_padding(const Type &ty, const expr &np) {
 }
 
 const StateValue&
-State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
+State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
+                         bool ptr_compare) {
   auto &sv = (*this)[val];
 
   bool poison_already_added = !analysis.non_poison_vals.insert(&val).second;
@@ -540,7 +547,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
     if (I != analysis.non_undef_vals.end()) {
       v = I->second;
     } else {
-      v = strip_undef_and_add_ub(val, v);
+      v = strip_undef_and_add_ub(val, v, ptr_compare);
       analysis.non_undef_vals.emplace(&val, v);
     }
   }
@@ -573,6 +580,10 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too) {
 
   return tmp_values[i_tmp_values++] = { std::move(v),
            sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
+}
+
+const expr& State::getWellDefinedPtr(const Value &val) {
+  return getAndAddPoisonUB(val, true, true).value;
 }
 
 const State::ValTy& State::at(const Value &val) const {
