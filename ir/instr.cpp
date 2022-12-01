@@ -885,8 +885,15 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case CopySign:
-    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
-      return expr::mkIf(a.isFPNegative() == b.isFPNegative(), a, a.fneg());
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
+      auto isnan = b.isNaN();
+      auto samesign = a.isFPNegative() == b.isFPNegative();
+      if (isnan.isFalse())
+        return expr::mkIf(samesign, a, a.fneg());
+
+      expr var = expr::mkFreshVar("#flipsign", false);
+      s.addQuantVar(var);
+      return expr::mkIf(expr::mkIf(isnan, var, samesign), a, a.fneg());
     };
     break;
   }
