@@ -1103,7 +1103,7 @@ void FpUnaryOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
-  expr (*fn)(const expr&, FpRoundingMode) = nullptr;
+  function<expr(const expr&, const Type&, FpRoundingMode)> fn;
   bool bitwise = false;
   bool normalize = true;
 
@@ -1111,45 +1111,77 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   case FAbs:
     bitwise = true;
     normalize = false;
-    fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
+    fn = [&](const expr &v, const Type &ty, FpRoundingMode rm) {
+      auto isnan = ty.getAsFloatType()->getFloat(v).isNaN();
+      auto abs = v.fabs();
+      if (isnan.isFalse())
+        return abs;
+
+      expr flip = expr::mkFreshVar("#flipsign", false);
+      s.addNondetVar(flip);
+      return expr::mkIf(isnan, expr::mkIf(flip, v, v.fneg()), abs);
+    };
     break;
   case FNeg:
     bitwise = true;
     normalize = false;
-    fn = [](const expr &v, FpRoundingMode rm) { return v.fneg(); };
+    fn = [&](const expr &v, const Type &ty, FpRoundingMode rm) {
+      auto isnan = ty.getAsFloatType()->getFloat(v).isNaN();
+      auto neg = v.fneg();
+      if (isnan.isFalse())
+        return neg;
+
+      expr flip = expr::mkFreshVar("#flipsign", false);
+      s.addNondetVar(flip);
+      return expr::mkIf(isnan && flip, v, neg);
+    };
     break;
   case Canonicalize:
-    fn = [](const expr &v, FpRoundingMode rm) { return v; };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) { return v; };
     break;
   case Ceil:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.ceil(); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.ceil();
+    };
     break;
   case Floor:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.floor(); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.floor();
+    };
     break;
   case RInt:
   case NearbyInt:
     // TODO: they differ in exception behavior
-    fn = [](const expr &v, FpRoundingMode rm) { return v.round(rm.toSMT()); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.round(rm.toSMT());
+    };
     break;
   case Round:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rna()); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.round(expr::rna());
+    };
     break;
   case RoundEven:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rne()); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.round(expr::rne());
+    };
     break;
   case Trunc:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.round(expr::rtz()); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.round(expr::rtz());
+    };
     break;
   case Sqrt:
-    fn = [](const expr &v, FpRoundingMode rm) { return v.sqrt(rm.toSMT()); };
+    fn = [](const expr &v, const Type &ty, FpRoundingMode rm) {
+      return v.sqrt(rm.toSMT());
+    };
     break;
   }
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
     return fm_poison(s, v.value, v.non_poison,
-                     [fn](auto &v, auto rm){ return fn(v, rm); }, ty, fmath, rm,
-                     bitwise, false, normalize);
+                     [&](auto &v, auto rm){ return fn(v, ty, rm); }, ty, fmath,
+                     rm, bitwise, false, normalize);
   };
 
   auto &v = s[*val];

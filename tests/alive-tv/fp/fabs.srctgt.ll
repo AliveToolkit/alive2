@@ -26,9 +26,8 @@ define void @tgt() {
   %zero = fdiv float 0.0, 1.0
   %inf = fdiv float 1.0, 0.0
   %nan = fdiv float 0.0, 0.0
-  %posnan = call float @llvm.fabs.f32(float %nan)
 
-  call void @f(float %one, float %one, float %zero, float %zero, float %inf, float %inf, float %posnan, float %posnan)
+  call void @f(float %one, float %one, float %zero, float %zero, float %inf, float %inf, float %nan, float %nan)
   ret void
 }
 
