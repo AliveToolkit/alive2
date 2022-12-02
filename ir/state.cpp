@@ -437,7 +437,7 @@ void State::check_enough_tmp_slots() {
     throw AliveException("Too many temporaries", false);
 }
 
-const StateValue& State::operator[](const Value &val) {
+const StateValue& State::eval(const Value &val, bool quantify_nondet) {
   auto &[var, val_uvars] = values[values_map.at(&val)];
   auto &[sval, _retdom, _ub, uvars] = val_uvars;
 
@@ -467,7 +467,7 @@ const StateValue& State::operator[](const Value &val) {
 
   if (is_non_undef) {
     // We don't need to add uvar to undef_vars
-    freeze_vars.insert(uvars.begin(), uvars.end());
+    quantified_vars.insert(uvars.begin(), uvars.end());
     return simplify(sval, true);
   }
 
@@ -488,14 +488,30 @@ const StateValue& State::operator[](const Value &val) {
   if (hit_half_memory_limit())
     throw_oom_exception();
 
+  unsigned undef_repls = repls.size();
+  assert(undef_repls > 0);
+
+  if (quantify_nondet) {
+    for (auto &var : sval.vars()) {
+      if (nondet_vars.count(var)) {
+        auto qvar = expr::mkFreshVar("nondetvar", var);
+        addNondetVar(qvar);
+        repls.emplace_back(var, std::move(qvar));
+      }
+    }
+  }
+
   auto sval_new = sval.subst(repls);
   if (sval_new.eq(sval)) {
     uvars.clear();
     return simplify(sval, true);
   }
 
+  unsigned i = 0;
   for (auto &p : repls) {
     undef_vars.emplace(std::move(p.second));
+    if (++i == undef_repls)
+      break;
   }
 
   check_enough_tmp_slots();
@@ -1022,8 +1038,8 @@ void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
 
-void State::addFreezeVar(const expr &var) {
-  freeze_vars.emplace(var);
+void State::addNondetVar(const expr &var) {
+  nondet_vars.emplace(var);
 }
 
 void State::addFnQuantVar(const expr &var) {
@@ -1035,7 +1051,7 @@ void State::addUndefVar(expr &&var) {
 }
 
 void State::resetUndefVars() {
-  freeze_vars.insert(undef_vars.begin(), undef_vars.end());
+  quantified_vars.insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
 }
 

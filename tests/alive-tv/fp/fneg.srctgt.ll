@@ -1,9 +1,13 @@
-define half @src(half %x) {
+define void @src(half %x, half %y) {
   %s = fsub half -0.0, %x
-  ret half %s
+  call void @fn(half %s)
+  ret void
 }
 
-define half @tgt(half %x) {
+define void @tgt(half %x, half %y) {
   %s = fneg half %x
-  ret half %s
+  call void @fn(half %s)
+  ret void
 }
+
+declare void @fn(half)

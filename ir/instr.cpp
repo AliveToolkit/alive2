@@ -625,7 +625,7 @@ static expr any_fp_zero(State &s, const expr &v) {
   }
 
   expr var = expr::mkFreshVar("anyzero", true);
-  s.addQuantVar(var);
+  s.addNondetVar(var);
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
@@ -784,7 +784,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                   expr::mkIf(fp_b.isNaN() && var == 1, b,
                     expr::mkIf(fp_c.isNaN() && var == 2, c, canonical_nan))));
       }
-      s.addQuantVar(var);
+      s.addNondetVar(var);
     }
 #endif
   }
@@ -816,35 +816,36 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
-  function<expr(const expr&, const expr&, FpRoundingMode)> fn;
+  function<expr(const expr&, const expr&, const Type&, FpRoundingMode)> fn;
+  bool bitwise = false;
 
   switch (op) {
   case FAdd:
-    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       return a.fadd(b, rm.toSMT());
     };
     break;
 
   case FSub:
-    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       return a.fsub(b, rm.toSMT());
     };
     break;
 
   case FMul:
-    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       return a.fmul(b, rm.toSMT());
     };
     break;
 
   case FDiv:
-    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       return a.fdiv(b, rm.toSMT());
     };
     break;
 
   case FRem:
-    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       auto val = expr::mkUF("fmod", {a, b}, a);
       s.doesApproximation("frem", val);
@@ -854,9 +855,9 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMin:
   case FMax:
-    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
-      s.addQuantVar(ndet);
+      s.addNondetVar(ndet);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
                             expr::mkNumber("-0", a));
 
@@ -871,7 +872,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMinimum:
   case FMaximum:
-    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
       expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
       expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
@@ -885,14 +886,17 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
 
   case CopySign:
-    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
-      auto isnan = b.isNaN();
+    bitwise = true;
+    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+      auto fpty = ty.getAsFloatType();
+      expr fp_b = fpty->getFloat(b);
+      auto isnan = fp_b.isNaN();
       auto samesign = a.isFPNegative() == b.isFPNegative();
       if (isnan.isFalse())
         return expr::mkIf(samesign, a, a.fneg());
 
       expr var = expr::mkFreshVar("#flipsign", false);
-      s.addQuantVar(var);
+      s.addNondetVar(var);
       return expr::mkIf(expr::mkIf(isnan, var, samesign), a, a.fneg());
     };
     break;
@@ -900,8 +904,8 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto rm){ return fn(a, b, rm); },
-                     ty, fmath, rm, false);
+                     [&](auto &a, auto &b, auto rm){ return fn(a, b, ty, rm); },
+                     ty, fmath, rm, bitwise);
   };
 
   auto &a = s[*lhs];
@@ -992,7 +996,7 @@ StateValue UnaryOp::toSMT(State &s) const {
 
     // may or may not be a constant
     expr var = expr::mkFreshVar("is.const", one);
-    s.addQuantVar(var);
+    s.addNondetVar(var);
     return { std::move(var), true };
   }
   case FFS:
@@ -1105,12 +1109,12 @@ StateValue FpUnaryOp::toSMT(State &s) const {
 
   switch (op) {
   case FAbs:
-    //TODO: enable in some strict FP mode: bitwise = true;
+    bitwise = true;
     normalize = false;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fabs(); };
     break;
   case FNeg:
-    // TODO: enable in some strict FP mode: bitwise = true;
+    bitwise = true;
     normalize = false;
     fn = [](const expr &v, FpRoundingMode rm) { return v.fneg(); };
     break;
@@ -1398,7 +1402,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     fn = [&](const expr &a, const expr &b, const expr &c, FpRoundingMode rm0) {
       auto rm = rm0.toSMT();
       expr var = expr::mkFreshVar("nondet", expr(false));
-      s.addQuantVar(var);
+      s.addNondetVar(var);
       return expr::mkIf(var, expr::fma(a, b, c, rm), a.fmul(b, rm).fadd(c, rm));
     };
     break;
@@ -2332,7 +2336,7 @@ StateValue FnCall::toSMT(State &s) const {
         sv2 = s.getAndAddPoisonUB(*arg, false);
     } else {
       sv  = s[*arg];
-      sv2 = s[*arg];
+      sv2 = s.eval(*arg, true);
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, std::move(sv), std::move(sv2),
@@ -2691,7 +2695,7 @@ static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
 
   StateValue ret_type = ty.getDummyValue(true);
   expr nondet = expr::mkFreshVar("nondet", ret_type.value);
-  s.addFreezeVar(nondet);
+  s.addQuantVar(nondet);
   return { expr::mkIf(v.non_poison, v.value, nondet),
            std::move(ret_type.non_poison) };
 }
@@ -3846,16 +3850,16 @@ StateValue Memcmp::toSMT(State &s) const {
   if (is_bcmp) {
     result_var = expr::mkFreshVar("bcmp_nonzero", zero);
     s.addPre(result_var != zero);
-    s.addQuantVar(result_var);
+    s.addNondetVar(result_var);
   } else {
     auto z31 = expr::mkUInt(0, 31);
     result_var = expr::mkFreshVar("memcmp_nonzero", z31);
     s.addPre(result_var != z31);
-    s.addQuantVar(result_var);
+    s.addNondetVar(result_var);
     result_var = expr::mkUInt(0, 1).concat(result_var);
 
     result_var_neg = expr::mkFreshVar("memcmp", z31);
-    s.addQuantVar(result_var_neg);
+    s.addNondetVar(result_var_neg);
     result_var_neg = expr::mkUInt(1, 1).concat(result_var_neg);
   }
 

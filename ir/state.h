@@ -112,7 +112,7 @@ private:
   std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
 
   std::set<smt::expr> quantified_vars;
-  std::set<smt::expr> freeze_vars;
+  std::set<smt::expr> nondet_vars;
 
   // var -> ((value, not_poison), ub, undef_vars)
   std::unordered_map<const Value*, unsigned> values_map;
@@ -198,7 +198,8 @@ public:
 
   /*--- Get values or update registers ---*/
   const ValTy& exec(const Value &v);
-  const StateValue& operator[](const Value &val);
+  const StateValue& eval(const Value &val, bool quantify_nondet);
+  const StateValue& operator[](const Value &val) { return eval(val, false); }
   const StateValue& getAndAddUndefs(const Value &val);
   // If undef_ub is true, UB is also added when val was undef
   const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false,
@@ -240,7 +241,7 @@ public:
   auto& getApproximations() const { return used_approximations; }
 
   void addQuantVar(const smt::expr &var);
-  void addFreezeVar(const smt::expr &var);
+  void addNondetVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
@@ -263,7 +264,7 @@ public:
   auto& getFnPre() const { return fn_call_pre; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
-  const auto& getFreezeVars() const { return freeze_vars; }
+  const auto& getNondetVars() const { return nondet_vars; }
   const auto& getFnQuantVars() const { return fn_call_qvars; }
 
   void saveReturnedInput();

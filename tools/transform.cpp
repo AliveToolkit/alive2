@@ -392,7 +392,7 @@ static expr encode_undef_refinement(const State &src_state,
     // expressions. Since we are now rewriting those expressions, those
     // variables *may* need to be refreshed.
     if (!repls.empty()) {
-      for (auto &v : state.getQuantVars()) {
+      for (auto &v : state.getNondetVars()) {
         repls.emplace_back(v, expr::some(v));
       }
     }
@@ -419,8 +419,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   auto &uvars = ap.undef_vars;
   auto qvars = src_state.getQuantVars();
   qvars.insert(ap.undef_vars.begin(), ap.undef_vars.end());
-  auto &src_freeze_vars = src_state.getFreezeVars();
-  qvars.insert(src_freeze_vars.begin(), src_freeze_vars.end());
+  auto &src_nondet_vars = src_state.getNondetVars();
+  qvars.insert(src_nondet_vars.begin(), src_nondet_vars.end());
   auto &fn_qvars = tgt_state.getFnQuantVars();
   qvars.insert(fn_qvars.begin(), fn_qvars.end());
 
