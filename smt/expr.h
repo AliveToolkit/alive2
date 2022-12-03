@@ -234,6 +234,7 @@ public:
   expr fdiv(const expr &rhs, const expr &rm) const;
   expr fabs() const;
   expr fneg() const;
+  expr copysign(const expr &sign) const;
   expr sqrt(const expr &rm) const;
 
   static expr fma(const expr &a, const expr &b, const expr &c, const expr &rm);

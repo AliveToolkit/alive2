@@ -1114,10 +1114,6 @@ expr expr::isFPZero() const {
 }
 
 expr expr::isFPNegative() const {
-  if (isBV()) {
-    auto signbit = bits() - 1;
-    return extract(signbit, signbit) == 1;
-  }
   return unop_fold(Z3_mk_fpa_is_negative);
 }
 
@@ -1188,6 +1184,11 @@ expr expr::fneg() const {
              .concat(extract(signbit - 1, 0));
   }
   return unop_fold(Z3_mk_fpa_neg);
+}
+
+expr expr::copysign(const expr &sign) const {
+  auto sign_bit = sign.bits() - 1;
+  return sign.extract(sign_bit, sign_bit).concat(extract(bits() - 2, 0));
 }
 
 expr expr::sqrt(const expr &rm) const {

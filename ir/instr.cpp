@@ -889,15 +889,14 @@ StateValue FpBinOp::toSMT(State &s) const {
     bitwise = true;
     fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
       auto fpty = ty.getAsFloatType();
-      expr fp_b = fpty->getFloat(b);
-      auto isnan = fp_b.isNaN();
-      auto samesign = a.isFPNegative() == b.isFPNegative();
+      auto isnan = fpty->getFloat(a).isNaN() || fpty->getFloat(b).isNaN();
+      auto copysign = a.copysign(b);
       if (isnan.isFalse())
-        return expr::mkIf(samesign, a, a.fneg());
+        return copysign;
 
-      expr var = expr::mkFreshVar("#flipsign", false);
-      s.addNondetVar(var);
-      return expr::mkIf(expr::mkIf(isnan, var, samesign), a, a.fneg());
+      expr flip = expr::mkFreshVar("#flipsign", false);
+      s.addNondetVar(flip);
+      return expr::mkIf(isnan, expr::mkIf(flip, a, a.fneg()), copysign);
     };
     break;
   }
