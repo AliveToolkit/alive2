@@ -78,8 +78,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 71. InstSimplify: xor pattern miscompiles undef lane (https://llvm.org/PR58977)
 72. llvm.canonicalize() folding incorrect for denormals (https://llvm.org/PR59245)
 73. InstCombine: incorrect fabs formation (https://llvm.org/PR59279)
-74. InstCombine: incorrect copysign formation (https://llvm.org/PR59280)
-75. InstCombine: incorrect increase of alignment of load with null_pointer_is_valid (https://llvm.org/PR59281)
+74. InstCombine: incorrect increase of alignment of load with null_pointer_is_valid (https://llvm.org/PR59281)
 
 
 ### Bugs found in Z3

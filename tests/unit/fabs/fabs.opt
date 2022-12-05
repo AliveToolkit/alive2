@@ -8,12 +8,6 @@ Name: constant2
   =>
 %r = 2.0
 
-Name: nnan
-%negnan = fdiv float 0.0, -0.0
-%r = fabs float %negnan
-  =>
-%r = %negnan
-
 Name: fabs-twice
 %k = fabs float %x
 %r = fabs float %k
