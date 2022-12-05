@@ -744,47 +744,10 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!flags_in_only && fmath.flags & FastMathFlags::NSZ)
     val = any_fp_zero(s, std::move(val));
 
-  if (!bitwise && val.isFloat())
+  if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
-
-  if (!bitwise && val.isFloat()) {
-#if 0
-    // optimization to prevent variables from NaN conversion
-    if (fp_a.isNaN().isTrue() || fp_b.isNaN().isTrue() || fp_c.isNaN().isTrue())
-      val = expr::mkNumber("0", val);
-#endif
-
     val = fpty->fromFloat(s, val);
-
-#if 0
-    // TODO: enable this stuff just in some strict FP mode
-    // if any of the inputs is NaN, pick one of the NaN bit-patterns
-    // non-deterministically
-
-    // TODO: must be a quiet nan, otherwise gets "quieted" somehow
-    if (!(fmath.flags & FastMathFlags::NNaN)) {
-      auto canonical_nan = fpty->mkNaN(s, true);
-      expr var;
-      if (nary == 1) {
-        var = expr::mkFreshVar("#picknan", false);
-        val = expr::mkIf(fp_a.isNaN(), expr::mkIf(var, a, canonical_nan), val);
-      } else if (nary == 2) {
-        var = expr::mkFreshVar("#picknan", expr::mkUInt(0, 2));
-        val = expr::mkIf(!fp_a.isNaN() && !fp_b.isNaN(), val,
-                expr::mkIf(fp_a.isNaN() && var == 0, a,
-                  expr::mkIf(fp_b.isNaN() && var == 1, b, canonical_nan)));
-      } else {
-        assert(nary == 3);
-        var = expr::mkFreshVar("#picknan", expr::mkUInt(0, 2));
-        val = expr::mkIf(!fp_a.isNaN() && !fp_b.isNaN() && !fp_c.isNaN(), val,
-                expr::mkIf(fp_a.isNaN() && var == 0, a,
-                  expr::mkIf(fp_b.isNaN() && var == 1, b,
-                    expr::mkIf(fp_c.isNaN() && var == 2, c, canonical_nan))));
-      }
-      s.addNondetVar(var);
-    }
-#endif
   }
 
   return { std::move(val), non_poison() };
