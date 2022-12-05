@@ -493,11 +493,8 @@ const StateValue& State::eval(const Value &val, bool quantify_nondet) {
 
   if (quantify_nondet) {
     for (auto &var : sval.vars()) {
-      if (nondet_vars.count(var)) {
-        auto qvar = expr::mkFreshVar("nondetvar", var);
-        addNondetVar(qvar);
-        repls.emplace_back(var, std::move(qvar));
-      }
+      if (nondet_vars.count(var))
+        repls.emplace_back(var, getFreshNondetVar("nondetvar", var));
     }
   }
 
@@ -1038,8 +1035,10 @@ void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
 
-void State::addNondetVar(const expr &var) {
+expr State::getFreshNondetVar(const char *prefix, const expr &type) {
+  expr var = expr::mkFreshVar(prefix, type);
   nondet_vars.emplace(var);
+  return var;
 }
 
 void State::addFnQuantVar(const expr &var) {

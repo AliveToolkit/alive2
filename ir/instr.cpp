@@ -624,8 +624,7 @@ static expr any_fp_zero(State &s, const expr &v) {
     }
   }
 
-  expr var = expr::mkFreshVar("anyzero", true);
-  s.addNondetVar(var);
+  expr var = s.getFreshNondetVar("anyzero", true);
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
@@ -855,8 +854,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMin:
   case FMax:
     fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
-      expr ndet = expr::mkFreshVar("maxminnondet", true);
-      s.addNondetVar(ndet);
+      expr ndet = s.getFreshNondetVar("maxminnondet", true);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
                             expr::mkNumber("-0", a));
 
@@ -985,9 +983,7 @@ StateValue UnaryOp::toSMT(State &s) const {
       return { std::move(one), true };
 
     // may or may not be a constant
-    expr var = expr::mkFreshVar("is.const", one);
-    s.addNondetVar(var);
-    return { std::move(var), true };
+    return { s.getFreshNondetVar("is.const", one), true };
   }
   case FFS:
     fn = [](auto &v, auto np) -> StateValue {
@@ -1388,8 +1384,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
   case MulAdd:
     fn = [&](const expr &a, const expr &b, const expr &c, FpRoundingMode rm0) {
       auto rm = rm0.toSMT();
-      expr var = expr::mkFreshVar("nondet", expr(false));
-      s.addNondetVar(var);
+      expr var = s.getFreshNondetVar("nondet", expr(false));
       return expr::mkIf(var, expr::fma(a, b, c, rm), a.fmul(b, rm).fadd(c, rm));
     };
     break;
@@ -1718,9 +1713,11 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case LRound:
     fn = [&](auto &val, auto &to_type, auto rm_in) -> StateValue {
       expr rm;
+      bool is_poison = false;
       switch (op) {
       case FPToSInt:
         rm = expr::rtz();
+        is_poison = true;
         break;
       case LRInt:
         rm = rm_in.toSMT();
@@ -1734,7 +1731,17 @@ StateValue FpConversionOp::toSMT(State &s) const {
       expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
       expr val_rounded = val.round(rm);
-      return { std::move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
+      expr overflow = val_rounded.isFPZero() || fp2 == val_rounded;
+
+      expr np;
+      if (is_poison) {
+        np = std::move(overflow);
+      } else {
+        np = true;
+        bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
+      }
+
+      return { std::move(bv), std::move(np) };
     };
     break;
   case FPToUInt:
@@ -3835,18 +3842,15 @@ StateValue Memcmp::toSMT(State &s) const {
 
   expr result_var, result_var_neg;
   if (is_bcmp) {
-    result_var = expr::mkFreshVar("bcmp_nonzero", zero);
+    result_var = s.getFreshNondetVar("bcmp_nonzero", zero);
     s.addPre(result_var != zero);
-    s.addNondetVar(result_var);
   } else {
     auto z31 = expr::mkUInt(0, 31);
-    result_var = expr::mkFreshVar("memcmp_nonzero", z31);
+    result_var = s.getFreshNondetVar("memcmp_nonzero", z31);
     s.addPre(result_var != z31);
-    s.addNondetVar(result_var);
     result_var = expr::mkUInt(0, 1).concat(result_var);
 
-    result_var_neg = expr::mkFreshVar("memcmp", z31);
-    s.addNondetVar(result_var_neg);
+    result_var_neg = s.getFreshNondetVar("memcmp", z31);
     result_var_neg = expr::mkUInt(1, 1).concat(result_var_neg);
   }
 

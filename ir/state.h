@@ -240,8 +240,8 @@ public:
   void doesApproximation(std::string &&name, std::optional<smt::expr> e = {});
   auto& getApproximations() const { return used_approximations; }
 
+  smt::expr getFreshNondetVar(const char *prefix, const smt::expr &type);
   void addQuantVar(const smt::expr &var);
-  void addNondetVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }

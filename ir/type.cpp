@@ -434,13 +434,11 @@ expr FloatType::mkNaN(State &s, bool canonical) const {
   // NaN has a non-deterministic non-zero fraction bit pattern
   expr zero = expr::mkUInt(0, var_bits);
   expr var = canonical ? expr::mkVar("#NaN_canonical", zero)
-                       : expr::mkFreshVar("#NaN", zero);
+                       : s.getFreshNondetVar("#NaN", zero);
   expr fraction = var.extract(fraction_bits - 1, 0);
 
   s.addPre(fraction != 0);
   // TODO s.addPre(expr::mkUF("isQNaN", { fraction }, false));
-  if (!canonical)
-    s.addNondetVar(var);
 
   // sign bit, exponent (-1), fraction (non-zero)
   return var.extract(fraction_bits, fraction_bits)
