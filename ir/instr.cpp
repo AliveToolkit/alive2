@@ -816,36 +816,36 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
-  function<expr(const expr&, const expr&, const Type&, FpRoundingMode)> fn;
+  function<expr(const expr&, const expr&, FpRoundingMode)> fn;
   bool bitwise = false;
 
   switch (op) {
   case FAdd:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fadd(b, rm.toSMT());
     };
     break;
 
   case FSub:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fsub(b, rm.toSMT());
     };
     break;
 
   case FMul:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fmul(b, rm.toSMT());
     };
     break;
 
   case FDiv:
-    fn = [](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
       return a.fdiv(b, rm.toSMT());
     };
     break;
 
   case FRem:
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
       auto val = expr::mkUF("fmod", {a, b}, a);
       s.doesApproximation("frem", val);
@@ -855,7 +855,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMin:
   case FMax:
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       expr ndet = expr::mkFreshVar("maxminnondet", true);
       s.addNondetVar(ndet);
       auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
@@ -872,7 +872,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FMinimum:
   case FMaximum:
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
+    fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
       expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
       expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
@@ -887,23 +887,15 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case CopySign:
     bitwise = true;
-    fn = [&](const expr &a, const expr &b, const Type &ty, FpRoundingMode rm) {
-      auto fpty = ty.getAsFloatType();
-      auto isnan = fpty->getFloat(a).isNaN() || fpty->getFloat(b).isNaN();
-      auto copysign = a.copysign(b);
-      if (isnan.isFalse())
-        return copysign;
-
-      expr flip = expr::mkFreshVar("#flipsign", false);
-      s.addNondetVar(flip);
-      return expr::mkIf(isnan, expr::mkIf(flip, a, a.fneg()), copysign);
+    fn = [](const expr &a, const expr &b, FpRoundingMode rm) {
+      return a.copysign(b);
     };
     break;
   }
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto rm){ return fn(a, b, ty, rm); },
+                     [&](auto &a, auto &b, auto rm){ return fn(a, b, rm); },
                      ty, fmath, rm, bitwise);
   };
 
