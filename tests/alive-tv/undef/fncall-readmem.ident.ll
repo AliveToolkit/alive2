@@ -2,7 +2,7 @@
 declare void @g() noreturn
 
 define void @f(i32 %v) {
-  store i32 %v, i32* @x
+  store i32 %v, ptr @x
   call void @g()
   unreachable
 }

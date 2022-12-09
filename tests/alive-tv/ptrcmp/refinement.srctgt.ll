@@ -1,9 +1,9 @@
-define i8* @src(i8* %in) {
-  %c = icmp eq i8* %in, null
-  %r = select i1 %c, i8* null, i8* %in
-  ret i8* %r
+define ptr @src(ptr %in) {
+  %c = icmp eq ptr %in, null
+  %r = select i1 %c, ptr null, ptr %in
+  ret ptr %r
 }
 
-define i8* @tgt(i8* %in) {
-  ret i8* %in
+define ptr @tgt(ptr %in) {
+  ret ptr %in
 }

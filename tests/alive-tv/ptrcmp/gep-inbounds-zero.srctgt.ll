@@ -1,8 +1,8 @@
 @glb = global i8 0
 
 define i1 @src(i64 %idx) {
-  %p = getelementptr inbounds i8, i8* @glb, i64 %idx
-  %c = icmp eq i8* %p, null
+  %p = getelementptr inbounds i8, ptr @glb, i64 %idx
+  %c = icmp eq ptr %p, null
   ret i1 %c
 }
 

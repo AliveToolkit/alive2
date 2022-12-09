@@ -1,3 +1,3 @@
-define <2 x i8*> @f() {
-  ret <2 x i8*> undef
+define <2 x ptr> @f() {
+  ret <2 x ptr> undef
 }
