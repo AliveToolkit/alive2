@@ -127,7 +127,7 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
     assert((flags & Exact) == flags);
     break;
   default:
-    assert(flags == None);
+    assert((flags & NoUndef) == flags);
     break;
   }
 }
@@ -191,6 +191,8 @@ void BinOp::print(ostream &os) const {
   if (flags & Exact)
     os << "exact ";
   os << *lhs << ", " << rhs->getName();
+  if (flags & NoUndef)
+    os << ", !noundef";
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -448,24 +450,33 @@ StateValue BinOp::toSMT(State &s) const {
     break;
   }
 
+  bool noundef = flags & NoUndef;
   function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
                                        const expr&)> zip_op;
   if (vertical_zip) {
     zip_op = [&](auto &a, auto &ap, auto &b, auto &bp) {
       auto [v1, v2] = fn(a, ap, b, bp);
       expr non_poison = ap && bp;
+      if (noundef) {
+        s.addUB(std::move(non_poison));
+        non_poison = true;
+      }
       StateValue sv1(std::move(v1), expr(non_poison));
       return make_pair(std::move(sv1), StateValue(std::move(v2), std::move(non_poison)));
     };
   } else {
     scalar_op = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
       auto [v, np] = fn(a, ap, b, bp);
+      if (noundef) {
+        s.addUB(std::move(np));
+        np = true;
+      }
       return { std::move(v), ap && bp && np };
     };
   }
 
-  auto &a = s[*lhs];
-  auto &b = isDivOrRem() ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
+  auto &a = noundef ? s.getAndAddPoisonUB(*lhs) : s[*lhs];
+  auto &b = (isDivOrRem() || noundef) ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();

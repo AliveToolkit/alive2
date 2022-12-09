@@ -844,7 +844,13 @@ public:
       case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op));
+      FnAttrs attrs;
+      parse_fn_attrs(i, attrs);
+      unsigned flags = BinOp::None;
+      if (attrs.has(FnAttrs::NoUndef))
+        flags |= BinOp::NoUndef;
+      RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, op,
+                                           flags));
     }
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
