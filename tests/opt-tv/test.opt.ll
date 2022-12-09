@@ -1,4 +1,4 @@
-; TEST-ARGS: -instcombine
+; TEST-ARGS: -passes=instcombine
 
 define i32 @test(i32 %x) {
   %v = add i32 %x, 1

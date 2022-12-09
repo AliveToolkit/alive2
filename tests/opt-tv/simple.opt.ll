@@ -1,4 +1,4 @@
-; TEST-ARGS: -sroa -instsimplify
+; TEST-ARGS: -passes=sroa,instsimplify
 
 define i32 @f(i1 %cond) {
   %p = alloca i32

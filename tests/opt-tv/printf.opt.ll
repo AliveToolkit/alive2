@@ -1,4 +1,4 @@
-; TEST-ARGS: -instcombine
+; TEST-ARGS: -passes=instcombine
 @.str = constant [3 x i8] c"a\0A\00", align 1
 
 define void @f() {
