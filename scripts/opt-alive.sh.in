@@ -16,12 +16,11 @@ PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 # see opt.cpp: shouldForceLegacyPM()
 FORCE_OLD_NPM="safe-stack codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
 
-TV="-tv"
+TV=""
 SKIP_TV=0
 for arg in $@; do
   if [[ $arg == "-debug-pass-manager" ]]; then
     SKIP_TV=1
-    TV=""
     break
   fi
 done
@@ -39,14 +38,14 @@ for arg in $@; do
     continue
   fi
 
-  if [[ $arg == "-passes" || $arg == "--passes" ]]; then
+  if [[ $arg == "-passes" || $arg == "--passes" || $arg == "-p" || $arg == "--p" ]]; then
     arg="-passes=$1"
     SKIP_ARG=1
   fi
 
-  if [[ $arg == "-passes="* || $arg == "--passes="* ]]; then
-    TV=""
+  if [[ $arg == "-passes="* || $arg == "--passes="* || $arg == "-p="* || $arg == "--p="* ]]; then
     passes=${arg/-*passes=/}
+    passes=${passes/-*p=/}
     passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py "$PASSREGISTRY" $passes`
     firstpass_level=`echo $passes_new | cut -d "(" -f1`
     # tailcallelim is a function pass but unsupported by Alive2
@@ -56,7 +55,7 @@ for arg in $@; do
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
     else
       # Module/CGSCC-level passes shouldn't invoke tv
-      NPM_TV=0
+      SKIP_TV=1
       set -- "$@" "$arg"
     fi
   else
@@ -66,8 +65,7 @@ for arg in $@; do
     set -- "$@" "$arg"
     for p in $PASSES; do
       if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
-        TV=""
-        NPM_TV=0
+        SKIP_TV=1
         break
       fi
     done
@@ -86,6 +84,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 else
   # Linux, Cygwin/Msys, or Win32?
   TV_SHAREDLIB=tv.so
+fi
+
+if [[ $SKIP_TV == 0 && NPM_TV == 0 ]]; then
+  TV="-tv"
 fi
 
 TV_REPORT_DIR=""
