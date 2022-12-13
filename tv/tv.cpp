@@ -324,8 +324,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
         has_failure = true;
         *out << "\nPass: " << pass_name << '\n';
         emitCommandLine(out);
-	if (!SavedBitcode.empty())
-	  writeBitcode(report_filename);
+        if (!SavedBitcode.empty())
+          writeBitcode(report_filename);
         *out << "\n";
       }
       if (opt_error_fatal && has_failure)
@@ -462,6 +462,7 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 // interprocedural pass having other passes as children.
 const char* skip_pass_list[] = {
   "ArgumentPromotionPass",
+  "AttributorPass",
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
@@ -670,7 +671,7 @@ llvmGetPassPluginInfo() {
             TVPass::batched_pass_begin_name = "beginning";
 
           if ((is_first || do_start) && opt_save_ir)
-	    saveBitcode(unwrapModule(IR));
+            saveBitcode(unwrapModule(IR));
 
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
@@ -687,7 +688,7 @@ llvmGetPassPluginInfo() {
           PB.getPassInstrumentationCallbacks()
             ->registerBeforeNonSkippedPassCallback(
               [](llvm::StringRef P, llvm::Any IR) {
-		saveBitcode(unwrapModule(IR));
+                saveBitcode(unwrapModule(IR));
           });
         }
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
