@@ -474,6 +474,7 @@ const char* skip_pass_list[] = {
   "OpenMPOptPass",
   "PostOrderFunctionAttrsPass", // IPO
   "TailCallElimPass",
+  "VerifierPass",
 };
 
 bool do_skip(const llvm::StringRef &pass0) {
