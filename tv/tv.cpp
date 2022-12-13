@@ -164,11 +164,13 @@ struct TVLegacyPass final : public llvm::ModulePass {
   bool runOnModule(llvm::Module &M) override {
     anon_count = 0;
     for (auto &F: M)
-      runOnFunction(F);
+      runOn(F);
     return false;
   }
 
-  bool runOnFunction(llvm::Function &F) {
+  bool runOn(llvm::Module &M) { return runOnModule(M); }
+
+  bool runOn(llvm::Function &F) {
     if (F.isDeclaration())
       // This can happen at EntryExitInstrumenter pass.
       return false;
@@ -350,6 +352,10 @@ struct TVLegacyPass final : public llvm::ModulePass {
     return false;
   }
 
+  static void initialize(llvm::Function &fn) {
+    initialize(*fn.getParent());
+  }
+
   static void initialize(llvm::Module &module) {
     if (initialized++)
       return;
@@ -480,10 +486,18 @@ const char* skip_pass_list[] = {
   "VerifierPass",
 };
 
+const char* skip_pass_prefixes[] {
+  "InvalidateAnalysisPass",
+  "PassManager<",
+  "RequireAnalysisPass",
+};
+
 bool do_skip(const llvm::StringRef &pass0) {
   string_view pass = pass0;
   return any_of(skip_pass_list, end(skip_pass_list),
-                [&](auto skip) { return pass == skip; });
+                [&](auto skip) { return pass == skip; }) ||
+         any_of(skip_pass_prefixes, end(skip_pass_prefixes),
+                [&](auto skip) { return pass.starts_with(skip); });
 }
 
 
@@ -532,7 +546,8 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
     return llvm::PreservedAnalyses::all();
   }
 
-  void run(llvm::Module &M,
+  template <typename Ty>
+  void run(Ty &M,
            const function<llvm::TargetLibraryInfo*(llvm::Function&)> &get_TLI) {
     if (!initialized)
       TVLegacyPass::initialize(M);
@@ -561,7 +576,7 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 
       tv.TLI_override = &get_TLI;
       // If skip_pass is true, this updates fns map only.
-      tv.runOnModule(M);
+      tv.runOn(M);
 
       if (!set_src)
         *out << "-- DONE: " << batched_pass_count << ". " << pass_name << "\n";
@@ -582,7 +597,7 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 
       tv.TLI_override = &get_TLI;
       // If skip_pass is true, this updates fns map only.
-      tv.runOnModule(M);
+      tv.runOn(M);
     }
   }
 };
@@ -592,7 +607,8 @@ bool TVPass::batch_started;
 unsigned TVPass::batched_pass_count;
 unsigned TVPass::num_instances = 0;
 
-void runTVPass(llvm::Module &M) {
+template <typename Ty>
+void runTVPass(Ty &M) {
   static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
   optional<llvm::TargetLibraryInfo> TLI_holder;
 
@@ -695,11 +711,21 @@ llvmGetPassPluginInfo() {
           });
         }
         PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
-            [](llvm::StringRef P, llvm::Any IR,
-                    const llvm::PreservedAnalyses &PA) {
+          [](llvm::StringRef P, llvm::Any IR,
+             const llvm::PreservedAnalyses &PA) {
           pass_name = P.str();
-          if (is_clangtv && !is_clangtv_done)
-            runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
+          if (is_clangtv && !is_clangtv_done) {
+            if (any_isa<const llvm::Function*>(IR)) {
+              runTVPass(*const_cast<llvm::Function*>(
+                          any_cast<const llvm::Function*>(IR)));
+            } else if (any_isa<const llvm::Loop*>(IR)) {
+              runTVPass(*const_cast<llvm::Function*>(
+                          any_cast<const llvm::Loop *>(IR)->getHeader()
+                                                          ->getParent()));
+            } else {
+              runTVPass(*const_cast<llvm::Module*>(unwrapModule(IR)));
+            }
+          }
         });
       }
     }
