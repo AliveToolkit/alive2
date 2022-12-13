@@ -86,7 +86,7 @@ else
   TV_SHAREDLIB=tv.so
 fi
 
-if [[ $SKIP_TV == 0 && NPM_TV == 0 ]]; then
+if [[ $SKIP_TV == 0 && $NPM_TV == 0 ]]; then
   TV="-tv"
 fi
 
