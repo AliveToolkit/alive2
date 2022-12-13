@@ -64,6 +64,8 @@ llvm::cl::opt<bool> batch_opts("tv-batch-opts",
   llvm::cl::cat(alive_cmdargs));
 
 
+struct ErrorException {};
+
 struct FnInfo {
   Function fn;
   string fn_tostr;
@@ -79,6 +81,7 @@ bool showed_stats = false;
 bool has_failure = false;
 // If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
+bool is_clangtv_done = false;
 unique_ptr<Cache> cache;
 unique_ptr<parallel> parallelMgr;
 stringstream parent_ss;
@@ -163,8 +166,10 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   bool runOnModule(llvm::Module &M) override {
     anon_count = 0;
-    for (auto &F: M)
-      runOnFunction(F);
+    try {
+      for (auto &F: M)
+        runOnFunction(F);
+    } catch (ErrorException) {}
     return false;
   }
 
@@ -328,8 +333,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
           writeBitcode(report_filename);
         *out << "\n";
       }
-      if (opt_error_fatal && has_failure)
+      if (opt_error_fatal && has_failure) {
         finalize();
+        if (!parallelMgr)
+          throw ErrorException();
+      }
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -410,6 +418,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     llvm_util_init.reset();
     smt_init.reset();
     --initialized;
+    is_clangtv_done = true;
 
     if (has_failure) {
       if (opt_error_fatal)
@@ -461,18 +470,21 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 // For example, ModuleInlinerWrapperPass shouldn't be here because it is an
 // interprocedural pass having other passes as children.
 const char* skip_pass_list[] = {
+  "AlwaysInlinerPass",
   "ArgumentPromotionPass",
+  "AttributorCGSCCPass",
   "AttributorPass",
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
   "GlobalOptPass",
   "HotColdSplittingPass",
-  "InferFunctionAttrsPass", // IPO
+  "InferFunctionAttrsPass",
   "InlinerPass",
   "IPSCCPPass",
   "OpenMPOptPass",
-  "PostOrderFunctionAttrsPass", // IPO
+  "PartialInlinerPass",
+  "PostOrderFunctionAttrsPass",
   "TailCallElimPass",
   "VerifierPass",
 };
@@ -588,7 +600,6 @@ string TVPass::batched_pass_begin_name;
 bool TVPass::batch_started;
 unsigned TVPass::batched_pass_count;
 unsigned TVPass::num_instances = 0;
-bool is_clangtv_done = false;
 
 void runTVPass(llvm::Module &M) {
   static optional<llvm::TargetLibraryInfoImpl> TLIImpl;
@@ -692,15 +703,15 @@ llvmGetPassPluginInfo() {
                 saveBitcode(unwrapModule(IR));
           });
         }
-        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
-            [](llvm::StringRef P, llvm::Any IR,
-                    const llvm::PreservedAnalyses &PA) {
-          pass_name = P.str();
-          if (!is_clangtv || is_clangtv_done)
-            return;
-
-          runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
-        });
+        if (is_clangtv) {
+          PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
+              [](llvm::StringRef P, llvm::Any IR,
+                      const llvm::PreservedAnalyses &PA) {
+            pass_name = P.str();
+            if (!is_clangtv_done)
+              runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
+          });
+        }
       }
     }
   };
