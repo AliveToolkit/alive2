@@ -482,6 +482,7 @@ const char* skip_pass_list[] = {
   "InferFunctionAttrsPass",
   "InlinerPass",
   "IPSCCPPass",
+  "IROutlinerPass",
   "OpenMPOptPass",
   "PartialInlinerPass",
   "PostOrderFunctionAttrsPass",
