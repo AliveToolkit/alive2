@@ -64,8 +64,6 @@ llvm::cl::opt<bool> batch_opts("tv-batch-opts",
   llvm::cl::cat(alive_cmdargs));
 
 
-struct ErrorException {};
-
 struct FnInfo {
   Function fn;
   string fn_tostr;
@@ -79,7 +77,6 @@ unordered_map<string, FnInfo> fns;
 unsigned initialized = 0;
 bool showed_stats = false;
 bool has_failure = false;
-// If is_clangtv is true, tv should exit with zero
 bool is_clangtv = false;
 bool is_clangtv_done = false;
 unique_ptr<Cache> cache;
@@ -166,10 +163,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
 
   bool runOnModule(llvm::Module &M) override {
     anon_count = 0;
-    try {
-      for (auto &F: M)
-        runOnFunction(F);
-    } catch (ErrorException) {}
+    for (auto &F: M)
+      runOnFunction(F);
     return false;
   }
 
@@ -333,11 +328,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
           writeBitcode(report_filename);
         *out << "\n";
       }
-      if (opt_error_fatal && has_failure) {
+      if (opt_error_fatal && has_failure)
         finalize();
-        if (!parallelMgr)
-          throw ErrorException();
-      }
     } else {
       *out << "Transformation seems to be correct!\n\n";
     }
@@ -425,9 +417,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
         *out << "Alive2: Transform doesn't verify; aborting!" << endl;
       else
         *out << "Alive2: Transform doesn't verify!" << endl;
-
-      if (!is_clangtv)
-        exit(1);
+      exit(1);
     }
   }
 
@@ -491,7 +481,7 @@ const char* skip_pass_list[] = {
 };
 
 bool do_skip(const llvm::StringRef &pass0) {
-  auto pass = pass0.str();
+  string_view pass = pass0;
   return any_of(skip_pass_list, end(skip_pass_list),
                 [&](auto skip) { return pass == skip; });
 }
@@ -704,15 +694,13 @@ llvmGetPassPluginInfo() {
                 saveBitcode(unwrapModule(IR));
           });
         }
-        if (is_clangtv) {
-          PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
-              [](llvm::StringRef P, llvm::Any IR,
-                      const llvm::PreservedAnalyses &PA) {
-            pass_name = P.str();
-            if (!is_clangtv_done)
-              runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
-          });
-        }
+        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
+            [](llvm::StringRef P, llvm::Any IR,
+                    const llvm::PreservedAnalyses &PA) {
+          pass_name = P.str();
+          if (is_clangtv && !is_clangtv_done)
+            runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
+        });
       }
     }
   };
