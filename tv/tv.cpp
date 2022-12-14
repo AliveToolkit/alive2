@@ -485,9 +485,14 @@ const char* unsupported_pass_list[] = {
   "InlinerPass",
   "IPSCCPPass",
   "IROutlinerPass",
+  "LoopExtractorPass",
+  "MergeFunctionsPass",
+  "OpenMPOptCGSCCPass",
   "OpenMPOptPass",
   "PartialInlinerPass",
   "PostOrderFunctionAttrsPass",
+  "RequireAnalysisPass<GlobalsAA, Module>",
+  "SampleProfileLoaderPass",
   "TailCallElimPass",
 };
 
