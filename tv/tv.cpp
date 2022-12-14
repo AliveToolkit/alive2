@@ -691,10 +691,11 @@ llvmGetPassPluginInfo() {
             MPM.addPass(ClangTVFinalizePass());
           });
 
+      auto *instrument = PB.getPassInstrumentationCallbacks();
+
       if (batch_opts) {
         // For batched clang tv, manually run TVPass before each pass
-        PB.getPassInstrumentationCallbacks()
-            ->registerBeforeNonSkippedPassCallback(
+        instrument->registerBeforeNonSkippedPassCallback(
               [](llvm::StringRef P, llvm::Any IR) {
           assert(is_clangtv && "Batching is enabled for clang-tv only");
           if (is_clangtv_done)
@@ -720,24 +721,14 @@ llvmGetPassPluginInfo() {
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
         });
-        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback([&](
+        instrument->registerAfterPassCallback([&](
             llvm::StringRef P, llvm::Any, const llvm::PreservedAnalyses &) {
           TVPass::batched_pass_count++;
           pass_name = P.str();
         });
 
       } else {
-        // For non-batched clang tv, manually run TVPass after each pass
-        if (opt_save_ir) {
-          PB.getPassInstrumentationCallbacks()
-            ->registerBeforeNonSkippedPassCallback(
-              [](llvm::StringRef P, llvm::Any IR) {
-                saveBitcode(unwrapModule(IR));
-          });
-        }
-        PB.getPassInstrumentationCallbacks()->registerAfterPassCallback(
-          [](llvm::StringRef P, llvm::Any IR,
-             const llvm::PreservedAnalyses &PA) {
+        auto fn = [](llvm::StringRef P, llvm::Any IR) {
           pass_name = P.str();
           if (is_clangtv && !is_clangtv_done) {
             if (any_isa<const llvm::Function*>(IR)) {
@@ -751,6 +742,16 @@ llvmGetPassPluginInfo() {
               runTVPass(*const_cast<llvm::Module*>(unwrapModule(IR)));
             }
           }
+        };
+        // For non-batched clang tv, manually run TVPass after each pass
+        // We also need to run it before everything else as sometimes we have
+        // a transformation pass in the beginning of the pipeline
+        // This varies per LLVM version!
+        instrument->registerBeforeNonSkippedPassCallback(fn);
+        instrument->registerAfterPassCallback(
+          [fn](llvm::StringRef P, llvm::Any IR,
+             const llvm::PreservedAnalyses &PA) {
+            return fn(P, IR);
         });
       }
     }
