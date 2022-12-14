@@ -152,7 +152,8 @@ void emitCommandLine(ostream *out) {
 
 struct TVLegacyPass final : public llvm::ModulePass {
   static char ID;
-  bool skip_verify = false;
+  bool unsupported_transform = false;
+  bool nop_transform = false;
   bool onlyif_src_exists = false; // Verify this pair only if src exists
   const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override
     = nullptr;
@@ -203,6 +204,9 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
+    if (!first && nop_transform)
+      return false;
+
     auto fn = llvm2alive(F, *TLI, first,
                          first ? vector<string_view>()
                                : I->second.fn.getGlobalVarNames());
@@ -211,7 +215,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
     }
 
-    if (first || skip_verify) {
+    if (first || unsupported_transform) {
       I->second.fn = std::move(*fn);
       if (!opt_always_verify)
         // Prepare syntactic check
@@ -467,7 +471,7 @@ const llvm::Module * unwrapModule(llvm::Any IR) {
 // List 'leaf' interprocedural passes only.
 // For example, ModuleInlinerWrapperPass shouldn't be here because it is an
 // interprocedural pass having other passes as children.
-const char* skip_pass_list[] = {
+const char* unsupported_pass_list[] = {
   "AlwaysInlinerPass",
   "ArgumentPromotionPass",
   "AttributorCGSCCPass",
@@ -485,20 +489,25 @@ const char* skip_pass_list[] = {
   "PartialInlinerPass",
   "PostOrderFunctionAttrsPass",
   "TailCallElimPass",
+};
+
+const char* nop_pass_prefixes[] {
+  "InvalidateAnalysisPass",
+  "ModuleToFunctionPassAdaptor",
+  "PassManager<",
+  "RequireAnalysisPass",
   "VerifierPass",
 };
 
-const char* skip_pass_prefixes[] {
-  "InvalidateAnalysisPass",
-  "PassManager<",
-  "RequireAnalysisPass",
-};
-
-bool do_skip(const llvm::StringRef &pass0) {
+bool is_unsupported_pass(const llvm::StringRef &pass0) {
   string_view pass = pass0;
-  return any_of(skip_pass_list, end(skip_pass_list),
-                [&](auto skip) { return pass == skip; }) ||
-         any_of(skip_pass_prefixes, end(skip_pass_prefixes),
+  return any_of(unsupported_pass_list, end(unsupported_pass_list),
+                [&](auto skip) { return pass == skip; });
+}
+
+bool is_nop_pass(const llvm::StringRef &pass0) {
+  string_view pass = pass0;
+  return any_of(nop_pass_prefixes, end(nop_pass_prefixes),
                 [&](auto skip) { return pass.starts_with(skip); });
 }
 
@@ -564,13 +573,13 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
       TVLegacyPass tv;
 
       if (set_src) {
-        // Prepare src. Do this by setting skip_pass to true.
-        tv.skip_verify = true;
+        // Prepare src. Do this by setting this to true.
+        tv.unsupported_transform = true;
         *out << "-- FROM THE BITCODE AFTER "
-              << batched_pass_count << ". " << batched_pass_begin_name << "\n";
+              << batched_pass_count << ". " << batched_pass_begin_name << '\n';
       } else {
         *out << "-- TO THE BITCODE AFTER "
-              << batched_pass_count << ". " << pass_name << "\n";
+              << batched_pass_count << ". " << pass_name << '\n';
 
         // Translate LLVM to Alive2 only if there exists src
         tv.onlyif_src_exists = true;
@@ -581,21 +590,28 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
       tv.runOn(M);
 
       if (!set_src)
-        *out << "-- DONE: " << batched_pass_count << ". " << pass_name << "\n";
+        *out << "-- DONE: " << batched_pass_count << ". " << pass_name << '\n';
       batch_started = !batch_started;
     } else {
-      bool skip_tv = do_skip(pass_name);
+      bool unsupported = is_unsupported_pass(pass_name);
+      bool nop = is_nop_pass(pass_name);
 
       static unsigned count = 0;
       count++;
       if (print_pass_name) {
         // print_pass_name is set only when running clang tv
-        *out << "-- " << count << ". " << pass_name
-            << (skip_tv ? " : Skipping\n" : "\n");
+        *out << "-- " << count << ". " << pass_name;
+        if (unsupported)
+          *out << " : Skipping unsupported\n";
+        else if (nop)
+          *out << " : Skipping NOP\n";
+        else
+          *out << "\n";
       }
 
       TVLegacyPass tv;
-      tv.skip_verify = skip_tv;
+      tv.unsupported_transform = unsupported;
+      tv.nop_transform = nop;
 
       tv.TLI_override = &get_TLI;
       // If skip_pass is true, this updates fns map only.
@@ -681,10 +697,12 @@ llvmGetPassPluginInfo() {
 
           // Run only when it is at the boundary
           bool is_first = pass_name.empty();
-          bool do_start = !TVPass::batch_started && do_skip(pass_name)
-              && !do_skip(P);
-          bool do_finish = TVPass::batch_started && !do_skip(pass_name)
-              && do_skip(P);
+          bool do_start = !TVPass::batch_started &&
+                          is_unsupported_pass(pass_name) &&
+                          !is_unsupported_pass(P);
+          bool do_finish = TVPass::batch_started &&
+                           !is_unsupported_pass(pass_name) &&
+                           is_unsupported_pass(P);
 
           if (do_start)
             TVPass::batched_pass_begin_name = pass_name;
