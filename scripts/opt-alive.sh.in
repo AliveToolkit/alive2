@@ -27,6 +27,7 @@ for arg in $@; do
 
   if [[ $arg == "-enable-new-pm=0" || $arg == "-enable-new-pm=false" ]]; then
     NPM_TV=0
+    continue
   fi
 
   for p in $SKIP_TV_PASSES; do
