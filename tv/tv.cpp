@@ -498,7 +498,7 @@ const char* unsupported_pass_list[] = {
 
 const char* nop_pass_prefixes[] {
   "InvalidateAnalysisPass",
-  "ModuleToFunctionPassAdaptor",
+  // "ModuleToFunctionPassAdaptor", --  don't skip; runs function passes
   "PassManager<",
   "RequireAnalysisPass",
   "VerifierPass",
