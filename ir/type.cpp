@@ -458,10 +458,10 @@ expr FloatType::isNaN(const expr &v, bool signalling) const {
   unsigned fraction_bits = bits() - exp_bits - 1;
 
   expr exponent = v.extract(fraction_bits + exp_bits - 1, fraction_bits);
-  expr nanqbit = exponent.extract(exp_bits - 1, exp_bits - 1);
+  expr nanqbit  = v.extract(fraction_bits - 1, fraction_bits - 1);
   expr isqnan;
   if (signalling) {
-    expr fraction = v.extract(fraction_bits - 1, 0);
+    expr fraction = v.extract(fraction_bits - 2, 0);
     isqnan = nanqbit == 0 && fraction != 0;
   } else {
     isqnan = nanqbit == 1;
