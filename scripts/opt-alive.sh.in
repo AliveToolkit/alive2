@@ -10,70 +10,38 @@ set -e
 # attributor, function-attrs: inter procedural pass that deduces and/or propagates attributes
 # metarenamer: anonymizes function names
 # sample-profile: inlines functions
-PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization =tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner globals-aa -O0 -Os -Oz -O1 -O2 -O3"
-PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
+SKIP_TV_PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization =tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner globals-aa debug-pass-manager"
 
 # see opt.cpp: shouldForceLegacyPM()
 FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
 
-TV=""
-SKIP_TV=0
-for arg in $@; do
-  if [[ $arg == "-debug-pass-manager" ]]; then
-    SKIP_TV=1
-    break
-  fi
-done
-
 # opt enables NPM by default.
 NPM_TV=1
-SKIP_ARG=0
+SKIP_TV=0
 
 for arg in $@; do
-  # update the -passes argument only.
-  shift
-
-  if [[ $SKIP_ARG == 1 ]]; then
-    SKIP_ARG=0
+  if [[ $arg == "-passes"* || $arg == "--passes"* || $arg == "-p"* || $arg == "--p"* ]]; then
+    # NPM, all good
     continue
   fi
 
-  if [[ $arg == "-passes" || $arg == "--passes" || $arg == "-p" || $arg == "--p" ]]; then
-    arg="-passes=$1"
-    SKIP_ARG=1
+  if [[ $arg == "-enable-new-pm=0" || $arg == "-enable-new-pm=false" ]]; then
+    NPM_TV=0
   fi
 
-  if [[ $arg == "-passes="* || $arg == "--passes="* || $arg == "-p="* || $arg == "--p="* ]]; then
-    passes=${arg/-*passes=/}
-    passes=${passes/-*p=/}
-    passes_new=`@CMAKE_SOURCE_DIR@/scripts/rewritepass.py "$PASSREGISTRY" $passes`
-    firstpass_level=`echo $passes_new | cut -d "(" -f1`
-    # tailcallelim is a function pass but unsupported by Alive2
-    if [[ $SKIP_TV == 0 &&
-        $firstpass_level != "module" && $firstpass_level != "cgscc" &&
-        $passes != *"tailcallelim"* && $NPM_TV -eq 1 ]]; then
-      set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
-    else
-      set -- "$@" "$arg"
+  for p in $SKIP_TV_PASSES; do
+    if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
+      SKIP_TV=1
+      break
     fi
-  else
-    if [[ $arg == "-enable-new-pm=0" || $arg == "-enable-new-pm=false" ]]; then
+  done
+
+  for p in $FORCE_OLD_NPM; do
+    if [[ $arg == "-$p" ]]; then
       NPM_TV=0
+      break
     fi
-    set -- "$@" "$arg"
-    for p in $PASSES; do
-      if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
-        SKIP_TV=1
-        break
-      fi
-    done
-    for p in $FORCE_OLD_NPM; do
-      if [[ $arg == "-$p" ]]; then
-        NPM_TV=0
-        break
-      fi
-    done
-  fi
+  done
 done
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -84,6 +52,7 @@ else
   TV_SHAREDLIB=tv.so
 fi
 
+TV=""
 if [[ $SKIP_TV == 0 && $NPM_TV == 0 ]]; then
   TV="-tv"
 fi
@@ -98,9 +67,10 @@ if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
   TV_SMT_TO=-tv-smt-to=20000
   TV_SMT_STATS=-tv-smt-stats
 fi
+
 NPM_PLUGIN=""
-# Without this guard, passes like default<Os> invokes whole-pass validation
 if [[ $SKIP_TV == 0 && $NPM_TV == 1 ]]; then
   NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
 fi
+
 $TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS
