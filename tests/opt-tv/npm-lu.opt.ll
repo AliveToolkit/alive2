@@ -1,4 +1,4 @@
-; TEST-ARGS: -passes='loop(simple-loop-unswitch<nontrivial>)' -tv-src-unroll=2 -tv-tgt-unroll=2
+; TEST-ARGS: -p=loop(simple-loop-unswitch<nontrivial>) -tv-src-unroll=2 -tv-tgt-unroll=2
 
 define i32 @test(i1 %cond) {
 entry:
