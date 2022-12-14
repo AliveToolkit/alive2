@@ -14,7 +14,7 @@ PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipscc
 PASSREGISTRY="@LLVM_BUILD_MAIN_SRC_DIR@/lib/Passes/PassRegistry.def"
 
 # see opt.cpp: shouldForceLegacyPM()
-FORCE_OLD_NPM="safe-stack codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
+FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
 
 TV=""
 SKIP_TV=0
@@ -54,8 +54,6 @@ for arg in $@; do
         $passes != *"tailcallelim"* && $NPM_TV -eq 1 ]]; then
       set -- "$@" "-passes=module(tv),$passes_new,module(tv)"
     else
-      # Module/CGSCC-level passes shouldn't invoke tv
-      SKIP_TV=1
       set -- "$@" "$arg"
     fi
   else
@@ -102,7 +100,7 @@ if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
 fi
 NPM_PLUGIN=""
 # Without this guard, passes like default<Os> invokes whole-pass validation
-if [[ $NPM_TV == 1 ]]; then
+if [[ $SKIP_TV == 0 && $NPM_TV == 1 ]]; then
   NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
 fi
 $TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS
