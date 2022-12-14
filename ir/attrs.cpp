@@ -502,12 +502,12 @@ ostream& operator<<(ostream &os, const FastMathFlags &fm) {
 smt::expr FpRoundingMode::toSMT() const {
   switch (mode) {
   case FpRoundingMode::Dynamic: UNREACHABLE();
+  case FpRoundingMode::Default:
   case FpRoundingMode::RNE:     return expr::rne();
   case FpRoundingMode::RNA:     return expr::rna();
   case FpRoundingMode::RTP:     return expr::rtp();
   case FpRoundingMode::RTN:     return expr::rtn();
   case FpRoundingMode::RTZ:     return expr::rtz();
-  case FpRoundingMode::Default: UNREACHABLE();
   }
   UNREACHABLE();
 }

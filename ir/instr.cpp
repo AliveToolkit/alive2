@@ -1749,7 +1749,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     np.add(sv.non_poison);
 
     StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
-                                           : fn(val, to_type, {});
+                                           : fn(val, to_type, rm);
 
     return { to_type.isFloatType()
                ? to_type.getAsFloatType()->fromFloat(s, ret.value)
