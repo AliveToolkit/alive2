@@ -1535,8 +1535,10 @@ void Transform::print(ostream &os, const TransformPrintOpts &opt) const {
     os << '\n';
   }
   src.print(os, opt.print_fn_header);
-  os << "=>\n";
-  tgt.print(os, opt.print_fn_header);
+  if (!opt.skip_tgt) {
+    os << "=>\n";
+    tgt.print(os, opt.print_fn_header);
+  }
 }
 
 ostream& operator<<(ostream &os, const Transform &t) {

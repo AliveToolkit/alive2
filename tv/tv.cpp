@@ -72,7 +72,6 @@ struct FnInfo {
 
 optional<smt::smt_initializer> smt_init;
 optional<llvm_util::initializer> llvm_util_init;
-TransformPrintOpts print_opts;
 unordered_map<string, FnInfo> fns;
 unsigned initialized = 0;
 bool showed_stats = false;
@@ -245,8 +244,11 @@ struct TVLegacyPass final : public llvm::ModulePass {
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
       if (src_tostr == tgt_tostr) {
-        if (!opt_quiet)
+        if (!opt_quiet) {
+          TransformPrintOpts print_opts;
+          print_opts.skip_tgt = true;
           t.print(*out, print_opts);
+        }
         *out << "Transformation seems to be correct! (syntactically equal)\n\n";
         return;
       }
@@ -306,7 +308,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     t.preprocess();
     TransformVerify verifier(t, false);
     if (!opt_quiet)
-      t.print(*out, print_opts);
+      t.print(*out);
 
     {
       auto types = verifier.getTypings();

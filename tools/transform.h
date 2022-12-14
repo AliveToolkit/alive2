@@ -18,6 +18,7 @@ namespace tools {
 
 struct TransformPrintOpts {
   bool print_fn_header = true;
+  bool skip_tgt = false;
 };
 
 
@@ -27,7 +28,7 @@ struct Transform {
   IR::Predicate *precondition = nullptr;
 
   void preprocess();
-  void print(std::ostream &os, const TransformPrintOpts &opt) const;
+  void print(std::ostream &os, const TransformPrintOpts &opt = {}) const;
   friend std::ostream& operator<<(std::ostream &os, const Transform &t);
 };
 
