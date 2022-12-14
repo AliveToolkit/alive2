@@ -20,11 +20,6 @@ NPM_TV=1
 SKIP_TV=0
 
 for arg in $@; do
-  if [[ $arg == "-passes"* || $arg == "--passes"* || $arg == "-p"* || $arg == "--p"* ]]; then
-    # NPM, all good
-    continue
-  fi
-
   if [[ $arg == "-enable-new-pm=0" || $arg == "-enable-new-pm=false" ]]; then
     NPM_TV=0
     continue
