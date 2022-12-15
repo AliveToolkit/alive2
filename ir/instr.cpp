@@ -475,8 +475,8 @@ StateValue BinOp::toSMT(State &s) const {
     };
   }
 
-  auto &a = noundef ? s.getAndAddPoisonUB(*lhs) : s[*lhs];
-  auto &b = (isDivOrRem() || noundef) ? s.getAndAddPoisonUB(*rhs) : s[*rhs];
+  auto &a = s.getVal(*lhs, noundef);
+  auto &b = s.getVal(*rhs, isDivOrRem() || noundef);
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
@@ -616,7 +616,8 @@ void FpBinOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
-  os << ", exceptions=" << ex;
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
 }
 
 static expr any_fp_zero(State &s, const expr &v) {
@@ -1059,7 +1060,8 @@ void FpUnaryOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *val;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
-  os << ", exceptions=" << ex;
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
@@ -1343,7 +1345,8 @@ void FpTernaryOp::print(ostream &os) const {
   os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
-  os << ", exceptions=" << ex;
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
 }
 
 StateValue FpTernaryOp::toSMT(State &s) const {
@@ -1662,11 +1665,15 @@ void FpConversionOp::print(ostream &os) const {
   os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
   if (!rm.isDefault())
     os << ", rounding=" << rm;
-  os << ", exceptions=" << ex;
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
+  if (flags & NoUndef)
+    os << ", !noundef";
 }
 
 StateValue FpConversionOp::toSMT(State &s) const {
-  auto &v = s[*val];
+  bool noundef = flags & NoUndef;
+  auto &v = s.getVal(*val, noundef);
   function<StateValue(const expr &, const Type &, FpRoundingMode)> fn;
 
   switch (op) {
@@ -1750,11 +1757,16 @@ StateValue FpConversionOp::toSMT(State &s) const {
 
     StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
                                            : fn(val, to_type, rm);
+    np.add(std::move(ret.non_poison));
+
+    if (noundef) {
+      s.addUB(np());
+      np.reset();
+    }
 
     return { to_type.isFloatType()
                ? to_type.getAsFloatType()->fromFloat(s, ret.value)
-               : std::move(ret.value),
-             np() && ret.non_poison};
+               : std::move(ret.value), np()};
   };
 
   if (getType().isVectorType()) {

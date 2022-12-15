@@ -204,6 +204,7 @@ public:
   // If undef_ub is true, UB is also added when val was undef
   const StateValue& getAndAddPoisonUB(const Value &val, bool undef_ub = false,
                                       bool ptr_compare = false);
+  const StateValue& getVal(const Value &val, bool is_poison_ub);
   const smt::expr& getWellDefinedPtr(const Value &val);
 
   const ValTy& at(const Value &val) const;

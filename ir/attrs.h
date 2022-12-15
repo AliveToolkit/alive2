@@ -203,6 +203,7 @@ struct FpExceptionMode final {
   FpExceptionMode() : mode(Ignore) {}
   FpExceptionMode(Mode mode) : mode(mode) {}
   Mode getMode() const { return mode; }
+  bool ignore() const { return mode == Ignore; }
   friend std::ostream& operator<<(std::ostream &os, FpExceptionMode ex);
 };
 

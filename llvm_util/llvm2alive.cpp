@@ -1035,6 +1035,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_fptosi:
     case llvm::Intrinsic::experimental_constrained_fptoui:
     case llvm::Intrinsic::experimental_constrained_fpext:
+    case llvm::Intrinsic::fptrunc_round:
     case llvm::Intrinsic::experimental_constrained_fptrunc:
     case llvm::Intrinsic::lrint:
     case llvm::Intrinsic::experimental_constrained_lrint:
@@ -1053,6 +1054,7 @@ public:
       case llvm::Intrinsic::experimental_constrained_fptosi:  op = FpConversionOp::FPToSInt; break;
       case llvm::Intrinsic::experimental_constrained_fptoui:  op = FpConversionOp::FPToUInt; break;
       case llvm::Intrinsic::experimental_constrained_fpext:   op = FpConversionOp::FPExt; break;
+      case llvm::Intrinsic::fptrunc_round:
       case llvm::Intrinsic::experimental_constrained_fptrunc: op = FpConversionOp::FPTrunc; break;
       case llvm::Intrinsic::lrint:
       case llvm::Intrinsic::experimental_constrained_lrint:
@@ -1064,9 +1066,15 @@ public:
       case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
       default: UNREACHABLE();
       }
+      FnAttrs attrs;
+      parse_fn_attrs(i, attrs);
+      unsigned flags = FpConversionOp::None;
+      if (attrs.has(FnAttrs::NoUndef))
+        flags |= FpConversionOp::NoUndef;
       RETURN_IDENTIFIER(make_unique<FpConversionOp>(*ty, value_name(i), *val,
                                                     op, parse_rounding(i),
-                                                    parse_exceptions(i)));
+                                                    parse_exceptions(i),
+                                                    flags));
     }
     case llvm::Intrinsic::is_fpclass:
     {

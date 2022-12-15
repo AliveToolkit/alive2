@@ -278,16 +278,21 @@ public:
   enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc, LRInt,
             LRound };
 
+  enum Flags { None = 0, NoUndef = 1<<0 };
+
 private:
   Value *val;
   Op op;
   FpRoundingMode rm;
   FpExceptionMode ex;
+  unsigned flags;
 
 public:
   FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
-                 FpRoundingMode rm = {}, FpExceptionMode ex = {})
-    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex) {}
+                 FpRoundingMode rm = {}, FpExceptionMode ex = {},
+                 unsigned flags =  None)
+    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
+      flags(flags) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

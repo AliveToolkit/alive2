@@ -595,6 +595,10 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
            sv.non_poison.isBool() ? true : expr::mkInt(-1, sv.non_poison) };
 }
 
+const StateValue& State::getVal(const Value &val, bool is_poison_ub) {
+  return is_poison_ub ? getAndAddPoisonUB(val) : (*this)[val];
+}
+
 const expr& State::getWellDefinedPtr(const Value &val) {
   return getAndAddPoisonUB(val, true, true).value;
 }
