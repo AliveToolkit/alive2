@@ -219,7 +219,7 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
 
 bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
                                 const llvm::StringSet<> &filterSet) {
-  return !block.getInstList().empty() &&
+  return !block.instructionsWithoutDebug().empty() &&
          std::any_of(block.begin(), block.end(),
                      [&filterSet](const llvm::Instruction &inst) {
                        return canMutate(inst, filterSet);
@@ -228,7 +228,7 @@ bool FunctionMutator::canMutate(const llvm::BasicBlock &block,
 
 bool FunctionMutator::canMutate(const llvm::Function *function,
                                 const llvm::StringSet<> &filterSet) {
-  return !function->getBasicBlockList().empty() &&
+  return !function->empty() &&
          std::any_of(function->begin(), function->end(),
                      [&filterSet](const llvm::BasicBlock &bb) {
                        return canMutate(bb, filterSet);
