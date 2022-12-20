@@ -192,6 +192,8 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
 
+  set(LLVM_LINK_COMPONENTS ${LLVM_LINK_COMPONENTS} TargetParser)
+
   add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
   )
