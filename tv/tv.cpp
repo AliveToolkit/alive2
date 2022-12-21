@@ -453,16 +453,15 @@ llvm::RegisterPass<TVLegacyPass> X("tv", "Translation Validator", false, false);
 const llvm::Module * unwrapModule(llvm::Any IR) {
   using namespace llvm;
 
-  if (any_cast<const Module *>(IR))
-    return any_cast<const Module *>(IR);
-  else if (any_cast<const llvm::Function *>(IR))
-    return any_cast<const llvm::Function *>(IR)->getParent();
-  else if (any_cast<const LazyCallGraph::SCC *>(IR)) {
-    auto C = any_cast<const LazyCallGraph::SCC *>(IR);
-    assert(C->begin() != C->end()); // there's at least one function
-    return C->begin()->getFunction().getParent();
-  } else if (any_cast<const Loop *>(IR))
-    return any_cast<const Loop *>(IR)->getHeader()->getParent()->getParent();
+  if (auto **M = any_cast<const Module *>(&IR))
+    return *M;
+  else if (auto **F = any_cast<const llvm::Function *>(&IR))
+    return (*F)->getParent();
+  else if (auto **C = any_cast<const LazyCallGraph::SCC *>(&IR)) {
+    assert((*C)->begin() != (*C)->end()); // there's at least one function
+    return (*C)->begin()->getFunction().getParent();
+  } else if (auto **L = any_cast<const Loop *>(&IR))
+    return (*L)->getHeader()->getParent()->getParent();
 
   llvm_unreachable("Unknown IR unit");
 }
@@ -731,13 +730,11 @@ llvmGetPassPluginInfo() {
         auto fn = [](llvm::StringRef P, llvm::Any IR) {
           pass_name = P.str();
           if (is_clangtv && !is_clangtv_done) {
-            if (any_cast<const llvm::Function *>(IR)) {
-              runTVPass(*const_cast<llvm::Function*>(
-                          any_cast<const llvm::Function*>(IR)));
-            } else if (any_cast<const llvm::Loop *>(IR)) {
-              runTVPass(*const_cast<llvm::Function*>(
-                          any_cast<const llvm::Loop *>(IR)->getHeader()
-                                                          ->getParent()));
+            if (auto **F = any_cast<const llvm::Function *>(&IR)) {
+              runTVPass(*const_cast<llvm::Function*>(*F));
+            } else if (auto **L = any_cast<const llvm::Loop *>(&IR)) {
+              runTVPass(*const_cast<llvm::Function*>((*L)->getHeader()
+                                                         ->getParent()));
             } else {
               runTVPass(*const_cast<llvm::Module*>(unwrapModule(IR)));
             }
