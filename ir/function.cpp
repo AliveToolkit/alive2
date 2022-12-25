@@ -50,7 +50,7 @@ void BasicBlock::addInstrAt(unique_ptr<Instr> &&i, const Instr *other,
   }
 }
 
-void BasicBlock::delInstr(Instr *i) {
+void BasicBlock::delInstr(const Instr *i) {
   for (auto I = m_instrs.begin(), E = m_instrs.end(); I != E; ++I) {
     if (I->get() == i) {
       m_instrs.erase(I);
@@ -123,6 +123,11 @@ expr Function::getTypeConstraints() const {
     }
   }
   return t;
+}
+
+void Function::rauw(const Value &what, Value &with) {
+  for (auto bb : getBBs())
+    bb->rauw(what, with);
 }
 
 void Function::fixupTypes(const Model &m) {
@@ -221,6 +226,10 @@ void Function::addInput(unique_ptr<Value> &&i) {
   assert(dynamic_cast<Input *>(i.get()) ||
          dynamic_cast<ConstantInput*>(i.get()));
   inputs.emplace_back(std::move(i));
+}
+
+void Function::replaceInput(std::unique_ptr<Value> &&c, unsigned idx) {
+  inputs[idx] = std::move(c);
 }
 
 bool Function::hasReturn() const {
