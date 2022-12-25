@@ -36,6 +36,10 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "noalias ";
   if (attr.has(ParamAttrs::DereferenceableOrNull))
     os << "dereferenceable_or_null(" << attr.derefOrNullBytes << ") ";
+  if (attr.has(ParamAttrs::ZeroExt))
+    os << "zeroext ";
+  if (attr.has(ParamAttrs::SignExt))
+    os << "signext ";
   if (attr.has(ParamAttrs::AllocPtr))
     os << "allocptr ";
   if (attr.has(ParamAttrs::AllocAlign))
@@ -87,6 +91,10 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " dereferenceable_or_null(" << attr.derefOrNullBytes << ')';
   if (attr.has(FnAttrs::NullPointerIsValid))
     os << " null_pointer_is_valid";
+  if (attr.has(FnAttrs::ZeroExt))
+    os << " zeroext";
+  if (attr.has(FnAttrs::SignExt))
+    os << " signext";
   if (!attr.allocfamily.empty())
     os << " alloc-family(" << attr.allocfamily << ')';
   if (attr.allockind != 0) {
