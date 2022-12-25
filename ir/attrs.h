@@ -63,7 +63,8 @@ public:
                    NoRead = 1<<3, NoWrite = 1<<4, Dereferenceable = 1<<5,
                    NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8,
                    NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
-                   AllocPtr = 1<<11, AllocAlign = 1<<12 };
+                   AllocPtr = 1<<11, AllocAlign = 1<<12,
+                   ZeroExt = 1<<13, SignExt = 1<<14};
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -123,7 +124,8 @@ public:
                    NoThrow = 1 << 7, NoAlias = 1 << 8, WillReturn = 1 << 9,
                    DereferenceableOrNull = 1 << 10,
                    NullPointerIsValid = 1 << 11,
-                   AllocSize = 1 << 12 };
+                   AllocSize = 1 << 12, ZeroExt = 1<<13,
+                   SignExt = 1<<14 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
