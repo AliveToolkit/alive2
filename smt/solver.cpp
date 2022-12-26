@@ -33,75 +33,33 @@ static unsigned num_timeout = 0;
 static unsigned num_errors = 0;
 
 namespace {
-class Tactic {
-protected:
-  Z3_tactic t = nullptr;
-  const char *name = nullptr;
 
-  Tactic(Z3_tactic t) : t(t) {
-    Z3_tactic_inc_ref(ctx(), t);
-  }
-
-  void destroy() {
-    if (t)
-      Z3_tactic_dec_ref(ctx(), t);
-  }
-
-public:
-  Tactic(const char *name) : Tactic(Z3_mk_tactic(ctx(), name)) {
-    this->name = name;
-  }
-
-  Tactic(Tactic &&other) {
-    swap(t, other.t);
-    swap(name, other.name);
-  }
-
-  void operator=(Tactic &&other) {
-    destroy();
-    t = nullptr;
-    name = nullptr;
-    swap(t, other.t);
-    swap(name, other.name);
-  }
-
-  ~Tactic() { destroy(); }
-
-  friend class smt::Solver;
-  friend class MultiTactic;
-};
-
-
-class MultiTactic final : public Tactic {
-  vector<Tactic> tactics;
+struct Goal {
   Z3_goal goal = nullptr;
 
-public:
-  MultiTactic(initializer_list<const char*> ts) : Tactic("skip") {
+  Goal() {
     if (tactic_verbose) {
       goal = Z3_mk_goal(ctx(), true, false, false);
       Z3_goal_inc_ref(ctx(), goal);
     }
-
-    for (auto I = ts.begin(), E = ts.end(); I != E; ++I) {
-      Tactic t(*I);
-      *this = mkThen(*this, t);
-      if (tactic_verbose)
-        tactics.emplace_back(std::move(t));
-    }
   }
 
-  ~MultiTactic() {
+  Goal(const Goal &g) noexcept : goal(g.goal) {
+    if (goal)
+      Z3_goal_inc_ref(ctx(), goal);
+  }
+
+  Goal(Goal &&g) noexcept {
+    swap(goal, g.goal);
+  }
+
+  void operator=(Goal &&g) noexcept {
+    swap(goal, g.goal);
+  }
+
+  ~Goal() {
     if (goal)
       Z3_goal_dec_ref(ctx(), goal);
-  }
-
-  void operator=(Tactic &&other) {
-    static_cast<Tactic&>(*this) = std::move(other);
-  }
-
-  static Tactic mkThen(const Tactic &a, const Tactic &b) {
-    return Z3_tactic_and_then(ctx(), a.t, b.t);
   }
 
   void add(Z3_ast ast) {
@@ -109,49 +67,224 @@ public:
       Z3_goal_assert(ctx(), goal, ast);
   }
 
-  void check() {
-    if (!tactic_verbose)
-      return;
-
-    string last_result;
-
-    for (auto &t : tactics) {
-      dbg() << "\nApplying " << t.name << endl;
-
-      Tactic to(Z3_tactic_try_for(ctx(), t.t, 5000));
-      Tactic skip(Z3_tactic_skip(ctx()));
-      to = Tactic(Z3_tactic_or_else(ctx(), to.t, skip.t));
-      auto r = Z3_tactic_apply(ctx(), to.t, goal);
-      Z3_apply_result_inc_ref(ctx(), r);
-      reset_solver();
-
-      for (unsigned i = 0, e = Z3_apply_result_get_num_subgoals(ctx(), r);
-           i != e; ++i) {
-        auto ng = Z3_apply_result_get_subgoal(ctx(), r, i);
-        for (unsigned ii = 0, ee = Z3_goal_size(ctx(), ng); ii != ee; ++ii) {
-          add(Z3_goal_formula(ctx(), ng, ii));
-        }
-      }
-      Z3_apply_result_dec_ref(ctx(), r);
-
-      string new_r = Z3_goal_to_string(ctx(), goal);
-      if (new_r != last_result) {
-        dbg() << new_r << '\n';
-        last_result = std::move(new_r);
-      } else {
-        dbg() << "(no change)\n";
-      }
-    }
-  }
-
-  void reset_solver() {
+  void reset() {
     if (tactic_verbose)
       Z3_goal_reset(ctx(), goal);
   }
+
+  const char* toString() const {
+    return Z3_goal_to_string(ctx(), goal);
+  }
+};
+
+
+struct TacticResult {
+  Z3_apply_result r = nullptr;
+
+  TacticResult(Z3_apply_result r = nullptr) : r(r) {
+    if (r)
+      Z3_apply_result_inc_ref(ctx(), r);
+  }
+
+  TacticResult(TacticResult &&other) noexcept {
+    swap(r, other.r);
+  }
+
+  ~TacticResult() {
+    if (r)
+      Z3_apply_result_dec_ref(ctx(), r);
+  }
+
+  void operator=(TacticResult &&other) {
+    swap(r, other.r);
+  }
+
+  Goal toGoal() const {
+    Goal goal;
+    for (unsigned i = 0, e = Z3_apply_result_get_num_subgoals(ctx(), r);
+          i != e; ++i) {
+      auto ng = Z3_apply_result_get_subgoal(ctx(), r, i);
+      for (unsigned ii = 0, ee = Z3_goal_size(ctx(), ng); ii != ee; ++ii) {
+        Z3_goal_assert(ctx(), goal.goal, Z3_goal_formula(ctx(), ng, ii));
+      }
+    }
+    return goal;
+  }
+};
+
+
+struct Probe {
+  Z3_probe p = nullptr;
+  const char *name;
+
+  Probe(const char *name) : p(Z3_mk_probe(ctx(), name)), name(name) {
+    Z3_probe_inc_ref(ctx(), p);
+  }
+
+  Probe(Probe &&other) noexcept {
+    swap(p, other.p);
+    name = other.name;
+  }
+
+  void operator=(Probe &&other) noexcept {
+    swap(p, other.p);
+    name = other.name;
+  }
+
+  ~Probe() {
+    if (p)
+      Z3_probe_dec_ref(ctx(), p);
+  }
+
+  bool check(const Goal &goal) const {
+    return Z3_probe_apply(ctx(), p, goal.goal) != 0.0;
+  }
+};
+
+
+struct Tactic {
+  Z3_tactic t = nullptr;
+
+  Tactic(Z3_tactic t = nullptr) : t(t) {
+    if (t)
+      Z3_tactic_inc_ref(ctx(), t);
+  }
+
+  Tactic(Tactic &&other) noexcept {
+    swap(t, other.t);
+  }
+
+  void destroy() {
+    if (t)
+      Z3_tactic_dec_ref(ctx(), t);
+  }
+
+  virtual ~Tactic() { destroy(); }
+
+  void set(Z3_tactic newt) {
+    Z3_tactic_inc_ref(ctx(), newt);
+    destroy();
+    t = newt;
+  }
+
+  virtual TacticResult exec(const Goal &goal) const {
+    UNREACHABLE();
+    return {};
+  };
+};
+
+
+struct NamedTactic final : public Tactic {
+  const char *name = nullptr;
+
+  NamedTactic(const char *name) : Tactic(Z3_mk_tactic(ctx(), name)) {
+    this->name = name;
+  }
+
+  TacticResult exec(const Goal &goal) const override {
+    dbg() << "\nApplying " << name << endl;
+    Tactic to(Z3_tactic_or_else(ctx(),
+                                Tactic(Z3_tactic_try_for(ctx(), t, 10000)).t,
+                                Tactic(Z3_tactic_skip(ctx())).t));
+    return Z3_tactic_apply(ctx(), to.t, goal.goal);
+  }
+};
+
+
+struct IfTactic final : public Tactic {
+  Probe p;
+  unique_ptr<Tactic> then, els;
+
+  IfTactic(Probe &&p, unique_ptr<Tactic> &&then, unique_ptr<Tactic> &&els)
+    : Tactic(Z3_tactic_cond(ctx(), p.p, then->t, els->t)),
+      p(std::move(p)), then(std::move(then)), els(std::move(els)) {}
+
+  TacticResult exec(const Goal &goal) const override {
+    bool probe = p.check(goal);
+    dbg() << "\nProbe " << p.name << (probe ? " is true\n" : " is false\n");
+    return (probe ? then : els)->exec(goal);
+  }
+};
+
+
+class AndTactic final : public Tactic {
+  vector<unique_ptr<Tactic>> tactics;
+
+  void append(Z3_tactic t) {
+    set(this->t ? Z3_tactic_and_then(ctx(), this->t, t) : t);
+  }
+
+public:
+  AndTactic(initializer_list<const char*> ts) {
+    for (auto *name : ts) {
+      NamedTactic t(name);
+      append(t.t);
+      if (tactic_verbose)
+        tactics.emplace_back(make_unique<NamedTactic>(std::move(t)));
+    }
+  }
+
+  template <typename T1, typename T2>
+  void appendIf(const char *probe, T1 &&then, T2 &&els) {
+    IfTactic t(probe, make_unique<T1>(std::move(then)),
+               make_unique<T2>(std::move(els)));
+    append(t.t);
+    if (tactic_verbose)
+      tactics.emplace_back(make_unique<IfTactic>(std::move(t)));
+  }
+
+  TacticResult exec(const Goal &goal0) const override {
+    Goal goal(goal0);
+    TacticResult r;
+    string last_result;
+
+    for (auto &t : tactics) {
+      r = t->exec(goal);
+      auto newgoal = r.toGoal();
+
+      auto new_r = newgoal.toString();
+      if (new_r != last_result) {
+        dbg() << new_r << '\n';
+        last_result = new_r;
+      } else {
+        dbg() << "(no change)\n";
+      }
+      goal = std::move(newgoal);
+    }
+    return r;
+  }
+};
+
+
+class TopLevelTactic {
+  AndTactic tactics;
+  Goal goal;
+
+public:
+  TopLevelTactic(initializer_list<const char*> ts) : tactics(std::move(ts)) {}
+
+  template <typename T1, typename T2>
+  void appendIf(const char *probe, T1 &&then, T2 &&els) {
+    tactics.appendIf(probe, std::move(then), std::move(els));
+  }
+
+  void add(Z3_ast ast) { goal.add(ast); }
+  void reset_solver()  { goal.reset(); }
+
+  void check() {
+    if (tactic_verbose)
+      goal = tactics.exec(goal).toGoal();
+  }
+
+  Z3_solver getSolver() const {
+    return Z3_mk_solver_from_tactic(ctx(), tactics.t);
+  }
+
+  friend class smt::Solver;
 };
 }
 
-static optional<MultiTactic> tactic;
+static optional<TopLevelTactic> tactic;
 
 
 namespace smt {
@@ -223,7 +356,7 @@ void solver_tactic_verbose(bool yes) {
 
 Solver::Solver(bool simple) {
   s = simple ? Z3_mk_simple_solver(ctx())
-             : Z3_mk_solver_from_tactic(ctx(), tactic->t);
+             : tactic->getSolver();
   Z3_solver_inc_ref(ctx(), s);
 }
 
@@ -407,6 +540,12 @@ void solver_init() {
     "simplify",
     "smt"
   });
+#if 0
+  tactic->appendIf("is-qfbv",
+                   AndTactic({
+                    "bit-blast", "simplify", "solve-eqs", "aig", "sat"}),
+                   NamedTactic("smt"));
+#endif
 }
 
 void solver_destroy() {
