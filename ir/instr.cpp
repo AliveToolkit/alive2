@@ -2364,13 +2364,15 @@ StateValue FnCall::toSMT(State &s) const {
 
       m.copy(ptr_old, Pointer(m, p_new));
 
-      // 1) realloc(ptr, 0) always free the ptr.
-      // 2) If allocation failed, we should not free previous ptr, unless it's
-      // reallocf (always frees the pointer)
-      expr freeptr = fnName == "@reallocf"
-                       ? allocptr
-                       : expr::mkIf(size == 0 || allocated, allocptr, nullp);
-      m.free(freeptr, false);
+      if (!hasAttribute(FnAttrs::NoFree)) {
+        // 1) realloc(ptr, 0) always free the ptr.
+        // 2) If allocation failed, we should not free previous ptr, unless it's
+        // reallocf (always frees the pointer)
+        expr freeptr = fnName == "@reallocf"
+                        ? allocptr
+                        : expr::mkIf(size == 0 || allocated, allocptr, nullp);
+        m.free(freeptr, false);
+      }
     }
 
     // FIXME: for a realloc that zeroes the new stuff
@@ -2384,11 +2386,14 @@ StateValue FnCall::toSMT(State &s) const {
   }
   else if (attrs.has(AllocKind::Free)) {
     auto &allocptr = s.getAndAddPoisonUB(get_alloc_ptr()).value;
-    m.free(allocptr, false);
 
-    if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
-      Pointer ptr(m, allocptr);
-      s.addUB(ptr.isNull() || ptr.isLocal());
+    if (!hasAttribute(FnAttrs::NoFree)) {
+      m.free(allocptr, false);
+
+      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
+        Pointer ptr(m, allocptr);
+        s.addUB(ptr.isNull() || ptr.isLocal());
+      }
     }
     assert(isVoid());
     return {};
