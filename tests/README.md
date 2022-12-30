@@ -18,5 +18,8 @@ three test file formats are supported:
 - if a unit test has the suffix ".c" or ".cpp" then it will be sent to clang(++)
   with tv plugin enabled.
 
+- if a unit test has the suffix ".exec.ll" then it will be sent to 
+  alive-exec-concrete interpreter
+  
 - otherwise, the test is assumed to be written in the Alive domain
   specific language and it will be sent to alive

@@ -3,3 +3,5 @@
 build*/
 *.pyc
 CMakeSettings.json
+temp/*
+tests/temp/*
