@@ -2928,8 +2928,7 @@ StateValue Switch::toSMT(State &s) const {
     s.addJump(std::move(cmp), *bb);
   }
 
-  s.addJump(std::move(default_cond), *default_target);
-  s.addUB(expr(false));
+  s.addJump(std::move(default_cond), *default_target, true);
   return {};
 }
 
