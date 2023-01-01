@@ -301,7 +301,6 @@ public:
 private:
   smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e,
                                    bool isptr);
-  void addJump(const BasicBlock &dst, smt::expr &&cond, bool last_jump = false);
 };
 
 }
