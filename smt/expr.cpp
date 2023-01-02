@@ -1955,14 +1955,15 @@ expr expr::load(const expr &idx) const {
     expr cmp = idx == str_idx;
     if (cmp.isTrue())
       return val;
-    if (cmp.isFalse())
-      return array.load(idx);
+
+    auto loaded = array.load(idx);
+    if (cmp.isFalse() || val.eq(loaded))
+      return loaded;
 
   } else if (isConstArray(val)) {
     return val;
 
-  } else if (Z3_get_ast_kind(ctx(), ast()) == Z3_QUANTIFIER_AST &&
-             Z3_is_lambda(ctx(), ast())) {
+  } else if (Z3_is_lambda(ctx(), ast())) {
     assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
     expr body = Z3_get_quantifier_body(ctx(), ast());
     return body.subst({ idx }).foldTopLevel();

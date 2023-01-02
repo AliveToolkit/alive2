@@ -667,11 +667,11 @@ bool State::startBB(const BasicBlock &bb) {
   return domain;
 }
 
-void State::addJump(const BasicBlock &dst0, expr &&cond, bool always_jump) {
-  always_jump = always_jump || cond.isTrue();
+void State::addJump(expr &&cond, const BasicBlock &dst0, bool always_jump) {
+  always_jump |= cond.isTrue();
 
   cond &= domain.path;
-  if (cond.isFalse())
+  if (cond.isFalse() || !domain)
     return;
 
   auto dst = &dst0;
@@ -693,23 +693,20 @@ void State::addJump(const BasicBlock &dst0, expr &&cond, bool always_jump) {
   data.path.add(std::move(cond));
   data.undef_vars.insert(undef_vars.begin(), undef_vars.end());
   data.undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
+
+  if (always_jump)
+    addUB(expr(false));
 }
 
 void State::addJump(const BasicBlock &dst) {
-  addJump(dst, true, true);
-  addUB(expr(false));
-}
-
-void State::addJump(expr &&cond, const BasicBlock &dst) {
-  addJump(dst, std::move(cond));
+  addJump(true, dst, true);
 }
 
 void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
                         const BasicBlock &dst_false) {
   expr cond_false = cond == 0;
-  addJump(dst_true,  !cond_false);
-  addJump(dst_false, std::move(cond_false), true);
-  addUB(expr(false));
+  addJump(!cond_false, dst_true);
+  addJump(std::move(cond_false), dst_false, true);
 }
 
 void State::addReturn(StateValue &&val) {

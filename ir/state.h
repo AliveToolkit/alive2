@@ -215,7 +215,7 @@ public:
   bool startBB(const BasicBlock &bb);
   void addJump(const BasicBlock &dst);
   // boolean cond
-  void addJump(smt::expr &&cond, const BasicBlock &dst);
+  void addJump(smt::expr &&cond, const BasicBlock &dst, bool last_jump = false);
   // i1 cond
   void addCondJump(const smt::expr &cond, const BasicBlock &dst_true,
                    const BasicBlock &dst_false);
@@ -301,7 +301,6 @@ public:
 private:
   smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e,
                                    bool isptr);
-  void addJump(const BasicBlock &dst, smt::expr &&cond, bool last_jump = false);
 };
 
 }
