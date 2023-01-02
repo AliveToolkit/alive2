@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "cache/cache.h"
+#include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
 #include "smt/smt.h"
@@ -89,164 +90,7 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
 
 optional<smt::smt_initializer> smt_init;
 unique_ptr<Cache> cache;
-
-struct Results {
-  Transform t;
-  string error;
-  Errors errs;
-  enum {
-    ERROR,
-    TYPE_CHECKER_FAILED,
-    SYNTACTIC_EQ,
-    CORRECT,
-    UNSOUND,
-    FAILED_TO_PROVE
-  } status;
-
-  static Results Error(string &&err) {
-    Results r;
-    r.status = ERROR;
-    r.error = std::move(err);
-    return r;
-  }
-};
-
-Results verify(llvm::Function &F1, llvm::Function &F2,
-               llvm::TargetLibraryInfoWrapperPass &TLI,
-               bool print_transform = false,
-               bool always_verify = false) {
-  auto fn1 = llvm2alive(F1, TLI.getTLI(F1), true);
-  if (!fn1)
-    return Results::Error("Could not translate '" + F1.getName().str() +
-                          "' to Alive IR\n");
-
-  auto fn2 = llvm2alive(F2, TLI.getTLI(F2), false, fn1->getGlobalVarNames());
-  if (!fn2)
-    return Results::Error("Could not translate '" + F2.getName().str() +
-                          "' to Alive IR\n");
-
-  Results r;
-  r.t.src = std::move(*fn1);
-  r.t.tgt = std::move(*fn2);
-
-  if (!always_verify) {
-    stringstream ss1, ss2;
-    r.t.src.print(ss1);
-    r.t.tgt.print(ss2);
-    if (std::move(ss1).str() == std::move(ss2).str()) {
-      if (print_transform)
-        r.t.print(*out, {});
-      r.status = Results::SYNTACTIC_EQ;
-      return r;
-    }
-  }
-
-  smt_init->reset();
-  r.t.preprocess();
-  TransformVerify verifier(r.t, false);
-
-  if (print_transform)
-    r.t.print(*out, {});
-
-  {
-    auto types = verifier.getTypings();
-    if (!types) {
-      r.status = Results::TYPE_CHECKER_FAILED;
-      return r;
-    }
-    assert(types.hasSingleTyping());
-  }
-
-  r.errs = verifier.verify();
-  if (r.errs) {
-    r.status = r.errs.isUnsound() ? Results::UNSOUND : Results::FAILED_TO_PROVE;
-  } else {
-    r.status = Results::CORRECT;
-  }
-  return r;
-}
-
-unsigned num_correct = 0;
-unsigned num_unsound = 0;
-unsigned num_failed = 0;
-unsigned num_errors = 0;
-
-bool compareFunctions(llvm::Function &F1, llvm::Function &F2,
-                      llvm::TargetLibraryInfoWrapperPass &TLI) {
-  auto r = verify(F1, F2, TLI, !opt_quiet, opt_always_verify);
-  if (r.status == Results::ERROR) {
-    *out << "ERROR: " << r.error;
-    ++num_errors;
-    return true;
-  }
-
-  if (opt_print_dot) {
-    r.t.src.writeDot("src");
-    r.t.tgt.writeDot("tgt");
-  }
-
-  switch (r.status) {
-  case Results::ERROR:
-    UNREACHABLE();
-    break;
-
-  case Results::SYNTACTIC_EQ:
-    *out << "Transformation seems to be correct! (syntactically equal)\n\n";
-    ++num_correct;
-    break;
-
-  case Results::CORRECT:
-    *out << "Transformation seems to be correct!\n\n";
-    ++num_correct;
-    break;
-
-  case Results::TYPE_CHECKER_FAILED:
-    *out << "Transformation doesn't verify!\n"
-            "ERROR: program doesn't type check!\n\n";
-    ++num_errors;
-    return true;
-
-  case Results::UNSOUND:
-    *out << "Transformation doesn't verify!\n\n";
-    if (!opt_quiet)
-      *out << r.errs << endl;
-    ++num_unsound;
-    return false;
-
-  case Results::FAILED_TO_PROVE:
-    *out << r.errs << endl;
-    ++num_failed;
-    return true;
-  }
-
-  if (opt_bidirectional) {
-    r = verify(F2, F1, TLI, false, opt_always_verify);
-    switch (r.status) {
-    case Results::ERROR:
-    case Results::TYPE_CHECKER_FAILED:
-      UNREACHABLE();
-      break;
-
-    case Results::SYNTACTIC_EQ:
-    case Results::CORRECT:
-      *out << "These functions seem to be equivalent!\n\n";
-      return true;
-
-    case Results::FAILED_TO_PROVE:
-      *out << "Failed to verify the reverse transformation\n\n";
-      if (!opt_quiet)
-        *out << r.errs << endl;
-      return true;
-
-    case Results::UNSOUND:
-      *out << "Reverse transformation doesn't verify!\n\n";
-      if (!opt_quiet)
-        *out << r.errs << endl;
-      return false;
-    }
-  }
-  return true;
-}
+tv_stats stats;
 
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   for (auto &F : M) {
@@ -274,7 +118,7 @@ int main(int argc, char **argv) {
 version )EOF";
   Usage += alive_version;
   Usage += R"EOF(
-see alive-tv --version  for LLVM version info,
+see alive-tv --version for LLVM version info,
 
 This program takes either one or two LLVM IR files files as
 command-line arguments. Both .bc and .ll files are supported.
@@ -297,6 +141,7 @@ convenient way to demonstrate an existing optimizer bug.
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
+  const tv_opts opts(opt_quiet, opt_always_verify, opt_print_dot, opt_bidirectional);
 
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get()) {
@@ -319,7 +164,7 @@ convenient way to demonstrate an existing optimizer bug.
     auto SRC = findFunction(*M1, opt_src_fn);
     auto TGT = findFunction(*M1, opt_tgt_fn);
     if (SRC && TGT) {
-      compareFunctions(*SRC, *TGT, TLI);
+      compareFunctions(*SRC, *TGT, TLI, *smt_init, stats, opts, out);
       goto end;
     } else {
       M2 = CloneModule(*M1);
@@ -359,7 +204,7 @@ convenient way to demonstrate an existing optimizer bug.
         M2_anon_count++;
       if ((F1.getName().empty() && (M1_anon_count == M2_anon_count)) ||
           (F1.getName() == F2.getName())) {
-        if (!compareFunctions(F1, F2, TLI))
+        if (!compareFunctions(F1, F2, TLI, *smt_init, stats, opts, out))
           if (opt_error_fatal)
             goto end;
         break;
@@ -368,10 +213,10 @@ convenient way to demonstrate an existing optimizer bug.
   }
 
   *out << "Summary:\n"
-          "  " << num_correct << " correct transformations\n"
-          "  " << num_unsound << " incorrect transformations\n"
-          "  " << num_failed  << " failed-to-prove transformations\n"
-          "  " << num_errors << " Alive2 errors\n";
+          "  " << stats.num_correct << " correct transformations\n"
+          "  " << stats.num_unsound << " incorrect transformations\n"
+          "  " << stats.num_failed  << " failed-to-prove transformations\n"
+          "  " << stats.num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
@@ -382,5 +227,5 @@ end:
   if (opt_alias_stats)
     IR::Memory::printAliasStats(*out);
 
-  return num_errors > 0;
+  return stats.num_errors > 0;
 }
