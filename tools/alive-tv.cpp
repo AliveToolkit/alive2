@@ -1,7 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "cache/cache.h"
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
@@ -88,10 +87,6 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
   return M;
 }
 
-optional<smt::smt_initializer> smt_init;
-unique_ptr<Cache> cache;
-tv_stats stats;
-
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   for (auto &F : M) {
     if (F.isDeclaration())
@@ -141,7 +136,6 @@ convenient way to demonstrate an existing optimizer bug.
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
-  const tv_opts opts(opt_quiet, opt_always_verify, opt_print_dot, opt_bidirectional);
 
   auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get()) {
@@ -157,14 +151,19 @@ convenient way to demonstrate an existing optimizer bug.
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
   llvm_util::initializer llvm_util_init(*out, DL);
-  smt_init.emplace();
+  smt::smt_initializer smt_init;
+  Verifier verifier(TLI, smt_init, *out);
+  verifier.quiet = opt_quiet;
+  verifier.always_verify = opt_always_verify;
+  verifier.print_dot = opt_print_dot;
+  verifier.bidirectional = opt_bidirectional;
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
     auto SRC = findFunction(*M1, opt_src_fn);
     auto TGT = findFunction(*M1, opt_tgt_fn);
     if (SRC && TGT) {
-      compareFunctions(*SRC, *TGT, TLI, *smt_init, stats, opts, out);
+      verifier.compareFunctions(*SRC, *TGT);
       goto end;
     } else {
       M2 = CloneModule(*M1);
@@ -204,7 +203,7 @@ convenient way to demonstrate an existing optimizer bug.
         M2_anon_count++;
       if ((F1.getName().empty() && (M1_anon_count == M2_anon_count)) ||
           (F1.getName() == F2.getName())) {
-        if (!compareFunctions(F1, F2, TLI, *smt_init, stats, opts, out))
+        if (!verifier.compareFunctions(F1, F2))
           if (opt_error_fatal)
             goto end;
         break;
@@ -213,10 +212,10 @@ convenient way to demonstrate an existing optimizer bug.
   }
 
   *out << "Summary:\n"
-          "  " << stats.num_correct << " correct transformations\n"
-          "  " << stats.num_unsound << " incorrect transformations\n"
-          "  " << stats.num_failed  << " failed-to-prove transformations\n"
-          "  " << stats.num_errors << " Alive2 errors\n";
+          "  " << verifier.num_correct << " correct transformations\n"
+          "  " << verifier.num_unsound << " incorrect transformations\n"
+          "  " << verifier.num_failed  << " failed-to-prove transformations\n"
+          "  " << verifier.num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
@@ -227,5 +226,5 @@ end:
   if (opt_alias_stats)
     IR::Memory::printAliasStats(*out);
 
-  return stats.num_errors > 0;
+  return verifier.num_errors > 0;
 }

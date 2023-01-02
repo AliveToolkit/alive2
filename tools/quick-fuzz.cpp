@@ -1,7 +1,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "cache/cache.h"
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
@@ -76,10 +75,6 @@ llvm::cl::opt<string> optPass(
                    "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
     llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
-optional<smt::smt_initializer> smt_init;
-unique_ptr<Cache> cache;
-tv_stats stats;
-
 // FIXME we might want to be able to specify these on the command
 // line, but these should be pretty good defaults
 const int MaxBBs = 50;
@@ -87,7 +82,7 @@ const int MaxWidth = 20;
 const int MaxCounters = 16;
 const int MaxBoolParams = 16;
 
-std::unique_ptr<std::mt19937_64> Rand;
+std::optional<std::mt19937_64> Rand;
 
 long choose(long Choices) {
   std::uniform_int_distribution<int> Dist(0, Choices - 1);
@@ -97,7 +92,7 @@ long choose(long Choices) {
 void init() {
   auto Seed = (opt_rand_seed == 0) ? (std::random_device{}()) : opt_rand_seed;
   cout << "seed = " << Seed << endl;
-  Rand = std::make_unique<std::mt19937_64>(Seed);
+  Rand.emplace(Seed);
 }
 
 llvm::CmpInst::Predicate random_pred() {
@@ -259,7 +254,6 @@ reduced using llvm-reduce.
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
-  tv_opts opts(opt_quiet, opt_always_verify, opt_print_dot, opt_bidirectional);
 
   unique_ptr<llvm::Module> MDummy;
 #define ARGS_MODULE_VAR MDummy
@@ -267,12 +261,25 @@ reduced using llvm-reduce.
 
   init();
 
+  llvm::Module M1("fuzz", Context);
+  auto &DL = M1.getDataLayout();
+  llvm::Triple targetTriple(M1.getTargetTriple());
+  llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+
+  llvm_util::initializer llvm_util_init(*out, DL);
+  smt::smt_initializer smt_init;
+  Verifier verifier(TLI, smt_init, *out);
+  verifier.quiet = opt_quiet;
+  verifier.always_verify = opt_always_verify;
+  verifier.print_dot = opt_print_dot;
+  verifier.bidirectional = opt_bidirectional;
+
   for (int rep = 0; rep < opt_num_reps; ++rep) {
-    auto M1 = make_unique<llvm::Module>("fuzz", Context);
-    generate(&*M1);
+    M1.dropAllReferences();
+    generate(&M1);
 
     if (opt_run_sroa) {
-      auto err = optimize_module(M1.get(), "sroa,dse");
+      auto err = optimize_module(&M1, "sroa,dse");
       assert(err.empty());
     }
 
@@ -284,62 +291,49 @@ reduced using llvm-reduce.
       llvm::raw_fd_ostream output_file(output_fn.str(), EC);
       if (EC)
         llvm::report_fatal_error("Couldn't open output file, exiting");
-      llvm::WriteBitcodeToFile(*M1.get(), output_file);
+      llvm::WriteBitcodeToFile(M1, output_file);
     }
 
     if (opt_skip_alive)
       continue;
 
-    auto &DL = M1.get()->getDataLayout();
-    llvm::Triple targetTriple(M1.get()->getTargetTriple());
-    llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-
-    llvm_util::initializer llvm_util_init(*out, DL);
-    smt_init.emplace();
-
-    unique_ptr<llvm::Module> M2;
-    M2 = CloneModule(*M1);
+    auto M2 = CloneModule(M1);
     auto err = optimize_module(M2.get(), optPass);
     if (!err.empty()) {
       *out << "Error parsing list of LLVM passes: " << err << '\n';
       return -1;
     }
 
-    if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple()) {
+    if (M1.getTargetTriple() != M2.get()->getTargetTriple()) {
       *out << "Modules have different target triples\n";
       return -1;
     }
 
-    auto *F1 = M1->getFunction("f");
+    auto *F1 = M1.getFunction("f");
     auto *F2 = M2->getFunction("f");
     assert(F1 && F2);
 
-    if (!compareFunctions(*F1, *F2, TLI, *smt_init, stats, opts, out))
+    if (!verifier.compareFunctions(*F1, *F2))
       if (opt_error_fatal)
         goto end;
   }
 
   *out << "Summary:\n"
           "  "
-       << stats.num_correct
+       << verifier.num_correct
        << " correct transformations\n"
           "  "
-       << stats.num_unsound
+       << verifier.num_unsound
        << " incorrect transformations\n"
           "  "
-       << stats.num_failed
+       << verifier.num_failed
        << " failed-to-prove transformations\n"
           "  "
-       << stats.num_errors << " Alive2 errors\n";
+       << verifier.num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
     smt::solver_print_stats(*out);
 
-  smt_init.reset();
-
-  if (opt_alias_stats)
-    IR::Memory::printAliasStats(*out);
-
-  return stats.num_errors > 0;
+  return verifier.num_errors > 0;
 }
