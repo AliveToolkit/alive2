@@ -207,6 +207,10 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
     "tools/alive-tv.cpp"
   )
 
+  add_llvm_executable(backend-tv
+    "tools/backend-tv.cpp"
+  )
+
   add_llvm_executable(quick-fuzz
     "tools/quick-fuzz.cpp"
   )
@@ -260,6 +264,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   llvm_map_components_to_libnames(llvm_libs support core irreader bitwriter analysis passes transformutils asmparser asmprinter target mc mcparser mcdisassembler aarch64asmparser aarch64codegen aarch64desc aarch64disassembler aarch64info aarch64utils)
   #target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
+  target_link_libraries(backend-tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
   target_link_libraries(quick-fuzz PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
   target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
 endif()
@@ -284,5 +289,5 @@ add_custom_target("check"
                  )
 
 if (BUILD_TV)
-  add_dependencies("check" "alive-tv" "quick-fuzz" "tv")
+  add_dependencies("check" "alive-tv" "backend-tv" "quick-fuzz" "tv")
 endif()

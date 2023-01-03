@@ -66,7 +66,7 @@ class Alive2Test(TestFormat):
           (filename.endswith('.opt') or filename.endswith('.src.ll') or
            filename.endswith('.srctgt.ll') or filename.endswith('.c') or
            filename.endswith('.cpp') or filename.endswith('.opt.ll') or
-           filename.endswith('.ident.ll') or
+           filename.endswith('.ident.ll') or filename.endswith('.aarch64.ll') or
            filename.endswith('.exec.ll') or 
            filename.endswith('.ll')):
         yield lit.Test.Test(testSuite, path_in_suite + (filename,), localConfig)
@@ -78,10 +78,15 @@ class Alive2Test(TestFormat):
     alive_tv_1 = test.endswith('.srctgt.ll')
     alive_tv_2 = test.endswith('.src.ll')
     alive_tv_3 = test.endswith('.ident.ll')
+    alive_tv_4 = test.endswith('.aarch64.ll')
     if alive_tv_1 or alive_tv_2 or alive_tv_3:
       cmd = ['./alive-tv', '-smt-to=20000', '-always-verify']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
+    if alive_tv_4:
+      cmd = ['./backend-tv', '-smt-to=20000', '-always-verify']
+      if not os.path.isfile('backend-tv'):
+        return lit.Test.UNSUPPORTED, ''      
 
     opt_tv = test.endswith('.opt.ll')
     if opt_tv:
@@ -107,12 +112,12 @@ class Alive2Test(TestFormat):
     # TODO hacky way of using interpreter with .ll files
     llvm_exec = test.endswith('.ll')
     if llvm_exec and not alive_tv_1 and not alive_tv_2 and \
-       not alive_tv_3:
+       not alive_tv_3 and not alive_tv_4:
       cmd = ['./alive-interp']
       if not os.path.isfile('alive-interp'):
         return lit.Test.UNSUPPORTED, ''
 
-    if not alive_tv_1 and not alive_tv_2 and not alive_tv_3 and \
+    if not alive_tv_1 and not alive_tv_2 and not alive_tv_3 and not alive_tv_4 and \
        not clang_tv and not opt_tv and not alive_exec and not llvm_exec:
        #not clang_tv and not opt_tv and not alive_exec and not llvm_exec:
       cmd = ['./alive', '-smt-to:20000']

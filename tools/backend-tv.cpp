@@ -70,10 +70,8 @@ llvm::cl::opt<string>
                            "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
             llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
-llvm::cl::opt<bool> opt_backend_tv(
-    LLVM_ARGS_PREFIX "backend-tv",
-    llvm::cl::desc("Verify operation of a backend (default=false)"),
-    llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+// FIXME
+bool opt_backend_tv = true;
 
 llvm::cl::opt<bool> opt_asm_only(
     "asm-only",
