@@ -1,4 +1,4 @@
-; TEST-ARGS: -backend-tv --disable-undef-input
+; TEST-ARGS: --disable-undef-input
 
 
 define i64 @umull(i64 %0, i64 %1) {
