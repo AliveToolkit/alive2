@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "cache/cache.h"
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
@@ -255,6 +256,7 @@ reduced using llvm-reduce.
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
+  unique_ptr<Cache> cache;
   unique_ptr<llvm::Module> MDummy;
 #define ARGS_MODULE_VAR MDummy
 #include "llvm_util/cmd_args_def.h"
