@@ -2,7 +2,7 @@
 // util/spaceship.h
 #include "llvm/MC/MCAsmInfo.h"
 
-#include "backend_tv/mc.h"
+#include "backend_tv/backend_tv.h"
 #include "util/sort.h"
 
 #include "llvm/ADT/BitVector.h"
@@ -3718,42 +3718,32 @@ Function *adjustSrcReturn(Function *srcFn) {
   return NF;
 }
 
-} // namespace
+const char *TripleName = "aarch64-arm-none-eabi";
+const char *CPU = "apple-a12";
 
-pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule, bool asm_input,
-                                       string opt_file2, bool opt_asm_only,
-                                       Function *srcFn) {
-
-  // FIXME -- both adjustSrcInputs and adjustSrcReturn create an
-  // entirely new function, this is slow and not elegant, probably
-  // merge these together
-  outs() << "\n---------- src.ll ----------\n";
-  srcFn->print(outs());
-  srcFn = adjustSrcInputs(srcFn);
-  outs() << "\n---------- src.ll ---- changed-input -\n";
-  srcFn->print(outs());
-  srcFn = adjustSrcReturn(srcFn);
-  outs() << "\n---------- src.ll ---- changed-return -\n";
-  srcFn->print(outs());
-
-  LLVMInitializeAArch64TargetInfo();
-  LLVMInitializeAArch64Target();
-  LLVMInitializeAArch64TargetMC();
-  LLVMInitializeAArch64AsmParser();
-  LLVMInitializeAArch64AsmPrinter();
-
-  string Error;
-  const char *TripleName = "aarch64-arm-none-eabi";
-  auto Target = TargetRegistry::lookupTarget(TripleName, Error);
-  if (!Target) {
-    cerr << Error;
-    exit(-1);
+SourceMgr loadAsm(string &opt_file2) {
+  ExitOnError ExitOnErr;
+  auto MB_Asm =
+    ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(opt_file2)));
+  assert(MB_Asm);
+  cout << "reading asm from file\n";
+  for (auto it = MB_Asm->getBuffer().begin(); it != MB_Asm->getBuffer().end();
+       ++it) {
+    cout << *it;
   }
+  cout << "-------------\n";
+
+  SourceMgr SrcMgr;
+  SrcMgr.AddNewSourceBuffer(std::move(MB_Asm), SMLoc());
+  return SrcMgr;
+}
+
+SourceMgr generateAsm(Module &OrigModule, const Target *Target) {
   TargetOptions Opt;
-  const char *CPU = "apple-a12";
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
       Target->createTargetMachine(TripleName, CPU, "", Opt, RM));
+  
   SmallString<1024> Asm;
   raw_svector_ostream Dest(Asm);
 
@@ -3764,55 +3754,83 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
   }
   pass.run(OrigModule);
 
-  // FIXME only do this in verbose mode, or something
   cout << "\n----------arm asm----------\n\n";
   for (size_t i = 0; i < Asm.size(); ++i)
     cout << Asm[i];
   cout << "-------------\n";
   cout << "\n\n";
+
+  auto Buf = MemoryBuffer::getMemBuffer(Asm.c_str());
+  SourceMgr SrcMgr;
+  SrcMgr.AddNewSourceBuffer(std::move(Buf), SMLoc());
+  return SrcMgr;
+}
+
+} // namespace
+
+pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule, bool asm_input,
+                                       string opt_file2, bool opt_asm_only,
+                                       Function *srcFn) {
+  if (srcFn->isVarArg())
+    report_fatal_error("Varargs not supported");
+
+  // FIXME -- both adjustSrcInputs and adjustSrcReturn create an
+  // entirely new function, this is slow and not elegant, probably
+  // merge these together
+  
+  outs() << "\n---------- src.ll ----------\n";
+  srcFn->print(outs());
+
+  srcFn = adjustSrcInputs(srcFn);
+  
+  outs() << "\n---------- src.ll ---- changed-input -\n";
+  srcFn->print(outs());
+
+  srcFn = adjustSrcReturn(srcFn);
+  
+  outs() << "\n---------- src.ll ---- changed-return -\n";
+  srcFn->print(outs());
+  
+  LLVMInitializeAArch64TargetInfo();
+  LLVMInitializeAArch64Target();
+  LLVMInitializeAArch64TargetMC();
+  LLVMInitializeAArch64AsmParser();
+  LLVMInitializeAArch64AsmPrinter();
+
+  string Error;
+  auto *Target = TargetRegistry::lookupTarget(TripleName, Error);
+  if (!Target) {
+    cerr << Error;
+    exit(-1);
+  }
+
+  SourceMgr SrcMgr = asm_input ?
+    loadAsm(opt_file2) :
+    generateAsm(OrigModule, Target);
+
+  unique_ptr<MCInstrInfo> MCII(Target->createMCInstrInfo());
+  assert(MCII && "Unable to create instruction info!");
+
   Triple TheTriple(TripleName);
 
   auto MCOptions = mc::InitMCTargetOptionsFromFlags();
   unique_ptr<MCRegisterInfo> MRI(Target->createMCRegInfo(TripleName));
   assert(MRI && "Unable to create target register info!");
 
-  unique_ptr<MCAsmInfo> MAI(
-      Target->createMCAsmInfo(*MRI, TripleName, MCOptions));
-  assert(MAI && "Unable to create MC asm info!");
-
   unique_ptr<MCSubtargetInfo> STI(
       Target->createMCSubtargetInfo(TripleName, CPU, ""));
   assert(STI && "Unable to create subtarget info!");
   assert(STI->isCPUStringValid(CPU) && "Invalid CPU!");
 
-  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get());
-  SourceMgr SrcMgr;
-
-  if (asm_input) {
-    ExitOnError ExitOnErr;
-    auto MB_Asm =
-        ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(opt_file2)));
-    assert(MB_Asm);
-    cout << "reading asm from file\n";
-    for (auto it = MB_Asm->getBuffer().begin(); it != MB_Asm->getBuffer().end();
-         ++it) {
-      cout << *it;
-    }
-    cout << "-------------\n";
-    SrcMgr.AddNewSourceBuffer(std::move(MB_Asm), SMLoc());
-  } else {
-    auto Buf = MemoryBuffer::getMemBuffer(Asm.c_str());
-    SrcMgr.AddNewSourceBuffer(std::move(Buf), SMLoc());
-  }
-
-  unique_ptr<MCInstrInfo> MCII(Target->createMCInstrInfo());
-  assert(MCII && "Unable to create instruction info!");
-
+  unique_ptr<MCAsmInfo> MAI(
+      Target->createMCAsmInfo(*MRI, TripleName, MCOptions));
+  assert(MAI && "Unable to create MC asm info!");
   unique_ptr<MCInstPrinter> IPtemp(
       Target->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get());
   MCStreamerWrapper MCSW(Ctx, Ana.get(), IPtemp.get(), MRI.get());
 
   unique_ptr<MCAsmParser> Parser(createMCAsmParser(SrcMgr, Ctx, MCSW, *MAI));
@@ -3849,9 +3867,6 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
   }
 
   cout << "\n\n";
-
-  if (srcFn->isVarArg())
-    report_fatal_error("Varargs not supported");
 
   MCSW.printBlocksMF();
   MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
