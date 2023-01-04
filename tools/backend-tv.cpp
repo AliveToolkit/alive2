@@ -56,6 +56,18 @@ llvm::cl::opt<std::string> opt_fn(LLVM_ARGS_PREFIX "fn",
 
 // FIXME support opt_asm_only and opt_asm_input
   
+llvm::cl::opt<bool> opt_asm_only(
+    "asm-only",
+    llvm::cl::desc("Only generate assembly and exit (default=false)"),
+    llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
+llvm::cl::opt<bool> opt_asm_input(
+    "asm-input",
+    llvm::cl::desc("Use 2nd positional input as assembly, instead of "
+		   "lifting the provided LLVM IR. This is to support"
+		   "negative test cases (default=false)"),
+    llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
@@ -140,7 +152,6 @@ version )EOF";
   verifier.bidirectional = opt_bidirectional;
 
   // find the function we care about
-  // lift it
   llvm::Function *origF = nullptr;
   if (opt_fn == "") {
     origF = findFirstFunction(*M1);
@@ -155,8 +166,8 @@ version )EOF";
   std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", Context);
   M2->setDataLayout(M1.get()->getDataLayout());
   M2->setTargetTriple(M1.get()->getTargetTriple());
-  
   auto [F1, F2] = lift_func(*M1.get(), *M2.get(), false, "", false, origF);
+  
   verifier.compareFunctions(*F1, *F2);
 
   *out << "Summary:\n"
