@@ -5,6 +5,7 @@
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
+#include "llvm_util/utils.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
@@ -70,34 +71,6 @@ llvm::cl::opt<string>
             llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
 
-llvm::ExitOnError ExitOnErr;
-
-// adapted from llvm-dis.cpp
-std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
-                                            const string &InputFilename) {
-  auto MB =
-    ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
-  llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(std::move(MB), Diag, Context,
-                           /*ShouldLazyLoadMetadata=*/true);
-  if (!M) {
-    Diag.print("", llvm::errs(), false);
-    return 0;
-  }
-  ExitOnErr(M->materializeAll());
-  return M;
-}
-
-llvm::Function *findFunction(llvm::Module &M, const string &FName) {
-  for (auto &F : M) {
-    if (F.isDeclaration())
-      continue;
-    if (FName.compare(F.getName()) != 0)
-      continue;
-    return &F;
-  }
-  return 0;
-}
 }
 
 unique_ptr<Cache> cache;
@@ -139,7 +112,7 @@ convenient way to demonstrate an existing optimizer bug.
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
-  auto M1 = openInputFile(Context, opt_file1);
+  auto M1 = openInputFile(&Context, opt_file1);
   if (!M1.get()) {
     cerr << "Could not read bitcode from '" << opt_file1 << "'\n";
     return -1;
@@ -162,8 +135,8 @@ convenient way to demonstrate an existing optimizer bug.
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
-    auto SRC = findFunction(*M1, opt_src_fn);
-    auto TGT = findFunction(*M1, opt_tgt_fn);
+    auto SRC = findFunction(M1.get(), opt_src_fn);
+    auto TGT = findFunction(M1.get(), opt_tgt_fn);
     if (SRC && TGT) {
       verifier.compareFunctions(*SRC, *TGT);
       goto end;
@@ -176,7 +149,7 @@ convenient way to demonstrate an existing optimizer bug.
       }
     }
   } else {
-    M2 = openInputFile(Context, opt_file2);
+    M2 = openInputFile(&Context, opt_file2);
     if (!M2.get()) {
       *out << "Could not read bitcode from '" << opt_file2 << "'\n";
       return -1;

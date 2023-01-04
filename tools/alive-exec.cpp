@@ -4,6 +4,7 @@
 #include "cache/cache.h"
 #include "ir/type.h"
 #include "llvm_util/llvm2alive.h"
+#include "llvm_util/utils.h"
 #include "smt/expr.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
@@ -45,25 +46,6 @@ namespace {
 llvm::cl::opt<string> opt_file(llvm::cl::Positional,
   llvm::cl::desc("bitcode_file"), llvm::cl::Required,
   llvm::cl::value_desc("filename"), llvm::cl::cat(alive_cmdargs));
-
-
-llvm::ExitOnError ExitOnErr;
-
-// adapted from llvm-dis.cpp
-std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
-                                            const string &InputFilename) {
-  auto MB =
-    ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
-  llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(std::move(MB), Diag, Context,
-                           /*ShouldLazyLoadMetadata=*/true);
-  if (!M) {
-    Diag.print("", llvm::errs(), false);
-    return 0;
-  }
-  ExitOnErr(M->materializeAll());
-  return M;
-}
 
 optional<smt::smt_initializer> smt_init;
 unique_ptr<Cache> cache;
@@ -235,7 +217,7 @@ will attempt to execute every function in the bitcode file.
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
-  auto M = openInputFile(Context, opt_file);
+  auto M = openInputFile(&Context, opt_file);
   if (!M.get()) {
     cerr << "Could not read bitcode from '" << opt_file << "'\n";
     return -1;
