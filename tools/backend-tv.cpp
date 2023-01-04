@@ -17,8 +17,9 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -53,6 +54,11 @@ llvm::cl::opt<std::string> opt_fn(LLVM_ARGS_PREFIX "fn",
   llvm::cl::desc("Name of function to verify, without @ (default "
                  "= first function in the module)"),
   llvm::cl::cat(alive_cmdargs));
+
+llvm::cl::opt<bool> opt_optimize_tgt(LLVM_ARGS_PREFIX "optimize-tgt",
+  llvm::cl::desc("Optimize lifted code before performing translation "
+		 "validation (default=true)"),
+  llvm::cl::cat(alive_cmdargs), llvm::cl::init(true));
 
 // FIXME support opt_asm_only and opt_asm_input
   
@@ -168,6 +174,14 @@ version )EOF";
   M2->setTargetTriple(M1.get()->getTargetTriple());
   auto [F1, F2] = lift_func(*M1.get(), *M2.get(), false, "", false, origF);
   
+  if (llvm::verifyModule(*M2.get(), &llvm::errs()))
+    llvm::report_fatal_error("Lifted module is broken, this should not happen");
+
+  if (opt_optimize_tgt) {
+    auto err = optimize_module(M2.get(), "Oz");
+    assert(err.empty());
+  }
+
   verifier.compareFunctions(*F1, *F2);
 
   *out << "Summary:\n"

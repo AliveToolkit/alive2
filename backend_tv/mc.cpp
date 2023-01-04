@@ -3723,28 +3723,29 @@ const char *CPU = "apple-a12";
 
 SourceMgr loadAsm(string &opt_file2) {
   ExitOnError ExitOnErr;
-  auto MB_Asm =
+  auto MB =
     ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(opt_file2)));
-  assert(MB_Asm);
+  assert(MB);
+
   cout << "reading asm from file\n";
-  for (auto it = MB_Asm->getBuffer().begin(); it != MB_Asm->getBuffer().end();
+  for (auto it = MB->getBuffer().begin(); it != MB->getBuffer().end();
        ++it) {
     cout << *it;
   }
   cout << "-------------\n";
 
   SourceMgr SrcMgr;
-  SrcMgr.AddNewSourceBuffer(std::move(MB_Asm), SMLoc());
+  SrcMgr.AddNewSourceBuffer(std::move(MB), SMLoc());
   return SrcMgr;
 }
 
-SourceMgr generateAsm(Module &OrigModule, const Target *Target) {
+SourceMgr generateAsm(Module &OrigModule, const Target *Target,
+		      SmallString<1024> &Asm) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
       Target->createTargetMachine(TripleName, CPU, "", Opt, RM));
   
-  SmallString<1024> Asm;
   raw_svector_ostream Dest(Asm);
 
   legacy::PassManager pass;
@@ -3804,9 +3805,10 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
     exit(-1);
   }
 
+  SmallString<1024> Asm;
   SourceMgr SrcMgr = asm_input ?
     loadAsm(opt_file2) :
-    generateAsm(OrigModule, Target);
+    generateAsm(OrigModule, Target, Asm);
 
   unique_ptr<MCInstrInfo> MCII(Target->createMCInstrInfo());
   assert(MCII && "Unable to create instruction info!");
