@@ -143,13 +143,13 @@ version )EOF";
 
   // this rewrites the signature of the function so it has to return a
   // new pointer
-  srcFn = adjust(srcFn);
+  srcFn = lifter::adjust(srcFn);
   
   std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", Context);
   M2->setDataLayout(M1.get()->getDataLayout());
   M2->setTargetTriple(M1.get()->getTargetTriple());
 
-  auto [F1, F2] = lift_func(M1.get(), M2.get(), false, "", false, srcFn);
+  auto [F1, F2] = lifter::lift_func(M1.get(), M2.get(), false, "", false, srcFn);
   
   if (llvm::verifyModule(*M2.get(), &llvm::errs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");

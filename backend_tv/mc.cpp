@@ -3769,6 +3769,8 @@ SourceMgr generateAsm(Module &OrigModule, const Target *Target,
 
 } // namespace
 
+namespace lifter {
+
 Function *adjust(Function *srcFn) {
   // FIXME -- both adjustSrcInputs and adjustSrcReturn create an
   // entirely new function, this is slow and not elegant, probably
@@ -3898,3 +3900,5 @@ pair<Function *, Function *> lift_func(Module *OrigModule, Module *LiftedModule,
   return make_pair(srcFn, arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(),
                                        MRI.get()));
 }
+
+} // namespace
