@@ -19,6 +19,7 @@ This category is for bugs that generating wrong codes from passes
 17. miscompile a usub.sat on AArch64 (https://github.com/llvm/llvm-project/issues/58109)
 18. miscompile of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
 19. miscompile from aarch64 backend with global isel (https://github.com/llvm/llvm-project/issues/58431)
+20. i34 miscompile in miscombine (https://github.com/llvm/llvm-project/issues/59836)
 
 
 ## Category 2
