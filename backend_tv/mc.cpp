@@ -3584,30 +3584,39 @@ public:
 const char *TripleName = "aarch64-arm-none-eabi";
 const char *CPU = "apple-a12";
 
-SourceMgr loadAsm(string &opt_file2) {
-  ExitOnError ExitOnErr;
-  auto MB =
-    ExitOnErr(errorOrToExpected(MemoryBuffer::getFile(opt_file2)));
-  assert(MB);
+} // namespace
 
-  cout << "reading asm from file\n";
-  for (auto it = MB->getBuffer().begin(); it != MB->getBuffer().end();
-       ++it) {
-    cout << *it;
+namespace lifter {
+
+unsigned int orig_ret_bitwidth{64};
+bool has_ret_attr{false};
+
+// Keep track of which oprands had their type adjusted and their original
+// bitwidth
+vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
+
+const Target *Targ;
+
+void init() {
+  LLVMInitializeAArch64TargetInfo();
+  LLVMInitializeAArch64Target();
+  LLVMInitializeAArch64TargetMC();
+  LLVMInitializeAArch64AsmParser();
+  LLVMInitializeAArch64AsmPrinter();
+
+  string Error;
+  Targ = TargetRegistry::lookupTarget(TripleName, Error);
+  if (!Targ) {
+    cerr << Error;
+    exit(-1);
   }
-  cout << "-------------\n";
-
-  SourceMgr SrcMgr;
-  SrcMgr.AddNewSourceBuffer(std::move(MB), SMLoc());
-  return SrcMgr;
 }
 
-SourceMgr generateAsm(Module &OrigModule, const Target *Target,
-		      SmallString<1024> &Asm) {
+SourceMgr generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
-      Target->createTargetMachine(TripleName, CPU, "", Opt, RM));
+      Targ->createTargetMachine(TripleName, CPU, "", Opt, RM));
   
   raw_svector_ostream Dest(Asm);
 
@@ -3630,61 +3639,27 @@ SourceMgr generateAsm(Module &OrigModule, const Target *Target,
   return SrcMgr;
 }
 
-} // namespace
-
-namespace lifter {
-
-unsigned int orig_ret_bitwidth{64};
-bool has_ret_attr{false};
-
-// Keep track of which oprands had their type adjusted and their original
-// bitwidth
-vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
-
-const Target *Target;
-
-void init() {
-  LLVMInitializeAArch64TargetInfo();
-  LLVMInitializeAArch64Target();
-  LLVMInitializeAArch64TargetMC();
-  LLVMInitializeAArch64AsmParser();
-  LLVMInitializeAArch64AsmPrinter();
-
-  string Error;
-  Target = TargetRegistry::lookupTarget(TripleName, Error);
-  if (!Target) {
-    cerr << Error;
-    exit(-1);
-  }
-}
-
-pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, bool asm_input,
-				      string opt_file2, bool opt_asm_only,
-				      Function *srcFn) {
-  SmallString<1024> Asm;
-  SourceMgr SrcMgr = asm_input ?
-    loadAsm(opt_file2) :
-    generateAsm(*OrigModule, Target, Asm);
-
-  unique_ptr<MCInstrInfo> MCII(Target->createMCInstrInfo());
+pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
+				      Function *srcFn, SourceMgr &SrcMgr) {
+  unique_ptr<MCInstrInfo> MCII(Targ->createMCInstrInfo());
   assert(MCII && "Unable to create instruction info!");
 
   Triple TheTriple(TripleName);
 
   auto MCOptions = mc::InitMCTargetOptionsFromFlags();
-  unique_ptr<MCRegisterInfo> MRI(Target->createMCRegInfo(TripleName));
+  unique_ptr<MCRegisterInfo> MRI(Targ->createMCRegInfo(TripleName));
   assert(MRI && "Unable to create target register info!");
 
   unique_ptr<MCSubtargetInfo> STI(
-      Target->createMCSubtargetInfo(TripleName, CPU, ""));
+      Targ->createMCSubtargetInfo(TripleName, CPU, ""));
   assert(STI && "Unable to create subtarget info!");
   assert(STI->isCPUStringValid(CPU) && "Invalid CPU!");
 
   unique_ptr<MCAsmInfo> MAI(
-      Target->createMCAsmInfo(*MRI, TripleName, MCOptions));
+      Targ->createMCAsmInfo(*MRI, TripleName, MCOptions));
   assert(MAI && "Unable to create MC asm info!");
   unique_ptr<MCInstPrinter> IPtemp(
-      Target->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
+      Targ->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
@@ -3697,7 +3672,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, 
   MCTargetOptions Opts;
   Opts.PreserveAsmComments = false;
   unique_ptr<MCTargetAsmParser> TAP(
-      Target->createMCAsmParser(*STI, *Parser, *MCII, Opts));
+      Targ->createMCAsmParser(*STI, *Parser, *MCII, Opts));
   assert(TAP);
   Parser->setTargetParser(*TAP);
   Parser->Run(true); // ??
@@ -3714,14 +3689,6 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, 
   for (auto I : MCSW.Insts) {
     I.dump_pretty(errs());
     errs() << '\n';
-  }
-
-  if (opt_asm_only) {
-    cout << "arm instruction count = " << MCSW.Insts.size() << "\n";
-    cout.flush();
-    errs().flush();
-    cerr.flush();
-    exit(0);
   }
 
   cout << "\n\n";

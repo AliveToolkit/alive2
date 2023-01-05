@@ -68,12 +68,12 @@ llvm::cl::opt<bool> opt_asm_only(
     llvm::cl::desc("Only generate assembly and exit (default=false)"),
     llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<bool> opt_asm_input(
+llvm::cl::opt<string> opt_asm_input(
     "asm-input",
-    llvm::cl::desc("Use 2nd positional input as assembly, instead of "
-		   "lifting the provided LLVM IR. This is to support"
-		   "negative test cases (default=false)"),
-    llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+    llvm::cl::desc("Use the provied file as lifted assembly, instead of "
+		   "lifting the LLVM IR. This is only for testing. "
+		   "(default=no asm input)"),
+    llvm::cl::cat(alive_cmdargs));
 
 llvm::ExitOnError ExitOnErr;
 
@@ -84,6 +84,24 @@ llvm::Function *findFirstFunction(llvm::Module &M) {
     return &F;
   }
   return 0;
+}
+
+llvm::SourceMgr loadAsm(string &file_name) {
+  llvm::ExitOnError ExitOnErr;
+  auto MB =
+    ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(file_name)));
+  assert(MB);
+
+  cout << "reading asm from file\n";
+  for (auto it = MB->getBuffer().begin(); it != MB->getBuffer().end();
+       ++it) {
+    cout << *it;
+  }
+  cout << "-------------\n";
+
+  llvm::SourceMgr SrcMgr;
+  SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
+  return SrcMgr;
 }
 
 } // namespace
@@ -150,7 +168,16 @@ version )EOF";
   M2->setTargetTriple(M1.get()->getTargetTriple());
 
   lifter::init();
-  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), false, "", false, srcFn);
+  llvm::SmallString<1024> Asm;
+  llvm::SourceMgr SrcMgr = (opt_asm_input == "") ?
+    lifter::generateAsm(*M1.get(), Asm) : 
+    loadAsm(opt_asm_input);
+
+  if (opt_asm_only)
+    exit(0);
+
+  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn,
+				   SrcMgr);
   
   if (llvm::verifyModule(*M2.get(), &llvm::errs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
