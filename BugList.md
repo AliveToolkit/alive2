@@ -80,6 +80,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 73. InstCombine: incorrect fabs formation (https://llvm.org/PR59279)
 74. InstCombine: incorrect select + fast-math swap (https://llvm.org/PR59451)
 75. SCEV expander introduces poison when hoisting IV (https://llvm.org/PR59777)
+76. InstCombine: incorrect overflow check simplification (https://llvm.org/59836)
 
 
 ### Bugs found in Z3
