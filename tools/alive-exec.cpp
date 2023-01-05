@@ -217,7 +217,7 @@ will attempt to execute every function in the bitcode file.
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
-  auto M = openInputFile(&Context, opt_file);
+  auto M = openInputFile(Context, opt_file);
   if (!M.get()) {
     cerr << "Could not read bitcode from '" << opt_file << "'\n";
     return -1;
