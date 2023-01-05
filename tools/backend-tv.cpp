@@ -20,7 +20,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -86,7 +85,7 @@ llvm::Function *findFirstFunction(llvm::Module &M) {
   return 0;
 }
 
-llvm::SourceMgr loadAsm(string &file_name) {
+unique_ptr<llvm::MemoryBuffer> loadAsm(string &file_name) {
   llvm::ExitOnError ExitOnErr;
   auto MB =
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(file_name)));
@@ -99,9 +98,7 @@ llvm::SourceMgr loadAsm(string &file_name) {
   }
   cout << "-------------\n";
 
-  llvm::SourceMgr SrcMgr;
-  SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
-  return SrcMgr;
+  return MB;
 }
 
 } // namespace
@@ -169,18 +166,15 @@ version )EOF";
 
   lifter::init();
   llvm::SmallString<1024> Asm;
-  llvm::SourceMgr SrcMgr = (opt_asm_input == "") ?
-    lifter::generateAsm(*M1.get(), Asm) : 
-    loadAsm(opt_asm_input);
+  auto AsmBuffer = (opt_asm_input != "") ?
+    loadAsm(opt_asm_input) :
+    lifter::generateAsm(*M1.get(), Asm);
 
   if (opt_asm_only)
     exit(0);
 
-  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn, SrcMgr);
+  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn, std::move(AsmBuffer));
   
-  if (llvm::verifyModule(*M2.get(), &llvm::errs()))
-    llvm::report_fatal_error("Lifted module is broken, this should not happen");
-
   if (opt_optimize_tgt) {
     auto err = optimize_module(M2.get(), "Oz");
     assert(err.empty());

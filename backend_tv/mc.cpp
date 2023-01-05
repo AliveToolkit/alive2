@@ -17,6 +17,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/MCContext.h"
@@ -3612,7 +3613,7 @@ void init() {
   }
 }
 
-SourceMgr generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
+unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
@@ -3633,14 +3634,14 @@ SourceMgr generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
   cout << "-------------\n";
   cout << "\n\n";
 
-  auto Buf = MemoryBuffer::getMemBuffer(Asm.c_str());
-  SourceMgr SrcMgr;
-  SrcMgr.AddNewSourceBuffer(std::move(Buf), SMLoc());
-  return SrcMgr;
+  return MemoryBuffer::getMemBuffer(Asm.c_str());
 }
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
-				      Function *srcFn, SourceMgr &SrcMgr) {
+				      Function *srcFn, unique_ptr<MemoryBuffer> MB) {
+  llvm::SourceMgr SrcMgr;
+  SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
+
   unique_ptr<MCInstrInfo> MCII(Targ->createMCInstrInfo());
   assert(MCII && "Unable to create instruction info!");
 
@@ -3714,8 +3715,12 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   cout << "after SSA conversion\n";
   MCSW.printBlocksMF();
 
-  return make_pair(srcFn, arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(),
-                                       MRI.get()));
+  auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
+
+  if (llvm::verifyModule(*LiftedModule, &llvm::errs()))
+    llvm::report_fatal_error("Lifted module is broken, this should not happen");
+
+  return make_pair(srcFn, lifted);
 }
 
 } // namespace

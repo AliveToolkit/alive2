@@ -1,7 +1,7 @@
 #include <utility>
 #include <vector>
 
-// FIXME
+// FIXME get rid of these eventually
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -25,11 +25,11 @@ void init();
 
 llvm::Function *adjustSrc(llvm::Function *srcFn);
 
-llvm::SourceMgr generateAsm(llvm::Module &OrigModule,
-			    llvm::SmallString<1024> &Asm);
+std::unique_ptr<llvm::MemoryBuffer> generateAsm(llvm::Module &OrigModule,
+						llvm::SmallString<1024> &Asm);
 
 std::pair<llvm::Function *, llvm::Function *>
 liftFunc(llvm::Module *OrigModule, llvm::Module *LiftedModule,
-	 llvm::Function *srcFnLLVM, llvm::SourceMgr &SrcMgr);
+	 llvm::Function *srcFnLLVM, std::unique_ptr<llvm::MemoryBuffer> MB);
 
 }
