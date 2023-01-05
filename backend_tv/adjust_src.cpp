@@ -2,7 +2,7 @@
 // util/spaceship.h
 #include "llvm/MC/MCAsmInfo.h"
 
-#include "backend_tv/backend_tv.h"
+#include "backend_tv/lifter.h"
 #include "util/sort.h"
 
 #include "llvm/ADT/BitVector.h"

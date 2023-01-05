@@ -1,7 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "backend_tv/backend_tv.h"
+#include "backend_tv/lifter.h"
 #include "cache/cache.h"
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
@@ -176,8 +176,7 @@ version )EOF";
   if (opt_asm_only)
     exit(0);
 
-  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn,
-				   SrcMgr);
+  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn, SrcMgr);
   
   if (llvm::verifyModule(*M2.get(), &llvm::errs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
