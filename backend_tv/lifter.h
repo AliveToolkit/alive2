@@ -16,10 +16,14 @@ namespace llvm {
 
 namespace lifter {
 
-// FIXME
+// FIXME we'd rather not have these globals shared across files
 extern std::vector<std::pair<unsigned, unsigned>> new_input_idx_bitwidth;
 extern unsigned orig_ret_bitwidth;
 extern bool has_ret_attr;
+extern const llvm::Target *Targ;
+
+inline const char *TripleName = "aarch64-arm-none-eabi";
+inline const char *CPU = "apple-a12";
 
 void init();
 

@@ -85,22 +85,6 @@ llvm::Function *findFirstFunction(llvm::Module &M) {
   return 0;
 }
 
-unique_ptr<llvm::MemoryBuffer> loadAsm(string &file_name) {
-  llvm::ExitOnError ExitOnErr;
-  auto MB =
-    ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(file_name)));
-  assert(MB);
-
-  cout << "reading asm from file\n";
-  for (auto it = MB->getBuffer().begin(); it != MB->getBuffer().end();
-       ++it) {
-    cout << *it;
-  }
-  cout << "-------------\n";
-
-  return MB;
-}
-
 } // namespace
 
 unique_ptr<Cache> cache;
@@ -167,8 +151,15 @@ version )EOF";
   lifter::init();
   llvm::SmallString<1024> Asm;
   auto AsmBuffer = (opt_asm_input != "") ?
-    loadAsm(opt_asm_input) :
+    ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
     lifter::generateAsm(*M1.get(), Asm);
+
+  cout << "\n\nARM Assembly:\n\n";
+  for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
+       ++it) {
+    cout << *it;
+  }
+  cout << "-------------\n";
 
   if (opt_asm_only)
     exit(0);

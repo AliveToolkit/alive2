@@ -3582,60 +3582,17 @@ public:
   return reads;
 }
 
-const char *TripleName = "aarch64-arm-none-eabi";
-const char *CPU = "apple-a12";
-
 } // namespace
 
 namespace lifter {
 
 unsigned int orig_ret_bitwidth{64};
 bool has_ret_attr{false};
+const Target *Targ;
 
 // Keep track of which oprands had their type adjusted and their original
 // bitwidth
 vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
-
-const Target *Targ;
-
-void init() {
-  LLVMInitializeAArch64TargetInfo();
-  LLVMInitializeAArch64Target();
-  LLVMInitializeAArch64TargetMC();
-  LLVMInitializeAArch64AsmParser();
-  LLVMInitializeAArch64AsmPrinter();
-
-  string Error;
-  Targ = TargetRegistry::lookupTarget(TripleName, Error);
-  if (!Targ) {
-    cerr << Error;
-    exit(-1);
-  }
-}
-
-unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
-  TargetOptions Opt;
-  auto RM = optional<Reloc::Model>();
-  unique_ptr<TargetMachine> TM(
-      Targ->createTargetMachine(TripleName, CPU, "", Opt, RM));
-  
-  raw_svector_ostream Dest(Asm);
-
-  legacy::PassManager pass;
-  if (TM->addPassesToEmitFile(pass, Dest, nullptr, CGFT_AssemblyFile)) {
-    cerr << "Failed to generate assembly";
-    exit(-1);
-  }
-  pass.run(OrigModule);
-
-  cout << "\n----------arm asm----------\n\n";
-  for (size_t i = 0; i < Asm.size(); ++i)
-    cout << Asm[i];
-  cout << "-------------\n";
-  cout << "\n\n";
-
-  return MemoryBuffer::getMemBuffer(Asm.c_str());
-}
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 				      Function *srcFn, unique_ptr<MemoryBuffer> MB) {

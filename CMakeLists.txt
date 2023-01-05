@@ -195,6 +195,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   set(BACKEND_TV_SRCS
     "backend_tv/adjust_src.cpp"
     "backend_tv/mc.cpp"
+    "backend_tv/run_backend.cpp"
   )
 
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
