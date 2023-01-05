@@ -1,3 +1,6 @@
+#include <utility>
+#include <vector>
+
 #include "ir/function.h"
 
 namespace llvm {
@@ -7,12 +10,17 @@ namespace llvm {
 
 namespace lifter {
 
-llvm::Function *adjust(llvm::Function *srcFn);
+// FIXME
+extern std::vector<std::pair<unsigned, unsigned>> new_input_idx_bitwidth;
+extern unsigned orig_ret_bitwidth;
+extern bool has_ret_attr;
+
+llvm::Function *adjustSrc(llvm::Function *srcFn);
 
 std::pair<llvm::Function *, llvm::Function *>
-  lift_func(llvm::Module *OrigModule, llvm::Module *LiftedModule,
-            bool asm_input, std::string opt_file2,
-            bool opt_asm_only,
-            llvm::Function *srcFnLLVM);
+liftFunc(llvm::Module *OrigModule, llvm::Module *LiftedModule,
+	 bool asm_input, std::string opt_file2,
+	 bool opt_asm_only,
+	 llvm::Function *srcFnLLVM);
 
 }
