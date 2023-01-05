@@ -112,7 +112,7 @@ convenient way to demonstrate an existing optimizer bug.
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
 
-  auto M1 = openInputFile(&Context, opt_file1);
+  auto M1 = openInputFile(Context, opt_file1);
   if (!M1.get()) {
     cerr << "Could not read bitcode from '" << opt_file1 << "'\n";
     return -1;
@@ -135,8 +135,8 @@ convenient way to demonstrate an existing optimizer bug.
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
-    auto SRC = findFunction(M1.get(), opt_src_fn);
-    auto TGT = findFunction(M1.get(), opt_tgt_fn);
+    auto SRC = findFunction(*M1, opt_src_fn);
+    auto TGT = findFunction(*M1, opt_tgt_fn);
     if (SRC && TGT) {
       verifier.compareFunctions(*SRC, *TGT);
       goto end;
@@ -149,7 +149,7 @@ convenient way to demonstrate an existing optimizer bug.
       }
     }
   } else {
-    M2 = openInputFile(&Context, opt_file2);
+    M2 = openInputFile(Context, opt_file2);
     if (!M2.get()) {
       *out << "Could not read bitcode from '" << opt_file2 << "'\n";
       return -1;
