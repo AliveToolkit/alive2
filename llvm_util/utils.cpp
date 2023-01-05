@@ -449,15 +449,15 @@ void reset_state(Function &f) {
   current_fn = &f;
 }
 
-llvm::ExitOnError ExitOnErr;
+static llvm::ExitOnError ExitOnErr;
 
 // adapted from llvm-dis.cpp
-std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext *Context,
+std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
                                             const string &InputFilename) {
   auto MB =
     ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
   llvm::SMDiagnostic Diag;
-  auto M = getLazyIRModule(std::move(MB), Diag, *Context,
+  auto M = getLazyIRModule(std::move(MB), Diag, Context,
                            /*ShouldLazyLoadMetadata=*/true);
   if (!M) {
     Diag.print("", llvm::errs(), false);
@@ -467,15 +467,15 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext *Context,
   return M;
 }
 
-llvm::Function *findFunction(llvm::Module *M, const string &FName) {
-  for (auto &F : *M) {
+llvm::Function *findFunction(llvm::Module &M, const string &FName) {
+  for (auto &F : M) {
     if (F.isDeclaration())
       continue;
     if (FName.compare(F.getName()) != 0)
       continue;
     return &F;
   }
-  return 0;
+  return nullptr;
 }
 
 }
