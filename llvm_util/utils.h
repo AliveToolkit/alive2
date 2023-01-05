@@ -15,6 +15,9 @@ class DataLayout;
 class Instruction;
 class Type;
 class Value;
+class Module;
+class LLVMContext;
+class Function;
 }
 
 namespace IR {
@@ -55,4 +58,9 @@ void set_outs(std::ostream &os);
 
 void reset_state();
 void reset_state(IR::Function &f);
+
+std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
+                                            const std::string &InputFilename);
+llvm::Function *findFunction(llvm::Module &M, const std::string &FName);
+
 }
