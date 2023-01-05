@@ -130,12 +130,13 @@ version )EOF";
   verifier.print_dot = opt_print_dot;
   verifier.bidirectional = opt_bidirectional;
 
-  llvm::Function *srcFn;
-  if (opt_fn == "")
-    srcFn = findFirstFunction(*M1);
-  else
-    srcFn = findFunction(*M1, opt_fn);
-  if (!srcFn) {
+  // FIXME support lifting and verifying multiple functions
+
+  auto *srcFn = (opt_fn == "") ?
+    findFirstFunction(*M1) :
+    findFunction(*M1, opt_fn);
+
+  if (srcFn == nullptr) {
     *out << "Fatal error: Couldn't find function to verify\n";
     exit(-1);
   }
@@ -154,7 +155,7 @@ version )EOF";
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
     lifter::generateAsm(*M1.get(), Asm);
 
-  cout << "\n\nARM Assembly:\n\n";
+  cout << "\n\nAArch64 Assembly:\n\n";
   for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
        ++it) {
     cout << *it;
