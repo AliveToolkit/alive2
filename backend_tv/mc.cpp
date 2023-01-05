@@ -3790,7 +3790,7 @@ Function *adjust(Function *srcFn) {
   return srcFn;
 }
 
-pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule, bool asm_input,
+pair<Function *, Function *> lift_func(Module *OrigModule, Module *LiftedModule, bool asm_input,
                                        string opt_file2, bool opt_asm_only,
                                        Function *srcFn) {
   if (srcFn->isVarArg())
@@ -3812,7 +3812,7 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
   SmallString<1024> Asm;
   SourceMgr SrcMgr = asm_input ?
     loadAsm(opt_file2) :
-    generateAsm(OrigModule, Target, Asm);
+    generateAsm(*OrigModule, Target, Asm);
 
   unique_ptr<MCInstrInfo> MCII(Target->createMCInstrInfo());
   assert(MCII && "Unable to create instruction info!");
@@ -3895,6 +3895,6 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
   cout << "after SSA conversion\n";
   MCSW.printBlocksMF();
 
-  return make_pair(srcFn, arm2llvm(&LiftedModule, MCSW.MF, *srcFn, IPtemp.get(),
+  return make_pair(srcFn, arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(),
                                        MRI.get()));
 }

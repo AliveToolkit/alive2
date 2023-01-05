@@ -131,25 +131,25 @@ version )EOF";
   verifier.print_dot = opt_print_dot;
   verifier.bidirectional = opt_bidirectional;
 
-  llvm::Function *SrcFn;
+  llvm::Function *srcFn;
   if (opt_fn == "")
-    SrcFn = findFirstFunction(*M1);
+    srcFn = findFirstFunction(*M1);
   else
-    SrcFn = findFunction(*M1, opt_fn);
-  if (!SrcFn) {
+    srcFn = findFunction(*M1, opt_fn);
+  if (!srcFn) {
     *out << "Fatal error: Couldn't find function to verify\n";
     exit(-1);
   }
 
   // this rewrites the signature of the function so it has to return a
-  // new one
-  SrcFn = adjust(SrcFn);
+  // new pointer
+  srcFn = adjust(srcFn);
   
   std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", Context);
   M2->setDataLayout(M1.get()->getDataLayout());
   M2->setTargetTriple(M1.get()->getTargetTriple());
 
-  auto [F1, F2] = lift_func(*M1.get(), *M2.get(), false, "", false, SrcFn);
+  auto [F1, F2] = lift_func(M1.get(), M2.get(), false, "", false, srcFn);
   
   if (llvm::verifyModule(*M2.get(), &llvm::errs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
