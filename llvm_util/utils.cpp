@@ -11,7 +11,11 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SourceMgr.h"
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -443,6 +447,35 @@ void reset_state() {
 
 void reset_state(Function &f) {
   current_fn = &f;
+}
+
+static llvm::ExitOnError ExitOnErr;
+
+// adapted from llvm-dis.cpp
+std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
+                                            const string &InputFilename) {
+  auto MB =
+    ExitOnErr(errorOrToExpected(llvm::MemoryBuffer::getFile(InputFilename)));
+  llvm::SMDiagnostic Diag;
+  auto M = getLazyIRModule(std::move(MB), Diag, Context,
+                           /*ShouldLazyLoadMetadata=*/true);
+  if (!M) {
+    Diag.print("", llvm::errs(), false);
+    return 0;
+  }
+  ExitOnErr(M->materializeAll());
+  return M;
+}
+
+llvm::Function *findFunction(llvm::Module &M, const string &FName) {
+  for (auto &F : M) {
+    if (F.isDeclaration())
+      continue;
+    if (FName.compare(F.getName()) != 0)
+      continue;
+    return &F;
+  }
+  return nullptr;
 }
 
 }
