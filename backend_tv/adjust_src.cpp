@@ -63,6 +63,10 @@ using namespace lifter;
 
 namespace {
 
+// FIXME -- each of adjustSrcInputs and adjustSrcReturn creates an
+// entirely new function, this is slow and not elegant, probably merge
+// these together
+
 Function *adjustSrcInputs(Function *srcFn) {
   vector<Type *> new_argtypes;
   unsigned idx = 0;
@@ -199,10 +203,9 @@ Function *adjustSrcReturn(Function *srcFn) {
 namespace lifter {
 
 Function *adjustSrc(Function *srcFn) {
-  // FIXME -- each of adjustSrcInputs and adjustSrcReturn creates an
-  // entirely new function, this is slow and not elegant, probably
-  // merge these together
-  
+  if (srcFn->isVarArg())
+    report_fatal_error("Varargs not supported");
+
   outs() << "\n---------- src.ll ----------\n";
   srcFn->print(outs());
 

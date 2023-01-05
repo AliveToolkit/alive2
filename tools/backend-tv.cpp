@@ -149,6 +149,7 @@ version )EOF";
   M2->setDataLayout(M1.get()->getDataLayout());
   M2->setTargetTriple(M1.get()->getTargetTriple());
 
+  lifter::init();
   auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), false, "", false, srcFn);
   
   if (llvm::verifyModule(*M2.get(), &llvm::errs()))

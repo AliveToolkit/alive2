@@ -3636,16 +3636,14 @@ namespace lifter {
 
 unsigned int orig_ret_bitwidth{64};
 bool has_ret_attr{false};
+
 // Keep track of which oprands had their type adjusted and their original
 // bitwidth
 vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
 
-pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, bool asm_input,
-				      string opt_file2, bool opt_asm_only,
-				      Function *srcFn) {
-  if (srcFn->isVarArg())
-    report_fatal_error("Varargs not supported");
+const Target *Target;
 
+void init() {
   LLVMInitializeAArch64TargetInfo();
   LLVMInitializeAArch64Target();
   LLVMInitializeAArch64TargetMC();
@@ -3653,12 +3651,16 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, 
   LLVMInitializeAArch64AsmPrinter();
 
   string Error;
-  auto *Target = TargetRegistry::lookupTarget(TripleName, Error);
+  Target = TargetRegistry::lookupTarget(TripleName, Error);
   if (!Target) {
     cerr << Error;
     exit(-1);
   }
+}
 
+pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule, bool asm_input,
+				      string opt_file2, bool opt_asm_only,
+				      Function *srcFn) {
   SmallString<1024> Asm;
   SourceMgr SrcMgr = asm_input ?
     loadAsm(opt_file2) :

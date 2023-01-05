@@ -15,6 +15,8 @@ extern std::vector<std::pair<unsigned, unsigned>> new_input_idx_bitwidth;
 extern unsigned orig_ret_bitwidth;
 extern bool has_ret_attr;
 
+void init();
+
 llvm::Function *adjustSrc(llvm::Function *srcFn);
 
 std::pair<llvm::Function *, llvm::Function *>
