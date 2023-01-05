@@ -2,6 +2,8 @@
 
 #include "llvm/IR/Module.h"
 
+llvm::Function *adjust(llvm::Function *srcFn);
+
 std::pair<llvm::Function *, llvm::Function *>
   lift_func(llvm::Module &OrigModule, llvm::Module &LiftedModule,
             bool asm_input, std::string opt_file2,

@@ -3769,12 +3769,7 @@ SourceMgr generateAsm(Module &OrigModule, const Target *Target,
 
 } // namespace
 
-pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule, bool asm_input,
-                                       string opt_file2, bool opt_asm_only,
-                                       Function *srcFn) {
-  if (srcFn->isVarArg())
-    report_fatal_error("Varargs not supported");
-
+Function *adjust(Function *srcFn) {
   // FIXME -- both adjustSrcInputs and adjustSrcReturn create an
   // entirely new function, this is slow and not elegant, probably
   // merge these together
@@ -3791,7 +3786,16 @@ pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule,
   
   outs() << "\n---------- src.ll ---- changed-return -\n";
   srcFn->print(outs());
-  
+
+  return srcFn;
+}
+
+pair<Function *, Function *> lift_func(Module &OrigModule, Module &LiftedModule, bool asm_input,
+                                       string opt_file2, bool opt_asm_only,
+                                       Function *srcFn) {
+  if (srcFn->isVarArg())
+    report_fatal_error("Varargs not supported");
+
   LLVMInitializeAArch64TargetInfo();
   LLVMInitializeAArch64Target();
   LLVMInitializeAArch64TargetMC();
