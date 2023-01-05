@@ -32,6 +32,7 @@ This category is for bugs that crashes
 7. InstCombine Crash (https://github.com/llvm/llvm-project/issues/56981)
 8. aarch64 global isel backend crashes on valid input (https://github.com/llvm/llvm-project/issues/58423)
 9. aarch64 global isel backend assertion violation when translating udiv of i1 (https://github.com/llvm/llvm-project/issues/58425)
+10. fprintf() requires two pointer arguments (https://github.com/llvm/llvm-project/issues/59757)
 
 ## Category 3
 This category is for that the test file is originaly wrong
