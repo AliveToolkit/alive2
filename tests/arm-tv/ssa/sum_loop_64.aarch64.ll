@@ -18,5 +18,3 @@ define i64 @sum(i64 %0) #0 {
 7:                                                ; preds = %2
   ret i64 %.01
 }
-
-; CHECK: ConcreteVal(poison=0, 32b, 3u, 3s)

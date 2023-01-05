@@ -83,6 +83,7 @@ class Alive2Test(TestFormat):
       cmd = ['./alive-tv', '-smt-to=20000', '-always-verify']
       if not os.path.isfile('alive-tv'):
         return lit.Test.UNSUPPORTED, ''
+
     if alive_tv_4:
       cmd = ['./backend-tv', '-smt-to=20000', '-always-verify']
       if not os.path.isfile('backend-tv'):
