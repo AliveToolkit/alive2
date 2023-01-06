@@ -157,7 +157,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
   bool onlyif_src_exists = false; // Verify this pair only if src exists
   const function<llvm::TargetLibraryInfo*(llvm::Function&)> *TLI_override
     = nullptr;
-  unsigned anon_count;
+  unsigned anon_count = 0;
 
   TVLegacyPass() : ModulePass(ID) {}
 
