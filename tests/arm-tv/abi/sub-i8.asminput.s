@@ -1,14 +1,16 @@
 	.text
-	.file	"i8_signext.aarch64.ll"
-	.globl	sext_arg_i8
+	.file	"sub-i8.asminput.ll"
+	.globl	f                               // -- Begin function f
 	.p2align	2
-	.type	sext_arg_i8,@function
-sext_arg_i8:
+	.type	f,@function
+f:                                      // @f
 	.cfi_startproc
-	sxtb	w0, w0
+// %bb.0:
+	subs	w0, w0, w1
 	ret
 .Lfunc_end0:
-	.size	sext_arg_i8, .Lfunc_end0-sext_arg_i8
+	.size	f, .Lfunc_end0-f
 	.cfi_endproc
-
+                                        // -- End function
 	.section	".note.GNU-stack","",@progbits
+	.addrsig
