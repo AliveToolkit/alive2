@@ -119,9 +119,8 @@ Function *adjustSrcInputs(Function *srcFn) {
 }
 
 Function *adjustSrcReturn(Function *srcFn) {
-  // FIXME -- there's some work to be done here for checking zeroext
-  
-  if (!srcFn->hasRetAttribute(Attribute::SExt))
+  if (!srcFn->hasRetAttribute(Attribute::SExt) &&
+      !srcFn->hasRetAttribute(Attribute::ZExt))
     return srcFn;
 
   auto *ret_typ = srcFn->getReturnType();
@@ -159,20 +158,36 @@ Function *adjustSrcReturn(Function *srcFn) {
   for (auto *RI : RIs) {
     auto retVal = RI->getReturnValue();
     if (orig_ret_bitwidth < 32) {
-      auto sext = new SExtInst(retVal, i32ty,
-                               retVal->getName() + "_sext",
-                               RI);
-      auto zext = new ZExtInst(sext, i64ty,
-                               retVal->getName() + "_zext",
-                               RI);
-      ReturnInst::Create(srcFn->getContext(),
-                         zext, RI);
+      if (srcFn->hasRetAttribute(Attribute::ZExt)) {
+	auto zext = new ZExtInst(retVal, i64ty,
+				 retVal->getName() + "_zext",
+				 RI);
+	ReturnInst::Create(srcFn->getContext(),
+			   zext, RI);
+      } else {
+	auto sext = new SExtInst(retVal, i32ty,
+				 retVal->getName() + "_sext",
+				 RI);
+	auto zext = new ZExtInst(sext, i64ty,
+				 retVal->getName() + "_zext",
+				 RI);
+	ReturnInst::Create(srcFn->getContext(),
+			   zext, RI);
+      }
     } else {
-      auto sext = new SExtInst(retVal, i64ty,
-                               retVal->getName() + "_sext",
-                               RI);
-      ReturnInst::Create(srcFn->getContext(),
-                         sext, RI);
+      if (srcFn->hasRetAttribute(Attribute::ZExt)) {
+	auto zext = new ZExtInst(retVal, i64ty,
+				 retVal->getName() + "_zext",
+				 RI);
+	ReturnInst::Create(srcFn->getContext(),
+			   zext, RI);
+      } else {
+	auto sext = new SExtInst(retVal, i64ty,
+				 retVal->getName() + "_sext",
+				 RI);
+	ReturnInst::Create(srcFn->getContext(),
+			   sext, RI);
+      }
     }
     RI->eraseFromParent();
   }
