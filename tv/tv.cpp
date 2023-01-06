@@ -736,7 +736,9 @@ llvmGetPassPluginInfo() {
               runTVPass(*const_cast<llvm::Function*>((*L)->getHeader()
                                                          ->getParent()));
             } else {
-              runTVPass(*const_cast<llvm::Module*>(unwrapModule(IR)));
+              auto *M = unwrapModule(IR);
+              saveBitcode(M);
+              runTVPass(*const_cast<llvm::Module*>(M));
             }
           }
         };

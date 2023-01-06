@@ -196,8 +196,6 @@ end:
   if (opt_smt_stats)
     smt::solver_print_stats(*out);
 
-  smt_init.reset();
-
   if (opt_alias_stats)
     IR::Memory::printAliasStats(*out);
 
