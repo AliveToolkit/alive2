@@ -90,6 +90,11 @@ llvm::Function *findFirstFunction(llvm::Module &M) {
 unique_ptr<Cache> cache;
 
 int main(int argc, char **argv) {
+
+  for (int i=0; i<argc; ++i)
+    cout << "'" << argv[i] << "' ";
+  cout << endl;
+  
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
   llvm::EnableDebugBuffering = true;

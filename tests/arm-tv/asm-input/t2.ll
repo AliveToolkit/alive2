@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --asm-input %S/t2.aarch64.s
+; RUN: backend-tv --disable-undef-input %t --asm-input %s/t2.aarch64.s
 ; CHECK: 1 correct
 
 define i32 @f(i32, i32) {
