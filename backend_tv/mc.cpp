@@ -203,7 +203,7 @@ size_t MCOperandHash::operator()(const MCOperand &op) const {
     if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
       const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
       const MCSymbol &Sym = SRE.getSymbol();
-      errs() << "label : " << Sym.getName() << '\n'; // FIXME remove when done
+      outs() << "label : " << Sym.getName() << '\n'; // FIXME remove when done
       id = Sym.getOffset();
     } else {
       assert("unsupported mcExpr" && false);
@@ -667,7 +667,7 @@ public:
     // temp for debugging
     for (auto &[var, blockSet] : defs) {
       cout << "defs for \n";
-      var.print(errs(), MRI_ptr);
+      var.print(outs(), MRI_ptr);
       cout << "\n";
       for (auto &block : blockSet) {
         cout << block->getName() << ",";
@@ -699,7 +699,7 @@ public:
     for (auto &[block, varSet] : phis) {
       cout << "phis for: " << block->getName() << "\n";
       for (auto &var : varSet) {
-        var.print(errs(), MRI_ptr);
+        var.print(outs(), MRI_ptr);
         cout << "\n";
       }
       cout << "-------------\n";
@@ -723,7 +723,7 @@ public:
     // temp for debugging
     cout << "printing fn_args\n";
     for (auto &arg : fn_args) {
-      arg.print(errs(), MRI_ptr);
+      arg.print(outs(), MRI_ptr);
       cout << "\n";
     }
   }
@@ -785,7 +785,7 @@ public:
 
     cout << "printing fn_args after rewrite\n";
     for (auto &arg : fn_args) {
-      arg.print(errs(), MRI_ptr);
+      arg.print(outs(), MRI_ptr);
       cout << "\n";
     }
 
@@ -805,9 +805,9 @@ public:
     //                                          MCOperandHash, MCOperandEqual>
     //                           s) {
     //   for (auto &[var, stack_vec] : s) {
-    //     errs() << "stack for ";
-    //     var.print(errs(), MRI_ptr);
-    //     errs() << "\n";
+    //     outs() << "stack for ";
+    //     var.print(outs(), MRI_ptr);
+    //     outs() << "\n";
     //     for (auto &stack_item : stack_vec) {
     //       cout << stack_item << ",";
     //     }
@@ -837,7 +837,7 @@ public:
         MCInst new_phi_instr;
         new_phi_instr.setOpcode(AArch64::PHI);
         new_phi_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
-        new_phi_instr.dump_pretty(errs(), IP_ptr, " ", MRI_ptr);
+        new_phi_instr.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
 
         MCInstWrapper new_w_instr(new_phi_instr);
         block->addInstBegin(std::move(new_w_instr));
@@ -864,11 +864,11 @@ public:
           continue;
         }
 
-        // mc_instr.dump_pretty(errs(), IP_ptr, " ", MRI_ptr);
-        // errs() << "\n";
-        // errs() << "printing stack\n";
+        // mc_instr.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        // outs() << "\n";
+        // outs() << "printing stack\n";
         // printStack(stack);
-        // errs() << "printing operands\n";
+        // outs() << "printing operands\n";
         unsigned i = 1;
         if (instrs_no_write.contains(mc_instr.getOpcode())) {
           cout << "iterating from first element in rename\n";
@@ -888,32 +888,32 @@ public:
           if (op.getReg() == AArch64::WZR || op.getReg() == AArch64::XZR)
             continue;
 
-          op.print(errs(), MRI_ptr);
-          errs() << "\n";
+          op.print(outs(), MRI_ptr);
+          outs() << "\n";
 
           auto &arg_id = stack[op][0];
           w_instr.setOpId(i, arg_id);
         }
-        errs() << "printing operands done\n";
+        outs() << "printing operands done\n";
         if (instrs_no_write.contains(mc_instr.getOpcode()))
           continue;
 
-        errs() << "renaming dst\n";
+        outs() << "renaming dst\n";
         auto &dst_op = mc_instr.getOperand(0);
-        dst_op.print(errs(), MRI_ptr);
+        dst_op.print(outs(), MRI_ptr);
         auto dst_id = pushFresh(dst_op);
         w_instr.setOpId(0, dst_id);
-        errs() << "\n";
+        outs() << "\n";
       }
 
-      errs() << "renaming phi args in block's successors\n";
+      outs() << "renaming phi args in block's successors\n";
 
       for (auto s_block : block->getSuccs()) {
-        errs() << block->getName() << " -> " << s_block->getName() << "\n";
+        outs() << block->getName() << " -> " << s_block->getName() << "\n";
 
         for (auto &phi_var : phis[s_block]) {
           if (stack.find(phi_var) == stack.end()) {
-            phi_var.print(errs(), MRI_ptr);
+            phi_var.print(outs(), MRI_ptr);
             assert(false && "phi var not in stack");
           }
           assert(stack[phi_var].size() > 0 && "phi var stack empty");
@@ -921,7 +921,7 @@ public:
           if (phi_args[s_block].find(phi_var) == phi_args[s_block].end()) {
             phi_args[s_block][phi_var] = vector<pair<unsigned, string>>();
           }
-          errs() << "phi_arg[" << s_block->getName() << "][" << phi_var.getReg()
+          outs() << "phi_arg[" << s_block->getName() << "][" << phi_var.getReg()
                  << "]=" << stack[phi_var][0] << "\n";
           phi_args[s_block][phi_var].push_back(
               make_pair(stack[phi_var][0], block->getName()));
@@ -1062,10 +1062,10 @@ public:
     cout << "-------------\n";
     int i = 0;
     for (auto &block : BBs) {
-      errs() << "block " << i << ", name= " << block.getName() << '\n';
+      outs() << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-        inst.getMCInst().dump_pretty(errs(), IP_ptr, " ", MRI_ptr);
-        errs() << '\n';
+        inst.getMCInst().dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        outs() << '\n';
       }
       i++;
     }
@@ -1270,10 +1270,10 @@ class arm2llvm_ {
     // comes out nice and pretty when combing the stdout/stderr in scripts
     cout.flush();
 
-    errs() << "ERROR: Unsupported arm instruction: "
+    outs() << "ERROR: Unsupported arm instruction: "
            << instrPrinter->getOpcodeName(I.getMCInst().getOpcode()) << "\n";
-    errs().flush();
-    cerr.flush();
+    outs().flush();
+    cout.flush();
     exit(-1); // FIXME handle this better
   }
 
@@ -2952,7 +2952,7 @@ public:
       break;
     }
     default:
-      Fn.print(errs());
+      Fn.print(outs());
       cout << "\nError "
               "detected----------partially-lifted-arm-target----------\n";
       visitError(I);
@@ -3217,24 +3217,24 @@ public:
         if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
           const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
           const MCSymbol &Sym = SRE.getSymbol();
-          errs() << "target label : " << Sym.getName()
+          outs() << "target label : " << Sym.getName()
                  << ", offset=" << Sym.getOffset()
                  << '\n'; // FIXME remove when done
         }
       }
     }
 
-    errs() << cnt++ << "  : ";
-    Inst.dump_pretty(errs(), IP_ptr, " ", MRI_ptr);
+    outs() << cnt++ << "  : ";
+    Inst.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
     if (Ana_ptr->isBranch(Inst))
-      errs() << ": branch ";
+      outs() << ": branch ";
     if (Ana_ptr->isConditionalBranch(Inst))
-      errs() << ": conditional branch ";
+      outs() << ": conditional branch ";
     if (Ana_ptr->isUnconditionalBranch(Inst))
-      errs() << ": unconditional branch ";
+      outs() << ": unconditional branch ";
     if (Ana_ptr->isTerminator(Inst))
-      errs() << ": terminator ";
-    errs() << "\n";
+      outs() << ": terminator ";
+    outs() << "\n";
   }
 
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
@@ -3260,8 +3260,8 @@ public:
     string cur_label = Symbol->getName().str();
     temp_block = MF.addBlock(cur_label);
     prev_line = ASMLine::label;
-    errs() << cnt++ << "  : ";
-    errs() << "inside Emit Label: symbol=" << Symbol->getName() << '\n';
+    outs() << cnt++ << "  : ";
+    outs() << "inside Emit Label: symbol=" << Symbol->getName() << '\n';
   }
 
   string findTargetLabel(MCInst &inst_ref) {
@@ -3457,10 +3457,10 @@ public:
     cout << "-------------\n";
     int i = 0;
     for (auto &block : MF.BBs) {
-      errs() << "block " << i << ", name= " << block.getName() << '\n';
+      outs() << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-        inst.getMCInst().dump_pretty(errs(), IP_ptr, " ", MRI_ptr);
-        errs() << '\n';
+        inst.getMCInst().dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        outs() << '\n';
       }
       i++;
     }
@@ -3608,7 +3608,7 @@ void reset() {
     string Error;
     Targ = TargetRegistry::lookupTarget(TripleName, Error);
     if (!Targ) {
-      cerr << Error;
+      cout << Error;
       exit(-1);
     }
 
@@ -3674,14 +3674,14 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   // For now, print the parsed instructions for debug puropses
   cout << "\n\nPretty Parsed MCInsts:\n";
   for (auto I : MCSW.Insts) {
-    I.dump_pretty(errs(), IPtemp.get(), " ", MRI.get());
-    errs() << '\n';
+    I.dump_pretty(outs(), IPtemp.get(), " ", MRI.get());
+    outs() << '\n';
   }
 
   cout << "\n\nParsed MCInsts:\n";
   for (auto I : MCSW.Insts) {
-    I.dump_pretty(errs());
-    errs() << '\n';
+    I.dump_pretty(outs());
+    outs() << '\n';
   }
 
   cout << "\n\n";
@@ -3709,7 +3709,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
 
-  if (llvm::verifyModule(*LiftedModule, &llvm::errs()))
+  if (llvm::verifyModule(*LiftedModule, &llvm::outs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
 
   return make_pair(srcFn, lifted);

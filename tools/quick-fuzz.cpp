@@ -957,11 +957,6 @@ reduced using llvm-reduce.
       }
       assert(srcFn != nullptr);
       doit(M1.get(), srcFn, verifier);
-      
-      num_correct += verifier.num_correct;
-      num_unsound += verifier.num_unsound;
-      num_failed += verifier.num_failed;
-      num_errors += verifier.num_errors;
     } else {
       unique_ptr<Module> M2 = CloneModule(*M1.get());
       auto err = optimize_module(M2.get(), optPass);
@@ -985,6 +980,11 @@ reduced using llvm-reduce.
 	if (opt_error_fatal)
 	  goto end;
     }
+
+    num_correct += verifier.num_correct;
+    num_unsound += verifier.num_unsound;
+    num_failed += verifier.num_failed;
+    num_errors += verifier.num_errors;
 
     M1 = nullptr;
     M1 = make_unique<Module>("fuzz", Context);
