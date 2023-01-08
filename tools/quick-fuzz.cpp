@@ -69,6 +69,11 @@ cl::opt<bool> opt_run_sroa(
              "the load on Alive's memory model"),
     cl::cat(alive_cmdargs), cl::init(false));
 
+cl::opt<bool> opt_print_ir(
+    LLVM_ARGS_PREFIX "print-ir",
+    cl::desc("Print LLVM IR to stdout"),
+    cl::cat(alive_cmdargs), cl::init(false));
+
 cl::opt<bool> opt_run_dce(
     LLVM_ARGS_PREFIX "run-dce",
     cl::desc(
@@ -849,6 +854,14 @@ reduced using llvm-reduce.
       WriteBitcodeToFile(M1, output_file);
     }
 
+    if (opt_print_ir) {
+      out->flush();
+      outs() << "------------------------------------------------------\n\n";
+      M1.print(outs(), nullptr);
+      outs() << "------------------------------------------------------\n\n";
+      outs().flush();
+    }
+
     if (opt_skip_alive)
       continue;
 
@@ -874,7 +887,11 @@ reduced using llvm-reduce.
       if (opt_error_fatal)
         goto end;
 
-    F1->eraseFromParent();
+    vector<Function *> Funcs;
+    for (auto &F : M1)
+      Funcs.push_back(&F);
+    for (auto F : Funcs)
+      F->eraseFromParent();
   }
 
   *out << "Summary:\n"
