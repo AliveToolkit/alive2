@@ -106,10 +106,10 @@ cl::opt<string>
 
 // FIXME we might want to be able to specify these on the command
 // line, but these should be pretty good defaults
-const int MaxBBs = 50;
-const int MaxWidth = 20;
-const int MaxCounters = 16;
-const int MaxBoolParams = 16;
+const int MaxBBs = 5;
+const int MaxWidth = 64;
+const int MaxCounters = 4;
+const int MaxBoolParams = 4;
 
 const int MaxIntWidth = 64;
 const int MaxIntParams = 5;
@@ -873,18 +873,7 @@ reduced using llvm-reduce.
 #define ARGS_MODULE_VAR MDummy
 #include "llvm_util/cmd_args_def.h"
 
-  unique_ptr<Module> M1 = make_unique<Module>("fuzz", Context);
-  auto &DL = M1.get()->getDataLayout();
-  Triple targetTriple(M1.get()->getTargetTriple());
-  TargetLibraryInfoWrapperPass TLI(targetTriple);
-
-  llvm_util::initializer llvm_util_init(*out, DL);
-  smt::smt_initializer smt_init;
-  Verifier verifier(TLI, smt_init, *out);
-  verifier.quiet = opt_quiet;
-  verifier.always_verify = opt_always_verify;
-  verifier.print_dot = opt_print_dot;
-  verifier.bidirectional = opt_bidirectional;
+  unique_ptr<Module> M1;
 
   void (*Fuzzer)(Module *);
   if (opt_fuzzer == "value") {
@@ -896,12 +885,27 @@ reduced using llvm-reduce.
     exit(-1);
   }
 
+  long num_correct = 0, num_unsound = 0, num_failed = 0, num_errors = 0;
+
   initFuzzer();
 
   for (int rep = 0; rep < opt_num_reps; ++rep) {
     cout << "\n================================================================= (" <<
       rep << ")\n\n";
     
+    M1 = make_unique<Module>("fuzz", Context);
+    auto &DL = M1.get()->getDataLayout();
+    Triple targetTriple(M1.get()->getTargetTriple());
+    TargetLibraryInfoWrapperPass TLI(targetTriple);
+
+    llvm_util::initializer llvm_util_init(*out, DL);
+    smt::smt_initializer smt_init;
+    Verifier verifier(TLI, smt_init, *out);
+    verifier.quiet = opt_quiet;
+    verifier.always_verify = opt_always_verify;
+    verifier.print_dot = opt_print_dot;
+    verifier.bidirectional = opt_bidirectional;
+
     Fuzzer(M1.get());
 
     if (opt_run_sroa) {
@@ -954,6 +958,10 @@ reduced using llvm-reduce.
       assert(srcFn != nullptr);
       doit(M1.get(), srcFn, verifier);
       
+      num_correct += verifier.num_correct;
+      num_unsound += verifier.num_unsound;
+      num_failed += verifier.num_failed;
+      num_errors += verifier.num_errors;
     } else {
       unique_ptr<Module> M2 = CloneModule(*M1.get());
       auto err = optimize_module(M2.get(), optPass);
@@ -984,20 +992,20 @@ reduced using llvm-reduce.
 
   *out << "Summary:\n"
           "  "
-       << verifier.num_correct
+       << num_correct
        << " correct transformations\n"
           "  "
-       << verifier.num_unsound
+       << num_unsound
        << " incorrect transformations\n"
           "  "
-       << verifier.num_failed
+       << num_failed
        << " failed-to-prove transformations\n"
           "  "
-       << verifier.num_errors << " Alive2 errors\n";
+       << num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
     smt::solver_print_stats(*out);
 
-  return verifier.num_errors > 0;
+  return 0;
 }
