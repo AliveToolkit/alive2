@@ -335,7 +335,7 @@ Constant *randomInt(Type *Ty, LLVMContext &Ctx, vector<vector<APInt>> &Pool) {
       break;
     }
     case 1:
-      I ^= APInt(Width, 1 << choose(Width));
+      I ^= APInt(Width, 1UL << choose(Width));
       break;
     case 2:
       I = ~I;
