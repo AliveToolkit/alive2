@@ -870,9 +870,9 @@ reduced using llvm-reduce.
 #define ARGS_MODULE_VAR MDummy
 #include "llvm_util/cmd_args_def.h"
 
-  Module M1("fuzz", Context);
-  auto &DL = M1.getDataLayout();
-  Triple targetTriple(M1.getTargetTriple());
+  unique_ptr<Module> M1 = make_unique<Module>("fuzz", Context);
+  auto &DL = M1.get()->getDataLayout();
+  Triple targetTriple(M1.get()->getTargetTriple());
   TargetLibraryInfoWrapperPass TLI(targetTriple);
 
   llvm_util::initializer llvm_util_init(*out, DL);
@@ -896,15 +896,15 @@ reduced using llvm-reduce.
   initFuzzer();
 
   for (int rep = 0; rep < opt_num_reps; ++rep) {
-    Fuzzer(&M1);
+    Fuzzer(M1.get());
 
     if (opt_run_sroa) {
-      auto err = optimize_module(&M1, "sroa,dse");
+      auto err = optimize_module(M1.get(), "sroa,dse");
       assert(err.empty());
     }
 
     if (opt_run_dce) {
-      auto err = optimize_module(&M1, "adce");
+      auto err = optimize_module(M1.get(), "adce");
       assert(err.empty());
     }
 
@@ -916,13 +916,13 @@ reduced using llvm-reduce.
       raw_fd_ostream output_file(output_fn.str(), EC);
       if (EC)
         report_fatal_error("Couldn't open output file, exiting");
-      WriteBitcodeToFile(M1, output_file);
+      WriteBitcodeToFile(*M1.get(), output_file);
     }
 
     if (opt_print_ir) {
       out->flush();
       outs() << "------------------------------------------------------\n\n";
-      M1.print(outs(), nullptr);
+      M1.get()->print(outs(), nullptr);
       outs() << "------------------------------------------------------\n\n";
       outs().flush();
     }
@@ -931,32 +931,32 @@ reduced using llvm-reduce.
       continue;
 
     if (opt_backend_tv) {
-      M1.setTargetTriple("aarch64-linux-gnu");
-      M1.setDataLayout(
+      M1.get()->setTargetTriple("aarch64-linux-gnu");
+      M1.get()->setDataLayout(
           "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
 
       // auto &DL = M1.getDataLayout();
-      Triple targetTriple(M1.getTargetTriple());
+      Triple targetTriple(M1.get()->getTargetTriple());
       llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
       llvm::Function *srcFn = nullptr;
-      for (auto &F : M1) {
+      for (auto &F : *M1.get()) {
 	if (F.isDeclaration())
 	  continue;
 	srcFn = &F;
       }
       assert(srcFn != nullptr);
-      doit(&M1, srcFn, verifier);
+      doit(M1.get(), srcFn, verifier);
       
     } else {
-      unique_ptr<Module> M2 = CloneModule(M1);
+      unique_ptr<Module> M2 = CloneModule(*M1.get());
       auto err = optimize_module(M2.get(), optPass);
       if (!err.empty()) {
 	*out << "Error parsing list of LLVM passes: " << err << '\n';
 	return -1;
       }
 
-      auto *F1 = M1.getFunction("f");
+      auto *F1 = M1->getFunction("f");
       auto *F2 = M2->getFunction("f");
       assert(F1 && F2);
 
@@ -972,11 +972,8 @@ reduced using llvm-reduce.
 	  goto end;
     }
 
-    vector<Function *> Funcs;
-    for (auto &F : M1)
-      Funcs.push_back(&F);
-    for (auto F : Funcs)
-      F->eraseFromParent();
+    M1 = nullptr;
+    M1 = make_unique<Module>("fuzz", Context);
   }
 
   *out << "Summary:\n"
