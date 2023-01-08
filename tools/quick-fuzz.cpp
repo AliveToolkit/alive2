@@ -29,6 +29,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -117,13 +118,11 @@ void initFuzzer() {
 }
 
 long choose(long Choices) {
-  std::uniform_int_distribution<int> Dist(0, Choices - 1);
-  return Dist(*Rand);
+  return uniform_int_distribution<int>(0, Choices - 1)(*Rand);
 }
 
 bool flip() {
-  std::uniform_int_distribution<int> Dist(0, 1);
-  return Dist(*Rand) == 0;
+  return choose(2) == 0;
 }
 
 BinaryOperator *randomBinop(Value *LHS, Value *RHS, BasicBlock *BB) {
@@ -223,9 +222,7 @@ Value *adapt(Value *Val, Type *Ty, BasicBlock *BB,
 
 // uniformly chosen 16-bit constant -- we'll get them all eventually
 APInt uniform16(int Width) {
-  uniform_int_distribution<unsigned long> Dist(
-      0, std::numeric_limits<unsigned long>::max());
-  return APInt(Width, 0xFFFF & Dist(*Rand));
+  return APInt(Width, choose(0xFFFF + 1));
 }
 
 // uniformly choose a Hamming weight and then uniformly select a value
@@ -343,8 +340,12 @@ Constant *randomInt(Type *Ty, LLVMContext &Ctx, vector<vector<APInt>> &Pool) {
     return ConstantInt::get(Ty, I);
   } else {
     auto I = randomIntHelper(Width);
-    if (flip())
-      I = ~I;
+    switch (choose(5)) {
+      case 0: I = ~I; break;
+      case 1: I = I + 1; break;
+      case 2: I = I - 1; break;
+      default: break;
+    }
     P.push_back(I);
     return ConstantInt::get(Ty, I);
   }
@@ -360,9 +361,18 @@ Value *getVal(Type *Ty, const vector<Value *> &Vals,
     return adapt(Vals[idx], Ty, BB);
 }
 
+Value *getRandomVal(unsigned Upto, Type *Ty, const vector<Value *> &Vals,
+                    vector<vector<APInt>> &Pool) {
+  const auto Width = Ty->getIntegerBitWidth();
+  auto &P = Pool.at(Width);
+  APInt I(Width, choose(Upto));
+  P.push_back(I);
+  return ConstantInt::get(Ty, I);
+}
+
 enum class WidthPolicy { Wild = 0, Chosen, AllOne, Mixed1, Mixed2, Mixed3 };
 
-const vector<int> ChosenIntWidths{1, 8, 16, 32, 64};
+const array<int, 5> ChosenIntWidths{1, 8, 16, 32, 64};
 int SavedWidth;
 
 int getWidth(WidthPolicy P) {
@@ -397,8 +407,6 @@ int getWidth(WidthPolicy P) {
     assert(false);
   }
 }
-
-// FIXME maybe sometime support the fixed point intrinsics
 
 Value *genUnaryIntrinsic(Type *Ty, vector<Value *> &Vals,
                          vector<vector<APInt>> &Pool, BasicBlock *BB,
@@ -526,26 +534,44 @@ Value *genTernaryIntrinsic(Type *Ty, vector<Value *> &Vals,
   auto *M = BB->getModule();
   auto *A = getVal(Ty, Vals, Pool, BB);
   auto *B = getVal(Ty, Vals, Pool, BB);
-  auto *C = getVal(Ty, Vals, Pool, BB);
+  bool force_32bits_imm = false;
+  Intrinsic::ID Op;
 
-  auto Op = flip() ? Intrinsic::fshl : Intrinsic::fshr;
+  switch (choose(6)) {
+    case 0:
+      Op = Intrinsic::fshl;
+      break;
+    case 1:
+      Op = Intrinsic::fshr;
+      break;
+    case 2:
+      Op = Intrinsic::smul_fix;
+      force_32bits_imm = true;
+      break;
+    case 3:
+      Op = Intrinsic::umul_fix;
+      force_32bits_imm = true;
+      break;
+    case 4:
+      Op = Intrinsic::smul_fix_sat;
+      force_32bits_imm = true;
+      break;
+    case 5:
+      Op = Intrinsic::umul_fix_sat;
+      force_32bits_imm = true;
+      break;
+    default:
+      UNREACHABLE();
+  }
+  auto *C = force_32bits_imm
+    ? getRandomVal(Ty->getIntegerBitWidth(), Type::getInt32Ty(BB->getContext()),
+                   Vals, Pool)
+    : getVal(Ty, Vals, Pool, BB);
+
   auto Decl = Intrinsic::getDeclaration(M, Op, Ty);
   auto *I = CallInst::Create(Decl, {A, B, C}, "", BB);
   return I;
 }
-
-const vector<int> log2{
-    0, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5,
-    5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8};
 
 void genInst(vector<Value *> &Vals, vector<vector<APInt>> &Pool, BasicBlock *BB,
              const WidthPolicy WP) {
@@ -560,7 +586,7 @@ void genInst(vector<Value *> &Vals, vector<vector<APInt>> &Pool, BasicBlock *BB,
   case 1: {
     auto *LHS = getVal(Ty, Vals, Pool, BB);
     Value *RHS = getVal(Ty, Vals, Pool, BB);
-    auto NarrowWidth = log2.at(Ty->getIntegerBitWidth());
+    auto NarrowWidth = ilog2_ceil(Ty->getIntegerBitWidth(), true);
     auto *NarrowTy = Type::getIntNTy(BB->getContext(), NarrowWidth);
     auto *Mask = ConstantInt::get(Ty, (1UL << NarrowWidth) - 1);
     auto *AltRHS = flip()
@@ -628,6 +654,8 @@ void valueFuzzer(Module *M) {
     else
       F->addRetAttr(Attribute::SExt);
   }
+  if (choose(4) == 0)
+    F->addRetAttr(Attribute::NoUndef);
   auto BB = BasicBlock::Create(Ctx, "", F);
 
   vector<Value *> Vals;
@@ -639,6 +667,8 @@ void valueFuzzer(Module *M) {
       else
         arg.addAttr(Attribute::SExt);
     }
+    if (choose(4) == 0)
+      arg.addAttr(Attribute::NoUndef);
   }
 
   vector<vector<APInt>> Pool;
