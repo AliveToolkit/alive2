@@ -680,7 +680,10 @@ void valueFuzzer(Module *M) {
   vector<vector<APInt>> Pool;
   for (int i = 0; i <= MaxIntWidth; ++i)
     Pool.push_back(vector<APInt>());
-  int num_insts = choose(MaxInsts);
+
+  // FIXME
+  int num_insts = opt_backend_tv ? choose(6) : choose(MaxInsts);
+
   for (int i = 0; i < num_insts; ++i)
     genInst(Vals, Pool, BB, WP);
 
@@ -896,6 +899,9 @@ reduced using llvm-reduce.
   initFuzzer();
 
   for (int rep = 0; rep < opt_num_reps; ++rep) {
+    cout << "\n================================================================= (" <<
+      rep << ")\n\n";
+    
     Fuzzer(M1.get());
 
     if (opt_run_sroa) {
@@ -919,7 +925,7 @@ reduced using llvm-reduce.
       WriteBitcodeToFile(*M1.get(), output_file);
     }
 
-    if (opt_print_ir) {
+    if (opt_print_ir || opt_backend_tv) {
       out->flush();
       outs() << "------------------------------------------------------\n\n";
       M1.get()->print(outs(), nullptr);
