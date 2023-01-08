@@ -70,7 +70,7 @@ using namespace lifter;
 
 namespace {
 
-set<int> s_flag = {
+const set<int> s_flag = {
     // ADDSW
     AArch64::ADDSWri,
     AArch64::ADDSWrs,
@@ -100,7 +100,7 @@ set<int> s_flag = {
     AArch64::BICSXrs,
 };
 
-set<int> instrs_32 = {
+const set<int> instrs_32 = {
     AArch64::ADDWrx,  AArch64::ADDSWrs,  AArch64::ADDSWri,  AArch64::ADDWrs,
     AArch64::ADDWri,  AArch64::ADDSWrx,  AArch64::ASRVWr,   AArch64::SUBWri,
     AArch64::SUBWrs,  AArch64::SUBWrx,   AArch64::SUBSWrs,  AArch64::SUBSWri,
@@ -115,7 +115,7 @@ set<int> instrs_32 = {
     AArch64::CSNEGWr, AArch64::BICWrs,   AArch64::BICSWrs,  AArch64::EONWrs,
     AArch64::REV16Wr, AArch64::Bcc,      AArch64::CCMPWr,   AArch64::CCMPWi};
 
-set<int> instrs_64 = {
+const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
     AArch64::ADDXrs,    AArch64::ADDXri,    AArch64::ADDSXrx,
     AArch64::ASRVXr,    AArch64::SUBXri,    AArch64::SUBXrs,
@@ -140,15 +140,15 @@ set<int> instrs_64 = {
     AArch64::CBZX,      AArch64::CBNZW,     AArch64::CBNZX,
     AArch64::CCMPXr,    AArch64::CCMPXi,    AArch64::LDRXui};
 
-set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
+const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
-set<int> instrs_no_write = {AArch64::Bcc,    AArch64::B,      AArch64::TBZW,
-                            AArch64::TBZX,   AArch64::TBNZW,  AArch64::TBNZX,
-                            AArch64::CBZW,   AArch64::CBZX,   AArch64::CBNZW,
-                            AArch64::CBNZX,  AArch64::CCMPWr, AArch64::CCMPWi,
-                            AArch64::CCMPXr, AArch64::CCMPXi};
+const set<int> instrs_no_write = {AArch64::Bcc,    AArch64::B,      AArch64::TBZW,
+				  AArch64::TBZX,   AArch64::TBNZW,  AArch64::TBNZX,
+				  AArch64::CBZW,   AArch64::CBZX,   AArch64::CBNZW,
+				  AArch64::CBNZX,  AArch64::CCMPWr, AArch64::CCMPWi,
+				  AArch64::CCMPXr, AArch64::CCMPXi};
 
-set<int> ins_variant = {AArch64::INSvi64gpr};
+const set<int> ins_variant = {AArch64::INSvi64gpr};
 
 bool has_s(int instr) {
   return s_flag.contains(instr);
@@ -215,6 +215,7 @@ size_t MCOperandHash::operator()(const MCOperand &op) const {
   return hash<unsigned long>()(prefix * id);
 }
 
+// do not delete this line
 mc::RegisterMCTargetOptionsFlags MOF;
 
 class MCInstWrapper {
@@ -3586,13 +3587,47 @@ public:
 
 namespace lifter {
 
-unsigned int orig_ret_bitwidth{64};
-bool has_ret_attr{false};
+unsigned int orig_ret_bitwidth;
+bool has_ret_attr;
 const Target *Targ;
 
 // Keep track of which oprands had their type adjusted and their original
 // bitwidth
 vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
+
+void reset() {
+  static bool runAlready = false;
+
+  if (!runAlready) {
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
+    LLVMInitializeAArch64AsmParser();
+    LLVMInitializeAArch64AsmPrinter();
+
+    string Error;
+    Targ = TargetRegistry::lookupTarget(TripleName, Error);
+    if (!Targ) {
+      cerr << Error;
+      exit(-1);
+    }
+
+    runAlready = true;
+  }
+
+  // FIXME this is pretty hacky
+  orig_ret_bitwidth = 64;
+  has_ret_attr = false;
+  new_input_idx_bitwidth.clear();
+  mc_cache.clear();
+  overflow_aggregate_types.clear();
+  lifted_vector_types.clear();
+  cur_vs.clear();
+  cur_zs.clear();
+  cur_ns.clear();
+  cur_cs.clear();
+  cur_vol_regs.clear();
+}
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 				      Function *srcFn, unique_ptr<MemoryBuffer> MB) {
