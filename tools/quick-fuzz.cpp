@@ -436,6 +436,9 @@ again:
     Op = Intrinsic::bswap;
     break;
   case 3:
+    // FIXME!!! ctpop not supported in ARM lifter yet
+    if (opt_backend_tv)
+      goto again;
     Op = Intrinsic::ctpop;
     break;
   case 4:
