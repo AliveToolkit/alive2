@@ -17,7 +17,9 @@ namespace llvm {
 namespace lifter {
 
 // FIXME we'd rather not have these globals shared across files
-extern std::vector<std::pair<unsigned, unsigned>> new_input_idx_bitwidth;
+
+// unadjusted parameter bitwidths
+extern std::vector<unsigned> orig_input_width;
 extern unsigned orig_ret_bitwidth;
 extern bool has_ret_attr;
 extern const llvm::Target *Targ;

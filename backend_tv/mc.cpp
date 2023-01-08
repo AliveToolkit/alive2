@@ -3005,7 +3005,6 @@ public:
     createBBs(sorted_bbs, *Fn);
 
     unsigned argNum = 0;
-    unsigned idx = 0;
     for (auto &Arg : Fn->args()) {
       // generate names and values for the input arguments
       // FIXME this is pretty convoluted and needs to be cleaned up
@@ -3017,13 +3016,13 @@ public:
       assert(Arg.getType()->getIntegerBitWidth() == 64 &&
              "at this point input type should be 64 bits");
 
-      if (!new_input_idx_bitwidth.empty() &&
-          (argNum == new_input_idx_bitwidth[idx].first)) {
+      auto orig_width = orig_input_width[argNum];
+      if (orig_width < 64) {
         auto op = Instruction::ZExt;
         if (Arg.hasSExtAttr())
           op = Instruction::SExt;
 
-        auto truncated_type = get_int_type(new_input_idx_bitwidth[idx].second);
+        auto truncated_type = get_int_type(orig_width);
         stored =
             createTrunc(stored, truncated_type, next_name(operand.getReg(), 2));
         auto extended_type = get_int_type(64);
@@ -3043,7 +3042,6 @@ public:
                                 next_name(operand.getReg(), 4));
           }
         }
-        idx++;
       }
       instructionCount++;
       mc_add_identifier(operand.getReg(), 2, stored);
@@ -3591,9 +3589,7 @@ unsigned int orig_ret_bitwidth;
 bool has_ret_attr;
 const Target *Targ;
 
-// Keep track of which oprands had their type adjusted and their original
-// bitwidth
-vector<pair<unsigned, unsigned>> new_input_idx_bitwidth;
+vector<unsigned> orig_input_width;
 
 void reset() {
   static bool runAlready = false;
@@ -3615,10 +3611,11 @@ void reset() {
     runAlready = true;
   }
 
-  // FIXME this is pretty hacky
+  // FIXME this is a pretty error-prone way to reset the state,
+  // probably should just encapsulate this in a class
   orig_ret_bitwidth = 64;
   has_ret_attr = false;
-  new_input_idx_bitwidth.clear();
+  orig_input_width.clear();
   mc_cache.clear();
   overflow_aggregate_types.clear();
   lifted_vector_types.clear();

@@ -65,11 +65,10 @@ namespace {
 
 // FIXME -- each of adjustSrcInputs and adjustSrcReturn creates an
 // entirely new function, this is slow and not elegant, probably merge
-// these together
+// these together so we only create the fresh function once
 
 Function *adjustSrcInputs(Function *srcFn) {
   vector<Type *> new_argtypes;
-  unsigned idx = 0;
 
   for (auto &v : srcFn->args()) {
     auto *ty = v.getType();    
@@ -80,11 +79,9 @@ Function *adjustSrcInputs(Function *srcFn) {
     if (orig_width > 64) // FIXME
       report_fatal_error("[Unsupported Function Argument]: Only int types 64 "
                          "bits or smaller supported for now");
-    if (orig_width < 64)
-      new_input_idx_bitwidth.emplace_back(idx, orig_width);
+    orig_input_width.emplace_back(orig_width);
     new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
     // FIXME Do we need to update the value_cache?
-    idx++;
   }
 
   FunctionType *NFTy = FunctionType::get(srcFn->getReturnType(), new_argtypes, false);
