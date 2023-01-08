@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "backend_tv/lifter.h"
 #include "cache/cache.h"
 #include "llvm_util/compare.h"
 #include "llvm_util/llvm2alive.h"
@@ -62,6 +63,11 @@ cl::opt<long> opt_num_reps(
 cl::opt<bool>
     opt_skip_alive(LLVM_ARGS_PREFIX "skip-alive",
                    cl::desc("Generate IR but then don't invoke Alive"),
+                   cl::cat(alive_cmdargs), cl::init(false));
+
+cl::opt<bool>
+    opt_backend_tv(LLVM_ARGS_PREFIX "backend-tv",
+		   cl::desc("Instead of testing the middle end, test the AArch64 backend"),
                    cl::cat(alive_cmdargs), cl::init(false));
 
 cl::opt<bool> opt_run_sroa(
@@ -797,6 +803,35 @@ void bbFuzzer(Module *M) {
     report_fatal_error("Broken module found, this should not happen");
 }
 
+void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
+  lifter::reset();
+
+  // this has to return a fresh function since it rewrites the
+  // signature
+  srcFn = lifter::adjustSrc(srcFn);
+  
+  std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", M1->getContext());
+  M2->setDataLayout(M1->getDataLayout());
+  M2->setTargetTriple(M1->getTargetTriple());
+
+  llvm::SmallString<1024> Asm;
+  auto AsmBuffer = lifter::generateAsm(*M1, Asm);
+
+  cout << "\n\nAArch64 Assembly:\n\n";
+  for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
+       ++it) {
+    cout << *it;
+  }
+  cout << "-------------\n";
+
+  auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
+  
+  auto err = optimize_module(M2.get(), "Oz");
+  assert(err.empty());
+
+  verifier.compareFunctions(*F1, *F2);
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -895,27 +930,47 @@ reduced using llvm-reduce.
     if (opt_skip_alive)
       continue;
 
-    auto M2 = CloneModule(M1);
-    auto err = optimize_module(M2.get(), optPass);
-    if (!err.empty()) {
-      *out << "Error parsing list of LLVM passes: " << err << '\n';
-      return -1;
+    if (opt_backend_tv) {
+      M1.setTargetTriple("aarch64-linux-gnu");
+      M1.setDataLayout(
+          "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
+
+      // auto &DL = M1.getDataLayout();
+      Triple targetTriple(M1.getTargetTriple());
+      llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+
+      llvm::Function *srcFn = nullptr;
+      for (auto &F : M1) {
+	if (F.isDeclaration())
+	  continue;
+	srcFn = &F;
+      }
+      assert(srcFn != nullptr);
+      doit(&M1, srcFn, verifier);
+      
+    } else {
+      unique_ptr<Module> M2 = CloneModule(M1);
+      auto err = optimize_module(M2.get(), optPass);
+      if (!err.empty()) {
+	*out << "Error parsing list of LLVM passes: " << err << '\n';
+	return -1;
+      }
+
+      auto *F1 = M1.getFunction("f");
+      auto *F2 = M2->getFunction("f");
+      assert(F1 && F2);
+
+      // this is a hack but a useful one. attribute inference sets these
+      // and then we always fail Alive's syntactic equality check. so we
+      // just go ahead and (soundly) drop them by hand.
+      F2->removeFnAttr(Attribute::NoFree);
+      F2->removeFnAttr(Attribute::Memory);
+      F2->removeFnAttr(Attribute::WillReturn);
+
+      if (!verifier.compareFunctions(*F1, *F2))
+	if (opt_error_fatal)
+	  goto end;
     }
-
-    auto *F1 = M1.getFunction("f");
-    auto *F2 = M2->getFunction("f");
-    assert(F1 && F2);
-
-    // this is a hack but a useful one. attribute inference sets these
-    // and then we always fail Alive's syntactic equality check. so we
-    // just go ahead and (soundly) drop them by hand.
-    F2->removeFnAttr(Attribute::NoFree);
-    F2->removeFnAttr(Attribute::Memory);
-    F2->removeFnAttr(Attribute::WillReturn);
-
-    if (!verifier.compareFunctions(*F1, *F2))
-      if (opt_error_fatal)
-        goto end;
 
     vector<Function *> Funcs;
     for (auto &F : M1)
