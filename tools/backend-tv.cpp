@@ -76,13 +76,40 @@ llvm::cl::opt<string> opt_asm_input(
 
 llvm::ExitOnError ExitOnErr;
 
-llvm::Function *findFirstFunction(llvm::Module &M) {
-  for (auto &F : M) {
-    if (F.isDeclaration())
-      continue;
-    return &F;
+void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
+  lifter::reset();
+
+  // this has to return a fresh function since it rewrites the
+  // signature
+  srcFn = lifter::adjustSrc(srcFn);
+  
+  std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", M1->getContext());
+  M2->setDataLayout(M1->getDataLayout());
+  M2->setTargetTriple(M1->getTargetTriple());
+
+  llvm::SmallString<1024> Asm;
+  auto AsmBuffer = (opt_asm_input != "") ?
+    ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
+    lifter::generateAsm(*M1, Asm);
+
+  cout << "\n\nAArch64 Assembly:\n\n";
+  for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
+       ++it) {
+    cout << *it;
   }
-  return 0;
+  cout << "-------------\n";
+
+  if (opt_asm_only)
+    exit(0);
+
+  auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
+  
+  if (opt_optimize_tgt) {
+    auto err = optimize_module(M2.get(), "Oz");
+    assert(err.empty());
+  }
+
+  verifier.compareFunctions(*F1, *F2);
 }
 
 } // namespace
@@ -138,51 +165,24 @@ version )EOF";
   verifier.print_dot = opt_print_dot;
   verifier.bidirectional = opt_bidirectional;
 
-  // FIXME support lifting and verifying multiple functions
-
-  auto *srcFn = (opt_fn == "") ?
-    findFirstFunction(*M1) :
-    findFunction(*M1, opt_fn);
-
-  if (srcFn == nullptr) {
-    *out << "Fatal error: Couldn't find function to verify\n";
-    exit(-1);
+  if (opt_fn != "") {
+    auto *srcFn = findFunction(*M1, opt_fn);
+    if (srcFn == nullptr) {
+      *out << "Fatal error: Couldn't find function to verify\n";
+      exit(-1);
+    }
+    doit(M1.get(), srcFn, verifier);
+  } else {
+    vector<llvm::Function *> Funcs;
+    for (auto &srcFn : *M1.get()) {
+      if (srcFn.isDeclaration())
+	continue;
+      Funcs.push_back(&srcFn);
+    }
+    for (auto *srcFn : Funcs)
+      doit(M1.get(), srcFn, verifier);
   }
-
-  lifter::reset();
-
-  // this has to return a fresh function since it rewrites the
-  // signature
-  srcFn = lifter::adjustSrc(srcFn);
   
-  std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", Context);
-  M2->setDataLayout(M1.get()->getDataLayout());
-  M2->setTargetTriple(M1.get()->getTargetTriple());
-
-  llvm::SmallString<1024> Asm;
-  auto AsmBuffer = (opt_asm_input != "") ?
-    ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
-    lifter::generateAsm(*M1.get(), Asm);
-
-  cout << "\n\nAArch64 Assembly:\n\n";
-  for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
-       ++it) {
-    cout << *it;
-  }
-  cout << "-------------\n";
-
-  if (opt_asm_only)
-    exit(0);
-
-  auto [F1, F2] = lifter::liftFunc(M1.get(), M2.get(), srcFn, std::move(AsmBuffer));
-  
-  if (opt_optimize_tgt) {
-    auto err = optimize_module(M2.get(), "Oz");
-    assert(err.empty());
-  }
-
-  verifier.compareFunctions(*F1, *F2);
-
   *out << "Summary:\n"
           "  " << verifier.num_correct << " correct transformations\n"
           "  " << verifier.num_unsound << " incorrect transformations\n"
