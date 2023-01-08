@@ -25,7 +25,7 @@ extern const llvm::Target *Targ;
 inline const char *TripleName = "aarch64-arm-none-eabi";
 inline const char *CPU = "apple-a12";
 
-void init();
+void reset();
 
 llvm::Function *adjustSrc(llvm::Function *srcFn);
 

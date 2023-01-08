@@ -64,21 +64,6 @@ using namespace lifter;
 
 namespace lifter {
 
-void init() {
-  LLVMInitializeAArch64TargetInfo();
-  LLVMInitializeAArch64Target();
-  LLVMInitializeAArch64TargetMC();
-  LLVMInitializeAArch64AsmParser();
-  LLVMInitializeAArch64AsmPrinter();
-
-  string Error;
-  Targ = TargetRegistry::lookupTarget(TripleName, Error);
-  if (!Targ) {
-    cerr << Error;
-    exit(-1);
-  }
-}
-
 unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();

@@ -149,6 +149,8 @@ version )EOF";
     exit(-1);
   }
 
+  lifter::reset();
+
   // this has to return a fresh function since it rewrites the
   // signature
   srcFn = lifter::adjustSrc(srcFn);
@@ -157,7 +159,6 @@ version )EOF";
   M2->setDataLayout(M1.get()->getDataLayout());
   M2->setTargetTriple(M1.get()->getTargetTriple());
 
-  lifter::init();
   llvm::SmallString<1024> Asm;
   auto AsmBuffer = (opt_asm_input != "") ?
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
