@@ -82,6 +82,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 75. SCEV expander introduces poison when hoisting IV (https://llvm.org/PR59777)
 76. InstCombine: incorrect overflow check simplification (https://llvm.org/PR59836)
 77. Loop reroll creates incorrect IV increment (https://llvm.org/PR59841)
+78. InstCombine: incorrect transformation of smul_overflow with i1 (https://llvm.org/PR59876)
 
 
 ### Bugs found in Z3
