@@ -104,12 +104,22 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
 
   auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
   
+  *out << "about to optimize lifted code:\n";
+  out->flush();
+  M2.get()->print(llvm::outs(), nullptr);
+
   if (opt_optimize_tgt) {
     auto err = optimize_module(M2.get(), "Oz");
     assert(err.empty());
   }
 
+  *out << "about to compare functions\n";
+  out->flush();
+
   verifier.compareFunctions(*F1, *F2);
+
+  *out << "done comparing functions\n";
+  out->flush();
 }
 
 } // namespace

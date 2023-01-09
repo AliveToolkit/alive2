@@ -3133,6 +3133,9 @@ public:
       tmp_index++;
       add_phi_params(phi, phi_mc_wrapper);
     }
+
+    cout << "returning from run method" << endl;
+    
     return Fn;
   }
 };
