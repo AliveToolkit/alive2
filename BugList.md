@@ -83,6 +83,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 76. InstCombine: incorrect overflow check simplification (https://llvm.org/PR59836)
 77. Loop reroll creates incorrect IV increment (https://llvm.org/PR59841)
 78. InstCombine: incorrect transformation of smul_overflow with i1 (https://llvm.org/PR59876)
+79. CVP: incorrect transformation of abs (https://llvm.org/PR59887)
+80. InstCombine generates incorrect range metadata for ctpop (https://llvm.org/PR59888)
 
 
 ### Bugs found in Z3
