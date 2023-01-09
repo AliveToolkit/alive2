@@ -126,3 +126,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 18. Miscompile of code involving a usub.sat by AArch64 backend (https://github.com/llvm/llvm-project/issues/58109)
 19. Miscompilation of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
 20. AArch64 backend miscompile of some funnel shifts (https://github.com/llvm/llvm-project/issues/59898)
+21. Miscompile by AArch64 backend related to smax.i64 (https://github.com/llvm/llvm-project/issues/59902)

@@ -685,7 +685,7 @@ void valueFuzzer(Module *M) {
     Pool.push_back(vector<APInt>());
 
   // FIXME
-  int num_insts = opt_backend_tv ? choose(6) : choose(MaxInsts);
+  int num_insts = opt_backend_tv ? choose(10) : choose(MaxInsts);
 
   for (int i = 0; i < num_insts; ++i)
     genInst(Vals, Pool, BB, WP);
