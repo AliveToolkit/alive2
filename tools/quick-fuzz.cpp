@@ -890,6 +890,19 @@ reduced using llvm-reduce.
 
   long num_correct = 0, num_unsound = 0, num_failed = 0, num_errors = 0;
 
+  auto DL = DataLayout("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
+  const string TTStr("aarch64-linux-gnu");
+  auto TT = Triple(TTStr);
+  TargetLibraryInfoWrapperPass TLI(TT);
+
+  llvm_util::initializer llvm_util_init(*out, DL);
+  smt::smt_initializer smt_init;
+  Verifier verifier(TLI, smt_init, *out);
+  verifier.quiet = opt_quiet;
+  verifier.always_verify = opt_always_verify;
+  verifier.print_dot = opt_print_dot;
+  verifier.bidirectional = opt_bidirectional;
+
   initFuzzer();
 
   for (int rep = 0; rep < opt_num_reps; ++rep) {
@@ -897,17 +910,8 @@ reduced using llvm-reduce.
       rep << ")\n\n";
     
     M1 = make_unique<Module>("fuzz", Context);
-    auto &DL = M1.get()->getDataLayout();
-    Triple targetTriple(M1.get()->getTargetTriple());
-    TargetLibraryInfoWrapperPass TLI(targetTriple);
-
-    llvm_util::initializer llvm_util_init(*out, DL);
-    smt::smt_initializer smt_init;
-    Verifier verifier(TLI, smt_init, *out);
-    verifier.quiet = opt_quiet;
-    verifier.always_verify = opt_always_verify;
-    verifier.print_dot = opt_print_dot;
-    verifier.bidirectional = opt_bidirectional;
+    M1.get()->setTargetTriple(TTStr);
+    M1.get()->setDataLayout(DL);
 
     Fuzzer(M1.get());
 
@@ -944,6 +948,7 @@ reduced using llvm-reduce.
       continue;
 
     if (opt_backend_tv) {
+#if 0
       M1.get()->setTargetTriple("aarch64-linux-gnu");
       M1.get()->setDataLayout(
           "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
@@ -951,6 +956,7 @@ reduced using llvm-reduce.
       // auto &DL = M1.getDataLayout();
       Triple targetTriple(M1.get()->getTargetTriple());
       llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+#endif
 
       llvm::Function *srcFn = nullptr;
       for (auto &F : *M1.get()) {
@@ -990,7 +996,6 @@ reduced using llvm-reduce.
     num_errors += verifier.num_errors;
 
     M1 = nullptr;
-    M1 = make_unique<Module>("fuzz", Context);
   }
 
   *out << "Summary:\n"
