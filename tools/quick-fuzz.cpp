@@ -888,8 +888,6 @@ reduced using llvm-reduce.
     exit(-1);
   }
 
-  long num_correct = 0, num_unsound = 0, num_failed = 0, num_errors = 0;
-
   auto DL = DataLayout("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
   const string TTStr("aarch64-linux-gnu");
   auto TT = Triple(TTStr);
@@ -948,16 +946,6 @@ reduced using llvm-reduce.
       continue;
 
     if (opt_backend_tv) {
-#if 0
-      M1.get()->setTargetTriple("aarch64-linux-gnu");
-      M1.get()->setDataLayout(
-          "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
-
-      // auto &DL = M1.getDataLayout();
-      Triple targetTriple(M1.get()->getTargetTriple());
-      llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-#endif
-
       llvm::Function *srcFn = nullptr;
       for (auto &F : *M1.get()) {
 	if (F.isDeclaration())
@@ -989,27 +977,21 @@ reduced using llvm-reduce.
 	if (opt_error_fatal)
 	  goto end;
     }
-
-    num_correct += verifier.num_correct;
-    num_unsound += verifier.num_unsound;
-    num_failed += verifier.num_failed;
-    num_errors += verifier.num_errors;
-
     M1 = nullptr;
   }
 
   *out << "Summary:\n"
           "  "
-       << num_correct
+       << verifier.num_correct
        << " correct transformations\n"
           "  "
-       << num_unsound
+       << verifier.num_unsound
        << " incorrect transformations\n"
           "  "
-       << num_failed
+       << verifier.num_failed
        << " failed-to-prove transformations\n"
           "  "
-       << num_errors << " Alive2 errors\n";
+       << verifier.num_errors << " Alive2 errors\n";
 
 end:
   if (opt_smt_stats)
