@@ -105,7 +105,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 17. Crash with FP<->BV conversions (https://github.com/Z3Prover/z3/issues/6460)
 
 
-### Bugs found in ARM64 Backend
+### Miscompilation bugs found in ARM64 Backend
 1. GlobalIsel miscompiles an llvm.fshl instruction (https://github.com/llvm/llvm-project/issues/55003)
 2. GlobalIsel miscompiles a zero-extended logical shift right (https://github.com/llvm/llvm-project/issues/55129)
 3. Incorrect optimization of sitofp/fptosi roundtrip (https://github.com/llvm/llvm-project/issues/55150)
@@ -125,3 +125,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 17. GlobalIsel backend miscompiles funnel shift with undef amount (https://github.com/llvm/llvm-project/issues/57256)
 18. Miscompile of code involving a usub.sat by AArch64 backend (https://github.com/llvm/llvm-project/issues/58109)
 19. Miscompilation of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
+20. AArch64 backend miscompile of some funnel shifts (https://github.com/llvm/llvm-project/issues/59898)
