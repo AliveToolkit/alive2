@@ -543,8 +543,7 @@ public:
     auto gep = make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds());
     auto gep_struct_ofs = [&i, this](llvm::StructType *sty, llvm::Value *ofs) {
       llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()), ofs };
-      return this->DL().getIndexedOffsetInType(sty,
-          llvm::makeArrayRef(vals, 2));
+      return this->DL().getIndexedOffsetInType(sty, { vals, 2 });
     };
 
     // reference: GEPOperator::accumulateConstantOffset()
@@ -578,7 +577,7 @@ public:
           }
 
           auto ofs_vector = llvm::ConstantVector::get(
-              llvm::makeArrayRef(offsets.data(), offsets.size()));
+	      { offsets.data(), offsets.size() });
           gep->addIdx(1, *get_operand(ofs_vector));
         } else {
           gep->addIdx(1, *make_intconst(
