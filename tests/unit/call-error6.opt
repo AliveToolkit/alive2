@@ -11,8 +11,8 @@ assume(%eq2)
 
 %eq3 = icmp ule i8 %c1, 9
 %eq4 = icmp ule i8 %c2, 9
-assume_non_poison(%eq3)
-assume_non_poison(%eq4)
+assume(%eq3)
+assume(%eq4)
 
 %d = add i8 %c1, %c2
 ret i8 %d
