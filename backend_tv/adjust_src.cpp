@@ -122,7 +122,7 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   auto *ret_typ = srcFn->getReturnType();
   orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
-  cout << "original return bitwidth = " << orig_ret_bitwidth << endl;
+  outs() << "original return bitwidth = " << orig_ret_bitwidth << "\n";
 
   // FIXME
   if (!ret_typ->isIntegerTy())

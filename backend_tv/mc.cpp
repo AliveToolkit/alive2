@@ -156,10 +156,10 @@ bool has_s(int instr) {
 
 // FIXME -- do this without the strings, just keep a map or something
 BasicBlock *getBBByName(Function &Fn, StringRef name) {
-  cout << "searching for BB named '" << (string)name << "'\n";
+  outs() << "searching for BB named '" << (string)name << "'\n";
   BasicBlock *BB = nullptr;
   for (auto &bb : Fn) {
-    cout << "  we have a BB named '" << (string)bb.getName() << "'\n";
+    outs() << "  we have a BB named '" << (string)bb.getName() << "'\n";
     if (bb.getName() == name) {
       BB = &bb;
       break;
@@ -280,27 +280,27 @@ public:
   // FIXME: for phi instructions and figure out to use register names rather
   // than numbers
   void print() const {
-    cout << "< MCInstWrapper " << getOpcode() << " ";
+    outs() << "< MCInstWrapper " << getOpcode() << " ";
     unsigned idx = 0;
     for (auto it = instr.begin(); it != instr.end(); ++it) {
       if (it->isReg()) {
         if (getOpcode() == AArch64::PHI && idx >= 1) {
-          cout << "<Phi arg>:[(" << it->getReg() << "," << op_ids[idx] << "),"
+          outs() << "<Phi arg>:[(" << it->getReg() << "," << op_ids[idx] << "),"
                << getOpPhiBlock(idx) << "]>";
         } else {
-          cout << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
+          outs() << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
                << ")>";
         }
       } else if (it->isImm()) {
-        cout << "<MCOperand Imm:" << it->getImm() << ">";
+        outs() << "<MCOperand Imm:" << it->getImm() << ">";
       } else if (it->isExpr()) {
-        cout << "<MCOperand Expr:>"; // FIXME
+        outs() << "<MCOperand Expr:>"; // FIXME
       } else {
         assert("MCInstWrapper printing an unsupported operand" && false);
       }
       idx++;
     }
-    cout << ">\n";
+    outs() << ">\n";
   }
 };
 
@@ -489,7 +489,7 @@ public:
     }
 
     if (add_entry_block) {
-      cout << "Added arm_tv_entry block\n";
+      outs() << "Added arm_tv_entry block\n";
       BBs.emplace(BBs.begin(), "arm_tv_entry");
       MCInst jmp_instr;
       jmp_instr.setOpcode(AArch64::B);
@@ -522,15 +522,15 @@ public:
   void generateDominator() {
     auto blocks = postOrder();
     reverse(blocks.begin(), blocks.end());
-    cout << "postOrder\n";
+    outs() << "postOrder\n";
     for (auto &curBlock : blocks) {
-      cout << curBlock->getName() << "\n";
+      outs() << curBlock->getName() << "\n";
       dom[curBlock] = BlockSetTy();
       for (auto &b : blocks)
         dom[curBlock].insert(b);
     }
 
-    cout << "printing dom before\n";
+    outs() << "printing dom before\n";
     printGraph(dom);
     while (true) {
       bool changed = false;
@@ -546,13 +546,13 @@ public:
       if (!changed)
         break;
     }
-    cout << "printing dom after\n";
+    outs() << "printing dom after\n";
     printGraph(dom);
   }
 
   void generateDominatorFrontier() {
     auto dominates = invertGraph(dom);
-    cout << "printing dom_inverse\n";
+    outs() << "printing dom_inverse\n";
     printGraph(dominates);
     for (auto &[block, domSet] : dom) {
       BlockSetTy dominated_succs;
@@ -568,16 +568,16 @@ public:
         }
       }
     }
-    cout << "printing dom_frontier\n";
+    outs() << "printing dom_frontier\n";
     printGraph(dom_frontier);
     return;
   }
 
   void generateDomTree() {
     auto dominates = invertGraph(dom);
-    cout << "printing dom_inverse\n";
+    outs() << "printing dom_inverse\n";
     printGraph(dominates);
-    cout << "-----------------\n";
+    outs() << "-----------------\n";
     unordered_map<MCBasicBlock *, BlockSetTy> s_dom;
     for (auto &[block, children] : dominates) {
       s_dom[block] = BlockSetTy();
@@ -607,22 +607,22 @@ public:
       }
     }
 
-    cout << "printing s_dom\n";
+    outs() << "printing s_dom\n";
     printGraph(s_dom);
-    cout << "-----------------\n";
+    outs() << "-----------------\n";
 
-    cout << "printing child_dom\n";
+    outs() << "printing child_dom\n";
     printGraph(child_dom);
-    cout << "-----------------\n";
+    outs() << "-----------------\n";
 
-    cout << "printing dom_tree\n";
+    outs() << "printing dom_tree\n";
     printGraph(dom_tree);
-    cout << "-----------------\n";
+    outs() << "-----------------\n";
 
     dom_tree_inv = invertGraph(dom_tree);
-    cout << "printing dom_tree_inv\n";
+    outs() << "printing dom_tree_inv\n";
     printGraph(dom_tree_inv);
-    cout << "-----------------\n";
+    outs() << "-----------------\n";
   }
 
   // compute a map from each variable to its defining block
@@ -649,7 +649,7 @@ public:
                "unsupported destination operand");
 
         if (dst_operand.isImm()) {
-          cout << "destination operand is an immediate. printing the "
+          outs() << "destination operand is an immediate. printing the "
                   "instruction and skipping it\n";
           w_instr.print();
           continue;
@@ -666,13 +666,13 @@ public:
 
     // temp for debugging
     for (auto &[var, blockSet] : defs) {
-      cout << "defs for \n";
+      outs() << "defs for \n";
       var.print(outs(), MRI_ptr);
-      cout << "\n";
+      outs() << "\n";
       for (auto &block : blockSet) {
-        cout << block->getName() << ",";
+        outs() << block->getName() << ",";
       }
-      cout << "\n";
+      outs() << "\n";
     }
   }
 
@@ -694,15 +694,15 @@ public:
       }
     }
     // temp for debugging
-    cout << "mapping from block name to variable names that require phi nodes "
+    outs() << "mapping from block name to variable names that require phi nodes "
             "in block\n";
     for (auto &[block, varSet] : phis) {
-      cout << "phis for: " << block->getName() << "\n";
+      outs() << "phis for: " << block->getName() << "\n";
       for (auto &var : varSet) {
         var.print(outs(), MRI_ptr);
-        cout << "\n";
+        outs() << "\n";
       }
-      cout << "-------------\n";
+      outs() << "-------------\n";
     }
   }
 
@@ -721,10 +721,10 @@ public:
     }
 
     // temp for debugging
-    cout << "printing fn_args\n";
+    outs() << "printing fn_args\n";
     for (auto &arg : fn_args) {
       arg.print(outs(), MRI_ptr);
-      cout << "\n";
+      outs() << "\n";
     }
   }
 
@@ -783,13 +783,13 @@ public:
       }
     }
 
-    cout << "printing fn_args after rewrite\n";
+    outs() << "printing fn_args after rewrite\n";
     for (auto &arg : fn_args) {
       arg.print(outs(), MRI_ptr);
-      cout << "\n";
+      outs() << "\n";
     }
 
-    cout << "printing MCInsts after rewriting operands\n";
+    outs() << "printing MCInsts after rewriting operands\n";
     printBlocks();
   }
 
@@ -798,7 +798,7 @@ public:
         stack;
     unordered_map<MCOperand, unsigned, MCOperandHash, MCOperandEqual> counters;
 
-    cout << "SSA rename\n";
+    outs() << "SSA rename\n";
 
     // auto printStack = [&](unordered_map<MCOperand,
     // vector<unsigned>,
@@ -809,9 +809,9 @@ public:
     //     var.print(outs(), MRI_ptr);
     //     outs() << "\n";
     //     for (auto &stack_item : stack_vec) {
-    //       cout << stack_item << ",";
+    //       outs() << stack_item << ",";
     //     }
-    //     cout << "\n";
+    //     outs() << "\n";
     //   }
     // };
 
@@ -829,9 +829,9 @@ public:
     function<void(MCBasicBlock *)> rename;
     rename = [&](MCBasicBlock *block) {
       auto old_stack = stack;
-      cout << "renaming block: " << block->getName() << "\n";
+      outs() << "renaming block: " << block->getName() << "\n";
       block->print();
-      cout << "----\n";
+      outs() << "----\n";
       for (auto &phi_var : phis[block]) {
 
         MCInst new_phi_instr;
@@ -842,14 +842,14 @@ public:
         MCInstWrapper new_w_instr(new_phi_instr);
         block->addInstBegin(std::move(new_w_instr));
         auto phi_dst_id = pushFresh(phi_var);
-        cout << "phi_dst_id: " << phi_dst_id << "\n";
+        outs() << "phi_dst_id: " << phi_dst_id << "\n";
         block->getInstrs()[0].setOpId(0, phi_dst_id);
       }
-      cout << "after phis\n";
+      outs() << "after phis\n";
       block->print();
-      cout << "----\n";
+      outs() << "----\n";
 
-      cout << "renaming instructions\n";
+      outs() << "renaming instructions\n";
       for (auto &w_instr : block->getInstrs()) {
         auto &mc_instr = w_instr.getMCInst();
 
@@ -871,7 +871,7 @@ public:
         // outs() << "printing operands\n";
         unsigned i = 1;
         if (instrs_no_write.contains(mc_instr.getOpcode())) {
-          cout << "iterating from first element in rename\n";
+          outs() << "iterating from first element in rename\n";
           i = 0;
         }
 
@@ -943,7 +943,7 @@ public:
       pushFresh(arg);
     }
 
-    cout << "adding volatile registers\n";
+    outs() << "adding volatile registers\n";
 
     auto v_registers = volatileRegisters();
     for (auto reg_num : v_registers) {
@@ -957,7 +957,7 @@ public:
       }
 
       if (!found_reg) {
-        cout << "adding volatile: " << reg_num << "\n";
+        outs() << "adding volatile: " << reg_num << "\n";
         auto vol_reg = MCOperand::createReg(reg_num);
         stack[vol_reg] = vector<unsigned>();
         pushFresh(vol_reg);
@@ -970,22 +970,22 @@ public:
     pushFresh(sp_reg);
 
     rename(entry_block_ptr);
-    cout << "printing MCInsts after renaming operands\n";
+    outs() << "printing MCInsts after renaming operands\n";
     printBlocks();
 
-    cout << "printing phi args\n";
+    outs() << "printing phi args\n";
     for (auto &[block, phi_vars] : phi_args) {
-      cout << "block: " << block->getName() << "\n";
+      outs() << "block: " << block->getName() << "\n";
       for (auto &[phi_var, args] : phi_vars) {
-        cout << "phi_var: " << phi_var.getReg() << "\n";
+        outs() << "phi_var: " << phi_var.getReg() << "\n";
         for (auto arg : args) {
-          cout << arg.first << "-" << arg.second << ", ";
+          outs() << arg.first << "-" << arg.second << ", ";
         }
-        cout << "\n";
+        outs() << "\n";
       }
     }
 
-    cout << "-----------------\n"; // adding args to phi-nodes
+    outs() << "-----------------\n"; // adding args to phi-nodes
     for (auto &[block, phi_vars] : phi_args) {
       for (auto &w_instr : block->getInstrs()) {
         auto &mc_instr = w_instr.getMCInst();
@@ -994,9 +994,9 @@ public:
 
         auto phi_var = mc_instr.getOperand(0);
         unsigned index = 1;
-        cout << "phi arg size " << phi_args[block][phi_var].size() << "\n";
+        outs() << "phi arg size " << phi_args[block][phi_var].size() << "\n";
         for (auto var_id_label_pair : phi_args[block][phi_var]) {
-          cout << "index = " << index
+          outs() << "index = " << index
                << ", var_id = " << var_id_label_pair.first << "\n";
           mc_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
           w_instr.pushOpId(var_id_label_pair.first);
@@ -1007,9 +1007,9 @@ public:
       }
     }
 
-    cout << "printing MCInsts after adding args to phi-nodes\n";
+    outs() << "printing MCInsts after adding args to phi-nodes\n";
     for (auto &b : BBs) {
-      cout << b.getName() << ":\n";
+      outs() << b.getName() << ":\n";
       b.print();
     }
   }
@@ -1050,16 +1050,16 @@ public:
   // Debug function to print domination info
   void printGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
     for (auto &curBlock : graph) {
-      cout << curBlock.first->getName() << ": ";
+      outs() << curBlock.first->getName() << ": ";
       for (auto &dst : curBlock.second)
-        cout << dst->getName() << " ";
-      cout << "\n";
+        outs() << dst->getName() << " ";
+      outs() << "\n";
     }
   }
 
   void printBlocks() {
-    cout << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
-    cout << "-------------\n";
+    outs() << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
+    outs() << "-------------\n";
     int i = 0;
     for (auto &block : BBs) {
       outs() << "block " << i << ", name= " << block.getName() << '\n';
@@ -1104,16 +1104,16 @@ vector<unique_ptr<VectorType *>> lifted_vector_types;
 // Add IR value to cache
 void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
   mc_cache.emplace(make_pair(reg, version), v);
-  cout << "mc_cache: adding " << reg << ", " << version << endl;
+  outs() << "mc_cache: adding " << reg << ", " << version << "\n";
 }
 
 Value *mc_get_operand(unsigned reg, unsigned version) {
-  cout << "mc_cache: looking for " << reg << ", " << version;
+  outs() << "mc_cache: looking for " << reg << ", " << version;
   if (auto I = mc_cache.find(make_pair(reg, version)); I != mc_cache.end()) {
-    cout << "  found it" << endl;
+    outs() << "  found it" << "\n";
     return I->second;
   }
-  cout << "  did not find it" << endl;
+  outs() << "  did not find it" << "\n";
   return nullptr;
 }
 
@@ -1224,7 +1224,7 @@ BasicBlock *get_basic_block(Function &F, MCOperand &jmp_tgt) {
   const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*jmp_tgt.getExpr());
   const MCSymbol &Sym = SRE.getSymbol();
   StringRef name = Sym.getName();
-  cout << "jump target: " << Sym.getName().str() << '\n';
+  outs() << "jump target: " << Sym.getName().str() << '\n';
   BasicBlock *BB = nullptr;
   for (auto &bb : F) {
     if (bb.getName() == name) {
@@ -1268,12 +1268,11 @@ class arm2llvm_ {
   [[noreturn]] void visitError(MCInstWrapper &I) {
     // flush must happen before error is printed to make sure the error
     // comes out nice and pretty when combing the stdout/stderr in scripts
-    cout.flush();
+    outs().flush();
 
     outs() << "ERROR: Unsupported arm instruction: "
            << instrPrinter->getOpcodeName(I.getMCInst().getOpcode()) << "\n";
     outs().flush();
-    cout.flush();
     exit(-1); // FIXME handle this better
   }
 
@@ -1284,7 +1283,7 @@ class arm2llvm_ {
       return 64;
     if (instrs_128.contains(instr))
       return 128;
-    cout << "get_size encountered unknown instruction" << endl;
+    outs() << "get_size encountered unknown instruction" << "\n";
     visitError(*wrapper);
     UNREACHABLE();
   }
@@ -1564,13 +1563,13 @@ class arm2llvm_ {
   }
 
   void add_phi_params(PHINode *phi_instr, MCInstWrapper *phi_mc_wrapper) {
-    cout << "entering add_phi_params" << endl;
+    outs() << "entering add_phi_params" << "\n";
     assert(phi_mc_wrapper->getOpcode() == AArch64::PHI &&
            "cannot add params to non-phi instr");
     for (unsigned i = 1; i < phi_mc_wrapper->getMCInst().getNumOperands();
          ++i) {
       assert(phi_mc_wrapper->getMCInst().getOperand(i).isReg());
-      cout << "<Phi arg>:[("
+      outs() << "<Phi arg>:[("
            << phi_mc_wrapper->getMCInst().getOperand(i).getReg() << ","
            << phi_mc_wrapper->getOpId(i) << "),"
            << phi_mc_wrapper->getOpPhiBlock(i) << "]>\n";
@@ -1579,11 +1578,11 @@ class arm2llvm_ {
           mc_get_operand(phi_mc_wrapper->getMCInst().getOperand(i).getReg(),
                          phi_mc_wrapper->getOpId(i));
       assert(val != nullptr);
-      cout << "block name = " << block_name << endl;
+      outs() << "block name = " << block_name << "\n";
       phi_instr->addIncoming(val, getBBByName(*(phi_instr->getParent()->getParent()), block_name));
-      cout << "i is = " << i << endl;
+      outs() << "i is = " << i << "\n";
     }
-    cout << "exiting add_phi_params" << endl;
+    outs() << "exiting add_phi_params" << "\n";
   }
 
   void add_identifier(Value *v) {
@@ -1638,7 +1637,7 @@ class arm2llvm_ {
     auto pstate_val = pstate_map[bb];
     if (pstate_val)
       return pstate_val;
-    cout << "retrieving pstate for block " << bb->getName() << endl;
+    outs() << "retrieving pstate for block " << bb->getName() << "\n";
     assert(
         bb->getPreds().size() == 1 &&
         "pstate can only be retrieved for blocks with up to one predecessor");
@@ -1776,7 +1775,7 @@ public:
         auto extendImm = mc_inst.getOperand(3).getImm();
         auto extendType = ((extendImm >> 3) & 0x7);
 
-        cout << "extendImm: " << extendImm << ", extendType: " << extendType
+        outs() << "extendImm: " << extendImm << ", extendType: " << extendType
              << "\n";
 
         auto isSigned = extendType / 4;
@@ -2459,13 +2458,12 @@ public:
         auto masked = createAnd(src, intconst(mask, size));
         auto zexted = createZExt(masked, ty);
         writeToReg(zexted);
-        // assert(false && "UXTB not supported");
         return;
       }
       // UXTH
       if (immr == 0 && imms == 15) {
-        assert(false && "UXTH not supported");
-        return;
+        outs() << "UXTH not supported\n";
+	exit(-1);
       }
 
       // UBFX
@@ -2746,7 +2744,7 @@ public:
       // value
       auto retTy = srcFn.getReturnType();
       if (auto *vecRetTy = dyn_cast<VectorType>(retTy)) {
-        cout << "returning vector type\n";
+        outs() << "returning vector type\n";
         auto elem_bitwidth = vecRetTy->getScalarType()->getIntegerBitWidth();
         auto poison_val = PoisonValue::get(vecRetTy->getScalarType());
         vector<Constant *> vals;
@@ -2759,13 +2757,13 @@ public:
         // in the assembly
         // unsigned int largest_vect_register = AArch64::Q0;
         // for (auto &[reg, val] : cur_vol_regs[MCBB]) {
-        //  cout << "reg num=" << reg << "\n";
+        //  outs() << "reg num=" << reg << "\n";
         //  if (reg > largest_vect_register) {
         //    largest_vect_register = reg;
         //  }
         //}
         //
-        // cout << "largest vect register=" << largest_vect_register-AArch64::Q0
+        // outs() << "largest vect register=" << largest_vect_register-AArch64::Q0
         // << "\n";
 
         auto elem_ret_typ = get_int_type(elem_bitwidth);
@@ -2787,7 +2785,7 @@ public:
         } else {
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
-          cout << "return width = " << retWidth << endl;
+          outs() << "return width = " << retWidth << "\n";
           auto val =
               getIdentifier(mc_inst.getOperand(0).getReg(), I.getOpId(0));
           if (val) {
@@ -2805,7 +2803,7 @@ public:
           } else {
             // Hacky solution to deal with functions where the assembly
             // is just a ret instruction
-            cout << "hack: returning poison" << endl;
+            outs() << "hack: returning poison" << "\n";
             createReturn(PoisonValue::get(get_int_type(retWidth)));
           }
         }
@@ -2836,7 +2834,7 @@ public:
              "expected symbol ref as bcc operand");
       const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*jmp_tgt_op.getExpr());
       const MCSymbol &Sym = SRE.getSymbol();
-      cout << "bcc target: " << Sym.getName().str() << '\n';
+      outs() << "bcc target: " << Sym.getName().str() << '\n';
       auto *dst_true = getBBByName(Fn, Sym.getName());
 
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
@@ -2915,9 +2913,9 @@ public:
           SRE.getSymbol(); // FIXME refactor this into a function
       auto *dst_false = getBBByName(Fn, Sym.getName());
 
-      cout << "current mcblock = " << MCBB->getName() << endl;
-      cout << "Curr BB=" << CurrBB->getName().str() << endl;
-      cout << "jump target = " << Sym.getName().str() << endl;
+      outs() << "current mcblock = " << MCBB->getName() << "\n";
+      outs() << "Curr BB=" << CurrBB->getName().str() << "\n";
+      outs() << "jump target = " << Sym.getName().str() << "\n";
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
       const string *dst_true_name;
@@ -2944,7 +2942,7 @@ public:
       auto size = get_size(opcode);
       auto ty = get_int_type(size);
       auto result = createPhi(ty);
-      cout << "pushing phi in todo : " << endl;
+      outs() << "pushing phi in todo : " << "\n";
       wrapper->print();
       auto p = make_pair(result, wrapper);
       lift_todo_phis.push_back(p);
@@ -2953,7 +2951,7 @@ public:
     }
     default:
       Fn.print(outs());
-      cout << "\nError "
+      outs() << "\nError "
               "detected----------partially-lifted-arm-target----------\n";
       visitError(I);
     }
@@ -2983,13 +2981,13 @@ public:
       }
     }
 
-    cout << "about to start creating basic blocks.\n";
+    outs() << "about to start creating basic blocks.\n";
     for (auto v : util::top_sort(edges)) {
-      cout << "creating a basic block called " << bbs[v]->getName() << "\n";
+      outs() << "creating a basic block called " << bbs[v]->getName() << "\n";
       auto bb = BasicBlock::Create(LLVMCtx, bbs[v]->getName(), &Fn);
       sorted_bbs.emplace_back(bb, bbs[v]);
     }
-    cout << "done creating basic blocks.\n";
+    outs() << "done creating basic blocks.\n";
 
     // setup BB so subsequent add_instr calls work
     CurrBB = sorted_bbs[0].first;
@@ -2999,7 +2997,7 @@ public:
     auto Fn = Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage, 0,
                                MF.getName(), LiftedModule);
 
-    cout << "function name: '" << MF.getName() << "'" << endl;
+    outs() << "function name: '" << MF.getName() << "'" << "\n";
 
     vector<pair<BasicBlock *, MCBasicBlock *>> sorted_bbs;
     createBBs(sorted_bbs, *Fn);
@@ -3047,14 +3045,14 @@ public:
       mc_add_identifier(operand.getReg(), 2, stored);
       argNum++;
     }
-    cout << "created non-vector args" << endl;
+    outs() << "created non-vector args" << "\n";
 
     // FIXME: Hacky way of supporting parameters passed via the stack
     // need to properly model the parameter passing rules described in
     // the spec
     if (argNum > 8) {
       auto num_stack_args = argNum - 8; // x0-x7 are passed via registers
-      cout << "num_stack_args = " << num_stack_args << "\n";
+      outs() << "num_stack_args = " << num_stack_args << "\n";
 
       // add stack with 16 slots, 8 bytes each
       auto alloc_size = intconst(16, 64);
@@ -3064,7 +3062,7 @@ public:
 
       for (unsigned i = 0; i < num_stack_args; ++i) {
         unsigned reg_num = AArch64::X8 + i;
-        cout << "reg_num = " << reg_num << "\n";
+        outs() << "reg_num = " << reg_num << "\n";
 
 	vector<Value *> idxlist{ intconst(i, 64) };
 	auto get_xi = createGEP(ty, alloca, idxlist, "stack_" + to_string(8 + i));
@@ -3077,8 +3075,8 @@ public:
 
     auto poison_val = PoisonValue::get(get_int_type(64));
     auto vect_poison_val = PoisonValue::get(get_int_type(128));
-    cout << "argNum = " << argNum << "\n";
-    cout << "entry mc_bb = " << sorted_bbs[0].second->getName() << "\n";
+    outs() << "argNum = " << argNum << "\n";
+    outs() << "entry mc_bb = " << sorted_bbs[0].second->getName() << "\n";
     auto entry_mc_bb = sorted_bbs[0].second;
     // add remaining volatile registers and set them to unitialized value
     // we chose frozen poison value to give a random yet determinate value
@@ -3100,16 +3098,16 @@ public:
     }
 
     for (auto &[llvm_bb, mc_bb] : sorted_bbs) {
-      cout << "visiting bb: " << mc_bb->getName() << endl;
+      outs() << "visiting bb: " << mc_bb->getName() << "\n";
       CurrBB = llvm_bb;
       MCBB = mc_bb;
       auto &mc_instrs = mc_bb->getInstrs();
 
       for (auto &mc_instr : mc_instrs) {
-        cout << "before visit\n";
+        outs() << "before visit\n";
         mc_instr.print();
         mc_visit(mc_instr, *Fn);
-        cout << "after visit\n";
+        outs() << "after visit\n";
       }
 
       if (!CurrBB->getTerminator()) {
@@ -3122,19 +3120,19 @@ public:
       blockCount++;
     }
 
-    cout << "\n----------lifted-arm-target-missing-phi-params----------\n";
+    outs() << "\n----------lifted-arm-target-missing-phi-params----------\n";
     Fn->print(outs());
-    cout << "lift_todo_phis.size() = " << lift_todo_phis.size() << endl;
+    outs() << "lift_todo_phis.size() = " << lift_todo_phis.size() << "\n";
 
     int tmp_index = 0;
     for (auto &[phi, phi_mc_wrapper] : lift_todo_phis) {
-      cout << "index = " << tmp_index
-           << "opcode =" << phi_mc_wrapper->getOpcode() << endl;
+      outs() << "index = " << tmp_index
+           << "opcode =" << phi_mc_wrapper->getOpcode() << "\n";
       tmp_index++;
       add_phi_params(phi, phi_mc_wrapper);
     }
 
-    cout << "returning from run method" << endl;
+    outs() << "returning from run method" << "\n";
     
     return Fn;
   }
@@ -3383,17 +3381,17 @@ public:
   // Debug function to print domination info
   void printGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
     for (auto &curBlock : graph) {
-      cout << curBlock.first->getName() << ": ";
+      outs() << curBlock.first->getName() << ": ";
       for (auto &dst : curBlock.second)
-        cout << dst->getName() << " ";
-      cout << "\n";
+        outs() << dst->getName() << " ";
+      outs() << "\n";
     }
   }
 
   // Only call after MF with Basicblocks is constructed to generate the
   // successors for each basic block
   void generateSuccessors() {
-    cout << "generating basic block successors" << '\n';
+    outs() << "generating basic block successors" << '\n';
     for (unsigned i = 0; i < MF.BBs.size(); ++i) {
       auto &cur_bb = MF.BBs[i];
       MCBasicBlock *next_bb_ptr = nullptr;
@@ -3401,7 +3399,7 @@ public:
         next_bb_ptr = &MF.BBs[i + 1];
 
       if (cur_bb.size() == 0) {
-        cout
+        outs()
             << "generateSuccessors, encountered basic block with 0 instructions"
             << '\n';
         continue;
@@ -3437,14 +3435,14 @@ public:
 
   // Remove empty basic blocks from the machine function
   void removeEmptyBlocks() {
-    cout << "removing empty basic blocks" << '\n';
+    outs() << "removing empty basic blocks" << '\n';
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
   // Only call after generateSucessors() has been called
   // generate predecessors for each basic block in a MCFunction
   void generatePredecessors() {
-    cout << "generating basic block predecessors" << '\n';
+    outs() << "generating basic block predecessors" << '\n';
     for (auto &block : MF.BBs) {
       for (auto it = block.succBegin(); it != block.succEnd(); ++it) {
         auto successor = *it;
@@ -3454,8 +3452,8 @@ public:
   }
 
   void printBlocksMF() {
-    cout << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
-    cout << "-------------\n";
+    outs() << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
+    outs() << "-------------\n";
     int i = 0;
     for (auto &block : MF.BBs) {
       outs() << "block " << i << ", name= " << block.getName() << '\n';
@@ -3468,25 +3466,25 @@ public:
   }
 
   void printCFG() {
-    cout << "printing arm function CFG" << '\n';
-    cout << "successors" << '\n';
+    outs() << "printing arm function CFG" << '\n';
+    outs() << "successors" << '\n';
     for (auto &block : MF.BBs) {
-      cout << block.getName() << ": [";
+      outs() << block.getName() << ": [";
       for (auto it = block.succBegin(); it != block.succEnd(); ++it) {
         auto successor = *it;
-        cout << successor->getName() << ", ";
+        outs() << successor->getName() << ", ";
       }
-      cout << "]\n";
+      outs() << "]\n";
     }
 
-    cout << "predecessors" << '\n';
+    outs() << "predecessors" << '\n';
     for (auto &block : MF.BBs) {
-      cout << block.getName() << ": [";
+      outs() << block.getName() << ": [";
       for (auto it = block.predBegin(); it != block.predEnd(); ++it) {
         auto predecessor = *it;
-        cout << predecessor->getName() << ", ";
+        outs() << predecessor->getName() << ", ";
       }
-      cout << "]\n";
+      outs() << "]\n";
     }
   }
 
@@ -3532,9 +3530,9 @@ public:
       }
     }
 
-    cout << "After adjusting return:\n";
+    outs() << "After adjusting return:\n";
     for (auto &b : MF.BBs) {
-      cout << b.getName() << ":\n";
+      outs() << b.getName() << ":\n";
       b.print();
     }
   }
@@ -3607,7 +3605,7 @@ void reset() {
     string Error;
     Targ = TargetRegistry::lookupTarget(TripleName, Error);
     if (!Targ) {
-      cout << Error;
+      outs() << Error;
       exit(-1);
     }
 
@@ -3672,19 +3670,19 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   // FIXME remove printing of the mcInsts
   // For now, print the parsed instructions for debug puropses
-  cout << "\n\nPretty Parsed MCInsts:\n";
+  outs() << "\n\nPretty Parsed MCInsts:\n";
   for (auto I : MCSW.Insts) {
     I.dump_pretty(outs(), IPtemp.get(), " ", MRI.get());
     outs() << '\n';
   }
 
-  cout << "\n\nParsed MCInsts:\n";
+  outs() << "\n\nParsed MCInsts:\n";
   for (auto I : MCSW.Insts) {
     I.dump_pretty(outs());
     outs() << '\n';
   }
 
-  cout << "\n\n";
+  outs() << "\n\n";
 
   MCSW.printBlocksMF();
   MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
@@ -3704,7 +3702,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.ssaRename();
   MCSW.adjustReturns(); // needs refactoring
 
-  cout << "after SSA conversion\n";
+  outs() << "after SSA conversion\n";
   MCSW.printBlocksMF();
 
   auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
