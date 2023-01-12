@@ -1193,7 +1193,7 @@ public:
     return {};
   }
 
-  bool handleMetadata(llvm::Instruction &llvm_i, Instr &i) {
+  bool handleMetadata(Function &Fn, llvm::Instruction &llvm_i, Instr &i) {
     llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
     llvm_i.getAllMetadataOtherThanDebugLoc(MDs);
 
@@ -1201,48 +1201,20 @@ public:
       switch (ID) {
       case LLVMContext::MD_range:
       {
-        Value *range = nullptr;
-        auto &boolTy = get_int_type(1);
+        vector<Value*> args;
         for (unsigned op = 0, e = Node->getNumOperands(); op < e; ++op) {
-          auto *low =
-            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(op));
-          auto *high =
-            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op));
-
-          auto op_name = to_string(op / 2);
-          auto l = make_unique<ICmp>(boolTy,
-                                     "%range_l#" + op_name + value_name(llvm_i),
-                                     ICmp::SGE, i, *get_operand(low));
-
-          auto h = make_unique<ICmp>(boolTy,
-                                     "%range_h#" + op_name + value_name(llvm_i),
-                                     ICmp::SLT, i, *get_operand(high));
-
-          bool wrap = low->getValue().sgt(high->getValue());
-          auto r = make_unique<BinOp>(boolTy,
-                                      "%range#" + op_name + value_name(llvm_i),
-                                      *l.get(), *h.get(),
-                                      wrap ? BinOp::Or : BinOp::And);
-
-          auto r_ptr = r.get();
-          BB->addInstr(std::move(l));
-          BB->addInstr(std::move(h));
-          BB->addInstr(std::move(r));
-
-          if (range) {
-            auto range_or = make_unique<BinOp>(boolTy,
-                                               "$rangeOR$" + op_name +
-                                                 value_name(llvm_i),
-                                               *range, *r_ptr, BinOp::Or);
-            range = range_or.get();
-            BB->addInstr(std::move(range_or));
-          } else {
-            range = r_ptr;
-          }
+          args.emplace_back(get_operand(
+            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(op))));
+          args.emplace_back(get_operand(
+            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op))));
         }
 
-        if (range)
-          BB->addInstr(make_unique<Assume>(*range, Assume::IfNonPoison));
+        auto assume
+          = make_unique<AssumeVal>(i.getType(), i.getName() + "_range", i,
+                                   std::move(args), AssumeVal::Range);
+        Fn.rauw(i, *assume);
+        replace_identifier(llvm_i, *assume);
+        BB->addInstr(std::move(assume));
         break;
       }
 
@@ -1646,7 +1618,7 @@ public:
           BB->addInstr(std::move(I));
 
           if (i.hasMetadataOtherThanDebugLoc() &&
-              !handleMetadata(i, *alive_i))
+              !handleMetadata(Fn, i, *alive_i))
             return {};
         } else
           return {};
