@@ -1211,13 +1211,22 @@ public:
         }
 
         AssumeVal::Kind op;
+        const char *str = nullptr;
         switch (ID) {
-        case LLVMContext::MD_nonnull: op = AssumeVal::NonNull; break;
-        case LLVMContext::MD_range:   op = AssumeVal::Range; break;
+        case LLVMContext::MD_nonnull:
+          op = AssumeVal::NonNull;
+          str = "_nonnull";
+        break;
+        case LLVMContext::MD_range:
+          op = AssumeVal::Range;
+          str = "_range";
+          break;
+        default:
+          UNREACHABLE();
         }
 
         auto assume
-          = make_unique<AssumeVal>(i.getType(), i.getName() + "_range", i,
+          = make_unique<AssumeVal>(i.getType(), i.getName() + str, i,
                                    std::move(args), op);
         Fn.rauw(i, *assume);
         replace_identifier(llvm_i, *assume);
