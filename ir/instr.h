@@ -589,6 +589,7 @@ public:
 class AssumeVal final : public Instr {
 public:
   enum Kind {
+    NonNull,
     Range,
   };
 

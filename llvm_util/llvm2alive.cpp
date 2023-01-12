@@ -1199,6 +1199,7 @@ public:
 
     for (auto &[ID, Node] : MDs) {
       switch (ID) {
+      case LLVMContext::MD_nonnull:
       case LLVMContext::MD_range:
       {
         vector<Value*> args;
@@ -1209,9 +1210,15 @@ public:
             llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op))));
         }
 
+        AssumeVal::Kind op;
+        switch (ID) {
+        case LLVMContext::MD_nonnull: op = AssumeVal::NonNull; break;
+        case LLVMContext::MD_range:   op = AssumeVal::Range; break;
+        }
+
         auto assume
           = make_unique<AssumeVal>(i.getType(), i.getName() + "_range", i,
-                                   std::move(args), AssumeVal::Range);
+                                   std::move(args), op);
         Fn.rauw(i, *assume);
         replace_identifier(llvm_i, *assume);
         BB->addInstr(std::move(assume));
