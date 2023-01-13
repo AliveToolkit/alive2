@@ -1533,6 +1533,12 @@ class arm2llvm_ {
     return BinaryOperator::Create(Instruction::Xor, a, b, next_name(), CurrBB);
   }
 
+  BinaryOperator *createLogicalNot(Value *a) {
+    auto *ty = a->getType();
+    auto NegOne = ConstantInt::getSigned(ty, -1);
+    return BinaryOperator::Create(Instruction::Xor, a, NegOne, next_name(), CurrBB);
+  }
+
   FreezeInst *createFreeze(Value *v, const string &NameStr = "") {
     return new FreezeInst(v, (NameStr == "") ? next_name() : NameStr, CurrBB);
   }
@@ -1741,6 +1747,10 @@ public:
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
         instrPrinter(instrPrinter), registerInfo(registerInfo),
         instructionCount(0), curId(0) {}
+
+  void revInst(Value *v) {
+    writeToReg(createBSwap(v));
+  }
 
   // Visit an MCInstWrapper instructions and convert it to LLVM IR
   void mc_visit(MCInstWrapper &I, Function &Fn) {
@@ -2584,12 +2594,9 @@ public:
       break;
     }
     case AArch64::REVWr:
-    case AArch64::REVXr: {
-      auto op = readFromReg(1);
-      auto result = createBSwap(op);
-      writeToReg(result);
+    case AArch64::REVXr:
+      revInst(readFromReg(1));
       break;
-    }
     case AArch64::CLZWr:
     case AArch64::CLZXr: {
       auto op = readFromReg(1);
