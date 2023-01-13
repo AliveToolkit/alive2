@@ -1485,6 +1485,8 @@ class arm2llvm_ {
   }
 
   BinaryOperator *createBinop(Value *a, Value *b, Instruction::BinaryOps op) {
+    outs() << "a.width = " << a->getType()->getIntegerBitWidth() << "\n";
+    outs() << "b.width = " << b->getType()->getIntegerBitWidth() << "\n";
     return BinaryOperator::Create(op, a, b, next_name(), CurrBB);
   }
 
@@ -1547,6 +1549,19 @@ class arm2llvm_ {
     return CastInst::Create(Instruction::Trunc, v, t,
                             (NameStr == "") ? next_name() : NameStr, CurrBB);
   }
+
+  // This implements the SMTLIB-like extract operator from Isla traces
+  Value *createExtract(Value *v, unsigned n1, unsigned n2, const string &NameStr = "") {
+    assert(n1 > n2);
+    if (n2 == 0) {
+      auto *ty = get_int_type(1 + n1);
+      return createTrunc(v, ty);
+    } else {
+      auto *shift = createLShr(v, intconst(n2, v->getType()->getIntegerBitWidth()));
+      auto *ty = get_int_type(1 + n1 - n2);
+      return createTrunc(shift, ty);
+    }
+  }
   
   CastInst *createSExt(Value *v, Type *t, const string &NameStr = "") {
     return CastInst::Create(Instruction::SExt, v, t,
@@ -1558,6 +1573,9 @@ class arm2llvm_ {
   }
 
   CastInst *createZExt(Value *v, Type *t, const string &NameStr = "") {
+    auto w1 = v->getType()->getIntegerBitWidth();
+    auto w2 = t->getIntegerBitWidth();
+    outs() << "zexting from " << w1 << " to " << w2 << "\n";
     return CastInst::Create(Instruction::ZExt, v, t,
                             (NameStr == "") ? next_name() : NameStr, CurrBB);
   }
@@ -1748,9 +1766,18 @@ public:
         instrPrinter(instrPrinter), registerInfo(registerInfo),
         instructionCount(0), curId(0) {}
 
+#if 1
   void revInst(Value *v) {
     writeToReg(createBSwap(v));
   }
+#else
+  #include "code0.cpp"
+  void revInst(Value *v) {
+    auto w = v->getType()->getIntegerBitWidth();
+    assert(w == 32 || w == 64);
+    return revInst_0(v);
+  }
+#endif
 
   // Visit an MCInstWrapper instructions and convert it to LLVM IR
   void mc_visit(MCInstWrapper &I, Function &Fn) {
