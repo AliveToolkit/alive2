@@ -3139,8 +3139,13 @@ AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
                      vector<Value *> &&args0, Kind kind)
     : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
       kind(kind) {
-  if (kind == Range) {
+  switch (kind) {
+  case NonNull:
+    assert(args.empty());
+    break;
+  case Range:
     assert((args.size() & 1) == 0);
+    break;
   }
 }
 
@@ -3159,10 +3164,11 @@ void AssumeVal::rauw(const Value &what, Value &with) {
 void AssumeVal::print(ostream &os) const {
   const char *str = nullptr;
   switch (kind) {
-  case Range: str = "range "; break;
+  case NonNull: str = "nonnull "; break;
+  case Range:   str = "range "; break;
   }
 
-  os << getName() << " = " << str << *val;
+  os << getName() << " = !" << str << *val;
 
   for (auto &arg: args) {
     os << ", " << *arg;
@@ -3172,7 +3178,12 @@ void AssumeVal::print(ostream &os) const {
 StateValue AssumeVal::toSMT(State &s) const {
   auto &v = s[*val];
 
+  expr np;
   switch (kind) {
+  case NonNull:
+    np = !Pointer(s.getMemory(), expr(v.value)).isNull();
+    break;
+
   case Range: { // val in [l1, h1) U ... U [ln, hn) (signed)
     OrExpr inrange;
     for (unsigned i = 0, e = args.size(); i != e; i += 2) {
@@ -3188,20 +3199,25 @@ StateValue AssumeVal::toSMT(State &s) const {
         inrange.add(l && h);
       }
     }
-    return { expr(v.value), v.non_poison && std::move(inrange)() };
+    np = std::move(inrange)();
+    break;
   }
   }
-  UNREACHABLE();
+  return { expr(v.value), v.non_poison && np };
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {
+  expr e = true;
   switch (kind) {
+  case NonNull:
+    break;
   case Range:
-    return getType() == val->getType() &&
-           args[0]->getType().enforceIntType() &&
-           args[1]->getType().enforceIntType();
+    for (auto &arg : args) {
+      e &= arg->getType() == getType();
+    }
+    break;
   }
-  UNREACHABLE();
+  return getType() == val->getType() && e;
 }
 
 unique_ptr<Instr> AssumeVal::dup(Function &f, const string &suffix) const {
