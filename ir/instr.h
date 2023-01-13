@@ -562,7 +562,6 @@ class Assume final : public Instr {
 public:
   enum Kind {
     AndNonPoison, /// cond should be non-poison and hold
-    IfNonPoison, /// cond only needs to hold if non-poison
     WellDefined, /// cond only needs to be well defined (can be false)
     Align,       /// args[0] satisfies alignment args[1]
     NonNull      /// args[0] is a nonnull pointer
@@ -575,6 +574,32 @@ private:
 public:
   Assume(Value &cond, Kind kind);
   Assume(std::vector<Value *> &&args, Kind kind);
+
+  std::vector<Value*> operands() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
+// yields poison if invalid
+class AssumeVal final : public Instr {
+public:
+  enum Kind {
+    Range,
+  };
+
+private:
+  Value *val;
+  std::vector<Value*> args;
+  Kind kind;
+
+public:
+  AssumeVal(Type &type, std::string &&name, Value &val,
+            std::vector<Value *> &&args, Kind kind);
 
   std::vector<Value*> operands() const override;
   void rauw(const Value &what, Value &with) override;

@@ -409,6 +409,10 @@ void add_identifier(const llvm::Value &llvm, Value &v) {
   value_cache.emplace(&llvm, &v);
 }
 
+void replace_identifier(const llvm::Value &llvm, Value &v) {
+  value_cache[&llvm] =  &v;
+}
+
 
 #define PRINT(T)                                \
 ostream& operator<<(ostream &os, const T &x) {  \

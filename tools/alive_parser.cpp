@@ -1294,12 +1294,11 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   UNREACHABLE();
 }
 
-static unique_ptr<Instr> parse_assume(bool if_non_poison) {
+static unique_ptr<Instr> parse_assume() {
   tokenizer.ensure(LPAREN);
   auto &val = parse_operand(*int_types[1].get());
   tokenizer.ensure(RPAREN);
-  return make_unique<Assume>(val, if_non_poison ? Assume::IfNonPoison :
-                                                  Assume::AndNonPoison);
+  return make_unique<Assume>(val, Assume::AndNonPoison);
 }
 
 static unique_ptr<Instr> parse_return() {
@@ -1316,10 +1315,7 @@ static void parse_fn(Function &f) {
   while (true) {
     switch (auto t = *tokenizer) {
     case ASSUME:
-      bb->addInstr(parse_assume(false));
-      break;
-    case ASSUME_NON_POISON:
-      bb->addInstr(parse_assume(true));
+      bb->addInstr(parse_assume());
       break;
     case LABEL:
       bb = &f.getBB(yylval.str);

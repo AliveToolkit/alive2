@@ -301,7 +301,6 @@ space+ {
 "ninf" { return NINF; }
 "nsz" { return NSZ; }
 "assume" { return ASSUME; }
-"assume_non_poison" { return ASSUME_NON_POISON; }
 "unreachable" { return UNREACH; }
 "memory" { return MEMORY; }
 "read" { return READ; }

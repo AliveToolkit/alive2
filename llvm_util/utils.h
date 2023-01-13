@@ -45,6 +45,7 @@ IR::Value* get_operand(llvm::Value *v,
   std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);
 
 void add_identifier(const llvm::Value &llvm, IR::Value &v);
+void replace_identifier(const llvm::Value &llvm, IR::Value &v);
 
 #define PRINT(T) std::ostream& operator<<(std::ostream &os, const T &x);
 PRINT(llvm::Type)

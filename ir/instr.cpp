@@ -3042,15 +3042,13 @@ unique_ptr<Instr> Return::dup(Function &f, const string &suffix) const {
 
 Assume::Assume(Value &cond, Kind kind)
     : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
-  assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined ||
-         kind == NonNull);
+  assert(kind == AndNonPoison || kind == WellDefined || kind == NonNull);
 }
 
 Assume::Assume(vector<Value *> &&args0, Kind kind)
     : Instr(Type::voidTy, "assume"), args(std::move(args0)), kind(kind) {
   if (args.size() == 1)
-    assert(kind == AndNonPoison || kind == IfNonPoison || kind == WellDefined ||
-           kind == NonNull);
+    assert(kind == AndNonPoison || kind == WellDefined || kind == NonNull);
   else {
     assert(kind == Align && args.size() == 2);
   }
@@ -3069,7 +3067,6 @@ void Assume::print(ostream &os) const {
   const char *str = nullptr;
   switch (kind) {
   case AndNonPoison: str = "assume "; break;
-  case IfNonPoison:  str = "assume_non_poison "; break;
   case WellDefined:  str = "assume_welldefined "; break;
   case Align:        str = "assume_align "; break;
   case NonNull:      str = "assume_nonnull "; break;
@@ -3090,11 +3087,6 @@ StateValue Assume::toSMT(State &s) const {
   case AndNonPoison: {
     auto &v = s.getAndAddPoisonUB(*args[0]);
     s.addUB(v.value != 0);
-    break;
-  }
-  case IfNonPoison: {
-    auto &[v, np] = s[*args[0]];
-    s.addUB(np.implies(v != 0));
     break;
   }
   case WellDefined:
@@ -3128,7 +3120,6 @@ expr Assume::getTypeConstraints(const Function &f) const {
   case WellDefined:
     return true;
   case AndNonPoison:
-  case IfNonPoison:
     return args[0]->getType().enforceIntType();
   case Align:
     return args[0]->getType().enforcePtrType() &&
@@ -3141,6 +3132,81 @@ expr Assume::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Assume::dup(Function &f, const string &suffix) const {
   return make_unique<Assume>(vector<Value *>(args), kind);
+}
+
+
+AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
+                     vector<Value *> &&args0, Kind kind)
+    : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
+      kind(kind) {
+  if (kind == Range) {
+    assert((args.size() & 1) == 0);
+  }
+}
+
+vector<Value*> AssumeVal::operands() const {
+  auto ret = args;
+  ret.emplace_back(val);
+  return ret;
+}
+
+void AssumeVal::rauw(const Value &what, Value &with) {
+  RAUW(val);
+  for (auto &arg: args)
+    RAUW(arg);
+}
+
+void AssumeVal::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (kind) {
+  case Range: str = "range "; break;
+  }
+
+  os << getName() << " = " << str << *val;
+
+  for (auto &arg: args) {
+    os << ", " << *arg;
+  }
+}
+
+StateValue AssumeVal::toSMT(State &s) const {
+  auto &v = s[*val];
+
+  switch (kind) {
+  case Range: { // val in [l1, h1) U ... U [ln, hn) (signed)
+    OrExpr inrange;
+    for (unsigned i = 0, e = args.size(); i != e; i += 2) {
+      auto &lb = s[*args[i]].value;
+      auto &hb = s[*args[i+1]].value;
+      auto l = v.value.sge(lb);
+      auto h = v.value.slt(hb);
+
+      if (lb.sgt(hb).isTrue()) { // wrapping interval
+        inrange.add(std::move(l));
+        inrange.add(std::move(h));
+      } else {
+        inrange.add(l && h);
+      }
+    }
+    return { expr(v.value), v.non_poison && std::move(inrange)() };
+  }
+  }
+  UNREACHABLE();
+}
+
+expr AssumeVal::getTypeConstraints(const Function &f) const {
+  switch (kind) {
+  case Range:
+    return getType() == val->getType() &&
+           args[0]->getType().enforceIntType() &&
+           args[1]->getType().enforceIntType();
+  }
+  UNREACHABLE();
+}
+
+unique_ptr<Instr> AssumeVal::dup(Function &f, const string &suffix) const {
+  return make_unique<AssumeVal>(getType(), getName() + suffix, *val,
+                                vector<Value*>(args), kind);
 }
 
 
