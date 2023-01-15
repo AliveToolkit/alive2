@@ -121,7 +121,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   template <typename T>
   uint64_t alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlign().value();
-    return a != 0 ? a : DL().getABITypeAlignment(ty);
+    return a != 0 ? a : DL().getABITypeAlign(ty).value();
   }
 
   template <typename T>
@@ -1299,7 +1299,7 @@ public:
         attrs.blockSize = max(attrs.blockSize, asz.getKnownMinValue());
 
         attrs.set(ParamAttrs::Align);
-        attrs.align = max(attrs.align, DL().getABITypeAlignment(ty));
+        attrs.align = max(attrs.align, DL().getABITypeAlign(ty).value());
         break;
       }
 
