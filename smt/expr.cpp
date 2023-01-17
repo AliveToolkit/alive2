@@ -1274,9 +1274,9 @@ expr expr::funo(const expr &rhs) const {
 static expr get_bool(const expr &e) {
   expr cond, then, els;
   if (e.isIf(cond, then, els)) {
-    if ((then == 1).isTrue() && (els == 0).isTrue())
+    if (then.isOne() && els.isZero())
       return cond;
-    if ((then == 0).isTrue() && (els == 1).isTrue())
+    if (then.isZero() && els.isOne())
       return !cond;
   }
   return {};
@@ -2228,7 +2228,7 @@ string expr::numeral_string() const {
 string expr::fn_name() const {
   if (isApp())
     return Z3_get_symbol_string(ctx(), Z3_get_decl_name(ctx(), decl()));
-  return "";
+  return {};
 }
 
 unsigned expr::getFnNumArgs() const {

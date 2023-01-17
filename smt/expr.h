@@ -21,7 +21,7 @@ typedef struct _Z3_sort* Z3_sort;
 namespace smt {
 
 class expr {
-  uintptr_t ptr;
+  uintptr_t ptr = 0;
 
   expr(Z3_ast ast) noexcept;
   bool isZ3Ast() const;
@@ -61,9 +61,9 @@ class expr {
   bool isTernaryOp(expr &a, expr &b, expr &c, int z3op) const;
 
 public:
-  expr() : ptr(0) {}
+  expr() = default;
 
-  expr(expr &&other) noexcept : ptr(0) {
+  expr(expr &&other) noexcept {
     std::swap(ptr, other.ptr);
   }
 
