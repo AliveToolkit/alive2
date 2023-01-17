@@ -404,7 +404,7 @@ public:
       return error(i);
 
     RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes,
-                                          max(1u, i.getDestAlignment())));
+                                          i.getDestAlign().valueOrOne().value()));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -416,8 +416,8 @@ public:
       return error(i);
 
     RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes,
-                                          max(1u, i.getDestAlignment()),
-                                          max(1u, i.getSourceAlignment()),
+                                          i.getDestAlign().valueOrOne().value(),
+                                          i.getSourceAlign().valueOrOne().value(),
                                           isa<llvm::MemMoveInst>(&i)));
   }
 
