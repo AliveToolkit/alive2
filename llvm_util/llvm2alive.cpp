@@ -1228,7 +1228,6 @@ public:
         auto assume
           = make_unique<AssumeVal>(i.getType(), i.getName() + str, i,
                                    std::move(args), op);
-        Fn.rauw(i, *assume);
         replace_identifier(llvm_i, *assume);
         BB->addInstr(std::move(assume));
         break;
