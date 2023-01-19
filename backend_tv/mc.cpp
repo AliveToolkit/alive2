@@ -98,47 +98,52 @@ const set<int> s_flag = {
     // BICS
     AArch64::BICSWrs,
     AArch64::BICSXrs,
+    // ADCS
+    AArch64::ADCSXr,
+    AArch64::ADCSWr,
 };
 
 const set<int> instrs_32 = {
-    AArch64::ADDWrx,  AArch64::ADDSWrs,  AArch64::ADDSWri,  AArch64::ADDWrs,
-    AArch64::ADDWri,  AArch64::ADDSWrx,  AArch64::ASRVWr,   AArch64::SUBWri,
-    AArch64::SUBWrs,  AArch64::SUBWrx,   AArch64::SUBSWrs,  AArch64::SUBSWri,
-    AArch64::SUBSWrx, AArch64::SBFMWri,  AArch64::CSELWr,   AArch64::ANDWri,
-    AArch64::ANDWrr,  AArch64::ANDWrs,   AArch64::ANDSWri,  AArch64::ANDSWrr,
-    AArch64::ANDSWrs, AArch64::MADDWrrr, AArch64::MSUBWrrr, AArch64::EORWri,
-    AArch64::CSINVWr, AArch64::CSINCWr,  AArch64::MOVZWi,   AArch64::MOVNWi,
-    AArch64::MOVKWi,  AArch64::LSLVWr,   AArch64::LSRVWr,   AArch64::ORNWrs,
-    AArch64::UBFMWri, AArch64::BFMWri,   AArch64::ORRWrs,   AArch64::ORRWri,
-    AArch64::SDIVWr,  AArch64::UDIVWr,   AArch64::EXTRWrri, AArch64::EORWrs,
-    AArch64::RORVWr,  AArch64::RBITWr,   AArch64::CLZWr,    AArch64::REVWr,
-    AArch64::CSNEGWr, AArch64::BICWrs,   AArch64::BICSWrs,  AArch64::EONWrs,
-    AArch64::REV16Wr, AArch64::Bcc,      AArch64::CCMPWr,   AArch64::CCMPWi};
+    AArch64::ADDWrx,   AArch64::ADDSWrs, AArch64::ADDSWri, AArch64::ADDWrs,
+    AArch64::ADDWri,   AArch64::ADDSWrx, AArch64::ADCWr,   AArch64::ADCSWr,
+    AArch64::ASRVWr,   AArch64::SUBWri,  AArch64::SUBWrs,  AArch64::SUBWrx,
+    AArch64::SUBSWrs,  AArch64::SUBSWri, AArch64::SUBSWrx, AArch64::SBFMWri,
+    AArch64::CSELWr,   AArch64::ANDWri,  AArch64::ANDWrr,  AArch64::ANDWrs,
+    AArch64::ANDSWri,  AArch64::ANDSWrr, AArch64::ANDSWrs, AArch64::MADDWrrr,
+    AArch64::MSUBWrrr, AArch64::EORWri,  AArch64::CSINVWr, AArch64::CSINCWr,
+    AArch64::MOVZWi,   AArch64::MOVNWi,  AArch64::MOVKWi,  AArch64::LSLVWr,
+    AArch64::LSRVWr,   AArch64::ORNWrs,  AArch64::UBFMWri, AArch64::BFMWri,
+    AArch64::ORRWrs,   AArch64::ORRWri,  AArch64::SDIVWr,  AArch64::UDIVWr,
+    AArch64::EXTRWrri, AArch64::EORWrs,  AArch64::RORVWr,  AArch64::RBITWr,
+    AArch64::CLZWr,    AArch64::REVWr,   AArch64::CSNEGWr, AArch64::BICWrs,
+    AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr, AArch64::Bcc,
+    AArch64::CCMPWr,   AArch64::CCMPWi};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
     AArch64::ADDXrs,    AArch64::ADDXri,    AArch64::ADDSXrx,
-    AArch64::ASRVXr,    AArch64::SUBXri,    AArch64::SUBXrs,
-    AArch64::SUBXrx,    AArch64::SUBSXrs,   AArch64::SUBSXri,
-    AArch64::SUBSXrx,   AArch64::SBFMXri,   AArch64::CSELXr,
-    AArch64::ANDXri,    AArch64::ANDXrr,    AArch64::ANDXrs,
-    AArch64::ANDSXri,   AArch64::ANDSXrr,   AArch64::ANDSXrs,
-    AArch64::MADDXrrr,  AArch64::MSUBXrrr,  AArch64::EORXri,
-    AArch64::CSINVXr,   AArch64::CSINCXr,   AArch64::MOVZXi,
-    AArch64::MOVNXi,    AArch64::MOVKXi,    AArch64::LSLVXr,
-    AArch64::LSRVXr,    AArch64::ORNXrs,    AArch64::UBFMXri,
-    AArch64::BFMXri,    AArch64::ORRXrs,    AArch64::ORRXri,
-    AArch64::SDIVXr,    AArch64::UDIVXr,    AArch64::EXTRXrri,
-    AArch64::EORXrs,    AArch64::SMADDLrrr, AArch64::UMADDLrrr,
-    AArch64::RORVXr,    AArch64::RBITXr,    AArch64::CLZXr,
-    AArch64::REVXr,     AArch64::CSNEGXr,   AArch64::BICXrs,
-    AArch64::BICSXrs,   AArch64::EONXrs,    AArch64::SMULHrr,
-    AArch64::UMULHrr,   AArch64::REV32Xr,   AArch64::REV16Xr,
-    AArch64::SMSUBLrrr, AArch64::UMSUBLrrr, AArch64::PHI,
-    AArch64::TBZW,      AArch64::TBZX,      AArch64::TBNZW,
-    AArch64::TBNZX,     AArch64::B,         AArch64::CBZW,
-    AArch64::CBZX,      AArch64::CBNZW,     AArch64::CBNZX,
-    AArch64::CCMPXr,    AArch64::CCMPXi,    AArch64::LDRXui};
+    AArch64::ADCXr,     AArch64::ADCSXr,    AArch64::ASRVXr,
+    AArch64::SUBXri,    AArch64::SUBXrs,    AArch64::SUBXrx,
+    AArch64::SUBSXrs,   AArch64::SUBSXri,   AArch64::SUBSXrx,
+    AArch64::SBFMXri,   AArch64::CSELXr,    AArch64::ANDXri,
+    AArch64::ANDXrr,    AArch64::ANDXrs,    AArch64::ANDSXri,
+    AArch64::ANDSXrr,   AArch64::ANDSXrs,   AArch64::MADDXrrr,
+    AArch64::MSUBXrrr,  AArch64::EORXri,    AArch64::CSINVXr,
+    AArch64::CSINCXr,   AArch64::MOVZXi,    AArch64::MOVNXi,
+    AArch64::MOVKXi,    AArch64::LSLVXr,    AArch64::LSRVXr,
+    AArch64::ORNXrs,    AArch64::UBFMXri,   AArch64::BFMXri,
+    AArch64::ORRXrs,    AArch64::ORRXri,    AArch64::SDIVXr,
+    AArch64::UDIVXr,    AArch64::EXTRXrri,  AArch64::EORXrs,
+    AArch64::SMADDLrrr, AArch64::UMADDLrrr, AArch64::RORVXr,
+    AArch64::RBITXr,    AArch64::CLZXr,     AArch64::REVXr,
+    AArch64::CSNEGXr,   AArch64::BICXrs,    AArch64::BICSXrs,
+    AArch64::EONXrs,    AArch64::SMULHrr,   AArch64::UMULHrr,
+    AArch64::REV32Xr,   AArch64::REV16Xr,   AArch64::SMSUBLrrr,
+    AArch64::UMSUBLrrr, AArch64::PHI,       AArch64::TBZW,
+    AArch64::TBZX,      AArch64::TBNZW,     AArch64::TBNZX,
+    AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
+    AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
+    AArch64::CCMPXi,    AArch64::LDRXui};
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
@@ -1562,7 +1567,7 @@ class arm2llvm_ {
       return createTrunc(shift, ty);
     }
   }
-  
+
   CastInst *createSExt(Value *v, Type *t, const string &NameStr = "") {
     return CastInst::Create(Instruction::SExt, v, t,
                             (NameStr == "") ? next_name() : NameStr, CurrBB);
@@ -1630,7 +1635,7 @@ class arm2llvm_ {
       return;
     }
 
-    // direcly add the value to the value cache
+    // directly add the value to the value cache
     if (v->getType()->getIntegerBitWidth() == 64 ||
         v->getType()->getIntegerBitWidth() == 128) {
       add_identifier(v);
@@ -1863,6 +1868,42 @@ public:
       }
 
       writeToReg(createAdd(a, b));
+      break;
+    }
+    case AArch64::ADCXr:
+    case AArch64::ADCWr:
+    case AArch64::ADCSXr:
+    case AArch64::ADCSWr: {
+      auto size = get_size(opcode);
+      auto ty = get_int_type(size);
+
+      auto a = readFromReg(1);
+      auto b = readFromReg(2);
+
+      // Deal with size+1 bit integers so that we can easily calculate the c/v
+      // PSTATE bits.
+      auto tyPlusOne = get_int_type(size + 1);
+
+      auto carry = createZExt(cur_zs[MCBB], tyPlusOne);
+      auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
+      auto withCarry = createAdd(add, carry);
+
+      writeToReg(createTrunc(withCarry, ty));
+
+      if (has_s(opcode)) {
+        // Mask off the sign bit. We could mask with an AND, but APInt semantics
+        // might be weird since we're passing in an uint64_t but we'll want a 65 bit int
+        auto masked = createLShr(createShl(withCarry, intconst(1, size+1)), intconst(1, size+1));
+
+        auto sAdd = createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
+        auto sWithCarry = createAdd(sAdd, carry);
+
+        set_n(withCarry);
+        set_z(withCarry);
+        cur_cs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked);
+        cur_vs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked);
+      }
+
       break;
     }
     case AArch64::ASRVWr:
@@ -3167,7 +3208,7 @@ public:
     }
 
     outs() << "returning from run method" << "\n";
-    
+
     return Fn;
   }
 };
