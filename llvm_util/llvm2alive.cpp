@@ -1199,20 +1199,23 @@ public:
 
     for (auto &[ID, Node] : MDs) {
       switch (ID) {
+      case LLVMContext::MD_align:
       case LLVMContext::MD_nonnull:
       case LLVMContext::MD_range:
       {
         vector<Value*> args;
-        for (unsigned op = 0, e = Node->getNumOperands(); op < e; ++op) {
+        for (auto &Op : Node->operands()) {
           args.emplace_back(get_operand(
-            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(op))));
-          args.emplace_back(get_operand(
-            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(++op))));
+            llvm::mdconst::extract<llvm::ConstantInt>(Op)));
         }
 
         AssumeVal::Kind op;
         const char *str = nullptr;
         switch (ID) {
+        case LLVMContext::MD_align:
+          op = AssumeVal::Align;
+          str = "_align";
+          break;
         case LLVMContext::MD_nonnull:
           op = AssumeVal::NonNull;
           str = "_nonnull";

@@ -3140,6 +3140,9 @@ AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
     : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
       kind(kind) {
   switch (kind) {
+  case Align:
+    assert(args.size() == 1);
+    break;
   case NonNull:
     assert(args.empty());
     break;
@@ -3164,6 +3167,7 @@ void AssumeVal::rauw(const Value &what, Value &with) {
 void AssumeVal::print(ostream &os) const {
   const char *str = nullptr;
   switch (kind) {
+  case Align:   str = "align "; break;
   case NonNull: str = "nonnull "; break;
   case Range:   str = "range "; break;
   }
@@ -3180,6 +3184,12 @@ StateValue AssumeVal::toSMT(State &s) const {
 
   expr np;
   switch (kind) {
+  case Align:
+    uint64_t n;
+    ENSURE(s[*args[0]].value.isUInt(n));
+    np = Pointer(s.getMemory(), expr(v.value)).isAligned(n);
+    break;
+
   case NonNull:
     np = !Pointer(s.getMemory(), expr(v.value)).isNull();
     break;
@@ -3209,6 +3219,9 @@ StateValue AssumeVal::toSMT(State &s) const {
 expr AssumeVal::getTypeConstraints(const Function &f) const {
   expr e = true;
   switch (kind) {
+  case Align:
+    e = args[0]->getType().isIntType();
+    break;
   case NonNull:
     break;
   case Range:
