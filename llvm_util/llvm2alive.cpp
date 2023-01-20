@@ -1193,7 +1193,7 @@ public:
     return {};
   }
 
-  bool handleMetadata(Function &Fn, llvm::Instruction &llvm_i, Instr &i) {
+  bool handleMetadata(Function &Fn, llvm::Instruction &llvm_i, Instr *i) {
     llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
     llvm_i.getAllMetadataOtherThanDebugLoc(MDs);
 
@@ -1229,15 +1229,16 @@ public:
         }
 
         auto assume
-          = make_unique<AssumeVal>(i.getType(), i.getName() + str, i,
+          = make_unique<AssumeVal>(i->getType(), i->getName() + str, *i,
                                    std::move(args), op);
         replace_identifier(llvm_i, *assume);
+        i = assume.get();
         BB->addInstr(std::move(assume));
         break;
       }
 
       case LLVMContext::MD_noundef:
-        BB->addInstr(make_unique<Assume>(i, Assume::WellDefined));
+        BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
         break;
 
       // non-relevant for correctness
@@ -1636,7 +1637,7 @@ public:
           BB->addInstr(std::move(I));
 
           if (i.hasMetadataOtherThanDebugLoc() &&
-              !handleMetadata(Fn, i, *alive_i))
+              !handleMetadata(Fn, i, alive_i))
             return {};
         } else
           return {};
