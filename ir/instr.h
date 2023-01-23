@@ -19,7 +19,8 @@ protected:
 
 public:
   virtual std::vector<Value*> operands() const = 0;
-  virtual bool propagatesPoison() const;
+  virtual bool propagatesPoison() const = 0;
+  virtual bool hasSideEffects() const = 0;
   smt::expr getTypeConstraints() const override;
   virtual smt::expr getTypeConstraints(const Function &f) const = 0;
   virtual std::unique_ptr<Instr> dup(Function &f,
@@ -49,6 +50,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -78,6 +80,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -105,6 +108,7 @@ public:
   Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -137,6 +141,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -163,6 +168,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -187,6 +193,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -216,6 +223,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -239,6 +247,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -264,6 +273,7 @@ public:
   Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -296,6 +306,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -317,6 +328,8 @@ public:
   Value *getFalseValue() const { return b; }
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -335,6 +348,8 @@ public:
   void addIdx(unsigned idx);
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -353,6 +368,8 @@ public:
   void addIdx(unsigned idx);
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -389,6 +406,7 @@ public:
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -414,6 +432,8 @@ public:
     : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath) {}
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -430,6 +450,8 @@ public:
     : Instr(type, std::move(name)), val(&val) {}
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -455,6 +477,8 @@ public:
   std::vector<std::string> sources() const;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void replace(const std::string &predecessor, Value &newval);
   void print(std::ostream &os) const override;
@@ -468,6 +492,8 @@ public:
 class JumpInstr : public Instr {
 public:
   JumpInstr(const char *name) : Instr(Type::voidTy, name) {}
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
 
   class target_iterator {
     const JumpInstr *instr;
@@ -549,6 +575,8 @@ public:
   Return(Type &type, Value &val) : Instr(type, "return"), val(&val) {}
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -576,6 +604,8 @@ public:
   Assume(std::vector<Value *> &&args, Kind kind);
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -589,6 +619,7 @@ public:
 class AssumeVal final : public Instr {
 public:
   enum Kind {
+    Align,
     NonNull,
     Range,
   };
@@ -603,6 +634,8 @@ public:
             std::vector<Value *> &&args, Kind kind);
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -615,6 +648,8 @@ public:
 class MemInstr : public Instr {
 public:
   MemInstr(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
+
+  bool hasSideEffects() const override;
 
   // If this instruction allocates a memory block, return its size and
   //  alignment. Returns 0 if it doesn't allocate anything.
@@ -672,6 +707,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -693,6 +729,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -713,6 +750,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -741,6 +779,8 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -766,6 +806,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -793,6 +834,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -819,6 +861,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -841,6 +884,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -861,6 +905,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -890,6 +935,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -915,6 +961,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -938,6 +985,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -975,6 +1023,7 @@ public:
   ByteAccessInfo getByteAccessInfo() const override;
 
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -996,6 +1045,8 @@ class VaStart final : public Instr {
 public:
   VaStart(Value &ptr) : Instr(Type::voidTy, "va_start"), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1010,6 +1061,8 @@ class VaEnd final : public Instr {
 public:
   VaEnd(Value &ptr) : Instr(Type::voidTy, "va_end"), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1025,6 +1078,8 @@ public:
   VaCopy(Value &dst, Value &src)
     : Instr(Type::voidTy, "va_copy"), dst(&dst), src(&src) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1040,6 +1095,8 @@ public:
   VaArg(Type &type, std::string &&name, Value &ptr)
     : Instr(type, std::move(name)), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1055,6 +1112,8 @@ public:
   ExtractElement(Type &type, std::string &&name, Value &v, Value &idx)
     : Instr(type, std::move(name)), v(&v), idx(&idx) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1070,6 +1129,8 @@ public:
   InsertElement(Type &type, std::string &&name, Value &v, Value &e, Value &idx)
     : Instr(type, std::move(name)), v(&v), e(&e), idx(&idx) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1087,6 +1148,8 @@ public:
                 std::vector<unsigned> mask)
     : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
   std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
@@ -1097,6 +1160,5 @@ public:
 
 
 const ConversionOp *isCast(ConversionOp::Op op, const Value &v);
-bool hasNoSideEffects(const Instr &i);
 Value *isNoOp(const Value &v);
 }

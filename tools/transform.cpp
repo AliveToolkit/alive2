@@ -1502,7 +1502,7 @@ void Transform::preprocess() {
       for (auto bb : fn->getBBs()) {
         for (auto &i : bb->instrs()) {
           auto i_ptr = const_cast<Instr*>(&i);
-          if (hasNoSideEffects(i) && !users.count(i_ptr))
+          if (!i.hasSideEffects() && !users.count(i_ptr))
             to_remove.emplace_back(i_ptr);
         }
 
