@@ -2493,7 +2493,6 @@ public:
     case AArch64::UBFMWri:
     case AArch64::UBFMXri: {
       auto size = get_size(opcode);
-      auto ty = get_int_type(size);
       auto src = readFromReg(1);
       auto immr = mc_inst.getOperand(2).getImm();
       auto imms = mc_inst.getOperand(3).getImm();
@@ -2534,14 +2533,16 @@ public:
       if (immr == 0 && imms == 7) {
         auto mask = ((uint64_t)1 << 8) - 1;
         auto masked = createAnd(src, intconst(mask, size));
-        auto zexted = createZExt(masked, ty);
-        writeToReg(zexted);
+        writeToReg(masked);
         return;
       }
+
       // UXTH
       if (immr == 0 && imms == 15) {
-        outs() << "UXTH not supported\n";
-	exit(-1);
+        auto mask = ((uint64_t)1 << 16) - 1;
+        auto masked = createAnd(src, intconst(mask, size));
+        writeToReg(masked);
+	return;
       }
 
       // UBFX
