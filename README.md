@@ -6,7 +6,7 @@ of LLVM code and transformations.
 Alive2 includes the following libraries:
 * Alive2 IR
 * Symbolic executor
-* LLVM -> Alive2 IR converter
+* LLVM → Alive2 IR converter
 * Refinement check (aka optimization verifier)
 * SMT abstraction layer
 
@@ -14,15 +14,18 @@ Included tools:
 * Alive drop-in replacement
 * Translation validation plugins for clang and LLVM's `opt`
 * Standalone translation validation tool: `alive-tv` ([online](https://alive2.llvm.org))
+* Clang drop-in replacement with translation validation (`alivecc` and
+  `alive++`)
+* An LLVM IR interpreter that is UB precise (`alive-exec`)
 
 For a technical introduction to Alive2, please see [our paper from
-PLDI 2021](https://web.ist.utl.pt/nuno.lopes/pubs.php?id=alive2-pldi21).
+PLDI 2021](https://web.ist.utl.pt/nuno.lopes/pubs/alive2-pldi21.pdf).
 
 
 WARNING
 -------
-Alive2 does not support inter-procedural transformations. Alive2 may crash
-or produce spurious counterexamples if run with such passes.
+Alive2 does not support inter-procedural transformations. Alive2 may produce
+spurious counterexamples if run with such passes.
 
 
 Prerequisites
@@ -94,8 +97,8 @@ Testing Time: 0.11s
   Expected Passes    : 1
 ```
 
-To run translation validation on all of the LLVM unit tests for
-IR-level transformations:
+To run translation validation on all the LLVM unit tests for IR-level
+transformations:
 
 ```
 ~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
@@ -177,7 +180,7 @@ IR file. For example, let's prove that removing `nsw` is correct
 for addition:
 
 ```
-$ ./alive-tv src.ll tgt.ll
+$ alive-tv src.ll tgt.ll
 
 ----------------------------------------
 define i32 @f(i32 %a, i32 %b) {
@@ -216,7 +219,7 @@ define i3 @foo(i3) {
   %x5 = lshr i3 %x4, %x3
   ret i3 %x5
 }
-$ ./alive-tv foo.ll
+$ alive-tv foo.ll
 
 ----------------------------------------
 define i3 @foo(i3 %0) {
