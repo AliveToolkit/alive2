@@ -72,6 +72,11 @@ struct Goal {
       Z3_goal_reset(ctx(), goal);
   }
 
+  bool isDecided() const {
+    return Z3_goal_is_decided_sat(ctx(), goal) ||
+           Z3_goal_is_decided_unsat(ctx(), goal);
+  }
+
   const char* toString() const {
     return Z3_goal_to_string(ctx(), goal);
   }
@@ -250,6 +255,8 @@ public:
         dbg() << "(no change)\n";
       }
       goal = std::move(newgoal);
+      if (goal.isDecided())
+        break;
     }
     return r;
   }
