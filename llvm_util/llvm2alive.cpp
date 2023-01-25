@@ -127,7 +127,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   template <typename T>
   uint64_t pref_alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlign().value();
-    return a != 0 ? a : DL().getPrefTypeAlignment(ty);
+    return a != 0 ? a : DL().getPrefTypeAlign(ty).value();
   }
 
   Value* convert_constexpr(llvm::ConstantExpr *cexpr) {
