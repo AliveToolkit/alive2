@@ -1262,7 +1262,8 @@ class arm2llvm_ {
   bool ret_void{false};
 
   Type *get_int_type(int bits) {
-    assert(bits > 0);
+    // just trying to catch silly errors
+    assert(bits > 0 && bits <= 129);
     return Type::getIntNTy(LLVMCtx, bits);
   }
 
@@ -1791,6 +1792,13 @@ public:
     wrapper = &I;
     curId = 0;
 
+    auto i1 = get_int_type(1);
+    auto i8 = get_int_type(8);
+    auto i16 = get_int_type(16);
+    auto i32 = get_int_type(32);
+    auto i64 = get_int_type(64);
+    auto i128 = get_int_type(128);
+
     switch (opcode) {
     case AArch64::ADDWrs:
     case AArch64::ADDWri:
@@ -2100,9 +2108,6 @@ public:
       auto mul_rhs = readFromReg(2, 0);
       auto addend = readFromReg(3, 0);
 
-      auto i32 = get_int_type(32);
-      auto i64 = get_int_type(64);
-
       // The inputs are automatically zero extended, but we want sign extension,
       // so we need to truncate them back to i32s
       auto lhs_trunc = createTrunc(mul_lhs, i32);
@@ -2138,8 +2143,6 @@ public:
       }
 
       auto minuend = readFromReg(3, 0);
-      auto i32 = get_int_type(32);
-      auto i64 = get_int_type(64);
 
       // The inputs are automatically zero extended, but we want sign
       // extension for signed, so we need to truncate them back to i32s
@@ -2169,9 +2172,6 @@ public:
       // UMULH: Unsigned Multiply High
       auto mul_lhs = readFromReg(1, 0);
       auto mul_rhs = readFromReg(2, 0);
-
-      auto i64 = get_int_type(64);
-      auto i128 = get_int_type(128);
 
       // For unsigned multiplication, must zero extend the lhs and rhs to not
       // overflow For signed multiplication, must sign extend the lhs and rhs to
@@ -2226,7 +2226,6 @@ public:
 
       // SXTB
       if (immr == 0 && imms == 7) {
-        auto i8 = get_int_type(8);
         auto trunc = createTrunc(src, i8);
         auto dst = createSExt(trunc, ty);
         writeToReg(dst);
@@ -2235,7 +2234,6 @@ public:
 
       // SXTH
       if (immr == 0 && imms == 15) {
-        auto i16 = get_int_type(16);
         auto trunc = createTrunc(src, i16);
         auto dst = createSExt(trunc, ty);
         writeToReg(dst);
@@ -2244,7 +2242,6 @@ public:
 
       // SXTW
       if (immr == 0 && imms == 31) {
-        auto i32 = get_int_type(32);
         auto trunc = createTrunc(src, i32);
         auto dst = createSExt(trunc, ty);
         writeToReg(dst);
@@ -2811,7 +2808,7 @@ public:
              "only loading from stack supported for now!");
       auto stack_gep = getIdentifier(AArch64::SP, op_0.getReg());
       assert(stack_gep && "loaded identifier should not be null!");
-      auto loaded_val = createLoad(get_int_type(64), stack_gep);
+      auto loaded_val = createLoad(i64, stack_gep);
       writeToReg(loaded_val);
       break;
     }
@@ -2872,8 +2869,8 @@ public:
             if (has_ret_attr && (orig_ret_bitwidth < 32)) {
               assert(retWidth >= orig_ret_bitwidth);
               assert(retWidth == 64);
-              auto trunc = createTrunc(val, get_int_type(32));
-              val = createZExt(trunc, get_int_type(64));
+              auto trunc = createTrunc(val, i32);
+              val = createZExt(trunc, i64);
             }
             createReturn(val);
           } else {
@@ -2978,7 +2975,7 @@ public:
       assert(operand != nullptr && "operand is null");
       auto bit_pos = mc_inst.getOperand(1).getImm();
       auto shift = createLShr(operand, intconst(bit_pos, size));
-      auto cond_val = createTrunc(shift, get_int_type(1));
+      auto cond_val = createTrunc(shift, i1);
 
       auto &jmp_tgt_op = mc_inst.getOperand(2);
       assert(jmp_tgt_op.isExpr() && "expected expression");
@@ -3070,6 +3067,10 @@ public:
   }
 
   Function *run() {
+    auto i32 = get_int_type(32);
+    auto i64 = get_int_type(64);
+    auto i128 = get_int_type(128);
+    
     auto Fn = Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage, 0,
                                MF.getName(), LiftedModule);
 
@@ -3099,20 +3100,19 @@ public:
         auto truncated_type = get_int_type(orig_width);
         stored =
             createTrunc(stored, truncated_type, next_name(operand.getReg(), 2));
-        auto extended_type = get_int_type(64);
         if (truncated_type->getIntegerBitWidth() == 1) {
-          stored = createCast(stored, get_int_type(32), op,
+          stored = createCast(stored, i32, op,
                               next_name(operand.getReg(), 3));
           stored =
-              createZExt(stored, extended_type, next_name(operand.getReg(), 4));
+              createZExt(stored, i64, next_name(operand.getReg(), 4));
         } else {
           if (truncated_type->getIntegerBitWidth() < 32) {
-            stored = createCast(stored, get_int_type(32), op,
+            stored = createCast(stored, i32, op,
                                 next_name(operand.getReg(), 3));
-            stored = createZExt(stored, extended_type,
+            stored = createZExt(stored, i64,
                                 next_name(operand.getReg(), 4));
           } else {
-            stored = createCast(stored, extended_type, op,
+            stored = createCast(stored, i64, op,
                                 next_name(operand.getReg(), 4));
           }
         }
@@ -3149,8 +3149,8 @@ public:
       }
     }
 
-    auto poison_val = PoisonValue::get(get_int_type(64));
-    auto vect_poison_val = PoisonValue::get(get_int_type(128));
+    auto poison_val = PoisonValue::get(i64);
+    auto vect_poison_val = PoisonValue::get(i128);
     outs() << "argNum = " << argNum << "\n";
     outs() << "entry mc_bb = " << sorted_bbs[0].second->getName() << "\n";
     auto entry_mc_bb = sorted_bbs[0].second;
