@@ -218,7 +218,9 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   }
 
   auto undef_mask = getUndefVar(ty, child);
-  if (undef_mask.isValid()) {
+  if (config::disable_undef_input || attrs.undefImpliesUB()) {
+    s.addUB(undef_mask == 0);
+  } else {
     auto [undef, var] = ty.mkUndefInput(s, attrs);
     if (undef_mask.bits() == 1)
       val = expr::mkIf(undef_mask == 0, val, undef);
@@ -230,11 +232,12 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   auto state_val = attrs.encode(s, {std::move(val), expr(true)}, ty);
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
-  string np_name = "np_" + getSMTName(child);
+  expr np = expr::mkBoolVar(("np_" + getSMTName(child)).c_str());
+  if (never_poison)
+    s.addUB(np);
 
   return { std::move(state_val.value),
-           std::move(state_val.non_poison) &&
-             (never_poison ? true : expr::mkBoolVar(np_name.c_str())) };
+           std::move(state_val.non_poison) && (never_poison ? true : np) };
 }
 
 bool Input::isUndefMask(const expr &e, const expr &var) {
@@ -254,9 +257,6 @@ void Input::merge(const ParamAttrs &other) {
 }
 
 expr Input::getUndefVar(const Type &ty, unsigned child) const {
-  if (config::disable_undef_input || attrs.undefImpliesUB())
-    return {};
-
   string tyname = "isundef_" + getSMTName(child);
   //return expr::mkVar(tyname.c_str(), ty.getDummyValue(false).value);
   // FIXME: only whole value undef or non-undef for now
