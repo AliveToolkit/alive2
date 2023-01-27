@@ -68,6 +68,14 @@ using namespace std;
 using namespace llvm;
 using namespace lifter;
 
+// just want to avoid collisions here
+namespace llvm::AArch64 {
+    const unsigned N = 100000000;
+    const unsigned Z = 100000001;
+    const unsigned C = 100000002;
+    const unsigned V = 100000003;
+}
+
 namespace {
 
 const set<int> s_flag = {
@@ -1242,17 +1250,17 @@ BasicBlock *get_basic_block(Function &F, MCOperand &jmp_tgt) {
 }
 
 class arm2llvm_ {
-  Module *LiftedModule;
+  Module *LiftedModule{nullptr};
   LLVMContext &LLVMCtx = LiftedModule->getContext();
   MCFunction &MF;
   // const DataLayout &DL;
   Function &srcFn;
-  MCBasicBlock *MCBB; // the current machine block
+  MCBasicBlock *MCBB{nullptr}; // the current machine block
   unsigned blockCount{0};
-  BasicBlock *CurrBB; // the current block
+  BasicBlock *CurrBB{nullptr}; // the current block
 
-  MCInstPrinter *instrPrinter;
-  MCRegisterInfo *registerInfo;
+  MCInstPrinter *instrPrinter{nullptr};
+  MCRegisterInfo *registerInfo{nullptr};
   vector<pair<PHINode *, MCInstWrapper *>> lift_todo_phis;
 
   MCInstWrapper *wrapper{nullptr};
@@ -1260,6 +1268,8 @@ class arm2llvm_ {
   unsigned instructionCount;
   unsigned curId;
   bool ret_void{false};
+
+  map<unsigned, Value *> RegFile;
 
   Type *get_int_type(int bits) {
     // just trying to catch silly errors
@@ -1334,43 +1344,6 @@ class arm2llvm_ {
     return mc_get_operand(reg, id);
   }
 
-  // TODO: make it so that lshr generates code on register lookups
-  //  some instructions make use of this, and the semantics need to be worked
-  //  out
-  Value *readFromReg(int idx, int shift = 0) {
-    auto inst = wrapper->getMCInst();
-    auto op = inst.getOperand(idx);
-    auto size = get_size(inst.getOpcode());
-
-    assert(op.isImm() || op.isReg());
-
-    Value *v = nullptr;
-    auto ty = get_int_type(size);
-
-    if (op.isImm()) {
-      v = intconst(op.getImm(), size);
-    } else if (op.getReg() == AArch64::XZR) {
-      v = intconst(0, 64);
-    } else if (op.getReg() == AArch64::WZR) {
-      v = intconst(0, 32);
-    } else if (size == 128) { // FIXME this needs to be generalized
-      auto tmp = getIdentifier(op.getReg(), wrapper->getOpId(idx));
-      v = createZExt(tmp, ty);
-    } else if (size == 64) {
-      v = getIdentifier(op.getReg(), wrapper->getOpId(idx));
-    } else if (size == 32) {
-      auto tmp = getIdentifier(op.getReg(), wrapper->getOpId(idx));
-      v = createTrunc(tmp, ty);
-    } else {
-      assert(false && "unhandled case in get_value*");
-    }
-
-    if (shift != 0)
-      v = reg_shift(v, shift);
-
-    return v;
-  }
-
   // Generates string name for the next instruction
   string next_name() {
     assert(wrapper);
@@ -1392,7 +1365,9 @@ class arm2llvm_ {
   }
 
   AllocaInst *createAlloca(Type *ty, Value *sz, const string &NameStr) {
-    return new AllocaInst(ty, 0, sz, NameStr, CurrBB);
+    auto A = new AllocaInst(ty, 0, sz, NameStr, CurrBB);
+    // TODO initialize ARM memory cells to freeze poison?
+    return A;
   }
 
   GetElementPtrInst *createGEP(Type *ty, Value *v, ArrayRef<Value *> idxlist,
@@ -1615,6 +1590,69 @@ class arm2llvm_ {
     outs() << "exiting add_phi_params" << "\n";
   }
 
+  // return pointer to the backing store for a register, doing the
+  // required de-aliasing
+  Value *getRegStorage(unsigned Reg) {
+      // FIXME do this better?
+      unsigned WideReg = Reg;
+      if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
+	WideReg = Reg - AArch64::W0 + AArch64::X0;
+      if (Reg == AArch64::WZR)
+	WideReg = AArch64::XZR;
+      auto RegAddr = RegFile[WideReg];
+      assert(RegAddr);
+      return RegAddr;
+  }
+  
+  // TODO: make it so that lshr generates code on register lookups
+  // some instructions make use of this, and the semantics need to be
+  // worked out
+  Value *readFromOperand(int idx, int shift = 0) {
+    auto inst = wrapper->getMCInst();
+    auto op = inst.getOperand(idx);
+    auto size = get_size(inst.getOpcode());
+    assert(size == 32 || size == 64);
+
+    Value *V = nullptr;
+    if (op.isImm()) {
+      V = intconst(op.getImm(), size);
+    } else {
+      assert(op.isReg());
+      auto Reg = op.getReg();
+
+#if 0
+      auto ty = get_int_type(size);
+      if (Reg == AArch64::XZR) {
+	V = intconst(0, 64);
+      } else if (Reg == AArch64::WZR) {
+	V = intconst(0, 32);
+      } else if (size == 128) { // FIXME this needs to be generalized
+	auto tmp = getIdentifier(Reg, wrapper->getOpId(idx));
+	V = createZExt(tmp, ty);
+      } else if (size == 64) {
+	V = getIdentifier(Reg, wrapper->getOpId(idx));
+      } else if (size == 32) {
+	auto tmp = getIdentifier(Reg, wrapper->getOpId(idx));
+	V = createTrunc(tmp, ty);
+      } else {
+	assert(false && "unhandled case in get_value*");
+      }
+#else
+      auto RegAddr = getRegStorage(Reg);
+      Value *VV = createLoad(get_int_type(64), RegAddr);
+      assert(VV);
+      if (size == 32)
+	VV = createTrunc(VV, get_int_type(32));
+      V = VV;
+#endif
+    }
+    
+    if (shift != 0)
+      V = reg_shift(V, shift);
+
+    return V;
+  }
+
   void add_identifier(Value *v) {
     auto reg = wrapper->getMCInst().getOperand(0).getReg();
     auto version = wrapper->getOpId(0);
@@ -1623,43 +1661,33 @@ class arm2llvm_ {
     mc_add_identifier(reg, version, v);
   }
 
-  // writeToReg saves an IR value using the current instruction's
-  // destination register. All values are kept track of in their
-  // full-width counterparts to simulate registers. For example, a x0
-  // register would be kept track of in the bottom bits of
-  // w0. Optionally, there is an "s" or signed flag that can be used
-  // when writing smaller bit-width values to half or full-width
-  // registers which will perform a small sign extension procedure.
-  void writeToReg(Value *v, bool s = false) {
-    if (wrapper->getMCInst().getOperand(0).getReg() == AArch64::WZR) {
+  void writeToOutputReg(Value *V, bool s = false) {
+    auto Reg = wrapper->getMCInst().getOperand(0).getReg();
+    cout << "output register = " << Reg << "\n";
+    
+    if (Reg == AArch64::WZR || Reg == AArch64::XZR) {
       instructionCount++;
       return;
     }
 
-    // directly add the value to the value cache
-    if (v->getType()->getIntegerBitWidth() == 64 ||
-        v->getType()->getIntegerBitWidth() == 128) {
-      add_identifier(v);
-      return;
+    auto W = V->getType()->getIntegerBitWidth();
+    if (W != 64 && W != 128) {
+      size_t regSize = get_size(wrapper->getMCInst().getOpcode());
+      assert(regSize == 32 || regSize == 64);
+
+      // if the s flag is set, the value is smaller than 32 bits, and
+      // the register we are storing it in _is_ 32 bits, we sign
+      // extend to 32 bits before zero-extending to 64
+      if (s && regSize == 32 && W < 32) {
+	V = createSExt(V, get_int_type(32));
+	V = createZExt(V, get_int_type(64));
+      } else {
+	auto op = s ? Instruction::SExt : Instruction::ZExt;
+	V = createCast(V, get_int_type(64), op);
+      }
     }
-
-    size_t regSize = get_size(wrapper->getMCInst().getOpcode());
-
-    // regSize should only be 32/64
-    assert(regSize == 32 || regSize == 64);
-
-    // if the s flag is set, the value is smaller than 32 bits,
-    // and the register we are storing it in _is_ 32 bits, we sign extend
-    // to 32 bits before zero-extending to 64
-    if (s && regSize == 32 && v->getType()->getIntegerBitWidth() < 32) {
-      auto sext32 = createSExt(v, get_int_type(32));
-      auto zext64 = createZExt(sext32, get_int_type(64));
-      add_identifier(zext64);
-    } else {
-      auto op = s ? Instruction::SExt : Instruction::ZExt;
-      auto new_val = createCast(v, get_int_type(64), op);
-      add_identifier(new_val);
-    }
+    add_identifier(V);
+    createStore(V, getRegStorage(Reg));
   }
 
   Value *retrieve_pstate(unordered_map<MCBasicBlock *, Value *> &pstate_map,
@@ -1752,16 +1780,40 @@ class arm2llvm_ {
     return res;
   }
 
-  void set_z(Value *val) {
-    auto zero = intconst(0, val->getType()->getIntegerBitWidth());
-    auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, val, zero);
-    cur_zs[MCBB] = z;
+  void setV(Value *val) {
+    assert(val->getType()->getIntegerBitWidth() == 1);
+    cur_vs[MCBB] = val;
   }
 
-  void set_n(Value *val) {
-    auto zero = intconst(0, val->getType()->getIntegerBitWidth());
+  void setZ(Value *val) {
+    assert(val->getType()->getIntegerBitWidth() == 1);
+    cur_zs[MCBB] = val;
+  }
+
+  void setN(Value *val) {
+    assert(val->getType()->getIntegerBitWidth() == 1);
+    cur_ns[MCBB] = val;
+  }
+
+  void setC(Value *val) {
+    assert(val->getType()->getIntegerBitWidth() == 1);
+    cur_cs[MCBB] = val;
+  }
+
+  void setZUsingResult(Value *val) {
+    auto W = val->getType()->getIntegerBitWidth();
+    assert(W == 32 || W == 64);
+    auto zero = intconst(0, W);
+    auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, val, zero);
+    setZ(z);
+  }
+
+  void setNUsingResult(Value *val) {
+    auto W = val->getType()->getIntegerBitWidth();
+    assert(W == 32 || W == 64);
+    auto zero = intconst(0, W);
     auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, val, zero);
-    cur_ns[MCBB] = n;
+    setN(n);
   }
 
 public:
@@ -1774,7 +1826,7 @@ public:
 
 #if 1
   void revInst(Value *v) {
-    writeToReg(createBSwap(v));
+    writeToOutputReg(createBSwap(v));
   }
 #else
   #include "code0.cpp"
@@ -1812,7 +1864,7 @@ public:
     case AArch64::ADDSXrs:
     case AArch64::ADDSXri:
     case AArch64::ADDSXrx: {
-      auto a = readFromReg(1);
+      auto a = readFromOperand(1);
       Value *b = nullptr;
 
       switch (opcode) {
@@ -1837,7 +1889,7 @@ public:
         unsigned extendSize = 8 << (extendType % 4);
         auto shift = extendImm & 0x7;
 
-        b = readFromReg(2);
+        b = readFromOperand(2);
 
         // Make sure to not to trunc to the same size as the parameter.
         // Sometimes ADDrx is generated using 32 bit registers and "extends" to
@@ -1856,7 +1908,7 @@ public:
         break;
       }
       default:
-        b = readFromReg(2, mc_inst.getOperand(3).getImm());
+        b = readFromOperand(2, mc_inst.getOperand(3).getImm());
         break;
       }
 
@@ -1868,14 +1920,14 @@ public:
         auto uadd = createUAddOverflow(a, b);
         auto new_c = createExtractValue(uadd, {1});
 
-        cur_vs[MCBB] = new_v;
-        cur_cs[MCBB] = new_c;
-        set_n(result);
-        set_z(result);
-        writeToReg(result);
+        setV(new_v);
+        setC(new_c);
+        setNUsingResult(result);
+        setZUsingResult(result);
+        writeToOutputReg(result);
       }
 
-      writeToReg(createAdd(a, b));
+      writeToOutputReg(createAdd(a, b));
       break;
     }
     case AArch64::ADCXr:
@@ -1885,8 +1937,8 @@ public:
       auto size = get_size(opcode);
       auto ty = get_int_type(size);
 
-      auto a = readFromReg(1);
-      auto b = readFromReg(2);
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
 
       // Deal with size+1 bit integers so that we can easily calculate the c/v
       // PSTATE bits.
@@ -1896,7 +1948,7 @@ public:
       auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
       auto withCarry = createAdd(add, carry);
 
-      writeToReg(createTrunc(withCarry, ty));
+      writeToOutputReg(createTrunc(withCarry, ty));
 
       if (has_s(opcode)) {
         // Mask off the sign bit. We could mask with an AND, but APInt semantics
@@ -1906,10 +1958,10 @@ public:
         auto sAdd = createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
         auto sWithCarry = createAdd(sAdd, carry);
 
-        set_n(withCarry);
-        set_z(withCarry);
-        cur_cs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked);
-        cur_vs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked);
+        setNUsingResult(withCarry);
+        setZUsingResult(withCarry);
+        setC(createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked));
+        setV(createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked));
       }
 
       break;
@@ -1917,12 +1969,12 @@ public:
     case AArch64::ASRVWr:
     case AArch64::ASRVXr: {
       auto size = get_size(opcode);
-      auto a = readFromReg(1);
-      auto b = readFromReg(2);
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
 
       auto shift_amt = createBinop(b, intconst(size, size), Instruction::URem);
       auto res = createAShr(a, shift_amt);
-      writeToReg(res);
+      writeToOutputReg(res);
       break;
     }
       // SUBrx is a subtract instruction with an extended register.
@@ -1957,7 +2009,7 @@ public:
       assert(mc_inst.getOperand(3).isImm());
 
       // convert lhs, rhs operands to IR::Values
-      auto a = readFromReg(1);
+      auto a = readFromOperand(1);
       Value *b = nullptr;
       switch (opcode) {
       case AArch64::SUBWrx:
@@ -1973,7 +2025,7 @@ public:
         // and more manual work to sign extend would be necessary
         unsigned extendSize = 8 << (extendType % 4);
         auto shift = extendImm & 0x7;
-        b = readFromReg(2);
+        b = readFromOperand(2);
 
         // Make sure to not to trunc to the same size as the parameter.
         // Sometimes SUBrx is generated using 32 bit registers and "extends" to
@@ -1992,7 +2044,7 @@ public:
         break;
       }
       default:
-        b = readFromReg(2, mc_inst.getOperand(3).getImm());
+        b = readFromOperand(2, mc_inst.getOperand(3).getImm());
       }
 
       // make sure that lhs and rhs conversion succeeded, type lookup succeeded
@@ -2003,14 +2055,14 @@ public:
         auto ssub = createSSubOverflow(a, b);
         auto result = createExtractValue(ssub, {0});
         auto new_v = createExtractValue(ssub, {1});
-        cur_cs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_UGE, a, b);
-        cur_zs[MCBB] = createICmp(ICmpInst::Predicate::ICMP_EQ, a, b);
-        cur_vs[MCBB] = new_v;
-        set_n(result);
-        writeToReg(result);
+        setC(createICmp(ICmpInst::Predicate::ICMP_UGE, a, b));
+        setZ(createICmp(ICmpInst::Predicate::ICMP_EQ, a, b));
+        setV(new_v);
+        setNUsingResult(result);
+        writeToOutputReg(result);
       } else {
         auto sub = createSub(a, b);
-        writeToReg(sub);
+        writeToOutputReg(sub);
       }
       break;
     }
@@ -2023,8 +2075,8 @@ public:
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isReg());
       assert(mc_inst.getOperand(3).isImm());
 
-      auto a = readFromReg(1);
-      auto b = readFromReg(2);
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
 
       auto cond_val_imm = mc_inst.getOperand(3).getImm();
       auto cond_val = evaluate_condition(cond_val_imm, MCBB);
@@ -2033,7 +2085,7 @@ public:
         visitError(I);
 
       auto result = createSelect(cond_val, a, b);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::ANDWri:
@@ -2054,7 +2106,7 @@ public:
         auto imm = decodeLogicalImmediate(mc_inst.getOperand(2).getImm(), size);
         rhs = intconst(imm, size);
       } else {
-        rhs = readFromReg(2);
+        rhs = readFromOperand(2);
       }
 
       // We are in a ANDrs case. We need to handle a shift
@@ -2064,49 +2116,49 @@ public:
         rhs = reg_shift(rhs, mc_inst.getOperand(3).getImm());
       }
 
-      auto and_op = createAnd(readFromReg(1), rhs);
+      auto and_op = createAnd(readFromOperand(1), rhs);
 
       if (has_s(opcode)) {
-        set_n(and_op);
-        set_z(and_op);
-        cur_cs[MCBB] = intconst(0, 1);
-        cur_vs[MCBB] = intconst(0, 1);
+        setNUsingResult(and_op);
+        setZUsingResult(and_op);
+        setC(intconst(0, 1));
+        setV(intconst(0, 1));
       }
 
-      writeToReg(and_op);
+      writeToOutputReg(and_op);
       break;
     }
     case AArch64::MADDWrrr:
     case AArch64::MADDXrrr: {
-      auto mul_lhs = readFromReg(1, 0);
-      auto mul_rhs = readFromReg(2, 0);
-      auto addend = readFromReg(3, 0);
+      auto mul_lhs = readFromOperand(1, 0);
+      auto mul_rhs = readFromOperand(2, 0);
+      auto addend = readFromOperand(3, 0);
 
       auto mul = createMul(mul_lhs, mul_rhs);
       auto add = createAdd(mul, addend);
-      writeToReg(add);
+      writeToOutputReg(add);
       break;
     }
     case AArch64::UMADDLrrr: {
       auto size = get_size(opcode);
-      auto mul_lhs = readFromReg(1, 0);
-      auto mul_rhs = readFromReg(2, 0);
-      auto addend = readFromReg(3, 0);
+      auto mul_lhs = readFromOperand(1, 0);
+      auto mul_rhs = readFromOperand(2, 0);
+      auto addend = readFromOperand(3, 0);
 
       auto lhs_masked = createAnd(mul_lhs, intconst(0xffffffffUL, size));
       auto rhs_masked = createAnd(mul_rhs, intconst(0xffffffffUL, size));
       auto mul = createMul(lhs_masked, rhs_masked);
       auto add = createAdd(mul, addend);
-      writeToReg(add);
+      writeToOutputReg(add);
       break;
     }
     case AArch64::SMADDLrrr: {
       // Signed Multiply-Add Long multiplies two 32-bit register values,
       // adds a 64-bit register value, and writes the result to the 64-bit
       // destination register.
-      auto mul_lhs = readFromReg(1, 0);
-      auto mul_rhs = readFromReg(2, 0);
-      auto addend = readFromReg(3, 0);
+      auto mul_lhs = readFromOperand(1, 0);
+      auto mul_rhs = readFromOperand(2, 0);
+      auto addend = readFromOperand(3, 0);
 
       // The inputs are automatically zero extended, but we want sign extension,
       // so we need to truncate them back to i32s
@@ -2120,7 +2172,7 @@ public:
 
       auto mul = createMul(lhs_ext, rhs_ext);
       auto add = createAdd(mul, addend);
-      writeToReg(add);
+      writeToOutputReg(add);
       break;
     }
     case AArch64::SMSUBLrrr:
@@ -2133,16 +2185,16 @@ public:
       if (wrapper->getMCInst().getOperand(1).getReg() == AArch64::WZR) {
         mul_lhs = intconst(0, size);
       } else {
-        mul_lhs = readFromReg(1, 0);
+        mul_lhs = readFromOperand(1, 0);
       }
 
       if (wrapper->getMCInst().getOperand(2).getReg() == AArch64::WZR) {
         mul_rhs = intconst(0, size);
       } else {
-        mul_rhs = readFromReg(2, 0);
+        mul_rhs = readFromOperand(2, 0);
       }
 
-      auto minuend = readFromReg(3, 0);
+      auto minuend = readFromOperand(3, 0);
 
       // The inputs are automatically zero extended, but we want sign
       // extension for signed, so we need to truncate them back to i32s
@@ -2163,15 +2215,15 @@ public:
 
       auto mul = createMul(lhs_extended, rhs_extended);
       auto subtract = createSub(minuend, mul);
-      writeToReg(subtract);
+      writeToOutputReg(subtract);
       break;
     }
     case AArch64::SMULHrr:
     case AArch64::UMULHrr: {
       // SMULH: Signed Multiply High
       // UMULH: Unsigned Multiply High
-      auto mul_lhs = readFromReg(1, 0);
-      auto mul_rhs = readFromReg(2, 0);
+      auto mul_lhs = readFromOperand(1, 0);
+      auto mul_rhs = readFromOperand(2, 0);
 
       // For unsigned multiplication, must zero extend the lhs and rhs to not
       // overflow For signed multiplication, must sign extend the lhs and rhs to
@@ -2192,24 +2244,24 @@ public:
 
       // Truncate to the proper size:
       auto trunc = createTrunc(shift, i64);
-      writeToReg(trunc);
+      writeToOutputReg(trunc);
       break;
     }
     case AArch64::MSUBWrrr:
     case AArch64::MSUBXrrr: {
-      auto mul_lhs = readFromReg(1, 0);
-      auto mul_rhs = readFromReg(2, 0);
-      auto minuend = readFromReg(3, 0);
+      auto mul_lhs = readFromOperand(1, 0);
+      auto mul_rhs = readFromOperand(2, 0);
+      auto minuend = readFromOperand(3, 0);
       auto mul = createMul(mul_lhs, mul_rhs);
       auto sub = createSub(minuend, mul);
-      writeToReg(sub);
+      writeToOutputReg(sub);
       break;
     }
     case AArch64::SBFMWri:
     case AArch64::SBFMXri: {
       auto size = get_size(opcode);
       auto ty = get_int_type(size);
-      auto src = readFromReg(1);
+      auto src = readFromOperand(1);
       auto immr = mc_inst.getOperand(2).getImm();
       auto imms = mc_inst.getOperand(3).getImm();
 
@@ -2220,7 +2272,7 @@ public:
       // imms == 011111 and size == 32 or when imms == 111111 and size = 64
       if ((size == 32 && imms == 31) || (size == 64 && imms == 63)) {
         auto dst = createAShr(src, r);
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
@@ -2228,7 +2280,7 @@ public:
       if (immr == 0 && imms == 7) {
         auto trunc = createTrunc(src, i8);
         auto dst = createSExt(trunc, ty);
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
@@ -2236,7 +2288,7 @@ public:
       if (immr == 0 && imms == 15) {
         auto trunc = createTrunc(src, i16);
         auto dst = createSExt(trunc, ty);
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
@@ -2244,7 +2296,7 @@ public:
       if (immr == 0 && imms == 31) {
         auto trunc = createTrunc(src, i32);
         auto dst = createSExt(trunc, ty);
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
@@ -2262,7 +2314,7 @@ public:
                                            bitfield_lsb, intconst(0, size));
         auto res = createSelect(bitfield_lsb_set, insert_ones, masked);
         auto shifted_res = createShl(res, intconst(pos, size));
-        writeToReg(shifted_res);
+        writeToOutputReg(shifted_res);
         return;
       }
       // FIXME: this requires checking if SBFX is preferred.
@@ -2275,7 +2327,7 @@ public:
       auto l_shifted = createShl(masked, intconst(size - width, size));
       auto shifted_res =
           createAShr(l_shifted, intconst(size - width + pos, size));
-      writeToReg(shifted_res);
+      writeToOutputReg(shifted_res);
       return;
     }
     case AArch64::CCMPWi:
@@ -2286,8 +2338,8 @@ public:
       auto ty = get_int_type(size);
       assert(mc_inst.getNumOperands() == 4);
 
-      auto lhs = readFromReg(0);
-      auto imm_rhs = readFromReg(1);
+      auto lhs = readFromOperand(0);
+      auto imm_rhs = readFromOperand(1);
 
       if (!ty || !lhs || !imm_rhs)
         visitError(I);
@@ -2314,14 +2366,11 @@ public:
       auto new_z_flag = createSelect(cond_val, new_z, imm_z_val);
       auto new_c_flag = createSelect(cond_val, new_c, imm_c_val);
       auto new_v_flag = createSelect(cond_val, new_v, imm_v_val);
-      writeToReg(new_n_flag);
-      cur_ns[MCBB] = new_n_flag;
-      writeToReg(new_z_flag);
-      cur_zs[MCBB] = new_z_flag;
-      writeToReg(new_c_flag);
-      cur_cs[MCBB] = new_c_flag;
-      writeToReg(new_v_flag);
-      cur_vs[MCBB] = new_v_flag;
+
+      setN(new_n_flag);
+      setZ(new_z_flag);
+      setC(new_c_flag);
+      setV(new_v_flag);
       break;
     }
     case AArch64::EORWri:
@@ -2331,7 +2380,7 @@ public:
       assert(mc_inst.getNumOperands() == 3); // dst, src, imm
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isImm());
 
-      auto a = readFromReg(1);
+      auto a = readFromOperand(1);
       auto decoded_immediate =
           decodeLogicalImmediate(mc_inst.getOperand(2).getImm(), size);
       auto imm_val = intconst(decoded_immediate,
@@ -2340,15 +2389,15 @@ public:
         visitError(I);
 
       auto res = createXor(a, imm_val);
-      writeToReg(res);
+      writeToOutputReg(res);
       break;
     }
     case AArch64::EORWrs:
     case AArch64::EORXrs: {
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2, mc_inst.getOperand(3).getImm());
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
       auto result = createXor(lhs, rhs);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::CSINVWr:
@@ -2364,8 +2413,8 @@ public:
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isReg());
       assert(mc_inst.getOperand(3).isImm());
 
-      auto a = readFromReg(1);
-      auto b = readFromReg(2);
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
 
       auto cond_val_imm = mc_inst.getOperand(3).getImm();
       auto cond_val = evaluate_condition(cond_val_imm, MCBB);
@@ -2379,12 +2428,12 @@ public:
       if (opcode == AArch64::CSNEGWr || opcode == AArch64::CSNEGXr) {
         auto negated_b = createAdd(inverted_b, intconst(1, size));
         auto ret = createSelect(cond_val, a, negated_b);
-        writeToReg(ret);
+        writeToOutputReg(ret);
         break;
       }
 
       auto ret = createSelect(cond_val, a, inverted_b);
-      writeToReg(ret);
+      writeToOutputReg(ret);
       break;
     }
     case AArch64::CSINCWr:
@@ -2394,8 +2443,8 @@ public:
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isReg());
       assert(mc_inst.getOperand(3).isImm());
 
-      auto a = readFromReg(1);
-      auto b = readFromReg(2);
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
 
       auto cond_val_imm = mc_inst.getOperand(3).getImm();
       auto cond_val = evaluate_condition(cond_val_imm, MCBB);
@@ -2403,7 +2452,7 @@ public:
       auto inc = createAdd(b, intconst(1, ty->getIntegerBitWidth()));
       auto sel = createSelect(cond_val, a, inc);
 
-      writeToReg(sel);
+      writeToOutputReg(sel);
       break;
     }
     case AArch64::MOVZWi:
@@ -2411,10 +2460,10 @@ public:
       auto size = get_size(opcode);
       assert(mc_inst.getOperand(0).isReg());
       assert(mc_inst.getOperand(1).isImm());
-      auto lhs = readFromReg(1, mc_inst.getOperand(2).getImm());
+      auto lhs = readFromOperand(1, mc_inst.getOperand(2).getImm());
       auto rhs = intconst(0, size);
       auto ident = createAdd(lhs, rhs);
-      writeToReg(ident);
+      writeToOutputReg(ident);
       break;
     }
     case AArch64::MOVNWi:
@@ -2424,50 +2473,50 @@ public:
       assert(mc_inst.getOperand(1).isImm());
       assert(mc_inst.getOperand(2).isImm());
 
-      auto lhs = readFromReg(1, mc_inst.getOperand(2).getImm());
+      auto lhs = readFromOperand(1, mc_inst.getOperand(2).getImm());
       auto neg_one = intconst(-1, size);
       auto not_lhs = createXor(lhs, neg_one);
 
-      writeToReg(not_lhs);
+      writeToOutputReg(not_lhs);
       break;
     }
     case AArch64::LSLVWr:
     case AArch64::LSLVXr: {
       auto size = get_size(opcode);
       auto zero = intconst(0, size);
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2);
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2);
       auto exp = createFShl(lhs, zero, rhs);
-      writeToReg(exp);
+      writeToOutputReg(exp);
       break;
     }
     case AArch64::LSRVWr:
     case AArch64::LSRVXr: {
       auto size = get_size(opcode);
       auto zero = intconst(0, size);
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2);
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2);
       auto exp = createFShr(zero, lhs, rhs);
-      writeToReg(exp);
+      writeToOutputReg(exp);
       break;
     }
     case AArch64::ORNWrs:
     case AArch64::ORNXrs: {
       auto size = get_size(opcode);
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2, mc_inst.getOperand(3).getImm());
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
 
       auto neg_one = intconst(-1, size);
       auto not_rhs = createXor(rhs, neg_one);
       auto ident = createOr(lhs, not_rhs);
-      writeToReg(ident);
+      writeToOutputReg(ident);
       break;
     }
     case AArch64::MOVKWi:
     case AArch64::MOVKXi: {
       auto size = get_size(opcode);
-      auto dest = readFromReg(1);
-      auto lhs = readFromReg(2, mc_inst.getOperand(3).getImm());
+      auto dest = readFromOperand(1);
+      auto lhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
 
       uint64_t bitmask;
       auto shift_amt = mc_inst.getOperand(3).getImm();
@@ -2484,34 +2533,34 @@ public:
       auto bottom_bits = intconst(bitmask, size);
       auto cleared = createAnd(dest, bottom_bits);
       auto ident = createOr(cleared, lhs);
-      writeToReg(ident);
+      writeToOutputReg(ident);
       break;
     }
     case AArch64::UBFMWri:
     case AArch64::UBFMXri: {
       auto size = get_size(opcode);
-      auto src = readFromReg(1);
+      auto src = readFromOperand(1);
       auto immr = mc_inst.getOperand(2).getImm();
       auto imms = mc_inst.getOperand(3).getImm();
 
       // LSL is preferred when imms != 31 and imms + 1 == immr
       if (size == 32 && imms != 31 && imms + 1 == immr) {
         auto dst = createShl(src, intconst(31 - imms, size));
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
       // LSL is preferred when imms != 63 and imms + 1 == immr
       if (size == 64 && imms != 63 && imms + 1 == immr) {
         auto dst = createShl(src, intconst(63 - imms, size));
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
       // LSR is preferred when imms == 31 or 63 (size - 1)
       if (imms == size - 1) {
         auto dst = createLShr(src, intconst(immr, size));
-        writeToReg(dst);
+        writeToOutputReg(dst);
         return;
       }
 
@@ -2522,7 +2571,7 @@ public:
         auto mask = ((uint64_t)1 << (width)) - 1;
         auto masked = createAnd(src, intconst(mask, size));
         auto shifted = createShl(masked, intconst(pos, size));
-        writeToReg(shifted);
+        writeToOutputReg(shifted);
         return;
       }
 
@@ -2530,7 +2579,7 @@ public:
       if (immr == 0 && imms == 7) {
         auto mask = ((uint64_t)1 << 8) - 1;
         auto masked = createAnd(src, intconst(mask, size));
-        writeToReg(masked);
+        writeToOutputReg(masked);
         return;
       }
 
@@ -2538,7 +2587,7 @@ public:
       if (immr == 0 && imms == 15) {
         auto mask = ((uint64_t)1 << 16) - 1;
         auto masked = createAnd(src, intconst(mask, size));
-        writeToReg(masked);
+        writeToOutputReg(masked);
 	return;
       }
 
@@ -2552,15 +2601,15 @@ public:
 
       auto masked = createAnd(src, intconst(mask, size));
       auto shifted_res = createLShr(masked, intconst(pos, size));
-      writeToReg(shifted_res);
+      writeToOutputReg(shifted_res);
       return;
       // assert(false && "UBFX not supported");
     }
     case AArch64::BFMWri:
     case AArch64::BFMXri: {
       auto size = get_size(opcode);
-      auto dst = readFromReg(1);
-      auto src = readFromReg(2);
+      auto dst = readFromOperand(1);
+      auto src = readFromOperand(2);
 
       auto immr = mc_inst.getOperand(3).getImm();
       auto imms = mc_inst.getOperand(4).getImm();
@@ -2575,7 +2624,7 @@ public:
         auto shifted = createLShr(masked, intconst(pos, size));
         auto cleared = createAnd(dst, intconst((uint64_t)(-1) << bits, size));
         auto res = createOr(cleared, shifted);
-        writeToReg(res);
+        writeToOutputReg(res);
         return;
       }
 
@@ -2598,76 +2647,76 @@ public:
       auto masked = createAnd(dst, intconst(mask, size));
       // place the bitfield
       auto res = createOr(masked, moved);
-      writeToReg(res);
+      writeToOutputReg(res);
       return;
     }
     case AArch64::ORRWri:
     case AArch64::ORRXri: {
       auto size = get_size(opcode);
-      auto lhs = readFromReg(1);
+      auto lhs = readFromOperand(1);
       auto imm = mc_inst.getOperand(2).getImm();
       auto decoded = decodeLogicalImmediate(imm, size);
       auto result = createOr(lhs, intconst(decoded, size));
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::ORRWrs:
     case AArch64::ORRXrs: {
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2, mc_inst.getOperand(3).getImm());
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
       auto result = createOr(lhs, rhs);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::SDIVWr:
     case AArch64::SDIVXr: {
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2);
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2);
       auto result = createSDiv(lhs, rhs);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::UDIVWr:
     case AArch64::UDIVXr: {
-      auto lhs = readFromReg(1);
-      auto rhs = readFromReg(2);
+      auto lhs = readFromOperand(1);
+      auto rhs = readFromOperand(2);
       auto result = createUDiv(lhs, rhs);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::EXTRWrri:
     case AArch64::EXTRXrri: {
-      auto op1 = readFromReg(1);
-      auto op2 = readFromReg(2);
-      auto shift = readFromReg(3);
+      auto op1 = readFromOperand(1);
+      auto op2 = readFromOperand(2);
+      auto shift = readFromOperand(3);
       auto result = createFShr(op1, op2, shift);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::RORVWr:
     case AArch64::RORVXr: {
-      auto op = readFromReg(1);
-      auto shift = readFromReg(2);
+      auto op = readFromOperand(1);
+      auto shift = readFromOperand(2);
       auto result = createFShr(op, op, shift);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::RBITWr:
     case AArch64::RBITXr: {
-      auto op = readFromReg(1);
+      auto op = readFromOperand(1);
       auto result = createBitReverse(op);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::REVWr:
     case AArch64::REVXr:
-      revInst(readFromReg(1));
+      revInst(readFromOperand(1));
       break;
     case AArch64::CLZWr:
     case AArch64::CLZXr: {
-      auto op = readFromReg(1);
+      auto op = readFromOperand(1);
       auto result = createCtlz(op);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     case AArch64::EONWrs:
@@ -2682,8 +2731,8 @@ public:
       // EON:
       // return = op1 XOR NOT (optional shift) op2
 
-      auto op1 = readFromReg(1);
-      auto op2 = readFromReg(2);
+      auto op1 = readFromOperand(1);
+      auto op2 = readFromOperand(2);
 
       // If there is a shift to be performed on the second operand
       if (mc_inst.getNumOperands() == 4) {
@@ -2717,19 +2766,19 @@ public:
       //    no "S" instructions for EON
       if (has_s(opcode)) {
         // set n/z, clear c/v
-        set_n(ret);
-        set_z(ret);
-        cur_cs[MCBB] = intconst(0, 1);
-        cur_vs[MCBB] = intconst(0, 1);
+        setNUsingResult(ret);
+        setZUsingResult(ret);
+        setC(intconst(0, 1));
+        setV(intconst(0, 1));
       }
 
-      writeToReg(ret);
+      writeToOutputReg(ret);
       break;
     }
     case AArch64::REV16Xr: {
       // REV16Xr: Reverse bytes of 64 bit value in 16-bit half-words.
       auto size = get_size(opcode);
-      auto val = readFromReg(1);
+      auto val = readFromOperand(1);
       auto first_part = createShl(val, intconst(8, size));
       auto first_part_and =
           createAnd(first_part, intconst(0xFF00FF00FF00FF00UL, size));
@@ -2737,7 +2786,7 @@ public:
       auto second_part_and =
           createAnd(second_part, intconst(0x00FF00FF00FF00FFUL, size));
       auto combined_val = createOr(first_part_and, second_part_and);
-      writeToReg(combined_val);
+      writeToOutputReg(combined_val);
       break;
     }
     case AArch64::REV16Wr:
@@ -2745,21 +2794,21 @@ public:
       // REV16Wr: Reverse bytes of 32 bit value in 16-bit half-words.
       // REV32Xr: Reverse bytes of 64 bit value in 32-bit words.
       auto size = get_size(opcode);
-      auto val = readFromReg(1);
+      auto val = readFromOperand(1);
 
       // Reversing all of the bytes, then performing a rotation by half the
       // width reverses bytes in 16-bit halfwords for a 32 bit int and reverses
       // bytes in a 32-bit word for a 64 bit int
       auto reverse_val = createBSwap(val);
       auto ret = createFShr(reverse_val, reverse_val, intconst(size / 2, size));
-      writeToReg(ret);
+      writeToOutputReg(ret);
       break;
     }
     // assuming that the source is always an x register
     // This might not be the case but we need to look at the assembly emitter
     case AArch64::FMOVXDr: {
       // zero extended x register to 128 bits
-      auto val = readFromReg(1);
+      auto val = readFromOperand(1);
       const auto &cur_mc_instr = wrapper->getMCInst();
       auto &op_0 = cur_mc_instr.getOperand(0);
       auto q_reg_val = cur_vol_regs[MCBB][op_0.getReg()];
@@ -2769,7 +2818,7 @@ public:
       auto q_shift = createLShr(q_reg_val, intconst(64, 128));
       auto q_cleared = createShl(q_shift, intconst(64, 128));
       auto mov_res = createOr(q_cleared, val);
-      writeToReg(mov_res);
+      writeToOutputReg(mov_res);
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
@@ -2783,7 +2832,7 @@ public:
       assert((op_0.getReg() == op_1.getReg()) &&
              "this form of INSvi64gpr is not supported yet");
       auto op_index = cur_mc_instr.getOperand(2).getImm();
-      auto val = readFromReg(3);
+      auto val = readFromOperand(3);
       auto q_reg_val = cur_vol_regs[MCBB][op_0.getReg()];
       // FIXME make this a utility function that uses index and size
       auto mask = intconst(-1, 128);
@@ -2795,7 +2844,7 @@ public:
 
       auto q_cleared = createShl(q_reg_val, mask);
       auto mov_res = createAnd(q_cleared, val);
-      writeToReg(mov_res);
+      writeToOutputReg(mov_res);
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
@@ -2809,7 +2858,7 @@ public:
       auto stack_gep = getIdentifier(AArch64::SP, op_0.getReg());
       assert(stack_gep && "loaded identifier should not be null!");
       auto loaded_val = createLoad(i64, stack_gep);
-      writeToReg(loaded_val);
+      writeToOutputReg(loaded_val);
       break;
     }
     case AArch64::RET: {
@@ -2925,7 +2974,7 @@ public:
     }
     case AArch64::CBZW:
     case AArch64::CBZX: {
-      auto operand = readFromReg(0);
+      auto operand = readFromOperand(0);
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_EQ, operand,
@@ -2946,7 +2995,7 @@ public:
     }
     case AArch64::CBNZW:
     case AArch64::CBNZX: {
-      auto operand = readFromReg(0);
+      auto operand = readFromOperand(0);
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_NE, operand,
@@ -2971,7 +3020,7 @@ public:
     case AArch64::TBNZW:
     case AArch64::TBNZX: {
       auto size = get_size(opcode);
-      auto operand = readFromReg(0);
+      auto operand = readFromOperand(0);
       assert(operand != nullptr && "operand is null");
       auto bit_pos = mc_inst.getOperand(1).getImm();
       auto shift = createLShr(operand, intconst(bit_pos, size));
@@ -3019,7 +3068,7 @@ public:
       wrapper->print();
       auto p = make_pair(result, wrapper);
       lift_todo_phis.push_back(p);
-      writeToReg(result);
+      writeToOutputReg(result);
       break;
     }
     default:
@@ -3062,8 +3111,14 @@ public:
     }
     outs() << "done creating basic blocks.\n";
 
-    // setup BB so subsequent add_instr calls work
+    // default to adding instructions to the entry block
     CurrBB = sorted_bbs[0].first;
+  }
+
+  // create the storage associated with a register -- all of its
+  // asm-level aliases will get redirected here
+  void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
+    RegFile[Reg] = createAlloca(get_int_type(Width), intconst(1, 64), Name);
   }
 
   Function *run() {
@@ -3073,13 +3128,70 @@ public:
     
     auto Fn = Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage, 0,
                                MF.getName(), LiftedModule);
-
     outs() << "function name: '" << MF.getName() << "'" << "\n";
 
     vector<pair<BasicBlock *, MCBasicBlock *>> sorted_bbs;
     createBBs(sorted_bbs, *Fn);
 
+    // allocate storage for the main register file; FIXME not worrying
+    // about X29 and X30 -- code that touches them should trip out and
+    // we'll fix this later
+    for (unsigned Reg = AArch64::X0; Reg <= AArch64::X28; ++Reg) {
+      stringstream Name;
+      Name << "X" << Reg - AArch64::X0;
+      createRegStorage(Reg, 64, Name.str());
+    }
+    // initializing to zero makes loads from XZR work; stores are
+    // handled in writeToOutputReg()
+    createRegStorage(AArch64::XZR, 64, "XZR");
+    createStore(intconst(0, 64), RegFile[AArch64::XZR]);
+
+    // allocate storage for PSTATE
+    createRegStorage(AArch64::N, 1, "N");
+    createRegStorage(AArch64::Z, 1, "Z");
+    createRegStorage(AArch64::C, 1, "C");
+    createRegStorage(AArch64::V, 1, "V");
+    
+    // allocate storage for the stack
+ 
+    // store parameters into registers and stack slots
     unsigned argNum = 0;
+    for (auto &Arg : Fn->args()) {
+      auto operand = MCOperand::createReg(AArch64::X0 + argNum);
+      auto Reg = operand.getReg();
+      Value *V = createFreeze(&Arg, next_name(Reg, 1));
+
+      auto orig_width = orig_input_width[argNum];
+      // TODO maybe this is in a separate function
+      if (orig_width < 64) {
+        auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
+        auto orig_ty = get_int_type(orig_width);
+        V = createTrunc(V, orig_ty, next_name(Reg, 2));
+        if (orig_width == 1) {
+          V = createCast(V, i32, op,
+                              next_name(Reg, 3));
+          V =
+              createZExt(V, i64, next_name(Reg, 4));
+        } else {
+          if (orig_width < 32) {
+            V = createCast(V, i32, op,
+                                next_name(Reg, 3));
+            V = createZExt(V, i64,
+                                next_name(Reg, 4));
+          } else {
+            V = createCast(V, i64, op,
+                                next_name(Reg, 4));
+          }
+        }
+      }
+      // TODO also into stack slots
+      createStore(V, RegFile[Reg]);
+      argNum++;
+    }
+
+    // TODO vector registers
+
+    argNum = 0;
     for (auto &Arg : Fn->args()) {
       // generate names and values for the input arguments
       // FIXME this is pretty convoluted and needs to be cleaned up

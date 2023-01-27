@@ -109,7 +109,7 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   M2.get()->print(llvm::outs(), nullptr);
 
   if (opt_optimize_tgt) {
-    auto err = optimize_module(M2.get(), "Oz");
+    auto err = optimize_module(M2.get(), "O3");
     assert(err.empty());
   }
 
