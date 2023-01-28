@@ -1664,7 +1664,8 @@ class arm2llvm_ {
   void writeToOutputReg(Value *V, bool s = false) {
     auto Reg = wrapper->getMCInst().getOperand(0).getReg();
     cout << "output register = " << Reg << "\n";
-    
+
+    // important!
     if (Reg == AArch64::WZR || Reg == AArch64::XZR) {
       instructionCount++;
       return;
@@ -1712,10 +1713,18 @@ class arm2llvm_ {
 
     cond >>= 1;
 
+#if 0
     auto cur_v = retrieve_pstate(cur_vs, bb);
     auto cur_z = retrieve_pstate(cur_zs, bb);
     auto cur_n = retrieve_pstate(cur_ns, bb);
     auto cur_c = retrieve_pstate(cur_cs, bb);
+#else
+    auto i1 = get_int_type(1);
+    auto cur_v = createLoad(i1, getRegStorage(AArch64::V));
+    auto cur_z = createLoad(i1, getRegStorage(AArch64::Z));
+    auto cur_n = createLoad(i1, getRegStorage(AArch64::N));
+    auto cur_c = createLoad(i1, getRegStorage(AArch64::C));
+#endif
 
     assert(cur_v != nullptr && cur_z != nullptr && cur_n != nullptr &&
            cur_c != nullptr && "condition not initialized");
@@ -1780,39 +1789,43 @@ class arm2llvm_ {
     return res;
   }
 
-  void setV(Value *val) {
-    assert(val->getType()->getIntegerBitWidth() == 1);
-    cur_vs[MCBB] = val;
+  void setV(Value *V) {
+    assert(V->getType()->getIntegerBitWidth() == 1);
+    cur_vs[MCBB] = V;
+    createStore(V, getRegStorage(AArch64::V));
   }
 
-  void setZ(Value *val) {
-    assert(val->getType()->getIntegerBitWidth() == 1);
-    cur_zs[MCBB] = val;
+  void setZ(Value *V) {
+    assert(V->getType()->getIntegerBitWidth() == 1);
+    cur_zs[MCBB] = V;
+    createStore(V, getRegStorage(AArch64::Z));
   }
 
-  void setN(Value *val) {
-    assert(val->getType()->getIntegerBitWidth() == 1);
-    cur_ns[MCBB] = val;
+  void setN(Value *V) {
+    assert(V->getType()->getIntegerBitWidth() == 1);
+    cur_ns[MCBB] = V;
+    createStore(V, getRegStorage(AArch64::N));
   }
 
-  void setC(Value *val) {
-    assert(val->getType()->getIntegerBitWidth() == 1);
-    cur_cs[MCBB] = val;
+  void setC(Value *V) {
+    assert(V->getType()->getIntegerBitWidth() == 1);
+    cur_cs[MCBB] = V;
+    createStore(V, getRegStorage(AArch64::C));
   }
 
-  void setZUsingResult(Value *val) {
-    auto W = val->getType()->getIntegerBitWidth();
+  void setZUsingResult(Value *V) {
+    auto W = V->getType()->getIntegerBitWidth();
     assert(W == 32 || W == 64);
     auto zero = intconst(0, W);
-    auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, val, zero);
+    auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, V, zero);
     setZ(z);
   }
 
-  void setNUsingResult(Value *val) {
-    auto W = val->getType()->getIntegerBitWidth();
+  void setNUsingResult(Value *V) {
+    auto W = V->getType()->getIntegerBitWidth();
     assert(W == 32 || W == 64);
     auto zero = intconst(0, W);
-    auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, val, zero);
+    auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, V, zero);
     setN(n);
   }
 
@@ -1825,12 +1838,12 @@ public:
         instructionCount(0), curId(0) {}
 
 #if 1
-  void revInst(Value *v) {
-    writeToOutputReg(createBSwap(v));
+  void revInst(Value *V) {
+    writeToOutputReg(createBSwap(V));
   }
 #else
   #include "code0.cpp"
-  void revInst(Value *v) {
+  void revInst(Value *V) {
     auto w = v->getType()->getIntegerBitWidth();
     assert(w == 32 || w == 64);
     return revInst_0(v);
