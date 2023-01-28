@@ -1520,9 +1520,6 @@ class arm2llvm_ {
   }
 
   CastInst *createZExt(Value *v, Type *t, const string &NameStr = "") {
-    auto w1 = v->getType()->getIntegerBitWidth();
-    auto w2 = t->getIntegerBitWidth();
-    outs() << "zexting from " << w1 << " to " << w2 << "\n";
     return CastInst::Create(Instruction::ZExt, v, t,
                             (NameStr == "") ? next_name() : NameStr, CurrBB);
   }
@@ -1560,7 +1557,7 @@ class arm2llvm_ {
   }
 
   // return pointer to the backing store for a register, doing the
-  // required de-aliasing
+  // necessary de-aliasing
   Value *getRegStorage(unsigned Reg) {
     // FIXME do this better?
     unsigned WideReg = Reg;
