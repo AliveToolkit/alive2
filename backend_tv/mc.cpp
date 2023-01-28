@@ -3665,50 +3665,6 @@ public:
   }
 };
 
-// Return variables that are read before being written in the basic block
-[[maybe_unused]] auto FindReadBeforeWritten(vector<MCInst> &instrs,
-                                            MCInstrAnalysis *Ana_ptr) {
-  unordered_set<MCOperand, MCOperandHash, MCOperandEqual> reads;
-  unordered_set<MCOperand, MCOperandHash, MCOperandEqual> writes;
-  // TODO for writes, should only apply to instructions that update a
-  // destination register
-  for (auto &I : instrs) {
-    if (Ana_ptr->isReturn(I))
-      continue;
-    assert(I.getNumOperands() > 0 && "MCInst with zero operands");
-    for (unsigned j = 1; j < I.getNumOperands(); ++j) {
-      if (!writes.contains(I.getOperand(j)))
-        reads.insert(I.getOperand(j));
-    }
-    writes.insert(I.getOperand(0));
-  }
-
-  return reads;
-}
-
-// Return variable that are read before being written in the basicblock
-[[maybe_unused]] auto FindReadBeforeWritten(MCBasicBlock &block,
-                                            MCInstrAnalysis *Ana_ptr) {
-  auto mcInstrs = block.getInstrs();
-  unordered_set<MCOperand, MCOperandHash, MCOperandEqual> reads;
-  unordered_set<MCOperand, MCOperandHash, MCOperandEqual> writes;
-  // TODO for writes, should only apply to instructions that update a
-  // destination register
-  for (auto &WI : mcInstrs) {
-    auto &I = WI.getMCInst();
-    if (Ana_ptr->isReturn(I))
-      continue;
-    assert(I.getNumOperands() > 0 && "MCInst with zero operands");
-    for (unsigned j = 1; j < I.getNumOperands(); ++j) {
-      if (!writes.contains(I.getOperand(j)))
-        reads.insert(I.getOperand(j));
-    }
-    writes.insert(I.getOperand(0));
-  }
-
-  return reads;
-}
-
 } // namespace
 
 namespace lifter {
