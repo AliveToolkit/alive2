@@ -426,9 +426,9 @@ class MCFunction {
   vector<MCOperand> fn_args;
 
 public:
-  MCInstrAnalysis *Ana_ptr;
-  MCInstPrinter *IP_ptr;
-  MCRegisterInfo *MRI_ptr;
+  MCInstrAnalysis *IA;
+  MCInstPrinter *IP;
+  MCRegisterInfo *MRI;
   vector<MCBasicBlock> BBs;
   unordered_map<MCBasicBlock *, BlockSetTy> dom_tree_inv;
 
@@ -478,8 +478,8 @@ public:
     for (unsigned i = 0; i < BBs.size(); ++i) {
       auto &cur_bb = BBs[i];
       auto &last_mc_instr = cur_bb.getInstrs().back();
-      if (Ana_ptr->isConditionalBranch(last_mc_instr.getMCInst()) ||
-          Ana_ptr->isUnconditionalBranch(last_mc_instr.getMCInst())) {
+      if (IA->isConditionalBranch(last_mc_instr.getMCInst()) ||
+          IA->isUnconditionalBranch(last_mc_instr.getMCInst())) {
         string target = last_mc_instr.findTargetLabel();
         if (target == first_block.getName()) {
           add_entry_block = true;
@@ -633,10 +633,10 @@ public:
         // need to check for special instructions like ret and branch
         // need to check for special destination operands like WZR
 
-        if (Ana_ptr->isCall(mc_instr))
+        if (IA->isCall(mc_instr))
           report_fatal_error("Function calls not supported yet");
 
-        if (Ana_ptr->isReturn(mc_instr) || Ana_ptr->isBranch(mc_instr)) {
+        if (IA->isReturn(mc_instr) || IA->isBranch(mc_instr)) {
           continue;
         }
 
@@ -667,7 +667,7 @@ public:
     // temp for debugging
     for (auto &[var, blockSet] : defs) {
       outs() << "defs for \n";
-      var.print(outs(), MRI_ptr);
+      var.print(outs(), MRI);
       outs() << "\n";
       for (auto &block : blockSet) {
         outs() << block->getName() << ",";
@@ -700,7 +700,7 @@ public:
     for (auto &[block, varSet] : phis) {
       outs() << "phis for: " << block->getName() << "\n";
       for (auto &var : varSet) {
-        var.print(outs(), MRI_ptr);
+        var.print(outs(), MRI);
         outs() << "\n";
       }
       outs() << "-------------\n";
@@ -724,7 +724,7 @@ public:
     // temp for debugging
     outs() << "printing fn_args\n";
     for (auto &arg : fn_args) {
-      arg.print(outs(), MRI_ptr);
+      arg.print(outs(), MRI);
       outs() << "\n";
     }
   }
@@ -762,7 +762,7 @@ public:
           // encountered
           string buff;
           raw_string_ostream str_stream(buff);
-          op.print(str_stream, MRI_ptr);
+          op.print(str_stream, MRI);
           stringstream error_msg;
           error_msg << "Unsupported registers detected in the Assembly: "
                     << str_stream.str();
@@ -786,7 +786,7 @@ public:
 
     outs() << "printing fn_args after rewrite\n";
     for (auto &arg : fn_args) {
-      arg.print(outs(), MRI_ptr);
+      arg.print(outs(), MRI);
       outs() << "\n";
     }
 
@@ -807,7 +807,7 @@ public:
     //                           s) {
     //   for (auto &[var, stack_vec] : s) {
     //     outs() << "stack for ";
-    //     var.print(outs(), MRI_ptr);
+    //     var.print(outs(), MRI);
     //     outs() << "\n";
     //     for (auto &stack_item : stack_vec) {
     //       outs() << stack_item << ",";
@@ -838,7 +838,7 @@ public:
         MCInst new_phi_instr;
         new_phi_instr.setOpcode(AArch64::PHI);
         new_phi_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
-        new_phi_instr.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        new_phi_instr.dump_pretty(outs(), IP, " ", MRI);
 
         MCInstWrapper new_w_instr(new_phi_instr);
         block->addInstBegin(std::move(new_w_instr));
@@ -865,7 +865,7 @@ public:
           continue;
         }
 
-        // mc_instr.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        // mc_instr.dump_pretty(outs(), IP, " ", MRI);
         // outs() << "\n";
         // outs() << "printing stack\n";
         // printStack(stack);
@@ -889,7 +889,7 @@ public:
           if (op.getReg() == AArch64::WZR || op.getReg() == AArch64::XZR)
             continue;
 
-          op.print(outs(), MRI_ptr);
+          op.print(outs(), MRI);
           outs() << "\n";
 
           auto &arg_id = stack[op][0];
@@ -901,7 +901,7 @@ public:
 
         outs() << "renaming dst\n";
         auto &dst_op = mc_instr.getOperand(0);
-        dst_op.print(outs(), MRI_ptr);
+        dst_op.print(outs(), MRI);
         auto dst_id = pushFresh(dst_op);
         w_instr.setOpId(0, dst_id);
         outs() << "\n";
@@ -914,7 +914,7 @@ public:
 
         for (auto &phi_var : phis[s_block]) {
           if (stack.find(phi_var) == stack.end()) {
-            phi_var.print(outs(), MRI_ptr);
+            phi_var.print(outs(), MRI);
             assert(false && "phi var not in stack");
           }
           assert(stack[phi_var].size() > 0 && "phi var stack empty");
@@ -1065,7 +1065,7 @@ public:
     for (auto &block : BBs) {
       outs() << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-        inst.getMCInst().dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        inst.getMCInst().dump_pretty(outs(), IP, " ", MRI);
         outs() << '\n';
       }
       i++;
@@ -3292,9 +3292,9 @@ private:
   MCBasicBlock *temp_block{nullptr};
   bool first_label{true};
   unsigned prev_line{0};
-  MCInstrAnalysis *Ana_ptr;
-  MCInstPrinter *IP_ptr;
-  MCRegisterInfo *MRI_ptr;
+  MCInstrAnalysis *IA;
+  MCInstPrinter *IP;
+  MCRegisterInfo *MRI;
 
 public:
   MCFunction MF;
@@ -3304,13 +3304,13 @@ public:
              // which makes it unused after fixing MCInstWrapper::print
   using BlockSetTy = SetVector<MCBasicBlock *>;
 
-  MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_Ana_ptr,
-                    MCInstPrinter *_IP_ptr, MCRegisterInfo *_MRI_ptr)
-      : MCStreamer(Context), Ana_ptr(_Ana_ptr), IP_ptr(_IP_ptr),
-        MRI_ptr(_MRI_ptr) {
-    MF.Ana_ptr = Ana_ptr;
-    MF.IP_ptr = IP_ptr;
-    MF.MRI_ptr = MRI_ptr;
+  MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_IA,
+                    MCInstPrinter *_IP, MCRegisterInfo *_MRI)
+      : MCStreamer(Context), IA(_IA), IP(_IP),
+        MRI(_MRI) {
+    MF.IA = IA;
+    MF.IP = IP;
+    MF.MRI = MRI;
   }
 
   // We only want to intercept the emission of new instructions.
@@ -3326,7 +3326,7 @@ public:
     temp_block->addInst(Cur_Inst);
     Insts.push_back(Inst);
 
-    if (Ana_ptr->isTerminator(Inst)) {
+    if (IA->isTerminator(Inst)) {
       prev_line = ASMLine::terminator;
     } else {
       prev_line = ASMLine::non_term_instr;
@@ -3348,14 +3348,14 @@ public:
     }
 
     outs() << cnt++ << "  : ";
-    Inst.dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
-    if (Ana_ptr->isBranch(Inst))
+    Inst.dump_pretty(outs(), IP, " ", MRI);
+    if (IA->isBranch(Inst))
       outs() << ": branch ";
-    if (Ana_ptr->isConditionalBranch(Inst))
+    if (IA->isConditionalBranch(Inst))
       outs() << ": conditional branch ";
-    if (Ana_ptr->isUnconditionalBranch(Inst))
+    if (IA->isUnconditionalBranch(Inst))
       outs() << ": unconditional branch ";
-    if (Ana_ptr->isTerminator(Inst))
+    if (IA->isTerminator(Inst))
       outs() << ": terminator ";
     outs() << "\n";
   }
@@ -3533,22 +3533,22 @@ public:
       // with no predecessors. This is hacky because I don't know the API to
       // create and MCExpr and have to create a branch with an immediate operand
       // instead
-      if (i == 0 && (Ana_ptr->isUnconditionalBranch(last_mc_instr)) &&
+      if (i == 0 && (IA->isUnconditionalBranch(last_mc_instr)) &&
           last_mc_instr.getOperand(0).isImm()) {
         cur_bb.addSucc(next_bb_ptr);
         continue;
       }
-      if (Ana_ptr->isConditionalBranch(last_mc_instr)) {
+      if (IA->isConditionalBranch(last_mc_instr)) {
         string target = findTargetLabel(last_mc_instr);
         auto target_bb = MF.findBlockByName(target);
         cur_bb.addSucc(target_bb);
         if (next_bb_ptr)
           cur_bb.addSucc(next_bb_ptr);
-      } else if (Ana_ptr->isUnconditionalBranch(last_mc_instr)) {
+      } else if (IA->isUnconditionalBranch(last_mc_instr)) {
         string target = findTargetLabel(last_mc_instr);
         auto target_bb = MF.findBlockByName(target);
         cur_bb.addSucc(target_bb);
-      } else if (Ana_ptr->isReturn(last_mc_instr)) {
+      } else if (IA->isReturn(last_mc_instr)) {
         continue;
       } else if (next_bb_ptr) {
         // add edge to next block
@@ -3582,7 +3582,7 @@ public:
     for (auto &block : MF.BBs) {
       outs() << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-        inst.getMCInst().dump_pretty(outs(), IP_ptr, " ", MRI_ptr);
+        inst.getMCInst().dump_pretty(outs(), IP, " ", MRI);
         outs() << '\n';
       }
       i++;

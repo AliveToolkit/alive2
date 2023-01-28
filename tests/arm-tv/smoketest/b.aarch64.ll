@@ -1,5 +1,5 @@
 ; TEST-ARGS: --disable-undef-input --disable-poison-input
 
-define i64 @f(i64 %a) {
-  ret i64 %a
+define i5 @f(i5 %a) {
+  ret i5 %a
 }
