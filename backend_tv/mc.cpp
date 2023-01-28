@@ -1079,28 +1079,6 @@ unordered_map<MCOperand, unique_ptr<StructType *>, MCOperandHash,
               MCOperandEqual>
     overflow_aggregate_types;
 vector<unique_ptr<VectorType *>> lifted_vector_types;
-// unsigned type_id_counter{0};
-
-// IR::Type *uadd_overflow_type(MCOperand op, int size) {
-//   assert(op.isReg());
-//
-//   auto p = overflow_aggregate_types.try_emplace(op);
-//   auto &st = p.first->second;
-//   vector<IR::Type *> elems;
-//   vector<bool> is_padding{false, false, true};
-//
-//   if (p.second) {
-//     auto add_res_ty = &llvm_util::get_int_type(size);
-//     auto add_ov_ty = &llvm_util::get_int_type(1);
-//     auto padding_ty = &llvm_util::get_int_type(24);
-//     elems.push_back(add_res_ty);
-//     elems.push_back(add_ov_ty);
-//     elems.push_back(padding_ty);
-//     st = make_unique<IR::StructType>("ty_" + to_string(type_id_counter++),
-//                                  std::move(elems), std::move(is_padding));
-//   }
-//   return st.get();
-// }
 
 // Add IR value to cache
 void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
@@ -1255,13 +1233,13 @@ class arm2llvm_ {
 
   map<unsigned, Value *> RegFile;
 
-  Type *get_int_type(int bits) {
+  Type *getIntTy(int bits) {
     // just trying to catch silly errors
     assert(bits > 0 && bits <= 129);
     return Type::getIntNTy(LLVMCtx, bits);
   }
 
-  Value *intconst(uint64_t val, int bits) {
+  Value *getIntConst(uint64_t val, int bits) {
     return ConstantInt::get(LLVMCtx, llvm::APInt(bits, val));
   }
 
@@ -1276,14 +1254,14 @@ class arm2llvm_ {
     exit(-1); // FIXME handle this better
   }
 
-  int get_size(int instr) {
+  int getInstSize(int instr) {
     if (instrs_32.contains(instr))
       return 32;
     if (instrs_64.contains(instr))
       return 64;
     if (instrs_128.contains(instr))
       return 128;
-    outs() << "get_size encountered unknown instruction"
+    outs() << "getInstSize encountered unknown instruction"
            << "\n";
     visitError(*wrapper);
     UNREACHABLE();
@@ -1312,17 +1290,17 @@ class arm2llvm_ {
       // ROR shift
       return createFShr(
           value, value,
-          intconst(encodedShift & 0x3f, typ->getIntegerBitWidth()));
+          getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth()));
     default:
       // FIXME: handle other case (msl)
       report_fatal_error("shift type not supported");
     }
     return createBinop(
-        value, intconst(encodedShift & 0x3f, typ->getIntegerBitWidth()), op);
+        value, getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth()), op);
   }
 
   Value *reg_shift(int value, int size, int encodedShift) {
-    return reg_shift(intconst(value, size), encodedShift);
+    return reg_shift(getIntConst(value, size), encodedShift);
   }
 
   Value *getIdentifier(unsigned reg, unsigned id) {
@@ -1433,7 +1411,7 @@ class arm2llvm_ {
   CallInst *createCtlz(Value *v) {
     auto *decl =
         Intrinsic::getDeclaration(LiftedModule, Intrinsic::ctlz, v->getType());
-    return CallInst::Create(decl, {v, intconst(0, 1)}, next_name(), CurrBB);
+    return CallInst::Create(decl, {v, getIntConst(0, 1)}, next_name(), CurrBB);
   }
 
   CallInst *createBSwap(Value *v) {
@@ -1522,12 +1500,12 @@ class arm2llvm_ {
                        const string &NameStr = "") {
     assert(n1 > n2);
     if (n2 == 0) {
-      auto *ty = get_int_type(1 + n1);
+      auto *ty = getIntTy(1 + n1);
       return createTrunc(v, ty);
     } else {
       auto *shift =
-          createLShr(v, intconst(n2, v->getType()->getIntegerBitWidth()));
-      auto *ty = get_int_type(1 + n1 - n2);
+          createLShr(v, getIntConst(n2, v->getType()->getIntegerBitWidth()));
+      auto *ty = getIntTy(1 + n1 - n2);
       return createTrunc(shift, ty);
     }
   }
@@ -1601,41 +1579,18 @@ class arm2llvm_ {
   Value *readFromOperand(int idx, int shift = 0) {
     auto inst = wrapper->getMCInst();
     auto op = inst.getOperand(idx);
-    auto size = get_size(inst.getOpcode());
+    auto size = getInstSize(inst.getOpcode());
     assert(size == 32 || size == 64);
 
     Value *V = nullptr;
     if (op.isImm()) {
-      V = intconst(op.getImm(), size);
+      V = getIntConst(op.getImm(), size);
     } else {
       assert(op.isReg());
-      auto Reg = op.getReg();
-
-#if 0
-      auto ty = get_int_type(size);
-      if (Reg == AArch64::XZR) {
-	V = intconst(0, 64);
-      } else if (Reg == AArch64::WZR) {
-	V = intconst(0, 32);
-      } else if (size == 128) { // FIXME this needs to be generalized
-	auto tmp = getIdentifier(Reg, wrapper->getOpId(idx));
-	V = createZExt(tmp, ty);
-      } else if (size == 64) {
-	V = getIdentifier(Reg, wrapper->getOpId(idx));
-      } else if (size == 32) {
-	auto tmp = getIdentifier(Reg, wrapper->getOpId(idx));
-	V = createTrunc(tmp, ty);
-      } else {
-	assert(false && "unhandled case in get_value*");
-      }
-#else
-      auto RegAddr = getRegStorage(Reg);
-      Value *VV = createLoad(get_int_type(64), RegAddr);
-      assert(VV);
+      auto RegAddr = getRegStorage(op.getReg());
+      V = createLoad(getIntTy(64), RegAddr);
       if (size == 32)
-        VV = createTrunc(VV, get_int_type(32));
-      V = VV;
-#endif
+        V = createTrunc(V, getIntTy(32));
     }
 
     if (shift != 0)
@@ -1664,18 +1619,18 @@ class arm2llvm_ {
 
     auto W = V->getType()->getIntegerBitWidth();
     if (W != 64 && W != 128) {
-      size_t regSize = get_size(wrapper->getMCInst().getOpcode());
+      size_t regSize = getInstSize(wrapper->getMCInst().getOpcode());
       assert(regSize == 32 || regSize == 64);
 
       // if the s flag is set, the value is smaller than 32 bits, and
       // the register we are storing it in _is_ 32 bits, we sign
       // extend to 32 bits before zero-extending to 64
       if (s && regSize == 32 && W < 32) {
-        V = createSExt(V, get_int_type(32));
-        V = createZExt(V, get_int_type(64));
+        V = createSExt(V, getIntTy(32));
+        V = createZExt(V, getIntTy(64));
       } else {
         auto op = s ? Instruction::SExt : Instruction::ZExt;
-        V = createCast(V, get_int_type(64), op);
+        V = createCast(V, getIntTy(64), op);
       }
     }
     add_identifier(V);
@@ -1683,23 +1638,19 @@ class arm2llvm_ {
   }
 
   Value *getV() {
-    auto i1 = get_int_type(1);
-    return createLoad(i1, getRegStorage(AArch64::V));
+    return createLoad(getIntTy(1), getRegStorage(AArch64::V));
   }
 
   Value *getZ() {
-    auto i1 = get_int_type(1);
-    return createLoad(i1, getRegStorage(AArch64::Z));
+    return createLoad(getIntTy(1), getRegStorage(AArch64::Z));
   }
 
   Value *getN() {
-    auto i1 = get_int_type(1);
-    return createLoad(i1, getRegStorage(AArch64::N));
+    return createLoad(getIntTy(1), getRegStorage(AArch64::N));
   }
 
   Value *getC() {
-    auto i1 = get_int_type(1);
-    return createLoad(i1, getRegStorage(AArch64::C));
+    return createLoad(getIntTy(1), getRegStorage(AArch64::C));
   }
 
   Value *evaluate_condition(uint64_t cond, MCBasicBlock *bb) {
@@ -1733,10 +1684,10 @@ class arm2llvm_ {
              "HI/LS requires C and Z bits to be generated");
       // C == 1
       auto c_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, intconst(1, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, getIntConst(1, 1));
       // Z == 0
       auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, intconst(0, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
       // C == 1 && Z == 0
       res = createAnd(c_cond, z_cond);
       break;
@@ -1753,12 +1704,12 @@ class arm2llvm_ {
              "GT/LE requires N, V and Z bits to be generated");
       auto n_eq_v = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
       auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, intconst(0, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
       res = createAnd(n_eq_v, z_cond);
       break;
     }
     case 7:
-      res = intconst(1, 1);
+      res = getIntConst(1, 1);
       break;
     default:
       assert(false && "invalid condition code");
@@ -1768,7 +1719,7 @@ class arm2llvm_ {
     assert(res != nullptr && "condition code was not generated");
 
     if (invert_bit)
-      res = createXor(res, intconst(1, 1));
+      res = createXor(res, getIntConst(1, 1));
 
     return res;
   }
@@ -1796,7 +1747,7 @@ class arm2llvm_ {
   void setZUsingResult(Value *V) {
     auto W = V->getType()->getIntegerBitWidth();
     assert(W == 32 || W == 64);
-    auto zero = intconst(0, W);
+    auto zero = getIntConst(0, W);
     auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, V, zero);
     setZ(z);
   }
@@ -1804,7 +1755,7 @@ class arm2llvm_ {
   void setNUsingResult(Value *V) {
     auto W = V->getType()->getIntegerBitWidth();
     assert(W == 32 || W == 64);
-    auto zero = intconst(0, W);
+    auto zero = getIntConst(0, W);
     auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, V, zero);
     setN(n);
   }
@@ -1836,12 +1787,12 @@ public:
     wrapper = &I;
     curId = 0;
 
-    auto i1 = get_int_type(1);
-    auto i8 = get_int_type(8);
-    auto i16 = get_int_type(16);
-    auto i32 = get_int_type(32);
-    auto i64 = get_int_type(64);
-    auto i128 = get_int_type(128);
+    auto i1 = getIntTy(1);
+    auto i8 = getIntTy(8);
+    auto i16 = getIntTy(16);
+    auto i32 = getIntTy(32);
+    auto i64 = getIntTy(64);
+    auto i128 = getIntTy(128);
 
     switch (opcode) {
     case AArch64::ADDWrs:
@@ -1864,8 +1815,8 @@ public:
       case AArch64::ADDSWrx:
       case AArch64::ADDXrx:
       case AArch64::ADDSXrx: {
-        auto size = get_size(opcode);
-        auto ty = get_int_type(size);
+        auto size = getInstSize(opcode);
+        auto ty = getIntTy(size);
         auto extendImm = mc_inst.getOperand(3).getImm();
         auto extendType = ((extendImm >> 3) & 0x7);
 
@@ -1888,7 +1839,7 @@ public:
         // a 32 bit value. This is seen as a type error by LLVM, but is valid
         // ARM
         if (extendSize != (unsigned)size) {
-          auto truncType = get_int_type(extendSize);
+          auto truncType = getIntTy(extendSize);
           b = createTrunc(b, truncType);
           b = createCast(b, ty,
                          isSigned ? Instruction::SExt : Instruction::ZExt);
@@ -1896,7 +1847,7 @@ public:
 
         // shift may not be there, it may just be the extend
         if (shift != 0)
-          b = createShl(b, intconst(shift, size));
+          b = createShl(b, getIntConst(shift, size));
         break;
       }
       default:
@@ -1926,15 +1877,15 @@ public:
     case AArch64::ADCWr:
     case AArch64::ADCSXr:
     case AArch64::ADCSWr: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
 
       auto a = readFromOperand(1);
       auto b = readFromOperand(2);
 
       // Deal with size+1 bit integers so that we can easily calculate the c/v
       // PSTATE bits.
-      auto tyPlusOne = get_int_type(size + 1);
+      auto tyPlusOne = getIntTy(size + 1);
 
       auto carry = createZExt(getZ(), tyPlusOne);
       auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
@@ -1946,8 +1897,8 @@ public:
         // Mask off the sign bit. We could mask with an AND, but APInt semantics
         // might be weird since we're passing in an uint64_t but we'll want a 65
         // bit int
-        auto masked = createLShr(createShl(withCarry, intconst(1, size + 1)),
-                                 intconst(1, size + 1));
+        auto masked = createLShr(createShl(withCarry, getIntConst(1, size + 1)),
+                                 getIntConst(1, size + 1));
 
         auto sAdd =
             createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
@@ -1963,11 +1914,11 @@ public:
     }
     case AArch64::ASRVWr:
     case AArch64::ASRVXr: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto a = readFromOperand(1);
       auto b = readFromOperand(2);
 
-      auto shift_amt = createBinop(b, intconst(size, size), Instruction::URem);
+      auto shift_amt = createBinop(b, getIntConst(size, size), Instruction::URem);
       auto res = createAShr(a, shift_amt);
       writeToOutputReg(res);
       break;
@@ -1998,8 +1949,8 @@ public:
     case AArch64::SUBSXrs:
     case AArch64::SUBSXri:
     case AArch64::SUBSXrx: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       assert(mc_inst.getNumOperands() == 4); // dst, lhs, rhs, shift amt
       assert(mc_inst.getOperand(3).isImm());
 
@@ -2027,7 +1978,7 @@ public:
         // a 32 bit value. This is seen as a type error by LLVM, but is valid
         // ARM
         if (extendSize != ty->getIntegerBitWidth()) {
-          auto truncType = get_int_type(extendSize);
+          auto truncType = getIntTy(extendSize);
           b = createTrunc(b, truncType);
           b = createCast(b, ty,
                          isSigned ? Instruction::SExt : Instruction::ZExt);
@@ -2035,7 +1986,7 @@ public:
 
         // shift may not be there, it may just be the extend
         if (shift != 0)
-          b = createShl(b, intconst(shift, size));
+          b = createShl(b, getIntConst(shift, size));
         break;
       }
       default:
@@ -2063,8 +2014,8 @@ public:
     }
     case AArch64::CSELWr:
     case AArch64::CSELXr: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       assert(mc_inst.getNumOperands() == 4); // dst, lhs, rhs, cond
       // TODO decode condition and find the approprate cond val
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isReg());
@@ -2095,11 +2046,11 @@ public:
     case AArch64::ANDSXri:
     case AArch64::ANDSXrr:
     case AArch64::ANDSXrs: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       Value *rhs = nullptr;
       if (mc_inst.getOperand(2).isImm()) {
         auto imm = decodeLogicalImmediate(mc_inst.getOperand(2).getImm(), size);
-        rhs = intconst(imm, size);
+        rhs = getIntConst(imm, size);
       } else {
         rhs = readFromOperand(2);
       }
@@ -2116,8 +2067,8 @@ public:
       if (has_s(opcode)) {
         setNUsingResult(and_op);
         setZUsingResult(and_op);
-        setC(intconst(0, 1));
-        setV(intconst(0, 1));
+        setC(getIntConst(0, 1));
+        setV(getIntConst(0, 1));
       }
 
       writeToOutputReg(and_op);
@@ -2135,13 +2086,13 @@ public:
       break;
     }
     case AArch64::UMADDLrrr: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto mul_lhs = readFromOperand(1, 0);
       auto mul_rhs = readFromOperand(2, 0);
       auto addend = readFromOperand(3, 0);
 
-      auto lhs_masked = createAnd(mul_lhs, intconst(0xffffffffUL, size));
-      auto rhs_masked = createAnd(mul_rhs, intconst(0xffffffffUL, size));
+      auto lhs_masked = createAnd(mul_lhs, getIntConst(0xffffffffUL, size));
+      auto rhs_masked = createAnd(mul_rhs, getIntConst(0xffffffffUL, size));
       auto mul = createMul(lhs_masked, rhs_masked);
       auto add = createAdd(mul, addend);
       writeToOutputReg(add);
@@ -2172,19 +2123,19 @@ public:
     }
     case AArch64::SMSUBLrrr:
     case AArch64::UMSUBLrrr: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       // SMSUBL: Signed Multiply-Subtract Long.
       // UMSUBL: Unsigned Multiply-Subtract Long.
       Value *mul_lhs = nullptr;
       Value *mul_rhs = nullptr;
       if (wrapper->getMCInst().getOperand(1).getReg() == AArch64::WZR) {
-        mul_lhs = intconst(0, size);
+        mul_lhs = getIntConst(0, size);
       } else {
         mul_lhs = readFromOperand(1, 0);
       }
 
       if (wrapper->getMCInst().getOperand(2).getReg() == AArch64::WZR) {
-        mul_rhs = intconst(0, size);
+        mul_rhs = getIntConst(0, size);
       } else {
         mul_rhs = readFromOperand(2, 0);
       }
@@ -2235,7 +2186,7 @@ public:
       auto mul = createMul(lhs_extended, rhs_extended);
       // After multiplying, shift down 64 bits to get the top half of the i128
       // into the bottom half
-      auto shift = createLShr(mul, intconst(64, 128));
+      auto shift = createLShr(mul, getIntConst(64, 128));
 
       // Truncate to the proper size:
       auto trunc = createTrunc(shift, i64);
@@ -2254,14 +2205,14 @@ public:
     }
     case AArch64::SBFMWri:
     case AArch64::SBFMXri: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       auto src = readFromOperand(1);
       auto immr = mc_inst.getOperand(2).getImm();
       auto imms = mc_inst.getOperand(3).getImm();
 
-      auto r = intconst(immr, size);
-      //      auto s = intconst(imms, size);
+      auto r = getIntConst(immr, size);
+      //      auto s = getIntConst(imms, size);
 
       // arithmetic shift right (ASR) alias is perferred when:
       // imms == 011111 and size == 32 or when imms == 111111 and size = 64
@@ -2302,13 +2253,13 @@ public:
         auto mask = ((uint64_t)1 << (width)) - 1;
         auto bitfield_mask = (uint64_t)1 << (width - 1);
 
-        auto masked = createAnd(src, intconst(mask, size));
-        auto bitfield_lsb = createAnd(src, intconst(bitfield_mask, size));
-        auto insert_ones = createOr(masked, intconst(~mask, size));
+        auto masked = createAnd(src, getIntConst(mask, size));
+        auto bitfield_lsb = createAnd(src, getIntConst(bitfield_mask, size));
+        auto insert_ones = createOr(masked, getIntConst(~mask, size));
         auto bitfield_lsb_set = createICmp(ICmpInst::Predicate::ICMP_NE,
-                                           bitfield_lsb, intconst(0, size));
+                                           bitfield_lsb, getIntConst(0, size));
         auto res = createSelect(bitfield_lsb_set, insert_ones, masked);
-        auto shifted_res = createShl(res, intconst(pos, size));
+        auto shifted_res = createShl(res, getIntConst(pos, size));
         writeToOutputReg(shifted_res);
         return;
       }
@@ -2318,10 +2269,10 @@ public:
       auto mask = ((uint64_t)1 << (width)) - 1;
       auto pos = immr;
 
-      auto masked = createAnd(src, intconst(mask, size));
-      auto l_shifted = createShl(masked, intconst(size - width, size));
+      auto masked = createAnd(src, getIntConst(mask, size));
+      auto l_shifted = createShl(masked, getIntConst(size - width, size));
       auto shifted_res =
-          createAShr(l_shifted, intconst(size - width + pos, size));
+          createAShr(l_shifted, getIntConst(size - width + pos, size));
       writeToOutputReg(shifted_res);
       return;
     }
@@ -2329,8 +2280,8 @@ public:
     case AArch64::CCMPWr:
     case AArch64::CCMPXi:
     case AArch64::CCMPXr: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       assert(mc_inst.getNumOperands() == 4);
 
       auto lhs = readFromOperand(0);
@@ -2340,17 +2291,17 @@ public:
         visitError(I);
 
       auto imm_flags = mc_inst.getOperand(2).getImm();
-      auto imm_v_val = intconst((imm_flags & 1) ? 1 : 0, 1);
-      auto imm_c_val = intconst((imm_flags & 2) ? 1 : 0, 1);
-      auto imm_z_val = intconst((imm_flags & 4) ? 1 : 0, 1);
-      auto imm_n_val = intconst((imm_flags & 8) ? 1 : 0, 1);
+      auto imm_v_val = getIntConst((imm_flags & 1) ? 1 : 0, 1);
+      auto imm_c_val = getIntConst((imm_flags & 2) ? 1 : 0, 1);
+      auto imm_z_val = getIntConst((imm_flags & 4) ? 1 : 0, 1);
+      auto imm_n_val = getIntConst((imm_flags & 8) ? 1 : 0, 1);
 
       auto cond_val_imm = mc_inst.getOperand(3).getImm();
       auto cond_val = evaluate_condition(cond_val_imm, MCBB);
 
       auto ssub = createSSubOverflow(lhs, imm_rhs);
       auto result = createExtractValue(ssub, {0});
-      auto zero_val = intconst(0, result->getType()->getIntegerBitWidth());
+      auto zero_val = getIntConst(0, result->getType()->getIntegerBitWidth());
 
       auto new_n = createICmp(ICmpInst::Predicate::ICMP_SLT, result, zero_val);
       auto new_z = createICmp(ICmpInst::Predicate::ICMP_EQ, lhs, imm_rhs);
@@ -2370,15 +2321,15 @@ public:
     }
     case AArch64::EORWri:
     case AArch64::EORXri: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       assert(mc_inst.getNumOperands() == 3); // dst, src, imm
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isImm());
 
       auto a = readFromOperand(1);
       auto decoded_immediate =
           decodeLogicalImmediate(mc_inst.getOperand(2).getImm(), size);
-      auto imm_val = intconst(decoded_immediate,
+      auto imm_val = getIntConst(decoded_immediate,
                               size); // FIXME, need to decode immediate val
       if (!ty || !a || !imm_val)
         visitError(I);
@@ -2399,8 +2350,8 @@ public:
     case AArch64::CSINVXr:
     case AArch64::CSNEGWr:
     case AArch64::CSNEGXr: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       // csinv dst, a, b, cond
       // if (cond) a else ~b
       assert(mc_inst.getNumOperands() == 4); // dst, lhs, rhs, cond
@@ -2417,11 +2368,11 @@ public:
       if (!ty || !a || !b)
         visitError(I);
 
-      auto neg_one = intconst(-1, size);
+      auto neg_one = getIntConst(-1, size);
       auto inverted_b = createXor(b, neg_one);
 
       if (opcode == AArch64::CSNEGWr || opcode == AArch64::CSNEGXr) {
-        auto negated_b = createAdd(inverted_b, intconst(1, size));
+        auto negated_b = createAdd(inverted_b, getIntConst(1, size));
         auto ret = createSelect(cond_val, a, negated_b);
         writeToOutputReg(ret);
         break;
@@ -2433,8 +2384,8 @@ public:
     }
     case AArch64::CSINCWr:
     case AArch64::CSINCXr: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       assert(mc_inst.getOperand(1).isReg() && mc_inst.getOperand(2).isReg());
       assert(mc_inst.getOperand(3).isImm());
 
@@ -2444,7 +2395,7 @@ public:
       auto cond_val_imm = mc_inst.getOperand(3).getImm();
       auto cond_val = evaluate_condition(cond_val_imm, MCBB);
 
-      auto inc = createAdd(b, intconst(1, ty->getIntegerBitWidth()));
+      auto inc = createAdd(b, getIntConst(1, ty->getIntegerBitWidth()));
       auto sel = createSelect(cond_val, a, inc);
 
       writeToOutputReg(sel);
@@ -2452,24 +2403,24 @@ public:
     }
     case AArch64::MOVZWi:
     case AArch64::MOVZXi: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       assert(mc_inst.getOperand(0).isReg());
       assert(mc_inst.getOperand(1).isImm());
       auto lhs = readFromOperand(1, mc_inst.getOperand(2).getImm());
-      auto rhs = intconst(0, size);
+      auto rhs = getIntConst(0, size);
       auto ident = createAdd(lhs, rhs);
       writeToOutputReg(ident);
       break;
     }
     case AArch64::MOVNWi:
     case AArch64::MOVNXi: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       assert(mc_inst.getOperand(0).isReg());
       assert(mc_inst.getOperand(1).isImm());
       assert(mc_inst.getOperand(2).isImm());
 
       auto lhs = readFromOperand(1, mc_inst.getOperand(2).getImm());
-      auto neg_one = intconst(-1, size);
+      auto neg_one = getIntConst(-1, size);
       auto not_lhs = createXor(lhs, neg_one);
 
       writeToOutputReg(not_lhs);
@@ -2477,8 +2428,8 @@ public:
     }
     case AArch64::LSLVWr:
     case AArch64::LSLVXr: {
-      auto size = get_size(opcode);
-      auto zero = intconst(0, size);
+      auto size = getInstSize(opcode);
+      auto zero = getIntConst(0, size);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2);
       auto exp = createFShl(lhs, zero, rhs);
@@ -2487,8 +2438,8 @@ public:
     }
     case AArch64::LSRVWr:
     case AArch64::LSRVXr: {
-      auto size = get_size(opcode);
-      auto zero = intconst(0, size);
+      auto size = getInstSize(opcode);
+      auto zero = getIntConst(0, size);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2);
       auto exp = createFShr(zero, lhs, rhs);
@@ -2497,11 +2448,11 @@ public:
     }
     case AArch64::ORNWrs:
     case AArch64::ORNXrs: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
 
-      auto neg_one = intconst(-1, size);
+      auto neg_one = getIntConst(-1, size);
       auto not_rhs = createXor(rhs, neg_one);
       auto ident = createOr(lhs, not_rhs);
       writeToOutputReg(ident);
@@ -2509,7 +2460,7 @@ public:
     }
     case AArch64::MOVKWi:
     case AArch64::MOVKXi: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto dest = readFromOperand(1);
       auto lhs = readFromOperand(2, mc_inst.getOperand(3).getImm());
 
@@ -2525,7 +2476,7 @@ public:
         bitmask = ~(((uint64_t)0xffff) << shift_amt);
       }
 
-      auto bottom_bits = intconst(bitmask, size);
+      auto bottom_bits = getIntConst(bitmask, size);
       auto cleared = createAnd(dest, bottom_bits);
       auto ident = createOr(cleared, lhs);
       writeToOutputReg(ident);
@@ -2533,28 +2484,28 @@ public:
     }
     case AArch64::UBFMWri:
     case AArch64::UBFMXri: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto src = readFromOperand(1);
       auto immr = mc_inst.getOperand(2).getImm();
       auto imms = mc_inst.getOperand(3).getImm();
 
       // LSL is preferred when imms != 31 and imms + 1 == immr
       if (size == 32 && imms != 31 && imms + 1 == immr) {
-        auto dst = createShl(src, intconst(31 - imms, size));
+        auto dst = createShl(src, getIntConst(31 - imms, size));
         writeToOutputReg(dst);
         return;
       }
 
       // LSL is preferred when imms != 63 and imms + 1 == immr
       if (size == 64 && imms != 63 && imms + 1 == immr) {
-        auto dst = createShl(src, intconst(63 - imms, size));
+        auto dst = createShl(src, getIntConst(63 - imms, size));
         writeToOutputReg(dst);
         return;
       }
 
       // LSR is preferred when imms == 31 or 63 (size - 1)
       if (imms == size - 1) {
-        auto dst = createLShr(src, intconst(immr, size));
+        auto dst = createLShr(src, getIntConst(immr, size));
         writeToOutputReg(dst);
         return;
       }
@@ -2564,8 +2515,8 @@ public:
         auto pos = size - immr;
         auto width = imms + 1;
         auto mask = ((uint64_t)1 << (width)) - 1;
-        auto masked = createAnd(src, intconst(mask, size));
-        auto shifted = createShl(masked, intconst(pos, size));
+        auto masked = createAnd(src, getIntConst(mask, size));
+        auto shifted = createShl(masked, getIntConst(pos, size));
         writeToOutputReg(shifted);
         return;
       }
@@ -2573,7 +2524,7 @@ public:
       // UXTB
       if (immr == 0 && imms == 7) {
         auto mask = ((uint64_t)1 << 8) - 1;
-        auto masked = createAnd(src, intconst(mask, size));
+        auto masked = createAnd(src, getIntConst(mask, size));
         writeToOutputReg(masked);
         return;
       }
@@ -2581,7 +2532,7 @@ public:
       // UXTH
       if (immr == 0 && imms == 15) {
         auto mask = ((uint64_t)1 << 16) - 1;
-        auto masked = createAnd(src, intconst(mask, size));
+        auto masked = createAnd(src, getIntConst(mask, size));
         writeToOutputReg(masked);
         return;
       }
@@ -2594,15 +2545,15 @@ public:
       auto mask = ((uint64_t)1 << (width)) - 1;
       auto pos = immr;
 
-      auto masked = createAnd(src, intconst(mask, size));
-      auto shifted_res = createLShr(masked, intconst(pos, size));
+      auto masked = createAnd(src, getIntConst(mask, size));
+      auto shifted_res = createLShr(masked, getIntConst(pos, size));
       writeToOutputReg(shifted_res);
       return;
       // assert(false && "UBFX not supported");
     }
     case AArch64::BFMWri:
     case AArch64::BFMXri: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto dst = readFromOperand(1);
       auto src = readFromOperand(2);
 
@@ -2615,9 +2566,9 @@ public:
 
         auto mask = (((uint64_t)1 << bits) - 1) << pos;
 
-        auto masked = createAnd(src, intconst(mask, size));
-        auto shifted = createLShr(masked, intconst(pos, size));
-        auto cleared = createAnd(dst, intconst((uint64_t)(-1) << bits, size));
+        auto masked = createAnd(src, getIntConst(mask, size));
+        auto shifted = createLShr(masked, getIntConst(pos, size));
+        auto cleared = createAnd(dst, getIntConst((uint64_t)(-1) << bits, size));
         auto res = createOr(cleared, shifted);
         writeToOutputReg(res);
         return;
@@ -2633,13 +2584,13 @@ public:
           ~((((uint64_t)1 << bits) - 1) << pos) & ((uint64_t)-1 >> (64 - size));
 
       // get `bits` number of bits from the least significant bits
-      auto bitfield = createAnd(src, intconst(~((uint64_t)-1 << bits), size));
+      auto bitfield = createAnd(src, getIntConst(~((uint64_t)-1 << bits), size));
 
       // move the bitfield into position
-      auto moved = createShl(bitfield, intconst(pos, size));
+      auto moved = createShl(bitfield, getIntConst(pos, size));
 
       // carve out a place for the bitfield
-      auto masked = createAnd(dst, intconst(mask, size));
+      auto masked = createAnd(dst, getIntConst(mask, size));
       // place the bitfield
       auto res = createOr(masked, moved);
       writeToOutputReg(res);
@@ -2647,11 +2598,11 @@ public:
     }
     case AArch64::ORRWri:
     case AArch64::ORRXri: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto lhs = readFromOperand(1);
       auto imm = mc_inst.getOperand(2).getImm();
       auto decoded = decodeLogicalImmediate(imm, size);
-      auto result = createOr(lhs, intconst(decoded, size));
+      auto result = createOr(lhs, getIntConst(decoded, size));
       writeToOutputReg(result);
       break;
     }
@@ -2720,7 +2671,7 @@ public:
     case AArch64::BICXrs:
     case AArch64::BICSWrs:
     case AArch64::BICSXrs: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       // BIC:
       // return = op1 AND NOT (optional shift) op2
       // EON:
@@ -2737,7 +2688,7 @@ public:
       }
 
       // Perform NOT
-      auto neg_one = intconst(-1, size);
+      auto neg_one = getIntConst(-1, size);
       auto inverted_op2 = createXor(op2, neg_one);
 
       // Perform final Op: AND for BIC, XOR for EON
@@ -2763,8 +2714,8 @@ public:
         // set n/z, clear c/v
         setNUsingResult(ret);
         setZUsingResult(ret);
-        setC(intconst(0, 1));
-        setV(intconst(0, 1));
+        setC(getIntConst(0, 1));
+        setV(getIntConst(0, 1));
       }
 
       writeToOutputReg(ret);
@@ -2772,14 +2723,14 @@ public:
     }
     case AArch64::REV16Xr: {
       // REV16Xr: Reverse bytes of 64 bit value in 16-bit half-words.
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto val = readFromOperand(1);
-      auto first_part = createShl(val, intconst(8, size));
+      auto first_part = createShl(val, getIntConst(8, size));
       auto first_part_and =
-          createAnd(first_part, intconst(0xFF00FF00FF00FF00UL, size));
-      auto second_part = createLShr(val, intconst(8, size));
+          createAnd(first_part, getIntConst(0xFF00FF00FF00FF00UL, size));
+      auto second_part = createLShr(val, getIntConst(8, size));
       auto second_part_and =
-          createAnd(second_part, intconst(0x00FF00FF00FF00FFUL, size));
+          createAnd(second_part, getIntConst(0x00FF00FF00FF00FFUL, size));
       auto combined_val = createOr(first_part_and, second_part_and);
       writeToOutputReg(combined_val);
       break;
@@ -2788,14 +2739,14 @@ public:
     case AArch64::REV32Xr: {
       // REV16Wr: Reverse bytes of 32 bit value in 16-bit half-words.
       // REV32Xr: Reverse bytes of 64 bit value in 32-bit words.
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto val = readFromOperand(1);
 
       // Reversing all of the bytes, then performing a rotation by half the
       // width reverses bytes in 16-bit halfwords for a 32 bit int and reverses
       // bytes in a 32-bit word for a 64 bit int
       auto reverse_val = createBSwap(val);
-      auto ret = createFShr(reverse_val, reverse_val, intconst(size / 2, size));
+      auto ret = createFShr(reverse_val, reverse_val, getIntConst(size / 2, size));
       writeToOutputReg(ret);
       break;
     }
@@ -2810,8 +2761,8 @@ public:
       assert(q_reg_val && "volatile register's value not in cache");
 
       // zero out the bottom 64-bits of the vector register by shifting
-      auto q_shift = createLShr(q_reg_val, intconst(64, 128));
-      auto q_cleared = createShl(q_shift, intconst(64, 128));
+      auto q_shift = createLShr(q_reg_val, getIntConst(64, 128));
+      auto q_cleared = createShl(q_shift, getIntConst(64, 128));
       auto mov_res = createOr(q_cleared, val);
       writeToOutputReg(mov_res);
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
@@ -2830,11 +2781,11 @@ public:
       auto val = readFromOperand(3);
       auto q_reg_val = cur_vol_regs[MCBB][op_0.getReg()];
       // FIXME make this a utility function that uses index and size
-      auto mask = intconst(-1, 128);
+      auto mask = getIntConst(-1, 128);
 
       if (op_index > 0) {
-        mask = createShl(mask, intconst(64, 128));
-        val = createShl(val, intconst(64, 128));
+        mask = createShl(mask, getIntConst(64, 128));
+        val = createShl(val, getIntConst(64, 128));
       }
 
       auto q_cleared = createShl(q_reg_val, mask);
@@ -2884,14 +2835,14 @@ public:
         // largest_vect_register-AArch64::Q0
         // << "\n";
 
-        auto elem_ret_typ = get_int_type(elem_bitwidth);
+        auto elem_ret_typ = getIntTy(elem_bitwidth);
         // need to trunc if the element's bitwidth is less than 128
         if (elem_bitwidth < 128) {
           for (unsigned i = 0; i < elts; ++i) {
             auto vect_reg_val = cur_vol_regs[MCBB][AArch64::Q0 + i];
             assert(vect_reg_val && "register value to return cannot be null!");
             auto trunc = createTrunc(vect_reg_val, elem_ret_typ);
-            vec = createInsertElement(vec, trunc, intconst(i, 32));
+            vec = createInsertElement(vec, trunc, getIntConst(i, 32));
           }
         } else {
           assert(false && "we're not handling this case yet");
@@ -2908,7 +2859,7 @@ public:
               getIdentifier(mc_inst.getOperand(0).getReg(), I.getOpId(0));
           if (val) {
             if (retWidth < val->getType()->getIntegerBitWidth())
-              val = createTrunc(val, get_int_type(retWidth));
+              val = createTrunc(val, getIntTy(retWidth));
 
             // for don't care bits we need to mask them off before returning
             if (has_ret_attr && (orig_ret_bitwidth < 32)) {
@@ -2923,7 +2874,7 @@ public:
             // is just a ret instruction
             outs() << "hack: returning poison"
                    << "\n";
-            createReturn(PoisonValue::get(get_int_type(retWidth)));
+            createReturn(PoisonValue::get(getIntTy(retWidth)));
           }
         }
       }
@@ -2975,7 +2926,7 @@ public:
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_EQ, operand,
-                     intconst(0, operand->getType()->getIntegerBitWidth()));
+                     getIntConst(0, operand->getType()->getIntegerBitWidth()));
       auto dst_true = get_basic_block(Fn, mc_inst.getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
@@ -2996,7 +2947,7 @@ public:
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_NE, operand,
-                     intconst(0, operand->getType()->getIntegerBitWidth()));
+                     getIntConst(0, operand->getType()->getIntegerBitWidth()));
 
       auto dst_true = get_basic_block(Fn, mc_inst.getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
@@ -3016,11 +2967,11 @@ public:
     case AArch64::TBZX:
     case AArch64::TBNZW:
     case AArch64::TBNZX: {
-      auto size = get_size(opcode);
+      auto size = getInstSize(opcode);
       auto operand = readFromOperand(0);
       assert(operand != nullptr && "operand is null");
       auto bit_pos = mc_inst.getOperand(1).getImm();
-      auto shift = createLShr(operand, intconst(bit_pos, size));
+      auto shift = createLShr(operand, getIntConst(bit_pos, size));
       auto cond_val = createTrunc(shift, i1);
 
       auto &jmp_tgt_op = mc_inst.getOperand(2);
@@ -3046,20 +2997,15 @@ public:
       }
       auto *dst_true = getBBByName(Fn, *dst_true_name);
 
-      switch (opcode) {
-      case AArch64::TBNZW:
-      case AArch64::TBNZX:
+      if (opcode == AArch64::TBNZW || opcode == AArch64::TBNZX)
         createBranch(cond_val, dst_false, dst_true);
-        break;
-      default:
+      else
         createBranch(cond_val, dst_true, dst_false);
-      }
-
       break;
     }
     case AArch64::PHI: {
-      auto size = get_size(opcode);
-      auto ty = get_int_type(size);
+      auto size = getInstSize(opcode);
+      auto ty = getIntTy(size);
       auto result = createPhi(ty);
       outs() << "pushing phi in todo : "
              << "\n";
@@ -3116,13 +3062,13 @@ public:
   // create the storage associated with a register -- all of its
   // asm-level aliases will get redirected here
   void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
-    RegFile[Reg] = createAlloca(get_int_type(Width), intconst(1, 64), Name);
+    RegFile[Reg] = createAlloca(getIntTy(Width), getIntConst(1, 64), Name);
   }
 
   Function *run() {
-    auto i32 = get_int_type(32);
-    auto i64 = get_int_type(64);
-    auto i128 = get_int_type(128);
+    auto i32 = getIntTy(32);
+    auto i64 = getIntTy(64);
+    auto i128 = getIntTy(128);
 
     auto Fn =
         Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
@@ -3144,7 +3090,7 @@ public:
     // initializing to zero makes loads from XZR work; stores are
     // handled in writeToOutputReg()
     createRegStorage(AArch64::XZR, 64, "XZR");
-    createStore(intconst(0, 64), RegFile[AArch64::XZR]);
+    createStore(getIntConst(0, 64), RegFile[AArch64::XZR]);
 
     // allocate storage for PSTATE
     createRegStorage(AArch64::N, 1, "N");
@@ -3165,7 +3111,7 @@ public:
       // TODO maybe this is in a separate function
       if (orig_width < 64) {
         auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
-        auto orig_ty = get_int_type(orig_width);
+        auto orig_ty = getIntTy(orig_width);
         V = createTrunc(V, orig_ty, next_name(Reg, 2));
         if (orig_width == 1) {
           V = createCast(V, i32, op, next_name(Reg, 3));
@@ -3204,7 +3150,7 @@ public:
         if (Arg.hasSExtAttr())
           op = Instruction::SExt;
 
-        auto truncated_type = get_int_type(orig_width);
+        auto truncated_type = getIntTy(orig_width);
         stored =
             createTrunc(stored, truncated_type, next_name(operand.getReg(), 2));
         if (truncated_type->getIntegerBitWidth() == 1) {
@@ -3236,7 +3182,7 @@ public:
       outs() << "num_stack_args = " << num_stack_args << "\n";
 
       // add stack with 16 slots, 8 bytes each
-      auto alloc_size = intconst(16, 64);
+      auto alloc_size = getIntConst(16, 64);
       auto ty = Type::getInt64Ty(LLVMCtx);
       auto alloca = createAlloca(ty, alloc_size, "stack");
       mc_add_identifier(AArch64::SP, 3, alloca);
@@ -3245,7 +3191,7 @@ public:
         unsigned reg_num = AArch64::X8 + i;
         outs() << "reg_num = " << reg_num << "\n";
 
-        vector<Value *> idxlist{intconst(i, 64)};
+        vector<Value *> idxlist{getIntConst(i, 64)};
         auto get_xi =
             createGEP(ty, alloca, idxlist, "stack_" + to_string(8 + i));
         // FIXME, need to use version similar to the offset to address the stack
@@ -3267,13 +3213,13 @@ public:
     // arguments
 
     for (unsigned int i = AArch64::X0 + argNum; i <= AArch64::X17; ++i) {
-      auto val = createOr(poison_val, intconst(0, 64), next_name(i, 3));
+      auto val = createOr(poison_val, getIntConst(0, 64), next_name(i, 3));
       auto val_frozen = createFreeze(val, next_name(i, 4));
       mc_add_identifier(i, 2, val_frozen);
     }
 
     for (unsigned int i = AArch64::Q0; i <= AArch64::Q3; ++i) {
-      auto val = createOr(vect_poison_val, intconst(0, 128), next_name(i, 3));
+      auto val = createOr(vect_poison_val, getIntConst(0, 128), next_name(i, 3));
       auto val_frozen = createFreeze(val, next_name(i, 4));
       mc_add_identifier(i, 2, val_frozen);
       cur_vol_regs[entry_mc_bb][i] = val_frozen;
