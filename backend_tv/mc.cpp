@@ -68,7 +68,7 @@ using namespace std;
 using namespace llvm;
 using namespace lifter;
 
-// just want to avoid collisions here
+// avoid collisions with the upstream AArch64 namespace
 namespace llvm::AArch64 {
 const unsigned N = 100000000;
 const unsigned Z = 100000001;
@@ -388,19 +388,6 @@ public:
     }
   }
 };
-
-// utility function
-[[maybe_unused]] bool isIntegerRegister(const MCOperand &op) {
-  if (!op.isReg())
-    return false;
-
-  if ((AArch64::W0 <= op.getReg() && op.getReg() <= AArch64::W30) ||
-      (AArch64::X0 <= op.getReg() && op.getReg() <= AArch64::X28)) {
-    return true;
-  }
-
-  return false;
-}
 
 // hacky way of returning supported volatile registers
 vector<unsigned> volatileRegisters() {
@@ -1223,12 +1210,6 @@ APInt replicate(APInt bits, unsigned N) {
   return {welem.trunc(M), telem.trunc(M)};
 }
 
-// Values currently holding ZNCV bits, for each basicblock respectively
-unordered_map<MCBasicBlock *, Value *> cur_vs;
-unordered_map<MCBasicBlock *, Value *> cur_zs;
-unordered_map<MCBasicBlock *, Value *> cur_ns;
-unordered_map<MCBasicBlock *, Value *> cur_cs;
-
 // Values currently holding the latest definition for a volatile register, for
 // each basic block currently used by vector instructions only
 unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
@@ -1701,20 +1682,24 @@ class arm2llvm_ {
     createStore(V, getRegStorage(Reg));
   }
 
-  Value *retrieve_pstate(unordered_map<MCBasicBlock *, Value *> &pstate_map,
-                         MCBasicBlock *bb) {
-    auto pstate_val = pstate_map[bb];
-    if (pstate_val)
-      return pstate_val;
-    outs() << "retrieving pstate for block " << bb->getName() << "\n";
-    assert(
-        bb->getPreds().size() == 1 &&
-        "pstate can only be retrieved for blocks with up to one predecessor");
-    auto pred_bb = bb->getPreds().front();
-    auto pred_pstate = pstate_map[pred_bb];
-    assert(pred_pstate != nullptr && "pstate must be defined for predecessor");
-    pstate_map[bb] = pred_pstate;
-    return pred_pstate;
+  Value *getV() {
+    auto i1 = get_int_type(1);
+    return createLoad(i1, getRegStorage(AArch64::V));
+  }
+
+  Value *getZ() {
+    auto i1 = get_int_type(1);
+    return createLoad(i1, getRegStorage(AArch64::Z));
+  }
+
+  Value *getN() {
+    auto i1 = get_int_type(1);
+    return createLoad(i1, getRegStorage(AArch64::N));
+  }
+
+  Value *getC() {
+    auto i1 = get_int_type(1);
+    return createLoad(i1, getRegStorage(AArch64::C));
   }
 
   Value *evaluate_condition(uint64_t cond, MCBasicBlock *bb) {
@@ -1723,21 +1708,10 @@ class arm2llvm_ {
 
     cond >>= 1;
 
-#if 0
-    auto cur_v = retrieve_pstate(cur_vs, bb);
-    auto cur_z = retrieve_pstate(cur_zs, bb);
-    auto cur_n = retrieve_pstate(cur_ns, bb);
-    auto cur_c = retrieve_pstate(cur_cs, bb);
-#else
-    auto i1 = get_int_type(1);
-    auto cur_v = createLoad(i1, getRegStorage(AArch64::V));
-    auto cur_z = createLoad(i1, getRegStorage(AArch64::Z));
-    auto cur_n = createLoad(i1, getRegStorage(AArch64::N));
-    auto cur_c = createLoad(i1, getRegStorage(AArch64::C));
-#endif
-
-    assert(cur_v != nullptr && cur_z != nullptr && cur_n != nullptr &&
-           cur_c != nullptr && "condition not initialized");
+    auto cur_v = getV();
+    auto cur_z = getZ();
+    auto cur_n = getN();
+    auto cur_c = getC();
 
     Value *res = nullptr;
     switch (cond) {
@@ -1801,25 +1775,21 @@ class arm2llvm_ {
 
   void setV(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    cur_vs[MCBB] = V;
     createStore(V, getRegStorage(AArch64::V));
   }
 
   void setZ(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    cur_zs[MCBB] = V;
     createStore(V, getRegStorage(AArch64::Z));
   }
 
   void setN(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    cur_ns[MCBB] = V;
     createStore(V, getRegStorage(AArch64::N));
   }
 
   void setC(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    cur_cs[MCBB] = V;
     createStore(V, getRegStorage(AArch64::C));
   }
 
@@ -1966,7 +1936,7 @@ public:
       // PSTATE bits.
       auto tyPlusOne = get_int_type(size + 1);
 
-      auto carry = createZExt(cur_zs[MCBB], tyPlusOne);
+      auto carry = createZExt(getZ(), tyPlusOne);
       auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
       auto withCarry = createAdd(add, carry);
 
@@ -3831,10 +3801,6 @@ void reset() {
   mc_cache.clear();
   overflow_aggregate_types.clear();
   lifted_vector_types.clear();
-  cur_vs.clear();
-  cur_zs.clear();
-  cur_ns.clear();
-  cur_cs.clear();
   cur_vol_regs.clear();
 }
 
