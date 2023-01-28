@@ -70,11 +70,11 @@ using namespace lifter;
 
 // just want to avoid collisions here
 namespace llvm::AArch64 {
-    const unsigned N = 100000000;
-    const unsigned Z = 100000001;
-    const unsigned C = 100000002;
-    const unsigned V = 100000003;
-}
+const unsigned N = 100000000;
+const unsigned Z = 100000001;
+const unsigned C = 100000002;
+const unsigned V = 100000003;
+} // namespace llvm::AArch64
 
 namespace {
 
@@ -155,11 +155,11 @@ const set<int> instrs_64 = {
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
-const set<int> instrs_no_write = {AArch64::Bcc,    AArch64::B,      AArch64::TBZW,
-				  AArch64::TBZX,   AArch64::TBNZW,  AArch64::TBNZX,
-				  AArch64::CBZW,   AArch64::CBZX,   AArch64::CBNZW,
-				  AArch64::CBNZX,  AArch64::CCMPWr, AArch64::CCMPWi,
-				  AArch64::CCMPXr, AArch64::CCMPXi};
+const set<int> instrs_no_write = {
+    AArch64::Bcc,    AArch64::B,     AArch64::TBZW,   AArch64::TBZX,
+    AArch64::TBNZW,  AArch64::TBNZX, AArch64::CBZW,   AArch64::CBZX,
+    AArch64::CBNZW,  AArch64::CBNZX, AArch64::CCMPWr, AArch64::CCMPWi,
+    AArch64::CCMPXr, AArch64::CCMPXi};
 
 const set<int> ins_variant = {AArch64::INSvi64gpr};
 
@@ -299,10 +299,10 @@ public:
       if (it->isReg()) {
         if (getOpcode() == AArch64::PHI && idx >= 1) {
           outs() << "<Phi arg>:[(" << it->getReg() << "," << op_ids[idx] << "),"
-               << getOpPhiBlock(idx) << "]>";
+                 << getOpPhiBlock(idx) << "]>";
         } else {
           outs() << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
-               << ")>";
+                 << ")>";
         }
       } else if (it->isImm()) {
         outs() << "<MCOperand Imm:" << it->getImm() << ">";
@@ -663,7 +663,7 @@ public:
 
         if (dst_operand.isImm()) {
           outs() << "destination operand is an immediate. printing the "
-                  "instruction and skipping it\n";
+                    "instruction and skipping it\n";
           w_instr.print();
           continue;
         }
@@ -707,8 +707,9 @@ public:
       }
     }
     // temp for debugging
-    outs() << "mapping from block name to variable names that require phi nodes "
-            "in block\n";
+    outs()
+        << "mapping from block name to variable names that require phi nodes "
+           "in block\n";
     for (auto &[block, varSet] : phis) {
       outs() << "phis for: " << block->getName() << "\n";
       for (auto &var : varSet) {
@@ -1010,7 +1011,7 @@ public:
         outs() << "phi arg size " << phi_args[block][phi_var].size() << "\n";
         for (auto var_id_label_pair : phi_args[block][phi_var]) {
           outs() << "index = " << index
-               << ", var_id = " << var_id_label_pair.first << "\n";
+                 << ", var_id = " << var_id_label_pair.first << "\n";
           mc_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
           w_instr.pushOpId(var_id_label_pair.first);
           w_instr.setOpPhiBlock(index, var_id_label_pair.second);
@@ -1123,10 +1124,12 @@ void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
 Value *mc_get_operand(unsigned reg, unsigned version) {
   outs() << "mc_cache: looking for " << reg << ", " << version;
   if (auto I = mc_cache.find(make_pair(reg, version)); I != mc_cache.end()) {
-    outs() << "  found it" << "\n";
+    outs() << "  found it"
+           << "\n";
     return I->second;
   }
-  outs() << "  did not find it" << "\n";
+  outs() << "  did not find it"
+         << "\n";
   return nullptr;
 }
 
@@ -1299,7 +1302,8 @@ class arm2llvm_ {
       return 64;
     if (instrs_128.contains(instr))
       return 128;
-    outs() << "get_size encountered unknown instruction" << "\n";
+    outs() << "get_size encountered unknown instruction"
+           << "\n";
     visitError(*wrapper);
     UNREACHABLE();
   }
@@ -1371,7 +1375,7 @@ class arm2llvm_ {
   }
 
   GetElementPtrInst *createGEP(Type *ty, Value *v, ArrayRef<Value *> idxlist,
-			       const string &NameStr) {
+                               const string &NameStr) {
     return GetElementPtrInst::Create(ty, v, idxlist, NameStr, CurrBB);
   }
 
@@ -1519,7 +1523,8 @@ class arm2llvm_ {
   BinaryOperator *createLogicalNot(Value *a) {
     auto *ty = a->getType();
     auto NegOne = ConstantInt::getSigned(ty, -1);
-    return BinaryOperator::Create(Instruction::Xor, a, NegOne, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Xor, a, NegOne, next_name(),
+                                  CurrBB);
   }
 
   FreezeInst *createFreeze(Value *v, const string &NameStr = "") {
@@ -1532,13 +1537,15 @@ class arm2llvm_ {
   }
 
   // This implements the SMTLIB-like extract operator from Isla traces
-  Value *createExtract(Value *v, unsigned n1, unsigned n2, const string &NameStr = "") {
+  Value *createExtract(Value *v, unsigned n1, unsigned n2,
+                       const string &NameStr = "") {
     assert(n1 > n2);
     if (n2 == 0) {
       auto *ty = get_int_type(1 + n1);
       return createTrunc(v, ty);
     } else {
-      auto *shift = createLShr(v, intconst(n2, v->getType()->getIntegerBitWidth()));
+      auto *shift =
+          createLShr(v, intconst(n2, v->getType()->getIntegerBitWidth()));
       auto *ty = get_int_type(1 + n1 - n2);
       return createTrunc(shift, ty);
     }
@@ -1568,42 +1575,45 @@ class arm2llvm_ {
   }
 
   void add_phi_params(PHINode *phi_instr, MCInstWrapper *phi_mc_wrapper) {
-    outs() << "entering add_phi_params" << "\n";
+    outs() << "entering add_phi_params"
+           << "\n";
     assert(phi_mc_wrapper->getOpcode() == AArch64::PHI &&
            "cannot add params to non-phi instr");
     for (unsigned i = 1; i < phi_mc_wrapper->getMCInst().getNumOperands();
          ++i) {
       assert(phi_mc_wrapper->getMCInst().getOperand(i).isReg());
       outs() << "<Phi arg>:[("
-           << phi_mc_wrapper->getMCInst().getOperand(i).getReg() << ","
-           << phi_mc_wrapper->getOpId(i) << "),"
-           << phi_mc_wrapper->getOpPhiBlock(i) << "]>\n";
+             << phi_mc_wrapper->getMCInst().getOperand(i).getReg() << ","
+             << phi_mc_wrapper->getOpId(i) << "),"
+             << phi_mc_wrapper->getOpPhiBlock(i) << "]>\n";
       string block_name(phi_mc_wrapper->getOpPhiBlock(i));
       auto val =
           mc_get_operand(phi_mc_wrapper->getMCInst().getOperand(i).getReg(),
                          phi_mc_wrapper->getOpId(i));
       assert(val != nullptr);
       outs() << "block name = " << block_name << "\n";
-      phi_instr->addIncoming(val, getBBByName(*(phi_instr->getParent()->getParent()), block_name));
+      phi_instr->addIncoming(
+          val, getBBByName(*(phi_instr->getParent()->getParent()), block_name));
       outs() << "i is = " << i << "\n";
     }
-    outs() << "exiting add_phi_params" << "\n";
+    outs() << "exiting add_phi_params"
+           << "\n";
   }
 
   // return pointer to the backing store for a register, doing the
   // required de-aliasing
   Value *getRegStorage(unsigned Reg) {
-      // FIXME do this better?
-      unsigned WideReg = Reg;
-      if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
-	WideReg = Reg - AArch64::W0 + AArch64::X0;
-      if (Reg == AArch64::WZR)
-	WideReg = AArch64::XZR;
-      auto RegAddr = RegFile[WideReg];
-      assert(RegAddr);
-      return RegAddr;
+    // FIXME do this better?
+    unsigned WideReg = Reg;
+    if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
+      WideReg = Reg - AArch64::W0 + AArch64::X0;
+    if (Reg == AArch64::WZR)
+      WideReg = AArch64::XZR;
+    auto RegAddr = RegFile[WideReg];
+    assert(RegAddr);
+    return RegAddr;
   }
-  
+
   // TODO: make it so that lshr generates code on register lookups
   // some instructions make use of this, and the semantics need to be
   // worked out
@@ -1642,11 +1652,11 @@ class arm2llvm_ {
       Value *VV = createLoad(get_int_type(64), RegAddr);
       assert(VV);
       if (size == 32)
-	VV = createTrunc(VV, get_int_type(32));
+        VV = createTrunc(VV, get_int_type(32));
       V = VV;
 #endif
     }
-    
+
     if (shift != 0)
       V = reg_shift(V, shift);
 
@@ -1680,11 +1690,11 @@ class arm2llvm_ {
       // the register we are storing it in _is_ 32 bits, we sign
       // extend to 32 bits before zero-extending to 64
       if (s && regSize == 32 && W < 32) {
-	V = createSExt(V, get_int_type(32));
-	V = createZExt(V, get_int_type(64));
+        V = createSExt(V, get_int_type(32));
+        V = createZExt(V, get_int_type(64));
       } else {
-	auto op = s ? Instruction::SExt : Instruction::ZExt;
-	V = createCast(V, get_int_type(64), op);
+        auto op = s ? Instruction::SExt : Instruction::ZExt;
+        V = createCast(V, get_int_type(64), op);
       }
     }
     add_identifier(V);
@@ -1830,9 +1840,8 @@ class arm2llvm_ {
   }
 
 public:
-  arm2llvm_(Module *LiftedModule, MCFunction &MF,
-            Function &srcFn, MCInstPrinter *instrPrinter,
-            MCRegisterInfo *registerInfo)
+  arm2llvm_(Module *LiftedModule, MCFunction &MF, Function &srcFn,
+            MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
         instrPrinter(instrPrinter), registerInfo(registerInfo),
         instructionCount(0), curId(0) {}
@@ -1842,7 +1851,7 @@ public:
     writeToOutputReg(createBSwap(V));
   }
 #else
-  #include "code0.cpp"
+#include "code0.cpp"
   void revInst(Value *V) {
     auto w = v->getType()->getIntegerBitWidth();
     assert(w == 32 || w == 64);
@@ -1891,7 +1900,7 @@ public:
         auto extendType = ((extendImm >> 3) & 0x7);
 
         outs() << "extendImm: " << extendImm << ", extendType: " << extendType
-             << "\n";
+               << "\n";
 
         auto isSigned = extendType / 4;
 
@@ -1965,10 +1974,13 @@ public:
 
       if (has_s(opcode)) {
         // Mask off the sign bit. We could mask with an AND, but APInt semantics
-        // might be weird since we're passing in an uint64_t but we'll want a 65 bit int
-        auto masked = createLShr(createShl(withCarry, intconst(1, size+1)), intconst(1, size+1));
+        // might be weird since we're passing in an uint64_t but we'll want a 65
+        // bit int
+        auto masked = createLShr(createShl(withCarry, intconst(1, size + 1)),
+                                 intconst(1, size + 1));
 
-        auto sAdd = createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
+        auto sAdd =
+            createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
         auto sWithCarry = createAdd(sAdd, carry);
 
         setNUsingResult(withCarry);
@@ -2601,7 +2613,7 @@ public:
         auto mask = ((uint64_t)1 << 16) - 1;
         auto masked = createAnd(src, intconst(mask, size));
         writeToOutputReg(masked);
-	return;
+        return;
       }
 
       // UBFX
@@ -2898,7 +2910,8 @@ public:
         //  }
         //}
         //
-        // outs() << "largest vect register=" << largest_vect_register-AArch64::Q0
+        // outs() << "largest vect register=" <<
+        // largest_vect_register-AArch64::Q0
         // << "\n";
 
         auto elem_ret_typ = get_int_type(elem_bitwidth);
@@ -2938,7 +2951,8 @@ public:
           } else {
             // Hacky solution to deal with functions where the assembly
             // is just a ret instruction
-            outs() << "hack: returning poison" << "\n";
+            outs() << "hack: returning poison"
+                   << "\n";
             createReturn(PoisonValue::get(get_int_type(retWidth)));
           }
         }
@@ -3077,7 +3091,8 @@ public:
       auto size = get_size(opcode);
       auto ty = get_int_type(size);
       auto result = createPhi(ty);
-      outs() << "pushing phi in todo : " << "\n";
+      outs() << "pushing phi in todo : "
+             << "\n";
       wrapper->print();
       auto p = make_pair(result, wrapper);
       lift_todo_phis.push_back(p);
@@ -3087,7 +3102,7 @@ public:
     default:
       Fn.print(outs());
       outs() << "\nError "
-              "detected----------partially-lifted-arm-target----------\n";
+                "detected----------partially-lifted-arm-target----------\n";
       visitError(I);
     }
   }
@@ -3138,10 +3153,12 @@ public:
     auto i32 = get_int_type(32);
     auto i64 = get_int_type(64);
     auto i128 = get_int_type(128);
-    
-    auto Fn = Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage, 0,
-                               MF.getName(), LiftedModule);
-    outs() << "function name: '" << MF.getName() << "'" << "\n";
+
+    auto Fn =
+        Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
+                         0, MF.getName(), LiftedModule);
+    outs() << "function name: '" << MF.getName() << "'"
+           << "\n";
 
     vector<pair<BasicBlock *, MCBasicBlock *>> sorted_bbs;
     createBBs(sorted_bbs, *Fn);
@@ -3164,9 +3181,9 @@ public:
     createRegStorage(AArch64::Z, 1, "Z");
     createRegStorage(AArch64::C, 1, "C");
     createRegStorage(AArch64::V, 1, "V");
-    
+
     // allocate storage for the stack
- 
+
     // store parameters into registers and stack slots
     unsigned argNum = 0;
     for (auto &Arg : Fn->args()) {
@@ -3181,19 +3198,14 @@ public:
         auto orig_ty = get_int_type(orig_width);
         V = createTrunc(V, orig_ty, next_name(Reg, 2));
         if (orig_width == 1) {
-          V = createCast(V, i32, op,
-                              next_name(Reg, 3));
-          V =
-              createZExt(V, i64, next_name(Reg, 4));
+          V = createCast(V, i32, op, next_name(Reg, 3));
+          V = createZExt(V, i64, next_name(Reg, 4));
         } else {
           if (orig_width < 32) {
-            V = createCast(V, i32, op,
-                                next_name(Reg, 3));
-            V = createZExt(V, i64,
-                                next_name(Reg, 4));
+            V = createCast(V, i32, op, next_name(Reg, 3));
+            V = createZExt(V, i64, next_name(Reg, 4));
           } else {
-            V = createCast(V, i64, op,
-                                next_name(Reg, 4));
+            V = createCast(V, i64, op, next_name(Reg, 4));
           }
         }
       }
@@ -3226,19 +3238,16 @@ public:
         stored =
             createTrunc(stored, truncated_type, next_name(operand.getReg(), 2));
         if (truncated_type->getIntegerBitWidth() == 1) {
-          stored = createCast(stored, i32, op,
-                              next_name(operand.getReg(), 3));
-          stored =
-              createZExt(stored, i64, next_name(operand.getReg(), 4));
+          stored = createCast(stored, i32, op, next_name(operand.getReg(), 3));
+          stored = createZExt(stored, i64, next_name(operand.getReg(), 4));
         } else {
           if (truncated_type->getIntegerBitWidth() < 32) {
-            stored = createCast(stored, i32, op,
-                                next_name(operand.getReg(), 3));
-            stored = createZExt(stored, i64,
-                                next_name(operand.getReg(), 4));
+            stored =
+                createCast(stored, i32, op, next_name(operand.getReg(), 3));
+            stored = createZExt(stored, i64, next_name(operand.getReg(), 4));
           } else {
-            stored = createCast(stored, i64, op,
-                                next_name(operand.getReg(), 4));
+            stored =
+                createCast(stored, i64, op, next_name(operand.getReg(), 4));
           }
         }
       }
@@ -3246,7 +3255,8 @@ public:
       mc_add_identifier(operand.getReg(), 2, stored);
       argNum++;
     }
-    outs() << "created non-vector args" << "\n";
+    outs() << "created non-vector args"
+           << "\n";
 
     // FIXME: Hacky way of supporting parameters passed via the stack
     // need to properly model the parameter passing rules described in
@@ -3265,12 +3275,13 @@ public:
         unsigned reg_num = AArch64::X8 + i;
         outs() << "reg_num = " << reg_num << "\n";
 
-	vector<Value *> idxlist{ intconst(i, 64) };
-	auto get_xi = createGEP(ty, alloca, idxlist, "stack_" + to_string(8 + i));
+        vector<Value *> idxlist{intconst(i, 64)};
+        auto get_xi =
+            createGEP(ty, alloca, idxlist, "stack_" + to_string(8 + i));
         // FIXME, need to use version similar to the offset to address the stack
         // pointer or alternatively a more elegant solution altogether
         mc_add_identifier(AArch64::SP, reg_num, get_xi);
-	createStore(getIdentifier(reg_num, 2), get_xi);
+        createStore(getIdentifier(reg_num, 2), get_xi);
       }
     }
 
@@ -3328,12 +3339,13 @@ public:
     int tmp_index = 0;
     for (auto &[phi, phi_mc_wrapper] : lift_todo_phis) {
       outs() << "index = " << tmp_index
-           << "opcode =" << phi_mc_wrapper->getOpcode() << "\n";
+             << "opcode =" << phi_mc_wrapper->getOpcode() << "\n";
       tmp_index++;
       add_phi_params(phi, phi_mc_wrapper);
     }
 
-    outs() << "returning from run method" << "\n";
+    outs() << "returning from run method"
+           << "\n";
 
     return Fn;
   }
@@ -3343,11 +3355,9 @@ public:
 // Adapted from llvm2alive_ in llvm2alive.cpp with some simplifying assumptions
 // FIXME for now, we are making a lot of simplifying assumptions like assuming
 // types of arguments.
-Function *arm2llvm(Module *OrigModule, MCFunction &MF,
-                   Function &srcFn, MCInstPrinter *instrPrinter,
-                   MCRegisterInfo *registerInfo) {
-  return arm2llvm_(OrigModule, MF, srcFn, instrPrinter, registerInfo)
-      .run();
+Function *arm2llvm(Module *OrigModule, MCFunction &MF, Function &srcFn,
+                   MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo) {
+  return arm2llvm_(OrigModule, MF, srcFn, instrPrinter, registerInfo).run();
 }
 
 // We're overriding MCStreamerWrapper to generate an MCFunction
@@ -3829,7 +3839,8 @@ void reset() {
 }
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
-				      Function *srcFn, unique_ptr<MemoryBuffer> MB) {
+                                      Function *srcFn,
+                                      unique_ptr<MemoryBuffer> MB) {
   llvm::SourceMgr SrcMgr;
   SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
 
@@ -3847,8 +3858,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   assert(STI && "Unable to create subtarget info!");
   assert(STI->isCPUStringValid(CPU) && "Invalid CPU!");
 
-  unique_ptr<MCAsmInfo> MAI(
-      Targ->createMCAsmInfo(*MRI, TripleName, MCOptions));
+  unique_ptr<MCAsmInfo> MAI(Targ->createMCAsmInfo(*MRI, TripleName, MCOptions));
   assert(MAI && "Unable to create MC asm info!");
   unique_ptr<MCInstPrinter> IPtemp(
       Targ->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
@@ -3906,7 +3916,8 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   outs() << "after SSA conversion\n";
   MCSW.printBlocksMF();
 
-  auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
+  auto lifted =
+      arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
 
   if (llvm::verifyModule(*LiftedModule, &llvm::outs()))
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
@@ -3914,4 +3925,4 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   return make_pair(srcFn, lifted);
 }
 
-} // namespace
+} // namespace lifter
