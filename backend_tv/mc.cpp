@@ -1133,20 +1133,6 @@ uint64_t decodeLogicalImmediate(uint64_t val, unsigned regSize) {
   return pattern;
 }
 
-// replicate is a pseudocode function used in the ARM ISA
-// replicate's documentation isn't particularly clear, but it takes a bit-vector
-// of size M, and duplicates it N times, returning a bit-vector of size M*N
-// reference:
-// https://developer.arm.com/documentation/ddi0596/2020-12/Shared-Pseudocode/Shared-Functions?lang=en#impl-shared.Replicate.2
-APInt replicate(APInt bits, unsigned N) {
-  auto bitsWidth = bits.getBitWidth();
-  auto newInt = APInt(bitsWidth * N, 0);
-  auto mask = APInt(bitsWidth * N, bits.getZExtValue());
-  for (size_t i = 0; i < N; i++)
-    newInt |= (mask << (bitsWidth * i));
-  return newInt;
-}
-
 // Values currently holding the latest definition for a volatile register, for
 // each basic block currently used by vector instructions only
 unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
