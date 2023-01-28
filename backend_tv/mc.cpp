@@ -1147,47 +1147,6 @@ APInt replicate(APInt bits, unsigned N) {
   return newInt;
 }
 
-// adapted from the arm ISA DecodeBitMasks:
-// https://developer.arm.com/documentation/ddi0596/2020-12/Shared-Pseudocode/AArch64-Instrs?lang=en#impl-aarch64.DecodeBitMasks.4
-// Decode AArch64 bitfield and logical immediate masks which use a similar
-// encoding structure
-// TODO: this is super broken
-[[maybe_unused]] tuple<APInt, APInt> decode_bit_mask(bool immNBit,
-                                                     uint32_t _imms,
-                                                     uint32_t _immr,
-                                                     bool immediate, int M) {
-  APInt imms(6, _imms);
-  APInt immr(6, _immr);
-
-  auto notImm = APInt(6, _imms);
-  notImm.flipAllBits();
-
-  auto concatted = APInt(1, (immNBit ? 1 : 0)).concat(notImm);
-  auto len = concatted.getBitWidth() - concatted.countLeadingZeros() - 1;
-
-  // Undefined behavior
-  assert(len >= 1);
-  assert(M >= (1 << len));
-
-  auto levels = APInt::getAllOnes(len).zext(6);
-
-  auto S = (imms & levels);
-  auto R = (immr & levels);
-
-  auto diff = S - R;
-
-  auto esize = (1 << len);
-  auto d = APInt(len - 1, diff.getZExtValue());
-
-  auto welem = APInt::getAllOnes(S.getZExtValue() + 1).zext(esize).rotr(R);
-  auto telem = APInt::getAllOnes(d.getZExtValue() + 1).zext(esize);
-
-  auto wmask = replicate(welem, esize);
-  auto tmask = replicate(telem, esize);
-
-  return {welem.trunc(M), telem.trunc(M)};
-}
-
 // Values currently holding the latest definition for a volatile register, for
 // each basic block currently used by vector instructions only
 unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
@@ -2868,7 +2827,8 @@ public:
             createReturn(val);
           } else {
             // Hacky solution to deal with functions where the assembly
-            // is just a ret instruction
+            // is just a ret instruction -- JDR fixme this special case
+            // won't be needed
             outs() << "hack: returning poison"
                    << "\n";
             createReturn(PoisonValue::get(getIntTy(retWidth)));
