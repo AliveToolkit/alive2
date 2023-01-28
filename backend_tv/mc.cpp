@@ -1137,10 +1137,10 @@ uint64_t decodeLogicalImmediate(uint64_t val, unsigned regSize) {
 // each basic block currently used by vector instructions only
 unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
 
-BasicBlock *get_basic_block(Function &F, MCOperand &jmp_tgt) {
-  assert(jmp_tgt.isExpr() && "[get_basic_block] expected expression operand");
+BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
+  assert(jmp_tgt.isExpr() && "[getBB] expected expression operand");
   assert((jmp_tgt.getExpr()->getKind() == MCExpr::ExprKind::SymbolRef) &&
-         "[get_basic_block] expected symbol ref as jump operand");
+         "[getBB] expected symbol ref as jump operand");
   const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*jmp_tgt.getExpr());
   const MCSymbol &Sym = SRE.getSymbol();
   StringRef name = Sym.getName();
@@ -1515,6 +1515,12 @@ class arm2llvm_ {
     return RegAddr;
   }
 
+  // always does a full-width read
+  Value *readFromRegister(unsigned Reg) {
+    auto RegAddr = getRegStorage(Reg);
+    return createLoad(getIntTy(64), RegAddr);
+  }
+
   // TODO: make it so that lshr generates code on register lookups
   // some instructions make use of this, and the semantics need to be
   // worked out
@@ -1523,14 +1529,13 @@ class arm2llvm_ {
     auto op = inst.getOperand(idx);
     auto size = getInstSize(inst.getOpcode());
     assert(size == 32 || size == 64);
+    assert(op.isImm() || op.isReg());
 
     Value *V = nullptr;
     if (op.isImm()) {
       V = getIntConst(op.getImm(), size);
     } else {
-      assert(op.isReg());
-      auto RegAddr = getRegStorage(op.getReg());
-      V = createLoad(getIntTy(64), RegAddr);
+      V = readFromRegister(op.getReg());
       if (size == 32)
         V = createTrunc(V, getIntTy(32));
     }
@@ -1860,7 +1865,8 @@ public:
       auto a = readFromOperand(1);
       auto b = readFromOperand(2);
 
-      auto shift_amt = createBinop(b, getIntConst(size, size), Instruction::URem);
+      auto shift_amt =
+          createBinop(b, getIntConst(size, size), Instruction::URem);
       auto res = createAShr(a, shift_amt);
       writeToOutputReg(res);
       break;
@@ -2272,7 +2278,7 @@ public:
       auto decoded_immediate =
           decodeLogicalImmediate(mc_inst.getOperand(2).getImm(), size);
       auto imm_val = getIntConst(decoded_immediate,
-                              size); // FIXME, need to decode immediate val
+                                 size); // FIXME, need to decode immediate val
       if (!ty || !a || !imm_val)
         visitError(I);
 
@@ -2510,7 +2516,8 @@ public:
 
         auto masked = createAnd(src, getIntConst(mask, size));
         auto shifted = createLShr(masked, getIntConst(pos, size));
-        auto cleared = createAnd(dst, getIntConst((uint64_t)(-1) << bits, size));
+        auto cleared =
+            createAnd(dst, getIntConst((uint64_t)(-1) << bits, size));
         auto res = createOr(cleared, shifted);
         writeToOutputReg(res);
         return;
@@ -2526,7 +2533,8 @@ public:
           ~((((uint64_t)1 << bits) - 1) << pos) & ((uint64_t)-1 >> (64 - size));
 
       // get `bits` number of bits from the least significant bits
-      auto bitfield = createAnd(src, getIntConst(~((uint64_t)-1 << bits), size));
+      auto bitfield =
+          createAnd(src, getIntConst(~((uint64_t)-1 << bits), size));
 
       // move the bitfield into position
       auto moved = createShl(bitfield, getIntConst(pos, size));
@@ -2688,7 +2696,8 @@ public:
       // width reverses bytes in 16-bit halfwords for a 32 bit int and reverses
       // bytes in a 32-bit word for a 64 bit int
       auto reverse_val = createBSwap(val);
-      auto ret = createFShr(reverse_val, reverse_val, getIntConst(size / 2, size));
+      auto ret =
+          createFShr(reverse_val, reverse_val, getIntConst(size / 2, size));
       writeToOutputReg(ret);
       break;
     }
@@ -2797,28 +2806,19 @@ public:
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
           outs() << "return width = " << retWidth << "\n";
-          auto val =
-              getIdentifier(mc_inst.getOperand(0).getReg(), I.getOpId(0));
-          if (val) {
-            if (retWidth < val->getType()->getIntegerBitWidth())
-              val = createTrunc(val, getIntTy(retWidth));
+          auto val = readFromRegister(mc_inst.getOperand(0).getReg());
 
-            // for don't care bits we need to mask them off before returning
-            if (has_ret_attr && (orig_ret_bitwidth < 32)) {
-              assert(retWidth >= orig_ret_bitwidth);
-              assert(retWidth == 64);
-              auto trunc = createTrunc(val, i32);
-              val = createZExt(trunc, i64);
-            }
-            createReturn(val);
-          } else {
-            // Hacky solution to deal with functions where the assembly
-            // is just a ret instruction -- JDR fixme this special case
-            // won't be needed
-            outs() << "hack: returning poison"
-                   << "\n";
-            createReturn(PoisonValue::get(getIntTy(retWidth)));
+          if (retWidth < val->getType()->getIntegerBitWidth())
+            val = createTrunc(val, getIntTy(retWidth));
+
+          // for don't care bits we need to mask them off before returning
+          if (has_ret_attr && (orig_ret_bitwidth < 32)) {
+            assert(retWidth >= orig_ret_bitwidth);
+            assert(retWidth == 64);
+            auto trunc = createTrunc(val, i32);
+            val = createZExt(trunc, i64);
           }
+          createReturn(val);
         }
       }
       break;
@@ -2833,7 +2833,7 @@ public:
         break;
       }
 
-      auto dst_ptr = get_basic_block(Fn, mc_inst.getOperand(0));
+      auto dst_ptr = getBB(Fn, mc_inst.getOperand(0));
       createBranch(dst_ptr);
       break;
     }
@@ -2870,7 +2870,7 @@ public:
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_EQ, operand,
                      getIntConst(0, operand->getType()->getIntegerBitWidth()));
-      auto dst_true = get_basic_block(Fn, mc_inst.getOperand(1));
+      auto dst_true = getBB(Fn, mc_inst.getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
       const string *dst_false_name;
@@ -2892,7 +2892,7 @@ public:
           createICmp(ICmpInst::Predicate::ICMP_NE, operand,
                      getIntConst(0, operand->getType()->getIntegerBitWidth()));
 
-      auto dst_true = get_basic_block(Fn, mc_inst.getOperand(1));
+      auto dst_true = getBB(Fn, mc_inst.getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
       const string *dst_false_name;
@@ -3162,7 +3162,8 @@ public:
     }
 
     for (unsigned int i = AArch64::Q0; i <= AArch64::Q3; ++i) {
-      auto val = createOr(vect_poison_val, getIntConst(0, 128), next_name(i, 3));
+      auto val =
+          createOr(vect_poison_val, getIntConst(0, 128), next_name(i, 3));
       auto val_frozen = createFreeze(val, next_name(i, 4));
       mc_add_identifier(i, 2, val_frozen);
       cur_vol_regs[entry_mc_bb][i] = val_frozen;
@@ -3252,8 +3253,7 @@ public:
 
   MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_IA,
                     MCInstPrinter *_IP, MCRegisterInfo *_MRI)
-      : MCStreamer(Context), IA(_IA), IP(_IP),
-        MRI(_MRI) {
+      : MCStreamer(Context), IA(_IA), IP(_IP), MRI(_MRI) {
     MF.IA = IA;
     MF.IP = IP;
     MF.MRI = MRI;
