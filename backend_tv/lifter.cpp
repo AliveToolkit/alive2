@@ -523,7 +523,7 @@ class arm2llvm_ {
   Function &srcFn;
   MCBasicBlock *MCBB{nullptr}; // the current machine block
   unsigned blockCount{0};
-  BasicBlock *CurrBB{nullptr}; // the current block
+  BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
   MCRegisterInfo *registerInfo{nullptr};
@@ -627,167 +627,167 @@ class arm2llvm_ {
   }
 
   AllocaInst *createAlloca(Type *ty, Value *sz, const string &NameStr) {
-    auto A = new AllocaInst(ty, 0, sz, NameStr, CurrBB);
+    auto A = new AllocaInst(ty, 0, sz, NameStr, LLVMBB);
     // TODO initialize ARM memory cells to freeze poison?
     return A;
   }
 
   GetElementPtrInst *createGEP(Type *ty, Value *v, ArrayRef<Value *> idxlist,
                                const string &NameStr) {
-    return GetElementPtrInst::Create(ty, v, idxlist, NameStr, CurrBB);
+    return GetElementPtrInst::Create(ty, v, idxlist, NameStr, LLVMBB);
   }
 
   void createBranch(Value *c, BasicBlock *t, BasicBlock *f) {
-    BranchInst::Create(t, f, c, CurrBB);
+    BranchInst::Create(t, f, c, LLVMBB);
   }
 
   void createBranch(BasicBlock *dst) {
-    BranchInst::Create(dst, CurrBB);
+    BranchInst::Create(dst, LLVMBB);
   }
 
   LoadInst *createLoad(Type *ty, Value *ptr, const string &NameStr = "") {
-    return new LoadInst(ty, ptr, (NameStr == "") ? next_name() : NameStr, CurrBB);
+    return new LoadInst(ty, ptr, (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   void createStore(Value *v, Value *ptr) {
-    new StoreInst(v, ptr, CurrBB);
+    new StoreInst(v, ptr, LLVMBB);
   }
 
   CallInst *createSSubOverflow(Value *a, Value *b) {
     auto ssub_decl = Intrinsic::getDeclaration(
         LiftedModule, Intrinsic::ssub_with_overflow, a->getType());
-    return CallInst::Create(ssub_decl, {a, b}, next_name(), CurrBB);
+    return CallInst::Create(ssub_decl, {a, b}, next_name(), LLVMBB);
   }
 
   CallInst *createSAddOverflow(Value *a, Value *b) {
     auto sadd_decl = Intrinsic::getDeclaration(
         LiftedModule, Intrinsic::sadd_with_overflow, a->getType());
-    return CallInst::Create(sadd_decl, {a, b}, next_name(), CurrBB);
+    return CallInst::Create(sadd_decl, {a, b}, next_name(), LLVMBB);
   }
 
   CallInst *createUSubOverflow(Value *a, Value *b) {
     auto usub_decl = Intrinsic::getDeclaration(
         LiftedModule, Intrinsic::usub_with_overflow, a->getType());
-    return CallInst::Create(usub_decl, {a, b}, next_name(), CurrBB);
+    return CallInst::Create(usub_decl, {a, b}, next_name(), LLVMBB);
   }
 
   CallInst *createUAddOverflow(Value *a, Value *b) {
     auto uadd_decl = Intrinsic::getDeclaration(
         LiftedModule, Intrinsic::uadd_with_overflow, a->getType());
-    return CallInst::Create(uadd_decl, {a, b}, next_name(), CurrBB);
+    return CallInst::Create(uadd_decl, {a, b}, next_name(), LLVMBB);
   }
 
   ExtractValueInst *createExtractValue(Value *v, ArrayRef<unsigned> idxs) {
-    return ExtractValueInst::Create(v, idxs, next_name(), CurrBB);
+    return ExtractValueInst::Create(v, idxs, next_name(), LLVMBB);
   }
 
   ReturnInst *createReturn(Value *v) {
-    return ReturnInst::Create(Ctx, v, CurrBB);
+    return ReturnInst::Create(Ctx, v, LLVMBB);
   }
 
   CallInst *createFShr(Value *a, Value *b, Value *c) {
     auto *decl =
         Intrinsic::getDeclaration(LiftedModule, Intrinsic::fshr, a->getType());
-    return CallInst::Create(decl, {a, b, c}, next_name(), CurrBB);
+    return CallInst::Create(decl, {a, b, c}, next_name(), LLVMBB);
   }
 
   CallInst *createFShl(Value *a, Value *b, Value *c) {
     auto *decl =
         Intrinsic::getDeclaration(LiftedModule, Intrinsic::fshl, a->getType());
-    return CallInst::Create(decl, {a, b, c}, next_name(), CurrBB);
+    return CallInst::Create(decl, {a, b, c}, next_name(), LLVMBB);
   }
 
   CallInst *createBitReverse(Value *v) {
     auto *decl = Intrinsic::getDeclaration(LiftedModule, Intrinsic::bitreverse,
                                            v->getType());
-    return CallInst::Create(decl, {v}, next_name(), CurrBB);
+    return CallInst::Create(decl, {v}, next_name(), LLVMBB);
   }
 
   CallInst *createCtlz(Value *v) {
     auto *decl =
         Intrinsic::getDeclaration(LiftedModule, Intrinsic::ctlz, v->getType());
-    return CallInst::Create(decl, {v, getIntConst(0, 1)}, next_name(), CurrBB);
+    return CallInst::Create(decl, {v, getIntConst(0, 1)}, next_name(), LLVMBB);
   }
 
   CallInst *createBSwap(Value *v) {
     auto *decl =
         Intrinsic::getDeclaration(LiftedModule, Intrinsic::bswap, v->getType());
-    return CallInst::Create(decl, {v}, next_name(), CurrBB);
+    return CallInst::Create(decl, {v}, next_name(), LLVMBB);
   }
 
   SelectInst *createSelect(Value *cond, Value *a, Value *b) {
-    return SelectInst::Create(cond, a, b, next_name(), CurrBB);
+    return SelectInst::Create(cond, a, b, next_name(), LLVMBB);
   }
 
   ICmpInst *createICmp(ICmpInst::Predicate p, Value *a, Value *b) {
-    return new ICmpInst(*CurrBB, p, a, b, next_name());
+    return new ICmpInst(*LLVMBB, p, a, b, next_name());
   }
 
   BinaryOperator *createBinop(Value *a, Value *b, Instruction::BinaryOps op) {
     outs() << "a.width = " << a->getType()->getIntegerBitWidth() << "\n";
     outs() << "b.width = " << b->getType()->getIntegerBitWidth() << "\n";
-    return BinaryOperator::Create(op, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(op, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createUDiv(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::UDiv, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::UDiv, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createSDiv(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::SDiv, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::SDiv, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createMul(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Mul, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Mul, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createAdd(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Add, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Add, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createSub(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Sub, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Sub, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createLShr(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::LShr, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::LShr, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createAShr(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::AShr, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::AShr, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createShl(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Shl, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Shl, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createAnd(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::And, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::And, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createOr(Value *a, Value *b, const string &NameStr = "") {
     return BinaryOperator::Create(
-        Instruction::Or, a, b, (NameStr == "") ? next_name() : NameStr, CurrBB);
+        Instruction::Or, a, b, (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   BinaryOperator *createXor(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Xor, a, b, next_name(), CurrBB);
+    return BinaryOperator::Create(Instruction::Xor, a, b, next_name(), LLVMBB);
   }
 
   BinaryOperator *createLogicalNot(Value *a) {
     auto *ty = a->getType();
     auto NegOne = ConstantInt::getSigned(ty, -1);
     return BinaryOperator::Create(Instruction::Xor, a, NegOne, next_name(),
-                                  CurrBB);
+                                  LLVMBB);
   }
 
   FreezeInst *createFreeze(Value *v, const string &NameStr = "") {
-    return new FreezeInst(v, (NameStr == "") ? next_name() : NameStr, CurrBB);
+    return new FreezeInst(v, (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   CastInst *createTrunc(Value *v, Type *t, const string &NameStr = "") {
     return CastInst::Create(Instruction::Trunc, v, t,
-                            (NameStr == "") ? next_name() : NameStr, CurrBB);
+                            (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   // This implements the SMTLIB-like extract operator from Isla traces
@@ -807,22 +807,22 @@ class arm2llvm_ {
 
   CastInst *createSExt(Value *v, Type *t, const string &NameStr = "") {
     return CastInst::Create(Instruction::SExt, v, t,
-                            (NameStr == "") ? next_name() : NameStr, CurrBB);
+                            (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   InsertElementInst *createInsertElement(Value *vec, Value *val, Value *index) {
-    return InsertElementInst::Create(vec, val, index, next_name(), CurrBB);
+    return InsertElementInst::Create(vec, val, index, next_name(), LLVMBB);
   }
 
   CastInst *createZExt(Value *v, Type *t, const string &NameStr = "") {
     return CastInst::Create(Instruction::ZExt, v, t,
-                            (NameStr == "") ? next_name() : NameStr, CurrBB);
+                            (NameStr == "") ? next_name() : NameStr, LLVMBB);
   }
 
   CastInst *createCast(Value *v, Type *t, Instruction::CastOps op,
                        const string &NameStr = "") {
     return CastInst::Create(op, v, t, (NameStr == "") ? next_name() : NameStr,
-                            CurrBB);
+                            LLVMBB);
   }
 
   // return pointer to the backing store for a register, doing the
@@ -2251,7 +2251,7 @@ public:
       auto *dst_false = getBBByName(Fn, Sym.getName());
 
       outs() << "current mcblock = " << MCBB->getName() << "\n";
-      outs() << "Curr BB=" << CurrBB->getName().str() << "\n";
+      outs() << "Curr BB=" << LLVMBB->getName().str() << "\n";
       outs() << "jump target = " << Sym.getName().str() << "\n";
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
@@ -2295,14 +2295,14 @@ public:
            << "\n";
 
     // create LLVM-side basic blocks
-    vector<pair<BasicBlock *, MCBasicBlock *>> bbs;
+    vector<pair<BasicBlock *, MCBasicBlock *>> BBs;
     for (auto &mbb : MF.BBs) {
       auto bb = BasicBlock::Create(Ctx, mbb.getName(), Fn);
-      bbs.push_back(make_pair(bb, &mbb));
+      BBs.push_back(make_pair(bb, &mbb));
     }
 
     // default to adding instructions to the entry block
-    CurrBB = bbs[0].first;
+    LLVMBB = BBs[0].first;
 
     // allocate storage for the main register file; FIXME not worrying
     // about X29 and X30 -- code that touches them should trip out and
@@ -2393,9 +2393,9 @@ public:
       }
     }
 
-    for (auto &[llvm_bb, mc_bb] : bbs) {
+    for (auto &[llvm_bb, mc_bb] : BBs) {
       outs() << "visiting bb: " << mc_bb->getName() << "\n";
-      CurrBB = llvm_bb;
+      LLVMBB = llvm_bb;
       MCBB = mc_bb;
       auto &mc_instrs = mc_bb->getInstrs();
 
@@ -2406,7 +2406,7 @@ public:
         outs() << "after visit\n";
       }
 
-      if (!CurrBB->getTerminator()) {
+      if (!LLVMBB->getTerminator()) {
         assert(MCBB->getSuccs().size() == 1 &&
                "expected 1 successor for block with no terminator");
         auto *dst = getBBByName(*Fn, MCBB->getSuccs()[0]->getName());
@@ -2419,7 +2419,7 @@ public:
   }
 };
 
-// Convert an MCFucntion to IR::Function
+// Convert an MCFunction to IR::Function
 // Adapted from llvm2alive_ in llvm2alive.cpp with some simplifying assumptions
 // FIXME for now, we are making a lot of simplifying assumptions like assuming
 // types of arguments.
@@ -2447,9 +2447,6 @@ private:
 public:
   MCFunction MF;
   unsigned cnt{0};
-  vector<MCInst>
-      Insts; // CHECK this should go as it's only being used for pretty printing
-             // which makes it unused after fixing MCInstWrapper::print
   using BlockSetTy = SetVector<MCBasicBlock *>;
 
   MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_IA,
@@ -2466,12 +2463,10 @@ public:
 
     assert(prev_line != ASMLine::none);
 
-    if (prev_line == ASMLine::terminator) {
+    if (prev_line == ASMLine::terminator)
       temp_block = MF.addBlock(MF.getLabel());
-    }
     MCInstWrapper Cur_Inst(Inst);
     temp_block->addInst(Cur_Inst);
-    Insts.push_back(Inst);
 
     prev_line = IA->isTerminator(Inst) ? ASMLine::terminator : ASMLine::non_term_instr;
     auto &inst_ref = Cur_Inst.getMCInst();
@@ -2737,31 +2732,15 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->setTargetParser(*TAP);
   Parser->Run(true); // ??
 
-  // FIXME remove printing of the mcInsts
-  // For now, print the parsed instructions for debug puropses
-  outs() << "\n\nPretty Parsed MCInsts:\n";
-  for (auto I : MCSW.Insts) {
-    I.dump_pretty(outs(), IPtemp.get(), " ", MRI.get());
-    outs() << '\n';
-  }
-
-  outs() << "\n\nParsed MCInsts:\n";
-  for (auto I : MCSW.Insts) {
-    I.dump_pretty(outs());
-    outs() << '\n';
-  }
-
-  outs() << "\n\n";
-
   MCSW.printBlocksMF();
   MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
   MCSW.printBlocksMF();
 
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.findArgs(srcFn); // needs refactoring
+  MCSW.findArgs(srcFn); // FIXME needs refactoring
   MCSW.printCFG();
-  MCSW.adjustReturns(); // needs refactoring
+  MCSW.adjustReturns(); // FIXME needs refactoring
 
   auto lifted =
       arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
