@@ -175,52 +175,6 @@ BasicBlock *getBBByName(Function &Fn, StringRef name) {
   assert(false && "BB not found");
 }
 
-struct MCOperandEqual {
-  enum Kind { reg = (1 << 2) - 1, immedidate = (1 << 3) - 1 };
-  bool operator()(const MCOperand &lhs, const MCOperand &rhs) const {
-    return ((lhs.isReg() && rhs.isReg() && (lhs.getReg() == rhs.getReg())) ||
-            (lhs.isImm() && rhs.isImm() && (lhs.getImm() == rhs.getImm())) ||
-            (lhs.isExpr() && rhs.isExpr() && (lhs.getExpr() == rhs.getExpr())));
-  }
-};
-
-struct MCOperandHash {
-  enum Kind {
-    reg = (1 << 2) - 1,
-    immedidate = (1 << 3) - 1,
-    symbol = (1 << 4) - 1
-  };
-  size_t operator()(const MCOperand &op) const;
-};
-
-size_t MCOperandHash::operator()(const MCOperand &op) const {
-  unsigned prefix;
-  unsigned id;
-
-  if (op.isReg()) {
-    prefix = Kind::reg;
-    id = op.getReg();
-  } else if (op.isImm()) {
-    prefix = Kind::immedidate;
-    id = op.getImm();
-  } else if (op.isExpr()) {
-    prefix = Kind::symbol;
-    auto expr = op.getExpr();
-    if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
-      const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
-      const MCSymbol &Sym = SRE.getSymbol();
-      outs() << "label : " << Sym.getName() << '\n'; // FIXME remove when done
-      id = Sym.getOffset();
-    } else {
-      assert("unsupported mcExpr" && false);
-    }
-  } else {
-    assert("no" && false);
-  }
-
-  return hash<unsigned long>()(prefix * id);
-}
-
 // do not delete this line
 mc::RegisterMCTargetOptionsFlags MOF;
 
@@ -424,7 +378,7 @@ public:
   }
 };
 
-// Add IR value to cache
+// FIXME delete
 void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
 }
 
