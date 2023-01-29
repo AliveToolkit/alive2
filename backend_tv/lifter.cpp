@@ -378,7 +378,6 @@ public:
       auto new_block = addBlock("entry");
       MCInst ret_instr;
       ret_instr.setOpcode(AArch64::RET);
-      ret_instr.addOperand(MCOperand::createReg(AArch64::X0));
       new_block->addInstBegin(std::move(ret_instr));
     }
 
@@ -2101,7 +2100,7 @@ public:
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
           outs() << "return width = " << retWidth << "\n";
-          auto val = readFromRegister(mc_inst.getOperand(0).getReg());
+          auto val = readFromRegister(AArch64::X0);
 
           if (retWidth < val->getType()->getIntegerBitWidth())
             val = createTrunc(val, getIntTy(retWidth));
@@ -2585,23 +2584,6 @@ public:
     }
   }
 
-  // FIXME this shouldn't be necessary
-  void adjustReturns() {
-    for (auto &block : MF.BBs) {
-      for (auto &instr : block.getInstrs()) {
-        if (instr.getOpcode() == AArch64::RET) {
-          auto &retArg = instr.getMCInst().getOperand(0);
-          retArg.setReg(AArch64::X0);
-        }
-      }
-    }
-
-    outs() << "After adjusting return:\n";
-    for (auto &b : MF.BBs) {
-      outs() << b.getName() << ":\n";
-      b.print();
-    }
-  }
 };
 
 } // namespace
@@ -2688,7 +2670,6 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.removeEmptyBlocks();
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.adjustReturns(); // FIXME needs refactoring
 
   MCSW.printBlocksMF();
 
