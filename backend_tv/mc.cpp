@@ -279,8 +279,6 @@ public:
     UNREACHABLE();
   }
 
-  // FIXME: for phi instructions and figure out to use register names rather
-  // than numbers
   void print() const {
     outs() << "< MCInstWrapper " << getOpcode() << " ";
     unsigned idx = 0;
@@ -361,11 +359,6 @@ class MCFunction {
   string name;
   unsigned label_cnt{0};
   using BlockSetTy = SetVector<MCBasicBlock *>;
-  unordered_map<MCBasicBlock *, BlockSetTy> dom;
-  unordered_map<MCBasicBlock *, BlockSetTy> dom_frontier;
-  unordered_map<MCBasicBlock *, BlockSetTy> dom_tree;
-
-  unordered_map<MCOperand, BlockSetTy, MCOperandHash, MCOperandEqual> defs;
   vector<MCOperand> fn_args;
 
 public:
@@ -373,7 +366,6 @@ public:
   MCInstPrinter *IP;
   MCRegisterInfo *MRI;
   vector<MCBasicBlock> BBs;
-  unordered_map<MCBasicBlock *, BlockSetTy> dom_tree_inv;
 
   MCFunction() {}
   MCFunction(string _name) : name(_name) {}
@@ -2698,28 +2690,6 @@ public:
   // Make sure that we have an entry label with no predecessors
   void addEntryBlock() {
     MF.addEntryBlock();
-  }
-
-  void postOrderDFS(MCBasicBlock &curBlock, BlockSetTy &visited,
-                    vector<MCBasicBlock *> &postOrder) {
-    visited.insert(&curBlock);
-    for (auto succ : curBlock.getSuccs()) {
-      if (find(visited.begin(), visited.end(), succ) == visited.end()) {
-        postOrderDFS(*succ, visited, postOrder);
-      }
-    }
-    postOrder.push_back(&curBlock);
-  }
-
-  vector<MCBasicBlock *> postOrder() {
-    vector<MCBasicBlock *> postOrder;
-    BlockSetTy visited;
-    for (auto &curBlock : MF.BBs) {
-      if (visited.count(&curBlock) == 0) {
-        postOrderDFS(curBlock, visited, postOrder);
-      }
-    }
-    return postOrder;
   }
 
   // FIXME: this is duplicated code. need to refactor
