@@ -2002,26 +2002,25 @@ public:
         }
         createReturn(vec);
       } else {
-        if (ret_void) {
-          createReturn(nullptr);
-        } else {
+	Value *retVal = nullptr;
+        if (!ret_void) {
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
           outs() << "return width = " << retWidth << "\n";
-          auto val = readFromRegister(AArch64::X0);
+          retVal = readFromRegister(AArch64::X0);
 
-          if (retWidth < val->getType()->getIntegerBitWidth())
-            val = createTrunc(val, getIntTy(retWidth));
+          if (retWidth < retVal->getType()->getIntegerBitWidth())
+            retVal = createTrunc(retVal, getIntTy(retWidth));
 
-          // for don't care bits we need to mask them off before returning
+	  // mask off any don't-care bits
           if (has_ret_attr && (orig_ret_bitwidth < 32)) {
             assert(retWidth >= orig_ret_bitwidth);
             assert(retWidth == 64);
-            auto trunc = createTrunc(val, i32);
-            val = createZExt(trunc, i64);
+            auto trunc = createTrunc(retVal, i32);
+            retVal = createZExt(trunc, i64);
           }
-          createReturn(val);
         }
+	createReturn(retVal);
       }
       break;
     }
@@ -2343,15 +2342,14 @@ public:
 
     if (prev_line == ASMLine::terminator)
       temp_block = MF.addBlock(MF.getLabel());
-    MCInst Cur_Inst(Inst);
-    temp_block->addInst(Cur_Inst);
+    MCInst curInst(Inst);
+    temp_block->addInst(curInst);
 
     prev_line =
         IA->isTerminator(Inst) ? ASMLine::terminator : ASMLine::non_term_instr;
-    auto &inst_ref = Cur_Inst;
-    auto num_operands = inst_ref.getNumOperands();
+    auto num_operands = curInst.getNumOperands();
     for (unsigned i = 0; i < num_operands; ++i) {
-      auto op = inst_ref.getOperand(i);
+      auto op = curInst.getOperand(i);
       if (op.isExpr()) {
         auto expr = op.getExpr();
         if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
@@ -2400,14 +2398,12 @@ public:
     string cur_label = Symbol->getName().str();
     temp_block = MF.addBlock(cur_label);
     prev_line = ASMLine::label;
-    outs() << cnt++ << "  : ";
-    outs() << "inside Emit Label: symbol=" << Symbol->getName() << '\n';
   }
 
-  string findTargetLabel(MCInst &inst_ref) {
-    auto num_operands = inst_ref.getNumOperands();
+  string findTargetLabel(MCInst &Inst) {
+    auto num_operands = Inst.getNumOperands();
     for (unsigned i = 0; i < num_operands; ++i) {
-      auto op = inst_ref.getOperand(i);
+      auto op = Inst.getOperand(i);
       if (op.isExpr()) {
         auto expr = op.getExpr();
         if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
@@ -2497,11 +2493,10 @@ public:
 
 namespace lifter {
 
+vector<unsigned> orig_input_width;
 unsigned int orig_ret_bitwidth;
 bool has_ret_attr;
 const Target *Targ;
-
-vector<unsigned> orig_input_width;
 
 void reset() {
   static bool initialized = false;
@@ -2573,11 +2568,9 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->Run(true); // ??
 
   MCSW.printBlocksMF();
-
   MCSW.removeEmptyBlocks();
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
-
   MCSW.printBlocksMF();
 
   auto lifted =
