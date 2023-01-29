@@ -185,9 +185,9 @@ string findTargetLabel(MCInst &Inst) {
     if (op.isExpr()) {
       auto expr = op.getExpr();
       if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
-	const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
-	const MCSymbol &Sym = SRE.getSymbol();
-	return Sym.getName().str();
+        const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
+        const MCSymbol &Sym = SRE.getSymbol();
+        return Sym.getName().str();
       }
     }
   }
@@ -205,7 +205,7 @@ void print(MCInst &Inst) {
       outs() << "<MCOperand Imm:" << it->getImm() << ">";
     } else if (it->isExpr()) {
       outs() << "<MCOperand Expr:>"; // FIXME
-      } else {
+    } else {
       assert("MCInst printing an unsupported operand" && false);
     }
     idx++;
@@ -260,7 +260,6 @@ public:
   auto succEnd() const {
     return Succs.end();
   }
-
 };
 
 // Represents a machine function
@@ -356,8 +355,7 @@ public:
 };
 
 // FIXME delete
-void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
-}
+void mc_add_identifier(unsigned reg, unsigned version, Value *v) {}
 
 // Code taken from llvm. This should be okay for now. But we generally
 // don't want to trust the llvm implementation so we need to complete my
@@ -719,7 +717,7 @@ class arm2llvm_ {
       return 64;
     assert(false && "unhandled register");
   }
-  
+
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
   Value *getRegStorage(unsigned Reg) {
@@ -764,8 +762,7 @@ class arm2llvm_ {
   }
 
   // TODO remove
-  void add_identifier(Value *v) {
-  }
+  void add_identifier(Value *v) {}
 
   void writeToOutputReg(Value *V, bool s = false) {
     auto Reg = CurInst->getOperand(0).getReg();
@@ -921,8 +918,7 @@ public:
   arm2llvm_(Module *LiftedModule, MCFunction &MF, Function &srcFn,
             MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
-        instrPrinter(instrPrinter), registerInfo(registerInfo),
-        instCount(0) {}
+        instrPrinter(instrPrinter), registerInfo(registerInfo), instCount(0) {}
 
 #if 1
   void revInst(Value *V) {
@@ -1205,7 +1201,8 @@ public:
       auto size = getInstSize(opcode);
       Value *rhs = nullptr;
       if (CurInst->getOperand(2).isImm()) {
-        auto imm = decodeLogicalImmediate(CurInst->getOperand(2).getImm(), size);
+        auto imm =
+            decodeLogicalImmediate(CurInst->getOperand(2).getImm(), size);
         rhs = getIntConst(imm, size);
       } else {
         rhs = readFromOperand(2);
@@ -2283,7 +2280,7 @@ public:
       for (auto &mc_instr : mc_instrs) {
         print(mc_instr);
         mc_visit(mc_instr, *Fn);
-	++instCount;
+        ++instCount;
       }
 
       // machine code falls through but LLVM isn't allowed to
@@ -2475,7 +2472,7 @@ public:
     }
   }
 
-// Remove empty basic blocks, including .Lfunc_end
+  // Remove empty basic blocks, including .Lfunc_end
   void removeEmptyBlocks() {
     outs() << "removing empty basic blocks" << '\n';
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
@@ -2494,7 +2491,6 @@ public:
       i++;
     }
   }
-
 };
 
 } // namespace
