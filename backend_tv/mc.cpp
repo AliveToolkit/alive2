@@ -2020,9 +2020,9 @@ public:
     }
     case AArch64::MADDWrrr:
     case AArch64::MADDXrrr: {
-      auto mul_lhs = readFromOperand(1, 0);
-      auto mul_rhs = readFromOperand(2, 0);
-      auto addend = readFromOperand(3, 0);
+      auto mul_lhs = readFromOperand(1);
+      auto mul_rhs = readFromOperand(2);
+      auto addend = readFromOperand(3);
 
       auto mul = createMul(mul_lhs, mul_rhs);
       auto add = createAdd(mul, addend);
@@ -2031,9 +2031,9 @@ public:
     }
     case AArch64::UMADDLrrr: {
       auto size = getInstSize(opcode);
-      auto mul_lhs = readFromOperand(1, 0);
-      auto mul_rhs = readFromOperand(2, 0);
-      auto addend = readFromOperand(3, 0);
+      auto mul_lhs = readFromOperand(1);
+      auto mul_rhs = readFromOperand(2);
+      auto addend = readFromOperand(3);
 
       auto lhs_masked = createAnd(mul_lhs, getIntConst(0xffffffffUL, size));
       auto rhs_masked = createAnd(mul_rhs, getIntConst(0xffffffffUL, size));
@@ -2046,9 +2046,9 @@ public:
       // Signed Multiply-Add Long multiplies two 32-bit register values,
       // adds a 64-bit register value, and writes the result to the 64-bit
       // destination register.
-      auto mul_lhs = readFromOperand(1, 0);
-      auto mul_rhs = readFromOperand(2, 0);
-      auto addend = readFromOperand(3, 0);
+      auto mul_lhs = readFromOperand(1);
+      auto mul_rhs = readFromOperand(2);
+      auto addend = readFromOperand(3);
 
       // The inputs are automatically zero extended, but we want sign extension,
       // so we need to truncate them back to i32s
@@ -2075,16 +2075,16 @@ public:
       if (wrapper->getMCInst().getOperand(1).getReg() == AArch64::WZR) {
         mul_lhs = getIntConst(0, size);
       } else {
-        mul_lhs = readFromOperand(1, 0);
+        mul_lhs = readFromOperand(1);
       }
 
       if (wrapper->getMCInst().getOperand(2).getReg() == AArch64::WZR) {
         mul_rhs = getIntConst(0, size);
       } else {
-        mul_rhs = readFromOperand(2, 0);
+        mul_rhs = readFromOperand(2);
       }
 
-      auto minuend = readFromOperand(3, 0);
+      auto minuend = readFromOperand(3);
 
       // The inputs are automatically zero extended, but we want sign
       // extension for signed, so we need to truncate them back to i32s
@@ -2112,8 +2112,8 @@ public:
     case AArch64::UMULHrr: {
       // SMULH: Signed Multiply High
       // UMULH: Unsigned Multiply High
-      auto mul_lhs = readFromOperand(1, 0);
-      auto mul_rhs = readFromOperand(2, 0);
+      auto mul_lhs = readFromOperand(1);
+      auto mul_rhs = readFromOperand(2);
 
       // For unsigned multiplication, must zero extend the lhs and rhs to not
       // overflow For signed multiplication, must sign extend the lhs and rhs to
@@ -2139,9 +2139,9 @@ public:
     }
     case AArch64::MSUBWrrr:
     case AArch64::MSUBXrrr: {
-      auto mul_lhs = readFromOperand(1, 0);
-      auto mul_rhs = readFromOperand(2, 0);
-      auto minuend = readFromOperand(3, 0);
+      auto mul_lhs = readFromOperand(1);
+      auto mul_rhs = readFromOperand(2);
+      auto minuend = readFromOperand(3);
       auto mul = createMul(mul_lhs, mul_rhs);
       auto sub = createSub(minuend, mul);
       writeToOutputReg(sub);
@@ -3007,7 +3007,6 @@ public:
   Function *run() {
     auto i32 = getIntTy(32);
     auto i64 = getIntTy(64);
-    auto i128 = getIntTy(128);
 
     auto Fn =
         Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
@@ -3026,8 +3025,14 @@ public:
       Name << "X" << Reg - AArch64::X0;
       createRegStorage(Reg, 64, Name.str());
     }
+
+    // we model SP partially symbolically; it stores the offset into a
+    // the stack block
     createRegStorage(AArch64::SP, 64, "SP");
+    createStore(getIntConst(0, 64), RegFile[AArch64::SP]);
+    
     createRegStorage(AArch64::LR, 64, "LR");
+    
     // initializing to zero makes loads from XZR work; stores are
     // handled in writeToOutputReg()
     createRegStorage(AArch64::XZR, 64, "XZR");
@@ -3041,79 +3046,42 @@ public:
 
     // allocate storage for the stack
 
-    // store parameters into registers and stack slots
+    // implement the callee side of the ABI; FIXME -- this code
+    // requires significant generalization to handle large parameters,
+    // and vector and FP values
     unsigned argNum = 0;
     for (auto &Arg : Fn->args()) {
-      auto operand = MCOperand::createReg(AArch64::X0 + argNum);
-      auto Reg = operand.getReg();
-      Value *V = createFreeze(&Arg, next_name(Reg, 1));
+      if (argNum < 8) {
+        auto operand = MCOperand::createReg(AArch64::X0 + argNum);
+        auto Reg = operand.getReg();
+        Value *V = createFreeze(&Arg, next_name(Reg, 1));
 
-      auto orig_width = orig_input_width[argNum];
-      // TODO maybe this is in a separate function
-      if (orig_width < 64) {
-        auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
-        auto orig_ty = getIntTy(orig_width);
-        V = createTrunc(V, orig_ty, next_name(Reg, 2));
-        if (orig_width == 1) {
-          V = createCast(V, i32, op, next_name(Reg, 3));
-          V = createZExt(V, i64, next_name(Reg, 4));
-        } else {
-          if (orig_width < 32) {
+        auto orig_width = orig_input_width[argNum];
+        // TODO maybe this is in a separate function
+        if (orig_width < 64) {
+          auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
+          auto orig_ty = getIntTy(orig_width);
+          V = createTrunc(V, orig_ty, next_name(Reg, 2));
+          if (orig_width == 1) {
             V = createCast(V, i32, op, next_name(Reg, 3));
             V = createZExt(V, i64, next_name(Reg, 4));
           } else {
-            V = createCast(V, i64, op, next_name(Reg, 4));
+            if (orig_width < 32) {
+              V = createCast(V, i32, op, next_name(Reg, 3));
+              V = createZExt(V, i64, next_name(Reg, 4));
+            } else {
+              V = createCast(V, i64, op, next_name(Reg, 4));
+            }
           }
         }
+        createStore(V, RegFile[Reg]);
+      } else {
+        assert(false && "implement the stack");
       }
-      // TODO also into stack slots
-      createStore(V, RegFile[Reg]);
       argNum++;
     }
 
     // TODO vector registers
-
-    argNum = 0;
-    for (auto &Arg : Fn->args()) {
-      // generate names and values for the input arguments
-      // FIXME this is pretty convoluted and needs to be cleaned up
-      auto operand = MCOperand::createReg(AArch64::X0 + argNum);
-
-      Value *stored = createFreeze(&Arg, next_name(operand.getReg(), 1));
-
-      mc_add_identifier(operand.getReg(), 1, &Arg);
-      assert(Arg.getType()->getIntegerBitWidth() == 64 &&
-             "at this point input type should be 64 bits");
-
-      auto orig_width = orig_input_width[argNum];
-      if (orig_width < 64) {
-        auto op = Instruction::ZExt;
-        if (Arg.hasSExtAttr())
-          op = Instruction::SExt;
-
-        auto truncated_type = getIntTy(orig_width);
-        stored =
-            createTrunc(stored, truncated_type, next_name(operand.getReg(), 2));
-        if (truncated_type->getIntegerBitWidth() == 1) {
-          stored = createCast(stored, i32, op, next_name(operand.getReg(), 3));
-          stored = createZExt(stored, i64, next_name(operand.getReg(), 4));
-        } else {
-          if (truncated_type->getIntegerBitWidth() < 32) {
-            stored =
-                createCast(stored, i32, op, next_name(operand.getReg(), 3));
-            stored = createZExt(stored, i64, next_name(operand.getReg(), 4));
-          } else {
-            stored =
-                createCast(stored, i64, op, next_name(operand.getReg(), 4));
-          }
-        }
-      }
-      instructionCount++;
-      mc_add_identifier(operand.getReg(), 2, stored);
-      argNum++;
-    }
-    outs() << "created non-vector args"
-           << "\n";
 
     // FIXME: Hacky way of supporting parameters passed via the stack
     // need to properly model the parameter passing rules described in
@@ -3140,31 +3108,6 @@ public:
         mc_add_identifier(AArch64::SP, reg_num, get_xi);
         createStore(readFromRegister(AArch64::SP, "stack_"), get_xi);
       }
-    }
-
-    auto poison_val = PoisonValue::get(i64);
-    auto vect_poison_val = PoisonValue::get(i128);
-    outs() << "argNum = " << argNum << "\n";
-    outs() << "entry mc_bb = " << sorted_bbs[0].second->getName() << "\n";
-    auto entry_mc_bb = sorted_bbs[0].second;
-    // add remaining volatile registers and set them to unitialized value
-    // we chose frozen poison value to give a random yet determinate value
-    // FIXME: using the number of arguments to the function to determine which
-    // registers are uninitialized is hacky and will break when passing FP
-    // arguments
-
-    for (unsigned int i = AArch64::X0 + argNum; i <= AArch64::X17; ++i) {
-      auto val = createOr(poison_val, getIntConst(0, 64), next_name(i, 3));
-      auto val_frozen = createFreeze(val, next_name(i, 4));
-      mc_add_identifier(i, 2, val_frozen);
-    }
-
-    for (unsigned int i = AArch64::Q0; i <= AArch64::Q3; ++i) {
-      auto val =
-          createOr(vect_poison_val, getIntConst(0, 128), next_name(i, 3));
-      auto val_frozen = createFreeze(val, next_name(i, 4));
-      mc_add_identifier(i, 2, val_frozen);
-      cur_vol_regs[entry_mc_bb][i] = val_frozen;
     }
 
     for (auto &[llvm_bb, mc_bb] : sorted_bbs) {
@@ -3613,9 +3556,9 @@ const Target *Targ;
 vector<unsigned> orig_input_width;
 
 void reset() {
-  static bool runAlready = false;
+  static bool initialized = false;
 
-  if (!runAlready) {
+  if (!initialized) {
     LLVMInitializeAArch64TargetInfo();
     LLVMInitializeAArch64Target();
     LLVMInitializeAArch64TargetMC();
@@ -3629,7 +3572,7 @@ void reset() {
       exit(-1);
     }
 
-    runAlready = true;
+    initialized = true;
   }
 
   // FIXME this is a pretty error-prone way to reset the state,
