@@ -169,17 +169,11 @@ bool has_s(int instr) {
 
 // FIXME -- do this without the strings, just keep a map or something
 BasicBlock *getBBByName(Function &Fn, StringRef name) {
-  outs() << "searching for BB named '" << (string)name << "'\n";
-  BasicBlock *BB = nullptr;
   for (auto &bb : Fn) {
-    outs() << "  we have a BB named '" << (string)bb.getName() << "'\n";
-    if (bb.getName() == name) {
-      BB = &bb;
-      break;
-    }
+    if (bb.getName() == name)
+      return &bb;
   }
-  assert(BB && "BB not found");
-  return BB;
+  assert(false && "BB not found");
 }
 
 struct MCOperandEqual {
@@ -243,19 +237,6 @@ public:
 
   MCInst &getMCInst() {
     return instr;
-  }
-
-  void pushOpId(unsigned id) {
-    op_ids.push_back(id);
-  }
-
-  void setOpId(unsigned index, unsigned id) {
-    assert(op_ids.size() > index && "Invalid index");
-    op_ids[index] = id;
-  }
-
-  unsigned getOpId(unsigned index) {
-    return op_ids[index];
   }
 
   unsigned getOpcode() const {
@@ -348,9 +329,8 @@ public:
   }
 
   void print() const {
-    for (auto &instr : Instrs) {
+    for (auto &instr : Instrs)
       instr.print();
-    }
   }
 };
 
@@ -390,7 +370,7 @@ public:
     for (auto &bb : BBs)
       if (bb.getName() == b_name)
         return &bb;
-    return nullptr;
+    assert(false && "block not found");
   }
 
   void addEntryBlock() {
@@ -432,26 +412,6 @@ public:
     }
   }
 
-  void postOrderDFS(MCBasicBlock &curBlock, BlockSetTy &visited,
-                    vector<MCBasicBlock *> &postOrder) {
-    visited.insert(&curBlock);
-    for (auto succ : curBlock.getSuccs()) {
-      if (find(visited.begin(), visited.end(), succ) == visited.end())
-        postOrderDFS(*succ, visited, postOrder);
-    }
-    postOrder.push_back(&curBlock);
-  }
-
-  vector<MCBasicBlock *> postOrder() {
-    vector<MCBasicBlock *> postOrder;
-    BlockSetTy visited;
-    for (auto &curBlock : BBs) {
-      if (visited.count(&curBlock) == 0)
-        postOrderDFS(curBlock, visited, postOrder);
-    }
-    return postOrder;
-  }
-
   // FIXME: this is duplicated code. need to refactor
   void findArgs(Function *src_fn) {
     unsigned arg_num = 0;
@@ -472,71 +432,6 @@ public:
       arg.print(outs(), MRI);
       outs() << "\n";
     }
-  }
-
-  // go over 32 bit registers and replace them with the corresponding 64 bit
-  // FIXME: this will probably have some uninteded consequences that we need to
-  // identify
-  void rewriteOperands() {
-
-    // FIXME: this lambda is pretty hacky and brittle
-    auto in_range_rewrite = [&](MCOperand &op) {
-      if (op.isReg()) {
-        if (op.getReg() >= AArch64::W0 &&
-            op.getReg() <= AArch64::W28) { // FIXME: Why 28?
-          op.setReg(op.getReg() + AArch64::X0 - AArch64::W0);
-          // FIXME refactor and also need to deal with vector register aliases
-        } else if (op.getReg() >= AArch64::B0 && op.getReg() <= AArch64::B31) {
-          op.setReg(op.getReg() + AArch64::Q0 - AArch64::B0);
-        } else if (op.getReg() >= AArch64::H0 && op.getReg() <= AArch64::H31) {
-          op.setReg(op.getReg() + AArch64::Q0 - AArch64::H0);
-        } else if (op.getReg() >= AArch64::S0 && op.getReg() <= AArch64::S31) {
-          op.setReg(op.getReg() + AArch64::Q0 - AArch64::S0);
-        } else if (op.getReg() >= AArch64::D0 && op.getReg() <= AArch64::D31) {
-          op.setReg(op.getReg() + AArch64::Q0 - AArch64::D0);
-        } else if (!(op.getReg() >= AArch64::X0 &&
-                     op.getReg() <= AArch64::X28) &&
-                   !(op.getReg() >= AArch64::Q0 &&
-                     op.getReg() <= AArch64::Q31) &&
-                   !(op.getReg() <= AArch64::XZR &&
-                     op.getReg() >= AArch64::WZR) &&
-                   !(op.getReg() == AArch64::NoRegister) &&
-                   !(op.getReg() == AArch64::LR) &&
-                   !(op.getReg() == AArch64::SP)) {
-          // temporarily fix to print the name of unsupported register when
-          // encountered
-          string buff;
-          raw_string_ostream str_stream(buff);
-          op.print(str_stream, MRI);
-          stringstream error_msg;
-          error_msg << "Unsupported registers detected in the Assembly: "
-                    << str_stream.str();
-          report_fatal_error(error_msg.str().c_str());
-        }
-      }
-    };
-
-    for (auto &fn_arg : fn_args)
-      in_range_rewrite(fn_arg);
-
-    for (auto &block : BBs) {
-      for (auto &w_instr : block.getInstrs()) {
-        auto &mc_instr = w_instr.getMCInst();
-        for (unsigned i = 0; i < mc_instr.getNumOperands(); ++i) {
-          auto &operand = mc_instr.getOperand(i);
-          in_range_rewrite(operand);
-        }
-      }
-    }
-
-    outs() << "printing fn_args after rewrite\n";
-    for (auto &arg : fn_args) {
-      arg.print(outs(), MRI);
-      outs() << "\n";
-    }
-
-    outs() << "printing MCInsts after rewriting operands\n";
-    printBlocks();
   }
 
   void printBlocks() {
@@ -724,7 +619,7 @@ class arm2llvm_ {
       ss << "tx" << ++curId << "x" << instructionCount << "x" << blockCount;
     } else {
       ss << registerInfo->getName(wrapper->getMCInst().getOperand(0).getReg())
-         << "_" << wrapper->getOpId(0) << "x" << ++curId << "x"
+         << "x" << ++curId << "x"
          << instructionCount << "x" << blockCount;
     }
     return ss.str();
@@ -980,10 +875,10 @@ class arm2llvm_ {
     return V;
   }
 
+  // TODO remove
   void add_identifier(Value *v) {
     auto reg = wrapper->getMCInst().getOperand(0).getReg();
-    auto version = wrapper->getOpId(0);
-    // TODO: this probably should be in visit
+    auto version = -1;
     instructionCount++;
     mc_add_identifier(reg, version, v);
   }
@@ -2697,10 +2592,6 @@ public:
     MF.findArgs(src_fn);
   }
 
-  void rewriteOperands() {
-    MF.rewriteOperands();
-  }
-
   // Only call after MF with Basicblocks is constructed to generate the
   // successors for each basic block
   void generateSuccessors() {
@@ -2903,7 +2794,6 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
   MCSW.findArgs(srcFn); // needs refactoring
-  MCSW.rewriteOperands();
   MCSW.printCFG();
   MCSW.adjustReturns(); // needs refactoring
 
