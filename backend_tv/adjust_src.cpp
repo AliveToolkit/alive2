@@ -63,9 +63,7 @@ using namespace lifter;
 
 namespace {
 
-// FIXME -- each of adjustSrcInputs and adjustSrcReturn creates an
-// entirely new function, this is slow and not elegant, probably merge
-// these together so we only create the fresh function once
+// this is wasteful and duplicates code, merge these functions
 
 Function *adjustSrcInputs(Function *srcFn) {
   vector<Type *> new_argtypes;
@@ -81,7 +79,6 @@ Function *adjustSrcInputs(Function *srcFn) {
                          "bits or smaller supported for now");
     orig_input_width.emplace_back(orig_width);
     new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
-    // FIXME Do we need to update the value_cache?
   }
 
   FunctionType *NFTy =
