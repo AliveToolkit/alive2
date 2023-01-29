@@ -3,7 +3,6 @@
 #include "llvm/MC/MCAsmInfo.h"
 
 #include "backend_tv/lifter.h"
-#include "util/sort.h"
 
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseSet.h"
@@ -518,7 +517,7 @@ BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
 
 class arm2llvm_ {
   Module *LiftedModule{nullptr};
-  LLVMContext &LLVMCtx = LiftedModule->getContext();
+  LLVMContext &Ctx = LiftedModule->getContext();
   MCFunction &MF;
   // const DataLayout &DL;
   Function &srcFn;
@@ -540,11 +539,11 @@ class arm2llvm_ {
   Type *getIntTy(int bits) {
     // just trying to catch silly errors
     assert(bits > 0 && bits <= 129);
-    return Type::getIntNTy(LLVMCtx, bits);
+    return Type::getIntNTy(Ctx, bits);
   }
 
   Value *getIntConst(uint64_t val, int bits) {
-    return ConstantInt::get(LLVMCtx, llvm::APInt(bits, val));
+    return ConstantInt::get(Ctx, llvm::APInt(bits, val));
   }
 
   [[noreturn]] void visitError(MCInstWrapper &I) {
@@ -683,7 +682,7 @@ class arm2llvm_ {
   }
 
   ReturnInst *createReturn(Value *v) {
-    return ReturnInst::Create(LLVMCtx, v, CurrBB);
+    return ReturnInst::Create(Ctx, v, CurrBB);
   }
 
   CallInst *createFShr(Value *a, Value *b, Value *c) {
@@ -1742,7 +1741,7 @@ public:
 
       if (opcode == AArch64::MOVKWi) {
         assert(shift_amt == 0 || shift_amt == 16);
-        bitmask = (shift_amt == 0) ? 0xffff0000 : 0xffff;
+        bitmask = (shift_amt == 0) ? 0xffff0000 : 0x0000ffff;
       } else {
         assert(shift_amt == 0 || shift_amt == 16 || shift_amt == 32 ||
                shift_amt == 48);
@@ -2279,42 +2278,6 @@ public:
     }
   }
 
-  void createBBs(vector<pair<BasicBlock *, MCBasicBlock *>> &sorted_bbs,
-                 Function &Fn) {
-    util::edgesTy edges;
-    vector<MCBasicBlock *> bbs;
-    unordered_map<MCBasicBlock *, unsigned> bb_map;
-
-    auto bb_num = [&](MCBasicBlock *bb) {
-      auto [I, inserted] = bb_map.emplace(bb, bbs.size());
-      if (inserted) {
-        bbs.emplace_back(bb);
-        edges.emplace_back();
-      }
-      return I->second;
-    };
-
-    for (auto &bb : MF.BBs) {
-      auto n = bb_num(&bb);
-      for (auto it = bb.succBegin(); it != bb.succEnd(); ++it) {
-        auto succ_ptr = *it;
-        auto n_dst = bb_num(succ_ptr);
-        edges[n].emplace(n_dst);
-      }
-    }
-
-    outs() << "about to start creating basic blocks.\n";
-    for (auto v : util::top_sort(edges)) {
-      outs() << "creating a basic block called " << bbs[v]->getName() << "\n";
-      auto bb = BasicBlock::Create(LLVMCtx, bbs[v]->getName(), &Fn);
-      sorted_bbs.emplace_back(bb, bbs[v]);
-    }
-    outs() << "done creating basic blocks.\n";
-
-    // default to adding instructions to the entry block
-    CurrBB = sorted_bbs[0].first;
-  }
-
   // create the storage associated with a register -- all of its
   // asm-level aliases will get redirected here
   void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
@@ -2331,8 +2294,15 @@ public:
     outs() << "function name: '" << MF.getName() << "'"
            << "\n";
 
-    vector<pair<BasicBlock *, MCBasicBlock *>> sorted_bbs;
-    createBBs(sorted_bbs, *Fn);
+    // create LLVM-side basic blocks
+    vector<pair<BasicBlock *, MCBasicBlock *>> bbs;
+    for (auto &mbb : MF.BBs) {
+      auto bb = BasicBlock::Create(Ctx, mbb.getName(), Fn);
+      bbs.push_back(make_pair(bb, &mbb));
+    }
+
+    // default to adding instructions to the entry block
+    CurrBB = bbs[0].first;
 
     // allocate storage for the main register file; FIXME not worrying
     // about X29 and X30 -- code that touches them should trip out and
@@ -2405,7 +2375,7 @@ public:
 
       // add stack with 16 slots, 8 bytes each
       auto alloc_size = getIntConst(16, 64);
-      auto ty = Type::getInt64Ty(LLVMCtx);
+      auto ty = Type::getInt64Ty(Ctx);
       auto alloca = createAlloca(ty, alloc_size, "stack");
       mc_add_identifier(AArch64::SP, 3, alloca);
 
@@ -2423,7 +2393,7 @@ public:
       }
     }
 
-    for (auto &[llvm_bb, mc_bb] : sorted_bbs) {
+    for (auto &[llvm_bb, mc_bb] : bbs) {
       outs() << "visiting bb: " << mc_bb->getName() << "\n";
       CurrBB = llvm_bb;
       MCBB = mc_bb;
