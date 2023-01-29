@@ -509,15 +509,11 @@ BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
   const MCSymbol &Sym = SRE.getSymbol();
   StringRef name = Sym.getName();
   outs() << "jump target: " << Sym.getName().str() << '\n';
-  BasicBlock *BB = nullptr;
   for (auto &bb : F) {
-    if (bb.getName() == name) {
-      BB = &bb;
-      break;
-    }
+    if (bb.getName() == name)
+      return &bb;
   }
-  assert(BB && "basic block not found");
-  return BB;
+  assert(false && "basic block not found");
 }
 
 class arm2llvm_ {
