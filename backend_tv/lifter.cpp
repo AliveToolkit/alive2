@@ -304,7 +304,7 @@ public:
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
     if (BBs.empty()) {
-      cout << "adding entry block to empty function\n";
+      outs() << "adding entry block to empty function\n";
       auto new_block = addBlock("entry");
       MCInst ret_instr;
       ret_instr.setOpcode(AArch64::RET);
@@ -766,7 +766,6 @@ class arm2llvm_ {
 
   void writeToOutputReg(Value *V, bool s = false) {
     auto Reg = CurInst->getOperand(0).getReg();
-    cout << "output register = " << Reg << "\n";
 
     // important!
     if (Reg == AArch64::WZR || Reg == AArch64::XZR)

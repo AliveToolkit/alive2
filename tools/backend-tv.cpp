@@ -92,19 +92,19 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
     lifter::generateAsm(*M1, Asm);
 
-  cout << "\n\nAArch64 Assembly:\n\n";
+  llvm::outs() << "\n\n------------ AArch64 Assembly: ------------\n\n";
   for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
        ++it) {
-    cout << *it;
+    llvm::outs() << *it;
   }
-  cout << "-------------\n";
+  llvm::outs() << "-------------\n";
 
   if (opt_asm_only)
     exit(0);
 
   auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
   
-  *out << "about to optimize lifted code:\n";
+  llvm::outs() << "about to optimize lifted code:\n";
   out->flush();
   M2.get()->print(llvm::outs(), nullptr);
 
@@ -113,12 +113,12 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
     assert(err.empty());
   }
 
-  *out << "about to compare functions\n";
+  llvm::outs() << "about to compare functions\n";
   out->flush();
 
   verifier.compareFunctions(*F1, *F2);
 
-  *out << "done comparing functions\n";
+  llvm::outs() << "done comparing functions\n";
   out->flush();
 }
 
@@ -131,8 +131,8 @@ int main(int argc, char **argv) {
   // FIXME remove when done debugging
   if (true) {
     for (int i=0; i<argc; ++i)
-      cout << "'" << argv[i] << "' ";
-    cout << endl;
+      llvm::outs() << "'" << argv[i] << "' ";
+    llvm::outs() << "\n";
   }
   
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);

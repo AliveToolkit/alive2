@@ -209,7 +209,7 @@ Function *adjustSrc(Function *srcFn) {
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
-  outs() << "\n---------- src.ll (changed-return) -------\n";
+  outs() << "\n---------- src.ll (args/return adjusted) -------\n";
   srcFn->print(outs());
 
   return srcFn;
