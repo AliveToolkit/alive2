@@ -235,9 +235,7 @@ class MCInstWrapper {
 private:
   MCInst instr;
   vector<unsigned> op_ids;
-  map<unsigned, string>
-      phi_blocks; // This is pretty wasteful but I'm not sure how to add
-                  // MCExpr operands to the underlying MCInst phi instructions
+
 public:
   MCInstWrapper(MCInst _instr) : instr(_instr) {
     op_ids.resize(instr.getNumOperands(), 0);
@@ -247,7 +245,6 @@ public:
     return instr;
   }
 
-  // use to assign ids when adding the arugments to phi-nodes
   void pushOpId(unsigned id) {
     op_ids.push_back(id);
   }
@@ -259,14 +256,6 @@ public:
 
   unsigned getOpId(unsigned index) {
     return op_ids[index];
-  }
-
-  void setOpPhiBlock(unsigned index, const string &block_name) {
-    phi_blocks[index] = block_name;
-  }
-
-  const string &getOpPhiBlock(unsigned index) const {
-    return phi_blocks.at(index);
   }
 
   unsigned getOpcode() const {
@@ -297,13 +286,8 @@ public:
     unsigned idx = 0;
     for (auto it = instr.begin(); it != instr.end(); ++it) {
       if (it->isReg()) {
-        if (getOpcode() == AArch64::PHI && idx >= 1) {
-          outs() << "<Phi arg>:[(" << it->getReg() << "," << op_ids[idx] << "),"
-                 << getOpPhiBlock(idx) << "]>";
-        } else {
-          outs() << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
-                 << ")>";
-        }
+        outs() << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
+               << ")>";
       } else if (it->isImm()) {
         outs() << "<MCOperand Imm:" << it->getImm() << ">";
       } else if (it->isExpr()) {
@@ -372,22 +356,6 @@ public:
   }
 };
 
-// hacky way of returning supported volatile registers
-vector<unsigned> volatileRegisters() {
-  vector<unsigned> res;
-  // integer registers
-  for (unsigned int i = AArch64::X0; i <= AArch64::X17; ++i) {
-    res.push_back(i);
-  }
-
-  // fp registers
-  for (unsigned int i = AArch64::Q0; i <= AArch64::Q0; ++i) {
-    res.push_back(i);
-  }
-
-  return res;
-}
-
 // Represents a machine function
 class MCFunction {
   string name;
@@ -398,14 +366,6 @@ class MCFunction {
   unordered_map<MCBasicBlock *, BlockSetTy> dom_tree;
 
   unordered_map<MCOperand, BlockSetTy, MCOperandHash, MCOperandEqual> defs;
-  unordered_map<MCBasicBlock *,
-                unordered_set<MCOperand, MCOperandHash, MCOperandEqual>>
-      phis; // map from block to variable names that need phi-nodes in those
-            // blocks
-  unordered_map<MCBasicBlock *,
-                unordered_map<MCOperand, vector<pair<unsigned, string>>,
-                              MCOperandHash, MCOperandEqual>>
-      phi_args;
   vector<MCOperand> fn_args;
 
 public:
@@ -587,227 +547,6 @@ public:
     printBlocks();
   }
 
-  void ssaRename() {
-    unordered_map<MCOperand, vector<unsigned>, MCOperandHash, MCOperandEqual>
-        stack;
-    unordered_map<MCOperand, unsigned, MCOperandHash, MCOperandEqual> counters;
-
-    outs() << "SSA rename\n";
-
-    // auto printStack = [&](unordered_map<MCOperand,
-    // vector<unsigned>,
-    //                                          MCOperandHash, MCOperandEqual>
-    //                           s) {
-    //   for (auto &[var, stack_vec] : s) {
-    //     outs() << "stack for ";
-    //     var.print(outs(), MRI);
-    //     outs() << "\n";
-    //     for (auto &stack_item : stack_vec) {
-    //       outs() << stack_item << ",";
-    //     }
-    //     outs() << "\n";
-    //   }
-    // };
-
-    auto pushFresh = [&](const MCOperand &op) {
-      if (counters.find(op) == counters.end()) {
-        counters[op] = 2; // Set the stack to 2 to account for input registers
-                          // and renaming (freeze + extension)
-      }
-      auto fresh_id = counters[op]++;
-      auto &var_stack = stack[op];
-      var_stack.insert(var_stack.begin(), fresh_id);
-      return fresh_id;
-    };
-
-    function<void(MCBasicBlock *)> rename;
-    rename = [&](MCBasicBlock *block) {
-      auto old_stack = stack;
-      outs() << "renaming block: " << block->getName() << "\n";
-      block->print();
-      outs() << "----\n";
-      for (auto &phi_var : phis[block]) {
-
-        MCInst new_phi_instr;
-        new_phi_instr.setOpcode(AArch64::PHI);
-        new_phi_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
-        new_phi_instr.dump_pretty(outs(), IP, " ", MRI);
-
-        MCInstWrapper new_w_instr(new_phi_instr);
-        block->addInstBegin(std::move(new_w_instr));
-        auto phi_dst_id = pushFresh(phi_var);
-        outs() << "phi_dst_id: " << phi_dst_id << "\n";
-        block->getInstrs()[0].setOpId(0, phi_dst_id);
-      }
-      outs() << "after phis\n";
-      block->print();
-      outs() << "----\n";
-
-      outs() << "renaming instructions\n";
-      for (auto &w_instr : block->getInstrs()) {
-        auto &mc_instr = w_instr.getMCInst();
-
-        if (mc_instr.getOpcode() == AArch64::PHI) {
-          continue;
-        }
-
-        assert(mc_instr.getNumOperands() > 0 && "MCInst with zero operands");
-
-        // nothing to rename
-        if (mc_instr.getNumOperands() == 1) {
-          continue;
-        }
-
-        // mc_instr.dump_pretty(outs(), IP, " ", MRI);
-        // outs() << "\n";
-        // outs() << "printing stack\n";
-        // printStack(stack);
-        // outs() << "printing operands\n";
-        unsigned i = 1;
-        if (instrs_no_write.contains(mc_instr.getOpcode())) {
-          outs() << "iterating from first element in rename\n";
-          i = 0;
-        }
-
-        for (; i < mc_instr.getNumOperands(); ++i) {
-          auto &op = mc_instr.getOperand(i);
-          if (!op.isReg())
-            continue;
-
-          // hacky way of not renaming the element index for ins instruction
-          // variants
-          if ((i == 1) && (ins_variant.contains(mc_instr.getOpcode())))
-            continue;
-
-          if (op.getReg() == AArch64::WZR || op.getReg() == AArch64::XZR)
-            continue;
-
-          op.print(outs(), MRI);
-          outs() << "\n";
-
-          auto &arg_id = stack[op][0];
-          w_instr.setOpId(i, arg_id);
-        }
-        outs() << "printing operands done\n";
-        if (instrs_no_write.contains(mc_instr.getOpcode()))
-          continue;
-
-        outs() << "renaming dst\n";
-        auto &dst_op = mc_instr.getOperand(0);
-        dst_op.print(outs(), MRI);
-        auto dst_id = pushFresh(dst_op);
-        w_instr.setOpId(0, dst_id);
-        outs() << "\n";
-      }
-
-      outs() << "renaming phi args in block's successors\n";
-
-      for (auto s_block : block->getSuccs()) {
-        outs() << block->getName() << " -> " << s_block->getName() << "\n";
-
-        for (auto &phi_var : phis[s_block]) {
-          if (stack.find(phi_var) == stack.end()) {
-            phi_var.print(outs(), MRI);
-            assert(false && "phi var not in stack");
-          }
-          assert(stack[phi_var].size() > 0 && "phi var stack empty");
-
-          if (phi_args[s_block].find(phi_var) == phi_args[s_block].end()) {
-            phi_args[s_block][phi_var] = vector<pair<unsigned, string>>();
-          }
-          outs() << "phi_arg[" << s_block->getName() << "][" << phi_var.getReg()
-                 << "]=" << stack[phi_var][0] << "\n";
-          phi_args[s_block][phi_var].push_back(
-              make_pair(stack[phi_var][0], block->getName()));
-        }
-      }
-
-      for (auto b : dom_tree[block])
-        rename(b);
-
-      stack = old_stack;
-    };
-
-    auto entry_block_ptr = &(BBs[0]);
-
-    entry_block_ptr->getInstrs()[0].print();
-
-    for (auto &arg : fn_args) {
-      stack[arg] = vector<unsigned>();
-      pushFresh(arg);
-    }
-
-    outs() << "adding volatile registers\n";
-
-    auto v_registers = volatileRegisters();
-    for (auto reg_num : v_registers) {
-      // for (unsigned int i = AArch64::X0; i <= AArch64::X17; i++) {
-      bool found_reg = false;
-      for (const auto &arg : fn_args) {
-        if (arg.getReg() == reg_num) {
-          found_reg = true;
-          break;
-        }
-      }
-
-      if (!found_reg) {
-        outs() << "adding volatile: " << reg_num << "\n";
-        auto vol_reg = MCOperand::createReg(reg_num);
-        stack[vol_reg] = vector<unsigned>();
-        pushFresh(vol_reg);
-      }
-    }
-
-    // add SP to the stack
-    auto sp_reg = MCOperand::createReg(AArch64::SP);
-    stack[sp_reg] = vector<unsigned>();
-    pushFresh(sp_reg);
-
-    rename(entry_block_ptr);
-    outs() << "printing MCInsts after renaming operands\n";
-    printBlocks();
-
-    outs() << "printing phi args\n";
-    for (auto &[block, phi_vars] : phi_args) {
-      outs() << "block: " << block->getName() << "\n";
-      for (auto &[phi_var, args] : phi_vars) {
-        outs() << "phi_var: " << phi_var.getReg() << "\n";
-        for (auto arg : args) {
-          outs() << arg.first << "-" << arg.second << ", ";
-        }
-        outs() << "\n";
-      }
-    }
-
-    outs() << "-----------------\n"; // adding args to phi-nodes
-    for (auto &[block, phi_vars] : phi_args) {
-      for (auto &w_instr : block->getInstrs()) {
-        auto &mc_instr = w_instr.getMCInst();
-        if (mc_instr.getOpcode() != AArch64::PHI)
-          break;
-
-        auto phi_var = mc_instr.getOperand(0);
-        unsigned index = 1;
-        outs() << "phi arg size " << phi_args[block][phi_var].size() << "\n";
-        for (auto var_id_label_pair : phi_args[block][phi_var]) {
-          outs() << "index = " << index
-                 << ", var_id = " << var_id_label_pair.first << "\n";
-          mc_instr.addOperand(MCOperand::createReg(phi_var.getReg()));
-          w_instr.pushOpId(var_id_label_pair.first);
-          w_instr.setOpPhiBlock(index, var_id_label_pair.second);
-          w_instr.print();
-          index++;
-        }
-      }
-    }
-
-    outs() << "printing MCInsts after adding args to phi-nodes\n";
-    for (auto &b : BBs) {
-      outs() << b.getName() << ":\n";
-      b.print();
-    }
-  }
-
   void printBlocks() {
     outs() << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
     outs() << "-------------\n";
@@ -834,18 +573,6 @@ vector<unique_ptr<VectorType *>> lifted_vector_types;
 void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
   mc_cache.emplace(make_pair(reg, version), v);
   outs() << "mc_cache: adding " << reg << ", " << version << "\n";
-}
-
-Value *mc_get_operand(unsigned reg, unsigned version) {
-  outs() << "mc_cache: looking for " << reg << ", " << version;
-  if (auto I = mc_cache.find(make_pair(reg, version)); I != mc_cache.end()) {
-    outs() << "  found it"
-           << "\n";
-    return I->second;
-  }
-  outs() << "  did not find it"
-         << "\n";
-  return nullptr;
 }
 
 // Code taken from llvm. This should be okay for now. But we generally
@@ -918,7 +645,6 @@ class arm2llvm_ {
 
   MCInstPrinter *instrPrinter{nullptr};
   MCRegisterInfo *registerInfo{nullptr};
-  vector<pair<PHINode *, MCInstWrapper *>> lift_todo_phis;
 
   MCInstWrapper *wrapper{nullptr};
 
@@ -1073,10 +799,6 @@ class arm2llvm_ {
     return ExtractValueInst::Create(v, idxs, next_name(), CurrBB);
   }
 
-  PHINode *createPhi(Type *ty) {
-    return PHINode::Create(ty, 0, next_name(), CurrBB);
-  }
-
   ReturnInst *createReturn(Value *v) {
     return ReturnInst::Create(LLVMCtx, v, CurrBB);
   }
@@ -1219,32 +941,6 @@ class arm2llvm_ {
                        const string &NameStr = "") {
     return CastInst::Create(op, v, t, (NameStr == "") ? next_name() : NameStr,
                             CurrBB);
-  }
-
-  void add_phi_params(PHINode *phi_instr, MCInstWrapper *phi_mc_wrapper) {
-    outs() << "entering add_phi_params"
-           << "\n";
-    assert(phi_mc_wrapper->getOpcode() == AArch64::PHI &&
-           "cannot add params to non-phi instr");
-    for (unsigned i = 1; i < phi_mc_wrapper->getMCInst().getNumOperands();
-         ++i) {
-      assert(phi_mc_wrapper->getMCInst().getOperand(i).isReg());
-      outs() << "<Phi arg>:[("
-             << phi_mc_wrapper->getMCInst().getOperand(i).getReg() << ","
-             << phi_mc_wrapper->getOpId(i) << "),"
-             << phi_mc_wrapper->getOpPhiBlock(i) << "]>\n";
-      string block_name(phi_mc_wrapper->getOpPhiBlock(i));
-      auto val =
-          mc_get_operand(phi_mc_wrapper->getMCInst().getOperand(i).getReg(),
-                         phi_mc_wrapper->getOpId(i));
-      assert(val != nullptr);
-      outs() << "block name = " << block_name << "\n";
-      phi_instr->addIncoming(
-          val, getBBByName(*(phi_instr->getParent()->getParent()), block_name));
-      outs() << "i is = " << i << "\n";
-    }
-    outs() << "exiting add_phi_params"
-           << "\n";
   }
 
   // return pointer to the backing store for a register, doing the
@@ -2692,18 +2388,6 @@ public:
         createBranch(cond_val, dst_true, dst_false);
       break;
     }
-    case AArch64::PHI: {
-      auto size = getInstSize(opcode);
-      auto ty = getIntTy(size);
-      auto result = createPhi(ty);
-      outs() << "pushing phi in todo : "
-             << "\n";
-      wrapper->print();
-      auto p = make_pair(result, wrapper);
-      lift_todo_phis.push_back(p);
-      writeToOutputReg(result);
-      break;
-    }
     default:
       Fn.print(outs());
       outs() << "\nError "
@@ -2878,22 +2562,6 @@ public:
 
       blockCount++;
     }
-
-    outs() << "\n----------lifted-arm-target-missing-phi-params----------\n";
-    Fn->print(outs());
-    outs() << "lift_todo_phis.size() = " << lift_todo_phis.size() << "\n";
-
-    int tmp_index = 0;
-    for (auto &[phi, phi_mc_wrapper] : lift_todo_phis) {
-      outs() << "index = " << tmp_index
-             << "opcode =" << phi_mc_wrapper->getOpcode() << "\n";
-      tmp_index++;
-      add_phi_params(phi, phi_mc_wrapper);
-    }
-
-    outs() << "returning from run method"
-           << "\n";
-
     return Fn;
   }
 };
@@ -2912,13 +2580,6 @@ Function *arm2llvm(Module *OrigModule, MCFunction &MF, Function &srcFn,
 // different parts of the assembly file. The main callbacks that we're
 // using right now are emitInstruction and emitLabel to access the
 // instruction and labels in the arm assembly.
-//
-// FIXME for now, we're using this class to generate the MCFunction and
-// also print the MCFunction and to convert the MCFunction into SSA form.
-// We should move this implementation somewhere else
-// TODO we'll need to implement some of the other callbacks to extract more
-// information from the asm file. For example, it would be useful to extract
-// debug info to determine the number of function parameters.
 class MCStreamerWrapper final : public MCStreamer {
   enum ASMLine { none = 0, label = 1, non_term_instr = 2, terminator = 3 };
 
@@ -3148,7 +2809,7 @@ public:
     }
   }
 
-  // TODO: @Nader this should just fall out of our SSA implementation
+  // FIXME this shouldn't be necessary
   void adjustReturns() {
     for (auto &block : MF.BBs) {
       for (auto &instr : block.getInstrs()) {
@@ -3275,9 +2936,6 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.rewriteOperands();
   MCSW.printCFG();
   MCSW.adjustReturns(); // needs refactoring
-
-  outs() << "after SSA conversion\n";
-  MCSW.printBlocksMF();
 
   auto lifted =
       arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
