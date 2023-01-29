@@ -3081,11 +3081,7 @@ public:
       argNum++;
     }
 
-    // TODO vector registers
-
-    // FIXME: Hacky way of supporting parameters passed via the stack
-    // need to properly model the parameter passing rules described in
-    // the spec
+    // FIXME: fold something like this into the loop above
     if (argNum > 8) {
       auto num_stack_args = argNum - 8; // x0-x7 are passed via registers
       outs() << "num_stack_args = " << num_stack_args << "\n";
