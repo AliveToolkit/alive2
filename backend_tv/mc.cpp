@@ -1248,10 +1248,6 @@ class arm2llvm_ {
     return reg_shift(getIntConst(value, size), encodedShift);
   }
 
-  Value *getIdentifier(unsigned reg, unsigned id) {
-    return mc_get_operand(reg, id);
-  }
-
   // Generates string name for the next instruction
   string next_name() {
     assert(wrapper);
@@ -1291,8 +1287,8 @@ class arm2llvm_ {
     BranchInst::Create(dst, CurrBB);
   }
 
-  LoadInst *createLoad(Type *ty, Value *ptr) {
-    return new LoadInst(ty, ptr, next_name(), CurrBB);
+  LoadInst *createLoad(Type *ty, Value *ptr, const string &NameStr = "") {
+    return new LoadInst(ty, ptr, (NameStr == "") ? next_name() : NameStr, CurrBB);
   }
 
   void createStore(Value *v, Value *ptr) {
@@ -1516,9 +1512,9 @@ class arm2llvm_ {
   }
 
   // always does a full-width read
-  Value *readFromRegister(unsigned Reg) {
+  Value *readFromRegister(unsigned Reg, const string &NameStr = "") {
     auto RegAddr = getRegStorage(Reg);
-    return createLoad(getIntTy(64), RegAddr);
+    return createLoad(getIntTy(64), RegAddr, NameStr);
   }
 
   // TODO: make it so that lshr generates code on register lookups
@@ -2752,9 +2748,9 @@ public:
       assert(op_0.isReg() && op_1.isReg());
       assert(op_1.getReg() == AArch64::SP &&
              "only loading from stack supported for now!");
-      auto stack_gep = getIdentifier(AArch64::SP, op_0.getReg());
-      assert(stack_gep && "loaded identifier should not be null!");
-      auto loaded_val = createLoad(i64, stack_gep);
+      [[maybe_unused]] auto bits = readFromRegister(AArch64::SP);
+      // FIXME -- this'll work after we allocate a stack
+      auto loaded_val = createLoad(i64, nullptr, "foo");
       writeToOutputReg(loaded_val);
       break;
     }
@@ -3030,6 +3026,8 @@ public:
       Name << "X" << Reg - AArch64::X0;
       createRegStorage(Reg, 64, Name.str());
     }
+    createRegStorage(AArch64::SP, 64, "SP");
+    createRegStorage(AArch64::LR, 64, "LR");
     // initializing to zero makes loads from XZR work; stores are
     // handled in writeToOutputReg()
     createRegStorage(AArch64::XZR, 64, "XZR");
@@ -3140,7 +3138,7 @@ public:
         // FIXME, need to use version similar to the offset to address the stack
         // pointer or alternatively a more elegant solution altogether
         mc_add_identifier(AArch64::SP, reg_num, get_xi);
-        createStore(getIdentifier(reg_num, 2), get_xi);
+        createStore(readFromRegister(AArch64::SP, "stack_"), get_xi);
       }
     }
 
@@ -3272,11 +3270,7 @@ public:
     temp_block->addInst(Cur_Inst);
     Insts.push_back(Inst);
 
-    if (IA->isTerminator(Inst)) {
-      prev_line = ASMLine::terminator;
-    } else {
-      prev_line = ASMLine::non_term_instr;
-    }
+    prev_line = IA->isTerminator(Inst) ? ASMLine::terminator : ASMLine::non_term_instr;
     auto &inst_ref = Cur_Inst.getMCInst();
     auto num_operands = inst_ref.getNumOperands();
     for (unsigned i = 0; i < num_operands; ++i) {
