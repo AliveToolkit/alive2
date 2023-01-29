@@ -614,8 +614,7 @@ class arm2llvm_ {
       ss << "tx" << ++curId << "x" << instructionCount << "x" << blockCount;
     } else {
       ss << registerInfo->getName(wrapper->getMCInst().getOperand(0).getReg())
-         << "x" << ++curId << "x"
-         << instructionCount << "x" << blockCount;
+         << "x" << ++curId << "x" << instructionCount << "x" << blockCount;
     }
     return ss.str();
   }
@@ -646,7 +645,8 @@ class arm2llvm_ {
   }
 
   LoadInst *createLoad(Type *ty, Value *ptr, const string &NameStr = "") {
-    return new LoadInst(ty, ptr, (NameStr == "") ? next_name() : NameStr, LLVMBB);
+    return new LoadInst(ty, ptr, (NameStr == "") ? next_name() : NameStr,
+                        LLVMBB);
   }
 
   void createStore(Value *v, Value *ptr) {
@@ -2317,9 +2317,9 @@ public:
     // the stack block
     createRegStorage(AArch64::SP, 64, "SP");
     createStore(getIntConst(0, 64), RegFile[AArch64::SP]);
-    
+
     createRegStorage(AArch64::LR, 64, "LR");
-    
+
     // initializing to zero makes loads from XZR work; stores are
     // handled in writeToOutputReg()
     createRegStorage(AArch64::XZR, 64, "XZR");
@@ -2468,7 +2468,8 @@ public:
     MCInstWrapper Cur_Inst(Inst);
     temp_block->addInst(Cur_Inst);
 
-    prev_line = IA->isTerminator(Inst) ? ASMLine::terminator : ASMLine::non_term_instr;
+    prev_line =
+        IA->isTerminator(Inst) ? ASMLine::terminator : ASMLine::non_term_instr;
     auto &inst_ref = Cur_Inst.getMCInst();
     auto num_operands = inst_ref.getNumOperands();
     for (unsigned i = 0; i < num_operands; ++i) {
@@ -2733,14 +2734,15 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->Run(true); // ??
 
   MCSW.printBlocksMF();
-  MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
-  MCSW.printBlocksMF();
 
+  MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
   MCSW.findArgs(srcFn); // FIXME needs refactoring
   MCSW.printCFG();
   MCSW.adjustReturns(); // FIXME needs refactoring
+
+  MCSW.printBlocksMF();
 
   auto lifted =
       arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());

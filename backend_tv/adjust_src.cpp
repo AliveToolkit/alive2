@@ -222,13 +222,9 @@ Function *adjustSrc(Function *srcFn) {
   srcFn->print(outs());
 
   srcFn = adjustSrcInputs(srcFn);
-  
-  outs() << "\n---------- src.ll ---- changed-input -\n";
-  srcFn->print(outs());
-
   srcFn = adjustSrcReturn(srcFn);
   
-  outs() << "\n---------- src.ll ---- changed-return -\n";
+  outs() << "\n---------- src.ll (changed-return) -------\n";
   srcFn->print(outs());
 
   return srcFn;

@@ -10,9 +10,9 @@
 #include "ir/function.h"
 
 namespace llvm {
-  class Function;
-  class Module;
-}
+class Function;
+class Module;
+} // namespace llvm
 
 namespace lifter {
 
@@ -32,10 +32,10 @@ void reset();
 llvm::Function *adjustSrc(llvm::Function *srcFn);
 
 std::unique_ptr<llvm::MemoryBuffer> generateAsm(llvm::Module &OrigModule,
-						llvm::SmallString<1024> &Asm);
+                                                llvm::SmallString<1024> &Asm);
 
 std::pair<llvm::Function *, llvm::Function *>
 liftFunc(llvm::Module *OrigModule, llvm::Module *LiftedModule,
-	 llvm::Function *srcFnLLVM, std::unique_ptr<llvm::MemoryBuffer> MB);
+         llvm::Function *srcFnLLVM, std::unique_ptr<llvm::MemoryBuffer> MB);
 
-}
+} // namespace lifter
