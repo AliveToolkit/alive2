@@ -327,6 +327,7 @@ public:
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
     if (BBs.empty()) {
+      cout << "adding entry block to empty function\n";
       auto new_block = addBlock("entry");
       MCInst ret_instr;
       ret_instr.setOpcode(AArch64::RET);
@@ -446,12 +447,11 @@ class arm2llvm_ {
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
-  MCRegisterInfo *registerInfo{nullptr};
+  [[maybe_unused]] MCRegisterInfo *registerInfo{nullptr};
 
   MCInstWrapper *wrapper{nullptr};
 
-  unsigned instructionCount;
-  unsigned curId;
+  unsigned instCount{0};
   bool ret_void{false};
 
   map<unsigned, Value *> RegFile;
@@ -528,20 +528,8 @@ class arm2llvm_ {
 
   // Generates string name for the next instruction
   string next_name() {
-    assert(wrapper);
     stringstream ss;
-    if (instrs_no_write.contains(wrapper->getOpcode())) {
-      ss << "tx" << ++curId << "x" << instructionCount << "x" << blockCount;
-    } else {
-      ss << registerInfo->getName(wrapper->getMCInst().getOperand(0).getReg())
-         << "x" << ++curId << "x" << instructionCount << "x" << blockCount;
-    }
-    return ss.str();
-  }
-
-  string next_name(unsigned reg_num, unsigned id_num) {
-    stringstream ss;
-    ss << registerInfo->getName(reg_num) << "_" << id_num;
+    ss << "a" << instCount << "_";
     return ss.str();
   }
 
@@ -799,7 +787,6 @@ class arm2llvm_ {
 
   // TODO remove
   void add_identifier(Value *v) {
-    instructionCount++;
   }
 
   void writeToOutputReg(Value *V, bool s = false) {
@@ -807,10 +794,8 @@ class arm2llvm_ {
     cout << "output register = " << Reg << "\n";
 
     // important!
-    if (Reg == AArch64::WZR || Reg == AArch64::XZR) {
-      instructionCount++;
+    if (Reg == AArch64::WZR || Reg == AArch64::XZR)
       return;
-    }
 
     auto W = V->getType()->getIntegerBitWidth();
     if (W != 64 && W != 128) {
@@ -959,7 +944,7 @@ public:
             MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
         instrPrinter(instrPrinter), registerInfo(registerInfo),
-        instructionCount(0), curId(0) {}
+        instCount(0) {}
 
 #if 1
   void revInst(Value *V) {
@@ -979,7 +964,6 @@ public:
     auto opcode = I.getOpcode();
     auto &mc_inst = I.getMCInst();
     wrapper = &I;
-    curId = 0;
 
     auto i1 = getIntTy(1);
     auto i8 = getIntTy(8);
@@ -2264,23 +2248,23 @@ public:
       if (argNum < 8) {
         auto operand = MCOperand::createReg(AArch64::X0 + argNum);
         auto Reg = operand.getReg();
-        Value *V = createFreeze(&Arg, next_name(Reg, 1));
+        Value *V = createFreeze(&Arg, next_name());
 
         auto orig_width = orig_input_width[argNum];
         // TODO maybe this is in a separate function
         if (orig_width < 64) {
           auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
           auto orig_ty = getIntTy(orig_width);
-          V = createTrunc(V, orig_ty, next_name(Reg, 2));
+          V = createTrunc(V, orig_ty, next_name());
           if (orig_width == 1) {
-            V = createCast(V, i32, op, next_name(Reg, 3));
-            V = createZExt(V, i64, next_name(Reg, 4));
+            V = createCast(V, i32, op, next_name());
+            V = createZExt(V, i64, next_name());
           } else {
             if (orig_width < 32) {
-              V = createCast(V, i32, op, next_name(Reg, 3));
-              V = createZExt(V, i64, next_name(Reg, 4));
+              V = createCast(V, i32, op, next_name());
+              V = createZExt(V, i64, next_name());
             } else {
-              V = createCast(V, i64, op, next_name(Reg, 4));
+              V = createCast(V, i64, op, next_name());
             }
           }
         }
@@ -2323,12 +2307,12 @@ public:
       auto &mc_instrs = mc_bb->getInstrs();
 
       for (auto &mc_instr : mc_instrs) {
-        outs() << "before visit\n";
         mc_instr.print();
         mc_visit(mc_instr, *Fn);
-        outs() << "after visit\n";
+	++instCount;
       }
 
+      // machine code falls through but LLVM isn't allowed to
       if (!LLVMBB->getTerminator()) {
         assert(MCBB->getSuccs().size() == 1 &&
                "expected 1 successor for block with no terminator");
