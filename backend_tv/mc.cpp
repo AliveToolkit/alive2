@@ -324,7 +324,6 @@ private:
   using SetTy = SetVector<MCBasicBlock *>;
   vector<MCInstWrapper> Instrs;
   SetTy Succs;
-  SetTy Preds;
 
 public:
   MCBasicBlock(string _name) : name(_name) {}
@@ -346,10 +345,6 @@ public:
     return Succs;
   }
 
-  auto &getPreds() {
-    return Preds;
-  }
-
   void addInst(MCInstWrapper &inst) {
     Instrs.push_back(inst);
   }
@@ -360,18 +355,6 @@ public:
 
   void addSucc(MCBasicBlock *succ_block) {
     Succs.insert(succ_block);
-  }
-
-  void addPred(MCBasicBlock *pred_block) {
-    Preds.insert(pred_block);
-  }
-
-  auto predBegin() {
-    return Preds.begin();
-  }
-
-  auto predEnd() {
-    return Preds.end();
   }
 
   auto succBegin() const {
@@ -458,7 +441,6 @@ public:
     return nullptr;
   }
 
-  // Make sure that we have an entry label with no predecessors
   void addEntryBlock() {
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
@@ -516,195 +498,6 @@ public:
         postOrderDFS(curBlock, visited, postOrder);
     }
     return postOrder;
-  }
-
-  // compute the domination relation
-  void generateDominator() {
-    auto blocks = postOrder();
-    reverse(blocks.begin(), blocks.end());
-    outs() << "postOrder\n";
-    for (auto &curBlock : blocks) {
-      outs() << curBlock->getName() << "\n";
-      dom[curBlock] = BlockSetTy();
-      for (auto &b : blocks)
-        dom[curBlock].insert(b);
-    }
-
-    outs() << "printing dom before\n";
-    printGraph(dom);
-    while (true) {
-      bool changed = false;
-      for (auto &curBlock : blocks) {
-        BlockSetTy newDom = intersect(curBlock->getPreds(), dom);
-        newDom.insert(curBlock);
-
-        if (newDom != dom[curBlock]) {
-          changed = true;
-          dom[curBlock] = newDom;
-        }
-      }
-      if (!changed)
-        break;
-    }
-    outs() << "printing dom after\n";
-    printGraph(dom);
-  }
-
-  void generateDominatorFrontier() {
-    auto dominates = invertGraph(dom);
-    outs() << "printing dom_inverse\n";
-    printGraph(dominates);
-    for (auto &[block, domSet] : dom) {
-      BlockSetTy dominated_succs;
-      dom_frontier[block] = BlockSetTy();
-      for (auto &dominated : dominates[block]) {
-        auto &temp_succs = dominated->getSuccs();
-        for (auto &elem : temp_succs)
-          dominated_succs.insert(elem);
-
-        for (auto &b : dominated_succs) {
-          if (b == block || dominates[block].count(b) == 0)
-            dom_frontier[block].insert(b);
-        }
-      }
-    }
-    outs() << "printing dom_frontier\n";
-    printGraph(dom_frontier);
-    return;
-  }
-
-  void generateDomTree() {
-    auto dominates = invertGraph(dom);
-    outs() << "printing dom_inverse\n";
-    printGraph(dominates);
-    outs() << "-----------------\n";
-    unordered_map<MCBasicBlock *, BlockSetTy> s_dom;
-    for (auto &[block, children] : dominates) {
-      s_dom[block] = BlockSetTy();
-      for (auto &child : children) {
-        if (child != block) {
-          s_dom[block].insert(child);
-        }
-      }
-    }
-
-    unordered_map<MCBasicBlock *, BlockSetTy> child_dom;
-
-    for (auto &[block, children] : s_dom) {
-      child_dom[block] = BlockSetTy();
-      for (auto &child : children) {
-        for (auto &child_doominates : s_dom[child]) {
-          child_dom[block].insert(child_doominates);
-        }
-      }
-    }
-
-    for (auto &[block, children] : s_dom) {
-      for (auto &child : children) {
-        if (child_dom[block].count(child) == 0) {
-          dom_tree[block].insert(child);
-        }
-      }
-    }
-
-    outs() << "printing s_dom\n";
-    printGraph(s_dom);
-    outs() << "-----------------\n";
-
-    outs() << "printing child_dom\n";
-    printGraph(child_dom);
-    outs() << "-----------------\n";
-
-    outs() << "printing dom_tree\n";
-    printGraph(dom_tree);
-    outs() << "-----------------\n";
-
-    dom_tree_inv = invertGraph(dom_tree);
-    outs() << "printing dom_tree_inv\n";
-    printGraph(dom_tree_inv);
-    outs() << "-----------------\n";
-  }
-
-  // compute a map from each variable to its defining block
-  void findDefiningBlocks() {
-    for (auto &block : BBs) {
-      for (auto &w_instr : block.getInstrs()) {
-        auto &mc_instr = w_instr.getMCInst();
-        // need to check for special instructions like ret and branch
-        // need to check for special destination operands like WZR
-
-        if (IA->isCall(mc_instr))
-          report_fatal_error("Function calls not supported yet");
-
-        if (IA->isReturn(mc_instr) || IA->isBranch(mc_instr)) {
-          continue;
-        }
-
-        assert(mc_instr.getNumOperands() > 0 && "MCInst with zero operands");
-
-        // CHECK: if there is an ARM instruction that writes to two variables
-        auto &dst_operand = mc_instr.getOperand(0);
-
-        assert((dst_operand.isReg() || dst_operand.isImm()) &&
-               "unsupported destination operand");
-
-        if (dst_operand.isImm()) {
-          outs() << "destination operand is an immediate. printing the "
-                    "instruction and skipping it\n";
-          w_instr.print();
-          continue;
-        }
-
-        auto dst_reg = dst_operand.getReg();
-        // skip constant registers like WZR
-        if (dst_reg == AArch64::WZR || dst_reg == AArch64::XZR)
-          continue;
-
-        defs[dst_operand].insert(&block);
-      }
-    }
-
-    // temp for debugging
-    for (auto &[var, blockSet] : defs) {
-      outs() << "defs for \n";
-      var.print(outs(), MRI);
-      outs() << "\n";
-      for (auto &block : blockSet) {
-        outs() << block->getName() << ",";
-      }
-      outs() << "\n";
-    }
-  }
-
-  void findPhis() {
-    for (auto &[var, block_set] : defs) {
-      vector<MCBasicBlock *> block_list(block_set.begin(), block_set.end());
-      for (unsigned i = 0; i < block_list.size(); ++i) {
-        // auto& df_blocks = dom_frontier[block_list[i]];
-        for (auto block_ptr : dom_frontier[block_list[i]]) {
-          if (phis[block_ptr].count(var) == 0) {
-            phis[block_ptr].insert(var);
-
-            if (find(block_list.begin(), block_list.end(), block_ptr) ==
-                block_list.end()) {
-              block_list.push_back(block_ptr);
-            }
-          }
-        }
-      }
-    }
-    // temp for debugging
-    outs()
-        << "mapping from block name to variable names that require phi nodes "
-           "in block\n";
-    for (auto &[block, varSet] : phis) {
-      outs() << "phis for: " << block->getName() << "\n";
-      for (auto &var : varSet) {
-        var.print(outs(), MRI);
-        outs() << "\n";
-      }
-      outs() << "-------------\n";
-    }
   }
 
   // FIXME: this is duplicated code. need to refactor
@@ -1012,49 +805,6 @@ public:
     for (auto &b : BBs) {
       outs() << b.getName() << ":\n";
       b.print();
-    }
-  }
-
-  // helper function to compute the intersection of predecessor dominator sets
-  BlockSetTy intersect(BlockSetTy &preds,
-                       unordered_map<MCBasicBlock *, BlockSetTy> &dom) {
-    BlockSetTy ret;
-    if (preds.size() == 0)
-      return ret;
-    if (preds.size() == 1)
-      return dom[*preds.begin()];
-    ret = dom[*preds.begin()];
-    auto second = ++preds.begin();
-    for (auto it = second; it != preds.end(); ++it) {
-      auto &pred_set = dom[*it];
-      BlockSetTy new_ret;
-      for (auto &b : ret) {
-        if (pred_set.count(b) == 1)
-          new_ret.insert(b);
-      }
-      ret = new_ret;
-    }
-    return ret;
-  }
-
-  // helper function to invert a graph
-  unordered_map<MCBasicBlock *, BlockSetTy>
-  invertGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
-    unordered_map<MCBasicBlock *, BlockSetTy> res;
-    for (auto &curBlock : graph) {
-      for (auto &succ : curBlock.second)
-        res[succ].insert(curBlock.first);
-    }
-    return res;
-  }
-
-  // Debug function to print domination info
-  void printGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
-    for (auto &curBlock : graph) {
-      outs() << curBlock.first->getName() << ": ";
-      for (auto &dst : curBlock.second)
-        outs() << dst->getName() << " ";
-      outs() << "\n";
     }
   }
 
@@ -3311,28 +3061,6 @@ public:
     return postOrder;
   }
 
-  // compute the domination relation
-  void generateDominator() {
-    MF.generateDominator();
-  }
-
-  void generateDominatorFrontier() {
-    MF.generateDominatorFrontier();
-  }
-
-  void generateDomTree() {
-    MF.generateDomTree();
-  }
-
-  // compute a map from each variable to its defining block
-  void findDefiningBlocks() {
-    MF.findDefiningBlocks();
-  }
-
-  void findPhis() {
-    MF.findPhis();
-  }
-
   // FIXME: this is duplicated code. need to refactor
   void findArgs(Function *src_fn) {
     MF.findArgs(src_fn);
@@ -3340,55 +3068,6 @@ public:
 
   void rewriteOperands() {
     MF.rewriteOperands();
-  }
-
-  void ssaRename() {
-    MF.ssaRename();
-  }
-
-  // helper function to compute the intersection of predecessor dominator sets
-  BlockSetTy intersect(BlockSetTy &preds,
-                       unordered_map<MCBasicBlock *, BlockSetTy> &dom) {
-    BlockSetTy ret;
-    if (preds.size() == 0) {
-      return ret;
-    }
-    if (preds.size() == 1) {
-      return dom[*preds.begin()];
-    }
-    ret = dom[*preds.begin()];
-    auto second = ++preds.begin();
-    for (auto it = second; it != preds.end(); ++it) {
-      auto &pred_set = dom[*it];
-      BlockSetTy new_ret;
-      for (auto &b : ret) {
-        if (pred_set.count(b) == 1)
-          new_ret.insert(b);
-      }
-      ret = new_ret;
-    }
-    return ret;
-  }
-
-  // helper function to invert a graph
-  unordered_map<MCBasicBlock *, BlockSetTy>
-  invertGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
-    unordered_map<MCBasicBlock *, BlockSetTy> res;
-    for (auto &curBlock : graph) {
-      for (auto &succ : curBlock.second)
-        res[succ].insert(curBlock.first);
-    }
-    return res;
-  }
-
-  // Debug function to print domination info
-  void printGraph(unordered_map<MCBasicBlock *, BlockSetTy> &graph) {
-    for (auto &curBlock : graph) {
-      outs() << curBlock.first->getName() << ": ";
-      for (auto &dst : curBlock.second)
-        outs() << dst->getName() << " ";
-      outs() << "\n";
-    }
   }
 
   // Only call after MF with Basicblocks is constructed to generate the
@@ -3442,18 +3121,6 @@ public:
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
-  // Only call after generateSucessors() has been called
-  // generate predecessors for each basic block in a MCFunction
-  void generatePredecessors() {
-    outs() << "generating basic block predecessors" << '\n';
-    for (auto &block : MF.BBs) {
-      for (auto it = block.succBegin(); it != block.succEnd(); ++it) {
-        auto successor = *it;
-        successor->addPred(&block);
-      }
-    }
-  }
-
   void printBlocksMF() {
     outs() << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
     outs() << "-------------\n";
@@ -3479,45 +3146,6 @@ public:
       }
       outs() << "]\n";
     }
-
-    outs() << "predecessors" << '\n';
-    for (auto &block : MF.BBs) {
-      outs() << block.getName() << ": [";
-      for (auto it = block.predBegin(); it != block.predEnd(); ++it) {
-        auto predecessor = *it;
-        outs() << predecessor->getName() << ", ";
-      }
-      outs() << "]\n";
-    }
-  }
-
-  // findLastRetWrite will do a breadth-first search through the dominator tree
-  // looking for the last write to X0.
-  int findLastRetWrite(MCBasicBlock *bb) {
-    set<MCBasicBlock *> to_search = {bb};
-    while (to_search.size() != 0) { // exhaustively search previous BBs
-      set<MCBasicBlock *> next_search =
-          {}; // blocks to search in the next iteration
-      for (auto &b : to_search) {
-        auto instrs = b->getInstrs();
-        for (auto it = instrs.rbegin(); it != instrs.rend();
-             it++) { // iterate backwards looking for writes
-          const auto &inst = it->getMCInst();
-          const auto &firstOp = inst.getOperand(0);
-          if (firstOp.isReg() && firstOp.getReg() == AArch64::X0) {
-            return it->getOpId(0);
-          }
-        }
-        for (auto &new_b : MF.dom_tree_inv[b]) {
-          next_search.insert(new_b);
-        }
-      }
-      to_search = next_search;
-    }
-
-    // if we've found no write to X0, we just need to return version 2,
-    // which corresponds to the function argument X0 after freeze
-    return 2;
   }
 
   // TODO: @Nader this should just fall out of our SSA implementation
@@ -3525,9 +3153,7 @@ public:
     for (auto &block : MF.BBs) {
       for (auto &instr : block.getInstrs()) {
         if (instr.getOpcode() == AArch64::RET) {
-          auto lastWriteID = findLastRetWrite(&block);
           auto &retArg = instr.getMCInst().getOperand(0);
-          instr.setOpId(0, lastWriteID);
           retArg.setReg(AArch64::X0);
         }
       }
@@ -3645,16 +3271,9 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.generatePredecessors();
   MCSW.findArgs(srcFn); // needs refactoring
   MCSW.rewriteOperands();
   MCSW.printCFG();
-  MCSW.generateDominator();
-  MCSW.generateDominatorFrontier();
-  MCSW.findDefiningBlocks();
-  MCSW.findPhis();
-  MCSW.generateDomTree();
-  MCSW.ssaRename();
   MCSW.adjustReturns(); // needs refactoring
 
   outs() << "after SSA conversion\n";
