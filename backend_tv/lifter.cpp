@@ -338,7 +338,6 @@ class MCFunction {
   string name;
   unsigned label_cnt{0};
   using BlockSetTy = SetVector<MCBasicBlock *>;
-  vector<MCOperand> fn_args;
 
 public:
   MCInstrAnalysis *IA;
@@ -411,28 +410,6 @@ public:
     }
   }
 
-  // FIXME: this is duplicated code. need to refactor
-  void findArgs(Function *src_fn) {
-    unsigned arg_num = 0;
-
-    for (auto &arg : src_fn->args()) {
-      auto *ty = arg.getType();
-      if (!ty->isIntegerTy())
-        report_fatal_error("Only integer-typed arguments supported for now");
-      // FIXME. Do a switch statement to figure out which register to start from
-      auto start = ty->getIntegerBitWidth() == 32 ? AArch64::W0 : AArch64::X0;
-      auto mcarg = MCOperand::createReg(start + (arg_num++));
-      fn_args.push_back(std::move(mcarg));
-    }
-
-    // temp for debugging
-    outs() << "printing fn_args\n";
-    for (auto &arg : fn_args) {
-      arg.print(outs(), MRI);
-      outs() << "\n";
-    }
-  }
-
   void printBlocks() {
     outs() << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
     outs() << "-------------\n";
@@ -448,17 +425,8 @@ public:
   }
 };
 
-// Some variables that we need to maintain as we're performing arm-tv
-map<pair<unsigned, unsigned>, Value *> mc_cache;
-unordered_map<MCOperand, unique_ptr<StructType *>, MCOperandHash,
-              MCOperandEqual>
-    overflow_aggregate_types;
-vector<unique_ptr<VectorType *>> lifted_vector_types;
-
 // Add IR value to cache
 void mc_add_identifier(unsigned reg, unsigned version, Value *v) {
-  mc_cache.emplace(make_pair(reg, version), v);
-  outs() << "mc_cache: adding " << reg << ", " << version << "\n";
 }
 
 // Code taken from llvm. This should be okay for now. But we generally
@@ -557,7 +525,7 @@ class arm2llvm_ {
     exit(-1); // FIXME handle this better
   }
 
-  int getInstSize(int instr) {
+  unsigned getInstSize(int instr) {
     if (instrs_32.contains(instr))
       return 32;
     if (instrs_64.contains(instr))
@@ -825,10 +793,17 @@ class arm2llvm_ {
                             LLVMBB);
   }
 
+  [[maybe_unused]] unsigned getRegSize(unsigned Reg) {
+    if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
+      return 32;
+    if (Reg >= AArch64::X0 && Reg <= AArch64::X28)
+      return 64;
+    assert(false && "unhandled register");
+  }
+  
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
   Value *getRegStorage(unsigned Reg) {
-    // FIXME do this better?
     unsigned WideReg = Reg;
     if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
       WideReg = Reg - AArch64::W0 + AArch64::X0;
@@ -872,10 +847,7 @@ class arm2llvm_ {
 
   // TODO remove
   void add_identifier(Value *v) {
-    auto reg = wrapper->getMCInst().getOperand(0).getReg();
-    auto version = -1;
     instructionCount++;
-    mc_add_identifier(reg, version, v);
   }
 
   void writeToOutputReg(Value *V, bool s = false) {
@@ -904,7 +876,6 @@ class arm2llvm_ {
         V = createCast(V, getIntTy(64), op);
       }
     }
-    add_identifier(V);
     createStore(V, getRegStorage(Reg));
   }
 
@@ -2549,11 +2520,6 @@ public:
     MF.addEntryBlock();
   }
 
-  // FIXME: this is duplicated code. need to refactor
-  void findArgs(Function *src_fn) {
-    MF.findArgs(src_fn);
-  }
-
   // Only call after MF with Basicblocks is constructed to generate the
   // successors for each basic block
   void generateSuccessors() {
@@ -2599,7 +2565,7 @@ public:
     }
   }
 
-  // Remove empty basic blocks from the machine function
+// Remove empty basic blocks, including .Lfunc_end
   void removeEmptyBlocks() {
     outs() << "removing empty basic blocks" << '\n';
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
@@ -2616,19 +2582,6 @@ public:
         outs() << '\n';
       }
       i++;
-    }
-  }
-
-  void printCFG() {
-    outs() << "printing arm function CFG" << '\n';
-    outs() << "successors" << '\n';
-    for (auto &block : MF.BBs) {
-      outs() << block.getName() << ": [";
-      for (auto it = block.succBegin(); it != block.succEnd(); ++it) {
-        auto successor = *it;
-        outs() << successor->getName() << ", ";
-      }
-      outs() << "]\n";
     }
   }
 
@@ -2686,9 +2639,6 @@ void reset() {
   orig_ret_bitwidth = 64;
   has_ret_attr = false;
   orig_input_width.clear();
-  mc_cache.clear();
-  overflow_aggregate_types.clear();
-  lifted_vector_types.clear();
   cur_vol_regs.clear();
 }
 
@@ -2735,11 +2685,9 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   MCSW.printBlocksMF();
 
-  MCSW.removeEmptyBlocks(); // remove empty basic blocks, including .Lfunc_end
+  MCSW.removeEmptyBlocks();
   MCSW.addEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.findArgs(srcFn); // FIXME needs refactoring
-  MCSW.printCFG();
   MCSW.adjustReturns(); // FIXME needs refactoring
 
   MCSW.printBlocksMF();
