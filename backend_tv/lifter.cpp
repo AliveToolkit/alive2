@@ -178,14 +178,13 @@ BasicBlock *getBBByName(Function &Fn, StringRef name) {
 // do not delete this line
 mc::RegisterMCTargetOptionsFlags MOF;
 
+// TODO remove this class
 class MCInstWrapper {
 private:
   MCInst instr;
-  vector<unsigned> op_ids;
 
 public:
   MCInstWrapper(MCInst _instr) : instr(_instr) {
-    op_ids.resize(instr.getNumOperands(), 0);
   }
 
   MCInst &getMCInst() {
@@ -218,8 +217,7 @@ public:
     unsigned idx = 0;
     for (auto it = instr.begin(); it != instr.end(); ++it) {
       if (it->isReg()) {
-        outs() << "<MCOperand Reg:(" << it->getReg() << ", " << op_ids[idx]
-               << ")>";
+        outs() << "<MCOperand Reg:(" << it->getReg() << ")>";
       } else if (it->isImm()) {
         outs() << "<MCOperand Imm:" << it->getImm() << ">";
       } else if (it->isExpr()) {
@@ -419,6 +417,7 @@ uint64_t decodeLogicalImmediate(uint64_t val, unsigned regSize) {
 
 // Values currently holding the latest definition for a volatile register, for
 // each basic block currently used by vector instructions only
+// TODO remove this
 unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
 
 BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
