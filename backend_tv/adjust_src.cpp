@@ -71,7 +71,7 @@ Function *adjustSrcInputs(Function *srcFn) {
   vector<Type *> new_argtypes;
 
   for (auto &v : srcFn->args()) {
-    auto *ty = v.getType();    
+    auto *ty = v.getType();
     if (!ty->isIntegerTy()) // FIXME
       report_fatal_error("[Unsupported Function Argument]: Only int types "
                          "supported for now");
@@ -84,23 +84,23 @@ Function *adjustSrcInputs(Function *srcFn) {
     // FIXME Do we need to update the value_cache?
   }
 
-  FunctionType *NFTy = FunctionType::get(srcFn->getReturnType(), new_argtypes, false);
-  Function *NF = Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
-                                  srcFn->getName(), srcFn->getParent());
+  FunctionType *NFTy =
+      FunctionType::get(srcFn->getReturnType(), new_argtypes, false);
+  Function *NF =
+      Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
+                       srcFn->getName(), srcFn->getParent());
   NF->copyAttributesFrom(srcFn);
   // FIXME -- copy over argument attributes
   NF->splice(NF->begin(), srcFn);
   NF->takeName(srcFn);
   for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
-         I2 = NF->arg_begin();
+                              I2 = NF->arg_begin();
        I != E; ++I, ++I2) {
     if (I->getType()->getIntegerBitWidth() < 64) {
       auto name = I->getName().substr(I->getName().rfind('%')) + "_t";
-      auto trunc = new TruncInst(I2,
-                                 I->getType(),
-                                 name,
+      auto trunc = new TruncInst(I2, I->getType(), name,
                                  NF->getEntryBlock().getFirstNonPHI());
-      I->replaceAllUsesWith(trunc);      
+      I->replaceAllUsesWith(trunc);
     } else {
       I->replaceAllUsesWith(&*I2);
     }
@@ -110,7 +110,7 @@ Function *adjustSrcInputs(Function *srcFn) {
   // but if we're lifting modules with important calls, we need to
   // replace uses of the function with NF, see code in
   // DeadArgumentElimination.cpp
-  
+
   srcFn->eraseFromParent();
   return NF;
 }
@@ -140,13 +140,13 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   // starting here we commit to returning a copy instead of the
   // original function
-  
+
   has_ret_attr = true;
   auto *i32ty = Type::getIntNTy(srcFn->getContext(), 32);
   auto *i64ty = Type::getIntNTy(srcFn->getContext(), 64);
 
   // build this first to avoid iterator invalidation
-  vector<ReturnInst *> RIs;  
+  vector<ReturnInst *> RIs;
   for (auto &BB : *srcFn)
     for (auto &I : BB)
       if (auto *RI = dyn_cast<ReturnInst>(&I))
@@ -154,58 +154,46 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   for (auto *RI : RIs) {
     auto retVal = RI->getReturnValue();
+    auto Name = retVal->getName();
     if (orig_ret_bitwidth < 32) {
       if (srcFn->hasRetAttribute(Attribute::ZExt)) {
-	auto zext = new ZExtInst(retVal, i64ty,
-				 retVal->getName() + "_zext",
-				 RI);
-	ReturnInst::Create(srcFn->getContext(),
-			   zext, RI);
+        auto zext = new ZExtInst(retVal, i64ty, Name + "_zext", RI);
+        ReturnInst::Create(srcFn->getContext(), zext, RI);
       } else {
-	auto sext = new SExtInst(retVal, i32ty,
-				 retVal->getName() + "_sext",
-				 RI);
-	auto zext = new ZExtInst(sext, i64ty,
-				 retVal->getName() + "_zext",
-				 RI);
-	ReturnInst::Create(srcFn->getContext(),
-			   zext, RI);
+        auto sext = new SExtInst(retVal, i32ty, Name + "_sext", RI);
+        auto zext = new ZExtInst(sext, i64ty, Name + "_zext", RI);
+        ReturnInst::Create(srcFn->getContext(), zext, RI);
       }
     } else {
       if (srcFn->hasRetAttribute(Attribute::ZExt)) {
-	auto zext = new ZExtInst(retVal, i64ty,
-				 retVal->getName() + "_zext",
-				 RI);
-	ReturnInst::Create(srcFn->getContext(),
-			   zext, RI);
+        auto zext = new ZExtInst(retVal, i64ty, Name + "_zext", RI);
+        ReturnInst::Create(srcFn->getContext(), zext, RI);
       } else {
-	auto sext = new SExtInst(retVal, i64ty,
-				 retVal->getName() + "_sext",
-				 RI);
-	ReturnInst::Create(srcFn->getContext(),
-			   sext, RI);
+        auto sext = new SExtInst(retVal, i64ty, Name + "_sext", RI);
+        ReturnInst::Create(srcFn->getContext(), sext, RI);
       }
     }
     RI->eraseFromParent();
   }
 
   // FIXME this is duplicate code, factor it out
-  FunctionType *NFTy = FunctionType::get(i64ty,
-                                        srcFn->getFunctionType()->params(), false);
-  Function *NF = Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
-                                  srcFn->getName(), srcFn->getParent());
+  FunctionType *NFTy =
+      FunctionType::get(i64ty, srcFn->getFunctionType()->params(), false);
+  Function *NF =
+      Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
+                       srcFn->getName(), srcFn->getParent());
   NF->copyAttributesFrom(srcFn);
   // FIXME -- copy over argument attributes
   NF->splice(NF->begin(), srcFn);
   NF->takeName(srcFn);
   for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
-         I2 = NF->arg_begin();
+                              I2 = NF->arg_begin();
        I != E; ++I, ++I2)
     I->replaceAllUsesWith(&*I2);
 
   // FIXME -- if we're lifting modules with important calls, we need to replace
   // uses of the function with NF, see code in DeadArgumentElimination.cpp
-  
+
   srcFn->eraseFromParent();
   return NF;
 }
@@ -223,11 +211,11 @@ Function *adjustSrc(Function *srcFn) {
 
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
-  
+
   outs() << "\n---------- src.ll (changed-return) -------\n";
   srcFn->print(outs());
 
   return srcFn;
 }
 
-} // namespace
+} // namespace lifter
