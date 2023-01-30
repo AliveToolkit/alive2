@@ -436,7 +436,7 @@ again:
     Op = Intrinsic::bswap;
     break;
   case 3:
-    // FIXME!!! ctpop not supported in ARM lifter yet
+    // FIXME -- ctpop not supported in ARM lifter yet
     if (opt_backend_tv)
       goto again;
     Op = Intrinsic::ctpop;
@@ -733,7 +733,8 @@ void bbFuzzer(Module *M) {
   }
 
   for (int i = 0; i < NumBBs; ++i) {
-    if (choose(10) == 0) {
+    // FIXME support calls in the lifter
+    if (!opt_backend_tv && choose(10) == 0) {
       if (flip()) {
         auto idx = choose(NumCounters);
         auto *Load = new LoadInst(IntTy, Counters[idx], "", BBs[i]);
