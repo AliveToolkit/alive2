@@ -950,13 +950,14 @@ public:
 
     switch (opcode) {
     case AArch64::MRS: {
+      // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = CurInst->getOperand(1).getImm();
       assert(imm == 55824 && "NZCV is the only supported case for MRS");
       
-      auto N = createZExt(getN(), getIntTy(64));
-      auto Z = createZExt(getZ(), getIntTy(64));
-      auto C = createZExt(getC(), getIntTy(64));
-      auto V = createZExt(getV(), getIntTy(64));
+      auto N = createZExt(getN(), i64);
+      auto Z = createZExt(getZ(), i64);
+      auto C = createZExt(getC(), i64);
+      auto V = createZExt(getV(), i64);
 
       auto NS = createShl(N, getIntConst(31, 64));
       auto NZ = createShl(Z, getIntConst(30, 64));
@@ -972,25 +973,28 @@ public:
       break;
     }
     case AArch64::MSR: {
+      // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = CurInst->getOperand(0).getImm();
       assert(imm == 55824 && "NZCV is the only supported case for MSR");
 
-      auto Nmask = createShl(getIntConst(1, 64), getIntConst(31, 64));
-      auto Zmask = createShl(getIntConst(1, 64), getIntConst(30, 64));
-      auto Cmask = createShl(getIntConst(1, 64), getIntConst(29, 64));
-      auto Vmask = createShl(getIntConst(1, 64), getIntConst(28, 64));
+      auto i64_0 = getIntConst(0, 64);
+      auto i64_1 = getIntConst(1, 64);
+
+      auto Nmask = createShl(i64_1, getIntConst(31, 64));
+      auto Zmask = createShl(i64_1, getIntConst(30, 64));
+      auto Cmask = createShl(i64_1, getIntConst(29, 64));
+      auto Vmask = createShl(i64_1, getIntConst(28, 64));
       
       auto reg = readFromOperand(1);
-
       auto Nval = createAnd(Nmask, reg);
       auto Zval = createAnd(Zmask, reg);
       auto Cval = createAnd(Cmask, reg);
       auto Vval = createAnd(Vmask, reg);
 
-      setN(createICmp(ICmpInst::Predicate::ICMP_NE, Nval, getIntConst(0, 64)));
-      setZ(createICmp(ICmpInst::Predicate::ICMP_NE, Zval, getIntConst(0, 64)));
-      setC(createICmp(ICmpInst::Predicate::ICMP_NE, Cval, getIntConst(0, 64)));
-      setV(createICmp(ICmpInst::Predicate::ICMP_NE, Vval, getIntConst(0, 64)));
+      setN(createICmp(ICmpInst::Predicate::ICMP_NE, Nval, i64_0));
+      setZ(createICmp(ICmpInst::Predicate::ICMP_NE, Zval, i64_0));
+      setC(createICmp(ICmpInst::Predicate::ICMP_NE, Cval, i64_0));
+      setV(createICmp(ICmpInst::Predicate::ICMP_NE, Vval, i64_0));
       break;
     }
     case AArch64::ADDWrs:
