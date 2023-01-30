@@ -464,29 +464,24 @@ class arm2llvm_ {
   Value *reg_shift(Value *value, int encodedShift) {
     int shift_type = (encodedShift >> 6) & 0x7;
     auto typ = value->getType();
+    auto exp = getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth());
 
-    Instruction::BinaryOps op;
     switch (shift_type) {
     case 0:
-      op = Instruction::Shl;
-      break;
+      return createShl(value, exp);
     case 1:
-      op = Instruction::LShr;
-      break;
+      return createLShr(value, exp);
     case 2:
-      op = Instruction::AShr;
-      break;
+      return createAShr(value, exp);
     case 3:
       // ROR shift
       return createFShr(
           value, value,
-          getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth()));
+          exp);
     default:
       // FIXME: handle other case (msl)
       report_fatal_error("shift type not supported");
     }
-    return createBinop(
-        value, getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth()), op);
   }
 
   Value *reg_shift(int value, int size, int encodedShift) {
@@ -623,16 +618,28 @@ class arm2llvm_ {
     return BinaryOperator::Create(Instruction::Sub, a, b, nextName(), LLVMBB);
   }
 
-  BinaryOperator *createLShr(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::LShr, a, b, nextName(), LLVMBB);
+  Value *createLShr(Value *a, Value *b) {
+    auto W = b->getType()->getIntegerBitWidth();
+    auto C = getIntConst(W, W);
+    auto shift = BinaryOperator::Create(Instruction::LShr, a, b, nextName(), LLVMBB);
+    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
+    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
   }
 
-  BinaryOperator *createAShr(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::AShr, a, b, nextName(), LLVMBB);
+  Value *createAShr(Value *a, Value *b) {
+    auto W = b->getType()->getIntegerBitWidth();
+    auto C = getIntConst(W, W);
+    auto shift = BinaryOperator::Create(Instruction::AShr, a, b, nextName(), LLVMBB);
+    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
+    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
   }
 
-  BinaryOperator *createShl(Value *a, Value *b) {
-    return BinaryOperator::Create(Instruction::Shl, a, b, nextName(), LLVMBB);
+  Value *createShl(Value *a, Value *b) {
+    auto W = b->getType()->getIntegerBitWidth();
+    auto C = getIntConst(W, W);
+    auto shift = BinaryOperator::Create(Instruction::Shl, a, b, nextName(), LLVMBB);
+    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
+    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
   }
 
   BinaryOperator *createAnd(Value *a, Value *b) {
