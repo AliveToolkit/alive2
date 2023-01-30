@@ -113,7 +113,7 @@ const int MaxBoolParams = 4;
 
 const int MaxIntWidth = 64;
 const int MaxIntParams = 5;
-const int MaxInsts = 15;
+const int MaxInsts = 35;
 
 std::optional<std::mt19937_64> Rand;
 

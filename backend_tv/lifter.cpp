@@ -413,7 +413,7 @@ class arm2llvm_ {
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
-  [[maybe_unused]] MCRegisterInfo *registerInfo{nullptr};
+  MCRegisterInfo *registerInfo{nullptr};
 
   MCInst *CurInst{nullptr};
 
