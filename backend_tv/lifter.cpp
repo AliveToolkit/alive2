@@ -413,7 +413,7 @@ class arm2llvm_ {
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
-  MCRegisterInfo *registerInfo{nullptr};
+  [[maybe_unused]] MCRegisterInfo *registerInfo{nullptr};
 
   MCInst *CurInst{nullptr};
 
@@ -1021,7 +1021,7 @@ public:
       // PSTATE bits.
       auto tyPlusOne = getIntTy(size + 1);
 
-      auto carry = createZExt(getZ(), tyPlusOne);
+      auto carry = createZExt(getC(), tyPlusOne);
       auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
       auto withCarry = createAdd(add, carry);
 
