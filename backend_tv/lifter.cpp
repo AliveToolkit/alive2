@@ -463,8 +463,8 @@ class arm2llvm_ {
   // field in the instruction)
   Value *reg_shift(Value *value, int encodedShift) {
     int shift_type = (encodedShift >> 6) & 0x7;
-    auto typ = value->getType();
-    auto exp = getIntConst(encodedShift & 0x3f, typ->getIntegerBitWidth());
+    auto W = value->getType()->getIntegerBitWidth();
+    auto exp = getIntConst(encodedShift & 0x3f, W);
 
     switch (shift_type) {
     case 0:
