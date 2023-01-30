@@ -1579,8 +1579,6 @@ public:
     }
     case AArch64::LSLVWr:
     case AArch64::LSLVXr: {
-      //auto size = getInstSize(opcode);
-      //auto zero = getIntConst(0, size);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2);
       auto exp = createShl(lhs, rhs);
@@ -1862,7 +1860,6 @@ public:
       // FIXME: it might be better to have EON instruction separate since there
       //    no "S" instructions for EON
       if (has_s(opcode)) {
-        // set n/z, clear c/v
         setNUsingResult(ret);
         setZUsingResult(ret);
         setC(getIntConst(0, 1));
