@@ -187,21 +187,21 @@ string findTargetLabel(MCInst &Inst) {
 }
 
 void print(MCInst &Inst) {
-  outs() << "< MCInst " << Inst.getOpcode() << " ";
+  *out << "< MCInst " << Inst.getOpcode() << " ";
   unsigned idx = 0;
   for (auto it = Inst.begin(); it != Inst.end(); ++it) {
     if (it->isReg()) {
-      outs() << "<MCOperand Reg:(" << it->getReg() << ")>";
+      *out << "<MCOperand Reg:(" << it->getReg() << ")>";
     } else if (it->isImm()) {
-      outs() << "<MCOperand Imm:" << it->getImm() << ">";
+      *out << "<MCOperand Imm:" << it->getImm() << ">";
     } else if (it->isExpr()) {
-      outs() << "<MCOperand Expr:>"; // FIXME
+      *out << "<MCOperand Expr:>"; // FIXME
     } else {
       assert("MCInst printing an unsupported operand" && false);
     }
     idx++;
   }
-  outs() << ">\n";
+  *out << ">\n";
 }
 
 // Represents a basic block of machine instructions
@@ -295,7 +295,7 @@ public:
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
     if (BBs.empty()) {
-      outs() << "adding entry block to empty function\n";
+      *out << "adding entry block to empty function\n";
       auto new_block = addBlock("entry");
       MCInst ret_instr;
       ret_instr.setOpcode(AArch64::RET);
@@ -321,7 +321,7 @@ public:
     }
 
     if (add_entry_block) {
-      outs() << "Added arm_tv_entry block\n";
+      *out << "Added arm_tv_entry block\n";
       BBs.emplace(BBs.begin(), "arm_tv_entry");
       MCInst jmp_instr;
       jmp_instr.setOpcode(AArch64::B);
@@ -331,14 +331,16 @@ public:
   }
 
   void printBlocks() {
-    outs() << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
-    outs() << "-------------\n";
+    *out << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
+    *out << "-------------\n";
     int i = 0;
     for (auto &block : BBs) {
-      outs() << "block " << i << ", name= " << block.getName() << '\n';
+      *out << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &Inst : block.getInstrs()) {
-        Inst.dump_pretty(outs(), IP, " ", MRI);
-        outs() << '\n';
+	std::string sss;
+	llvm::raw_string_ostream ss(sss);
+        Inst.dump_pretty(ss, IP, " ", MRI);
+        *out << sss << '\n';
       }
       i++;
     }
@@ -434,11 +436,11 @@ class arm2llvm_ {
   [[noreturn]] void visitError(MCInst &I) {
     // flush must happen before error is printed to make sure the error
     // comes out nice and pretty when combing the stdout/stderr in scripts
-    outs().flush();
-
-    outs() << "ERROR: Unsupported arm instruction: "
-           << instrPrinter->getOpcodeName(I.getOpcode()) << "\n";
-    outs().flush();
+    out->flush();
+    string str(instrPrinter->getOpcodeName(I.getOpcode()));
+    *out << "ERROR: Unsupported arm instruction: "
+           << str << "\n";
+    out->flush();
     exit(-1); // FIXME handle this better
   }
 
@@ -449,7 +451,7 @@ class arm2llvm_ {
       return 64;
     if (instrs_128.contains(instr))
       return 128;
-    outs() << "getInstSize encountered unknown instruction"
+    *out << "getInstSize encountered unknown instruction"
            << "\n";
     visitError(*CurInst);
     UNREACHABLE();
@@ -1947,7 +1949,7 @@ public:
       // value
       auto retTy = srcFn.getReturnType();
       if (auto *vecRetTy = dyn_cast<VectorType>(retTy)) {
-        outs() << "returning vector type\n";
+        *out << "returning vector type\n";
         auto elem_bitwidth = vecRetTy->getScalarType()->getIntegerBitWidth();
         auto poison_val = PoisonValue::get(vecRetTy->getScalarType());
         vector<Constant *> vals;
@@ -1960,13 +1962,13 @@ public:
         // in the assembly
         // unsigned int largest_vect_register = AArch64::Q0;
         // for (auto &[reg, val] : cur_vol_regs[MCBB]) {
-        //  outs() << "reg num=" << reg << "\n";
+        //  *out << "reg num=" << reg << "\n";
         //  if (reg > largest_vect_register) {
         //    largest_vect_register = reg;
         //  }
         //}
         //
-        // outs() << "largest vect register=" <<
+        // *out << "largest vect register=" <<
         // largest_vect_register-AArch64::Q0
         // << "\n";
 
@@ -2125,8 +2127,8 @@ public:
       break;
     }
     default:
-      Fn.print(outs());
-      outs() << "\nError "
+      *out << funcToString(&Fn);
+      *out << "\nError "
                 "detected----------partially-lifted-arm-target----------\n";
       visitError(I);
     }
@@ -2145,7 +2147,7 @@ public:
     auto Fn =
         Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
                          0, MF.getName(), LiftedModule);
-    outs() << "function name: '" << MF.getName() << "'"
+    *out << "function name: '" << MF.getName() << "'"
            << "\n";
 
     // create LLVM-side basic blocks
@@ -2225,7 +2227,7 @@ public:
     // FIXME: fold something like this into the loop above
     if (argNum > 8) {
       auto num_stack_args = argNum - 8; // x0-x7 are passed via registers
-      outs() << "num_stack_args = " << num_stack_args << "\n";
+      *out << "num_stack_args = " << num_stack_args << "\n";
 
       // add stack with 16 slots, 8 bytes each
       auto alloc_size = getIntConst(16, 64);
@@ -2235,7 +2237,7 @@ public:
 
       for (unsigned i = 0; i < num_stack_args; ++i) {
         unsigned reg_num = AArch64::X8 + i;
-        outs() << "reg_num = " << reg_num << "\n";
+        *out << "reg_num = " << reg_num << "\n";
 
         vector<Value *> idxlist{getIntConst(i, 64)};
         auto get_xi =
@@ -2248,7 +2250,7 @@ public:
     }
 
     for (auto &[llvm_bb, mc_bb] : BBs) {
-      outs() << "visiting bb: " << mc_bb->getName() << "\n";
+      *out << "visiting bb: " << mc_bb->getName() << "\n";
       LLVMBB = llvm_bb;
       MCBB = mc_bb;
       auto &mc_instrs = mc_bb->getInstrs();
@@ -2332,24 +2334,27 @@ public:
         if (expr->getKind() == MCExpr::ExprKind::SymbolRef) {
           const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
           const MCSymbol &Sym = SRE.getSymbol();
-          outs() << "target label : " << Sym.getName()
-                 << ", offset=" << Sym.getOffset()
+          *out << "target label : " << (string)Sym.getName()
+                 << ", offset=" << to_string(Sym.getOffset())
                  << '\n'; // FIXME remove when done
         }
       }
     }
 
-    outs() << cnt++ << "  : ";
-    Inst.dump_pretty(outs(), IP, " ", MRI);
+    *out << cnt++ << "  : ";
+    std::string sss;
+    llvm::raw_string_ostream ss(sss);
+    Inst.dump_pretty(ss, IP, " ", MRI);
+    *out << sss;
     if (IA->isBranch(Inst))
-      outs() << ": branch ";
+      *out << ": branch ";
     if (IA->isConditionalBranch(Inst))
-      outs() << ": conditional branch ";
+      *out << ": conditional branch ";
     if (IA->isUnconditionalBranch(Inst))
-      outs() << ": unconditional branch ";
+      *out << ": unconditional branch ";
     if (IA->isTerminator(Inst))
-      outs() << ": terminator ";
-    outs() << "\n";
+      *out << ": terminator ";
+    *out << "\n";
   }
 
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
@@ -2403,7 +2408,7 @@ public:
   // Only call after MF with Basicblocks is constructed to generate the
   // successors for each basic block
   void generateSuccessors() {
-    outs() << "generating basic block successors" << '\n';
+    *out << "generating basic block successors" << '\n';
     for (unsigned i = 0; i < MF.BBs.size(); ++i) {
       auto &cur_bb = MF.BBs[i];
       MCBasicBlock *next_bb_ptr = nullptr;
@@ -2411,7 +2416,7 @@ public:
         next_bb_ptr = &MF.BBs[i + 1];
 
       if (cur_bb.size() == 0) {
-        outs()
+        *out
             << "generateSuccessors, encountered basic block with 0 instructions"
             << '\n';
         continue;
@@ -2451,14 +2456,16 @@ public:
   }
 
   void printBlocksMF() {
-    outs() << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
-    outs() << "-------------\n";
+    *out << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
+    *out << "-------------\n";
     int i = 0;
     for (auto &block : MF.BBs) {
-      outs() << "block " << i << ", name= " << block.getName() << '\n';
+      *out << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-        inst.dump_pretty(outs(), IP, " ", MRI);
-        outs() << '\n';
+	std::string sss;
+	llvm::raw_string_ostream ss(sss);
+        inst.dump_pretty(ss, IP, " ", MRI);
+        *out << sss << '\n';
       }
       i++;
     }
@@ -2469,6 +2476,7 @@ public:
 
 namespace lifter {
 
+std::ostream *out;
 vector<unsigned> orig_input_width;
 unsigned int orig_ret_bitwidth;
 bool has_ret_attr;
@@ -2487,7 +2495,7 @@ void reset() {
     string Error;
     Targ = TargetRegistry::lookupTarget(TripleName, Error);
     if (!Targ) {
-      outs() << Error;
+      *out << Error;
       exit(-1);
     }
 
@@ -2552,8 +2560,13 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   auto lifted =
       arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
 
-  if (llvm::verifyModule(*LiftedModule, &llvm::outs()))
+  std::string sss;
+  llvm::raw_string_ostream ss(sss);
+  if (llvm::verifyModule(*LiftedModule, &ss)) {
+    *out << sss << "\n\n";
+    out->flush();
     llvm::report_fatal_error("Lifted module is broken, this should not happen");
+  }
 
   return make_pair(srcFn, lifted);
 }

@@ -77,6 +77,7 @@ llvm::cl::opt<string> opt_asm_input(
 llvm::ExitOnError ExitOnErr;
 
 void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
+  assert(lifter::out);
   lifter::reset();
 
   // this has to return a fresh function since it rewrites the
@@ -92,33 +93,32 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
     lifter::generateAsm(*M1, Asm);
 
-  llvm::outs() << "\n\n------------ AArch64 Assembly: ------------\n\n";
+  *out << "\n\n------------ AArch64 Assembly: ------------\n\n";
   for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();
        ++it) {
-    llvm::outs() << *it;
+    *out << *it;
   }
-  llvm::outs() << "-------------\n";
+  *out << "-------------\n";
 
   if (opt_asm_only)
     exit(0);
 
   auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
   
-  llvm::outs() << "about to optimize lifted code:\n";
-  out->flush();
-  M2.get()->print(llvm::outs(), nullptr);
+  *out << "about to optimize lifted code:\n";
+  *out << lifter::moduleToString(M2.get());
 
   if (opt_optimize_tgt) {
     auto err = optimize_module(M2.get(), "O3");
     assert(err.empty());
   }
 
-  llvm::outs() << "about to compare functions\n";
+  *out << "about to compare functions\n";
   out->flush();
 
   verifier.compareFunctions(*F1, *F2);
 
-  llvm::outs() << "done comparing functions\n";
+  *out << "done comparing functions\n";
   out->flush();
 }
 
@@ -130,9 +130,10 @@ int main(int argc, char **argv) {
 
   // FIXME remove when done debugging
   if (true) {
+    cout << "comand line:\n";
     for (int i=0; i<argc; ++i)
-      llvm::outs() << "'" << argv[i] << "' ";
-    llvm::outs() << "\n";
+      cout << "'" << argv[i] << "' ";
+    cout << endl;
   }
   
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -162,6 +163,8 @@ version )EOF";
   M1.get()->setTargetTriple("aarch64-linux-gnu");
   M1.get()->setDataLayout(
       "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128");
+
+  lifter::out = out;
 
   auto &DL = M1.get()->getDataLayout();
   llvm::Triple targetTriple(M1.get()->getTargetTriple());

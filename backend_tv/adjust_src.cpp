@@ -119,7 +119,7 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   auto *ret_typ = srcFn->getReturnType();
   orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
-  outs() << "original return bitwidth = " << orig_ret_bitwidth << "\n";
+  *out << "original return bitwidth = " << orig_ret_bitwidth << "\n";
 
   // FIXME
   if (!ret_typ->isIntegerTy())
@@ -203,14 +203,14 @@ Function *adjustSrc(Function *srcFn) {
   if (srcFn->isVarArg())
     report_fatal_error("Varargs not supported");
 
-  outs() << "\n---------- src.ll ----------\n";
-  srcFn->print(outs());
+  *out << "\n---------- src.ll ----------\n";
+  *out << funcToString(srcFn);
 
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
-  outs() << "\n---------- src.ll (args/return adjusted) -------\n";
-  srcFn->print(outs());
+  *out << "\n---------- src.ll (args/return adjusted) -------\n";
+  *out << funcToString(srcFn);
 
   return srcFn;
 }
