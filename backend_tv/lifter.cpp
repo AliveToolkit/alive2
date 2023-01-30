@@ -292,6 +292,15 @@ public:
   }
 
   void addEntryBlock() {
+    *out << "adding fresh entry block to lifted code\n";
+    BBs.emplace(BBs.begin(), "arm_tv_entry");
+    MCInst jmp_instr;
+    jmp_instr.setOpcode(AArch64::B);
+    jmp_instr.addOperand(MCOperand::createImm(1));
+    BBs[0].addInstBegin(std::move(jmp_instr));
+  }
+  
+  void checkEntryBlock() {
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
     if (BBs.empty()) {
@@ -302,10 +311,10 @@ public:
       new_block->addInstBegin(std::move(ret_instr));
     }
 
-    if (BBs.size() == 1)
-      return;
-
-    bool add_entry_block = false;
+    // LLVM doesn't let the entry block be a jump target, but assembly
+    // does, so let's fix that up if necessary. alternatively, we
+    // could simply add the new block unconditionally and let
+    // simplifyCFG clean up the mess.
     const auto &first_block = BBs[0];
     for (unsigned i = 0; i < BBs.size(); ++i) {
       auto &cur_bb = BBs[i];
@@ -314,19 +323,10 @@ public:
           IA->isUnconditionalBranch(last_mc_instr)) {
         string target = findTargetLabel(last_mc_instr);
         if (target == first_block.getName()) {
-          add_entry_block = true;
-          break;
+	  addEntryBlock();
+	  return;
         }
       }
-    }
-
-    if (add_entry_block) {
-      *out << "Added arm_tv_entry block\n";
-      BBs.emplace(BBs.begin(), "arm_tv_entry");
-      MCInst jmp_instr;
-      jmp_instr.setOpcode(AArch64::B);
-      jmp_instr.addOperand(MCOperand::createImm(1));
-      BBs[0].addInstBegin(std::move(jmp_instr));
     }
   }
 
@@ -2399,8 +2399,8 @@ public:
   }
 
   // Make sure that we have an entry label with no predecessors
-  void addEntryBlock() {
-    MF.addEntryBlock();
+  void checkEntryBlock() {
+    MF.checkEntryBlock();
   }
 
   // Only call after MF with Basicblocks is constructed to generate the
@@ -2551,7 +2551,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   MCSW.printBlocksMF();
   MCSW.removeEmptyBlocks();
-  MCSW.addEntryBlock();
+  MCSW.checkEntryBlock();
   MCSW.generateSuccessors();
   MCSW.printBlocksMF();
 
