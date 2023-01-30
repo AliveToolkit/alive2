@@ -395,7 +395,6 @@ BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
   const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*jmp_tgt.getExpr());
   const MCSymbol &Sym = SRE.getSymbol();
   StringRef name = Sym.getName();
-  outs() << "jump target: " << Sym.getName().str() << '\n';
   for (auto &bb : F) {
     if (bb.getName() == name)
       return &bb;
@@ -600,8 +599,6 @@ class arm2llvm_ {
   }
 
   BinaryOperator *createBinop(Value *a, Value *b, Instruction::BinaryOps op) {
-    outs() << "a.width = " << a->getType()->getIntegerBitWidth() << "\n";
-    outs() << "b.width = " << b->getType()->getIntegerBitWidth() << "\n";
     return BinaryOperator::Create(op, a, b, nextName(), LLVMBB);
   }
 
@@ -960,10 +957,6 @@ public:
         auto ty = getIntTy(size);
         auto extendImm = CurInst->getOperand(3).getImm();
         auto extendType = ((extendImm >> 3) & 0x7);
-
-        outs() << "extendImm: " << extendImm << ", extendType: " << extendType
-               << "\n";
-
         auto isSigned = extendType / 4;
 
         // extendSize is necessary so that we can start with the word size
@@ -1996,7 +1989,6 @@ public:
         if (!ret_void) {
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
-          outs() << "return width = " << retWidth << "\n";
           retVal = readFromRegister(AArch64::X0);
 
           if (retWidth < retVal->getType()->getIntegerBitWidth())
@@ -2038,7 +2030,6 @@ public:
              "expected symbol ref as bcc operand");
       const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*jmp_tgt_op.getExpr());
       const MCSymbol &Sym = SRE.getSymbol();
-      outs() << "bcc target: " << Sym.getName().str() << '\n';
       auto *dst_true = getBBByName(Fn, Sym.getName());
 
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
@@ -2117,9 +2108,6 @@ public:
           SRE.getSymbol(); // FIXME refactor this into a function
       auto *dst_false = getBBByName(Fn, Sym.getName());
 
-      outs() << "current mcblock = " << MCBB->getName() << "\n";
-      outs() << "Curr BB=" << LLVMBB->getName().str() << "\n";
-      outs() << "jump target = " << Sym.getName().str() << "\n";
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
       const string *dst_true_name;
@@ -2460,7 +2448,6 @@ public:
 
   // Remove empty basic blocks, including .Lfunc_end
   void removeEmptyBlocks() {
-    outs() << "removing empty basic blocks" << '\n';
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
