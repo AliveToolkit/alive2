@@ -413,7 +413,7 @@ class arm2llvm_ {
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
-  [[maybe_unused]] MCRegisterInfo *registerInfo{nullptr};
+  MCRegisterInfo *registerInfo{nullptr};
 
   MCInst *CurInst{nullptr};
 
@@ -887,7 +887,7 @@ class arm2llvm_ {
 
   void setZUsingResult(Value *V) {
     auto W = V->getType()->getIntegerBitWidth();
-    assert(W == 32 || W == 64);
+    assert(W == 32 || W == 64 || W == 65);
     auto zero = getIntConst(0, W);
     auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, V, zero);
     setZ(z);
@@ -895,7 +895,7 @@ class arm2llvm_ {
 
   void setNUsingResult(Value *V) {
     auto W = V->getType()->getIntegerBitWidth();
-    assert(W == 32 || W == 64);
+    assert(W == 32 || W == 64 || W == 65);
     auto zero = getIntConst(0, W);
     auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, V, zero);
     setN(n);
