@@ -875,6 +875,8 @@ reduced using llvm-reduce.
 #define ARGS_MODULE_VAR MDummy
 #include "llvm_util/cmd_args_def.h"
 
+  lifter::out = out;
+
   unique_ptr<Module> M1;
 
   void (*Fuzzer)(Module *);
