@@ -413,7 +413,6 @@ class arm2llvm_ {
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
-  MCRegisterInfo *registerInfo{nullptr};
 
   MCInst *CurInst{nullptr};
 
@@ -903,9 +902,9 @@ class arm2llvm_ {
 
 public:
   arm2llvm_(Module *LiftedModule, MCFunction &MF, Function &srcFn,
-            MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo)
+            MCInstPrinter *instrPrinter)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
-        instrPrinter(instrPrinter), registerInfo(registerInfo), instCount(0) {}
+        instrPrinter(instrPrinter), instCount(0) {}
 
 #if 1
   void revInst(Value *V) {
@@ -2280,7 +2279,7 @@ public:
 // types of arguments.
 Function *arm2llvm(Module *OrigModule, MCFunction &MF, Function &srcFn,
                    MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo) {
-  return arm2llvm_(OrigModule, MF, srcFn, instrPrinter, registerInfo).run();
+  return arm2llvm_(OrigModule, MF, srcFn, instrPrinter).run();
 }
 
 // We're overriding MCStreamerWrapper to generate an MCFunction
