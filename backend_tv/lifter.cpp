@@ -618,28 +618,37 @@ class arm2llvm_ {
     return BinaryOperator::Create(Instruction::Sub, a, b, nextName(), LLVMBB);
   }
 
+  Value *createRawLShr(Value *a, Value *b) {
+    return BinaryOperator::Create(Instruction::LShr, a, b, nextName(), LLVMBB);
+  }
+
   Value *createLShr(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
-    auto C = getIntConst(W, W);
-    auto shift = BinaryOperator::Create(Instruction::LShr, a, b, nextName(), LLVMBB);
-    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
-    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
+    auto mask = getIntConst(W - 1, W);
+    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::LShr, a, masked, nextName(), LLVMBB);
+  }
+
+  Value *createRawAShr(Value *a, Value *b) {
+    return BinaryOperator::Create(Instruction::AShr, a, b, nextName(), LLVMBB);
   }
 
   Value *createAShr(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
-    auto C = getIntConst(W, W);
-    auto shift = BinaryOperator::Create(Instruction::AShr, a, b, nextName(), LLVMBB);
-    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
-    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
+    auto mask = getIntConst(W - 1, W);
+    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::AShr, a, masked, nextName(), LLVMBB);
+  }
+
+  Value *createRawShl(Value *a, Value *b) {
+    return BinaryOperator::Create(Instruction::Shl, a, b, nextName(), LLVMBB);
   }
 
   Value *createShl(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
-    auto C = getIntConst(W, W);
-    auto shift = BinaryOperator::Create(Instruction::Shl, a, b, nextName(), LLVMBB);
-    auto cond = new ICmpInst(*LLVMBB, ICmpInst::Predicate::ICMP_UGE, b, C, nextName());
-    return SelectInst::Create(cond, getIntConst(0, W), shift, nextName(), LLVMBB);
+    auto mask = getIntConst(W - 1, W);
+    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::Shl, a, masked, nextName(), LLVMBB);
   }
 
   BinaryOperator *createAnd(Value *a, Value *b) {
@@ -1037,8 +1046,8 @@ public:
         // Mask off the sign bit. We could mask with an AND, but APInt semantics
         // might be weird since we're passing in an uint64_t but we'll want a 65
         // bit int
-        auto masked = createLShr(createShl(withCarry, getIntConst(1, size + 1)),
-                                 getIntConst(1, size + 1));
+	auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
+        auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
 
         auto sAdd =
             createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
@@ -1570,21 +1579,19 @@ public:
     }
     case AArch64::LSLVWr:
     case AArch64::LSLVXr: {
-      auto size = getInstSize(opcode);
-      auto zero = getIntConst(0, size);
+      //auto size = getInstSize(opcode);
+      //auto zero = getIntConst(0, size);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2);
-      auto exp = createFShl(lhs, zero, rhs);
+      auto exp = createShl(lhs, rhs);
       writeToOutputReg(exp);
       break;
     }
     case AArch64::LSRVWr:
     case AArch64::LSRVXr: {
-      auto size = getInstSize(opcode);
-      auto zero = getIntConst(0, size);
       auto lhs = readFromOperand(1);
       auto rhs = readFromOperand(2);
-      auto exp = createFShr(zero, lhs, rhs);
+      auto exp = createLShr(lhs, rhs);
       writeToOutputReg(exp);
       break;
     }
