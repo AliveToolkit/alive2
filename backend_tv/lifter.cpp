@@ -78,34 +78,25 @@ const unsigned V = 100000003;
 namespace {
 
 const set<int> s_flag = {
-    // ADDSW
-    AArch64::ADDSWri,
-    AArch64::ADDSWrs,
+    AArch64::ADDSWri, AArch64::ADDSWrs,
     AArch64::ADDSWrx,
-    // ADDSX
     AArch64::ADDSXri,
     AArch64::ADDSXrs,
     AArch64::ADDSXrx,
-    // SUBSW
     AArch64::SUBSWri,
     AArch64::SUBSWrs,
     AArch64::SUBSWrx,
-    // SUBSX
     AArch64::SUBSXri,
     AArch64::SUBSXrs,
     AArch64::SUBSXrx,
-    // ANDSW
     AArch64::ANDSWri,
     AArch64::ANDSWrr,
     AArch64::ANDSWrs,
-    // ANDSX
     AArch64::ANDSXri,
     AArch64::ANDSXrr,
     AArch64::ANDSXrs,
-    // BICS
     AArch64::BICSWrs,
     AArch64::BICSXrs,
-    // ADCS
     AArch64::ADCSXr,
     AArch64::ADCSWr,
 };
