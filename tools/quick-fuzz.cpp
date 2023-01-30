@@ -113,7 +113,7 @@ const int MaxBoolParams = 4;
 
 const int MaxIntWidth = 64;
 const int MaxIntParams = 5;
-const int MaxInsts = 35;
+const int MaxInsts = 25;
 
 std::optional<std::mt19937_64> Rand;
 
@@ -684,8 +684,7 @@ void valueFuzzer(Module *M) {
   for (int i = 0; i <= MaxIntWidth; ++i)
     Pool.push_back(vector<APInt>());
 
-  // FIXME
-  int num_insts = opt_backend_tv ? choose(10) : choose(MaxInsts);
+  int num_insts = MaxInsts;
 
   for (int i = 0; i < num_insts; ++i)
     genInst(Vals, Pool, BB, WP);
