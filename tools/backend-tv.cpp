@@ -105,13 +105,16 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
 
   auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
   
-  *out << "about to optimize lifted code:\n";
+  *out << "\n\nabout to optimize lifted code:\n\n";
   *out << lifter::moduleToString(M2.get());
 
   if (opt_optimize_tgt) {
     auto err = optimize_module(M2.get(), "O3");
     assert(err.empty());
   }
+
+  *out << "\n\nafter optimization:\n\n";
+  *out << lifter::moduleToString(M2.get());
 
   *out << "about to compare functions\n";
   out->flush();
