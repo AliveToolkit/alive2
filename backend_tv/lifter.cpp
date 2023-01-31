@@ -189,7 +189,6 @@ string findTargetLabel(MCInst &Inst) {
 
 void print(MCInst &Inst) {
   *out << "< MCInst " << Inst.getOpcode() << " ";
-  unsigned idx = 0;
   for (auto it = Inst.begin(); it != Inst.end(); ++it) {
     if (it->isReg()) {
       *out << "<MCOperand Reg:(" << it->getReg() << ")>";
@@ -200,7 +199,6 @@ void print(MCInst &Inst) {
     } else {
       assert("MCInst printing an unsupported operand" && false);
     }
-    idx++;
   }
   *out << ">\n";
 }
@@ -412,7 +410,6 @@ class arm2llvm_ {
   // const DataLayout &DL;
   Function &srcFn;
   MCBasicBlock *MCBB{nullptr}; // the current machine block
-  unsigned blockCount{0};
   BasicBlock *LLVMBB{nullptr}; // the current block
 
   MCInstPrinter *instrPrinter{nullptr};
@@ -2196,9 +2193,9 @@ public:
   // asm-level aliases will get redirected here
   void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
     auto A = createAlloca(getIntTy(Width), getIntConst(1, 64), Name);
-    RegFile[Reg] = A;
     auto F = createFreeze(A);
     createStore(F, A);
+    RegFile[Reg] = A;
   }
 
   Function *run() {
@@ -2221,9 +2218,7 @@ public:
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
-    // allocate storage for the main register file; FIXME not worrying
-    // about X29 and X30 -- code that touches them should trip out and
-    // we'll fix this later
+    // allocate storage for the main register file
     for (unsigned Reg = AArch64::X0; Reg <= AArch64::X28; ++Reg) {
       stringstream Name;
       Name << "X" << Reg - AArch64::X0;
@@ -2331,7 +2326,6 @@ public:
         createBranch(dst);
       }
 
-      blockCount++;
     }
     return Fn;
   }
