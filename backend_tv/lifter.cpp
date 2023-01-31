@@ -933,6 +933,10 @@ public:
   }
 #endif
 
+  int64_t getImm(int idx) {
+    return CurInst->getOperand(idx).getImm();
+  }
+  
   // Visit an MCInst and convert it to LLVM IR
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
@@ -1320,24 +1324,11 @@ public:
     }
     case AArch64::SMSUBLrrr:
     case AArch64::UMSUBLrrr: {
-      auto size = getInstSize(opcode);
       // SMSUBL: Signed Multiply-Subtract Long.
       // UMSUBL: Unsigned Multiply-Subtract Long.
-      Value *mul_lhs = nullptr;
-      Value *mul_rhs = nullptr;
-      if (CurInst->getOperand(1).getReg() == AArch64::WZR) {
-        mul_lhs = getIntConst(0, size);
-      } else {
-        mul_lhs = readFromOperand(1);
-      }
-
-      if (CurInst->getOperand(2).getReg() == AArch64::WZR) {
-        mul_rhs = getIntConst(0, size);
-      } else {
-        mul_rhs = readFromOperand(2);
-      }
-
-      auto minuend = readFromOperand(3);
+      auto *mul_lhs = readFromOperand(1);
+      auto *mul_rhs = readFromOperand(2);
+      auto *minuend = readFromOperand(3);
 
       // The inputs are automatically zero extended, but we want sign
       // extension for signed, so we need to truncate them back to i32s
