@@ -204,13 +204,13 @@ Function *adjustSrc(Function *srcFn) {
     report_fatal_error("Varargs not supported");
 
   *out << "\n---------- src.ll ----------\n";
-  *out << funcToString(srcFn);
+  *out << moduleToString(srcFn->getParent());
 
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
   *out << "\n---------- src.ll (args/return adjusted) -------\n";
-  *out << funcToString(srcFn);
+  *out << moduleToString(srcFn->getParent());
 
   return srcFn;
 }

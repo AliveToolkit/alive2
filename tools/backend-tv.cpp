@@ -84,10 +84,6 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   // signature
   srcFn = lifter::adjustSrc(srcFn);
   
-  std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", M1->getContext());
-  M2->setDataLayout(M1->getDataLayout());
-  M2->setTargetTriple(M1->getTargetTriple());
-
   llvm::SmallString<1024> Asm;
   auto AsmBuffer = (opt_asm_input != "") ?
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
@@ -102,6 +98,10 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
 
   if (opt_asm_only)
     exit(0);
+
+  std::unique_ptr<llvm::Module> M2 = std::make_unique<llvm::Module>("M2", M1->getContext());
+  M2->setDataLayout(M1->getDataLayout());
+  M2->setTargetTriple(M1->getTargetTriple());
 
   auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
   

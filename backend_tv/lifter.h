@@ -40,8 +40,9 @@ extern unsigned orig_ret_bitwidth;
 extern bool has_ret_attr;
 extern const llvm::Target *Targ;
 
-inline const char *TripleName = "aarch64-arm-none-eabi";
-inline const char *CPU = "apple-a12";
+// TODO -- make expose these to the command line, probably
+inline const char *TripleName = "aarch64-unknown-linux-gnu";
+inline const char *CPU = "generic";
 
 void reset();
 
