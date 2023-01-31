@@ -2195,7 +2195,10 @@ public:
   // create the storage associated with a register -- all of its
   // asm-level aliases will get redirected here
   void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
-    RegFile[Reg] = createAlloca(getIntTy(Width), getIntConst(1, 64), Name);
+    auto A = createAlloca(getIntTy(Width), getIntConst(1, 64), Name);
+    RegFile[Reg] = A;
+    auto F = createFreeze(A);
+    createStore(F, A);
   }
 
   Function *run() {
@@ -2291,6 +2294,7 @@ public:
       auto alloc_size = getIntConst(16, 64);
       auto ty = Type::getInt64Ty(Ctx);
       auto alloca = createAlloca(ty, alloc_size, "stack");
+      // FIXME fill it with frozen poison
       mc_add_identifier(AArch64::SP, 3, alloca);
 
       for (unsigned i = 0; i < num_stack_args; ++i) {
