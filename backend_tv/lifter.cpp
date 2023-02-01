@@ -1956,14 +1956,17 @@ public:
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
-      //case AArch64::LDPXi:
-      //case AArch64::LDRBBui:
-      //case AArch64::LDRHHui:
-      //case AArch64::LDRSBWui:
-      //case AArch64::LDRSBXui:
-      //case AArch64::LDRSHWui:
-      //case AArch64::LDRSWui:
-      //case AArch64::LDRWui:
+      /*
+   2332 ERROR: Unsupported arm instruction: LDPXi
+    669 ERROR: Unsupported arm instruction: LDRBBui
+    502 ERROR: Unsupported arm instruction: LDRHHui
+     73 ERROR: Unsupported arm instruction: LDRSBWui
+     49 ERROR: Unsupported arm instruction: LDRSBXui
+     54 ERROR: Unsupported arm instruction: LDRSHWui
+     58 ERROR: Unsupported arm instruction: LDRSHXui
+     56 ERROR: Unsupported arm instruction: LDRSWui
+   1869 ERROR: Unsupported arm instruction: LDRWui
+      */
     case AArch64::LDRXui: {
       auto &op1 = CurInst->getOperand(1);
       auto &op2 = CurInst->getOperand(2);
@@ -2451,7 +2454,7 @@ public:
       auto &last_mc_instr = cur_bb.getInstrs().back();
       // handle the special case of adding where we have added a new entry block
       // with no predecessors. This is hacky because I don't know the API to
-      // create and MCExpr and have to create a branch with an immediate operand
+      // create an MCExpr and have to create a branch with an immediate operand
       // instead
       if (i == 0 && (IA->isUnconditionalBranch(last_mc_instr)) &&
           last_mc_instr.getOperand(0).isImm()) {
