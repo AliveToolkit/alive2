@@ -126,7 +126,7 @@ const set<int> instrs_64 = {
     AArch64::TBZX,      AArch64::TBNZW,     AArch64::TBNZX,
     AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
-    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::MSR,
+    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDRWui, AArch64::MSR,
     AArch64::MRS};
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -1966,12 +1966,13 @@ public:
      54 ERROR: Unsupported arm instruction: LDRSHWui
      58 ERROR: Unsupported arm instruction: LDRSHXui
      56 ERROR: Unsupported arm instruction: LDRSWui
-   1869 ERROR: Unsupported arm instruction: LDRWui
       */
-    case AArch64::LDRXui: {
+    case AArch64::LDRWui:
+      doLoadImmediate(4);
+      break;
+    case AArch64::LDRXui:
       doLoadImmediate(8);
       break;
-    }
     case AArch64::RET: {
       // for now we're assuming that the function returns an integer or void
       // value
@@ -2240,13 +2241,11 @@ public:
 
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
-
     const int stackSlots = 16; // 8 bytes each
-    auto bytes = 8 * stackSlots;
-    stackMem = createAlloca(i8, getIntConst(bytes, 64), "stack");
-    for (unsigned Idx = 0; Idx < bytes; ++Idx) {
-      auto F = createFreeze(PoisonValue::get(i8));
-      auto G = createGEP(i8, stackMem, {getIntConst(Idx, 64)}, "");
+    stackMem = createAlloca(i8, getIntConst(8 * stackSlots, 64), "stack");
+    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
+      auto F = createFreeze(PoisonValue::get(i64));
+      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
       createStore(F, G);
     }
 
