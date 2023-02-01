@@ -100,7 +100,7 @@ const set<int> instrs_32 = {
     AArch64::EXTRWrri, AArch64::EORWrs,  AArch64::RORVWr,  AArch64::RBITWr,
     AArch64::CLZWr,    AArch64::REVWr,   AArch64::CSNEGWr, AArch64::BICWrs,
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr, AArch64::Bcc,
-    AArch64::CCMPWr,   AArch64::CCMPWi};
+    AArch64::CCMPWr,   AArch64::CCMPWi, AArch64::LDRWui,};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -126,8 +126,8 @@ const set<int> instrs_64 = {
     AArch64::TBZX,      AArch64::TBNZW,     AArch64::TBNZX,
     AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
-    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDRWui,
-    AArch64::MSR,       AArch64::MRS};
+    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
+    AArch64::MSR,       AArch64::MRS,};
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
@@ -135,7 +135,7 @@ const set<int> instrs_no_write = {
     AArch64::Bcc,    AArch64::B,     AArch64::TBZW,   AArch64::TBZX,
     AArch64::TBNZW,  AArch64::TBNZX, AArch64::CBZW,   AArch64::CBZX,
     AArch64::CBNZW,  AArch64::CBNZX, AArch64::CCMPWr, AArch64::CCMPWi,
-    AArch64::CCMPXr, AArch64::CCMPXi};
+    AArch64::CCMPXr, AArch64::CCMPXi,};
 
 const set<int> ins_variant = {AArch64::INSvi64gpr};
 
@@ -1961,7 +1961,6 @@ public:
       break;
     }
       /*
-   2332 ERROR: Unsupported arm instruction: LDPXi
     669 ERROR: Unsupported arm instruction: LDRBBui
     502 ERROR: Unsupported arm instruction: LDRHHui
      73 ERROR: Unsupported arm instruction: LDRSBWui
@@ -1970,6 +1969,29 @@ public:
      58 ERROR: Unsupported arm instruction: LDRSHXui
      56 ERROR: Unsupported arm instruction: LDRSWui
       */
+    case AArch64::LDPXi: {
+      auto &op0 = CurInst->getOperand(0);
+      auto &op1 = CurInst->getOperand(1);
+      auto &op2 = CurInst->getOperand(2);
+      auto &op3 = CurInst->getOperand(3);
+      assert(op0.isReg() && op1.isReg() && op2.isReg());
+      assert(op2.getReg() == AArch64::SP &&
+	     "only loading from stack supported for now");
+      assert(op3.isImm());
+      auto imm = op3.getImm();
+      auto base = stackMem;
+      auto out1 = op0.getReg();
+      auto out2 = op1.getReg();
+      if (out1 != AArch64::XZR) {
+	auto loaded = doLoad(base, imm * 8, 8);
+	createStore(loaded, dealiasReg(out1));
+      }
+      if (out2 != AArch64::XZR) {
+	auto loaded = doLoad(base, (imm + 1) * 8, 8);
+	createStore(loaded, dealiasReg(out2));
+      }
+      break;
+    }
     case AArch64::LDRWui: {
       auto [base, imm] = getParamsLoadImmed();
       auto loaded = doLoad(base, imm * 4, 4);
