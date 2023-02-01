@@ -714,7 +714,7 @@ class arm2llvm_ {
 
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
-  Value *getRegStorage(unsigned Reg) {
+  Value *dealiasReg(unsigned Reg) {
     unsigned WideReg = Reg;
     if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
       WideReg = Reg - AArch64::W0 + AArch64::X0;
@@ -727,7 +727,7 @@ class arm2llvm_ {
 
   // always does a full-width read
   Value *readFromRegister(unsigned Reg, const string &NameStr = "") {
-    auto RegAddr = getRegStorage(Reg);
+    auto RegAddr = dealiasReg(Reg);
     return createLoad(getIntTy(64), RegAddr, NameStr);
   }
 
@@ -781,23 +781,23 @@ class arm2llvm_ {
         V = createCast(V, getIntTy(64), op);
       }
     }
-    createStore(V, getRegStorage(Reg));
+    createStore(V, dealiasReg(Reg));
   }
 
   Value *getV() {
-    return createLoad(getIntTy(1), getRegStorage(AArch64::V));
+    return createLoad(getIntTy(1), dealiasReg(AArch64::V));
   }
 
   Value *getZ() {
-    return createLoad(getIntTy(1), getRegStorage(AArch64::Z));
+    return createLoad(getIntTy(1), dealiasReg(AArch64::Z));
   }
 
   Value *getN() {
-    return createLoad(getIntTy(1), getRegStorage(AArch64::N));
+    return createLoad(getIntTy(1), dealiasReg(AArch64::N));
   }
 
   Value *getC() {
-    return createLoad(getIntTy(1), getRegStorage(AArch64::C));
+    return createLoad(getIntTy(1), dealiasReg(AArch64::C));
   }
 
   Value *evaluate_condition(uint64_t cond, MCBasicBlock *bb) {
@@ -873,22 +873,22 @@ class arm2llvm_ {
 
   void setV(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    createStore(V, getRegStorage(AArch64::V));
+    createStore(V, dealiasReg(AArch64::V));
   }
 
   void setZ(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    createStore(V, getRegStorage(AArch64::Z));
+    createStore(V, dealiasReg(AArch64::Z));
   }
 
   void setN(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    createStore(V, getRegStorage(AArch64::N));
+    createStore(V, dealiasReg(AArch64::N));
   }
 
   void setC(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
-    createStore(V, getRegStorage(AArch64::C));
+    createStore(V, dealiasReg(AArch64::C));
   }
 
   void setZUsingResult(Value *V) {
@@ -1963,10 +1963,10 @@ public:
       assert(op1.getReg() == AArch64::SP &&
              "only loading from stack supported for now!");
       assert(op2.isImm());
-      auto offset = op2.getImm(); // FIXME decode properly
+      auto offset = op2.getImm(); // FIXME!! decode properly
       *out << "offset = " << offset << "\n";
-      assert(((offset % 8) == 0) && "stack slots must be aligned");
-      auto ptr = createGEP(i64, stackMem, {getIntConst(offset / 8, 64)}, "");
+      // assert(((offset % 8) == 0) && "stack slots must be aligned");
+      auto ptr = createGEP(i64, stackMem, {getIntConst(offset, 64)}, "");
       auto loaded = createLoad(i64, ptr);
       writeToOutputReg(loaded);
       break;
