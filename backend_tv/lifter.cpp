@@ -78,27 +78,12 @@ const unsigned V = 100000003;
 namespace {
 
 const set<int> s_flag = {
-    AArch64::ADDSWri, AArch64::ADDSWrs,
-    AArch64::ADDSWrx,
-    AArch64::ADDSXri,
-    AArch64::ADDSXrs,
-    AArch64::ADDSXrx,
-    AArch64::SUBSWri,
-    AArch64::SUBSWrs,
-    AArch64::SUBSWrx,
-    AArch64::SUBSXri,
-    AArch64::SUBSXrs,
-    AArch64::SUBSXrx,
-    AArch64::ANDSWri,
-    AArch64::ANDSWrr,
-    AArch64::ANDSWrs,
-    AArch64::ANDSXri,
-    AArch64::ANDSXrr,
-    AArch64::ANDSXrs,
-    AArch64::BICSWrs,
-    AArch64::BICSXrs,
-    AArch64::ADCSXr,
-    AArch64::ADCSWr,
+    AArch64::ADDSWri, AArch64::ADDSWrs, AArch64::ADDSWrx, AArch64::ADDSXri,
+    AArch64::ADDSXrs, AArch64::ADDSXrx, AArch64::SUBSWri, AArch64::SUBSWrs,
+    AArch64::SUBSWrx, AArch64::SUBSXri, AArch64::SUBSXrs, AArch64::SUBSXrx,
+    AArch64::ANDSWri, AArch64::ANDSWrr, AArch64::ANDSWrs, AArch64::ANDSXri,
+    AArch64::ANDSXrr, AArch64::ANDSXrs, AArch64::BICSWrs, AArch64::BICSXrs,
+    AArch64::ADCSXr,  AArch64::ADCSWr,
 };
 
 const set<int> instrs_32 = {
@@ -298,7 +283,7 @@ public:
     jmp_instr.addOperand(MCOperand::createImm(1));
     BBs[0].addInstBegin(std::move(jmp_instr));
   }
-  
+
   void checkEntryBlock() {
     // If we have an empty assembly function, we need to add an entry block with
     // a return instruction
@@ -322,8 +307,8 @@ public:
           IA->isUnconditionalBranch(last_mc_instr)) {
         string target = findTargetLabel(last_mc_instr);
         if (target == first_block.getName()) {
-	  addEntryBlock();
-	  return;
+          addEntryBlock();
+          return;
         }
       }
     }
@@ -336,8 +321,8 @@ public:
     for (auto &block : BBs) {
       *out << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &Inst : block.getInstrs()) {
-	std::string sss;
-	llvm::raw_string_ostream ss(sss);
+        std::string sss;
+        llvm::raw_string_ostream ss(sss);
         Inst.dump_pretty(ss, IP, " ", MRI);
         *out << sss << '\n';
       }
@@ -413,7 +398,7 @@ class arm2llvm_ {
   bool ret_void{false};
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
-  
+
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
     assert(bits > 0 && bits <= 129);
@@ -427,8 +412,7 @@ class arm2llvm_ {
   [[noreturn]] void visitError(MCInst &I) {
     out->flush();
     string str(instrPrinter->getOpcodeName(I.getOpcode()));
-    *out << "ERROR: Unsupported arm instruction: "
-           << str << "\n";
+    *out << "ERROR: Unsupported arm instruction: " << str << "\n";
     out->flush();
     exit(-1); // FIXME handle this better
   }
@@ -441,7 +425,7 @@ class arm2llvm_ {
     if (instrs_128.contains(instr))
       return 128;
     *out << "getInstSize encountered unknown instruction"
-           << "\n";
+         << "\n";
     visitError(*CurInst);
     UNREACHABLE();
   }
@@ -464,9 +448,7 @@ class arm2llvm_ {
       return createAShr(value, exp);
     case 3:
       // ROR shift
-      return createFShr(
-          value, value,
-          exp);
+      return createFShr(value, value, exp);
     default:
       // FIXME: handle other case (msl)
       report_fatal_error("shift type not supported");
@@ -614,8 +596,10 @@ class arm2llvm_ {
   Value *createLShr(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
     auto mask = getIntConst(W - 1, W);
-    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
-    return BinaryOperator::Create(Instruction::LShr, a, masked, nextName(), LLVMBB);
+    auto masked =
+        BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::LShr, a, masked, nextName(),
+                                  LLVMBB);
   }
 
   Value *createRawAShr(Value *a, Value *b) {
@@ -625,8 +609,10 @@ class arm2llvm_ {
   Value *createAShr(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
     auto mask = getIntConst(W - 1, W);
-    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
-    return BinaryOperator::Create(Instruction::AShr, a, masked, nextName(), LLVMBB);
+    auto masked =
+        BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::AShr, a, masked, nextName(),
+                                  LLVMBB);
   }
 
   Value *createRawShl(Value *a, Value *b) {
@@ -636,8 +622,10 @@ class arm2llvm_ {
   Value *createShl(Value *a, Value *b) {
     auto W = b->getType()->getIntegerBitWidth();
     auto mask = getIntConst(W - 1, W);
-    auto masked = BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
-    return BinaryOperator::Create(Instruction::Shl, a, masked, nextName(), LLVMBB);
+    auto masked =
+        BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
+    return BinaryOperator::Create(Instruction::Shl, a, masked, nextName(),
+                                  LLVMBB);
   }
 
   BinaryOperator *createAnd(Value *a, Value *b) {
@@ -914,7 +902,7 @@ public:
   int64_t getImm(int idx) {
     return CurInst->getOperand(idx).getImm();
   }
-  
+
   // Visit an MCInst and convert it to LLVM IR
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
@@ -932,7 +920,7 @@ public:
       // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = getImm(1);
       assert(imm == 55824 && "NZCV is the only supported case for MRS");
-      
+
       auto N = createZExt(getN(), i64);
       auto Z = createZExt(getZ(), i64);
       auto C = createZExt(getC(), i64);
@@ -963,7 +951,7 @@ public:
       auto Zmask = createShl(i64_1, getIntConst(30, 64));
       auto Cmask = createShl(i64_1, getIntConst(29, 64));
       auto Vmask = createShl(i64_1, getIntConst(28, 64));
-      
+
       auto reg = readFromOperand(1);
       auto Nval = createAnd(Nmask, reg);
       auto Zval = createAnd(Zmask, reg);
@@ -1074,7 +1062,7 @@ public:
         // Mask off the sign bit. We could mask with an AND, but APInt semantics
         // might be weird since we're passing in an uint64_t but we'll want a 65
         // bit int
-	auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
+        auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
         auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
 
         auto sAdd =
@@ -1227,8 +1215,7 @@ public:
       auto size = getInstSize(opcode);
       Value *rhs = nullptr;
       if (CurInst->getOperand(2).isImm()) {
-        auto imm =
-            decodeLogicalImmediate(getImm(2), size);
+        auto imm = decodeLogicalImmediate(getImm(2), size);
         rhs = getIntConst(imm, size);
       } else {
         rhs = readFromOperand(2);
@@ -1493,8 +1480,7 @@ public:
       assert(CurInst->getOperand(1).isReg() && CurInst->getOperand(2).isImm());
 
       auto a = readFromOperand(1);
-      auto decoded_immediate =
-          decodeLogicalImmediate(getImm(2), size);
+      auto decoded_immediate = decodeLogicalImmediate(getImm(2), size);
       auto imm_val = getIntConst(decoded_immediate,
                                  size); // FIXME, need to decode immediate val
       if (!ty || !a || !imm_val)
@@ -2024,7 +2010,7 @@ public:
         }
         createReturn(vec);
       } else {
-	Value *retVal = nullptr;
+        Value *retVal = nullptr;
         if (!ret_void) {
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
@@ -2033,7 +2019,7 @@ public:
           if (retWidth < retVal->getType()->getIntegerBitWidth())
             retVal = createTrunc(retVal, getIntTy(retWidth));
 
-	  // mask off any don't-care bits
+          // mask off any don't-care bits
           if (has_ret_attr && (orig_ret_bitwidth < 32)) {
             assert(retWidth >= orig_ret_bitwidth);
             assert(retWidth == 64);
@@ -2041,7 +2027,7 @@ public:
             retVal = createZExt(trunc, i64);
           }
         }
-	createReturn(retVal);
+        createReturn(retVal);
       }
       break;
     }
@@ -2167,7 +2153,7 @@ public:
     default:
       *out << funcToString(&Fn);
       *out << "\nError "
-                "detected----------partially-lifted-arm-target----------\n";
+              "detected----------partially-lifted-arm-target----------\n";
       visitError(I);
     }
   }
@@ -2189,20 +2175,20 @@ public:
       auto orig_ty = getIntTy(origWidth);
       V = createTrunc(V, orig_ty, nextName());
       if (origWidth == 1) {
-	V = createCast(V, i32, op, nextName());
-	V = createZExt(V, i64, nextName());
+        V = createCast(V, i32, op, nextName());
+        V = createZExt(V, i64, nextName());
       } else {
-	if (origWidth < 32) {
-	  V = createCast(V, i32, op, nextName());
-	  V = createZExt(V, i64, nextName());
-	} else {
-	  V = createCast(V, i64, op, nextName());
-	}
+        if (origWidth < 32) {
+          V = createCast(V, i32, op, nextName());
+          V = createZExt(V, i64, nextName());
+        } else {
+          V = createCast(V, i64, op, nextName());
+        }
       }
     }
     return V;
   }
-  
+
   Function *run() {
     auto i64 = getIntTy(64);
 
@@ -2210,7 +2196,7 @@ public:
         Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
                          0, MF.getName(), LiftedModule);
     *out << "function name: '" << MF.getName() << "'"
-           << "\n";
+         << "\n";
 
     // create LLVM-side basic blocks
     vector<pair<BasicBlock *, MCBasicBlock *>> BBs;
@@ -2267,15 +2253,16 @@ public:
     unsigned argNum = 0;
     for (auto &arg : Fn->args()) {
       Value *frozenArg = createFreeze(&arg, nextName());
-      auto *val = parameterABIRules(frozenArg, arg.hasSExtAttr(), orig_input_width[argNum]);
+      auto *val = parameterABIRules(frozenArg, arg.hasSExtAttr(),
+                                    orig_input_width[argNum]);
       // first 8 are passed via registers, after that on the stack
       if (argNum < 8) {
         auto Reg = MCOperand::createReg(AArch64::X0 + argNum).getReg();
         createStore(val, RegFile[Reg]);
       } else {
-	auto slot = getIntConst(argNum - 8, 64);
-	auto addr = createGEP(i64, stackMem, { slot }, "");
-	createStore(val, addr);
+        auto slot = getIntConst(argNum - 8, 64);
+        auto addr = createGEP(i64, stackMem, {slot}, "");
+        createStore(val, addr);
       }
       argNum++;
     }
@@ -2299,7 +2286,6 @@ public:
         auto *dst = getBBByName(*Fn, MCBB->getSuccs()[0]->getName());
         createBranch(dst);
       }
-
     }
     return Fn;
   }
@@ -2365,8 +2351,8 @@ public:
           const MCSymbolRefExpr &SRE = cast<MCSymbolRefExpr>(*expr);
           const MCSymbol &Sym = SRE.getSymbol();
           *out << "target label : " << (string)Sym.getName()
-                 << ", offset=" << to_string(Sym.getOffset())
-                 << '\n'; // FIXME remove when done
+               << ", offset=" << to_string(Sym.getOffset())
+               << '\n'; // FIXME remove when done
         }
       }
     }
@@ -2492,8 +2478,8 @@ public:
     for (auto &block : MF.BBs) {
       *out << "block " << i << ", name= " << block.getName() << '\n';
       for (auto &inst : block.getInstrs()) {
-	std::string sss;
-	llvm::raw_string_ostream ss(sss);
+        std::string sss;
+        llvm::raw_string_ostream ss(sss);
         inst.dump_pretty(ss, IP, " ", MRI);
         *out << sss << '\n';
       }

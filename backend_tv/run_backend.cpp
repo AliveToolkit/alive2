@@ -64,12 +64,13 @@ using namespace lifter;
 
 namespace lifter {
 
-unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule, SmallString<1024> &Asm) {
+unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule,
+                                     SmallString<1024> &Asm) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
       Targ->createTargetMachine(TripleName, CPU, "", Opt, RM));
-  
+
   raw_svector_ostream Dest(Asm);
 
   legacy::PassManager pass;
@@ -81,4 +82,4 @@ unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule, SmallString<1024> &Asm)
   return MemoryBuffer::getMemBuffer(Asm.c_str());
 }
 
-} // namespace
+} // namespace lifter
