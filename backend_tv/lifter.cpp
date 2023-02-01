@@ -1960,10 +1960,8 @@ public:
       assert(op1.getReg() == AArch64::SP &&
              "only loading from stack supported for now!");
       assert(op2.isImm());
-      auto offset = op2.getImm(); // FIXME!! decode properly
-      *out << "offset = " << offset << "\n";
-      // assert(((offset % 8) == 0) && "stack slots must be aligned");
-      auto ptr = createGEP(i64, stackMem, {getIntConst(offset, 64)}, "");
+      auto offset = 8 * op2.getImm();
+      auto ptr = createGEP(i8, stackMem, {getIntConst(offset, 64)}, "");
       auto loaded = createLoad(i64, ptr);
       writeToOutputReg(loaded);
       break;
@@ -2190,6 +2188,7 @@ public:
   }
 
   Function *run() {
+    auto i8 = getIntTy(8);
     auto i64 = getIntTy(64);
 
     auto Fn =
@@ -2236,13 +2235,12 @@ public:
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
 
-    // FIXME let's do this all in terms of bytes, not doublewords
-
-    const int stackSlots = 16;
-    stackMem = createAlloca(i64, getIntConst(stackSlots, 64), "stack");
-    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
-      auto F = createFreeze(PoisonValue::get(i64));
-      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
+    const int stackSlots = 16; // 8 bytes each
+    auto bytes = 8 * stackSlots;
+    stackMem = createAlloca(i8, getIntConst(bytes, 64), "stack");
+    for (unsigned Idx = 0; Idx < bytes; ++Idx) {
+      auto F = createFreeze(PoisonValue::get(i8));
+      auto G = createGEP(i8, stackMem, {getIntConst(Idx, 64)}, "");
       createStore(F, G);
     }
 
@@ -2260,8 +2258,9 @@ public:
         auto Reg = MCOperand::createReg(AArch64::X0 + argNum).getReg();
         createStore(val, RegFile[Reg]);
       } else {
-        auto slot = getIntConst(argNum - 8, 64);
-        auto addr = createGEP(i64, stackMem, {slot}, "");
+        auto slot = argNum - 8;
+	assert (slot < stackSlots);
+        auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
       argNum++;
