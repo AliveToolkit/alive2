@@ -412,10 +412,10 @@ class arm2llvm_ {
   unsigned instCount{0};
   bool ret_void{false};
   map<unsigned, Value *> RegFile;
-  Value *stackMem;
+  Value *stackMem{nullptr};
   
   Type *getIntTy(int bits) {
-    // just trying to catch silly errors
+    // just trying to catch silly errors, remove this sometime
     assert(bits > 0 && bits <= 129);
     return Type::getIntNTy(Ctx, bits);
   }
@@ -425,8 +425,6 @@ class arm2llvm_ {
   }
 
   [[noreturn]] void visitError(MCInst &I) {
-    // flush must happen before error is printed to make sure the error
-    // comes out nice and pretty when combing the stdout/stderr in scripts
     out->flush();
     string str(instrPrinter->getOpcodeName(I.getOpcode()));
     *out << "ERROR: Unsupported arm instruction: "
@@ -1959,15 +1957,18 @@ public:
       break;
     }
     case AArch64::LDRXui: {
-      auto &op_0 = CurInst->getOperand(0);
-      auto &op_1 = CurInst->getOperand(1);
-      assert(op_0.isReg() && op_1.isReg());
-      assert(op_1.getReg() == AArch64::SP &&
+      auto &op1 = CurInst->getOperand(1);
+      auto &op2 = CurInst->getOperand(2);
+      assert(op1.isReg());
+      assert(op1.getReg() == AArch64::SP &&
              "only loading from stack supported for now!");
-      [[maybe_unused]] auto bits = readFromRegister(AArch64::SP);
-      // FIXME -- this'll work after we allocate a stack
-      auto loaded_val = createLoad(i64, nullptr, "foo");
-      writeToOutputReg(loaded_val);
+      assert(op2.isImm());
+      auto offset = op2.getImm(); // FIXME decode properly
+      *out << "offset = " << offset << "\n";
+      assert(((offset % 8) == 0) && "stack slots must be aligned");
+      auto ptr = createGEP(i64, stackMem, {getIntConst(offset / 8, 64)}, "");
+      auto loaded = createLoad(i64, ptr);
+      writeToOutputReg(loaded);
       break;
     }
     case AArch64::RET: {
@@ -2237,6 +2238,9 @@ public:
 
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
+
+    // FIXME let's do this all in terms of bytes, not doublewords
+
     const int stackSlots = 16;
     stackMem = createAlloca(i64, getIntConst(stackSlots, 64), "stack");
     for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
