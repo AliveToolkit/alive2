@@ -346,9 +346,6 @@ public:
   }
 };
 
-// FIXME delete
-void mc_add_identifier(unsigned reg, unsigned version, Value *v) {}
-
 // Code taken from llvm. This should be okay for now. But we generally
 // don't want to trust the llvm implementation so we need to complete my
 // implementation at function decode_bit_mask
@@ -415,7 +412,8 @@ class arm2llvm_ {
   unsigned instCount{0};
   bool ret_void{false};
   map<unsigned, Value *> RegFile;
-
+  Value *stackMem;
+  
   Type *getIntTy(int bits) {
     // just trying to catch silly errors
     assert(bits > 0 && bits <= 129);
@@ -2171,8 +2169,29 @@ public:
     RegFile[Reg] = A;
   }
 
-  Function *run() {
+  Value *parameterABIRules(Value *V, bool argIsSExt, unsigned origWidth) {
     auto i32 = getIntTy(32);
+    auto i64 = getIntTy(64);
+    if (origWidth < 64) {
+      auto op = argIsSExt ? Instruction::SExt : Instruction::ZExt;
+      auto orig_ty = getIntTy(origWidth);
+      V = createTrunc(V, orig_ty, nextName());
+      if (origWidth == 1) {
+	V = createCast(V, i32, op, nextName());
+	V = createZExt(V, i64, nextName());
+      } else {
+	if (origWidth < 32) {
+	  V = createCast(V, i32, op, nextName());
+	  V = createZExt(V, i64, nextName());
+	} else {
+	  V = createCast(V, i64, op, nextName());
+	}
+      }
+    }
+    return V;
+  }
+  
+  Function *run() {
     auto i64 = getIntTy(64);
 
     auto Fn =
@@ -2198,8 +2217,8 @@ public:
       createRegStorage(Reg, 64, Name.str());
     }
 
-    // we model SP partially symbolically; it stores the offset into a
-    // the stack block
+    // we model SP partially symbolically; it stores a byte offset
+    // into the stack memory block
     createRegStorage(AArch64::SP, 64, "SP");
     createStore(getIntConst(0, 64), RegFile[AArch64::SP]);
 
@@ -2216,67 +2235,34 @@ public:
     createRegStorage(AArch64::C, 1, "C");
     createRegStorage(AArch64::V, 1, "V");
 
-    // allocate storage for the stack
-
-    // implement the callee side of the ABI; FIXME -- this code
-    // requires significant generalization to handle large parameters,
-    // and vector and FP values
-    unsigned argNum = 0;
-    for (auto &Arg : Fn->args()) {
-      if (argNum < 8) {
-        auto operand = MCOperand::createReg(AArch64::X0 + argNum);
-        auto Reg = operand.getReg();
-        Value *V = createFreeze(&Arg, nextName());
-
-        auto orig_width = orig_input_width[argNum];
-        // TODO maybe this is in a separate function
-        if (orig_width < 64) {
-          auto op = Arg.hasSExtAttr() ? Instruction::SExt : Instruction::ZExt;
-          auto orig_ty = getIntTy(orig_width);
-          V = createTrunc(V, orig_ty, nextName());
-          if (orig_width == 1) {
-            V = createCast(V, i32, op, nextName());
-            V = createZExt(V, i64, nextName());
-          } else {
-            if (orig_width < 32) {
-              V = createCast(V, i32, op, nextName());
-              V = createZExt(V, i64, nextName());
-            } else {
-              V = createCast(V, i64, op, nextName());
-            }
-          }
-        }
-        createStore(V, RegFile[Reg]);
-      } else {
-        assert(false && "implement the stack");
-      }
-      argNum++;
+    // allocate storage for the stack; the initialization has to be
+    // unrolled in the IR so that Alive can see all of it
+    const int stackSlots = 16;
+    stackMem = createAlloca(i64, getIntConst(stackSlots, 64), "stack");
+    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
+      auto F = createFreeze(PoisonValue::get(i64));
+      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
+      createStore(F, G);
     }
 
-    // FIXME: fold something like this into the loop above
-    if (argNum > 8) {
-      auto num_stack_args = argNum - 8; // x0-x7 are passed via registers
-      *out << "num_stack_args = " << num_stack_args << "\n";
-
-      // add stack with 16 slots, 8 bytes each
-      auto alloc_size = getIntConst(16, 64);
-      auto ty = Type::getInt64Ty(Ctx);
-      auto alloca = createAlloca(ty, alloc_size, "stack");
-      // FIXME fill it with frozen poison
-      mc_add_identifier(AArch64::SP, 3, alloca);
-
-      for (unsigned i = 0; i < num_stack_args; ++i) {
-        unsigned reg_num = AArch64::X8 + i;
-        *out << "reg_num = " << reg_num << "\n";
-
-        vector<Value *> idxlist{getIntConst(i, 64)};
-        auto get_xi =
-            createGEP(ty, alloca, idxlist, "stack_" + to_string(8 + i));
-        // FIXME, need to use version similar to the offset to address the stack
-        // pointer or alternatively a more elegant solution altogether
-        mc_add_identifier(AArch64::SP, reg_num, get_xi);
-        createStore(readFromRegister(AArch64::SP, "stack_"), get_xi);
+    // implement the callee side of the ABI; FIXME -- this code only
+    // supports integer parameters <= 64 bits and will require
+    // significant generalization to handle large parameters, vectors,
+    // and FP values
+    unsigned argNum = 0;
+    for (auto &arg : Fn->args()) {
+      Value *frozenArg = createFreeze(&arg, nextName());
+      auto *val = parameterABIRules(frozenArg, arg.hasSExtAttr(), orig_input_width[argNum]);
+      // first 8 are passed via registers, after that on the stack
+      if (argNum < 8) {
+        auto Reg = MCOperand::createReg(AArch64::X0 + argNum).getReg();
+        createStore(val, RegFile[Reg]);
+      } else {
+	auto slot = getIntConst(argNum - 8, 64);
+	auto addr = createGEP(i64, stackMem, { slot }, "");
+	createStore(val, addr);
       }
+      argNum++;
     }
 
     for (auto &[llvm_bb, mc_bb] : BBs) {

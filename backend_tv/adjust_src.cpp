@@ -203,9 +203,6 @@ Function *adjustSrc(Function *srcFn) {
   if (srcFn->isVarArg())
     report_fatal_error("Varargs not supported");
 
-  *out << "\n---------- src.ll ----------\n";
-  *out << moduleToString(srcFn->getParent());
-
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
