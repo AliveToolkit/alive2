@@ -126,8 +126,8 @@ const set<int> instrs_64 = {
     AArch64::TBZX,      AArch64::TBNZW,     AArch64::TBNZX,
     AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
-    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDRWui, AArch64::MSR,
-    AArch64::MRS};
+    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDRWui,
+    AArch64::MSR,       AArch64::MRS};
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
@@ -903,19 +903,22 @@ public:
     return CurInst->getOperand(idx).getImm();
   }
 
-  void doLoadImmediate(int size) {
+  pair<Value *, int> getParamsLoadImmed() {
     auto &op0 = CurInst->getOperand(0);
     auto &op1 = CurInst->getOperand(1);
     auto &op2 = CurInst->getOperand(2);
     assert(op0.isReg() && op1.isReg());
     assert(op1.getReg() == AArch64::SP &&
-	   "only loading from stack supported for now!");
+           "only loading from stack supported for now");
     assert(op2.isImm());
-    auto offset = size * op2.getImm();
-    auto i8 = getIntTy(8);
-    auto ptr = createGEP(i8, stackMem, {getIntConst(offset, 64)}, "");
-    auto loaded = createLoad(getIntTy(8 * size), ptr);
-    writeToOutputReg(loaded);
+    return make_pair(stackMem, op2.getImm());
+  }
+
+  // offset and size are in bytes
+  Value *doLoad(Value *base, int offset, int size) {
+    auto offsetVal = getIntConst(offset, 64);
+    auto ptr = createGEP(getIntTy(8), stackMem, {offsetVal}, "");
+    return createLoad(getIntTy(8 * size), ptr);
   }
 
   // Visit an MCInst and convert it to LLVM IR
@@ -1967,12 +1970,16 @@ public:
      58 ERROR: Unsupported arm instruction: LDRSHXui
      56 ERROR: Unsupported arm instruction: LDRSWui
       */
-    case AArch64::LDRWui:
-      doLoadImmediate(4);
-      break;
-    case AArch64::LDRXui:
-      doLoadImmediate(8);
-      break;
+    case AArch64::LDRWui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = doLoad(base, imm * 4, 4);
+      writeToOutputReg(loaded);
+    } break;
+    case AArch64::LDRXui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = doLoad(base, imm * 8, 8);
+      writeToOutputReg(loaded);
+    } break;
     case AArch64::RET: {
       // for now we're assuming that the function returns an integer or void
       // value
@@ -2264,7 +2271,7 @@ public:
         createStore(val, RegFile[Reg]);
       } else {
         auto slot = argNum - 8;
-	assert (slot < stackSlots);
+        assert(slot < stackSlots);
         auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
