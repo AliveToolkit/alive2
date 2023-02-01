@@ -903,6 +903,25 @@ public:
     return CurInst->getOperand(idx).getImm();
   }
 
+  pair <Value *, int> getMemArgs() {
+    auto &op0 = CurInst->getOperand(0);
+    auto &op1 = CurInst->getOperand(1);
+    auto &op2 = CurInst->getOperand(2);
+    assert(op0.isReg() && op1.isReg());
+    assert(op1.getReg() == AArch64::SP &&
+	   "only loading from stack supported for now!");
+    assert(op2.isImm());
+    return make_pair(stackMem, op2.getImm());
+  }
+
+  void doLoad(Value *base, int imm, int size) {
+    auto i8 = getIntTy(8);    
+    auto offset = size * imm;
+    auto ptr = createGEP(i8, stackMem, {getIntConst(offset, 64)}, "");
+    auto loaded = createLoad(getIntTy(8 * size), ptr);
+    writeToOutputReg(loaded);
+  }
+
   // Visit an MCInst and convert it to LLVM IR
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
@@ -1954,16 +1973,8 @@ public:
    1869 ERROR: Unsupported arm instruction: LDRWui
       */
     case AArch64::LDRXui: {
-      auto &op1 = CurInst->getOperand(1);
-      auto &op2 = CurInst->getOperand(2);
-      assert(op1.isReg());
-      assert(op1.getReg() == AArch64::SP &&
-             "only loading from stack supported for now!");
-      assert(op2.isImm());
-      auto offset = 8 * op2.getImm();
-      auto ptr = createGEP(i8, stackMem, {getIntConst(offset, 64)}, "");
-      auto loaded = createLoad(i64, ptr);
-      writeToOutputReg(loaded);
+      auto [base, imm] = getMemArgs(); 
+      doLoad(base, imm, 8);
       break;
     }
     case AArch64::RET: {
