@@ -130,7 +130,7 @@ const set<int> instrs_64 = {
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
-    AArch64::LDRSBXui,
+    AArch64::LDRSBXui,  AArch64::LDRSHXui,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -719,9 +719,14 @@ class arm2llvm_ {
   }
 
   // always does a full-width read
-  Value *readFromRegister(unsigned Reg, const string &NameStr = "") {
+  Value *readFromReg(unsigned Reg, const string &NameStr = "") {
     auto RegAddr = dealiasReg(Reg);
     return createLoad(getIntTy(64), RegAddr, NameStr);
+  }
+
+  Value *readPtrFromReg(unsigned Reg, const string &NameStr = "") {
+    auto RegAddr = dealiasReg(Reg);
+    return createLoad(PointerType::get(Ctx, 0), RegAddr, NameStr);
   }
 
   // TODO: make it so that lshr generates code on register lookups
@@ -737,7 +742,7 @@ class arm2llvm_ {
     if (op.isImm()) {
       V = getIntConst(op.getImm(), size);
     } else {
-      V = readFromRegister(op.getReg());
+      V = readFromReg(op.getReg());
       if (size == 32)
         V = createTrunc(V, getIntTy(32));
     }
@@ -910,16 +915,20 @@ public:
     auto &op1 = CurInst->getOperand(1);
     auto &op2 = CurInst->getOperand(2);
     assert(op0.isReg() && op1.isReg());
-    assert(op1.getReg() == AArch64::SP &&
-           "only loading from stack supported for now");
     assert(op2.isImm());
-    return make_pair(stackMem, op2.getImm());
+
+    auto baseReg = op1.getReg();
+    assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+           (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+           (baseReg == AArch64::XZR));
+    auto baseAddr = readPtrFromReg(baseReg);
+    return make_pair(baseAddr, op2.getImm());
   }
 
   // offset and size are in bytes
   Value *makeLoad(Value *base, int offset, int size) {
     auto offsetVal = getIntConst(offset, 64);
-    auto ptr = createGEP(getIntTy(8), stackMem, {offsetVal}, "");
+    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
     return createLoad(getIntTy(8 * size), ptr);
   }
 
@@ -1969,19 +1978,23 @@ public:
       auto &op2 = CurInst->getOperand(2);
       auto &op3 = CurInst->getOperand(3);
       assert(op0.isReg() && op1.isReg() && op2.isReg());
-      assert(op2.getReg() == AArch64::SP &&
-             "only loading from stack supported for now");
       assert(op3.isImm());
+
+      auto baseReg = op2.getReg();
+      assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+             (baseReg == AArch64::XZR));
+      auto baseAddr = readPtrFromReg(baseReg);
+
       auto imm = op3.getImm();
-      auto base = stackMem;
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
       if (out1 != AArch64::XZR) {
-        auto loaded = makeLoad(base, imm * 8, 8);
+        auto loaded = makeLoad(baseAddr, imm * 8, 8);
         createStore(loaded, dealiasReg(out1));
       }
       if (out2 != AArch64::XZR) {
-        auto loaded = makeLoad(base, (imm + 1) * 8, 8);
+        auto loaded = makeLoad(baseAddr, (imm + 1) * 8, 8);
         createStore(loaded, dealiasReg(out2));
       }
       break;
@@ -2076,7 +2089,7 @@ public:
         if (!ret_void) {
           auto *retTyp = srcFn.getReturnType();
           auto retWidth = retTyp->getIntegerBitWidth();
-          retVal = readFromRegister(AArch64::X0);
+          retVal = readFromReg(AArch64::X0);
 
           if (retWidth < retVal->getType()->getIntegerBitWidth())
             retVal = createTrunc(retVal, getIntTy(retWidth));
@@ -2271,6 +2284,16 @@ public:
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
+    // allocate storage for the stack; the initialization has to be
+    // unrolled in the IR so that Alive can see all of it
+    const int stackSlots = 16; // 8 bytes each
+    stackMem = createAlloca(i8, getIntConst(8 * stackSlots, 64), "stack");
+    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
+      auto F = createFreeze(PoisonValue::get(i64));
+      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
+      createStore(F, G);
+    }
+
     // allocate storage for the main register file
     for (unsigned Reg = AArch64::X0; Reg <= AArch64::X28; ++Reg) {
       stringstream Name;
@@ -2278,10 +2301,11 @@ public:
       createRegStorage(Reg, 64, Name.str());
     }
 
-    // we model SP partially symbolically; it stores a byte offset
-    // into the stack memory block
     createRegStorage(AArch64::SP, 64, "SP");
-    createStore(getIntConst(0, 64), RegFile[AArch64::SP]);
+    // load the base address for the stack memory; FIXME: this works
+    // for accessing parameters but it doesn't support the general
+    // case
+    createStore(stackMem, RegFile[AArch64::SP]);
 
     createRegStorage(AArch64::LR, 64, "LR");
 
@@ -2295,16 +2319,6 @@ public:
     createRegStorage(AArch64::Z, 1, "Z");
     createRegStorage(AArch64::C, 1, "C");
     createRegStorage(AArch64::V, 1, "V");
-
-    // allocate storage for the stack; the initialization has to be
-    // unrolled in the IR so that Alive can see all of it
-    const int stackSlots = 16; // 8 bytes each
-    stackMem = createAlloca(i8, getIntConst(8 * stackSlots, 64), "stack");
-    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
-      auto F = createFreeze(PoisonValue::get(i64));
-      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
-      createStore(F, G);
-    }
 
     // implement the callee side of the ABI; FIXME -- this code only
     // supports integer parameters <= 64 bits and will require
