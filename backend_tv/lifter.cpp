@@ -1956,6 +1956,14 @@ public:
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
+      //case AArch64::LDPXi:
+      //case AArch64::LDRBBui:
+      //case AArch64::LDRHHui:
+      //case AArch64::LDRSBWui:
+      //case AArch64::LDRSBXui:
+      //case AArch64::LDRSHWui:
+      //case AArch64::LDRSWui:
+      //case AArch64::LDRWui:
     case AArch64::LDRXui: {
       auto &op1 = CurInst->getOperand(1);
       auto &op2 = CurInst->getOperand(2);
