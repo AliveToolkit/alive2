@@ -87,20 +87,22 @@ const set<int> s_flag = {
 };
 
 const set<int> instrs_32 = {
-    AArch64::ADDWrx,   AArch64::ADDSWrs, AArch64::ADDSWri, AArch64::ADDWrs,
-    AArch64::ADDWri,   AArch64::ADDSWrx, AArch64::ADCWr,   AArch64::ADCSWr,
-    AArch64::ASRVWr,   AArch64::SUBWri,  AArch64::SUBWrs,  AArch64::SUBWrx,
-    AArch64::SUBSWrs,  AArch64::SUBSWri, AArch64::SUBSWrx, AArch64::SBFMWri,
-    AArch64::CSELWr,   AArch64::ANDWri,  AArch64::ANDWrr,  AArch64::ANDWrs,
-    AArch64::ANDSWri,  AArch64::ANDSWrr, AArch64::ANDSWrs, AArch64::MADDWrrr,
-    AArch64::MSUBWrrr, AArch64::EORWri,  AArch64::CSINVWr, AArch64::CSINCWr,
-    AArch64::MOVZWi,   AArch64::MOVNWi,  AArch64::MOVKWi,  AArch64::LSLVWr,
-    AArch64::LSRVWr,   AArch64::ORNWrs,  AArch64::UBFMWri, AArch64::BFMWri,
-    AArch64::ORRWrs,   AArch64::ORRWri,  AArch64::SDIVWr,  AArch64::UDIVWr,
-    AArch64::EXTRWrri, AArch64::EORWrs,  AArch64::RORVWr,  AArch64::RBITWr,
-    AArch64::CLZWr,    AArch64::REVWr,   AArch64::CSNEGWr, AArch64::BICWrs,
-    AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr, AArch64::Bcc,
-    AArch64::CCMPWr,   AArch64::CCMPWi, AArch64::LDRWui,};
+    AArch64::ADDWrx,   AArch64::ADDSWrs, AArch64::ADDSWri,  AArch64::ADDWrs,
+    AArch64::ADDWri,   AArch64::ADDSWrx, AArch64::ADCWr,    AArch64::ADCSWr,
+    AArch64::ASRVWr,   AArch64::SUBWri,  AArch64::SUBWrs,   AArch64::SUBWrx,
+    AArch64::SUBSWrs,  AArch64::SUBSWri, AArch64::SUBSWrx,  AArch64::SBFMWri,
+    AArch64::CSELWr,   AArch64::ANDWri,  AArch64::ANDWrr,   AArch64::ANDWrs,
+    AArch64::ANDSWri,  AArch64::ANDSWrr, AArch64::ANDSWrs,  AArch64::MADDWrrr,
+    AArch64::MSUBWrrr, AArch64::EORWri,  AArch64::CSINVWr,  AArch64::CSINCWr,
+    AArch64::MOVZWi,   AArch64::MOVNWi,  AArch64::MOVKWi,   AArch64::LSLVWr,
+    AArch64::LSRVWr,   AArch64::ORNWrs,  AArch64::UBFMWri,  AArch64::BFMWri,
+    AArch64::ORRWrs,   AArch64::ORRWri,  AArch64::SDIVWr,   AArch64::UDIVWr,
+    AArch64::EXTRWrri, AArch64::EORWrs,  AArch64::RORVWr,   AArch64::RBITWr,
+    AArch64::CLZWr,    AArch64::REVWr,   AArch64::CSNEGWr,  AArch64::BICWrs,
+    AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
+    AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
+    AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
+    AArch64::LDRHHui};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -127,15 +129,18 @@ const set<int> instrs_64 = {
     AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
-    AArch64::MSR,       AArch64::MRS,};
+    AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
+    AArch64::LDRSBXui,
+};
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
 
 const set<int> instrs_no_write = {
-    AArch64::Bcc,    AArch64::B,     AArch64::TBZW,   AArch64::TBZX,
-    AArch64::TBNZW,  AArch64::TBNZX, AArch64::CBZW,   AArch64::CBZX,
-    AArch64::CBNZW,  AArch64::CBNZX, AArch64::CCMPWr, AArch64::CCMPWi,
-    AArch64::CCMPXr, AArch64::CCMPXi,};
+    AArch64::Bcc,    AArch64::B,      AArch64::TBZW,   AArch64::TBZX,
+    AArch64::TBNZW,  AArch64::TBNZX,  AArch64::CBZW,   AArch64::CBZX,
+    AArch64::CBNZW,  AArch64::CBNZX,  AArch64::CCMPWr, AArch64::CCMPWi,
+    AArch64::CCMPXr, AArch64::CCMPXi,
+};
 
 const set<int> ins_variant = {AArch64::INSvi64gpr};
 
@@ -743,10 +748,7 @@ class arm2llvm_ {
     return V;
   }
 
-  // TODO remove
-  void add_identifier(Value *v) {}
-
-  void writeToOutputReg(Value *V, bool s = false) {
+  void writeToOutputReg(Value *V, bool SExt = false) {
     auto Reg = CurInst->getOperand(0).getReg();
 
     // important!
@@ -761,11 +763,11 @@ class arm2llvm_ {
       // if the s flag is set, the value is smaller than 32 bits, and
       // the register we are storing it in _is_ 32 bits, we sign
       // extend to 32 bits before zero-extending to 64
-      if (s && regSize == 32 && W < 32) {
+      if (SExt && regSize == 32 && W < 32) {
         V = createSExt(V, getIntTy(32));
         V = createZExt(V, getIntTy(64));
       } else {
-        auto op = s ? Instruction::SExt : Instruction::ZExt;
+        auto op = SExt ? Instruction::SExt : Instruction::ZExt;
         V = createCast(V, getIntTy(64), op);
       }
     }
@@ -922,6 +924,7 @@ public:
   }
 
   // Visit an MCInst and convert it to LLVM IR
+  // See: https://documentation-service.arm.com/static/6245e8f0f7d10f7540e0c054
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
     CurInst = &I;
@@ -1967,43 +1970,66 @@ public:
       auto &op3 = CurInst->getOperand(3);
       assert(op0.isReg() && op1.isReg() && op2.isReg());
       assert(op2.getReg() == AArch64::SP &&
-	     "only loading from stack supported for now");
+             "only loading from stack supported for now");
       assert(op3.isImm());
       auto imm = op3.getImm();
       auto base = stackMem;
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
       if (out1 != AArch64::XZR) {
-	auto loaded = makeLoad(base, imm * 8, 8);
-	createStore(loaded, dealiasReg(out1));
+        auto loaded = makeLoad(base, imm * 8, 8);
+        createStore(loaded, dealiasReg(out1));
       }
       if (out2 != AArch64::XZR) {
-	auto loaded = makeLoad(base, (imm + 1) * 8, 8);
-	createStore(loaded, dealiasReg(out2));
+        auto loaded = makeLoad(base, (imm + 1) * 8, 8);
+        createStore(loaded, dealiasReg(out2));
       }
       break;
     }
-      /*
-    669 ERROR: Unsupported arm instruction: LDRBBui
-     73 ERROR: Unsupported arm instruction: LDRSBWui
-     49 ERROR: Unsupported arm instruction: LDRSBXui
-
-    502 ERROR: Unsupported arm instruction: LDRHHui
-     54 ERROR: Unsupported arm instruction: LDRSHWui
-     58 ERROR: Unsupported arm instruction: LDRSHXui
-
-     56 ERROR: Unsupported arm instruction: LDRSWui
-      */
+    case AArch64::LDRSWui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = makeLoad(base, imm * 4, 4);
+      writeToOutputReg(loaded, /*SExt=*/true);
+      break;
+    }
+    case AArch64::LDRSHXui:
+    case AArch64::LDRSHWui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = makeLoad(base, imm * 2, 2);
+      writeToOutputReg(loaded, /*SExt=*/true);
+      break;
+    }
+    case AArch64::LDRSBXui:
+    case AArch64::LDRSBWui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = makeLoad(base, imm * 1, 1);
+      writeToOutputReg(loaded, /*SExt=*/true);
+      break;
+    }
+    case AArch64::LDRHHui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = makeLoad(base, imm * 2, 2);
+      writeToOutputReg(loaded);
+      break;
+    }
+    case AArch64::LDRBBui: {
+      auto [base, imm] = getParamsLoadImmed();
+      auto loaded = makeLoad(base, imm * 1, 1);
+      writeToOutputReg(loaded);
+      break;
+    }
     case AArch64::LDRWui: {
       auto [base, imm] = getParamsLoadImmed();
       auto loaded = makeLoad(base, imm * 4, 4);
       writeToOutputReg(loaded);
-    } break;
+      break;
+    }
     case AArch64::LDRXui: {
       auto [base, imm] = getParamsLoadImmed();
       auto loaded = makeLoad(base, imm * 8, 8);
       writeToOutputReg(loaded);
-    } break;
+      break;
+    }
     case AArch64::RET: {
       // for now we're assuming that the function returns an integer or void
       // value
