@@ -412,7 +412,7 @@ class arm2llvm_ {
   [[noreturn]] void visitError(MCInst &I) {
     out->flush();
     string str(instrPrinter->getOpcodeName(I.getOpcode()));
-    *out << "ERROR: Unsupported arm instruction: " << str << "\n";
+    *out << "ERROR: Unsupported AArch64 instruction: " << str << "\n";
     out->flush();
     exit(-1); // FIXME handle this better
   }
@@ -915,7 +915,7 @@ public:
   }
 
   // offset and size are in bytes
-  Value *doLoad(Value *base, int offset, int size) {
+  Value *makeLoad(Value *base, int offset, int size) {
     auto offsetVal = getIntConst(offset, 64);
     auto ptr = createGEP(getIntTy(8), stackMem, {offsetVal}, "");
     return createLoad(getIntTy(8 * size), ptr);
@@ -1960,15 +1960,6 @@ public:
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
-      /*
-    669 ERROR: Unsupported arm instruction: LDRBBui
-    502 ERROR: Unsupported arm instruction: LDRHHui
-     73 ERROR: Unsupported arm instruction: LDRSBWui
-     49 ERROR: Unsupported arm instruction: LDRSBXui
-     54 ERROR: Unsupported arm instruction: LDRSHWui
-     58 ERROR: Unsupported arm instruction: LDRSHXui
-     56 ERROR: Unsupported arm instruction: LDRSWui
-      */
     case AArch64::LDPXi: {
       auto &op0 = CurInst->getOperand(0);
       auto &op1 = CurInst->getOperand(1);
@@ -1983,23 +1974,34 @@ public:
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
       if (out1 != AArch64::XZR) {
-	auto loaded = doLoad(base, imm * 8, 8);
+	auto loaded = makeLoad(base, imm * 8, 8);
 	createStore(loaded, dealiasReg(out1));
       }
       if (out2 != AArch64::XZR) {
-	auto loaded = doLoad(base, (imm + 1) * 8, 8);
+	auto loaded = makeLoad(base, (imm + 1) * 8, 8);
 	createStore(loaded, dealiasReg(out2));
       }
       break;
     }
+      /*
+    669 ERROR: Unsupported arm instruction: LDRBBui
+     73 ERROR: Unsupported arm instruction: LDRSBWui
+     49 ERROR: Unsupported arm instruction: LDRSBXui
+
+    502 ERROR: Unsupported arm instruction: LDRHHui
+     54 ERROR: Unsupported arm instruction: LDRSHWui
+     58 ERROR: Unsupported arm instruction: LDRSHXui
+
+     56 ERROR: Unsupported arm instruction: LDRSWui
+      */
     case AArch64::LDRWui: {
       auto [base, imm] = getParamsLoadImmed();
-      auto loaded = doLoad(base, imm * 4, 4);
+      auto loaded = makeLoad(base, imm * 4, 4);
       writeToOutputReg(loaded);
     } break;
     case AArch64::LDRXui: {
       auto [base, imm] = getParamsLoadImmed();
-      auto loaded = doLoad(base, imm * 8, 8);
+      auto loaded = makeLoad(base, imm * 8, 8);
       writeToOutputReg(loaded);
     } break;
     case AArch64::RET: {
