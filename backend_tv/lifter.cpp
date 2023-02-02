@@ -391,7 +391,7 @@ BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
   assert(false && "basic block not found");
 }
 
-class arm2llvm_ {
+class arm2llvm {
   Module *LiftedModule{nullptr};
   LLVMContext &Ctx = LiftedModule->getContext();
   MCFunction &MF;
@@ -902,8 +902,8 @@ class arm2llvm_ {
   }
 
 public:
-  arm2llvm_(Module *LiftedModule, MCFunction &MF, Function &srcFn,
-            MCInstPrinter *instrPrinter)
+  arm2llvm(Module *LiftedModule, MCFunction &MF, Function &srcFn,
+	   MCInstPrinter *instrPrinter)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
         instrPrinter(instrPrinter), instCount(0) {}
 
@@ -2430,9 +2430,9 @@ public:
 // Adapted from llvm2alive_ in llvm2alive.cpp with some simplifying assumptions
 // FIXME for now, we are making a lot of simplifying assumptions like assuming
 // types of arguments.
-Function *arm2llvm(Module *OrigModule, MCFunction &MF, Function &srcFn,
+Function *lift(Module *OrigModule, MCFunction &MF, Function &srcFn,
                    MCInstPrinter *instrPrinter) {
-  return arm2llvm_(OrigModule, MF, srcFn, instrPrinter).run();
+  return arm2llvm(OrigModule, MF, srcFn, instrPrinter).run();
 }
 
 // We're overriding MCStreamerWrapper to generate an MCFunction
@@ -2708,8 +2708,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.generateSuccessors();
   MCSW.printBlocksMF();
 
-  auto lifted =
-      arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get());
+  auto lifted = lift(LiftedModule, MCSW.MF, *srcFn, IPtemp.get());
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);
