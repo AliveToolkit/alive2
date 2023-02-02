@@ -102,7 +102,7 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui};
+    AArch64::LDRHHui,   AArch64::STRWui, };
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -130,7 +130,8 @@ const set<int> instrs_64 = {
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
-    AArch64::LDRSBXui,  AArch64::LDRSHXui,
+    AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
+    AArch64::STPXi,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -925,11 +926,33 @@ public:
     return make_pair(baseAddr, op2.getImm());
   }
 
+  tuple<Value *, int, Value *> getParamsStoreImmed() {
+    auto &op0 = CurInst->getOperand(0);
+    auto &op1 = CurInst->getOperand(1);
+    auto &op2 = CurInst->getOperand(2);
+    assert(op0.isReg() && op1.isReg());
+    assert(op2.isImm());
+
+    auto baseReg = op1.getReg();
+    assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+           (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+           (baseReg == AArch64::XZR));
+    auto baseAddr = readPtrFromReg(baseReg);
+    return make_tuple(baseAddr, op2.getImm(), readFromReg(op0.getReg()));
+  }
+
   // offset and size are in bytes
   Value *makeLoad(Value *base, int offset, int size) {
     auto offsetVal = getIntConst(offset, 64);
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
     return createLoad(getIntTy(8 * size), ptr);
+  }
+  
+  // offset and size are in bytes
+  void makeStore(Value *base, int offset, int size, Value *val) {
+    auto offsetVal = getIntConst(offset, 64);
+    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
+    createStore(val, ptr);
   }
 
   // Visit an MCInst and convert it to LLVM IR
@@ -1999,6 +2022,33 @@ public:
       }
       break;
     }
+    case AArch64::STPXi: {
+      auto &op0 = CurInst->getOperand(0);
+      auto &op1 = CurInst->getOperand(1);
+      auto &op2 = CurInst->getOperand(2);
+      auto &op3 = CurInst->getOperand(3);
+      assert(op0.isReg() && op1.isReg() && op2.isReg());
+      assert(op3.isImm());
+
+      auto baseReg = op2.getReg();
+      assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+             (baseReg == AArch64::XZR));
+      auto baseAddr = readPtrFromReg(baseReg);
+
+      auto imm = op3.getImm();
+      auto out1 = op0.getReg();
+      auto out2 = op1.getReg();
+      if (out1 != AArch64::XZR) {	
+	auto val = readFromReg(op0.getReg());
+	makeStore(baseAddr, imm * 8, 8, val);
+      }
+      if (out2 != AArch64::XZR) {
+	auto val = readFromReg(op1.getReg());
+        makeStore(baseAddr, (imm + 1) * 8, 8, val);
+      }
+      break;
+    }
     case AArch64::LDRSWui: {
       auto [base, imm] = getParamsLoadImmed();
       auto loaded = makeLoad(base, imm * 4, 4);
@@ -2041,6 +2091,16 @@ public:
       auto [base, imm] = getParamsLoadImmed();
       auto loaded = makeLoad(base, imm * 8, 8);
       writeToOutputReg(loaded);
+      break;
+    }
+    case AArch64::STRWui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 4, 4, val);
+      break;
+    }
+    case AArch64::STRXui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 8, 8, val);
       break;
     }
     case AArch64::RET: {
