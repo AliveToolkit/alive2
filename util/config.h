@@ -19,6 +19,8 @@ extern bool disable_poison_input;
 
 extern bool disable_undef_input;
 
+extern bool enable_approx_int2ptr;
+
 extern bool debug;
 
 extern unsigned src_unroll_cnt;
