@@ -162,6 +162,9 @@ version )EOF";
 #define ARGS_MODULE_VAR M1
 # include "llvm_util/cmd_args_def.h"
 
+  // unsound in general, but sound given our lifting strategy
+  config::enable_approx_int2ptr = true;
+
   // FIXME: For now, we're hardcoding these
   M1.get()->setTargetTriple("aarch64-linux-gnu");
   M1.get()->setDataLayout(
