@@ -2431,7 +2431,7 @@ public:
 // FIXME for now, we are making a lot of simplifying assumptions like assuming
 // types of arguments.
 Function *arm2llvm(Module *OrigModule, MCFunction &MF, Function &srcFn,
-                   MCInstPrinter *instrPrinter, MCRegisterInfo *registerInfo) {
+                   MCInstPrinter *instrPrinter) {
   return arm2llvm_(OrigModule, MF, srcFn, instrPrinter).run();
 }
 
@@ -2709,7 +2709,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.printBlocksMF();
 
   auto lifted =
-      arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get(), MRI.get());
+      arm2llvm(LiftedModule, MCSW.MF, *srcFn, IPtemp.get());
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);
