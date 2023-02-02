@@ -10,6 +10,7 @@ config::src_unroll_cnt = opt_unrolling_factor;
 #endif
 config::disable_undef_input = opt_disable_undef;
 config::disable_poison_input = opt_disable_poison;
+config::enable_approx_int2ptr = opt_enable_approx_int2ptr;
 config::symexec_print_each_value = opt_se_verbose;
 smt::set_query_timeout(to_string(opt_smt_to));
 smt::set_memory_limit((uint64_t)opt_smt_max_mem * 1024 * 1024);

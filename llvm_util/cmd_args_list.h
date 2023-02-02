@@ -40,6 +40,11 @@ llvm::cl::opt<bool> opt_disable_poison(LLVM_ARGS_PREFIX "disable-poison-input",
   llvm::cl::desc("Assume inputs are not poison (default=false)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> opt_enable_approx_int2ptr(
+  LLVM_ARGS_PREFIX "enable-approx-int2ptr",
+  llvm::cl::desc("Enable unsound approximation of int2ptr (default=false)"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 llvm::cl::opt<bool> opt_error_fatal(LLVM_ARGS_PREFIX "exit-on-error",
   llvm::cl::desc("Exit on error"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));

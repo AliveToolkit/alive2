@@ -1989,7 +1989,24 @@ expr Memory::ptr2int(const expr &ptr) const {
 
 expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused() && observesAddresses());
-  // TODO
+  // TODO: missing pointer escaping
+  if (config::enable_approx_int2ptr) {
+    DisjointExpr<expr> ret;
+    ret.add(Pointer::mkNullPointer(*this).release(), val == 0);
+
+    auto add = [&](unsigned limit, bool local) {
+      for (unsigned i = 0; i != limit; ++i) {
+        Pointer p(*this, i, local);
+        Pointer p_end = p + p.blockSize();
+        ret.add((p + (val - p.getAddress())).release(),
+                val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
+      }
+    };
+    add(numLocals(), true);
+    add(numNonlocals(), false);
+    return *std::move(ret)();
+  }
+
   expr null = Pointer::mkNullPointer(*this).release();
   expr fn = expr::mkUF("int2ptr", { val }, null);
   state->doesApproximation("inttoptr", fn);
