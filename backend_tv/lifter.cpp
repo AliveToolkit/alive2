@@ -102,7 +102,7 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi};
+    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi, AArch64::CCMNWr,};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -131,7 +131,7 @@ const set<int> instrs_64 = {
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
-    AArch64::STPXi,     AArch64::CCMNXi,
+    AArch64::STPXi,     AArch64::CCMNXi, AArch64::CCMNXr,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -1572,7 +1572,9 @@ public:
       break;
     }
     case AArch64::CCMNWi:
-    case AArch64::CCMNXi: {
+    case AArch64::CCMNWr:
+    case AArch64::CCMNXi:
+    case AArch64::CCMNXr: {
       auto a = readFromOperand(0);
       auto b = readFromOperand(1);
       auto nzcv = getImm(2);
