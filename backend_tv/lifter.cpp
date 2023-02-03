@@ -2426,15 +2426,6 @@ public:
   }
 };
 
-// Convert an MCFunction to IR::Function
-// Adapted from llvm2alive_ in llvm2alive.cpp with some simplifying assumptions
-// FIXME for now, we are making a lot of simplifying assumptions like assuming
-// types of arguments.
-Function *lift(Module *OrigModule, MCFunction &MF, Function &srcFn,
-                   MCInstPrinter *instrPrinter) {
-  return arm2llvm(OrigModule, MF, srcFn, instrPrinter).run();
-}
-
 // We're overriding MCStreamerWrapper to generate an MCFunction
 // from the arm assembly. MCStreamerWrapper provides callbacks to handle
 // different parts of the assembly file. The main callbacks that we're
@@ -2683,13 +2674,13 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   unique_ptr<MCAsmInfo> MAI(Targ->createMCAsmInfo(*MRI, TripleName, MCOptions));
   assert(MAI && "Unable to create MC asm info!");
-  unique_ptr<MCInstPrinter> IPtemp(
+  unique_ptr<MCInstPrinter> IP(
       Targ->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
   MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get());
-  MCStreamerWrapper MCSW(Ctx, Ana.get(), IPtemp.get(), MRI.get());
+  MCStreamerWrapper MCSW(Ctx, Ana.get(), IP.get(), MRI.get());
 
   unique_ptr<MCAsmParser> Parser(createMCAsmParser(SrcMgr, Ctx, MCSW, *MAI));
   assert(Parser);
@@ -2708,7 +2699,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   MCSW.generateSuccessors();
   MCSW.printBlocksMF();
 
-  auto lifted = lift(LiftedModule, MCSW.MF, *srcFn, IPtemp.get());
+  auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IP.get()).run();
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);
