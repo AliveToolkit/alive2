@@ -102,7 +102,7 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,   AArch64::STRWui, };
+    AArch64::LDRHHui,   AArch64::STRWui, AArch64::CCMNWi};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -131,7 +131,7 @@ const set<int> instrs_64 = {
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
-    AArch64::STPXi,
+    AArch64::STPXi, AArch64::CCMNXi,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -867,6 +867,44 @@ class arm2llvm {
     return res;
   }
 
+  tuple<Value*, tuple<Value*, Value*, Value*, Value*>> addWithCarry(Value* l, Value *r, Value* c) {
+    assert(l->getType()->getIntegerBitWidth() == r->getType()->getIntegerBitWidth());
+    assert(c->getType()->getIntegerBitWidth() == 1);
+
+    auto size = l->getType()->getIntegerBitWidth();
+
+    // Deal with size+1 bit integers so that we can easily calculate the c/v
+    // PSTATE bits.
+    auto ty = l->getType();
+    auto tyPlusOne = getIntTy(size + 1);
+
+    auto carry = createZExt(getC(), tyPlusOne);
+    auto add = createAdd(createZExt(l, tyPlusOne), createZExt(r, tyPlusOne));
+    auto withCarry = createAdd(add, carry);
+
+    auto res = createTrunc(withCarry, ty);
+
+    // Mask off the sign bit. We could mask with an AND, but APInt semantics
+    // might be weird since we're passing in an uint64_t but we'll want a 65
+    // bit int
+    auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
+    auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
+
+    auto sAdd =
+        createAdd(createSExt(l, tyPlusOne), createSExt(r, tyPlusOne));
+    auto sWithCarry = createAdd(sAdd, carry);
+
+
+    auto zero = getIntConst(0, size);
+
+    auto newN = createICmp(ICmpInst::Predicate::ICMP_SLT, res, zero);
+    auto newZ = createICmp(ICmpInst::Predicate::ICMP_EQ, res, zero);
+    auto newC = createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked);
+    auto newV = createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked);
+
+    return {res, {newN, newZ, newC, newV}};
+  };
+
   void setV(Value *V) {
     assert(V->getType()->getIntegerBitWidth() == 1);
     createStore(V, dealiasReg(AArch64::V));
@@ -1095,37 +1133,19 @@ public:
     case AArch64::ADCWr:
     case AArch64::ADCSXr:
     case AArch64::ADCSWr: {
-      auto size = getInstSize(opcode);
-      auto ty = getIntTy(size);
-
       auto a = readFromOperand(1);
       auto b = readFromOperand(2);
 
-      // Deal with size+1 bit integers so that we can easily calculate the c/v
-      // PSTATE bits.
-      auto tyPlusOne = getIntTy(size + 1);
-
-      auto carry = createZExt(getC(), tyPlusOne);
-      auto add = createAdd(createZExt(a, tyPlusOne), createZExt(b, tyPlusOne));
-      auto withCarry = createAdd(add, carry);
-
-      writeToOutputReg(createTrunc(withCarry, ty));
+      auto [res, flags] = addWithCarry(a, b, getC());
+      writeToOutputReg(res);
 
       if (has_s(opcode)) {
-        // Mask off the sign bit. We could mask with an AND, but APInt semantics
-        // might be weird since we're passing in an uint64_t but we'll want a 65
-        // bit int
-        auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
-        auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
+        auto [n, z, c, v] = flags;
 
-        auto sAdd =
-            createAdd(createSExt(a, tyPlusOne), createSExt(b, tyPlusOne));
-        auto sWithCarry = createAdd(sAdd, carry);
-
-        setNUsingResult(withCarry);
-        setZUsingResult(withCarry);
-        setC(createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked));
-        setV(createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked));
+        setN(n);
+        setZ(z);
+        setC(c);
+        setV(v);
       }
 
       break;
@@ -1549,6 +1569,26 @@ public:
       auto rhs = readFromOperand(2, getImm(3));
       auto result = createXor(lhs, rhs);
       writeToOutputReg(result);
+      break;
+    }
+    case AArch64::CCMNWi:
+    case AArch64::CCMNXi: {
+      cout << "yeet" << endl;
+      auto cond_val_imm = getImm(3);
+
+      auto a = readFromOperand(1);
+      auto b = readFromOperand(2);
+      auto carry = getIntConst(0, 1);
+
+      auto [res, flags] = addWithCarry(a, b, carry);
+      auto [n, z, c, v] = flags;
+
+      auto cond = evaluate_condition(cond_val_imm, MCBB);
+      setN(createSelect(cond, n, getN()));
+      setZ(createSelect(cond, z, getZ()));
+      setC(createSelect(cond, c, getC()));
+      setV(createSelect(cond, v, getV()));
+
       break;
     }
     case AArch64::CSINVWr:
