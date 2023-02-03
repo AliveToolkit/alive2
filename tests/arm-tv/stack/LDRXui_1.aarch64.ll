@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i64 @tgt(i64 %0, i64 %1, i64 %2, i64 %3, i64 %4, i64 %5, i64 %6, i64 %7, i64 %8, i64 %9, i64 %10) local_unnamed_addr #0 {
   %x = xor i64 %8, %4

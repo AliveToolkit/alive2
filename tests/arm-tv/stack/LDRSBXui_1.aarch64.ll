@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input --global-isel  -global-isel-abort=0
+; TEST-ARGS: --global-isel  -global-isel-abort=0
 ; ModuleID = 'fuzz'
 
 ; ModuleID = 'fuzz'

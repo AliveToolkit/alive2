@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input --global-isel
+; TEST-ARGS: --global-isel
 
 define i64 @f(i64 %0, i1 %1) {
   %3 = zext i1 %1 to i32

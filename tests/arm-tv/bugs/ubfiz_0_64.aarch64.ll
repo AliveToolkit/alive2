@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i64 @src(i64 %x) {
   %A = shl i64 %x, 3

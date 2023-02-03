@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i32 @test51(i32 %x) {
   %A = shl nuw i32 %x, 1

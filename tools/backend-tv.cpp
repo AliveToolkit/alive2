@@ -165,6 +165,14 @@ version )EOF";
   // unsound in general, but sound given our lifting strategy
   config::enable_approx_int2ptr = true;
 
+  // undef is going away, we don't want to see bugs about it
+  config::disable_undef_input = true;
+
+  // for now let's just avoid bugs coming from poison inputs;
+  // separately, this flag means that memory passed to us will be
+  // frozen
+  config::disable_poison_input = true;
+
   // FIXME: For now, we're hardcoding these
   M1.get()->setTargetTriple("aarch64-linux-gnu");
   M1.get()->setDataLayout(

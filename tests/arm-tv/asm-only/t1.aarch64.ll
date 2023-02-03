@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input
+; TEST-ARGS:
 ; CHECK: 1 correct
 
 define i32 @f(i32, i32) {

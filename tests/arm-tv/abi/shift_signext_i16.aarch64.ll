@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define signext i16 @test7(i64 %0) {
   %2 = lshr i64 %0, 23

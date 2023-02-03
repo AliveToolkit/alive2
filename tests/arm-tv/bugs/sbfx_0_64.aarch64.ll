@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i64 @test50(i64 %x) {
   %A = shl nsw i64 %x, 1

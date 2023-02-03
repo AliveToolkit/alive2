@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input
+; TEST-ARGS:
 ; SKIP-IDENTITY
 ; XFAIL: Only int types 64 bits or smaller supported for now
 

@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input
+; TEST-ARGS:
 ; SKIP-IDENTITY
 ; XFAIL: program doesn't type check!
 

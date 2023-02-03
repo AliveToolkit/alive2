@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input --global-isel
+; TEST-ARGS: --global-isel
 
 define i64 @test6_umsubl(i64 %0) {
   %2 = trunc i64 %0 to i32

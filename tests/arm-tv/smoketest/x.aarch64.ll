@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i32 @f(i8 %a, i32 %b, i64 %c, i1 %d) {
   %x = zext i8 %a to i32

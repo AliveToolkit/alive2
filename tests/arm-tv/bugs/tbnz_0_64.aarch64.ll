@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i64 @brR0_i64_slt(i64 %0) {
   %2 = icmp slt i64 %0, 0

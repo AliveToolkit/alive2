@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i1 @t4_nor_binop(i8 %0, i8 %1, i8 %2, i1 %3) {
   %5 = icmp eq i8 %0, 0

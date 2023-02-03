@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i1 @or_ne_ne(i8 %0) {
   %2 = icmp ne i8 %0, 13

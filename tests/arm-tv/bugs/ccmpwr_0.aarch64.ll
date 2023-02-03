@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i1 @test18(i32 %0) {
   %2 = icmp sge i32 %0, 100

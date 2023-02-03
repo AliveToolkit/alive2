@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 ; ModuleID = 'test-951506729.ll'
 source_filename = "test-951506729.ll"

@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input --disable-poison-input
+; TEST-ARGS:
 
 define i32 @separate_predecessors-tgt(i1 %0, i1 %1, i1 %2, i1 %3, i1 %4, i32 %5, i32 %6) {
 7:

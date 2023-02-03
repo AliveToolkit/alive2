@@ -1,4 +1,4 @@
-; TEST-ARGS: --disable-undef-input
+; TEST-ARGS:
 
 define i64 @umull(i64 %0, i64 %1) {
   %3 = and i64 %0, 4294967295
