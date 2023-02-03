@@ -1573,7 +1573,6 @@ public:
     }
     case AArch64::CCMNWi:
     case AArch64::CCMNXi: {
-      cout << "yeet" << endl;
       auto cond_val_imm = getImm(3);
 
       auto a = readFromOperand(1);
