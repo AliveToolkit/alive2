@@ -70,15 +70,23 @@ Function *adjustSrcInputs(Function *srcFn) {
 
   for (auto &v : srcFn->args()) {
     auto *ty = v.getType();
-    if (!ty->isIntegerTy()) // FIXME
-      report_fatal_error("[Unsupported Function Argument]: Only int types "
+    if (ty->isIntegerTy()) {
+      auto orig_width = ty->getIntegerBitWidth();
+      if (orig_width > 64) // FIXME
+	report_fatal_error("[Unsupported function argument]: Only parameters 64 "
+			   "bits or smaller supported for now");
+      orig_input_width.emplace_back(orig_width);
+      new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
+    } else if (ty->isPointerTy()) {
+      assert(ty->getIntegerBitWidth() == 64);
+      auto pty = dyn_cast<PointerType>(ty);
+      if (pty->getAddressSpace() != 0)
+	report_fatal_error("[Unsupported function argument]: Only address space "
+			   "0 is supported");
+    } else {
+      report_fatal_error("[Unsupported function argument]: Only int/ptr types "
                          "supported for now");
-    auto orig_width = ty->getIntegerBitWidth();
-    if (orig_width > 64) // FIXME
-      report_fatal_error("[Unsupported Function Argument]: Only int types 64 "
-                         "bits or smaller supported for now");
-    orig_input_width.emplace_back(orig_width);
-    new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
+    }
   }
 
   FunctionType *NFTy =
