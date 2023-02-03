@@ -796,7 +796,7 @@ class arm2llvm {
     return createLoad(getIntTy(1), dealiasReg(AArch64::C));
   }
 
-  Value *evaluate_condition(uint64_t cond, MCBasicBlock *bb) {
+  Value *evaluate_condition(uint64_t cond) {
     // cond<0> == '1' && cond != '1111'
     auto invert_bit = (cond & 1) && (cond != 15);
 
@@ -1264,7 +1264,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm, MCBB);
+      auto cond_val = evaluate_condition(cond_val_imm);
 
       if (!ty || !a || !b)
         visitError(I);
@@ -1523,7 +1523,7 @@ public:
       auto imm_n_val = getIntConst((imm_flags & 8) ? 1 : 0, 1);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm, MCBB);
+      auto cond_val = evaluate_condition(cond_val_imm);
 
       auto ssub = createSSubOverflow(lhs, imm_rhs);
       auto result = createExtractValue(ssub, {0});
@@ -1582,7 +1582,7 @@ public:
       auto [res, flags] = addWithCarry(a, b, carry);
       auto [n, z, c, v] = flags;
 
-      auto cond = evaluate_condition(cond_val_imm, MCBB);
+      auto cond = evaluate_condition(cond_val_imm);
       setN(createSelect(cond, n, getN()));
       setZ(createSelect(cond, z, getZ()));
       setC(createSelect(cond, c, getC()));
@@ -1607,7 +1607,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm, MCBB);
+      auto cond_val = evaluate_condition(cond_val_imm);
 
       if (!ty || !a || !b)
         visitError(I);
@@ -1637,7 +1637,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm, MCBB);
+      auto cond_val = evaluate_condition(cond_val_imm);
 
       auto inc = createAdd(b, getIntConst(1, ty->getIntegerBitWidth()));
       auto sel = createSelect(cond_val, a, inc);
@@ -2221,7 +2221,7 @@ public:
     }
     case AArch64::Bcc: {
       auto cond_val_imm = getImm(0);
-      auto cond_val = evaluate_condition(cond_val_imm, MCBB);
+      auto cond_val = evaluate_condition(cond_val_imm);
 
       auto &jmp_tgt_op = CurInst->getOperand(1);
       assert(jmp_tgt_op.isExpr() && "expected expression");
