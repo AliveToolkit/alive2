@@ -102,7 +102,7 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,   AArch64::STRWui, AArch64::CCMNWi};
+    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -131,7 +131,7 @@ const set<int> instrs_64 = {
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
-    AArch64::STPXi, AArch64::CCMNXi,
+    AArch64::STPXi,     AArch64::CCMNXi,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -867,8 +867,10 @@ class arm2llvm {
     return res;
   }
 
-  tuple<Value*, tuple<Value*, Value*, Value*, Value*>> addWithCarry(Value* l, Value *r, Value* c) {
-    assert(l->getType()->getIntegerBitWidth() == r->getType()->getIntegerBitWidth());
+  tuple<Value *, tuple<Value *, Value *, Value *, Value *>>
+  addWithCarry(Value *l, Value *r, Value *c) {
+    assert(l->getType()->getIntegerBitWidth() ==
+           r->getType()->getIntegerBitWidth());
     assert(c->getType()->getIntegerBitWidth() == 1);
 
     auto size = l->getType()->getIntegerBitWidth();
@@ -890,10 +892,8 @@ class arm2llvm {
     auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
     auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
 
-    auto sAdd =
-        createAdd(createSExt(l, tyPlusOne), createSExt(r, tyPlusOne));
+    auto sAdd = createAdd(createSExt(l, tyPlusOne), createSExt(r, tyPlusOne));
     auto sWithCarry = createAdd(sAdd, carry);
-
 
     auto zero = getIntConst(0, size);
 
@@ -941,7 +941,7 @@ class arm2llvm {
 
 public:
   arm2llvm(Module *LiftedModule, MCFunction &MF, Function &srcFn,
-	   MCInstPrinter *instrPrinter)
+           MCInstPrinter *instrPrinter)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
         instrPrinter(instrPrinter), instCount(0) {}
 
@@ -985,7 +985,7 @@ public:
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
     return createLoad(getIntTy(8 * size), ptr);
   }
-  
+
   // offset and size are in bytes
   void makeStore(Value *base, int offset, int size, Value *val) {
     auto offsetVal = getIntConst(offset, 64);
@@ -2078,12 +2078,12 @@ public:
       auto imm = op3.getImm();
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
-      if (out1 != AArch64::XZR) {	
-	auto val = readFromReg(op0.getReg());
-	makeStore(baseAddr, imm * 8, 8, val);
+      if (out1 != AArch64::XZR) {
+        auto val = readFromReg(op0.getReg());
+        makeStore(baseAddr, imm * 8, 8, val);
       }
       if (out2 != AArch64::XZR) {
-	auto val = readFromReg(op1.getReg());
+        auto val = readFromReg(op1.getReg());
         makeStore(baseAddr, (imm + 1) * 8, 8, val);
       }
       break;
@@ -2548,7 +2548,7 @@ public:
     *out << "Common? " << Symbol->isCommon() << "\n";
     *out << "Varible? " << Symbol->isVariable() << "\n";
     *out << "Attribute = " << Attribute << "\n\n";
-  return true;
+    return true;
   }
 
   virtual void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
@@ -2557,7 +2557,8 @@ public:
     std::string sss;
     llvm::raw_string_ostream ss(sss);
     Symbol->print(ss, nullptr);
-    *out << sss << " " << "size = " << Size << " Align = " << ByteAlignment.value() << "\n\n";
+    *out << sss << " "
+         << "size = " << Size << " Align = " << ByteAlignment.value() << "\n\n";
   }
 
   virtual void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
