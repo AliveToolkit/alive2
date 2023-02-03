@@ -796,7 +796,7 @@ class arm2llvm {
     return createLoad(getIntTy(1), dealiasReg(AArch64::C));
   }
 
-  Value *evaluate_condition(uint64_t cond) {
+  Value *conditionHolds(uint64_t cond) {
     // cond<0> == '1' && cond != '1111'
     auto invert_bit = (cond & 1) && (cond != 15);
 
@@ -1264,7 +1264,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm);
+      auto cond_val = conditionHolds(cond_val_imm);
 
       if (!ty || !a || !b)
         visitError(I);
@@ -1523,7 +1523,7 @@ public:
       auto imm_n_val = getIntConst((imm_flags & 8) ? 1 : 0, 1);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm);
+      auto cond_val = conditionHolds(cond_val_imm);
 
       auto ssub = createSSubOverflow(lhs, imm_rhs);
       auto result = createExtractValue(ssub, {0});
@@ -1573,20 +1573,27 @@ public:
     }
     case AArch64::CCMNWi:
     case AArch64::CCMNXi: {
+      auto a = readFromOperand(0);
+      auto b = readFromOperand(1);
+      auto nzcv = getImm(2);
       auto cond_val_imm = getImm(3);
 
-      auto a = readFromOperand(1);
-      auto b = readFromOperand(2);
-      auto carry = getIntConst(0, 1);
+      auto zero = getIntConst(0, 1);
+      auto one = getIntConst(1, 1);
 
-      auto [res, flags] = addWithCarry(a, b, carry);
+      auto [res, flags] = addWithCarry(a, b, zero);
       auto [n, z, c, v] = flags;
 
-      auto cond = evaluate_condition(cond_val_imm);
-      setN(createSelect(cond, n, getN()));
-      setZ(createSelect(cond, z, getZ()));
-      setC(createSelect(cond, c, getC()));
-      setV(createSelect(cond, v, getV()));
+      auto altn = (nzcv & 8) ? one : zero;
+      auto altz = (nzcv & 4) ? one : zero;
+      auto altc = (nzcv & 2) ? one : zero;
+      auto altv = (nzcv & 1) ? one : zero;
+      
+      auto cond = conditionHolds(cond_val_imm);
+      setN(createSelect(cond, n, altn));
+      setZ(createSelect(cond, z, altz));
+      setC(createSelect(cond, c, altc));
+      setV(createSelect(cond, v, altv));
 
       break;
     }
@@ -1607,7 +1614,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm);
+      auto cond_val = conditionHolds(cond_val_imm);
 
       if (!ty || !a || !b)
         visitError(I);
@@ -1637,7 +1644,7 @@ public:
       auto b = readFromOperand(2);
 
       auto cond_val_imm = getImm(3);
-      auto cond_val = evaluate_condition(cond_val_imm);
+      auto cond_val = conditionHolds(cond_val_imm);
 
       auto inc = createAdd(b, getIntConst(1, ty->getIntegerBitWidth()));
       auto sel = createSelect(cond_val, a, inc);
@@ -2221,7 +2228,7 @@ public:
     }
     case AArch64::Bcc: {
       auto cond_val_imm = getImm(0);
-      auto cond_val = evaluate_condition(cond_val_imm);
+      auto cond_val = conditionHolds(cond_val_imm);
 
       auto &jmp_tgt_op = CurInst->getOperand(1);
       assert(jmp_tgt_op.isExpr() && "expected expression");
