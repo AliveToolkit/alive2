@@ -102,7 +102,8 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi, AArch64::CCMNWr,};
+    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
+};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -131,7 +132,7 @@ const set<int> instrs_64 = {
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
-    AArch64::STPXi,     AArch64::CCMNXi, AArch64::CCMNXr,
+    AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -1141,7 +1142,6 @@ public:
 
       if (has_s(opcode)) {
         auto [n, z, c, v] = flags;
-
         setN(n);
         setZ(z);
         setC(c);
@@ -1590,7 +1590,7 @@ public:
       auto altz = (nzcv & 4) ? one : zero;
       auto altc = (nzcv & 2) ? one : zero;
       auto altv = (nzcv & 1) ? one : zero;
-      
+
       auto cond = conditionHolds(cond_val_imm);
       setN(createSelect(cond, n, altn));
       setZ(createSelect(cond, z, altz));
