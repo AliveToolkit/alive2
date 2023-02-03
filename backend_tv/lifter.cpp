@@ -2541,15 +2541,32 @@ public:
 
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
                                    MCSymbolAttr Attribute) override {
-    return true;
+    *out << "[emitSymbolAttribute]\n";
+    std::string sss;
+    llvm::raw_string_ostream ss(sss);
+    Symbol->print(ss, nullptr);
+    *out << sss << "\n";
+    *out << "Common? " << Symbol->isCommon() << "\n";
+    *out << "Varible? " << Symbol->isVariable() << "\n";
+    *out << "Attribute = " << Attribute << "\n\n";
+  return true;
   }
 
   virtual void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-                                Align ByteAlignment) override {}
+                                Align ByteAlignment) override {
+    *out << "[emitCommonSymbol]\n";
+    std::string sss;
+    llvm::raw_string_ostream ss(sss);
+    Symbol->print(ss, nullptr);
+    *out << sss << " " << "size = " << Size << " Align = " << ByteAlignment.value() << "\n\n";
+  }
 
   virtual void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
                             uint64_t Size = 0, Align ByteAlignment = Align(1),
-                            SMLoc Loc = SMLoc()) override {}
+                            SMLoc Loc = SMLoc()) override {
+    *out << "[emitZerofill]\n";
+    *out << (string)Section->getName() << "\n\n";
+  }
 
   virtual void emitLabel(MCSymbol *Symbol, SMLoc Loc) override {
     // Assuming the first label encountered is the function's name
