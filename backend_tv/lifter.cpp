@@ -868,10 +868,10 @@ class arm2llvm {
   }
 
   tuple<Value *, tuple<Value *, Value *, Value *, Value *>>
-  addWithCarry(Value *l, Value *r, Value *c) {
+  addWithCarry(Value *l, Value *r, Value *carryIn) {
     assert(l->getType()->getIntegerBitWidth() ==
            r->getType()->getIntegerBitWidth());
-    assert(c->getType()->getIntegerBitWidth() == 1);
+    assert(carryIn->getType()->getIntegerBitWidth() == 1);
 
     auto size = l->getType()->getIntegerBitWidth();
 
@@ -880,8 +880,8 @@ class arm2llvm {
     auto ty = l->getType();
     auto tyPlusOne = getIntTy(size + 1);
 
-    auto carry = createZExt(getC(), tyPlusOne);
     auto add = createAdd(createZExt(l, tyPlusOne), createZExt(r, tyPlusOne));
+    auto carry = createZExt(carryIn, tyPlusOne);
     auto withCarry = createAdd(add, carry);
 
     auto res = createTrunc(withCarry, ty);
