@@ -84,6 +84,7 @@ Function *adjustSrcInputs(Function *srcFn) {
             "[Unsupported function argument]: Only address space "
             "0 is supported");
       new_argtypes.emplace_back(pty);
+      orig_input_width.emplace_back(64);
     } else {
       report_fatal_error("[Unsupported function argument]: Only int/ptr types "
                          "supported for now");

@@ -2388,6 +2388,8 @@ public:
       BBs.push_back(make_pair(bb, &mbb));
     }
 
+    *out << "created LLVM basic blocks.\n";
+    
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
@@ -2427,6 +2429,8 @@ public:
     createRegStorage(AArch64::C, 1, "C");
     createRegStorage(AArch64::V, 1, "V");
 
+    *out << "about to do callee-side ABI stuff\n";
+    
     // implement the callee side of the ABI; FIXME -- this code only
     // supports integer parameters <= 64 bits and will require
     // significant generalization to handle large parameters, vectors,
@@ -2438,17 +2442,20 @@ public:
                                     orig_input_width[argNum]);
       // first 8 are passed via registers, after that on the stack
       if (argNum < 8) {
-        auto Reg = MCOperand::createReg(AArch64::X0 + argNum).getReg();
+        auto Reg = AArch64::X0 + argNum;
         createStore(val, RegFile[Reg]);
       } else {
         auto slot = argNum - 8;
-        assert(slot < stackSlots);
+        assert(slot < stackSlots && "maximum stack slots for parameter values exceeded");
         auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
       argNum++;
     }
 
+    *out << "done with callee-side ABI stuff\n";
+    *out << "about to lift the instructions\n";
+    
     for (auto &[llvm_bb, mc_bb] : BBs) {
       *out << "visiting bb: " << mc_bb->getName() << "\n";
       LLVMBB = llvm_bb;
