@@ -402,7 +402,6 @@ class arm2llvm {
   MCInstPrinter *instrPrinter{nullptr};
   MCInst *CurInst{nullptr};
   unsigned instCount{0};
-  bool ret_void{false};
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
 
@@ -2193,12 +2192,14 @@ public:
         createReturn(vec);
       } else {
         Value *retVal = nullptr;
-        if (!ret_void) {
-          auto *retTyp = srcFn.getReturnType();
-          auto retWidth = retTyp->getIntegerBitWidth();
+        auto *retTyp = srcFn.getReturnType();
+        if (!retTyp->isVoidTy()) {
+          auto retWidth = retTyp->isPointerTy() ? 64 : retTyp->getIntegerBitWidth();
           retVal = readFromReg(AArch64::X0);
+          auto retValWidth = retVal->getType()->isPointerTy() ? 64 :
+            retVal->getType()->getIntegerBitWidth();
 
-          if (retWidth < retVal->getType()->getIntegerBitWidth())
+          if (retWidth < retValWidth)
             retVal = createTrunc(retVal, getIntTy(retWidth));
 
           // mask off any don't-care bits
