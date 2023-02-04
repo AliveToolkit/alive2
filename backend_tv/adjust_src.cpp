@@ -78,13 +78,12 @@ Function *adjustSrcInputs(Function *srcFn) {
             "bits or smaller supported for now");
       orig_input_width.emplace_back(orig_width);
       new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
-    } else if (ty->isPointerTy()) {
-      assert(ty->getIntegerBitWidth() == 64);
-      auto pty = dyn_cast<PointerType>(ty);
+    } else if (auto pty = dyn_cast<PointerType>(ty)) {
       if (pty->getAddressSpace() != 0)
         report_fatal_error(
             "[Unsupported function argument]: Only address space "
             "0 is supported");
+      new_argtypes.emplace_back(pty);
     } else {
       report_fatal_error("[Unsupported function argument]: Only int/ptr types "
                          "supported for now");
@@ -103,7 +102,8 @@ Function *adjustSrcInputs(Function *srcFn) {
   for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
                               I2 = NF->arg_begin();
        I != E; ++I, ++I2) {
-    if (I->getType()->getIntegerBitWidth() < 64) {
+    if (!I->getType()->isPointerTy() &&
+        I->getType()->getIntegerBitWidth() < 64) {
       auto name = I->getName().substr(I->getName().rfind('%')) + "_t";
       auto trunc = new TruncInst(I2, I->getType(), name,
                                  NF->getEntryBlock().getFirstNonPHI());

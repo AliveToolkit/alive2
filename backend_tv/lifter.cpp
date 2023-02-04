@@ -799,7 +799,7 @@ class arm2llvm {
 
   Value *conditionHolds(uint64_t cond) {
     assert(cond < 16);
-    
+
     // cond<0> == '1' && cond != '1111'
     auto invert_bit = (cond & 1) && (cond != 15);
 
@@ -812,7 +812,7 @@ class arm2llvm {
 
     auto falseVal = getIntConst(0, 1);
     auto trueVal = getIntConst(1, 1);
-    
+
     Value *res = nullptr;
     switch (cond) {
     case 0:
@@ -830,11 +830,9 @@ class arm2llvm {
     case 4: {
       // HI/LS: PSTATE.C == '1' && PSTATE.Z == '0'
       // C == 1
-      auto c_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, trueVal);
+      auto c_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, trueVal);
       // Z == 0
-      auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
+      auto z_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       // C == 1 && Z == 0
       res = createAnd(c_cond, z_cond);
       break;
@@ -846,8 +844,7 @@ class arm2llvm {
     case 6: {
       // GT/LE PSTATE.N == PSTATE.V && PSTATE.Z == 0
       auto n_eq_v = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
-      auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
+      auto z_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       res = createAnd(n_eq_v, z_cond);
       break;
     }
@@ -1498,7 +1495,7 @@ public:
       *out << "size = " << size << "\n";
       *out << "width = " << width << "\n";
       *out << "pos = " << pos << "\n";
-      
+
       auto masked = createAnd(src, getIntConst(mask, size));
       auto l_shifted = createRawShl(masked, getIntConst(size - width, size));
       auto shifted_res =
@@ -1633,8 +1630,8 @@ public:
         auto ret = createSelect(cond_val, a, negated_b);
         writeToOutputReg(ret);
       } else {
-	auto ret = createSelect(cond_val, a, inverted_b);
-	writeToOutputReg(ret);
+        auto ret = createSelect(cond_val, a, inverted_b);
+        writeToOutputReg(ret);
       }
       break;
     }
