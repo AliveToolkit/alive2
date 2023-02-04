@@ -1628,11 +1628,10 @@ public:
         auto negated_b = createAdd(inverted_b, getIntConst(1, size));
         auto ret = createSelect(cond_val, a, negated_b);
         writeToOutputReg(ret);
-        break;
+      } else {
+	auto ret = createSelect(cond_val, a, inverted_b);
+	writeToOutputReg(ret);
       }
-
-      auto ret = createSelect(cond_val, a, inverted_b);
-      writeToOutputReg(ret);
       break;
     }
     case AArch64::CSINCWr:
