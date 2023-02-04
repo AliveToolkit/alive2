@@ -2194,10 +2194,12 @@ public:
         Value *retVal = nullptr;
         auto *retTyp = srcFn.getReturnType();
         if (!retTyp->isVoidTy()) {
-          auto retWidth = retTyp->isPointerTy() ? 64 : retTyp->getIntegerBitWidth();
+          auto retWidth =
+              retTyp->isPointerTy() ? 64 : retTyp->getIntegerBitWidth();
           retVal = readFromReg(AArch64::X0);
-          auto retValWidth = retVal->getType()->isPointerTy() ? 64 :
-            retVal->getType()->getIntegerBitWidth();
+          auto retValWidth = retVal->getType()->isPointerTy()
+                                 ? 64
+                                 : retVal->getType()->getIntegerBitWidth();
 
           if (retWidth < retValWidth)
             retVal = createTrunc(retVal, getIntTy(retWidth));
@@ -2390,7 +2392,7 @@ public:
     }
 
     *out << "created LLVM basic blocks.\n";
-    
+
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
@@ -2431,7 +2433,7 @@ public:
     createRegStorage(AArch64::V, 1, "V");
 
     *out << "about to do callee-side ABI stuff\n";
-    
+
     // implement the callee side of the ABI; FIXME -- this code only
     // supports integer parameters <= 64 bits and will require
     // significant generalization to handle large parameters, vectors,
@@ -2447,7 +2449,8 @@ public:
         createStore(val, RegFile[Reg]);
       } else {
         auto slot = argNum - 8;
-        assert(slot < stackSlots && "maximum stack slots for parameter values exceeded");
+        assert(slot < stackSlots &&
+               "maximum stack slots for parameter values exceeded");
         auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
@@ -2456,7 +2459,7 @@ public:
 
     *out << "done with callee-side ABI stuff\n";
     *out << "about to lift the instructions\n";
-    
+
     for (auto &[llvm_bb, mc_bb] : BBs) {
       *out << "visiting bb: " << mc_bb->getName() << "\n";
       LLVMBB = llvm_bb;
