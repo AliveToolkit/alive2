@@ -798,6 +798,8 @@ class arm2llvm {
   }
 
   Value *conditionHolds(uint64_t cond) {
+    assert(cond < 16);
+    
     // cond<0> == '1' && cond != '1111'
     auto invert_bit = (cond & 1) && (cond != 15);
 
@@ -808,6 +810,9 @@ class arm2llvm {
     auto cur_n = getN();
     auto cur_c = getC();
 
+    auto falseVal = getIntConst(0, 1);
+    auto trueVal = getIntConst(1, 1);
+    
     Value *res = nullptr;
     switch (cond) {
     case 0:
@@ -824,46 +829,40 @@ class arm2llvm {
       break; // VS/VC
     case 4: {
       // HI/LS: PSTATE.C == '1' && PSTATE.Z == '0'
-      assert(cur_c != nullptr && cur_z != nullptr &&
-             "HI/LS requires C and Z bits to be generated");
       // C == 1
       auto c_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, getIntConst(1, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, trueVal);
       // Z == 0
       auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       // C == 1 && Z == 0
       res = createAnd(c_cond, z_cond);
       break;
     }
     case 5:
       // GE/LT PSTATE.N == PSTATE.V
-      assert(cur_n != nullptr && cur_v != nullptr &&
-             "GE/LT requires N and V bits to be generated");
       res = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
       break;
     case 6: {
       // GT/LE PSTATE.N == PSTATE.V && PSTATE.Z == 0
-      assert(cur_n != nullptr && cur_v != nullptr && cur_z != nullptr &&
-             "GT/LE requires N, V and Z bits to be generated");
       auto n_eq_v = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
       auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
+          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       res = createAnd(n_eq_v, z_cond);
       break;
     }
     case 7:
-      res = getIntConst(1, 1);
+      res = trueVal;
       break;
     default:
-      assert(false && "invalid condition code");
+      assert(false && "invalid input to conditionHolds()");
       break;
     }
 
     assert(res != nullptr && "condition code was not generated");
 
     if (invert_bit)
-      res = createXor(res, getIntConst(1, 1));
+      res = createXor(res, trueVal);
 
     return res;
   }
@@ -1495,10 +1494,15 @@ public:
       auto mask = ((uint64_t)1 << (width)) - 1;
       auto pos = immr;
 
+      *out << "SBFX:\n";
+      *out << "size = " << size << "\n";
+      *out << "width = " << width << "\n";
+      *out << "pos = " << pos << "\n";
+      
       auto masked = createAnd(src, getIntConst(mask, size));
-      auto l_shifted = createShl(masked, getIntConst(size - width, size));
+      auto l_shifted = createRawShl(masked, getIntConst(size - width, size));
       auto shifted_res =
-          createAShr(l_shifted, getIntConst(size - width + pos, size));
+          createRawAShr(l_shifted, getIntConst(size - width + pos, size));
       writeToOutputReg(shifted_res);
       return;
     }
@@ -1637,7 +1641,6 @@ public:
     case AArch64::CSINCWr:
     case AArch64::CSINCXr: {
       auto size = getInstSize(opcode);
-      auto ty = getIntTy(size);
       assert(CurInst->getOperand(1).isReg() && CurInst->getOperand(2).isReg());
       assert(CurInst->getOperand(3).isImm());
 
@@ -1647,7 +1650,7 @@ public:
       auto cond_val_imm = getImm(3);
       auto cond_val = conditionHolds(cond_val_imm);
 
-      auto inc = createAdd(b, getIntConst(1, ty->getIntegerBitWidth()));
+      auto inc = createAdd(b, getIntConst(1, size));
       auto sel = createSelect(cond_val, a, inc);
 
       writeToOutputReg(sel);
