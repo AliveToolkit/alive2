@@ -103,7 +103,7 @@ const set<int> instrs_32 = {
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
     AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
-    AArch64::STRBBui,
+    AArch64::STRBBui, AArch64::STPWi,
 };
 
 const set<int> instrs_64 = {
@@ -2070,7 +2070,8 @@ public:
       }
       break;
     }
-    case AArch64::STPXi: {
+    case AArch64::STPXi:
+    case AArch64::STPWi: {
       auto &op0 = CurInst->getOperand(0);
       auto &op1 = CurInst->getOperand(1);
       auto &op2 = CurInst->getOperand(2);
@@ -2080,21 +2081,20 @@ public:
 
       auto baseReg = op2.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-             (baseReg == AArch64::XZR));
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR));
       auto baseAddr = readPtrFromReg(baseReg);
 
+      auto size = (opcode == AArch64::STPXi) ? 8 : 4;
+      *out << "STP size = " << size << "\n";
       auto imm = op3.getImm();
-      auto out1 = op0.getReg();
-      auto out2 = op1.getReg();
-      if (out1 != AArch64::XZR) {
-        auto val = readFromReg(op0.getReg());
-        makeStore(baseAddr, imm * 8, 8, val);
-      }
-      if (out2 != AArch64::XZR) {
-        auto val = readFromReg(op1.getReg());
-        makeStore(baseAddr, (imm + 1) * 8, 8, val);
-      }
+      auto val1 = readFromReg(op0.getReg());
+      if (opcode == AArch64::STPWi)
+	val1 = createTrunc(val1, i32);
+      makeStore(baseAddr, imm * size, size, val1);
+      auto val2 = readFromReg(op1.getReg());
+      if (opcode == AArch64::STPWi)
+	val2 = createTrunc(val2, i32);
+      makeStore(baseAddr, (imm + 1) * size, size, val2);
       break;
     }
     case AArch64::LDRSWui: {
