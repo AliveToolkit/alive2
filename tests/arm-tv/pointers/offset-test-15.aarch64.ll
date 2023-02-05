@@ -3,43 +3,45 @@ source_filename = "foo.c"
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx13.0.0"
 
-%struct.s = type { i8, i64, i8, i32, i16, i64 }
+%struct.s = type { i16, i64, i64, i32, i32, i64, i64, i32 }
 
-; Function Attrs: mustprogress nofree norecurse nosync nounwind ssp willreturn memory(argmem: readwrite) uwtable(sync)
-define void @f(ptr nocapture noundef %p) local_unnamed_addr #0 {
-entry:
-  %f5 = getelementptr inbounds %struct.s, ptr %p, i64 0, i32 5
-  %0 = load i64, ptr %f5, align 8
-  %conv1 = trunc i64 %0 to i32
-  %f4 = getelementptr inbounds %struct.s, ptr %p, i64 0, i32 4
-  %1 = load i16, ptr %f4, align 8
-  %conv2 = zext i16 %1 to i32
-  %add3 = add nsw i32 %conv2, %conv1
-  %conv4 = trunc i32 %add3 to i8
-  store i8 %conv4, ptr %p, align 8
-  %f1 = getelementptr inbounds %struct.s, ptr %p, i64 0, i32 1
-  %2 = load i64, ptr %f1, align 8
-  %3 = trunc i64 %2 to i32
-  %conv7 = add i32 %add3, %3
-  %conv8 = trunc i32 %conv7 to i8
-  store i8 %conv8, ptr %p, align 8
-  %f3 = getelementptr inbounds %struct.s, ptr %p, i64 0, i32 3
-  store i32 %conv7, ptr %f3, align 4
-  store i8 %conv8, ptr %p, align 8
-  %add15 = add nsw i32 %conv7, %conv2
-  %conv16 = sext i32 %add15 to i64
-  store i64 %conv16, ptr %f5, align 8
+; Function Attrs: mustprogress nofree norecurse nosync nounwind ssp uwtable willreturn
+define void @f(%struct.s* nocapture %0) local_unnamed_addr #0 {
+  %2 = getelementptr inbounds %struct.s, %struct.s* %0, i64 0, i32 2
+  %3 = load i64, i64* %2, align 8
+  %4 = getelementptr inbounds %struct.s, %struct.s* %0, i64 0, i32 1
+  %5 = load i64, i64* %4, align 8
+  %6 = add i64 %5, %3
+  %7 = trunc i64 %6 to i32
+  %8 = getelementptr inbounds %struct.s, %struct.s* %0, i64 0, i32 3
+  %9 = load i32, i32* %8, align 8
+  %10 = getelementptr inbounds %struct.s, %struct.s* %0, i64 0, i32 6
+  %11 = load i64, i64* %10, align 8
+  %12 = trunc i64 %11 to i32
+  %13 = trunc i64 %5 to i32
+  %14 = trunc i64 %3 to i32
+  %15 = add i32 %9, %13
+  %16 = shl i32 %15, 1
+  %17 = add i32 %7, %14
+  %18 = add i32 %17, %12
+  %19 = add i32 %18, %16
+  %20 = getelementptr inbounds %struct.s, %struct.s* %0, i64 0, i32 4
+  store i32 %19, i32* %20, align 4
   ret void
 }
 
-attributes #0 = { mustprogress nofree norecurse nosync nounwind ssp willreturn memory(argmem: readwrite) uwtable(sync) "frame-pointer"="non-leaf" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+crc,+dotprod,+fp-armv8,+fp16fml,+fullfp16,+lse,+neon,+ras,+rcpc,+rdm,+sha2,+sha3,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8.5a,+v8a,+zcm,+zcz" }
+attributes #0 = { mustprogress nofree norecurse nosync nounwind ssp uwtable willreturn "frame-pointer"="non-leaf" "min-legal-vector-width"="0" "no-trapping-math"="true" "probe-stack"="__chkstk_darwin" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+crc,+crypto,+dotprod,+fp-armv8,+fp16fml,+fullfp16,+lse,+neon,+ras,+rcpc,+rdm,+sha2,+sha3,+sm4,+v8.5a,+zcm,+zcz" }
 
-!llvm.module.flags = !{!0, !1, !2, !3, !4}
-!llvm.ident = !{!5}
+!llvm.module.flags = !{!0, !1, !2, !3, !4, !5, !6, !7, !8}
+!llvm.ident = !{!9}
 
 !0 = !{i32 2, !"SDK Version", [2 x i32] [i32 13, i32 1]}
 !1 = !{i32 1, !"wchar_size", i32 4}
-!2 = !{i32 8, !"PIC Level", i32 2}
-!3 = !{i32 7, !"uwtable", i32 1}
-!4 = !{i32 7, !"frame-pointer", i32 1}
-!5 = !{!"clang version 17.0.0 (git@github.com:llvm/llvm-project.git c32022ad260aa1e6f485c5a6820fa9973f3b108e)"}
+!2 = !{i32 1, !"branch-target-enforcement", i32 0}
+!3 = !{i32 1, !"sign-return-address", i32 0}
+!4 = !{i32 1, !"sign-return-address-all", i32 0}
+!5 = !{i32 1, !"sign-return-address-with-bkey", i32 0}
+!6 = !{i32 7, !"PIC Level", i32 2}
+!7 = !{i32 7, !"uwtable", i32 1}
+!8 = !{i32 7, !"frame-pointer", i32 1}
+!9 = !{!"Apple clang version 14.0.0 (clang-1400.0.29.202)"}

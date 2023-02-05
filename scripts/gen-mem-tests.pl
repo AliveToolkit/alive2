@@ -5,7 +5,7 @@ use strict;
 ##################################
 
 my $n = 0;
-my $FIELDS = 6;
+my $FIELDS = 8;
 
 my @types = ("char", "short", "int", "long");
 my @quals = ("signed", "unsigned");
@@ -23,7 +23,7 @@ sub go() {
     print $OUTF "\n";
     print $OUTF "void f(struct s *p) {\n";
     print $OUTF "  int x = 0;\n";
-    for (my $i=0; $i<10; ++$i) {
+    for (my $i=0; $i<12; ++$i) {
 	my $f = int(rand($FIELDS));
 	if (rand() < 0.5) {
 	    print $OUTF "  x += p->f${f};\n";
@@ -37,6 +37,6 @@ sub go() {
     system "clang -S -O -fno-strict-aliasing -emit-llvm foo.c -o $llvmfn";
 }
 
-for (my $i=0; $i<20; ++$i) {
+for (my $i=0; $i<200; ++$i) {
     go();
 }

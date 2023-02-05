@@ -103,7 +103,7 @@ const set<int> instrs_32 = {
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
     AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
-    AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,
+    AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,   AArch64::LDPWi,
 };
 
 const set<int> instrs_64 = {
@@ -2044,6 +2044,7 @@ public:
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
+    case AArch64::LDPWi:
     case AArch64::LDPXi: {
       auto &op0 = CurInst->getOperand(0);
       auto &op1 = CurInst->getOperand(1);
@@ -2058,15 +2059,16 @@ public:
              (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
 
+      auto size = (opcode == AArch64::LDPWi) ? 4 : 8;
       auto imm = op3.getImm();
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
-      if (out1 != AArch64::XZR) {
-        auto loaded = makeLoad(baseAddr, imm * 8, 8);
+      if (out1 != AArch64::XZR && out1 != AArch64::WZR) {
+        auto loaded = makeLoad(baseAddr, imm * size, size);
         createStore(loaded, dealiasReg(out1));
       }
-      if (out2 != AArch64::XZR) {
-        auto loaded = makeLoad(baseAddr, (imm + 1) * 8, 8);
+      if (out2 != AArch64::XZR && out2 != AArch64::WZR) {
+        auto loaded = makeLoad(baseAddr, (imm + 1) * size, size);
         createStore(loaded, dealiasReg(out2));
       }
       break;
