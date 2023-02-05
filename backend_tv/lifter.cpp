@@ -103,6 +103,7 @@ const set<int> instrs_32 = {
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
     AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
+    AArch64::STRBBui,
 };
 
 const set<int> instrs_64 = {
@@ -498,7 +499,8 @@ class arm2llvm {
   }
 
   void createStore(Value *v, Value *ptr) {
-    new StoreInst(v, ptr, LLVMBB);
+    Align align(1); // FIXME is this correct?
+    new StoreInst(v, ptr, false, align, LLVMBB);
   }
 
   CallInst *createSSubOverflow(Value *a, Value *b) {
@@ -2139,9 +2141,19 @@ public:
       writeToOutputReg(loaded);
       break;
     }
+    case AArch64::STRBBui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 1, 1, createTrunc(val, i8));
+      break;
+    }
+    case AArch64::STRHHui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 2, 2, createTrunc(val, i16));
+      break;
+    }
     case AArch64::STRWui: {
       auto [base, imm, val] = getParamsStoreImmed();
-      makeStore(base, imm * 4, 4, val);
+      makeStore(base, imm * 4, 4, createTrunc(val, i32));
       break;
     }
     case AArch64::STRXui: {
