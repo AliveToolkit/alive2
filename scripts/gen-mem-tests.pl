@@ -2,26 +2,41 @@
 
 use strict;
 
-# void f(long *x) {
-#   *x -= 777;
-# }
+##################################
 
 my $n = 0;
+my $FIELDS = 6;
 
-sub go($$) {
-    (my $t, my $q) = @_;
+my @types = ("char", "short", "int", "long");
+my @quals = ("signed", "unsigned");
+
+sub go() {
     open my $OUTF, ">foo.c" or die;
-    print $OUTF "void f(" . $q . " " . $t . " *x) {\n";
-    print $OUTF "  *x += " . (int(rand(100) - 50)) . ";\n";
+
+    print $OUTF "struct s {\n";
+    for (my $i=0; $i<$FIELDS; ++$i) {
+	print $OUTF "  " . $quals[rand @quals];
+	print $OUTF " " . $types[rand @types];
+	print $OUTF " f${i};\n";
+    }
+    print $OUTF "};\n";
+    print $OUTF "\n";
+    print $OUTF "void f(struct s *p) {\n";
+    print $OUTF "  int x = 0;\n";
+    for (my $i=0; $i<10; ++$i) {
+	my $f = int(rand($FIELDS));
+	if (rand() < 0.5) {
+	    print $OUTF "  x += p->f${f};\n";
+	} else {
+	    print $OUTF "  p->f${f} = x;\n";
+	}
+    }
     print $OUTF "}\n";
-    my $llvmfn = "simple-ptr-test-${n}.aarch64.ll";
+    my $llvmfn = "offset-test-${n}.aarch64.ll";
     $n++;
     system "clang -S -O -fno-strict-aliasing -emit-llvm foo.c -o $llvmfn";
 }
 
-my @types = ("char", "short", "int", "long");
-
-foreach my $t (@types) {
-    go($t, "signed");
-    go($t, "unsigned");
+for (my $i=0; $i<20; ++$i) {
+    go();
 }
