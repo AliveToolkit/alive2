@@ -323,21 +323,6 @@ public:
     }
   }
 
-  void printBlocks() {
-    *out << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
-    *out << "-------------\n";
-    int i = 0;
-    for (auto &block : BBs) {
-      *out << "block " << i << ", name= " << block.getName() << '\n';
-      for (auto &Inst : block.getInstrs()) {
-        std::string sss;
-        llvm::raw_string_ostream ss(sss);
-        Inst.dump_pretty(ss, IP, " ", MRI);
-        *out << sss << '\n';
-      }
-      i++;
-    }
-  }
 };
 
 // Code taken from llvm. This should be okay for now. But we generally
@@ -2697,7 +2682,7 @@ public:
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
-  void printBlocksMF() {
+  void printBlocks() {
     *out << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
     *out << "-------------\n";
     int i = 0;
@@ -2793,11 +2778,11 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->setTargetParser(*TAP);
   Parser->Run(true); // ??
 
-  MCSW.printBlocksMF();
+  MCSW.printBlocks();
   MCSW.removeEmptyBlocks();
   MCSW.checkEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.printBlocksMF();
+  MCSW.printBlocks();
 
   auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IP.get()).run();
 
