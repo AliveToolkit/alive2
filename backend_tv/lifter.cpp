@@ -135,7 +135,7 @@ const set<int> instrs_64 = {
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
     AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
-    AArch64::STURXi,
+    AArch64::STURXi,    AArch64::ADRP,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -389,11 +389,12 @@ class arm2llvm {
   MCBasicBlock *MCBB{nullptr};
   BasicBlock *LLVMBB{nullptr};
   MCInstPrinter *instrPrinter{nullptr};
-  MCInst *CurInst{nullptr};
+  MCInst *CurInst{nullptr}, *PrevInst{nullptr};
   unsigned instCount{0};
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
   unordered_map<string, GlobalVariable *> globals;
+  unordered_map<MCInst *, string> GOT;
 
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
@@ -941,14 +942,43 @@ public:
     auto &op1 = CurInst->getOperand(1);
     auto &op2 = CurInst->getOperand(2);
     assert(op0.isReg() && op1.isReg());
-    assert(op2.isImm());
 
-    auto baseReg = op1.getReg();
-    assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-           (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-           (baseReg == AArch64::XZR));
-    auto baseAddr = readPtrFromReg(baseReg);
-    return make_pair(baseAddr, op2.getImm());
+    if (op2.isImm()) {
+      auto baseReg = op1.getReg();
+      assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+	     (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+	     (baseReg == AArch64::XZR));
+      auto baseAddr = readPtrFromReg(baseReg);
+      return make_pair(baseAddr, op2.getImm());
+    }
+    if (op2.isExpr()) {
+      auto expr = op2.getExpr();
+      std::string sss;
+      llvm::raw_string_ostream ss(sss);
+      expr->print(ss, nullptr);
+      if (!sss.starts_with(":got_lo12:")) {
+	*out << "only :got_lo12: is supported\n";
+	exit(-1);
+      }
+      auto globName = sss.substr(10, string::npos);
+      if (!globals.contains(globName)) {
+	*out << "load mentions '" << globName << "'\n";
+	*out << "which is not a global variable we know about\n";
+	exit(-1);
+      }
+      auto got = GOT.find(PrevInst);
+      if (got == GOT.end() || got->second != globName) {
+	*out << "unexpected :got_lo12:\n";
+	exit(-1);
+      }
+      auto glob = globals.find(globName);
+      if (glob == globals.end()) {
+	*out << "global not found\n";
+	exit(-1);
+      }
+      return make_pair(glob->second, 0);
+    }
+    assert(false && "expected immediate or expression for operand 2 of a load");
   }
 
   tuple<Value *, int, Value *> getParamsStoreImmed() {
@@ -984,6 +1014,7 @@ public:
   // See: https://documentation-service.arm.com/static/6245e8f0f7d10f7540e0c054
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
+    PrevInst = CurInst;
     CurInst = &I;
 
     auto i1 = getIntTy(1);
@@ -2161,6 +2192,28 @@ public:
       makeStore(base, imm * 8, 8, val);
       break;
     }
+    case AArch64::ADRP: {
+      assert(CurInst->getOperand(0).isReg());
+      auto expr = CurInst->getOperand(1).getExpr();
+      std::string sss;
+      llvm::raw_string_ostream ss(sss);
+      expr->print(ss, nullptr);
+      if (sss.starts_with(":got:")) {
+	auto globName = sss.substr(5, string::npos);
+	if (!globals.contains(globName)) {
+	  *out << "ADRP mentions '" << globName << "'\n";
+	  *out << "which is not a global variable we know about\n";
+	  exit(-1);
+	}
+	GOT[CurInst] = globName;
+      } else {
+	*out << "\n";
+	*out << "Unexpected MCExpr in ADRP: '" << sss << "'\n";
+	*out << "only :got: is currently supported\n";
+	exit(-1);
+      }
+      break;
+    }
     case AArch64::RET: {
       // for now we're assuming that the function returns an integer or void
       // value
@@ -2409,12 +2462,17 @@ public:
     LLVMBB = BBs[0].first;
 
     // create globals
-    // FIXME initialize to freeze poison
     for (const auto& [name, size] : MF.globals) {
       auto *AT = ArrayType::get(i8, size);
-      globals[name] = new GlobalVariable(*LiftedModule, AT, false,
-					 GlobalValue::LinkageTypes::ExternalLinkage,
-					 nullptr);
+      auto *g = new GlobalVariable(*LiftedModule, AT, false,
+				   GlobalValue::LinkageTypes::ExternalLinkage,
+				   nullptr);
+      for (unsigned i = 0; i < size; ++i) {
+	auto F = createFreeze(PoisonValue::get(i8));
+	auto G = createGEP(i8, g, {getIntConst(i, 64)}, "");
+	createStore(F, G);
+      }
+      globals[name] = g;
     }
     
     // allocate storage for the stack; the initialization has to be
