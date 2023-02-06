@@ -2396,12 +2396,6 @@ public:
     *out << "function name: '" << MF.getName() << "'"
          << "\n";
 
-    for (const auto& [name, size] : MF.globals) {
-      globals[name] = new GlobalVariable(*LiftedModule, i8, false,
-					 GlobalValue::LinkageTypes::ExternalLinkage,
-					 nullptr);
-    }
-    
     // create LLVM-side basic blocks
     vector<pair<BasicBlock *, MCBasicBlock *>> BBs;
     for (auto &mbb : MF.BBs) {
@@ -2414,6 +2408,15 @@ public:
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
+    // create globals
+    // FIXME initialize to freeze poison
+    for (const auto& [name, size] : MF.globals) {
+      auto *AT = ArrayType::get(i8, size);
+      globals[name] = new GlobalVariable(*LiftedModule, AT, false,
+					 GlobalValue::LinkageTypes::ExternalLinkage,
+					 nullptr);
+    }
+    
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
     const int stackSlots = 16; // 8 bytes each
