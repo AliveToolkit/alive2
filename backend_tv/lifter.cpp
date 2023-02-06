@@ -31,6 +31,7 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -250,13 +251,13 @@ public:
 class MCFunction {
   string name;
   unsigned label_cnt{0};
-  using BlockSetTy = SetVector<MCBasicBlock *>;
 
 public:
   MCInstrAnalysis *IA;
   MCInstPrinter *IP;
   MCRegisterInfo *MRI;
   vector<MCBasicBlock> BBs;
+  unordered_map<string, int64_t> globals;
 
   MCFunction() {}
   MCFunction(string _name) : name(_name) {}
@@ -281,6 +282,7 @@ public:
     for (auto &bb : BBs)
       if (bb.getName() == b_name)
         return &bb;
+    *out << "couldn't find block '" << b_name << "'\n";
     assert(false && "block not found");
   }
 
@@ -391,6 +393,7 @@ class arm2llvm {
   unsigned instCount{0};
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
+  unordered_map<string, GlobalVariable *> globals;
 
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
@@ -2393,6 +2396,12 @@ public:
     *out << "function name: '" << MF.getName() << "'"
          << "\n";
 
+    for (const auto& [name, size] : MF.globals) {
+      globals[name] = new GlobalVariable(*LiftedModule, i8, false,
+					 GlobalValue::LinkageTypes::ExternalLinkage,
+					 nullptr);
+    }
+    
     // create LLVM-side basic blocks
     vector<pair<BasicBlock *, MCBasicBlock *>> BBs;
     for (auto &mbb : MF.BBs) {
@@ -2512,7 +2521,6 @@ private:
 public:
   MCFunction MF;
   unsigned cnt{0};
-  using BlockSetTy = SetVector<MCBasicBlock *>;
 
   MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_IA,
                     MCInstPrinter *_IP, MCRegisterInfo *_MRI)
@@ -2566,16 +2574,54 @@ public:
     *out << "\n";
   }
 
+  string attrName(MCSymbolAttr A) {
+    switch (A) {
+    case MCSA_ELF_TypeFunction:
+      return "ELF function";
+    case MCSA_ELF_TypeObject:
+      return "ELF object";
+    case MCSA_Global:
+      return "global";
+    default:
+      assert(false && "unknown symbol attribute");
+    }
+  }
+
+  void printMCExpr(const MCExpr *Expr) {
+    if (Expr) {
+      int64_t Res;
+      if (Expr->evaluateAsAbsolute(Res)) {
+	*out << "  expr = " << Res << "\n";
+      } else {
+	*out << "  can't evaluate expr as absolute\n";
+      }
+    } else{
+      *out << "  null expr\n";
+    }
+  }
+  
+  void dumpSymbol(MCSymbol *Symbol) {
+    if (auto ElfSymbol = dyn_cast<MCSymbolELF>(Symbol)) {
+      *out << "  ELF symbol\n";
+      if (auto size = ElfSymbol->getSize()) {
+	printMCExpr(size);
+      } else {
+	*out << "  symbol has no size\n";
+      }
+    }
+  }
+
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
                                    MCSymbolAttr Attribute) override {
-    *out << "[emitSymbolAttribute]\n";
+    *out << "[[emitSymbolAttribute]]\n";
     std::string sss;
     llvm::raw_string_ostream ss(sss);
     Symbol->print(ss, nullptr);
-    *out << sss << "\n";
-    *out << "Common? " << Symbol->isCommon() << "\n";
-    *out << "Varible? " << Symbol->isVariable() << "\n";
-    *out << "Attribute = " << Attribute << "\n\n";
+    *out << "  " << sss << "\n";
+    *out << "  Common? " << Symbol->isCommon() << "\n";
+    *out << "  Varible? " << Symbol->isVariable() << "\n";
+    *out << "  Attribute = " << attrName(Attribute) << "\n\n";
+    dumpSymbol(Symbol);
     return true;
   }
 
@@ -2596,10 +2642,23 @@ public:
     *out << (string)Section->getName() << "\n\n";
   }
 
+  virtual void emitELFSize(MCSymbol *Symbol, const MCExpr *Value) override {
+    *out << "[emitELFSize]\n";
+    auto name = (string)Symbol->getName();
+    int64_t size;
+    if (Value && Value->evaluateAsAbsolute(size)) {
+      *out << "  creating " << size << " byte global ELF object " << name << "\n";
+      MF.globals[name] = size;
+    } else {
+      *out << "  can't get ELF size of " << name << "\n";
+    }
+  }
+  
   virtual void emitLabel(MCSymbol *Symbol, SMLoc Loc) override {
     // Assuming the first label encountered is the function's name
     // Need to figure out if there is a better way to get access to the
-    // function's name
+    // function's name. FIXME: key on the actual name here
+    *out << "[[emitLabel " << Symbol->getName().str() << "]]\n";
     if (first_label) {
       MF.setName(Symbol->getName().str() + "-tgt");
       first_label = false;
@@ -2607,6 +2666,7 @@ public:
     string cur_label = Symbol->getName().str();
     temp_block = MF.addBlock(cur_label);
     prev_line = ASMLine::label;
+    dumpSymbol(Symbol);
   }
 
   string findTargetLabel(MCInst &Inst) {
