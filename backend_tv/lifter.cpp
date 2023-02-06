@@ -951,34 +951,14 @@ public:
       auto baseAddr = readPtrFromReg(baseReg);
       return make_pair(baseAddr, op2.getImm());
     }
-    if (op2.isExpr()) {
-      auto expr = op2.getExpr();
-      std::string sss;
-      llvm::raw_string_ostream ss(sss);
-      expr->print(ss, nullptr);
-      if (!sss.starts_with(":got_lo12:")) {
-	*out << "only :got_lo12: is supported\n";
-	exit(-1);
-      }
-      auto globName = sss.substr(10, string::npos);
-      if (!globals.contains(globName)) {
-	*out << "load mentions '" << globName << "'\n";
-	*out << "which is not a global variable we know about\n";
-	exit(-1);
-      }
-      auto got = GOT.find(PrevInst);
-      if (got == GOT.end() || got->second != globName) {
-	*out << "unexpected :got_lo12:\n";
-	exit(-1);
-      }
-      auto glob = globals.find(globName);
-      if (glob == globals.end()) {
-	*out << "global not found\n";
-	exit(-1);
-      }
-      return make_pair(glob->second, 0);
-    }
     assert(false && "expected immediate or expression for operand 2 of a load");
+  }
+
+  // offset and size are in bytes
+  Value *makeLoad(Value *base, int offset, int size) {
+    auto offsetVal = getIntConst(offset, 64);
+    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
+    return createLoad(getIntTy(8 * size), ptr);
   }
 
   tuple<Value *, int, Value *> getParamsStoreImmed() {
@@ -994,13 +974,6 @@ public:
            (baseReg == AArch64::XZR));
     auto baseAddr = readPtrFromReg(baseReg);
     return make_tuple(baseAddr, op2.getImm(), readFromReg(op0.getReg()));
-  }
-
-  // offset and size are in bytes
-  Value *makeLoad(Value *base, int offset, int size) {
-    auto offsetVal = getIntConst(offset, 64);
-    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
-    return createLoad(getIntTy(8 * size), ptr);
   }
 
   // offset and size are in bytes
@@ -2157,9 +2130,40 @@ public:
       break;
     }
     case AArch64::LDRXui: {
-      auto [base, imm] = getParamsLoadImmed();
-      auto loaded = makeLoad(base, imm * 8, 8);
-      writeToOutputReg(loaded);
+      auto &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+	auto expr = op2.getExpr();
+	std::string sss;
+	llvm::raw_string_ostream ss(sss);
+	expr->print(ss, nullptr);
+	if (!sss.starts_with(":got_lo12:")) {
+	  *out << "only :got_lo12: is supported\n";
+	  exit(-1);
+	}
+	auto globName = sss.substr(10, string::npos);
+	if (!globals.contains(globName)) {
+	  *out << "load mentions '" << globName << "'\n";
+	  *out << "which is not a global variable we know about\n";
+	  exit(-1);
+	}
+	auto got = GOT.find(PrevInst);
+	if (got == GOT.end() || got->second != globName) {
+	  *out << "unexpected :got_lo12:\n";
+	  exit(-1);
+	}
+	auto glob = globals.find(globName);
+	if (glob == globals.end()) {
+	  *out << "global not found\n";
+	  exit(-1);
+	}
+	auto Reg = CurInst->getOperand(0).getReg();
+	if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+	  createStore(glob->second, dealiasReg(Reg));
+      } else {
+	auto [base, imm] = getParamsLoadImmed();
+	auto loaded = makeLoad(base, imm * 8, 8);
+	writeToOutputReg(loaded);
+      }
       break;
     }
     case AArch64::STRBBui: {
@@ -2466,12 +2470,16 @@ public:
       auto *AT = ArrayType::get(i8, size);
       auto *g = new GlobalVariable(*LiftedModule, AT, false,
 				   GlobalValue::LinkageTypes::ExternalLinkage,
-				   nullptr);
+				   nullptr, name);
+      g->setAlignment(MaybeAlign(8));
+      /*
+	FIXME initialize
       for (unsigned i = 0; i < size; ++i) {
 	auto F = createFreeze(PoisonValue::get(i8));
 	auto G = createGEP(i8, g, {getIntConst(i, 64)}, "");
 	createStore(F, G);
       }
+      */
       globals[name] = g;
     }
     
