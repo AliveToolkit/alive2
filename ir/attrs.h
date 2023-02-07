@@ -22,7 +22,7 @@ class MemoryAccess final {
   MemoryAccess(unsigned val) : val(val) {}
 
 public:
-  enum AccessType { Args, Inaccessible, Errno, Other, NumTypes };
+  enum AccessType { Args, Globals, Inaccessible, Errno, Other, NumTypes };
   MemoryAccess() = default;
 
   bool canRead(AccessType ty) const;
