@@ -2682,23 +2682,28 @@ public:
 
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
                                    MCSymbolAttr Attribute) override {
-    *out << "[[emitSymbolAttribute]]\n";
-    std::string sss;
-    llvm::raw_string_ostream ss(sss);
-    Symbol->print(ss, nullptr);
-    *out << "  " << sss << "\n";
-    *out << "  Common? " << Symbol->isCommon() << "\n";
-    *out << "  Varible? " << Symbol->isVariable() << "\n";
-    *out << "  Attribute = " << attrName(Attribute) << "\n\n";
-    dumpSymbol(Symbol);
+    if (false) {
+      *out << "[[emitSymbolAttribute]]\n";
+      std::string sss;
+      llvm::raw_string_ostream ss(sss);
+      Symbol->print(ss, nullptr);
+      *out << "  " << sss << "\n";
+      *out << "  Common? " << Symbol->isCommon() << "\n";
+      *out << "  Varible? " << Symbol->isVariable() << "\n";
+      *out << "  Attribute = " << attrName(Attribute) << "\n\n";
+      dumpSymbol(Symbol);
+    }
     return true;
   }
 
   virtual void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
                                 Align ByteAlignment) override {
+    auto name = (string)Symbol->getName();
     *out << "[emitCommonSymbol]\n";
     std::string sss;
-    llvm::raw_string_ostream ss(sss);
+    llvm::raw_string_ostream ss(sss);    
+    *out << "  creating " << Size << " byte global ELF object " << name << "\n";
+    MF.globals[name] = Size;
     Symbol->print(ss, nullptr);
     *out << sss << " "
          << "size = " << Size << " Align = " << ByteAlignment.value() << "\n\n";
@@ -2707,8 +2712,10 @@ public:
   virtual void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
                             uint64_t Size = 0, Align ByteAlignment = Align(1),
                             SMLoc Loc = SMLoc()) override {
-    *out << "[emitZerofill]\n";
-    *out << (string)Section->getName() << "\n\n";
+    if (false) {
+      *out << "[emitZerofill]\n";
+      *out << (string)Section->getName() << "\n\n";
+    }
   }
 
   virtual void emitELFSize(MCSymbol *Symbol, const MCExpr *Value) override {

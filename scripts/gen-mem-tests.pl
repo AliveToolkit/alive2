@@ -13,30 +13,31 @@ my @quals = ("signed", "unsigned");
 sub go() {
     open my $OUTF, ">foo.c" or die;
 
-    print $OUTF "struct s {\n";
+    print $OUTF "struct {\n";
     for (my $i=0; $i<$FIELDS; ++$i) {
 	print $OUTF "  " . $quals[rand @quals];
 	print $OUTF " " . $types[rand @types];
 	print $OUTF " f${i};\n";
     }
-    print $OUTF "};\n";
+    print $OUTF "} s;\n";
     print $OUTF "\n";
-    print $OUTF "void f(struct s *p) {\n";
-    print $OUTF "  int x = 0;\n";
+    my $ty = $quals[rand @quals] . " " . $types[rand @types];
+    print $OUTF "$ty f($ty x) {\n";
     for (my $i=0; $i<12; ++$i) {
 	my $f = int(rand($FIELDS));
 	if (rand() < 0.5) {
-	    print $OUTF "  x += p->f${f};\n";
+	    print $OUTF "  x += s.f${f};\n";
 	} else {
-	    print $OUTF "  p->f${f} = x;\n";
+	    print $OUTF "  s.f${f} = x;\n";
 	}
     }
+    print $OUTF "  return x;\n";
     print $OUTF "}\n";
-    my $llvmfn = "offset-test-${n}.aarch64.ll";
+    my $llvmfn = "global-test-${n}.aarch64.ll";
     $n++;
     system "clang -S -O -fno-strict-aliasing -emit-llvm foo.c -o $llvmfn";
 }
 
-for (my $i=0; $i<200; ++$i) {
+for (my $i=0; $i<100; ++$i) {
     go();
 }

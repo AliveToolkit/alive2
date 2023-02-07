@@ -1,3 +1,5 @@
+; CHECK: 1 incorrect
+
 ; ModuleID = 'foo.c'
 source_filename = "foo.c"
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
