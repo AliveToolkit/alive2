@@ -2254,17 +2254,19 @@ static void check_can_load(State &s, const expr &p0) {
     return;
 
   Pointer p(s.getMemory(), p0);
-  expr readable    = p.isLocal() || p.isConstGlobal();
+  expr readable = p.isLocal() ||
+                  p.isConstGlobal() ||
+                  attrs.mem.canRead(MemoryAccess::Other);
   expr nonreadable = false;
 
-  if (attrs.has(FnAttrs::NullPointerIsValid) &&
-      attrs.mem.canRead(MemoryAccess::Other))
-    readable |= p.isNull();
+  (attrs.mem.canRead(MemoryAccess::Globals) ? readable : nonreadable)
+    |= p.isWritableGlobal();
 
   (attrs.mem.canRead(MemoryAccess::Args) ? readable : nonreadable)
     |= ptr_only_args(s, p);
 
-  s.addUB(readable && !nonreadable);
+  s.addUB(std::move(readable));
+  s.addUB(!nonreadable);
 }
 
 static void check_can_store(State &s, const expr &p0) {
@@ -2276,13 +2278,17 @@ static void check_can_store(State &s, const expr &p0) {
     return;
 
   Pointer p(s.getMemory(), p0);
-  expr writable    = p.isLocal();
+  expr writable    = p.isLocal() || attrs.mem.canWrite(MemoryAccess::Other);
   expr nonwritable = false;
+
+  (attrs.mem.canWrite(MemoryAccess::Globals) ? writable : nonwritable)
+    |= p.isWritableGlobal();
 
   (attrs.mem.canWrite(MemoryAccess::Args) ? writable : nonwritable)
     |= ptr_only_args(s, p);
 
-  s.addUB(writable && !nonwritable);
+  s.addUB(std::move(writable));
+  s.addUB(!nonwritable);
 }
 
 static void unpack_inputs(State &s, Value &argv, Type &ty,

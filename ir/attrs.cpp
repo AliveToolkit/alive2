@@ -244,8 +244,9 @@ ostream& operator<<(ostream &os, const MemoryAccess &a) {
   if (a.canWriteAnything())
     return os << " memory(write)";
 
-  array<const char*, 4> vals = {
+  array<const char*, 5> vals = {
     "argmem",
+    "globals",
     "inaccessiblemem",
     "errno",
     "other",
