@@ -220,6 +220,10 @@ Function *adjustSrc(Function *srcFn) {
 
   for (auto &bb : *srcFn) {
     for (auto &i : bb) {
+      if (isa<IntToPtrInst>(&i)) {
+	*out << "int2ptr instructions not supported yet\n";
+	exit(-1);
+      }
       if (isa<InvokeInst>(&i)) {
         *out << "invoke instructions not supported\n";
         exit(-1);
