@@ -448,7 +448,8 @@ class arm2llvm {
       return createFShr(value, value, exp);
     default:
       // FIXME: handle other case (msl)
-      report_fatal_error("shift type not supported");
+      *out << "ERROR: shift type not supported\n\n";
+      exit(-1);
     }
   }
 
@@ -1949,7 +1950,7 @@ public:
         ret = createXor(op1, inverted_op2);
         break;
       default:
-        report_fatal_error("missed case");
+        assert(false && "missed case");
       }
 
       // FIXME: it might be better to have EON instruction separate since there
@@ -2137,23 +2138,23 @@ public:
 	llvm::raw_string_ostream ss(sss);
 	expr->print(ss, nullptr);
 	if (!sss.starts_with(":got_lo12:")) {
-	  *out << "only :got_lo12: is supported\n";
+	  *out << "ERROR: only :got_lo12: is supported\n\n";
 	  exit(-1);
 	}
 	auto globName = sss.substr(10, string::npos);
 	if (!globals.contains(globName)) {
-	  *out << "load mentions '" << globName << "'\n";
-	  *out << "which is not a global variable we know about\n";
+	  *out << "ERROR: load mentions '" << globName << "'\n";
+	  *out << "which is not a global variable we know about\n\n";
 	  exit(-1);
 	}
 	auto got = GOT.find(PrevInst);
 	if (got == GOT.end() || got->second != globName) {
-	  *out << "unexpected :got_lo12:\n";
+	  *out << "ERROR: unexpected :got_lo12:\n\n";
 	  exit(-1);
 	}
 	auto glob = globals.find(globName);
 	if (glob == globals.end()) {
-	  *out << "global not found\n";
+	  *out << "ERROR: global not found\n\n";
 	  exit(-1);
 	}
 	auto Reg = CurInst->getOperand(0).getReg();
@@ -2205,14 +2206,14 @@ public:
       if (sss.starts_with(":got:")) {
 	auto globName = sss.substr(5, string::npos);
 	if (!globals.contains(globName)) {
-	  *out << "ADRP mentions '" << globName << "'\n";
+	  *out << "ERROR: ADRP mentions '" << globName << "'\n";
 	  *out << "which is not a global variable we know about\n";
 	  exit(-1);
 	}
 	GOT[CurInst] = globName;
       } else {
 	*out << "\n";
-	*out << "Unexpected MCExpr in ADRP: '" << sss << "'\n";
+	*out << "ERROR: Unexpected MCExpr in ADRP: '" << sss << "'\n";
 	*out << "only :got: is currently supported\n";
 	exit(-1);
       }
@@ -2927,7 +2928,8 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   if (llvm::verifyModule(*LiftedModule, &ss)) {
     *out << sss << "\n\n";
     out->flush();
-    llvm::report_fatal_error("Lifted module is broken, this should not happen");
+    *out << "ERROR: Lifted module is broken, this should not happen\n";
+    exit(-1);
   }
 
   return make_pair(srcFn, lifted);

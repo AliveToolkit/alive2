@@ -74,22 +74,25 @@ Function *adjustSrcInputs(Function *srcFn) {
       auto orig_width = ty->getIntegerBitWidth();
       if (orig_width > 64) {
         *out <<
-            "[Unsupported function argument]: Only parameters 64 "
-            "bits or smaller supported for now\n";
+            "ERROR: Unsupported function argument: Only parameters 64 "
+            "bits or smaller supported for now\n\n";
         exit(-1);
       }
       orig_input_width.emplace_back(orig_width);
       new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
     } else if (auto pty = dyn_cast<PointerType>(ty)) {
-      if (pty->getAddressSpace() != 0)
-        report_fatal_error(
-            "[Unsupported function argument]: Only address space "
-            "0 is supported");
+      if (pty->getAddressSpace() != 0) {
+	*out << 
+            "ERROR: Unsupported function argument: Only address space "
+            "0 is supported\n\n";
+	exit(-1);
+      }
       new_argtypes.emplace_back(pty);
       orig_input_width.emplace_back(64);
     } else {
-      report_fatal_error("[Unsupported function argument]: Only int/ptr types "
-                         "supported for now");
+      *out << "ERROR: Unsupported function argument: Only int/ptr types "
+	"supported for now\n\n";
+      exit(-1);
     }
   }
 
@@ -132,17 +135,20 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   auto *ret_typ = srcFn->getReturnType();
   orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
-  *out << "original return bitwidth = " << orig_ret_bitwidth << "\n";
 
   // FIXME
-  if (!ret_typ->isIntegerTy())
-    report_fatal_error("[Unsupported Function Return]: Only int types "
-                       "supported for now");
+  if (!ret_typ->isIntegerTy()) {
+    *out << "ERROR: [Unsupported Function Return]: Only int types "
+                       "supported for now\n\n";
+		       exit(-1);
+  }
 
   // FIXME
-  if (orig_ret_bitwidth > 64)
-    report_fatal_error("[Unsupported Function Return]: Only int types 64 "
-                       "bits or smaller supported for now");
+  if (orig_ret_bitwidth > 64) {
+    *out << "ERROR: [Unsupported Function Return]: Only int types 64 "
+                       "bits or smaller supported for now\n\n";
+		       exit(-1);
+  }
 
   // don't need to do any extension if the return type is exactly 32 bits
   if (orig_ret_bitwidth == 64 || orig_ret_bitwidth == 32)
@@ -214,23 +220,23 @@ namespace lifter {
 
 Function *adjustSrc(Function *srcFn) {
   if (srcFn->isVarArg()) {
-    *out << "varargs not supported yet\n";
+    *out << "ERROR: varargs not supported yet\n\n";
     exit(-1);
   }
 
   for (auto &bb : *srcFn) {
     for (auto &i : bb) {
       if (isa<IntToPtrInst>(&i)) {
-	*out << "int2ptr instructions not supported yet\n";
+	*out << "ERROR: int2ptr instructions not supported yet\n\n";
 	exit(-1);
       }
       if (isa<InvokeInst>(&i)) {
-        *out << "invoke instructions not supported\n";
+        *out << "ERROR: invoke instructions not supported\n\n";
         exit(-1);
       }
       if (auto *ci = dyn_cast<CallInst>(&i)) {
         if (!isa<IntrinsicInst>(ci)) {
-          *out << "calls (besides intrinsics) not supported yet\n";
+          *out << "ERROR: calls (besides intrinsics) not supported yet\n\n";
           exit(-1);
         }
       }
