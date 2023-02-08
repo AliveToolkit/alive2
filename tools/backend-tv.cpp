@@ -131,9 +131,8 @@ unique_ptr<Cache> cache;
 
 int main(int argc, char **argv) {
 
-  // FIXME remove when done debugging
   if (true) {
-    cout << "comand line:\n";
+    // FIXME remove when done debugging
     for (int i=0; i<argc; ++i)
       cout << "'" << argv[i] << "' ";
     cout << endl;
