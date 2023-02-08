@@ -8,7 +8,6 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -31,6 +30,7 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -45,6 +45,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -102,7 +103,9 @@ const set<int> instrs_32 = {
     AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
     AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi, AArch64::CCMNWr,};
+    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
+    AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,   AArch64::LDPWi,
+};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
@@ -131,7 +134,8 @@ const set<int> instrs_64 = {
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
-    AArch64::STPXi,     AArch64::CCMNXi, AArch64::CCMNXr,
+    AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
+    AArch64::STURXi,    AArch64::ADRP,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -247,13 +251,13 @@ public:
 class MCFunction {
   string name;
   unsigned label_cnt{0};
-  using BlockSetTy = SetVector<MCBasicBlock *>;
 
 public:
   MCInstrAnalysis *IA;
   MCInstPrinter *IP;
   MCRegisterInfo *MRI;
   vector<MCBasicBlock> BBs;
+  unordered_map<string, int64_t> globals;
 
   MCFunction() {}
   MCFunction(string _name) : name(_name) {}
@@ -278,6 +282,7 @@ public:
     for (auto &bb : BBs)
       if (bb.getName() == b_name)
         return &bb;
+    *out << "couldn't find block '" << b_name << "'\n";
     assert(false && "block not found");
   }
 
@@ -320,21 +325,6 @@ public:
     }
   }
 
-  void printBlocks() {
-    *out << "# of Blocks (orig print blocks) = " << BBs.size() << '\n';
-    *out << "-------------\n";
-    int i = 0;
-    for (auto &block : BBs) {
-      *out << "block " << i << ", name= " << block.getName() << '\n';
-      for (auto &Inst : block.getInstrs()) {
-        std::string sss;
-        llvm::raw_string_ostream ss(sss);
-        Inst.dump_pretty(ss, IP, " ", MRI);
-        *out << sss << '\n';
-      }
-      i++;
-    }
-  }
 };
 
 // Code taken from llvm. This should be okay for now. But we generally
@@ -399,11 +389,12 @@ class arm2llvm {
   MCBasicBlock *MCBB{nullptr};
   BasicBlock *LLVMBB{nullptr};
   MCInstPrinter *instrPrinter{nullptr};
-  MCInst *CurInst{nullptr};
+  MCInst *CurInst{nullptr}, *PrevInst{nullptr};
   unsigned instCount{0};
-  bool ret_void{false};
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
+  unordered_map<string, GlobalVariable *> globals;
+  unordered_map<MCInst *, string> GOT;
 
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
@@ -498,7 +489,8 @@ class arm2llvm {
   }
 
   void createStore(Value *v, Value *ptr) {
-    new StoreInst(v, ptr, LLVMBB);
+    Align align(1); // FIXME is this correct?
+    new StoreInst(v, ptr, false, align, LLVMBB);
   }
 
   CallInst *createSSubOverflow(Value *a, Value *b) {
@@ -797,6 +789,8 @@ class arm2llvm {
   }
 
   Value *conditionHolds(uint64_t cond) {
+    assert(cond < 16);
+
     // cond<0> == '1' && cond != '1111'
     auto invert_bit = (cond & 1) && (cond != 15);
 
@@ -806,6 +800,9 @@ class arm2llvm {
     auto cur_z = getZ();
     auto cur_n = getN();
     auto cur_c = getC();
+
+    auto falseVal = getIntConst(0, 1);
+    auto trueVal = getIntConst(1, 1);
 
     Value *res = nullptr;
     switch (cond) {
@@ -823,46 +820,37 @@ class arm2llvm {
       break; // VS/VC
     case 4: {
       // HI/LS: PSTATE.C == '1' && PSTATE.Z == '0'
-      assert(cur_c != nullptr && cur_z != nullptr &&
-             "HI/LS requires C and Z bits to be generated");
       // C == 1
-      auto c_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, getIntConst(1, 1));
+      auto c_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_c, trueVal);
       // Z == 0
-      auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
+      auto z_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       // C == 1 && Z == 0
       res = createAnd(c_cond, z_cond);
       break;
     }
     case 5:
       // GE/LT PSTATE.N == PSTATE.V
-      assert(cur_n != nullptr && cur_v != nullptr &&
-             "GE/LT requires N and V bits to be generated");
       res = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
       break;
     case 6: {
       // GT/LE PSTATE.N == PSTATE.V && PSTATE.Z == 0
-      assert(cur_n != nullptr && cur_v != nullptr && cur_z != nullptr &&
-             "GT/LE requires N, V and Z bits to be generated");
       auto n_eq_v = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_n, cur_v);
-      auto z_cond =
-          createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, getIntConst(0, 1));
+      auto z_cond = createICmp(ICmpInst::Predicate::ICMP_EQ, cur_z, falseVal);
       res = createAnd(n_eq_v, z_cond);
       break;
     }
     case 7:
-      res = getIntConst(1, 1);
+      res = trueVal;
       break;
     default:
-      assert(false && "invalid condition code");
+      assert(false && "invalid input to conditionHolds()");
       break;
     }
 
     assert(res != nullptr && "condition code was not generated");
 
     if (invert_bit)
-      res = createXor(res, getIntConst(1, 1));
+      res = createXor(res, trueVal);
 
     return res;
   }
@@ -954,14 +942,23 @@ public:
     auto &op1 = CurInst->getOperand(1);
     auto &op2 = CurInst->getOperand(2);
     assert(op0.isReg() && op1.isReg());
-    assert(op2.isImm());
 
-    auto baseReg = op1.getReg();
-    assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-           (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-           (baseReg == AArch64::XZR));
-    auto baseAddr = readPtrFromReg(baseReg);
-    return make_pair(baseAddr, op2.getImm());
+    if (op2.isImm()) {
+      auto baseReg = op1.getReg();
+      assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+	     (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+	     (baseReg == AArch64::XZR));
+      auto baseAddr = readPtrFromReg(baseReg);
+      return make_pair(baseAddr, op2.getImm());
+    }
+    assert(false && "expected immediate or expression for operand 2 of a load");
+  }
+
+  // offset and size are in bytes
+  Value *makeLoad(Value *base, int offset, int size) {
+    auto offsetVal = getIntConst(offset, 64);
+    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
+    return createLoad(getIntTy(8 * size), ptr);
   }
 
   tuple<Value *, int, Value *> getParamsStoreImmed() {
@@ -980,13 +977,6 @@ public:
   }
 
   // offset and size are in bytes
-  Value *makeLoad(Value *base, int offset, int size) {
-    auto offsetVal = getIntConst(offset, 64);
-    auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
-    return createLoad(getIntTy(8 * size), ptr);
-  }
-
-  // offset and size are in bytes
   void makeStore(Value *base, int offset, int size, Value *val) {
     auto offsetVal = getIntConst(offset, 64);
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
@@ -997,6 +987,7 @@ public:
   // See: https://documentation-service.arm.com/static/6245e8f0f7d10f7540e0c054
   void mc_visit(MCInst &I, Function &Fn) {
     auto opcode = I.getOpcode();
+    PrevInst = CurInst;
     CurInst = &I;
 
     auto i1 = getIntTy(1);
@@ -1141,7 +1132,6 @@ public:
 
       if (has_s(opcode)) {
         auto [n, z, c, v] = flags;
-
         setN(n);
         setZ(z);
         setC(c);
@@ -1495,10 +1485,15 @@ public:
       auto mask = ((uint64_t)1 << (width)) - 1;
       auto pos = immr;
 
+      *out << "SBFX:\n";
+      *out << "size = " << size << "\n";
+      *out << "width = " << width << "\n";
+      *out << "pos = " << pos << "\n";
+
       auto masked = createAnd(src, getIntConst(mask, size));
-      auto l_shifted = createShl(masked, getIntConst(size - width, size));
+      auto l_shifted = createRawShl(masked, getIntConst(size - width, size));
       auto shifted_res =
-          createAShr(l_shifted, getIntConst(size - width + pos, size));
+          createRawAShr(l_shifted, getIntConst(size - width + pos, size));
       writeToOutputReg(shifted_res);
       return;
     }
@@ -1590,7 +1585,7 @@ public:
       auto altz = (nzcv & 4) ? one : zero;
       auto altc = (nzcv & 2) ? one : zero;
       auto altv = (nzcv & 1) ? one : zero;
-      
+
       auto cond = conditionHolds(cond_val_imm);
       setN(createSelect(cond, n, altn));
       setZ(createSelect(cond, z, altz));
@@ -1628,17 +1623,15 @@ public:
         auto negated_b = createAdd(inverted_b, getIntConst(1, size));
         auto ret = createSelect(cond_val, a, negated_b);
         writeToOutputReg(ret);
-        break;
+      } else {
+        auto ret = createSelect(cond_val, a, inverted_b);
+        writeToOutputReg(ret);
       }
-
-      auto ret = createSelect(cond_val, a, inverted_b);
-      writeToOutputReg(ret);
       break;
     }
     case AArch64::CSINCWr:
     case AArch64::CSINCXr: {
       auto size = getInstSize(opcode);
-      auto ty = getIntTy(size);
       assert(CurInst->getOperand(1).isReg() && CurInst->getOperand(2).isReg());
       assert(CurInst->getOperand(3).isImm());
 
@@ -1648,7 +1641,7 @@ public:
       auto cond_val_imm = getImm(3);
       auto cond_val = conditionHolds(cond_val_imm);
 
-      auto inc = createAdd(b, getIntConst(1, ty->getIntegerBitWidth()));
+      auto inc = createAdd(b, getIntConst(1, size));
       auto sel = createSelect(cond_val, a, inc);
 
       writeToOutputReg(sel);
@@ -2043,6 +2036,7 @@ public:
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
       break;
     }
+    case AArch64::LDPWi:
     case AArch64::LDPXi: {
       auto &op0 = CurInst->getOperand(0);
       auto &op1 = CurInst->getOperand(1);
@@ -2057,20 +2051,22 @@ public:
              (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
 
+      auto size = (opcode == AArch64::LDPWi) ? 4 : 8;
       auto imm = op3.getImm();
       auto out1 = op0.getReg();
       auto out2 = op1.getReg();
-      if (out1 != AArch64::XZR) {
-        auto loaded = makeLoad(baseAddr, imm * 8, 8);
+      if (out1 != AArch64::XZR && out1 != AArch64::WZR) {
+        auto loaded = makeLoad(baseAddr, imm * size, size);
         createStore(loaded, dealiasReg(out1));
       }
-      if (out2 != AArch64::XZR) {
-        auto loaded = makeLoad(baseAddr, (imm + 1) * 8, 8);
+      if (out2 != AArch64::XZR && out2 != AArch64::WZR) {
+        auto loaded = makeLoad(baseAddr, (imm + 1) * size, size);
         createStore(loaded, dealiasReg(out2));
       }
       break;
     }
-    case AArch64::STPXi: {
+    case AArch64::STPXi:
+    case AArch64::STPWi: {
       auto &op0 = CurInst->getOperand(0);
       auto &op1 = CurInst->getOperand(1);
       auto &op2 = CurInst->getOperand(2);
@@ -2080,21 +2076,19 @@ public:
 
       auto baseReg = op2.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-             (baseReg == AArch64::XZR));
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR));
       auto baseAddr = readPtrFromReg(baseReg);
 
+      auto size = (opcode == AArch64::STPWi) ? 4 : 8;
       auto imm = op3.getImm();
-      auto out1 = op0.getReg();
-      auto out2 = op1.getReg();
-      if (out1 != AArch64::XZR) {
-        auto val = readFromReg(op0.getReg());
-        makeStore(baseAddr, imm * 8, 8, val);
-      }
-      if (out2 != AArch64::XZR) {
-        auto val = readFromReg(op1.getReg());
-        makeStore(baseAddr, (imm + 1) * 8, 8, val);
-      }
+      auto val1 = readFromReg(op0.getReg());
+      if (size == 4)
+	val1 = createTrunc(val1, i32);
+      makeStore(baseAddr, imm * size, size, val1);
+      auto val2 = readFromReg(op1.getReg());
+      if (size == 4)
+	val2 = createTrunc(val2, i32);
+      makeStore(baseAddr, (imm + 1) * size, size, val2);
       break;
     }
     case AArch64::LDRSWui: {
@@ -2136,19 +2130,92 @@ public:
       break;
     }
     case AArch64::LDRXui: {
-      auto [base, imm] = getParamsLoadImmed();
-      auto loaded = makeLoad(base, imm * 8, 8);
-      writeToOutputReg(loaded);
+      auto &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+	auto expr = op2.getExpr();
+	std::string sss;
+	llvm::raw_string_ostream ss(sss);
+	expr->print(ss, nullptr);
+	if (!sss.starts_with(":got_lo12:")) {
+	  *out << "only :got_lo12: is supported\n";
+	  exit(-1);
+	}
+	auto globName = sss.substr(10, string::npos);
+	if (!globals.contains(globName)) {
+	  *out << "load mentions '" << globName << "'\n";
+	  *out << "which is not a global variable we know about\n";
+	  exit(-1);
+	}
+	auto got = GOT.find(PrevInst);
+	if (got == GOT.end() || got->second != globName) {
+	  *out << "unexpected :got_lo12:\n";
+	  exit(-1);
+	}
+	auto glob = globals.find(globName);
+	if (glob == globals.end()) {
+	  *out << "global not found\n";
+	  exit(-1);
+	}
+	auto Reg = CurInst->getOperand(0).getReg();
+	if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+	  createStore(glob->second, dealiasReg(Reg));
+      } else {
+	auto [base, imm] = getParamsLoadImmed();
+	auto loaded = makeLoad(base, imm * 8, 8);
+	writeToOutputReg(loaded);
+      }
+      break;
+    }
+    case AArch64::STRBBui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 1, 1, createTrunc(val, i8));
+      break;
+    }
+    case AArch64::STRHHui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 2, 2, createTrunc(val, i16));
+      break;
+    }
+    case AArch64::STURWi: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 1, 4, createTrunc(val, i32));
+      break;
+    }
+    case AArch64::STURXi: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 1, 8, val);
       break;
     }
     case AArch64::STRWui: {
       auto [base, imm, val] = getParamsStoreImmed();
-      makeStore(base, imm * 4, 4, val);
+      makeStore(base, imm * 4, 4, createTrunc(val, i32));
       break;
     }
     case AArch64::STRXui: {
       auto [base, imm, val] = getParamsStoreImmed();
       makeStore(base, imm * 8, 8, val);
+      break;
+    }
+    case AArch64::ADRP: {
+      assert(CurInst->getOperand(0).isReg());
+      auto expr = CurInst->getOperand(1).getExpr();
+      std::string sss;
+      llvm::raw_string_ostream ss(sss);
+      expr->print(ss, nullptr);
+      if (sss.starts_with(":got:")) {
+	auto globName = sss.substr(5, string::npos);
+	if (!globals.contains(globName)) {
+	  *out << "ADRP mentions '" << globName << "'\n";
+	  *out << "which is not a global variable we know about\n";
+	  exit(-1);
+	}
+	GOT[CurInst] = globName;
+      } else {
+	*out << "\n";
+	*out << "Unexpected MCExpr in ADRP: '" << sss << "'\n";
+	*out << "only :got: is currently supported\n";
+	exit(-1);
+      }
       break;
     }
     case AArch64::RET: {
@@ -2194,12 +2261,16 @@ public:
         createReturn(vec);
       } else {
         Value *retVal = nullptr;
-        if (!ret_void) {
-          auto *retTyp = srcFn.getReturnType();
-          auto retWidth = retTyp->getIntegerBitWidth();
+        auto *retTyp = srcFn.getReturnType();
+        if (!retTyp->isVoidTy()) {
+          auto retWidth =
+              retTyp->isPointerTy() ? 64 : retTyp->getIntegerBitWidth();
           retVal = readFromReg(AArch64::X0);
+          auto retValWidth = retVal->getType()->isPointerTy()
+                                 ? 64
+                                 : retVal->getType()->getIntegerBitWidth();
 
-          if (retWidth < retVal->getType()->getIntegerBitWidth())
+          if (retWidth < retValWidth)
             retVal = createTrunc(retVal, getIntTy(retWidth));
 
           // mask off any don't-care bits
@@ -2389,9 +2460,29 @@ public:
       BBs.push_back(make_pair(bb, &mbb));
     }
 
+    *out << "created LLVM basic blocks.\n";
+
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
 
+    // create globals
+    for (const auto& [name, size] : MF.globals) {
+      auto *AT = ArrayType::get(i8, size);
+      auto *g = new GlobalVariable(*LiftedModule, AT, false,
+				   GlobalValue::LinkageTypes::ExternalLinkage,
+				   nullptr, name);
+      g->setAlignment(MaybeAlign(8));
+      /*
+	FIXME initialize
+      for (unsigned i = 0; i < size; ++i) {
+	auto F = createFreeze(PoisonValue::get(i8));
+	auto G = createGEP(i8, g, {getIntConst(i, 64)}, "");
+	createStore(F, G);
+      }
+      */
+      globals[name] = g;
+    }
+    
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
     const int stackSlots = 16; // 8 bytes each
@@ -2428,6 +2519,8 @@ public:
     createRegStorage(AArch64::C, 1, "C");
     createRegStorage(AArch64::V, 1, "V");
 
+    *out << "about to do callee-side ABI stuff\n";
+
     // implement the callee side of the ABI; FIXME -- this code only
     // supports integer parameters <= 64 bits and will require
     // significant generalization to handle large parameters, vectors,
@@ -2439,16 +2532,20 @@ public:
                                     orig_input_width[argNum]);
       // first 8 are passed via registers, after that on the stack
       if (argNum < 8) {
-        auto Reg = MCOperand::createReg(AArch64::X0 + argNum).getReg();
+        auto Reg = AArch64::X0 + argNum;
         createStore(val, RegFile[Reg]);
       } else {
         auto slot = argNum - 8;
-        assert(slot < stackSlots);
+        assert(slot < stackSlots &&
+               "maximum stack slots for parameter values exceeded");
         auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
       argNum++;
     }
+
+    *out << "done with callee-side ABI stuff\n";
+    *out << "about to lift the instructions\n";
 
     for (auto &[llvm_bb, mc_bb] : BBs) {
       *out << "visiting bb: " << mc_bb->getName() << "\n";
@@ -2493,7 +2590,6 @@ private:
 public:
   MCFunction MF;
   unsigned cnt{0};
-  using BlockSetTy = SetVector<MCBasicBlock *>;
 
   MCStreamerWrapper(MCContext &Context, MCInstrAnalysis *_IA,
                     MCInstPrinter *_IP, MCRegisterInfo *_MRI)
@@ -2547,24 +2643,67 @@ public:
     *out << "\n";
   }
 
+  string attrName(MCSymbolAttr A) {
+    switch (A) {
+    case MCSA_ELF_TypeFunction:
+      return "ELF function";
+    case MCSA_ELF_TypeObject:
+      return "ELF object";
+    case MCSA_Global:
+      return "global";
+    default:
+      assert(false && "unknown symbol attribute");
+    }
+  }
+
+  void printMCExpr(const MCExpr *Expr) {
+    if (Expr) {
+      int64_t Res;
+      if (Expr->evaluateAsAbsolute(Res)) {
+	*out << "  expr = " << Res << "\n";
+      } else {
+	*out << "  can't evaluate expr as absolute\n";
+      }
+    } else{
+      *out << "  null expr\n";
+    }
+  }
+  
+  void dumpSymbol(MCSymbol *Symbol) {
+    if (auto ElfSymbol = dyn_cast<MCSymbolELF>(Symbol)) {
+      *out << "  ELF symbol\n";
+      if (auto size = ElfSymbol->getSize()) {
+	printMCExpr(size);
+      } else {
+	*out << "  symbol has no size\n";
+      }
+    }
+  }
+
   virtual bool emitSymbolAttribute(MCSymbol *Symbol,
                                    MCSymbolAttr Attribute) override {
-    *out << "[emitSymbolAttribute]\n";
-    std::string sss;
-    llvm::raw_string_ostream ss(sss);
-    Symbol->print(ss, nullptr);
-    *out << sss << "\n";
-    *out << "Common? " << Symbol->isCommon() << "\n";
-    *out << "Varible? " << Symbol->isVariable() << "\n";
-    *out << "Attribute = " << Attribute << "\n\n";
+    if (false) {
+      *out << "[[emitSymbolAttribute]]\n";
+      std::string sss;
+      llvm::raw_string_ostream ss(sss);
+      Symbol->print(ss, nullptr);
+      *out << "  " << sss << "\n";
+      *out << "  Common? " << Symbol->isCommon() << "\n";
+      *out << "  Varible? " << Symbol->isVariable() << "\n";
+      *out << "  Attribute = " << attrName(Attribute) << "\n\n";
+      dumpSymbol(Symbol);
+    }
     return true;
   }
 
   virtual void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
                                 Align ByteAlignment) override {
+    auto name = (string)Symbol->getName();
     *out << "[emitCommonSymbol]\n";
     std::string sss;
-    llvm::raw_string_ostream ss(sss);
+    llvm::raw_string_ostream ss(sss);    
+    *out << "  creating " << Size << " byte global ELF object " << name << "\n";
+    MF.globals[name] = Size;
     Symbol->print(ss, nullptr);
     *out << sss << " "
          << "size = " << Size << " Align = " << ByteAlignment.value() << "\n\n";
@@ -2573,14 +2712,29 @@ public:
   virtual void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
                             uint64_t Size = 0, Align ByteAlignment = Align(1),
                             SMLoc Loc = SMLoc()) override {
-    *out << "[emitZerofill]\n";
-    *out << (string)Section->getName() << "\n\n";
+    if (false) {
+      *out << "[emitZerofill]\n";
+      *out << (string)Section->getName() << "\n\n";
+    }
   }
 
+  virtual void emitELFSize(MCSymbol *Symbol, const MCExpr *Value) override {
+    *out << "[emitELFSize]\n";
+    auto name = (string)Symbol->getName();
+    int64_t size;
+    if (Value && Value->evaluateAsAbsolute(size)) {
+      *out << "  creating " << size << " byte global ELF object " << name << "\n";
+      MF.globals[name] = size;
+    } else {
+      *out << "  can't get ELF size of " << name << "\n";
+    }
+  }
+  
   virtual void emitLabel(MCSymbol *Symbol, SMLoc Loc) override {
     // Assuming the first label encountered is the function's name
     // Need to figure out if there is a better way to get access to the
-    // function's name
+    // function's name. FIXME: key on the actual name here
+    *out << "[[emitLabel " << Symbol->getName().str() << "]]\n";
     if (first_label) {
       MF.setName(Symbol->getName().str() + "-tgt");
       first_label = false;
@@ -2588,6 +2742,7 @@ public:
     string cur_label = Symbol->getName().str();
     temp_block = MF.addBlock(cur_label);
     prev_line = ASMLine::label;
+    dumpSymbol(Symbol);
   }
 
   string findTargetLabel(MCInst &Inst) {
@@ -2663,7 +2818,7 @@ public:
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
-  void printBlocksMF() {
+  void printBlocks() {
     *out << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
     *out << "-------------\n";
     int i = 0;
@@ -2759,11 +2914,11 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->setTargetParser(*TAP);
   Parser->Run(true); // ??
 
-  MCSW.printBlocksMF();
+  MCSW.printBlocks();
   MCSW.removeEmptyBlocks();
   MCSW.checkEntryBlock();
   MCSW.generateSuccessors();
-  MCSW.printBlocksMF();
+  MCSW.printBlocks();
 
   auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IP.get()).run();
 

@@ -12,13 +12,13 @@
 #include "util/stopwatch.h"
 #include "util/version.h"
 #include "llvm/ADT/Any.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/TargetParser/Triple.h"
 #include <fstream>
 #include <iostream>
 #include <memory>

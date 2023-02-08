@@ -1494,12 +1494,13 @@ public:
     MemoryAccess attrs;
     attrs.setNoAccess();
 
-    array<pair<llvm::MemoryEffects::Location, MemoryAccess::AccessType>, 4> tys
+    array<pair<llvm::MemoryEffects::Location, MemoryAccess::AccessType>, 5> tys
     {
       make_pair(llvm::MemoryEffects::ArgMem,          MemoryAccess::Args),
       make_pair(llvm::MemoryEffects::InaccessibleMem,
                 MemoryAccess::Inaccessible),
       make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Other),
+      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Globals),
       make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Errno),
     };
 

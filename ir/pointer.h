@@ -57,6 +57,7 @@ public:
 
   smt::expr isLocal(bool simplify = true) const;
   smt::expr isConstGlobal() const;
+  smt::expr isWritableGlobal() const;
 
   smt::expr getBid() const;
   smt::expr getShortBid() const; // same as getBid but ignoring is_local bit
