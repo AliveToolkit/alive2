@@ -129,10 +129,6 @@ Function *adjustSrcInputs(Function *srcFn) {
 }
 
 Function *adjustSrcReturn(Function *srcFn) {
-  if (!srcFn->hasRetAttribute(Attribute::SExt) &&
-      !srcFn->hasRetAttribute(Attribute::ZExt))
-    return srcFn;
-
   auto *ret_typ = srcFn->getReturnType();
   orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
 
@@ -152,6 +148,10 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   // don't need to do any extension if the return type is exactly 32 bits
   if (orig_ret_bitwidth == 64 || orig_ret_bitwidth == 32)
+    return srcFn;
+
+  if (!srcFn->hasRetAttribute(Attribute::SExt) &&
+      !srcFn->hasRetAttribute(Attribute::ZExt))
     return srcFn;
 
   // starting here we commit to returning a copy instead of the
