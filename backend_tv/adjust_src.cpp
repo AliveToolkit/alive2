@@ -72,10 +72,12 @@ Function *adjustSrcInputs(Function *srcFn) {
     auto *ty = v.getType();
     if (ty->isIntegerTy()) {
       auto orig_width = ty->getIntegerBitWidth();
-      if (orig_width > 64) // FIXME
-        report_fatal_error(
+      if (orig_width > 64) {
+        *out <<
             "[Unsupported function argument]: Only parameters 64 "
-            "bits or smaller supported for now");
+            "bits or smaller supported for now\n";
+        exit(-1);
+      }
       orig_input_width.emplace_back(orig_width);
       new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
     } else if (auto pty = dyn_cast<PointerType>(ty)) {
@@ -211,9 +213,26 @@ Function *adjustSrcReturn(Function *srcFn) {
 namespace lifter {
 
 Function *adjustSrc(Function *srcFn) {
-  if (srcFn->isVarArg())
-    report_fatal_error("Varargs not supported");
+  if (srcFn->isVarArg()) {
+    *out << "varargs not supported yet\n";
+    exit(-1);
+  }
 
+  for (auto &bb : *srcFn) {
+    for (auto &i : bb) {
+      if (isa<InvokeInst>(&i)) {
+        *out << "invoke instructions not supported\n";
+        exit(-1);
+      }
+      if (auto *ci = dyn_cast<CallInst>(&i)) {
+        if (!isa<IntrinsicInst>(ci)) {
+          *out << "calls (besides intrinsics) not supported yet\n";
+          exit(-1);
+        }
+      }
+    }
+  }
+  
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
