@@ -2901,33 +2901,38 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   assert(MAI && "Unable to create MC asm info!");
   unique_ptr<MCInstPrinter> IP(
       Targ->createMCInstPrinter(TheTriple, 0, *MAI, *MCII, *MRI));
+  IP->setPrintImmHex(true);
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
-  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &SrcMgr);
-  MCStreamerWrapper MCSW(Ctx, Ana.get(), IP.get(), MRI.get());
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &SrcMgr, &MCOptions);
+  std::unique_ptr<MCObjectFileInfo> MOFI(
+      Targ->createMCObjectFileInfo(Ctx, false, false));
+  Ctx.setObjectFileInfo(MOFI.get());
 
-  unique_ptr<MCAsmParser> Parser(createMCAsmParser(SrcMgr, Ctx, MCSW, *MAI));
+  MCStreamerWrapper Str(Ctx, Ana.get(), IP.get(), MRI.get());
+  Str.setUseAssemblerInfoForParsing(true);
+
+  unique_ptr<MCAsmParser> Parser(createMCAsmParser(SrcMgr, Ctx, Str, *MAI));
   assert(Parser);
 
-  MCTargetOptions Opts;
-  Opts.PreserveAsmComments = false;
   unique_ptr<MCTargetAsmParser> TAP(
-      Targ->createMCAsmParser(*STI, *Parser, *MCII, Opts));
+      Targ->createMCAsmParser(*STI, *Parser, *MCII, MCOptions));
   assert(TAP);
   Parser->setTargetParser(*TAP);
-  if (Parser->Run(true, true)) {
+
+  if (Parser->Run(true)) {
     *out << "ERROR: AsmParser failed\n";
     exit(-1);
   }
 
-  MCSW.printBlocks();
-  MCSW.removeEmptyBlocks();
-  MCSW.checkEntryBlock();
-  MCSW.generateSuccessors();
-  MCSW.printBlocks();
+  Str.printBlocks();
+  Str.removeEmptyBlocks();
+  Str.checkEntryBlock();
+  Str.generateSuccessors();
+  Str.printBlocks();
 
-  auto lifted = arm2llvm(LiftedModule, MCSW.MF, *srcFn, IP.get()).run();
+  auto lifted = arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get()).run();
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);
