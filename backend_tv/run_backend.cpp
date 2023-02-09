@@ -74,8 +74,8 @@ unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule,
   raw_svector_ostream Dest(Asm);
 
   legacy::PassManager pass;
-  if (TM->addPassesToEmitFile(pass, Dest, nullptr, CGFT_AssemblyFile)) {
-    cerr << "ERROR: Failed to generate assembly\n\n";
+  if (TM->addPassesToEmitFile(pass, Dest, nullptr, CGFT_AssemblyFile, false)) {
+    cerr << "ERROR: Failed to add pass to generate assembly\n\n";
     exit(-1);
   }
   pass.run(OrigModule);
