@@ -2904,7 +2904,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
-  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get());
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &SrcMgr);
   MCStreamerWrapper MCSW(Ctx, Ana.get(), IP.get(), MRI.get());
 
   unique_ptr<MCAsmParser> Parser(createMCAsmParser(SrcMgr, Ctx, MCSW, *MAI));
@@ -2916,7 +2916,10 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
       Targ->createMCAsmParser(*STI, *Parser, *MCII, Opts));
   assert(TAP);
   Parser->setTargetParser(*TAP);
-  Parser->Run(true); // ??
+  if (Parser->Run(true)) {
+    *out << "ERROR: AsmParser failed\n";
+    exit(-1);
+  }
 
   MCSW.printBlocks();
   MCSW.removeEmptyBlocks();
