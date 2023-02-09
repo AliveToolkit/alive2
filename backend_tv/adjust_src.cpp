@@ -73,25 +73,23 @@ Function *adjustSrcInputs(Function *srcFn) {
     if (ty->isIntegerTy()) {
       auto orig_width = ty->getIntegerBitWidth();
       if (orig_width > 64) {
-        *out <<
-            "ERROR: Unsupported function argument: Only parameters 64 "
-            "bits or smaller supported for now\n\n";
+        *out << "ERROR: Unsupported function argument: Only parameters 64 "
+                "bits or smaller supported for now\n\n";
         exit(-1);
       }
       orig_input_width.emplace_back(orig_width);
       new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
     } else if (auto pty = dyn_cast<PointerType>(ty)) {
       if (pty->getAddressSpace() != 0) {
-	*out << 
-            "ERROR: Unsupported function argument: Only address space "
-            "0 is supported\n\n";
-	exit(-1);
+        *out << "ERROR: Unsupported function argument: Only address space "
+                "0 is supported\n\n";
+        exit(-1);
       }
       new_argtypes.emplace_back(pty);
       orig_input_width.emplace_back(64);
     } else {
       *out << "ERROR: Unsupported function argument: Only int/ptr types "
-	"supported for now\n\n";
+              "supported for now\n\n";
       exit(-1);
     }
   }
@@ -130,20 +128,21 @@ Function *adjustSrcInputs(Function *srcFn) {
 
 Function *adjustSrcReturn(Function *srcFn) {
   auto *ret_typ = srcFn->getReturnType();
-  orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
 
-  // FIXME
+  if (ret_typ->isPointerTy() || ret_typ->isVoidTy())
+    return srcFn;
+
   if (!ret_typ->isIntegerTy()) {
-    *out << "ERROR: [Unsupported Function Return]: Only int types "
-                       "supported for now\n\n";
-		       exit(-1);
+    *out << "ERROR: Unsupported Function Return Type: Only int, ptr, and void "
+            "supported for now\n\n";
+    exit(-1);
   }
 
-  // FIXME
+  orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
   if (orig_ret_bitwidth > 64) {
-    *out << "ERROR: [Unsupported Function Return]: Only int types 64 "
-                       "bits or smaller supported for now\n\n";
-		       exit(-1);
+    *out << "ERROR: Unsupported Function Return: Only int types 64 "
+            "bits or smaller supported for now\n\n";
+    exit(-1);
   }
 
   // don't need to do any extension if the return type is exactly 32 bits
@@ -158,8 +157,8 @@ Function *adjustSrcReturn(Function *srcFn) {
   // original function
 
   has_ret_attr = true;
-  auto *i32ty = Type::getIntNTy(srcFn->getContext(), 32);
-  auto *i64ty = Type::getIntNTy(srcFn->getContext(), 64);
+  auto *i32 = Type::getIntNTy(srcFn->getContext(), 32);
+  auto *i64 = Type::getIntNTy(srcFn->getContext(), 64);
 
   // build this first to avoid iterator invalidation
   vector<ReturnInst *> RIs;
@@ -173,19 +172,19 @@ Function *adjustSrcReturn(Function *srcFn) {
     auto Name = retVal->getName();
     if (orig_ret_bitwidth < 32) {
       if (srcFn->hasRetAttribute(Attribute::ZExt)) {
-        auto zext = new ZExtInst(retVal, i64ty, Name + "_zext", RI);
+        auto zext = new ZExtInst(retVal, i64, Name + "_zext", RI);
         ReturnInst::Create(srcFn->getContext(), zext, RI);
       } else {
-        auto sext = new SExtInst(retVal, i32ty, Name + "_sext", RI);
-        auto zext = new ZExtInst(sext, i64ty, Name + "_zext", RI);
+        auto sext = new SExtInst(retVal, i32, Name + "_sext", RI);
+        auto zext = new ZExtInst(sext, i64, Name + "_zext", RI);
         ReturnInst::Create(srcFn->getContext(), zext, RI);
       }
     } else {
       if (srcFn->hasRetAttribute(Attribute::ZExt)) {
-        auto zext = new ZExtInst(retVal, i64ty, Name + "_zext", RI);
+        auto zext = new ZExtInst(retVal, i64, Name + "_zext", RI);
         ReturnInst::Create(srcFn->getContext(), zext, RI);
       } else {
-        auto sext = new SExtInst(retVal, i64ty, Name + "_sext", RI);
+        auto sext = new SExtInst(retVal, i64, Name + "_sext", RI);
         ReturnInst::Create(srcFn->getContext(), sext, RI);
       }
     }
@@ -194,7 +193,7 @@ Function *adjustSrcReturn(Function *srcFn) {
 
   // FIXME this is duplicate code, factor it out
   FunctionType *NFTy =
-      FunctionType::get(i64ty, srcFn->getFunctionType()->params(), false);
+      FunctionType::get(i64, srcFn->getFunctionType()->params(), false);
   Function *NF =
       Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
                        srcFn->getName(), srcFn->getParent());
@@ -227,8 +226,8 @@ Function *adjustSrc(Function *srcFn) {
   for (auto &bb : *srcFn) {
     for (auto &i : bb) {
       if (isa<IntToPtrInst>(&i)) {
-	*out << "ERROR: int2ptr instructions not supported yet\n\n";
-	exit(-1);
+        *out << "ERROR: int2ptr instructions not supported yet\n\n";
+        exit(-1);
       }
       if (isa<InvokeInst>(&i)) {
         *out << "ERROR: invoke instructions not supported\n\n";
@@ -242,7 +241,7 @@ Function *adjustSrc(Function *srcFn) {
       }
     }
   }
-  
+
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 

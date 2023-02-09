@@ -324,7 +324,6 @@ public:
       }
     }
   }
-
 };
 
 // Code taken from llvm. This should be okay for now. But we generally
@@ -947,8 +946,8 @@ public:
     if (op2.isImm()) {
       auto baseReg = op1.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-	     (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-	     (baseReg == AArch64::XZR));
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+             (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
       return make_pair(baseAddr, op2.getImm());
     }
@@ -2084,11 +2083,11 @@ public:
       auto imm = op3.getImm();
       auto val1 = readFromReg(op0.getReg());
       if (size == 4)
-	val1 = createTrunc(val1, i32);
+        val1 = createTrunc(val1, i32);
       makeStore(baseAddr, imm * size, size, val1);
       auto val2 = readFromReg(op1.getReg());
       if (size == 4)
-	val2 = createTrunc(val2, i32);
+        val2 = createTrunc(val2, i32);
       makeStore(baseAddr, (imm + 1) * size, size, val2);
       break;
     }
@@ -2133,37 +2132,37 @@ public:
     case AArch64::LDRXui: {
       auto &op2 = CurInst->getOperand(2);
       if (op2.isExpr()) {
-	auto expr = op2.getExpr();
-	std::string sss;
-	llvm::raw_string_ostream ss(sss);
-	expr->print(ss, nullptr);
-	if (!sss.starts_with(":got_lo12:")) {
-	  *out << "ERROR: only :got_lo12: is supported\n\n";
-	  exit(-1);
-	}
-	auto globName = sss.substr(10, string::npos);
-	if (!globals.contains(globName)) {
-	  *out << "ERROR: load mentions '" << globName << "'\n";
-	  *out << "which is not a global variable we know about\n\n";
-	  exit(-1);
-	}
-	auto got = GOT.find(PrevInst);
-	if (got == GOT.end() || got->second != globName) {
-	  *out << "ERROR: unexpected :got_lo12:\n\n";
-	  exit(-1);
-	}
-	auto glob = globals.find(globName);
-	if (glob == globals.end()) {
-	  *out << "ERROR: global not found\n\n";
-	  exit(-1);
-	}
-	auto Reg = CurInst->getOperand(0).getReg();
-	if (Reg != AArch64::WZR && Reg != AArch64::XZR)
-	  createStore(glob->second, dealiasReg(Reg));
+        auto expr = op2.getExpr();
+        std::string sss;
+        llvm::raw_string_ostream ss(sss);
+        expr->print(ss, nullptr);
+        if (!sss.starts_with(":got_lo12:")) {
+          *out << "ERROR: only :got_lo12: is supported\n\n";
+          exit(-1);
+        }
+        auto globName = sss.substr(10, string::npos);
+        if (!globals.contains(globName)) {
+          *out << "ERROR: load mentions '" << globName << "'\n";
+          *out << "which is not a global variable we know about\n\n";
+          exit(-1);
+        }
+        auto got = GOT.find(PrevInst);
+        if (got == GOT.end() || got->second != globName) {
+          *out << "ERROR: unexpected :got_lo12:\n\n";
+          exit(-1);
+        }
+        auto glob = globals.find(globName);
+        if (glob == globals.end()) {
+          *out << "ERROR: global not found\n\n";
+          exit(-1);
+        }
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(glob->second, dealiasReg(Reg));
       } else {
-	auto [base, imm] = getParamsLoadImmed();
-	auto loaded = makeLoad(base, imm * 8, 8);
-	writeToOutputReg(loaded);
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 8, 8);
+        writeToOutputReg(loaded);
       }
       break;
     }
@@ -2204,18 +2203,19 @@ public:
       llvm::raw_string_ostream ss(sss);
       expr->print(ss, nullptr);
       if (sss.starts_with(":got:")) {
-	auto globName = sss.substr(5, string::npos);
-	if (!globals.contains(globName)) {
-	  *out << "ERROR: ADRP mentions '" << globName << "'\n";
-	  *out << "which is not a global variable we know about\n";
-	  exit(-1);
-	}
-	GOT[CurInst] = globName;
+        auto globName = sss.substr(5, string::npos);
+        if (!globals.contains(globName)) {
+          *out << "ERROR: ADRP mentions unknown global variable\n";
+          *out << "'" << globName
+               << "'  is not a global variable we know about\n";
+          exit(-1);
+        }
+        GOT[CurInst] = globName;
       } else {
-	*out << "\n";
-	*out << "ERROR: Unexpected MCExpr in ADRP: '" << sss << "'\n";
-	*out << "only :got: is currently supported\n";
-	exit(-1);
+        *out << "\n";
+        *out << "ERROR: Unexpected MCExpr in ADRP\n";
+        *out << "'" << sss << "' but only :got: is currently supported\n";
+        exit(-1);
       }
       break;
     }
@@ -2264,22 +2264,24 @@ public:
         Value *retVal = nullptr;
         auto *retTyp = srcFn.getReturnType();
         if (!retTyp->isVoidTy()) {
-          auto retWidth =
-              retTyp->isPointerTy() ? 64 : retTyp->getIntegerBitWidth();
           retVal = readFromReg(AArch64::X0);
-          auto retValWidth = retVal->getType()->isPointerTy()
-                                 ? 64
-                                 : retVal->getType()->getIntegerBitWidth();
+          if (retTyp->isPointerTy()) {
+            retVal =
+                new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
+          } else {
+            auto retWidth = retTyp->getIntegerBitWidth();
+            auto retValWidth = retVal->getType()->getIntegerBitWidth();
 
-          if (retWidth < retValWidth)
-            retVal = createTrunc(retVal, getIntTy(retWidth));
+            if (retWidth < retValWidth)
+              retVal = createTrunc(retVal, getIntTy(retWidth));
 
-          // mask off any don't-care bits
-          if (has_ret_attr && (orig_ret_bitwidth < 32)) {
-            assert(retWidth >= orig_ret_bitwidth);
-            assert(retWidth == 64);
-            auto trunc = createTrunc(retVal, i32);
-            retVal = createZExt(trunc, i64);
+            // mask off any don't-care bits
+            if (has_ret_attr && (orig_ret_bitwidth < 32)) {
+              assert(retWidth >= orig_ret_bitwidth);
+              assert(retWidth == 64);
+              auto trunc = createTrunc(retVal, i32);
+              retVal = createZExt(trunc, i64);
+            }
           }
         }
         createReturn(retVal);
@@ -2467,23 +2469,23 @@ public:
     LLVMBB = BBs[0].first;
 
     // create globals
-    for (const auto& [name, size] : MF.globals) {
+    for (const auto &[name, size] : MF.globals) {
       auto *AT = ArrayType::get(i8, size);
       auto *g = new GlobalVariable(*LiftedModule, AT, false,
-				   GlobalValue::LinkageTypes::ExternalLinkage,
-				   nullptr, name);
+                                   GlobalValue::LinkageTypes::ExternalLinkage,
+                                   nullptr, name);
       g->setAlignment(MaybeAlign(8));
       /*
-	FIXME initialize
+        FIXME initialize
       for (unsigned i = 0; i < size; ++i) {
-	auto F = createFreeze(PoisonValue::get(i8));
-	auto G = createGEP(i8, g, {getIntConst(i, 64)}, "");
-	createStore(F, G);
+        auto F = createFreeze(PoisonValue::get(i8));
+        auto G = createGEP(i8, g, {getIntConst(i, 64)}, "");
+        createStore(F, G);
       }
       */
       globals[name] = g;
     }
-    
+
     // allocate storage for the stack; the initialization has to be
     // unrolled in the IR so that Alive can see all of it
     const int stackSlots = 16; // 8 bytes each
@@ -2661,22 +2663,22 @@ public:
     if (Expr) {
       int64_t Res;
       if (Expr->evaluateAsAbsolute(Res)) {
-	*out << "  expr = " << Res << "\n";
+        *out << "  expr = " << Res << "\n";
       } else {
-	*out << "  can't evaluate expr as absolute\n";
+        *out << "  can't evaluate expr as absolute\n";
       }
-    } else{
+    } else {
       *out << "  null expr\n";
     }
   }
-  
+
   void dumpSymbol(MCSymbol *Symbol) {
     if (auto ElfSymbol = dyn_cast<MCSymbolELF>(Symbol)) {
       *out << "  ELF symbol\n";
       if (auto size = ElfSymbol->getSize()) {
-	printMCExpr(size);
+        printMCExpr(size);
       } else {
-	*out << "  symbol has no size\n";
+        *out << "  symbol has no size\n";
       }
     }
   }
@@ -2702,7 +2704,7 @@ public:
     auto name = (string)Symbol->getName();
     *out << "[emitCommonSymbol]\n";
     std::string sss;
-    llvm::raw_string_ostream ss(sss);    
+    llvm::raw_string_ostream ss(sss);
     *out << "  creating " << Size << " byte global ELF object " << name << "\n";
     MF.globals[name] = Size;
     Symbol->print(ss, nullptr);
@@ -2724,13 +2726,14 @@ public:
     auto name = (string)Symbol->getName();
     int64_t size;
     if (Value && Value->evaluateAsAbsolute(size)) {
-      *out << "  creating " << size << " byte global ELF object " << name << "\n";
+      *out << "  creating " << size << " byte global ELF object " << name
+           << "\n";
       MF.globals[name] = size;
     } else {
       *out << "  can't get ELF size of " << name << "\n";
     }
   }
-  
+
   virtual void emitLabel(MCSymbol *Symbol, SMLoc Loc) override {
     // Assuming the first label encountered is the function's name
     // Need to figure out if there is a better way to get access to the
