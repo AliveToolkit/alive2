@@ -2503,6 +2503,8 @@ public:
       createRegStorage(Reg, 64, Name.str());
     }
 
+    createRegStorage(AArch64::FP, 64, "FP");
+
     createRegStorage(AArch64::SP, 64, "SP");
     // load the base address for the stack memory; FIXME: this works
     // for accessing parameters but it doesn't support the general

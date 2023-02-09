@@ -234,6 +234,10 @@ Function *adjustSrc(Function *srcFn) {
         exit(-1);
       }
       if (auto *ci = dyn_cast<CallInst>(&i)) {
+        if (ci->isTailCall()) {
+          *out << "ERROR: tail calls not supported yet\n\n";
+          exit(-1);
+        }
         if (!isa<IntrinsicInst>(ci)) {
           *out << "ERROR: calls (besides intrinsics) not supported yet\n\n";
           exit(-1);
