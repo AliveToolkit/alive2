@@ -2448,6 +2448,7 @@ public:
 
   Function *run() {
     auto i8 = getIntTy(8);
+    auto i32 = getIntTy(32);
     auto i64 = getIntTy(64);
 
     auto Fn =
@@ -2486,15 +2487,20 @@ public:
       globals[name] = g;
     }
 
-    // allocate storage for the stack; the initialization has to be
-    // unrolled in the IR so that Alive can see all of it
-    const int stackSlots = 16; // 8 bytes each
-    stackMem = createAlloca(i8, getIntConst(8 * stackSlots, 64), "stack");
-    for (unsigned Idx = 0; Idx < stackSlots; ++Idx) {
-      auto F = createFreeze(PoisonValue::get(i64));
-      auto G = createGEP(i64, stackMem, {getIntConst(Idx, 64)}, "");
-      createStore(F, G);
-    }
+    // number of 8-byte stack slots for paramters
+    const int stackSlots = 16; 
+    // amount of stack available for use by the lifted function, in bytes
+    const int localFrame = 512;
+
+    auto *allocTy = FunctionType::get(PointerType::get(Ctx, 0), { i32 }, false);
+    auto *myAlloc = Function::Create(allocTy, GlobalValue::ExternalLinkage,
+				     0, "myalloc", LiftedModule);
+    myAlloc->addRetAttr(Attribute::NonNull);
+    AttrBuilder B(Ctx);
+    B.addAllocKindAttr(AllocFnKind::Alloc);
+    B.addAllocSizeAttr(0, {});
+    myAlloc->addFnAttrs(B);
+    stackMem = CallInst::Create(myAlloc, { getIntConst(localFrame + (8 * stackSlots), 32) }, "stack", LLVMBB);
 
     // allocate storage for the main register file
     for (unsigned Reg = AArch64::X0; Reg <= AArch64::X28; ++Reg) {
@@ -2503,13 +2509,15 @@ public:
       createRegStorage(Reg, 64, Name.str());
     }
 
+    // we'll initialize FP later
     createRegStorage(AArch64::FP, 64, "FP");
 
     createRegStorage(AArch64::SP, 64, "SP");
     // load the base address for the stack memory; FIXME: this works
     // for accessing parameters but it doesn't support the general
     // case
-    createStore(stackMem, RegFile[AArch64::SP]);
+    auto paramBase = createGEP(i8, stackMem, {getIntConst(localFrame, 64)}, "");
+    createStore(paramBase, RegFile[AArch64::SP]);
 
     createRegStorage(AArch64::LR, 64, "LR");
 
@@ -2543,7 +2551,7 @@ public:
         auto slot = argNum - 8;
         assert(slot < stackSlots &&
                "maximum stack slots for parameter values exceeded");
-        auto addr = createGEP(i64, stackMem, {getIntConst(slot, 64)}, "");
+        auto addr = createGEP(i64, paramBase, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }
       argNum++;
