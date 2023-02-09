@@ -2916,7 +2916,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
       Targ->createMCAsmParser(*STI, *Parser, *MCII, Opts));
   assert(TAP);
   Parser->setTargetParser(*TAP);
-  if (Parser->Run(true)) {
+  if (Parser->Run(true, true)) {
     *out << "ERROR: AsmParser failed\n";
     exit(-1);
   }
