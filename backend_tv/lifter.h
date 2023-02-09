@@ -48,8 +48,7 @@ void reset();
 
 llvm::Function *adjustSrc(llvm::Function *srcFn);
 
-std::unique_ptr<llvm::MemoryBuffer> generateAsm(llvm::Module &OrigModule,
-                                                llvm::SmallString<1024> &Asm);
+std::unique_ptr<llvm::MemoryBuffer> generateAsm(llvm::Module &OrigModule);
 
 std::pair<llvm::Function *, llvm::Function *>
 liftFunc(llvm::Module *OrigModule, llvm::Module *LiftedModule,

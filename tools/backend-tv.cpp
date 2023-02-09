@@ -84,10 +84,9 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   // signature
   srcFn = lifter::adjustSrc(srcFn);
   
-  llvm::SmallString<1024> Asm;
   auto AsmBuffer = (opt_asm_input != "") ?
     ExitOnErr(llvm::errorOrToExpected(llvm::MemoryBuffer::getFile(opt_asm_input))) :
-    lifter::generateAsm(*M1, Asm);
+    lifter::generateAsm(*M1);
 
   *out << "\n\n------------ AArch64 Assembly: ------------\n\n";
   for (auto it = AsmBuffer->getBuffer().begin(); it != AsmBuffer->getBuffer().end();

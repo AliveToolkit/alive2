@@ -64,21 +64,22 @@ using namespace lifter;
 
 namespace lifter {
 
-unique_ptr<MemoryBuffer> generateAsm(Module &OrigModule,
-                                     SmallString<1024> &Asm) {
+SmallString<1024> Asm;
+
+unique_ptr<MemoryBuffer> generateAsm(Module &M) {
   TargetOptions Opt;
   auto RM = optional<Reloc::Model>();
   unique_ptr<TargetMachine> TM(
       Targ->createTargetMachine(TripleName, CPU, "", Opt, RM));
 
-  raw_svector_ostream Dest(Asm);
+  raw_svector_ostream os(Asm);
 
   legacy::PassManager pass;
-  if (TM->addPassesToEmitFile(pass, Dest, nullptr, CGFT_AssemblyFile, false)) {
+  if (TM->addPassesToEmitFile(pass, os, nullptr, CGFT_AssemblyFile, false)) {
     cerr << "ERROR: Failed to add pass to generate assembly\n\n";
     exit(-1);
   }
-  pass.run(OrigModule);
+  pass.run(M);
   return MemoryBuffer::getMemBuffer(Asm.c_str());
 }
 
