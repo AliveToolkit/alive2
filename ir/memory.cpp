@@ -1991,7 +1991,7 @@ expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused() && observesAddresses());
   // TODO: missing pointer escaping
   if (config::enable_approx_int2ptr) {
-    DisjointExpr<expr> ret;
+    DisjointExpr<expr> ret(expr{});
     ret.add(Pointer::mkNullPointer(*this).release(), val == 0);
 
     auto add = [&](unsigned limit, bool local) {
