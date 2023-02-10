@@ -214,23 +214,19 @@ Function *adjustSrcReturn(Function *srcFn) {
 }
 
 void checkSupport(Instruction &i) {
+  if (i.isAtomic()) {
+    *out << "\nERROR: atomic instructions not supported yet\n\n";
+    exit(-1);
+  }
   if (auto *li = dyn_cast<LoadInst>(&i)) {
     if (li->isVolatile()) {
       *out << "\nERROR: volatile loads not supported yet\n\n";
-      exit(-1);
-    }
-    if (li->isAtomic()) {
-      *out << "\nERROR: atomic loads not supported yet\n\n";
       exit(-1);
     }
   }
   if (auto *si = dyn_cast<StoreInst>(&i)) {
     if (si->isVolatile()) {
       *out << "\nERROR: volatile stores not supported yet\n\n";
-      exit(-1);
-    }
-    if (si->isAtomic()) {
-      *out << "\nERROR: atomic stores not supported yet\n\n";
       exit(-1);
     }
   }
@@ -250,10 +246,6 @@ void checkSupport(Instruction &i) {
     if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
       if (ii->isVolatile()) {
         *out << "\nERROR: volatile intrinsics not supported yet\n\n";
-        exit(-1);
-      }
-      if (ii->isAtomic()) {
-        *out << "\nERROR: atomic intrinsics not supported yet\n\n";
         exit(-1);
       }
     } else {
