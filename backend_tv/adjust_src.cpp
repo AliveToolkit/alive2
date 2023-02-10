@@ -133,8 +133,9 @@ Function *adjustSrcReturn(Function *srcFn) {
     return srcFn;
 
   if (!ret_typ->isIntegerTy()) {
-    *out << "\nERROR: Unsupported Function Return Type: Only int, ptr, and void "
-            "supported for now\n\n";
+    *out
+        << "\nERROR: Unsupported Function Return Type: Only int, ptr, and void "
+           "supported for now\n\n";
     exit(-1);
   }
 
@@ -239,7 +240,8 @@ void checkSupport(Instruction &i) {
   if (auto *ci = dyn_cast<CallInst>(&i)) {
     if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
       if (IntrinsicInst::mayLowerToFunctionCall(ii->getIntrinsicID())) {
-        *out << "\nERROR: intrinsics that may lower to calls are not supported yet\n\n";
+        *out << "\nERROR: intrinsics that may lower to calls are not supported "
+                "yet\n\n";
         exit(-1);
       }
     } else {

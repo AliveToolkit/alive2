@@ -731,7 +731,7 @@ class arm2llvm {
     assert(op.isImm() || op.isReg());
 
     if (!(size == 32 || size == 64)) {
-      *out << "\nERROR" only 32 and 64 bit registers supported for now\n\n";
+      *out << "\nERROR: only 32 and 64 bit registers supported for now\n\n";
       exit(-1);
     }
 
@@ -760,10 +760,10 @@ class arm2llvm {
     auto W = V->getType()->getIntegerBitWidth();
     if (W != 64 && W != 128) {
       size_t regSize = getInstSize(CurInst->getOpcode());
-      
+
       if (!(regSize == 32 || regSize == 64)) {
-	*out << "\nERROR" only 32 and 64 bit registers supported for now\n\n";
-	exit(-1);
+        *out << "\nERROR: only 32 and 64 bit registers supported for now\n\n";
+        exit(-1);
       }
 
       // if the s flag is set, the value is smaller than 32 bits, and
@@ -2502,19 +2502,21 @@ public:
     }
 
     // number of 8-byte stack slots for paramters
-    const int stackSlots = 16; 
+    const int stackSlots = 16;
     // amount of stack available for use by the lifted function, in bytes
     const int localFrame = 512;
 
-    auto *allocTy = FunctionType::get(PointerType::get(Ctx, 0), { i32 }, false);
-    auto *myAlloc = Function::Create(allocTy, GlobalValue::ExternalLinkage,
-				     0, "myalloc", LiftedModule);
+    auto *allocTy = FunctionType::get(PointerType::get(Ctx, 0), {i32}, false);
+    auto *myAlloc = Function::Create(allocTy, GlobalValue::ExternalLinkage, 0,
+                                     "myalloc", LiftedModule);
     myAlloc->addRetAttr(Attribute::NonNull);
     AttrBuilder B(Ctx);
     B.addAllocKindAttr(AllocFnKind::Alloc);
     B.addAllocSizeAttr(0, {});
     myAlloc->addFnAttrs(B);
-    stackMem = CallInst::Create(myAlloc, { getIntConst(localFrame + (8 * stackSlots), 32) }, "stack", LLVMBB);
+    stackMem = CallInst::Create(
+        myAlloc, {getIntConst(localFrame + (8 * stackSlots), 32)}, "stack",
+        LLVMBB);
 
     // allocate storage for the main register file
     for (unsigned Reg = AArch64::X0; Reg <= AArch64::X28; ++Reg) {
@@ -2931,7 +2933,8 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
 
   auto Ana = make_unique<MCInstrAnalysis>(MCII.get());
 
-  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &SrcMgr, &MCOptions);
+  MCContext Ctx(TheTriple, MAI.get(), MRI.get(), STI.get(), &SrcMgr,
+                &MCOptions);
   std::unique_ptr<MCObjectFileInfo> MOFI(
       Targ->createMCObjectFileInfo(Ctx, false, false));
   Ctx.setObjectFileInfo(MOFI.get());
