@@ -215,6 +215,15 @@ Function *adjustSrcReturn(Function *srcFn) {
 }
 
 void checkSupport(Instruction &i) {
+  for (auto &op : i.operands()) {
+    auto *ty = op.get()->getType();
+    if (auto *pty = dyn_cast<PointerType>(ty)) {
+      if (pty->getAddressSpace() != 0) {
+        *out << "\nERROR: address spaces other than 0 are unsupported\n\n";
+        exit(-1);
+      }
+    }
+  }
   if (auto *gep = dyn_cast<GetElementPtrInst>(&i)) {
     if (!gep->isInBounds()) {
       *out << "\nERROR: only inbounds GEP instructions supported for now\n\n";
