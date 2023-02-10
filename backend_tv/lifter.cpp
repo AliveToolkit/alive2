@@ -1001,7 +1001,10 @@ public:
     case AArch64::MRS: {
       // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = getImm(1);
-      assert(imm == 55824 && "NZCV is the only supported case for MRS");
+      if (imm != 55824) {
+        *out << "\nNZCV is the only supported case for MRS\n\n";
+        exit(-1);
+      }
 
       auto N = createZExt(getN(), i64);
       auto Z = createZExt(getZ(), i64);
@@ -1024,7 +1027,10 @@ public:
     case AArch64::MSR: {
       // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = getImm(0);
-      assert(imm == 55824 && "NZCV is the only supported case for MSR");
+      if (imm != 55824) {
+        *out << "\nNZCV is the only supported case for MSR\n\n";
+        exit(-1);
+      }
 
       auto i64_0 = getIntConst(0, 64);
       auto i64_1 = getIntConst(1, 64);
@@ -2549,8 +2555,10 @@ public:
         createStore(val, RegFile[Reg]);
       } else {
         auto slot = argNum - 8;
-        assert(slot < stackSlots &&
-               "maximum stack slots for parameter values exceeded");
+        if (slot >= stackSlots) {
+          *out << "\nmaximum stack slots for parameter values exceeded\n\n";
+          exit(-1);
+        }
         auto addr = createGEP(i64, paramBase, {getIntConst(slot, 64)}, "");
         createStore(val, addr);
       }

@@ -214,21 +214,13 @@ Function *adjustSrcReturn(Function *srcFn) {
 }
 
 void checkSupport(Instruction &i) {
-  if (i.isAtomic()) {
-    *out << "\nERROR: atomic instructions not supported yet\n\n";
+  if (i.isVolatile()) {
+    *out << "\nERROR: volatiles not supported yet\n\n";
     exit(-1);
   }
-  if (auto *li = dyn_cast<LoadInst>(&i)) {
-    if (li->isVolatile()) {
-      *out << "\nERROR: volatile loads not supported yet\n\n";
-      exit(-1);
-    }
-  }
-  if (auto *si = dyn_cast<StoreInst>(&i)) {
-    if (si->isVolatile()) {
-      *out << "\nERROR: volatile stores not supported yet\n\n";
-      exit(-1);
-    }
+  if (i.isAtomic()) {
+    *out << "\nERROR: atomics not supported yet\n\n";
+    exit(-1);
   }
   if (isa<IntToPtrInst>(&i)) {
     *out << "\nERROR: int2ptr instructions not supported yet\n\n";
@@ -239,17 +231,22 @@ void checkSupport(Instruction &i) {
     exit(-1);
   }
   if (auto *ci = dyn_cast<CallInst>(&i)) {
-    if (ci->isTailCall()) {
-      *out << "\nERROR: tail calls not supported yet\n\n";
-      exit(-1);
-    }
     if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
-      if (ii->isVolatile()) {
-        *out << "\nERROR: volatile intrinsics not supported yet\n\n";
+      if (IntrinsicInst::mayLowerToFunctionCall(ii->getIntrinsicID())) {
+        *out << "\nERROR: intrinsics that may lower to calls are not supported yet\n\n";
         exit(-1);
       }
     } else {
       *out << "\nERROR: calls (besides intrinsics) not supported yet\n\n";
+      exit(-1);
+    }
+    if (ci->isTailCall()) {
+      *out << "\nERROR: tail calls not supported yet\n\n";
+      exit(-1);
+    }
+    auto callee = (string)ci->getCalledFunction()->getName();
+    if (callee.find("llvm.objc") != string::npos) {
+      *out << "\nERROR: llvm.objc instrinsics not supported\n\n";
       exit(-1);
     }
   }
