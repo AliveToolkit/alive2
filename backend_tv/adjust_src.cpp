@@ -73,7 +73,7 @@ Function *adjustSrcInputs(Function *srcFn) {
     if (ty->isIntegerTy()) {
       auto orig_width = ty->getIntegerBitWidth();
       if (orig_width > 64) {
-        *out << "ERROR: Unsupported function argument: Only parameters 64 "
+        *out << "\nERROR: Unsupported function argument: Only parameters 64 "
                 "bits or smaller supported for now\n\n";
         exit(-1);
       }
@@ -81,14 +81,14 @@ Function *adjustSrcInputs(Function *srcFn) {
       new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
     } else if (auto pty = dyn_cast<PointerType>(ty)) {
       if (pty->getAddressSpace() != 0) {
-        *out << "ERROR: Unsupported function argument: Only address space "
+        *out << "\nERROR: Unsupported function argument: Only address space "
                 "0 is supported\n\n";
         exit(-1);
       }
       new_argtypes.emplace_back(pty);
       orig_input_width.emplace_back(64);
     } else {
-      *out << "ERROR: Unsupported function argument: Only int/ptr types "
+      *out << "\nERROR: Unsupported function argument: Only int/ptr types "
               "supported for now\n\n";
       exit(-1);
     }
@@ -133,14 +133,14 @@ Function *adjustSrcReturn(Function *srcFn) {
     return srcFn;
 
   if (!ret_typ->isIntegerTy()) {
-    *out << "ERROR: Unsupported Function Return Type: Only int, ptr, and void "
+    *out << "\nERROR: Unsupported Function Return Type: Only int, ptr, and void "
             "supported for now\n\n";
     exit(-1);
   }
 
   orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
   if (orig_ret_bitwidth > 64) {
-    *out << "ERROR: Unsupported Function Return: Only int types 64 "
+    *out << "\nERROR: Unsupported Function Return: Only int types 64 "
             "bits or smaller supported for now\n\n";
     exit(-1);
   }
@@ -219,27 +219,56 @@ namespace lifter {
 
 Function *adjustSrc(Function *srcFn) {
   if (srcFn->isVarArg()) {
-    *out << "ERROR: varargs not supported yet\n\n";
+    *out << "\nERROR: varargs not supported yet\n\n";
     exit(-1);
   }
 
   for (auto &bb : *srcFn) {
     for (auto &i : bb) {
+      if (auto *li = dyn_cast<LoadInst>(&i)) {
+	if (li->isVolatile()) {
+	  *out << "\nERROR: volatile loads not supported yet\n\n";
+	  exit(-1);
+	}
+	if (li->isAtomic()) {
+	  *out << "\nERROR: atomic loads not supported yet\n\n";
+	  exit(-1);
+	}
+      }
+      if (auto *si = dyn_cast<StoreInst>(&i)) {
+	if (si->isVolatile()) {
+	  *out << "\nERROR: volatile stores not supported yet\n\n";
+	  exit(-1);
+	}
+	if (si->isAtomic()) {
+	  *out << "\nERROR: atomic stores not supported yet\n\n";
+	  exit(-1);
+	}
+      }
       if (isa<IntToPtrInst>(&i)) {
-        *out << "ERROR: int2ptr instructions not supported yet\n\n";
+        *out << "\nERROR: int2ptr instructions not supported yet\n\n";
         exit(-1);
       }
       if (isa<InvokeInst>(&i)) {
-        *out << "ERROR: invoke instructions not supported\n\n";
+        *out << "\nERROR: invoke instructions not supported\n\n";
         exit(-1);
       }
       if (auto *ci = dyn_cast<CallInst>(&i)) {
         if (ci->isTailCall()) {
-          *out << "ERROR: tail calls not supported yet\n\n";
+          *out << "\nERROR: tail calls not supported yet\n\n";
           exit(-1);
         }
-        if (!isa<IntrinsicInst>(ci)) {
-          *out << "ERROR: calls (besides intrinsics) not supported yet\n\n";
+        if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
+	  if (ii->isVolatile()) {
+	    *out << "\nERROR: volatile intrinsics not supported yet\n\n";
+	    exit(-1);
+	  }
+	  if (ii->isAtomic()) {
+	    *out << "\nERROR: atomic intrinsics not supported yet\n\n";
+	    exit(-1);
+	  }
+	} else {
+          *out << "\nERROR: calls (besides intrinsics) not supported yet\n\n";
           exit(-1);
         }
       }

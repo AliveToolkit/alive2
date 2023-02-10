@@ -408,7 +408,7 @@ class arm2llvm {
   [[noreturn]] void visitError(MCInst &I) {
     out->flush();
     string str(instrPrinter->getOpcodeName(I.getOpcode()));
-    *out << "ERROR: Unsupported AArch64 instruction: " << str << "\n";
+    *out << "\nERROR: Unsupported AArch64 instruction: " << str << "\n";
     out->flush();
     exit(-1); // FIXME handle this better
   }
@@ -447,7 +447,7 @@ class arm2llvm {
       return createFShr(value, value, exp);
     default:
       // FIXME: handle other case (msl)
-      *out << "ERROR: shift type not supported\n\n";
+      *out << "\nERROR: shift type not supported\n\n";
       exit(-1);
     }
   }
@@ -2137,23 +2137,23 @@ public:
         llvm::raw_string_ostream ss(sss);
         expr->print(ss, nullptr);
         if (!sss.starts_with(":got_lo12:")) {
-          *out << "ERROR: only :got_lo12: is supported\n\n";
+          *out << "\nERROR: only :got_lo12: is supported\n\n";
           exit(-1);
         }
         auto globName = sss.substr(10, string::npos);
         if (!globals.contains(globName)) {
-          *out << "ERROR: load mentions '" << globName << "'\n";
+          *out << "\nERROR: load mentions '" << globName << "'\n";
           *out << "which is not a global variable we know about\n\n";
           exit(-1);
         }
         auto got = GOT.find(PrevInst);
         if (got == GOT.end() || got->second != globName) {
-          *out << "ERROR: unexpected :got_lo12:\n\n";
+          *out << "\nERROR: unexpected :got_lo12:\n\n";
           exit(-1);
         }
         auto glob = globals.find(globName);
         if (glob == globals.end()) {
-          *out << "ERROR: global not found\n\n";
+          *out << "\nERROR: global not found\n\n";
           exit(-1);
         }
         auto Reg = CurInst->getOperand(0).getReg();
@@ -2205,7 +2205,7 @@ public:
       if (sss.starts_with(":got:")) {
         auto globName = sss.substr(5, string::npos);
         if (!globals.contains(globName)) {
-          *out << "ERROR: ADRP mentions unknown global variable\n";
+          *out << "\nERROR: ADRP mentions unknown global variable\n";
           *out << "'" << globName
                << "'  is not a global variable we know about\n";
           exit(-1);
@@ -2213,7 +2213,7 @@ public:
         GOT[CurInst] = globName;
       } else {
         *out << "\n";
-        *out << "ERROR: Unexpected MCExpr in ADRP\n";
+        *out << "\nERROR: Unexpected MCExpr in ADRP\n";
         *out << "'" << sss << "' but only :got: is currently supported\n";
         exit(-1);
       }
@@ -2932,7 +2932,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Parser->setTargetParser(*TAP);
 
   if (Parser->Run(true)) {
-    *out << "ERROR: AsmParser failed\n";
+    *out << "\nERROR: AsmParser failed\n";
     exit(-1);
   }
 
@@ -2949,7 +2949,7 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   if (llvm::verifyModule(*LiftedModule, &ss)) {
     *out << sss << "\n\n";
     out->flush();
-    *out << "ERROR: Lifted module is broken, this should not happen\n";
+    *out << "\nERROR: Lifted module is broken, this should not happen\n";
     exit(-1);
   }
 
