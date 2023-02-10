@@ -728,8 +728,12 @@ class arm2llvm {
   Value *readFromOperand(int idx, int shift = 0) {
     auto op = CurInst->getOperand(idx);
     auto size = getInstSize(CurInst->getOpcode());
-    assert(size == 32 || size == 64);
     assert(op.isImm() || op.isReg());
+
+    if (!(size == 32 || size == 64)) {
+      *out << "\nERROR" only 32 and 64 bit registers supported for now\n\n";
+      exit(-1);
+    }
 
     Value *V = nullptr;
     if (op.isImm()) {
@@ -756,7 +760,11 @@ class arm2llvm {
     auto W = V->getType()->getIntegerBitWidth();
     if (W != 64 && W != 128) {
       size_t regSize = getInstSize(CurInst->getOpcode());
-      assert(regSize == 32 || regSize == 64);
+      
+      if (!(regSize == 32 || regSize == 64)) {
+	*out << "\nERROR" only 32 and 64 bit registers supported for now\n\n";
+	exit(-1);
+      }
 
       // if the s flag is set, the value is smaller than 32 bits, and
       // the register we are storing it in _is_ 32 bits, we sign

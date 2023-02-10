@@ -214,6 +214,12 @@ Function *adjustSrcReturn(Function *srcFn) {
 }
 
 void checkSupport(Instruction &i) {
+  if (auto *gep = dyn_cast<GetElementPtrInst>(&i)) {
+    if (!gep->isInBounds()) {
+      *out << "\nERROR: only inbounds GEP instructions supported for now\n\n";
+      exit(-1);
+    }
+  }
   if (i.isVolatile()) {
     *out << "\nERROR: volatiles not supported yet\n\n";
     exit(-1);
