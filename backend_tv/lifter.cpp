@@ -955,7 +955,7 @@ public:
       auto baseReg = op1.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
              (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-             (baseReg == AArch64::XZR));
+             (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
       return make_pair(baseAddr, op2.getImm());
     }
@@ -979,7 +979,7 @@ public:
     auto baseReg = op1.getReg();
     assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
            (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
-           (baseReg == AArch64::XZR));
+           (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
     auto baseAddr = readPtrFromReg(baseReg);
     return make_tuple(baseAddr, op2.getImm(), readFromReg(op0.getReg()));
   }
@@ -2525,9 +2525,6 @@ public:
       createRegStorage(Reg, 64, Name.str());
     }
 
-    // we'll initialize FP later
-    createRegStorage(AArch64::FP, 64, "FP");
-
     createRegStorage(AArch64::SP, 64, "SP");
     // load the base address for the stack memory; FIXME: this works
     // for accessing parameters but it doesn't support the general
@@ -2535,6 +2532,10 @@ public:
     auto paramBase = createGEP(i8, stackMem, {getIntConst(localFrame, 64)}, "");
     createStore(paramBase, RegFile[AArch64::SP]);
 
+    // FP is X29; we'll initialize it later
+    createRegStorage(AArch64::FP, 64, "FP");
+
+    // LR is X30; FIXME initialize this
     createRegStorage(AArch64::LR, 64, "LR");
 
     // initializing to zero makes loads from XZR work; stores are
@@ -2574,6 +2575,10 @@ public:
       }
       argNum++;
     }
+    auto initFP = (argNum > 8) ?
+      createGEP(i64, paramBase, {getIntConst(argNum - 8, 64)}, "") :
+      paramBase;
+    createStore(initFP, RegFile[AArch64::FP]);
 
     *out << "done with callee-side ABI stuff\n";
     *out << "about to lift the instructions\n";
