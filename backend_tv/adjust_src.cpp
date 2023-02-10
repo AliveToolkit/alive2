@@ -213,6 +213,56 @@ Function *adjustSrcReturn(Function *srcFn) {
   return NF;
 }
 
+void checkSupport(Instruction &i) {
+  if (auto *li = dyn_cast<LoadInst>(&i)) {
+    if (li->isVolatile()) {
+      *out << "\nERROR: volatile loads not supported yet\n\n";
+      exit(-1);
+    }
+    if (li->isAtomic()) {
+      *out << "\nERROR: atomic loads not supported yet\n\n";
+      exit(-1);
+    }
+  }
+  if (auto *si = dyn_cast<StoreInst>(&i)) {
+    if (si->isVolatile()) {
+      *out << "\nERROR: volatile stores not supported yet\n\n";
+      exit(-1);
+    }
+    if (si->isAtomic()) {
+      *out << "\nERROR: atomic stores not supported yet\n\n";
+      exit(-1);
+    }
+  }
+  if (isa<IntToPtrInst>(&i)) {
+    *out << "\nERROR: int2ptr instructions not supported yet\n\n";
+    exit(-1);
+  }
+  if (isa<InvokeInst>(&i)) {
+    *out << "\nERROR: invoke instructions not supported\n\n";
+    exit(-1);
+  }
+  if (auto *ci = dyn_cast<CallInst>(&i)) {
+    if (ci->isTailCall()) {
+      *out << "\nERROR: tail calls not supported yet\n\n";
+      exit(-1);
+    }
+    if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
+      if (ii->isVolatile()) {
+        *out << "\nERROR: volatile intrinsics not supported yet\n\n";
+        exit(-1);
+      }
+      if (ii->isAtomic()) {
+        *out << "\nERROR: atomic intrinsics not supported yet\n\n";
+        exit(-1);
+      }
+    } else {
+      *out << "\nERROR: calls (besides intrinsics) not supported yet\n\n";
+      exit(-1);
+    }
+  }
+}
+
 } // namespace
 
 namespace lifter {
@@ -223,57 +273,9 @@ Function *adjustSrc(Function *srcFn) {
     exit(-1);
   }
 
-  for (auto &bb : *srcFn) {
-    for (auto &i : bb) {
-      if (auto *li = dyn_cast<LoadInst>(&i)) {
-	if (li->isVolatile()) {
-	  *out << "\nERROR: volatile loads not supported yet\n\n";
-	  exit(-1);
-	}
-	if (li->isAtomic()) {
-	  *out << "\nERROR: atomic loads not supported yet\n\n";
-	  exit(-1);
-	}
-      }
-      if (auto *si = dyn_cast<StoreInst>(&i)) {
-	if (si->isVolatile()) {
-	  *out << "\nERROR: volatile stores not supported yet\n\n";
-	  exit(-1);
-	}
-	if (si->isAtomic()) {
-	  *out << "\nERROR: atomic stores not supported yet\n\n";
-	  exit(-1);
-	}
-      }
-      if (isa<IntToPtrInst>(&i)) {
-        *out << "\nERROR: int2ptr instructions not supported yet\n\n";
-        exit(-1);
-      }
-      if (isa<InvokeInst>(&i)) {
-        *out << "\nERROR: invoke instructions not supported\n\n";
-        exit(-1);
-      }
-      if (auto *ci = dyn_cast<CallInst>(&i)) {
-        if (ci->isTailCall()) {
-          *out << "\nERROR: tail calls not supported yet\n\n";
-          exit(-1);
-        }
-        if (auto *ii = dyn_cast<IntrinsicInst>(ci)) {
-	  if (ii->isVolatile()) {
-	    *out << "\nERROR: volatile intrinsics not supported yet\n\n";
-	    exit(-1);
-	  }
-	  if (ii->isAtomic()) {
-	    *out << "\nERROR: atomic intrinsics not supported yet\n\n";
-	    exit(-1);
-	  }
-	} else {
-          *out << "\nERROR: calls (besides intrinsics) not supported yet\n\n";
-          exit(-1);
-        }
-      }
-    }
-  }
+  for (auto &bb : *srcFn)
+    for (auto &i : bb)
+      checkSupport(i);
 
   srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
