@@ -215,8 +215,16 @@ Function *adjustSrcReturn(Function *srcFn) {
 }
 
 void checkSupport(Instruction &i) {
+  if (i.getType()->isVectorTy()) {
+    *out << "\nERROR: vector types not supported yet\n\n";
+    exit(-1);
+  }
   for (auto &op : i.operands()) {
     auto *ty = op.get()->getType();
+    if (ty->isVectorTy()) {
+        *out << "\nERROR: vector types not supported yet\n\n";
+        exit(-1);
+    }
     if (auto *pty = dyn_cast<PointerType>(ty)) {
       if (pty->getAddressSpace() != 0) {
         *out << "\nERROR: address spaces other than 0 are unsupported\n\n";
@@ -266,6 +274,19 @@ void checkSupport(Instruction &i) {
       *out << "\nERROR: llvm.objc instrinsics not supported\n\n";
       exit(-1);
     }
+    if (callee.find("llvm.thread") != string::npos) {
+      *out << "\nERROR: llvm.thread instrinsics not supported\n\n";
+      exit(-1);
+    }
+    if ((callee.find("llvm.experimental.gc") != string::npos) ||
+	(callee.find("llvm.experimental.stackmap") != string::npos)) {
+      *out << "\nERROR: llvm GC instrinsics not supported\n\n";
+      exit(-1);
+    }
+    if (callee.find("llvm.objc") != string::npos) {
+      *out << "\nERROR: llvm.objc instrinsics not supported\n\n";
+      exit(-1);
+    }
   }
 }
 
@@ -274,6 +295,11 @@ void checkSupport(Instruction &i) {
 namespace lifter {
 
 Function *adjustSrc(Function *srcFn) {
+  if (srcFn->getCallingConv() != CallingConv::C) {
+    *out << "\nERROR: only the C calling convention is supported\n\n";
+    exit(-1);
+  }
+  
   if (srcFn->isVarArg()) {
     *out << "\nERROR: varargs not supported yet\n\n";
     exit(-1);
