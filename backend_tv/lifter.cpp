@@ -701,11 +701,18 @@ class arm2llvm {
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
   Value *dealiasReg(unsigned Reg) {
+    *out << "dealias = " << Reg << "\n";
     unsigned WideReg = Reg;
-    if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
-      WideReg = Reg - AArch64::W0 + AArch64::X0;
     if (Reg == AArch64::WZR)
       WideReg = AArch64::XZR;
+    else if (Reg == AArch64::W29)
+      WideReg = AArch64::FP;
+    else if (Reg == AArch64::W30)
+      WideReg = AArch64::LR;
+    else if (Reg == AArch64::WSP)
+      WideReg = AArch64::SP;
+    else if (Reg >= AArch64::W0 && Reg <= AArch64::W28)
+      WideReg = Reg - AArch64::W0 + AArch64::X0;
     auto RegAddr = RegFile[WideReg];
     assert(RegAddr);
     return RegAddr;
@@ -2090,7 +2097,8 @@ public:
 
       auto baseReg = op2.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-             (baseReg == AArch64::SP) || (baseReg == AArch64::LR));
+             (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+             (baseReg == AArch64::FP));
       auto baseAddr = readPtrFromReg(baseReg);
 
       auto size = (opcode == AArch64::STPWi) ? 4 : 8;
