@@ -446,6 +446,12 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     return;
   }
 
+  if (config::check_if_src_is_ub &&
+      check_expr(axioms_expr && fndom_a).isUnsat()) {
+    errs.add("Source function is always UB", false);
+    return;
+  }
+
   {
     auto sink_src = src_state.sinkDomain();
     if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
@@ -936,7 +942,7 @@ static void calculateAndInitConstants(Transform &t) {
 
       if (auto *mi = dynamic_cast<const MemInstr *>(&i)) {
         auto [alloc, align] = mi->getMaxAllocSize();
-        max_alloc_size     = max(max_alloc_size, alloc);
+        max_alloc_size      = max(max_alloc_size, alloc);
         loc_alloc_aligned_size = add_saturate(loc_alloc_aligned_size,
                                               aligned_alloc_size(alloc, align));
         max_access_size  = max(max_access_size, mi->getMaxAccessSize());
@@ -1012,8 +1018,8 @@ static void calculateAndInitConstants(Transform &t) {
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
   observes_addresses |= has_int2ptr || has_ptr2int;
-  // condition can happen with ptr2int(poison)
-  if (has_ptr2int && num_nonlocals == 0) {
+  // condition can happen with ptr2int(poison) or e.g., load poison
+  if ((has_ptr2int || does_mem_access) && num_nonlocals == 0) {
     ++num_nonlocals_src;
     ++num_nonlocals;
   }

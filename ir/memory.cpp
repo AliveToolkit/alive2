@@ -1993,13 +1993,14 @@ expr Memory::int2ptr(const expr &val) const {
   // TODO: missing pointer escaping
   if (config::enable_approx_int2ptr) {
     DisjointExpr<expr> ret(expr{});
+    expr valx = val.zextOrTrunc(bits_program_pointer);
 
     auto add = [&](unsigned limit, bool local) {
       for (unsigned i = 0; i != limit; ++i) {
         Pointer p(*this, i, local);
         Pointer p_end = p + p.blockSize();
-        ret.add((p + (val - p.getAddress())).release(),
-                val.uge(p.getAddress()) && val.ule(p_end.getAddress()));
+        ret.add((p + (valx - p.getAddress())).release(),
+                valx.uge(p.getAddress()) && valx.ule(p_end.getAddress()));
       }
     };
     add(numLocals(), true);
