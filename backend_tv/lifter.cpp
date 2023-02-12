@@ -1010,7 +1010,7 @@ public:
       // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = getImm(1);
       if (imm != 55824) {
-        *out << "\nNZCV is the only supported case for MRS\n\n";
+        *out << "\nERROR: NZCV is the only supported case for MRS\n\n";
         exit(-1);
       }
 
@@ -1036,7 +1036,7 @@ public:
       // https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/NZCV--Condition-Flags
       auto imm = getImm(0);
       if (imm != 55824) {
-        *out << "\nNZCV is the only supported case for MSR\n\n";
+        *out << "\nERROR: NZCV is the only supported case for MSR\n\n";
         exit(-1);
       }
 
@@ -2567,7 +2567,7 @@ public:
       } else {
         auto slot = argNum - 8;
         if (slot >= stackSlots) {
-          *out << "\nmaximum stack slots for parameter values exceeded\n\n";
+          *out << "\nERROR: maximum stack slots for parameter values exceeded\n\n";
           exit(-1);
         }
         auto addr = createGEP(i64, paramBase, {getIntConst(slot, 64)}, "");
