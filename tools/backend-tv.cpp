@@ -193,7 +193,7 @@ version )EOF";
   if (opt_fn != "") {
     auto *srcFn = findFunction(*M1, opt_fn);
     if (srcFn == nullptr) {
-      *out << "Fatal error: Couldn't find function to verify\n";
+      *out << "ERROR: Couldn't find function to verify\n";
       exit(-1);
     }
     doit(M1.get(), srcFn, verifier);
@@ -203,6 +203,10 @@ version )EOF";
       if (srcFn.isDeclaration())
 	continue;
       Funcs.push_back(&srcFn);
+    }
+    if (Funcs.empty()) {
+      *out << "ERROR: No functions found\n";
+      exit(-1);
     }
     for (auto *srcFn : Funcs)
       doit(M1.get(), srcFn, verifier);
