@@ -446,6 +446,12 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     return;
   }
 
+  if (config::check_if_src_is_ub &&
+      check_expr(axioms_expr && fndom_a).isUnsat()) {
+    errs.add("Source function is always UB", false);
+    return;
+  }
+
   {
     auto sink_src = src_state.sinkDomain();
     if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
