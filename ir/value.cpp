@@ -76,8 +76,7 @@ void NullPointerValue::print(ostream &os) const {
 }
 
 StateValue NullPointerValue::toSMT(State &s) const {
-  auto nullp = Pointer::mkNullPointer(s.getMemory());
-  return { nullp.release(), true };
+  return { Pointer::mkNullPointer(s.getMemory()).release(), true };
 }
 
 

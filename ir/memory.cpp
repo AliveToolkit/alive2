@@ -1273,7 +1273,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
   }
   ptr_alias.emplace(p.getBid(), std::move(alias));
 
-  return p.release();
+  return std::move(p).release();
 }
 
 pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
@@ -1291,8 +1291,9 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
                           one << var.zextOrTrunc(bits_for_offset));
     offset = undef.extract(bits_undef - 1, log_offset) | shl;
   }
-  Pointer p(*this, expr::mkUInt(0, bits_for_bid), offset, attrs);
-  return { p.release(), std::move(undef) };
+  return
+    { Pointer(*this, expr::mkUInt(0, bits_for_bid), offset, attrs).release(),
+      std::move(undef) };
 }
 
 bool Memory::PtrInput::eq_attrs(const PtrInput &rhs) const {
@@ -1384,7 +1385,7 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
   ptr_alias.emplace(p.getBid(), std::move(alias));
 
   state->addAxiom(expr::mkIf(p.isLocal(), local, nonlocal));
-  return { p.release(), {} };
+  return { std::move(p).release(), {} };
 }
 
 Memory::CallState Memory::CallState::mkIf(const expr &cond,
@@ -1668,7 +1669,7 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
     state->addQuantVar(nondet_nonnull);
     allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
   }
-  return { p.release(), std::move(allocated) };
+  return { std::move(p).release(), std::move(allocated) };
 }
 
 void Memory::startLifetime(const expr &ptr_local) {
@@ -1976,7 +1977,7 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
 void Memory::fillPoison(const expr &bid) {
   Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
   expr blksz = p.blockSize();
-  memset(p.release(), IntType("i8", 8).getDummyValue(false),
+  memset(std::move(p).release(), IntType("i8", 8).getDummyValue(false),
          std::move(blksz), bits_byte / 8, {}, false);
 }
 
@@ -1992,14 +1993,13 @@ expr Memory::int2ptr(const expr &val) const {
   // TODO: missing pointer escaping
   if (config::enable_approx_int2ptr) {
     DisjointExpr<expr> ret(expr{});
-    ret.add(Pointer::mkNullPointer(*this).release(), val == 0);
 
     auto add = [&](unsigned limit, bool local) {
       for (unsigned i = 0; i != limit; ++i) {
         Pointer p(*this, i, local);
         Pointer p_end = p + p.blockSize();
         ret.add((p + (val - p.getAddress())).release(),
-                val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
+                val.uge(p.getAddress()) && val.ule(p_end.getAddress()));
       }
     };
     add(numLocals(), true);

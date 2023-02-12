@@ -71,7 +71,7 @@ public:
   smt::expr blockSizeOffsetT() const; // to compare with offsets
 
   const smt::expr& operator()() const { return p; }
-  smt::expr release() { return std::move(p); }
+  smt::expr release() && { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
   Pointer operator+(unsigned) const;

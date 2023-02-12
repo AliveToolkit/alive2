@@ -3654,7 +3654,7 @@ StateValue GEP::toSMT(State &s) const {
       if (inbounds)
         non_poison.add(ptr.inbounds());
     }
-    return { ptr.release(), non_poison() };
+    return { std::move(ptr).release(), non_poison() };
   };
 
   if (auto aty = getType().getAsAggregateType()) {
