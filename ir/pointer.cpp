@@ -412,7 +412,7 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
     // record pointer if not definitely unfeasible
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.blockSize().isZero())
-      all_ptrs.add(ptr.release(), domain);
+      all_ptrs.add(std::move(ptr).release(), domain);
 
     UB.add(std::move(ub), domain);
     is_aligned.add(std::move(aligned), domain);
