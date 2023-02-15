@@ -551,7 +551,7 @@ struct ConstModifier : public Modifier {
         RandomFromLLVMStressBits[i] = Ran->Rand64();
 
       APInt RandomFromLLVMStressInt(Ty->getPrimitiveSizeInBits(),
-                                    makeArrayRef(RandomFromLLVMStressBits));
+                                    {RandomFromLLVMStressBits[0],RandomFromLLVMStressBits[1]});
       APFloat RandomFromLLVMStressFloat(Ty->getFltSemantics(),
                                         RandomFromLLVMStressInt);
 
