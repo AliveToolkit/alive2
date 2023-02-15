@@ -2,7 +2,6 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 /*
-
 1. Special constants
   min/max ± ∆
   Small numbers, required for peephole optimizations
@@ -191,6 +190,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
   Results r;
   r.t.src = move(*fn1);
   r.t.tgt = move(*fn2);
+
   if (!always_verify) {
     stringstream ss1, ss2;
     r.t.src.print(ss1);
@@ -421,15 +421,7 @@ version )EOF";
   } else if (timeElapsed > 0) {
     timeMode();
   }
-  //if(verbose){
-  std::cout<<"program ended\n";
- 
-  std::cout << "Summary:\n"
-        "  " << tot_num_correct << " correct transformations\n"
-        "  " << tot_num_unsound << " incorrect transformations\n"
-        "  " << tot_num_failed  << " failed-to-prove transformations\n"
-        "  " << tot_num_errors << " Alive2 errors\n";
-  //}
+  programEnd();
   return num_errors > 0;
 }
 
@@ -681,7 +673,7 @@ void runOnce(int ith, llvm::LLVMContext &context, Mutator &mutator) {
   } else if (num_errors) {
     ++logIndex;
     std::cout << "Alive error found! at" << ith << "th copies\n";
-  
+  }
 
   if (verbose) {
     *out << "Summary:\n"
