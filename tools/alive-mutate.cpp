@@ -456,7 +456,7 @@ bool inputVerify() {
     unique_ptr<llvm::Module> M2 = CloneModule(*M1);
     llvm_util::optimize_module(M2.get(), optPass);
     size_t unnamedFunction = 0;
-    for (auto fit = M1->begin(); !testMode && fit != M1->end(); ++fit) {
+    for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
       if (fit->getName().empty()) {
         fit->setName(std::string("resetUnnamedFunction") +
                      std::to_string(unnamedFunction++));
