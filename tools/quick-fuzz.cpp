@@ -922,6 +922,13 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   assert(err.empty());
 
   verifier.compareFunctions(*F1, *F2);
+
+  F1->eraseFromParent();
+  vector<Function *> Funcs;
+  for (auto &F : *M1)
+    Funcs.push_back(&F);
+  for (auto F : Funcs)
+    F->eraseFromParent();
 }
 
 } // namespace
@@ -964,7 +971,18 @@ reduced using llvm-reduce.
 
   lifter::out = out;
 
-  unique_ptr<Module> M1;
+  auto M1 = make_unique<Module>("M1", Context);
+  auto &DL = M1->getDataLayout();
+  Triple targetTriple(M1->getTargetTriple());
+  TargetLibraryInfoWrapperPass TLI(targetTriple);
+
+  llvm_util::initializer llvm_util_init(*out, DL);
+  smt::smt_initializer smt_init;
+  Verifier verifier(TLI, smt_init, *out);
+  verifier.quiet = opt_quiet;
+  verifier.always_verify = opt_always_verify;
+  verifier.print_dot = opt_print_dot;
+  verifier.bidirectional = opt_bidirectional;
 
   function<unique_ptr<Fuzzer>(Module &, long)> makeFuzzer;
   if (opt_fuzzer == "value") {
@@ -985,10 +1003,10 @@ reduced using llvm-reduce.
       0, numeric_limits<unsigned long>::max());
 
   for (int rep = 0; rep < opt_num_reps; ++rep) {
-    auto F = makeFuzzer(M1, Dist(Rand));
+    auto F = makeFuzzer(*M1.get(), Dist(Rand));
     F->go();
 
-    if (verifyModule(M1, &errs()))
+    if (verifyModule(*M1.get(), &errs()))
       report_fatal_error("Broken module found, this should not happen");
 
     if (opt_run_sroa) {
@@ -1054,29 +1072,14 @@ reduced using llvm-reduce.
       if (!verifier.compareFunctions(*F1, *F2))
 	if (opt_error_fatal)
 	  goto end;
+
+      F1->eraseFromParent();
+      vector<Function *> Funcs;
+      for (auto &F : *M1)
+        Funcs.push_back(&F);
+      for (auto F : Funcs)
+        F->eraseFromParent();
     }
-
-    auto *F1 = M1.getFunction("f");
-    auto *F2 = M2->getFunction("f");
-    assert(F1 && F2);
-
-    // this is a hack but a useful one. attribute inference sets these
-    // and then we always fail Alive's syntactic equality check. so we
-    // just go ahead and (soundly) drop them by hand.
-    F2->removeFnAttr(Attribute::NoFree);
-    F2->removeFnAttr(Attribute::Memory);
-    F2->removeFnAttr(Attribute::WillReturn);
-
-    if (!verifier.compareFunctions(*F1, *F2))
-      if (opt_error_fatal)
-        goto end;
-
-    F1->eraseFromParent();
-    vector<Function *> Funcs;
-    for (auto &F : M1)
-      Funcs.push_back(&F);
-    for (auto F : Funcs)
-      F->eraseFromParent();
   }
 
   *out << "Summary:\n"
