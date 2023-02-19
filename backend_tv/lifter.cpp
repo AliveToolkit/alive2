@@ -701,7 +701,6 @@ class arm2llvm {
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
   Value *dealiasReg(unsigned Reg) {
-    *out << "dealias = " << Reg << "\n";
     unsigned WideReg = Reg;
     if (Reg == AArch64::WZR)
       WideReg = AArch64::XZR;

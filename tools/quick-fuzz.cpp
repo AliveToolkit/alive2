@@ -542,6 +542,8 @@ private:
       Op = Intrinsic::bswap;
       break;
     case 3:
+      if (opt_backend_tv)
+        goto again;
       Op = Intrinsic::ctpop;
       break;
     case 4:
@@ -715,7 +717,7 @@ void ValueFuzzer::go() {
   for (int i = 0; i < NumIntParams; ++i) {
     auto *origTy = Type::getIntNTy(Ctx, VG->getWidth());
     auto *realTy =
-        C->flip() ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
+        true ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
     ParamsRealTy.push_back(origTy);
     ParamsTy.push_back(realTy);
   }
@@ -972,11 +974,23 @@ reduced using llvm-reduce.
   lifter::out = out;
 
   auto M1 = make_unique<Module>("M1", Context);
-  auto &DL = M1->getDataLayout();
-  Triple targetTriple(M1->getTargetTriple());
-  TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-  llvm_util::initializer llvm_util_init(*out, DL);
+  optional<DataLayout> DL;
+  optional<Triple> TT;
+  if (opt_backend_tv) {
+    const string DLStr{"e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"};
+    const string TTStr{"aarch64-linux-gnu"};
+    DL.emplace(DLStr);
+    TT.emplace(TTStr);
+    M1->setDataLayout(DLStr);
+    M1->setTargetTriple(TTStr);
+  } else {
+    DL.emplace(M1->getDataLayout());
+    TT.emplace(M1->getTargetTriple());
+  }
+  TargetLibraryInfoWrapperPass TLI(TT.value());
+
+  llvm_util::initializer llvm_util_init(*out, DL.value());
   smt::smt_initializer smt_init;
   Verifier verifier(TLI, smt_init, *out);
   verifier.quiet = opt_quiet;
