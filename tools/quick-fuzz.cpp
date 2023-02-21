@@ -717,7 +717,7 @@ void ValueFuzzer::go() {
   for (int i = 0; i < NumIntParams; ++i) {
     auto *origTy = Type::getIntNTy(Ctx, VG->getWidth());
     auto *realTy =
-        true ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
+      true ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
     ParamsRealTy.push_back(origTy);
     ParamsTy.push_back(realTy);
   }
