@@ -97,16 +97,14 @@ cl::opt<string>
             cl::cat(alive_cmdargs), cl::init("O2"));
 
 class Chooser {
-  optional<mt19937_64> Rand;
+  mt19937_64 Rand;
   Chooser() = delete;
 
 public:
-  Chooser(long seed) {
-    Rand.emplace(seed);
-  }
+  Chooser(long seed) : Rand(seed) {}
 
   long choose(long Choices) {
-    return uniform_int_distribution<int>(0, Choices - 1)(*Rand);
+    return uniform_int_distribution<int>(0, Choices - 1)(Rand);
   }
 
   bool flip() {
@@ -116,7 +114,7 @@ public:
   long dist() {
     uniform_int_distribution<unsigned long> Dist(
         0, numeric_limits<unsigned long>::max());
-    return Dist(*Rand);
+    return Dist(Rand);
   }
 };
 
@@ -498,10 +496,7 @@ private:
     case WidthPolicy::AllOne:
       return SavedWidth;
     case WidthPolicy::Mixed1:
-      if (C.flip())
-        return getWidth(WidthPolicy::Wild);
-      else
-        return getWidth(WidthPolicy::Chosen);
+      return getWidth(C.flip() ? WidthPolicy::Chosen : WidthPolicy::Wild);
     case WidthPolicy::Mixed2:
       if (C.flip())
         return SavedWidth;
@@ -688,15 +683,14 @@ class ValueFuzzer : public Fuzzer {
   const int MaxInsts = 15;
   Module &M;
   LLVMContext &Ctx;
-  optional<Chooser> C;
-  optional<ValueGenerator> VG;
+  Chooser C;
+  ValueGenerator VG;
   bool gone = false;
 
 public:
-  ValueFuzzer(Module &_M, long seed) : M(_M), Ctx(M.getContext()) {
-    C.emplace(seed);
-    VG.emplace(C.value(), MaxIntWidth, Ctx);
-  }
+  ValueFuzzer(Module &_M, long seed) : M(_M), Ctx(M.getContext()), C(seed),
+    VG(C, MaxIntWidth, Ctx) {}
+
   void go() override;
 };
 
@@ -704,59 +698,53 @@ void ValueFuzzer::go() {
   assert(!gone);
   gone = true;
 
-  const int NumIntParams = 1 + C->choose(MaxIntParams);
-  auto *RetTy = Type::getIntNTy(Ctx, VG->getWidth());
+  const int NumIntParams = 1 + C.choose(MaxIntParams);
+  auto *RetTy = Type::getIntNTy(Ctx, VG.getWidth());
   vector<Type *> ParamsTy, ParamsRealTy;
   for (int i = 0; i < NumIntParams; ++i) {
-    auto *origTy = Type::getIntNTy(Ctx, VG->getWidth());
+    auto *origTy = Type::getIntNTy(Ctx, VG.getWidth());
     auto *realTy =
-        C->flip() ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
+        C.flip() ? (Type *)origTy : (Type *)PointerType::get(Ctx, 0);
     ParamsRealTy.push_back(origTy);
     ParamsTy.push_back(realTy);
   }
   auto *FTy = FunctionType::get(RetTy, ParamsTy, false);
   auto *F = Function::Create(FTy, GlobalValue::ExternalLinkage, 0, "f", &M);
-  if (C->flip()) {
-    if (C->flip())
-      F->addRetAttr(Attribute::ZExt);
-    else
-      F->addRetAttr(Attribute::SExt);
+  if (C.flip()) {
+    F->addRetAttr(C.flip() ? Attribute::ZExt : Attribute::SExt);
   }
-  if (C->choose(4) == 0)
+  if (C.choose(4) == 0)
     F->addRetAttr(Attribute::NoUndef);
   auto BB = BasicBlock::Create(Ctx, "", F);
-  VG->setBB(BB);
+  VG.setBB(BB);
 
   vector<Value *> PointerParams;
   int idx = 0;
   for (auto &arg : F->args()) {
-    VG->addVal(&arg);
+    VG.addVal(&arg);
     if (arg.getType()->isPointerTy()) {
       PointerParams.push_back(&arg);
-      VG->addArgTy(arg, ParamsRealTy[idx]);
+      VG.addArgTy(arg, ParamsRealTy[idx]);
     } else {
-      if (C->flip()) {
-        if (C->flip())
-          arg.addAttr(Attribute::ZExt);
-        else
-          arg.addAttr(Attribute::SExt);
+      if (C.flip()) {
+        arg.addAttr(C.flip() ? Attribute::ZExt : Attribute::SExt);
       }
     }
-    if (C->choose(4) == 0)
+    if (C.choose(4) == 0)
       arg.addAttr(Attribute::NoUndef);
     ++idx;
   }
 
-  int num_insts = C->choose(MaxInsts);
+  int num_insts = C.choose(MaxInsts);
   for (int i = 0; i < num_insts; ++i) {
-    auto *v = VG->genInst();
-    if (C->choose(4) == 0 && !PointerParams.empty()) {
-      auto *p = PointerParams[C->choose(PointerParams.size())];
-      new StoreInst(VG->adapt(v, VG->getArgTy(p)), p, BB);
+    auto *v = VG.genInst();
+    if (C.choose(4) == 0 && !PointerParams.empty()) {
+      auto *p = PointerParams[C.choose(PointerParams.size())];
+      new StoreInst(VG.adapt(v, VG.getArgTy(p)), p, BB);
     }
   }
 
-  ReturnInst::Create(Ctx, VG->getVal(RetTy), BB);
+  ReturnInst::Create(Ctx, VG.getVal(RetTy), BB);
 }
 
 class BBFuzzer : public Fuzzer {
@@ -764,17 +752,16 @@ class BBFuzzer : public Fuzzer {
   const int MaxWidth = 20;
   const int MaxCounters = 16;
   const int MaxBoolParams = 16;
-  optional<Chooser> C;
   Module &M;
   LLVMContext &Ctx;
-  optional<ValueGenerator> VG;
+  Chooser C;
+  ValueGenerator VG;
   bool gone = false;
 
 public:
-  BBFuzzer(Module &_M, long seed) : M(_M), Ctx(M.getContext()) {
-    C.emplace(seed);
-    VG.emplace(C.value(), MaxWidth, Ctx);
-  }
+  BBFuzzer(Module &_M, long seed) : M(_M), Ctx(M.getContext()), C(seed),
+    VG(C, MaxWidth, Ctx) {}
+
   void go() override;
 };
 
@@ -782,10 +769,10 @@ void BBFuzzer::go() {
   assert(!gone);
   gone = true;
 
-  const int NumCounters = 1 + C->choose(MaxCounters);
-  const int NumBoolParams = 1 + C->choose(MaxBoolParams);
-  const int NumBBs = 2 + C->choose(MaxBBs);
-  const int Width = 1 + C->choose(MaxWidth);
+  const int NumCounters = 1 + C.choose(MaxCounters);
+  const int NumBoolParams = 1 + C.choose(MaxBoolParams);
+  const int NumBBs = 2 + C.choose(MaxBBs);
+  const int Width = 1 + C.choose(MaxWidth);
   auto *IntTy = Type::getIntNTy(Ctx, Width);
 
   auto *Callee1Ty = FunctionType::get(Type::getVoidTy(Ctx), {}, false);
@@ -818,22 +805,22 @@ void BBFuzzer::go() {
   }
 
   for (int i = 0; i < NumBBs; ++i) {
-    if (C->choose(10) == 0) {
-      if (C->flip()) {
-        auto idx = C->choose(NumCounters);
+    if (C.choose(10) == 0) {
+      if (C.flip()) {
+        auto idx = C.choose(NumCounters);
         auto *Load = new LoadInst(IntTy, Counters[idx], "", BBs[i]);
         CallInst::Create(Callee2, {Load}, "", BBs[i]);
       } else {
         CallInst::Create(Callee1, {}, "", BBs[i]);
       }
     } else {
-      auto idx = C->choose(NumCounters);
+      auto idx = C.choose(NumCounters);
       auto *Load = new LoadInst(IntTy, Counters[idx], "", BBs[i]);
       auto *Inc =
           BinaryOperator::Create(Instruction::Add, Load, One, "", BBs[i]);
-      if (C->flip())
+      if (C.flip())
         Inc->setHasNoUnsignedWrap();
-      if (C->flip())
+      if (C.flip())
         Inc->setHasNoSignedWrap();
       new StoreInst(Inc, Counters[idx], BBs[i]);
     }
@@ -841,48 +828,48 @@ void BBFuzzer::go() {
 
   for (int i = 0; i < NumBBs; ++i) {
   again:
-    switch (C->choose(4)) {
+    switch (C.choose(4)) {
     case 0: {
-      if (i == 0 || (C->choose(100) > 25))
+      if (i == 0 || (C.choose(100) > 25))
         goto again;
-      auto idx = C->choose(NumCounters);
+      auto idx = C.choose(NumCounters);
       auto *Load = new LoadInst(IntTy, Counters[idx], "", BBs[i]);
       ReturnInst::Create(Ctx, Load, BBs[i]);
     } break;
     case 1: {
-      auto *Dest = BBs[1 + C->choose(NumBBs - 1)];
+      auto *Dest = BBs[1 + C.choose(NumBBs - 1)];
       BranchInst::Create(Dest, BBs[i]);
     } break;
     case 2: {
-      auto *Dest1 = BBs[1 + C->choose(NumBBs - 1)];
-      auto *Dest2 = BBs[1 + C->choose(NumBBs - 1)];
+      auto *Dest1 = BBs[1 + C.choose(NumBBs - 1)];
+      auto *Dest2 = BBs[1 + C.choose(NumBBs - 1)];
       Value *Cond = nullptr;
-      if (C->flip()) {
-        Cond = Args[FirstBoolParamIdx + C->choose(NumBoolParams)];
+      if (C.flip()) {
+        Cond = Args[FirstBoolParamIdx + C.choose(NumBoolParams)];
       } else {
         auto *LHS =
-            new LoadInst(IntTy, Counters[C->choose(NumCounters)], "", BBs[i]);
-        auto *RHS = (C->flip())
-                        ? new LoadInst(IntTy, Counters[C->choose(NumCounters)],
+            new LoadInst(IntTy, Counters[C.choose(NumCounters)], "", BBs[i]);
+        auto *RHS = (C.flip())
+                        ? new LoadInst(IntTy, Counters[C.choose(NumCounters)],
                                        "", BBs[i])
-                        : (Value *)ConstantInt::get(IntTy, C->choose(20));
-        Cond = new ICmpInst(*BBs[i], VG->randomPred(), LHS, RHS);
+                        : (Value *)ConstantInt::get(IntTy, C.choose(20));
+        Cond = new ICmpInst(*BBs[i], VG.randomPred(), LHS, RHS);
       }
       BranchInst::Create(Dest1, Dest2, Cond, BBs[i]);
     } break;
     case 3: {
-      unsigned long NumCases = 1 + C->choose(2 * NumBBs);
+      unsigned long NumCases = 1 + C.choose(2 * NumBBs);
       auto *Load =
-          new LoadInst(IntTy, Counters[C->choose(NumCounters)], "", BBs[i]);
-      auto *Swch = SwitchInst::Create(Load, BBs[1 + C->choose(NumBBs - 1)],
+          new LoadInst(IntTy, Counters[C.choose(NumCounters)], "", BBs[i]);
+      auto *Swch = SwitchInst::Create(Load, BBs[1 + C.choose(NumBBs - 1)],
                                       NumCases, BBs[i]);
       for (unsigned long i = 0; i < NumCases; ++i) {
         if (i >= (1UL << Width))
           break;
         Swch->addCase(ConstantInt::get(IntTy, i),
-                      BBs[1 + C->choose(NumBBs - 1)]);
-        if (C->choose(4) == 0)
-          i += C->choose(4);
+                      BBs[1 + C.choose(NumBBs - 1)]);
+        if (C.choose(4) == 0)
+          i += C.choose(4);
       }
     } break;
     default:
