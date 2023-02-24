@@ -896,6 +896,10 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   M2->setDataLayout(M1->getDataLayout());
   M2->setTargetTriple(M1->getTargetTriple());
 
+  cout << "###################################################\n";
+  M1->dump();
+  cout << "###################################################\n";
+
   auto AsmBuffer = lifter::generateAsm(*M1);
 
   cout << "\n\nAArch64 Assembly:\n\n";

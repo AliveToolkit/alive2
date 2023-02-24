@@ -72,6 +72,7 @@ unique_ptr<MemoryBuffer> generateAsm(Module &M) {
   unique_ptr<TargetMachine> TM(
       Targ->createTargetMachine(TripleName, CPU, "", Opt, RM));
 
+  Asm = "";
   raw_svector_ostream os(Asm);
 
   legacy::PassManager pass;
