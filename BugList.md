@@ -85,6 +85,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 78. InstCombine: incorrect transformation of smul_overflow with i1 (https://llvm.org/PR59876)
 79. CVP: incorrect transformation of abs (https://llvm.org/PR59887)
 80. InstCombine generates incorrect range metadata for ctpop (https://llvm.org/PR59888)
+81. InstCombine introduces UB when moving rem instructions (https://llvm.org/PR60906)
 
 
 ### Bugs found in Z3
