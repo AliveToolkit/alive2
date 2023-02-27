@@ -214,6 +214,25 @@ Function *adjustSrcReturn(Function *srcFn) {
   return NF;
 }
 
+void checkTy(Type *t) {
+  if (t->isIntegerTy()) {
+    if (t->getIntegerBitWidth() > 64) {
+      *out << "\nERROR: integer arguments can't be more than 64 bits yet\n\n";
+      exit(-1);
+    }
+  } else if (auto pty = dyn_cast<PointerType>(t)) {
+    if (pty->getAddressSpace() != 0) {
+      *out << "\nERROR: Unsupported function argument: Only address space "
+	"0 is supported\n\n";
+      exit(-1);
+    }
+  } else if (t->isVoidTy()) {
+  } else {
+    *out << "\nERROR: only integer and pointer arguments supported so far\n\n";
+    exit(-1);
+  }
+}
+  
 void checkSupport(Instruction &i) {
   if (i.getType()->isVectorTy()) {
     *out << "\nERROR: vector types not supported yet\n\n";
@@ -262,12 +281,13 @@ void checkSupport(Instruction &i) {
         exit(-1);
       }
     } else {
-      *out << "\nERROR: calls (besides intrinsics) not supported yet\n\n";
-      exit(-1);
-    }
-    if (ci->isTailCall()) {
-      *out << "\nERROR: tail calls not supported yet\n\n";
-      exit(-1);
+      if (ci->arg_size() > 1) {
+	*out << "\nERROR: only zero or one arguments supported for now\n\n";
+	exit(-1);
+      }
+      if (ci->arg_size() == 1)
+	checkTy(ci->getArgOperand(0)->getType());
+      checkTy(ci->getType());
     }
     auto callee = (string)ci->getCalledFunction()->getName();
     if (callee.find("llvm.objc") != string::npos) {
