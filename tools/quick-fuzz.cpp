@@ -999,7 +999,9 @@ reduced using llvm-reduce.
     exit(-1);
   }
 
-  mt19937_64 Rand((opt_rand_seed == 0) ? random_device{}() : opt_rand_seed);
+  auto seed = (opt_rand_seed == 0) ? random_device{}() : opt_rand_seed;
+  *out << "random seed = " << seed << "\n\n";
+  mt19937_64 Rand(seed);
   uniform_int_distribution<unsigned long> Dist(
       0, numeric_limits<unsigned long>::max());
 
