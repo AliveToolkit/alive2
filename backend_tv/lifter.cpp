@@ -2574,7 +2574,8 @@ public:
       } else {
         auto slot = argNum - 8;
         if (slot >= stackSlots) {
-          *out << "\nERROR: maximum stack slots for parameter values exceeded\n\n";
+          *out << "\nERROR: maximum stack slots for parameter values "
+                  "exceeded\n\n";
           exit(-1);
         }
         auto addr = createGEP(i64, paramBase, {getIntConst(slot, 64)}, "");
@@ -2582,9 +2583,9 @@ public:
       }
       argNum++;
     }
-    auto initFP = (argNum > 8) ?
-      createGEP(i64, paramBase, {getIntConst(argNum - 8, 64)}, "") :
-      paramBase;
+    auto initFP = (argNum > 8) ? createGEP(i64, paramBase,
+                                           {getIntConst(argNum - 8, 64)}, "")
+                               : paramBase;
     createStore(initFP, RegFile[AArch64::FP]);
 
     *out << "done with callee-side ABI stuff\n";

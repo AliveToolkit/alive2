@@ -223,7 +223,7 @@ void checkTy(Type *t) {
   } else if (auto pty = dyn_cast<PointerType>(t)) {
     if (pty->getAddressSpace() != 0) {
       *out << "\nERROR: Unsupported function argument: Only address space "
-	"0 is supported\n\n";
+              "0 is supported\n\n";
       exit(-1);
     }
   } else if (t->isVoidTy()) {
@@ -232,7 +232,7 @@ void checkTy(Type *t) {
     exit(-1);
   }
 }
-  
+
 void checkSupport(Instruction &i) {
   if (i.getType()->isVectorTy()) {
     *out << "\nERROR: vector types not supported yet\n\n";
@@ -241,8 +241,8 @@ void checkSupport(Instruction &i) {
   for (auto &op : i.operands()) {
     auto *ty = op.get()->getType();
     if (ty->isVectorTy()) {
-        *out << "\nERROR: vector types not supported yet\n\n";
-        exit(-1);
+      *out << "\nERROR: vector types not supported yet\n\n";
+      exit(-1);
     }
     if (auto *pty = dyn_cast<PointerType>(ty)) {
       if (pty->getAddressSpace() != 0) {
@@ -282,11 +282,11 @@ void checkSupport(Instruction &i) {
       }
     } else {
       if (ci->arg_size() > 1) {
-	*out << "\nERROR: only zero or one arguments supported for now\n\n";
-	exit(-1);
+        *out << "\nERROR: only zero or one arguments supported for now\n\n";
+        exit(-1);
       }
       if (ci->arg_size() == 1)
-	checkTy(ci->getArgOperand(0)->getType());
+        checkTy(ci->getArgOperand(0)->getType());
       checkTy(ci->getType());
     }
     auto callee = (string)ci->getCalledFunction()->getName();
@@ -299,7 +299,7 @@ void checkSupport(Instruction &i) {
       exit(-1);
     }
     if ((callee.find("llvm.experimental.gc") != string::npos) ||
-	(callee.find("llvm.experimental.stackmap") != string::npos)) {
+        (callee.find("llvm.experimental.stackmap") != string::npos)) {
       *out << "\nERROR: llvm GC instrinsics not supported\n\n";
       exit(-1);
     }
@@ -319,7 +319,7 @@ Function *adjustSrc(Function *srcFn) {
     *out << "\nERROR: only the C calling convention is supported\n\n";
     exit(-1);
   }
-  
+
   if (srcFn->isVarArg()) {
     *out << "\nERROR: varargs not supported yet\n\n";
     exit(-1);
