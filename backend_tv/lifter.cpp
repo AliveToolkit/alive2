@@ -2863,21 +2863,6 @@ public:
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
 
-  void printBlocks() {
-    *out << "# of Blocks (MF print blocks) = " << MF.BBs.size() << '\n';
-    *out << "-------------\n";
-    int i = 0;
-    for (auto &block : MF.BBs) {
-      *out << "block " << i << ", name= " << block.getName() << '\n';
-      for (auto &inst : block.getInstrs()) {
-        std::string sss;
-        llvm::raw_string_ostream ss(sss);
-        inst.dump_pretty(ss, IP, " ", MRI);
-        *out << sss << '\n';
-      }
-      i++;
-    }
-  }
 };
 
 } // namespace
@@ -2968,11 +2953,9 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
     exit(-1);
   }
 
-  Str.printBlocks();
   Str.removeEmptyBlocks();
   Str.checkEntryBlock();
   Str.generateSuccessors();
-  Str.printBlocks();
 
   auto lifted = arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get()).run();
 
