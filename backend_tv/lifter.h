@@ -52,6 +52,7 @@ std::unique_ptr<llvm::MemoryBuffer> generateAsm(llvm::Module &OrigModule);
 
 std::pair<llvm::Function *, llvm::Function *>
 liftFunc(llvm::Module *OrigModule, llvm::Module *LiftedModule,
-         llvm::Function *srcFnLLVM, std::unique_ptr<llvm::MemoryBuffer> MB);
+         llvm::Function *srcFnLLVM, std::unique_ptr<llvm::MemoryBuffer> MB,
+	 bool DebugRegs);
 
 } // namespace lifter

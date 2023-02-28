@@ -394,6 +394,7 @@ class arm2llvm {
   Value *stackMem{nullptr};
   unordered_map<string, GlobalVariable *> globals;
   unordered_map<MCInst *, string> GOT;
+  bool DebugRegs;
 
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
@@ -943,9 +944,10 @@ class arm2llvm {
 
 public:
   arm2llvm(Module *LiftedModule, MCFunction &MF, Function &srcFn,
-           MCInstPrinter *instrPrinter)
+           MCInstPrinter *instrPrinter, bool DebugRegs)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
-        instrPrinter(instrPrinter), instCount(0) {}
+        instrPrinter(instrPrinter), instCount(0),
+	DebugRegs(DebugRegs) {}
 
   int64_t getImm(int idx) {
     return CurInst->getOperand(idx).getImm();
@@ -2467,6 +2469,9 @@ public:
     return V;
   }
 
+  void printRegs() {
+  }
+  
   Function *run() {
     auto i8 = getIntTy(8);
     auto i32 = getIntTy(32);
@@ -2595,6 +2600,8 @@ public:
 
       for (auto &mc_instr : mc_instrs) {
         print(mc_instr);
+	if (DebugRegs)
+	  printRegs();
         mc_visit(mc_instr, *Fn);
         ++instCount;
       }
@@ -2901,7 +2908,8 @@ void reset() {
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
                                       Function *srcFn,
-                                      unique_ptr<MemoryBuffer> MB) {
+                                      unique_ptr<MemoryBuffer> MB,
+				      bool DebugRegs) {
   llvm::SourceMgr SrcMgr;
   SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
 
@@ -2953,7 +2961,8 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Str.checkEntryBlock();
   Str.generateSuccessors();
 
-  auto lifted = arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get()).run();
+  auto lifted = arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get(),
+			 DebugRegs).run();
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);

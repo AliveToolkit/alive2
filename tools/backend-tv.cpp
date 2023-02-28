@@ -62,6 +62,11 @@ llvm::cl::opt<bool> opt_optimize_tgt(LLVM_ARGS_PREFIX "optimize-tgt",
 
 // FIXME support opt_asm_only and opt_asm_input
   
+llvm::cl::opt<bool> opt_debug_regs(
+    "debug-regs",
+    llvm::cl::desc("Add register debugging code (default=false)"),
+    llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 llvm::cl::opt<bool> opt_asm_only(
     "asm-only",
     llvm::cl::desc("Only generate assembly and exit (default=false)"),
@@ -102,7 +107,8 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   M2->setDataLayout(M1->getDataLayout());
   M2->setTargetTriple(M1->getTargetTriple());
 
-  auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer));
+  auto [F1, F2] = lifter::liftFunc(M1, M2.get(), srcFn, std::move(AsmBuffer),
+				   opt_debug_regs);
   
   *out << "\n\nabout to optimize lifted code:\n\n";
   *out << lifter::moduleToString(M2.get());
