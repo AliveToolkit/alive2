@@ -2475,8 +2475,6 @@ public:
     auto Fn =
         Function::Create(srcFn.getFunctionType(), GlobalValue::ExternalLinkage,
                          0, MF.getName(), LiftedModule);
-    *out << "function name: '" << MF.getName() << "'"
-         << "\n";
 
     // create LLVM-side basic blocks
     vector<pair<BasicBlock *, MCBasicBlock *>> BBs;
@@ -2484,8 +2482,6 @@ public:
       auto bb = BasicBlock::Create(Ctx, mbb.getName(), Fn);
       BBs.push_back(make_pair(bb, &mbb));
     }
-
-    *out << "created LLVM basic blocks.\n";
 
     // default to adding instructions to the entry block
     LLVMBB = BBs[0].first;
