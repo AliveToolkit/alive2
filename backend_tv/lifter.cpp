@@ -1596,16 +1596,11 @@ public:
       auto [res, flags] = addWithCarry(a, b, zero);
       auto [n, z, c, v] = flags;
 
-      auto altn = (nzcv & 8) ? one : zero;
-      auto altz = (nzcv & 4) ? one : zero;
-      auto altc = (nzcv & 2) ? one : zero;
-      auto altv = (nzcv & 1) ? one : zero;
-
       auto cond = conditionHolds(cond_val_imm);
-      setN(createSelect(cond, n, altn));
-      setZ(createSelect(cond, z, altz));
-      setC(createSelect(cond, c, altc));
-      setV(createSelect(cond, v, altv));
+      setN(createSelect(cond, n, (nzcv & 8) ? one : zero));
+      setZ(createSelect(cond, z, (nzcv & 4) ? one : zero));
+      setC(createSelect(cond, c, (nzcv & 2) ? one : zero));
+      setV(createSelect(cond, v, (nzcv & 1) ? one : zero));
 
       break;
     }
