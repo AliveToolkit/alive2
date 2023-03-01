@@ -121,6 +121,10 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   *out << "\n\nafter optimization:\n\n";
   *out << lifter::moduleToString(M2.get());
 
+  // lifted function can never verify after we've added debugging code
+  if (opt_debug_regs)
+    exit(0);
+  
   *out << "about to compare functions\n";
   out->flush();
 

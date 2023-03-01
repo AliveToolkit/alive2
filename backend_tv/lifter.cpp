@@ -882,28 +882,21 @@ class arm2llvm {
     // PSTATE bits.
     auto ty = l->getType();
     auto tyPlusOne = getIntTy(size + 1);
-
-    auto add = createAdd(createZExt(l, tyPlusOne), createZExt(r, tyPlusOne));
     auto carry = createZExt(carryIn, tyPlusOne);
-    auto withCarry = createAdd(add, carry);
 
-    auto res = createTrunc(withCarry, ty);
-
-    // Mask off the sign bit. We could mask with an AND, but APInt semantics
-    // might be weird since we're passing in an uint64_t but we'll want a 65
-    // bit int
-    auto tmp = createRawShl(withCarry, getIntConst(1, size + 1));
-    auto masked = createRawLShr(tmp, getIntConst(1, size + 1));
+    auto uAdd = createAdd(createZExt(l, tyPlusOne), createZExt(r, tyPlusOne));
+    auto unsignedSum = createAdd(uAdd, carry);
 
     auto sAdd = createAdd(createSExt(l, tyPlusOne), createSExt(r, tyPlusOne));
-    auto sWithCarry = createAdd(sAdd, carry);
+    auto signedSum = createAdd(sAdd, carry);
 
     auto zero = getIntConst(0, size);
-
+    auto res = createTrunc(unsignedSum, ty);
+    
     auto newN = createICmp(ICmpInst::Predicate::ICMP_SLT, res, zero);
     auto newZ = createICmp(ICmpInst::Predicate::ICMP_EQ, res, zero);
-    auto newC = createICmp(ICmpInst::Predicate::ICMP_NE, withCarry, masked);
-    auto newV = createICmp(ICmpInst::Predicate::ICMP_NE, sWithCarry, masked);
+    auto newC = createICmp(ICmpInst::Predicate::ICMP_NE, unsignedSum, createZExt(res, tyPlusOne));
+    auto newV = createICmp(ICmpInst::Predicate::ICMP_NE, signedSum, createSExt(res, tyPlusOne));
 
     return {res, {newN, newZ, newC, newV}};
   };
@@ -2470,6 +2463,19 @@ public:
   }
 
   void printRegs() {
+    const string funcName{"printRegs"};
+    auto i1 = getIntTy(1);
+    auto retTy = Type::getVoidTy(Ctx);
+    auto argTy = {i1, i1, i1, i1};
+    auto *fTy = FunctionType::get(retTy, argTy, false);
+    Function *F =
+      LiftedModule->getFunction(funcName) ? :
+      Function::createWithDefaultAttr(fTy, GlobalValue::LinkageTypes::ExternalLinkage, 0, funcName, LiftedModule);
+    auto N = getN();
+    auto Z = getZ();
+    auto C = getC();
+    auto V = getV();
+    CallInst::Create(fTy, F, {N, Z, C, V}, "", LLVMBB);
   }
   
   Function *run() {
