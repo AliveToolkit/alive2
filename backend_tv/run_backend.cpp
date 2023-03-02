@@ -80,6 +80,10 @@ unique_ptr<MemoryBuffer> generateAsm(Module &M) {
     cerr << "\nERROR: Failed to add pass to generate assembly\n\n";
     exit(-1);
   }
+  /*
+   * sigh... running these passes changes the module, and some of
+   * these changes are non-trivial refinements
+   */
   auto MClone = CloneModule(M);
   pass.run(*MClone.get());
   return MemoryBuffer::getMemBuffer(Asm.c_str());
