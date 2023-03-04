@@ -225,9 +225,9 @@ public:
       auto NarrowWidth = ilog2_ceil(Ty->getIntegerBitWidth(), true);
       auto *NarrowTy = Type::getIntNTy(BB->getContext(), NarrowWidth);
       auto *Mask = ConstantInt::get(Ty, (1UL << NarrowWidth) - 1);
-      auto *AltRHS = C.flip() ? adapt(adapt(RHS, NarrowTy, "mask"), Ty, "mask")
+      auto *AltRHS = C.flip() ? adapt(adapt(RHS, NarrowTy, "maskA"), Ty, "maskB")
                               : BinaryOperator::Create(BinaryOperator::And, RHS,
-                                                       Mask, "mask", BB);
+                                                       Mask, "maskC", BB);
       BinaryOperator *BinOp = randomBinop(LHS, PoisonValue::get(Ty));
       Val = BinOp;
       auto Op = BinOp->getOpcode();
