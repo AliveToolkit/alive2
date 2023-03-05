@@ -1013,6 +1013,8 @@ reduced using llvm-reduce.
     if (verifyModule(*M1.get(), &errs()))
       report_fatal_error("Broken module found, this should not happen");
 
+    optimize_module(M1.get(), "Oz");
+
     if (opt_run_sroa) {
       auto err = optimize_module(M1.get(), "mem2reg");
       assert(err.empty());
