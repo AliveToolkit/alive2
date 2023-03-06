@@ -717,7 +717,7 @@ public:
           unsigned BitWidth = DL().getIndexTypeSizeInBits(GEPI->getType());
           llvm::APInt Offset(BitWidth, 0);
           if (GEPI->accumulateConstantOffset(DL(), Offset) &&
-              !Offset.isNullValue())
+              !Offset.isZero())
             return LIFETIME_FILLPOISON;
         }
       }
