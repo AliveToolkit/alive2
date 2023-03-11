@@ -222,7 +222,7 @@ public:
     case 1: {
       auto *LHS = getVal(Ty);
       Value *RHS = getVal(Ty);
-      auto NarrowWidth = ilog2_ceil(Ty->getIntegerBitWidth(), true);
+      auto NarrowWidth = ilog2_ceil(Ty->getIntegerBitWidth() - 1, true);
       auto *NarrowTy = Type::getIntNTy(BB->getContext(), NarrowWidth);
       auto *Mask = ConstantInt::get(Ty, (1UL << NarrowWidth) - 1);
       auto *AltRHS = C.flip() ? adapt(adapt(RHS, NarrowTy, "mask"), Ty, "mask")

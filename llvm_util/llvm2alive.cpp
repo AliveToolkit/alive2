@@ -717,7 +717,7 @@ public:
           unsigned BitWidth = DL().getIndexTypeSizeInBits(GEPI->getType());
           llvm::APInt Offset(BitWidth, 0);
           if (GEPI->accumulateConstantOffset(DL(), Offset) &&
-              !Offset.isNullValue())
+              !Offset.isZero())
             return LIFETIME_FILLPOISON;
         }
       }
@@ -1134,7 +1134,6 @@ public:
     }
 
     // do nothing intrinsics
-    case llvm::Intrinsic::dbg_addr:
     case llvm::Intrinsic::dbg_declare:
     case llvm::Intrinsic::dbg_label:
     case llvm::Intrinsic::dbg_value:
