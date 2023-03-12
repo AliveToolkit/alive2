@@ -379,7 +379,7 @@ ostream& operator<<(ostream &os, const Byte &byte) {
 }
 
 bool Memory::observesAddresses() {
-  return observes_addresses;
+  return true; //observes_addresses;
 }
 
 static bool isFnReturnValue(const expr &e) {
@@ -1678,7 +1678,7 @@ void Memory::startLifetime(const expr &ptr_local) {
   state->addUB(p.isLocal());
 
   if (observesAddresses())
-    state->addPre(
+    state->addPre(p.isBlockAlive() ||
       disjoint_local_blocks(*this, p.getAddress(),
                             p.blockSize().zextOrTrunc(bits_ptr_address),
                             p.blockAlignment(), local_blk_addr));
