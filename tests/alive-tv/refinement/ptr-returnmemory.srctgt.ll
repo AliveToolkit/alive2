@@ -1,3 +1,5 @@
+; SKIP-IDENTITY
+
 define i8* @src(i1 %cond, i8* %a, i8* %b, i8* %dummy) {
   call void @free(i8* %dummy) ; dummy free
 

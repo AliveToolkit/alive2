@@ -348,8 +348,9 @@ expr Pointer::isAligned(uint64_t align) {
 
   expr blk_align = isBlockAligned(align);
 
-  if (!Memory::observesAddresses() ||
-      (blk_align.isConst() && offset.isConst())) {
+  // TODO: allow this in more cases. for example when the block is local
+  // and addresses are not observed.
+  if (blk_align.isConst() && offset.isConst()) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
