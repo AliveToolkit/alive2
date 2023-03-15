@@ -779,7 +779,7 @@ static void initBitsProgramPointer(Transform &t) {
   assert(bits_program_pointer == t.tgt.bitsPointers());
 }
 
-static uint64_t aligned_alloc_size(uint64_t size, unsigned align) {
+static uint64_t aligned_alloc_size(uint64_t size, uint64_t align) {
   if (size <= align)
     return align;
   return add_saturate(size, align - 1);
