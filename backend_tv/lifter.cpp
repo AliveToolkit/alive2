@@ -104,6 +104,7 @@ const set<int> instrs_32 = {
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
     AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
     AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,   AArch64::LDPWi,
+    AArch64::STRWpre
 };
 
 const set<int> instrs_64 = {
@@ -134,7 +135,7 @@ const set<int> instrs_64 = {
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
     AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
-    AArch64::STURXi,    AArch64::ADRP,
+    AArch64::STURXi,    AArch64::ADRP,      AArch64::STRXpre,
 };
 
 const set<int> instrs_128 = {AArch64::FMOVXDr, AArch64::INSvi64gpr};
@@ -984,12 +985,50 @@ public:
     return make_tuple(baseAddr, op2.getImm(), readFromReg(op0.getReg()));
   }
 
+
+  tuple<Value *, int, Value *> getParamsStorePreImmed() {
+    auto &op0 = CurInst->getOperand(0);
+    auto &op1 = CurInst->getOperand(1);
+    auto &op2 = CurInst->getOperand(2);
+    auto &op3 = CurInst->getOperand(3);
+    assert(op0.isReg() && op1.isReg() && op2.isReg());
+    assert(op0.getReg() == op2.getReg());
+    assert(op3.isImm());
+
+    auto baseReg = op2.getReg();
+    assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+           (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
+           (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
+    auto baseAddr = readPtrFromReg(baseReg);
+    return make_tuple(baseAddr, op3.getImm(), readFromReg(op1.getReg()));
+  }
+
+
   // offset and size are in bytes
   void makeStore(Value *base, int offset, int size, Value *val) {
     auto offsetVal = getIntConst(offset, 64);
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
     createStore(val, ptr);
   }
+
+
+  // Shifts a given pointer by the offset, and stores the new pointer
+  // Must have register associated with value
+  // size is the size of the ptr in bits used by the instruction
+  Value* shiftPtr(Value *base, int offset) {
+    auto currPtrReg = CurInst->getOperand(2).getReg();
+
+    // 64 bit offsetVal, because readFromReg always returns 64bit val
+    auto offsetVal = getIntConst(offset, 64);
+
+    auto basePtrInt = readFromReg(currPtrReg);
+    auto newPtrAddr = createAdd(basePtrInt, offsetVal);
+
+    createStore(newPtrAddr, dealiasReg(currPtrReg));
+
+    return readPtrFromReg(currPtrReg);
+  }
+
 
   // Visit an MCInst and convert it to LLVM IR
   // See: https://documentation-service.arm.com/static/6245e8f0f7d10f7540e0c054
@@ -2204,6 +2243,18 @@ public:
     case AArch64::STRXui: {
       auto [base, imm, val] = getParamsStoreImmed();
       makeStore(base, imm * 8, 8, val);
+      break;
+    }
+    case AArch64::STRXpre:
+    case AArch64::STRWpre: {
+      auto [basePtr, immOffset, valToStore] = getParamsStorePreImmed();
+
+      auto shiftedPtr = shiftPtr(basePtr, immOffset);
+
+      if(getInstSize(opcode) == 32)
+        valToStore = createTrunc(valToStore, getIntTy(32));
+
+      makeStore(shiftedPtr, 0, 8, valToStore);
       break;
     }
     case AArch64::ADRP: {
