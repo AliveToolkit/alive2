@@ -106,6 +106,14 @@ alive-tv will optimize the entire module using an optimization
 pipeline similar to -O2, and then verify that functions in the
 optimized module refine those in the original one. This provides a
 convenient way to demonstrate an existing optimizer bug.
+
+Multiple "src" and "tgt" functions can be specified in the same file
+by postfixing, after "src" and "tgt", either a unique integer or an
+'_' followed by an arbitrary string. For example if the file contains
+the following functions "src", "tgt", "src4", "tgt4", "src_foo",
+"tgt_foo", "src_bar", "tgt5", then the pairs "src" <-> "tgt", "src4"
+<-> "tgt4", and "src_foo" <-> "tgt_foo" will be verifed but "src_bar"
+and "tgt5" will unused.
 )EOF";
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
@@ -134,18 +142,53 @@ convenient way to demonstrate an existing optimizer bug.
 
   unique_ptr<llvm::Module> M2;
   if (opt_file2.empty()) {
-    auto SRC = findFunction(*M1, opt_src_fn);
-    auto TGT = findFunction(*M1, opt_tgt_fn);
-    if (SRC && TGT) {
-      verifier.compareFunctions(*SRC, *TGT);
-      goto end;
-    } else {
+    unsigned Cnt = 0;
+    for (auto &F1 : *M1.get()) {
+      if (F1.isDeclaration())
+        continue;
+      auto SrcFName = F1.getName();
+      if (!SrcFName.startswith(opt_src_fn))
+        continue;
+
+      // Check src{+d}/tgt{+d} variant
+      if (std::find_if(SrcFName.begin() + opt_src_fn.length(), SrcFName.end(),
+                       [](unsigned char c) { return !std::isdigit(c); }) ==
+          SrcFName.end()) {
+        // Pass, we found a valid postfix
+      }
+      // Check src_*/tgt_* variant
+      else if (SrcFName.str().length() > opt_src_fn.length() &&
+               SrcFName[opt_src_fn.length()] == '_') {
+        // Pass, we found a valid postfix
+      }
+      // No valid postfix.
+      else {
+        continue;
+      }
+
+      // Check if we have tgt + same postfix
+      auto DstFName =
+          SrcFName.str().replace(0, opt_src_fn.length(), opt_tgt_fn);
+      auto SRC = findFunction(*M1, SrcFName.str());
+      auto TGT = findFunction(*M1, DstFName);
+      if (SRC && TGT) {
+        ++Cnt;
+        if (!verifier.compareFunctions(*SRC, *TGT))
+          if (opt_error_fatal)
+            goto end;
+      }
+    }
+    if (Cnt == 0) {
       M2 = CloneModule(*M1);
       auto err = optimize_module(M2.get(), optPass);
       if (!err.empty()) {
         *out << "Error parsing list of LLVM passes: " << err << '\n';
         return -1;
       }
+    } else if (Cnt > 1) {
+      goto summary;
+    } else {
+      goto end;
     }
   } else {
     M2 = openInputFile(Context, opt_file2);
@@ -184,7 +227,7 @@ convenient way to demonstrate an existing optimizer bug.
       }
     }
   }
-
+summary:
   *out << "Summary:\n"
           "  " << verifier.num_correct << " correct transformations\n"
           "  " << verifier.num_unsound << " incorrect transformations\n"
