@@ -265,7 +265,7 @@ if (NOT DEFINED TEST_NTHREADS)
   endif()
 endif()
 add_custom_target("check"
-                  COMMAND "python"
+                  COMMAND "python3"
                           "${PROJECT_SOURCE_DIR}/tests/lit/lit.py"
                           "-s"
                           "${PROJECT_SOURCE_DIR}/tests"
