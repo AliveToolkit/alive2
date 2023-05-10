@@ -35,12 +35,16 @@ for arg in $@; do
   done
 done
 
+TIMEOUT=""
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # Mac
   TV_SHAREDLIB=tv.dylib
 else
   # Linux, Cygwin/Msys, or Win32?
   TV_SHAREDLIB=tv.so
+  if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
+    TIMEOUT="timeout 4000"
+  fi
 fi
 
 TV=""
@@ -49,12 +53,10 @@ if [[ $SKIP_TV == 0 && $NPM_TV == 0 ]]; then
 fi
 
 TV_REPORT_DIR=""
-TIMEOUT=""
 TV_SMT_TO=""
 TV_SMT_STATS=""
 if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
   TV_REPORT_DIR=-tv-report-dir=@CMAKE_BINARY_DIR@/logs
-  TIMEOUT="timeout 4000"
   TV_SMT_TO=-tv-smt-to=20000
   TV_SMT_STATS=-tv-smt-stats
 fi
