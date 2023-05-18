@@ -358,6 +358,17 @@ static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
       if (dst_I != bb_map.end())
         edges[i].emplace(dst_I->second);
     }
+
+    // If `bb` is a loop header, we need to go through its exit block
+    // in order to account for some transitive dependencies we may have
+    // missed due to compression of its inner loops.
+    // If there are no inner loops, this is redundant and if `bb` is not
+    // a loop header, the set of its exit blocks is empty. 
+    for (auto &dst : bb->getExitBlocks()) {
+      auto dst_I = bb_map.find(dst);
+      if (dst_I != bb_map.end())
+        edges[i].emplace(dst_I->second);
+    }
     ++i;
   }
 
@@ -548,6 +559,7 @@ void Function::unroll(unsigned k) {
       for (auto &dst : bb->targets()) {
         if (!bbmap.count(&dst)) {
           exit_edges.emplace(bb, const_cast<BasicBlock*>(&dst));
+          header->addExitBlock(const_cast<BasicBlock*>(&dst));
         }
       }
     }
