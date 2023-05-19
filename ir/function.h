@@ -15,8 +15,8 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 namespace smt { class Model; }
 
