@@ -59,6 +59,10 @@ void BasicBlock::delInstr(const Instr *i) {
   }
 }
 
+void BasicBlock::addExitBlock(BasicBlock* bb) {
+    exit_blocks.emplace(bb);
+}
+
 vector<Phi*> BasicBlock::phis() const {
   vector<Phi*> phis;
   for (auto &i : m_instrs) {

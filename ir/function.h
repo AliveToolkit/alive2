@@ -43,9 +43,7 @@ public:
   void addInstrAt(std::unique_ptr<Instr> &&i, const Instr *other, bool before);
   void delInstr(const Instr *i);
 
-  void addExitBlock(BasicBlock* bb) {
-    exit_blocks.emplace(bb);
-  }
+  void addExitBlock(BasicBlock* bb);
   const std::unordered_set<BasicBlock*>& getExitBlocks() const {
     return exit_blocks;
   }
