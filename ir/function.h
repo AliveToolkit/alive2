@@ -15,6 +15,7 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace smt { class Model; }
@@ -27,6 +28,9 @@ class BasicBlock final {
   std::string name;
   std::vector<std::unique_ptr<Instr>> m_instrs;
 
+  // If the basic block is a header, this holds all exit blocks of its loop
+    std::unordered_set<BasicBlock*> exit_blocks; 
+
 public:
   BasicBlock(std::string_view name) : name(name) {}
 
@@ -38,6 +42,11 @@ public:
   void addInstr(std::unique_ptr<Instr> &&i, bool push_front = false);
   void addInstrAt(std::unique_ptr<Instr> &&i, const Instr *other, bool before);
   void delInstr(const Instr *i);
+
+  void addExitBlock(BasicBlock* bb);
+  const std::unordered_set<BasicBlock*>& getExitBlocks() const {
+    return exit_blocks;
+  }
 
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;
