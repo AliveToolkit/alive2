@@ -157,8 +157,12 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       auto layout = DL->getStructLayout(const_cast<llvm::StructType *>(strty));
       for (unsigned i = 0; i < strty->getNumElements(); ++i) {
         auto e = strty->getElementType(i);
-        unsigned ofs = layout->getElementOffset(i);
-        unsigned sz = DL->getTypeStoreSize(e);
+        auto ofs = layout->getElementOffset(i);
+        auto sz = DL->getTypeStoreSize(e);
+
+        // TODO: support vscale
+        if (ofs.isScalable() || sz.isScalable())
+          return nullptr;
 
         if (auto ty = llvm_type2alive(e)) {
           elems.push_back(ty);
@@ -166,9 +170,12 @@ Type* llvm_type2alive(const llvm::Type *ty) {
         } else
           return nullptr;
 
-        unsigned ofs_next = i + 1 == strty->getNumElements() ?
+        auto ofs_next = i + 1 == strty->getNumElements() ?
                 DL->getTypeAllocSize(const_cast<llvm::StructType *>(strty)) :
                 layout->getElementOffset(i + 1);
+        // TODO: support vscale
+        if (ofs_next.isScalable())
+          return nullptr;
         assert(ofs + sz <= ofs_next);
 
         if (ofs_next != ofs + sz) {
