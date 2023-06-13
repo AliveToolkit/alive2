@@ -44,15 +44,15 @@ unsigned num_sign_bits(uint64_t n) {
 }
 
 uint64_t add_saturate(uint64_t a, uint64_t b) {
-  unsigned long res;
+  unsigned long long res;
   static_assert(sizeof(res) == sizeof(uint64_t));
-  return __builtin_uaddl_overflow(a, b, &res) ? UINT64_MAX : res;
+  return __builtin_uaddll_overflow(a, b, &res) ? UINT64_MAX : res;
 }
 
 uint64_t mul_saturate(uint64_t a, uint64_t b) {
-  unsigned long res;
+  unsigned long long res;
   static_assert(sizeof(res) == sizeof(uint64_t));
-  return __builtin_umull_overflow(a, b, &res) ? UINT64_MAX : res;
+  return __builtin_umulll_overflow(a, b, &res) ? UINT64_MAX : res;
 }
 
 uint64_t divide_up(uint64_t n, uint64_t amount) {
