@@ -136,8 +136,8 @@ public:
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   uint64_t align = 0;
 
-  unsigned allocsize_0;
-  unsigned allocsize_1 = -1u;
+  unsigned allocsize_0 = 0;      // AllocSize
+  unsigned allocsize_1 = -1u;    // AllocSize
 
   MemoryAccess mem;
 
