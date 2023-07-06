@@ -3625,9 +3625,11 @@ StateValue GEP::toSMT(State &s) const {
                     vector<pair<uint64_t, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
     AndExpr non_poison(ptrval.non_poison);
+    AndExpr inbounds_np;
+    AndExpr idx_all_zeros;
 
     if (inbounds)
-      non_poison.add(ptr.inbounds(true));
+      inbounds_np.add(ptr.inbounds());
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
@@ -3636,8 +3638,10 @@ StateValue GEP::toSMT(State &s) const {
       auto inc = multiplier * val;
 
       if (inbounds) {
-        if (sz != 0)
+        if (sz != 0) {
+          idx_all_zeros.add(v == 0);
           non_poison.add(val.sextOrTrunc(v.bits()) == v);
+        }
         non_poison.add(multiplier.mul_no_soverflow(val));
         non_poison.add(ptr.addNoOverflow(inc));
       }
@@ -3652,8 +3656,18 @@ StateValue GEP::toSMT(State &s) const {
       non_poison.add(np);
 
       if (inbounds)
-        non_poison.add(ptr.inbounds());
+        inbounds_np.add(ptr.inbounds());
     }
+
+    if (inbounds) {
+      auto all_zeros = idx_all_zeros();
+      non_poison.add(all_zeros || inbounds_np());
+
+      // try to simplify the pointer
+      if (all_zeros.isFalse())
+        ptr.inbounds(true);
+    }
+
     return { std::move(ptr).release(), non_poison() };
   };
 

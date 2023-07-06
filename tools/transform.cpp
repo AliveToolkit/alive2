@@ -1419,8 +1419,18 @@ static void remove_unreachable_bbs(Function &f) {
 
 static void optimize_ptrcmp(Function &f) {
   auto is_inbounds = [](const Value &v) {
-    if (auto *gep = dynamic_cast<const GEP*>(&v))
-      return gep->isInBounds();
+    if (auto *gep = dynamic_cast<const GEP*>(&v)) {
+      if (!gep->isInBounds())
+        return false;
+
+      // ptr only in bounds if some idx is non-zero
+      for (auto &[sz, idx] : gep->getIdxs()) {
+        auto n = getInt(*idx);
+        if (sz != 0 && n.value_or(0) != 0)
+          return true;
+      }
+      return false;
+    }
 
     if (!returns_local(v))
       return false;
