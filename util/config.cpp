@@ -17,6 +17,7 @@ bool disable_poison_input = false;
 bool disable_undef_input = false;
 bool enable_approx_int2ptr = false;
 bool check_if_src_is_ub = false;
+bool disallow_ub_exploitation = false;
 bool debug = false;
 unsigned src_unroll_cnt = 0;
 unsigned tgt_unroll_cnt = 0;

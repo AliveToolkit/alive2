@@ -109,6 +109,9 @@ private:
   smt::AndExpr precondition;
   smt::AndExpr axioms;
 
+  // for -disallow-ub-exploitation
+  smt::OrExpr unreachable_paths;
+
   std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
 
   std::set<smt::expr> quantified_vars;
@@ -228,6 +231,7 @@ public:
   void addUB(smt::expr &&ub);
   void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
+  void addUnreachable();
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
 
@@ -263,6 +267,7 @@ public:
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
   auto& getFnPre() const { return fn_call_pre; }
+  auto& getUnreachable() const { return unreachable_paths; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
   const auto& getNondetVars() const { return nondet_vars; }

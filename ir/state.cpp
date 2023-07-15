@@ -741,6 +741,10 @@ void State::addUB(AndExpr &&ubs) {
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
+void State::addUnreachable() {
+  unreachable_paths.add(domain());
+}
+
 void State::addNoReturn(const expr &cond) {
   if (cond.isFalse())
     return;

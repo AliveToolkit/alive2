@@ -9,6 +9,7 @@
 #include "smt/exprs.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <functional>
 #include <numeric>
 #include <sstream>
@@ -3204,6 +3205,8 @@ StateValue Assume::toSMT(State &s) const {
   switch (kind) {
   case AndNonPoison: {
     auto &v = s.getAndAddPoisonUB(*args[0]);
+    if (config::disallow_ub_exploitation && v.value.isZero())
+      s.addUnreachable();
     s.addUB(v.value != 0);
     break;
   }

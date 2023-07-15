@@ -24,6 +24,11 @@ config::debug = opt_debug;
 config::max_offset_bits = opt_max_offset_in_bits;
 config::max_sizet_bits  = opt_max_sizet_in_bits;
 
+if ((config::disallow_ub_exploitation = opt_disallow_ub_exploitation)) {
+  config::disable_undef_input = true;
+  config::disable_poison_input = true;
+}
+
 func_names.insert(opt_funcs.begin(), opt_funcs.end());
 
 if (!report_dir_created && !opt_report_dir.empty()) {
