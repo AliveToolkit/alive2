@@ -551,6 +551,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   // Src function can't return poison
   if (config::disallow_ub_exploitation) {
     CHECK(retdom_a && !a.non_poison, print_value, "Source returns poison");
+    CHECK(retdom_b && !b.non_poison, print_value, "Target returns poison");
   }
 
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
@@ -564,11 +565,15 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   }
 
   // 4. Check undef
-  CHECK(dom && encode_undef_refinement(src_state, tgt_state, type, ap, bp),
-        print_value,
-        config::disallow_ub_exploitation
-          ? "Source returns undef"
-          : "Target's return value is more undefined");
+  if (config::disallow_ub_exploitation) {
+    CHECK(retdom_a && encode_undef_refinement(src_state, tgt_state, type,ap,bp),
+          print_value, "Source returns undef");
+    CHECK(retdom_b && encode_undef_refinement(tgt_state, src_state, type,bp,ap),
+          print_value, "Target returns undef");
+  } else {
+    CHECK(dom && encode_undef_refinement(src_state, tgt_state, type, ap, bp),
+          print_value, "Target's return value is more undefined");
+  }
 
   // 5. Check value
   CHECK(dom && !value_cnstr, print_value, "Value mismatch");
