@@ -89,12 +89,12 @@ public:
 
   // WARNING: these modify the pointer in place
   smt::expr isAligned(uint64_t align);
-  smt::AndExpr isDereferenceable(uint64_t bytes, uint64_t align,
-                                 bool iswrite = false,
-                                 bool ignore_accessability = false);
-  smt::AndExpr isDereferenceable(const smt::expr &bytes, uint64_t align,
-                                 bool iswrite,
-                                 bool ignore_accessability = false);
+  std::pair<smt::AndExpr, smt::expr>
+  isDereferenceable(uint64_t bytes, uint64_t align, bool iswrite = false,
+                    bool ignore_accessability = false);
+  std::pair<smt::AndExpr, smt::expr>
+  isDereferenceable(const smt::expr &bytes, uint64_t align, bool iswrite,
+                    bool ignore_accessability = false);
 
   void isDisjointOrEqual(const smt::expr &len1, const Pointer &ptr2,
                          const smt::expr &len2) const;

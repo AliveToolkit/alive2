@@ -303,7 +303,7 @@ public:
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              uint64_t align, const std::set<smt::expr> &undef_vars);
-  std::pair<StateValue, smt::AndExpr>
+  std::pair<StateValue, std::pair<smt::AndExpr, smt::expr>>
     load(const smt::expr &ptr, const Type &type, uint64_t align);
 
   // raw load; NB: no UB check

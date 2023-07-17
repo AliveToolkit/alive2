@@ -5,6 +5,7 @@
 #include "ir/function.h"
 #include "ir/globals.h"
 #include "smt/smt.h"
+#include "util/config.h"
 #include "util/errors.h"
 #include <cassert>
 
@@ -633,7 +634,7 @@ bool State::startBB(const BasicBlock &bb) {
     throw_oom_exception();
 
   DisjointExpr<Memory> in_memory;
-  DisjointExpr<expr> UB;
+  DisjointExpr<expr> UB, guardUB;
   DisjointExpr<VarArgsData> var_args_in;
   OrExpr path;
 
@@ -642,6 +643,7 @@ bool State::startBB(const BasicBlock &bb) {
     path.add(data.path);
     expr p = data.path();
     UB.add_disj(data.UB, p);
+    guardUB.add_disj(data.guardUB, p);
 
     // This data is never used again, so clean it up to reduce mem consumption
     in_memory.add_disj(std::move(data.mem), p);
@@ -659,10 +661,10 @@ bool State::startBB(const BasicBlock &bb) {
   }
   assert(!isFirst);
 
-  domain.path   = std::move(path)();
-  domain.UB     = *std::move(UB)();
-  memory        = *std::move(in_memory)();
-  var_args_data = *std::move(var_args_in)();
+  domain.path    = std::move(path)();
+  domain.UB      = *std::move(UB)();
+  memory         = *std::move(in_memory)();
+  var_args_data  = *std::move(var_args_in)();
 
   return domain;
 }
@@ -721,16 +723,15 @@ void State::addReturn(StateValue &&val) {
   addUB(expr(false));
 }
 
+void State::addUB(pair<AndExpr, expr> &&ub) {
+  addUB(std::move(ub.first));
+  addGuardableUB(std::move(ub.second));
+}
+
 void State::addUB(expr &&ub) {
   bool isconst = ub.isConst();
   domain.UB.add(std::move(ub));
   if (!isconst)
-    domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
-}
-
-void State::addUB(const expr &ub) {
-  domain.UB.add(ub);
-  if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
 }
 
@@ -739,6 +740,17 @@ void State::addUB(AndExpr &&ubs) {
   domain.UB.add(std::move(ubs));
   if (!isconst)
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+}
+
+void State::addGuardableUB(expr &&ub) {
+  if (config::disallow_ub_exploitation) {
+    bool isconst = ub.isConst();
+    guardable_ub.add(domain.path.implies(ub));
+    if (!isconst)
+      domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  } else {
+    addUB(std::move(ub));
+  }
 }
 
 void State::addUnreachable() {

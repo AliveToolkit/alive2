@@ -95,7 +95,7 @@ private:
 
   struct BasicBlockInfo {
     smt::OrExpr path;
-    smt::DisjointExpr<smt::expr> UB;
+    smt::DisjointExpr<smt::expr> UB, guardUB;
     smt::DisjointExpr<Memory> mem;
     std::set<smt::expr> undef_vars;
     ValueAnalysis analysis;
@@ -149,6 +149,7 @@ private:
   smt::OrExpr return_domain;
   // function_domain: a condition for function having well-defined behavior
   smt::OrExpr function_domain;
+  smt::AndExpr guardable_ub;
   std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
   std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -228,9 +229,15 @@ public:
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
   void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
+
+  // we have 2 types of UB to support -disallow-ub-exploitation
+  // 1) UB that cannot be safeguarded, and 2) UB that can be safeguarded
+  // The 2nd type is not allowed.
+  void addUB(std::pair<smt::AndExpr, smt::expr> &&ub);
   void addUB(smt::expr &&ub);
-  void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
+  void addGuardableUB(smt::expr &&ub);
+
   void addUnreachable();
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
@@ -285,6 +292,8 @@ public:
     return { returnValCached(), return_domain(), function_domain(),
              return_undef_vars };
   }
+
+  smt::expr getGuardableUB() const { return guardable_ub(); }
 
   smt::expr getJumpCond(const BasicBlock &src, const BasicBlock &dst) const;
 

@@ -400,8 +400,9 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
 }
 
 // When bytes is 0, pointer is always derefenceable
-AndExpr Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
-                                   bool iswrite, bool ignore_accessability) {
+pair<AndExpr, expr>
+Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
+                           bool iswrite, bool ignore_accessability) {
   expr bytes_off = bytes0.zextOrTrunc(bits_for_offset);
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
@@ -427,19 +428,18 @@ AndExpr Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     exprs.add(bytes0.extract(bytes0.bits() - 1, bits_size_t) == 0);
 
   // address must be always aligned regardless of access size
-  exprs.add(*std::move(is_aligned)());
+  // exprs.add(*std::move(is_aligned)());
 
   // trim set of valid ptrs
-  if (auto ptrs = std::move(all_ptrs)())
-    p = *ptrs;
-  else
-    p = expr::mkUInt(0, totalBits());
+  auto ptrs = std::move(all_ptrs)();
+  p = ptrs ? *std::move(ptrs) : expr::mkUInt(0, totalBits());
 
-  return exprs;
+  return { std::move(exprs), *std::move(is_aligned)() };
 }
 
-AndExpr Pointer::isDereferenceable(uint64_t bytes, uint64_t align,
-                                   bool iswrite, bool ignore_accessability) {
+pair<AndExpr, expr>
+Pointer::isDereferenceable(uint64_t bytes, uint64_t align,
+                           bool iswrite, bool ignore_accessability) {
   return isDereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite,
                            ignore_accessability);
 }

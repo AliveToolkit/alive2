@@ -199,9 +199,10 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
   // addUB(bp) is not needed because it is registered by getAndAddPoisonUB.
   assert(!bp.isValid() || bp.isTrue());
-  s.addUB(b != 0);
+  s.addGuardableUB(b != 0);
   if (sign)
-    s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
+    s.addGuardableUB((ap && a != expr::IntSMin(b.bits())) ||
+                     b != expr::mkInt(-1, b));
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -3218,7 +3219,7 @@ StateValue Assume::toSMT(State &s) const {
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
     if (auto align = dynamic_cast<IntConst *>(args[1])) {
       Pointer ptr(s.getMemory(), vptr.value);
-      s.addUB(ptr.isAligned(*align->getInt()));
+      s.addGuardableUB(ptr.isAligned(*align->getInt()));
     } else {
       // TODO: add support for non-constant align
       s.addUB(expr());
@@ -4224,7 +4225,8 @@ StateValue Strlen::toSMT(State &s) const {
       [&s, &p, &ty](unsigned i, bool _) -> tuple<expr, expr, AndExpr, expr> {
     AndExpr ub;
     auto [val, ub_load] = s.getMemory().load((p + i)(), IntType("i8", 8), 1);
-    ub.add(std::move(ub_load));
+    ub.add(std::move(ub_load.first));
+    ub.add(std::move(ub_load.second));
     ub.add(std::move(val.non_poison));
     return { expr::mkUInt(i, ty.bits()), true, std::move(ub), val.value != 0 };
   };

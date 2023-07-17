@@ -148,7 +148,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       for (auto &msg : approx) {
         s << " - " << msg << '\n';
       }
-      errs.add(s.str(), false);
+      errs.add(std::move(s).str(), false);
       return false;
     }
   }
@@ -240,7 +240,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
   }
 
   print_var_val(s, m);
-  errs.add(s.str(), true);
+  errs.add(std::move(s).str(), true);
   return false;
 }
 
@@ -515,6 +515,16 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
 #define CHECK(fml, printer, msg) \
   if (!check(fml, printer, msg)) \
     return
+
+  if (config::disallow_ub_exploitation) {
+    if (!null_is_dereferenceable)
+      errs.add("Null is not dereferenceable", false);
+
+    CHECK(!src_state.getGuardableUB(), [](ostream&, const Model&){},
+          "Source has guardable UB");
+    CHECK(!tgt_state.getGuardableUB(), [](ostream&, const Model&){},
+          "Target has guardable UB");
+  }
 
   // 1. Check UB
   CHECK(fndom_a.notImplies(fndom_b),

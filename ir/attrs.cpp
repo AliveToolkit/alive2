@@ -326,6 +326,11 @@ void ParamAttrs::merge(const ParamAttrs &other) {
   align            = max(align, other.align);
 }
 
+static expr merge(pair<AndExpr, expr> e) {
+  e.first.add(move(e.second));
+  return std::move(e.first)();
+}
+
 static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
@@ -346,12 +351,12 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
         Pointer(m, ptrvalue).isDereferenceable(derefBytes, align, false, true));
     if (derefOrNullBytes)
       s.addUB(p.isNull() ||
-              Pointer(m, ptrvalue).isDereferenceable(derefOrNullBytes, align,
-                                                     false, true)());
+              merge(Pointer(m, ptrvalue)
+                      .isDereferenceable(derefOrNullBytes, align, false,true)));
     if (deref_expr.isValid())
       s.addUB(p.isNull() ||
-              Pointer(m, ptrvalue).isDereferenceable(deref_expr, align, false,
-                                                     true)());
+              merge(Pointer(m, ptrvalue)
+                      .isDereferenceable(deref_expr, align, false, true)));
   } else if (align > 1)
     non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
