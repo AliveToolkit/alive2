@@ -327,7 +327,7 @@ void ParamAttrs::merge(const ParamAttrs &other) {
 }
 
 static expr merge(pair<AndExpr, expr> e) {
-  e.first.add(move(e.second));
+  e.first.add(std::move(e.second));
   return std::move(e.first)();
 }
 
