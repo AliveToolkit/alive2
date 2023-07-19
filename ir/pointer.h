@@ -78,6 +78,8 @@ public:
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);
 
+  Pointer maskOffset(const smt::expr &mask) const;
+
   smt::expr addNoOverflow(const smt::expr &offset) const;
 
   smt::expr operator==(const Pointer &rhs) const;

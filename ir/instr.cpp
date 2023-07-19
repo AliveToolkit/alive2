@@ -3737,6 +3737,57 @@ unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
 }
 
 
+DEFINE_AS_RETZEROALIGN(PtrMask, getMaxAllocSize);
+DEFINE_AS_RETZERO(PtrMask, getMaxAccessSize);
+DEFINE_AS_EMPTYACCESS(PtrMask);
+
+uint64_t PtrMask::getMaxGEPOffset() const {
+  if (auto n = getInt(*mask))
+    return ~*n;
+  return UINT64_MAX;
+}
+
+vector<Value*> PtrMask::operands() const {
+  return { ptr, mask };
+}
+
+bool PtrMask::propagatesPoison() const {
+  return true;
+}
+
+bool PtrMask::hasSideEffects() const {
+  return false;
+}
+
+void PtrMask::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  RAUW(mask);
+}
+
+void PtrMask::print(ostream &os) const {
+  os << getName() << " = ptrmask " << *ptr << ", " << *mask;
+}
+
+StateValue PtrMask::toSMT(State &s) const {
+  auto &ptrval  = s[*ptr];
+  auto &maskval = s[*mask];
+  Pointer ptr(s.getMemory(), ptrval.value);
+  return { ptr.maskOffset(maskval.value).release(),
+           ptrval.non_poison && maskval.non_poison };
+}
+
+expr PtrMask::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr->getType().enforcePtrType() &&
+         getType() == ptr->getType() &&
+         mask->getType().enforceIntType();
+}
+
+unique_ptr<Instr> PtrMask::dup(Function &f, const string &suffix) const {
+  return make_unique<PtrMask>(getType(), getName() + suffix, *ptr, *mask);
+}
+
+
 DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize);
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
 

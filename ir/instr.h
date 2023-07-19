@@ -790,6 +790,30 @@ public:
 };
 
 
+class PtrMask final : public MemInstr {
+  Value *ptr;
+  Value *mask;
+public:
+  PtrMask(Type &type, std::string &&name, Value &ptr, Value &mask)
+    : MemInstr(type, std::move(name)), ptr(&ptr), mask(&mask) {}
+
+  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 class Load final : public MemInstr {
   Value *ptr;
   uint64_t align;

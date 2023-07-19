@@ -1105,6 +1105,11 @@ public:
         return error(i);
       }
     }
+    case llvm::Intrinsic::ptrmask:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<PtrMask>(*ty, value_name(i), *a, *b));
+    }
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);

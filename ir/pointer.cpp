@@ -279,6 +279,11 @@ void Pointer::operator+=(const expr &bytes) {
   p = (*this + bytes).p;
 }
 
+Pointer Pointer::maskOffset(const expr &mask) const {
+  return { m, getBid(), getOffset() & mask.zextOrTrunc(bits_for_offset),
+           getAttrs() };
+}
+
 expr Pointer::addNoOverflow(const expr &offset) const {
   return getOffset().add_no_soverflow(offset);
 }
