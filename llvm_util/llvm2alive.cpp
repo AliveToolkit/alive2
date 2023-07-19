@@ -1405,6 +1405,7 @@ public:
   }
 
   static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
+    if (str == "dynamic")       return FPDenormalAttrs::Dynamic;
     if (str == "ieee")          return FPDenormalAttrs::IEEE;
     if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
     if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;

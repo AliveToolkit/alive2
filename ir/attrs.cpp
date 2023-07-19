@@ -52,8 +52,9 @@ static ostream& operator<<(ostream &os, FPDenormalAttrs::Type t) {
   const char *str = nullptr;
   switch (t) {
   case FPDenormalAttrs::IEEE:         str = "ieee"; break;
-  case FPDenormalAttrs::PreserveSign: str = "preserve-sign"; break;
   case FPDenormalAttrs::PositiveZero: str = "positive-zero"; break;
+  case FPDenormalAttrs::PreserveSign: str = "preserve-sign"; break;
+  case FPDenormalAttrs::Dynamic:      str = "dynamic"; break;
   }
   return os << str;
 }

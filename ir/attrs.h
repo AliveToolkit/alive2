@@ -94,7 +94,7 @@ public:
 };
 
 struct FPDenormalAttrs {
-  enum Type { IEEE, PreserveSign, PositiveZero };
+  enum Type { IEEE, PositiveZero, PreserveSign, Dynamic };
   Type input = IEEE;
   Type output = IEEE;
 

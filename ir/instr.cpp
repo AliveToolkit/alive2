@@ -645,20 +645,37 @@ static expr any_fp_zero(State &s, const expr &v) {
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
-static expr handle_subnormal(FPDenormalAttrs::Type attr, expr &&v) {
+static expr handle_subnormal(const State &s, FPDenormalAttrs::Type attr,
+                             expr &&v) {
+  auto posz = [&]() {
+    return expr::mkIf(v.isFPSubNormal(), expr::mkNumber("0", v), v);
+  };
+  auto sign = [&]() {
+    return expr::mkIf(v.isFPSubNormal(),
+                      expr::mkIf(v.isFPNegative(),
+                                 expr::mkNumber("-0", v),
+                                 expr::mkNumber("0", v)),
+                      v);
+  };
+
   switch (attr) {
   case FPDenormalAttrs::IEEE:
     break;
   case FPDenormalAttrs::PositiveZero:
-    v = expr::mkIf(v.isFPSubNormal(), expr::mkNumber("0", v), v);
+    v = posz();
     break;
   case FPDenormalAttrs::PreserveSign:
-    v = expr::mkIf(v.isFPSubNormal(),
-                   expr::mkIf(v.isFPNegative(),
-                              expr::mkNumber("-0", v),
-                              expr::mkNumber("0", v)),
-                   v);
+    v = sign();
     break;
+  case FPDenormalAttrs::Dynamic: {
+    auto &mode = s.getFpDenormalMode();
+    v = expr::mkIf(mode == FPDenormalAttrs::IEEE,
+                   v,
+                   expr::mkIf(mode == FPDenormalAttrs::PositiveZero,
+                              posz(),
+                              sign()));
+    break;
+  }
   }
   return std::move(v);
 }
@@ -715,9 +732,9 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
 
   if (!bitwise) {
     auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
-    fp_a = handle_subnormal(fpdenormal, std::move(fp_a));
-    fp_b = handle_subnormal(fpdenormal, std::move(fp_b));
-    fp_c = handle_subnormal(fpdenormal, std::move(fp_c));
+    fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
+    fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
+    fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
   }
 
   function<expr(FpRoundingMode)> fn_rm
@@ -762,7 +779,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = any_fp_zero(s, std::move(val));
 
   if (!bitwise && val.isFloat()) {
-    val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
+    val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
     val = fpty->fromFloat(s, val);
   }
