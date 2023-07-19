@@ -3327,40 +3327,55 @@ void AssumeVal::print(ostream &os) const {
 }
 
 StateValue AssumeVal::toSMT(State &s) const {
-  auto &v = s[*val];
+  function<expr(const expr&)> fn;
 
-  expr np;
   switch (kind) {
   case Align:
-    uint64_t n;
-    ENSURE(s[*args[0]].value.isUInt(n));
-    np = Pointer(s.getMemory(), expr(v.value)).isAligned(n);
+    fn = [&](const expr &v) {
+      uint64_t n;
+      ENSURE(s[*args[0]].value.isUInt(n));
+      return Pointer(s.getMemory(), expr(v)).isAligned(n);
+    };
     break;
 
   case NonNull:
-    np = !Pointer(s.getMemory(), expr(v.value)).isNull();
+    fn = [&](const expr &v) {
+      return !Pointer(s.getMemory(), expr(v)).isNull();
+    };
     break;
 
-  case Range: { // val in [l1, h1) U ... U [ln, hn) (signed)
-    OrExpr inrange;
-    for (unsigned i = 0, e = args.size(); i != e; i += 2) {
-      auto &lb = s[*args[i]].value;
-      auto &hb = s[*args[i+1]].value;
-      auto l = v.value.sge(lb);
-      auto h = v.value.slt(hb);
+  case Range: // val in [l1, h1) U ... U [ln, hn) (signed)
+    fn = [&](const expr &v) {
+      OrExpr inrange;
+      for (unsigned i = 0, e = args.size(); i != e; i += 2) {
+        auto &lb = s[*args[i]].value;
+        auto &hb = s[*args[i+1]].value;
+        auto l = v.sge(lb);
+        auto h = v.slt(hb);
 
-      if (lb.sgt(hb).isTrue()) { // wrapping interval
-        inrange.add(std::move(l));
-        inrange.add(std::move(h));
-      } else {
-        inrange.add(l && h);
+        if (lb.sgt(hb).isTrue()) { // wrapping interval
+          inrange.add(std::move(l));
+          inrange.add(std::move(h));
+        } else {
+          inrange.add(l && h);
+        }
       }
-    }
-    np = std::move(inrange)();
+      return std::move(inrange)();
+    };
     break;
   }
+
+  auto &v = s[*val];
+  if (auto agg = getType().getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      auto elem = agg->extract(v, i);
+      vals.emplace_back(expr(elem.value), elem.non_poison && fn(elem.value));
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return { expr(v.value), v.non_poison && np };
+
+  return { expr(v.value), v.non_poison && fn(v.value) };
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {
@@ -3371,11 +3386,14 @@ expr AssumeVal::getTypeConstraints(const Function &f) const {
     break;
   case NonNull:
     break;
-  case Range:
+  case Range: {
+    e = getType().enforceIntOrVectorType();
     for (auto &arg : args) {
-      e &= arg->getType() == getType();
+      e &= getType().enforceScalarOrVectorType(
+                       [&](auto &ty) { return ty == arg->getType(); });
     }
     break;
+  }
   }
   return getType() == val->getType() && e;
 }
