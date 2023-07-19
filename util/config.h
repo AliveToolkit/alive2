@@ -23,6 +23,12 @@ extern bool enable_approx_int2ptr;
 
 extern bool check_if_src_is_ub;
 
+/// This is a special mode to verify that LLVM's optimizations are not
+/// exploiting UB. In particular, we disallow any UB related with arithmetic,
+/// but UB related with memory optimizations is OK. UB can only be refined to
+/// call @llvm.trap().
+extern bool disallow_ub_exploitation;
+
 extern bool debug;
 
 extern unsigned src_unroll_cnt;

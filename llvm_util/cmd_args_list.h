@@ -180,4 +180,9 @@ llvm::cl::opt<unsigned> opt_max_sizet_in_bits(
                  "address space size exceeds the specified limit."),
   llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> opt_disallow_ub_exploitation(
+  LLVM_ARGS_PREFIX "disallow-ub-exploitation",
+  llvm::cl::desc("Disallow UB exploitation by optimizations (default=allow)"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 }

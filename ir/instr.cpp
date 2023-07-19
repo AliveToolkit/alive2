@@ -9,6 +9,7 @@
 #include "smt/exprs.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <functional>
 #include <numeric>
 #include <sstream>
@@ -198,9 +199,10 @@ static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
                    const expr &bp, bool sign) {
   // addUB(bp) is not needed because it is registered by getAndAddPoisonUB.
   assert(!bp.isValid() || bp.isTrue());
-  s.addUB(b != 0);
+  s.addGuardableUB(b != 0);
   if (sign)
-    s.addUB((ap && a != expr::IntSMin(b.bits())) || b != expr::mkInt(-1, b));
+    s.addGuardableUB((ap && a != expr::IntSMin(b.bits())) ||
+                     b != expr::mkInt(-1, b));
 }
 
 StateValue BinOp::toSMT(State &s) const {
@@ -643,20 +645,37 @@ static expr any_fp_zero(State &s, const expr &v) {
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
-static expr handle_subnormal(FPDenormalAttrs::Type attr, expr &&v) {
+static expr handle_subnormal(const State &s, FPDenormalAttrs::Type attr,
+                             expr &&v) {
+  auto posz = [&]() {
+    return expr::mkIf(v.isFPSubNormal(), expr::mkNumber("0", v), v);
+  };
+  auto sign = [&]() {
+    return expr::mkIf(v.isFPSubNormal(),
+                      expr::mkIf(v.isFPNegative(),
+                                 expr::mkNumber("-0", v),
+                                 expr::mkNumber("0", v)),
+                      v);
+  };
+
   switch (attr) {
   case FPDenormalAttrs::IEEE:
     break;
   case FPDenormalAttrs::PositiveZero:
-    v = expr::mkIf(v.isFPSubNormal(), expr::mkNumber("0", v), v);
+    v = posz();
     break;
   case FPDenormalAttrs::PreserveSign:
-    v = expr::mkIf(v.isFPSubNormal(),
-                   expr::mkIf(v.isFPNegative(),
-                              expr::mkNumber("-0", v),
-                              expr::mkNumber("0", v)),
-                   v);
+    v = sign();
     break;
+  case FPDenormalAttrs::Dynamic: {
+    auto &mode = s.getFpDenormalMode();
+    v = expr::mkIf(mode == FPDenormalAttrs::IEEE,
+                   v,
+                   expr::mkIf(mode == FPDenormalAttrs::PositiveZero,
+                              posz(),
+                              sign()));
+    break;
+  }
   }
   return std::move(v);
 }
@@ -713,9 +732,9 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
 
   if (!bitwise) {
     auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
-    fp_a = handle_subnormal(fpdenormal, std::move(fp_a));
-    fp_b = handle_subnormal(fpdenormal, std::move(fp_b));
-    fp_c = handle_subnormal(fpdenormal, std::move(fp_c));
+    fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
+    fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
+    fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
   }
 
   function<expr(FpRoundingMode)> fn_rm
@@ -760,7 +779,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = any_fp_zero(s, std::move(val));
 
   if (!bitwise && val.isFloat()) {
-    val = handle_subnormal(s.getFn().getFnAttrs().getFPDenormal(ty).output,
+    val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
     val = fpty->fromFloat(s, val);
   }
@@ -3204,6 +3223,8 @@ StateValue Assume::toSMT(State &s) const {
   switch (kind) {
   case AndNonPoison: {
     auto &v = s.getAndAddPoisonUB(*args[0]);
+    if (config::disallow_ub_exploitation && v.value.isZero())
+      s.addUnreachable();
     s.addUB(v.value != 0);
     break;
   }
@@ -3215,7 +3236,7 @@ StateValue Assume::toSMT(State &s) const {
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
     if (auto align = dynamic_cast<IntConst *>(args[1])) {
       Pointer ptr(s.getMemory(), vptr.value);
-      s.addUB(ptr.isAligned(*align->getInt()));
+      s.addGuardableUB(ptr.isAligned(*align->getInt()));
     } else {
       // TODO: add support for non-constant align
       s.addUB(expr());
@@ -3306,40 +3327,55 @@ void AssumeVal::print(ostream &os) const {
 }
 
 StateValue AssumeVal::toSMT(State &s) const {
-  auto &v = s[*val];
+  function<expr(const expr&)> fn;
 
-  expr np;
   switch (kind) {
   case Align:
-    uint64_t n;
-    ENSURE(s[*args[0]].value.isUInt(n));
-    np = Pointer(s.getMemory(), expr(v.value)).isAligned(n);
+    fn = [&](const expr &v) {
+      uint64_t n;
+      ENSURE(s[*args[0]].value.isUInt(n));
+      return Pointer(s.getMemory(), expr(v)).isAligned(n);
+    };
     break;
 
   case NonNull:
-    np = !Pointer(s.getMemory(), expr(v.value)).isNull();
+    fn = [&](const expr &v) {
+      return !Pointer(s.getMemory(), expr(v)).isNull();
+    };
     break;
 
-  case Range: { // val in [l1, h1) U ... U [ln, hn) (signed)
-    OrExpr inrange;
-    for (unsigned i = 0, e = args.size(); i != e; i += 2) {
-      auto &lb = s[*args[i]].value;
-      auto &hb = s[*args[i+1]].value;
-      auto l = v.value.sge(lb);
-      auto h = v.value.slt(hb);
+  case Range: // val in [l1, h1) U ... U [ln, hn) (signed)
+    fn = [&](const expr &v) {
+      OrExpr inrange;
+      for (unsigned i = 0, e = args.size(); i != e; i += 2) {
+        auto &lb = s[*args[i]].value;
+        auto &hb = s[*args[i+1]].value;
+        auto l = v.sge(lb);
+        auto h = v.slt(hb);
 
-      if (lb.sgt(hb).isTrue()) { // wrapping interval
-        inrange.add(std::move(l));
-        inrange.add(std::move(h));
-      } else {
-        inrange.add(l && h);
+        if (lb.sgt(hb).isTrue()) { // wrapping interval
+          inrange.add(std::move(l));
+          inrange.add(std::move(h));
+        } else {
+          inrange.add(l && h);
+        }
       }
-    }
-    np = std::move(inrange)();
+      return std::move(inrange)();
+    };
     break;
   }
+
+  auto &v = s[*val];
+  if (auto agg = getType().getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      auto elem = agg->extract(v, i);
+      vals.emplace_back(expr(elem.value), elem.non_poison && fn(elem.value));
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
   }
-  return { expr(v.value), v.non_poison && np };
+
+  return { expr(v.value), v.non_poison && fn(v.value) };
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {
@@ -3350,11 +3386,14 @@ expr AssumeVal::getTypeConstraints(const Function &f) const {
     break;
   case NonNull:
     break;
-  case Range:
+  case Range: {
+    e = getType().enforceIntOrVectorType();
     for (auto &arg : args) {
-      e &= arg->getType() == getType();
+      e &= getType().enforceScalarOrVectorType(
+                       [&](auto &ty) { return ty == arg->getType(); });
     }
     break;
+  }
   }
   return getType() == val->getType() && e;
 }
@@ -3625,9 +3664,11 @@ StateValue GEP::toSMT(State &s) const {
                     vector<pair<uint64_t, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
     AndExpr non_poison(ptrval.non_poison);
+    AndExpr inbounds_np;
+    AndExpr idx_all_zeros;
 
     if (inbounds)
-      non_poison.add(ptr.inbounds(true));
+      inbounds_np.add(ptr.inbounds());
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
@@ -3636,8 +3677,10 @@ StateValue GEP::toSMT(State &s) const {
       auto inc = multiplier * val;
 
       if (inbounds) {
-        if (sz != 0)
+        if (sz != 0) {
+          idx_all_zeros.add(v == 0);
           non_poison.add(val.sextOrTrunc(v.bits()) == v);
+        }
         non_poison.add(multiplier.mul_no_soverflow(val));
         non_poison.add(ptr.addNoOverflow(inc));
       }
@@ -3652,8 +3695,18 @@ StateValue GEP::toSMT(State &s) const {
       non_poison.add(np);
 
       if (inbounds)
-        non_poison.add(ptr.inbounds());
+        inbounds_np.add(ptr.inbounds());
     }
+
+    if (inbounds) {
+      auto all_zeros = idx_all_zeros();
+      non_poison.add(all_zeros || inbounds_np());
+
+      // try to simplify the pointer
+      if (all_zeros.isFalse())
+        ptr.inbounds(true);
+    }
+
     return { std::move(ptr).release(), non_poison() };
   };
 
@@ -3699,6 +3752,57 @@ unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
     dup->addIdx(sz, *idx);
   }
   return dup;
+}
+
+
+DEFINE_AS_RETZEROALIGN(PtrMask, getMaxAllocSize);
+DEFINE_AS_RETZERO(PtrMask, getMaxAccessSize);
+DEFINE_AS_EMPTYACCESS(PtrMask);
+
+uint64_t PtrMask::getMaxGEPOffset() const {
+  if (auto n = getInt(*mask))
+    return ~*n;
+  return UINT64_MAX;
+}
+
+vector<Value*> PtrMask::operands() const {
+  return { ptr, mask };
+}
+
+bool PtrMask::propagatesPoison() const {
+  return true;
+}
+
+bool PtrMask::hasSideEffects() const {
+  return false;
+}
+
+void PtrMask::rauw(const Value &what, Value &with) {
+  RAUW(ptr);
+  RAUW(mask);
+}
+
+void PtrMask::print(ostream &os) const {
+  os << getName() << " = ptrmask " << *ptr << ", " << *mask;
+}
+
+StateValue PtrMask::toSMT(State &s) const {
+  auto &ptrval  = s[*ptr];
+  auto &maskval = s[*mask];
+  Pointer ptr(s.getMemory(), ptrval.value);
+  return { ptr.maskOffset(maskval.value).release(),
+           ptrval.non_poison && maskval.non_poison };
+}
+
+expr PtrMask::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         ptr->getType().enforcePtrType() &&
+         getType() == ptr->getType() &&
+         mask->getType().enforceIntType();
+}
+
+unique_ptr<Instr> PtrMask::dup(Function &f, const string &suffix) const {
+  return make_unique<PtrMask>(getType(), getName() + suffix, *ptr, *mask);
 }
 
 
@@ -4207,7 +4311,8 @@ StateValue Strlen::toSMT(State &s) const {
       [&s, &p, &ty](unsigned i, bool _) -> tuple<expr, expr, AndExpr, expr> {
     AndExpr ub;
     auto [val, ub_load] = s.getMemory().load((p + i)(), IntType("i8", 8), 1);
-    ub.add(std::move(ub_load));
+    ub.add(std::move(ub_load.first));
+    ub.add(std::move(ub_load.second));
     ub.add(std::move(val.non_poison));
     return { expr::mkUInt(i, ty.bits()), true, std::move(ub), val.value != 0 };
   };

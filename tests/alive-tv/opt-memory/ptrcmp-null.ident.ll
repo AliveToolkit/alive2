@@ -5,5 +5,4 @@ define i1 @f(i8* %p) {
   ret i1 %c
 }
 
-; CHECK: use_provenance
-; CHECK: observes_addresses: 0
+; CHECK: observes_addresses: 1

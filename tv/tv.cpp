@@ -490,7 +490,6 @@ const char* unsupported_pass_list[] = {
   "OpenMPOptPass",
   "PartialInlinerPass",
   "PostOrderFunctionAttrsPass",
-  "RequireAnalysisPass<GlobalsAA, Module>",
   "SampleProfileLoaderPass",
   "TailCallElimPass",
 };
@@ -501,6 +500,10 @@ const char* nop_pass_prefixes[] {
   "PassManager<",
   "RequireAnalysisPass",
   "VerifierPass",
+};
+
+const char* terminate_execution[] {
+  "RequireAnalysisPass<GlobalsAA, Module>",
 };
 
 bool is_unsupported_pass(const llvm::StringRef &pass0) {
@@ -515,6 +518,12 @@ bool is_nop_pass(const llvm::StringRef &pass0) {
                 [&](auto skip) { return pass.starts_with(skip); });
 }
 
+bool is_terminate_pass(const llvm::StringRef &pass0) {
+  string_view pass = pass0;
+  return any_of(terminate_execution, end(terminate_execution),
+                [&](auto skip) { return pass.starts_with(skip); });
+}
+
 
 struct TVPass : public llvm::PassInfoMixin<TVPass> {
   static string batched_pass_begin_name;
@@ -522,23 +531,20 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
   // # of run passes when batching is enabled
   static unsigned batched_pass_count;
 
-  bool print_pass_name = false;
+  static bool dont_verify;
+
   // A reference counter for TVPass objects.
   // If this counter reaches zero, finalization should be called.
   // Note that this is necessary for opt + NPM only.
   // (1) In case of opt + LegacyPM, we can use TVLegacyPass::doFinalization().
   // (2) In case of clang tv, we have registerOptimizerLastEPCallback.
   static unsigned num_instances;
-  bool is_moved = false;
 
   TVPass() { ++num_instances; }
-  TVPass(TVPass &&other) {
-    other.is_moved = true;
-    print_pass_name = other.print_pass_name;
-  }
+  TVPass(TVPass&&) { ++num_instances; }
   ~TVPass() {
-    assert(num_instances >= (unsigned)!is_moved);
-    num_instances -= !is_moved;
+    assert(num_instances > 0);
+    --num_instances;
     if (initialized && num_instances == 0 && !is_clangtv) {
       // All TVPass instances are deleted.
       // This happens when llvm::runPassPipeline is done.
@@ -599,19 +605,22 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
     } else {
       bool unsupported = is_unsupported_pass(pass_name);
       bool nop = is_nop_pass(pass_name);
+      bool terminate = is_terminate_pass(pass_name);
 
       static unsigned count = 0;
-      count++;
-      if (print_pass_name) {
-        // print_pass_name is set only when running clang tv
-        *out << "-- " << count << ". " << pass_name;
-        if (unsupported)
-          *out << " : Skipping unsupported\n";
-        else if (nop)
-          *out << " : Skipping NOP\n";
-        else
-          *out << "\n";
-      }
+
+      *out << "-- " << ++count << ". " << pass_name;
+      if (unsupported)
+        *out << " : Skipping unsupported\n";
+      else if (terminate)
+        *out << " : Global pass. Cannot continue verification\n";
+      else if (nop)
+        *out << " : Skipping NOP\n";
+      else
+        *out << '\n';
+
+      if ((dont_verify |= terminate))
+        return;
 
       TVLegacyPass tv;
       tv.unsupported_transform = unsupported;
@@ -625,8 +634,9 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
 };
 
 string TVPass::batched_pass_begin_name;
-bool TVPass::batch_started;
-unsigned TVPass::batched_pass_count;
+bool TVPass::batch_started = false;
+unsigned TVPass::batched_pass_count = 0;
+bool TVPass::dont_verify = false;
 unsigned TVPass::num_instances = 0;
 
 template <typename Ty>
@@ -641,7 +651,6 @@ void runTVPass(Ty &M) {
   };
 
   TVPass tv;
-  tv.print_pass_name = true;
   tv.run(M, get_TLI);
 }
 

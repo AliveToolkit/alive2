@@ -1105,6 +1105,11 @@ public:
         return error(i);
       }
     }
+    case llvm::Intrinsic::ptrmask:
+    {
+      PARSE_BINOP();
+      RETURN_IDENTIFIER(make_unique<PtrMask>(*ty, value_name(i), *a, *b));
+    }
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
@@ -1405,6 +1410,7 @@ public:
   }
 
   static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
+    if (str == "dynamic")       return FPDenormalAttrs::Dynamic;
     if (str == "ieee")          return FPDenormalAttrs::IEEE;
     if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
     if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;
@@ -1493,14 +1499,14 @@ public:
     MemoryAccess attrs;
     attrs.setNoAccess();
 
-    array<pair<llvm::MemoryEffects::Location, MemoryAccess::AccessType>, 5> tys
+    array<pair<llvm::IRMemLocation, MemoryAccess::AccessType>, 5> tys
     {
-      make_pair(llvm::MemoryEffects::ArgMem,          MemoryAccess::Args),
-      make_pair(llvm::MemoryEffects::InaccessibleMem,
+      make_pair(llvm::IRMemLocation::ArgMem,          MemoryAccess::Args),
+      make_pair(llvm::IRMemLocation::InaccessibleMem,
                 MemoryAccess::Inaccessible),
-      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Other),
-      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Globals),
-      make_pair(llvm::MemoryEffects::Other,           MemoryAccess::Errno),
+      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Other),
+      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Globals),
+      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Errno),
     };
 
     for (auto &[ef, ty] : tys) {

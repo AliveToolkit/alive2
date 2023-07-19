@@ -1,10 +1,11 @@
 <?php
 
-$data = `grep 'ERROR: ' *.txt | grep -v Unsupported | grep -v Timeout | grep -v Invalid`;
+$data = `grep 'ERROR: ' *.txt | grep -v Invalid`;
 $data = explode("\n", trim($data));
 
 $errors = array(
   'Out of memory; skipping function.' => 'OOM',
+  'Timeout' => 'timeout',
   'Source is more defined than target' => 'domain',
   "Source and target don't have the same return domain" => 'noreturn',
   'Target is more poisonous than source' => 'poison',
@@ -14,6 +15,7 @@ $errors = array(
   'Precondition is always false' => 'pre',
   "Couldn't prove the correctness of the transformation" => 'approx',
   'SMT Error' => 'SMT error',
+  'Unsupported' => 'unsupported',
 );
 
 foreach ($data as $line) {

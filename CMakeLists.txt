@@ -259,6 +259,7 @@ target_link_libraries(alive PRIVATE ${ALIVE_LIBS})
 add_executable(alive-jobserver
                "tools/alive-jobserver.cpp"
               )
+install(TARGETS alive alive-jobserver)
 
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
@@ -269,6 +270,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   target_link_libraries(backend-tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
   target_link_libraries(quick-fuzz PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
   target_link_libraries(alive-exec PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
+  install(TARGETS alive-tv quick-fuzz alive-exec)
 endif()
 
 target_link_libraries(alive PRIVATE ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})

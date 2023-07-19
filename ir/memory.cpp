@@ -1819,7 +1819,7 @@ StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
   return val;
 }
 
-pair<StateValue, AndExpr>
+pair<StateValue, pair<AndExpr, expr>>
 Memory::load(const expr &p, const Type &type, uint64_t align) {
   assert(!memory_unused());
 

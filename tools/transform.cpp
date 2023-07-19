@@ -148,7 +148,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       for (auto &msg : approx) {
         s << " - " << msg << '\n';
       }
-      errs.add(s.str(), false);
+      errs.add(std::move(s).str(), false);
       return false;
     }
   }
@@ -240,7 +240,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
   }
 
   print_var_val(s, m);
-  errs.add(s.str(), true);
+  errs.add(std::move(s).str(), true);
   return false;
 }
 
@@ -345,8 +345,11 @@ static expr
 encode_undef_refinement_per_elem(const Type &ty, const StateValue &sva,
                                  expr &&a2, expr &&b, expr &&b2) {
   const auto *aty = ty.getAsAggregateType();
-  if (!aty)
+  if (!aty) {
+    if (config::disallow_ub_exploitation)
+      return sva.non_poison && sva.value != a2;
     return sva.non_poison && sva.value == a2 && b != b2;
+  }
 
   StateValue sva2{std::move(a2), expr()};
   StateValue svb{std::move(b), expr()}, svb2{std::move(b2), expr()};
@@ -378,7 +381,7 @@ static expr encode_undef_refinement(const State &src_state,
 
   if (dynamic_cast<const VoidType *>(&type))
     return false;
-  if (b.undef_vars.empty())
+  if (!config::disallow_ub_exploitation && b.undef_vars.empty())
     // target is never undef
     return false;
 
@@ -418,7 +421,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
 
   auto &uvars = ap.undef_vars;
   auto qvars = src_state.getQuantVars();
-  qvars.insert(ap.undef_vars.begin(), ap.undef_vars.end());
+  if (!config::disallow_ub_exploitation)
+    qvars.insert(ap.undef_vars.begin(), ap.undef_vars.end());
   auto &src_nondet_vars = src_state.getNondetVars();
   qvars.insert(src_nondet_vars.begin(), src_nondet_vars.end());
   auto &fn_qvars = tgt_state.getFnQuantVars();
@@ -512,9 +516,25 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   if (!check(fml, printer, msg)) \
     return
 
+  if (config::disallow_ub_exploitation) {
+    if (!null_is_dereferenceable)
+      errs.add("Null is not dereferenceable", false);
+
+    CHECK(!src_state.getGuardableUB(), [](ostream&, const Model&){},
+          "Source has guardable UB");
+    CHECK(!tgt_state.getGuardableUB(), [](ostream&, const Model&){},
+          "Target has guardable UB");
+  }
+
   // 1. Check UB
   CHECK(fndom_a.notImplies(fndom_b),
         [](ostream&, const Model&){}, "Source is more defined than target");
+
+  if (config::disallow_ub_exploitation) {
+    // disallow refinement by unreachable
+    CHECK(tgt_state.getUnreachable()().notImplies(src_state.getUnreachable()()),
+          [](ostream&, const Model&){}, "Target introduces unreachable BB");
+  }
 
   // 2. Check return domain (noreturn check)
   {
@@ -538,17 +558,32 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     print_model_val(s, tgt_state, m, var, type, b);
   };
 
+  // Src function can't return poison
+  if (config::disallow_ub_exploitation) {
+    CHECK(retdom_a && !a.non_poison, print_value, "Source returns poison");
+    CHECK(retdom_b && !b.non_poison, print_value, "Target returns poison");
+  }
+
   auto [poison_cnstr, value_cnstr] = type.refines(src_state, tgt_state, a, b);
   expr dom = retdom_a && retdom_b;
   if (check_each_var)
     dom &= fndom_a && fndom_b;
 
-  CHECK(dom && !poison_cnstr,
-        print_value, "Target is more poisonous than source");
+  if (!config::disallow_ub_exploitation) {
+    CHECK(dom && !poison_cnstr,
+          print_value, "Target is more poisonous than source");
+  }
 
   // 4. Check undef
-  CHECK(dom && encode_undef_refinement(src_state, tgt_state, type, ap, bp),
-        print_value, "Target's return value is more undefined");
+  if (config::disallow_ub_exploitation) {
+    CHECK(retdom_a && encode_undef_refinement(src_state, tgt_state, type,ap,bp),
+          print_value, "Source returns undef");
+    CHECK(retdom_b && encode_undef_refinement(tgt_state, src_state, type,bp,ap),
+          print_value, "Target returns undef");
+  } else {
+    CHECK(dom && encode_undef_refinement(src_state, tgt_state, type, ap, bp),
+          print_value, "Target's return value is more undefined");
+  }
 
   // 5. Check value
   CHECK(dom && !value_cnstr, print_value, "Value mismatch");
@@ -1419,8 +1454,18 @@ static void remove_unreachable_bbs(Function &f) {
 
 static void optimize_ptrcmp(Function &f) {
   auto is_inbounds = [](const Value &v) {
-    if (auto *gep = dynamic_cast<const GEP*>(&v))
-      return gep->isInBounds();
+    if (auto *gep = dynamic_cast<const GEP*>(&v)) {
+      if (!gep->isInBounds())
+        return false;
+
+      // ptr only in bounds if some idx is non-zero
+      for (auto &[sz, idx] : gep->getIdxs()) {
+        auto n = getInt(*idx);
+        if (sz != 0 && n.value_or(0) != 0)
+          return true;
+      }
+      return false;
+    }
 
     if (!returns_local(v))
       return false;

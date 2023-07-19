@@ -95,7 +95,7 @@ private:
 
   struct BasicBlockInfo {
     smt::OrExpr path;
-    smt::DisjointExpr<smt::expr> UB;
+    smt::DisjointExpr<smt::expr> UB, guardUB;
     smt::DisjointExpr<Memory> mem;
     std::set<smt::expr> undef_vars;
     ValueAnalysis analysis;
@@ -108,6 +108,9 @@ private:
   bool is_initialization_phase = true;
   smt::AndExpr precondition;
   smt::AndExpr axioms;
+
+  // for -disallow-ub-exploitation
+  smt::OrExpr unreachable_paths;
 
   std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
 
@@ -135,6 +138,7 @@ private:
   CurrentDomain domain;
   Memory memory;
   smt::expr fp_rounding_mode;
+  smt::expr fp_denormal_mode;
   std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
@@ -146,6 +150,7 @@ private:
   smt::OrExpr return_domain;
   // function_domain: a condition for function having well-defined behavior
   smt::OrExpr function_domain;
+  smt::AndExpr guardable_ub;
   std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
   std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
@@ -225,9 +230,16 @@ public:
   void addAxiom(smt::AndExpr &&ands) { axioms.add(std::move(ands)); }
   void addAxiom(smt::expr &&axiom) { axioms.add(std::move(axiom)); }
   void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
+
+  // we have 2 types of UB to support -disallow-ub-exploitation
+  // 1) UB that cannot be safeguarded, and 2) UB that can be safeguarded
+  // The 2nd type is not allowed.
+  void addUB(std::pair<smt::AndExpr, smt::expr> &&ub);
   void addUB(smt::expr &&ub);
-  void addUB(const smt::expr &ub);
   void addUB(smt::AndExpr &&ubs);
+  void addGuardableUB(smt::expr &&ub);
+
+  void addUnreachable();
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
 
@@ -260,9 +272,11 @@ public:
   auto& getMemory() const { return memory; }
   auto& getMemory() { return memory; }
   auto& getFpRoundingMode() const { return fp_rounding_mode; }
+  auto& getFpDenormalMode() const { return fp_denormal_mode; }
   auto& getAxioms() const { return axioms; }
   auto& getPre() const { return precondition; }
   auto& getFnPre() const { return fn_call_pre; }
+  auto& getUnreachable() const { return unreachable_paths; }
   const auto& getValues() const { return values; }
   const auto& getQuantVars() const { return quantified_vars; }
   const auto& getNondetVars() const { return nondet_vars; }
@@ -280,6 +294,8 @@ public:
     return { returnValCached(), return_domain(), function_domain(),
              return_undef_vars };
   }
+
+  smt::expr getGuardableUB() const { return guardable_ub(); }
 
   smt::expr getJumpCond(const BasicBlock &src, const BasicBlock &dst) const;
 
