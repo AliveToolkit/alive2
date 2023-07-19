@@ -86,6 +86,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 79. CVP: incorrect transformation of abs (https://llvm.org/PR59887)
 80. InstCombine generates incorrect range metadata for ctpop (https://llvm.org/PR59888)
 81. InstCombine introduces UB when moving rem instructions (https://llvm.org/PR60906)
+82. SimpleLoopUnswitch reverses branch condition incorrectly (https://llvm.org/PR63962)
 
 
 ### Bugs found in Z3
