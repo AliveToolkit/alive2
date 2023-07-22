@@ -123,7 +123,7 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
     assert((flags & Exact) == flags);
     break;
   default:
-    assert((flags & NoUndef) == flags);
+    assert(flags == 0);
     break;
   }
 }
@@ -137,7 +137,7 @@ bool BinOp::propagatesPoison() const {
 }
 
 bool BinOp::hasSideEffects() const {
-  return isDivOrRem() || (flags & NoUndef);
+  return isDivOrRem();
 }
 
 void BinOp::rauw(const Value &what, Value &with) {
@@ -191,8 +191,6 @@ void BinOp::print(ostream &os) const {
   if (flags & Exact)
     os << "exact ";
   os << *lhs << ", " << rhs->getName();
-  if (flags & NoUndef)
-    os << ", !noundef";
 }
 
 static void div_ub(State &s, const expr &a, const expr &b, const expr &ap,
@@ -451,33 +449,25 @@ StateValue BinOp::toSMT(State &s) const {
     break;
   }
 
-  bool noundef = flags & NoUndef;
   function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
                                        const expr&)> zip_op;
   if (vertical_zip) {
     zip_op = [&](auto &a, auto &ap, auto &b, auto &bp) {
       auto [v1, v2] = fn(a, ap, b, bp);
       expr non_poison = ap && bp;
-      if (noundef) {
-        s.addUB(std::move(non_poison));
-        non_poison = true;
-      }
       StateValue sv1(std::move(v1), expr(non_poison));
-      return make_pair(std::move(sv1), StateValue(std::move(v2), std::move(non_poison)));
+      return make_pair(std::move(sv1),
+                       StateValue(std::move(v2), std::move(non_poison)));
     };
   } else {
     scalar_op = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
       auto [v, np] = fn(a, ap, b, bp);
-      if (noundef) {
-        s.addUB(std::move(np));
-        np = true;
-      }
       return { std::move(v), ap && bp && np };
     };
   }
 
-  auto &a = s.getVal(*lhs, noundef);
-  auto &b = s.getVal(*rhs, isDivOrRem() || noundef);
+  auto &a = s[*lhs];
+  auto &b = s.getVal(*rhs, isDivOrRem());
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
@@ -1480,32 +1470,9 @@ StateValue TestOp::toSMT(State &s) const {
   switch (op) {
   case Is_FPClass:
     fn = [&](const expr &v, const Type &ty) -> expr {
-      uint64_t n;
-      ENSURE(b.value.isUInt(n) && b.non_poison.isTrue());
-      auto *fpty = ty.getAsFloatType();
-      auto a = fpty->getFloat(v);
-      OrExpr result;
-      if (n & (1 << 0))
-        result.add(fpty->isNaN(v, true));
-      if (n & (1 << 1))
-        result.add(fpty->isNaN(v, false));
-      if (n & (1 << 2))
-        result.add(a.isFPNegative() && a.isInf());
-      if (n & (1 << 3))
-        result.add(a.isFPNegative() && a.isFPNormal());
-      if (n & (1 << 4))
-        result.add(a.isFPNegative() && a.isFPSubNormal());
-      if (n & (1 << 5))
-        result.add(a.isFPNegZero());
-      if (n & (1 << 6))
-        result.add(a.isFPZero() && !a.isFPNegative());
-      if (n & (1 << 7))
-        result.add(!a.isFPNegative() && a.isFPSubNormal());
-      if (n & (1 << 8))
-        result.add(!a.isFPNegative() && a.isFPNormal());
-      if (n & (1 << 9))
-        result.add(!a.isFPNegative() && a.isInf());
-      return result().toBVBool();
+      uint64_t mask;
+      ENSURE(b.value.isUInt(mask) && b.non_poison.isTrue());
+      return isfpclass(v, ty, mask).toBVBool();
     };
     break;
   }
@@ -1693,7 +1660,7 @@ bool FpConversionOp::propagatesPoison() const {
 }
 
 bool FpConversionOp::hasSideEffects() const {
-  return flags & NoUndef;
+  return false;
 }
 
 void FpConversionOp::rauw(const Value &what, Value &with) {
@@ -1718,13 +1685,10 @@ void FpConversionOp::print(ostream &os) const {
     os << ", rounding=" << rm;
   if (!ex.ignore())
     os << ", exceptions=" << ex;
-  if (flags & NoUndef)
-    os << ", !noundef";
 }
 
 StateValue FpConversionOp::toSMT(State &s) const {
-  bool noundef = flags & NoUndef;
-  auto &v = s.getVal(*val, noundef);
+  auto &v = s[*val];
   function<StateValue(const expr &, const Type &, FpRoundingMode)> fn;
 
   switch (op) {
@@ -1809,11 +1773,6 @@ StateValue FpConversionOp::toSMT(State &s) const {
     StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
                                            : fn(val, to_type, rm);
     np.add(std::move(ret.non_poison));
-
-    if (noundef) {
-      s.addUB(np());
-      np.reset();
-    }
 
     return { to_type.isFloatType()
                ? to_type.getAsFloatType()->fromFloat(s, ret.value)

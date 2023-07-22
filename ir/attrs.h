@@ -64,7 +64,7 @@ public:
                    NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8,
                    NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
                    AllocPtr = 1<<11, AllocAlign = 1<<12,
-                   ZeroExt = 1<<13, SignExt = 1<<14};
+                   ZeroExt = 1<<13, SignExt = 1<<14, NoFPClass = 1<<15 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -72,6 +72,7 @@ public:
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
   uint64_t blockSize = 0;        // exact block size for e.g. byval args
   uint64_t align = 1;
+  uint16_t nofpclass = 0;
 
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
@@ -125,7 +126,7 @@ public:
                    DereferenceableOrNull = 1 << 10,
                    NullPointerIsValid = 1 << 11,
                    AllocSize = 1 << 12, ZeroExt = 1<<13,
-                   SignExt = 1<<14 };
+                   SignExt = 1<<14, NoFPClass = 1<<15, };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
@@ -142,6 +143,8 @@ public:
   MemoryAccess mem;
 
   std::string allocfamily;
+
+  uint16_t nofpclass = 0;
 
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
@@ -208,5 +211,7 @@ struct FpExceptionMode final {
   bool ignore() const { return mode == Ignore; }
   friend std::ostream& operator<<(std::ostream &os, FpExceptionMode ex);
 };
+
+smt::expr isfpclass(const smt::expr &v, const Type &ty, uint16_t mask);
 
 }

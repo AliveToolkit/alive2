@@ -28,6 +28,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "dereferenceable(" << attr.derefBytes << ") ";
   if (attr.has(ParamAttrs::NoUndef))
     os << "noundef ";
+  if (attr.has(ParamAttrs::NoFPClass))
+    os << " nofpclass(" << attr.nofpclass << ')';
   if (attr.has(ParamAttrs::Align))
     os << "align(" << attr.align << ") ";
   if (attr.has(ParamAttrs::Returned))
@@ -80,6 +82,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     os << " nofree";
   if (attr.has(FnAttrs::NoUndef))
     os << " noundef";
+  if (attr.has(FnAttrs::NoFPClass))
+    os << " nofpclass(" << attr.nofpclass << ')';
   if (attr.has(FnAttrs::Align))
     os << " align(" << attr.align << ')';
   if (attr.has(FnAttrs::NoThrow))
@@ -373,6 +377,11 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
 }
 
 StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty) const{
+  if (has(NoFPClass)) {
+    assert(ty.isFloatType());
+    val.non_poison &= !isfpclass(val.value, ty, nofpclass);
+  }
+
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
@@ -473,9 +482,14 @@ bool FnAttrs::refinedBy(const FnAttrs &other) const {
 StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
                            const expr &allocsize,
                            Value *allocalign) const {
-  if (has(FnAttrs::NNaN)) {
+  if (has(NNaN)) {
     assert(ty.isFloatType());
     val.non_poison &= !ty.getAsFloatType()->getFloat(val.value).isNaN();
+  }
+
+  if (has(NoFPClass)) {
+    assert(ty.isFloatType());
+    val.non_poison &= !isfpclass(val.value, ty, nofpclass);
   }
 
   if (ty.isPtrType())
@@ -489,6 +503,34 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
   }
 
   return std::move(val);
+}
+
+
+expr isfpclass(const expr &v, const Type &ty, uint16_t mask) {
+  auto *fpty = ty.getAsFloatType();
+  auto a = fpty->getFloat(v);
+  OrExpr result;
+  if (mask & (1 << 0))
+    result.add(fpty->isNaN(v, true));
+  if (mask & (1 << 1))
+    result.add(fpty->isNaN(v, false));
+  if (mask & (1 << 2))
+    result.add(a.isFPNegative() && a.isInf());
+  if (mask & (1 << 3))
+    result.add(a.isFPNegative() && a.isFPNormal());
+  if (mask & (1 << 4))
+    result.add(a.isFPNegative() && a.isFPSubNormal());
+  if (mask & (1 << 5))
+    result.add(a.isFPNegZero());
+  if (mask & (1 << 6))
+    result.add(a.isFPZero() && !a.isFPNegative());
+  if (mask & (1 << 7))
+    result.add(!a.isFPNegative() && a.isFPSubNormal());
+  if (mask & (1 << 8))
+    result.add(!a.isFPNegative() && a.isFPNormal());
+  if (mask & (1 << 9))
+    result.add(!a.isFPNegative() && a.isInf());
+  return std::move(result)();
 }
 
 

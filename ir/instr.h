@@ -35,8 +35,7 @@ public:
             SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
             SMul_Overflow, UMul_Overflow,
             And, Or, Xor, Cttz, Ctlz, UMin, UMax, SMin, SMax, Abs };
-  enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2,
-               NoUndef = 1 << 3 };
+  enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2 };
 
 private:
   Value *lhs, *rhs;
@@ -288,21 +287,16 @@ public:
   enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc, LRInt,
             LRound };
 
-  enum Flags { None = 0, NoUndef = 1<<0 };
-
 private:
   Value *val;
   Op op;
   FpRoundingMode rm;
   FpExceptionMode ex;
-  unsigned flags;
 
 public:
   FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
-                 FpRoundingMode rm = {}, FpExceptionMode ex = {},
-                 unsigned flags =  None)
-    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
-      flags(flags) {}
+                 FpRoundingMode rm = {}, FpExceptionMode ex = {})
+    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
