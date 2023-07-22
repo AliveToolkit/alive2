@@ -96,13 +96,16 @@ string_view s(llvm::StringRef str) {
     return ret;                    \
   } while (0)
 
-#define RETURN_IDENTIFIER_FNATTRS(op, attrs)                        \
-  do {                                                              \
-    auto ret = op;                                                  \
-    add_identifier(i, *ret.get());                                  \
-    if (attrs.has(FnAttrs::NoUndef))                                \
-      BB->addInstr(make_unique<Assume>(*ret, Assume::WellDefined)); \
-    return ret;                                                     \
+#define RETURN_IDENTIFIER_FNATTRS(op, attrs)                 \
+  do {                                                       \
+    auto ret = op;                                           \
+    add_identifier(i, *ret.get());                           \
+    if (attrs.has(FnAttrs::NoUndef)) {                       \
+      auto &ptr = *ret;                                      \
+      BB->addInstr(std::move(ret));                          \
+      return make_unique<Assume>(ptr, Assume::WellDefined);  \
+    }                                                        \
+    return ret;                                              \
   } while (0)
 
 
