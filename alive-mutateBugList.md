@@ -38,4 +38,4 @@ This category is for bugs that crashes
 
 ## Category 3
 This category is for that the test file is originaly wrong
-1. Wrong test file in Coroutines(https://github.com/llvm/llvm-project/commit/ea6a3f9f960e52ea39edd5edddf5afad3c11f7a0)
+1. Wrong test file in Coroutines(https://github.com/llvm/llvm-project/issues/52912)
