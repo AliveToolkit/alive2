@@ -424,33 +424,38 @@ expr FloatType::getFloat(const expr &v) const {
   return v.BV2float(ty);
 }
 
-expr FloatType::mkNaN(State &s, bool canonical) const {
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1;
-  unsigned var_bits = fraction_bits + 1;
-
-  // NaN has a non-deterministic non-zero fraction bit pattern
-  expr zero = expr::mkUInt(0, var_bits);
-  expr var = canonical ? expr::mkVar("#NaN_canonical", zero)
-                       : s.getFreshNondetVar("#NaN", zero);
-  expr fraction = var.extract(fraction_bits - 1, 0);
-
-  s.addPre(fraction != 0);
-  // TODO s.addPre(expr::mkUF("isQNaN", { fraction }, false));
-
-  // sign bit, exponent (-1), fraction (non-zero)
-  return var.extract(fraction_bits, fraction_bits)
-            .concat(expr::mkInt(-1, exp_bits))
-            .concat(fraction);
-}
-
-expr FloatType::fromFloat(State &s, const expr &fp) const {
+expr FloatType::fromFloat(State &s, const expr &fp, const expr &is_snan) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
-  if (isnan.isFalse())
+  if (isnan.isFalse()) {
+    assert(is_snan.isFalse());
     return val;
-  return expr::mkIf(isnan, mkNaN(s, false), val);
+  }
+
+  // Rules to create NaN payload
+  // 1) SNaN iff is_snan is true
+  // 2) QNaN if the result is NaN
+  unsigned exp_bits = float_sizes[fpType].second;
+  unsigned fraction_bits = bits() - exp_bits - 1 /* sign */ - is_snan.isFalse();
+  unsigned var_bits = fraction_bits + 1 /* sign */;
+
+  expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
+  auto fraction = var.extract(fraction_bits - 1, 0);
+
+  // sign bit, exponent (-1),  qnan bit (1) or snan (0), rest of fraction
+  auto nan = var.sign()
+                .concat(expr::mkInt(-1, exp_bits + is_snan.isFalse()))
+                .concat(fraction);
+  assert(isNaNInt(nan));
+
+  // we optimize the encoding when we know the result must be a QNaN
+  // by extending the exponent with another constant bit (of 1)
+  s.addPre(expr::mkIf(is_snan,
+                      fraction != 0,
+                      is_snan.isFalse() ? expr(true) : fraction.sign() == 1));
+
+  return expr::mkIf(isnan, nan, val);
 }
 
 expr FloatType::isNaN(const expr &v, bool signalling) const {
@@ -459,14 +464,14 @@ expr FloatType::isNaN(const expr &v, bool signalling) const {
 
   expr exponent = v.extract(fraction_bits + exp_bits - 1, fraction_bits);
   expr nanqbit  = v.extract(fraction_bits - 1, fraction_bits - 1);
-  expr isqnan;
+  expr isnan;
   if (signalling) {
     expr fraction = v.extract(fraction_bits - 2, 0);
-    isqnan = nanqbit == 0 && fraction != 0;
+    isnan = nanqbit == 0 && fraction != 0;
   } else {
-    isqnan = nanqbit == 1;
+    isnan = nanqbit == 1;
   }
-  return exponent == -1u && isqnan;
+  return exponent == UINT64_MAX && isnan;
 }
 
 unsigned FloatType::bits() const {
@@ -484,21 +489,20 @@ bool FloatType::isNaNInt(const expr &e) const {
 
   auto bw = e.bits();
   unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bw - exp_bits - 1;
+  unsigned fraction_bits = bw - exp_bits - 1 /* sign bit */;
 
   expr sign = e.extract(bw - 1, bw - 1);
   expr exponent = e.extract(bw - 2, fraction_bits);
-  expr fraction = e.extract(fraction_bits - 1, 0);
+  expr fraction = e.extract(fraction_bits - 2, 0);
   assert(exponent.bits() == exp_bits);
 
   expr nan, nan2;
   unsigned h, l;
-  bool ok = sign.isExtract(nan, h, l) &&
-            fraction.isExtract(nan2, h, l) &&
-            nan.eq(nan2) &&
-            nan.fn_name().starts_with("#NaN");
-
-  return ok && exponent.isAllOnes();
+  return exponent.isAllOnes() &&
+         sign.isExtract(nan, h, l) &&
+         fraction.isExtract(nan2, h, l) &&
+         nan.eq(nan2) &&
+         nan.fn_name().starts_with("#NaN");
 }
 
 expr FloatType::sizeVar() const {

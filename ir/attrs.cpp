@@ -29,7 +29,7 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
   if (attr.has(ParamAttrs::NoUndef))
     os << "noundef ";
   if (attr.has(ParamAttrs::NoFPClass))
-    os << " nofpclass(" << attr.nofpclass << ')';
+    os << "nofpclass(" << attr.nofpclass << ") ";
   if (attr.has(ParamAttrs::Align))
     os << "align(" << attr.align << ") ";
   if (attr.has(ParamAttrs::Returned))

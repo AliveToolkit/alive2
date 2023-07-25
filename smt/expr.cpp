@@ -1848,6 +1848,11 @@ end:
   return simplify_const(Z3_mk_extract(ctx(), high, low, ast()), *this);
 }
 
+expr expr::sign() const {
+  auto bit = bits() - 1;
+  return extract(bit, bit);
+}
+
 expr expr::toBVBool() const {
   auto sort = mkBVSort(1);
   return mkIf(*this, mkUInt(1, sort), mkUInt(0, sort));

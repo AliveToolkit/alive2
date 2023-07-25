@@ -235,8 +235,7 @@ Byte Byte::mkPoisonByte(const Memory &m) {
 }
 
 expr Byte::isPtr() const {
-  auto bit = p.bits() - 1;
-  return p.extract(bit, bit) == 1;
+  return p.sign() == 1;
 }
 
 expr Byte::ptrNonpoison() const {
@@ -1216,11 +1215,10 @@ void Memory::mkAxioms(const Memory &tgt) const {
     if (!has_null_block || bid != 0)
       state->addAxiom(addr != 0);
 
-    auto msb_bit = bits_ptr_address - 1;
     state->addAxiom(
       Pointer::hasLocalBit()
         // don't spill to local addr section
-        ? (addr + sz).extract(msb_bit, msb_bit) == 0
+        ? (addr + sz).sign() == 0
         : addr.add_no_uoverflow(sz));
 
     // disjointness constraint
