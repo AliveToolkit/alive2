@@ -394,10 +394,8 @@ static expr encode_undef_refinement(const State &src_state,
     // We need to consider fresh variables that are produced for specific
     // expressions. Since we are now rewriting those expressions, those
     // variables *may* need to be refreshed.
-    if (!repls.empty()) {
-      for (auto &v : state.getNondetVars()) {
-        repls.emplace_back(v, expr::some(v));
-      }
+    for (auto &v : state.getNondetVars()) {
+      repls.emplace_back(v, expr::some(v));
     }
     return val.val.value.subst(repls);
   };

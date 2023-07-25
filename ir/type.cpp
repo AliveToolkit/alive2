@@ -443,7 +443,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const expr &is_snan) const {
   expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
   auto fraction = var.extract(fraction_bits - 1, 0);
 
-  // sign bit, exponent (-1),  qnan bit (1) or snan (0), rest of fraction
+  // sign bit, exponent (-1), qnan bit (1) or snan (0), rest of fraction
   auto nan = var.sign()
                 .concat(expr::mkInt(-1, exp_bits + is_snan.isFalse()))
                 .concat(fraction);
@@ -462,16 +462,13 @@ expr FloatType::isNaN(const expr &v, bool signalling) const {
   unsigned exp_bits = float_sizes[fpType].second;
   unsigned fraction_bits = bits() - exp_bits - 1;
 
-  expr exponent = v.extract(fraction_bits + exp_bits - 1, fraction_bits);
-  expr nanqbit  = v.extract(fraction_bits - 1, fraction_bits - 1);
-  expr isnan;
+  expr bits = v.extract(fraction_bits + exp_bits - 1, fraction_bits - 1);
   if (signalling) {
     expr fraction = v.extract(fraction_bits - 2, 0);
-    isnan = nanqbit == 0 && fraction != 0;
+    return bits == (UINT64_MAX << 1ull) && fraction != 0;
   } else {
-    isnan = nanqbit == 1;
+    return bits == UINT64_MAX;
   }
-  return exponent == UINT64_MAX && isnan;
 }
 
 unsigned FloatType::bits() const {

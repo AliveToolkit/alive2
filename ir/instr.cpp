@@ -706,6 +706,14 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!ty.isFloatType())
     return { fn(a, b, c, {}), non_poison() };
 
+  auto fpty = ty.getAsFloatType();
+  expr issnan = fpty->isNaN(a, true);
+  if (nary >= 2) {
+    issnan |= fpty->isNaN(b, true);
+    if (nary >= 3)
+      issnan |= fpty->isNaN(c, true);
+  }
+
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
     if (nary >= 2) {
@@ -715,7 +723,6 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     }
   }
 
-  auto fpty = ty.getAsFloatType();
   expr fp_a = fpty->getFloat(a);
   expr fp_b = fpty->getFloat(b);
   expr fp_c = fpty->getFloat(c);
@@ -771,14 +778,6 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
-
-    expr issnan = fpty->isNaN(a, true);
-    if (nary >= 2) {
-      issnan |= fpty->isNaN(b, true);
-      if (nary >= 3) {
-        issnan |= fpty->isNaN(c, true);
-      }
-    }
     val = fpty->fromFloat(s, val, issnan);
   }
 
