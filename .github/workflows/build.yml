@@ -33,7 +33,7 @@ jobs:
             sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main"
           fi
           if [[ ${{ matrix.compiler }} == "clang++-17" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
+            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main"
           fi
           sudo apt-get update
           sudo apt-get install z3 re2c ninja-build
