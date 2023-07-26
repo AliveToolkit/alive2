@@ -1,15 +1,15 @@
-define void @src(i32* %p) {
-  load i32, i32* %p, align 1
-  call void @f(i32* dereferenceable(4) %p)
+define void @src(ptr %p) {
+  load i32, ptr %p, align 1
+  call void @f(ptr dereferenceable(4) %p)
   ret void
 }
 
-define void @tgt(i32* %p) {
-  load i32, i32* %p, align 4
-  call void @f(i32* dereferenceable(4) %p)
+define void @tgt(ptr %p) {
+  load i32, ptr %p, align 4
+  call void @f(ptr dereferenceable(4) %p)
   ret void
 }
 
-declare void @f(i32* %ptr)
+declare void @f(ptr %ptr)
 
 ; ERROR: Source is more defined than target

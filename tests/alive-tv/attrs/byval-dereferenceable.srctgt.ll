@@ -1,11 +1,11 @@
-define void @src(i8* %p) {
-    call void @f(i8* %p)
+define void @src(ptr %p) {
+    call void @f(ptr %p)
     ret void
 }
 
-define void @tgt(i8* %p) {
-    call void @f(i8* dereferenceable(1) %p)
+define void @tgt(ptr %p) {
+    call void @f(ptr dereferenceable(1) %p)
     ret void
 }
 
-declare void @f(i8* byval(i8))
+declare void @f(ptr byval(i8))

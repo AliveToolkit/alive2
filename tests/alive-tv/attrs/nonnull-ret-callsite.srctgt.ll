@@ -1,12 +1,12 @@
-define nonnull i8* @src() {
-  %p = call i8* @f()
-  ret i8* %p
+define nonnull ptr @src() {
+  %p = call ptr @f()
+  ret ptr %p
 }
 
-define nonnull i8* @tgt() {
+define nonnull ptr @tgt() {
   unreachable
 }
 
 ; ERROR: Source is more defined than target
 
-declare nonnull i8* @f()
+declare nonnull ptr @f()

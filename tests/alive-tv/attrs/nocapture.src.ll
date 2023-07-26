@@ -1,42 +1,42 @@
-@x = global i8* null
+@x = global ptr null
 
-define void @f1(i8* nocapture %p) {
-  store i8* %p, i8** @x
+define void @f1(ptr nocapture %p) {
+  store ptr %p, ptr @x
   ret void
 }
 
-define void @f2(i8* nocapture %p0) {
-  %p = getelementptr i8, i8* %p0, i32 1
-  store i8* %p, i8** @x
+define void @f2(ptr nocapture %p0) {
+  %p = getelementptr i8, ptr %p0, i32 1
+  store ptr %p, ptr @x
   ret void
 }
 
-define i8* @f3(i8* nocapture %p) {
-  ret i8* %p
+define ptr @f3(ptr nocapture %p) {
+  ret ptr %p
 }
 
-define i8* @f4(i8* nocapture %p) {
-  %p2 = getelementptr i8, i8* %p, i32 1
-  ret i8* %p2
+define ptr @f4(ptr nocapture %p) {
+  %p2 = getelementptr i8, ptr %p, i32 1
+  ret ptr %p2
 }
 
-define <2 x i8*> @f5(i8* nocapture %p) {
-  %v = insertelement <2 x i8*> undef, i8* %p, i32 1
-  ret <2 x i8*> %v
+define <2 x ptr> @f5(ptr nocapture %p) {
+  %v = insertelement <2 x ptr> undef, ptr %p, i32 1
+  ret <2 x ptr> %v
 }
 
-define i8* @f6(i8* nocapture %p, i8* %q) {
-  %c = icmp eq i8* %p, %q
+define ptr @f6(ptr nocapture %p, ptr %q) {
+  %c = icmp eq ptr %p, %q
   br i1 %c, label %A, label %B
 A:
-  ret i8* %p
+  ret ptr %p
 B:
-  ret i8* null
+  ret ptr null
 }
 
-define i8* @f7(i8* %a, i8* nocapture %b) {
-  %v = call i8* @g(i8* %a)
-  ret i8* %v
+define ptr @f7(ptr %a, ptr nocapture %b) {
+  %v = call ptr @g(ptr %a)
+  ret ptr %v
 }
 
-declare i8* @g(i8*)
+declare ptr @g(ptr)

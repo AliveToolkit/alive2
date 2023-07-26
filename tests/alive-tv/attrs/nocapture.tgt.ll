@@ -1,45 +1,45 @@
-@x = global i8* null
+@x = global ptr null
 
-define void @f1(i8* nocapture %p) {
-  %poison = getelementptr inbounds i8, i8* null, i64 1
-  store i8* %poison, i8** @x
+define void @f1(ptr nocapture %p) {
+  %poison = getelementptr inbounds i8, ptr null, i64 1
+  store ptr %poison, ptr @x
   ret void
 }
 
-define void @f2(i8* nocapture %p) {
-  %poison = getelementptr inbounds i8, i8* null, i64 1
-  store i8* %poison, i8** @x
+define void @f2(ptr nocapture %p) {
+  %poison = getelementptr inbounds i8, ptr null, i64 1
+  store ptr %poison, ptr @x
   ret void
 }
 
-define i8* @f3(i8* nocapture %p) {
-  %poison = getelementptr inbounds i8, i8* null, i64 1
-  ret i8* %poison
+define ptr @f3(ptr nocapture %p) {
+  %poison = getelementptr inbounds i8, ptr null, i64 1
+  ret ptr %poison
 }
 
-define i8* @f4(i8* nocapture %p) {
-  %poison = getelementptr inbounds i8, i8* null, i64 1
-  ret i8* %poison
+define ptr @f4(ptr nocapture %p) {
+  %poison = getelementptr inbounds i8, ptr null, i64 1
+  ret ptr %poison
 }
 
-define <2 x i8*> @f5(i8* nocapture %p) {
-  %poison = getelementptr inbounds i8, i8* null, i64 1
-  %v = insertelement <2 x i8*> undef, i8* %poison, i32 1
-  ret <2 x i8*> %v
+define <2 x ptr> @f5(ptr nocapture %p) {
+  %poison = getelementptr inbounds i8, ptr null, i64 1
+  %v = insertelement <2 x ptr> undef, ptr %poison, i32 1
+  ret <2 x ptr> %v
 }
 
-define i8* @f6(i8* nocapture %p, i8* %q) {
-  %c = icmp eq i8* %p, %q
+define ptr @f6(ptr nocapture %p, ptr %q) {
+  %c = icmp eq ptr %p, %q
   br i1 %c, label %A, label %B
 A:
-  ret i8* %q
+  ret ptr %q
 B:
-  ret i8* null
+  ret ptr null
 }
 
-define i8* @f7(i8* %a, i8* nocapture %b) {
-  %v = call i8* @g(i8* %a)
-  ret i8* %v
+define ptr @f7(ptr %a, ptr nocapture %b) {
+  %v = call ptr @g(ptr %a)
+  ret ptr %v
 }
 
-declare i8* @g(i8*)
+declare ptr @g(ptr)

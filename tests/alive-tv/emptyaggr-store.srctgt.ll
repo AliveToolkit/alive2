@@ -1,9 +1,8 @@
-define void @src(i8* %p) {
-  %p2 = bitcast i8* %p to {}*
-  store {} {}, {}* %p2
+define void @src(ptr %p) {
+  store {} {}, ptr %p
   ret void
 }
 
-define void @tgt(i8* %p) {
+define void @tgt(ptr %p) {
   ret void
 }

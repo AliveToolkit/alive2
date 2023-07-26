@@ -1,10 +1,10 @@
-define void @src(i8* %dummyptr) {
+define void @src(ptr %dummyptr) {
   call void @llvm.trap()
-  store i8 0, i8* %dummyptr
+  store i8 0, ptr %dummyptr
   ret void
 }
 
-define void @tgt(i8* %dummyptr) {
+define void @tgt(ptr %dummyptr) {
   call void @llvm.trap()
   unreachable
 }

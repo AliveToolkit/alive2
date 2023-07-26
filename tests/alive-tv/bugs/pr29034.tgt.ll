@@ -46,7 +46,7 @@ while.cond2:                                      ; preds = %while.cond2.backedg
 
 sw.bb:                                            ; preds = %while.cond2
   %7 = load i32, ptr %file_num9, align 1
-  %call6 = call i32 (ptr, ...) @printf(ptr getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %7)
+  %call6 = call i32 (ptr, ...) @printf(ptr getelementptr inbounds ([10 x i8], ptr @.str, i64 0, i64 0), i32 %7)
   br label %while.cond2.backedge
 
 sw.bb7:                                           ; preds = %while.cond2

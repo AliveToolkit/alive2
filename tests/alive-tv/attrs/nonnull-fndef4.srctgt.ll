@@ -1,7 +1,7 @@
-define nonnull noundef i8* @src(i8* %p) {
-  ret i8* null
+define nonnull noundef ptr @src(ptr %p) {
+  ret ptr null
 }
 
-define nonnull noundef i8* @tgt(i8* %p) {
+define nonnull noundef ptr @tgt(ptr %p) {
   unreachable
 }

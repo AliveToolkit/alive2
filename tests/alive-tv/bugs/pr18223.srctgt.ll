@@ -15,8 +15,8 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i32 @src() {
 entry:
-  store i32 0, i32* @b, align 4
-  %0 = load i32, i32* @c, align 4
+  store i32 0, ptr @b, align 4
+  %0 = load i32, ptr @c, align 4
   %tobool = icmp eq i32 %0, 0
   br i1 %tobool, label %entry.split.us, label %entry.entry.split_crit_edge
 
@@ -57,7 +57,7 @@ for.body:                                         ; preds = %for.inc, %entry.spl
   br i1 false, label %for.inc, label %if.then
 
 if.then:                                          ; preds = %for.body
-  store i32 0, i32* @h, align 4
+  store i32 0, ptr @h, align 4
   br label %for.inc
 
 for.inc:                                          ; preds = %if.then, %for.body
@@ -71,17 +71,17 @@ for.end_us_lcssa:                                 ; preds = %for.inc
 for.end:                                          ; preds = %for.end_us_lcssa, %for.end_us_lcssa.us
   %inc.lcssa = phi i32 [ %inc, %for.end_us_lcssa ], [ %inc.us, %for.end_us_lcssa.us ]
   %conv.lcssa = phi i32 [ %conv, %for.end_us_lcssa ], [ %conv.us, %for.end_us_lcssa.us ]
-  store i32 1, i32* @d, align 4
-  store i32 %inc.lcssa, i32* @b, align 4
-  store i32 %conv.lcssa, i32* @f, align 4
-  %call = tail call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
+  store i32 1, ptr @d, align 4
+  store i32 %inc.lcssa, ptr @b, align 4
+  store i32 %conv.lcssa, ptr @f, align 4
+  %call = tail call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 
 define i32 @tgt() {
 entry:
-  store i32 0, i32* @b, align 4
-  %0 = load i32, i32* @c, align 4
+  store i32 0, ptr @b, align 4
+  %0 = load i32, ptr @c, align 4
   %tobool = icmp eq i32 %0, 0
   br i1 %tobool, label %entry.split.us, label %entry.entry.split_crit_edge
 
@@ -114,7 +114,7 @@ for.body:                                         ; preds = %for.inc, %entry.spl
   br i1 false, label %for.inc, label %if.then
 
 if.then:                                          ; preds = %for.body
-  store i32 0, i32* @h, align 4
+  store i32 0, ptr @h, align 4
   br label %for.inc
 
 for.inc:                                          ; preds = %if.then, %for.body
@@ -128,12 +128,11 @@ for.end_us_lcssa:                                 ; preds = %for.inc
 for.end:                                          ; preds = %for.end_us_lcssa, %for.end_us_lcssa.us
   %inc.lcssa = phi i32 [ 5, %for.end_us_lcssa ], [ 5, %for.end_us_lcssa.us ]
   %conv.lcssa = phi i32 [ 1, %for.end_us_lcssa ], [ 1, %for.end_us_lcssa.us ]
-  store i32 1, i32* @d, align 4
-  store i32 %inc.lcssa, i32* @b, align 4
-  store i32 %conv.lcssa, i32* @f, align 4
-  %call = tail call i32 (i8*, ...) @myprintf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i32 %conv.lcssa)
+  store i32 1, ptr @d, align 4
+  store i32 %inc.lcssa, ptr @b, align 4
+  store i32 %conv.lcssa, ptr @f, align 4
+  %call = tail call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 
-
-declare i32 @myprintf(i8* nocapture readonly, ...)
+declare i32 @myprintf(ptr nocapture readonly, ...)

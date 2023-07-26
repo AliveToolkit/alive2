@@ -1,12 +1,12 @@
-define void @src(i8* %p) {
-  call void @f(i8* undef)
+define void @src(ptr %p) {
+  call void @f(ptr undef)
   ret void
 }
 
-define void @tgt(i8* %p) {
+define void @tgt(ptr %p) {
   unreachable
 }
 
-declare void @f(i8* nonnull)
+declare void @f(ptr nonnull)
 
 ; ERROR: Source is more defined than target

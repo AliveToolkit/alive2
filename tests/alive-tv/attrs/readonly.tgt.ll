@@ -1,3 +1,3 @@
-define void @f(i8* readonly %x) {
+define void @f(ptr readonly %x) {
   unreachable
 }
