@@ -2365,11 +2365,8 @@ StateValue FnCall::toSMT(State &s) const {
     // different values so we can catch the bug in f(freeze(undef)) -> f(undef)
     StateValue sv, sv2;
     if (flags.poisonImpliesUB()) {
-      sv = s.getAndAddPoisonUB(*arg, flags.undefImpliesUB());
-      if (flags.undefImpliesUB())
-        sv2 = sv;
-      else
-        sv2 = s.getAndAddPoisonUB(*arg, false);
+      sv  = s.getAndAddPoisonUB(*arg, true);
+      sv2 = sv;
     } else {
       sv  = s[*arg];
       sv2 = s.eval(*arg, true);
@@ -3106,7 +3103,7 @@ StateValue Return::toSMT(State &s) const {
 
   auto &attrs = s.getFn().getFnAttrs();
   if (attrs.poisonImpliesUB())
-    retval = s.getAndAddPoisonUB(*val, attrs.undefImpliesUB());
+    retval = s.getAndAddPoisonUB(*val, true);
   else
     retval = s[*val];
 

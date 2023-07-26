@@ -281,13 +281,11 @@ ostream& operator<<(ostream &os, const MemoryAccess &a) {
 
 
 bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
-  // check attributes that are properties of the caller
+  // check attributes that may give UB to the caller if added
   unsigned attrs =
-    NonNull |
+    ByVal |
     Dereferenceable |
     NoUndef |
-    Align |
-    NoAlias |
     DereferenceableOrNull
   ;
 
@@ -306,20 +304,13 @@ bool ParamAttrs::poisonImpliesUB() const {
          has(DereferenceableOrNull);
 }
 
-bool ParamAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef) || has(Dereferenceable) || has(ByVal) ||
-            has(DereferenceableOrNull);
-  assert(!ub || poisonImpliesUB());
-  return ub;
-}
-
 uint64_t ParamAttrs::getDerefBytes() const {
   uint64_t bytes = 0;
   if (has(ParamAttrs::Dereferenceable))
     bytes = derefBytes;
   // byval copies bytes; the ptr needs to be dereferenceable
   if (has(ParamAttrs::ByVal))
-    bytes = max(bytes, (uint64_t)blockSize);
+    bytes = max(bytes, blockSize);
   return bytes;
 }
 
@@ -437,15 +428,8 @@ bool FnAttrs::isNonNull() const {
 }
 
 bool FnAttrs::poisonImpliesUB() const {
-  return has(Dereferenceable) || has(NoUndef) || has(NNaN) ||
-         has(DereferenceableOrNull) || has(AllocSize);
-}
-
-bool FnAttrs::undefImpliesUB() const {
-  bool ub = has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull)||
-            has(AllocSize);
-  assert(!ub || poisonImpliesUB());
-  return ub;
+  return has(NoUndef) || has(Dereferenceable) || has(DereferenceableOrNull) ||
+         has(AllocSize) || has(NNaN);
 }
 
 void FnAttrs::setFPDenormal(FPDenormalAttrs attr, unsigned bits) {

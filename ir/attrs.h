@@ -81,9 +81,6 @@ public:
   // Returns true if it's UB for the argument to be poison / have a poison elem.
   bool poisonImpliesUB() const;
 
-  // Returns true if it is UB for the argument to be (partially) undef.
-  bool undefImpliesUB() const;
-
   uint64_t getDerefBytes() const;
 
   void merge(const ParamAttrs &other);
@@ -160,9 +157,6 @@ public:
 
   // Returns true if returning poison or an aggregate having a poison is UB
   bool poisonImpliesUB() const;
-
-  // Returns true if returning (partially) undef is UB
-  bool undefImpliesUB() const;
 
   void setFPDenormal(FPDenormalAttrs attr, unsigned bits = 0);
   FPDenormalAttrs getFPDenormal(const Type &ty) const;
