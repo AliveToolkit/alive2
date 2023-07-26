@@ -1,5 +1,5 @@
 define void @src() {
-  store i8 0, i8* null
+  store i8 0, ptr null
   ret void
 }
 

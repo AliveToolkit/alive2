@@ -1,11 +1,11 @@
-define {} @src({}* %p, {}* %q) {
-  %v = load {}, {}* %p
-  %w = load {}, {}* %q
+define {} @src(ptr %p, ptr %q) {
+  %v = load {}, ptr %p
+  %w = load {}, ptr %q
   ret {} %v
 }
 
-define {} @tgt({}* %p, {}* %q) {
-  %v = load {}, {}* %p
-  %w = load {}, {}* %q
+define {} @tgt(ptr %p, ptr %q) {
+  %v = load {}, ptr %p
+  %w = load {}, ptr %q
   ret {} %w
 }

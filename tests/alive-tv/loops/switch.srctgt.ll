@@ -3,13 +3,13 @@
 define i32 @src() {
 entry:
   %i = alloca i32, align 4
-  store i32 0, i32* %i, align 4
+  store i32 0, ptr %i, align 4
   br label %while.body
 
 while.body:
-  %0 = load i32, i32* %i, align 4
+  %0 = load i32, ptr %i, align 4
   %inc = add i32 %0, 1
-  store i32 %inc, i32* %i, align 4
+  store i32 %inc, ptr %i, align 4
   switch i32 %0, label %sw.default [
     i32 2, label %foo
     i32 3, label %bar

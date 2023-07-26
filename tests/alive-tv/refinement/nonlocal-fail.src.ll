@@ -1,6 +1,6 @@
-define void @f(i32* %p, i32* %q) {
-  store i32 10, i32* %p
-  store i32 20, i32* %q
+define void @f(ptr %p, ptr %q) {
+  store i32 10, ptr %p
+  store i32 20, ptr %q
   ret void
 }
 

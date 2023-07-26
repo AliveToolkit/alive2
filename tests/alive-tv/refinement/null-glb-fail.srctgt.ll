@@ -1,17 +1,17 @@
 @glb = global i8 0
 
-define i8* @src(i8* %p) {
+define ptr @src(ptr %p) {
 entry:
-  %c = icmp eq i8* %p, null
+  %c = icmp eq ptr %p, null
   br i1 %c, label %if.then, label %if.end
 if.then:
-  ret i8* %p
+  ret ptr %p
 if.end:
-  ret i8* @glb
+  ret ptr @glb
 }
 
-define i8* @tgt(i8* %p) {
-  ret i8* @glb
+define ptr @tgt(ptr %p) {
+  ret ptr @glb
 }
 
 ; ERROR: Value mismatch

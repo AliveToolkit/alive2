@@ -1,7 +1,7 @@
 ; TEST-ARGS: -dbg
 
-define i8* @f() {
-  ret i8* null
+define ptr @f() {
+  ret ptr null
 }
 
 ; CHECK: has_null_block: 1

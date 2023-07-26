@@ -4,8 +4,8 @@
 
 define i32 @f() {
   %p = alloca i32
-  %p2 = getelementptr i32, i32* %p, i32 0
-  %y = load i32, i32* @x
+  %p2 = getelementptr i32, ptr %p, i32 0
+  %y = load i32, ptr @x
   ret i32 %y
 }
 

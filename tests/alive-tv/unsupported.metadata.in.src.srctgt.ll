@@ -1,12 +1,12 @@
-define i1 @src(i8* %a, i8* %b) {
-  %l = load i8, i8* %a, !alias.scope !0, !noalias !3
-  store i8 %l, i8* %b, !alias.scope !0, !noalias !3
+define i1 @src(ptr %a, ptr %b) {
+  %l = load i8, ptr %a, !alias.scope !0, !noalias !3
+  store i8 %l, ptr %b, !alias.scope !0, !noalias !3
   ret i1 false
 }
 
-define i1 @tgt(i8* %a, i8* %b) {
-  %l = load i8, i8* %a, !alias.scope !0, !noalias !3
-  store i8 %l, i8* %b, !alias.scope !0, !noalias !3
+define i1 @tgt(ptr %a, ptr %b) {
+  %l = load i8, ptr %a, !alias.scope !0, !noalias !3
+  store i8 %l, ptr %b, !alias.scope !0, !noalias !3
   ret i1 true
 }
 

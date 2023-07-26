@@ -1,32 +1,31 @@
 ; SKIP-IDENTITY
 
-define i8* @src(i1 %cond, i8* %a, i8* %b, i8* %dummy) {
-  call void @free(i8* %dummy) ; dummy free
+define ptr @src(i1 %cond, ptr %a, ptr %b, ptr %dummy) {
+  call void @free(ptr %dummy) ; dummy free
 
   br i1 %cond, label %A, label %B
 A:
-  %c1 = call i8* @callee2(i8* %a)
-  ret i8* %c1
+  %c1 = call ptr @callee2(ptr %a)
+  ret ptr %c1
 B:
-  %c2 = call i8* @callee2(i8* %b)
-  ret i8* %c2
+  %c2 = call ptr @callee2(ptr %b)
+  ret ptr %c2
 }
 
-define i8* @tgt(i1 %cond, i8* %a, i8* %b, i8* %dummy) {
-  call void @free(i8* %dummy) ; dummy free
+define ptr @tgt(i1 %cond, ptr %a, ptr %b, ptr %dummy) {
+  call void @free(ptr %dummy) ; dummy free
 
   br i1 %cond, label %A, label %B
 A:
-  %c1 = call i8* @callee2(i8* %a)
+  %c1 = call ptr @callee2(ptr %a)
   br label %EXIT
 B:
-  %c2 = call i8* @callee2(i8* %b)
+  %c2 = call ptr @callee2(ptr %b)
   br label %EXIT
 EXIT:
-  %cc = phi i8* [%c1, %A], [%c2, %B]
-  ret i8* %cc
+  %cc = phi ptr [%c1, %A], [%c2, %B]
+  ret ptr %cc
 }
 
-
-declare i8* @callee2(i8*)
-declare void @free(i8*)
+declare ptr @callee2(ptr)
+declare void @free(ptr)
