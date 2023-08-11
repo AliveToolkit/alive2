@@ -103,25 +103,6 @@ llvm::cl::opt<string> optPass(
                    "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
     llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
-llvm::cl::opt<string> opt_file1(llvm::cl::Positional,
-                                llvm::cl::desc("first_bitcode_file"),
-                                llvm::cl::Required, llvm::cl::value_desc("filename"),
-                                llvm::cl::cat(alive_cmdargs));
-
-llvm::cl::opt<string> opt_file2(llvm::cl::Positional,
-                                llvm::cl::desc("[second_bitcode_file]"),
-                                llvm::cl::Optional, llvm::cl::value_desc("filename"),
-                                llvm::cl::cat(alive_cmdargs));
-
-llvm::cl::opt<std::string> opt_src_fn(LLVM_ARGS_PREFIX "src-fn",
-                                      llvm::cl::desc("Name of src function (without @)"),
-                                      llvm::cl::cat(alive_cmdargs), llvm::cl::init("src"));
-
-llvm::cl::opt<std::string> opt_tgt_fn(LLVM_ARGS_PREFIX"tgt-fn",
-                                      llvm::cl::desc("Name of tgt function (without @)"),
-                                      llvm::cl::cat(alive_cmdargs), llvm::cl::init("tgt"));
-
-
 llvm::cl::opt<int> copyFunctions(
     LLVM_ARGS_PREFIX "copy",
     llvm::cl::value_desc("number of function copies generated"),
@@ -131,9 +112,31 @@ llvm::cl::opt<int> copyFunctions(
     llvm::cl::init(0));
 }
 
+cl::list<size_t>
+    disableSEXT(LLVM_ARGS_PREFIX "disable-sigext",
+                cl::desc("option list -- This option would disable adding or "
+                         "removing sigext on integer type you specified"),
+                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
+cl::list<size_t>
+    disableZEXT(LLVM_ARGS_PREFIX "disable-zeroext",
+                cl::desc("option list -- This option would disable adding or "
+                         "removing sigext on integer type you specified"),
+                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
+cl::list<size_t>
+    disableEXT(LLVM_ARGS_PREFIX "disable-ext",
+               cl::desc("option list -- This option would disable all ext "
+                        "instructions on integer type you specified"),
+               cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
+
 unique_ptr<Cache> cache;
 std::stringstream logStream;
 
+
+std::string getOutputSrcFilename(int ith);
+std::string getOutputLogFilename(int ith);
 // This function would detect result from verifier and check log information.
 // If there is an unsound, write log and the mutated module.
 void tryWriteLog(std::string logPath);
@@ -223,6 +226,16 @@ bool isValidOutputPath(){
   return result;
 }
 
+std::string getOutputSrcFilename(int ith){
+  static filesystem::path inputPath = filesystem::path(string(inputFile));
+  static string templateName = string(outputFolder) + inputPath.stem().string();
+  return templateName + to_string(ith) + ".ll";
+}
+
+std::string getOutputLogFilename(int ith){
+  return getOutputSrcFilename(ith)+"-log.txt";
+}
+
 bool verifyInput(std::shared_ptr<llvm::Module>& M1){
   mutator_util::removeTBAAMetadata(M1.get());
   if (removeUndef) {
@@ -266,9 +279,9 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
   llvm::Triple targetTriple(M1.get()->getTargetTriple());
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-  llvm_util::initializer llvm_util_init(*out, DL);
+  llvm_util::initializer llvm_util_init(logStream, DL);
   smt::smt_initializer smt_init;
-  Verifier verifier(TLI, smt_init, *out);
+  Verifier verifier(TLI, smt_init, logStream);
   verifier.quiet = opt_quiet;
   verifier.always_verify = opt_always_verify;
   verifier.print_dot = opt_print_dot;
@@ -278,6 +291,8 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
     if(!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
       llvm::Function* f2=M2->getFunction(fit->getName());
       verifier.compareFunctions(*fit, *f2);
+      //FIX ME: need update
+      logStream.str("");
       //equals to 0 means not correct
       if(verifier.num_correct==0){
         invalidFunctions.insert(fit->getName());
@@ -339,17 +354,45 @@ void timeMode(std::shared_ptr<llvm::Module>& pm){
 }
 
 void runOnce(int ith, Mutator &mutator){
+  mutator.mutateModule(getOutputSrcFilename(ith));
+
   auto M1 = mutator.getModule();
 
   auto &DL = M1.get()->getDataLayout();
   llvm::Triple targetTriple(M1.get()->getTargetTriple());
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
-  llvm_util::initializer llvm_util_init(*out, DL);
+  llvm_util::initializer llvm_util_init(logStream, DL);
   smt::smt_initializer smt_init;
-  Verifier verifier(TLI, smt_init, *out);
+  Verifier verifier(TLI, smt_init, logStream);
   verifier.quiet = opt_quiet;
   verifier.always_verify = opt_always_verify;
   verifier.print_dot = opt_print_dot;
   verifier.bidirectional = opt_bidirectional;
+
+  const string optFunc = mutator.getCurrentFunction();
+  bool shouldLog=false;
+
+  if (llvm::Function *pf1 = M1->getFunction(optFunc); pf1 != nullptr) {
+    if (!pf1->isDeclaration()) {
+      std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*M1);
+      llvm_util::optimize_module(M2.get(), optPass);
+      llvm::Function *pf2 = M2->getFunction(pf1->getName());
+      assert(pf2 != nullptr && "pf2 clone failed");
+      verifier.compareFunctions(*pf1, *pf2);
+      if(verifier.num_correct!=0){
+        shouldLog=true;
+      }
+    }
+  }
+
+  if(shouldLog){
+    mutator.saveModule(getOutputSrcFilename(ith));
+    std::ofstream logFile(getOutputLogFilename(ith));
+    assert(logFile.is_open());
+    logFile<<"Current seed: "<<Random::getSeed()<<"\n";
+    logFile << "Source file:" << M1->getSourceFileName() << "\n";
+    logFile<<logStream.rdbuf();
+    logStream.str("");
+  }
 }
