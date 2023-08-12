@@ -177,6 +177,7 @@ void copyMode(std::shared_ptr<llvm::Module>& pm),
 // 4. Rename unnamed functions
 // 5. Skip functions stored in some function pointers
 // 6. Skip functions with the only declaration.
+// 7. Reset 'internal' attr on functions (because they might be removed after optimization)
 // return true if all functions are invalid
 llvm::StringSet<> invalidFunctions;
 bool verifyInput(std::shared_ptr<llvm::Module>& pm);
@@ -274,6 +275,14 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
     if(f.getName().empty()){
       f.setName(std::string("resetUnnamedFunction") +
                    std::to_string(unnamedFunction++));
+    }
+  });
+
+  //Reset internal attr
+  for_each(M1->begin(),M1->end(),[](llvm::Function& f){
+    if (f.getLinkage() ==
+        llvm::GlobalValue::LinkageTypes::InternalLinkage) {
+      f.setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
   });
 
