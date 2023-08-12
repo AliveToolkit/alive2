@@ -133,7 +133,29 @@ cl::list<size_t>
 
 unique_ptr<Cache> cache;
 std::stringstream logStream;
+// To eliminate extra verifier construction;
+std::optional<llvm::TargetLibraryInfoWrapperPass> TLI;
+std::optional<smt::smt_initializer> smt_init;
+std::optional<Verifier> verifier;
 
+void initVerifier(llvm::Triple targetTriple){
+  TLI.emplace(targetTriple);
+
+
+  smt_init.emplace();
+  verifier.emplace(TLI.value(), smt_init.value(), logStream);
+  verifier->quiet = opt_quiet;
+  verifier->always_verify = opt_always_verify;
+  verifier->print_dot = opt_print_dot;
+  verifier->bidirectional = opt_bidirectional;
+}
+
+void destroyVerifier(){
+  verifier.reset();
+  smt_init.reset();
+  TLI.reset();
+  logStream.str("");
+}
 
 std::string getOutputSrcFilename(int ith);
 std::string getOutputLogFilename(int ith);
@@ -276,30 +298,24 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
   llvm_util::optimize_module(M2.get(), optPass);
 
   auto &DL = M1.get()->getDataLayout();
-  llvm::Triple targetTriple(M1.get()->getTargetTriple());
-  llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
-
   llvm_util::initializer llvm_util_init(logStream, DL);
-  smt::smt_initializer smt_init;
-  Verifier verifier(TLI, smt_init, logStream);
-  verifier.quiet = opt_quiet;
-  verifier.always_verify = opt_always_verify;
-  verifier.print_dot = opt_print_dot;
-  verifier.bidirectional = opt_bidirectional;
+  llvm::Triple targetTriple(M1.get()->getTargetTriple());
+  initVerifier(targetTriple);
 
   for(auto fit=M1->begin();fit!=M1->end();++fit){
     if(!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
       llvm::Function* f2=M2->getFunction(fit->getName());
-      verifier.compareFunctions(*fit, *f2);
+      verifier->compareFunctions(*fit, *f2);
       //FIX ME: need update
       logStream.str("");
       //equals to 0 means not correct
-      if(verifier.num_correct==0){
+      if(verifier->num_correct==0){
         invalidFunctions.insert(fit->getName());
-        verifier.num_correct=0;
+        verifier->num_correct=0;
       }
     }
   }
+  destroyVerifier();
   return invalidFunctions.size()==M1->size();
 }
 
@@ -358,17 +374,11 @@ void runOnce(int ith, Mutator &mutator){
 
   auto M1 = mutator.getModule();
 
-  auto &DL = M1.get()->getDataLayout();
-  llvm::Triple targetTriple(M1.get()->getTargetTriple());
-  llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
+  if(!verifier.has_value()){
+    llvm::Triple targetTriple(M1.get()->getTargetTriple());
+    initVerifier(targetTriple);
+  }
 
-  llvm_util::initializer llvm_util_init(logStream, DL);
-  smt::smt_initializer smt_init;
-  Verifier verifier(TLI, smt_init, logStream);
-  verifier.quiet = opt_quiet;
-  verifier.always_verify = opt_always_verify;
-  verifier.print_dot = opt_print_dot;
-  verifier.bidirectional = opt_bidirectional;
 
   const string optFunc = mutator.getCurrentFunction();
   bool shouldLog=false;
@@ -379,8 +389,8 @@ void runOnce(int ith, Mutator &mutator){
       llvm_util::optimize_module(M2.get(), optPass);
       llvm::Function *pf2 = M2->getFunction(pf1->getName());
       assert(pf2 != nullptr && "pf2 clone failed");
-      verifier.compareFunctions(*pf1, *pf2);
-      if(verifier.num_correct!=0){
+      verifier->compareFunctions(*pf1, *pf2);
+      if(verifier->num_correct!=0){
         shouldLog=true;
       }
     }
