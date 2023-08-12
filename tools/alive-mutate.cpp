@@ -390,7 +390,7 @@ void runOnce(int ith, Mutator &mutator){
       llvm::Function *pf2 = M2->getFunction(pf1->getName());
       assert(pf2 != nullptr && "pf2 clone failed");
       verifier->compareFunctions(*pf1, *pf2);
-      if(verifier->num_correct!=0){
+      if(verifier->num_correct==0){
         shouldLog=true;
       }
     }
