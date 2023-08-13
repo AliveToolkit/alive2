@@ -304,6 +304,24 @@ void FunctionMutator::mutate() {
   } while (!mutated && canMutate);
 
   if(!checkValid()){
+    /*for(auto bb=functionInTmp->begin();bb!=functionInTmp->end();++bb){
+      if(bb->getName()=="bb27.i.i"){
+        llvm::errs()<<"Current dominance: "<<DT.dominates(&*iitInTmp, &*bb)<<"\n";
+        assert(DT.dominates(&*iitInTmp, &*bb));
+        llvm::Instruction* tmp35ii=&*(++bb->begin());
+        llvm::errs()<<"Another dominance:"<<DT.dominates(&*iitInTmp, tmp35ii)<<"\n";
+        assert(DT.dominates(&*iitInTmp, tmp35ii));
+        auto added0=iitInTmp;
+        --added0;--added0;
+        llvm::Instruction* added=&*added0;
+        llvm::errs()<<"Another dominance:"<<DT.dominates(added,tmp35ii)<<"\n";
+        tmp35ii->dump();
+        iitInTmp->dump();
+        added->dump();
+        llvm::errs()<<"check ended\n";
+        break;
+      }
+    }*/
     llvm::errs()<<"Invalid LLVM IR generated. Current seed: "<<Random::getSeed()<<"\n";
     llvm::errs()<<"Current Module Identifier: "<<currentFunction->getParent()->getModuleIdentifier()<<"\n";
     llvm::errs()<<"Current Function:\n";
@@ -369,16 +387,19 @@ void FunctionMutator::calcDomVals() {
   domVals.resize(currentFunction->arg_size());
   // add BasicBlocks before bitTmp
   for (auto bitTmp = currentFunction->begin(); bitTmp != bit; ++bitTmp) {
-    if (DT.dominates(&*iit, &*bitTmp)) {
+    if (DT.dominates(&*bitTmp, &*bit)) {
       for (auto iitTmp = bitTmp->begin(); iitTmp != bitTmp->end(); ++iitTmp) {
-        domVals.push_back(&*iitTmp);
+        //Some special inst like unwind invoke would be false here
+        if(DT.dominates(&*iitTmp, &*iit)){
+          domVals.push_back(&*iitTmp);
+        }
       }
     }
   }
   domVals.startBackup();
   // add Instructions before iitTmp
   for (auto iitTmp = bit->begin(); iitTmp != iit; ++iitTmp) {
-    if (DT.dominates(&*iit, &*iitTmp)) {
+    if (DT.dominates(&*iitTmp, &*iit)) {
       domVals.push_back(&*iitTmp);
     }
   }
