@@ -369,7 +369,7 @@ void FunctionMutator::calcDomVals() {
   domVals.resize(currentFunction->arg_size());
   // add BasicBlocks before bitTmp
   for (auto bitTmp = currentFunction->begin(); bitTmp != bit; ++bitTmp) {
-    if (DT.dominates(&*bitTmp, &*bit)) {
+    if (DT.dominates(&*iit, &*bitTmp)) {
       for (auto iitTmp = bitTmp->begin(); iitTmp != bitTmp->end(); ++iitTmp) {
         domVals.push_back(&*iitTmp);
       }
@@ -378,7 +378,7 @@ void FunctionMutator::calcDomVals() {
   domVals.startBackup();
   // add Instructions before iitTmp
   for (auto iitTmp = bit->begin(); iitTmp != iit; ++iitTmp) {
-    if (DT.dominates(&*iitTmp, &*iit)) {
+    if (DT.dominates(&*iit, &*iitTmp)) {
       domVals.push_back(&*iitTmp);
     }
   }
