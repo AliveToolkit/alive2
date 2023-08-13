@@ -1,26 +1,26 @@
 ; TEST-ARGS: -dbg
 ; CHECK: num_nonlocals_src: 6
 
-define void @f(i8** %p, i1 %c) {
+define void @f(ptr %p, i1 %c) {
   br i1 %c, label %then, label %else
 
 then:
-  load i8*, i8** %p
-  %p01 = getelementptr i8*, i8** %p, i32 3
-  load i8*, i8** %p01
+  load ptr, ptr %p
+  %p01 = getelementptr ptr, ptr %p, i32 3
+  load ptr, ptr %p01
   br label %exit
 
 else:
-  load i8*, i8** %p
-  %p2 = getelementptr i8*, i8** %p, i32 1
-  load i8*, i8** %p2
-  %p3 = getelementptr i8*, i8** %p, i32 2
-  load i8*, i8** %p3
-  %p4 = getelementptr i8*, i8** %p, i32 4
-  load i8*, i8** %p4
+  load ptr, ptr %p
+  %p2 = getelementptr ptr, ptr %p, i32 1
+  load ptr, ptr %p2
+  %p3 = getelementptr ptr, ptr %p, i32 2
+  load ptr, ptr %p3
+  %p4 = getelementptr ptr, ptr %p, i32 4
+  load ptr, ptr %p4
   br label %exit
 
 exit:
-  load i8*, i8** %p
+  load ptr, ptr %p
   ret void
 }

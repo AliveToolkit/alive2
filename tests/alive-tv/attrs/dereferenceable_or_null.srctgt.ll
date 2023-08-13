@@ -1,9 +1,9 @@
-define i32* @src(i32* dereferenceable_or_null(4) %p) {
-  ret i32* %p
+define ptr @src(ptr dereferenceable_or_null(4) %p) {
+  ret ptr %p
 }
 
-define i32* @tgt(i32* dereferenceable(4) %p) {
-  ret i32* %p
+define ptr @tgt(ptr dereferenceable(4) %p) {
+  ret ptr %p
 }
 
 ; ERROR: Parameter attributes not refined

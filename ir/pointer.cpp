@@ -280,7 +280,9 @@ void Pointer::operator+=(const expr &bytes) {
 }
 
 Pointer Pointer::maskOffset(const expr &mask) const {
-  return { m, getBid(), getOffset() & mask.zextOrTrunc(bits_for_offset),
+  return { m, getBid(),
+           getOffset() + ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
+                             - getAddress()).zextOrTrunc(bits_for_offset),
            getAttrs() };
 }
 

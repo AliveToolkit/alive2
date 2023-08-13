@@ -6,7 +6,7 @@
 
 @b = external global [2048 x i32], align 16
 
-define i32 @src(i32* %b, i32 %n) #0 {
+define i32 @src(ptr %b, i32 %n) {
   %1 = icmp sgt i32 %n, 0
   br i1 %1, label %.lr.ph, label %._crit_edge
 
@@ -17,8 +17,8 @@ define i32 @src(i32* %b, i32 %n) #0 {
 3:                                                ; preds = %3, %.lr.ph
   %indvars.iv = phi i64 [ %2, %.lr.ph ], [ %indvars.iv.next, %3 ]
   %indvars.iv.next = add i64 %indvars.iv, -1
-  %4 = getelementptr inbounds i32, i32* %b, i64 %indvars.iv.next
-  %5 = load i32, i32* %4, align 4
+  %4 = getelementptr inbounds i32, ptr %b, i64 %indvars.iv.next
+  %5 = load i32, ptr %4, align 4
   %6 = add nsw i32 %5, 0
   %7 = trunc i64 %indvars.iv.next to i32
   %8 = icmp sgt i32 %7, 0
@@ -30,7 +30,7 @@ define i32 @src(i32* %b, i32 %n) #0 {
 }
 
 
-define i32 @tgt(i32* %b, i32 %n) #0 {
+define i32 @tgt(ptr %b, i32 %n) {
   %1 = icmp sgt i32 %n, 0
   br i1 %1, label %.lr.ph, label %._crit_edge
 
@@ -54,12 +54,12 @@ vector.body:                                      ; preds = %vector.body, %vecto
   br i1 %6, label %middle.block, label %vector.body
 
 middle.block:                                     ; preds = %vector.body
-  %7 = getelementptr inbounds i32, i32* %b, i64 -3
+  %7 = getelementptr inbounds i32, ptr %b, i64 -3
   %8 = xor i64 %index, -1
   %9 = add i64 %8, %2
-  %10 = getelementptr inbounds i32, i32* %7, i64 %9
-  %11 = bitcast i32* %10 to <4 x i32>*
-  %wide.load = load <4 x i32>, <4 x i32>* %11, align 4
+  %10 = getelementptr inbounds i32, ptr %7, i64 %9
+  %11 = bitcast ptr %10 to ptr
+  %wide.load = load <4 x i32>, ptr %11, align 4
   %cmp.n = icmp eq i64 %5, %n.vec
   %12 = extractelement <4 x i32> %wide.load, i32 0
   br i1 %cmp.n, label %._crit_edge.loopexit, label %scalar.ph
@@ -71,8 +71,8 @@ scalar.ph:                                        ; preds = %middle.block, %.lr.
 13:                                               ; preds = %13, %scalar.ph
   %indvars.iv = phi i64 [ %bc.resume.val, %scalar.ph ], [ %indvars.iv.next, %13 ]
   %indvars.iv.next = add i64 %indvars.iv, -1
-  %14 = getelementptr inbounds i32, i32* %b, i64 %indvars.iv.next
-  %15 = load i32, i32* %14, align 4
+  %14 = getelementptr inbounds i32, ptr %b, i64 %indvars.iv.next
+  %15 = load i32, ptr %14, align 4
   %16 = trunc i64 %indvars.iv.next to i32
   %17 = icmp sgt i32 %16, 0
   br i1 %17, label %13, label %._crit_edge.loopexit

@@ -1,7 +1,7 @@
-define nonnull i8* @src(i8* %p) {
-  ret i8* null
+define nonnull ptr @src(ptr %p) {
+  ret ptr null
 }
 
-define nonnull i8* @tgt(i8* %p) {
-  ret i8* poison
+define nonnull ptr @tgt(ptr %p) {
+  ret ptr poison
 }

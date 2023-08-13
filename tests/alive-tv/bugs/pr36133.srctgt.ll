@@ -1,10 +1,10 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=36133
-@global = external local_unnamed_addr global i8*, align 8
+@global = external global ptr, align 8
 
-define i32 @src(i32 %arg) local_unnamed_addr #0 {
+define i32 @src(i32 %arg) {
 bb:
-  %tmp = load i8*, i8** @global, align 8
-  %tmp1 = icmp eq i8* %tmp, null
+  %tmp = load ptr, ptr @global, align 8
+  %tmp1 = icmp eq ptr %tmp, null
   br i1 %tmp1, label %bb3, label %bb2
 
 bb2:
@@ -31,17 +31,12 @@ bb10:                        ; Single pred - %bb7
   ret i32 1
 }
 
-; Function Attrs: nounwind
-declare void @llvm.assume(i1) #1
+declare void @llvm.assume(i1)
 
-attributes #0 = { uwtable }
-attributes #1 = { nounwind }
-
-; Function Attrs: uwtable
-define i32 @tgt(i32 %arg) local_unnamed_addr #0 {
+define i32 @tgt(i32 %arg) {
 bb:
-  %tmp = load i8*, i8** @global, align 8
-  %tmp1 = icmp eq i8* %tmp, null
+  %tmp = load ptr, ptr @global, align 8
+  %tmp1 = icmp eq ptr %tmp, null
   br i1 %tmp1, label %bb10, label %bb7             ; This now bypasses %arg check directly going to one of the possible rets
 
 bb7:

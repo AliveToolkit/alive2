@@ -1,12 +1,12 @@
-define dereferenceable(4) i32* @src() {
-  %p = call i32* @f()
-  ret i32* %p
+define dereferenceable(4) ptr @src() {
+  %p = call ptr @f()
+  ret ptr %p
 }
 
-define dereferenceable(4) i32* @tgt() {
+define dereferenceable(4) ptr @tgt() {
   unreachable
 }
 
 ; ERROR: Source is more defined than target
 
-declare dereferenceable(4) i32* @f()
+declare dereferenceable(4) ptr @f()

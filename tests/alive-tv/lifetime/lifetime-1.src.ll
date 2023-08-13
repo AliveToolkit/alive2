@@ -5,7 +5,7 @@ define void @f1() {
 
 define i32 @f2() {
   %p = alloca i32
-  store i32 10, i32* %p
-  %v = load i32, i32* %p
+  store i32 10, ptr %p
+  %v = load i32, ptr %p
   ret i32 %v
 }

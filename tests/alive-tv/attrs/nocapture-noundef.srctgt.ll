@@ -1,29 +1,29 @@
-define i8* @src(i8* %a, i8* nocapture %b) {
-  %cmp = icmp eq i8* %a, %b
+define ptr @src(ptr %a, ptr nocapture %b) {
+  %cmp = icmp eq ptr %a, %b
   br i1 %cmp, label %t, label %f
 
 t:
-  %v = call i8* @g(i8* %b)
-  ret i8* %v
+  %v = call ptr @g(ptr %b)
+  ret ptr %v
 
 f:
-  ret i8* null
+  ret ptr null
 }
 
-define i8* @tgt(i8* %a, i8* nocapture %b) {
-  %cmp = icmp eq i8* %a, %b
+define ptr @tgt(ptr %a, ptr nocapture %b) {
+  %cmp = icmp eq ptr %a, %b
   br i1 %cmp, label %t, label %f
 
 t:
-  %v = call i8* @g(i8* %a)
-  ret i8* %v
+  %v = call ptr @g(ptr %a)
+  ret ptr %v
 
 f:
-  ret i8* null
+  ret ptr null
 }
 
 
-declare i8* @g(i8* nocapture)
+declare ptr @g(ptr nocapture)
 
 ; If %a = %b + n, this is wrong.
 ; ERROR: Source is more defined than target

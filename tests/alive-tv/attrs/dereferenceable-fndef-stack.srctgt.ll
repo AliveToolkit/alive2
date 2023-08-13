@@ -1,8 +1,8 @@
-define dereferenceable(4) i32* @src() {
+define dereferenceable(4) ptr @src() {
   %p = alloca i32
-  ret i32* %p
+  ret ptr %p
 }
 
-define dereferenceable(4) i32* @tgt() {
+define dereferenceable(4) ptr @tgt() {
   unreachable
 }

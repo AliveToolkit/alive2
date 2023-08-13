@@ -217,7 +217,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   }
 
   auto undef_mask = getUndefVar(ty, child);
-  if (config::disable_undef_input || attrs.undefImpliesUB()) {
+  if (config::disable_undef_input || attrs.poisonImpliesUB()) {
     s.addUB(undef_mask == 0);
   } else {
     auto [undef, var] = ty.mkUndefInput(s, attrs);

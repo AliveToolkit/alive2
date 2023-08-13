@@ -6,7 +6,7 @@
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128:1"
 target triple = "x86_64-unknown-linux-gnu"
 
-define i32 @src(i8* %p, i64* %p1) {
+define i32 @src(ptr %p, ptr %p1) {
 entry:
   br label %loop1
 
@@ -26,10 +26,10 @@ loop2:
   %local_1_56 = phi i32 [ %2, %general_case24 ], [ %3, %loop2 ]
   %local_2_57 = phi i32 [ 1, %general_case24 ], [ %7, %loop2 ]
   %3 = add i32 %local_1_56, -1
-  %4 = load i64, i64* %p1, align 8
+  %4 = load i64, ptr %p1, align 8
   %5 = sext i32 %3 to i64
   %6 = sub i64 %4, %5
-  store i64 %6, i64* %p1, align 8
+  store i64 %6, ptr %p1, align 8
   %7 = add nuw nsw i32 %local_2_57, 1
   %8 = icmp ugt i32 %local_2_57, 7
   br i1 %8, label %loop2.exit, label %loop2
@@ -45,7 +45,7 @@ exit:
   ret i32 0
 }
 
-define i32 @tgt(i8* %p, i64* %p1) {
+define i32 @tgt(ptr %p, ptr %p1) {
 entry:
   br label %loop1
 
@@ -67,9 +67,9 @@ loop2:                                            ; preds = %loop2.preheader, %l
   %indvars.iv = phi i64 [ %2, %loop2.preheader ], [ %indvars.iv.next, %loop2 ]
   %local_2_57 = phi i32 [ %6, %loop2 ], [ 1, %loop2.preheader ]
   %indvars.iv.next = add nsw i64 %indvars.iv, -1
-  %4 = load i64, i64* %p1, align 8
+  %4 = load i64, ptr %p1, align 8
   %5 = sub i64 %4, %indvars.iv.next
-  store i64 %5, i64* %p1, align 8
+  store i64 %5, ptr %p1, align 8
   %6 = add nuw nsw i32 %local_2_57, 1
   %exitcond = icmp eq i32 %6, 9
   br i1 %exitcond, label %loop2.exit.loopexit, label %loop2

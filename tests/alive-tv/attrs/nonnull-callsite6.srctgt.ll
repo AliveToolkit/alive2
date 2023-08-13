@@ -1,11 +1,11 @@
-define void @src(i8* %p) {
-  call void @f(i8* null)
+define void @src(ptr %p) {
+  call void @f(ptr null)
   ret void
 }
 
-define void @tgt(i8* %p) {
-  call void @f(i8* poison)
+define void @tgt(ptr %p) {
+  call void @f(ptr poison)
   ret void
 }
 
-declare void @f(i8* nonnull)
+declare void @f(ptr nonnull)

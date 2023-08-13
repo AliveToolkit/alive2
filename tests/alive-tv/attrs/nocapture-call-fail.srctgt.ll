@@ -1,13 +1,13 @@
 ; ERROR: Source is more defined
 
-define void @src(i8* nocapture %p) {
-  call i8* @g(i8* %p)
+define void @src(ptr nocapture %p) {
+  call ptr @g(ptr %p)
   ret void
 }
 
-define void @tgt(i8* nocapture %p) {
-  call i8* @g(i8* poison)
+define void @tgt(ptr nocapture %p) {
+  call ptr @g(ptr poison)
   ret void
 }
 
-declare i8* @g(i8* nocapture)
+declare ptr @g(ptr nocapture)

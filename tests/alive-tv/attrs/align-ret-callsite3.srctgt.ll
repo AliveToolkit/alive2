@@ -1,14 +1,14 @@
 ; ERROR: Target is more poisonous than source
 
-define i8* @src() {
-  %p = call i8* @g()
-  %p.fr = freeze i8* %p
-  ret i8* %p.fr
+define ptr @src() {
+  %p = call ptr @g()
+  %p.fr = freeze ptr %p
+  ret ptr %p.fr
 }
 
-define i8* @tgt() {
-  %p = call i8* @g()
-  ret i8* %p
+define ptr @tgt() {
+  %p = call ptr @g()
+  ret ptr %p
 }
 
-declare align 4 i8* @g()
+declare align 4 ptr @g()

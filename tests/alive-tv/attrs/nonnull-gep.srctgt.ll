@@ -1,13 +1,13 @@
-define void @src(i8* %p) {
-  %q = getelementptr inbounds i8, i8* %p, i64 1
-  call void @f(i8* %q)
+define void @src(ptr %p) {
+  %q = getelementptr inbounds i8, ptr %p, i64 1
+  call void @f(ptr %q)
   ret void
 }
 
-define void @tgt(i8* %p) {
-  %q = getelementptr inbounds i8, i8* %p, i64 1
-  call void @f(i8* nonnull %q)
+define void @tgt(ptr %p) {
+  %q = getelementptr inbounds i8, ptr %p, i64 1
+  call void @f(ptr nonnull %q)
   ret void
 }
 
-declare void @f(i8*)
+declare void @f(ptr)

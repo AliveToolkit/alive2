@@ -1,8 +1,8 @@
 ; TEST-ARGS: -dbg
-define i1 @f(i8* %p) {
-  %p2 = getelementptr i8, i8* %p, i64 0
-  %p3 = getelementptr i8, i8* %p, i64 1
-  %c = icmp eq i8* %p2, %p3
+define i1 @f(ptr %p) {
+  %p2 = getelementptr i8, ptr %p, i64 0
+  %p3 = getelementptr i8, ptr %p, i64 1
+  %c = icmp eq ptr %p2, %p3
   ret i1 %c
 }
 

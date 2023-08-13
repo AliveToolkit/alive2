@@ -1,9 +1,9 @@
-define void @src(i8* align(4) %p) {
-  load i8, i8* %p
+define void @src(ptr align(4) %p) {
+  load i8, ptr %p
   ret void
 }
 
-define void @tgt(i8* align(4) %p) {
-  load i8, i8* %p, align 4
+define void @tgt(ptr align(4) %p) {
+  load i8, ptr %p, align 4
   ret void
 }

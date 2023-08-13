@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-22.04]
-        compiler:   [g++-11, clang++-16]
+        compiler:   [g++-11, clang++-17]
         build_type: [Release, Debug]
         cache:      ['', Redis]
         include:
@@ -33,10 +33,10 @@ jobs:
             sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main"
           fi
           if [[ ${{ matrix.compiler }} == "clang++-17" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
+            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main"
           fi
           sudo apt-get update
-          sudo apt-get install z3 re2c ninja-build g++-12
+          sudo apt-get install z3 re2c ninja-build
           if [[ ${{ matrix.compiler }} == "clang++-16" ]]; then
             sudo apt-get install clang++-16
           fi

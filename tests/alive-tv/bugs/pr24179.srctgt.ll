@@ -8,10 +8,10 @@ define void @src() {
   br label %loop
 
  loop:
-  %v = load i32, i32* %t
+  %v = load i32, ptr %t
   %c = call i1 @use(i32 %v)
-  store i32 46, i32* %t
-  store i32 42, i32* %t
+  store i32 46, ptr %t
+  store i32 42, ptr %t
   br i1 %c, label %loop, label %exit
 
  exit:

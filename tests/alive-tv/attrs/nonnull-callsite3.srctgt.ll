@@ -1,21 +1,21 @@
-define void @src(i8* %p) {
-  %c = icmp ne i8* %p, null
+define void @src(ptr %p) {
+  %c = icmp ne ptr %p, null
   br i1 %c, label %A, label %B
 A:
-  call void @f(i8* %p)
+  call void @f(ptr %p)
   ret void
 B:
   ret void
 }
 
-define void @tgt(i8* %p) {
-  %c = icmp ne i8* %p, null
+define void @tgt(ptr %p) {
+  %c = icmp ne ptr %p, null
   br i1 %c, label %A, label %B
 A:
-  call void @f(i8* nonnull %p)
+  call void @f(ptr nonnull %p)
   ret void
 B:
   ret void
 }
 
-declare void @f(i8*)
+declare void @f(ptr)

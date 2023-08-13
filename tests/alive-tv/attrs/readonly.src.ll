@@ -1,4 +1,4 @@
-define void @f(i8* readonly %x) {
-  store i8 0, i8* %x
+define void @f(ptr readonly %x) {
+  store i8 0, ptr %x
   ret void
 }

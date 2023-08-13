@@ -5,7 +5,7 @@ define void @src() {
 entry:
   br label %for.cond
 for.cond:                                         ; preds = %for.cond, %entry
-  %0 = load i32, i32* @a, align 4
+  %0 = load i32, ptr @a, align 4
   %tobool.not = icmp eq i32 %0, 0
   br i1 %tobool.not, label %for.cond1, label %for.cond
 for.cond1:                                        ; preds = %for.cond, %for.inc

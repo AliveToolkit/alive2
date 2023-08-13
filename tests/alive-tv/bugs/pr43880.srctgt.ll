@@ -10,10 +10,10 @@ define i32 @src(ptr nocapture readonly %x, ptr nocapture readonly %y)  {
 }
 
 define i32 @tgt(ptr nocapture readonly %x, ptr nocapture readonly %y) {
-  %1 = bitcast ptr %x to i16*
-  %2 = bitcast ptr %y to i16*
-  %3 = load i16, i16* %1
-  %4 = load i16, i16* %2
+  %1 = bitcast ptr %x to ptr
+  %2 = bitcast ptr %y to ptr
+  %3 = load i16, ptr %1
+  %4 = load i16, ptr %2
   %5 = call i16 @llvm.bswap.i16(i16 %3)
   %6 = call i16 @llvm.bswap.i16(i16 %4)
   %7 = zext i16 %5 to i32

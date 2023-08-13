@@ -1,8 +1,8 @@
-define nonnull i8* @src(i8* nonnull %p) {
-  ret i8* %p
+define nonnull ptr @src(ptr nonnull %p) {
+  ret ptr %p
 }
 
-define nonnull i8* @tgt(i8* nonnull %p) {
+define nonnull ptr @tgt(ptr nonnull %p) {
   unreachable
 }
 

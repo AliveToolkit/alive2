@@ -1,13 +1,13 @@
-declare void @llvm.lifetime.start.p0i8(i64, i8*)
-declare void @llvm.lifetime.end.p0i8(i64, i8*)
-declare i8* @malloc(i64)
+declare void @llvm.lifetime.start.p0i8(i64, ptr)
+declare void @llvm.lifetime.end.p0i8(i64, ptr)
+declare ptr @malloc(i64)
 
 define i8 @src() {
-  %p = call i8* @malloc(i64 1)
-  store i8 1, i8* %p
-  call void @llvm.lifetime.start.p0i8(i64 1, i8* %p)
-  %v = load i8, i8* %p
-  call void @llvm.lifetime.end.p0i8(i64 1, i8* %p)
+  %p = call ptr @malloc(i64 1)
+  store i8 1, ptr %p
+  call void @llvm.lifetime.start.p0i8(i64 1, ptr %p)
+  %v = load i8, ptr %p
+  call void @llvm.lifetime.end.p0i8(i64 1, ptr %p)
   ret i8 %v
 }
 

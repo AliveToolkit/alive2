@@ -49,7 +49,7 @@ sw.bb:                                            ; preds = %while.cond2
   %5 = load ptr, ptr %dop_api4, align 8
   %file_num5 = getelementptr inbounds %struct.__MUSIC_API, ptr %5, i64 0, i32 2
   %6 = load i32, ptr %file_num5, align 1
-  %call6 = call i32 (ptr, ...) @printf(ptr getelementptr inbounds ([10 x i8], [10 x i8]* @.str, i64 0, i64 0), i32 %6) #6
+  %call6 = call i32 (ptr, ...) @printf(ptr getelementptr inbounds ([10 x i8], ptr @.str, i64 0, i64 0), i32 %6) #6
   br label %while.cond2.backedge
 
 sw.bb7:                                           ; preds = %while.cond2

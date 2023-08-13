@@ -3,7 +3,7 @@
 define i32 @src() {
 entry:
   %r = alloca i32, align 4
-  store i32 0, i32* %r, align 4
+  store i32 0, ptr %r, align 4
   br label %for.cond
 
 for.cond:
@@ -20,9 +20,9 @@ for.cond1:
   br i1 %cmp2, label %for.body3, label %for.inc5
 
 for.body3:
-  %2 = load i32, i32* %r, align 4
+  %2 = load i32, ptr %r, align 4
   %inc = add i32 %2, 1
-  store i32 %inc, i32* %r, align 4
+  store i32 %inc, ptr %r, align 4
   br label %for.inc
 
 for.inc:
@@ -34,7 +34,7 @@ for.inc5:
   br label %for.cond
 
 for.end7:
-  %3 = load i32, i32* %r, align 4
+  %3 = load i32, ptr %r, align 4
   ret i32 %3
 }
 

@@ -195,9 +195,9 @@ public:
   FpType getFpType() const { return fpType; };
 
   smt::expr getDummyFloat() const;
-  smt::expr mkNaN(State &s, bool canonical) const;
   smt::expr getFloat(const smt::expr &v) const;
-  smt::expr fromFloat(State &s, const smt::expr &fp) const;
+  smt::expr fromFloat(State &s, const smt::expr &fp,
+                      const smt::expr &is_snan) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
 
   IR::StateValue getDummyValue(bool non_poison) const override;

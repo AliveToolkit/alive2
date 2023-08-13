@@ -1,9 +1,9 @@
-; ERROR: Parameter attributes not refined
+; ERROR: Target is more poisonous than source
 
-define i8* @src(i8* %p) {
-  ret i8* %p
+define ptr @src(ptr %p) {
+  ret ptr %p
 }
 
-define i8* @tgt(i8* nonnull %p) {
-  ret i8* %p
+define ptr @tgt(ptr nonnull %p) {
+  ret ptr %p
 }

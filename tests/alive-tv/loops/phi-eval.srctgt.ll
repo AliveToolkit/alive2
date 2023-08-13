@@ -7,7 +7,7 @@ entry:
   br label %for.cond
 
 for.cond:
-  %0 = phi i16 [ 0, %entry ], [ ptrtoint (i16* @c to i16), %if.end ], [ 0, %for.cond1 ]
+  %0 = phi i16 [ 0, %entry ], [ ptrtoint (ptr @c to i16), %if.end ], [ 0, %for.cond1 ]
   br i1 0, label %for.cond1, label %for.end8
 
 for.cond1:

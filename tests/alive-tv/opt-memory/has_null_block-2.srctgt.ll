@@ -1,15 +1,15 @@
 ; TEST-ARGS: -dbg
 
-define i8* @src() {
-  %q = call i8* @malloc(i32 1)
-  ret i8* %q
+define ptr @src() {
+  %q = call ptr @malloc(i32 1)
+  ret ptr %q
 }
 
-define i8* @tgt() {
-  %q = call i8* @malloc(i32 1)
-  ret i8* %q
+define ptr @tgt() {
+  %q = call ptr @malloc(i32 1)
+  ret ptr %q
 }
 
-declare i8* @malloc(i32)
+declare ptr @malloc(i32)
 
 ; CHECK: has_null_block: 1

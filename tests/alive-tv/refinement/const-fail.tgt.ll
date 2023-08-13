@@ -2,7 +2,7 @@
 @y = internal constant i32 0
 
 define void @f() {
-  %a = load i32, i32* @x
-  %b = load i32, i32* @y
+  %a = load i32, ptr @x
+  %b = load i32, ptr @y
   ret void
 }
