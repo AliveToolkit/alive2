@@ -1,10 +1,10 @@
 #pragma once
-#include "llvmStress.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -246,69 +246,6 @@ public:
   }
 };
 
-class RandomCodePieceGenerator {
-public:
-  static void setInsertPoint(Instruction *inst) {
-    Modifier::setInsertPoint(inst);
-  }
-  static Instruction *getInsertPoint() {
-    return Modifier::getInsertPoint();
-  }
-  static void insertCode(unsigned codeSize) {
-    Instruction *insertPoint = getInsertPoint();
-    assert(insertPoint != nullptr && "insertPoint should not be nullptr!");
-
-    // Create the value table.
-    Modifier::PieceTable PT;
-    RandomFromLLVMStress R(Random::getRandomUnsigned());
-
-    // Consider arguments as legal values.
-    for (auto &arg : insertPoint->getParent()->getParent()->args())
-      PT.push_back(&arg);
-    Module *module = insertPoint->getModule();
-    // List of modifiers which add new RandomFromLLVMStress instructions.
-    std::vector<std::unique_ptr<Modifier>> Modifiers;
-    Modifiers.emplace_back(new LoadModifier(&PT, &R, module));
-    Modifiers.emplace_back(new StoreModifier(&PT, &R, module));
-    auto SM = Modifiers.back().get();
-    Modifiers.emplace_back(new ExtractElementModifier(&PT, &R, module));
-    Modifiers.emplace_back(new ShuffModifier(&PT, &R, module));
-    Modifiers.emplace_back(new InsertElementModifier(&PT, &R, module));
-    Modifiers.emplace_back(new BinModifier(&PT, &R, module));
-    Modifiers.emplace_back(new CastModifier(&PT, &R, module));
-    Modifiers.emplace_back(new SelectModifier(&PT, &R, module));
-    Modifiers.emplace_back(new CmpModifier(&PT, &R, module));
-
-    int tmpNum = R.Rand() % std::min(5, (int)codeSize);
-    codeSize -= tmpNum;
-    // Generate the RandomFromLLVMStress instructions
-    AllocaModifier{&PT, &R, module}.ActN(tmpNum); // Throw in a few allocas
-    if (codeSize == 0)
-      return;
-
-    tmpNum = R.Rand() % std::min(5, (int)codeSize);
-    codeSize -= tmpNum;
-    ConstModifier{&PT, &R, module}.ActN(tmpNum); // Throw in a few constants
-
-    for (unsigned i = 0; codeSize != 0 && codeSize >= Modifiers.size(); ++i) {
-      for (auto &Mod : Modifiers) {
-        Mod->Act();
-        --codeSize;
-        if (codeSize == 0) {
-          return;
-        }
-      }
-    }
-
-    SM->ActN(codeSize); // Throw in a few stores.
-  }
-  static void insertCodeBefore(Instruction *inst, unsigned codeSize) {
-    Modifier::init();
-    setInsertPoint(inst);
-    insertCode(codeSize);
-  }
-};
-
 class mutator_util {
   static LLVMFunctionComparator comparator;
   const static std::vector<llvm::Instruction::BinaryOps> integerBinaryOps;
@@ -325,7 +262,6 @@ public:
   insertFunctionArguments(llvm::Function *f,
                           llvm::SmallVector<llvm::Type *> tys,
                           llvm::ValueToValueMapTy &VMap);
-  static void insertRandomCodeBefore(llvm::Instruction *inst);
   static void propagateFunctionsInModule(llvm::Module *M, size_t num);
   static llvm::Value *
   updateIntegerSize(llvm::Value *integer, llvm::Type *newIntTy,
@@ -371,7 +307,7 @@ public:
 
   static bool isPadInstruction(llvm::Instruction *inst) {
     return llvm::isa<llvm::LandingPadInst>(inst) ||
-           llvm::isa<CleanupPadInst>(inst) ||
+           llvm::isa<llvm::CleanupPadInst>(inst) ||
            llvm::isa<llvm::CatchPadInst>(inst);
   }
 };

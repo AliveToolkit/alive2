@@ -105,16 +105,16 @@ void FunctionMutator::print() {
   llvm::errs() << "\n";
 }
 
-extern cl::list<size_t> disableSEXT;
-extern cl::list<size_t> disableZEXT;
-extern cl::list<size_t> disableEXT;
+extern llvm::cl::list<size_t> disableSEXT;
+extern llvm::cl::list<size_t> disableZEXT;
+extern llvm::cl::list<size_t> disableEXT;
 
 void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
   for (llvm::inst_iterator it = inst_begin(*currentFunction);
        it != inst_end(*currentFunction); ++it) {
     for (size_t i = 0; i < it->getNumOperands(); ++i) {
       if (llvm::Value *val = it->getOperand(i);
-          val != nullptr && llvm::isa<ConstantInt>(*val)) {
+          val != nullptr && llvm::isa<llvm::ConstantInt>(*val)) {
         Random::addUsedInt(((llvm::ConstantInt *)val)->getLimitedValue());
       }
     }
@@ -636,7 +636,7 @@ bool ModuleMutator::init() {
               llvm::cast<llvm::ConstantInt>(*oit)->getLimitedValue());
         }
       }
-      if (llvm::isa<ConstantInt>(*git)) {
+      if (llvm::isa<llvm::ConstantInt>(*git)) {
         Random::addUsedInt(
             llvm::cast<llvm::ConstantInt>(*git).getLimitedValue());
       }

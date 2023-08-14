@@ -143,29 +143,6 @@ public:
   virtual void debug() override;
 };
 
-class RandomCodeInserterHelper : public MutationHelper {
-  bool generated;
-
-public:
-  RandomCodeInserterHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), generated(false) {}
-  virtual void init() override {
-    generated = false;
-  }
-  virtual void reset() override {
-    generated = false;
-  }
-  virtual void whenMoveToNextInst() override {
-    generated = false;
-  }
-  static bool canMutate(llvm::Function *func) {
-    return true;
-  };
-  virtual void mutate() override;
-  virtual bool shouldMutate() override;
-  virtual void debug() override;
-};
-
 class FunctionCallInlineHelper : public MutationHelper {
   bool inlined;
   std::vector<std::vector<std::string>> idToFuncSet;

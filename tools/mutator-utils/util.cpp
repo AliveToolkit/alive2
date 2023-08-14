@@ -288,11 +288,6 @@ const std::vector<llvm::Intrinsic::ID> mutator_util::floatUnaryIntrinsic{
     llvm::Intrinsic::IndependentIntrinsics::roundeven,
     llvm::Intrinsic::IndependentIntrinsics::canonicalize};
 
-void mutator_util::insertRandomCodeBefore(llvm::Instruction *inst) {
-  RandomCodePieceGenerator::insertCodeBefore(
-      inst, 5 + (Random::getRandomUnsigned() & 15)); // last 4 binary bits
-}
-
 llvm::Instruction *
 mutator_util::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
                                       llvm::Instruction *insertBefore) {

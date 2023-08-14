@@ -21,6 +21,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/CommandLine.h"
 #include <functional>
 #include <list>
 #include <memory>

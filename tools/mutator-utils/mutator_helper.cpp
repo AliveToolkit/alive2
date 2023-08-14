@@ -272,7 +272,7 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
       // make sure at least one
       std::any_of(inst->op_begin(), inst->op_end(),
                   [](llvm::Use &use) { return canMutate(use.get()); }) &&
-      (inst->getNumOperands() - llvm::isa<CallBase>(*inst) > 0) &&
+      (inst->getNumOperands() - llvm::isa<llvm::CallBase>(*inst) > 0) &&
       !llvm::isa<llvm::LandingPadInst>(inst)
       // The ret value of CleanupRet Inst must be a CleanupPad, needs extra
       // check so ignore for now.
@@ -437,44 +437,6 @@ void RandomMoveHelper::debug() {
   llvm::errs() << "\n";
 }
 
-// don't allow insert code at LandPadInst.
-// don't allow insert code at CatchPadInst.
-// don't allow insert code at CleanupPadInst.
-bool RandomCodeInserterHelper::shouldMutate() {
-  llvm::Instruction *inst = &*mutator->iitInTmp;
-  return !generated && !llvm::isa<llvm::PHINode>(inst) &&
-         !mutator_util::isPadInstruction(inst);
-}
-
-void RandomCodeInserterHelper::debug() {
-  llvm::errs() << "Code piece generated\n";
-  mutator->iitInTmp->print(llvm::errs());
-  llvm::errs() << "\n";
-}
-
-void RandomCodeInserterHelper::mutate() {
-  generated = true;
-  // if not the first inst of this block, we can do a split
-  llvm::Instruction *insertPoint = &*mutator->iitInTmp;
-  if (mutator->bitInTmp->getFirstNonPHIOrDbg() != insertPoint) {
-    llvm::BasicBlock *oldBB = &*mutator->bitInTmp;
-    llvm::Instruction *inst = oldBB->getTerminator();
-    llvm::SmallVector<llvm::BasicBlock *> succs;
-    for (size_t i = 0; i < inst->getNumOperands(); ++i) {
-      if (llvm::Value *val = inst->getOperand(i); llvm::isa<BasicBlock>(val)) {
-        succs.push_back((llvm::BasicBlock *)val);
-      }
-    }
-    llvm::BasicBlock *newBB =
-        mutator->bitInTmp->splitBasicBlock(mutator->iitInTmp);
-    for (auto bb : succs) {
-      bb->replacePhiUsesWith(oldBB, newBB);
-    }
-    mutator->bitInTmp = newBB->getIterator();
-  }
-  mutator_util::insertRandomCodeBefore(insertPoint);
-}
-
 void FunctionCallInlineHelper::init() {
   if (funcToId.empty()) {
     llvm::Module *module = mutator->currentFunction->getParent();
@@ -574,7 +536,7 @@ bool VoidFunctionCallRemoveHelper::canMutate(llvm::Function *func) {
 }
 
 void VoidFunctionCallRemoveHelper::mutate() {
-  assert(llvm::isa<CallInst>(&*mutator->iitInTmp) &&
+  assert(llvm::isa<llvm::CallInst>(&*mutator->iitInTmp) &&
          "the void call has to be a call inst to be removed");
   llvm::CallInst *callInst = (llvm::CallInst *)&*mutator->iitInTmp;
   llvm::Instruction *nextInst = callInst->getNextNonDebugInstruction();

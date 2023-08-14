@@ -112,23 +112,23 @@ llvm::cl::opt<int> copyFunctions(
     llvm::cl::init(0));
 }
 
-cl::list<size_t>
+llvm::cl::list<size_t>
     disableSEXT(LLVM_ARGS_PREFIX "disable-sigext",
-                cl::desc("option list -- This option would disable adding or "
+                llvm::cl::desc("option list -- This option would disable adding or "
                          "removing sigext on integer type you specified"),
-                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+                llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
-cl::list<size_t>
+llvm::cl::list<size_t>
     disableZEXT(LLVM_ARGS_PREFIX "disable-zeroext",
-                cl::desc("option list -- This option would disable adding or "
+                llvm::cl::desc("option list -- This option would disable adding or "
                          "removing sigext on integer type you specified"),
-                cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+                llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
-cl::list<size_t>
+llvm::cl::list<size_t>
     disableEXT(LLVM_ARGS_PREFIX "disable-ext",
-               cl::desc("option list -- This option would disable all ext "
+               llvm::cl::desc("option list -- This option would disable all ext "
                         "instructions on integer type you specified"),
-               cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+               llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 
 unique_ptr<Cache> cache;
