@@ -304,24 +304,6 @@ void FunctionMutator::mutate() {
   } while (!mutated && canMutate);
 
   if(!checkValid()){
-    /*for(auto bb=functionInTmp->begin();bb!=functionInTmp->end();++bb){
-      if(bb->getName()=="bb27.i.i"){
-        llvm::errs()<<"Current dominance: "<<DT.dominates(&*iitInTmp, &*bb)<<"\n";
-        assert(DT.dominates(&*iitInTmp, &*bb));
-        llvm::Instruction* tmp35ii=&*(++bb->begin());
-        llvm::errs()<<"Another dominance:"<<DT.dominates(&*iitInTmp, tmp35ii)<<"\n";
-        assert(DT.dominates(&*iitInTmp, tmp35ii));
-        auto added0=iitInTmp;
-        --added0;--added0;
-        llvm::Instruction* added=&*added0;
-        llvm::errs()<<"Another dominance:"<<DT.dominates(added,tmp35ii)<<"\n";
-        tmp35ii->dump();
-        iitInTmp->dump();
-        added->dump();
-        llvm::errs()<<"check ended\n";
-        break;
-      }
-    }*/
     llvm::errs()<<"Invalid LLVM IR generated. Current seed: "<<Random::getSeed()<<"\n";
     llvm::errs()<<"Current Module Identifier: "<<currentFunction->getParent()->getModuleIdentifier()<<"\n";
     llvm::errs()<<"Current Function:\n";
@@ -583,6 +565,8 @@ static bool hasUndefOperand(llvm::Instruction *inst) {
 }
 
 void FunctionMutator::removeAllUndef() {
+  resetIterator();
+  calcDomVals();
   llvm::SmallVector<llvm::Value *> vec;
   for (auto it = inst_begin(functionInTmp); it != inst_end(functionInTmp);
        ++it) {
