@@ -34,6 +34,8 @@ This category is for bugs that crashes
 8. aarch64 global isel backend crashes on valid input (https://github.com/llvm/llvm-project/issues/58423)
 9. aarch64 global isel backend assertion violation when translating udiv of i1 (https://github.com/llvm/llvm-project/issues/58425)
 10. fprintf() requires two pointer arguments (https://github.com/llvm/llvm-project/issues/59757)
+11. opt -O2 crash Assertion (Value == 0 || llvm::isPowerOf2_64(Value)) && Alignment is neither 0 nor a power of 2 failed, but works under instcombine(https://github.com/llvm/llvm-project/issues/64687)
+12. opt -O2 crash Assertion false && "memory location set"' failed, but works underinstcombine(https://github.com/llvm/llvm-project/issues/64661)
 
 ## Category 3
 This category is for that the test file is originaly wrong
