@@ -594,7 +594,12 @@ void FunctionMutator::removeAllUndef() {
 bool ModuleMutator::init() {
   for (auto fit = pm->begin(); fit != pm->end(); ++fit) {
     for (auto ait = fit->arg_begin(); ait != fit->arg_end(); ++ait) {
+      //ignore functions with immarg attributes
       if (ait->hasAttribute(llvm::Attribute::AttrKind::ImmArg)) {
+        filterSet.insert(fit->getName());
+      }
+      //ignore functions with swifterror attributes
+      if(ait->hasAttribute(llvm::Attribute::AttrKind::SwiftError)){
         filterSet.insert(fit->getName());
       }
     }
