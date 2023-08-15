@@ -284,6 +284,10 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
         llvm::GlobalValue::LinkageTypes::InternalLinkage) {
       f.setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
+    if(f.getLinkage() ==
+        llvm::GlobalValue::LinkageTypes::LinkOnceAnyLinkage){
+      f.setLinkage(llvm::GlobalValue::ExternalLinkage);
+    }
   });
 
   for(auto fit=M1->begin();fit!=M1->end();++fit){
