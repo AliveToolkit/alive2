@@ -552,13 +552,20 @@ expr Pointer::isWritable() const {
     non_local &= bid.ult(num_nonlocals_src);
   if (has_null_block && null_is_dereferenceable)
     non_local |= bid == 0;
+
+  // check for non-writable byval blocks (which are non-local)
+  for (auto [byval, is_const] : m.byval_blks) {
+    if (is_const)
+      non_local &= bid != byval;
+  }
+
   return isLocal() || non_local;
 }
 
 expr Pointer::isByval() const {
   auto this_bid = getShortBid();
   expr non_local(false);
-  for (auto bid : m.byval_blks) {
+  for (auto [bid, is_const] : m.byval_blks) {
     non_local |= this_bid == bid;
   }
   return !isLocal() && non_local;

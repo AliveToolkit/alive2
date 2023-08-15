@@ -281,8 +281,9 @@ expr Byte::nonptrValue() const {
 
 expr Byte::isPoison() const {
   expr np = nonptrNonpoison();
-  if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
-    assert(!np.isValid() || ptrNonpoison().eq(np == 1));
+  if (!does_int_mem_access ||
+      (byte_has_ptr_bit() && bits_poison_per_byte == 1)) {
+    assert(!np.isValid() || !does_int_mem_access || ptrNonpoison().eq(np == 1));
     return np == 0;
   }
   return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
@@ -1251,9 +1252,9 @@ void Memory::syncWithSrc(const Memory &src) {
   // TODO: copy alias info for fn return ptrs from src?
 }
 
-void Memory::markByVal(unsigned bid) {
+void Memory::markByVal(unsigned bid, bool is_const) {
   assert(is_globalvar(bid, false));
-  byval_blks.emplace_back(bid);
+  byval_blks.emplace_back(bid, is_const);
 }
 
 expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
@@ -1267,7 +1268,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
   AliasSet alias(*this);
   alias.setMayAliasUpTo(false, max_bid);
 
-  for (auto byval_bid : byval_blks) {
+  for (auto [byval_bid, is_const] : byval_blks) {
     state->addAxiom(bid != byval_bid);
     alias.setNoAlias(false, byval_bid);
   }
@@ -1378,7 +1379,7 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
   auto alias = escaped_local_blks;
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
 
-  for (auto byval_bid : byval_blks) {
+  for (auto [byval_bid, is_const] : byval_blks) {
     nonlocal &= bid != byval_bid;
     alias.setNoAlias(false, byval_bid);
   }
@@ -2072,8 +2073,6 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
           blockValRefined(tgt.getMemory(), bid, false, ptr_offset, undef));
   }
 
-  assert(src.isWritable().eq(tgt.isWritable()));
-
   expr aligned(true);
   expr src_align = src.blockAlignment();
   expr tgt_align = tgt.blockAlignment();
@@ -2238,7 +2237,6 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   ret.non_local_blk_size.add(els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
-  assert(then.byval_blks == els.byval_blks);
   ret.escaped_local_blks.unionWith(els.escaped_local_blks);
 
   for (const auto &[expr, alias] : els.ptr_alias) {
