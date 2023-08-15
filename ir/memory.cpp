@@ -266,6 +266,8 @@ expr Byte::ptrByteoffset() const {
 }
 
 expr Byte::nonptrNonpoison() const {
+  if (!does_int_mem_access)
+    return expr::mkUInt(0, 1);
   unsigned start = padding_nonptr_byte() + bits_byte;
   return p.extract(start + bits_poison_per_byte - 1, start);
 }
