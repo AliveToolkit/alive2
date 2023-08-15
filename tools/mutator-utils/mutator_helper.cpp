@@ -254,6 +254,10 @@ bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
   //skip those call base with inlning asm.
   if(llvm::isa<llvm::CallBase>(inst)){
     llvm::CallBase * callBase=(llvm::CallBase *)inst;
+    //don't update on call with kcfi, they are required to be constants.
+    if(callBase->getOperandBundle("kcfi").has_value()){
+      return false;
+    }
     if(callBase->isInlineAsm()){
       return false;
     }
