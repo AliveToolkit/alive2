@@ -305,25 +305,26 @@ expr Byte::refined(const Byte &other) const {
   expr np1 = nonptrNonpoison();
   expr np2 = other.nonptrNonpoison();
 
-  expr int_cnstr;
-  if (bits_poison_per_byte == bits_byte) {
-    int_cnstr = (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
-  }
-  else if (bits_poison_per_byte > 1) {
-    assert((bits_byte % bits_poison_per_byte) == 0);
-    unsigned bits_val = bits_byte / bits_poison_per_byte;
-    int_cnstr = true;
-    for (unsigned i = 0; i < bits_poison_per_byte; ++i) {
-      expr ev1 = v1.extract((i+1) * bits_val - 1, i * bits_val);
-      expr ev2 = v2.extract((i+1) * bits_val - 1, i * bits_val);
-      expr enp1 = np1.extract(i, i);
-      expr enp2 = np2.extract(i, i);
-      int_cnstr
-        &= enp1 == 0 || ((enp1.eq(enp2) ? true : enp2 == 1) && ev1 == ev2);
+  expr int_cnstr = true;
+  if (does_int_mem_access) {
+    if (bits_poison_per_byte == bits_byte) {
+      int_cnstr = (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
     }
-  } else {
-    assert(!np1.isValid() || np1.bits() == 1);
-    int_cnstr = np1 == 0 || ((np1.eq(np2) ? true : np2 == 1) && v1 == v2);
+    else if (bits_poison_per_byte > 1) {
+      assert((bits_byte % bits_poison_per_byte) == 0);
+      unsigned bits_val = bits_byte / bits_poison_per_byte;
+      for (unsigned i = 0; i < bits_poison_per_byte; ++i) {
+        expr ev1 = v1.extract((i+1) * bits_val - 1, i * bits_val);
+        expr ev2 = v2.extract((i+1) * bits_val - 1, i * bits_val);
+        expr enp1 = np1.extract(i, i);
+        expr enp2 = np2.extract(i, i);
+        int_cnstr
+          &= enp1 == 0 || ((enp1.eq(enp2) ? true : enp2 == 1) && ev1 == ev2);
+      }
+    } else {
+      assert(!np1.isValid() || np1.bits() == 1);
+      int_cnstr = np1 == 0 || ((np1.eq(np2) ? true : np2 == 1) && v1 == v2);
+    }
   }
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
