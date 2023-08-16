@@ -1128,6 +1128,7 @@ public:
       parse_fn_attrs(i, attrs);
       attrs.set(FnAttrs::NoReturn);
       attrs.set(FnAttrs::NoThrow);
+      attrs.mem.canOnlyWrite(MemoryAccess::Inaccessible);
       return make_unique<FnCall>(Type::voidTy, "", "#trap", std::move(attrs));
     }
     case llvm::Intrinsic::vastart: {
