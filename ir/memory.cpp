@@ -280,10 +280,12 @@ expr Byte::nonptrValue() const {
 }
 
 expr Byte::isPoison() const {
+  if (!does_int_mem_access)
+    return !ptrNonpoison();
+
   expr np = nonptrNonpoison();
-  if (!does_int_mem_access ||
-      (byte_has_ptr_bit() && bits_poison_per_byte == 1)) {
-    assert(!np.isValid() || !does_int_mem_access || ptrNonpoison().eq(np == 1));
+  if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
+    assert(!np.isValid() || ptrNonpoison().eq(np == 1));
     return np == 0;
   }
   return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
