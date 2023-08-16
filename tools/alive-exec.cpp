@@ -109,13 +109,16 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
 
     Solver s(true);
 
-    for (auto &[var, val] : state.getValues()) {
-      auto &name = var->getName();
-      auto *i = dynamic_cast<const Instr*>(var);
-      if (!i || &fn.bbOf(*i) != bb)
+    for (auto &i : state.getFn().instrs()) {
+      auto &name = i.getName();
+      if (&fn.bbOf(i) != bb)
         continue;
 
-      if (auto *jmp = dynamic_cast<const JumpInstr*>(var)) {
+      auto *val = state.at(i);
+      if (!val)
+        continue;
+
+      if (auto *jmp = dynamic_cast<const JumpInstr*>(&i)) {
         bool jumped = false;
         expr cond;
         for (auto &dst : jmp->targets()) {
@@ -144,26 +147,26 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
         }
       }
 
-      if (dynamic_cast<const Return*>(var)) {
+      if (dynamic_cast<const Return*>(&i)) {
         const auto &ret = state.returnVal();
         s.add(ret.domain);
         auto r = s.check();
         if (error(r))
             return;
         cout << "Returned: ";
-        print_model_val(cout, state, r.getModel(), var, fn.getType(), ret.val);
+        print_model_val(cout, state, r.getModel(), &i, fn.getType(), ret.val);
         cout << "\n\n";
         ++successCount;
         return;
       }
 
-      s.add(val.domain);
+      s.add(val->domain);
       auto r = s.check();
       if (error(r))
         return;
 
       if (r.isUnsat()) {
-        cout << *var << " = UB triggered!\n\n";
+        cout << i << " = UB triggered!\n\n";
         ++successCount;
         return;
       }
@@ -171,8 +174,8 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
       if (name[0] != '%')
         continue;
 
-      cout << *var << " = ";
-      print_model_val(cout, state, r.getModel(), var, var->getType(), val.val);
+      cout << i << " = ";
+      print_model_val(cout, state, r.getModel(), &i, i.getType(), val->val);
       cout << '\n';
       continue;
     }

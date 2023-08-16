@@ -158,12 +158,10 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
     s << " for " << *var;
   s << "\n\nExample:\n";
 
-  for (auto &[var, val] : src_state.getValues()) {
-    if (!dynamic_cast<const Input*>(var) &&
-        !dynamic_cast<const ConstantInput*>(var))
-      continue;
-    s << *var << " = ";
-    print_model_val(s, src_state, m, var, var->getType(), val.val);
+  for (auto &var: src_state.getFn().getInputs()) {
+    s << var << " = ";
+    print_model_val(s, src_state, m, &var, var.getType(),
+                    src_state.at(var)->val);
     s << '\n';
   }
 
@@ -179,7 +177,13 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
 
     auto *bb = &st->getFn().getFirstBB();
 
-    for (auto &[var, val] : st->getValues()) {
+    for (auto &var0 : st->getFn().instrs()) {
+      auto *var  = &var0;
+      auto *val0 = st->at(var0);
+      if (!val0)
+        continue;
+
+      auto &val = *val0;
       auto &name = var->getName();
       if (name == var_name)
         break;
@@ -214,7 +218,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
           break;
         } else if (m.eval(val.domain).isFalse()) {
           s << "Function " << call->getFnName() << " triggered UB\n";
-          continue;
+          break;
         } else if (var->isVoid()) {
           s << "Function " << call->getFnName() << " returned\n";
           continue;
@@ -222,7 +226,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       }
 
       if (!dynamic_cast<const Return*>(var) && // domain always false after exec
-          !m.eval(val.domain).isTrue()) {
+          m.eval(val.domain).isFalse()) {
         s << *var << " = UB triggered!\n";
         break;
       }
@@ -1262,14 +1266,15 @@ Errors TransformVerify::verify() const {
     auto [src_state, tgt_state] = exec();
 
     if (check_each_var) {
-      for (auto &[var, val] : src_state->getValues()) {
-        auto &name = var->getName();
-        if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
+      for (auto &var : src_state->getFn().instrs()) {
+        auto &name = var.getName();
+        auto *val  = src_state->at(var);
+        if (name[0] != '%' || !val)
           continue;
 
-        auto &val_tgt = tgt_state->at(*tgt_instrs.at(name));
-        check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
-                         val, val_tgt, check_each_var);
+        auto *val_tgt = tgt_state->at(*tgt_instrs.at(name));
+        check_refinement(errs, t, *src_state, *tgt_state, &var, var.getType(),
+                         *val, *val_tgt, check_each_var);
         if (errs)
           return errs;
       }
