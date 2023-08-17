@@ -231,7 +231,7 @@ bool parallel::emitOutput() {
         new_ss << line << '\n';
         auto cur = parent_ss.tellg();
         new_ss << std::move(parent_ss).str().substr(cur);
-        parent_ss.swap(new_ss);
+        parent_ss = std::move(new_ss);
         return false;
       }
     } else {
