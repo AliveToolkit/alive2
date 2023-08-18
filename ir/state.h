@@ -214,6 +214,10 @@ public:
   const ValTy* at(const Value &val) const;
   bool isUndef(const smt::expr &e) const;
 
+  // only used by alive-exec to support execution of the same BB multiple times
+  void cleanup(const Value &val);
+  void cleanupPredecessorData();
+
   /*--- Control flow ---*/
   const smt::OrExpr* jumpCondFrom(const BasicBlock &bb) const;
   bool startBB(const BasicBlock &bb);

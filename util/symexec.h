@@ -7,6 +7,7 @@ namespace IR { class State; }
 
 namespace util {
 
+void sym_exec_init(IR::State &s);
 void sym_exec(IR::State &s);
 
 }

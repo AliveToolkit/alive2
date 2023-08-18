@@ -620,6 +620,18 @@ bool State::isUndef(const expr &e) const {
   return undef_vars.count(e) != 0;
 }
 
+void State::cleanup(const Value &val) {
+  values.erase(&val);
+  seen_bbs.clear();
+  analysis.unused_vars.clear();
+  analysis.non_poison_vals.clear();
+  analysis.non_undef_vals.clear();
+}
+
+void State::cleanupPredecessorData() {
+  predecessor_data.clear();
+}
+
 bool State::startBB(const BasicBlock &bb) {
   assert(undef_vars.empty());
   ENSURE(seen_bbs.emplace(&bb).second);

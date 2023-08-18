@@ -103,6 +103,7 @@ static bool always_nowrite(unsigned bid, bool src_only = false,
 
 
 static unsigned next_local_bid;
+static unsigned next_const_bid;
 static unsigned next_global_bid;
 static unsigned next_ptr_input;
 
@@ -1241,7 +1242,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
 
 void Memory::resetGlobals() {
   Pointer::resetGlobals();
-  next_global_bid = has_null_block;
+  next_const_bid  = has_null_block;
+  next_global_bid = has_null_block + num_consts_src;
   next_local_bid = 0;
   next_ptr_input = 0;
 }
@@ -1249,8 +1251,8 @@ void Memory::resetGlobals() {
 void Memory::syncWithSrc(const Memory &src) {
   assert(src.state->isSource() && !state->isSource());
   resetGlobals();
-  // The bid of tgt global starts with num_nonlocals_src
-  next_global_bid = num_nonlocals_src;
+  next_const_bid  = num_nonlocals_src; // tgt consts start after all src vars
+  next_global_bid = has_null_block;    // tgt can only have new const globals
   next_nonlocal_bid = src.next_nonlocal_bid;
   // TODO: copy alias info for fn return ptrs from src?
 }
@@ -1605,9 +1607,11 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
 
   // Produce a local block if blockKind is heap or stack.
   bool is_local = blockKind != GLOBAL && blockKind != CONSTGLOBAL;
+  bool is_const = blockKind == CONSTGLOBAL;
 
-  auto &last_bid = is_local ? next_local_bid : next_global_bid;
-  unsigned bid = bidopt ? *bidopt : last_bid;
+  auto &last_bid = is_local ? next_local_bid
+                            : (is_const ? next_const_bid : next_global_bid);
+  unsigned bid = bidopt.value_or(last_bid);
   assert((is_local && bid < numLocals()) ||
          (!is_local && bid < numNonlocals()));
   if (!bidopt)
@@ -1654,9 +1658,9 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
     if (align_bits && observesAddresses())
       state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
-    bool nonconst = (has_null_block && bid == 0) || !is_constglb(bid);
-    if (blockKind == CONSTGLOBAL) assert(!nonconst); else assert(nonconst);
-    (void)nonconst;
+    assert(is_const == is_constglb(bid, state->isSource()));
+    assert((has_null_block && bid == 0) ||
+           is_globalvar(bid, !state->isSource()));
   }
 
   if (!is_null)

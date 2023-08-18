@@ -832,8 +832,6 @@ static void calculateAndInitConstants(Transform &t) {
   unsigned num_globals = num_globals_src;
   uint64_t glb_alloc_aligned_size = 0;
 
-  heap_block_alignment = 8;
-
   num_consts_src = 0;
 
   for (auto GV : globals_src) {

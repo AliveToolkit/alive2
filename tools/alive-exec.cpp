@@ -1,29 +1,22 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "cache/cache.h"
-#include "ir/type.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/utils.h"
-#include "smt/expr.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
 #include "tools/transform.h"
+#include "util/symexec.h"
 #include "util/version.h"
 
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/TargetParser/Triple.h"
 
 #include <fstream>
@@ -46,37 +39,28 @@ llvm::cl::opt<string> opt_file(llvm::cl::Positional,
   llvm::cl::desc("bitcode_file"), llvm::cl::Required,
   llvm::cl::value_desc("filename"), llvm::cl::cat(alive_cmdargs));
 
-optional<smt::smt_initializer> smt_init;
-unique_ptr<Cache> cache;
+StateValue eval(const Result &r, const StateValue &v) {
+  auto &m = r.getModel();
+  return { m[v.value], m[v.non_poison] };
+}
 
-void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
-                  unsigned &successCount, unsigned &errorCount) {
+optional<StateValue> exec(llvm::Function &F,
+                          llvm::TargetLibraryInfoWrapperPass &TLI) {
   auto Func = llvm2alive(F, TLI.getTLI(F), true);
   if (!Func) {
     cerr << "ERROR: Could not translate '" << F.getName().str()
          << "' to Alive IR\n";
-    ++errorCount;
-    return;
-  }
-  if (opt_print_dot) {
-    Func->writeDot("");
+    return {};
   }
 
-  Transform t;
-  t.src = std::move(*Func);
-  t.tgt = *llvm2alive(F, TLI.getTLI(F), false);
-  t.preprocess();
-  TransformVerify verifier(t, false);
   if (!opt_quiet)
-    t.src.print(cout << "\n----------------------------------------\n");
+    Func->print(cout << "\n----------------------------------------\n");
 
   {
-    auto types = verifier.getTypings();
+    TypingAssignments types{Func->getTypeConstraints()};
     if (!types) {
-      cerr << "Transformation doesn't verify!\n"
-              "ERROR: program doesn't type check!\n\n";
-      ++errorCount;
-      return;
+      cerr << "Internal ERROR: program doesn't type check!\n\n";
+      return {};
     }
     assert(types.hasSingleTyping());
   }
@@ -86,105 +70,126 @@ void execFunction(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
       return false;
 
     if (r.isInvalid()) {
-      cout << "ERROR: invalid expression\n";
+      cerr << "ERROR: invalid expression\n";
     } else if (r.isError()) {
-      cout << "ERROR: Error in SMT solver: " << r.getReason() << '\n';
+      cerr << "ERROR: Error in SMT solver: " << r.getReason() << '\n';
     } else if (r.isTimeout()) {
-      cout << "ERROR: SMT solver timedout\n";
+      cerr << "ERROR: SMT solver timedout\n";
     } else if (r.isSkip()) {
-      cout << "ERROR: SMT queries disabled";
+      cerr << "ERROR: SMT queries disabled";
     } else {
       UNREACHABLE();
     }
-    ++errorCount;
     return true;
   };
 
-  smt_init->reset();
   try {
-    auto p = verifier.exec();
-    auto &state = *p.first;
-    const auto &fn = t.src;
-    const auto *bb = &fn.getFirstBB();
+    State state(*Func, true);
+    sym_exec_init(state);
 
-    Solver s(true);
+    const BasicBlock *curr_bb = &Func->getFirstBB();
+    state.startBB(*curr_bb);
 
-    for (auto &i : state.getFn().instrs()) {
-      auto &name = i.getName();
-      if (&fn.bbOf(i) != bb)
-        continue;
+    // initialize global variables
+    if (curr_bb->getName() == "#init") {
+      for (auto &i : curr_bb->instrs()) {
+        state.exec(i);
+      }
+      curr_bb = Func->getBBs()[1];
+      state.startBB(*curr_bb);
+    }
+    state.finishInitializer();
 
-      auto *val = state.at(i);
-      if (!val)
-        continue;
+    auto It = curr_bb->instrs().begin();
+    Solver solver(true);
 
-      if (auto *jmp = dynamic_cast<const JumpInstr*>(&i)) {
+    if (!opt_quiet)
+      cout << "Executing " << curr_bb->getName() << '\n';
+
+    while (true) {
+      auto &next_instr = *It;
+
+      state.cleanup(next_instr);
+      if (dynamic_cast<const JumpInstr*>(&next_instr))
+        state.cleanupPredecessorData();
+
+      auto &val  = state.exec(next_instr);
+      auto &name = next_instr.getName();
+
+      solver.add(val.return_domain);
+      auto r = solver.check();
+      if (error(r))
+        return {};
+
+      if (dynamic_cast<const Return*>(&next_instr)) {
+        assert(r.isSat());
+        auto ret = eval(r, state.returnVal().val);
+        if (!opt_quiet)
+          cout << "Returned " << ret << '\n';
+        return ret;
+      }
+
+      if (auto *jmp = dynamic_cast<const JumpInstr*>(&next_instr)) {
         bool jumped = false;
-        expr cond;
         for (auto &dst : jmp->targets()) {
-          cond = state.getJumpCond(*bb, dst);
+          expr cond = state.getJumpCond(*curr_bb, dst);
+          {
+            SolverPush push(solver);
+            solver.add(cond);
+            auto r = solver.check();
+            if (error(r))
+              return {};
 
-          SolverPush push(s);
-          s.add(cond);
-          auto r = s.check();
-          if (error(r))
-            return;
-
-          if ((jumped = r.isSat())) {
-            cout << "  >> Jump to " << dst.getName() << "\n\n";
-            bb = &dst;
-            break;
+            if (r.isSat()) {
+              if (!opt_quiet)
+                cout << "  >> Jump to " << dst.getName() << "\n\n";
+              curr_bb = &dst;
+              state.startBB(dst);
+              It = dst.instrs().begin();
+              jumped = true;
+              break;
+            }
+            continue;
+          }
+          solver.add(cond);
+          if (!jumped) {
+            cerr << "ERROR: All jump destinations are unreachable!\n\n";
+            return {};
           }
         }
-
-        if (jumped) {
-          s.add(cond);
-          continue;
-        } else {
-          cout << "UB triggered on " << name << "\n\n";
-          ++successCount;
-          return;
-        }
+        continue;
       }
 
-      if (dynamic_cast<const Return*>(&i)) {
-        const auto &ret = state.returnVal();
-        s.add(ret.domain);
-        auto r = s.check();
-        if (error(r))
-            return;
-        cout << "Returned: ";
-        print_model_val(cout, state, r.getModel(), &i, fn.getType(), ret.val);
-        cout << "\n\n";
-        ++successCount;
-        return;
-      }
-
-      s.add(val->domain);
-      auto r = s.check();
+      solver.add(val.domain);
+      r = solver.check();
       if (error(r))
-        return;
+        return {};
 
       if (r.isUnsat()) {
-        cout << i << " = UB triggered!\n\n";
-        ++successCount;
-        return;
+        cout << name << " = UB triggered!\n\n";
+        return {};
       }
 
-      if (name[0] != '%')
-        continue;
+      if (!opt_quiet) {
+        cout << name;
+        if (name[0] == '%') {
+          auto v = eval(r, val.val);
+          if (v.non_poison.isFalse())
+            cout << " = poison";
+          else
+            cout << " = " << v.value;
+        }
+        cout << '\n';
+      }
 
-      cout << i << " = ";
-      print_model_val(cout, state, r.getModel(), &i, i.getType(), val->val);
-      cout << '\n';
-      continue;
+      // move to the next instruction
+      ++It;
     }
   } catch (const AliveException &e) {
     cout << "ERROR: " << e.msg << '\n';
-    ++errorCount;
-    return;
+    return {};
   }
-  ++successCount;
+  UNREACHABLE();
 }
 }
 
@@ -202,18 +207,16 @@ version )EOF";
   Usage += R"EOF(
 see alive-exec --version  for LLVM version info,
 
-This program takes an LLVM IR files files as a command-line
-argument. Both .bc and .ll files are supported.
+This program takes an LLVM IR file as a command-line argument.
+Both .bc and .ll files are supported.
 
 If one or more functions are specified (as a comma-separated list)
 using the --funcs command line option, alive-exec will attempt to
-execute them using Alive2 as an interpreter. There are currently many
-restrictions on what kind of functions can be executed: they cannot
-take inputs, cannot use memory, cannot depend on undefined behaviors,
-and cannot include loops that execute too many iterations.
+execute them using Alive2 as an interpreter.
 
 If no functions are specified on the command line, then alive-exec
-will attempt to execute every function in the bitcode file.
+will attempt to execute the 'main' function.
+If it doesn't exist, alive-exec executes every function in the bitcode file.
 )EOF";
 
   llvm::cl::HideUnrelatedOptions(alive_cmdargs);
@@ -233,29 +236,31 @@ will attempt to execute every function in the bitcode file.
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
 
   llvm_util::initializer llvm_util_init(cerr, DL);
-  smt_init.emplace();
+  smt::smt_initializer smt_init;
 
-  unsigned successCount = 0, errorCount = 0;
+  auto *main_fn = findFunction(*M, "main");
+  optional<StateValue> ret_val;
 
-  for (auto &F : *M.get()) {
-    if (F.isDeclaration())
-      continue;
-    if (!func_names.empty() && !func_names.count(F.getName().str()))
-      continue;
-    execFunction(F, TLI, successCount, errorCount);
+  if (main_fn && func_names.empty()) {
+    State::resetGlobals();
+    ret_val = exec(*main_fn, TLI);
+  } else {
+    for (auto &F : *M) {
+      if (F.isDeclaration())
+        continue;
+      if (!func_names.empty() && !func_names.count(F.getName().str()))
+        continue;
+      State::resetGlobals();
+      smt_init.reset();
+      ret_val = exec(F, TLI);
+    }
   }
 
-  cout << "Summary:\n"
-          "  " << successCount << " functions interpreted successfully\n"
-          "  " << errorCount << " Alive2 errors\n";
-
-  if (opt_smt_stats)
-    smt::solver_print_stats(cout);
-
-  smt_init.reset();
-
-  if (opt_alias_stats)
-    IR::Memory::printAliasStats(cout);
-
-  return errorCount > 0;
+  if (ret_val) {
+    int64_t n = 0;
+    ret_val->value.isInt(n);
+    return (int)n;
+  } else {
+    return -1;
+  }
 }

@@ -38,9 +38,9 @@ class TypingAssignments {
   smt::Result r;
   bool has_only_one_solution = false;
   bool is_unsat = false;
-  TypingAssignments(const smt::expr &e);
 
 public:
+  TypingAssignments(const smt::expr &e);
   bool operator!() const { return !(bool)*this; }
   operator bool() const;
   void operator++(void);
