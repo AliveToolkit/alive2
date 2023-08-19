@@ -1,6 +1,6 @@
-declare i8* @llvm.thread.pointer()
+declare ptr @llvm.thread.pointer()
 
-define i8* @f() {
-  %call = call i8* @llvm.thread.pointer()
-  ret i8* %call
+define ptr @f() {
+  %call = call ptr @llvm.thread.pointer()
+  ret ptr %call
 }

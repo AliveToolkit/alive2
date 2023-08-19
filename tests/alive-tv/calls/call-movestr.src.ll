@@ -1,9 +1,9 @@
 ; ERROR: Source is more defined
 
-define i8 @f(i8* %a) {
-  store i8 3, i8* %a
-  %b = call i8 @g(i8* %a)
+define i8 @f(ptr %a) {
+  store i8 3, ptr %a
+  %b = call i8 @g(ptr %a)
   ret i8 %b
 }
 
-declare i8 @g(i8*)
+declare i8 @g(ptr)

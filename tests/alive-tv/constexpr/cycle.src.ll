@@ -1,7 +1,7 @@
-@g1 = constant i8* bitcast (i8** getelementptr inbounds (i8*, i8** @g2, i64 1) to i8*)
-@g2 = constant i8* bitcast (i8** getelementptr inbounds (i8*, i8** @g1, i64 1) to i8*)
+@g1 = constant ptr getelementptr inbounds (ptr, ptr @g2, i64 1)
+@g2 = constant ptr getelementptr inbounds (ptr, ptr @g1, i64 1)
 
-define i8* @f() {
-  %x  = load i8*, i8** @g2
-  ret i8* %x
+define ptr @f() {
+  %x  = load ptr, ptr @g2
+  ret ptr %x
 }

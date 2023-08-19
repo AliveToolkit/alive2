@@ -1,25 +1,25 @@
-@glb = global i8* null
-declare i8* @f(i8* %p)
+@glb = global ptr null
+declare ptr @f(ptr %p)
 
 define i8 @src() {
   %p = alloca i8
-  store i8 1, i8* %p
+  store i8 1, ptr %p
 
-  %q = load i8*, i8** @glb
-  %q2 = call i8* @f(i8* %q) ; cannot be %p
-  store i8 2, i8* %q2
+  %q = load ptr, ptr @glb
+  %q2 = call ptr @f(ptr %q) ; cannot be %p
+  store i8 2, ptr %q2
 
-  %v = load i8, i8* %p
+  %v = load i8, ptr %p
   ret i8 %v
 }
 
 define i8 @tgt() {
   %p = alloca i8
-  store i8 1, i8* %p
+  store i8 1, ptr %p
 
-  %q = load i8*, i8** @glb
-  %q2 = call i8* @f(i8* %q) ; cannot be %p
-  store i8 2, i8* %q2
+  %q = load ptr, ptr @glb
+  %q2 = call ptr @f(ptr %q) ; cannot be %p
+  store i8 2, ptr %q2
 
   ret i8 1
 }

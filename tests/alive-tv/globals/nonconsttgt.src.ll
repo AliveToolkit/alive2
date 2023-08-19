@@ -2,7 +2,7 @@
 
 define void @test() {
 entry:
-  store i8 1, i8* @var_10, align 1
+  store i8 1, ptr @var_10, align 1
   ret void
 }
 
