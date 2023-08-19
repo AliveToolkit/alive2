@@ -232,7 +232,7 @@ expr Pointer::getValue(const char *name, const FunctionExpr &local_fn,
   return non_local;
 }
 
-expr Pointer::getAddress(bool simplify) const {
+expr Pointer::getBlockBaseAddress(bool simplify) const {
   assert(Memory::observesAddresses());
 
   auto bid = getShortBid();
@@ -245,15 +245,17 @@ expr Pointer::getAddress(bool simplify) const {
   if (hasLocalBit())
     non_local = expr::mkUInt(0, 1).concat(non_local);
 
-  expr addr;
   if (auto local = m.local_blk_addr(bid)) {
     // Local block area is the upper half of the memory
     expr lc = hasLocalBit() ? expr::mkUInt(1, 1).concat(*local) : *local;
-    addr = expr::mkIf(isLocal(), lc, non_local);
+    return expr::mkIf(isLocal(), lc, non_local);
   } else
-    addr = std::move(non_local);
+    return non_local;
+}
 
-  return addr + getOffset().zextOrTrunc(bits_ptr_address);
+expr Pointer::getAddress(bool simplify) const {
+  return
+    getBlockBaseAddress(simplify) + getOffset().zextOrTrunc(bits_ptr_address);
 }
 
 expr Pointer::blockSize() const {
@@ -281,8 +283,8 @@ void Pointer::operator+=(const expr &bytes) {
 
 Pointer Pointer::maskOffset(const expr &mask) const {
   return { m, getBid(),
-           getOffset() + ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
-                             - getAddress()).zextOrTrunc(bits_for_offset),
+           ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
+               - getBlockBaseAddress()).zextOrTrunc(bits_for_offset),
            getAttrs() };
 }
 

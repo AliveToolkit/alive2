@@ -65,6 +65,7 @@ public:
   smt::expr getOffsetSizet() const;
   smt::expr getShortOffset() const; // same as getOffset but skips aligned bits
   smt::expr getAttrs() const;
+  smt::expr getBlockBaseAddress(bool simplify = true) const;
   smt::expr getAddress(bool simplify = true) const;
 
   smt::expr blockSize() const;
