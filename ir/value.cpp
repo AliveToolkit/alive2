@@ -68,7 +68,7 @@ void VoidValue::print(ostream &os) const {
 }
 
 StateValue VoidValue::toSMT(State &s) const {
-  return { false, false };
+  return { false, true };
 }
 
 
