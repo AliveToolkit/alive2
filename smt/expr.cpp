@@ -991,6 +991,10 @@ static expr log2_rec(const expr &e, unsigned idx, unsigned bw) {
                     log2_rec(e, idx - 1, bw));
 }
 
+expr expr::isPowerOf2() const {
+  return *this != 0 && (*this & (*this - expr::mkUInt(1, *this))) == 0;
+}
+
 expr expr::log2(unsigned bw_output) const {
   C();
   return log2_rec(*this, bits() - 1, bw_output);

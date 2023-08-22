@@ -200,6 +200,7 @@ public:
   expr ashr_exact(const expr &rhs) const;
   expr lshr_exact(const expr &rhs) const;
 
+  expr isPowerOf2() const;
   expr log2(unsigned bw_output) const;
   expr bswap() const;
   expr bitreverse() const;

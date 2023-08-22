@@ -2096,12 +2096,13 @@ Value* FnCall::getAlignArg() const {
 }
 
 uint64_t FnCall::getAlign() const {
-  uint64_t align = 0;
+  uint64_t align = 1;
   // TODO: add support for non constant alignments
   if (auto *arg = getAlignArg())
-    align = getIntOr(*arg, 0);
+    align = getIntOr(*arg, 1);
 
-  return max(align, attrs.align ? attrs.align : heap_block_alignment);
+  return max(align,
+             attrs.has(FnAttrs::Align) ? attrs.align : heap_block_alignment);
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -3201,14 +3202,9 @@ StateValue Assume::toSMT(State &s) const {
     break;
   case Align: {
     // assume(ptr, align)
-    const auto &vptr = s.getAndAddPoisonUB(*args[0]);
-    if (auto align = dynamic_cast<IntConst *>(args[1])) {
-      Pointer ptr(s.getMemory(), vptr.value);
-      s.addGuardableUB(ptr.isAligned(*align->getInt()));
-    } else {
-      // TODO: add support for non-constant align
-      s.addUB(expr());
-    }
+    const auto &ptr   = s.getAndAddPoisonUB(*args[0]).value;
+    const auto &align = s.getAndAddPoisonUB(*args[1]).value;
+    s.addGuardableUB(Pointer(s.getMemory(), ptr).isAligned(align));
     break;
   }
   case NonNull: {

@@ -346,8 +346,12 @@ expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
 }
 
 expr Pointer::isAligned(uint64_t align) {
-  if (align <= 1)
+  if (align == 0)
+    return isNull();
+  if (align == 1)
     return true;
+  if (!is_power2(align))
+    return false;
 
   auto offset = getOffset();
   if (isUndef(offset))
@@ -374,6 +378,18 @@ expr Pointer::isAligned(uint64_t align) {
   }
 
   return getAddress().extract(bits - 1, 0) == 0;
+}
+
+expr Pointer::isAligned(const expr &align) {
+  uint64_t n;
+  if (align.isUInt(n))
+    return isAligned(n);
+
+  return
+    expr::mkIf(align == 0,
+               isNull(),
+               align.isPowerOf2() &&
+                 getAddress().urem(align.zextOrTrunc(bits_ptr_address)) == 0);
 }
 
 static pair<expr, expr> is_dereferenceable(Pointer &p,

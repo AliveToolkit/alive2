@@ -353,16 +353,13 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
       s.addUB(p.isNull() ||
               merge(Pointer(m, ptrvalue)
                       .isDereferenceable(deref_expr, align, false, true)));
-  } else if (align > 1)
+  } else if (align != 1)
     non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
-  // TODO: handle non-constant allocalign
   if (allocalign) {
-    StateValue align = s[*allocalign];
+    auto &align = s[*allocalign];
     non_poison &= align.non_poison;
-    uint64_t val;
-    if (align.value.isUInt(val))
-      non_poison &= Pointer(m, ptrvalue).isAligned(val);
+    non_poison &= Pointer(m, ptrvalue).isAligned(align.value);
   }
   return non_poison;
 }
