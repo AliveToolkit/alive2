@@ -3215,7 +3215,7 @@ StateValue Assume::toSMT(State &s) const {
     // assume(ptr)
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
     Pointer ptr(s.getMemory(), vptr.value);
-    s.addUB(!ptr.isNull());
+    s.addGuardableUB(!ptr.isNull());
     break;
   }
   }
