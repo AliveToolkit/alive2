@@ -532,12 +532,6 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   CHECK(fndom_a.notImplies(fndom_b),
         [](ostream&, const Model&){}, "Source is more defined than target");
 
-  if (config::disallow_ub_exploitation) {
-    // disallow refinement by unreachable
-    CHECK(tgt_state.getUnreachable()().notImplies(src_state.getUnreachable()()),
-          [](ostream&, const Model&){}, "Target introduces unreachable BB");
-  }
-
   // 2. Check return domain (noreturn check)
   {
     expr dom_constr;
