@@ -1173,6 +1173,11 @@ expr expr::fdiv(const expr &rhs, const expr &rm) const {
   return simplify_const(Z3_mk_fpa_div(ctx(), rm(), ast(), rhs()), *this, rhs);
 }
 
+expr expr::frem(const expr &rhs) const {
+  C(rhs);
+  return simplify_const(Z3_mk_fpa_rem(ctx(), ast(), rhs()), *this, rhs);
+}
+
 expr expr::fabs() const {
   if (isBV())
     return expr::mkUInt(0, 1).concat(extract(bits() - 2, 0));

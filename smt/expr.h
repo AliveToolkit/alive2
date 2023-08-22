@@ -233,6 +233,7 @@ public:
   expr fsub(const expr &rhs, const expr &rm) const;
   expr fmul(const expr &rhs, const expr &rm) const;
   expr fdiv(const expr &rhs, const expr &rm) const;
+  expr frem(const expr &rhs) const;
   expr fabs() const;
   expr fneg() const;
   expr copysign(const expr &sign) const;
