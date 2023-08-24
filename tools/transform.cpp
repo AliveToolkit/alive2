@@ -135,7 +135,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
     for (auto *v : { &src_state.getApproximations(),
                      &tgt_state.getApproximations() }) {
       for (auto &[msg, var] : *v) {
-        if (!var || m.hasFnModel(*var))
+        if (!var || m.hasFnModel(*var) || var->isConst())
           approx.emplace(msg);
       }
     }
