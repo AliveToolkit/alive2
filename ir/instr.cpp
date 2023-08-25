@@ -2067,7 +2067,15 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
   return ret;
 }
 
+
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
+
+FnCall::FnCall(Type &type, string &&name, string &&fnName, FnAttrs &&attrs)
+  : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
+    attrs(std::move(attrs)) {
+  if (config::disallow_ub_exploitation)
+    this->attrs.set(FnAttrs::NoUndef);
+}
 
 pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   if (!hasAttribute(FnAttrs::AllocSize))
