@@ -1081,7 +1081,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
   if (config::disable_poison_input && state->isSource() &&
       (does_int_mem_access || does_ptr_mem_access)) {
     for (auto &block : non_local_block_val) {
-      if (isInitialMemBlock(block.val))
+      if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
         state->addAxiom(
           expr::mkForAll({ offset },
                          !Byte(*this, block.val.load(offset)).isPoison()));
