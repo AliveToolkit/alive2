@@ -4108,7 +4108,7 @@ StateValue Memcpy::toSMT(State &s) const {
   }
 
   if (vbytes.bits() > bits_size_t)
-    s.addGuardableUB(
+    s.addUB(
       vbytes.ule(expr::IntUMax(bits_size_t).zext(vbytes.bits() - bits_size_t)));
 
   check_can_load(s, vsrc);
