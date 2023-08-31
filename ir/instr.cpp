@@ -2391,7 +2391,7 @@ StateValue FnCall::toSMT(State &s) const {
 
   // Check attributes that calles must have if caller has them
   if (!attrs.refinedBy(s.getFn().getFnAttrs()))
-    s.addUB(expr(false));
+    s.addGuardableUB(expr(false));
 
   auto get_alloc_ptr = [&]() -> Value& {
     for (auto &[arg, flags] : args) {
