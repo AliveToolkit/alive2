@@ -2389,8 +2389,9 @@ StateValue FnCall::toSMT(State &s) const {
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
 
-  // Check attributes that calles must have if caller has them
-  if (!attrs.refinedBy(s.getFn().getFnAttrs()))
+  // Callee must return if caller must return
+  if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
+      !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
 
   auto get_alloc_ptr = [&]() -> Value& {

@@ -1544,6 +1544,20 @@ void Memory::setState(const Memory::CallState &st,
   }
 
   mkNonlocalValAxioms(true);
+
+  // TODO: havoc local blocks
+  // for now, zero out if in non UB-exploitation mode to avoid false positives
+  if (config::disallow_ub_exploitation) {
+    expr raw_byte = Byte(*this, {expr::mkUInt(0, bits_byte), true})();
+    expr array = expr::mkConstArray(expr::mkUInt(0, bits_for_offset),
+                                    raw_byte);
+
+    for (unsigned i = 0; i < next_local_bid; ++i) {
+      if (escaped_local_blks.mayAlias(true, i)) {
+        local_block_val[i] = expr(array);
+      }
+    }
+  }
 }
 
 static expr disjoint_local_blocks(const Memory &m, const expr &addr,
