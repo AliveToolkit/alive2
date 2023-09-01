@@ -3671,7 +3671,12 @@ StateValue GEP::toSMT(State &s) const {
 
     if (inbounds) {
       auto all_zeros = idx_all_zeros();
-      non_poison.add(all_zeros || inbounds_np());
+      auto inbounds_cond = all_zeros || inbounds_np();
+
+      if (config::disallow_ub_exploitation)
+        s.addGuardableUB(non_poison().implies(inbounds_cond));
+      else
+        non_poison.add(std::move(inbounds_cond));
 
       // try to simplify the pointer
       if (all_zeros.isFalse())

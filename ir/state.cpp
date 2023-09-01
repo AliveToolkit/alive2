@@ -588,11 +588,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
     }
 
     // If val is an aggregate, all elements should be non-poison
-    expr np = not_poison_except_padding(val.getType(), sv.non_poison);
-    if (ptr_compare)
-      addGuardableUB(std::move(np));
-    else
-      addUB(std::move(np));
+    addUB(not_poison_except_padding(val.getType(), sv.non_poison));
   }
 
   check_enough_tmp_slots();
