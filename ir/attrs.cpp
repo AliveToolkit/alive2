@@ -343,8 +343,8 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   if (derefBytes || derefOrNullBytes || deref_expr.isValid()) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
-      s.addUB(
-        Pointer(m, ptrvalue).isDereferenceable(derefBytes, align, false, true));
+      s.addUB(merge(Pointer(m, ptrvalue)
+                      .isDereferenceable(derefBytes, align, false, true)));
     if (derefOrNullBytes)
       s.addUB(p.isNull() ||
               merge(Pointer(m, ptrvalue)
