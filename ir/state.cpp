@@ -781,6 +781,10 @@ void State::addNoReturn(const expr &cond) {
   addUB(!cond);
 }
 
+void State::addUnreachable() {
+  unreachable_paths.add(domain());
+}
+
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
   if (memaccess != rhs.memaccess ||
       noret != rhs.noret || willret != rhs.willret ||
