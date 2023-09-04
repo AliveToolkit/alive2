@@ -1,6 +1,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "cache/cache.h"
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/utils.h"
 #include "smt/smt.h"
@@ -192,6 +193,8 @@ optional<StateValue> exec(llvm::Function &F,
   UNREACHABLE();
 }
 }
+
+unique_ptr<Cache> cache;
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
