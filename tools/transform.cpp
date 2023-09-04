@@ -522,9 +522,9 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     if (!null_is_dereferenceable)
       errs.add("Null is not dereferenceable", false);
 
-    CHECK(!src_state.getGuardableUB(), [](ostream&, const Model&){},
+    CHECK(src_state.getGuardableUB(), [](ostream&, const Model&){},
           "Source has guardable UB");
-    CHECK(fndom_a && !tgt_state.getGuardableUB(), [](ostream&, const Model&){},
+    CHECK(fndom_a && tgt_state.getGuardableUB(), [](ostream&, const Model&){},
           "Target has guardable UB");
   }
 

@@ -149,7 +149,7 @@ private:
   smt::OrExpr return_domain;
   // function_domain: a condition for function having well-defined behavior
   smt::OrExpr function_domain;
-  smt::AndExpr guardable_ub;
+  smt::OrExpr guardable_ub;
   std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
   std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;

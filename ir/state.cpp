@@ -759,7 +759,7 @@ void State::addUB(AndExpr &&ubs) {
 void State::addGuardableUB(expr &&ub) {
   if (config::disallow_ub_exploitation) {
     bool isconst = ub.isConst();
-    guardable_ub.add((domain.path && domain.UB()).implies(ub));
+    guardable_ub.add(domain.path && domain.UB() && !ub);
     domain.UB.add(std::move(ub));
     if (!isconst)
       domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
