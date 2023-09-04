@@ -3348,7 +3348,12 @@ StateValue AssumeVal::toSMT(State &s) const {
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
 
-  return { expr(v.value), v.non_poison && fn(v.value) };
+  expr np = fn(v.value);
+
+  if (config::disallow_ub_exploitation)
+    s.addGuardableUB(expr(np));
+
+  return { expr(v.value), v.non_poison && np };
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {

@@ -522,21 +522,21 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     if (!null_is_dereferenceable)
       errs.add("Null is not dereferenceable", false);
 
-    CHECK(src_state.getGuardableUB(), [](ostream&, const Model&){},
-          "Source has guardable UB");
-    CHECK(fndom_a && tgt_state.getGuardableUB(), [](ostream&, const Model&){},
-          "Target has guardable UB");
+    CHECK(retdom_a && src_state.getGuardableUB(),
+          [](ostream&, const Model&){}, "Source has guardable UB");
+    CHECK(retdom_a && retdom_b && tgt_state.getGuardableUB(),
+          [](ostream&, const Model&){}, "Target has guardable UB");
+
+    // disallow reaching unreachable instructions
+    CHECK(src_state.getUnreachable()(),
+          [](ostream&, const Model&){}, "Source has reachable unreachable");
+    CHECK(tgt_state.getUnreachable()(),
+          [](ostream&, const Model&){}, "Target has reachable unreachable");
   }
 
   // 1. Check UB
   CHECK(fndom_a.notImplies(fndom_b),
         [](ostream&, const Model&){}, "Source is more defined than target");
-
-  if (config::disallow_ub_exploitation) {
-    // disallow refinement by unreachable
-    CHECK(tgt_state.getUnreachable()().notImplies(src_state.getUnreachable()()),
-          [](ostream&, const Model&){}, "Target introduces unreachable BB");
-  }
 
   // 2. Check return domain (noreturn check)
   {
@@ -547,8 +547,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       dom_constr = (fndom_a && fndom_b) && retdom_a != retdom_b;
     }
 
-    CHECK(std::move(dom_constr),
-          [](ostream&, const Model&){},
+    CHECK(std::move(dom_constr), [](ostream&, const Model&){},
           "Source and target don't have the same return domain");
   }
 

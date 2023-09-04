@@ -200,9 +200,14 @@ const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   domain.noreturn = true;
   auto val = v.toSMT(*this);
+
+  auto value_ub = domain.UB();
+  if (config::disallow_ub_exploitation)
+    value_ub &= !guardable_ub();
+
   auto [I, inserted]
-    = values.try_emplace(&v, ValTy{std::move(val), domain.noreturn, domain.UB(),
-                                   std::move(undef_vars)});
+    = values.try_emplace(&v, ValTy{std::move(val), domain.noreturn,
+                                   std::move(value_ub), std::move(undef_vars)});
   assert(inserted);
   analysis.unused_vars.insert(&v);
 
@@ -743,26 +748,22 @@ void State::addUB(pair<AndExpr, expr> &&ub) {
 }
 
 void State::addUB(expr &&ub) {
-  bool isconst = ub.isConst();
-  domain.UB.add(std::move(ub));
-  if (!isconst)
+  if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ub));
 }
 
 void State::addUB(AndExpr &&ubs) {
-  bool isconst = ubs.isTrue();
-  domain.UB.add(std::move(ubs));
-  if (!isconst)
+  if (!ubs.isTrue())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ubs));
 }
 
 void State::addGuardableUB(expr &&ub) {
   if (config::disallow_ub_exploitation) {
-    bool isconst = ub.isConst();
-    guardable_ub.add(domain.path && domain.UB() && !ub);
-    domain.UB.add(std::move(ub));
-    if (!isconst)
+    if (!ub.isConst())
       domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+    guardable_ub.add(domain.path && !ub);
   } else {
     addUB(std::move(ub));
   }
