@@ -13,7 +13,7 @@ using util::config::dbg;
 
 namespace util {
 
-void sym_exec(State &s) {
+void sym_exec_init(State &s) {
   Function &f = const_cast<Function&>(s.getFn());
 
   // global constants need to be created in the right order so they get the
@@ -40,6 +40,12 @@ void sym_exec(State &s) {
     s.saveReturnedInput();
 
   s.exec(Value::voidVal);
+}
+
+void sym_exec(State &s) {
+  sym_exec_init(s);
+
+  Function &f = const_cast<Function&>(s.getFn());
 
   bool first = true;
   if (f.getFirstBB().getName() != "#init") {

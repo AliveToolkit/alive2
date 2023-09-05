@@ -2,9 +2,9 @@
 
 define i1 @f() {
   %p = alloca i8, align 1
-  %call = call i8* @g(i8* %p)
-  %c = icmp eq i8* %p, %call
+  %call = call ptr @g(ptr %p)
+  %c = icmp eq ptr %p, %call
   ret i1 %c
 }
 
-declare i8* @g(i8*)
+declare ptr @g(ptr)

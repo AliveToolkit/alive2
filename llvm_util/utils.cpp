@@ -479,14 +479,8 @@ std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
 }
 
 llvm::Function *findFunction(llvm::Module &M, const string &FName) {
-  for (auto &F : M) {
-    if (F.isDeclaration())
-      continue;
-    if (FName.compare(F.getName()) != 0)
-      continue;
-    return &F;
-  }
-  return nullptr;
+  auto F = M.getFunction(FName);
+  return F && !F->isDeclaration() ? F : nullptr;
 }
 
 }

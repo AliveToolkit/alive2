@@ -991,6 +991,10 @@ static expr log2_rec(const expr &e, unsigned idx, unsigned bw) {
                     log2_rec(e, idx - 1, bw));
 }
 
+expr expr::isPowerOf2() const {
+  return *this != 0 && (*this & (*this - expr::mkUInt(1, *this))) == 0;
+}
+
 expr expr::log2(unsigned bw_output) const {
   C();
   return log2_rec(*this, bits() - 1, bw_output);
@@ -1167,6 +1171,11 @@ expr expr::fmul(const expr &rhs, const expr &rm) const {
 expr expr::fdiv(const expr &rhs, const expr &rm) const {
   C(rhs, rm);
   return simplify_const(Z3_mk_fpa_div(ctx(), rm(), ast(), rhs()), *this, rhs);
+}
+
+expr expr::frem(const expr &rhs) const {
+  C(rhs);
+  return simplify_const(Z3_mk_fpa_rem(ctx(), ast(), rhs()), *this, rhs);
 }
 
 expr expr::fabs() const {

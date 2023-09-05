@@ -146,7 +146,7 @@ class Memory {
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
 
-  std::vector<unsigned> byval_blks;
+  std::vector<std::pair<unsigned, bool>> byval_blks; /// <bid, is_const>
   AliasSet escaped_local_blks;
 
   bool hasEscapedLocals() const {
@@ -241,7 +241,7 @@ public:
   static void resetGlobals();
   void syncWithSrc(const Memory &src);
 
-  void markByVal(unsigned bid);
+  void markByVal(unsigned bid, bool is_const);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 

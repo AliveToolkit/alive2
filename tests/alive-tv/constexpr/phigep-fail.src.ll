@@ -7,9 +7,9 @@ A:
 B:
   br label %EXIT
 EXIT:
-  %addr = phi i8* [getelementptr inbounds (i8, i8* bitcast (i16* @g to i8*), i64 0), %A],
-                  [getelementptr inbounds (i8, i8* bitcast (i16* @g to i8*), i64 1), %B]
-  %x  = load i8, i8* %addr
+  %addr = phi ptr [getelementptr inbounds (i8, ptr @g, i64 0), %A],
+                  [getelementptr inbounds (i8, ptr @g, i64 1), %B]
+  %x  = load i8, ptr %addr
   ret i8 %x
 }
 

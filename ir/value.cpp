@@ -1,9 +1,10 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/value.h"
+#include "ir/function.h"
 #include "ir/instr.h"
 #include "ir/globals.h"
-#include "ir/value.h"
 #include "smt/expr.h"
 #include "util/compiler.h"
 #include "util/config.h"
@@ -67,7 +68,7 @@ void VoidValue::print(ostream &os) const {
 }
 
 StateValue VoidValue::toSMT(State &s) const {
-  return { false, false };
+  return { false, true };
 }
 
 
@@ -210,7 +211,9 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     unsigned bid;
     expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
     val = get_global(s, smt_name, size, attrs.align, false, bid);
-    s.getMemory().markByVal(bid);
+    bool is_const = hasAttribute(ParamAttrs::NoWrite) ||
+                    !s.getFn().getFnAttrs().mem.canWrite(MemoryAccess::Args);
+    s.getMemory().markByVal(bid, is_const);
   } else {
     auto name = getSMTName(child);
     val = ty.mkInput(s, name.c_str(), attrs);

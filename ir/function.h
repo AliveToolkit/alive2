@@ -29,7 +29,8 @@ class BasicBlock final {
   std::vector<std::unique_ptr<Instr>> m_instrs;
 
   // If the basic block is a header, this holds all exit blocks of its loop
-    std::unordered_set<BasicBlock*> exit_blocks; 
+  // TODO: remove this..
+  std::unordered_set<BasicBlock*> exit_blocks;
 
 public:
   BasicBlock(std::string_view name) : name(name) {}

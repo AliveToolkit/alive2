@@ -65,6 +65,7 @@ public:
   smt::expr getOffsetSizet() const;
   smt::expr getShortOffset() const; // same as getOffset but skips aligned bits
   smt::expr getAttrs() const;
+  smt::expr getBlockBaseAddress(bool simplify = true) const;
   smt::expr getAddress(bool simplify = true) const;
 
   smt::expr blockSize() const;
@@ -91,6 +92,7 @@ public:
 
   // WARNING: these modify the pointer in place
   smt::expr isAligned(uint64_t align);
+  smt::expr isAligned(const smt::expr &align);
   std::pair<smt::AndExpr, smt::expr>
   isDereferenceable(uint64_t bytes, uint64_t align, bool iswrite = false,
                     bool ignore_accessability = false);

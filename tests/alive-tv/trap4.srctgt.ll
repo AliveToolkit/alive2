@@ -1,9 +1,9 @@
-define void @src(i8* %ptr) {
+define void @src(ptr %ptr) {
   call void @llvm.trap()
   unreachable
 }
 
-define void @tgt(i8* %ptr) {
+define void @tgt(ptr %ptr) {
   unreachable
 }
 

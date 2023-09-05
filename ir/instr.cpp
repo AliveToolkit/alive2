@@ -839,7 +839,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FRem:
     fn = [&](const expr &a, const expr &b, FpRoundingMode rm) {
       // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      auto val = expr::mkUF("fmod", {a, b}, a);
+      auto val = a.frem(b);
       s.doesApproximation("frem", val);
       return val;
     };
@@ -2067,7 +2067,15 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
   return ret;
 }
 
+
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
+
+FnCall::FnCall(Type &type, string &&name, string &&fnName, FnAttrs &&attrs)
+  : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
+    attrs(std::move(attrs)) {
+  if (config::disallow_ub_exploitation)
+    this->attrs.set(FnAttrs::NoUndef);
+}
 
 pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   if (!hasAttribute(FnAttrs::AllocSize))
@@ -2096,12 +2104,13 @@ Value* FnCall::getAlignArg() const {
 }
 
 uint64_t FnCall::getAlign() const {
-  uint64_t align = 0;
+  uint64_t align = 1;
   // TODO: add support for non constant alignments
   if (auto *arg = getAlignArg())
-    align = getIntOr(*arg, 0);
+    align = getIntOr(*arg, 1);
 
-  return max(align, attrs.align ? attrs.align : heap_block_alignment);
+  return max(align,
+             attrs.has(FnAttrs::Align) ? attrs.align : heap_block_alignment);
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -2380,9 +2389,10 @@ StateValue FnCall::toSMT(State &s) const {
   if (!isVoid())
     unpack_ret_ty(out_types, getType());
 
-  // Check attributes that calles must have if caller has them
-  if (!attrs.refinedBy(s.getFn().getFnAttrs()))
-    s.addUB(expr(false));
+  // Callee must return if caller must return
+  if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
+      !attrs.has(FnAttrs::WillReturn))
+    s.addGuardableUB(expr(false));
 
   auto get_alloc_ptr = [&]() -> Value& {
     for (auto &[arg, flags] : args) {
@@ -2413,7 +2423,7 @@ StateValue FnCall::toSMT(State &s) const {
 
       Pointer ptr_old(m, allocptr);
       if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
-        s.addUB(ptr_old.isNull() || ptr_old.isLocal());
+        s.addGuardableUB(ptr_old.isNull() || ptr_old.isLocal());
 
       m.copy(ptr_old, Pointer(m, p_new));
 
@@ -2445,7 +2455,7 @@ StateValue FnCall::toSMT(State &s) const {
 
       if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
         Pointer ptr(m, allocptr);
-        s.addUB(ptr.isNull() || ptr.isLocal());
+        s.addGuardableUB(ptr.isNull() || ptr.isLocal());
       }
     }
     assert(isVoid());
@@ -3095,7 +3105,7 @@ static void eq_val_rec(State &s, const Type &t, const StateValue &a,
     }
     return;
   }
-  s.addUB(a == b);
+  s.addGuardableUB(a == b);
 }
 
 StateValue Return::toSMT(State &s) const {
@@ -3107,7 +3117,7 @@ StateValue Return::toSMT(State &s) const {
   else
     retval = s[*val];
 
-  s.addUB(s.getMemory().checkNocapture());
+  s.addGuardableUB(s.getMemory().checkNocapture());
 
   vector<pair<Value*, ParamAttrs>> args;
   for (auto &arg : s.getFn().getInputs()) {
@@ -3117,7 +3127,7 @@ StateValue Return::toSMT(State &s) const {
   retval = check_ret_attributes(s, std::move(retval), getType(), attrs, args);
 
   if (attrs.has(FnAttrs::NoReturn))
-    s.addUB(expr(false));
+    s.addGuardableUB(expr(false));
 
   if (auto &val_returned = s.getReturnedInput())
     eq_val_rec(s, getType(), retval, *val_returned);
@@ -3193,7 +3203,7 @@ StateValue Assume::toSMT(State &s) const {
     auto &v = s.getAndAddPoisonUB(*args[0]);
     if (config::disallow_ub_exploitation && v.value.isZero())
       s.addUnreachable();
-    s.addUB(v.value != 0);
+    s.addGuardableUB(v.value != 0);
     break;
   }
   case WellDefined:
@@ -3201,21 +3211,16 @@ StateValue Assume::toSMT(State &s) const {
     break;
   case Align: {
     // assume(ptr, align)
-    const auto &vptr = s.getAndAddPoisonUB(*args[0]);
-    if (auto align = dynamic_cast<IntConst *>(args[1])) {
-      Pointer ptr(s.getMemory(), vptr.value);
-      s.addGuardableUB(ptr.isAligned(*align->getInt()));
-    } else {
-      // TODO: add support for non-constant align
-      s.addUB(expr());
-    }
+    const auto &ptr   = s.getAndAddPoisonUB(*args[0]).value;
+    const auto &align = s.getAndAddPoisonUB(*args[1]).value;
+    s.addGuardableUB(Pointer(s.getMemory(), ptr).isAligned(align));
     break;
   }
   case NonNull: {
     // assume(ptr)
     const auto &vptr = s.getAndAddPoisonUB(*args[0]);
     Pointer ptr(s.getMemory(), vptr.value);
-    s.addUB(!ptr.isNull());
+    s.addGuardableUB(!ptr.isNull());
     break;
   }
   }
@@ -3343,7 +3348,12 @@ StateValue AssumeVal::toSMT(State &s) const {
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
 
-  return { expr(v.value), v.non_poison && fn(v.value) };
+  expr np = fn(v.value);
+
+  if (config::disallow_ub_exploitation)
+    s.addGuardableUB(expr(np));
+
+  return { expr(v.value), v.non_poison && np };
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {
@@ -3452,14 +3462,14 @@ StateValue Alloc::toSMT(State &s) const {
     auto &mul_e = s.getAndAddPoisonUB(*mul, true).value;
 
     if (sz.bits() > bits_size_t)
-      s.addUB(mul_e == 0 || sz.extract(sz.bits()-1, bits_size_t) == 0);
+      s.addGuardableUB(mul_e == 0 || sz.extract(sz.bits()-1, bits_size_t) == 0);
     sz = sz.zextOrTrunc(bits_size_t);
 
     if (mul_e.bits() > bits_size_t)
-      s.addUB(mul_e.extract(mul_e.bits()-1, bits_size_t) == 0);
+      s.addGuardableUB(mul_e.extract(mul_e.bits()-1, bits_size_t) == 0);
     auto m = mul_e.zextOrTrunc(bits_size_t);
 
-    s.addUB(sz.mul_no_uoverflow(m));
+    s.addGuardableUB(sz.mul_no_uoverflow(m));
     sz = sz * m;
   }
 
@@ -3668,7 +3678,12 @@ StateValue GEP::toSMT(State &s) const {
 
     if (inbounds) {
       auto all_zeros = idx_all_zeros();
-      non_poison.add(all_zeros || inbounds_np());
+      auto inbounds_cond = all_zeros || inbounds_np();
+
+      if (config::disallow_ub_exploitation)
+        s.addGuardableUB(non_poison().implies(inbounds_cond));
+      else
+        non_poison.add(std::move(inbounds_cond));
 
       // try to simplify the pointer
       if (all_zeros.isFalse())
@@ -3917,8 +3932,9 @@ StateValue Memset::toSMT(State &s) const {
     auto &sv_ptr = s[*ptr];
     auto &sv_ptr2 = s[*ptr];
     // can't be poison even if bytes=0 as address must be aligned regardless
-    s.addUB(sv_ptr.non_poison);
-    s.addUB((vbytes != 0).implies(sv_ptr.value == sv_ptr2.value));
+    s.addGuardableUB(expr(sv_ptr.non_poison));
+    // disallow undef ptrs
+    s.addGuardableUB((vbytes != 0).implies(sv_ptr.value == sv_ptr2.value));
     vptr = sv_ptr.value;
   }
   check_can_store(s, vptr);
@@ -4089,7 +4105,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_dst = s[*dst];
     auto &sv_dst2 = s[*dst];
-    s.addUB((vbytes != 0).implies(
+    s.addGuardableUB((vbytes != 0).implies(
               sv_dst.non_poison && sv_dst.value == sv_dst2.value));
     vdst = sv_dst.value;
   }
@@ -4099,7 +4115,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_src = s[*src];
     auto &sv_src2 = s[*src];
-    s.addUB((vbytes != 0).implies(
+    s.addGuardableUB((vbytes != 0).implies(
                sv_src.non_poison && sv_src.value == sv_src2.value));
     vsrc = sv_src.value;
   }
@@ -4162,7 +4178,7 @@ StateValue Memcmp::toSMT(State &s) const {
   auto &[vptr1, np1] = s[*ptr1];
   auto &[vptr2, np2] = s[*ptr2];
   auto &vnum = s.getAndAddPoisonUB(*num).value;
-  s.addUB((vnum != 0).implies(np1 && np2));
+  s.addGuardableUB((vnum != 0).implies(np1 && np2));
 
   check_can_load(s, vptr1);
   check_can_load(s, vptr2);
@@ -4322,7 +4338,7 @@ void VaStart::print(ostream &os) const {
 }
 
 StateValue VaStart::toSMT(State &s) const {
-  s.addUB(expr(s.getFn().isVarArgs()));
+  s.addGuardableUB(expr(s.getFn().isVarArgs()));
 
   auto &data  = s.getVarArgsData();
   auto &raw_p = s.getWellDefinedPtr(*ptr);

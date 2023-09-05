@@ -200,9 +200,15 @@ const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   domain.noreturn = true;
   auto val = v.toSMT(*this);
-  ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy{std::move(val), domain.noreturn, domain.UB(),
-                                std::move(undef_vars)});
+
+  auto value_ub = domain.UB();
+  if (config::disallow_ub_exploitation)
+    value_ub &= !guardable_ub();
+
+  auto [I, inserted]
+    = values.try_emplace(&v, ValTy{std::move(val), domain.noreturn,
+                                   std::move(value_ub), std::move(undef_vars)});
+  assert(inserted);
   analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
@@ -210,7 +216,7 @@ const State::ValTy& State::exec(const Value &v) {
     tmp_values[--i_tmp_values] = StateValue();
   }
 
-  return get<1>(values.back());
+  return I->second;
 }
 
 static expr eq_except_padding(const Memory &m, const Type &ty, const expr &e1,
@@ -312,9 +318,9 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
 
   auto mark_notundef = [&](const expr &var) {
     auto name = var.fn_name();
-    for (auto &v : values_map) {
-      if (v.first->getName() == name) {
-        analysis.non_undef_vals.emplace(v.first, var);
+    for (auto &[v, _val] : values) {
+      if (v->getName() == name) {
+        analysis.non_undef_vals.emplace(v, var);
         return;
       }
     }
@@ -440,8 +446,7 @@ void State::check_enough_tmp_slots() {
 }
 
 const StateValue& State::eval(const Value &val, bool quantify_nondet) {
-  auto &[var, val_uvars] = values[values_map.at(&val)];
-  auto &[sval, _retdom, _ub, uvars] = val_uvars;
+  auto &[sval, _retdom, _ub, uvars] = values.at(&val);
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
@@ -521,7 +526,7 @@ const StateValue& State::eval(const Value &val, bool quantify_nondet) {
 
 const StateValue& State::getAndAddUndefs(const Value &val) {
   auto &v = (*this)[val];
-  for (auto uvar: at(val).undef_vars)
+  for (auto uvar: at(val)->undef_vars)
     addQuantVar(std::move(uvar));
   return v;
 }
@@ -605,8 +610,9 @@ const expr& State::getWellDefinedPtr(const Value &val) {
   return getAndAddPoisonUB(val, true, true).value;
 }
 
-const State::ValTy& State::at(const Value &val) const {
-  return get<1>(values[values_map.at(&val)]);
+const State::ValTy* State::at(const Value &val) const {
+  auto I = values.find(&val);
+  return I == values.end() ? nullptr : &I->second;
 }
 
 const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
@@ -617,6 +623,18 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
 
 bool State::isUndef(const expr &e) const {
   return undef_vars.count(e) != 0;
+}
+
+void State::cleanup(const Value &val) {
+  values.erase(&val);
+  seen_bbs.clear();
+  analysis.unused_vars.clear();
+  analysis.non_poison_vals.clear();
+  analysis.non_undef_vals.clear();
+}
+
+void State::cleanupPredecessorData() {
+  predecessor_data.clear();
 }
 
 bool State::startBB(const BasicBlock &bb) {
@@ -730,32 +748,25 @@ void State::addUB(pair<AndExpr, expr> &&ub) {
 }
 
 void State::addUB(expr &&ub) {
-  bool isconst = ub.isConst();
-  domain.UB.add(std::move(ub));
-  if (!isconst)
+  if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ub));
 }
 
 void State::addUB(AndExpr &&ubs) {
-  bool isconst = ubs.isTrue();
-  domain.UB.add(std::move(ubs));
-  if (!isconst)
+  if (!ubs.isTrue())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ubs));
 }
 
 void State::addGuardableUB(expr &&ub) {
   if (config::disallow_ub_exploitation) {
-    bool isconst = ub.isConst();
-    guardable_ub.add(domain.path.implies(ub));
-    if (!isconst)
+    if (!ub.isConst())
       domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+    guardable_ub.add(domain.path && !ub);
   } else {
     addUB(std::move(ub));
   }
-}
-
-void State::addUnreachable() {
-  unreachable_paths.add(domain());
 }
 
 void State::addNoReturn(const expr &cond) {
@@ -769,6 +780,10 @@ void State::addNoReturn(const expr &cond) {
   if (cond.isTrue())
     undef_vars.clear();
   addUB(!cond);
+}
+
+void State::addUnreachable() {
+  unreachable_paths.add(domain());
 }
 
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {

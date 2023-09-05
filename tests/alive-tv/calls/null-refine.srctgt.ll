@@ -1,5 +1,5 @@
-define void @src(i8* %p) {
-  %c = icmp eq i8* %p, null
+define void @src(ptr %p) {
+  %c = icmp eq ptr %p, null
   br i1 %c, label %then, label %else
 
 then:
@@ -9,21 +9,21 @@ else:
   br label %exit
 
 exit:
-  call void @f(i8* %p)
+  call void @f(ptr %p)
   ret void
 }
 
-define void @tgt(i8* %p) {
-  %c = icmp eq i8* %p, null
+define void @tgt(ptr %p) {
+  %c = icmp eq ptr %p, null
   br i1 %c, label %then, label %else
 
 then:
-  call void @f(i8* null)
+  call void @f(ptr null)
   ret void
 
 else:
-  call void @f(i8* %p)
+  call void @f(ptr %p)
   ret void
 }
 
-declare void @f(i8*)
+declare void @f(ptr)

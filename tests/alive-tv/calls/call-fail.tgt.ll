@@ -1,7 +1,7 @@
 define i1 @f() {
   %p = alloca i8, align 1
-  %call = call i8* @g(i8* %p)
+  %call = call ptr @g(ptr %p)
   ret i1 false
 }
 
-declare i8* @g(i8*)
+declare ptr @g(ptr)

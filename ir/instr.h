@@ -1024,9 +1024,7 @@ private:
 
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None)
-    : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
-      attrs(std::move(attrs)) {}
+         FnAttrs &&attrs = FnAttrs::None);
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }
