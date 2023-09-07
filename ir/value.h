@@ -85,11 +85,12 @@ class GlobalVariable final : public Value {
   uint64_t allocsize;
   unsigned align;
   bool isconst;
+  bool arbitrary_size;
 public:
   GlobalVariable(Type &type, std::string &&name, uint64_t allocsize,
-                 unsigned align, bool isconst) :
+                 unsigned align, bool isconst, bool arbitrary_size) :
     Value(type, std::move(name)), allocsize(allocsize), align(align),
-    isconst(isconst) {}
+    isconst(isconst), arbitrary_size(arbitrary_size) {}
   uint64_t size() const { return allocsize; }
   unsigned getAlignment() const { return align; }
   bool isConst() const { return isconst; }

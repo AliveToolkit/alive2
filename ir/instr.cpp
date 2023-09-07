@@ -2408,7 +2408,7 @@ StateValue FnCall::toSMT(State &s) const {
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
     auto [p_new, allocated]
-      = m.alloc(size, getAlign(), Memory::MALLOC, np_size, nonnull);
+      = m.alloc(&size, getAlign(), Memory::MALLOC, np_size, nonnull);
 
     expr nullp = Pointer::mkNullPointer(m)();
     expr ret = expr::mkIf(allocated, p_new, nullp);
@@ -3473,7 +3473,7 @@ StateValue Alloc::toSMT(State &s) const {
     sz = sz * m;
   }
 
-  expr ptr = s.getMemory().alloc(sz, align, Memory::STACK, true, true).first;
+  expr ptr = s.getMemory().alloc(&sz, align, Memory::STACK, true, true).first;
   if (initially_dead)
     s.getMemory().free(ptr, true);
   return { std::move(ptr), true };

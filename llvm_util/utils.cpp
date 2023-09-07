@@ -329,8 +329,13 @@ Value* get_operand(llvm::Value *v,
     } else {
       name = '@' + gv->getName().str();
     }
+
+    bool arb_size = false;
+    if (auto *arr = dyn_cast<llvm::ArrayType>(gv->getValueType()))
+      arb_size = arr->getNumElements() == 0;
+
     auto val = make_unique<GlobalVariable>(*ty, std::move(name), size, align,
-                                           gv->isConstant());
+                                           gv->isConstant(), arb_size);
     auto gvar = val.get();
     current_fn->addConstant(std::move(val));
     RETURN_CACHE(gvar);

@@ -1160,8 +1160,10 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   }
 
   // Initialize a memory block for null pointer.
-  if (skip_null)
-    alloc(expr::mkUInt(0, bits_size_t), bits_byte / 8, GLOBAL, false, false, 0);
+  if (skip_null) {
+    auto zero = expr::mkUInt(0, bits_size_t);
+    alloc(&zero, bits_byte / 8, GLOBAL, false, false, 0);
+  }
 }
 
 void Memory::mkAxioms(const Memory &tgt) const {
@@ -1618,7 +1620,7 @@ void Memory::mkLocalDisjAddrAxioms(const expr &allocated, const expr &short_bid,
 }
 
 pair<expr, expr>
-Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
+Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
               const expr &precond, const expr &nonnull,
               optional<unsigned> bidopt, unsigned *bid_out) {
   assert(!memory_unused());
@@ -1639,9 +1641,14 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
   if (bid_out)
     *bid_out = bid;
 
-  expr size_zext = size.zextOrTrunc(bits_size_t);
-  expr nooverflow = size.bits() <= bits_size_t ? true :
-                      size.extract(size.bits()-1, bits_size_t) == 0;
+  expr size_zext;
+  expr nooverflow = true;
+  if (size) {
+    size_zext  = size->zextOrTrunc(bits_size_t);
+    nooverflow = size->bits() <= bits_size_t ? true :
+                   size->extract(size->bits()-1, bits_size_t) == 0;
+  }
+
 
   expr allocated = precond && nooverflow;
   state->addPre(nonnull.implies(allocated));
@@ -1666,11 +1673,13 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
   bool is_null = !is_local && has_null_block && bid == 0;
 
   if (is_local) {
+    assert(size);
     mkLocalDisjAddrAxioms(allocated, short_bid, size_zext, align_expr,
                           align_bits);
   } else {
     // support for 0-sized arrays like [0 x i8], which are arbitrarily sized
-    state->addAxiom((size_zext == 0 && !is_null) || p.blockSize() == size_zext);
+    if (size)
+      state->addAxiom(p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 
@@ -1684,7 +1693,7 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
 
   if (!is_null)
     store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
-  if (is_local || (!is_null && !size_zext.isZero()))
+  if (size)
     (is_local ? local_blk_size : non_local_blk_size)
       .add(short_bid, std::move(size_zext));
   (is_local ? local_blk_align : non_local_blk_align)

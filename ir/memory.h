@@ -288,7 +288,7 @@ public:
   // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
   // Returns <pointer if allocated, allocated?>
-  std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, uint64_t align,
+  std::pair<smt::expr, smt::expr> alloc(const smt::expr *size, uint64_t align,
       BlockKind blockKind, const smt::expr &precond = true,
       const smt::expr &nonnull = false,
       std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);

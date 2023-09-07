@@ -82,11 +82,15 @@ StateValue NullPointerValue::toSMT(State &s) const {
 
 
 void GlobalVariable::print(ostream &os) const {
-  os << getName() << " = " << (isconst ? "constant " : "global ") << allocsize
-     << " bytes, align " << align;
+  os << getName() << " = " << (isconst ? "constant " : "global ");
+  if (arbitrary_size)
+    os << '?';
+  else
+    os << allocsize;
+  os << " bytes, align " << align;
 }
 
-static expr get_global(State &s, const string &name, const expr &size,
+static expr get_global(State &s, const string &name, const expr *size,
                        unsigned align, bool isconst, unsigned &bid) {
   expr ptr;
   bool allocated;
@@ -112,7 +116,9 @@ static expr get_global(State &s, const string &name, const expr &size,
 StateValue GlobalVariable::toSMT(State &s) const {
   unsigned bid;
   expr size = expr::mkUInt(allocsize, bits_size_t);
-  return { get_global(s, getName(), size, align, isconst, bid), true };
+  return { get_global(s, getName(), arbitrary_size ? nullptr : &size, align,
+                      isconst, bid),
+           true };
 }
 
 
@@ -210,7 +216,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (hasAttribute(ParamAttrs::ByVal)) {
     unsigned bid;
     expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
-    val = get_global(s, smt_name, size, attrs.align, false, bid);
+    val = get_global(s, smt_name, &size, attrs.align, false, bid);
     bool is_const = hasAttribute(ParamAttrs::NoWrite) ||
                     !s.getFn().getFnAttrs().mem.canWrite(MemoryAccess::Args);
     s.getMemory().markByVal(bid, is_const);
