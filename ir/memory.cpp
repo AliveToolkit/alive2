@@ -1669,7 +1669,8 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
     mkLocalDisjAddrAxioms(allocated, short_bid, size_zext, align_expr,
                           align_bits);
   } else {
-    state->addAxiom(p.blockSize() == size_zext);
+    // support for 0-sized arrays like [0 x i8], which are arbitrarily sized
+    state->addAxiom((size_zext == 0 && !is_null) || p.blockSize() == size_zext);
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 
@@ -1683,8 +1684,9 @@ Memory::alloc(const expr &size, uint64_t align, BlockKind blockKind,
 
   if (!is_null)
     store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
-  (is_local ? local_blk_size : non_local_blk_size)
-    .add(short_bid, std::move(size_zext));
+  if (is_local || (!is_null && !size_zext.isZero()))
+    (is_local ? local_blk_size : non_local_blk_size)
+      .add(short_bid, std::move(size_zext));
   (is_local ? local_blk_align : non_local_blk_align)
     .add(short_bid, std::move(align_expr));
   (is_local ? local_blk_kind : non_local_blk_kind)
