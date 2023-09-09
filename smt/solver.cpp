@@ -339,16 +339,59 @@ pair<expr, expr> Model::iterator::operator*(void) const {
   return { expr::mkConst(decl), Z3_model_get_const_interp(ctx(), m, decl) };
 }
 
-Model::iterator Model::begin() const {
-  return { m, 0 };
-}
-
 Model::iterator Model::end() const {
   return { nullptr, Z3_model_get_num_consts(ctx(), m) };
 }
 
+pair<string, FnModel> Model::fns::iterator::operator*(void) const {
+  auto decl = Z3_model_get_func_decl(ctx(), m, idx);
+  auto name = Z3_get_symbol_string(ctx(), Z3_get_decl_name(ctx(), decl));
+  FnModel model(Z3_model_get_func_interp(ctx(), m, decl), name);
+  return { std::move(name), std::move(model) };
+}
+
+Model::fns::iterator Model::fns::end() const {
+  return { nullptr, Z3_model_get_num_funcs(ctx(), m) };
+}
+
 ostream& operator<<(ostream &os, const Model &m) {
   return os << Z3_model_to_string(ctx(), m.m);
+}
+
+
+FnModel::FnModel(Z3_func_interp f, const string &fn_name)
+  : f(f), fn_name(fn_name) {
+  Z3_func_interp_inc_ref(ctx(), f);
+}
+
+FnModel::~FnModel() {
+  if (f)
+    Z3_func_interp_dec_ref(ctx(), f);
+}
+
+FnModel::iterator FnModel::end() const {
+ return { nullptr, nullptr, Z3_func_interp_get_num_entries(ctx(), f) };
+}
+
+pair<expr, expr> FnModel::iterator::operator*(void) const {
+  auto entry = Z3_func_interp_get_entry(ctx(), f, idx);
+  Z3_func_entry_inc_ref(ctx(), entry);
+  expr value = Z3_func_entry_get_value(ctx(), entry);
+
+  vector<expr> args;
+  for (unsigned i = 0, e = Z3_func_entry_get_num_args(ctx(), entry);
+       i != e; ++i) {
+    args.emplace_back(expr(Z3_func_entry_get_arg(ctx(), entry, i)));
+  }
+  Z3_func_entry_inc_ref(ctx(), entry);
+
+  auto var = expr::mkUF(fn_name, args, value);
+  return { std::move(var), std::move(value) };
+}
+
+expr FnModel::getElse() const {
+  auto ast = Z3_func_interp_get_else(ctx(), f);
+  return ast ? expr(ast) : expr();
 }
 
 

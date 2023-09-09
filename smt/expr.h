@@ -382,6 +382,7 @@ public:
   static bool allValid() { return true; }
 
   friend class Solver;
+  friend class FnModel;
   friend class Model;
 };
 

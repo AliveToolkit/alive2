@@ -9,10 +9,13 @@
 #include <string>
 #include <utility>
 
+typedef struct _Z3_func_interp* Z3_func_interp;
 typedef struct _Z3_model* Z3_model;
 typedef struct _Z3_solver* Z3_solver;
 
 namespace smt {
+
+class FnModel;
 
 class Model {
   Z3_model m;
@@ -48,10 +51,65 @@ public:
   };
 
   // WARNING: the parent Model class has to be alive while iterators are in use.
-  iterator begin() const;
+  iterator begin() const { return { m, 0 }; }
   iterator end() const;
 
+  class fns {
+    Z3_model m;
+    fns(Z3_model m) : m(m) {}
+  public:
+    class iterator {
+      Z3_model m;
+      unsigned idx;
+      iterator(Z3_model m, unsigned idx) : m(m), idx(idx) {}
+    public:
+      void operator++(void) { ++idx; }
+      std::pair<std::string, FnModel> operator*(void) const;
+      bool operator!=(const iterator &rhs) const { return idx != rhs.idx; }
+      friend class fns;
+    };
+    iterator begin() const { return { m, 0 }; }
+    iterator end() const;
+    friend class Model;
+  };
+
+  fns getFns() const { return m; }
+
   friend std::ostream& operator<<(std::ostream &os, const Model &m);
+};
+
+
+class FnModel {
+  Z3_func_interp f;
+  std::string fn_name;
+  FnModel(Z3_func_interp f, const std::string &fn_name);
+
+public:
+  FnModel(FnModel &&other) noexcept : f(0) {
+    std::swap(other.f, f);
+    std::swap(other.fn_name, fn_name);
+  }
+  ~FnModel();
+
+  class iterator {
+    Z3_func_interp f;
+    const char *fn_name;
+    unsigned idx;
+    iterator(Z3_func_interp f, const char *fn_name, unsigned idx)
+      : f(f), fn_name(fn_name), idx(idx) {}
+  public:
+    void operator++(void) { ++idx; }
+    std::pair<expr, expr> operator*(void) const; // <fn, value>
+    bool operator!=(const iterator &rhs) const { return idx != rhs.idx; }
+    friend class FnModel;
+  };
+
+  iterator begin() const { return { f, fn_name.c_str(), 0 }; }
+  iterator end() const;
+
+  expr getElse() const;
+
+  friend class Model::fns::iterator;
 };
 
 
