@@ -473,6 +473,14 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
                                const Type &toType) {
   assert(!bytes.empty());
 
+  auto ub_pre = [&](expr &&e) -> expr {
+    if (config::disallow_ub_exploitation) {
+      m.getState().addPre(std::move(e));
+      return true;
+    }
+    return std::move(e);
+  };
+
   if (toType.isPtrType()) {
     assert(bytes.size() == bits_program_pointer / bits_byte);
     expr loaded_ptr, is_ptr;
@@ -492,15 +500,14 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       if (i == 0) {
         loaded_ptr = ptr_value;
         is_ptr     = std::move(b_is_ptr);
-      } else if (!config::disallow_ub_exploitation) {
-        non_poison &= is_ptr == b_is_ptr;
+      } else {
+        non_poison &= ub_pre(is_ptr == b_is_ptr);
       }
 
-      if (!config::disallow_ub_exploitation)
-        non_poison &=
-          expr::mkIf(is_ptr,
-                     b.ptrByteoffset() == i && ptr_value == loaded_ptr,
-                     b.nonptrValue() == 0);
+      non_poison &=
+        ub_pre(expr::mkIf(is_ptr,
+                          b.ptrByteoffset() == i && ptr_value == loaded_ptr,
+                          b.nonptrValue() == 0));
       non_poison &= !b.isPoison();
     }
 
@@ -528,7 +535,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     IntType ibyteTy("", bits_byte);
 
     for (auto &b: bytes) {
-      expr isptr = config::disallow_ub_exploitation ? expr(true) : !b.isPtr();
+      expr isptr = ub_pre(!b.isPtr());
       StateValue v(b.nonptrValue(),
                    ibyteTy.combine_poison(isptr, b.nonptrNonpoison()));
       val = first ? std::move(v) : v.concat(val);

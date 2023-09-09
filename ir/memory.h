@@ -346,6 +346,8 @@ public:
     AliasSet::printStats(os);
   }
 
+  State& getState() const { return *state; }
+
   void print(std::ostream &os, const smt::Model &m) const;
   friend std::ostream& operator<<(std::ostream &os, const Memory &m);
 
