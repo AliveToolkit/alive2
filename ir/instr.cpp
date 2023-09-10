@@ -2191,6 +2191,8 @@ void FnCall::addArg(Value &arg, ParamAttrs &&attrs) {
 
 vector<Value*> FnCall::operands() const {
   vector<Value*> output;
+  if (fnptr)
+    output.emplace_back(fnptr);
   transform(args.begin(), args.end(), back_inserter(output),
             [](auto &p){ return p.first; });
   return output;
@@ -2211,12 +2213,8 @@ void FnCall::print(ostream &os) const {
   if (!isVoid())
     os << getName() << " = ";
 
-  os << "call " << print_type(getType());
-  if (fnptr)
-    os << *fnptr;
-  else
-    os << fnName;
-  os << '(';
+  os << "call " << print_type(getType())
+     << (fnptr ? fnptr->getName() : fnName) << '(';
 
   bool first = true;
   for (auto &[arg, attrs] : args) {
@@ -2492,7 +2490,10 @@ StateValue FnCall::toSMT(State &s) const {
 
 expr FnCall::getTypeConstraints(const Function &f) const {
   // TODO : also need to name each arg type smt var uniquely
-  return Value::getTypeConstraints();
+  expr ret = Value::getTypeConstraints();
+  if (fnptr)
+    ret &= fnptr->getType().enforcePtrType();
+  return ret;
 }
 
 unique_ptr<Instr> FnCall::dup(Function &f, const string &suffix) const {
