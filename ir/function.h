@@ -92,7 +92,7 @@ class Function final {
   FnAttrs attrs;
 
 public:
-  Function() {}
+  Function() = default;
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
            unsigned bits_ptr_offset = 64, bool little_endian = true,
            bool is_var_args = false)
@@ -129,6 +129,7 @@ public:
   }
   unsigned numConstants() const { return constants.size(); }
   Value &getConstant(int idx) const { return *constants[idx]; }
+  Value* getConstant(std::string_view name) const;
 
   std::vector<GlobalVariable *> getGlobalVars() const;
   std::vector<std::string_view> getGlobalVarNames() const;

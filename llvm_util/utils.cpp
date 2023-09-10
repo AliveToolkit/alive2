@@ -143,6 +143,10 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       ptr_types[as] = make_unique<PtrType>(as);
     return ptr_types[as].get();
   }
+
+  case llvm::Type::FunctionTyID:
+    return ptr_types[0].get();
+
   case llvm::Type::StructTyID: {
     auto strty = cast<llvm::StructType>(ty);
     // 8 bits should be plenty to represent all unique values of this type
@@ -336,6 +340,15 @@ Value* get_operand(llvm::Value *v,
 
     auto val = make_unique<GlobalVariable>(*ty, std::move(name), size, align,
                                            gv->isConstant(), arb_size);
+    auto gvar = val.get();
+    current_fn->addConstant(std::move(val));
+    RETURN_CACHE(gvar);
+  }
+
+  if (auto fn = dyn_cast<llvm::Function>(v)) {
+    auto val = make_unique<GlobalVariable>(*ty, fn->getName().str(), 0,
+                                           fn->getAlign().valueOrOne().value(),
+                                           true, true);
     auto gvar = val.get();
     current_fn->addConstant(std::move(val));
     RETURN_CACHE(gvar);

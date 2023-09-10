@@ -197,6 +197,14 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(std::move(c));
 }
 
+Value* Function::getConstant(string_view name) const {
+  for (auto &c : constants) {
+    if (c->getName() == name)
+      return c.get();
+  }
+  return nullptr;
+}
+
 vector<GlobalVariable *> Function::getGlobalVars() const {
   vector<GlobalVariable *> gvs;
   for (auto I = constants.begin(), E = constants.end(); I != E; ++I) {
@@ -259,6 +267,13 @@ void Function::syncDataWithSrc(const Function &src) {
   if (IS != ES || IT != ET)
     throw AliveException("Source and target have different number of args",
                          false);
+
+  // copy function decls that are called indirectly
+  for (auto &c : src.getConstants()) {
+    auto *gv = dynamic_cast<const GlobalVariable*>(&c);
+    if (gv && gv->isArbitrarySize() && !getConstant(gv->getName()))
+      addConstant(make_unique<GlobalVariable>(*gv));
+  }
 }
 
 Function::instr_iterator::
