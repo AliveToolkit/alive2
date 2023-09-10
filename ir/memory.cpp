@@ -1687,6 +1687,8 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     // support for 0-sized arrays like [0 x i8], which are arbitrarily sized
     if (size)
       state->addAxiom(p.blockSize() == size_zext);
+    else
+      state->addAxiom(p.blockSize().uge(1));
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 
@@ -2316,6 +2318,8 @@ void Memory::print(ostream &os, const Model &m) const {
       P("alloc type", p.getAllocType());
       if (observesAddresses())
         P("address", p.getAddress());
+      if (!local && is_constglb(bid))
+        os << "\tconst";
       os << '\n';
     }
   };

@@ -252,7 +252,7 @@ bool Function::hasReturn() const {
   return false;
 }
 
-void Function::syncDataWithSrc(const Function &src) {
+void Function::syncDataWithSrc(Function &src) {
   auto IS = src.inputs.begin(), ES = src.inputs.end();
   auto IT = inputs.begin(), ET = inputs.end();
 
@@ -269,11 +269,15 @@ void Function::syncDataWithSrc(const Function &src) {
                          false);
 
   // copy function decls that are called indirectly
-  for (auto &c : src.getConstants()) {
-    auto *gv = dynamic_cast<const GlobalVariable*>(&c);
-    if (gv && gv->isArbitrarySize() && !getConstant(gv->getName()))
-      addConstant(make_unique<GlobalVariable>(*gv));
-  }
+  auto copy_fns = [](const auto &src, auto &dst) {
+    for (auto &c : src.getConstants()) {
+      auto *gv = dynamic_cast<const GlobalVariable*>(&c);
+      if (gv && gv->isArbitrarySize() && !dst.getConstant(gv->getName()))
+        dst.addConstant(make_unique<GlobalVariable>(*gv));
+    }
+  };
+  copy_fns(src, *this);
+  copy_fns(*this, src);
 }
 
 Function::instr_iterator::

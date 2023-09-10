@@ -158,7 +158,7 @@ public:
   bool isLittleEndian() const { return little_endian; }
   bool isVarArgs() const { return is_var_args; }
 
-  void syncDataWithSrc(const Function &src);
+  void syncDataWithSrc(Function &src);
 
   auto& getBBs() { return BB_order; }
   const auto& getBBs() const { return BB_order; }

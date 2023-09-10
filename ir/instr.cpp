@@ -2383,6 +2383,9 @@ StateValue FnCall::toSMT(State &s) const {
   if (ptr) {
     fnName_mangled << "#indirect_call";
     inputs.emplace_back(s.getAndAddPoisonUB(*ptr, true));
+
+    Pointer ptr(s.getMemory(), inputs.back().value);
+    s.addUB(ptr.isDereferenceable(1, 1, false));
   } else {
     fnName_mangled << fnName;
   }
