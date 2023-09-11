@@ -1222,17 +1222,22 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(Pointer::mkNullPointer(*this).getAddress(false) == 0);
 
   // Non-local blocks are disjoint.
+  auto one = expr::mkUInt(1, bits_ptr_address);
   for (unsigned bid = 0; bid < num_nonlocals; ++bid) {
     if (skip_bid(bid))
       continue;
 
-    Pointer p1(*this, bid, false);
+    Pointer p1(bid < num_nonlocals_src ? *this : tgt, bid, false);
     auto addr  = p1.getAddress();
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
     if (!has_null_block || bid != 0)
       state->addAxiom(addr != 0);
+
+    // address must be properly aligned
+    state->addAxiom(
+      (addr & ((one << align.zextOrTrunc(bits_ptr_address)) - one)) == 0);
 
     state->addAxiom(
       Pointer::hasLocalBit()
@@ -1244,7 +1249,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
       if (skip_bid(bid2))
         continue;
-      Pointer p2(*this, bid2, false);
+      Pointer p2(bid2 < num_nonlocals_src ? *this : tgt, bid2, false);
       state->addAxiom(disjoint(addr, sz, align, p2.getAddress(),
                                p2.blockSize().zextOrTrunc(bits_ptr_address),
                                p2.blockAlignment()));
@@ -1691,9 +1696,6 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
       state->addAxiom(p.blockSize().uge(1));
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
-
-    if (align_bits && observesAddresses())
-      state->addAxiom(p.getAddress().extract(align_bits - 1, 0) == 0);
 
     assert(is_const == is_constglb(bid, state->isSource()));
     assert((has_null_block && bid == 0) ||
