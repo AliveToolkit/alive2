@@ -447,6 +447,11 @@ bool expr::isInt(int64_t &n) const {
   return true;
 }
 
+bool expr::isSameTypeOf(const expr &other) const {
+  C(other);
+  return sort() == other.sort();
+}
+
 bool expr::isEq(expr &lhs, expr &rhs) const {
   return isBinOp(lhs, rhs, Z3_OP_EQ);
 }

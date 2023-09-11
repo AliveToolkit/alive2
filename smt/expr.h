@@ -126,6 +126,7 @@ public:
   unsigned bits() const;
   bool isUInt(uint64_t &n) const;
   bool isInt(int64_t &n) const;
+  bool isSameTypeOf(const expr &other) const;
 
   bool isEq(expr &lhs, expr &rhs) const;
   bool isSLE(expr &lhs, expr &rhs) const;

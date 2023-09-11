@@ -278,6 +278,10 @@ void Function::syncDataWithSrc(Function &src) {
   };
   copy_fns(src, *this);
   copy_fns(*this, src);
+
+  for (auto &decl : fn_decls) {
+    src.addFnDecl(FnDecl(decl));
+  }
 }
 
 Function::instr_iterator::
@@ -311,6 +315,13 @@ static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
     }
   }
   users[val].emplace(i, bb);
+}
+
+void Function::addFnDecl(FnDecl &&decl) {
+  if (find_if(fn_decls.begin(), fn_decls.end(),
+      [&](auto &d) { return d.name == decl.name; }) != fn_decls.end())
+    return;
+  fn_decls.emplace_back(std::move(decl));
 }
 
 Function::UsersTy Function::getUsers() const {
@@ -798,6 +809,21 @@ void Function::unroll(unsigned k) {
 }
 
 void Function::print(ostream &os, bool print_header) const {
+  if (!fn_decls.empty()) {
+    for (auto &decl : fn_decls) {
+      os << "declare " << *decl.output << ' ' << decl.name << '(';
+      bool first = true;
+      for (auto &input : decl.inputs) {
+        if (!first)
+          os << ", ";
+        os << input.second << *input.first;
+        first = false;
+      }
+      os << ")\n";
+    }
+    os << '\n';
+  }
+
   {
     const auto &gvars = getGlobalVars();
     if (!gvars.empty()) {

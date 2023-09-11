@@ -91,6 +91,17 @@ class Function final {
 
   FnAttrs attrs;
 
+  // TODO: Move this to a 'program' class
+public:
+  struct FnDecl {
+    std::string name;
+    std::vector<std::pair<Type*, ParamAttrs>> inputs;
+    Type *output;
+    FnAttrs attrs;
+  };
+private:
+  std::vector<FnDecl> fn_decls;
+
 public:
   Function() = default;
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
@@ -185,6 +196,9 @@ public:
   };
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
+
+  void addFnDecl(FnDecl &&decl);
+  auto& getFnDecls() const { return fn_decls; }
 
   using UsersTy = std::unordered_map<const Value*,
                                      std::set<std::pair<Value*, BasicBlock*>>>;

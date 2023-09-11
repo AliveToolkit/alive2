@@ -874,6 +874,14 @@ expr State::FnCallInput::refinedBy(
   return refines();
 }
 
+State::FnCallOutput
+State::FnCallOutput::replace(const optional<StateValue> &retval) const {
+  FnCallOutput copy = *this;
+  assert(retvals.size() == 1);
+  copy.retvals[0] = *retval;
+  return copy;
+}
+
 State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
                                               const FnCallOutput &a,
                                               const FnCallOutput &b) {
@@ -882,6 +890,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   ret.noreturns = expr::mkIf(cond, a.noreturns, b.noreturns);
   ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
   assert(a.retvals.size() == b.retvals.size());
+  assert(a.ret_data.size() == b.ret_data.size());
   for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
     ret.retvals.emplace_back(
       StateValue::mkIf(cond, a.retvals[i], b.retvals[i]));
@@ -904,11 +913,19 @@ expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
 vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
-                 const vector<Type*> &out_types, const FnAttrs &attrs) {
-  bool noret = attrs.has(FnAttrs::NoReturn);
+                 const vector<Type*> &out_types, optional<StateValue> &&ret_arg,
+                 vector<StateValue> &&ret_args, const FnAttrs &attrs) {
+  bool noret   = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
   bool noalias = attrs.has(FnAttrs::NoAlias);
+  bool is_indirect = name.starts_with("#indirect_call");
+
+  expr fn_ptr;
+  if (is_indirect) {
+    assert(inputs.size() >= 1);
+    fn_ptr = inputs[0].value;
+  }
 
   assert(!noret || !willret);
 
@@ -972,12 +989,46 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       vector<Memory::FnRetData> ret_data;
       string valname = name + "#val";
       string npname = name + "#np";
-      for (auto t : out_types) {
-        auto [val, data] = mk_val(*t, valname);
-        values.emplace_back(
-          std::move(val),
-          noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
-        ret_data.emplace_back(std::move(data));
+      if (ret_arg) {
+        assert(out_types.size() == 1);
+        values.emplace_back(std::move(ret_arg).value());
+        ret_data.emplace_back();
+      } else {
+        for (auto t : out_types) {
+          auto [val, data] = mk_val(*t, valname);
+          values.emplace_back(
+            std::move(val),
+            noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
+          ret_data.emplace_back(std::move(data));
+        }
+      }
+
+      // Indirect calls may be changed into direct in tgt
+      // Account for this if we have declarations with a returned argument
+      // to limit the behavior of the SMT var.
+      if (is_indirect) {
+        for (auto &decl : getFn().getFnDecls()) {
+          if (decl.inputs.size() != ret_args.size())
+            continue;
+          unsigned idx = 0;
+          for (auto &[ty, attrs] : decl.inputs) {
+            if (attrs.has(ParamAttrs::Returned)) {
+              auto &ret = ret_args[idx];
+              if (ret.value.isSameTypeOf(values[0].value)) {
+                assert(values.size() == 1);
+                auto gv = getFn().getConstant(string_view(decl.name).substr(1));
+                assert(gv);
+                auto cmp = Pointer(memory, fn_ptr).getAddress() ==
+                           Pointer(memory, (*this)[*gv].value).getAddress();
+                values[0].value = expr::mkIf(cmp, ret.value, values[0].value);
+                values[0].non_poison
+                  = expr::mkIf(cmp, ret.non_poison, values[0].non_poison);
+              }
+              break;
+            }
+            ++idx;
+          }
+        }
       }
 
       I->second
@@ -1016,7 +1067,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto refined = in.refinedBy(*this, name, inaccessible_bid, inputs,
                                   ptr_inputs, call_ranges, memory, attrs.mem,
                                   noret, willret);
-      data.add(out, std::move(refined));
+      data.add(ret_arg ? out.replace(ret_arg) : out, std::move(refined));
     }
 
     if (data) {

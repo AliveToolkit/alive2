@@ -2390,6 +2390,9 @@ StateValue FnCall::toSMT(State &s) const {
     fnName_mangled << fnName;
   }
 
+  optional<StateValue> ret_val;
+  vector<StateValue> ret_vals;
+
   for (auto &[arg, flags] : args) {
     // we duplicate each argument so that undef values are allowed to take
     // different values so we can catch the bug in f(freeze(undef)) -> f(undef)
@@ -2400,6 +2403,14 @@ StateValue FnCall::toSMT(State &s) const {
     } else {
       sv  = s[*arg];
       sv2 = s.eval(*arg, true);
+    }
+
+    if (fnptr)
+      ret_vals.emplace_back(sv);
+
+    if (flags.has(ParamAttrs::Returned)) {
+      assert(!ret_val);
+      ret_val = sv;
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, std::move(sv), std::move(sv2),
@@ -2484,8 +2495,9 @@ StateValue FnCall::toSMT(State &s) const {
   }
 
   unsigned idx = 0;
-  auto ret = s.addFnCall(fnName_mangled.str(), std::move(inputs),
-                         std::move(ptr_inputs), out_types, attrs);
+  auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
+                         std::move(ptr_inputs), out_types, std::move(ret_val),
+                         std::move(ret_vals), attrs);
 
   return isVoid() ? StateValue()
                   : pack_return(s, getType(), ret, attrs, idx, args);
