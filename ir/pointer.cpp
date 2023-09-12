@@ -232,7 +232,7 @@ expr Pointer::getValue(const char *name, const FunctionExpr &local_fn,
   return non_local;
 }
 
-expr Pointer::getAddress(bool simplify) const {
+expr Pointer::getBlockBaseAddress(bool simplify) const {
   assert(Memory::observesAddresses());
 
   auto bid = getShortBid();
@@ -245,15 +245,17 @@ expr Pointer::getAddress(bool simplify) const {
   if (hasLocalBit())
     non_local = expr::mkUInt(0, 1).concat(non_local);
 
-  expr addr;
   if (auto local = m.local_blk_addr(bid)) {
     // Local block area is the upper half of the memory
     expr lc = hasLocalBit() ? expr::mkUInt(1, 1).concat(*local) : *local;
-    addr = expr::mkIf(isLocal(), lc, non_local);
+    return expr::mkIf(isLocal(), lc, non_local);
   } else
-    addr = std::move(non_local);
+    return non_local;
+}
 
-  return addr + getOffset().zextOrTrunc(bits_ptr_address);
+expr Pointer::getAddress(bool simplify) const {
+  return
+    getBlockBaseAddress(simplify) + getOffset().zextOrTrunc(bits_ptr_address);
 }
 
 expr Pointer::blockSize() const {
@@ -281,8 +283,8 @@ void Pointer::operator+=(const expr &bytes) {
 
 Pointer Pointer::maskOffset(const expr &mask) const {
   return { m, getBid(),
-           getOffset() + ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
-                             - getAddress()).zextOrTrunc(bits_for_offset),
+           ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
+               - getBlockBaseAddress()).zextOrTrunc(bits_for_offset),
            getAttrs() };
 }
 
@@ -344,8 +346,12 @@ expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
 }
 
 expr Pointer::isAligned(uint64_t align) {
-  if (align <= 1)
+  if (align == 0)
+    return isNull();
+  if (align == 1)
     return true;
+  if (!is_power2(align))
+    return false;
 
   auto offset = getOffset();
   if (isUndef(offset))
@@ -372,6 +378,18 @@ expr Pointer::isAligned(uint64_t align) {
   }
 
   return getAddress().extract(bits - 1, 0) == 0;
+}
+
+expr Pointer::isAligned(const expr &align) {
+  uint64_t n;
+  if (align.isUInt(n))
+    return isAligned(n);
+
+  return
+    expr::mkIf(align == 0,
+               isNull(),
+               align.isPowerOf2() &&
+                 getAddress().urem(align.zextOrTrunc(bits_ptr_address)) == 0);
 }
 
 static pair<expr, expr> is_dereferenceable(Pointer &p,
@@ -552,13 +570,20 @@ expr Pointer::isWritable() const {
     non_local &= bid.ult(num_nonlocals_src);
   if (has_null_block && null_is_dereferenceable)
     non_local |= bid == 0;
+
+  // check for non-writable byval blocks (which are non-local)
+  for (auto [byval, is_const] : m.byval_blks) {
+    if (is_const)
+      non_local &= bid != byval;
+  }
+
   return isLocal() || non_local;
 }
 
 expr Pointer::isByval() const {
   auto this_bid = getShortBid();
   expr non_local(false);
-  for (auto bid : m.byval_blks) {
+  for (auto [bid, is_const] : m.byval_blks) {
     non_local |= this_bid == bid;
   }
   return !isLocal() && non_local;

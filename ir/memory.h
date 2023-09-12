@@ -146,7 +146,7 @@ class Memory {
   smt::FunctionExpr non_local_blk_align;
   smt::FunctionExpr non_local_blk_kind;
 
-  std::vector<unsigned> byval_blks;
+  std::vector<std::pair<unsigned, bool>> byval_blks; /// <bid, is_const>
   AliasSet escaped_local_blks;
 
   bool hasEscapedLocals() const {
@@ -241,7 +241,7 @@ public:
   static void resetGlobals();
   void syncWithSrc(const Memory &src);
 
-  void markByVal(unsigned bid);
+  void markByVal(unsigned bid, bool is_const);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 
@@ -288,7 +288,7 @@ public:
   // In this case, it is caller's responsibility to give a unique bid.
   // The newly assigned bid is stored to bid_out if bid_out != nullptr.
   // Returns <pointer if allocated, allocated?>
-  std::pair<smt::expr, smt::expr> alloc(const smt::expr &size, uint64_t align,
+  std::pair<smt::expr, smt::expr> alloc(const smt::expr *size, uint64_t align,
       BlockKind blockKind, const smt::expr &precond = true,
       const smt::expr &nonnull = false,
       std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);
@@ -345,6 +345,8 @@ public:
   static void printAliasStats(std::ostream &os) {
     AliasSet::printStats(os);
   }
+
+  State& getState() const { return *state; }
 
   void print(std::ostream &os, const smt::Model &m) const;
   friend std::ostream& operator<<(std::ostream &os, const Memory &m);

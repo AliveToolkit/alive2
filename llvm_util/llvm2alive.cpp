@@ -111,6 +111,7 @@ string_view s(llvm::StringRef str) {
 
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
+  Function *alive_fn;
   llvm::Function &f;
   const llvm::TargetLibraryInfo &TLI;
   /// True if converting a source function, false when converting a target
@@ -306,15 +307,36 @@ public:
       args.emplace_back(a);
     }
 
+    auto fn = i.getCalledFunction();
     FnAttrs attrs;
     vector<ParamAttrs> param_attrs;
 
-    parse_fn_attrs(i, attrs);
+    parse_fn_attrs(i, attrs, true);
 
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
       if (op->hasNoNaNs())
         attrs.set(FnAttrs::NNaN);
     }
+
+    // record fn decl in case there are indirect calls to this function
+    // elsewhere
+    if (fn) {
+      Function::FnDecl decl;
+      decl.name   = '@' + fn->getName().str();
+      decl.output = llvm_type2alive(fn->getReturnType());
+      decl.attrs  = attrs;
+
+      auto attrs_fndef = fn->getAttributes();
+      for (uint64_t idx = 0, nargs = fn->arg_size(); idx < nargs; ++idx) {
+        unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
+        ParamAttrs pattr;
+        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, true);
+        decl.inputs.emplace_back(&args[idx]->getType(), std::move(pattr));
+      }
+      alive_fn->addFnDecl(std::move(decl));
+    }
+
+    parse_fn_attrs(i, attrs);
 
     if (!approx) {
       auto [known, approx0]
@@ -329,7 +351,7 @@ public:
       return error(i);
 
     unique_ptr<FnCall> call;
-    auto fn = i.getCalledFunction();
+    Value *fnptr = nullptr;
 
     if (auto *iasm = dyn_cast<llvm::InlineAsm>(i.getCalledOperand())) {
       assert(!approx);
@@ -339,20 +361,20 @@ public:
                                     iasm->getConstraintString(),
                                     std::move(attrs));
     } else {
-      if (!fn) // TODO: support indirect calls
-        return error(i);
-
-      if (fn->getName().substr(0, 15) == "__llvm_profile_")
+      if (!fn) {
+        if (!(fnptr = get_operand(i.getCalledOperand())))
+          return error(i);
+      } else if (fn->getName().starts_with("__llvm_profile_"))
         return NOP(i);
+
+      call = make_unique<FnCall>(*ty, value_name(i),
+                                 fn ? '@' + fn->getName().str() : string(),
+                                 std::move(attrs), fnptr);
     }
 
-    llvm::AttributeList attrs_callsite = i.getAttributes();
-    llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
-                                         : llvm::AttributeList();
+    auto attrs_callsite = i.getAttributes();
+    auto attrs_fndef = fn ? fn->getAttributes() : llvm::AttributeList();
 
-    if (fn)
-      call = make_unique<FnCall>(*ty, value_name(i),
-                                 '@' + fn->getName().str(), std::move(attrs));
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
@@ -373,36 +395,10 @@ public:
           // padding
           return errorAttr(i.getAttributeAtIndex(argidx, llvm::Attribute::NoUndef));
       }
-
-      if (i.paramHasAttr(argidx, llvm::Attribute::Returned)) {
-        auto call2
-          = make_unique<FnCall>(Type::voidTy, "", string(call->getFnName()),
-                                FnAttrs(call->getAttributes()));
-        for (auto &[arg, flags] : call->getArgs()) {
-          call2->addArg(*arg, ParamAttrs(flags));
-        }
-        call = std::move(call2);
-
-        // fn may have different type than argument. LLVM assumes there's
-        // an implicit bitcast
-        assert(!ret_val);
-        if (i.getArgOperand(argidx)->getType() == i.getType())
-          ret_val = make_unique<UnaryOp>(*ty, value_name(i), *arg,
-                                          UnaryOp::Copy);
-        else
-          ret_val = make_unique<ConversionOp>(*ty, value_name(i), *arg,
-                                              ConversionOp::BitCast);
-      }
-
       call->addArg(*arg, std::move(pattr));
     }
 
     call->setApproximated(approx);
-
-    if (ret_val) {
-      BB->addInstr(std::move(call));
-      RETURN_IDENTIFIER(std::move(ret_val));
-    }
     RETURN_IDENTIFIER(std::move(call));
   }
 
@@ -1128,6 +1124,7 @@ public:
       parse_fn_attrs(i, attrs);
       attrs.set(FnAttrs::NoReturn);
       attrs.set(FnAttrs::NoThrow);
+      attrs.mem.canOnlyWrite(MemoryAccess::Inaccessible);
       return make_unique<FnCall>(Type::voidTy, "", "#trap", std::move(attrs));
     }
     case llvm::Intrinsic::vastart: {
@@ -1534,7 +1531,8 @@ public:
     return attrs;
   }
 
-  void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs) {
+  void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs,
+                      bool decl_only = false) {
     auto fn = i.getCalledFunction();
     llvm::AttributeList attrs_callsite = i.getAttributes();
     llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
@@ -1542,9 +1540,11 @@ public:
     auto ret = llvm::AttributeList::ReturnIndex;
     auto fnidx = llvm::AttributeList::FunctionIndex;
 
-    handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
+    if (!decl_only) {
+      handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
+      handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
+    }
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
-    handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
     attrs.mem = handleMemAttrs(i.getMemoryEffects());
     if (fn)
@@ -1574,6 +1574,8 @@ public:
                 DL().getIndexSizeInBits(0), DL().isLittleEndian(),
                 f.isVarArg());
     reset_state(Fn);
+
+    alive_fn = &Fn;
 
     auto &attrs = Fn.getFnAttrs();
     vector<ParamAttrs> param_attrs;
@@ -1721,7 +1723,7 @@ public:
       if (!GV)
         continue;
       auto gv = getGlobalVariable(GV->getName().substr(1));
-      if (!gv->isConstant() || !gv->hasDefinitiveInitializer())
+      if (!gv || !gv->isConstant() || !gv->hasDefinitiveInitializer())
         continue;
 
       auto storedval = get_operand(gv->getInitializer());

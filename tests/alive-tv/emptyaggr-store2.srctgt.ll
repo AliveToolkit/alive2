@@ -1,11 +1,10 @@
 ; Show that storing {} is a nop
 
-define void @src(i8* noundef %p) {
+define void @src(ptr noundef %p) {
   ret void
 }
 
-define void @tgt(i8* noundef %p) {
-  %p2 = bitcast i8* %p to {}*
-  store {} {}, {}* %p2
+define void @tgt(ptr noundef %p) {
+  store {} {}, ptr %p
   ret void
 }

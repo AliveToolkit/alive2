@@ -200,9 +200,15 @@ const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   domain.noreturn = true;
   auto val = v.toSMT(*this);
-  ENSURE(values_map.try_emplace(&v, (unsigned)values.size()).second);
-  values.emplace_back(&v, ValTy{std::move(val), domain.noreturn, domain.UB(),
-                                std::move(undef_vars)});
+
+  auto value_ub = domain.UB();
+  if (config::disallow_ub_exploitation)
+    value_ub &= !guardable_ub();
+
+  auto [I, inserted]
+    = values.try_emplace(&v, ValTy{std::move(val), domain.noreturn,
+                                   std::move(value_ub), std::move(undef_vars)});
+  assert(inserted);
   analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
@@ -210,7 +216,7 @@ const State::ValTy& State::exec(const Value &v) {
     tmp_values[--i_tmp_values] = StateValue();
   }
 
-  return get<1>(values.back());
+  return I->second;
 }
 
 static expr eq_except_padding(const Memory &m, const Type &ty, const expr &e1,
@@ -312,9 +318,9 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
 
   auto mark_notundef = [&](const expr &var) {
     auto name = var.fn_name();
-    for (auto &v : values_map) {
-      if (v.first->getName() == name) {
-        analysis.non_undef_vals.emplace(v.first, var);
+    for (auto &[v, _val] : values) {
+      if (v->getName() == name) {
+        analysis.non_undef_vals.emplace(v, var);
         return;
       }
     }
@@ -440,8 +446,7 @@ void State::check_enough_tmp_slots() {
 }
 
 const StateValue& State::eval(const Value &val, bool quantify_nondet) {
-  auto &[var, val_uvars] = values[values_map.at(&val)];
-  auto &[sval, _retdom, _ub, uvars] = val_uvars;
+  auto &[sval, _retdom, _ub, uvars] = values.at(&val);
 
   auto undef_itr = analysis.non_undef_vals.find(&val);
   bool is_non_undef = undef_itr != analysis.non_undef_vals.end();
@@ -521,7 +526,7 @@ const StateValue& State::eval(const Value &val, bool quantify_nondet) {
 
 const StateValue& State::getAndAddUndefs(const Value &val) {
   auto &v = (*this)[val];
-  for (auto uvar: at(val).undef_vars)
+  for (auto uvar: at(val)->undef_vars)
     addQuantVar(std::move(uvar));
   return v;
 }
@@ -605,8 +610,9 @@ const expr& State::getWellDefinedPtr(const Value &val) {
   return getAndAddPoisonUB(val, true, true).value;
 }
 
-const State::ValTy& State::at(const Value &val) const {
-  return get<1>(values[values_map.at(&val)]);
+const State::ValTy* State::at(const Value &val) const {
+  auto I = values.find(&val);
+  return I == values.end() ? nullptr : &I->second;
 }
 
 const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
@@ -617,6 +623,18 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
 
 bool State::isUndef(const expr &e) const {
   return undef_vars.count(e) != 0;
+}
+
+void State::cleanup(const Value &val) {
+  values.erase(&val);
+  seen_bbs.clear();
+  analysis.unused_vars.clear();
+  analysis.non_poison_vals.clear();
+  analysis.non_undef_vals.clear();
+}
+
+void State::cleanupPredecessorData() {
+  predecessor_data.clear();
 }
 
 bool State::startBB(const BasicBlock &bb) {
@@ -730,32 +748,25 @@ void State::addUB(pair<AndExpr, expr> &&ub) {
 }
 
 void State::addUB(expr &&ub) {
-  bool isconst = ub.isConst();
-  domain.UB.add(std::move(ub));
-  if (!isconst)
+  if (!ub.isConst())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ub));
 }
 
 void State::addUB(AndExpr &&ubs) {
-  bool isconst = ubs.isTrue();
-  domain.UB.add(std::move(ubs));
-  if (!isconst)
+  if (!ubs.isTrue())
     domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+  domain.UB.add(std::move(ubs));
 }
 
 void State::addGuardableUB(expr &&ub) {
   if (config::disallow_ub_exploitation) {
-    bool isconst = ub.isConst();
-    guardable_ub.add(domain.path.implies(ub));
-    if (!isconst)
+    if (!ub.isConst())
       domain.undef_vars.insert(undef_vars.begin(), undef_vars.end());
+    guardable_ub.add(domain.path && !ub);
   } else {
     addUB(std::move(ub));
   }
-}
-
-void State::addUnreachable() {
-  unreachable_paths.add(domain());
 }
 
 void State::addNoReturn(const expr &cond) {
@@ -769,6 +780,10 @@ void State::addNoReturn(const expr &cond) {
   if (cond.isTrue())
     undef_vars.clear();
   addUB(!cond);
+}
+
+void State::addUnreachable() {
+  unreachable_paths.add(domain());
 }
 
 expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
@@ -859,6 +874,14 @@ expr State::FnCallInput::refinedBy(
   return refines();
 }
 
+State::FnCallOutput
+State::FnCallOutput::replace(const optional<StateValue> &retval) const {
+  FnCallOutput copy = *this;
+  assert(retvals.size() == 1);
+  copy.retvals[0] = *retval;
+  return copy;
+}
+
 State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
                                               const FnCallOutput &a,
                                               const FnCallOutput &b) {
@@ -867,6 +890,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   ret.noreturns = expr::mkIf(cond, a.noreturns, b.noreturns);
   ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
   assert(a.retvals.size() == b.retvals.size());
+  assert(a.ret_data.size() == b.ret_data.size());
   for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
     ret.retvals.emplace_back(
       StateValue::mkIf(cond, a.retvals[i], b.retvals[i]));
@@ -889,11 +913,19 @@ expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
 vector<StateValue>
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
-                 const vector<Type*> &out_types, const FnAttrs &attrs) {
-  bool noret = attrs.has(FnAttrs::NoReturn);
+                 const vector<Type*> &out_types, optional<StateValue> &&ret_arg,
+                 vector<StateValue> &&ret_args, const FnAttrs &attrs) {
+  bool noret   = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
   bool noalias = attrs.has(FnAttrs::NoAlias);
+  bool is_indirect = name.starts_with("#indirect_call");
+
+  expr fn_ptr;
+  if (is_indirect) {
+    assert(inputs.size() >= 1);
+    fn_ptr = inputs[0].value;
+  }
 
   assert(!noret || !willret);
 
@@ -957,12 +989,46 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       vector<Memory::FnRetData> ret_data;
       string valname = name + "#val";
       string npname = name + "#np";
-      for (auto t : out_types) {
-        auto [val, data] = mk_val(*t, valname);
-        values.emplace_back(
-          std::move(val),
-          noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
-        ret_data.emplace_back(std::move(data));
+      if (ret_arg) {
+        assert(out_types.size() == 1);
+        values.emplace_back(std::move(ret_arg).value());
+        ret_data.emplace_back();
+      } else {
+        for (auto t : out_types) {
+          auto [val, data] = mk_val(*t, valname);
+          values.emplace_back(
+            std::move(val),
+            noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
+          ret_data.emplace_back(std::move(data));
+        }
+      }
+
+      // Indirect calls may be changed into direct in tgt
+      // Account for this if we have declarations with a returned argument
+      // to limit the behavior of the SMT var.
+      if (is_indirect) {
+        for (auto &decl : getFn().getFnDecls()) {
+          if (decl.inputs.size() != ret_args.size())
+            continue;
+          unsigned idx = 0;
+          for (auto &[ty, attrs] : decl.inputs) {
+            if (attrs.has(ParamAttrs::Returned)) {
+              auto &ret = ret_args[idx];
+              if (ret.value.isSameTypeOf(values[0].value)) {
+                assert(values.size() == 1);
+                auto gv = getFn().getConstant(string_view(decl.name).substr(1));
+                assert(gv);
+                auto cmp = Pointer(memory, fn_ptr).getAddress() ==
+                           Pointer(memory, (*this)[*gv].value).getAddress();
+                values[0].value = expr::mkIf(cmp, ret.value, values[0].value);
+                values[0].non_poison
+                  = expr::mkIf(cmp, ret.non_poison, values[0].non_poison);
+              }
+              break;
+            }
+            ++idx;
+          }
+        }
       }
 
       I->second
@@ -1001,7 +1067,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto refined = in.refinedBy(*this, name, inaccessible_bid, inputs,
                                   ptr_inputs, call_ranges, memory, attrs.mem,
                                   noret, willret);
-      data.add(out, std::move(refined));
+      data.add(ret_arg ? out.replace(ret_arg) : out, std::move(refined));
     }
 
     if (data) {

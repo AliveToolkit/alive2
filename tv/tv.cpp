@@ -475,6 +475,7 @@ const char* unsupported_pass_list[] = {
   "ArgumentPromotionPass",
   "AttributorCGSCCPass",
   "AttributorPass",
+  "CalledValuePropagationPass",
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",

@@ -11,5 +11,3 @@ define void @tgt(ptr %ptr) {
 }
 
 declare void @llvm.trap()
-
-; ERROR: Source is more defined than target

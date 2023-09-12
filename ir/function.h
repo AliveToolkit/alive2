@@ -29,7 +29,8 @@ class BasicBlock final {
   std::vector<std::unique_ptr<Instr>> m_instrs;
 
   // If the basic block is a header, this holds all exit blocks of its loop
-    std::unordered_set<BasicBlock*> exit_blocks; 
+  // TODO: remove this..
+  std::unordered_set<BasicBlock*> exit_blocks;
 
 public:
   BasicBlock(std::string_view name) : name(name) {}
@@ -90,8 +91,19 @@ class Function final {
 
   FnAttrs attrs;
 
+  // TODO: Move this to a 'program' class
 public:
-  Function() {}
+  struct FnDecl {
+    std::string name;
+    std::vector<std::pair<Type*, ParamAttrs>> inputs;
+    Type *output;
+    FnAttrs attrs;
+  };
+private:
+  std::vector<FnDecl> fn_decls;
+
+public:
+  Function() = default;
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
            unsigned bits_ptr_offset = 64, bool little_endian = true,
            bool is_var_args = false)
@@ -128,6 +140,7 @@ public:
   }
   unsigned numConstants() const { return constants.size(); }
   Value &getConstant(int idx) const { return *constants[idx]; }
+  Value* getConstant(std::string_view name) const;
 
   std::vector<GlobalVariable *> getGlobalVars() const;
   std::vector<std::string_view> getGlobalVarNames() const;
@@ -156,7 +169,7 @@ public:
   bool isLittleEndian() const { return little_endian; }
   bool isVarArgs() const { return is_var_args; }
 
-  void syncDataWithSrc(const Function &src);
+  void syncDataWithSrc(Function &src);
 
   auto& getBBs() { return BB_order; }
   const auto& getBBs() const { return BB_order; }
@@ -183,6 +196,9 @@ public:
   };
   instr_helper instrs() { return *this; }
   instr_helper instrs() const { return *this; }
+
+  void addFnDecl(FnDecl &&decl);
+  auto& getFnDecls() const { return fn_decls; }
 
   using UsersTy = std::unordered_map<const Value*,
                                      std::set<std::pair<Value*, BasicBlock*>>>;

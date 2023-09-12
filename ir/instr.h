@@ -1016,6 +1016,7 @@ public:
 class FnCall : public MemInstr {
 private:
   std::string fnName;
+  Value *fnptr;
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
   bool approx = false;
@@ -1024,9 +1025,7 @@ private:
 
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None)
-    : MemInstr(type, std::move(name)), fnName(std::move(fnName)),
-      attrs(std::move(attrs)) {}
+         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr);
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   const auto& getArgs() const { return args; }

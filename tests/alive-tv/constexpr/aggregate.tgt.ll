@@ -1,7 +1,6 @@
 @a = constant i32 0
-@x = constant { i8*, i8* } { i8* bitcast (i32* @a to i8*), i8* bitcast (i32* @a to i8*) }
+@x = constant { ptr, ptr } { ptr @a , ptr @a }
 
-define i8* @f() {
-  ret i8* bitcast (i32* @a to i8*)
+define ptr @f() {
+  ret ptr @a
 }
-

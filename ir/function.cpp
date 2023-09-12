@@ -197,6 +197,14 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(std::move(c));
 }
 
+Value* Function::getConstant(string_view name) const {
+  for (auto &c : constants) {
+    if (c->getName() == name)
+      return c.get();
+  }
+  return nullptr;
+}
+
 vector<GlobalVariable *> Function::getGlobalVars() const {
   vector<GlobalVariable *> gvs;
   for (auto I = constants.begin(), E = constants.end(); I != E; ++I) {
@@ -244,7 +252,7 @@ bool Function::hasReturn() const {
   return false;
 }
 
-void Function::syncDataWithSrc(const Function &src) {
+void Function::syncDataWithSrc(Function &src) {
   auto IS = src.inputs.begin(), ES = src.inputs.end();
   auto IT = inputs.begin(), ET = inputs.end();
 
@@ -259,6 +267,21 @@ void Function::syncDataWithSrc(const Function &src) {
   if (IS != ES || IT != ET)
     throw AliveException("Source and target have different number of args",
                          false);
+
+  // copy function decls that are called indirectly
+  auto copy_fns = [](const auto &src, auto &dst) {
+    for (auto &c : src.getConstants()) {
+      auto *gv = dynamic_cast<const GlobalVariable*>(&c);
+      if (gv && gv->isArbitrarySize() && !dst.getConstant(gv->getName()))
+        dst.addConstant(make_unique<GlobalVariable>(*gv));
+    }
+  };
+  copy_fns(src, *this);
+  copy_fns(*this, src);
+
+  for (auto &decl : fn_decls) {
+    src.addFnDecl(FnDecl(decl));
+  }
 }
 
 Function::instr_iterator::
@@ -292,6 +315,13 @@ static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
     }
   }
   users[val].emplace(i, bb);
+}
+
+void Function::addFnDecl(FnDecl &&decl) {
+  if (find_if(fn_decls.begin(), fn_decls.end(),
+      [&](auto &d) { return d.name == decl.name; }) != fn_decls.end())
+    return;
+  fn_decls.emplace_back(std::move(decl));
 }
 
 Function::UsersTy Function::getUsers() const {
@@ -779,6 +809,21 @@ void Function::unroll(unsigned k) {
 }
 
 void Function::print(ostream &os, bool print_header) const {
+  if (!fn_decls.empty()) {
+    for (auto &decl : fn_decls) {
+      os << "declare " << *decl.output << ' ' << decl.name << '(';
+      bool first = true;
+      for (auto &input : decl.inputs) {
+        if (!first)
+          os << ", ";
+        os << input.second << *input.first;
+        first = false;
+      }
+      os << ")\n";
+    }
+    os << '\n';
+  }
+
   {
     const auto &gvars = getGlobalVars();
     if (!gvars.empty()) {

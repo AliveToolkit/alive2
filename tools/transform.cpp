@@ -100,8 +100,9 @@ void tools::print_model_val(ostream &os, const State &st, const Model &m,
 using print_var_val_ty = function<void(ostream&, const Model&)>;
 
 static bool error(Errors &errs, const State &src_state, const State &tgt_state,
-                  const Result &r, const Value *var, const char *msg,
-                  bool check_each_var, print_var_val_ty print_var_val) {
+                  const Result &r, Solver &solver, const Value *var,
+                  const char *msg, bool check_each_var,
+                  print_var_val_ty print_var_val) {
 
   if (r.isInvalid()) {
     errs.add("Invalid expr", false);
@@ -126,16 +127,16 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
   stringstream s;
   string empty;
   auto &var_name = var ? var->getName() : empty;
-  auto &m = r.getModel();
 
   {
     // filter out approximations that don't contribute to the bug
     // i.e., they don't show up in the SMT model
+    auto &m = r.getModel();
     set<string> approx;
     for (auto *v : { &src_state.getApproximations(),
                      &tgt_state.getApproximations() }) {
       for (auto &[msg, var] : *v) {
-        if (!var || m.hasFnModel(*var))
+        if (!var || m.hasFnModel(*var) || var->isConst())
           approx.emplace(msg);
       }
     }
@@ -153,17 +154,78 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
     }
   }
 
+  // minimize the model
+  optional<Result> newr;
+
+  auto try_reduce = [&](const expr &e) {
+    bool ok = false;
+    {
+      SolverPush push(solver);
+      solver.add(e);
+      auto tmpr = solver.check();
+      if (tmpr.isSat()) {
+        ok   = true;
+        newr = std::move(tmpr);
+      }
+    }
+    //if (ok) cout << "SIMPL: " << e << '\n';
+    if (ok)
+      solver.add(e);
+    return ok;
+  };
+
+  function<void(const expr&)> reduce = [&](const expr &var) {
+    if (var.isBV()) {
+      if (!try_reduce(var == 0)) {
+        auto bw = var.bits();
+        if (bw > 4 && try_reduce(var.ule(0xf)))
+          return;
+        if (bw > 8 && try_reduce(var.ule(0xff)))
+          return;
+
+        // this *may* be a pointer
+        if (bw == Pointer::totalBits()) {
+          Pointer p(src_state.getMemory(), var);
+          reduce(p.getOffset());
+        }
+      }
+    } else if (var.isFloat()) {
+      if (!try_reduce(var.foeq(expr::mkFloat(0.0, var)))) {
+        try_reduce(!var.isNaN());
+        try_reduce(!var.isInf());
+        try_reduce(var.fole(expr::mkFloat(3.0, var)));
+        try_reduce(var.foge(expr::mkFloat(-3.0, var)));
+      }
+    } else if (var.isBool()) {
+      try_reduce(var);
+    }
+  };
+
+  for (const auto &[var, value] : r.getModel()) {
+    reduce(var);
+  }
+
+  // reduce functions. They are a map inputs -> output + else clause
+  // We ignore the else clause as it's not easy to do something with it.
+  for (const auto &[fn, interp] : r.getModel().getFns()) {
+    for (const auto &[var, value] : interp) {
+      reduce(var);
+    }
+  }
+
+  // now reduce memory-related stuff, like addresses and block sizes
+
+  auto &m = (newr ? &*newr : &r)->getModel();
+
   s << msg;
   if (!var_name.empty())
     s << " for " << *var;
   s << "\n\nExample:\n";
 
-  for (auto &[var, val] : src_state.getValues()) {
-    if (!dynamic_cast<const Input*>(var) &&
-        !dynamic_cast<const ConstantInput*>(var))
-      continue;
-    s << *var << " = ";
-    print_model_val(s, src_state, m, var, var->getType(), val.val);
+  for (auto &var: src_state.getFn().getInputs()) {
+    s << var << " = ";
+    print_model_val(s, src_state, m, &var, var.getType(),
+                    src_state.at(var)->val);
     s << '\n';
   }
 
@@ -179,7 +241,13 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
 
     auto *bb = &st->getFn().getFirstBB();
 
-    for (auto &[var, val] : st->getValues()) {
+    for (auto &var0 : st->getFn().instrs()) {
+      auto *var  = &var0;
+      auto *val0 = st->at(var0);
+      if (!val0)
+        continue;
+
+      auto &val = *val0;
       auto &name = var->getName();
       if (name == var_name)
         break;
@@ -214,7 +282,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
           break;
         } else if (m.eval(val.domain).isFalse()) {
           s << "Function " << call->getFnName() << " triggered UB\n";
-          continue;
+          break;
         } else if (var->isVoid()) {
           s << "Function " << call->getFnName() << " returned\n";
           continue;
@@ -222,7 +290,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       }
 
       if (!dynamic_cast<const Return*>(var) && // domain always false after exec
-          !m.eval(val.domain).isTrue()) {
+          m.eval(val.domain).isFalse()) {
         s << *var << " = UB triggered!\n";
         break;
       }
@@ -501,10 +569,13 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   };
 
   auto check = [&](expr &&e, auto &&printer, const char *msg) {
-    e = mk_fml(std::move(e));
-    auto res = check_expr(e);
+    Solver s;
+    s.add(mk_fml(std::move(e)));
+    e = expr();
+    auto res = s.check();
+
     if (!res.isUnsat() &&
-        !error(errs, src_state, tgt_state, res, var, msg, check_each_var,
+        !error(errs, src_state, tgt_state, res, s, var, msg, check_each_var,
                printer))
       return false;
     return true;
@@ -518,21 +589,21 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     if (!null_is_dereferenceable)
       errs.add("Null is not dereferenceable", false);
 
-    CHECK(!src_state.getGuardableUB(), [](ostream&, const Model&){},
-          "Source has guardable UB");
-    CHECK(!tgt_state.getGuardableUB(), [](ostream&, const Model&){},
-          "Target has guardable UB");
+    CHECK(retdom_a && src_state.getGuardableUB(),
+          [](ostream&, const Model&){}, "Source has guardable UB");
+    CHECK(retdom_a && retdom_b && tgt_state.getGuardableUB(),
+          [](ostream&, const Model&){}, "Target has guardable UB");
+
+    // disallow reaching unreachable instructions
+    CHECK(src_state.getUnreachable()(),
+          [](ostream&, const Model&){}, "Source has reachable unreachable");
+    CHECK(tgt_state.getUnreachable()(),
+          [](ostream&, const Model&){}, "Target has reachable unreachable");
   }
 
   // 1. Check UB
   CHECK(fndom_a.notImplies(fndom_b),
         [](ostream&, const Model&){}, "Source is more defined than target");
-
-  if (config::disallow_ub_exploitation) {
-    // disallow refinement by unreachable
-    CHECK(tgt_state.getUnreachable()().notImplies(src_state.getUnreachable()()),
-          [](ostream&, const Model&){}, "Target introduces unreachable BB");
-  }
 
   // 2. Check return domain (noreturn check)
   {
@@ -543,8 +614,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       dom_constr = (fndom_a && fndom_b) && retdom_a != retdom_b;
     }
 
-    CHECK(std::move(dom_constr),
-          [](ostream&, const Model&){},
+    CHECK(std::move(dom_constr), [](ostream&, const Model&){},
           "Source and target don't have the same return domain");
   }
 
@@ -827,8 +897,6 @@ static void calculateAndInitConstants(Transform &t) {
   num_globals_src = globals_src.size();
   unsigned num_globals = num_globals_src;
   uint64_t glb_alloc_aligned_size = 0;
-
-  heap_block_alignment = 8;
 
   num_consts_src = 0;
 
@@ -1262,14 +1330,15 @@ Errors TransformVerify::verify() const {
     auto [src_state, tgt_state] = exec();
 
     if (check_each_var) {
-      for (auto &[var, val] : src_state->getValues()) {
-        auto &name = var->getName();
-        if (name[0] != '%' || !dynamic_cast<const Instr*>(var))
+      for (auto &var : src_state->getFn().instrs()) {
+        auto &name = var.getName();
+        auto *val  = src_state->at(var);
+        if (name[0] != '%' || !val)
           continue;
 
-        auto &val_tgt = tgt_state->at(*tgt_instrs.at(name));
-        check_refinement(errs, t, *src_state, *tgt_state, var, var->getType(),
-                         val, val_tgt, check_each_var);
+        auto *val_tgt = tgt_state->at(*tgt_instrs.at(name));
+        check_refinement(errs, t, *src_state, *tgt_state, &var, var.getType(),
+                         *val, *val_tgt, check_each_var);
         if (errs)
           return errs;
       }

@@ -1,6 +1,6 @@
-define i8 @f(i8* %p) {
-  %b = call i8 @g(i8* %p)
+define i8 @f(ptr %p) {
+  %b = call i8 @g(ptr %p)
   ret i8 %b
 }
 
-declare i8 @g(i8*)
+declare i8 @g(ptr)

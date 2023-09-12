@@ -126,6 +126,7 @@ public:
   unsigned bits() const;
   bool isUInt(uint64_t &n) const;
   bool isInt(int64_t &n) const;
+  bool isSameTypeOf(const expr &other) const;
 
   bool isEq(expr &lhs, expr &rhs) const;
   bool isSLE(expr &lhs, expr &rhs) const;
@@ -200,6 +201,7 @@ public:
   expr ashr_exact(const expr &rhs) const;
   expr lshr_exact(const expr &rhs) const;
 
+  expr isPowerOf2() const;
   expr log2(unsigned bw_output) const;
   expr bswap() const;
   expr bitreverse() const;
@@ -232,6 +234,7 @@ public:
   expr fsub(const expr &rhs, const expr &rm) const;
   expr fmul(const expr &rhs, const expr &rm) const;
   expr fdiv(const expr &rhs, const expr &rm) const;
+  expr frem(const expr &rhs) const;
   expr fabs() const;
   expr fneg() const;
   expr copysign(const expr &sign) const;
@@ -380,6 +383,7 @@ public:
   static bool allValid() { return true; }
 
   friend class Solver;
+  friend class FnModel;
   friend class Model;
 };
 

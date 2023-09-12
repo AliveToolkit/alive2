@@ -132,7 +132,7 @@ public:
 
   uint64_t derefBytes = 0;       // Dereferenceable
   uint64_t derefOrNullBytes = 0; // DereferenceableOrNull
-  uint64_t align = 0;
+  uint64_t align = 1;
 
   unsigned allocsize_0 = 0;      // AllocSize
   unsigned allocsize_1 = -1u;    // AllocSize

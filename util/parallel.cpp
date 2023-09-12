@@ -7,7 +7,6 @@
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <sys/wait.h>
@@ -213,12 +212,9 @@ void parallel::finishParent() {
 bool parallel::emitOutput() {
   ensureParent();
   std::string line;
-  std::regex rgx("^include\\(([0-9]+)\\)$");
   while (getline(parent_ss, line)) {
-    std::smatch sm;
-    if (std::regex_match(line, sm, rgx)) {
-      assert(sm.size() == 2);
-      int index = std::stoi(*std::next(sm.begin()));
+    if (line.starts_with("include(")) {
+      int index = std::stoi(line.substr(sizeof("include(") - 1));
       if (children[index].eof) {
         out_file << std::move(children[index].output).str();
         stringstream().swap(children[index].output); // free the RAM
@@ -235,11 +231,10 @@ bool parallel::emitOutput() {
         new_ss << line << '\n';
         auto cur = parent_ss.tellg();
         new_ss << std::move(parent_ss).str().substr(cur);
-        parent_ss.swap(new_ss);
+        parent_ss = std::move(new_ss);
         return false;
       }
     } else {
-      assert(line.rfind("include(", 0) == std::string::npos);
       out_file << line << '\n';
     }
   }
