@@ -175,7 +175,7 @@ private:
   };
 
   struct FnCallOutput {
-    std::vector<StateValue> retvals;
+    StateValue retval;
     smt::expr ub;
     smt::expr noreturns;
     Memory::CallState callstate;
@@ -248,10 +248,10 @@ public:
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
 
-  std::vector<StateValue>
+  StateValue
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
-              const std::vector<Type*> &out_types,
+              const Type &out_type,
               std::optional<StateValue> &&ret_arg,
               std::vector<StateValue> &&ret_args, const FnAttrs &attrs);
 

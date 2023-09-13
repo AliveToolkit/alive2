@@ -2327,17 +2327,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   unpack(std::move(value2));
 }
 
-static void unpack_ret_ty(vector<Type*> &out_types, Type &ty) {
-  if (auto agg = ty.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (!agg->isPadding(i))
-        unpack_ret_ty(out_types, agg->getChild(i));
-    }
-  } else {
-    out_types.emplace_back(&ty);
-  }
-}
-
 static StateValue
 check_return_value(State &s, StateValue &&val, const Type &ty,
                    const FnAttrs &attrs,
@@ -2348,19 +2337,19 @@ check_return_value(State &s, StateValue &&val, const Type &ty,
 }
 
 static StateValue
-pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
-            unsigned &idx, const vector<pair<Value*, ParamAttrs>> &args) {
+pack_return(State &s, Type &ty, StateValue &&val, const FnAttrs &attrs,
+            const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (!agg->isPadding(i))
         vs.emplace_back(
-          pack_return(s, agg->getChild(i), vals, attrs, idx, args));
+          pack_return(s, agg->getChild(i), agg->extract(val, i), attrs, args));
     }
     return agg->aggregateVals(vs);
   }
 
-  return check_return_value(s, std::move(vals[idx++]), ty, attrs, args);
+  return check_return_value(s, std::move(val), ty, attrs, args);
 }
 
 StateValue FnCall::toSMT(State &s) const {
@@ -2371,7 +2360,6 @@ StateValue FnCall::toSMT(State &s) const {
 
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
-  vector<Type*> out_types;
 
   auto ptr = fnptr;
   // This is a direct call, but check if there are indirect calls elsewhere
@@ -2418,8 +2406,6 @@ StateValue FnCall::toSMT(State &s) const {
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
-  if (!isVoid())
-    unpack_ret_ty(out_types, getType());
 
   // Callee must return if caller must return
   if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
@@ -2494,13 +2480,12 @@ StateValue FnCall::toSMT(State &s) const {
     return {};
   }
 
-  unsigned idx = 0;
   auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
-                         std::move(ptr_inputs), out_types, std::move(ret_val),
+                         std::move(ptr_inputs), getType(), std::move(ret_val),
                          std::move(ret_vals), attrs);
 
   return isVoid() ? StateValue()
-                  : pack_return(s, getType(), ret, attrs, idx, args);
+                  : pack_return(s, getType(), std::move(ret), attrs, args);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
