@@ -480,6 +480,7 @@ const char* unsupported_pass_list[] = {
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
   "GlobalOptPass",
+  "GlobalSplitPass",
   "HotColdSplittingPass",
   "InferFunctionAttrsPass",
   "InlinerPass",
