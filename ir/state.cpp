@@ -1082,11 +1082,12 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         // no alias functions in tgt must allocate a local block on each call
         // bid may be different from that of src
         unsigned i = 0;
+        auto &ret_data = d.ret_data;
         function<StateValue(const Type &, StateValue &&)> mk_output
           = [&](const Type &ty, StateValue &&val) -> StateValue {
           if (ty.isPtrType()) {
             return { memory.mkFnRet(name.c_str(), ptr_inputs, noalias,
-                                    &d.ret_data[i++]).first,
+                                    &ret_data[i++]).first,
                      std::move(val.non_poison) };
           }
 
