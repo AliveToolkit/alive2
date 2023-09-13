@@ -495,6 +495,7 @@ const char* unsupported_pass_list[] = {
   "PostOrderFunctionAttrsPass",
   "SampleProfileLoaderPass",
   "TailCallElimPass",
+  "ThinLTOBitcodeWriterPass",
 };
 
 const char* nop_pass_prefixes[] {
