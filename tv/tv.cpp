@@ -479,6 +479,7 @@ const char* unsupported_pass_list[] = {
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
+  "GlobalDCEPass",
   "GlobalOptPass",
   "GlobalSplitPass",
   "HotColdSplittingPass",
