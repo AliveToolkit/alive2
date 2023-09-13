@@ -2302,6 +2302,8 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
                           vector<Memory::PtrInput> &ptr_inputs) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (agg->isPadding(i))
+        continue;
       unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
                     agg->extract(value2, i), inputs, ptr_inputs);
     }
@@ -2325,13 +2327,11 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   unpack(std::move(value2));
 }
 
-static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
+static void unpack_ret_ty(vector<Type*> &out_types, Type &ty) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      // Padding is automatically filled with poison
-      if (agg->isPadding(i))
-        continue;
-      unpack_ret_ty(out_types, agg->getChild(i));
+      if (!agg->isPadding(i))
+        unpack_ret_ty(out_types, agg->getChild(i));
     }
   } else {
     out_types.emplace_back(&ty);
