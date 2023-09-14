@@ -786,7 +786,7 @@ void State::addUnreachable() {
   unreachable_paths.add(domain());
 }
 
-expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
+expr State::FnCallInput::implies(const FnCallInput &rhs) const {
   if (memaccess != rhs.memaccess ||
       noret != rhs.noret || willret != rhs.willret ||
       (memaccess.canReadSomething() &&
@@ -795,7 +795,7 @@ expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
 
   AndExpr eq;
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
-    eq.add(args_nonptr[i] == rhs.args_nonptr[i]);
+    eq.add(args_nonptr[i].implies(rhs.args_nonptr[i]));
   }
 
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
@@ -898,11 +898,24 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   return ret;
 }
 
-expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
-  expr ret = retval == rhs.retval;
-  ret     &= ub == rhs.ub;
+expr State::FnCallOutput::implies(const FnCallOutput &rhs,
+                                  const Type &retval_ty) const {
+  expr ret = ub == rhs.ub;
   ret     &= noreturns == rhs.noreturns;
   ret     &= callstate == rhs.callstate;
+
+  function<void(const StateValue&, const StateValue&, const Type&)> check_out
+    = [&](const StateValue &a, const StateValue &b, const Type &ty) -> void {
+    if (auto agg = ty.getAsAggregateType()) {
+      for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+        if (!agg->isPadding(i))
+          check_out(agg->extract(a, i), agg->extract(b, i), agg->getChild(i));
+      }
+      return;
+    }
+    ret &= a.implies(b);
+  };
+  check_out(retval, rhs.retval, retval_ty);
   return ret;
 }
 
@@ -1048,9 +1061,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
         if (II == I)
           continue;
-        auto in_eq = I->first == II->first;
+        auto in_eq = I->first.implies(II->first);
         if (!in_eq.isFalse())
-          fn_call_pre &= in_eq.implies(I->second == II->second);
+          fn_call_pre &= in_eq.implies(I->second.implies(II->second, out_type));
       }
     }
 

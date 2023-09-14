@@ -24,7 +24,9 @@ namespace IR {
 
 VoidType Type::voidTy;
 
-unsigned Type::np_bits() const {
+unsigned Type::np_bits(bool fromInt) const {
+  if (!fromInt)
+    return 1;
   auto bw = bits();
   return min(bw, (unsigned)divide_up(bw * bits_poison_per_byte, bits_byte));
 }
@@ -215,9 +217,7 @@ expr Type::toBV(expr e) const {
 }
 
 StateValue Type::toBV(StateValue v) const {
-  auto bw = np_bits();
-  return { toBV(std::move(v.value)),
-           expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
+  return { toBV(std::move(v.value)), v.non_poison.toBVBool() };
 }
 
 expr Type::fromBV(expr e) const {
@@ -234,7 +234,7 @@ expr Type::toInt(State &s, expr v) const {
 }
 
 StateValue Type::toInt(State &s, StateValue v) const {
-  auto bw = np_bits();
+  auto bw = np_bits(true);
   return { toInt(s, std::move(v.value)),
            expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
@@ -607,7 +607,7 @@ unsigned PtrType::bits() const {
   return Pointer::totalBits();
 }
 
-unsigned PtrType::np_bits() const {
+unsigned PtrType::np_bits(bool fromInt) const {
   return 1;
 }
 
@@ -770,13 +770,12 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
   return v;
 }
 
-StateValue
-AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
-    const {
+StateValue AggregateType::extract(const StateValue &val, unsigned index,
+                                  bool fromInt) const {
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_value += children[i]->bits();
-    total_np += children[i]->np_bits();
+    total_np += children[i]->np_bits(fromInt);
   }
 
   unsigned h_val, l_val, h_np, l_np;
@@ -784,16 +783,16 @@ AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
     h_val = total_value + children[index]->bits() - 1;
     l_val = total_value;
 
-    h_np = total_np + children[index]->np_bits() - 1;
+    h_np = total_np + children[index]->np_bits(fromInt) - 1;
     l_np = total_np;
   } else {
     unsigned high_val = bits() - total_value;
     h_val = high_val - 1;
     l_val = high_val - children[index]->bits();
 
-    unsigned high_np = np_bits() - total_np;
+    unsigned high_np = np_bits(fromInt) - total_np;
     h_np = high_np - 1;
-    l_np = high_np - children[index]->np_bits();
+    l_np = high_np - children[index]->np_bits(fromInt);
   }
 
   StateValue sv(val.value.extract(h_val, l_val),
@@ -814,14 +813,14 @@ unsigned AggregateType::bits() const {
   return bw;
 }
 
-unsigned AggregateType::np_bits() const {
+unsigned AggregateType::np_bits(bool fromInt) const {
   if (elements == 0)
     // It is set as 1 because zero-width bitvector is invalid.
     return 1;
 
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
-    bw += children[i]->np_bits();
+    bw += children[i]->np_bits(fromInt);
   }
   return bw;
 }
@@ -1037,7 +1036,7 @@ StateValue VectorType::extract(const StateValue &vector,
   unsigned h_val = elements * bw_elem - 1;
   unsigned l_val = (elements - 1) * bw_elem;
 
-  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np_elem = elementTy.np_bits(false);
   unsigned bw_np = bw_np_elem * elements;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
   unsigned h_np = elements * bw_np_elem - 1;
@@ -1063,7 +1062,7 @@ StateValue VectorType::update(const StateValue &vector,
   expr mask_v = ~expr::mkInt(-1, bw_elem).concat(fill_v).lshr(idx_v);
   expr nv_shifted = val_bv.value.concat(fill_v).lshr(idx_v);
 
-  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np_elem = elementTy.np_bits(false);
   unsigned bw_np = bw_np_elem * elements;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
   expr fill_np = expr::mkUInt(0, bw_np - bw_np_elem);
@@ -1072,12 +1071,6 @@ StateValue VectorType::update(const StateValue &vector,
 
   return fromBV({ (vector.value & mask_v) | nv_shifted,
                   (vector.non_poison & mask_np) | np_shifted});
-}
-
-unsigned VectorType::np_bits() const {
-  if (getChild(0).isPtrType())
-    return elements;
-  return Type::np_bits();
 }
 
 expr VectorType::getTypeConstraints() const {
@@ -1197,8 +1190,8 @@ unsigned SymbolicType::bits() const {
   DISPATCH(bits(), UNREACHABLE());
 }
 
-unsigned SymbolicType::np_bits() const {
-  DISPATCH(np_bits(), UNREACHABLE());
+unsigned SymbolicType::np_bits(bool fromInt) const {
+  DISPATCH(np_bits(fromInt), UNREACHABLE());
 }
 
 StateValue SymbolicType::getDummyValue(bool non_poison) const {

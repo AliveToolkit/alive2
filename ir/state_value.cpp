@@ -46,8 +46,11 @@ bool StateValue::isValid() const {
 }
 
 expr StateValue::operator==(const StateValue &other) const {
-  return non_poison == other.non_poison &&
-         non_poison.implies(value == other.value);
+  return non_poison == other.non_poison && value == other.value;
+}
+
+expr StateValue::implies(const StateValue &other) const {
+  return non_poison.implies(other.non_poison && value == other.value);
 }
 
 bool StateValue::eq(const StateValue &other) const {

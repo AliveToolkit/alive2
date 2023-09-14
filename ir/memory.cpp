@@ -541,7 +541,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromInt(val.trunc(bitsize, toType.np_bits()));
+    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
   }
 }
 

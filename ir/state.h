@@ -162,7 +162,7 @@ private:
     MemoryAccess memaccess;
     bool noret, willret;
 
-    smt::expr operator==(const FnCallInput &rhs) const;
+    smt::expr implies(const FnCallInput &rhs) const;
     smt::expr refinedBy(State &s, const std::string &callee,
                         unsigned inaccessible_bid,
                         const std::vector<StateValue> &args_nonptr,
@@ -185,7 +185,7 @@ private:
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);
-    smt::expr operator==(const FnCallOutput &rhs) const;
+    smt::expr implies(const FnCallOutput &rhs, const Type &retval_ty) const;
     auto operator<=>(const FnCallOutput &rhs) const = default;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
