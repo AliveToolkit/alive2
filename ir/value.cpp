@@ -241,11 +241,12 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   expr np = expr::mkBoolVar(("np_" + getSMTName(child)).c_str());
-  if (never_poison)
-    s.addUB(np);
+  if (never_poison) {
+    s.addUB(std::move(np));
+    np = true;
+  }
 
-  return { std::move(state_val.value),
-           std::move(state_val.non_poison) && (never_poison ? true : np) };
+  return { std::move(state_val.value), std::move(state_val.non_poison) && np };
 }
 
 bool Input::isUndefMask(const expr &e, const expr &var) {

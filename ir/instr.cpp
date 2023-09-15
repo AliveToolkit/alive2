@@ -1564,10 +1564,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case BitCast:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return to_type.fromInt(std::move(val));
-    };
-    break;
+    UNREACHABLE();
   case Ptr2Int:
     fn = [&](auto &&val, auto &to_type) -> expr {
       return s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits());
@@ -1586,32 +1583,22 @@ StateValue ConversionOp::toSMT(State &s) const {
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
-    v = val->getType().toInt(s, std::move(v));
+    return getType().fromInt(val->getType().toInt(s, std::move(v)));
   }
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto retty = getType().getAsAggregateType();
     auto elems = retty->numElementsConst();
-
-    // bitcast vect elems size may vary, so create a new data type whose
-    // element size is aligned with the output vector elem size
-    IntType elem_ty("int", retty->bits() / elems);
-    VectorType int_ty("vec", elems, elem_ty);
-    auto valty = op == BitCast ? &int_ty : val->getType().getAsAggregateType();
+    auto valty = val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      unsigned idx = (little_endian && op == BitCast) ? elems - i - 1 : i;
-      auto vi = valty->extract(v, idx);
-      vals.emplace_back(fn(std::move(vi.value), retty->getChild(idx)),
+      auto vi = valty->extract(v, i);
+      vals.emplace_back(fn(std::move(vi.value), retty->getChild(i)),
                         std::move(vi.non_poison));
     }
     return retty->aggregateVals(vals);
   }
-
-  // turn poison data into boolean
-  if (op == BitCast)
-    v.non_poison = v.non_poison == expr::mkInt(-1, v.non_poison);
 
   return { fn(std::move(v.value), getType()), std::move(v.non_poison) };
 }
