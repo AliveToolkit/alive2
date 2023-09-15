@@ -121,7 +121,7 @@ public:
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
-                           unsigned byval_bytes) const;
+                           const smt::expr &byval_bytes) const;
 
   const Memory& getMemory() const { return m; }
 

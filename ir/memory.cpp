@@ -1320,17 +1320,15 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
       std::move(undef) };
 }
 
-bool Memory::PtrInput::eq_attrs(const PtrInput &rhs) const {
-  return byval == rhs.byval &&
-         noread == rhs.noread &&
-         nowrite == rhs.nowrite &&
-         nocapture == rhs.nocapture;
+expr Memory::PtrInput::implies(const PtrInput &rhs) const {
+  return implies_attrs(rhs) && val == rhs.val && idx == rhs.idx;
 }
 
-expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
-  if (!eq_attrs(rhs))
-    return false;
-  return val == rhs.val;
+expr Memory::PtrInput::implies_attrs(const PtrInput &rhs) const {
+  return byval == rhs.byval &&
+         rhs.noread   .implies(noread) &&
+         rhs.nowrite  .implies(nowrite) &&
+         rhs.nocapture.implies(nocapture);
 }
 
 Memory::FnRetData Memory::FnRetData::mkIf(const expr &cond, const FnRetData &a,
@@ -1499,11 +1497,10 @@ void Memory::setState(const Memory::CallState &st,
 
       expr modifies(false);
       for (auto &ptr_in : ptr_inputs) {
-        if (ptr_in.nowrite)
-          continue;
-
-        if (!ptr_in.byval && bid < next_nonlocal_bid) {
+        if (bid < next_nonlocal_bid) {
           modifies |= ptr_in.val.non_poison &&
+                      !ptr_in.nowrite &&
+                      ptr_in.byval == 0 &&
                       Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -1541,8 +1538,9 @@ void Memory::setState(const Memory::CallState &st,
       if (!access.canWrite(MemoryAccess::Other)) {
         may_free = false;
         for (auto &ptr_in : ptr_inputs) {
-          if (!ptr_in.byval && bid < next_nonlocal_bid)
+          if (bid < next_nonlocal_bid)
             may_free |= ptr_in.val.non_poison &&
+                        ptr_in.byval == 0 &&
                         Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }

@@ -799,7 +799,7 @@ expr State::FnCallInput::implies(const FnCallInput &rhs) const {
   }
 
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
-    eq.add(args_ptr[i] == rhs.args_ptr[i]);
+    eq.add(args_ptr[i].implies(rhs.args_ptr[i]));
   }
   return eq();
 }
@@ -820,9 +820,7 @@ expr State::FnCallInput::refinedBy(
   AndExpr refines;
   assert(args_nonptr.size() == args_nonptr2.size());
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
-    refines.add(args_nonptr[i].non_poison.implies(
-      args_nonptr[i].value == args_nonptr2[i].value &&
-      args_nonptr2[i].non_poison));
+    refines.add(args_nonptr[i].implies(args_nonptr2[i]));
   }
 
   if (!refines)
@@ -833,13 +831,12 @@ expr State::FnCallInput::refinedBy(
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
     auto &ptr1 = args_ptr[i];
     auto &ptr2 = args_ptr2[i];
-    if (!ptr1.eq_attrs(ptr2))
-      return false;
-
     expr eq_val = Pointer(m, ptr1.val.value)
                     .fninputRefined(Pointer(m2, ptr2.val.value),
                                     undef_vars, ptr2.byval);
-    refines.add(ptr1.val.non_poison.implies(eq_val && ptr2.val.non_poison));
+    refines.add(ptr1.val.non_poison.implies(ptr2.val.non_poison &&
+                                            eq_val &&
+                                            ptr1.implies_attrs(ptr2)));
 
     if (!refines)
       return false;
@@ -855,10 +852,10 @@ expr State::FnCallInput::refinedBy(
     auto restrict_ptrs2 = argmemonly ? &args_ptr2 : nullptr;
     if (memaccess.canOnlyRead(MemoryAccess::Inaccessible)) {
       assert(inaccessible_bid != -1u);
-      dummy1.emplace_back(
+      dummy1.emplace_back(0,
         StateValue(Pointer(m, inaccessible_bid, false).release(), true), 0,
         false, false, false);
-      dummy2.emplace_back(
+      dummy2.emplace_back(0,
         StateValue(Pointer(m2, inaccessible_bid, false).release(), true), 0,
         false, false, false);
       assert(!restrict_ptrs && !restrict_ptrs2);
@@ -952,7 +949,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       attrs.mem.canWrite(MemoryAccess::Inaccessible) ||
       attrs.mem.canWrite(MemoryAccess::Other)) {
     for (auto &v : ptr_inputs) {
-      if (!v.byval && !v.nocapture)
+      if (!v.byval.isTrue() && !v.nocapture.isTrue())
         memory.escapeLocalPtr(v.val.value, v.val.non_poison);
     }
   }
@@ -973,6 +970,36 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                     ? analysis.ranges_fn_calls.project(name)
                     : analysis.ranges_fn_calls;
 
+  auto isgvar = [&](const auto &decl) {
+    auto gv = getFn().getConstant(string_view(decl.name).substr(1));
+    assert(gv);
+    return Pointer(memory, fn_ptr).getAddress() ==
+           Pointer(memory, (*this)[*gv].value).getAddress();
+  };
+
+  if (is_indirect) {
+    // adjust attributes of pointer arguments
+    for (auto &decl : getFn().getFnDecls()) {
+      if (decl.inputs.size() != ret_args.size())
+        continue;
+
+      auto cmp = isgvar(decl);
+      for (auto &ptr : ptr_inputs) {
+        if (decl.inputs.size() != ret_args.size())
+          continue;
+        auto &attrs = decl.inputs[ptr.idx].second;
+        ptr.byval   = expr::mkIf(cmp, expr::mkUInt(attrs.blockSize, 64),
+                                 ptr.byval);
+        if (attrs.has(ParamAttrs::NoRead))
+          ptr.noread |= cmp;
+        if (attrs.has(ParamAttrs::NoWrite))
+          ptr.nowrite |= cmp;
+        if (attrs.has(ParamAttrs::NoCapture))
+          ptr.nocapture |= cmp;
+      }
+    }
+  }
+
   // source may create new fn symbols, target just references src symbols
   if (isSource()) {
     auto &calls_fn = fn_call_data[name];
@@ -987,11 +1014,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     if (inserted) {
       StateValue output;
       vector<Memory::FnRetData> ret_data;
-      string valname = name + "#val";
       string npname = name + "#np";
 
-      auto mk_np = [&](const expr &np) {
-        return noundef ? np : expr::mkFreshVar(npname.c_str(), np);
+      auto mk_np = [&](expr &&np) {
+        return noundef ? std::move(np) : expr::mkFreshVar(npname.c_str(), np);
       };
 
       function<StateValue(const Type &)> mk_output
@@ -1006,7 +1032,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         if (!hasPtr(ty)) {
           auto dummy = ty.getDummyValue(true);
           return { expr::mkFreshVar(name.c_str(), dummy.value),
-                   mk_np(dummy.non_poison) };
+                   mk_np(std::move(dummy.non_poison)) };
         }
 
         assert(ty.isAggregateType());
@@ -1033,11 +1059,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
             if (attrs.has(ParamAttrs::Returned)) {
               auto &ret = ret_args[idx];
               if (ret.value.isSameTypeOf(output.value)) {
-                auto gv = getFn().getConstant(string_view(decl.name).substr(1));
-                assert(gv);
-                auto cmp = Pointer(memory, fn_ptr).getAddress() ==
-                           Pointer(memory, (*this)[*gv].value).getAddress();
-                output = StateValue::mkIf(cmp, ret, output);
+                output = StateValue::mkIf(isgvar(decl), ret, output);
               }
               break;
             }

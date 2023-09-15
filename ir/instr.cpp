@@ -2286,13 +2286,14 @@ static void check_can_store(State &s, const expr &p0) {
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag, StateValue value,
                           StateValue value2, vector<StateValue> &inputs,
-                          vector<Memory::PtrInput> &ptr_inputs) {
+                          vector<Memory::PtrInput> &ptr_inputs,
+                          unsigned idx) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (agg->isPadding(i))
         continue;
       unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
-                    agg->extract(value2, i), inputs, ptr_inputs);
+                    agg->extract(value2, i), inputs, ptr_inputs, idx);
     }
     return;
   }
@@ -2301,8 +2302,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     value = argflag.encode(s, std::move(value), ty);
 
     if (ty.isPtrType()) {
-      ptr_inputs.emplace_back(std::move(value),
-                              argflag.blockSize,
+      ptr_inputs.emplace_back(idx,
+                              std::move(value),
+                              expr::mkUInt(argflag.blockSize, 64),
                               argflag.has(ParamAttrs::NoRead),
                               argflag.has(ParamAttrs::NoWrite),
                               argflag.has(ParamAttrs::NoCapture));
@@ -2367,6 +2369,7 @@ StateValue FnCall::toSMT(State &s) const {
 
   optional<StateValue> ret_val;
   vector<StateValue> ret_vals;
+  unsigned i = 0;
 
   for (auto &[arg, flags] : args) {
     // we duplicate each argument so that undef values are allowed to take
@@ -2389,7 +2392,7 @@ StateValue FnCall::toSMT(State &s) const {
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, std::move(sv), std::move(sv2),
-                  inputs, ptr_inputs);
+                  inputs, ptr_inputs, i);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
@@ -4113,8 +4116,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_dst = s[*dst];
     auto &sv_dst2 = s[*dst];
-    s.addGuardableUB((vbytes != 0).implies(
-              sv_dst.non_poison && sv_dst.value == sv_dst2.value));
+    s.addGuardableUB((vbytes != 0).implies(sv_dst.implies(sv_dst2)));
     vdst = sv_dst.value;
   }
 
@@ -4123,8 +4125,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_src = s[*src];
     auto &sv_src2 = s[*src];
-    s.addGuardableUB((vbytes != 0).implies(
-               sv_src.non_poison && sv_src.value == sv_src2.value));
+    s.addGuardableUB((vbytes != 0).implies(sv_src.implies(sv_src2)));
     vsrc = sv_src.value;
   }
 
