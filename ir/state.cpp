@@ -971,10 +971,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                     : analysis.ranges_fn_calls;
 
   auto isgvar = [&](const auto &decl) {
-    auto gv = getFn().getConstant(string_view(decl.name).substr(1));
-    assert(gv);
-    return Pointer(memory, fn_ptr).getAddress() ==
-           Pointer(memory, (*this)[*gv].value).getAddress();
+    if (auto gv = getFn().getConstant(string_view(decl.name).substr(1)))
+      return Pointer(memory, fn_ptr).getAddress() ==
+             Pointer(memory, (*this)[*gv].value).getAddress();
+    return expr();
   };
 
   if (is_indirect) {
@@ -984,6 +984,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         continue;
 
       auto cmp = isgvar(decl);
+      if (!cmp.isValid())
+        continue;
+
       for (auto &ptr : ptr_inputs) {
         if (decl.inputs.size() != ret_args.size())
           continue;
@@ -1059,7 +1062,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
             if (attrs.has(ParamAttrs::Returned)) {
               auto &ret = ret_args[idx];
               if (ret.value.isSameTypeOf(output.value)) {
-                output = StateValue::mkIf(isgvar(decl), ret, output);
+                auto cmp = isgvar(decl);
+                if (cmp.isValid())
+                  output = StateValue::mkIf(cmp, ret, output);
               }
               break;
             }
