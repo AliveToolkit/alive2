@@ -123,6 +123,8 @@ unsigned Function::FnDecl::hash() const {
   function<void(const Type&)> hash_ty = [&](const Type &ty) {
     if (ty.isPtrType()) {
       hash.add((uint8_t)0x42);
+    } else if (dynamic_cast<const VoidType*>(&ty)) {
+      hash.add((uint8_t)0xEF);
     } else if (auto agg = ty.getAsAggregateType()) {
       hash.add((uint8_t)0x11);
       for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
