@@ -971,7 +971,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                     ? analysis.ranges_fn_calls.project(name)
                     : analysis.ranges_fn_calls;
 
-  if ((*ret_arg_ty == out_type).isFalse()) {
+  if (ret_arg_ty && (*ret_arg_ty == out_type).isFalse()) {
     ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)));
   }
 

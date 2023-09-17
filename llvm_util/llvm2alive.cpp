@@ -328,17 +328,21 @@ public:
     }
     if (fn_decl) {
       Function::FnDecl decl;
-      decl.name   = '@' + fn_decl->getName().str();
-      decl.output = llvm_type2alive(fn_decl->getReturnType());
-      decl.attrs  = attrs;
+      decl.name  = '@' + fn_decl->getName().str();
+      decl.attrs = attrs;
+      if (!(decl.output = llvm_type2alive(fn_decl->getReturnType())))
+        return error(i);
 
       auto attrs_fndef = fn_decl->getAttributes();
       for (uint64_t idx = 0, nargs = fn_decl->arg_size(); idx < nargs; ++idx) {
+        auto ty = llvm_type2alive(fn_decl->getArg(idx)->getType());
+        if (!ty)
+          return error(i);
+
         unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
         ParamAttrs pattr;
         handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, true);
-        decl.inputs.emplace_back(
-          llvm_type2alive(fn_decl->getArg(idx)->getType()), std::move(pattr));
+        decl.inputs.emplace_back(ty, std::move(pattr));
       }
       alive_fn->addFnDecl(std::move(decl));
     }
