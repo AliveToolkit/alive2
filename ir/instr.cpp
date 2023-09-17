@@ -2375,7 +2375,8 @@ StateValue FnCall::toSMT(State &s) const {
     fnName_mangled << fnName;
   }
 
-  optional<StateValue> ret_val;
+  StateValue ret_val;
+  Type *ret_arg_ty = nullptr;
   vector<StateValue> ret_vals;
   unsigned i = 0;
 
@@ -2395,8 +2396,9 @@ StateValue FnCall::toSMT(State &s) const {
       ret_vals.emplace_back(sv);
 
     if (flags.has(ParamAttrs::Returned)) {
-      assert(!ret_val);
-      ret_val = sv;
+      assert(!ret_arg_ty);
+      ret_val    = sv;
+      ret_arg_ty = &arg->getType();
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, std::move(sv), std::move(sv2),
@@ -2480,7 +2482,7 @@ StateValue FnCall::toSMT(State &s) const {
 
   auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
                          std::move(ptr_inputs), getType(), std::move(ret_val),
-                         std::move(ret_vals), attrs);
+                         ret_arg_ty, std::move(ret_vals), attrs);
 
   return isVoid() ? StateValue()
                   : pack_return(s, getType(), std::move(ret), attrs, args);

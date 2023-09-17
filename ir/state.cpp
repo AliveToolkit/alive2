@@ -872,9 +872,9 @@ expr State::FnCallInput::refinedBy(
 }
 
 State::FnCallOutput
-State::FnCallOutput::replace(const optional<StateValue> &retval) const {
+State::FnCallOutput::replace(const StateValue &retval) const {
   FnCallOutput copy = *this;
-  copy.retval = *retval;
+  copy.retval = retval;
   return copy;
 }
 
@@ -919,8 +919,9 @@ expr State::FnCallOutput::implies(const FnCallOutput &rhs,
 StateValue
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
-                 const Type &out_type, optional<StateValue> &&ret_arg,
-                 vector<StateValue> &&ret_args, const FnAttrs &attrs) {
+                 const Type &out_type, StateValue &&ret_arg,
+                 const Type *ret_arg_ty, vector<StateValue> &&ret_args,
+                 const FnAttrs &attrs) {
   bool noret   = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
@@ -969,6 +970,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     call_ranges = attrs.mem.canOnlyRead(MemoryAccess::Inaccessible)
                     ? analysis.ranges_fn_calls.project(name)
                     : analysis.ranges_fn_calls;
+
+  if ((*ret_arg_ty == out_type).isFalse()) {
+    ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)));
+  }
 
   auto isgvar = [&](const auto &decl) {
     if (auto gv = getFn().getConstant(string_view(decl.name).substr(1)))
@@ -1048,7 +1053,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         return agg->aggregateVals(vals);
       };
 
-      output = ret_arg ? std::move(ret_arg).value() : mk_output(out_type);
+      output = ret_arg_ty ? std::move(ret_arg) : mk_output(out_type);
 
       // Indirect calls may be changed into direct in tgt
       // Account for this if we have declarations with a returned argument
@@ -1109,7 +1114,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto refined = in.refinedBy(*this, name, inaccessible_bid, inputs,
                                   ptr_inputs, call_ranges, memory, attrs.mem,
                                   noret, willret);
-      data.add(ret_arg ? out.replace(ret_arg) : out, std::move(refined));
+      data.add(ret_arg_ty ? out.replace(ret_arg) : out, std::move(refined));
     }
 
     if (data) {

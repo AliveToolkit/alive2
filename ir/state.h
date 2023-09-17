@@ -181,7 +181,7 @@ private:
     Memory::CallState callstate;
     std::vector<Memory::FnRetData> ret_data;
 
-    FnCallOutput replace(const std::optional<StateValue> &retval) const;
+    FnCallOutput replace(const StateValue &retval) const;
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);
@@ -252,7 +252,7 @@ public:
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
               const Type &out_type,
-              std::optional<StateValue> &&ret_arg,
+              StateValue &&ret_arg, const Type *ret_arg_ty,
               std::vector<StateValue> &&ret_args, const FnAttrs &attrs);
 
   auto& getVarArgsData() { return var_args_data.data; }
