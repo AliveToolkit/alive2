@@ -1564,7 +1564,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case BitCast:
-    UNREACHABLE();
+    break;
   case Ptr2Int:
     fn = [&](auto &&val, auto &to_type) -> expr {
       return s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits());
