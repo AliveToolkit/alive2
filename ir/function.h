@@ -98,6 +98,7 @@ public:
     std::vector<std::pair<Type*, ParamAttrs>> inputs;
     Type *output;
     FnAttrs attrs;
+    unsigned hash() const;
   };
 private:
   std::vector<FnDecl> fn_decls;

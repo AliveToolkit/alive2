@@ -320,18 +320,25 @@ public:
 
     // record fn decl in case there are indirect calls to this function
     // elsewhere
-    if (fn) {
+    auto fn_decl = fn;
+    // Fetch decls from type punned calls
+    if (!fn_decl) {
+      if (auto fn = dyn_cast<llvm::Function>(i.getCalledOperand()))
+        fn_decl = i.getModule()->getFunction(fn->getName());
+    }
+    if (fn_decl) {
       Function::FnDecl decl;
-      decl.name   = '@' + fn->getName().str();
-      decl.output = llvm_type2alive(fn->getReturnType());
+      decl.name   = '@' + fn_decl->getName().str();
+      decl.output = llvm_type2alive(fn_decl->getReturnType());
       decl.attrs  = attrs;
 
-      auto attrs_fndef = fn->getAttributes();
-      for (uint64_t idx = 0, nargs = fn->arg_size(); idx < nargs; ++idx) {
+      auto attrs_fndef = fn_decl->getAttributes();
+      for (uint64_t idx = 0, nargs = fn_decl->arg_size(); idx < nargs; ++idx) {
         unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
         ParamAttrs pattr;
         handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, true);
-        decl.inputs.emplace_back(&args[idx]->getType(), std::move(pattr));
+        decl.inputs.emplace_back(
+          llvm_type2alive(fn_decl->getArg(idx)->getType()), std::move(pattr));
       }
       alive_fn->addFnDecl(std::move(decl));
     }

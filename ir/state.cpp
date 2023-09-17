@@ -1294,6 +1294,14 @@ void State::syncSEdataWithSrc(State &src) {
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
   returnMemory().mkAxioms(tgt.returnMemory());
+
+  if (has_indirect_fncalls) {
+    for (auto &decl : f.getFnDecls()) {
+      if (auto gv = f.getConstant(string_view(decl.name).substr(1)))
+        addAxiom(expr::mkUF("#fndeclty", { (*this)[*gv].value },
+                            expr::mkUInt(0, 32)) == decl.hash());
+    }
+  }
 }
 
 }

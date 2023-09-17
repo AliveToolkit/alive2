@@ -1033,6 +1033,7 @@ public:
   bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
   void setApproximated(bool flag) { approx = flag; }
   uint64_t getAlign() const;
+  bool isIndirect() const { return fnptr != nullptr; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

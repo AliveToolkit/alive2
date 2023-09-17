@@ -2363,6 +2363,14 @@ StateValue FnCall::toSMT(State &s) const {
 
     Pointer ptr(s.getMemory(), inputs.back().value);
     s.addUB(ptr.isDereferenceable(1, 1, false));
+
+    Function::FnDecl decl;
+    decl.output = &getType();
+    for (auto &[arg, params] : args) {
+      decl.inputs.emplace_back(&arg->getType(), params);
+    }
+    s.addUB(expr::mkUF("#fndeclty", { std::move(ptr).release() },
+                       expr::mkUInt(0, 32)) == decl.hash());
   } else {
     fnName_mangled << fnName;
   }

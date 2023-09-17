@@ -42,6 +42,7 @@ bool does_int_mem_access = true;
 bool does_ptr_mem_access = true;
 bool does_ptr_store = true;
 unsigned heap_block_alignment = 8;
+bool has_indirect_fncalls = true;
 
 
 bool isUndef(const expr &e) {
