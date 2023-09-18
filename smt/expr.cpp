@@ -811,11 +811,9 @@ expr expr::add_no_soverflow(const expr &rhs) const {
     return true;
 
   if (rhs.isConst()) {
-    if (rhs.isNegative().isTrue()) {
-      return sge(rhs - IntSMin(bits()));
-    } else {
-      return slt(IntSMin(bits()) - rhs);
-    }
+    auto v = IntSMin(bits()) - rhs;
+    return
+      rhs.isNegative().isTrue() ? sge(v) : sle(v - expr::mkUInt(1, sort()));
   }
   if (isConst())
     return rhs.add_no_soverflow(*this);
