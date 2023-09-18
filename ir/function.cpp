@@ -132,8 +132,7 @@ unsigned Function::FnDecl::hash() const {
           hash_ty(agg->getChild(i));
       }
     } else {
-      // don't bother with int vs float differences
-      uint8_t data[2] = { 0x33, (uint8_t)ty.bits() };
+      uint8_t data[2] = { uint8_t(0x33+ty.isFloatType()), (uint8_t)ty.bits() };
       hash.add(data, sizeof(data));
     }
   };
