@@ -809,6 +809,17 @@ expr expr::ushl_sat(const expr &rhs) const {
 expr expr::add_no_soverflow(const expr &rhs) const {
   if (min_leading_zeros() >= 2 && rhs.min_leading_zeros() >= 2)
     return true;
+
+  if (rhs.isConst()) {
+    if (rhs.isNegative().isTrue()) {
+      return sge(rhs - IntSMin(bits()));
+    } else {
+      return slt(IntSMin(bits()) - rhs);
+    }
+  }
+  if (isConst())
+    return rhs.add_no_soverflow(*this);
+
   return sext(1) + rhs.sext(1) == (*this + rhs).sext(1);
 }
 
@@ -1656,6 +1667,14 @@ expr expr::sle(const expr &rhs) const {
 }
 
 expr expr::slt(const expr &rhs) const {
+  C();
+  if (rhs.isSMin())
+    return false;
+
+  int64_t n;
+  if (rhs.isInt(n))
+    return sle(mkInt(n - 1, sort()));
+
   return !rhs.sle(*this);
 }
 
