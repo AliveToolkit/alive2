@@ -1137,6 +1137,12 @@ static void calculateAndInitConstants(Transform &t) {
         if (i && i->hasAttribute(a))
           return true;
       }
+      for (auto &decl : fn->getFnDecls()) {
+        for (auto &[_, params] : decl.inputs) {
+          if (params.has(a))
+            return true;
+        }
+      }
     }
     return false;
   };
