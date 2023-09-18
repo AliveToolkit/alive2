@@ -2392,7 +2392,7 @@ StateValue FnCall::toSMT(State &s) const {
       sv2 = s.eval(*arg, true);
     }
 
-    if (fnptr)
+    if (ptr)
       ret_vals.emplace_back(sv);
 
     if (flags.has(ParamAttrs::Returned)) {
