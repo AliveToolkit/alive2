@@ -75,6 +75,9 @@ public:
   smt::expr release() && { return std::move(p); }
   unsigned bits() const { return p.bits(); }
 
+  smt::expr reprWithoutAttrs() const;
+  static Pointer mkPointerFromNoAttrs(const Memory &m, const smt::expr &e);
+
   Pointer operator+(unsigned) const;
   Pointer operator+(const smt::expr &bytes) const;
   void operator+=(const smt::expr &bytes);

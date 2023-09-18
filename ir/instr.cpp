@@ -2359,18 +2359,18 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   if (ptr) {
     fnName_mangled << "#indirect_call";
-    inputs.emplace_back(s.getAndAddPoisonUB(*ptr, true));
 
-    Pointer ptr(s.getMemory(), inputs.back().value);
-    s.addUB(ptr.isDereferenceable(1, 1, false));
+    Pointer p(s.getMemory(), s.getAndAddPoisonUB(*ptr, true).value);
+    inputs.emplace_back(p.reprWithoutAttrs(), true);
+    s.addUB(p.isDereferenceable(1, 1, false));
 
     Function::FnDecl decl;
     decl.output = &getType();
     for (auto &[arg, params] : args) {
       decl.inputs.emplace_back(&arg->getType(), params);
     }
-    s.addUB(expr::mkUF("#fndeclty", { std::move(ptr).release() },
-                       expr::mkUInt(0, 32)) == decl.hash());
+    s.addUB(expr::mkUF("#fndeclty", { inputs[0].value }, expr::mkUInt(0, 32)) ==
+            decl.hash());
   } else {
     fnName_mangled << fnName;
   }

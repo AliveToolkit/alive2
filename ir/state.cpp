@@ -977,7 +977,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   auto isgvar = [&](const auto &decl) {
     if (auto gv = getFn().getConstant(string_view(decl.name).substr(1)))
-      return Pointer(memory, fn_ptr).getAddress() ==
+      return Pointer::mkPointerFromNoAttrs(memory, fn_ptr).getAddress() ==
              Pointer(memory, (*this)[*gv].value).getAddress();
     return expr();
   };
@@ -1303,8 +1303,10 @@ void State::mkAxioms(State &tgt) {
   if (has_indirect_fncalls) {
     for (auto &decl : f.getFnDecls()) {
       if (auto gv = f.getConstant(string_view(decl.name).substr(1)))
-        addAxiom(expr::mkUF("#fndeclty", { (*this)[*gv].value },
-                            expr::mkUInt(0, 32)) == decl.hash());
+        addAxiom(
+          expr::mkUF("#fndeclty",
+                     { Pointer(memory, (*this)[*gv].value).reprWithoutAttrs() },
+                     expr::mkUInt(0, 32)) == decl.hash());
     }
   }
 }
