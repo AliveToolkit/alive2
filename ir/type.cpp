@@ -424,8 +424,8 @@ expr FloatType::getFloat(const expr &v) const {
   return v.BV2float(ty);
 }
 
-expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
-                          const expr &a, const expr &b,
+expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
+                          unsigned nary, const expr &a, const expr &b,
                           const expr &c) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
@@ -433,8 +433,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
   if (isnan.isFalse())
     return val;
 
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1 /* sign */;
+  unsigned fraction_bits = fractionBits();
   unsigned var_bits = fraction_bits-1 + 1 /* sign */;
 
   // sign bit, exponent (-1), qnan bit (1) or snan (0), rest of fraction
@@ -447,16 +446,24 @@ expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
 
   // 2) input NaN
   // 3) quieted input NaN
+  const FloatType &from_type = *from_type0.getAsFloatType();
+
   auto maybe_quiet = [&](const expr &e) {
-    expr qnan = e.extract(fraction_bits - 1, fraction_bits - 1);
-    return (qnan | var.extract(0, 0)).concat(e.extract(fraction_bits - 2, 0));
+    // account for fpext/fptruc
+    expr fraction = e.trunc(min(from_type.fractionBits(), fraction_bits));
+    if (fraction.bits() < fraction_bits)
+      fraction = fraction.concat_zeros(fraction_bits - fraction.bits());
+    assert(!fraction.isValid() || fraction.bits() == fraction_bits);
+
+    expr qnan = fraction.extract(fraction_bits - 1, fraction_bits - 1);
+    return (qnan | var.extract(0, 0)).concat(fraction.trunc(fraction_bits - 1));
   };
   if (nary >= 1) {
-    exprs.add(maybe_quiet(a), getFloat(a).isNaN());
+    exprs.add(maybe_quiet(a), from_type.getFloat(a).isNaN());
     if (nary >= 2) {
-      exprs.add(maybe_quiet(b), getFloat(b).isNaN());
+      exprs.add(maybe_quiet(b), from_type.getFloat(b).isNaN());
       if (nary >= 3)
-        exprs.add(maybe_quiet(c), getFloat(c).isNaN());
+        exprs.add(maybe_quiet(c), from_type.getFloat(c).isNaN());
     }
   }
 
@@ -467,7 +474,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
 
   auto [fraction, domain, choice_var, pre] = std::move(exprs)();
   assert(!domain.isValid() || domain.isTrue());
-  expr nan = var.sign().concat(expr::mkInt(-1, exp_bits)).concat(fraction);
+  expr nan = var.sign().concat(expr::mkInt(-1, expBits())).concat(fraction);
   assert(isNaNInt(nan));
 
   s.addNonDetVar(std::move(choice_var));
@@ -477,10 +484,9 @@ expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
 }
 
 expr FloatType::isNaN(const expr &v, bool signalling) const {
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1;
+  unsigned fraction_bits = fractionBits();
 
-  expr bits = v.extract(fraction_bits + exp_bits - 1, fraction_bits - 1);
+  expr bits = v.extract(fraction_bits + expBits() - 1, fraction_bits - 1);
   if (signalling) {
     expr fraction = v.extract(fraction_bits - 2, 0);
     return bits == (UINT64_MAX << 1ull) && fraction != 0;
@@ -494,6 +500,15 @@ unsigned FloatType::bits() const {
   return float_sizes[fpType].first;
 }
 
+unsigned FloatType::expBits() const {
+  assert(fpType != Unknown);
+  return float_sizes[fpType].second;
+}
+
+unsigned FloatType::fractionBits() const {
+  return bits() - expBits() - 1 /* sign bit */;
+}
+
 const FloatType* FloatType::getAsFloatType() const {
   return this;
 }
@@ -505,18 +520,16 @@ bool FloatType::isNaNInt(const expr &e) const {
   // unsigned var_bits = fraction_bits-1 + 1 /* sign */;
   // expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
   // var.sign().concat(expr::mkInt(-1, exp_bits)).concat(fraction)
-  auto bw = e.bits();
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bw - exp_bits - 1 /* sign bit */;
+  auto bw = bits();
 
-  expr exponent = e.extract(bw - 2, fraction_bits);
-  assert(exponent.bits() == exp_bits);
+  expr exponent = e.extract(bw - 2, fractionBits());
+  assert(exponent.bits() == expBits());
 
   expr nan;
   unsigned h, l;
   return exponent.isAllOnes() &&
          e.sign().isExtract(nan, h, l) &&
-         h == l && h == fraction_bits - 1 &&
+         h == l && h == fractionBits() - 1 &&
          nan.fn_name().starts_with("#NaN");
 }
 

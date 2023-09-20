@@ -772,7 +772,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
-    val = fpty->fromFloat(s, val, nary, a, b, c);
+    val = fpty->fromFloat(s, val, *fpty, nary, a, b, c);
   }
 
   return { std::move(val), non_poison() };
@@ -1767,7 +1767,8 @@ StateValue FpConversionOp::toSMT(State &s) const {
 
     return { to_type.isFloatType()
                ? to_type.getAsFloatType()
-                   ->fromFloat(s, ret.value, from_type.isFloatType(), sv.value)
+                   ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
+                               sv.value)
                : std::move(ret.value), np()};
   };
 

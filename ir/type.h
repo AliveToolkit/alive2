@@ -185,6 +185,8 @@ private:
   FpType fpType = Unknown;
   bool defined = false;
 
+  unsigned expBits() const;
+  unsigned fractionBits() const;
   bool isNaNInt(const smt::expr &e) const;
 
 public:
@@ -196,9 +198,9 @@ public:
 
   smt::expr getDummyFloat() const;
   smt::expr getFloat(const smt::expr &v) const;
-  smt::expr fromFloat(State &s, const smt::expr &fp, unsigned nary,
-                      const smt::expr &a, const smt::expr &b = {},
-                      const smt::expr &c = {}) const;
+  smt::expr fromFloat(State &s, const smt::expr &fp, const Type &from_type,
+                      unsigned nary, const smt::expr &a,
+                      const smt::expr &b = {}, const smt::expr &c = {}) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
 
   IR::StateValue getDummyValue(bool non_poison) const override;
