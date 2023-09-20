@@ -164,7 +164,7 @@ public:
       return { vals.begin()->first, vals.begin()->second, expr(), true };
 
     expr dom = domain();
-    unsigned bits = util::ilog2_ceil(vals.size()+1, false);
+    unsigned bits = util::ilog2_ceil(vals.size() + !dom.isTrue(), false);
     expr qvar = expr::mkFreshVar("choice", expr::mkUInt(0, bits));
 
     T ret;

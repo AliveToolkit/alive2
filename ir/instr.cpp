@@ -707,12 +707,6 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     return { fn(a, b, c, {}), non_poison() };
 
   auto fpty = ty.getAsFloatType();
-  expr issnan = fpty->isNaN(a, true);
-  if (nary >= 2) {
-    issnan |= fpty->isNaN(b, true);
-    if (nary >= 3)
-      issnan |= fpty->isNaN(c, true);
-  }
 
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
@@ -778,7 +772,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
-    val = fpty->fromFloat(s, val, issnan);
+    val = fpty->fromFloat(s, val, nary, a, b, c);
   }
 
   return { std::move(val), non_poison() };
@@ -1756,11 +1750,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &sv, const Type &from_type,
                     const Type &to_type) -> StateValue {
     auto val = sv.value;
-    expr issnan = false;
 
     if (from_type.isFloatType()) {
       auto ty = from_type.getAsFloatType();
-      issnan  = ty->isNaN(val, true);
       val     = ty->getFloat(val);
     }
 
@@ -1774,7 +1766,8 @@ StateValue FpConversionOp::toSMT(State &s) const {
     np.add(std::move(ret.non_poison));
 
     return { to_type.isFloatType()
-               ? to_type.getAsFloatType()->fromFloat(s, ret.value, issnan)
+               ? to_type.getAsFloatType()
+                   ->fromFloat(s, ret.value, from_type.isFloatType(), sv.value)
                : std::move(ret.value), np()};
   };
 
