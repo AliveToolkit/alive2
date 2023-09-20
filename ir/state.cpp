@@ -1177,6 +1177,10 @@ void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
 }
 
+void State::addNonDetVar(const expr &var) {
+  nondet_vars.emplace(var);
+}
+
 expr State::getFreshNondetVar(const char *prefix, const expr &type) {
   expr var = expr::mkFreshVar(prefix, type);
   nondet_vars.emplace(var);

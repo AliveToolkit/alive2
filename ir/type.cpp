@@ -470,7 +470,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, unsigned nary,
   expr nan = var.sign().concat(expr::mkInt(-1, exp_bits)).concat(fraction);
   assert(isNaNInt(nan));
 
-  s.addQuantVar(std::move(choice_var));
+  s.addNonDetVar(std::move(choice_var));
   s.addPre(std::move(pre));
 
   return expr::mkIf(isnan, nan, val);

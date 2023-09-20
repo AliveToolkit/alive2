@@ -262,6 +262,7 @@ public:
 
   smt::expr getFreshNondetVar(const char *prefix, const smt::expr &type);
   void addQuantVar(const smt::expr &var);
+  void addNonDetVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
