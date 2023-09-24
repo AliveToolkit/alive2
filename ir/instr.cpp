@@ -2093,7 +2093,8 @@ uint64_t FnCall::getAlign() const {
     align = getIntOr(*arg, 1);
 
   return max(align,
-             attrs.has(FnAttrs::Align) ? attrs.align : heap_block_alignment);
+             attrs.has(FnAttrs::Align) ? attrs.align :
+            (attrs.isAlloc() ? heap_block_alignment : 1));
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -3618,6 +3619,23 @@ uint64_t GEP::getMaxGEPOffset() const {
   return off;
 }
 
+optional<uint64_t> GEP::getExactOffset() const {
+  uint64_t off = 0;
+  for (auto &[mul, v] : getIdxs()) {
+    if (mul == 0)
+      continue;
+    if (mul >= INT64_MAX)
+      return {};
+
+    if (auto n = getInt(*v)) {
+      off = add_saturate(off, abs((int64_t)mul * *n));
+      continue;
+    }
+    return {};
+  }
+  return off;
+}
+
 vector<Value*> GEP::operands() const {
   vector<Value*> v = { ptr };
   for (auto &[sz, idx] : idxs) {
@@ -3761,6 +3779,15 @@ uint64_t PtrMask::getMaxGEPOffset() const {
   if (auto n = getInt(*mask))
     return ~*n;
   return UINT64_MAX;
+}
+
+optional<uint64_t> PtrMask::getExactAlign() const {
+  if (auto n = getInt(*mask)) {
+    uint64_t align = -*n;
+    if (is_power2(align))
+      return align;
+  }
+  return {};
 }
 
 vector<Value*> PtrMask::operands() const {

@@ -692,6 +692,7 @@ public:
 
   Value& getSize() const { return *size; }
   Value* getMul() const { return mul; }
+  uint64_t getAlign() const { return align; }
   bool initDead() const { return initially_dead; }
   void markAsInitiallyDead() { initially_dead = true; }
 
@@ -766,6 +767,7 @@ public:
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
   bool isInBounds() const { return inbounds; }
+  std::optional<uint64_t> getExactOffset() const;
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -790,6 +792,9 @@ class PtrMask final : public MemInstr {
 public:
   PtrMask(Type &type, std::string &&name, Value &ptr, Value &mask)
     : MemInstr(type, std::move(name)), ptr(&ptr), mask(&mask) {}
+
+  Value& getPtr() const { return *ptr; }
+  std::optional<uint64_t> getExactAlign() const;
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -817,6 +822,7 @@ public:
 
   Value& getPtr() const { return *ptr; }
   uint64_t getAlign() const { return align; }
+  void setAlign(uint64_t align) { this->align = align; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -844,6 +850,7 @@ public:
   Value& getValue() const { return *val; }
   Value& getPtr() const { return *ptr; }
   uint64_t getAlign() const { return align; }
+  void setAlign(uint64_t align) { this->align = align; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -870,8 +877,10 @@ public:
     : MemInstr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
             align(align) {}
 
+  Value& getPtr() const { return *ptr; }
   Value& getBytes() const { return *bytes; }
   uint64_t getAlign() const { return align; }
+  void setAlign(uint64_t align) { this->align = align; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -943,9 +952,13 @@ public:
     : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
             align_dst(align_dst), align_src(align_src), move(move) {}
 
+  Value& getSrc() const { return *src; }
+  Value& getDst() const { return *dst; }
   Value& getBytes() const { return *bytes; }
   uint64_t getSrcAlign() const { return align_src; }
   uint64_t getDstAlign() const { return align_dst; }
+  void setSrcAlign(uint64_t align) { align_src = align; }
+  void setDstAlign(uint64_t align) { align_dst = align; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
