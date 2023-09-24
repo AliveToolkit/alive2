@@ -251,9 +251,8 @@ StateValue Type::fromInt(StateValue v) const {
 }
 
 expr Type::combine_poison(const expr &boolean, const expr &orig) const {
-  return orig.bits() == 1
-    ? boolean && orig == 1
-    : expr::mkIf(boolean, expr::mkInt(-1, orig), expr::mkInt(0, orig)) & orig;
+  return
+    expr::mkIf(boolean, expr::mkInt(-1, orig), expr::mkInt(0, orig)) & orig;
 }
 
 StateValue Type::mkUndef(State &s) const {
