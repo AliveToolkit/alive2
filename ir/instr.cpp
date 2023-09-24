@@ -3628,7 +3628,7 @@ optional<uint64_t> GEP::getExactOffset() const {
       return {};
 
     if (auto n = getInt(*v)) {
-      off += abs((int64_t)mul * *n));
+      off += (int64_t)mul * *n;
       continue;
     }
     return {};
