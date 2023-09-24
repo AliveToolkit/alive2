@@ -2094,7 +2094,7 @@ uint64_t FnCall::getAlign() const {
 
   return max(align,
              attrs.has(FnAttrs::Align) ? attrs.align :
-            (attrs.isAlloc() ? heap_block_alignment : 1));
+               (attrs.isAlloc() ? heap_block_alignment : 1));
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -3628,7 +3628,7 @@ optional<uint64_t> GEP::getExactOffset() const {
       return {};
 
     if (auto n = getInt(*v)) {
-      off = add_saturate(off, abs((int64_t)mul * *n));
+      off += abs((int64_t)mul * *n));
       continue;
     }
     return {};
