@@ -123,7 +123,7 @@ public:
                    DereferenceableOrNull = 1 << 10,
                    NullPointerIsValid = 1 << 11,
                    AllocSize = 1 << 12, ZeroExt = 1<<13,
-                   SignExt = 1<<14, NoFPClass = 1<<15, };
+                   SignExt = 1<<14, NoFPClass = 1<<15, Asm = 1<<16 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 

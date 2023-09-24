@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/memory.h"
+#include "ir/function.h"
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "ir/value.h"
@@ -514,16 +515,16 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     // if bits of loaded ptr are a subset of the non-ptr value,
     // we know they must be zero otherwise the value is poison.
     // Therefore we obtain a null pointer for free.
-    expr _, value;
+    expr _;
     unsigned low, high, low2, high2;
     if (loaded_ptr.isExtract(_, high, low) &&
         bytes[0].nonptrValue().isExtract(_, high2, low2) &&
         high2 >= high && low2 <= low) {
-      value = std::move(loaded_ptr);
+      // do nothing
     } else {
-      value = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
+      loaded_ptr = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
     }
-    return { std::move(value), std::move(non_poison) };
+    return { std::move(loaded_ptr), std::move(non_poison) };
 
   } else {
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
@@ -541,7 +542,18 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
+    val = toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
+
+    // allow ptr->int type punning in Assembly mode
+    if (bitsize == bits_ptr_address &&
+      m.getState().getFn().getFnAttrs().has(FnAttrs::Asm)) {
+      StateValue ptr_val = bytesToValue(m, bytes, PtrType(0));
+      ptr_val.value = Pointer(m, ptr_val.value).getAddress();
+      expr is_ptr = bytes[0].isPtr();
+      val
+        = StateValue::mkIf(is_ptr, ptr_val.subst(is_ptr, true).simplify(), val);
+    }
+    return val;
   }
 }
 
@@ -1232,8 +1244,10 @@ void Memory::mkAxioms(const Memory &tgt) const {
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
-    if (!has_null_block || bid != 0)
+    if (!has_null_block || bid != 0) {
       state->addAxiom(addr != 0);
+      state->addAxiom(p1.blockSize() != 0);
+    }
 
     // address must be properly aligned
     state->addAxiom(
@@ -2036,8 +2050,7 @@ expr Memory::ptr2int(const expr &ptr) const {
 
 expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused() && observesAddresses());
-  // TODO: missing pointer escaping
-  if (config::enable_approx_int2ptr) {
+  if (state->getFn().getFnAttrs().has(FnAttrs::Asm)) {
     DisjointExpr<expr> ret(expr{});
     expr valx = val.zextOrTrunc(bits_program_pointer);
 
@@ -2046,7 +2059,7 @@ expr Memory::int2ptr(const expr &val) const {
         Pointer p(*this, i, local);
         Pointer p_end = p + p.blockSize();
         ret.add((p + (valx - p.getAddress())).release(),
-                valx.uge(p.getAddress()) && valx.ule(p_end.getAddress()));
+                valx.uge(p.getAddress()) && valx.ult(p_end.getAddress()));
       }
     };
     add(numLocals(), true);

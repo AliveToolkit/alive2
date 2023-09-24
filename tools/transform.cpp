@@ -1589,6 +1589,9 @@ static void optimize_ptrcmp(Function &f) {
 }
 
 void Transform::preprocess() {
+  if (config::tgt_is_asm)
+    tgt.getFnAttrs().set(FnAttrs::Asm);
+
   remove_unreachable_bbs(src);
   remove_unreachable_bbs(tgt);
 

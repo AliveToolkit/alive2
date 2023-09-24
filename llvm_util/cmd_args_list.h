@@ -45,9 +45,9 @@ llvm::cl::opt<bool> opt_check_if_src_is_ub(
   llvm::cl::desc("Check if source function is always UB (default=false)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<bool> opt_enable_approx_int2ptr(
-  LLVM_ARGS_PREFIX "enable-approx-int2ptr",
-  llvm::cl::desc("Enable unsound approximation of int2ptr (default=false)"),
+llvm::cl::opt<bool> opt_tgt_is_asm(
+  LLVM_ARGS_PREFIX "tgt-is-asm",
+  llvm::cl::desc("Target uses assembly semantics (default=false)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<bool> opt_error_fatal(LLVM_ARGS_PREFIX "exit-on-error",
