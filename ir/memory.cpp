@@ -288,7 +288,7 @@ expr Byte::isPoison() const {
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
     assert(!np.isValid() || ptrNonpoison().eq(np == 1));
-    return np == 0;
+    return np != 1;
   }
   return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
 }
@@ -550,8 +550,8 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       StateValue ptr_val = bytesToValue(m, bytes, PtrType(0));
       ptr_val.value = Pointer(m, ptr_val.value).getAddress();
       expr is_ptr = bytes[0].isPtr();
-      val
-        = StateValue::mkIf(is_ptr, ptr_val.subst(is_ptr, true).simplify(), val);
+      val = StateValue::mkIf(is_ptr, ptr_val.subst(is_ptr, true),
+                             val.subst(is_ptr, false)).simplify();
     }
     return val;
   }
