@@ -954,6 +954,7 @@ static void calculateAndInitConstants(Transform &t) {
   does_int_mem_access = false;
   observes_addresses  = false;
   bool does_any_byte_access = false;
+  has_indirect_fncalls = false;
 
   set<string> inaccessiblememonly_fns;
   num_inaccessiblememonly_fns = 0;
@@ -1026,6 +1027,7 @@ static void calculateAndInitConstants(Transform &t) {
 
       if (auto fn = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
+        has_indirect_fncalls |= fn->isIndirect();
         if (!fn->getAttributes().isAlloc()) {
           if (fn->getAttributes().mem.canOnlyWrite(MemoryAccess::Inaccessible)) {
             if (inaccessiblememonly_fns.emplace(fn->getName()).second)
@@ -1134,6 +1136,12 @@ static void calculateAndInitConstants(Transform &t) {
         auto i = dynamic_cast<const Input*>(&v);
         if (i && i->hasAttribute(a))
           return true;
+      }
+      for (auto &decl : fn->getFnDecls()) {
+        for (auto &[_, params] : decl.inputs) {
+          if (params.has(a))
+            return true;
+        }
       }
     }
     return false;
@@ -1581,6 +1589,9 @@ static void optimize_ptrcmp(Function &f) {
 }
 
 void Transform::preprocess() {
+  if (config::tgt_is_asm)
+    tgt.getFnAttrs().set(FnAttrs::Asm);
+
   remove_unreachable_bbs(src);
   remove_unreachable_bbs(tgt);
 
@@ -1635,6 +1646,80 @@ void Transform::preprocess() {
         fn->removeUnusedStuff(users, fn == &src ? vector<string_view>()
                                                 : src.getGlobalVarNames());
     } while (changed);
+  }
+
+  // infer alignment of memory operations
+  unordered_map<const Value*, uint64_t> aligns;
+  unordered_set<const Value*> worklist;
+  for (auto fn : { &src, &tgt }) {
+    for (auto &in0 : fn->getInputs()) {
+      auto *in = dynamic_cast<const Input*>(&in0);
+      if (!in || !in->getType().isPtrType())
+        continue;
+      aligns.emplace(in, in->getAttributes().align);
+    }
+
+    for (auto &i : fn->instrs()) {
+      worklist.emplace(&i);
+    }
+
+    auto users = fn->getUsers();
+
+    do {
+      auto I = worklist.begin();
+      auto *i = *I;
+      worklist.erase(I);
+
+      uint64_t align = 0;
+      if (auto *alloc = dynamic_cast<const Alloc*>(i)) {
+        align = alloc->getAlign();
+      } else if (auto *call = dynamic_cast<const FnCall*>(i)) {
+        align = call->getAlign();
+      } else if (auto *mask = dynamic_cast<const PtrMask*>(i)) {
+        if (auto a = mask->getExactAlign()) {
+          align = max(*a, aligns[&mask->getPtr()]);
+        } else {
+          continue;
+        }
+      } else if (auto *gep = dynamic_cast<const GEP*>(i)) {
+        auto off = gep->getExactOffset();
+        if (!off || !is_power2(*off))
+          continue;
+        align = min(aligns[&gep->getPtr()], *off);
+      } else if (auto *phi = dynamic_cast<const Phi*>(i)) {
+        // optimistic handling of phis: unreachable predecessors don't
+        // contribute to the result. This is revisited once they become reach
+        for (auto &[val, bb] : phi->getValues()) {
+          if (auto phi_align = aligns[val])
+            align = align ? min(align, phi_align) : phi_align;
+        }
+      } else {
+        continue;
+      }
+      if (align != aligns[i]) {
+        aligns[i] = align;
+        for (auto [user, BB] : users[i]) {
+          worklist.emplace(user);
+        }
+      }
+    } while (!worklist.empty());
+
+#define HANDLE(class, ptr, get, set)          \
+  if (auto *obj = dynamic_cast<class*>(i)) {  \
+    uint64_t newal = aligns[&obj->ptr()];     \
+    if (newal > obj->get())                   \
+      obj->set(newal);                        \
+  }
+
+    for (auto &i0 : fn->instrs()) {
+      auto i = const_cast<Instr*>(&i0);
+      HANDLE(Store, getPtr, getAlign, setAlign)
+      HANDLE(Load, getPtr, getAlign, setAlign)
+      HANDLE(Memset, getPtr, getAlign, setAlign)
+      HANDLE(Memcpy, getSrc, getSrcAlign, setSrcAlign)
+      HANDLE(Memcpy, getDst, getDstAlign, setDstAlign)
+    }
+    aligns.clear();
   }
 
   // bits_program_pointer is used by unroll. Initialize it in advance

@@ -19,7 +19,7 @@ extern bool disable_poison_input;
 
 extern bool disable_undef_input;
 
-extern bool enable_approx_int2ptr;
+extern bool tgt_is_asm;
 
 extern bool check_if_src_is_ub;
 

@@ -130,6 +130,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
   attr.fp_denormal.print(os);
   if (attr.fp_denormal32)
     attr.fp_denormal32->print(os, true);
+  if (attr.has(FnAttrs::Asm))
+    os << " asm";
   return os << attr.mem;
 }
 

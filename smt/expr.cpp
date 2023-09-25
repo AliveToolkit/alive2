@@ -809,6 +809,15 @@ expr expr::ushl_sat(const expr &rhs) const {
 expr expr::add_no_soverflow(const expr &rhs) const {
   if (min_leading_zeros() >= 2 && rhs.min_leading_zeros() >= 2)
     return true;
+
+  if (rhs.isConst()) {
+    auto v = IntSMin(bits()) - rhs;
+    return
+      rhs.isNegative().isTrue() ? sge(v) : sle(v - expr::mkUInt(1, sort()));
+  }
+  if (isConst())
+    return rhs.add_no_soverflow(*this);
+
   return sext(1) + rhs.sext(1) == (*this + rhs).sext(1);
 }
 
@@ -1656,6 +1665,14 @@ expr expr::sle(const expr &rhs) const {
 }
 
 expr expr::slt(const expr &rhs) const {
+  C();
+  if (rhs.isSMin())
+    return false;
+
+  int64_t n;
+  if (rhs.isInt(n))
+    return sle(mkInt(n - 1, sort()));
+
   return !rhs.sle(*this);
 }
 
@@ -2217,6 +2234,29 @@ set<expr> expr::leafs(unsigned max) const {
       for (auto &v : worklist)
         ret.emplace(std::move(v));
       break;
+    }
+  } while (!worklist.empty());
+
+  return ret;
+}
+
+set<expr> expr::get_apps_of(const char *fn_name) const {
+  C();
+  vector<expr> worklist = { *this };
+  unordered_set<Z3_ast> seen;
+  set<expr> ret;
+  do {
+    auto val = std::move(worklist.back());
+    worklist.pop_back();
+    if (!seen.emplace(val()).second || !val.isApp())
+      continue;
+
+    for (unsigned i = 0, e = val.getFnNumArgs(); i < e; ++i) {
+      worklist.emplace_back(val.getFnArg(i));
+    }
+
+    if (val.fn_name() == fn_name) {
+      ret.emplace(std::move(val));
     }
   } while (!worklist.empty());
 

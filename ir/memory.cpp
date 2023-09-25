@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/memory.h"
+#include "ir/function.h"
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "ir/value.h"
@@ -287,7 +288,7 @@ expr Byte::isPoison() const {
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
     assert(!np.isValid() || ptrNonpoison().eq(np == 1));
-    return np == 0;
+    return np != 1;
   }
   return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
 }
@@ -514,16 +515,16 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     // if bits of loaded ptr are a subset of the non-ptr value,
     // we know they must be zero otherwise the value is poison.
     // Therefore we obtain a null pointer for free.
-    expr _, value;
+    expr _;
     unsigned low, high, low2, high2;
     if (loaded_ptr.isExtract(_, high, low) &&
         bytes[0].nonptrValue().isExtract(_, high2, low2) &&
         high2 >= high && low2 <= low) {
-      value = std::move(loaded_ptr);
+      // do nothing
     } else {
-      value = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
+      loaded_ptr = expr::mkIf(is_ptr, loaded_ptr, Pointer::mkNullPointer(m)());
     }
-    return { std::move(value), std::move(non_poison) };
+    return { std::move(loaded_ptr), std::move(non_poison) };
 
   } else {
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
@@ -541,7 +542,18 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromInt(val.trunc(bitsize, toType.np_bits()));
+    val = toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
+
+    // allow ptr->int type punning in Assembly mode
+    if (bitsize == bits_ptr_address &&
+      m.getState().getFn().getFnAttrs().has(FnAttrs::Asm)) {
+      StateValue ptr_val = bytesToValue(m, bytes, PtrType(0));
+      ptr_val.value = Pointer(m, ptr_val.value).getAddress();
+      expr is_ptr = bytes[0].isPtr();
+      val = StateValue::mkIf(is_ptr, ptr_val.subst(is_ptr, true),
+                             val.subst(is_ptr, false)).simplify();
+    }
+    return val;
   }
 }
 
@@ -1320,17 +1332,15 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
       std::move(undef) };
 }
 
-bool Memory::PtrInput::eq_attrs(const PtrInput &rhs) const {
-  return byval == rhs.byval &&
-         noread == rhs.noread &&
-         nowrite == rhs.nowrite &&
-         nocapture == rhs.nocapture;
+expr Memory::PtrInput::implies(const PtrInput &rhs) const {
+  return implies_attrs(rhs) && val == rhs.val && idx == rhs.idx;
 }
 
-expr Memory::PtrInput::operator==(const PtrInput &rhs) const {
-  if (!eq_attrs(rhs))
-    return false;
-  return val == rhs.val;
+expr Memory::PtrInput::implies_attrs(const PtrInput &rhs) const {
+  return byval == rhs.byval &&
+         rhs.noread   .implies(noread) &&
+         rhs.nowrite  .implies(nowrite) &&
+         rhs.nocapture.implies(nocapture);
 }
 
 Memory::FnRetData Memory::FnRetData::mkIf(const expr &cond, const FnRetData &a,
@@ -1499,11 +1509,10 @@ void Memory::setState(const Memory::CallState &st,
 
       expr modifies(false);
       for (auto &ptr_in : ptr_inputs) {
-        if (ptr_in.nowrite)
-          continue;
-
-        if (!ptr_in.byval && bid < next_nonlocal_bid) {
+        if (bid < next_nonlocal_bid) {
           modifies |= ptr_in.val.non_poison &&
+                      !ptr_in.nowrite &&
+                      ptr_in.byval == 0 &&
                       Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -1541,8 +1550,9 @@ void Memory::setState(const Memory::CallState &st,
       if (!access.canWrite(MemoryAccess::Other)) {
         may_free = false;
         for (auto &ptr_in : ptr_inputs) {
-          if (!ptr_in.byval && bid < next_nonlocal_bid)
+          if (bid < next_nonlocal_bid)
             may_free |= ptr_in.val.non_poison &&
+                        ptr_in.byval == 0 &&
                         Pointer(*this, ptr_in.val.value).getBid() == bid;
         }
       }
@@ -2036,11 +2046,45 @@ expr Memory::ptr2int(const expr &ptr) const {
   return p.getAddress();
 }
 
-expr Memory::int2ptr(const expr &val) const {
+expr Memory::int2ptr(const expr &val0) const {
   assert(!memory_unused() && observesAddresses());
-  // TODO: missing pointer escaping
-  if (config::enable_approx_int2ptr) {
+  if (state->getFn().getFnAttrs().has(FnAttrs::Asm)) {
     DisjointExpr<expr> ret(expr{});
+    expr val = val0;
+    OrExpr domain;
+    bool processed_all = true;
+
+    // Try to optimize the conversion
+    // Note that the result of int2ptr is always used to dereference the ptr
+    // Hence we can throw away null & OOB pointers
+    // Also, these pointers must have originated from ptr->int type punning
+    // so they must have a (blk_addr bid) expression in them (+ some offset)
+    for (auto [e, cond] : DisjointExpr<expr>(val, 5)) {
+      auto blks = e.get_apps_of("blk_addr");
+      if (blks.empty()) {
+        expr subst = false;
+        if (cond.isNot(cond))
+          subst = true;
+        val = val.subst(cond, subst);
+        continue;
+      }
+      if (blks.size() == 1) {
+        expr bid = blks.begin()->getFnArg(0);
+        Pointer base(*this, bid, expr::mkUInt(0, bits_for_offset));
+        expr offset = (e - base.getAddress()).sextOrTrunc(bits_for_offset);
+        ret.add(Pointer(*this, bid, offset).release(), cond);
+      } else {
+        processed_all = false;
+      }
+      domain.add(std::move(cond));
+    }
+    state->addUB(std::move(domain)());
+
+    if (processed_all)
+      return std::move(ret)()->simplify();
+
+    val = val.simplify();
+
     expr valx = val.zextOrTrunc(bits_program_pointer);
 
     auto add = [&](unsigned limit, bool local) {
@@ -2048,7 +2092,7 @@ expr Memory::int2ptr(const expr &val) const {
         Pointer p(*this, i, local);
         Pointer p_end = p + p.blockSize();
         ret.add((p + (valx - p.getAddress())).release(),
-                valx.uge(p.getAddress()) && valx.ule(p_end.getAddress()));
+                valx.uge(p.getAddress()) && valx.ult(p_end.getAddress()));
       }
     };
     add(numLocals(), true);
@@ -2057,9 +2101,9 @@ expr Memory::int2ptr(const expr &val) const {
   }
 
   expr null = Pointer::mkNullPointer(*this).release();
-  expr fn = expr::mkUF("int2ptr", { val }, null);
+  expr fn = expr::mkUF("int2ptr", { val0 }, null);
   state->doesApproximation("inttoptr", fn);
-  return expr::mkIf(val == 0, null, fn);
+  return expr::mkIf(val0 == 0, null, fn);
 }
 
 expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,

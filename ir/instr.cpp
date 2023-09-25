@@ -707,12 +707,6 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     return { fn(a, b, c, {}), non_poison() };
 
   auto fpty = ty.getAsFloatType();
-  expr issnan = fpty->isNaN(a, true);
-  if (nary >= 2) {
-    issnan |= fpty->isNaN(b, true);
-    if (nary >= 3)
-      issnan |= fpty->isNaN(c, true);
-  }
 
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
@@ -778,7 +772,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val));
-    val = fpty->fromFloat(s, val, issnan);
+    val = fpty->fromFloat(s, val, *fpty, nary, a, b, c);
   }
 
   return { std::move(val), non_poison() };
@@ -1564,9 +1558,6 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case BitCast:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return to_type.fromInt(std::move(val));
-    };
     break;
   case Ptr2Int:
     fn = [&](auto &&val, auto &to_type) -> expr {
@@ -1586,32 +1577,22 @@ StateValue ConversionOp::toSMT(State &s) const {
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
-    v = val->getType().toInt(s, std::move(v));
+    return getType().fromInt(val->getType().toInt(s, std::move(v)));
   }
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto retty = getType().getAsAggregateType();
     auto elems = retty->numElementsConst();
-
-    // bitcast vect elems size may vary, so create a new data type whose
-    // element size is aligned with the output vector elem size
-    IntType elem_ty("int", retty->bits() / elems);
-    VectorType int_ty("vec", elems, elem_ty);
-    auto valty = op == BitCast ? &int_ty : val->getType().getAsAggregateType();
+    auto valty = val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      unsigned idx = (little_endian && op == BitCast) ? elems - i - 1 : i;
-      auto vi = valty->extract(v, idx);
-      vals.emplace_back(fn(std::move(vi.value), retty->getChild(idx)),
+      auto vi = valty->extract(v, i);
+      vals.emplace_back(fn(std::move(vi.value), retty->getChild(i)),
                         std::move(vi.non_poison));
     }
     return retty->aggregateVals(vals);
   }
-
-  // turn poison data into boolean
-  if (op == BitCast)
-    v.non_poison = v.non_poison == expr::mkInt(-1, v.non_poison);
 
   return { fn(std::move(v.value), getType()), std::move(v.non_poison) };
 }
@@ -1769,11 +1750,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &sv, const Type &from_type,
                     const Type &to_type) -> StateValue {
     auto val = sv.value;
-    expr issnan = false;
 
     if (from_type.isFloatType()) {
       auto ty = from_type.getAsFloatType();
-      issnan  = ty->isNaN(val, true);
       val     = ty->getFloat(val);
     }
 
@@ -1787,7 +1766,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
     np.add(std::move(ret.non_poison));
 
     return { to_type.isFloatType()
-               ? to_type.getAsFloatType()->fromFloat(s, ret.value, issnan)
+               ? to_type.getAsFloatType()
+                   ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
+                               sv.value)
                : std::move(ret.value), np()};
   };
 
@@ -2112,7 +2093,8 @@ uint64_t FnCall::getAlign() const {
     align = getIntOr(*arg, 1);
 
   return max(align,
-             attrs.has(FnAttrs::Align) ? attrs.align : heap_block_alignment);
+             attrs.has(FnAttrs::Align) ? attrs.align :
+               (attrs.isAlloc() ? heap_block_alignment : 1));
 }
 
 uint64_t FnCall::getMaxAccessSize() const {
@@ -2299,11 +2281,14 @@ static void check_can_store(State &s, const expr &p0) {
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag, StateValue value,
                           StateValue value2, vector<StateValue> &inputs,
-                          vector<Memory::PtrInput> &ptr_inputs) {
+                          vector<Memory::PtrInput> &ptr_inputs,
+                          unsigned idx) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (agg->isPadding(i))
+        continue;
       unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
-                    agg->extract(value2, i), inputs, ptr_inputs);
+                    agg->extract(value2, i), inputs, ptr_inputs, idx);
     }
     return;
   }
@@ -2312,8 +2297,9 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
     value = argflag.encode(s, std::move(value), ty);
 
     if (ty.isPtrType()) {
-      ptr_inputs.emplace_back(std::move(value),
-                              argflag.blockSize,
+      ptr_inputs.emplace_back(idx,
+                              std::move(value),
+                              expr::mkUInt(argflag.blockSize, 64),
                               argflag.has(ParamAttrs::NoRead),
                               argflag.has(ParamAttrs::NoWrite),
                               argflag.has(ParamAttrs::NoCapture));
@@ -2323,19 +2309,6 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
   };
   unpack(std::move(value));
   unpack(std::move(value2));
-}
-
-static void unpack_ret_ty (vector<Type*> &out_types, Type &ty) {
-  if (auto agg = ty.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      // Padding is automatically filled with poison
-      if (agg->isPadding(i))
-        continue;
-      unpack_ret_ty(out_types, agg->getChild(i));
-    }
-  } else {
-    out_types.emplace_back(&ty);
-  }
 }
 
 static StateValue
@@ -2348,19 +2321,19 @@ check_return_value(State &s, StateValue &&val, const Type &ty,
 }
 
 static StateValue
-pack_return(State &s, Type &ty, vector<StateValue> &vals, const FnAttrs &attrs,
-            unsigned &idx, const vector<pair<Value*, ParamAttrs>> &args) {
+pack_return(State &s, Type &ty, StateValue &&val, const FnAttrs &attrs,
+            const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (!agg->isPadding(i))
         vs.emplace_back(
-          pack_return(s, agg->getChild(i), vals, attrs, idx, args));
+          pack_return(s, agg->getChild(i), agg->extract(val, i), attrs, args));
     }
     return agg->aggregateVals(vs);
   }
 
-  return check_return_value(s, std::move(vals[idx++]), ty, attrs, args);
+  return check_return_value(s, std::move(val), ty, attrs, args);
 }
 
 StateValue FnCall::toSMT(State &s) const {
@@ -2371,7 +2344,6 @@ StateValue FnCall::toSMT(State &s) const {
 
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
-  vector<Type*> out_types;
 
   auto ptr = fnptr;
   // This is a direct call, but check if there are indirect calls elsewhere
@@ -2382,16 +2354,26 @@ StateValue FnCall::toSMT(State &s) const {
   ostringstream fnName_mangled;
   if (ptr) {
     fnName_mangled << "#indirect_call";
-    inputs.emplace_back(s.getAndAddPoisonUB(*ptr, true));
 
-    Pointer ptr(s.getMemory(), inputs.back().value);
-    s.addUB(ptr.isDereferenceable(1, 1, false));
+    Pointer p(s.getMemory(), s.getAndAddPoisonUB(*ptr, true).value);
+    inputs.emplace_back(p.reprWithoutAttrs(), true);
+    s.addUB(p.isDereferenceable(1, 1, false));
+
+    Function::FnDecl decl;
+    decl.output = &getType();
+    for (auto &[arg, params] : args) {
+      decl.inputs.emplace_back(&arg->getType(), params);
+    }
+    s.addUB(expr::mkUF("#fndeclty", { inputs[0].value }, expr::mkUInt(0, 32)) ==
+            decl.hash());
   } else {
     fnName_mangled << fnName;
   }
 
-  optional<StateValue> ret_val;
+  StateValue ret_val;
+  Type *ret_arg_ty = nullptr;
   vector<StateValue> ret_vals;
+  unsigned i = 0;
 
   for (auto &[arg, flags] : args) {
     // we duplicate each argument so that undef values are allowed to take
@@ -2405,21 +2387,20 @@ StateValue FnCall::toSMT(State &s) const {
       sv2 = s.eval(*arg, true);
     }
 
-    if (fnptr)
+    if (ptr)
       ret_vals.emplace_back(sv);
 
     if (flags.has(ParamAttrs::Returned)) {
-      assert(!ret_val);
-      ret_val = sv;
+      assert(!ret_arg_ty);
+      ret_val    = sv;
+      ret_arg_ty = &arg->getType();
     }
 
     unpack_inputs(s, *arg, arg->getType(), flags, std::move(sv), std::move(sv2),
-                  inputs, ptr_inputs);
+                  inputs, ptr_inputs, i);
     fnName_mangled << '#' << arg->getType();
   }
   fnName_mangled << '!' << getType();
-  if (!isVoid())
-    unpack_ret_ty(out_types, getType());
 
   // Callee must return if caller must return
   if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
@@ -2494,13 +2475,12 @@ StateValue FnCall::toSMT(State &s) const {
     return {};
   }
 
-  unsigned idx = 0;
   auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
-                         std::move(ptr_inputs), out_types, std::move(ret_val),
-                         std::move(ret_vals), attrs);
+                         std::move(ptr_inputs), getType(), std::move(ret_val),
+                         ret_arg_ty, std::move(ret_vals), attrs);
 
   return isVoid() ? StateValue()
-                  : pack_return(s, getType(), ret, attrs, idx, args);
+                  : pack_return(s, getType(), std::move(ret), attrs, args);
 }
 
 expr FnCall::getTypeConstraints(const Function &f) const {
@@ -3639,6 +3619,23 @@ uint64_t GEP::getMaxGEPOffset() const {
   return off;
 }
 
+optional<uint64_t> GEP::getExactOffset() const {
+  uint64_t off = 0;
+  for (auto &[mul, v] : getIdxs()) {
+    if (mul == 0)
+      continue;
+    if (mul >= INT64_MAX)
+      return {};
+
+    if (auto n = getInt(*v)) {
+      off += (int64_t)mul * *n;
+      continue;
+    }
+    return {};
+  }
+  return off;
+}
+
 vector<Value*> GEP::operands() const {
   vector<Value*> v = { ptr };
   for (auto &[sz, idx] : idxs) {
@@ -3782,6 +3779,15 @@ uint64_t PtrMask::getMaxGEPOffset() const {
   if (auto n = getInt(*mask))
     return ~*n;
   return UINT64_MAX;
+}
+
+optional<uint64_t> PtrMask::getExactAlign() const {
+  if (auto n = getInt(*mask)) {
+    uint64_t align = -*n;
+    if (is_power2(align))
+      return align;
+  }
+  return {};
 }
 
 vector<Value*> PtrMask::operands() const {
@@ -4141,8 +4147,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_dst = s[*dst];
     auto &sv_dst2 = s[*dst];
-    s.addGuardableUB((vbytes != 0).implies(
-              sv_dst.non_poison && sv_dst.value == sv_dst2.value));
+    s.addGuardableUB((vbytes != 0).implies(sv_dst.implies(sv_dst2)));
     vdst = sv_dst.value;
   }
 
@@ -4151,8 +4156,7 @@ StateValue Memcpy::toSMT(State &s) const {
   } else {
     auto &sv_src = s[*src];
     auto &sv_src2 = s[*src];
-    s.addGuardableUB((vbytes != 0).implies(
-               sv_src.non_poison && sv_src.value == sv_src2.value));
+    s.addGuardableUB((vbytes != 0).implies(sv_src.implies(sv_src2)));
     vsrc = sv_src.value;
   }
 

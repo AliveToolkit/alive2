@@ -786,7 +786,7 @@ void State::addUnreachable() {
   unreachable_paths.add(domain());
 }
 
-expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
+expr State::FnCallInput::implies(const FnCallInput &rhs) const {
   if (memaccess != rhs.memaccess ||
       noret != rhs.noret || willret != rhs.willret ||
       (memaccess.canReadSomething() &&
@@ -795,11 +795,11 @@ expr State::FnCallInput::operator==(const FnCallInput &rhs) const {
 
   AndExpr eq;
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
-    eq.add(args_nonptr[i] == rhs.args_nonptr[i]);
+    eq.add(args_nonptr[i].implies(rhs.args_nonptr[i]));
   }
 
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
-    eq.add(args_ptr[i] == rhs.args_ptr[i]);
+    eq.add(args_ptr[i].implies(rhs.args_ptr[i]));
   }
   return eq();
 }
@@ -820,9 +820,7 @@ expr State::FnCallInput::refinedBy(
   AndExpr refines;
   assert(args_nonptr.size() == args_nonptr2.size());
   for (unsigned i = 0, e = args_nonptr.size(); i != e; ++i) {
-    refines.add(args_nonptr[i].non_poison.implies(
-      args_nonptr[i].value == args_nonptr2[i].value &&
-      args_nonptr2[i].non_poison));
+    refines.add(args_nonptr[i].implies(args_nonptr2[i]));
   }
 
   if (!refines)
@@ -833,13 +831,12 @@ expr State::FnCallInput::refinedBy(
   for (unsigned i = 0, e = args_ptr.size(); i != e; ++i) {
     auto &ptr1 = args_ptr[i];
     auto &ptr2 = args_ptr2[i];
-    if (!ptr1.eq_attrs(ptr2))
-      return false;
-
     expr eq_val = Pointer(m, ptr1.val.value)
                     .fninputRefined(Pointer(m2, ptr2.val.value),
                                     undef_vars, ptr2.byval);
-    refines.add(ptr1.val.non_poison.implies(eq_val && ptr2.val.non_poison));
+    refines.add(ptr1.val.non_poison.implies(ptr2.val.non_poison &&
+                                            eq_val &&
+                                            ptr1.implies_attrs(ptr2)));
 
     if (!refines)
       return false;
@@ -855,10 +852,10 @@ expr State::FnCallInput::refinedBy(
     auto restrict_ptrs2 = argmemonly ? &args_ptr2 : nullptr;
     if (memaccess.canOnlyRead(MemoryAccess::Inaccessible)) {
       assert(inaccessible_bid != -1u);
-      dummy1.emplace_back(
+      dummy1.emplace_back(0,
         StateValue(Pointer(m, inaccessible_bid, false).release(), true), 0,
         false, false, false);
-      dummy2.emplace_back(
+      dummy2.emplace_back(0,
         StateValue(Pointer(m2, inaccessible_bid, false).release(), true), 0,
         false, false, false);
       assert(!restrict_ptrs && !restrict_ptrs2);
@@ -875,10 +872,9 @@ expr State::FnCallInput::refinedBy(
 }
 
 State::FnCallOutput
-State::FnCallOutput::replace(const optional<StateValue> &retval) const {
+State::FnCallOutput::replace(const StateValue &retval) const {
   FnCallOutput copy = *this;
-  assert(retvals.size() == 1);
-  copy.retvals[0] = *retval;
+  copy.retval = retval;
   return copy;
 }
 
@@ -886,35 +882,46 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
                                               const FnCallOutput &a,
                                               const FnCallOutput &b) {
   FnCallOutput ret;
-  ret.ub = expr::mkIf(cond, a.ub, b.ub);
+  ret.retval    = StateValue::mkIf(cond, a.retval, b.retval);
+  ret.ub        = expr::mkIf(cond, a.ub, b.ub);
   ret.noreturns = expr::mkIf(cond, a.noreturns, b.noreturns);
   ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
-  assert(a.retvals.size() == b.retvals.size());
+
   assert(a.ret_data.size() == b.ret_data.size());
-  for (unsigned i = 0, e = a.retvals.size(); i != e; ++i) {
-    ret.retvals.emplace_back(
-      StateValue::mkIf(cond, a.retvals[i], b.retvals[i]));
+  for (unsigned i = 0, e = a.ret_data.size(); i != e; ++i) {
     ret.ret_data.emplace_back(
       Memory::FnRetData::mkIf(cond, a.ret_data[i], b.ret_data[i]));
   }
   return ret;
 }
 
-expr State::FnCallOutput::operator==(const FnCallOutput &rhs) const {
+expr State::FnCallOutput::implies(const FnCallOutput &rhs,
+                                  const Type &retval_ty) const {
   expr ret = ub == rhs.ub;
-  ret &= noreturns == rhs.noreturns;
-  for (unsigned i = 0, e = retvals.size(); i != e; ++i) {
-    ret &= retvals[i] == rhs.retvals[i];
-  }
-  ret &= callstate == rhs.callstate;
+  ret     &= noreturns == rhs.noreturns;
+  ret     &= callstate == rhs.callstate;
+
+  function<void(const StateValue&, const StateValue&, const Type&)> check_out
+    = [&](const StateValue &a, const StateValue &b, const Type &ty) -> void {
+    if (auto agg = ty.getAsAggregateType()) {
+      for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+        if (!agg->isPadding(i))
+          check_out(agg->extract(a, i), agg->extract(b, i), agg->getChild(i));
+      }
+      return;
+    }
+    ret &= a.implies(b);
+  };
+  check_out(retval, rhs.retval, retval_ty);
   return ret;
 }
 
-vector<StateValue>
+StateValue
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<Memory::PtrInput> &&ptr_inputs,
-                 const vector<Type*> &out_types, optional<StateValue> &&ret_arg,
-                 vector<StateValue> &&ret_args, const FnAttrs &attrs) {
+                 const Type &out_type, StateValue &&ret_arg,
+                 const Type *ret_arg_ty, vector<StateValue> &&ret_args,
+                 const FnAttrs &attrs) {
   bool noret   = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
@@ -936,19 +943,19 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   if (!all_valid) {
     addUB(expr());
-    return vector<StateValue>(out_types.size());
+    return {};
   }
 
   if (attrs.mem.canWrite(MemoryAccess::Args) ||
       attrs.mem.canWrite(MemoryAccess::Inaccessible) ||
       attrs.mem.canWrite(MemoryAccess::Other)) {
     for (auto &v : ptr_inputs) {
-      if (!v.byval && !v.nocapture)
+      if (!v.byval.isTrue() && !v.nocapture.isTrue())
         memory.escapeLocalPtr(v.val.value, v.val.non_poison);
     }
   }
 
-  vector<StateValue> retval;
+  StateValue retval;
   unsigned inaccessible_bid = -1u;
   if (attrs.mem.canOnlyRead(MemoryAccess::Inaccessible) ||
       attrs.mem.canOnlyWrite(MemoryAccess::Inaccessible))
@@ -964,6 +971,43 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                     ? analysis.ranges_fn_calls.project(name)
                     : analysis.ranges_fn_calls;
 
+  if (ret_arg_ty && (*ret_arg_ty == out_type).isFalse()) {
+    ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)));
+  }
+
+  auto isgvar = [&](const auto &decl) {
+    if (auto gv = getFn().getConstant(string_view(decl.name).substr(1)))
+      return Pointer::mkPointerFromNoAttrs(memory, fn_ptr).getAddress() ==
+             Pointer(memory, (*this)[*gv].value).getAddress();
+    return expr();
+  };
+
+  if (is_indirect) {
+    // adjust attributes of pointer arguments
+    for (auto &decl : getFn().getFnDecls()) {
+      if (decl.inputs.size() != ret_args.size())
+        continue;
+
+      auto cmp = isgvar(decl);
+      if (!cmp.isValid())
+        continue;
+
+      for (auto &ptr : ptr_inputs) {
+        if (decl.inputs.size() != ret_args.size())
+          continue;
+        auto &attrs = decl.inputs[ptr.idx].second;
+        ptr.byval   = expr::mkIf(cmp, expr::mkUInt(attrs.blockSize, 64),
+                                 ptr.byval);
+        if (attrs.has(ParamAttrs::NoRead))
+          ptr.noread |= cmp;
+        if (attrs.has(ParamAttrs::NoWrite))
+          ptr.nowrite |= cmp;
+        if (attrs.has(ParamAttrs::NoCapture))
+          ptr.nocapture |= cmp;
+      }
+    }
+  }
+
   // source may create new fn symbols, target just references src symbols
   if (isSource()) {
     auto &calls_fn = fn_call_data[name];
@@ -976,32 +1020,40 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     bool inserted = call_data_pair.second;
 
     if (inserted) {
-      auto mk_val = [&](const Type &t, const string &name) {
-        if (t.isPtrType())
-          return memory.mkFnRet(name.c_str(), I->first.args_ptr, noalias);
+      StateValue output;
+      vector<Memory::FnRetData> ret_data;
+      string npname = name + "#np";
 
-         return make_pair(
-           expr::mkFreshVar(name.c_str(), t.getDummyValue(false).value),
-           Memory::FnRetData());
+      auto mk_np = [&](expr &&np) {
+        return noundef ? std::move(np) : expr::mkFreshVar(npname.c_str(), np);
       };
 
-      vector<StateValue> values;
-      vector<Memory::FnRetData> ret_data;
-      string valname = name + "#val";
-      string npname = name + "#np";
-      if (ret_arg) {
-        assert(out_types.size() == 1);
-        values.emplace_back(std::move(ret_arg).value());
-        ret_data.emplace_back();
-      } else {
-        for (auto t : out_types) {
-          auto [val, data] = mk_val(*t, valname);
-          values.emplace_back(
-            std::move(val),
-            noundef ? expr(true) : expr::mkFreshVar(npname.c_str(), false));
-          ret_data.emplace_back(std::move(data));
+      function<StateValue(const Type &)> mk_output
+        = [&](const Type &ty) -> StateValue {
+        if (ty.isPtrType()) {
+          auto [val, mem]
+            = memory.mkFnRet(name.c_str(), I->first.args_ptr, noalias);
+          ret_data.emplace_back(std::move(mem));
+          return { std::move(val), mk_np(true) };
         }
-      }
+
+        if (!hasPtr(ty)) {
+          auto dummy = ty.getDummyValue(true);
+          return { expr::mkFreshVar(name.c_str(), dummy.value),
+                   mk_np(std::move(dummy.non_poison)) };
+        }
+
+        assert(ty.isAggregateType());
+        auto agg = ty.getAsAggregateType();
+        vector<StateValue> vals;
+        for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+          if (!agg->isPadding(i))
+            vals.emplace_back(mk_output(agg->getChild(i)));
+        }
+        return agg->aggregateVals(vals);
+      };
+
+      output = ret_arg_ty ? std::move(ret_arg) : mk_output(out_type);
 
       // Indirect calls may be changed into direct in tgt
       // Account for this if we have declarations with a returned argument
@@ -1014,15 +1066,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
           for (auto &[ty, attrs] : decl.inputs) {
             if (attrs.has(ParamAttrs::Returned)) {
               auto &ret = ret_args[idx];
-              if (ret.value.isSameTypeOf(values[0].value)) {
-                assert(values.size() == 1);
-                auto gv = getFn().getConstant(string_view(decl.name).substr(1));
-                assert(gv);
-                auto cmp = Pointer(memory, fn_ptr).getAddress() ==
-                           Pointer(memory, (*this)[*gv].value).getAddress();
-                values[0].value = expr::mkIf(cmp, ret.value, values[0].value);
-                values[0].non_poison
-                  = expr::mkIf(cmp, ret.non_poison, values[0].non_poison);
+              if (ret.value.isSameTypeOf(output.value)) {
+                auto cmp = isgvar(decl);
+                if (cmp.isValid())
+                  output = StateValue::mkIf(cmp, ret, output);
               }
               break;
             }
@@ -1032,7 +1079,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       }
 
       I->second
-        = { std::move(values), expr::mkFreshVar((name + "#ub").c_str(), false),
+        = { std::move(output), expr::mkFreshVar((name + "#ub").c_str(), false),
             (noret || willret)
               ? expr(noret)
               : expr::mkFreshVar((name + "#noreturn").c_str(), false),
@@ -1046,15 +1093,15 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
         if (II == I)
           continue;
-        auto in_eq = I->first == II->first;
+        auto in_eq = I->first.implies(II->first);
         if (!in_eq.isFalse())
-          fn_call_pre &= in_eq.implies(I->second == II->second);
+          fn_call_pre &= in_eq.implies(I->second.implies(II->second, out_type));
       }
     }
 
     addUB(I->second.ub);
     addNoReturn(I->second.noreturns);
-    retval = I->second.retvals;
+    retval = I->second.retval;
     if (attrs.mem.canWriteSomething())
       memory.setState(I->second.callstate, attrs.mem, I->first.args_ptr,
                       inaccessible_bid);
@@ -1067,7 +1114,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       auto refined = in.refinedBy(*this, name, inaccessible_bid, inputs,
                                   ptr_inputs, call_ranges, memory, attrs.mem,
                                   noret, willret);
-      data.add(ret_arg ? out.replace(ret_arg) : out, std::move(refined));
+      data.add(ret_arg_ty ? out.replace(ret_arg) : out, std::move(refined));
     }
 
     if (data) {
@@ -1080,17 +1127,30 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         // no alias functions in tgt must allocate a local block on each call
         // bid may be different from that of src
         unsigned i = 0;
-        for (auto t : out_types) {
-          retval.emplace_back(
-            t->isPtrType()
-              ? StateValue(memory.mkFnRet(name.c_str(), ptr_inputs, noalias,
-                                          &d.ret_data[i]).first,
-                           std::move(d.retvals[i].non_poison))
-              : std::move(d.retvals[i]));
-          ++i;
-        }
+        auto &ret_data = d.ret_data;
+        function<StateValue(const Type &, StateValue &&)> mk_output
+          = [&](const Type &ty, StateValue &&val) -> StateValue {
+          if (ty.isPtrType()) {
+            return { memory.mkFnRet(name.c_str(), ptr_inputs, noalias,
+                                    &ret_data[i++]).first,
+                     std::move(val.non_poison) };
+          }
+
+          if (!hasPtr(ty))
+            return std::move(val);
+
+          assert(ty.isAggregateType());
+          auto agg = ty.getAsAggregateType();
+          vector<StateValue> vals;
+          for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+            vals.emplace_back(
+              mk_output(agg->getChild(i), agg->extract(val, i)));
+          }
+          return agg->aggregateVals(vals);
+        };
+        retval = mk_output(out_type, std::move(d.retval));
       } else
-        retval = std::move(d.retvals);
+        retval = std::move(d.retval);
 
       if (attrs.mem.canWriteSomething())
         memory.setState(d.callstate, attrs.mem, ptr_inputs, inaccessible_bid);
@@ -1100,9 +1160,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         fn_call_qvars.emplace(std::move(qvar));
     } else {
       addUB(expr(false));
-      for (auto *t : out_types) {
-        retval.emplace_back(t->getDummyValue(false));
-      }
+      retval = out_type.getDummyValue(false);
     }
   }
 
@@ -1117,6 +1175,10 @@ void State::doesApproximation(string &&name, optional<expr> e) {
 
 void State::addQuantVar(const expr &var) {
   quantified_vars.emplace(var);
+}
+
+void State::addNonDetVar(const expr &var) {
+  nondet_vars.emplace(var);
 }
 
 expr State::getFreshNondetVar(const char *prefix, const expr &type) {
@@ -1241,6 +1303,16 @@ void State::syncSEdataWithSrc(State &src) {
 void State::mkAxioms(State &tgt) {
   assert(isSource() && !tgt.isSource());
   returnMemory().mkAxioms(tgt.returnMemory());
+
+  if (has_indirect_fncalls) {
+    for (auto &decl : f.getFnDecls()) {
+      if (auto gv = f.getConstant(string_view(decl.name).substr(1)))
+        addAxiom(
+          expr::mkUF("#fndeclty",
+                     { Pointer(memory, (*this)[*gv].value).reprWithoutAttrs() },
+                     expr::mkUInt(0, 32)) == decl.hash());
+    }
+  }
 }
 
 }

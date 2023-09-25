@@ -43,7 +43,7 @@ protected:
 public:
   Type(std::string &&name) : name(std::move(name)) {}
   virtual unsigned bits() const = 0;
-  virtual unsigned np_bits() const;
+  virtual unsigned np_bits(bool fromInt) const;
 
   // to use when one needs the corresponding SMT type
   virtual IR::StateValue getDummyValue(bool non_poison) const = 0;
@@ -185,6 +185,8 @@ private:
   FpType fpType = Unknown;
   bool defined = false;
 
+  unsigned expBits() const;
+  unsigned fractionBits() const;
   bool isNaNInt(const smt::expr &e) const;
 
 public:
@@ -196,8 +198,9 @@ public:
 
   smt::expr getDummyFloat() const;
   smt::expr getFloat(const smt::expr &v) const;
-  smt::expr fromFloat(State &s, const smt::expr &fp,
-                      const smt::expr &is_snan) const;
+  smt::expr fromFloat(State &s, const smt::expr &fp, const Type &from_type,
+                      unsigned nary, const smt::expr &a,
+                      const smt::expr &b = {}, const smt::expr &c = {}) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
 
   IR::StateValue getDummyValue(bool non_poison) const override;
@@ -229,7 +232,7 @@ public:
 
   PtrType(unsigned addr_space);
   unsigned bits() const override;
-  unsigned np_bits() const override;
+  unsigned np_bits(bool fromInt) const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;
@@ -282,7 +285,7 @@ public:
   unsigned countPaddings(unsigned to_idx) const;
 
   unsigned bits() const override;
-  unsigned np_bits() const override;
+  unsigned np_bits(bool fromInt) const override;
   // Padding is filled with poison regardless of non_poison.
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
@@ -333,7 +336,6 @@ public:
   IR::StateValue update(const IR::StateValue &vector,
                         const IR::StateValue &val,
                         const smt::expr &idx) const;
-  unsigned np_bits() const override;
   smt::expr getTypeConstraints() const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
@@ -375,7 +377,7 @@ public:
   SymbolicType(std::string &&name, unsigned type_mask);
 
   unsigned bits() const override;
-  unsigned np_bits() const override;
+  unsigned np_bits(bool fromInt) const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
   smt::expr sizeVar() const override;

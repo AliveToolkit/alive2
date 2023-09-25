@@ -46,8 +46,11 @@ bool StateValue::isValid() const {
 }
 
 expr StateValue::operator==(const StateValue &other) const {
-  return non_poison == other.non_poison &&
-         non_poison.implies(value == other.value);
+  return non_poison == other.non_poison && value == other.value;
+}
+
+expr StateValue::implies(const StateValue &other) const {
+  return non_poison.implies(other.non_poison && value == other.value);
 }
 
 bool StateValue::eq(const StateValue &other) const {
@@ -56,6 +59,10 @@ bool StateValue::eq(const StateValue &other) const {
 
 set<expr> StateValue::vars() const {
   return expr::vars({ &value, &non_poison });
+}
+
+StateValue StateValue::subst(const expr &from, const expr &to) const {
+  return { value.subst(from, to), non_poison.subst(from, to) };
 }
 
 StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
@@ -76,6 +83,10 @@ StateValue StateValue::subst(const vector<pair<expr, expr>> &repls) const {
     np = non_poison;
   }
   return { then.eq(v1) ? std::move(els) : std::move(then), std::move(np) };
+}
+
+StateValue StateValue::simplify() const {
+  return { value.simplify(), non_poison.simplify() };
 }
 
 ostream& operator<<(ostream &os, const StateValue &val) {

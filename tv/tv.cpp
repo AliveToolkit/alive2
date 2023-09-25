@@ -479,7 +479,9 @@ const char* unsupported_pass_list[] = {
   "DeadArgumentEliminationPass",
   "EliminateAvailableExternallyPass",
   "EntryExitInstrumenterPass",
+  "GlobalDCEPass",
   "GlobalOptPass",
+  "GlobalSplitPass",
   "HotColdSplittingPass",
   "InferFunctionAttrsPass",
   "InlinerPass",
@@ -493,6 +495,7 @@ const char* unsupported_pass_list[] = {
   "PostOrderFunctionAttrsPass",
   "SampleProfileLoaderPass",
   "TailCallElimPass",
+  "ThinLTOBitcodeWriterPass",
 };
 
 const char* nop_pass_prefixes[] {

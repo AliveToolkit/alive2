@@ -4,6 +4,7 @@
 #include "ir/function.h"
 #include "ir/instr.h"
 #include "util/errors.h"
+#include "util/hash.h"
 #include "util/sort.h"
 #include "util/unionfind.h"
 #include <fstream>
@@ -115,6 +116,33 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
 
 
 BasicBlock Function::sink_bb("#sink");
+
+unsigned Function::FnDecl::hash() const {
+  GenHash hash;
+
+  function<void(const Type&)> hash_ty = [&](const Type &ty) {
+    if (ty.isPtrType()) {
+      hash.add((uint8_t)0x42);
+    } else if (dynamic_cast<const VoidType*>(&ty)) {
+      hash.add((uint8_t)0xEF);
+    } else if (auto agg = ty.getAsAggregateType()) {
+      hash.add((uint8_t)0x11);
+      for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+        if (!agg->isPadding(i))
+          hash_ty(agg->getChild(i));
+      }
+    } else {
+      uint8_t data[2] = { uint8_t(0x33+ty.isFloatType()), (uint8_t)ty.bits() };
+      hash.add(data, sizeof(data));
+    }
+  };
+
+  for (auto &[ty, attrs] : inputs) {
+    hash_ty(*ty);
+  }
+  hash_ty(*output);
+  return hash();
+}
 
 expr Function::getTypeConstraints() const {
   expr t(true);

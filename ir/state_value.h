@@ -30,11 +30,15 @@ struct StateValue {
   bool isValid() const;
 
   smt::expr operator==(const StateValue &other) const;
+  smt::expr implies(const StateValue &other) const;
   bool eq(const StateValue &other) const;
 
   std::set<smt::expr> vars() const;
+  StateValue subst(const smt::expr &from, const smt::expr &to) const;
   StateValue
     subst(const std::vector<std::pair<smt::expr, smt::expr>> &repls) const;
+
+  StateValue simplify() const;
 
   auto operator<=>(const StateValue &rhs) const = default;
 

@@ -383,7 +383,7 @@ pair<expr, expr> FnModel::iterator::operator*(void) const {
        i != e; ++i) {
     args.emplace_back(expr(Z3_func_entry_get_arg(ctx(), entry, i)));
   }
-  Z3_func_entry_inc_ref(ctx(), entry);
+  Z3_func_entry_dec_ref(ctx(), entry);
 
   auto var = expr::mkUF(fn_name, args, value);
   return { std::move(var), std::move(value) };

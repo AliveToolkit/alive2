@@ -162,7 +162,7 @@ private:
     MemoryAccess memaccess;
     bool noret, willret;
 
-    smt::expr operator==(const FnCallInput &rhs) const;
+    smt::expr implies(const FnCallInput &rhs) const;
     smt::expr refinedBy(State &s, const std::string &callee,
                         unsigned inaccessible_bid,
                         const std::vector<StateValue> &args_nonptr,
@@ -175,17 +175,17 @@ private:
   };
 
   struct FnCallOutput {
-    std::vector<StateValue> retvals;
+    StateValue retval;
     smt::expr ub;
     smt::expr noreturns;
     Memory::CallState callstate;
     std::vector<Memory::FnRetData> ret_data;
 
-    FnCallOutput replace(const std::optional<StateValue> &retval) const;
+    FnCallOutput replace(const StateValue &retval) const;
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
                              const FnCallOutput &els);
-    smt::expr operator==(const FnCallOutput &rhs) const;
+    smt::expr implies(const FnCallOutput &rhs, const Type &retval_ty) const;
     auto operator<=>(const FnCallOutput &rhs) const = default;
   };
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
@@ -248,11 +248,11 @@ public:
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
 
-  std::vector<StateValue>
+  StateValue
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<Memory::PtrInput> &&ptr_inputs,
-              const std::vector<Type*> &out_types,
-              std::optional<StateValue> &&ret_arg,
+              const Type &out_type,
+              StateValue &&ret_arg, const Type *ret_arg_ty,
               std::vector<StateValue> &&ret_args, const FnAttrs &attrs);
 
   auto& getVarArgsData() { return var_args_data.data; }
@@ -262,6 +262,7 @@ public:
 
   smt::expr getFreshNondetVar(const char *prefix, const smt::expr &type);
   void addQuantVar(const smt::expr &var);
+  void addNonDetVar(const smt::expr &var);
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }

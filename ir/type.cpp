@@ -24,7 +24,9 @@ namespace IR {
 
 VoidType Type::voidTy;
 
-unsigned Type::np_bits() const {
+unsigned Type::np_bits(bool fromInt) const {
+  if (!fromInt)
+    return 1;
   auto bw = bits();
   return min(bw, (unsigned)divide_up(bw * bits_poison_per_byte, bits_byte));
 }
@@ -215,9 +217,7 @@ expr Type::toBV(expr e) const {
 }
 
 StateValue Type::toBV(StateValue v) const {
-  auto bw = np_bits();
-  return { toBV(std::move(v.value)),
-           expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
+  return { toBV(std::move(v.value)), v.non_poison.toBVBool() };
 }
 
 expr Type::fromBV(expr e) const {
@@ -234,7 +234,7 @@ expr Type::toInt(State &s, expr v) const {
 }
 
 StateValue Type::toInt(State &s, StateValue v) const {
-  auto bw = np_bits();
+  auto bw = np_bits(true);
   return { toInt(s, std::move(v.value)),
            expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
@@ -424,45 +424,69 @@ expr FloatType::getFloat(const expr &v) const {
   return v.BV2float(ty);
 }
 
-expr FloatType::fromFloat(State &s, const expr &fp, const expr &is_snan) const {
+expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
+                          unsigned nary, const expr &a, const expr &b,
+                          const expr &c) const {
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
-  if (isnan.isFalse()) {
-    assert(is_snan.isFalse());
+  if (isnan.isFalse())
     return val;
-  }
 
-  // Rules to create NaN payload
-  // 1) SNaN iff is_snan is true
-  // 2) QNaN if the result is NaN
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1 /* sign */ - is_snan.isFalse();
-  unsigned var_bits = fraction_bits + 1 /* sign */;
-
-  expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
-  auto fraction = var.extract(fraction_bits - 1, 0);
+  unsigned fraction_bits = fractionBits();
+  unsigned var_bits = fraction_bits-1 + 1 /* sign */;
 
   // sign bit, exponent (-1), qnan bit (1) or snan (0), rest of fraction
-  auto nan = var.sign()
-                .concat(expr::mkInt(-1, exp_bits + is_snan.isFalse()))
-                .concat(fraction);
+  expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
+
+  ChoiceExpr<expr> exprs;
+
+  // 1) preferred QNaN (1000..00)
+  exprs.add(expr::mkUInt(1ull << (fraction_bits-1), fraction_bits), expr(true));
+
+  // 2) input NaN
+  // 3) quieted input NaN
+  const FloatType &from_type = *from_type0.getAsFloatType();
+
+  auto maybe_quiet = [&](const expr &e) {
+    // account for fpext/fptruc
+    expr fraction = e.trunc(min(from_type.fractionBits(), fraction_bits));
+    if (fraction.bits() < fraction_bits)
+      fraction = fraction.concat_zeros(fraction_bits - fraction.bits());
+    assert(!fraction.isValid() || fraction.bits() == fraction_bits);
+
+    expr qnan = fraction.extract(fraction_bits - 1, fraction_bits - 1);
+    return (qnan | var.extract(0, 0)).concat(fraction.trunc(fraction_bits - 1));
+  };
+  if (nary >= 1) {
+    exprs.add(maybe_quiet(a), from_type.getFloat(a).isNaN());
+    if (nary >= 2) {
+      exprs.add(maybe_quiet(b), from_type.getFloat(b).isNaN());
+      if (nary >= 3)
+        exprs.add(maybe_quiet(c), from_type.getFloat(c).isNaN());
+    }
+  }
+
+  // 4) target specific preferred QNaN (a set, possibliy empty)
+  // approximated by adding just one more value
+  exprs.add(expr::mkUInt(1, 1).concat(var.extract(fraction_bits - 2, 0)),
+            expr(true));
+
+  auto [fraction, domain, choice_var, pre] = std::move(exprs)();
+  assert(!domain.isValid() || domain.isTrue());
+  expr nan = var.sign().concat(expr::mkInt(-1, expBits())).concat(fraction);
   assert(isNaNInt(nan));
 
-  // we optimize the encoding when we know the result must be a QNaN
-  // by extending the exponent with another constant bit (of 1)
-  s.addPre(expr::mkIf(is_snan,
-                      fraction != 0,
-                      is_snan.isFalse() ? expr(true) : fraction.sign() == 1));
+  s.addNonDetVar(std::move(choice_var));
+  s.addPre(std::move(pre));
 
   return expr::mkIf(isnan, nan, val);
 }
 
 expr FloatType::isNaN(const expr &v, bool signalling) const {
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bits() - exp_bits - 1;
+  unsigned fraction_bits = fractionBits();
 
-  expr bits = v.extract(fraction_bits + exp_bits - 1, fraction_bits - 1);
+  expr bits = v.extract(fraction_bits + expBits() - 1, fraction_bits - 1);
   if (signalling) {
     expr fraction = v.extract(fraction_bits - 2, 0);
     return bits == (UINT64_MAX << 1ull) && fraction != 0;
@@ -476,6 +500,15 @@ unsigned FloatType::bits() const {
   return float_sizes[fpType].first;
 }
 
+unsigned FloatType::expBits() const {
+  assert(fpType != Unknown);
+  return float_sizes[fpType].second;
+}
+
+unsigned FloatType::fractionBits() const {
+  return bits() - expBits() - 1 /* sign bit */;
+}
+
 const FloatType* FloatType::getAsFloatType() const {
   return this;
 }
@@ -484,21 +517,19 @@ bool FloatType::isNaNInt(const expr &e) const {
   if (!e.isValid())
     return false;
 
-  auto bw = e.bits();
-  unsigned exp_bits = float_sizes[fpType].second;
-  unsigned fraction_bits = bw - exp_bits - 1 /* sign bit */;
+  // unsigned var_bits = fraction_bits-1 + 1 /* sign */;
+  // expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
+  // var.sign().concat(expr::mkInt(-1, exp_bits)).concat(fraction)
+  auto bw = bits();
 
-  expr sign = e.extract(bw - 1, bw - 1);
-  expr exponent = e.extract(bw - 2, fraction_bits);
-  expr fraction = e.extract(fraction_bits - 2, 0);
-  assert(exponent.bits() == exp_bits);
+  expr exponent = e.extract(bw - 2, fractionBits());
+  assert(exponent.bits() == expBits());
 
-  expr nan, nan2;
+  expr nan;
   unsigned h, l;
   return exponent.isAllOnes() &&
-         sign.isExtract(nan, h, l) &&
-         fraction.isExtract(nan2, h, l) &&
-         nan.eq(nan2) &&
+         e.sign().isExtract(nan, h, l) &&
+         h == l && h == fractionBits() - 1 &&
          nan.fn_name().starts_with("#NaN");
 }
 
@@ -607,7 +638,7 @@ unsigned PtrType::bits() const {
   return Pointer::totalBits();
 }
 
-unsigned PtrType::np_bits() const {
+unsigned PtrType::np_bits(bool fromInt) const {
   return 1;
 }
 
@@ -770,13 +801,12 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
   return v;
 }
 
-StateValue
-AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
-    const {
+StateValue AggregateType::extract(const StateValue &val, unsigned index,
+                                  bool fromInt) const {
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
     total_value += children[i]->bits();
-    total_np += children[i]->np_bits();
+    total_np += children[i]->np_bits(fromInt);
   }
 
   unsigned h_val, l_val, h_np, l_np;
@@ -784,16 +814,16 @@ AggregateType::extract(const StateValue &val, unsigned index, bool fromInt)
     h_val = total_value + children[index]->bits() - 1;
     l_val = total_value;
 
-    h_np = total_np + children[index]->np_bits() - 1;
+    h_np = total_np + children[index]->np_bits(fromInt) - 1;
     l_np = total_np;
   } else {
     unsigned high_val = bits() - total_value;
     h_val = high_val - 1;
     l_val = high_val - children[index]->bits();
 
-    unsigned high_np = np_bits() - total_np;
+    unsigned high_np = np_bits(fromInt) - total_np;
     h_np = high_np - 1;
-    l_np = high_np - children[index]->np_bits();
+    l_np = high_np - children[index]->np_bits(fromInt);
   }
 
   StateValue sv(val.value.extract(h_val, l_val),
@@ -814,14 +844,14 @@ unsigned AggregateType::bits() const {
   return bw;
 }
 
-unsigned AggregateType::np_bits() const {
+unsigned AggregateType::np_bits(bool fromInt) const {
   if (elements == 0)
     // It is set as 1 because zero-width bitvector is invalid.
     return 1;
 
   unsigned bw = 0;
   for (unsigned i = 0; i < elements; ++i) {
-    bw += children[i]->np_bits();
+    bw += children[i]->np_bits(fromInt);
   }
   return bw;
 }
@@ -1037,7 +1067,7 @@ StateValue VectorType::extract(const StateValue &vector,
   unsigned h_val = elements * bw_elem - 1;
   unsigned l_val = (elements - 1) * bw_elem;
 
-  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np_elem = elementTy.np_bits(false);
   unsigned bw_np = bw_np_elem * elements;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
   unsigned h_np = elements * bw_np_elem - 1;
@@ -1063,7 +1093,7 @@ StateValue VectorType::update(const StateValue &vector,
   expr mask_v = ~expr::mkInt(-1, bw_elem).concat(fill_v).lshr(idx_v);
   expr nv_shifted = val_bv.value.concat(fill_v).lshr(idx_v);
 
-  unsigned bw_np_elem = elementTy.np_bits();
+  unsigned bw_np_elem = elementTy.np_bits(false);
   unsigned bw_np = bw_np_elem * elements;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
   expr fill_np = expr::mkUInt(0, bw_np - bw_np_elem);
@@ -1072,12 +1102,6 @@ StateValue VectorType::update(const StateValue &vector,
 
   return fromBV({ (vector.value & mask_v) | nv_shifted,
                   (vector.non_poison & mask_np) | np_shifted});
-}
-
-unsigned VectorType::np_bits() const {
-  if (getChild(0).isPtrType())
-    return elements;
-  return Type::np_bits();
 }
 
 expr VectorType::getTypeConstraints() const {
@@ -1197,8 +1221,8 @@ unsigned SymbolicType::bits() const {
   DISPATCH(bits(), UNREACHABLE());
 }
 
-unsigned SymbolicType::np_bits() const {
-  DISPATCH(np_bits(), UNREACHABLE());
+unsigned SymbolicType::np_bits(bool fromInt) const {
+  DISPATCH(np_bits(fromInt), UNREACHABLE());
 }
 
 StateValue SymbolicType::getDummyValue(bool non_poison) const {

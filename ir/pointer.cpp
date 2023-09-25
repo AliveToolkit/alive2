@@ -268,6 +268,14 @@ expr Pointer::blockSizeOffsetT() const {
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
 }
 
+expr Pointer::reprWithoutAttrs() const {
+  return p.extract(totalBits() - 1, bits_for_ptrattrs);
+}
+
+Pointer Pointer::mkPointerFromNoAttrs(const Memory &m, const expr &e) {
+  return { m, e.concat_zeros(bits_for_ptrattrs) };
+}
+
 Pointer Pointer::operator+(const expr &bytes) const {
   return { m, getBid(), getOffset() + bytes.zextOrTrunc(bits_for_offset),
            getAttrs() };
@@ -293,8 +301,7 @@ expr Pointer::addNoOverflow(const expr &offset) const {
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {
-  return p.extract(totalBits() - 1, bits_for_ptrattrs) ==
-         rhs.p.extract(totalBits() - 1, bits_for_ptrattrs);
+  return reprWithoutAttrs() == rhs.reprWithoutAttrs();
 }
 
 expr Pointer::operator!=(const Pointer &rhs) const {
@@ -527,14 +534,14 @@ expr Pointer::refined(const Pointer &other) const {
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
-                             unsigned byval_bytes) const {
+                             const expr &byval_bytes) const {
   expr size = blockSizeOffsetT();
   expr off = getOffsetSizet();
   expr size2 = other.blockSizeOffsetT();
   expr off2 = other.getOffsetSizet();
 
   // TODO: check block value for byval_bytes
-  if (byval_bytes)
+  if (!byval_bytes.isZero())
     return true;
 
   expr local

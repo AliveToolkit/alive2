@@ -246,19 +246,21 @@ public:
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
 
   struct PtrInput {
+    unsigned idx;
     StateValue val;
-    uint64_t byval;
-    bool noread;
-    bool nowrite;
-    bool nocapture;
+    smt::expr byval;
+    smt::expr noread;
+    smt::expr nowrite;
+    smt::expr nocapture;
 
-    PtrInput(StateValue &&val, uint64_t byval, bool noread, bool nowrite,
-             bool nocapture) :
-      val(std::move(val)), byval(byval), noread(noread), nowrite(nowrite),
-      nocapture(nocapture) {}
+    PtrInput(unsigned idx, StateValue &&val, smt::expr &&byval,
+             smt::expr &&noread, smt::expr &&nowrite, smt::expr &&nocapture) :
+      idx(idx), val(std::move(val)), byval(std::move(byval)),
+      noread(std::move(noread)), nowrite(std::move(nowrite)),
+      nocapture(std::move(nocapture)) {}
 
-    smt::expr operator==(const PtrInput &rhs) const;
-    bool eq_attrs(const PtrInput &rhs) const;
+    smt::expr implies(const PtrInput &rhs) const;
+    smt::expr implies_attrs(const PtrInput &rhs) const;
     auto operator<=>(const PtrInput &rhs) const = default;
   };
 
