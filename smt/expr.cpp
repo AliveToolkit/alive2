@@ -2240,6 +2240,29 @@ set<expr> expr::leafs(unsigned max) const {
   return ret;
 }
 
+set<expr> expr::get_apps_of(const char *fn_name) const {
+  C();
+  vector<expr> worklist = { *this };
+  unordered_set<Z3_ast> seen;
+  set<expr> ret;
+  do {
+    auto val = std::move(worklist.back());
+    worklist.pop_back();
+    if (!seen.emplace(val()).second || !val.isApp())
+      continue;
+
+    for (unsigned i = 0, e = val.getFnNumArgs(); i < e; ++i) {
+      worklist.emplace_back(val.getFnArg(i));
+    }
+
+    if (val.fn_name() == fn_name) {
+      ret.emplace(std::move(val));
+    }
+  } while (!worklist.empty());
+
+  return ret;
+}
+
 void expr::printUnsigned(ostream &os) const {
   os << numeral_string();
 }

@@ -2048,10 +2048,45 @@ expr Memory::ptr2int(const expr &ptr) const {
   return p.getAddress();
 }
 
-expr Memory::int2ptr(const expr &val) const {
+expr Memory::int2ptr(const expr &val0) const {
   assert(!memory_unused() && observesAddresses());
   if (state->getFn().getFnAttrs().has(FnAttrs::Asm)) {
     DisjointExpr<expr> ret(expr{});
+    expr val = val0;
+    OrExpr domain;
+    bool processed_all = true;
+
+    // Try to optimize the conversion
+    // Note that the result of int2ptr is always used to dereference the ptr
+    // Hence we can throw away null & OOB pointers
+    // Also, these pointers must have originated from ptr->int type punning
+    // so they must have a (blk_addr bid) expression in them (+ some offset)
+    for (auto [e, cond] : DisjointExpr<expr>(val, 5)) {
+      auto blks = e.get_apps_of("blk_addr");
+      if (blks.empty()) {
+        expr subst = false;
+        if (cond.isNot(cond))
+          subst = true;
+        val = val.subst(cond, subst);
+        continue;
+      }
+      if (blks.size() == 1) {
+        expr bid = blks.begin()->getFnArg(0);
+        Pointer base(*this, bid, expr::mkUInt(0, bits_for_offset));
+        expr offset = (e - base.getAddress()).sextOrTrunc(bits_for_offset);
+        ret.add(Pointer(*this, bid, offset).release(), cond);
+      } else {
+        processed_all = false;
+      }
+      domain.add(std::move(cond));
+    }
+    state->addUB(std::move(domain)());
+
+    if (processed_all)
+      return std::move(ret)()->simplify();
+
+    val = val.simplify();
+
     expr valx = val.zextOrTrunc(bits_program_pointer);
 
     auto add = [&](unsigned limit, bool local) {
@@ -2068,9 +2103,9 @@ expr Memory::int2ptr(const expr &val) const {
   }
 
   expr null = Pointer::mkNullPointer(*this).release();
-  expr fn = expr::mkUF("int2ptr", { val }, null);
+  expr fn = expr::mkUF("int2ptr", { val0 }, null);
   state->doesApproximation("inttoptr", fn);
-  return expr::mkIf(val == 0, null, fn);
+  return expr::mkIf(val0 == 0, null, fn);
 }
 
 expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
