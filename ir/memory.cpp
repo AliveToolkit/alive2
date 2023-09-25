@@ -1244,10 +1244,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
-    if (!has_null_block || bid != 0) {
+    if (!has_null_block || bid != 0)
       state->addAxiom(addr != 0);
-      state->addAxiom(p1.blockSize() != 0);
-    }
 
     // address must be properly aligned
     state->addAxiom(
