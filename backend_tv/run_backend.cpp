@@ -75,7 +75,7 @@ unique_ptr<MemoryBuffer> generateAsm(Module &M) {
   raw_svector_ostream os(Asm);
 
   legacy::PassManager pass;
-  if (TM->addPassesToEmitFile(pass, os, nullptr, CGFT_AssemblyFile, false)) {
+  if (TM->addPassesToEmitFile(pass, os, nullptr, CodeGenFileType::AssemblyFile, false)) {
     cerr << "\nERROR: Failed to add pass to generate assembly\n\n";
     exit(-1);
   }

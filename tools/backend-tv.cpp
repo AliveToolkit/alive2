@@ -169,8 +169,11 @@ version )EOF";
 #define ARGS_MODULE_VAR M1
 # include "llvm_util/cmd_args_def.h"
 
-  // unsound in general, but sound given our lifting strategy
-  config::enable_approx_int2ptr = true;
+  // turn on Alive2's asm-level memory model for the target; this
+  // helps Alive2 deal more gracefully with the fact that integers and
+  // pointers are freely mixed at the asm level, unlike in LLVM IR in
+  // general
+  config::tgt_is_asm = true;
 
   // undef is going away, we don't want to see bugs about it
   config::disable_undef_input = true;
