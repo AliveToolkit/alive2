@@ -547,6 +547,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     // allow ptr->int type punning in Assembly mode
     if (bitsize == bits_program_pointer &&
         has_null_block && // a ptr load in src sets this to true
+        does_ptr_mem_access &&
         m.getState().getFn().getFnAttrs().has(FnAttrs::Asm)) {
       StateValue ptr_val = bytesToValue(m, bytes, PtrType(0));
       ptr_val.value = Pointer(m, ptr_val.value).getAddress();
