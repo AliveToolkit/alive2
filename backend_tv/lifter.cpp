@@ -2548,7 +2548,7 @@ public:
       auto *g = new GlobalVariable(*LiftedModule, AT, false,
                                    GlobalValue::LinkageTypes::ExternalLinkage,
                                    nullptr, name);
-      g->setAlignment(MaybeAlign(8));
+      g->setAlignment(MaybeAlign(16));
       /*
         FIXME initialize
       for (unsigned i = 0; i < size; ++i) {
