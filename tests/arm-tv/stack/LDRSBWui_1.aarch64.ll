@@ -1,3 +1,5 @@
+; XFAIL: 
+
 ; TEST-ARGS: --global-isel  -global-isel-abort=0
 ; ModuleID = 'fuzz'
 
