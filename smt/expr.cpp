@@ -812,8 +812,8 @@ expr expr::add_no_soverflow(const expr &rhs) const {
 
   if (rhs.isConst()) {
     auto v = IntSMin(bits()) - rhs;
-    return
-      rhs.isNegative().isTrue() ? sge(v) : sle(v - expr::mkUInt(1, sort()));
+    return rhs.isNegative().isTrue() ? sge(v)
+                                     : sle(v - expr::mkUInt(1, rhs.sort()));
   }
   if (isConst())
     return rhs.add_no_soverflow(*this);
@@ -2240,7 +2240,7 @@ set<expr> expr::leafs(unsigned max) const {
   return ret;
 }
 
-set<expr> expr::get_apps_of(const char *fn_name) const {
+set<expr> expr::get_apps_of(const char *fn_name, const char *prefix) const {
   C();
   vector<expr> worklist = { *this };
   unordered_set<Z3_ast> seen;
@@ -2248,14 +2248,15 @@ set<expr> expr::get_apps_of(const char *fn_name) const {
   do {
     auto val = std::move(worklist.back());
     worklist.pop_back();
-    if (!seen.emplace(val()).second || !val.isApp())
-      continue;
 
     for (unsigned i = 0, e = val.getFnNumArgs(); i < e; ++i) {
-      worklist.emplace_back(val.getFnArg(i));
+      expr arg = val.getFnArg(i);
+      if (arg.isApp() && seen.emplace(arg()).second)
+        worklist.emplace_back(std::move(arg));
     }
 
-    if (val.fn_name() == fn_name) {
+    auto str = val.fn_name();
+    if (str == fn_name || str.starts_with(prefix)) {
       ret.emplace(std::move(val));
     }
   } while (!worklist.empty());

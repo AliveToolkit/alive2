@@ -360,7 +360,7 @@ public:
 
   std::set<expr> leafs(unsigned max = 64) const;
 
-  std::set<expr> get_apps_of(const char *fn_name) const;
+  std::set<expr> get_apps_of(const char *fn_name, const char *prefix) const;
 
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
