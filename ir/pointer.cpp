@@ -431,7 +431,7 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
   return { std::move(cond), p.isAligned(align) };
 }
 
-// When bytes is 0, pointer is always derefenceable
+// When bytes is 0, pointer is always dereferenceable
 pair<AndExpr, expr>
 Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
                            bool iswrite, bool ignore_accessability) {

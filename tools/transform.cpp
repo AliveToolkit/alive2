@@ -959,7 +959,7 @@ static void calculateAndInitConstants(Transform &t) {
   set<string> inaccessiblememonly_fns;
   num_inaccessiblememonly_fns = 0;
 
-  // Mininum access size (in bytes)
+  // Minimum access size (in bytes)
   uint64_t min_access_size = 8;
   uint64_t loc_src_alloc_aligned_size = 0;
   uint64_t loc_tgt_alloc_aligned_size = 0;

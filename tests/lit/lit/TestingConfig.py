@@ -157,10 +157,10 @@ class SubstituteCaptures:
     """
     Helper class to indicate that the substitutions contains backreferences.
 
-    This can be used as the following in lit.cfg to mark subsitutions as having
+    This can be used as the following in lit.cfg to mark substitutions as having
     back-references::
 
-        config.substutions.append(('\b[^ ]*.cpp', SubstituteCaptures('\0.txt')))
+        config.substitutions.append(('\b[^ ]*.cpp', SubstituteCaptures('\0.txt')))
 
     """
     def __init__(self, substitution):

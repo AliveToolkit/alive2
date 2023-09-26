@@ -1090,7 +1090,7 @@ void LoopAnalysis::getDepthFirstSpanningTree() {
   }
 }
 
-// Implemention of Tarjan-Havlak algorithm.
+// Implementation of Tarjan-Havlak algorithm.
 //
 // Irreducible loops are partially supported.
 //

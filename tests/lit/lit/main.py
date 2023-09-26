@@ -356,7 +356,7 @@ def main_with_tmp(builtinParameters):
             name,val = entry.split('=', 1)
         userParams[name] = val
 
-    # Decide what the requested maximum indvidual test time should be
+    # Decide what the requested maximum individual test time should be
     if opts.maxIndividualTestTime is not None:
         maxIndividualTestTime = opts.maxIndividualTestTime
     else:
