@@ -2051,7 +2051,7 @@ expr Memory::ptr2int(const expr &ptr) const {
 expr Memory::int2ptr(const expr &val0) const {
   assert(!memory_unused() && observesAddresses());
   if (state->getFn().getFnAttrs().has(FnAttrs::Asm)) {
-    DisjointExpr<expr> ret(expr{});
+    DisjointExpr<expr> ret(Pointer::mkNullPointer(*this).release());
     expr val = val0;
     OrExpr domain;
     bool processed_all = true;
@@ -2062,7 +2062,7 @@ expr Memory::int2ptr(const expr &val0) const {
     // Also, these pointers must have originated from ptr->int type punning
     // so they must have a (blk_addr bid) expression in them (+ some offset)
     for (auto [e, cond] : DisjointExpr<expr>(val, 5)) {
-      auto blks = e.get_apps_of("blk_addr");
+      auto blks = e.get_apps_of("blk_addr", "local_addr!");
       if (blks.empty()) {
         expr subst = false;
         if (cond.isNot(cond))
@@ -2070,8 +2070,23 @@ expr Memory::int2ptr(const expr &val0) const {
         val = val.subst(cond, subst);
         continue;
       }
+      // There's only only possible bid in this expression
       if (blks.size() == 1) {
-        expr bid = blks.begin()->getFnArg(0);
+        auto &fn = *blks.begin();
+        expr bid;
+        if (fn.fn_name().starts_with("local_addr!")) {
+          for (auto &[bid0, addr] : local_blk_addr) {
+            auto blks = addr.get_apps_of("blk_addr", "local_addr!");
+            assert(blks.size() == 1);
+            if (blks.begin()->eq(fn)) {
+              bid = Pointer::mkLongBid(bid0, true);
+              break;
+            }
+          }
+        } else {
+          bid = fn.getFnArg(0);
+        }
+        assert(bid.isValid());
         Pointer base(*this, bid, expr::mkUInt(0, bits_for_offset));
         expr offset = (e - base.getAddress()).sextOrTrunc(bits_for_offset);
         ret.add(Pointer(*this, bid, offset).release(), cond);
