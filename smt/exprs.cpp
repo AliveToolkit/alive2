@@ -90,7 +90,7 @@ static expr simplify(const expr &e, const expr &cond, bool negate) {
   // (bvadd ((_ extract ..) (ite cond X Y)) Z)
   // -> (bvadd ((_ extract ..) X) Z)  or  (bvadd ((_ extract ..) Y) Z)
   // NB: although this potentially increases the circuit size, it allows further
-  // simplifications down the road, and has been shown to be benefitial to perf
+  // simplifications down the road, and has been shown to be beneficial to perf
   expr a, b;
   if (e.isAdd(a, b)) {
     auto test = [&](const expr &a, const expr &b) -> expr {

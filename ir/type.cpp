@@ -467,7 +467,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
     }
   }
 
-  // 4) target specific preferred QNaN (a set, possibliy empty)
+  // 4) target specific preferred QNaN (a set, possibly empty)
   // approximated by adding just one more value
   exprs.add(expr::mkUInt(1, 1).concat(var.extract(fraction_bits - 2, 0)),
             expr(true));

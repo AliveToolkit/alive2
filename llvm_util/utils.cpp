@@ -40,7 +40,7 @@ FloatType bfloat_type("bfloat", FloatType::BFloat);
 
 // cache complex types
 unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
-unsigned type_id_counter; // for unamed types
+unsigned type_id_counter; // for unnamed types
 
 Function *current_fn;
 unordered_map<const llvm::Value*, Value*> value_cache;
