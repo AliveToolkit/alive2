@@ -220,6 +220,11 @@ version )EOF";
       *out << "ERROR: No functions found\n";
       exit(-1);
     }
+    // FIXME -- relax this restriction
+    if (Funcs.size() > 1) {
+      *out << "ERROR: Only one function supported\n";
+      exit(-1);
+    }
     for (auto *srcFn : Funcs)
       doit(M1.get(), srcFn, verifier);
   }
