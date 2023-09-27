@@ -87,7 +87,7 @@ version )EOF";
   Usage += R"EOF(
 see alive-tv --version for LLVM version info,
 
-This program takes either one or two LLVM IR files files as
+This program takes either one or two LLVM IR files as
 command-line arguments. Both .bc and .ll files are supported.
 
 If two files are provided, alive-tv checks that functions in the
@@ -110,7 +110,7 @@ by postfixing, after "src" and "tgt", either a unique integer or an
 '_' followed by an arbitrary string. For example if the file contains
 the following functions "src", "tgt", "src4", "tgt4", "src_foo",
 "tgt_foo", "src_bar", "tgt5", then the pairs "src" <-> "tgt", "src4"
-<-> "tgt4", and "src_foo" <-> "tgt_foo" will be verifed but "src_bar"
+<-> "tgt4", and "src_foo" <-> "tgt_foo" will be verified but "src_bar"
 and "tgt5" will unused.
 )EOF";
 

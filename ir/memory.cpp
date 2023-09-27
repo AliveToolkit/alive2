@@ -2070,7 +2070,7 @@ expr Memory::int2ptr(const expr &val0) const {
         val = val.subst(cond, subst);
         continue;
       }
-      // There's only only possible bid in this expression
+      // There's only one possible bid in this expression
       if (blks.size() == 1) {
         auto &fn = *blks.begin();
         expr bid;
@@ -2141,7 +2141,7 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
     if (is_fn1 == 2 && is_fn2 == 2)
       return mem1.val == mem2;
 
-    // an inital memory (m0) vs a function call is always false, as a function
+    // an initial memory (m0) vs a function call is always false, as a function
     // may always store something to memory
     assert((is_fn1 == 1 && is_fn2 == 2) || (is_fn1 == 2 && is_fn2 == 1));
     return false;

@@ -56,7 +56,7 @@ llvm::cl::opt<int> max_subprocesses("max-subprocesses",
 
 llvm::cl::opt<long> subprocess_timeout("tv-subprocess-timeout",
   llvm::cl::desc("Maximum time, in seconds, that a parallel TV call "
-                 "will be allowed to execeute (default=infinite)"),
+                 "will be allowed to execute (default=infinite)"),
   llvm::cl::init(-1), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<bool> batch_opts("tv-batch-opts",
