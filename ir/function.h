@@ -119,6 +119,7 @@ public:
 
   auto& getFnAttrs() { return attrs; }
   auto& getFnAttrs() const { return attrs; }
+  bool has(FnAttrs::Attribute a) const { return attrs.has(a); }
 
   smt::expr getTypeConstraints() const;
   void fixupTypes(const smt::Model &m);

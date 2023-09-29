@@ -2403,7 +2403,7 @@ StateValue FnCall::toSMT(State &s) const {
   fnName_mangled << '!' << getType();
 
   // Callee must return if caller must return
-  if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
+  if (s.getFn().has(FnAttrs::WillReturn) &&
       !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
 
@@ -2435,7 +2435,7 @@ StateValue FnCall::toSMT(State &s) const {
       check_can_store(s, allocptr);
 
       Pointer ptr_old(m, allocptr);
-      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
+      if (s.getFn().has(FnAttrs::NoFree))
         s.addGuardableUB(ptr_old.isNull() || ptr_old.isLocal());
 
       m.copy(ptr_old, Pointer(m, p_new));
@@ -2466,7 +2466,7 @@ StateValue FnCall::toSMT(State &s) const {
     if (!hasAttribute(FnAttrs::NoFree)) {
       m.free(allocptr, false);
 
-      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
+      if (s.getFn().has(FnAttrs::NoFree)) {
         Pointer ptr(m, allocptr);
         s.addGuardableUB(ptr.isNull() || ptr.isLocal());
       }
