@@ -2403,7 +2403,7 @@ StateValue FnCall::toSMT(State &s) const {
   fnName_mangled << '!' << getType();
 
   // Callee must return if caller must return
-  if (s.getFn().getFnAttrs().has(FnAttrs::WillReturn) &&
+  if (s.getFn().has(FnAttrs::WillReturn) &&
       !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
 
@@ -2435,7 +2435,7 @@ StateValue FnCall::toSMT(State &s) const {
       check_can_store(s, allocptr);
 
       Pointer ptr_old(m, allocptr);
-      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree))
+      if (s.getFn().has(FnAttrs::NoFree))
         s.addGuardableUB(ptr_old.isNull() || ptr_old.isLocal());
 
       m.copy(ptr_old, Pointer(m, p_new));
@@ -2466,7 +2466,7 @@ StateValue FnCall::toSMT(State &s) const {
     if (!hasAttribute(FnAttrs::NoFree)) {
       m.free(allocptr, false);
 
-      if (s.getFn().getFnAttrs().has(FnAttrs::NoFree)) {
+      if (s.getFn().has(FnAttrs::NoFree)) {
         Pointer ptr(m, allocptr);
         s.addGuardableUB(ptr.isNull() || ptr.isLocal());
       }
@@ -3814,16 +3814,32 @@ void PtrMask::print(ostream &os) const {
 StateValue PtrMask::toSMT(State &s) const {
   auto &ptrval  = s[*ptr];
   auto &maskval = s[*mask];
-  Pointer ptr(s.getMemory(), ptrval.value);
-  return { ptr.maskOffset(maskval.value).release(),
-           ptrval.non_poison && maskval.non_poison };
+
+  auto fn = [&](const StateValue &ptrval, const StateValue &mask) -> StateValue {
+    Pointer ptr(s.getMemory(), ptrval.value);
+    return { ptr.maskOffset(mask.value).release(),
+             ptrval.non_poison && mask.non_poison };
+  };
+
+  if (auto agg = getType().getAsAggregateType()) {
+    auto maskTy = mask->getType().getAsAggregateType();
+    assert(maskTy);
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(fn(agg->extract(ptrval, i),
+                           maskTy->extract(maskval, i)));
+    }
+    return agg->aggregateVals(vals);
+  }
+  return fn(ptrval, maskval);
 }
 
 expr PtrMask::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         ptr->getType().enforcePtrType() &&
+         ptr->getType().enforcePtrOrVectorType() &&
          getType() == ptr->getType() &&
-         mask->getType().enforceIntType();
+         mask->getType().enforceIntOrVectorType() &&
+         ptr->getType().enforceVectorTypeIff(mask->getType());
 }
 
 unique_ptr<Instr> PtrMask::dup(Function &f, const string &suffix) const {

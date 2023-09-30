@@ -330,6 +330,7 @@ public:
 
   smt::expr ptr2int(const smt::expr &ptr) const;
   smt::expr int2ptr(const smt::expr &val) const;
+  Pointer searchPointer(const smt::expr &val) const;
 
   std::tuple<smt::expr, Pointer, std::set<smt::expr>>
     refined(const Memory &other, bool fncall,

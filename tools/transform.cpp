@@ -99,7 +99,7 @@ void tools::print_model_val(ostream &os, const State &st, const Model &m,
 
 using print_var_val_ty = function<void(ostream&, const Model&)>;
 
-static bool error(Errors &errs, const State &src_state, const State &tgt_state,
+static bool error(Errors &errs, State &src_state, State &tgt_state,
                   const Result &r, Solver &solver, const Value *var,
                   const char *msg, bool check_each_var,
                   print_var_val_ty print_var_val) {
@@ -185,7 +185,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
 
         // this *may* be a pointer
         if (bw == Pointer::totalBits()) {
-          Pointer p(src_state.getMemory(), var);
+          Pointer p(src_state.returnMemory(), var);
           reduce(p.getOffset());
         }
       }
@@ -304,7 +304,7 @@ static bool error(Errors &errs, const State &src_state, const State &tgt_state,
       s << '\n';
     }
 
-    st->getMemory().print(s, m);
+    st->returnMemory().print(s, m);
   }
 
   print_var_val(s, m);

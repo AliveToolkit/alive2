@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/pointer.h"
+#include "ir/function.h"
 #include "ir/memory.h"
 #include "ir/globals.h"
 #include "ir/state.h"
@@ -490,7 +491,7 @@ void Pointer::isDisjointOrEqual(const expr &len1, const Pointer &ptr2,
 
 expr Pointer::isBlockAlive() const {
   // NULL block is dead
-  if (has_null_block && !null_is_dereferenceable & getBid().isZero())
+  if (has_null_block && !null_is_dereferenceable && getBid().isZero())
     return false;
 
   auto bid = getShortBid();
@@ -518,6 +519,8 @@ expr Pointer::isHeapAllocated() const {
 }
 
 expr Pointer::refined(const Pointer &other) const {
+  bool is_asm = other.m.state->getFn().has(FnAttrs::Asm);
+
   // This refers to a block that was malloc'ed within the function
   expr local = other.isLocal();
   local &= getAllocType() == other.getAllocType();
@@ -528,13 +531,19 @@ expr Pointer::refined(const Pointer &other) const {
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
+  expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
+
+  Pointer other_deref
+    = is_asm ? other.m.searchPointer(other.getAddress()) : other;
+
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(isLocal(), std::move(local), *this == other) &&
-                      isBlockAlive().implies(other.isBlockAlive()));
+                    expr::mkIf(isLocal(), std::move(local), nonlocal) &&
+                      isBlockAlive().implies(other_deref.isBlockAlive()));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
                              const expr &byval_bytes) const {
+  bool is_asm = other.m.state->getFn().has(FnAttrs::Asm);
   expr size = blockSizeOffsetT();
   expr off = getOffsetSizet();
   expr size2 = other.blockSizeOffsetT();
@@ -563,9 +572,14 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   // TODO: this induces an infinite loop
   // block_refined(other);
 
+  expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
+
+  Pointer other_deref
+    = is_asm ? other.m.searchPointer(other.getAddress()) : other;
+
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(isLocal(), local, *this == other) &&
-                      isBlockAlive().implies(other.isBlockAlive()));
+                    expr::mkIf(isLocal(), local, nonlocal) &&
+                      isBlockAlive().implies(other_deref.isBlockAlive()));
 }
 
 expr Pointer::isWritable() const {

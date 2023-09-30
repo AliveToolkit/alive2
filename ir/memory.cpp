@@ -2048,9 +2048,26 @@ expr Memory::ptr2int(const expr &ptr) const {
   return p.getAddress();
 }
 
+Pointer Memory::searchPointer(const expr &val0) const {
+  DisjointExpr<expr> ret;
+  expr val = val0.zextOrTrunc(bits_program_pointer);
+
+  auto add = [&](unsigned limit, bool local) {
+    for (unsigned i = 0; i != limit; ++i) {
+      Pointer p(*this, i, local);
+      Pointer p_end = p + p.blockSize();
+      ret.add((p + (val - p.getAddress())).release(),
+              val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
+    }
+  };
+  add(numLocals(), true);
+  add(numNonlocals(), false);
+  return Pointer(*this, *std::move(ret)());
+}
+
 expr Memory::int2ptr(const expr &val0) const {
   assert(!memory_unused() && observesAddresses());
-  if (state->getFn().getFnAttrs().has(FnAttrs::Asm)) {
+  if (state->getFn().has(FnAttrs::Asm)) {
     DisjointExpr<expr> ret(Pointer::mkNullPointer(*this).release());
     expr val = val0;
     OrExpr domain;
@@ -2100,21 +2117,7 @@ expr Memory::int2ptr(const expr &val0) const {
     if (processed_all)
       return std::move(ret)()->simplify();
 
-    val = val.simplify();
-
-    expr valx = val.zextOrTrunc(bits_program_pointer);
-
-    auto add = [&](unsigned limit, bool local) {
-      for (unsigned i = 0; i != limit; ++i) {
-        Pointer p(*this, i, local);
-        Pointer p_end = p + p.blockSize();
-        ret.add((p + (valx - p.getAddress())).release(),
-                valx.uge(p.getAddress()) && valx.ult(p_end.getAddress()));
-      }
-    };
-    add(numLocals(), true);
-    add(numNonlocals(), false);
-    return *std::move(ret)();
+    return searchPointer(val.simplify()).release();
   }
 
   expr null = Pointer::mkNullPointer(*this).release();
@@ -2379,6 +2382,7 @@ void Memory::print(ostream &os, const Model &m) const {
       P("size", p.blockSize());
       P("align", expr::mkInt(1, 64) << p.blockAlignment().zextOrTrunc(64));
       P("alloc type", p.getAllocType());
+      P("alive", p.isBlockAlive());
       if (observesAddresses())
         P("address", p.getAddress());
       if (!local && is_constglb(bid))
