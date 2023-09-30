@@ -640,7 +640,8 @@ private:
     bool force_32bits_imm = false;
     Intrinsic::ID Op;
 
-    switch (C.choose(6)) {
+    switch (C.choose(2)) {
+    // switch (C.choose(6)) {
     case 0:
       Op = Intrinsic::fshl;
       break;
