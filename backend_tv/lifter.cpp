@@ -58,11 +58,11 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
+#include <regex>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <regex>
 
 using namespace std;
 using namespace llvm;
@@ -105,36 +105,34 @@ const set<int> instrs_32 = {
     AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
     AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
     AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,   AArch64::LDPWi,
-    AArch64::STRWpre
-};
+    AArch64::STRWpre};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
     AArch64::ADDXrs,    AArch64::ADDXri,    AArch64::ADDSXrx,
-    AArch64::ADDv8i8,
-    AArch64::ADCXr,     AArch64::ADCSXr,    AArch64::ASRVXr,
-    AArch64::SUBXri,    AArch64::SUBXrs,    AArch64::SUBXrx,
-    AArch64::SUBSXrs,   AArch64::SUBSXri,   AArch64::SUBSXrx,
-    AArch64::SBFMXri,   AArch64::CSELXr,    AArch64::ANDXri,
-    AArch64::ANDXrr,    AArch64::ANDXrs,    AArch64::ANDSXri,
-    AArch64::ANDSXrr,   AArch64::ANDSXrs,   AArch64::MADDXrrr,
-    AArch64::MSUBXrrr,  AArch64::EORXri,    AArch64::CSINVXr,
-    AArch64::CSINCXr,   AArch64::MOVZXi,    AArch64::MOVNXi,
-    AArch64::MOVKXi,    AArch64::LSLVXr,    AArch64::LSRVXr,
-    AArch64::ORNXrs,    AArch64::UBFMXri,   AArch64::BFMXri,
-    AArch64::ORRXrs,    AArch64::ORRXri,    AArch64::SDIVXr,
-    AArch64::UDIVXr,    AArch64::EXTRXrri,  AArch64::EORXrs,
-    AArch64::SMADDLrrr, AArch64::UMADDLrrr, AArch64::RORVXr,
-    AArch64::RBITXr,    AArch64::CLZXr,     AArch64::REVXr,
-    AArch64::CSNEGXr,   AArch64::BICXrs,    AArch64::BICSXrs,
-    AArch64::EONXrs,    AArch64::SMULHrr,   AArch64::UMULHrr,
-    AArch64::REV32Xr,   AArch64::REV16Xr,   AArch64::SMSUBLrrr,
-    AArch64::UMSUBLrrr, AArch64::PHI,       AArch64::TBZW,
-    AArch64::TBZX,      AArch64::TBNZW,     AArch64::TBNZX,
-    AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
-    AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
-    AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
-    AArch64::LDRDui,    AArch64::STRDui,
+    AArch64::ADDv8i8,   AArch64::ADCXr,     AArch64::ADCSXr,
+    AArch64::ASRVXr,    AArch64::SUBXri,    AArch64::SUBXrs,
+    AArch64::SUBXrx,    AArch64::SUBSXrs,   AArch64::SUBSXri,
+    AArch64::SUBSXrx,   AArch64::SBFMXri,   AArch64::CSELXr,
+    AArch64::ANDXri,    AArch64::ANDXrr,    AArch64::ANDXrs,
+    AArch64::ANDSXri,   AArch64::ANDSXrr,   AArch64::ANDSXrs,
+    AArch64::MADDXrrr,  AArch64::MSUBXrrr,  AArch64::EORXri,
+    AArch64::CSINVXr,   AArch64::CSINCXr,   AArch64::MOVZXi,
+    AArch64::MOVNXi,    AArch64::MOVKXi,    AArch64::LSLVXr,
+    AArch64::LSRVXr,    AArch64::ORNXrs,    AArch64::UBFMXri,
+    AArch64::BFMXri,    AArch64::ORRXrs,    AArch64::ORRXri,
+    AArch64::SDIVXr,    AArch64::UDIVXr,    AArch64::EXTRXrri,
+    AArch64::EORXrs,    AArch64::SMADDLrrr, AArch64::UMADDLrrr,
+    AArch64::RORVXr,    AArch64::RBITXr,    AArch64::CLZXr,
+    AArch64::REVXr,     AArch64::CSNEGXr,   AArch64::BICXrs,
+    AArch64::BICSXrs,   AArch64::EONXrs,    AArch64::SMULHrr,
+    AArch64::UMULHrr,   AArch64::REV32Xr,   AArch64::REV16Xr,
+    AArch64::SMSUBLrrr, AArch64::UMSUBLrrr, AArch64::PHI,
+    AArch64::TBZW,      AArch64::TBZX,      AArch64::TBNZW,
+    AArch64::TBNZX,     AArch64::B,         AArch64::CBZW,
+    AArch64::CBZX,      AArch64::CBNZW,     AArch64::CBNZX,
+    AArch64::CCMPXr,    AArch64::CCMPXi,    AArch64::LDRXui,
+    AArch64::LDPXi,     AArch64::LDRDui,    AArch64::STRDui,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
     AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
@@ -735,8 +733,9 @@ class arm2llvm {
       return Reg - AArch64::S0 + AArch64::Q0;
     else if (Reg >= AArch64::D0 && Reg <= AArch64::D31)
       return Reg - AArch64::D0 + AArch64::Q0;
-    assert(RegFile[Reg] && "ERROR: Cannot have a register without a backing store"
-                           " register corresponding it.");
+    assert(RegFile[Reg] &&
+           "ERROR: Cannot have a register without a backing store"
+           " register corresponding it.");
     return Reg;
   }
 
@@ -765,7 +764,8 @@ class arm2llvm {
   Value *readFromOperand(int idx, int shift = 0) {
     auto op = CurInst->getOperand(idx);
     auto size = getInstSize(CurInst->getOpcode());
-    // Expr operand is required for a combination of ADRP and ADDXri address calculation
+    // Expr operand is required for a combination of ADRP and ADDXri address
+    // calculation
     assert(op.isImm() || op.isReg() || op.isExpr());
 
     if (!(size == 32 || size == 64)) {
@@ -801,9 +801,10 @@ class arm2llvm {
     unsigned int W;
     // If vector type, compute bitwidth using product of size of each element
     // and number of elements.
-    if(V->getType()->isVectorTy()) {
-      VectorType* v_type = (VectorType*)V->getType();
-      W = v_type->getScalarSizeInBits() * v_type->getElementCount().getFixedValue();
+    if (V->getType()->isVectorTy()) {
+      VectorType *v_type = (VectorType *)V->getType();
+      W = v_type->getScalarSizeInBits() *
+          v_type->getElementCount().getFixedValue();
     } else {
       W = V->getType()->getIntegerBitWidth();
     }
@@ -814,7 +815,8 @@ class arm2llvm {
       size_t destRegSize = getRegSize(mapRegToBackingReg(destReg));
 
       if (!(destRegSize == 32 || destRegSize == 64 || destRegSize == 128)) {
-        *out << "\nERROR: only 32, 64 and 128 bit registers supported for now\n\n";
+        *out << "\nERROR: only 32, 64 and 128 bit registers supported for "
+                "now\n\n";
         exit(-1);
       }
 
@@ -826,7 +828,7 @@ class arm2llvm {
       if (SExt && destReg >= AArch64::W0 && destReg <= AArch64::W30 && W < 32) {
         V = createSExt(V, getIntTy(32));
         V = createZExt(V, getIntTy(64));
-      } else if(destRegSize == 64 && W < 64) {
+      } else if (destRegSize == 64 && W < 64) {
         auto op = SExt ? Instruction::SExt : Instruction::ZExt;
         V = createCast(V, getIntTy(64), op);
       } else {
@@ -845,18 +847,20 @@ class arm2llvm {
     std::smatch sm;
 
     // Regex to match relocation specifiers
-    std::regex re (":[a-z0-9_]+:");
+    std::regex re(":[a-z0-9_]+:");
 
     llvm::raw_string_ostream ss(sss);
     expr->print(ss, nullptr);
 
     // If the expression starts with a relocation specifier, strip it and map
     // the rest to a global variable. Assuming there is only one relocation
-    // specifier and it is at the beginning (std::regex_constants::match_continuous).
-    if (std::regex_search(sss, sm, re, std::regex_constants::match_continuous)) {
+    // specifier and it is at the beginning
+    // (std::regex_constants::match_continuous).
+    if (std::regex_search(sss, sm, re,
+                          std::regex_constants::match_continuous)) {
       auto stringVar = sm.suffix();
-//      for (auto x:sm) { *out << x << " "; }
-//      *out << stringVar << "\n";
+      //      for (auto x:sm) { *out << x << " "; }
+      //      *out << stringVar << "\n";
       if (!globals.contains(stringVar)) {
         *out << "\nERROR: ADRP mentions unknown global variable\n";
         *out << "'" << stringVar
@@ -864,7 +868,7 @@ class arm2llvm {
         exit(-1);
       }
       instExprVarMap[CurInst] = stringVar;
-    } else if(globals.contains(sss)) {
+    } else if (globals.contains(sss)) {
       instExprVarMap[CurInst] = sss;
     } else {
       *out << "\n";
@@ -883,19 +887,20 @@ class arm2llvm {
     std::smatch sm;
 
     // Regex to match relocation specifiers
-    std::regex re (":[a-z0-9_]+:");
+    std::regex re(":[a-z0-9_]+:");
 
     llvm::raw_string_ostream ss(sss);
     expr->print(ss, nullptr);
 
-    // If the expression starts with a relocation specifier, strip it and look for
-    // the rest (variable in the Expr) in the instExprVarMap and globals.
-    // Assuming there is only one relocation specifier and it is at the beginning
-    // (std::regex_constants::match_continuous).
-    if (std::regex_search(sss, sm, re, std::regex_constants::match_continuous)) {
+    // If the expression starts with a relocation specifier, strip it and look
+    // for the rest (variable in the Expr) in the instExprVarMap and globals.
+    // Assuming there is only one relocation specifier and it is at the
+    // beginning (std::regex_constants::match_continuous).
+    if (std::regex_search(sss, sm, re,
+                          std::regex_constants::match_continuous)) {
       auto stringVar = sm.suffix();
-//      for (auto x:sm) { *out << x << " "; }
-//      *out << stringVar << "\n";
+      //      for (auto x:sm) { *out << x << " "; }
+      //      *out << stringVar << "\n";
       if (!globals.contains(stringVar)) {
         *out << "\nERROR: instruction mentions '" << stringVar << "'\n";
         *out << "which is not a global variable we know about\n\n";
@@ -903,7 +908,8 @@ class arm2llvm {
       }
       auto exprVar = instExprVarMap.find(PrevInst);
       if (exprVar == instExprVarMap.end() || exprVar->second != stringVar) {
-        *out << "\nERROR: unexpected relocation specifier " << sm.str() << "\n\n";
+        *out << "\nERROR: unexpected relocation specifier " << sm.str()
+             << "\n\n";
         exit(-1);
       }
       auto glob = globals.find(stringVar);
@@ -1029,11 +1035,13 @@ class arm2llvm {
 
     auto zero = getIntConst(0, size);
     auto res = createTrunc(unsignedSum, ty);
-    
+
     auto newN = createICmp(ICmpInst::Predicate::ICMP_SLT, res, zero);
     auto newZ = createICmp(ICmpInst::Predicate::ICMP_EQ, res, zero);
-    auto newC = createICmp(ICmpInst::Predicate::ICMP_NE, unsignedSum, createZExt(res, tyPlusOne));
-    auto newV = createICmp(ICmpInst::Predicate::ICMP_NE, signedSum, createSExt(res, tyPlusOne));
+    auto newC = createICmp(ICmpInst::Predicate::ICMP_NE, unsignedSum,
+                           createZExt(res, tyPlusOne));
+    auto newV = createICmp(ICmpInst::Predicate::ICMP_NE, signedSum,
+                           createSExt(res, tyPlusOne));
 
     return {res, {newN, newZ, newC, newV}};
   };
@@ -1076,8 +1084,7 @@ public:
   arm2llvm(Module *LiftedModule, MCFunction &MF, Function &srcFn,
            MCInstPrinter *instrPrinter, bool DebugRegs)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
-        instrPrinter(instrPrinter), instCount(0),
-	DebugRegs(DebugRegs) {}
+        instrPrinter(instrPrinter), instCount(0), DebugRegs(DebugRegs) {}
 
   int64_t getImm(int idx) {
     return CurInst->getOperand(idx).getImm();
@@ -1124,7 +1131,6 @@ public:
     return make_tuple(baseAddr, op2.getImm(), readFromReg(op0.getReg()));
   }
 
-
   tuple<Value *, int, Value *> getParamsStorePreImmed() {
     auto &op0 = CurInst->getOperand(0);
     auto &op1 = CurInst->getOperand(1);
@@ -1142,7 +1148,6 @@ public:
     return make_tuple(baseAddr, op3.getImm(), readFromReg(op1.getReg()));
   }
 
-
   // offset and size are in bytes
   void makeStore(Value *base, int offset, int size, Value *val) {
     auto offsetVal = getIntConst(offset, 64);
@@ -1150,11 +1155,10 @@ public:
     createStore(val, ptr);
   }
 
-
   // Shifts a given pointer by the offset, and stores the new pointer
   // Must have register associated with value
   // size is the size of the ptr in bits used by the instruction
-  Value* shiftPtr(Value *base, int offset) {
+  Value *shiftPtr(Value *base, int offset) {
     auto currPtrReg = CurInst->getOperand(2).getReg();
 
     // 64 bit offsetVal, because readFromReg always returns 64bit val
@@ -1167,7 +1171,6 @@ public:
 
     return readPtrFromReg(currPtrReg);
   }
-
 
   // Visit an MCInst and convert it to LLVM IR
   // See: https://documentation-service.arm.com/static/6245e8f0f7d10f7540e0c054
@@ -1292,7 +1295,7 @@ public:
       }
       default:
         b = readFromOperand(2, getImm(3));
-        if(b->getType()->isPointerTy()) {
+        if (b->getType()->isPointerTy()) {
           auto Reg = CurInst->getOperand(0).getReg();
           if (Reg != AArch64::WZR && Reg != AArch64::XZR)
             createStore(b, dealiasReg(Reg));
@@ -1301,7 +1304,8 @@ public:
         }
         break;
       }
-      if(break_outer_switch) break;
+      if (break_outer_switch)
+        break;
 
       if (has_s(opcode)) {
         auto sadd = createSAddOverflow(a, b);
@@ -1355,18 +1359,18 @@ public:
     }
     case AArch64::ADDv8i8: {
       auto a = readFromOperand(1);
-      // Reads from backing register as a scalar. Create cast to reinterpret bit as
-      // vector type
-      auto a_v8i8 = createCast(a,
-                               VectorType::get(i8, ElementCount::getFixed(8)),
-                               Instruction::BitCast);
+      // Reads from backing register as a scalar. Create cast to reinterpret bit
+      // as vector type
+      auto a_v8i8 =
+          createCast(a, VectorType::get(i8, ElementCount::getFixed(8)),
+                     Instruction::BitCast);
 
       auto b = readFromOperand(2);
-      // Reads from backing register as a scalar. Create cast to reinterpret bit as
-      // vector type
-      auto b_v8i8 = createCast(b,
-                               VectorType::get(i8, ElementCount::getFixed(8)),
-                               Instruction::BitCast);
+      // Reads from backing register as a scalar. Create cast to reinterpret bit
+      // as vector type
+      auto b_v8i8 =
+          createCast(b, VectorType::get(i8, ElementCount::getFixed(8)),
+                     Instruction::BitCast);
       writeToOutputReg(createAdd(a_v8i8, b_v8i8));
       break;
     }
@@ -2414,7 +2418,7 @@ public:
 
       auto shiftedPtr = shiftPtr(basePtr, immOffset);
 
-      if(getInstSize(opcode) == 32)
+      if (getInstSize(opcode) == 32)
         valToStore = createTrunc(valToStore, getIntTy(32));
 
       makeStore(shiftedPtr, 0, 8, valToStore);
@@ -2658,16 +2662,17 @@ public:
     auto retTy = Type::getVoidTy(Ctx);
     auto argTy = {i1, i1, i1, i1};
     auto *fTy = FunctionType::get(retTy, argTy, false);
-    Function *F =
-      LiftedModule->getFunction(funcName) ? :
-      Function::createWithDefaultAttr(fTy, GlobalValue::LinkageTypes::ExternalLinkage, 0, funcName, LiftedModule);
+    Function *F = LiftedModule->getFunction(funcName)
+                      ?: Function::createWithDefaultAttr(
+                             fTy, GlobalValue::LinkageTypes::ExternalLinkage, 0,
+                             funcName, LiftedModule);
     auto N = getN();
     auto Z = getZ();
     auto C = getC();
     auto V = getV();
     CallInst::Create(fTy, F, {N, Z, C, V}, "", LLVMBB);
   }
-  
+
   Function *run() {
     auto i8 = getIntTy(8);
     auto i32 = getIntTy(32);
@@ -2804,8 +2809,8 @@ public:
 
       for (auto &mc_instr : mc_instrs) {
         print(mc_instr);
-	if (DebugRegs)
-	  printRegs();
+        if (DebugRegs)
+          printRegs();
         mc_visit(mc_instr, *Fn);
         ++instCount;
       }
@@ -3069,7 +3074,6 @@ public:
   void removeEmptyBlocks() {
     erase_if(MF.BBs, [](MCBasicBlock b) { return b.size() == 0; });
   }
-
 };
 
 } // namespace
@@ -3113,7 +3117,7 @@ void reset() {
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
                                       Function *srcFn,
                                       unique_ptr<MemoryBuffer> MB,
-				      bool DebugRegs) {
+                                      bool DebugRegs) {
   llvm::SourceMgr SrcMgr;
   SrcMgr.AddNewSourceBuffer(std::move(MB), llvm::SMLoc());
 
@@ -3165,8 +3169,8 @@ pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,
   Str.checkEntryBlock();
   Str.generateSuccessors();
 
-  auto lifted = arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get(),
-			 DebugRegs).run();
+  auto lifted =
+      arm2llvm(LiftedModule, Str.MF, *srcFn, IP.get(), DebugRegs).run();
 
   std::string sss;
   llvm::raw_string_ostream ss(sss);

@@ -311,7 +311,7 @@ Function *adjustSrc(Function *srcFn) {
     *out << "\nERROR: varargs not supported yet\n\n";
     exit(-1);
   }
-  
+
   for (auto &bb : *srcFn)
     for (auto &i : bb)
       checkSupport(i);
