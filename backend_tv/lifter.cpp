@@ -62,6 +62,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <regex>
 
 using namespace std;
 using namespace llvm;
@@ -110,6 +111,7 @@ const set<int> instrs_32 = {
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
     AArch64::ADDXrs,    AArch64::ADDXri,    AArch64::ADDSXrx,
+    AArch64::ADDv8i8,
     AArch64::ADCXr,     AArch64::ADCSXr,    AArch64::ASRVXr,
     AArch64::SUBXri,    AArch64::SUBXrs,    AArch64::SUBXrx,
     AArch64::SUBSXrs,   AArch64::SUBSXri,   AArch64::SUBSXrx,
@@ -132,6 +134,7 @@ const set<int> instrs_64 = {
     AArch64::B,         AArch64::CBZW,      AArch64::CBZX,
     AArch64::CBNZW,     AArch64::CBNZX,     AArch64::CCMPXr,
     AArch64::CCMPXi,    AArch64::LDRXui,    AArch64::LDPXi,
+    AArch64::LDRDui,    AArch64::STRDui,
     AArch64::MSR,       AArch64::MRS,       AArch64::LDRSBXui,
     AArch64::LDRSBXui,  AArch64::LDRSHXui,  AArch64::STRXui,
     AArch64::STPXi,     AArch64::CCMNXi,    AArch64::CCMNXr,
@@ -393,7 +396,7 @@ class arm2llvm {
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
   unordered_map<string, GlobalVariable *> globals;
-  unordered_map<MCInst *, string> GOT;
+  unordered_map<MCInst *, string> instExprVarMap;
   bool DebugRegs;
 
   Type *getIntTy(int bits) {
@@ -691,29 +694,56 @@ class arm2llvm {
                             LLVMBB);
   }
 
-  [[maybe_unused]] unsigned getRegSize(unsigned Reg) {
-    if (Reg >= AArch64::W0 && Reg <= AArch64::W30)
+  // Returns bitWidth corresponding the registers.
+  unsigned getRegSize(unsigned Reg) {
+    if (Reg >= AArch64::B0 && Reg <= AArch64::B31)
+      return 8;
+    if (Reg >= AArch64::H0 && Reg <= AArch64::H31)
+      return 16;
+    if ((Reg >= AArch64::W0 && Reg <= AArch64::W30) ||
+        (Reg >= AArch64::S0 && Reg <= AArch64::S31))
       return 32;
-    if (Reg >= AArch64::X0 && Reg <= AArch64::X28)
+    if ((Reg >= AArch64::X0 && Reg <= AArch64::X28) ||
+        (Reg >= AArch64::D0 && Reg <= AArch64::D31))
       return 64;
+    if (Reg >= AArch64::Q0 && Reg <= AArch64::Q31)
+      return 128;
     assert(false && "unhandled register");
+  }
+
+  // Maps ARM registers to backing registers
+  unsigned mapRegToBackingReg(unsigned Reg) {
+    if (Reg == AArch64::WZR)
+      return AArch64::XZR;
+    else if (Reg == AArch64::W29)
+      return AArch64::FP;
+    else if (Reg == AArch64::W30)
+      return AArch64::LR;
+    else if (Reg == AArch64::WSP)
+      return AArch64::SP;
+    else if (Reg >= AArch64::W0 && Reg <= AArch64::W28)
+      return Reg - AArch64::W0 + AArch64::X0;
+    else if (Reg >= AArch64::X0 && Reg <= AArch64::X28)
+      return Reg - AArch64::X0 + AArch64::X0;
+    // Dealias rules for floating-point registers
+    // https://developer.arm.com/documentation/den0024/a/AArch64-Floating-point-and-NEON/NEON-and-Floating-Point-architecture/Floating-point
+    else if (Reg >= AArch64::B0 && Reg <= AArch64::B31)
+      return Reg - AArch64::B0 + AArch64::Q0;
+    else if (Reg >= AArch64::H0 && Reg <= AArch64::H31)
+      return Reg - AArch64::H0 + AArch64::Q0;
+    else if (Reg >= AArch64::S0 && Reg <= AArch64::S31)
+      return Reg - AArch64::S0 + AArch64::Q0;
+    else if (Reg >= AArch64::D0 && Reg <= AArch64::D31)
+      return Reg - AArch64::D0 + AArch64::Q0;
+    assert(RegFile[Reg] && "ERROR: Cannot have a register without a backing store"
+                           " register corresponding it.");
+    return Reg;
   }
 
   // return pointer to the backing store for a register, doing the
   // necessary de-aliasing
   Value *dealiasReg(unsigned Reg) {
-    unsigned WideReg = Reg;
-    if (Reg == AArch64::WZR)
-      WideReg = AArch64::XZR;
-    else if (Reg == AArch64::W29)
-      WideReg = AArch64::FP;
-    else if (Reg == AArch64::W30)
-      WideReg = AArch64::LR;
-    else if (Reg == AArch64::WSP)
-      WideReg = AArch64::SP;
-    else if (Reg >= AArch64::W0 && Reg <= AArch64::W28)
-      WideReg = Reg - AArch64::W0 + AArch64::X0;
-    auto RegAddr = RegFile[WideReg];
+    auto RegAddr = RegFile[mapRegToBackingReg(Reg)];
     assert(RegAddr);
     return RegAddr;
   }
@@ -735,7 +765,8 @@ class arm2llvm {
   Value *readFromOperand(int idx, int shift = 0) {
     auto op = CurInst->getOperand(idx);
     auto size = getInstSize(CurInst->getOpcode());
-    assert(op.isImm() || op.isReg());
+    // Expr operand is required for a combination of ADRP and ADDXri address calculation
+    assert(op.isImm() || op.isReg() || op.isExpr());
 
     if (!(size == 32 || size == 64)) {
       *out << "\nERROR: only 32 and 64 bit registers supported for now\n\n";
@@ -745,10 +776,12 @@ class arm2llvm {
     Value *V = nullptr;
     if (op.isImm()) {
       V = getIntConst(op.getImm(), size);
-    } else {
+    } else if (op.isReg()) {
       V = readFromReg(op.getReg());
       if (size == 32)
         V = createTrunc(V, getIntTy(32));
+    } else {
+      V = getExprVar(op.getExpr());
     }
 
     if (shift != 0)
@@ -758,33 +791,137 @@ class arm2llvm {
   }
 
   void writeToOutputReg(Value *V, bool SExt = false) {
-    auto Reg = CurInst->getOperand(0).getReg();
+    auto destReg = CurInst->getOperand(0).getReg();
 
     // important!
-    if (Reg == AArch64::WZR || Reg == AArch64::XZR)
+    if (destReg == AArch64::WZR || destReg == AArch64::XZR)
       return;
 
-    auto W = V->getType()->getIntegerBitWidth();
-    if (W != 64 && W != 128) {
-      size_t regSize = getInstSize(CurInst->getOpcode());
+    // BitWidth of Value V to be written
+    unsigned int W;
+    // If vector type, compute bitwidth using product of size of each element
+    // and number of elements.
+    if(V->getType()->isVectorTy()) {
+      VectorType* v_type = (VectorType*)V->getType();
+      W = v_type->getScalarSizeInBits() * v_type->getElementCount().getFixedValue();
+    } else {
+      W = V->getType()->getIntegerBitWidth();
+    }
 
-      if (!(regSize == 32 || regSize == 64)) {
-        *out << "\nERROR: only 32 and 64 bit registers supported for now\n\n";
+    // Create LLVM instructions extending the Value V if it is smaller than the
+    // specified backing registers Xn or Vn
+    if (W != 64 && W != 128) {
+      size_t destRegSize = getRegSize(mapRegToBackingReg(destReg));
+
+      if (!(destRegSize == 32 || destRegSize == 64 || destRegSize == 128)) {
+        *out << "\nERROR: only 32, 64 and 128 bit registers supported for now\n\n";
         exit(-1);
       }
 
       // if the s flag is set, the value is smaller than 32 bits, and
       // the register we are storing it in _is_ 32 bits, we sign
       // extend to 32 bits before zero-extending to 64
-      if (SExt && regSize == 32 && W < 32) {
+      // We need to handle the first case without destRegSize since the backing
+      // store does not have a 32 bit register.
+      if (SExt && destReg >= AArch64::W0 && destReg <= AArch64::W30 && W < 32) {
         V = createSExt(V, getIntTy(32));
         V = createZExt(V, getIntTy(64));
-      } else {
+      } else if(destRegSize == 64 && W < 64) {
         auto op = SExt ? Instruction::SExt : Instruction::ZExt;
         V = createCast(V, getIntTy(64), op);
+      } else {
+        // Always zero extend to 128 bits when storing into SIMD/FP registers
+        V = createZExt(V, getIntTy(128));
       }
     }
-    createStore(V, dealiasReg(Reg));
+    createStore(V, dealiasReg(destReg));
+  }
+
+  // Reads an Expr and maps containing string variable to a global variable
+  void mapExprVar(const MCExpr *expr) {
+    std::string sss;
+
+    // Matched strings
+    std::smatch sm;
+
+    // Regex to match relocation specifiers
+    std::regex re (":[a-z0-9_]+:");
+
+    llvm::raw_string_ostream ss(sss);
+    expr->print(ss, nullptr);
+
+    // If the expression starts with a relocation specifier, strip it and map
+    // the rest to a global variable. Assuming there is only one relocation
+    // specifier and it is at the beginning (std::regex_constants::match_continuous).
+    if (std::regex_search(sss, sm, re, std::regex_constants::match_continuous)) {
+      auto stringVar = sm.suffix();
+//      for (auto x:sm) { *out << x << " "; }
+//      *out << stringVar << "\n";
+      if (!globals.contains(stringVar)) {
+        *out << "\nERROR: ADRP mentions unknown global variable\n";
+        *out << "'" << stringVar
+             << "'  is not a global variable we know about\n";
+        exit(-1);
+      }
+      instExprVarMap[CurInst] = stringVar;
+    } else if(globals.contains(sss)) {
+      instExprVarMap[CurInst] = sss;
+    } else {
+      *out << "\n";
+      *out << "\nERROR: Unexpected MCExpr: '" << sss << "' \n";
+      exit(-1);
+    }
+  }
+
+  // Reads an Expr and gets the global variable corresponding the containing
+  // string variable
+  Value *getExprVar(const MCExpr *expr) {
+    Value *globalVar;
+    std::string sss;
+
+    // Matched strings
+    std::smatch sm;
+
+    // Regex to match relocation specifiers
+    std::regex re (":[a-z0-9_]+:");
+
+    llvm::raw_string_ostream ss(sss);
+    expr->print(ss, nullptr);
+
+    // If the expression starts with a relocation specifier, strip it and look for
+    // the rest (variable in the Expr) in the instExprVarMap and globals.
+    // Assuming there is only one relocation specifier and it is at the beginning
+    // (std::regex_constants::match_continuous).
+    if (std::regex_search(sss, sm, re, std::regex_constants::match_continuous)) {
+      auto stringVar = sm.suffix();
+//      for (auto x:sm) { *out << x << " "; }
+//      *out << stringVar << "\n";
+      if (!globals.contains(stringVar)) {
+        *out << "\nERROR: instruction mentions '" << stringVar << "'\n";
+        *out << "which is not a global variable we know about\n\n";
+        exit(-1);
+      }
+      auto exprVar = instExprVarMap.find(PrevInst);
+      if (exprVar == instExprVarMap.end() || exprVar->second != stringVar) {
+        *out << "\nERROR: unexpected relocation specifier " << sm.str() << "\n\n";
+        exit(-1);
+      }
+      auto glob = globals.find(stringVar);
+      if (glob == globals.end()) {
+        *out << "\nERROR: global not found\n\n";
+        exit(-1);
+      }
+      globalVar = glob->second;
+    } else {
+      auto glob = globals.find(sss);
+      if (glob == globals.end()) {
+        *out << "\nERROR: global not found\n\n";
+        exit(-1);
+      }
+      globalVar = glob->second;
+    }
+
+    return globalVar;
   }
 
   Value *getV() {
@@ -955,6 +1092,7 @@ public:
     if (op2.isImm()) {
       auto baseReg = op1.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+             (baseReg >= AArch64::Q0 && baseReg <= AArch64::Q31) ||
              (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
              (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
@@ -979,6 +1117,7 @@ public:
 
     auto baseReg = op1.getReg();
     assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
+           (baseReg >= AArch64::Q0 && baseReg <= AArch64::Q31) ||
            (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
            (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
     auto baseAddr = readPtrFromReg(baseReg);
@@ -1113,6 +1252,7 @@ public:
     case AArch64::ADDSXrx: {
       auto a = readFromOperand(1);
       Value *b = nullptr;
+      bool break_outer_switch = false;
 
       switch (opcode) {
       case AArch64::ADDWrx:
@@ -1152,8 +1292,16 @@ public:
       }
       default:
         b = readFromOperand(2, getImm(3));
+        if(b->getType()->isPointerTy()) {
+          auto Reg = CurInst->getOperand(0).getReg();
+          if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+            createStore(b, dealiasReg(Reg));
+          break_outer_switch = true;
+          break;
+        }
         break;
       }
+      if(break_outer_switch) break;
 
       if (has_s(opcode)) {
         auto sadd = createSAddOverflow(a, b);
@@ -1203,6 +1351,23 @@ public:
           createBinop(b, getIntConst(size, size), Instruction::URem);
       auto res = createAShr(a, shift_amt);
       writeToOutputReg(res);
+      break;
+    }
+    case AArch64::ADDv8i8: {
+      auto a = readFromOperand(1);
+      // Reads from backing register as a scalar. Create cast to reinterpret bit as
+      // vector type
+      auto a_v8i8 = createCast(a,
+                               VectorType::get(i8, ElementCount::getFixed(8)),
+                               Instruction::BitCast);
+
+      auto b = readFromOperand(2);
+      // Reads from backing register as a scalar. Create cast to reinterpret bit as
+      // vector type
+      auto b_v8i8 = createCast(b,
+                               VectorType::get(i8, ElementCount::getFixed(8)),
+                               Instruction::BitCast);
+      writeToOutputReg(createAdd(a_v8i8, b_v8i8));
       break;
     }
       // SUBrx is a subtract instruction with an extended register.
@@ -2181,33 +2346,26 @@ public:
     case AArch64::LDRXui: {
       auto &op2 = CurInst->getOperand(2);
       if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 8, 8);
+        writeToOutputReg(loaded);
+      }
+      break;
+    }
+    case AArch64::LDRDui: {
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
         auto expr = op2.getExpr();
         std::string sss;
         llvm::raw_string_ostream ss(sss);
         expr->print(ss, nullptr);
-        if (!sss.starts_with(":got_lo12:")) {
-          *out << "\nERROR: only :got_lo12: is supported\n\n";
-          exit(-1);
-        }
-        auto globName = sss.substr(10, string::npos);
-        if (!globals.contains(globName)) {
-          *out << "\nERROR: load mentions '" << globName << "'\n";
-          *out << "which is not a global variable we know about\n\n";
-          exit(-1);
-        }
-        auto got = GOT.find(PrevInst);
-        if (got == GOT.end() || got->second != globName) {
-          *out << "\nERROR: unexpected :got_lo12:\n\n";
-          exit(-1);
-        }
-        auto glob = globals.find(globName);
-        if (glob == globals.end()) {
-          *out << "\nERROR: global not found\n\n";
-          exit(-1);
-        }
-        auto Reg = CurInst->getOperand(0).getReg();
-        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
-          createStore(glob->second, dealiasReg(Reg));
+        *out << "\nERROR: load mentions '" << sss << "' ";
+        *out << "which has not been handled yet\n\n";
       } else {
         auto [base, imm] = getParamsLoadImmed();
         auto loaded = makeLoad(base, imm * 8, 8);
@@ -2245,6 +2403,11 @@ public:
       makeStore(base, imm * 8, 8, val);
       break;
     }
+    case AArch64::STRDui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 8, 8, val);
+      break;
+    }
     case AArch64::STRXpre:
     case AArch64::STRWpre: {
       auto [basePtr, immOffset, valToStore] = getParamsStorePreImmed();
@@ -2259,25 +2422,7 @@ public:
     }
     case AArch64::ADRP: {
       assert(CurInst->getOperand(0).isReg());
-      auto expr = CurInst->getOperand(1).getExpr();
-      std::string sss;
-      llvm::raw_string_ostream ss(sss);
-      expr->print(ss, nullptr);
-      if (sss.starts_with(":got:")) {
-        auto globName = sss.substr(5, string::npos);
-        if (!globals.contains(globName)) {
-          *out << "\nERROR: ADRP mentions unknown global variable\n";
-          *out << "'" << globName
-               << "'  is not a global variable we know about\n";
-          exit(-1);
-        }
-        GOT[CurInst] = globName;
-      } else {
-        *out << "\n";
-        *out << "\nERROR: Unexpected MCExpr in ADRP\n";
-        *out << "'" << sss << "' but only :got: is currently supported\n";
-        exit(-1);
-      }
+      mapExprVar(CurInst->getOperand(1).getExpr());
       break;
     }
     case AArch64::RET: {
@@ -2582,6 +2727,14 @@ public:
       stringstream Name;
       Name << "X" << Reg - AArch64::X0;
       createRegStorage(Reg, 64, Name.str());
+    }
+
+    // Allocating storage for thirty-two 128 bit NEON registers
+    // https://developer.arm.com/documentation/den0024/a/AArch64-Floating-point-and-NEON?lang=en
+    for (unsigned Reg = AArch64::Q0; Reg <= AArch64::Q31; ++Reg) {
+      stringstream Name;
+      Name << "Q" << Reg - AArch64::Q0;
+      createRegStorage(Reg, 128, Name.str());
     }
 
     createRegStorage(AArch64::SP, 64, "SP");
