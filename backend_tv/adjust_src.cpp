@@ -62,79 +62,12 @@ using namespace lifter;
 
 namespace {
 
-// this is wasteful and duplicates code, merge these functions
-
-Function *adjustSrcInputs(Function *srcFn) {
-  vector<Type *> new_argtypes;
-
-  for (auto &v : srcFn->args()) {
-    auto *ty = v.getType();
-    if (ty->isIntegerTy()) {
-      auto orig_width = ty->getIntegerBitWidth();
-      if (orig_width > 64) {
-        *out << "\nERROR: Unsupported function argument: Only integer "
-                "parameters 64 "
-                "bits or smaller supported for now\n\n";
-        exit(-1);
-      }
-      orig_input_width.emplace_back(orig_width);
-      new_argtypes.emplace_back(Type::getIntNTy(srcFn->getContext(), 64));
-    } else if (auto pty = dyn_cast<PointerType>(ty)) {
-      if (pty->getAddressSpace() != 0) {
-        *out << "\nERROR: Unsupported function argument: Only address space "
-                "0 is supported\n\n";
-        exit(-1);
-      }
-      orig_input_width.emplace_back(64);
-      new_argtypes.emplace_back(pty);
-    } else if (auto vty = dyn_cast<VectorType>(ty)) {
-      auto &DL = srcFn->getParent()->getDataLayout();
-      if (DL.getTypeSizeInBits(vty) > 64) {
-        *out << "\nERROR: Unsupported function argument: Only vector "
-                "parameters 64 "
-                "bits or smaller supported for now\n\n";
-      }
-      orig_input_width.emplace_back(DL.getTypeSizeInBits(vty));
-      new_argtypes.emplace_back(vty);
-    } else {
-      *out << "\nERROR: Unsupported function argument: Only int/ptr/vec types "
-              "supported for now\n\n";
-      exit(-1);
-    }
-  }
-
-  FunctionType *NFTy =
-      FunctionType::get(srcFn->getReturnType(), new_argtypes, false);
-  Function *NF =
-      Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
-                       srcFn->getName(), srcFn->getParent());
-  NF->copyAttributesFrom(srcFn);
-  // FIXME -- copy over argument attributes
-  NF->splice(NF->begin(), srcFn);
-  NF->takeName(srcFn);
-  for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
-                              I2 = NF->arg_begin();
-       I != E; ++I, ++I2) {
-    if (I->getType()->isPointerTy() ||
-        I->getType()->getPrimitiveSizeInBits() == 64) {
-      I->replaceAllUsesWith(&*I2);
-    } else {
-      auto name = I->getName().substr(I->getName().rfind('%')) + "_t";
-      auto trunc = new TruncInst(I2, I->getType(), name,
-                                 NF->getEntryBlock().getFirstNonPHI());
-      I->replaceAllUsesWith(trunc);
-    }
-  }
-
-  // FIXME -- doesn't matter if we're just dealing with one function,
-  // but if we're lifting modules with important calls, we need to
-  // replace uses of the function with NF, see code in
-  // DeadArgumentElimination.cpp
-
-  srcFn->eraseFromParent();
-  return NF;
-}
-
+/*
+ * a function that have the sext or zext attribute on its return value
+ * is awkward: this obligates the function to sign- or zero-extend the
+ * return value. we want to check this, which requires rewriting the
+ * function to return a larger type
+ */
 Function *adjustSrcReturn(Function *srcFn) {
   auto *ret_typ = srcFn->getReturnType();
 
@@ -149,7 +82,9 @@ Function *adjustSrcReturn(Function *srcFn) {
   }
 
   auto &DL = srcFn->getParent()->getDataLayout();
+  cout << "getting size of return type" << endl;
   orig_ret_bitwidth = DL.getTypeSizeInBits(ret_typ);
+  cout << "size = " << orig_ret_bitwidth << endl;
   if (orig_ret_bitwidth > 64) {
     *out << "\nERROR: Unsupported Function Return: Only int/vec types 64 "
             "bits or smaller supported for now\n\n";
@@ -202,48 +137,52 @@ Function *adjustSrcReturn(Function *srcFn) {
     RI->eraseFromParent();
   }
 
-  // FIXME this is duplicate code, factor it out
   FunctionType *NFTy =
       FunctionType::get(i64, srcFn->getFunctionType()->params(), false);
   Function *NF =
       Function::Create(NFTy, srcFn->getLinkage(), srcFn->getAddressSpace(),
                        srcFn->getName(), srcFn->getParent());
   NF->copyAttributesFrom(srcFn);
-  // FIXME -- copy over argument attributes
+
   NF->splice(NF->begin(), srcFn);
   NF->takeName(srcFn);
   for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
                               I2 = NF->arg_begin();
-       I != E; ++I, ++I2)
+       I != E; ++I, ++I2) {
     I->replaceAllUsesWith(&*I2);
+  }
 
-  // FIXME -- if we're lifting modules with important calls, we need to replace
-  // uses of the function with NF, see code in DeadArgumentElimination.cpp
+  // FIXME -- doesn't matter if we're just dealing with one function,
+  // but if we're lifting modules with important calls, we need to
+  // replace uses of the function with NF, see code in
+  // DeadArgumentElimination.cpp
 
   srcFn->eraseFromParent();
   return NF;
 }
 
-void checkTy(Type *t) {
-  if (t->isIntegerTy()) {
-    if (t->getIntegerBitWidth() > 64) {
-      *out << "\nERROR: integer arguments can't be more than 64 bits yet\n\n";
-      exit(-1);
-    }
-  } else if (auto pty = dyn_cast<PointerType>(t)) {
+void checkTy(Type *t, const DataLayout &DL) {
+  if (t->isVoidTy())
+    return;
+  if (DL.getTypeSizeInBits(t) > 64) {
+    *out << "\nERROR: integer arguments can't be more than 64 bits yet\n\n";
+    exit(-1);
+  }
+  if (auto pty = dyn_cast<PointerType>(t)) {
     if (pty->getAddressSpace() != 0) {
       *out << "\nERROR: Unsupported function argument: Only address space "
               "0 is supported\n\n";
       exit(-1);
     }
-  } else if (t->isVoidTy()) {
+  } else if (t->isIntegerTy()) {
+  } else if (t->isVectorTy()) {
   } else {
-    *out << "\nERROR: only integer and pointer arguments supported so far\n\n";
+    *out << "\nERROR: only integer, pointer, and vector arguments supported so far\n\n";
     exit(-1);
   }
 }
 
-void checkSupport(Instruction &i) {
+void checkSupport(Instruction &i, const DataLayout &DL) {
   for (auto &op : i.operands()) {
     auto *ty = op.get()->getType();
     if (auto *pty = dyn_cast<PointerType>(ty)) {
@@ -283,13 +222,14 @@ void checkSupport(Instruction &i) {
         exit(-1);
       }
     } else {
+      // FIXME
       if (ci->arg_size() > 1) {
         *out << "\nERROR: only zero or one arguments supported for now\n\n";
         exit(-1);
       }
       if (ci->arg_size() == 1)
-        checkTy(ci->getArgOperand(0)->getType());
-      checkTy(ci->getType());
+        checkTy(ci->getArgOperand(0)->getType(), DL);
+      checkTy(ci->getType(), DL);
     }
     auto callee = (string)ci->getCalledFunction()->getName();
     if (callee.find("llvm.objc") != string::npos) {
@@ -323,11 +263,24 @@ Function *adjustSrc(Function *srcFn) {
     exit(-1);
   }
 
+  for (auto &v : srcFn->args()) {
+    auto *ty = v.getType();
+    auto &DL = srcFn->getParent()->getDataLayout();
+    cout << "getting size of arg" << endl;
+    auto orig_width = DL.getTypeSizeInBits(ty);
+    cout << "arg size = " << orig_width << endl;
+    if (orig_width > 64) {
+      *out << "\nERROR: Unsupported function argument: Only integer / vector "
+	"parameters 64 bits or smaller supported for now\n\n";
+      exit(-1);
+    }
+  }
+
+  auto &DL = srcFn->getParent()->getDataLayout();
   for (auto &bb : *srcFn)
     for (auto &i : bb)
-      checkSupport(i);
+      checkSupport(i, DL);
 
-  srcFn = adjustSrcInputs(srcFn);
   srcFn = adjustSrcReturn(srcFn);
 
   *out << "\n---------- src.ll (args/return adjusted) -------\n";

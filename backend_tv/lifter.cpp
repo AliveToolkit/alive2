@@ -395,6 +395,7 @@ class arm2llvm {
   // names
   unordered_map<MCInst *, string> instExprVarMap;
   bool DebugRegs;
+  const DataLayout &DL;
 
   Type *getIntTy(int bits) {
     // just trying to catch silly errors, remove this sometime
@@ -1140,7 +1141,8 @@ public:
   arm2llvm(Module *LiftedModule, MCFunction &MF, Function &srcFn,
            MCInstPrinter *instrPrinter, bool DebugRegs)
       : LiftedModule(LiftedModule), MF(MF), srcFn(srcFn),
-        instrPrinter(instrPrinter), instCount(0), DebugRegs(DebugRegs) {}
+        instrPrinter(instrPrinter), instCount(0), DebugRegs(DebugRegs),
+	DL(srcFn.getParent()->getDataLayout()) {}
 
   int64_t getImm(int idx) {
     return CurInst->getOperand(idx).getImm();
@@ -2579,8 +2581,7 @@ public:
       } else {
         Value *retVal = nullptr;
         if (retTyp->isVectorTy()) {
-          retVal = createCast(readFromReg(AArch64::Q0), retTyp,
-                              Instruction::BitCast);
+          retVal = readFromReg(AArch64::Q0);
         } else {
           retVal = readFromReg(AArch64::X0);
         }
@@ -2588,11 +2589,11 @@ public:
           retVal =
               new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
         } else {
-          auto retWidth = retTyp->getPrimitiveSizeInBits();
-          auto retValWidth = retVal->getType()->getPrimitiveSizeInBits();
+          auto retWidth = DL.getTypeSizeInBits(retTyp);
+          auto retValWidth = DL.getTypeSizeInBits(retVal->getType());
 
-          if (retWidth < retValWidth)
-            retVal = createTrunc(retVal, getIntTy(retWidth));
+	  if (retWidth < retValWidth)
+	    retVal = createTrunc(retVal, getIntTy(retWidth));
 
           // mask off any don't-care bits
           if (has_ret_attr && (orig_ret_bitwidth < 32)) {
@@ -2601,6 +2602,9 @@ public:
             auto trunc = createTrunc(retVal, i32);
             retVal = createZExt(trunc, i64);
           }
+
+	  if (retTyp->isVectorTy() && !has_ret_attr)
+	    retVal = createCast(retVal, retTyp, Instruction::BitCast);
         }
         createReturn(retVal);
       }
@@ -2733,7 +2737,7 @@ public:
     }
   }
 
-  // create the storage associated with a register -- all of its
+  // create the actual storage associated with a register -- all of its
   // asm-level aliases will get redirected here
   void createRegStorage(unsigned Reg, unsigned Width, const string &Name) {
     auto A = createAlloca(getIntTy(Width), getIntConst(1, 64), Name);
@@ -2742,13 +2746,15 @@ public:
     RegFile[Reg] = A;
   }
 
-  Value *parameterABIRules(Value *V, bool argIsSExt, unsigned origWidth) {
+  Value *parameterABIRules(Value *V, bool argIsSExt) {
     auto i32 = getIntTy(32);
     auto i64 = getIntTy(64);
+    auto origWidth = DL.getTypeSizeInBits(V->getType());
+    if (V->getType()->isVectorTy())
+      V = createCast(V, getIntTy(origWidth), Instruction::BitCast, nextName());
     if (origWidth < 64) {
+      assert(V->getType()->isIntegerTy());
       auto op = argIsSExt ? Instruction::SExt : Instruction::ZExt;
-      auto orig_ty = getIntTy(origWidth);
-      V = createTrunc(V, orig_ty, nextName());
       if (origWidth == 1) {
         V = createCast(V, i32, op, nextName());
         V = createZExt(V, i64, nextName());
@@ -2880,15 +2886,18 @@ public:
     // supports integer parameters <= 64 bits and will require
     // significant generalization to handle large parameters, vectors,
     // and FP values
-    unsigned argNum = 0;
     unsigned vecArgNum = 0;
     unsigned scalarArgNum = 0;
     unsigned stackArgNum = 0;
-    for (auto &arg : Fn->args()) {
-      auto argTy = arg.getType();
-      Value *frozenArg = createFreeze(&arg, nextName());
-      auto *val = parameterABIRules(frozenArg, arg.hasSExtAttr(),
-                                    orig_input_width[argNum]);
+
+    for (Function::arg_iterator arg = Fn->arg_begin(), E = Fn->arg_end(),
+	   srcArg = srcFn.arg_begin();
+	 arg != E; ++arg, ++srcArg) {
+      *out << "  processing arg wtih vecArgNum = " << vecArgNum <<
+        ", scalarArgNum = " << scalarArgNum << ", stackArgNum = " << stackArgNum << "\n";
+      auto *argTy = arg->getType();
+      Value *frozenArg = createFreeze(arg, nextName());
+      auto *val = parameterABIRules(frozenArg, srcArg->hasSExtAttr());
 
       // first 8 integer parameters go in the first 8 integer registers
       if ((argTy->isIntegerTy() || argTy->isPointerTy()) && scalarArgNum < 8) {
@@ -2920,14 +2929,15 @@ public:
       }
 
     end:
-      argNum++;
+      ;
     }
+
+    *out << "done with callee-side ABI stuff\n";
 
     // initialize the frame pointer
     auto initFP = createGEP(i64, paramBase, {getIntConst(stackArgNum, 64)}, "");
     createStore(initFP, RegFile[AArch64::FP]);
 
-    *out << "done with callee-side ABI stuff\n";
     *out << "about to lift the instructions\n";
 
     for (auto &[llvm_bb, mc_bb] : BBs) {
@@ -3210,7 +3220,6 @@ public:
 namespace lifter {
 
 std::ostream *out;
-vector<unsigned> orig_input_width;
 unsigned int orig_ret_bitwidth;
 bool has_ret_attr;
 const Target *Targ;
@@ -3239,7 +3248,6 @@ void reset() {
   // probably should just encapsulate this in a class
   orig_ret_bitwidth = 64;
   has_ret_attr = false;
-  orig_input_width.clear();
 }
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,

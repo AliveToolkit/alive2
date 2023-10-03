@@ -34,8 +34,7 @@ inline std::string funcToString(llvm::Function *F) {
 
 // FIXME we'd rather not have these globals shared across files
 
-// unadjusted parameter bitwidths
-extern std::vector<unsigned> orig_input_width;
+// details from rewriting the src function
 extern unsigned orig_ret_bitwidth;
 extern bool has_ret_attr;
 extern const llvm::Target *Targ;
