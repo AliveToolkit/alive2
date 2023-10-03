@@ -2437,20 +2437,21 @@ public:
       } else {
         Value *retVal = nullptr;
         if (retTyp->isVectorTy()) {
-          retVal = createCast(readFromReg(AArch64::Q0), retTyp, Instruction::BitCast);
+          retVal = createCast(readFromReg(AArch64::Q0), retTyp,
+                              Instruction::BitCast);
         } else {
           retVal = readFromReg(AArch64::X0);
         }
         if (retTyp->isPointerTy()) {
           retVal =
-            new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
+              new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
         } else {
           auto retWidth = retTyp->getPrimitiveSizeInBits();
           auto retValWidth = retVal->getType()->getPrimitiveSizeInBits();
-          
+
           if (retWidth < retValWidth)
             retVal = createTrunc(retVal, getIntTy(retWidth));
-          
+
           // mask off any don't-care bits
           if (has_ret_attr && (orig_ret_bitwidth < 32)) {
             assert(retWidth >= orig_ret_bitwidth);
@@ -2767,10 +2768,11 @@ public:
         // anything else goes onto the stack!
         if (stackArgNum >= stackSlots) {
           *out << "\nERROR: maximum stack slots for parameter values "
-            "exceeded\n\n";
+                  "exceeded\n\n";
           exit(-1);
         }
-        auto addr = createGEP(i64, paramBase, {getIntConst(stackArgNum, 64)}, "");
+        auto addr =
+            createGEP(i64, paramBase, {getIntConst(stackArgNum, 64)}, "");
         createStore(val, addr);
         ++stackArgNum;
       }

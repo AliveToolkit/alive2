@@ -72,7 +72,8 @@ Function *adjustSrcInputs(Function *srcFn) {
     if (ty->isIntegerTy()) {
       auto orig_width = ty->getIntegerBitWidth();
       if (orig_width > 64) {
-        *out << "\nERROR: Unsupported function argument: Only integer parameters 64 "
+        *out << "\nERROR: Unsupported function argument: Only integer "
+                "parameters 64 "
                 "bits or smaller supported for now\n\n";
         exit(-1);
       }
@@ -89,7 +90,8 @@ Function *adjustSrcInputs(Function *srcFn) {
     } else if (auto vty = dyn_cast<VectorType>(ty)) {
       auto &DL = srcFn->getParent()->getDataLayout();
       if (DL.getTypeSizeInBits(vty) > 64) {
-        *out << "\nERROR: Unsupported function argument: Only vector parameters 64 "
+        *out << "\nERROR: Unsupported function argument: Only vector "
+                "parameters 64 "
                 "bits or smaller supported for now\n\n";
       }
       orig_input_width.emplace_back(DL.getTypeSizeInBits(vty));
@@ -140,9 +142,9 @@ Function *adjustSrcReturn(Function *srcFn) {
     return srcFn;
 
   if (!(ret_typ->isIntegerTy() || ret_typ->isVectorTy())) {
-    *out
-        << "\nERROR: Unsupported Function Return Type: Only int, ptr, vec, and void "
-           "supported for now\n\n";
+    *out << "\nERROR: Unsupported Function Return Type: Only int, ptr, vec, "
+            "and void "
+            "supported for now\n\n";
     exit(-1);
   }
 
