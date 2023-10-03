@@ -362,11 +362,6 @@ uint64_t decodeLogicalImmediate(uint64_t val, unsigned regSize) {
   return pattern;
 }
 
-// Values currently holding the latest definition for a volatile register, for
-// each basic block currently used by vector instructions only
-// TODO remove this
-unordered_map<MCBasicBlock *, unordered_map<unsigned, Value *>> cur_vol_regs;
-
 BasicBlock *getBB(Function &F, MCOperand &jmp_tgt) {
   assert(jmp_tgt.isExpr() && "[getBB] expected expression operand");
   assert((jmp_tgt.getExpr()->getKind() == MCExpr::ExprKind::SymbolRef) &&
@@ -2214,6 +2209,8 @@ public:
     // assuming that the source is always an x register
     // This might not be the case but we need to look at the assembly emitter
     case AArch64::FMOVXDr: {
+      assert(false); // avoid executing old code
+#if 0
       // zero extended x register to 128 bits
       auto val = readFromOperand(1);
       auto &op_0 = CurInst->getOperand(0);
@@ -2226,11 +2223,14 @@ public:
       auto mov_res = createOr(q_cleared, val);
       writeToOutputReg(mov_res);
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
+#endif
       break;
     }
     // assuming that the source is always an x register
     // This might not be the case but we need to look at the assembly emitter
     case AArch64::INSvi64gpr: {
+      assert(false); // avoid executing old code
+#if 0
       auto &op_0 = CurInst->getOperand(0);
       auto &op_1 = CurInst->getOperand(1);
       assert(op_0.isReg() && op_1.isReg());
@@ -2251,6 +2251,7 @@ public:
       auto mov_res = createAnd(q_cleared, val);
       writeToOutputReg(mov_res);
       cur_vol_regs[MCBB][op_0.getReg()] = mov_res;
+#endif
       break;
     }
     case AArch64::LDPWi:
@@ -2430,68 +2431,32 @@ public:
       break;
     }
     case AArch64::RET: {
-      // for now we're assuming that the function returns an integer or void
-      // value
-      auto retTy = srcFn.getReturnType();
-      if (auto *vecRetTy = dyn_cast<VectorType>(retTy)) {
-        *out << "returning vector type\n";
-        auto elem_bitwidth = vecRetTy->getScalarType()->getIntegerBitWidth();
-        auto poison_val = PoisonValue::get(vecRetTy->getScalarType());
-        vector<Constant *> vals;
-        auto elts = vecRetTy->getElementCount().getKnownMinValue();
-        for (unsigned i = 0; i < elts; ++i)
-          vals.emplace_back(poison_val);
-        Value *vec = ConstantVector::get(vals);
-
-        // Hacky way to identify how the returned vector is mapped to register
-        // in the assembly
-        // unsigned int largest_vect_register = AArch64::Q0;
-        // for (auto &[reg, val] : cur_vol_regs[MCBB]) {
-        //  *out << "reg num=" << reg << "\n";
-        //  if (reg > largest_vect_register) {
-        //    largest_vect_register = reg;
-        //  }
-        //}
-        //
-        // *out << "largest vect register=" <<
-        // largest_vect_register-AArch64::Q0
-        // << "\n";
-
-        auto elem_ret_typ = getIntTy(elem_bitwidth);
-        // need to trunc if the element's bitwidth is less than 128
-        if (elem_bitwidth < 128) {
-          for (unsigned i = 0; i < elts; ++i) {
-            auto vect_reg_val = cur_vol_regs[MCBB][AArch64::Q0 + i];
-            assert(vect_reg_val && "register value to return cannot be null!");
-            auto trunc = createTrunc(vect_reg_val, elem_ret_typ);
-            vec = createInsertElement(vec, trunc, getIntConst(i, 32));
-          }
-        } else {
-          assert(false && "we're not handling this case yet");
-        }
-        createReturn(vec);
+      auto *retTyp = srcFn.getReturnType();
+      if (retTyp->isVoidTy()) {
+        createReturn(nullptr);
       } else {
         Value *retVal = nullptr;
-        auto *retTyp = srcFn.getReturnType();
-        if (!retTyp->isVoidTy()) {
+        if (retTyp->isVectorTy()) {
+          retVal = createCast(readFromReg(AArch64::Q0), retTyp, Instruction::BitCast);
+        } else {
           retVal = readFromReg(AArch64::X0);
-          if (retTyp->isPointerTy()) {
-            retVal =
-                new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
-          } else {
-            auto retWidth = retTyp->getIntegerBitWidth();
-            auto retValWidth = retVal->getType()->getIntegerBitWidth();
-
-            if (retWidth < retValWidth)
-              retVal = createTrunc(retVal, getIntTy(retWidth));
-
-            // mask off any don't-care bits
-            if (has_ret_attr && (orig_ret_bitwidth < 32)) {
-              assert(retWidth >= orig_ret_bitwidth);
-              assert(retWidth == 64);
-              auto trunc = createTrunc(retVal, i32);
-              retVal = createZExt(trunc, i64);
-            }
+        }
+        if (retTyp->isPointerTy()) {
+          retVal =
+            new IntToPtrInst(retVal, PointerType::get(Ctx, 0), "", LLVMBB);
+        } else {
+          auto retWidth = retTyp->getPrimitiveSizeInBits();
+          auto retValWidth = retVal->getType()->getPrimitiveSizeInBits();
+          
+          if (retWidth < retValWidth)
+            retVal = createTrunc(retVal, getIntTy(retWidth));
+          
+          // mask off any don't-care bits
+          if (has_ret_attr && (orig_ret_bitwidth < 32)) {
+            assert(retWidth >= orig_ret_bitwidth);
+            assert(retWidth == 64);
+            auto trunc = createTrunc(retVal, i32);
+            retVal = createZExt(trunc, i64);
           }
         }
         createReturn(retVal);
@@ -2773,29 +2738,49 @@ public:
     // significant generalization to handle large parameters, vectors,
     // and FP values
     unsigned argNum = 0;
+    unsigned vecArgNum = 0;
+    unsigned scalarArgNum = 0;
+    unsigned stackArgNum = 0;
     for (auto &arg : Fn->args()) {
+      auto argTy = arg.getType();
       Value *frozenArg = createFreeze(&arg, nextName());
       auto *val = parameterABIRules(frozenArg, arg.hasSExtAttr(),
                                     orig_input_width[argNum]);
-      // first 8 are passed via registers, after that on the stack
-      if (argNum < 8) {
-        auto Reg = AArch64::X0 + argNum;
+
+      // first 8 integer parameters go in the first 8 integer registers
+      if ((argTy->isIntegerTy() || argTy->isPointerTy()) && scalarArgNum < 8) {
+        auto Reg = AArch64::X0 + scalarArgNum;
         createStore(val, RegFile[Reg]);
-      } else {
-        auto slot = argNum - 8;
-        if (slot >= stackSlots) {
+        ++scalarArgNum;
+        goto end;
+      }
+
+      // first 8 vector parameters go in the first 8 vector registers
+      if (argTy->isVectorTy() && vecArgNum < 8) {
+        auto Reg = AArch64::Q0 + vecArgNum;
+        createStore(val, RegFile[Reg]);
+        ++vecArgNum;
+        goto end;
+      }
+
+      {
+        // anything else goes onto the stack!
+        if (stackArgNum >= stackSlots) {
           *out << "\nERROR: maximum stack slots for parameter values "
-                  "exceeded\n\n";
+            "exceeded\n\n";
           exit(-1);
         }
-        auto addr = createGEP(i64, paramBase, {getIntConst(slot, 64)}, "");
+        auto addr = createGEP(i64, paramBase, {getIntConst(stackArgNum, 64)}, "");
         createStore(val, addr);
+        ++stackArgNum;
       }
+
+    end:
       argNum++;
     }
-    auto initFP = (argNum > 8) ? createGEP(i64, paramBase,
-                                           {getIntConst(argNum - 8, 64)}, "")
-                               : paramBase;
+
+    // initialize the frame pointer
+    auto initFP = createGEP(i64, paramBase, {getIntConst(stackArgNum, 64)}, "");
     createStore(initFP, RegFile[AArch64::FP]);
 
     *out << "done with callee-side ABI stuff\n";
@@ -3111,7 +3096,6 @@ void reset() {
   orig_ret_bitwidth = 64;
   has_ret_attr = false;
   orig_input_width.clear();
-  cur_vol_regs.clear();
 }
 
 pair<Function *, Function *> liftFunc(Module *OrigModule, Module *LiftedModule,

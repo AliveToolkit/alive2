@@ -72,7 +72,7 @@ Function *adjustSrcInputs(Function *srcFn) {
     if (ty->isIntegerTy()) {
       auto orig_width = ty->getIntegerBitWidth();
       if (orig_width > 64) {
-        *out << "\nERROR: Unsupported function argument: Only parameters 64 "
+        *out << "\nERROR: Unsupported function argument: Only integer parameters 64 "
                 "bits or smaller supported for now\n\n";
         exit(-1);
       }
@@ -84,10 +84,18 @@ Function *adjustSrcInputs(Function *srcFn) {
                 "0 is supported\n\n";
         exit(-1);
       }
-      new_argtypes.emplace_back(pty);
       orig_input_width.emplace_back(64);
+      new_argtypes.emplace_back(pty);
+    } else if (auto vty = dyn_cast<VectorType>(ty)) {
+      auto &DL = srcFn->getParent()->getDataLayout();
+      if (DL.getTypeSizeInBits(vty) > 64) {
+        *out << "\nERROR: Unsupported function argument: Only vector parameters 64 "
+                "bits or smaller supported for now\n\n";
+      }
+      orig_input_width.emplace_back(DL.getTypeSizeInBits(vty));
+      new_argtypes.emplace_back(vty);
     } else {
-      *out << "\nERROR: Unsupported function argument: Only int/ptr types "
+      *out << "\nERROR: Unsupported function argument: Only int/ptr/vec types "
               "supported for now\n\n";
       exit(-1);
     }
@@ -105,14 +113,14 @@ Function *adjustSrcInputs(Function *srcFn) {
   for (Function::arg_iterator I = srcFn->arg_begin(), E = srcFn->arg_end(),
                               I2 = NF->arg_begin();
        I != E; ++I, ++I2) {
-    if (!I->getType()->isPointerTy() &&
-        I->getType()->getIntegerBitWidth() < 64) {
+    if (I->getType()->isPointerTy() ||
+        I->getType()->getPrimitiveSizeInBits() == 64) {
+      I->replaceAllUsesWith(&*I2);
+    } else {
       auto name = I->getName().substr(I->getName().rfind('%')) + "_t";
       auto trunc = new TruncInst(I2, I->getType(), name,
                                  NF->getEntryBlock().getFirstNonPHI());
       I->replaceAllUsesWith(trunc);
-    } else {
-      I->replaceAllUsesWith(&*I2);
     }
   }
 
@@ -131,16 +139,17 @@ Function *adjustSrcReturn(Function *srcFn) {
   if (ret_typ->isPointerTy() || ret_typ->isVoidTy())
     return srcFn;
 
-  if (!ret_typ->isIntegerTy()) {
+  if (!(ret_typ->isIntegerTy() || ret_typ->isVectorTy())) {
     *out
-        << "\nERROR: Unsupported Function Return Type: Only int, ptr, and void "
+        << "\nERROR: Unsupported Function Return Type: Only int, ptr, vec, and void "
            "supported for now\n\n";
     exit(-1);
   }
 
-  orig_ret_bitwidth = ret_typ->getIntegerBitWidth();
+  auto &DL = srcFn->getParent()->getDataLayout();
+  orig_ret_bitwidth = DL.getTypeSizeInBits(ret_typ);
   if (orig_ret_bitwidth > 64) {
-    *out << "\nERROR: Unsupported Function Return: Only int types 64 "
+    *out << "\nERROR: Unsupported Function Return: Only int/vec types 64 "
             "bits or smaller supported for now\n\n";
     exit(-1);
   }
