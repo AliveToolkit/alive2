@@ -108,7 +108,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 15. Incorrect sort after lambda rewrite (https://github.com/Z3Prover/z3/issues/6340)
 16. Incorrect BV rewrite (https://github.com/Z3Prover/z3/issues/6426)
 17. Crash with FP<->BV conversions (https://github.com/Z3Prover/z3/issues/6460)
-
+18. Integer overflow (https://github.com/Z3Prover/z3/commit/a96f5a9b425b6f5ba7e8ce1c1a75db6683c4bdc9)
+19. Memory leak with arrays on timeout (https://github.com/Z3Prover/z3/commit/dda0c8ff4200faa6a441855716b47ec7f93e026e)
 
 ### Miscompilation bugs found in ARM64 Backend
 1. GlobalIsel miscompiles an llvm.fshl instruction (https://github.com/llvm/llvm-project/issues/55003)
@@ -133,3 +134,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 20. AArch64 backend miscompile of some funnel shifts (https://github.com/llvm/llvm-project/issues/59898)
 21. Miscompile by AArch64 backend related to smax.i64 (https://github.com/llvm/llvm-project/issues/59902)
 22. miscompile from AArch64 global isel backend (https://github.com/llvm/llvm-project/issues/61008)
+=======
