@@ -1662,6 +1662,10 @@ void Transform::preprocess() {
       aligns.emplace(in, in->getAttributes().align);
     }
 
+    for (auto *var : fn->getGlobalVars()) {
+      aligns.emplace(var, var->getAlignment());
+    }
+
     for (auto &i : fn->instrs()) {
       worklist.emplace(&i);
     }
