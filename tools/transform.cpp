@@ -1689,10 +1689,21 @@ void Transform::preprocess() {
           continue;
         }
       } else if (auto *gep = dynamic_cast<const GEP*>(i)) {
-        auto off = gep->getExactOffset();
-        if (!off || !is_power2(*off))
-          continue;
-        align = min(aligns[&gep->getPtr()], *off);
+        int mul_bits = sizeof(uint64_t) * 8 - 1;
+        uint64_t const_offset = 0;
+        for (auto &[mul, v] : gep->getIdxs()) {
+          if (mul == 0)
+            continue;
+          if (auto n = getInt(*v))
+            const_offset += mul * (uint64_t)*n;
+          else
+            mul_bits = min(mul_bits, countr_zero(mul));
+        }
+        align = min(aligns[&gep->getPtr()], ((uint64_t)1) << mul_bits);
+        if (const_offset) {
+          align = min(align, ((uint64_t)1) << countr_zero(const_offset));
+        }
+
       } else if (auto *phi = dynamic_cast<const Phi*>(i)) {
         // optimistic handling of phis: unreachable predecessors don't
         // contribute to the result. This is revisited once they become reach

@@ -767,7 +767,6 @@ public:
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
   bool isInBounds() const { return inbounds; }
-  std::optional<uint64_t> getExactOffset() const;
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

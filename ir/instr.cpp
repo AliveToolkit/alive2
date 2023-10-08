@@ -3619,23 +3619,6 @@ uint64_t GEP::getMaxGEPOffset() const {
   return off;
 }
 
-optional<uint64_t> GEP::getExactOffset() const {
-  uint64_t off = 0;
-  for (auto &[mul, v] : getIdxs()) {
-    if (mul == 0)
-      continue;
-    if (mul >= INT64_MAX)
-      return {};
-
-    if (auto n = getInt(*v)) {
-      off += (int64_t)mul * *n;
-      continue;
-    }
-    return {};
-  }
-  return off;
-}
-
 vector<Value*> GEP::operands() const {
   vector<Value*> v = { ptr };
   for (auto &[sz, idx] : idxs) {
