@@ -31,11 +31,11 @@ spurious counterexamples if run with such passes.
 Prerequisites
 -------------
 To build Alive2 you need recent versions of:
-* cmake
-* gcc/clang
+* [cmake](https://cmake.org)
+* [gcc](https://gcc.gnu.org)/[clang](https://clang.llvm.org)
 * [re2c](https://re2c.org/)
 * [Z3](https://github.com/Z3Prover/z3)
-* LLVM (optional)
+* [LLVM](https://llvm.org) (optional)
 * [hiredis](https://github.com/redis/hiredis) (optional, needed for caching)
 
 
