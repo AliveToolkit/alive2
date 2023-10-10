@@ -43,6 +43,8 @@ Building
 --------
 
 ```
+export ALIVE2_HOME=$PWD
+export LLVM2_HOME=$PWD
 mkdir build
 cd build
 cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
@@ -68,16 +70,16 @@ cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DBUILD_SHARED_LIBS=ON -
 
 Alive2 should then be configured as follows:
 ```
-cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
+cmake -GNinja -DCMAKE_PREFIX_PATH=$LLVM2_HOME/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
 ```
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -load-pass-plugin $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_HOME/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -load-pass-plugin $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
 On a Mac:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -load-pass-plugin $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_HOME/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -load-pass-plugin $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -86,7 +88,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -101,7 +103,7 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
+$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
