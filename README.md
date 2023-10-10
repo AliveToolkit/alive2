@@ -35,7 +35,7 @@ To build Alive2 you need recent versions of:
 * [gcc](https://gcc.gnu.org)/[clang](https://clang.llvm.org)
 * [re2c](https://re2c.org/)
 * [Z3](https://github.com/Z3Prover/z3)
-* [LLVM](https://llvm.org) (optional)
+* [LLVM](https://github.com/llvm/llvm-project) (optional)
 * [hiredis](https://github.com/redis/hiredis) (optional, needed for caching)
 
 
