@@ -75,11 +75,11 @@ cmake -GNinja -DCMAKE_PREFIX_PATH=$LLVM2_HOME/llvm/build -DBUILD_TV=1 -DCMAKE_BU
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-$LLVM2_HOME/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -load-pass-plugin $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_HOME/llvm/build/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
 On a Mac:
 ```
-$LLVM2_HOME/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -load-pass-plugin $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_HOME/llvm/build/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -88,7 +88,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -103,7 +103,7 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms
+$LLVM2_HOME/llvm/build/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
@@ -118,15 +118,15 @@ by LLVM.  Invoke the plugin like this:
 
 ```
 $ clang -O3 <src.c> -S -emit-llvm \
-  -fpass-plugin=$HOME/alive2/build/tv/tv.so \
-  -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
+  -fpass-plugin=$ALIVE2_HOME/alive2/build/tv/tv.so \
+  -Xclang -load -Xclang $ALIVE2_HOME/alive2/build/tv/tv.so
 ```
 
 Or, more conveniently:
 
 ```
-$ $HOME/alive2/build/alivecc -O3 -c <src.c>
-$ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
+$ $ALIVE2_HOME/alive2/build/alivecc -O3 -c <src.c>
+$ $ALIVE2_HOME/alive2/build/alive++ -O3 -c <src.cpp>
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
