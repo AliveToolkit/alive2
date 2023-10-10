@@ -6,11 +6,9 @@ target datalayout = "E-p:64:64:64"
 define i32 @src(i16 noundef %x, i16 noundef %y) {
   %p = alloca i16
   %q = alloca i16
-  store i16 %x, i16* %p, align 1
-  store i16 %y, i16* %q, align 1
-  %p8 = bitcast i16* %p to i8*
-  %q8 = bitcast i16* %q to i8*
-  %res = call i32 @memcmp(i8* %p8, i8* %q8, i64 2)
+  store i16 %x, ptr %p, align 1
+  store i16 %y, ptr %q, align 1
+  %res = call i32 @memcmp(ptr %p, ptr %q, i64 2)
   ret i32 %res
 }
 
@@ -22,4 +20,4 @@ define i32 @tgt(i16 noundef %x, i16 noundef %y) {
   ret i32 %res
 }
 
-declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)
+declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)

@@ -1,9 +1,9 @@
-define void @f(i8* %ptr) {
-  %dst2 = bitcast i8* %ptr to i8**
-  store i8* %ptr, i8** %dst2, align 1
+define void @f(ptr %ptr) {
+  %dst2 = bitcast ptr %ptr to ptr
+  store ptr %ptr, ptr %ptr, align 1
 
-  %ptr1 = getelementptr i8, i8* %ptr, i64 1
-  %dst = bitcast i8* %ptr1 to i8**
-  store i8* %ptr, i8** %dst, align 1
+  %ptr1 = getelementptr i8, ptr %ptr, i64 1
+  %dst = bitcast ptr %ptr1 to ptr
+  store ptr %ptr, ptr %dst, align 1
   ret void
 }

@@ -3,6 +3,6 @@ target datalayout="e-p:64:64:64-p1:16:16:16-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i6
 @g = constant {i64, i64} { i64 123, i64 112312312 }
 
 define <2 x i64> @test() {
-  %r = load <2 x i64>, <2 x i64>* bitcast({i64, i64}* @g to <2 x i64>*)
+  %r = load <2 x i64>, ptr @g
   ret <2 x i64> %r
 }

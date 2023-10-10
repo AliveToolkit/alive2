@@ -1,11 +1,11 @@
-define void @f(i8* %p) {
-  %v = load i8, i8* %p
-  store i8 %v, i8* %p
+define void @f(ptr %p) {
+  %v = load i8, ptr %p
+  store i8 %v, ptr %p
   ret void
 }
 
-define void @f2(i8** %p) {
-  %v = load i8*, i8** %p
-  store i8* %v, i8** %p
+define void @f2(ptr %p) {
+  %v = load ptr, ptr %p
+  store ptr %v, ptr %p
   ret void
 }

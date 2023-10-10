@@ -1,13 +1,12 @@
 target datalayout="e"
 
-define i64 @src(<2 x float>* %p) {
-  store <2 x float> <float 1.0, float 2.0>, <2 x float>* %p
-  %p2 = bitcast <2 x float>* %p to i64*
-  %i = load i64, i64* %p2
+define i64 @src(ptr %p) {
+  store <2 x float> <float 1.0, float 2.0>, ptr %p
+  %i = load i64, ptr %p
   ret i64 %i
 }
 
-define i64 @tgt(<2 x float>* %p) {
-	store <2 x float> <float 1.0, float 2.0>, <2 x float>* %p
+define i64 @tgt(ptr %p) {
+	store <2 x float> <float 1.0, float 2.0>, ptr %p
 	ret i64 4611686019492741120
 }

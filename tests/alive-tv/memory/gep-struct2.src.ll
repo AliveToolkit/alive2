@@ -5,11 +5,11 @@ target datalayout = "e-i32:32-i128:32-i8:8"
 ; struct S1 { X(i32); Y(i8); Z(i8); }
 ; struct S2 {A(i32); B(i128); S1[5]; }
 ; %0 = S2[10]
-define i64 @0(%0*) {
+define i64 @0(ptr) {
 ; %2 points to: S2[2]->S1[3]->Z
-  %2 = getelementptr inbounds %0, %0* %0, i32 0, i32 2, i32 2, i32 3, i32 2
-  %3 = ptrtoint %0* %0 to i64
-  %4 = ptrtoint i8* %2 to i64
+  %2 = getelementptr inbounds %0, ptr %0, i32 0, i32 2, i32 2, i32 3, i32 2
+  %3 = ptrtoint ptr %0 to i64
+  %4 = ptrtoint ptr %2 to i64
   %5 = sub i64 %4, %3
   ret i64 %5
 }

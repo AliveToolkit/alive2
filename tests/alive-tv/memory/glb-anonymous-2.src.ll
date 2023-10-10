@@ -3,9 +3,9 @@
 @1 = constant i32 3
 
 define i32 @f() {
-  %a = load i32, i32* @0
-  %b = load i32, i32* @x
-  %c = load i32, i32* @1
+  %a = load i32, ptr @0
+  %b = load i32, ptr @x
+  %c = load i32, ptr @1
 
   %p = mul i32 100, %a
   %q = mul i32 10, %b

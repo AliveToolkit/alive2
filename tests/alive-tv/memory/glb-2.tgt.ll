@@ -3,9 +3,7 @@ target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128" ; has little endian
 @y = constant i32 258, align 4
 
 define i8 @f() {
-  %x8 = bitcast i32* @x to i8*
-  %y8 = bitcast i32* @y to i8*
-  %v = load i8, i8* %x8
-  %w = load i8, i8* %y8
+  %v = load i8, ptr @x
+  %w = load i8, ptr @y
   ret i8 3
 }

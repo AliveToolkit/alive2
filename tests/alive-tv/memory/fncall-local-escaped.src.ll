@@ -1,23 +1,23 @@
-@glb = global i8* null
+@glb = global ptr null
 
 define i8 @foo(i1 %cmp) {
   %a = alloca i8
   %b = alloca i8
   %c = alloca i8
-  store i8 42, i8* %c
+  store i8 42, ptr %c
   br i1 %cmp, label %t, label %f
 
 t:
-  store i8* %a, i8** @glb
+  store ptr %a, ptr @glb
   br label %end
 
 f:
-  store i8* %b, i8** @glb
+  store ptr %b, ptr @glb
   br label %end
 
 end:
   call void @fn()
-  %load = load i8, i8* %c
+  %load = load i8, ptr %c
   ret i8 %load
 }
 

@@ -1,5 +1,5 @@
-@g7 = constant {[0 x i32], [0 x i8], {}*} { [0 x i32] undef, [0 x i8] undef, {}* null }
+@g7 = constant {[0 x i32], [0 x i8], ptr} { [0 x i32] poison, [0 x i8] poison, ptr null }
 
-define i64* @test_leading_zero_size_elems() {
-  ret i64* null
+define ptr @test_leading_zero_size_elems() {
+  ret ptr null
 }

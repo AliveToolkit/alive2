@@ -1,9 +1,9 @@
-define i1 @src(i64* %arg) {
+define i1 @src(ptr %arg) {
   %alloc = alloca i64
-  %cmp = icmp eq i64* %arg, %alloc
+  %cmp = icmp eq ptr %arg, %alloc
   ret i1 %cmp
 }
 
-define i1 @tgt(i64* %arg) {
+define i1 @tgt(ptr %arg) {
   ret i1 false
 }

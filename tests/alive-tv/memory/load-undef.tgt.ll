@@ -6,7 +6,7 @@ entry:
   br i1 %cmp, label %if.then, label %if.end
 
 if.then:
-  store i8 %v, i8* @gv
+  store i8 %v, ptr @gv
   br label %if.end
 
 if.end:

@@ -1,7 +1,6 @@
 define i16 @f1(half %x) {
   %a = alloca half
-  store half %x, half* %a
-  %p = bitcast half* %a to i16*
-  %i = load i16, i16* %p
+  store half %x, ptr %a
+  %i = load i16, ptr %a
   ret i16 %i
 }
