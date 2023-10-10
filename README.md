@@ -33,10 +33,10 @@ Prerequisites
 To build Alive2 you need recent versions of:
 * cmake
 * gcc/clang
-* re2c
-* Z3
+* [re2c](https://re2c.org/)
+* [Z3](https://github.com/Z3Prover/z3)
 * LLVM (optional)
-* hiredis (optional, needed for caching)
+* [hiredis](https://github.com/redis/hiredis) (optional, needed for caching)
 
 
 Building
