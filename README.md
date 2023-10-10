@@ -58,7 +58,7 @@ Building and Running Translation Validation
 
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
 RTTI and exceptions turned on.
-LLVM can be built in the following way:
+LLVM can be built targeting X86 in the following way:
 ```
 cd llvm
 mkdir build
