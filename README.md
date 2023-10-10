@@ -72,10 +72,11 @@ cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DBUILD_SHARED_LIBS=ON -
 ninja
 ```
 
-Alive2 should then be configured as follows:
+Alive2 should then be configured and built as follows:
 ```
 cd $ALIVE2_HOME/alive2/build
 cmake -GNinja -DCMAKE_PREFIX_PATH=$LLVM2_BUILD -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
+ninja
 ```
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
