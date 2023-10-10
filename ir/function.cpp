@@ -105,7 +105,7 @@ void BasicBlock::rauw(const Value &what, Value &with) {
 
 ostream& operator<<(ostream &os, const BasicBlock &bb) {
   if (!bb.name.empty())
-    os << bb.name << ":\n";
+    os << string_view(bb.name).substr(1) << ":\n";
   for (auto &i : bb.instrs()) {
     os << "  ";
     i.print(os);
