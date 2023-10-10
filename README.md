@@ -44,7 +44,7 @@ Building
 
 ```
 export ALIVE2_HOME=$PWD
-export LLVM2_HOME=$PWD
+export LLVM2_HOME=$PWD/llvm-project
 export LLVM2_BUILD=$LLVM2_HOME/llvm/build
 git clone git@github.com:AliveToolkit/alive2.git
 cd alive2
@@ -65,7 +65,7 @@ Alive2's `opt` and `clang` translation validation requires a build of LLVM with
 RTTI and exceptions turned on.
 LLVM can be built targeting X86 in the following way:
 ```
-cd $LLVM2_HOME/llvm
+cd $LLVM2_HOME
 mkdir build
 cd build
 cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="llvm;clang" ../llvm
