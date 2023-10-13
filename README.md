@@ -45,7 +45,7 @@ Building
 ```
 export ALIVE2_HOME=$PWD
 export LLVM2_HOME=$PWD/llvm-project
-export LLVM2_BUILD=$LLVM2_HOME/llvm/build
+export LLVM2_BUILD=$LLVM2_HOME/build
 git clone git@github.com:AliveToolkit/alive2.git
 cd alive2
 mkdir build
