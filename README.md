@@ -115,7 +115,7 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms
+$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
