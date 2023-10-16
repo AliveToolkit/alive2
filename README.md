@@ -129,7 +129,7 @@ This plugin tries to validate every IR-level transformation performed
 by LLVM.  Invoke the plugin like this:
 
 ```
-$ clang -O3 <src.c> -S -emit-llvm \
+clang -O3 $LLVM2_HOME/clang/test/C/C99/n505.c -S -emit-llvm \
   -fpass-plugin=$ALIVE2_HOME/alive2/build/tv/tv.so \
   -Xclang -load -Xclang $ALIVE2_HOME/alive2/build/tv/tv.so
 ```
@@ -137,8 +137,9 @@ $ clang -O3 <src.c> -S -emit-llvm \
 Or, more conveniently:
 
 ```
-$ $ALIVE2_HOME/alive2/build/alivecc -O3 -c <src.c>
-$ $ALIVE2_HOME/alive2/build/alive++ -O3 -c <src.cpp>
+$ALIVE2_HOME/alive2/build/alivecc -O3 -c $LLVM2_HOME/clang/test/C/C99/n505.c
+
+$ALIVE2_HOME/alive2/build/alive++ -O3 -c $LLVM2_HOME/clang/test/Analysis/aggrinit-cfg-output.cpp
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
