@@ -54,10 +54,10 @@ llvm::cl::opt<std::string> opt_fn(LLVM_ARGS_PREFIX "fn",
                  "= first function in the module)"),
   llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<bool> opt_optimize_tgt(LLVM_ARGS_PREFIX "optimize-tgt",
+llvm::cl::opt<string> opt_optimize_tgt(LLVM_ARGS_PREFIX "optimize-tgt",
   llvm::cl::desc("Optimize lifted code before performing translation "
-		 "validation (default=true)"),
-  llvm::cl::cat(alive_cmdargs), llvm::cl::init(true));
+		 "validation (default=O3)"),
+                 llvm::cl::cat(alive_cmdargs), llvm::cl::init("O3"));
 
 // FIXME support opt_asm_only and opt_asm_input
   
@@ -112,10 +112,8 @@ void doit(llvm::Module *M1, llvm::Function *srcFn, Verifier &verifier) {
   *out << "\n\nabout to optimize lifted code:\n\n";
   *out << lifter::moduleToString(M2.get());
 
-  if (opt_optimize_tgt) {
-    auto err = optimize_module(M2.get(), "O3");
-    assert(err.empty());
-  }
+  auto err = optimize_module(M2.get(), opt_optimize_tgt);
+  assert(err.empty());
 
   *out << "\n\nafter optimization:\n\n";
   *out << lifter::moduleToString(M2.get());
