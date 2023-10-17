@@ -100,7 +100,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -115,7 +115,7 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/llvm/test/Transforms
+$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
@@ -129,7 +129,7 @@ This plugin tries to validate every IR-level transformation performed
 by LLVM.  Invoke the plugin like this:
 
 ```
-$ clang -O3 <src.c> -S -emit-llvm \
+clang -O3 $LLVM2_HOME/clang/test/C/C99/n505.c -S -emit-llvm \
   -fpass-plugin=$ALIVE2_HOME/alive2/build/tv/tv.so \
   -Xclang -load -Xclang $ALIVE2_HOME/alive2/build/tv/tv.so
 ```
@@ -137,8 +137,9 @@ $ clang -O3 <src.c> -S -emit-llvm \
 Or, more conveniently:
 
 ```
-$ $ALIVE2_HOME/alive2/build/alivecc -O3 -c <src.c>
-$ $ALIVE2_HOME/alive2/build/alive++ -O3 -c <src.cpp>
+$ALIVE2_HOME/alive2/build/alivecc -O3 -c $LLVM2_HOME/clang/test/C/C99/n505.c
+
+$ALIVE2_HOME/alive2/build/alive++ -O3 -c $LLVM2_HOME/clang/test/Analysis/aggrinit-cfg-output.cpp
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
