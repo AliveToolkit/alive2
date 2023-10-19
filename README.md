@@ -89,9 +89,13 @@ $LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin 
 ```
 
 
-On a Mac:
+On a Mac with the old pass manager:
 ```
 $LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+```
+On a Mac with the new pass manager:
+```
+$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -passes=tv -passes=instcombine -passes=tv -o /dev/null $LLVM2_HOME/llvm/test/Analysis/AssumptionCache/basic.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -300,6 +304,14 @@ repeated work. When it hits a repeated refinement check, it prints
 If you want to use this functionality, you will need to manually start
 and stop, as appropriate, a Redis server instance on localhost. Alive2
 should be the only user of this server.
+
+Troubleshooting
+--------
+Some combinations of Clang and MacOS versions may give link warnings 
+“-undefined dynamic_lookup may not work with chained fixups,” and
+runtime errors with “symbol not found in flat namespace.”  Setting
+[CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html) as a cache entry to 11.0
+or less at the beginning of CMakeLists.txt may work around this. 
 
 LLVM Bugs Found by Alive2
 --------
