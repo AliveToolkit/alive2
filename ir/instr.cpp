@@ -2074,7 +2074,7 @@ pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   return { UINT64_MAX, getAlign() };
 }
 
-static Value* get_align_arg(const vector<pair<Value*, ParamAttrs>> args) {
+static Value* get_align_arg(const vector<pair<Value*, ParamAttrs>> &args) {
   for (auto &[arg, attrs] : args) {
     if (attrs.has(ParamAttrs::AllocAlign))
       return arg;
@@ -2420,11 +2420,23 @@ StateValue FnCall::toSMT(State &s) const {
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
+    // FIXME: take allocalign into account
     auto [p_new, allocated]
       = m.alloc(&size, getAlign(), Memory::MALLOC, np_size, nonnull);
 
+    // pointer must be null if:
+    // 1) alignment is not a power of 2
+    // 2) size is not a multiple of alignment
+    expr is_not_null = true;
+    if (auto *allocalign = getAlignArg()) {
+      auto &align = s[*allocalign].value;
+      auto bw = max(align.bits(), size.bits());
+      is_not_null &= align.isPowerOf2();
+      is_not_null &= size.zextOrTrunc(bw).urem(align.zextOrTrunc(bw)) == 0;
+    }
+
     expr nullp = Pointer::mkNullPointer(m)();
-    expr ret = expr::mkIf(allocated, p_new, nullp);
+    expr ret = expr::mkIf(allocated && is_not_null, p_new, nullp);
 
     // TODO: In C++ we need to throw an exception if the allocation fails.
 
