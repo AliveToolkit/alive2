@@ -123,7 +123,11 @@ $LLVM2_BUILD/bin/llvm-lit -s -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
-[here](https://web.ist.utl.pt/nuno.lopes/alive2/).
+[here](https://web.ist.utl.pt/nuno.lopes/alive2/).  To detect unsound transformations in a local run:
+
+```
+fgrep -r "(unsound)" alive2/build/logs/
+```
 
 
 Running Alive2 as a Clang Plugin
