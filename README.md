@@ -311,12 +311,12 @@ should be the only user of this server.
 
 Troubleshooting
 --------
+* Check the “LLVMConfig.cmake” and “CMAKE_PREFIX_PATH” output from CMake in case of build problems. CMake may look for configuration information in old installations of LLVM, e.g., under `/opt/`, if these are not set properly.
 * Some combinations of Clang and MacOS versions may give link warnings 
 “-undefined dynamic_lookup may not work with chained fixups,” and
 runtime errors with “symbol not found in flat namespace.”  Setting
 [CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html) as a cache entry to 11.0
 or less at the beginning of CMakeLists.txt may work around this.
-* CMake may look for configuration information in old installations of LLVM, e.g., under `/opt/`.
 
 LLVM Bugs Found by Alive2
 --------
