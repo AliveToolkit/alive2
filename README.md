@@ -311,15 +311,25 @@ should be the only user of this server.
 
 Troubleshooting
 --------
-* Check the “LLVMConfig.cmake” and “CMAKE_PREFIX_PATH” output from CMake in case of build problems. CMake may look for configuration information in old installations of LLVM, e.g., under `/opt/`, if these are not set properly.
+* Check the “LLVMConfig.cmake” and “CMAKE_PREFIX_PATH” output from CMake in
+case of build problems. CMake may look for configuration information in old
+installations of LLVM, e.g., under `/opt/`, if these are not set properly.
 * Some combinations of Clang and MacOS versions may give link warnings 
 “-undefined dynamic_lookup may not work with chained fixups,” and
 runtime errors with “symbol not found in flat namespace.”  Setting
-[CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html) as a cache entry to 11.0
+[CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/
+CMAKE_OSX_DEPLOYMENT_TARGET.html) as a cache entry to 11.0
 or less at the beginning of CMakeLists.txt may work around this.
-* Building for Translation Validation requires enabling `BUILD_SHARED_LIBS`.  For LLVM forks not normally built with the option, this may interfere with CMake files’ use of `USEDLIBS` and `LLVMLIBS` and perhaps `dd_llvm_target`. 
-* Building for Translation Validation is tightly coupled to LLVM top of tree source.  Building a fork with older source may require reverting to the corresponding Alive2 commit.  This in turn may require experimentation with Clang versions and vendors.
-* Building older source on an up-to-date machine may require adjustments.  For example, the now-deleted file `scripts/rewritepass.py` depended on the deprecated Python 2; update the shebang line to `python3`.
+* Building for Translation Validation requires enabling `BUILD_SHARED_LIBS`. 
+For LLVM forks not normally built with the option, this may interfere with
+CMake files’ use of `USEDLIBS` and `LLVMLIBS` and perhaps `dd_llvm_target`. 
+* Building for Translation Validation is tightly coupled to LLVM top of tree
+source.  Building a fork with older source may require reverting to the
+corresponding Alive2 commit.  This in turn may require experimentation with
+Clang versions and vendors.
+* Building older source on an up-to-date machine may require adjustments.  For
+example, the now-deleted file `scripts/rewritepass.py` depended on the
+deprecated Python 2; update the shebang line to `python3`.
 
 LLVM Bugs Found by Alive2
 --------
