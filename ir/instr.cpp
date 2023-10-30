@@ -1534,51 +1534,57 @@ void ConversionOp::print(ostream &os) const {
   case Int2Ptr:  str = "int2ptr "; break;
   }
 
-  os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
+  os << getName() << " = " << str;
+  if (flags & NNEG)
+    os << "nneg ";
+  os << *val << print_type(getType(), " to ", "");
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
   auto v = s[*val];
-  function<expr(expr &&, const Type &)> fn;
+  function<StateValue(expr &&, const Type &)> fn;
 
   switch (op) {
   case SExt:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.sext(to_type.bits() - val.bits());
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return {val.sext(to_type.bits() - val.bits()), true};
     };
     break;
   case ZExt:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.zext(to_type.bits() - val.bits());
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return { val.zext(to_type.bits() - val.bits()),
+               (flags & NNEG) ? !val.isNegative() : true };
     };
     break;
   case Trunc:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.trunc(to_type.bits());
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return {val.trunc(to_type.bits()), true};
     };
     break;
   case BitCast:
-    break;
-  case Ptr2Int:
-    fn = [&](auto &&val, auto &to_type) -> expr {
-      return s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits());
-    };
-    break;
-  case Int2Ptr:
-    fn = [&](auto &&val, auto &to_type) -> expr {
-      return s.getMemory().int2ptr(val);
-    };
-    break;
-  }
-
-  if (op == BitCast) {
     // NOP: ptr vect -> ptr vect
     if (getType().isVectorType() &&
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
     return getType().fromInt(val->getType().toInt(s, std::move(v)));
+
+  case Ptr2Int:
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return {s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true};
+    };
+    break;
+  case Int2Ptr:
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return {s.getMemory().int2ptr(val), true};
+    };
+    break;
   }
+
+  auto scalar = [&](StateValue &&v, const Type &to_type) -> StateValue {
+    auto [v2, np] = fn(std::move(v.value), to_type);
+    return { std::move(v2),  v.non_poison && np };
+  };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -1587,14 +1593,12 @@ StateValue ConversionOp::toSMT(State &s) const {
     auto valty = val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      auto vi = valty->extract(v, i);
-      vals.emplace_back(fn(std::move(vi.value), retty->getChild(i)),
-                        std::move(vi.non_poison));
+      vals.emplace_back(scalar(valty->extract(v, i), retty->getChild(i)));
     }
     return retty->aggregateVals(vals);
   }
 
-  return { fn(std::move(v.value), getType()), std::move(v.non_poison) };
+  return scalar(std::move(v), getType());
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
@@ -1635,7 +1639,8 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ConversionOp::dup(Function &f, const string &suffix) const {
-  return make_unique<ConversionOp>(getType(), getName() + suffix, *val, op);
+  return
+    make_unique<ConversionOp>(getType(), getName() + suffix, *val, op, flags);
 }
 
 

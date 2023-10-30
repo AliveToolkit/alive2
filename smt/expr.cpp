@@ -421,9 +421,7 @@ bool expr::isSMax() const {
 }
 
 expr expr::isNegative() const {
-  C();
-  auto bit = bits() - 1;
-  return extract(bit, bit) == 1;
+  return sign() == 1;
 }
 
 unsigned expr::bits() const {
