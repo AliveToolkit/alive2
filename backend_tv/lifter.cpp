@@ -88,29 +88,30 @@ const set<int> s_flag = {
 };
 
 const set<int> instrs_32 = {
-    AArch64::ADDWrx,   AArch64::ADDSWrs, AArch64::ADDSWri,  AArch64::ADDWrs,
-    AArch64::ADDWri,   AArch64::ADDSWrx, AArch64::ADCWr,    AArch64::ADCSWr,
-    AArch64::ASRVWr,   AArch64::SUBWri,  AArch64::SUBWrs,   AArch64::SUBWrx,
-    AArch64::SUBSWrs,  AArch64::SUBSWri, AArch64::SUBSWrx,  AArch64::SBFMWri,
-    AArch64::CSELWr,   AArch64::ANDWri,  AArch64::ANDWrr,   AArch64::ANDWrs,
-    AArch64::ANDSWri,  AArch64::ANDSWrr, AArch64::ANDSWrs,  AArch64::MADDWrrr,
-    AArch64::MSUBWrrr, AArch64::EORWri,  AArch64::CSINVWr,  AArch64::CSINCWr,
-    AArch64::MOVZWi,   AArch64::MOVNWi,  AArch64::MOVKWi,   AArch64::LSLVWr,
-    AArch64::LSRVWr,   AArch64::ORNWrs,  AArch64::UBFMWri,  AArch64::BFMWri,
-    AArch64::ORRWrs,   AArch64::ORRWri,  AArch64::SDIVWr,   AArch64::UDIVWr,
-    AArch64::EXTRWrri, AArch64::EORWrs,  AArch64::RORVWr,   AArch64::RBITWr,
-    AArch64::CLZWr,    AArch64::REVWr,   AArch64::CSNEGWr,  AArch64::BICWrs,
-    AArch64::BICSWrs,  AArch64::EONWrs,  AArch64::REV16Wr,  AArch64::Bcc,
-    AArch64::CCMPWr,   AArch64::CCMPWi,  AArch64::LDRWui,   AArch64::LDRBBui,
-    AArch64::LDRSBWui, AArch64::LDRSWui, AArch64::LDRSHWui, AArch64::LDRSBWui,
-    AArch64::LDRHHui,  AArch64::STRWui,  AArch64::CCMNWi,   AArch64::CCMNWr,
-    AArch64::STRBBui,  AArch64::STPWi,   AArch64::STURWi,   AArch64::LDPWi,
-    AArch64::STRWpre};
+    AArch64::ADDWrx,   AArch64::ADDSWrs,  AArch64::ADDSWri,  AArch64::ADDWrs,
+    AArch64::ADDWri,   AArch64::ADDSWrx,  AArch64::ADCWr,    AArch64::ADCSWr,
+    AArch64::ASRVWr,   AArch64::SUBWri,   AArch64::SUBWrs,   AArch64::SUBWrx,
+    AArch64::SUBSWrs,  AArch64::SUBSWri,  AArch64::SUBSWrx,  AArch64::SBFMWri,
+    AArch64::CSELWr,   AArch64::ANDWri,   AArch64::ANDWrr,   AArch64::ANDWrs,
+    AArch64::ANDSWri,  AArch64::ANDSWrr,  AArch64::ANDSWrs,  AArch64::MADDWrrr,
+    AArch64::MSUBWrrr, AArch64::EORWri,   AArch64::CSINVWr,  AArch64::CSINCWr,
+    AArch64::MOVZWi,   AArch64::MOVNWi,   AArch64::MOVKWi,   AArch64::LSLVWr,
+    AArch64::LSRVWr,   AArch64::ORNWrs,   AArch64::UBFMWri,  AArch64::BFMWri,
+    AArch64::ORRWrs,   AArch64::ORRWri,   AArch64::SDIVWr,   AArch64::UDIVWr,
+    AArch64::EXTRWrri, AArch64::EORWrs,   AArch64::RORVWr,   AArch64::RBITWr,
+    AArch64::CLZWr,    AArch64::REVWr,    AArch64::CSNEGWr,  AArch64::BICWrs,
+    AArch64::BICSWrs,  AArch64::EONWrs,   AArch64::REV16Wr,  AArch64::Bcc,
+    AArch64::CCMPWr,   AArch64::CCMPWi,   AArch64::LDRWui,   AArch64::LDRBBui,
+    AArch64::LDRBui,   AArch64::LDRSBWui, AArch64::LDRSWui,  AArch64::LDRSHWui,
+    AArch64::LDRSBWui, AArch64::LDRHHui,  AArch64::LDRHui,   AArch64::STRWui,
+    AArch64::CCMNWi,   AArch64::CCMNWr,   AArch64::STRBBui,  AArch64::STRBui,
+    AArch64::STPWi,    AArch64::STRHHui,  AArch64::STRHui,   AArch64::STURWi,
+    AArch64::LDPWi,    AArch64::STRWpre};
 
 const set<int> instrs_64 = {
     AArch64::ADDXrx,    AArch64::ADDSXrs,   AArch64::ADDSXri,
     AArch64::ADDXrs,    AArch64::ADDXri,    AArch64::ADDSXrx,
-    AArch64::ADDv8i8,   AArch64::ADCXr,     AArch64::ADCSXr,
+    AArch64::ADDv4i16,  AArch64::ADDv8i8,   AArch64::ADCXr,     AArch64::ADCSXr,
     AArch64::ASRVXr,    AArch64::SUBXri,    AArch64::SUBXrs,
     AArch64::SUBXrx,    AArch64::SUBSXrs,   AArch64::SUBSXri,
     AArch64::SUBSXrx,   AArch64::SBFMXri,   AArch64::CSELXr,
@@ -389,6 +390,9 @@ class arm2llvm {
   map<unsigned, Value *> RegFile;
   Value *stackMem{nullptr};
   unordered_map<string, GlobalVariable *> globals;
+
+  // Map of ADRP MCInsts to the string representations of the operand variable
+  // names
   unordered_map<MCInst *, string> instExprVarMap;
   bool DebugRegs;
 
@@ -429,7 +433,7 @@ class arm2llvm {
   // field in the instruction)
   Value *reg_shift(Value *value, int encodedShift) {
     int shift_type = (encodedShift >> 6) & 0x7;
-    auto W = value->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(value);
     auto exp = getIntConst(encodedShift & 0x3f, W);
 
     switch (shift_type) {
@@ -589,7 +593,7 @@ class arm2llvm {
   }
 
   Value *createLShr(Value *a, Value *b) {
-    auto W = b->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(b);
     auto mask = getIntConst(W - 1, W);
     auto masked =
         BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
@@ -602,7 +606,7 @@ class arm2llvm {
   }
 
   Value *createAShr(Value *a, Value *b) {
-    auto W = b->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(b);
     auto mask = getIntConst(W - 1, W);
     auto masked =
         BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
@@ -615,7 +619,7 @@ class arm2llvm {
   }
 
   Value *createShl(Value *a, Value *b) {
-    auto W = b->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(b);
     auto mask = getIntConst(W - 1, W);
     auto masked =
         BinaryOperator::Create(Instruction::And, mask, b, nextName(), LLVMBB);
@@ -661,7 +665,7 @@ class arm2llvm {
       return createTrunc(v, ty);
     } else {
       auto *shift =
-          createLShr(v, getIntConst(n2, v->getType()->getIntegerBitWidth()));
+          createLShr(v, getIntConst(n2, getBitWidth(v)));
       auto *ty = getIntTy(1 + n1 - n2);
       return createTrunc(shift, ty);
     }
@@ -687,6 +691,53 @@ class arm2llvm {
                             LLVMBB);
   }
 
+  // Creates LLVM IR instructions by takes two values with the same number of bits,
+  // bit casting them to vectors of numElements elements of size elementTypeInBits
+  // and adding them.
+  BinaryOperator *createVectorAdd(Value *a, Value *b, int elementTypeInBits, int numElements) {
+    assert(getBitWidth(a) == getBitWidth(b) &&
+           "Expected values of same bit width");
+
+    // Create cast to reinterpret bits as a vector type
+    CastInst *a_vector =
+        createCast(a,
+                   VectorType::get(getIntTy(elementTypeInBits),
+                                   ElementCount::getFixed(numElements)),
+                   Instruction::BitCast);
+
+    // Create cast to reinterpret bits as a vector type
+    CastInst *b_vector =
+        createCast(b,
+                   VectorType::get(getIntTy(elementTypeInBits),
+                                   ElementCount::getFixed(numElements)),
+                   Instruction::BitCast);
+
+    return BinaryOperator::Create(Instruction::Add,
+                                  a_vector,
+                                  b_vector,
+                                  nextName(),
+                                  LLVMBB);
+  }
+
+  // Returns Bit Width of Value V
+  static unsigned int getBitWidth(Value *V) {
+    unsigned int bitWidth = 0;
+
+    // If vector type, compute bitwidth using product of size of each element
+    // and number of elements.
+    if (V->getType()->isVectorTy()) {
+      auto *v_type = (VectorType *)V->getType();
+      bitWidth = v_type->getScalarSizeInBits() *
+          v_type->getElementCount().getFixedValue();
+    } else {
+      bitWidth = V->getType()->getIntegerBitWidth();
+    }
+
+    assert(bitWidth && "Could not determine bit width of value\n");
+
+    return bitWidth;
+  }
+
   // Returns bitWidth corresponding the registers.
   unsigned getRegSize(unsigned Reg) {
     if (Reg >= AArch64::B0 && Reg <= AArch64::B31)
@@ -694,10 +745,16 @@ class arm2llvm {
     if (Reg >= AArch64::H0 && Reg <= AArch64::H31)
       return 16;
     if ((Reg >= AArch64::W0 && Reg <= AArch64::W30) ||
-        (Reg >= AArch64::S0 && Reg <= AArch64::S31))
+        (Reg >= AArch64::S0 && Reg <= AArch64::S31) ||
+        Reg == AArch64::WZR ||
+        Reg == AArch64::WSP)
       return 32;
     if ((Reg >= AArch64::X0 && Reg <= AArch64::X28) ||
-        (Reg >= AArch64::D0 && Reg <= AArch64::D31))
+        (Reg >= AArch64::D0 && Reg <= AArch64::D31) ||
+        Reg == AArch64::XZR ||
+        Reg == AArch64::SP ||
+        Reg == AArch64::FP ||
+        Reg == AArch64::LR)
       return 64;
     if (Reg >= AArch64::Q0 && Reg <= AArch64::Q31)
       return 128;
@@ -718,7 +775,7 @@ class arm2llvm {
       return Reg - AArch64::W0 + AArch64::X0;
     else if (Reg >= AArch64::X0 && Reg <= AArch64::X28)
       return Reg - AArch64::X0 + AArch64::X0;
-    // Dealias rules for floating-point registers
+    // Dealias rules for NEON SIMD/floating-point registers
     // https://developer.arm.com/documentation/den0024/a/AArch64-Floating-point-and-NEON/NEON-and-Floating-Point-architecture/Floating-point
     else if (Reg >= AArch64::B0 && Reg <= AArch64::B31)
       return Reg - AArch64::B0 + AArch64::Q0;
@@ -745,7 +802,8 @@ class arm2llvm {
   // always does a full-width read
   Value *readFromReg(unsigned Reg, const string &NameStr = "") {
     auto RegAddr = dealiasReg(Reg);
-    return createLoad(getIntTy(64), RegAddr, NameStr);
+    int regSize = getRegSize(Reg) <= 64?64:128;
+    return createLoad(getIntTy(regSize), RegAddr, NameStr);
   }
 
   Value *readPtrFromReg(unsigned Reg, const string &NameStr = "") {
@@ -793,16 +851,7 @@ class arm2llvm {
       return;
 
     // BitWidth of Value V to be written
-    unsigned int W;
-    // If vector type, compute bitwidth using product of size of each element
-    // and number of elements.
-    if (V->getType()->isVectorTy()) {
-      VectorType *v_type = (VectorType *)V->getType();
-      W = v_type->getScalarSizeInBits() *
-          v_type->getElementCount().getFixedValue();
-    } else {
-      W = V->getType()->getIntegerBitWidth();
-    }
+    unsigned int W = getBitWidth(V);
 
     // Create LLVM instructions extending the Value V if it is smaller than the
     // specified backing registers Xn or Vn
@@ -848,9 +897,10 @@ class arm2llvm {
     expr->print(ss, nullptr);
 
     // If the expression starts with a relocation specifier, strip it and map
-    // the rest to a global variable. Assuming there is only one relocation
-    // specifier and it is at the beginning
+    // the rest to a string name of the global variable. Assuming there is only
+    // one relocation specifier, and it is at the beginning
     // (std::regex_constants::match_continuous).
+    // eg: ":lo12:a" becomes  "a"
     if (std::regex_search(sss, sm, re,
                           std::regex_constants::match_continuous)) {
       auto stringVar = sm.suffix();
@@ -873,7 +923,7 @@ class arm2llvm {
   }
 
   // Reads an Expr and gets the global variable corresponding the containing
-  // string variable
+  // string variable. Assuming the Expr consists of a single global variable.
   Value *getExprVar(const MCExpr *expr) {
     Value *globalVar;
     std::string sss;
@@ -889,7 +939,7 @@ class arm2llvm {
 
     // If the expression starts with a relocation specifier, strip it and look
     // for the rest (variable in the Expr) in the instExprVarMap and globals.
-    // Assuming there is only one relocation specifier and it is at the
+    // Assuming there is only one relocation specifier, and it is at the
     // beginning (std::regex_constants::match_continuous).
     if (std::regex_search(sss, sm, re,
                           std::regex_constants::match_continuous)) {
@@ -901,12 +951,23 @@ class arm2llvm {
         *out << "which is not a global variable we know about\n\n";
         exit(-1);
       }
-      auto exprVar = instExprVarMap.find(PrevInst);
-      if (exprVar == instExprVarMap.end() || exprVar->second != stringVar) {
-        *out << "\nERROR: unexpected relocation specifier " << sm.str()
-             << "\n\n";
+
+      // Look through all visited ADRP instructions to find one in which
+      // stringVar was the operand used.
+      bool foundStringVar = false;
+      for(const auto& exprVar: instExprVarMap) {
+        if(exprVar.second == stringVar) {
+          foundStringVar = true;
+          break;
+        }
+      }
+
+      if (!foundStringVar) {
+        *out << "\nERROR: Did not use \"" << stringVar << "\" in an ADRP "
+                                                          "instruction\n\n";
         exit(-1);
       }
+
       auto glob = globals.find(stringVar);
       if (glob == globals.end()) {
         *out << "\nERROR: global not found\n\n";
@@ -1010,11 +1071,11 @@ class arm2llvm {
 
   tuple<Value *, tuple<Value *, Value *, Value *, Value *>>
   addWithCarry(Value *l, Value *r, Value *carryIn) {
-    assert(l->getType()->getIntegerBitWidth() ==
-           r->getType()->getIntegerBitWidth());
-    assert(carryIn->getType()->getIntegerBitWidth() == 1);
+    assert(getBitWidth(l) ==
+           getBitWidth(r));
+    assert(getBitWidth(carryIn) == 1);
 
-    auto size = l->getType()->getIntegerBitWidth();
+    auto size = getBitWidth(l);
 
     // Deal with size+1 bit integers so that we can easily calculate the c/v
     // PSTATE bits.
@@ -1042,34 +1103,34 @@ class arm2llvm {
   };
 
   void setV(Value *V) {
-    assert(V->getType()->getIntegerBitWidth() == 1);
+    assert(getBitWidth(V) == 1);
     createStore(V, dealiasReg(AArch64::V));
   }
 
   void setZ(Value *V) {
-    assert(V->getType()->getIntegerBitWidth() == 1);
+    assert(getBitWidth(V) == 1);
     createStore(V, dealiasReg(AArch64::Z));
   }
 
   void setN(Value *V) {
-    assert(V->getType()->getIntegerBitWidth() == 1);
+    assert(getBitWidth(V) == 1);
     createStore(V, dealiasReg(AArch64::N));
   }
 
   void setC(Value *V) {
-    assert(V->getType()->getIntegerBitWidth() == 1);
+    assert(getBitWidth(V) == 1);
     createStore(V, dealiasReg(AArch64::C));
   }
 
   void setZUsingResult(Value *V) {
-    auto W = V->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(V);
     auto zero = getIntConst(0, W);
     auto z = createICmp(ICmpInst::Predicate::ICMP_EQ, V, zero);
     setZ(z);
   }
 
   void setNUsingResult(Value *V) {
-    auto W = V->getType()->getIntegerBitWidth();
+    auto W = getBitWidth(V);
     auto zero = getIntConst(0, W);
     auto n = createICmp(ICmpInst::Predicate::ICMP_SLT, V, zero);
     setN(n);
@@ -1094,7 +1155,6 @@ public:
     if (op2.isImm()) {
       auto baseReg = op1.getReg();
       assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-             (baseReg >= AArch64::Q0 && baseReg <= AArch64::Q31) ||
              (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
              (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
       auto baseAddr = readPtrFromReg(baseReg);
@@ -1103,10 +1163,17 @@ public:
     assert(false && "expected immediate or expression for operand 2 of a load");
   }
 
+  // Creates instructions to store val in memory pointed by base + offset
   // offset and size are in bytes
   Value *makeLoad(Value *base, int offset, int size) {
+    // Get offset as a 64-bit LLVM constant
     auto offsetVal = getIntConst(offset, 64);
+
+    // Create a GEP instruction based on a byte addressing basis (8 bits)
+    // returning pointer to base + offset
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
+
+    // Load Value val in the pointer returned by the GEP instruction
     return createLoad(getIntTy(8 * size), ptr);
   }
 
@@ -1119,7 +1186,6 @@ public:
 
     auto baseReg = op1.getReg();
     assert((baseReg >= AArch64::X0 && baseReg <= AArch64::X28) ||
-           (baseReg >= AArch64::Q0 && baseReg <= AArch64::Q31) ||
            (baseReg == AArch64::SP) || (baseReg == AArch64::LR) ||
            (baseReg == AArch64::FP) || (baseReg == AArch64::XZR));
     auto baseAddr = readPtrFromReg(baseReg);
@@ -1143,10 +1209,17 @@ public:
     return make_tuple(baseAddr, op3.getImm(), readFromReg(op1.getReg()));
   }
 
-  // offset and size are in bytes
+  // Creates instructions to store val in memory pointed by base + offset
+  //  and size are in bytes
   void makeStore(Value *base, int offset, int size, Value *val) {
+    // Get offset as a 64-bit LLVM constant
     auto offsetVal = getIntConst(offset, 64);
+
+    // Create a GEP instruction based on a byte addressing basis (8 bits)
+    // returning pointer to base + offset
     auto ptr = createGEP(getIntTy(8), base, {offsetVal}, "");
+
+    // Store Value val in the pointer returned by the GEP instruction
     createStore(val, ptr);
   }
 
@@ -1248,7 +1321,7 @@ public:
     case AArch64::ADDSXrs:
     case AArch64::ADDSXri:
     case AArch64::ADDSXrx: {
-      auto a = readFromOperand(1);
+      Value *a = nullptr;
       Value *b = nullptr;
       bool break_outer_switch = false;
 
@@ -1291,6 +1364,7 @@ public:
       default:
         b = readFromOperand(2, getImm(3));
         if (b->getType()->isPointerTy()) {
+          // This control path is for PC-Relative addressing.
           auto Reg = CurInst->getOperand(0).getReg();
           if (Reg != AArch64::WZR && Reg != AArch64::XZR)
             createStore(b, dealiasReg(Reg));
@@ -1299,8 +1373,12 @@ public:
         }
         break;
       }
+      // Let the PC-Relative addressing control path break here instead of the
+      // end of the case as we do not want any more instructions created.
       if (break_outer_switch)
         break;
+
+      a = readFromOperand(1);
 
       if (has_s(opcode)) {
         auto sadd = createSAddOverflow(a, b);
@@ -1352,21 +1430,30 @@ public:
       writeToOutputReg(res);
       break;
     }
-    case AArch64::ADDv8i8: {
+    case AArch64::ADDv8i8:
+    case AArch64::ADDv4i16: {
       auto a = readFromOperand(1);
-      // Reads from backing register as a scalar. Create cast to reinterpret bit
-      // as vector type
-      auto a_v8i8 =
-          createCast(a, VectorType::get(i8, ElementCount::getFixed(8)),
-                     Instruction::BitCast);
-
       auto b = readFromOperand(2);
-      // Reads from backing register as a scalar. Create cast to reinterpret bit
-      // as vector type
-      auto b_v8i8 =
-          createCast(b, VectorType::get(i8, ElementCount::getFixed(8)),
-                     Instruction::BitCast);
-      writeToOutputReg(createAdd(a_v8i8, b_v8i8));
+      int elementTypeInBits;
+      int numElements;
+
+      switch (opcode) {
+      case AArch64::ADDv8i8: {
+        numElements = 8;
+        elementTypeInBits = 8;
+        break;
+      }
+      case AArch64::ADDv4i16: {
+        numElements = 4;
+        elementTypeInBits = 16;
+        break;
+      }
+      default:
+        assert(false && "missed case");
+        break;
+      }
+
+      writeToOutputReg(createVectorAdd(a, b, elementTypeInBits, numElements));
       break;
     }
       // SUBrx is a subtract instruction with an extended register.
@@ -1739,7 +1826,7 @@ public:
 
       auto ssub = createSSubOverflow(lhs, imm_rhs);
       auto result = createExtractValue(ssub, {0});
-      auto zero_val = getIntConst(0, result->getType()->getIntegerBitWidth());
+      auto zero_val = getIntConst(0, getBitWidth(result));
 
       auto new_n = createICmp(ICmpInst::Predicate::ICMP_SLT, result, zero_val);
       auto new_z = createICmp(ICmpInst::Predicate::ICMP_EQ, lhs, imm_rhs);
@@ -2331,25 +2418,77 @@ public:
       break;
     }
     case AArch64::LDRHHui: {
-      auto [base, imm] = getParamsLoadImmed();
-      auto loaded = makeLoad(base, imm * 2, 2);
-      writeToOutputReg(loaded);
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 2, 2);
+        writeToOutputReg(loaded);
+      }
+      break;
+    }
+    case AArch64::LDRHui: {
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 2, 2);
+        writeToOutputReg(loaded);
+      }
       break;
     }
     case AArch64::LDRBBui: {
-      auto [base, imm] = getParamsLoadImmed();
-      auto loaded = makeLoad(base, imm * 1, 1);
-      writeToOutputReg(loaded);
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 1, 1);
+        writeToOutputReg(loaded);
+      }
+      break;
+    }
+    case AArch64::LDRBui: {
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 1, 1);
+        writeToOutputReg(loaded);
+      }
       break;
     }
     case AArch64::LDRWui: {
-      auto [base, imm] = getParamsLoadImmed();
-      auto loaded = makeLoad(base, imm * 4, 4);
-      writeToOutputReg(loaded);
+      MCOperand &op2 = CurInst->getOperand(2);
+      if (op2.isExpr()) {
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
+      } else {
+        auto [base, imm] = getParamsLoadImmed();
+        auto loaded = makeLoad(base, imm * 4, 4);
+        writeToOutputReg(loaded);
+      }
       break;
     }
     case AArch64::LDRXui: {
-      auto &op2 = CurInst->getOperand(2);
+      MCOperand &op2 = CurInst->getOperand(2);
       if (op2.isExpr()) {
         Value *globalVar = getExprVar(op2.getExpr());
         auto Reg = CurInst->getOperand(0).getReg();
@@ -2365,12 +2504,10 @@ public:
     case AArch64::LDRDui: {
       MCOperand &op2 = CurInst->getOperand(2);
       if (op2.isExpr()) {
-        auto expr = op2.getExpr();
-        std::string sss;
-        llvm::raw_string_ostream ss(sss);
-        expr->print(ss, nullptr);
-        *out << "\nERROR: load mentions '" << sss << "' ";
-        *out << "which has not been handled yet\n\n";
+        Value *globalVar = getExprVar(op2.getExpr());
+        auto Reg = CurInst->getOperand(0).getReg();
+        if (Reg != AArch64::WZR && Reg != AArch64::XZR)
+          createStore(globalVar, dealiasReg(Reg));
       } else {
         auto [base, imm] = getParamsLoadImmed();
         auto loaded = makeLoad(base, imm * 8, 8);
@@ -2384,6 +2521,11 @@ public:
       break;
     }
     case AArch64::STRHHui: {
+      auto [base, imm, val] = getParamsStoreImmed();
+      makeStore(base, imm * 2, 2, createTrunc(val, i16));
+      break;
+    }
+    case AArch64::STRHui: {
       auto [base, imm, val] = getParamsStoreImmed();
       makeStore(base, imm * 2, 2, createTrunc(val, i16));
       break;
@@ -2509,7 +2651,7 @@ public:
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_EQ, operand,
-                     getIntConst(0, operand->getType()->getIntegerBitWidth()));
+                     getIntConst(0, getBitWidth(operand)));
       auto dst_true = getBB(Fn, CurInst->getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
 
@@ -2530,7 +2672,7 @@ public:
       assert(operand != nullptr && "operand is null");
       auto cond_val =
           createICmp(ICmpInst::Predicate::ICMP_NE, operand,
-                     getIntConst(0, operand->getType()->getIntegerBitWidth()));
+                     getIntConst(0, getBitWidth(operand)));
 
       auto dst_true = getBB(Fn, CurInst->getOperand(1));
       assert(MCBB->getSuccs().size() == 2 && "expected 2 successors");
