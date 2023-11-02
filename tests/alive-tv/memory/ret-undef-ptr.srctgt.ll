@@ -1,10 +1,10 @@
-define i32* @src() {
-  %retval = alloca i32*, align 8
-  %v = load i32*, i32** %retval, align 8
-  ret i32* %v
+define ptr @src() {
+  %retval = alloca ptr, align 8
+  %v = load ptr, ptr %retval, align 8
+  ret ptr %v
 }
 
-define i32* @tgt() {
-  %retval = alloca i32*, align 8
-  ret i32* undef
+define ptr @tgt() {
+  %retval = alloca ptr, align 8
+  ret ptr undef
 }

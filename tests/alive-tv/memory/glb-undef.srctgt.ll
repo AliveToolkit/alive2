@@ -1,8 +1,8 @@
-@g = internal unnamed_addr constant i8* undef, align 8
+@g = internal unnamed_addr constant ptr poison, align 8
 
 define i8 @src()  {
   %a = alloca i8, align 8
-  %v = load i8*, i8** @g
+  %v = load ptr, ptr @g
   ret i8 0
 }
 

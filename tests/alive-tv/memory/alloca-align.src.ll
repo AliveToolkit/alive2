@@ -5,9 +5,8 @@ define void @f1() {
 
 define void @f2() {
   %p = alloca i32, align 1
-  %p0 = bitcast i32* %p to i8*
-  call void @llvm.lifetime.start.p0i8(i64 4, i8* %p0)
-  call void @llvm.lifetime.end.p0i8(i64 4, i8* %p0)
+  call void @llvm.lifetime.start.p0i8(i64 4, ptr %p)
+  call void @llvm.lifetime.end.p0i8(i64 4, ptr %p)
   ret void
 }
 
@@ -18,12 +17,11 @@ define void @f3() {
 
 define void @f4() {
   %p = alloca i32, align 1
-  %p0 = bitcast i32* %p to i8*
-  call void @llvm.lifetime.start.p0i8(i64 4, i8* %p0)
-  call void @llvm.lifetime.end.p0i8(i64 4, i8* %p0)
+  call void @llvm.lifetime.start.p0i8(i64 4, ptr %p)
+  call void @llvm.lifetime.end.p0i8(i64 4, ptr %p)
   ret void
 }
 
 
-declare void @llvm.lifetime.start.p0i8(i64, i8*)
-declare void @llvm.lifetime.end.p0i8(i64, i8*)
+declare void @llvm.lifetime.start.p0i8(i64, ptr)
+declare void @llvm.lifetime.end.p0i8(i64, ptr)

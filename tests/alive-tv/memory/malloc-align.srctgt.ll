@@ -1,13 +1,13 @@
-define i8* @src() {
-  %call = call align 16 i8* @malloc(i64 8)
-  store i8 0, i8* %call, align 1
-  ret i8* %call
+define ptr @src() {
+  %call = call align 16 ptr @malloc(i64 8)
+  store i8 0, ptr %call, align 1
+  ret ptr %call
 }
 
-define i8* @tgt() {
-  %call = call align 16 i8* @malloc(i64 8)
-  store i8 0, i8* %call, align 16
-  ret i8* %call
+define ptr @tgt() {
+  %call = call align 16 ptr @malloc(i64 8)
+  store i8 0, ptr %call, align 16
+  ret ptr %call
 }
 
-declare i8* @malloc(i64)
+declare ptr @malloc(i64)

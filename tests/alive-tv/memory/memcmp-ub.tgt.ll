@@ -11,5 +11,3 @@ define i32 @ub_oob() {
 define i32 @ub_oob2() {
   unreachable
 }
-
-declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)

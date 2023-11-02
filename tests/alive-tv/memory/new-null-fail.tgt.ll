@@ -5,6 +5,4 @@ define i64 @malloc_null() {
   ret i64 0
 }
 
-declare i8* @_Znwm(i64)
-
 ; ERROR: Value mismatch

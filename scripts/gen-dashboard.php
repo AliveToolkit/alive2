@@ -25,7 +25,7 @@ $fail_without_undef = 0;
 
 foreach ($test_failures as $test) {
   if (!preg_match('@'.$test.'\' FAILED \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\n'.
-                  'Script:\n.*?Exit Code:[^\n]+\n\n'.
+                  'Exit Code:[^\n]+\n\n'.
                   '(?:Command Output \(stdout\):\n--.*?\n--\n)?'.
                   'Command Output \(stderr\):\n--(.*?)\n--\n@Ss', $dump, $m)) {
     die("Failed to get data for $test\n");

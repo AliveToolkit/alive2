@@ -1,9 +1,9 @@
-define void @src(i28* %in) {
-  %val2 = load i28, i28* %in, align 4
-  store i28 %val2, i28* %in, align 4
+define void @src(ptr %in) {
+  %val2 = load i28, ptr %in, align 4
+  store i28 %val2, ptr %in, align 4
   ret void
 }
 
-define void @tgt(i28* %in) {
+define void @tgt(ptr %in) {
   ret void
 }

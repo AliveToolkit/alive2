@@ -1,7 +1,7 @@
-define i8* @malloc_null() {
-  %ptr = call noalias i8* @malloc(i64 1)
-  store i8 10, i8* %ptr
-  ret i8* %ptr
+define ptr @malloc_null() {
+  %ptr = call ptr @malloc(i64 1)
+  store i8 10, ptr %ptr
+  ret ptr %ptr
 }
 
-declare noalias i8* @malloc(i64)
+declare noalias ptr @malloc(i64)

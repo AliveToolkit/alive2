@@ -1,7 +1,7 @@
-@x = global i8* null
+@x = global ptr null
 @y = global i8 0
 
 define void @f1() {
-  store i8* null, i8** @x
+  store ptr null, ptr @x
   ret void
 }

@@ -1,14 +1,14 @@
-define i8* @malloc_null() {
-  %ptr = call noalias i8* @malloc(i64 1)
-  %c = icmp eq i8* %ptr, null
+define ptr @malloc_null() {
+  %ptr = call ptr @malloc(i64 1)
+  %c = icmp eq ptr %ptr, null
   br i1 %c, label %A, label %B
 A:
-  ret i8* null
+  ret ptr null
 B:
-  store i8 10, i8* %ptr
-  ret i8* %ptr
+  store i8 10, ptr %ptr
+  ret ptr %ptr
 }
 
-declare noalias i8* @malloc(i64)
+declare noalias ptr @malloc(i64)
 
 ; ERROR: Source is more defined than target

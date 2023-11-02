@@ -273,9 +273,15 @@ public:
       case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
       default: has_non_fp = false; break;
       }
-      if (has_non_fp)
+      if (has_non_fp) {
+        unsigned flags = 0;
+        if (const auto *NNI = dyn_cast<llvm::PossiblyNonNegInst>(&i)) {
+          if (NNI->hasNonNeg())
+            flags |= ConversionOp::NNEG;
+        }
         RETURN_IDENTIFIER(
-          make_unique<ConversionOp>(*ty, value_name(i), *val, op));
+          make_unique<ConversionOp>(*ty, value_name(i), *val, op, flags));
+      }
     }
 
     FpConversionOp::Op op;

@@ -4,5 +4,5 @@ define i64 @realloc-check() {
   ret i64 -1
 }
 
-declare noalias i8* @malloc(i64)
-declare noalias i8* @realloc(i8*, i64)
+declare noalias ptr @malloc(i64)
+declare noalias ptr @realloc(ptr, i64)

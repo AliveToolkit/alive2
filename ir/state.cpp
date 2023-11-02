@@ -1238,7 +1238,7 @@ expr State::sinkDomain() const {
 
   OrExpr ret;
   for (auto &[src, data] : I->second) {
-    ret.add(data.path());
+    ret.add(data.path() && *data.UB());
   }
   return ret();
 }

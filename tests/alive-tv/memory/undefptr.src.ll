@@ -1,6 +1,6 @@
 define void @f() {
-  %a = bitcast i8* undef to i32*
-  %b = getelementptr i32, i32* %a, i32 1
-  store i32 undef, i32* %b
+  %a = bitcast ptr undef to ptr
+  %b = getelementptr i32, ptr %a, i32 1
+  store i32 undef, ptr %b
   ret void
 }

@@ -1,5 +1,5 @@
 define void @src() {
-  %ptr = call i8* @malloc(i64 undef)
+  %ptr = call ptr @malloc(i64 undef)
   ret void
 }
 
@@ -7,4 +7,4 @@ define void @tgt() {
   unreachable
 }
 
-declare i8* @malloc(i64)
+declare ptr @malloc(i64)

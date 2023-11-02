@@ -1534,51 +1534,57 @@ void ConversionOp::print(ostream &os) const {
   case Int2Ptr:  str = "int2ptr "; break;
   }
 
-  os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
+  os << getName() << " = " << str;
+  if (flags & NNEG)
+    os << "nneg ";
+  os << *val << print_type(getType(), " to ", "");
 }
 
 StateValue ConversionOp::toSMT(State &s) const {
   auto v = s[*val];
-  function<expr(expr &&, const Type &)> fn;
+  function<StateValue(expr &&, const Type &)> fn;
 
   switch (op) {
   case SExt:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.sext(to_type.bits() - val.bits());
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return {val.sext(to_type.bits() - val.bits()), true};
     };
     break;
   case ZExt:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.zext(to_type.bits() - val.bits());
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return { val.zext(to_type.bits() - val.bits()),
+               (flags & NNEG) ? !val.isNegative() : true };
     };
     break;
   case Trunc:
-    fn = [](auto &&val, auto &to_type) -> expr {
-      return val.trunc(to_type.bits());
+    fn = [](auto &&val, auto &to_type) -> StateValue {
+      return {val.trunc(to_type.bits()), true};
     };
     break;
   case BitCast:
-    break;
-  case Ptr2Int:
-    fn = [&](auto &&val, auto &to_type) -> expr {
-      return s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits());
-    };
-    break;
-  case Int2Ptr:
-    fn = [&](auto &&val, auto &to_type) -> expr {
-      return s.getMemory().int2ptr(val);
-    };
-    break;
-  }
-
-  if (op == BitCast) {
     // NOP: ptr vect -> ptr vect
     if (getType().isVectorType() &&
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
     return getType().fromInt(val->getType().toInt(s, std::move(v)));
+
+  case Ptr2Int:
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return {s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true};
+    };
+    break;
+  case Int2Ptr:
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return {s.getMemory().int2ptr(val), true};
+    };
+    break;
   }
+
+  auto scalar = [&](StateValue &&v, const Type &to_type) -> StateValue {
+    auto [v2, np] = fn(std::move(v.value), to_type);
+    return { std::move(v2),  v.non_poison && np };
+  };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -1587,14 +1593,12 @@ StateValue ConversionOp::toSMT(State &s) const {
     auto valty = val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      auto vi = valty->extract(v, i);
-      vals.emplace_back(fn(std::move(vi.value), retty->getChild(i)),
-                        std::move(vi.non_poison));
+      vals.emplace_back(scalar(valty->extract(v, i), retty->getChild(i)));
     }
     return retty->aggregateVals(vals);
   }
 
-  return { fn(std::move(v.value), getType()), std::move(v.non_poison) };
+  return scalar(std::move(v), getType());
 }
 
 expr ConversionOp::getTypeConstraints(const Function &f) const {
@@ -1635,7 +1639,8 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ConversionOp::dup(Function &f, const string &suffix) const {
-  return make_unique<ConversionOp>(getType(), getName() + suffix, *val, op);
+  return
+    make_unique<ConversionOp>(getType(), getName() + suffix, *val, op, flags);
 }
 
 
@@ -2074,7 +2079,7 @@ pair<uint64_t, uint64_t> FnCall::getMaxAllocSize() const {
   return { UINT64_MAX, getAlign() };
 }
 
-static Value* get_align_arg(const vector<pair<Value*, ParamAttrs>> args) {
+static Value* get_align_arg(const vector<pair<Value*, ParamAttrs>> &args) {
   for (auto &[arg, attrs] : args) {
     if (attrs.has(ParamAttrs::AllocAlign))
       return arg;
@@ -2420,11 +2425,23 @@ StateValue FnCall::toSMT(State &s) const {
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
+    // FIXME: take allocalign into account
     auto [p_new, allocated]
       = m.alloc(&size, getAlign(), Memory::MALLOC, np_size, nonnull);
 
+    // pointer must be null if:
+    // 1) alignment is not a power of 2
+    // 2) size is not a multiple of alignment
+    expr is_not_null = true;
+    if (auto *allocalign = getAlignArg()) {
+      auto &align = s[*allocalign].value;
+      auto bw = max(align.bits(), size.bits());
+      is_not_null &= align.isPowerOf2();
+      is_not_null &= size.zextOrTrunc(bw).urem(align.zextOrTrunc(bw)) == 0;
+    }
+
     expr nullp = Pointer::mkNullPointer(m)();
-    expr ret = expr::mkIf(allocated, p_new, nullp);
+    expr ret = expr::mkIf(allocated && is_not_null, p_new, nullp);
 
     // TODO: In C++ we need to throw an exception if the allocation fails.
 
@@ -3615,23 +3632,6 @@ uint64_t GEP::getMaxGEPOffset() const {
     off = add_saturate(off,
                        mul_saturate(mul,
                                     UINT64_MAX >> (64 - off_used_bits(*v))));
-  }
-  return off;
-}
-
-optional<uint64_t> GEP::getExactOffset() const {
-  uint64_t off = 0;
-  for (auto &[mul, v] : getIdxs()) {
-    if (mul == 0)
-      continue;
-    if (mul >= INT64_MAX)
-      return {};
-
-    if (auto n = getInt(*v)) {
-      off += (int64_t)mul * *n;
-      continue;
-    }
-    return {};
   }
   return off;
 }

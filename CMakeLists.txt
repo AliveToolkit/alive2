@@ -166,6 +166,7 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   find_package(LLVM REQUIRED CONFIG)
 
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+  message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
   if (NOT LLVM_ENABLE_RTTI)

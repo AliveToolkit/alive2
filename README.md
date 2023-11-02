@@ -31,18 +31,23 @@ spurious counterexamples if run with such passes.
 Prerequisites
 -------------
 To build Alive2 you need recent versions of:
-* cmake
-* gcc/clang
-* re2c
-* Z3
-* LLVM (optional)
-* hiredis (optional, needed for caching)
+* [cmake](https://cmake.org)
+* [gcc](https://gcc.gnu.org)/[clang](https://clang.llvm.org)
+* [re2c](https://re2c.org/)
+* [Z3](https://github.com/Z3Prover/z3)
+* [LLVM](https://github.com/llvm/llvm-project) (optional)
+* [hiredis](https://github.com/redis/hiredis) (optional, needed for caching)
 
 
 Building
 --------
 
 ```
+export ALIVE2_HOME=$PWD
+export LLVM2_HOME=$PWD/llvm-project
+export LLVM2_BUILD=$LLVM2_HOME/build
+git clone git@github.com:AliveToolkit/alive2.git
+cd alive2
 mkdir build
 cd build
 cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
@@ -58,26 +63,39 @@ Building and Running Translation Validation
 
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
 RTTI and exceptions turned on.
-LLVM can be built in the following way:
+LLVM can be built targeting X86 in the following way.  (You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the CMake step if your default compiler is `gcc`.)
 ```
-cd llvm
+cd $LLVM2_HOME
 mkdir build
 cd build
 cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_EH=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="llvm;clang" ../llvm
+ninja
 ```
 
-Alive2 should then be configured as follows:
+Alive2 should then be configured and built as follows:
 ```
-cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
+cd $ALIVE2_HOME/alive2/build
+cmake -GNinja -DCMAKE_PREFIX_PATH=$LLVM2_BUILD -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
+ninja
 ```
 
 Translation validation of one or more LLVM passes transforming an IR file on Linux:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.so -load-pass-plugin $HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
 ```
-On a Mac:
+For the new pass manager:
 ```
-~/llvm/build/bin/opt -load $HOME/alive2/build/tv/tv.dylib -load-pass-plugin $HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.so -passes=tv -passes=instcombine -passes=tv -o /dev/null $LLVM2_HOME/llvm/test/Analysis/AssumptionCache/basic.ll
+```
+
+
+On a Mac with the old pass manager:
+```
+$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
+```
+On a Mac with the new pass manager:
+```
+$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -passes=tv -passes=instcombine -passes=tv -o /dev/null $LLVM2_HOME/llvm/test/Analysis/AssumptionCache/basic.ll
 ```
 You can run any pass or combination of passes, but on the command line
 they must be placed in between the two invocations of the Alive2 `-tv`
@@ -86,7 +104,7 @@ pass.
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -101,11 +119,15 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-~/llvm/build/bin/llvm-lit -vv -Dopt=$HOME/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
+$LLVM2_BUILD/bin/llvm-lit -s -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
-[here](https://web.ist.utl.pt/nuno.lopes/alive2/).
+[here](https://web.ist.utl.pt/nuno.lopes/alive2/).  To detect unsound transformations in a local run:
+
+```
+fgrep -r "(unsound)" $ALIVE2_HOME/alive2/build/logs/
+```
 
 
 Running Alive2 as a Clang Plugin
@@ -115,16 +137,17 @@ This plugin tries to validate every IR-level transformation performed
 by LLVM.  Invoke the plugin like this:
 
 ```
-$ clang -O3 <src.c> -S -emit-llvm \
-  -fpass-plugin=$HOME/alive2/build/tv/tv.so \
-  -Xclang -load -Xclang $HOME/alive2/build/tv/tv.so
+clang -O3 $LLVM2_HOME/clang/test/C/C99/n505.c -S -emit-llvm \
+  -fpass-plugin=$ALIVE2_HOME/alive2/build/tv/tv.so \
+  -Xclang -load -Xclang $ALIVE2_HOME/alive2/build/tv/tv.so
 ```
 
 Or, more conveniently:
 
 ```
-$ $HOME/alive2/build/alivecc -O3 -c <src.c>
-$ $HOME/alive2/build/alive++ -O3 -c <src.cpp>
+$ALIVE2_HOME/alive2/build/alivecc -O3 -c $LLVM2_HOME/clang/test/C/C99/n505.c
+
+$ALIVE2_HOME/alive2/build/alive++ -O3 -c $LLVM2_HOME/clang/test/Analysis/aggrinit-cfg-output.cpp
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
@@ -285,6 +308,28 @@ repeated work. When it hits a repeated refinement check, it prints
 If you want to use this functionality, you will need to manually start
 and stop, as appropriate, a Redis server instance on localhost. Alive2
 should be the only user of this server.
+
+Troubleshooting
+--------
+* Check the “LLVMConfig.cmake” and “CMAKE_PREFIX_PATH” output from CMake in
+case of build problems. CMake may look for configuration information in old
+installations of LLVM, e.g., under `/opt/`, if these are not set properly.
+* Some combinations of Clang and MacOS versions may give link warnings 
+“-undefined dynamic_lookup may not work with chained fixups,” and
+runtime errors with “symbol not found in flat namespace.”  Setting
+[CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/
+CMAKE_OSX_DEPLOYMENT_TARGET.html) as a cache entry to 11.0
+or less at the beginning of CMakeLists.txt may work around this.
+* Building for Translation Validation requires enabling `BUILD_SHARED_LIBS`. 
+For LLVM forks not normally built with the option, this may interfere with
+CMake files’ use of `USEDLIBS` and `LLVMLIBS` and perhaps `dd_llvm_target`. 
+* Building for Translation Validation is tightly coupled to LLVM top of tree
+source.  Building a fork with older source may require reverting to the
+corresponding Alive2 commit.  This in turn may require experimentation with
+Clang versions and vendors.
+* Building older source on an up-to-date machine may require adjustments.  For
+example, the now-deleted file `scripts/rewritepass.py` depended on the
+deprecated Python 2; update the shebang line to `python3`.
 
 LLVM Bugs Found by Alive2
 --------

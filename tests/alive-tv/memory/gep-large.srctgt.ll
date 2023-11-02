@@ -14,7 +14,7 @@
 %13 = type { i32, i32 }
 
 define i64 @src() {
-  ret i64 ptrtoint (%0* getelementptr (%0, %0* null, i32 1) to i64)
+  ret i64 ptrtoint (ptr getelementptr (%0, ptr null, i32 1) to i64)
 }
 
 define i64 @tgt() {

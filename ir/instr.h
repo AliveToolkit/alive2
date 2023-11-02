@@ -259,14 +259,17 @@ public:
 class ConversionOp final : public Instr {
 public:
   enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
+  enum Flags { None = 0, NNEG = 1 << 0 };
 
 private:
   Value *val;
   Op op;
+  unsigned flags;
 
 public:
-  ConversionOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(&val), op(op) {}
+  ConversionOp(Type &type, std::string &&name, Value &val, Op op,
+               unsigned flags = None)
+    : Instr(type, std::move(name)), val(&val), op(op), flags(flags) {}
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
@@ -767,7 +770,6 @@ public:
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
   bool isInBounds() const { return inbounds; }
-  std::optional<uint64_t> getExactOffset() const;
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
