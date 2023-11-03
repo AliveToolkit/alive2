@@ -313,14 +313,14 @@ Diagnosing Unsoundness Reports
 --------
 
 * Select a failing test file. It may be convenient to choose one whose path is given at the beginning of a log file containing the text "(unsound)" as above; this is guaranteed to contain an unsoundness report.  Many log files, however, contain only “Source: <stdin>” rather than a file path.
-* Do a verbose run of Lit for just that file, with the `opt`  option `--print-after-all` appended e.g.
+* Do a verbose run of Lit for just that file, with the `opt`  option `--print-after-all` appended, e.g. (as of Alive2 commit 43c51831 and LLVM b2417f51dbbd):
 ```
 $LLVM2_BUILD/bin/llvm-lit -vva "-Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh --print-after-all" $LLVM2_HOME/llvm/test/Transforms/InstCombine/insert-const-shuf.ll
 ```
 * Collect Lit’s LLVM IR terminal output, for comparison with Alive2’s Alive2 IR output in the log file indicated by “Report written to…”.
-* The Alive2 unsoundness report in the corresponding log file will have two versions of the misoptimized function.  The Alive2 IR function body may indicate the problem to a human.   For the Alive2 Compiler Explorer instance you will need LLVM IR.  Search for the function name in the terminal output.
+* The Alive2 unsoundness report in the corresponding log file will have two versions of the misoptimized function.  The Alive2 IR function body may indicate the problem to a human, but for the Alive2 Compiler Explorer instance you will need LLVM IR.  Search for the function name in the terminal output.
 * Copy the first function definition and necessary declarations to [https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).  Without a second version of the function to compare, it just runs some standard optimizations; if it reports an error, your fork’s optimizations are not to blame.
-* Otherwise copy the second, unsound, function definition and necessary declarations, and change the second function name.
+* If there is a second, unsound, function definition in the LLVM IR terminal output, copy it and necessary declarations to Compiler Explorer, and change the second function name.
 * If it now reports a miscompilation, presumably your fork has a bug, demonstrated by the provided examples.
 
 
