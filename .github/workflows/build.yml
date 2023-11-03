@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-22.04]
-        compiler:   [g++-11, clang++-17, clang++-18]
+        compiler:   [g++-13, clang++-17, clang++-18]
         build_type: [Release, Debug]
         cache:      ['', Redis]
         include:
