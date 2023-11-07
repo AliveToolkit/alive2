@@ -729,7 +729,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   }
 
   function<expr(const expr&)> fn_rm
-    = [&](auto rm) { return fn(fp_a, fp_b, fp_c, rm); };
+    = [&](auto &rm) { return fn(fp_a, fp_b, fp_c, rm); };
   expr val = bitwise ? fn(a, b, c, {}) : round_value(s, rm, non_poison, fn_rm);
 
   if (fmath.flags & FastMathFlags::NNaN) {
@@ -786,7 +786,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             FpRoundingMode rm, bool bitwise,
                             bool flags_in_only = false) {
   return fm_poison(s, std::move(a), ap, std::move(b), bp, expr(), expr(),
-                   [fn](auto &a, auto &b, auto &c, auto rm) {
+                   [fn](auto &a, auto &b, auto &c, auto &rm) {
                     return fn(a, b, rm);
                    }, ty, fmath, rm, bitwise, flags_in_only, 2);
 }
@@ -797,7 +797,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
                             FpRoundingMode rm, bool bitwise,
                             bool flags_in_only = false) {
   return fm_poison(s, std::move(a), ap, expr(), expr(), expr(), expr(),
-                   [fn](auto &a, auto &b, auto &c, auto rm) {return fn(a, rm);},
+                   [fn](auto &a, auto &b, auto &c, auto &rm) {return fn(a, rm);},
                    ty, fmath, rm, bitwise, flags_in_only, 1);
 }
 
@@ -880,7 +880,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto rm){ return fn(a, b, rm); },
+                     [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
                      ty, fmath, rm, bitwise);
   };
 
@@ -1128,7 +1128,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
     return fm_poison(s, v.value, v.non_poison,
-                     [fn](auto &v, auto rm){ return fn(v, rm); }, ty, fmath, rm,
+                     [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
                      bitwise, false);
   };
 
@@ -1685,13 +1685,13 @@ StateValue FpConversionOp::toSMT(State &s) const {
 
   switch (op) {
   case SIntToFP:
-    fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
+    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
       return { val.sint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
                true };
     };
     break;
   case UIntToFP:
-    fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
+    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
       return { val.uint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
                true };
     };
@@ -1699,7 +1699,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case FPToSInt:
   case LRInt:
   case LRound:
-    fn = [&](auto &val, auto &to_type, auto rm_in) -> StateValue {
+    fn = [&](auto &val, auto &to_type, auto &rm_in) -> StateValue {
       expr rm;
       bool is_poison = false;
       switch (op) {
@@ -1733,7 +1733,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToUInt:
-    fn = [](auto &val, auto &to_type, auto rm_) -> StateValue {
+    fn = [](auto &val, auto &to_type, auto &rm_) -> StateValue {
       expr rm = expr::rtz();
       expr bv  = val.fp2uint(to_type.bits(), rm);
       expr fp2 = bv.uint2fp(val, rm);
@@ -1744,7 +1744,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     break;
   case FPExt:
   case FPTrunc:
-    fn = [](auto &val, auto &to_type, auto rm) -> StateValue {
+    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
       return { val.float2Float(to_type.getAsFloatType()->getDummyFloat(), rm),
                true };
     };
@@ -1761,7 +1761,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     }
 
     function<StateValue(const expr&)> fn_rm
-      = [&](auto rm) { return fn(val, to_type, rm); };
+      = [&](auto &rm) { return fn(val, to_type, rm); };
     AndExpr np;
     np.add(sv.non_poison);
 
@@ -1855,7 +1855,7 @@ StateValue Select::toSMT(State &s) const {
   auto scalar
     = [&](const auto &a, const auto &b, const auto &c, const Type &ty) {
     auto cond = c.value == 1;
-    auto identity = [](const expr &x, auto rm) { return x; };
+    auto identity = [](const expr &x, auto &rm) { return x; };
     return fm_poison(s, expr::mkIf(cond, a.value, b.value),
                      c.non_poison &&
                        expr::mkIf(cond, a.non_poison, b.non_poison),
@@ -2710,7 +2710,7 @@ StateValue FCmp::toSMT(State &s) const {
   auto &b_eval = s[*b];
 
   auto fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
-    auto cmp = [&](const expr &a, const expr &b, auto rm) {
+    auto cmp = [&](const expr &a, const expr &b, auto &rm) {
       switch (cond) {
       case OEQ: return a.foeq(b);
       case OGT: return a.fogt(b);
@@ -2905,10 +2905,9 @@ StateValue Phi::toSMT(State &s) const {
   }
 
   StateValue sv = *std::move(ret)();
-  auto identity = [](const expr &x, auto rm) { return x; };
-  return
-    fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, {}, true,
-              /*flags_out_only=*/true);
+  auto identity = [](const expr &x, auto &rm) { return x; };
+  return fm_poison(s, sv.value, sv.non_poison, identity, getType(), fmath, {},
+                   true, /*flags_out_only=*/true);
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {
