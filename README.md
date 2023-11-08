@@ -324,7 +324,9 @@ b2417f51dbbd):
 $LLVM2_BUILD/bin/llvm-lit -vva "-Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh --print-after-all" $LLVM2_HOME/llvm/test/Transforms/InstCombine/insert-const-shuf.ll
 ```
 * Collect Lit’s LLVM IR terminal output, for comparison with Alive2’s Alive2 IR
-output in the log file indicated by “Report written to…”.
+output in the log file indicated by “Report written to…”.  Sometimes the Lit
+output may not contain useful LLVM IR, in which case executing the output
+RUN command separately may give better results.
 * The Alive2 unsoundness report in the corresponding log file will have two
 versions of the misoptimized function.  The Alive2 IR function body may
 indicate the problem to a human, but for the Alive2 Compiler Explorer instance
