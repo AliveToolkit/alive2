@@ -193,6 +193,18 @@ void FunctionMutator::resetIterator() {
   initAtFunctionEntry();
 }
 
+void FunctionMutator::resetRandomIterator(){
+  bit=currentFunction->begin();
+  for(size_t i=Random::getRandomUnsigned()%currentFunction->size();i;--i,++bit);
+  iit=bit->begin();
+  for(size_t i=Random::getRandomUnsigned()%bit->size();i;--i,++iit);
+  initAtNewBasicBlock();
+  initAtFunctionEntry();
+  moveToNextMutant();
+  bitInTmp=((llvm::BasicBlock*)&*vMap[&*bit])->getIterator();
+  iitInTmp=((llvm::Instruction*)&*vMap[&*iit])->getIterator();
+}
+
 bool FunctionMutator::canMutate(const llvm::Instruction &inst,
                                 const llvm::StringSet<> &filterSet) {
   // contain immarg attributes
@@ -319,8 +331,6 @@ void FunctionMutator::mutate() {
 }
 
 void FunctionMutator::moveToNextInstruction() {
-  assert(domVals.inBackup());
-  domVals.push_back(&*iit);
   ++iit;
   if (iit == bit->end()) {
     moveToNextBasicBlock();
@@ -353,42 +363,18 @@ void FunctionMutator::moveToNextBasicBlock() {
   } else {
     iit = bit->begin();
   }
-  calcDomVals();
 }
 
 void FunctionMutator::moveToNextMutant() {
   moveToNextInstruction();
   while (!canMutate(*iit, filterSet))
     moveToNextInstruction();
-  domVals.restoreBackup();
   initAtNewInstruction();
-}
-
-void FunctionMutator::calcDomVals() {
-  domVals.deleteBackup();
-  domVals.resize(currentFunction->arg_size());
-  // add BasicBlocks before bitTmp
-  for (auto bitTmp = currentFunction->begin(); bitTmp != bit; ++bitTmp) {
-    if (DT.dominates(&*bitTmp, &*bit)) {
-      for (auto iitTmp = bitTmp->begin(); iitTmp != bitTmp->end(); ++iitTmp) {
-        //Some special inst like unwind invoke would be false here
-        if(DT.dominates(&*iitTmp, &*iit)){
-          domVals.push_back(&*iitTmp);
-        }
-      }
-    }
-  }
-  domVals.startBackup();
-  // add Instructions before iitTmp
-  for (auto iitTmp = bit->begin(); iitTmp != iit; ++iitTmp) {
-    if (DT.dominates(&*iitTmp, &*iit)) {
-      domVals.push_back(&*iitTmp);
-    }
-  }
 }
 
 void FunctionMutator::resetTmpCopy(std::shared_ptr<llvm::Module> copy) {
   extraValues.clear();
+  invalidValues.clear();
   tmpFuncs.clear();
   tmpCopy = copy;
   assert(vMap.find(currentFunction) != vMap.end() &&
@@ -444,12 +430,19 @@ void FunctionMutator::addFunctionArguments(
 void FunctionMutator::fixAllValues(llvm::SmallVector<llvm::Value *> &vals) {
   if (!lazyUpdateInsts.empty()) {
     llvm::ValueToValueMapTy VMap;
+    llvm::DenseSet<llvm::Instruction*> newInvalidValues;
     addFunctionArguments(lazyUpdateArgTys, VMap);
     for (size_t i = 0; i < extraValues.size(); ++i) {
       if (VMap.find(extraValues[i]) != VMap.end()) {
         extraValues[i] = (llvm::Value *)&*VMap[extraValues[i]];
       }
     }
+    for(auto it=invalidValues.begin();it!=invalidValues.end();++it){
+      if(VMap.find(*it)!=VMap.end()){
+        newInvalidValues.insert((llvm::Instruction*)&*VMap[*it]);
+      }
+    }
+    invalidValues=std::move(newInvalidValues);
     for (size_t i = 0; i < vals.size(); ++i) {
       vals[i] = (llvm::Value *)&*VMap[vals[i]];
     }
@@ -471,23 +464,57 @@ llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
   return llvm::UndefValue::get(ty);
 }
 
-llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
-  if (ty != nullptr && !domVals.empty()) {
+llvm::Value *FunctionMutator::getRandomDominatedInstruction(llvm::Type *ty) {
+  if(ty!=nullptr){
+    auto bbIt=currentFunction->begin();
+    auto instIt=iit;
     bool isIntTy = ty->isIntegerTy();
-    for (size_t i = 0, pos = Random::getRandomUnsigned() % domVals.size();
-         i < domVals.size(); ++i, ++pos) {
-      if (pos == domVals.size())
-        pos = 0;
-      if (domVals[pos]->getType() == ty) {
-        return &*vMap[domVals[pos]];
-      } else if (isIntTy && domVals[pos]->getType()->isIntegerTy()) {
-        llvm::Value *valInTmp = &*vMap[domVals[pos]];
-        llvm::Instruction *insertBefore = nullptr;
-        if (llvm::isa<llvm::Argument>(valInTmp)) {
-          insertBefore = &*functionInTmp->begin()->begin();
-        } else {
-          insertBefore = &*iitInTmp;
+    for(size_t pos=Random::getRandomUnsigned()%currentFunction->size();pos;--pos,++bbIt);
+    for(size_t i=0;i<currentFunction->size();++i,++bbIt){
+      if(bbIt==currentFunction->end()){
+        bbIt=currentFunction->begin();
+      }
+      if(DT.dominates(&*bbIt, &*bit) || bbIt==bit){
+        instIt=bbIt->begin();
+        for(size_t pos=Random::getRandomUnsigned()%bbIt->size();pos;--pos,++instIt);
+        for(size_t inner_i=0;inner_i<bbIt->size();++inner_i,++instIt){
+          if(instIt==bbIt->end()){
+            instIt=bbIt->begin();
+          }
+          if(invalidValues.contains((llvm::Instruction*)&*vMap[&*instIt])){
+            continue;
+          }
+          if(DT.dominates(&*instIt, &*iit)){
+            if(instIt->getType()==ty){
+              return &*vMap[&*instIt];
+            }else if(isIntTy && instIt->getType()->isIntegerTy()){
+              llvm::Value *valInTmp = &*vMap[&*instIt];
+              llvm::Instruction *insertBefore = &*iitInTmp;
+              return mutator_util::updateIntegerSize(
+                  valInTmp, (llvm::IntegerType *)ty, &*insertBefore);
+            }
+          }
         }
+      }
+    }
+  }
+  return nullptr;
+}
+
+llvm::Value *FunctionMutator::getRandomArgument(llvm::Type *ty) {
+  if(currentFunction->arg_size()!=0){
+    bool isIntTy = ty->isIntegerTy();
+    for(size_t i=0,pos=Random::getRandomUnsigned()%currentFunction->arg_size();
+         i<currentFunction->arg_size();++i,++pos){
+      if(pos==currentFunction->arg_size()){
+        pos=0;
+      }
+      llvm::Argument* curArg=currentFunction->getArg(pos);
+      if(currentFunction->getArg(pos)->getType()==ty){
+        return &*vMap[curArg];
+      }else if (isIntTy && curArg->getType()->isIntegerTy()) {
+        llvm::Instruction *insertBefore = &*functionInTmp->begin()->begin();
+        llvm::Value *valInTmp = &*vMap[curArg];
         return mutator_util::updateIntegerSize(
             valInTmp, (llvm::IntegerType *)ty, &*insertBefore);
       }
@@ -498,10 +525,18 @@ llvm::Value *FunctionMutator::getRandomDominatedValue(llvm::Type *ty) {
 
 llvm::Value *FunctionMutator::getRandomValueFromExtraValue(llvm::Type *ty) {
   if (ty != nullptr && !extraValues.empty()) {
-    return mutator_util::findRandomInArray<llvm::Value *, llvm::Type *>(
-        extraValues, ty,
-        [](llvm::Value *v, llvm::Type *ty) { return v->getType() == ty; },
-        nullptr);
+    for(size_t i=0,pos=Random::getRandomUnsigned()%extraValues.size();i<extraValues.size();++i,++pos){
+      if(pos==extraValues.size()){
+        pos=0;
+      }
+      if(llvm::Instruction* inst=llvm::dyn_cast<llvm::Instruction>(extraValues[pos]); inst){
+        if(!invalidValues.contains(inst) && inst->getType()==ty){
+          return extraValues[pos];
+        }
+      }else if(extraValues[pos]->getType()==ty){
+        return extraValues[pos];
+      }
+    }
   }
   return nullptr;
 }
@@ -566,7 +601,6 @@ static bool hasUndefOperand(llvm::Instruction *inst) {
 
 void FunctionMutator::removeAllUndef() {
   resetIterator();
-  calcDomVals();
   llvm::SmallVector<llvm::Value *> vec;
   for (auto it = inst_begin(functionInTmp); it != inst_end(functionInTmp);
        ++it) {
@@ -654,6 +688,10 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
       functionMutants[i]->removeTmpFunction();
     }
   } else {
+    if(randomMutate){
+      curFunction = Random::getRandomUnsigned() % functionMutants.size();
+      functionMutants[curFunction]->resetRandomIterator();
+    }
     functionMutants[curFunction]->mutate();
     curFunctionName =
         functionMutants[curFunction]->getCurrentFunction()->getName();
@@ -669,6 +707,8 @@ void ModuleMutator::mutateModule(const std::string &outputFileName) {
 void ModuleMutator::saveModule(const std::string &outputFileName) {
   std::error_code ec;
   llvm::raw_fd_ostream fout(outputFileName, ec);
+  fout<<";"<<curFunctionName<<"\n";
+  fout<<";current seed:" << Random::getSeed()<<"\n";
   fout << *tmpCopy;
   fout.close();
   if (debug) {

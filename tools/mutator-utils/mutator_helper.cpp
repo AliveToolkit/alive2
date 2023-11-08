@@ -2,26 +2,11 @@
 #include "mutator.h"
 
 void ShuffleHelper::init() {
-  shuffleUnitInBasicBlockIndex = 0;
-  /**
-   * find the same location as iit,bit,fit, and set shuffleBasicBlock
-   *
-   */
-  for (auto bit = mutator->currentFunction->begin();
-       bit != mutator->currentFunction->end();
-       ++bit, ++shuffleUnitInBasicBlockIndex) {
-    for (auto iit = bit->begin(); iit != bit->end(); ++iit) {
-      if (&*iit == (&*(mutator->iit))) {
-        goto varSetEnd;
-      }
-    }
-  }
-varSetEnd:
   llvm::Function *func = mutator->currentFunction;
-  shuffleBlockInFunction.resize(func->size());
-  size_t idx = 0;
-  for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt, ++idx) {
-    ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[idx];
+  shuffleBlockInFunction.init(func->size());
+  for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt) {
+    shuffleBlockInFunction[&*bbIt]=ShuffleUnitInBasicBlock();
+    ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[&*bbIt];
     ShuffleUnit tmp;
     std::unordered_set<llvm::Value *> us;
     auto instIt = bbIt->begin();
@@ -67,24 +52,23 @@ varSetEnd:
 }
 
 bool ShuffleHelper::shouldMutate() {
-  return shuffleBlockInFunction[shuffleUnitInBasicBlockIndex].size() >
+  return shuffleBlockInFunction[&*mutator->bit].size() >
          shuffleUnitIndex;
 }
 
 void ShuffleHelper::shuffleCurrentBlock() {
   ShuffleUnit &sblock =
-      shuffleBlockInFunction[shuffleUnitInBasicBlockIndex][shuffleUnitIndex];
+      shuffleBlockInFunction[&*mutator->bit][shuffleUnitIndex];
   llvm::SmallVector<llvm::Instruction *> sv;
   for (const auto &p : sblock) {
     sv.push_back(p);
   }
-  int idx = mutator->domVals.find(sv[0]);
   llvm::Instruction *nextInst =
       (llvm::Instruction *)&*(mutator->vMap)[&*(++sv.back()->getIterator())];
-  int findInSV = -1;
-  for (int i = 0; i < (int)sv.size(); ++i) {
+  bool findInSV = false;
+  for (size_t i = 0; i < sv.size(); ++i) {
     if (sv[i]->getIterator() == mutator->iit) {
-      findInSV = i;
+      findInSV = true;
       break;
     }
   }
@@ -100,20 +84,17 @@ void ShuffleHelper::shuffleCurrentBlock() {
    * current it is in shuffle interval. Then end of domInst must be pop first
    * and then insert those dom-ed insts.
    */
-  if (findInSV == -1) {
-    if (idx != -1) {
-      for (size_t i = 0; i + idx < mutator->domVals.size() && i < sv.size();
-           ++i) {
-        mutator->domVals[i + idx] = sv[i];
-      }
-    }
-  } else {
-    while (findInSV--) {
-      mutator->domVals.pop_back_tmp();
+  if (findInSV) {
+    for(size_t i=0;i<sv.size();++i){
+      mutator->invalidValues.insert((llvm::Instruction*)&*mutator->vMap[sv[i]]);
     }
     for (size_t i = 0; i < sv.size() && sv[i]->getIterator() != mutator->iit;
          ++i) {
-      mutator->domVals.push_back_tmp(sv[i]);
+      llvm::Instruction* mappedVal=(llvm::Instruction*)&*mutator->vMap[sv[i]];
+      if(mutator->invalidValues.contains(mappedVal)){
+        mutator->invalidValues.erase(mappedVal);
+      }
+      mutator->extraValues.push_back(mappedVal);
     }
   }
 
@@ -130,7 +111,10 @@ void ShuffleHelper::shuffleCurrentBlock() {
 
 void ShuffleHelper::debug() {
   llvm::errs() << "\nInstructions shuffled\n";
-  mutator->iitInTmp->print(llvm::errs());
+  mutator->bitInTmp->print(llvm::errs());
+  for(auto it=mutator->invalidValues.begin();it!=mutator->invalidValues.end();++it){
+    (*it)->dump();
+  }
   llvm::errs() << "\n";
 };
 
@@ -305,7 +289,6 @@ bool RandomMoveHelper::canMutate(llvm::Function *func) {
 void RandomMoveHelper::mutate() {
   randomMoveInstruction(&*(mutator->iitInTmp));
   moved = true;
-  mutator->extraValues.clear();
 }
 
 void RandomMoveHelper::randomMoveInstruction(llvm::Instruction *inst) {
@@ -364,8 +347,7 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
     --newPosIt;
     v.push_back(&*newPosIt);
     // remove Insts in current basic block
-    assert(mutator->domVals.tmp_size() != 0);
-    mutator->domVals.pop_back_tmp();
+    mutator->invalidValues.insert(&*newPosIt);
   }
   newPosInst = &*newPosIt;
 
@@ -404,8 +386,11 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   if (pos + 1 == endPos) {
     return;
   }
-
-  newPos = Random::getRandomInt() % (endPos - pos) + 1 + pos;
+  // newPos should be in [pos+2, endPos]
+  // Because we use moveBefore, moving pos before pos + 1 makes no change
+  newPos = Random::getRandomInt() % (endPos - pos - 1) + 2 + pos;
+  //llvm::errs()<<"AAAAAAAAAAAAAA\n";
+  //llvm::errs()<<pos<<" "<<newPos<<" "<<endPos<<"\n";
   // need fix all insts used current inst in [pos,newPos]
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
@@ -430,6 +415,9 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
     newPosIt = newPosInst->getIterator();
     mutator->extraValues.push_back(newPosInst);
   }
+  //move before newPos
+  ++newPosIt;
+  newPosInst = &*newPosIt;
   inst = (llvm::Instruction *)extraVals[0];
   inst->moveBefore(newPosInst);
   mutator->iitInTmp = inst->getIterator();
@@ -613,7 +601,7 @@ void FunctionAttributeHelper::init() {
 
 void FunctionAttributeHelper::mutate() {
   updated = true;
-  llvm::Function *func = mutator->currentFunction;
+  llvm::Function *func = mutator->functionInTmp;
   setFuncAttr(llvm::Attribute::AttrKind::NoFree, Random::getRandomBool());
   if (func->getReturnType()->isIntegerTy()) {
     llvm::IntegerType *intTy = (llvm::IntegerType *)func->getReturnType();
@@ -667,6 +655,7 @@ void FunctionAttributeHelper::mutate() {
 
 void FunctionAttributeHelper::debug() {
   llvm::errs() << "FunctionAttributeHelper: Function attributes updated\n";
+
 }
 
 void GEPHelper::mutate() {

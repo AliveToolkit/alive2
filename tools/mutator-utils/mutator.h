@@ -120,8 +120,8 @@ class FunctionMutator {
   // instruction. this vector would be updated when moveToNextBasicBlock,
   // moveToNextInst and restoreBackup
 
-  DominatedValueVector domVals;
   llvm::SmallVector<llvm::Value *> extraValues;
+  llvm::DenseSet<llvm::Instruction* > invalidValues;
   llvm::SmallVector<std::string> tmpFuncs;
   const llvm::StringSet<> &filterSet;
   const llvm::SmallVector<llvm::Value *> &globals;
@@ -131,7 +131,6 @@ class FunctionMutator {
   void moveToNextBasicBlock();
   void moveToNextMutant();
   void resetIterator();
-  void calcDomVals();
 
   llvm::SmallVector<std::unique_ptr<MutationHelper>> helpers;
   llvm::SmallVector<size_t> whenMoveToNextInstFuncs;
@@ -152,7 +151,8 @@ class FunctionMutator {
   void fixAllValues(llvm::SmallVector<llvm::Value *> &vals);
 
   llvm::Value *getRandomConstant(llvm::Type *ty);
-  llvm::Value *getRandomDominatedValue(llvm::Type *ty);
+  llvm::Value *getRandomArgument(llvm::Type* ty);
+  llvm::Value *getRandomDominatedInstruction(llvm::Type *ty);
   llvm::Value *getRandomValueFromExtraValue(llvm::Type *ty);
   llvm::Value *getRandomPointerValue(llvm::Type *ty);
   llvm::Value *getRandomFromGlobal(llvm::Type *ty);
@@ -173,17 +173,13 @@ public:
       : currentFunction(currentFunction), vMap(vMap), filterSet(filterSet),
         globals(globals),
         valueFuncs({&FunctionMutator::getRandomConstant,
-                    &FunctionMutator::getRandomDominatedValue,
+                    &FunctionMutator::getRandomDominatedInstruction,
+                    &FunctionMutator::getRandomArgument,
                     &FunctionMutator::getRandomValueFromExtraValue}),
         debug(debug) {
     bit = currentFunction->begin();
     iit = bit->begin();
-    for (auto it = currentFunction->arg_begin();
-         it != currentFunction->arg_end(); ++it) {
-      domVals.push_back(&*it);
-    }
     DT = llvm::DominatorTree(*currentFunction);
-    calcDomVals();
     moveToNextMutant();
   }
   llvm::Function *getCurrentFunction() const {
@@ -196,6 +192,7 @@ public:
   static bool canMutate(const llvm::Function *function,
                         const llvm::StringSet<> &filterSet);
   void mutate();
+  void resetRandomIterator();
   void print();
   void setDebug(bool debug) {
     this->debug = debug;
@@ -217,7 +214,7 @@ class ModuleMutator : public Mutator {
   // calls.
   llvm::StringSet<> filterSet, invalidFunctions;
   std::shared_ptr<llvm::Module> tmpCopy;
-  bool onEveryFunction;
+  bool onEveryFunction, randomMutate;
   llvm::ValueToValueMapTy vMap;
   llvm::SmallVector<llvm::Value *> globals;
 
@@ -231,9 +228,10 @@ public:
   ModuleMutator(bool debug = false) : Mutator(debug){};
   ModuleMutator(std::shared_ptr<llvm::Module> pm_,
                 const llvm::StringSet<> &invalidFunctions, bool debug = false,
-                bool onEveryFunction = false)
+                bool onEveryFunction = false, bool randomMutate=false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),
-        onEveryFunction(onEveryFunction), curFunction(0) {
+        onEveryFunction(onEveryFunction), randomMutate(randomMutate),
+        curFunction(0) {
     pm = pm_;
   };
   ModuleMutator(std::shared_ptr<llvm::Module> pm_, bool debug = false,

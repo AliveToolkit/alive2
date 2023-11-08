@@ -83,6 +83,26 @@ llvm::cl::opt<bool> removeUndef(
     llvm::cl::desc("remove all undef in all functions in the input module"),
     llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<bool> masterRNG(
+    LLVM_ARGS_PREFIX "masterRNG",
+    llvm::cl::value_desc("turn on master RNG mode"),
+    llvm::cl::desc("master RNG will generate a list of random seeds and set use"
+                   " one seed for every mutant"),
+    llvm::cl::cat(mutatorArgs));
+
+llvm::cl::opt<bool> randomMutate(
+    LLVM_ARGS_PREFIX "randomMutate",
+    llvm::cl::value_desc("turn on randomMutate mode"),
+    llvm::cl::desc("Random mutate mode will random mutate an instruction in the"
+                   " function instead of linear sequence"),
+    llvm::cl::cat(mutatorArgs));
+
+llvm::cl::opt<bool> disableAlive(
+    LLVM_ARGS_PREFIX "disableAlive",
+    llvm::cl::value_desc("a flag to disable alive2 verifications"),
+    llvm::cl::desc("don't verify mutated result by alive2"),
+    llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
+
 llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
                             llvm::cl::value_desc("verbose mode"),
                             llvm::cl::desc("specify if verbose mode is on"),
@@ -131,6 +151,7 @@ llvm::cl::list<size_t>
                llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 
+std::vector<unsigned> RNGseeds;
 unique_ptr<Cache> cache;
 std::stringstream logStream;
 // To eliminate extra verifier construction;
@@ -214,8 +235,16 @@ see alive-tv --version for LLVM version info,
   if (outputFolder.back() != '/')
     outputFolder += '/';
 
+
   if (randomSeed >= 0) {
     Random::setSeed((unsigned)randomSeed);
+    if(masterRNG){
+      assert(numCopy > 0 && "master RNG setting should only be allowed under copy mode!\n");
+      RNGseeds.resize(numCopy);
+      for(int i=0;i<numCopy;++i){
+        RNGseeds[i]=Random::getRandomUnsigned();
+      }
+    }
   }
 
   if (numCopy < 0 && timeElapsed < 0) {
@@ -333,16 +362,22 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
 }
 
 void copyMode(std::shared_ptr<llvm::Module>& pm){
-    if (copyFunctions != 0) {
+  if (copyFunctions != 0) {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      pm, invalidFunctions, verbose, onEveryFunction);
+      pm, invalidFunctions, verbose, onEveryFunction, randomMutate);
   if (bool init = mutator->init(); init) {
-
+    //Eliminate the influence of verifyInput
+    if(!masterRNG && randomSeed >= 0){
+      Random::setSeed((unsigned)randomSeed);
+    }
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
+      }
+      if(masterRNG){
+        Random::setSeed(RNGseeds[i]);
       }
       runOnce(i, *mutator);
 
@@ -359,7 +394,7 @@ void timeMode(std::shared_ptr<llvm::Module>& pm){
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
-      pm, invalidFunctions, verbose, onEveryFunction);
+      pm, invalidFunctions, verbose, onEveryFunction, randomMutate);
   bool init = mutator->init();
   if (!init) {
     cerr << "Cannot find any location to mutate, " + inputFile + " skipped\n";
@@ -387,16 +422,18 @@ void runOnce(int ith, Mutator &mutator){
 
   auto M1 = mutator.getModule();
 
-  if(!verifier.has_value()){
-    llvm::Triple targetTriple(M1.get()->getTargetTriple());
-    initVerifier(targetTriple);
+  if(!disableAlive) {
+    if (!verifier.has_value()) {
+      llvm::Triple targetTriple(M1.get()->getTargetTriple());
+      initVerifier(targetTriple);
+    }
   }
 
 
   const string optFunc = mutator.getCurrentFunction();
   bool shouldLog=false;
 
-  if (llvm::Function *pf1 = M1->getFunction(optFunc); pf1 != nullptr) {
+  if (llvm::Function *pf1 = M1->getFunction(optFunc); !disableAlive && pf1 != nullptr) {
     if (!pf1->isDeclaration()) {
       std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*M1);
       llvm_util::optimize_module(M2.get(), optPass);
@@ -409,13 +446,15 @@ void runOnce(int ith, Mutator &mutator){
     }
   }
 
-  if(shouldLog){
+  if(shouldLog || disableAlive){
     mutator.saveModule(getOutputSrcFilename(ith));
-    std::ofstream logFile(getOutputLogFilename(ith));
-    assert(logFile.is_open());
-    logFile<<"Current seed: "<<Random::getSeed()<<"\n";
-    logFile << "Source file:" << M1->getSourceFileName() << "\n";
-    logFile<<logStream.rdbuf();
-    logStream.str("");
+    if(!disableAlive){
+      std::ofstream logFile(getOutputLogFilename(ith));
+      assert(logFile.is_open());
+      logFile<<"Current seed: "<<Random::getSeed()<<"\n";
+      logFile << "Source file:" << M1->getSourceFileName() << "\n";
+      logFile<<logStream.rdbuf();
+      logStream.str("");
+    }
   }
 }

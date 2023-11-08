@@ -46,16 +46,15 @@ public:
 class ShuffleHelper : public MutationHelper {
   using ShuffleUnit = llvm::SmallVector<llvm::Instruction *>;
   using ShuffleUnitInBasicBlock = llvm::SmallVector<ShuffleUnit>;
-  using ShuffleBlockInFunction = llvm::SmallVector<ShuffleUnitInBasicBlock>;
+  using ShuffleBlockInFunction = llvm::DenseMap<llvm::BasicBlock*, ShuffleUnitInBasicBlock>;
 
   ShuffleBlockInFunction shuffleBlockInFunction;
-  size_t shuffleUnitInBasicBlockIndex, shuffleUnitIndex;
+  size_t shuffleUnitIndex;
   void shuffleCurrentBlock();
 
 public:
   ShuffleHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), shuffleUnitInBasicBlockIndex(0),
-        shuffleUnitIndex(0){};
+      : MutationHelper(mutator), shuffleUnitIndex(0){};
   // we know this value after calculation in init, so return ture for now for
   // every function
   static bool canMutate(llvm::Function *func) {
@@ -63,7 +62,7 @@ public:
   };
   virtual void init() override;
   virtual void reset() override {
-    shuffleUnitInBasicBlockIndex = shuffleUnitIndex = 0;
+    shuffleUnitIndex = 0;
   }
   virtual void mutate() override {
     shuffleCurrentBlock();
@@ -72,10 +71,6 @@ public:
   virtual bool shouldMutate() override;
   virtual void whenMoveToNextBasicBlock() override {
     shuffleUnitIndex = 0;
-    ++shuffleUnitInBasicBlockIndex;
-  };
-  virtual void whenMoveToNextFunction() override {
-    shuffleUnitInBasicBlockIndex = 0;
   };
   virtual void debug() override;
 };
