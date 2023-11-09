@@ -65,18 +65,16 @@ llvm::cl::opt<long long> randomSeed(
                    "set the master RNG if masterRNG argument is specified"),
     llvm::cl::init(-1));
 
-llvm::cl::opt<int>
-    numCopy(LLVM_ARGS_PREFIX "n",
-            llvm::cl::value_desc("number of copies of test files"),
-            llvm::cl::desc("specify number of copies of test files"),
-            llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
+llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
+                           llvm::cl::value_desc("number of mutants"),
+                           llvm::cl::desc("specify number of mutants"),
+                           llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
 
-llvm::cl::opt<int>
-    timeElapsed(LLVM_ARGS_PREFIX "t",
-                llvm::cl::value_desc("seconds of the mutator should run"),
-                llvm::cl::cat(mutatorArgs),
-                llvm::cl::desc("specify seconds of the mutator should run"),
-                llvm::cl::init(-1));
+llvm::cl::opt<int> timeElapsed(
+    LLVM_ARGS_PREFIX "t", llvm::cl::value_desc("seconds"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("specify how long the mutator should run in seconds"),
+    llvm::cl::init(-1));
 
 llvm::cl::opt<bool> removeUndef(
     LLVM_ARGS_PREFIX "removeUndef",
@@ -105,11 +103,11 @@ llvm::cl::opt<bool>
                                 "save all mutants to output folder"),
                  llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
-llvm::cl::opt<bool> verbose(
-    LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
-    llvm::cl::desc(
-        "turn verbose mode, mutations and module will be printed on screen"),
-    llvm::cl::cat(mutatorArgs));
+llvm::cl::opt<bool>
+    verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
+            llvm::cl::desc(
+                "turn on verbose mode, mutations and module will be printed"),
+            llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
@@ -127,11 +125,11 @@ llvm::cl::opt<string> optPass(
     llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
 llvm::cl::opt<int> copyFunctions(
-    LLVM_ARGS_PREFIX "copy",
-    llvm::cl::value_desc("number of function copies generated"),
+    LLVM_ARGS_PREFIX "duplicate",
+    llvm::cl::value_desc("the number of functions duplicated"),
     llvm::cl::cat(mutatorArgs),
     llvm::cl::desc(
-        "it describes number of copies for every function in the module"),
+        "duplicate every function in the module with specified number."),
     llvm::cl::init(0));
 } // namespace
 
@@ -212,11 +210,10 @@ int main(int argc, char **argv) {
   llvm::LLVMContext Context;
 
   std::string Usage =
-      R"EOF(Alive2 stand-alone translation validator:
-version )EOF";
+      R"EOF(Alive-mutate, a stand-alone LLVM IR fuzzer cooperates  with Alive2. Alive2 version: )EOF";
   Usage += alive_version;
   Usage += R"EOF(
-see alive-tv --version for LLVM version info,
+see alive-mutate --help for more options,
 )EOF";
 
   llvm::cl::HideUnrelatedOptions(mutatorArgs);
