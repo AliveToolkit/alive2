@@ -250,7 +250,6 @@ see alive-mutate --help for more options,
       }
     }
   }
-  llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
 
   if (numCopy < 0 && timeElapsed < 0) {
     cerr << "Please specify either number of copies or running time!\n";
@@ -269,6 +268,7 @@ see alive-mutate --help for more options,
     cerr << "Some functions can't pass input check, those would be skipped\n";
   }
 
+  llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
   int totalMutants = 0;
   if (numCopy > 0) {
     totalMutants = copyMode(M1);
