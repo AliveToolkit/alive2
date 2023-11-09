@@ -7,19 +7,19 @@
 #include "llvm_util/llvm_optimizer.h"
 #include "llvm_util/utils.h"
 #include "smt/smt.h"
+#include "tools/mutator-utils/mutator.h"
 #include "tools/transform.h"
 #include "util/version.h"
-#include "tools/mutator-utils/mutator.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -46,10 +46,10 @@ namespace {
 llvm::cl::OptionCategory mutatorArgs("Mutator options");
 
 llvm::cl::opt<string> inputFile(llvm::cl::Positional,
-                               llvm::cl::desc("<inputFile>"),
-                               llvm::cl::Required,
-                               llvm::cl::value_desc("filename"),
-                               llvm::cl::cat(mutatorArgs));
+                                llvm::cl::desc("<inputFile>"),
+                                llvm::cl::Required,
+                                llvm::cl::value_desc("filename"),
+                                llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
                                    llvm::cl::desc("<outputFileFolder>"),
@@ -61,7 +61,8 @@ llvm::cl::opt<long long> randomSeed(
     LLVM_ARGS_PREFIX "s",
     llvm::cl::value_desc("specify the seed of the random number generator"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc("specify the seed of the random number generator"),
+    llvm::cl::desc("specify the seed of the random number generator. It will "
+                   "set the master RNG if masterRNG argument is specified"),
     llvm::cl::init(-1));
 
 llvm::cl::opt<int>
@@ -86,7 +87,7 @@ llvm::cl::opt<bool> removeUndef(
 llvm::cl::opt<bool> masterRNG(
     LLVM_ARGS_PREFIX "masterRNG",
     llvm::cl::value_desc("turn on master RNG mode"),
-    llvm::cl::desc("master RNG will generate a list of random seeds and set use"
+    llvm::cl::desc("master RNG will generate a list of random seeds and use"
                    " one seed for every mutant"),
     llvm::cl::cat(mutatorArgs));
 
@@ -97,16 +98,18 @@ llvm::cl::opt<bool> randomMutate(
                    " function instead of linear sequence"),
     llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<bool> disableAlive(
-    LLVM_ARGS_PREFIX "disableAlive",
-    llvm::cl::value_desc("a flag to disable alive2 verifications"),
-    llvm::cl::desc("don't verify mutated result by alive2"),
-    llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
+llvm::cl::opt<bool>
+    disableAlive(LLVM_ARGS_PREFIX "disableAlive",
+                 llvm::cl::value_desc("a flag to disable alive2 verifications"),
+                 llvm::cl::desc("don't verify mutated result by alive2 and "
+                                "save all mutants to output folder"),
+                 llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
-llvm::cl::opt<bool> verbose(LLVM_ARGS_PREFIX "v",
-                            llvm::cl::value_desc("verbose mode"),
-                            llvm::cl::desc("specify if verbose mode is on"),
-                            llvm::cl::cat(mutatorArgs));
+llvm::cl::opt<bool> verbose(
+    LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
+    llvm::cl::desc(
+        "turn verbose mode, mutations and module will be printed on screen"),
+    llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
@@ -130,26 +133,25 @@ llvm::cl::opt<int> copyFunctions(
     llvm::cl::desc(
         "it describes number of copies for every function in the module"),
     llvm::cl::init(0));
-}
+} // namespace
 
-llvm::cl::list<size_t>
-    disableSEXT(LLVM_ARGS_PREFIX "disable-sigext",
-                llvm::cl::desc("option list -- This option would disable adding or "
-                         "removing sigext on integer type you specified"),
-                llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+llvm::cl::list<size_t> disableSEXT(
+    LLVM_ARGS_PREFIX "disable-sigext",
+    llvm::cl::desc("option list -- This option would disable adding or "
+                   "removing sigext on integer type you specified"),
+    llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
-llvm::cl::list<size_t>
-    disableZEXT(LLVM_ARGS_PREFIX "disable-zeroext",
-                llvm::cl::desc("option list -- This option would disable adding or "
-                         "removing sigext on integer type you specified"),
-                llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+llvm::cl::list<size_t> disableZEXT(
+    LLVM_ARGS_PREFIX "disable-zeroext",
+    llvm::cl::desc("option list -- This option would disable adding or "
+                   "removing sigext on integer type you specified"),
+    llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
-llvm::cl::list<size_t>
-    disableEXT(LLVM_ARGS_PREFIX "disable-ext",
-               llvm::cl::desc("option list -- This option would disable all ext "
-                        "instructions on integer type you specified"),
-               llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
-
+llvm::cl::list<size_t> disableEXT(
+    LLVM_ARGS_PREFIX "disable-ext",
+    llvm::cl::desc("option list -- This option would disable all ext "
+                   "instructions on integer type you specified"),
+    llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 std::vector<unsigned> RNGseeds;
 unique_ptr<Cache> cache;
@@ -159,9 +161,8 @@ std::optional<llvm::TargetLibraryInfoWrapperPass> TLI;
 std::optional<smt::smt_initializer> smt_init;
 std::optional<Verifier> verifier;
 
-void initVerifier(llvm::Triple targetTriple){
+void initVerifier(llvm::Triple targetTriple) {
   TLI.emplace(targetTriple);
-
 
   smt_init.emplace();
   verifier.emplace(TLI.value(), smt_init.value(), logStream);
@@ -171,7 +172,7 @@ void initVerifier(llvm::Triple targetTriple){
   verifier->bidirectional = opt_bidirectional;
 }
 
-void destroyVerifier(){
+void destroyVerifier() {
   verifier.reset();
   smt_init.reset();
   TLI.reset();
@@ -185,10 +186,10 @@ std::string getOutputLogFilename(int ith);
 void tryWriteLog(std::string logPath);
 bool isValidOutputPath();
 
-// These function are used for actually running mutations. Both copy mode and time
-// mode would call runOnce a couple of times and exit.
-void copyMode(std::shared_ptr<llvm::Module>& pm),
-    timeMode(std::shared_ptr<llvm::Module>& pm),
+// These function are used for actually running mutations. Both copy mode and
+// time mode would call runOnce a couple of times and exit.
+void copyMode(std::shared_ptr<llvm::Module> &pm),
+    timeMode(std::shared_ptr<llvm::Module> &pm),
     runOnce(int ith, Mutator &mutator);
 
 // We need to verify the input to avoid certain scenarios.
@@ -198,10 +199,10 @@ void copyMode(std::shared_ptr<llvm::Module>& pm),
 // 4. Rename unnamed functions
 // 5. Skip functions stored in some function pointers
 // 6. Skip functions with the only declaration.
-// 7. Reset 'internal' attr on functions (because they might be removed after optimization)
-// return true if all functions are invalid
+// 7. Reset 'internal' attr on functions (because they might be removed after
+// optimization) return true if all functions are invalid
 llvm::StringSet<> invalidFunctions;
-bool verifyInput(std::shared_ptr<llvm::Module>& pm);
+bool verifyInput(std::shared_ptr<llvm::Module> &pm);
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
@@ -229,20 +230,19 @@ see alive-tv --version for LLVM version info,
   }
 
 #define ARGS_MODULE_VAR M1
-# include "llvm_util/cmd_args_def.h"
-
+#include "llvm_util/cmd_args_def.h"
 
   if (outputFolder.back() != '/')
     outputFolder += '/';
 
-
   if (randomSeed >= 0) {
     Random::setSeed((unsigned)randomSeed);
-    if(masterRNG){
-      assert(numCopy > 0 && "master RNG setting should only be allowed under copy mode!\n");
+    if (masterRNG) {
+      assert(numCopy > 0 &&
+             "master RNG setting should only be allowed under copy mode!\n");
       RNGseeds.resize(numCopy);
-      for(int i=0;i<numCopy;++i){
-        RNGseeds[i]=Random::getRandomUnsigned();
+      for (int i = 0; i < numCopy; ++i) {
+        RNGseeds[i] = Random::getRandomUnsigned();
       }
     }
   }
@@ -255,12 +255,12 @@ see alive-tv --version for LLVM version info,
     return -1;
   }
 
-  if(verifyInput(M1)){
+  if (verifyInput(M1)) {
     cerr << "All functions cannot pass input check!\n";
     return -1;
   }
 
-  if(invalidFunctions.size() > 0){
+  if (invalidFunctions.size() > 0) {
     cerr << "Some functions can't pass input check, those would be skipped\n";
   }
 
@@ -272,23 +272,23 @@ see alive-tv --version for LLVM version info,
   return 0;
 }
 
-bool isValidOutputPath(){
+bool isValidOutputPath() {
   bool result = filesystem::status(string(outputFolder)).type() ==
                 filesystem::file_type::directory;
   return result;
 }
 
-std::string getOutputSrcFilename(int ith){
+std::string getOutputSrcFilename(int ith) {
   static filesystem::path inputPath = filesystem::path(string(inputFile));
   static string templateName = string(outputFolder) + inputPath.stem().string();
   return templateName + to_string(ith) + ".ll";
 }
 
-std::string getOutputLogFilename(int ith){
-  return getOutputSrcFilename(ith)+"-log.txt";
+std::string getOutputLogFilename(int ith) {
+  return getOutputSrcFilename(ith) + "-log.txt";
 }
 
-bool verifyInput(std::shared_ptr<llvm::Module>& M1){
+bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
   mutator_util::removeTBAAMetadata(M1.get());
   if (removeUndef) {
     ModuleMutator mutator(M1, verbose, onEveryFunction);
@@ -298,38 +298,35 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
     M1 = mutator.getModule();
   }
 
-  //Rename unnamed functions
-  size_t unnamedFunction=0;
-  for_each(M1->begin(),M1->end(),[&unnamedFunction](llvm::Function& f){
-    if(f.getName().empty()){
+  // Rename unnamed functions
+  size_t unnamedFunction = 0;
+  for_each(M1->begin(), M1->end(), [&unnamedFunction](llvm::Function &f) {
+    if (f.getName().empty()) {
       f.setName(std::string("resetUnnamedFunction") +
-                   std::to_string(unnamedFunction++));
+                std::to_string(unnamedFunction++));
     }
   });
 
-  //Reset internal attr
-  for_each(M1->begin(),M1->end(),[](llvm::Function& f){
-    if (f.getLinkage() ==
-        llvm::GlobalValue::LinkageTypes::InternalLinkage) {
+  // Reset internal attr
+  for_each(M1->begin(), M1->end(), [](llvm::Function &f) {
+    if (f.getLinkage() == llvm::GlobalValue::LinkageTypes::InternalLinkage) {
       f.setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
-    if(f.getLinkage() ==
-        llvm::GlobalValue::LinkageTypes::LinkOnceAnyLinkage){
+    if (f.getLinkage() == llvm::GlobalValue::LinkageTypes::LinkOnceAnyLinkage) {
       f.setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
   });
 
-  for(auto fit=M1->begin();fit!=M1->end();++fit){
-    if(!fit->isDeclaration() || invalidFunctions.contains(fit->getName())){
-      if(llvm::verifyFunction(*fit, nullptr)){
+  for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
+    if (!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
+      if (llvm::verifyFunction(*fit, nullptr)) {
         invalidFunctions.insert(fit->getName());
         continue;
       }
 
-      for (auto use_it = fit->use_begin();
-           use_it != fit->use_end(); use_it++) {
+      for (auto use_it = fit->use_begin(); use_it != fit->use_end(); use_it++) {
         llvm::Value *user = use_it->getUser();
-        if (llvm::StoreInst* inst= dyn_cast<llvm::StoreInst>(user);inst) {
+        if (llvm::StoreInst *inst = dyn_cast<llvm::StoreInst>(user); inst) {
           invalidFunctions.insert(inst->getFunction()->getName());
         }
       }
@@ -344,44 +341,42 @@ bool verifyInput(std::shared_ptr<llvm::Module>& M1){
   llvm::Triple targetTriple(M1.get()->getTargetTriple());
   initVerifier(targetTriple);
 
-  for(auto fit=M1->begin();fit!=M1->end();++fit){
-    if(!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
-      llvm::Function* f2=M2->getFunction(fit->getName());
+  for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
+    if (!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
+      llvm::Function *f2 = M2->getFunction(fit->getName());
       verifier->compareFunctions(*fit, *f2);
-      //FIX ME: need update
+      // FIX ME: need update
       logStream.str("");
-      //equals to 0 means not correct
-      if(verifier->num_correct==0){
+      // equals to 0 means not correct
+      if (verifier->num_correct == 0) {
         invalidFunctions.insert(fit->getName());
-        verifier->num_correct=0;
+        verifier->num_correct = 0;
       }
     }
   }
   destroyVerifier();
-  return invalidFunctions.size()==M1->size();
+  return invalidFunctions.size() == M1->size();
 }
 
-void copyMode(std::shared_ptr<llvm::Module>& pm){
+void copyMode(std::shared_ptr<llvm::Module> &pm) {
   if (copyFunctions != 0) {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
   std::unique_ptr<Mutator> mutator = std::make_unique<ModuleMutator>(
       pm, invalidFunctions, verbose, onEveryFunction, randomMutate);
   if (bool init = mutator->init(); init) {
-    //Eliminate the influence of verifyInput
-    if(!masterRNG && randomSeed >= 0){
+    // Eliminate the influence of verifyInput
+    if (!masterRNG && randomSeed >= 0) {
       Random::setSeed((unsigned)randomSeed);
     }
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
       }
-      if(masterRNG){
+      if (masterRNG) {
         Random::setSeed(RNGseeds[i]);
       }
       runOnce(i, *mutator);
-
-
     }
   } else {
     cerr << "Cannot find any locations to mutate, " + inputFile + " skipped!\n";
@@ -389,7 +384,7 @@ void copyMode(std::shared_ptr<llvm::Module>& pm){
   }
 }
 
-void timeMode(std::shared_ptr<llvm::Module>& pm){
+void timeMode(std::shared_ptr<llvm::Module> &pm) {
   if (copyFunctions != 0) {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
@@ -417,43 +412,43 @@ void timeMode(std::shared_ptr<llvm::Module>& pm){
   }
 }
 
-void runOnce(int ith, Mutator &mutator){
+void runOnce(int ith, Mutator &mutator) {
   mutator.mutateModule(getOutputSrcFilename(ith));
 
   auto M1 = mutator.getModule();
 
-  if(!disableAlive) {
+  if (!disableAlive) {
     if (!verifier.has_value()) {
       llvm::Triple targetTriple(M1.get()->getTargetTriple());
       initVerifier(targetTriple);
     }
   }
 
-
   const string optFunc = mutator.getCurrentFunction();
-  bool shouldLog=false;
+  bool shouldLog = false;
 
-  if (llvm::Function *pf1 = M1->getFunction(optFunc); !disableAlive && pf1 != nullptr) {
+  if (llvm::Function *pf1 = M1->getFunction(optFunc);
+      !disableAlive && pf1 != nullptr) {
     if (!pf1->isDeclaration()) {
       std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*M1);
       llvm_util::optimize_module(M2.get(), optPass);
       llvm::Function *pf2 = M2->getFunction(pf1->getName());
       assert(pf2 != nullptr && "pf2 clone failed");
       verifier->compareFunctions(*pf1, *pf2);
-      if(verifier->num_correct==0){
-        shouldLog=true;
+      if (verifier->num_correct == 0) {
+        shouldLog = true;
       }
     }
   }
 
-  if(shouldLog || disableAlive){
+  if (shouldLog || disableAlive) {
     mutator.saveModule(getOutputSrcFilename(ith));
-    if(!disableAlive){
+    if (!disableAlive) {
       std::ofstream logFile(getOutputLogFilename(ith));
       assert(logFile.is_open());
-      logFile<<"Current seed: "<<Random::getSeed()<<"\n";
+      logFile << "Current seed: " << Random::getSeed() << "\n";
       logFile << "Source file:" << M1->getSourceFileName() << "\n";
-      logFile<<logStream.rdbuf();
+      logFile << logStream.rdbuf();
       logStream.str("");
     }
   }
