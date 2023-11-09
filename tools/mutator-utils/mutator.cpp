@@ -328,6 +328,7 @@ void FunctionMutator::mutate() {
     llvm::errs() << "\n";
     print();
     llvm::errs() << "End\n";
+    exit(1);
   }
   if (debug) {
     print();

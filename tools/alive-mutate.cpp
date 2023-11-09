@@ -68,7 +68,7 @@ llvm::cl::opt<long long> randomSeed(
 
 llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
                            llvm::cl::value_desc("number of mutants"),
-                           llvm::cl::desc("specify number of mutants"),
+                           llvm::cl::desc("specify the number of mutants"),
                            llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
 
 llvm::cl::opt<int> timeElapsed(
@@ -102,22 +102,23 @@ llvm::cl::opt<bool> randomMutate(
 llvm::cl::opt<bool>
     disableAlive(LLVM_ARGS_PREFIX "disableAlive",
                  llvm::cl::value_desc("a flag to disable alive2 verifications"),
-                 llvm::cl::desc("don't verify mutated result by alive2 and "
+                 llvm::cl::desc("don't verify mutants by alive2 and "
                                 "save all mutants to output folder"),
                  llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
 llvm::cl::opt<bool>
     verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
-            llvm::cl::desc(
-                "turn on verbose mode, mutations and module will be printed"),
+            llvm::cl::desc("turn on verbose mode, the detail of mutations and "
+                           "module will be printed"),
             llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
                          "in the module would be mutated"),
-    llvm::cl::desc("instead of mutating a single function, all function in the "
-                   "module would be mutated"),
+    llvm::cl::desc("Alive-mutate will perform mutations on every function in "
+                   "the module when generating one mutant, otherwise only one "
+                   "function will be mutated in one mutant"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<string> optPass(
@@ -192,9 +193,9 @@ bool isValidOutputPath();
 
 // These function are used for actually running mutations. Both copy mode and
 // time mode would call runOnce a couple of times and exit.
-void copyMode(std::shared_ptr<llvm::Module> &pm),
-    timeMode(std::shared_ptr<llvm::Module> &pm),
-    runOnce(int ith, Mutator &mutator);
+int copyMode(std::shared_ptr<llvm::Module> &pm),
+    timeMode(std::shared_ptr<llvm::Module> &pm);
+void runOnce(int ith, Mutator &mutator);
 
 // We need to verify the input to avoid certain scenarios.
 // 1. For those already non-sound functions, we need to skip them.
@@ -249,6 +250,7 @@ see alive-mutate --help for more options,
       }
     }
   }
+  llvm::errs() << "Current random seed: " << Random::getSeed() << "\n";
 
   if (numCopy < 0 && timeElapsed < 0) {
     cerr << "Please specify either number of copies or running time!\n";
@@ -267,11 +269,13 @@ see alive-mutate --help for more options,
     cerr << "Some functions can't pass input check, those would be skipped\n";
   }
 
+  int totalMutants = 0;
   if (numCopy > 0) {
-    copyMode(M1);
+    totalMutants = copyMode(M1);
   } else if (timeElapsed > 0) {
-    timeMode(M1);
+    totalMutants = timeMode(M1);
   }
+  llvm::outs() << "Total mutants generated: " << totalMutants << "\n";
   return 0;
 }
 
@@ -361,7 +365,7 @@ bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
   return invalidFunctions.size() == M1->size();
 }
 
-void copyMode(std::shared_ptr<llvm::Module> &pm) {
+int copyMode(std::shared_ptr<llvm::Module> &pm) {
   if (copyFunctions != 0) {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
@@ -383,11 +387,12 @@ void copyMode(std::shared_ptr<llvm::Module> &pm) {
     }
   } else {
     cerr << "Cannot find any locations to mutate, " + inputFile + " skipped!\n";
-    return;
+    return 0;
   }
+  return numCopy;
 }
 
-void timeMode(std::shared_ptr<llvm::Module> &pm) {
+int timeMode(std::shared_ptr<llvm::Module> &pm) {
   if (copyFunctions != 0) {
     mutator_util::propagateFunctionsInModule(pm.get(), copyFunctions);
   }
@@ -396,7 +401,7 @@ void timeMode(std::shared_ptr<llvm::Module> &pm) {
   bool init = mutator->init();
   if (!init) {
     cerr << "Cannot find any location to mutate, " + inputFile + " skipped\n";
-    return;
+    return 0;
   }
   std::chrono::duration<double> sum = std::chrono::duration<double>::zero();
   int cnt = 1;
@@ -407,12 +412,13 @@ void timeMode(std::shared_ptr<llvm::Module> &pm) {
     auto t_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> cur = t_end - t_start;
     if (verbose) {
-      std::cout << "Generted " + to_string(cnt) + "th copies in " +
+      std::cout << "Generated " + to_string(cnt) + "th copies in " +
                        to_string((cur).count()) + " seconds\n";
     }
     sum += cur;
     ++cnt;
   }
+  return cnt;
 }
 
 void runOnce(int ith, Mutator &mutator) {
