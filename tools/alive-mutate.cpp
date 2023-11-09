@@ -250,7 +250,7 @@ see alive-mutate --help for more options,
       }
     }
   }
-  llvm::errs() << "Current random seed: " << Random::getSeed() << "\n";
+  llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
 
   if (numCopy < 0 && timeElapsed < 0) {
     cerr << "Please specify either number of copies or running time!\n";
