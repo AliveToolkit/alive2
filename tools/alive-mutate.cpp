@@ -121,6 +121,13 @@ llvm::cl::opt<bool>
                            "module will be printed"),
             llvm::cl::cat(mutatorArgs));
 
+llvm::cl::opt<bool>
+    saveAll(LLVM_ARGS_PREFIX "saveAll",
+            llvm::cl::value_desc("save all mutants"),
+            llvm::cl::desc(
+                "save all mutants including correct ones before alive2 checks"),
+            llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
+
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
@@ -447,6 +454,12 @@ int timeMode(std::shared_ptr<llvm::Module> &pm) {
 void runOnce(int ith, Mutator &mutator) {
   mutator.mutateModule(getOutputSrcFilename(ith));
 
+  bool hasSaved = false;
+  if (saveAll) {
+    mutator.saveModule(getOutputSrcFilename(ith));
+    hasSaved = true;
+  }
+
   auto M1 = mutator.getModule();
 
   if (!disableAlive) {
@@ -473,15 +486,15 @@ void runOnce(int ith, Mutator &mutator) {
     }
   }
 
-  if (shouldLog || disableAlive) {
-    mutator.saveModule(getOutputSrcFilename(ith));
-    if (!disableAlive) {
-      std::ofstream logFile(getOutputLogFilename(ith));
-      assert(logFile.is_open());
-      logFile << "Current seed: " << Random::getSeed() << "\n";
-      logFile << "Source file:" << M1->getSourceFileName() << "\n";
-      logFile << logStream.rdbuf();
-      logStream.str("");
+  if (shouldLog) {
+    if (!hasSaved) {
+      mutator.saveModule(getOutputSrcFilename(ith));
     }
+    std::ofstream logFile(getOutputLogFilename(ith));
+    assert(logFile.is_open());
+    logFile << "Current seed: " << Random::getSeed() << "\n";
+    logFile << "Source file:" << M1->getSourceFileName() << "\n";
+    logFile << logStream.rdbuf();
+    logStream.str("");
   }
 }
