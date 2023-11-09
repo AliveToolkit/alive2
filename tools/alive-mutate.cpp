@@ -278,7 +278,7 @@ see alive-mutate --help for more options,
         << "Some functions can't pass input check, those would be skipped. "
            "They might are only function declarations, "
         << (verifyInputModule ? "can't pass alive2 initial checks, " : "")
-        << " or stores a function pointer inside";
+        << " or stores a function pointer inside\n";
   }
 
   llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
@@ -374,9 +374,8 @@ bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
         if (verifier->num_correct == 0) {
           invalidFunctions.insert(fit->getName());
           if (incorrect_count <= 10) {
-            llvm::errs() << "Function " << fit->getName()
-                         << " failed in alive2 initial checks. It will be "
-                            "skipped in the fuzzing stage";
+            llvm::errs() << "Function: " << fit->getName()
+                         << " failed in alive2 initial checks.\n";
             ++incorrect_count;
           }
           verifier->num_correct = 0;
