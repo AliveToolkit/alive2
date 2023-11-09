@@ -317,6 +317,20 @@ public:
     FnAttrs attrs;
     vector<ParamAttrs> param_attrs;
 
+    // @llvm.assert is not special as far as LLVM is concerned, but in
+    // Alive we treat it as an alias for the simple
+    // (non-operand-bundle) version of @llvm.assume. its reason for
+    // existing is that the optimizer is not free to remove
+    // @llvm.assert, as it is @llvm.assume
+    if (fn->getName() == "llvm.assert") {
+      auto &ctx = i.getContext();
+      auto *assertTy = llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
+					       { llvm::Type::getInt1Ty(ctx) },
+					       false);
+      if (fn->getFunctionType() == assertTy)
+	return make_unique<Assume>(*args[0], Assume::WellDefined);
+    }
+
     parse_fn_attrs(i, attrs, true);
 
     if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
