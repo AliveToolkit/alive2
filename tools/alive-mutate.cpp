@@ -61,8 +61,9 @@ llvm::cl::opt<long long> randomSeed(
     LLVM_ARGS_PREFIX "s",
     llvm::cl::value_desc("specify the seed of the random number generator"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc("specify the seed of the random number generator. It will "
-                   "set the master RNG if masterRNG argument is specified"),
+    llvm::cl::desc(
+        "specify the seed of the random number generator. It will "
+        "set the seed of master RNG if masterRNG argument is specified"),
     llvm::cl::init(-1));
 
 llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
@@ -85,15 +86,17 @@ llvm::cl::opt<bool> removeUndef(
 llvm::cl::opt<bool> masterRNG(
     LLVM_ARGS_PREFIX "masterRNG",
     llvm::cl::value_desc("turn on master RNG mode"),
-    llvm::cl::desc("master RNG will generate a list of random seeds and use"
+    llvm::cl::desc("Turn on master RNG mode. Alive-mutate will use a master "
+                   "RNG to generate a list of random seeds and use"
                    " one seed for every mutant"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> randomMutate(
     LLVM_ARGS_PREFIX "randomMutate",
     llvm::cl::value_desc("turn on randomMutate mode"),
-    llvm::cl::desc("Random mutate mode will random mutate an instruction in the"
-                   " function instead of linear sequence"),
+    llvm::cl::desc(
+        "Random mutate mode will randomly mutate an instruction in the"
+        " function instead of linearly"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool>
@@ -135,18 +138,21 @@ llvm::cl::opt<int> copyFunctions(
 
 llvm::cl::list<size_t> disableSEXT(
     LLVM_ARGS_PREFIX "disable-sigext",
+    llvm::cl::value_desc("list of integer width"),
     llvm::cl::desc("option list -- This option would disable adding or "
                    "removing sigext on integer type you specified"),
     llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 llvm::cl::list<size_t> disableZEXT(
     LLVM_ARGS_PREFIX "disable-zeroext",
+    llvm::cl::value_desc("list of integer width"),
     llvm::cl::desc("option list -- This option would disable adding or "
-                   "removing sigext on integer type you specified"),
+                   "removing zext on integer type you specified"),
     llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
 llvm::cl::list<size_t> disableEXT(
     LLVM_ARGS_PREFIX "disable-ext",
+    llvm::cl::value_desc("list of integer width"),
     llvm::cl::desc("option list -- This option would disable all ext "
                    "instructions on integer type you specified"),
     llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
