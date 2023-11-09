@@ -16,12 +16,12 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Support/CommandLine.h"
 #include <functional>
 #include <list>
 #include <memory>
@@ -121,7 +121,7 @@ class FunctionMutator {
   // moveToNextInst and restoreBackup
 
   llvm::SmallVector<llvm::Value *> extraValues;
-  llvm::DenseSet<llvm::Instruction* > invalidValues;
+  llvm::DenseSet<llvm::Instruction *> invalidValues;
   llvm::SmallVector<std::string> tmpFuncs;
   const llvm::StringSet<> &filterSet;
   const llvm::SmallVector<llvm::Value *> &globals;
@@ -151,7 +151,7 @@ class FunctionMutator {
   void fixAllValues(llvm::SmallVector<llvm::Value *> &vals);
 
   llvm::Value *getRandomConstant(llvm::Type *ty);
-  llvm::Value *getRandomArgument(llvm::Type* ty);
+  llvm::Value *getRandomArgument(llvm::Type *ty);
   llvm::Value *getRandomDominatedInstruction(llvm::Type *ty);
   llvm::Value *getRandomValueFromExtraValue(llvm::Type *ty);
   llvm::Value *getRandomPointerValue(llvm::Type *ty);
@@ -228,7 +228,7 @@ public:
   ModuleMutator(bool debug = false) : Mutator(debug){};
   ModuleMutator(std::shared_ptr<llvm::Module> pm_,
                 const llvm::StringSet<> &invalidFunctions, bool debug = false,
-                bool onEveryFunction = false, bool randomMutate=false)
+                bool onEveryFunction = false, bool randomMutate = false)
       : Mutator(debug), invalidFunctions(invalidFunctions), tmpCopy(nullptr),
         onEveryFunction(onEveryFunction), randomMutate(randomMutate),
         curFunction(0) {

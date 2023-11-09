@@ -5,7 +5,7 @@ void ShuffleHelper::init() {
   llvm::Function *func = mutator->currentFunction;
   shuffleBlockInFunction.init(func->size());
   for (auto bbIt = func->begin(); bbIt != func->end(); ++bbIt) {
-    shuffleBlockInFunction[&*bbIt]=ShuffleUnitInBasicBlock();
+    shuffleBlockInFunction[&*bbIt] = ShuffleUnitInBasicBlock();
     ShuffleUnitInBasicBlock &bSBlock = shuffleBlockInFunction[&*bbIt];
     ShuffleUnit tmp;
     std::unordered_set<llvm::Value *> us;
@@ -52,8 +52,7 @@ void ShuffleHelper::init() {
 }
 
 bool ShuffleHelper::shouldMutate() {
-  return shuffleBlockInFunction[&*mutator->bit].size() >
-         shuffleUnitIndex;
+  return shuffleBlockInFunction[&*mutator->bit].size() > shuffleUnitIndex;
 }
 
 void ShuffleHelper::shuffleCurrentBlock() {
@@ -85,13 +84,15 @@ void ShuffleHelper::shuffleCurrentBlock() {
    * and then insert those dom-ed insts.
    */
   if (findInSV) {
-    for(size_t i=0;i<sv.size();++i){
-      mutator->invalidValues.insert((llvm::Instruction*)&*mutator->vMap[sv[i]]);
+    for (size_t i = 0; i < sv.size(); ++i) {
+      mutator->invalidValues.insert(
+          (llvm::Instruction *)&*mutator->vMap[sv[i]]);
     }
     for (size_t i = 0; i < sv.size() && sv[i]->getIterator() != mutator->iit;
          ++i) {
-      llvm::Instruction* mappedVal=(llvm::Instruction*)&*mutator->vMap[sv[i]];
-      if(mutator->invalidValues.contains(mappedVal)){
+      llvm::Instruction *mappedVal =
+          (llvm::Instruction *)&*mutator->vMap[sv[i]];
+      if (mutator->invalidValues.contains(mappedVal)) {
         mutator->invalidValues.erase(mappedVal);
       }
       mutator->extraValues.push_back(mappedVal);
@@ -112,7 +113,8 @@ void ShuffleHelper::shuffleCurrentBlock() {
 void ShuffleHelper::debug() {
   llvm::errs() << "\nInstructions shuffled\n";
   mutator->bitInTmp->print(llvm::errs());
-  for(auto it=mutator->invalidValues.begin();it!=mutator->invalidValues.end();++it){
+  for (auto it = mutator->invalidValues.begin();
+       it != mutator->invalidValues.end(); ++it) {
     (*it)->dump();
   }
   llvm::errs() << "\n";
@@ -144,13 +146,14 @@ void MutateInstructionHelper::debug() {
 void MutateInstructionHelper::mutate() {
   // do extra handling for br insts
   if (llvm::isa<llvm::BranchInst>(mutator->iitInTmp)) {
-    //empty for now
+    // empty for now
   }
   // 75% chances to add a new inst, 25% chances to replace with a existent usage
   else if ((Random::getRandomUnsigned() & 3) != 0) {
-    //indices in GEP point to its member variabls, shouldn't be random changed.
-    bool isGEPInst=llvm::isa<llvm::GetElementPtrInst>(*mutator->iitInTmp),res=false;
-    if(!isGEPInst){
+    // indices in GEP point to its member variabls, shouldn't be random changed.
+    bool isGEPInst = llvm::isa<llvm::GetElementPtrInst>(*mutator->iitInTmp),
+         res = false;
+    if (!isGEPInst) {
       res = insertRandomBinaryInstruction(&*(mutator->iitInTmp));
     }
     if (!res) {
@@ -201,7 +204,7 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
 void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
   bool found = false;
   size_t pos = Random::getRandomUnsigned() % inst->getNumOperands();
-  bool isGEP=llvm::isa<llvm::GetElementPtrInst>(inst);
+  bool isGEP = llvm::isa<llvm::GetElementPtrInst>(inst);
   // make sure at least one
   for (size_t i = 0; !found && i < mutator->iitInTmp->getNumOperands();
        i++, pos++) {
@@ -209,7 +212,8 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
       pos = 0;
     }
     if (canMutate(mutator->iitInTmp->getOperand(pos))) {
-      if(isGEP && llvm::isa<llvm::Constant>(mutator->iitInTmp->getOperand(pos))){
+      if (isGEP &&
+          llvm::isa<llvm::Constant>(mutator->iitInTmp->getOperand(pos))) {
         continue;
       }
       found = true;
@@ -235,21 +239,21 @@ void MutateInstructionHelper::replaceRandomUsage(llvm::Instruction *inst) {
 }
 
 bool MutateInstructionHelper::canMutate(llvm::Instruction *inst) {
-  //skip those call base with inlning asm.
-  if(llvm::isa<llvm::CallBase>(inst)){
-    llvm::CallBase * callBase=(llvm::CallBase *)inst;
-    //don't update on call with kcfi, they are required to be constants.
-    if(callBase->getOperandBundle("kcfi").has_value()){
+  // skip those call base with inlning asm.
+  if (llvm::isa<llvm::CallBase>(inst)) {
+    llvm::CallBase *callBase = (llvm::CallBase *)inst;
+    // don't update on call with kcfi, they are required to be constants.
+    if (callBase->getOperandBundle("kcfi").has_value()) {
       return false;
     }
-    if(callBase->isInlineAsm()){
+    if (callBase->isInlineAsm()) {
       return false;
     }
   }
 
-  if(llvm::isa<llvm::GetElementPtrInst>(inst)){
-    for(auto it=inst->op_begin();it!=inst->op_end();++it){
-      if(!canMutate(it->get())&&!llvm::isa<llvm::Constant>(it->get())){
+  if (llvm::isa<llvm::GetElementPtrInst>(inst)) {
+    for (auto it = inst->op_begin(); it != inst->op_end(); ++it) {
+      if (!canMutate(it->get()) && !llvm::isa<llvm::Constant>(it->get())) {
         return true;
       }
     }
@@ -389,9 +393,9 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   // newPos should be in [pos+2, endPos]
   // Because we use moveBefore, moving pos before pos + 1 makes no change
   newPos = Random::getRandomInt() % (endPos - pos - 1) + 2 + pos;
-  //llvm::errs()<<"AAAAAAAAAAAAAA\n";
-  //llvm::errs()<<pos<<" "<<newPos<<" "<<endPos<<"\n";
-  // need fix all insts used current inst in [pos,newPos]
+  // llvm::errs()<<"AAAAAAAAAAAAAA\n";
+  // llvm::errs()<<pos<<" "<<newPos<<" "<<endPos<<"\n";
+  //  need fix all insts used current inst in [pos,newPos]
   llvm::Instruction *newPosInst = inst;
   llvm::BasicBlock::iterator newPosIt = newPosInst->getIterator();
   //[0] keeps pointing to inst, [1] keeps pointing to iterator inst.
@@ -415,7 +419,7 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
     newPosIt = newPosInst->getIterator();
     mutator->extraValues.push_back(newPosInst);
   }
-  //move before newPos
+  // move before newPos
   ++newPosIt;
   newPosInst = &*newPosIt;
   inst = (llvm::Instruction *)extraVals[0];
@@ -610,9 +614,11 @@ void FunctionAttributeHelper::mutate() {
       setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
       setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
       if (disableZEXT.find(bitWidth) != disableZEXT.end()) {
-        setFuncRetAttr(llvm::Attribute::AttrKind::SExt, Random::getRandomBool());
+        setFuncRetAttr(llvm::Attribute::AttrKind::SExt,
+                       Random::getRandomBool());
       } else if (disableSEXT.find(bitWidth) != disableSEXT.end()) {
-        setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, Random::getRandomBool());
+        setFuncRetAttr(llvm::Attribute::AttrKind::ZExt,
+                       Random::getRandomBool());
       } else {
         setFuncRetAttr(Random::getRandomBool()
                            ? llvm::Attribute::AttrKind::ZExt
@@ -655,7 +661,6 @@ void FunctionAttributeHelper::mutate() {
 
 void FunctionAttributeHelper::debug() {
   llvm::errs() << "FunctionAttributeHelper: Function attributes updated\n";
-
 }
 
 void GEPHelper::mutate() {
@@ -791,7 +796,7 @@ void BinaryInstructionHelper::debug() {
 
 bool ResizeIntegerHelper::isValidNode(llvm::Value *val) {
   if (llvm::isa<llvm::BinaryOperator>(val)) {
-    llvm::Type* ty=val->getType();
+    llvm::Type *ty = val->getType();
     return ty->isIntOrIntVectorTy();
   }
   return false;
@@ -812,23 +817,22 @@ bool ResizeIntegerHelper::shouldMutate() {
 
 // 1, 8, 16, 32, 64 50%
 // 1....64 50%
-llvm::Type *
-ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context, llvm::Type* intTy) {
+llvm::Type *ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context,
+                                                 llvm::Type *intTy) {
   static llvm::SmallVector<size_t> defaultWidth{1, 8, 16, 32, 64};
   assert(intTy->isIntOrIntVectorTy() && "ty should be an int or int vector ty");
-  llvm::Type* result=nullptr;
+  llvm::Type *result = nullptr;
   if (Random::getRandomBool()) {
     result = llvm::IntegerType::get(
         context,
         defaultWidth[Random::getRandomUnsigned() % defaultWidth.size()]);
   } else {
-    result = llvm::IntegerType::get(context,
-                                  1 + Random::getRandomUnsigned() % 64);
+    result =
+        llvm::IntegerType::get(context, 1 + Random::getRandomUnsigned() % 64);
   }
 
-  
-  if(intTy->isVectorTy()) {
-    llvm::VectorType* vecTy=(llvm::VectorType*)intTy;    
+  if (intTy->isVectorTy()) {
+    llvm::VectorType *vecTy = (llvm::VectorType *)intTy;
     result = llvm::VectorType::get(result, vecTy->getElementCount());
   }
   return result;
@@ -943,8 +947,7 @@ void ResizeIntegerHelper::resizeOperand(llvm::Instruction *inst, size_t index,
 void ResizeIntegerHelper::mutate() {
   llvm::Instruction *inst = &*mutator->iitInTmp;
   std::vector<llvm::Instruction *> useChain = constructUseChain(inst);
-  llvm::Type *oldIntTy = inst->getType(),
-                    *newIntTy = oldIntTy;
+  llvm::Type *oldIntTy = inst->getType(), *newIntTy = oldIntTy;
   do {
     newIntTy = getNewIntegerTy(inst->getContext(), oldIntTy);
   } while (newIntTy == oldIntTy);

@@ -46,7 +46,8 @@ public:
 class ShuffleHelper : public MutationHelper {
   using ShuffleUnit = llvm::SmallVector<llvm::Instruction *>;
   using ShuffleUnitInBasicBlock = llvm::SmallVector<ShuffleUnit>;
-  using ShuffleBlockInFunction = llvm::DenseMap<llvm::BasicBlock*, ShuffleUnitInBasicBlock>;
+  using ShuffleBlockInFunction =
+      llvm::DenseMap<llvm::BasicBlock *, ShuffleUnitInBasicBlock>;
 
   ShuffleBlockInFunction shuffleBlockInFunction;
   size_t shuffleUnitIndex;
@@ -312,13 +313,13 @@ class ResizeIntegerHelper : public MutationHelper {
   static bool isValidNode(llvm::Value *val);
   std::vector<llvm::Instruction *>
   constructUseChain(llvm::Instruction *startPoint);
-  static llvm::Type *getNewIntegerTy(llvm::LLVMContext &context, llvm::Type* intTy);
+  static llvm::Type *getNewIntegerTy(llvm::LLVMContext &context,
+                                     llvm::Type *intTy);
   llvm::Instruction *updateNode(llvm::Instruction *val,
                                 llvm::ArrayRef<llvm::Value *> args);
   void updateChain(std::vector<llvm::Instruction *> &chain,
                    llvm::Type *newIntTy);
-  void resizeOperand(llvm::Instruction *inst, size_t index,
-                     llvm::Type *newTy);
+  void resizeOperand(llvm::Instruction *inst, size_t index, llvm::Type *newTy);
 
 public:
   ResizeIntegerHelper(std::shared_ptr<FunctionMutator> mutator)
