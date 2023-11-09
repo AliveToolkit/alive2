@@ -72,8 +72,7 @@ void ShuffleHelper::shuffleCurrentBlock() {
     }
   }
   while (sv == sblock) {
-    std::random_shuffle(sv.begin(), sv.end(),
-                        [](int i) { return Random::getRandomUnsigned() % i; });
+    std::shuffle(sv.begin(), sv.end(), Random::getRNG());
   }
 
   /**

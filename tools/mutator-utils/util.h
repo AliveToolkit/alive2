@@ -45,6 +45,11 @@ public:
   static int getRandomInt() {
     return dist(mt);
   }
+
+  static std::mt19937& getRNG() {
+    return mt;
+  }
+
   static void addUsedInt(unsigned i) {
     usedInts.push_back(i);
   }
