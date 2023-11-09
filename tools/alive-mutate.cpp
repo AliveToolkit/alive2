@@ -106,6 +106,15 @@ llvm::cl::opt<bool>
                                 "save all mutants to output folder"),
                  llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
+llvm::cl::opt<bool> verifyInputModule(
+    LLVM_ARGS_PREFIX "verifyInputModule",
+    llvm::cl::value_desc("a flag to verify input module"),
+    llvm::cl::desc(
+        "Perform an initial check on all functions in the input "
+        "module by Alive2. Functions failed in the check will be skipped in "
+        "the next fuzzing stage"),
+    llvm::cl::cat(mutatorArgs), llvm::cl::init(true));
+
 llvm::cl::opt<bool>
     verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
             llvm::cl::desc("turn on verbose mode, the detail of mutations and "
@@ -229,7 +238,7 @@ see alive-mutate --help for more options,
   auto uni_M1 = openInputFile(Context, inputFile);
   std::shared_ptr M1 = std::move(uni_M1);
   if (!M1.get()) {
-    cerr << "Could not read input file from '" << inputFile << "'\n";
+    llvm::errs() << "Could not read input file from '" << inputFile << "'\n";
     return -1;
   }
 
@@ -252,20 +261,24 @@ see alive-mutate --help for more options,
   }
 
   if (numCopy < 0 && timeElapsed < 0) {
-    cerr << "Please specify either number of copies or running time!\n";
+    llvm::errs() << "Please specify either number of copies or running time!\n";
     return -1;
   } else if (!isValidOutputPath()) {
-    cerr << "Output folder does not exist!\n";
+    llvm::errs() << "Output folder does not exist!\n";
     return -1;
   }
 
   if (verifyInput(M1)) {
-    cerr << "All functions cannot pass input check!\n";
+    llvm::errs() << "All functions cannot pass input check!\n";
     return -1;
   }
 
   if (invalidFunctions.size() > 0) {
-    cerr << "Some functions can't pass input check, those would be skipped\n";
+    llvm::errs()
+        << "Some functions can't pass input check, those would be skipped. "
+           "They might are only function declarations, "
+        << (verifyInputModule ? "can't pass alive2 initial checks, " : "")
+        << " or stores a function pointer inside";
   }
 
   llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
@@ -340,28 +353,39 @@ bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
     }
   }
 
-  unique_ptr<llvm::Module> M2 = CloneModule(*M1);
-  llvm_util::optimize_module(M2.get(), optPass);
-
   auto &DL = M1.get()->getDataLayout();
   llvm_util::initializer llvm_util_init(logStream, DL);
-  llvm::Triple targetTriple(M1.get()->getTargetTriple());
-  initVerifier(targetTriple);
 
-  for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
-    if (!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
-      llvm::Function *f2 = M2->getFunction(fit->getName());
-      verifier->compareFunctions(*fit, *f2);
-      // FIX ME: need update
-      logStream.str("");
-      // equals to 0 means not correct
-      if (verifier->num_correct == 0) {
-        invalidFunctions.insert(fit->getName());
-        verifier->num_correct = 0;
+  if (verifyInputModule) {
+    unique_ptr<llvm::Module> M2 = CloneModule(*M1);
+    llvm_util::optimize_module(M2.get(), optPass);
+
+    llvm::Triple targetTriple(M1.get()->getTargetTriple());
+    initVerifier(targetTriple);
+
+    size_t incorrect_count = 0;
+    for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
+      if (!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
+        llvm::Function *f2 = M2->getFunction(fit->getName());
+        verifier->compareFunctions(*fit, *f2);
+        // FIX ME: need update
+        logStream.str("");
+        // equals to 0 means not correct
+        if (verifier->num_correct == 0) {
+          invalidFunctions.insert(fit->getName());
+          if (incorrect_count <= 10) {
+            llvm::errs() << "Function " << fit->getName()
+                         << " failed in alive2 initial checks. It will be "
+                            "skipped in the fuzzing stage";
+            ++incorrect_count;
+          }
+          verifier->num_correct = 0;
+        }
       }
     }
+
+    destroyVerifier();
   }
-  destroyVerifier();
   return invalidFunctions.size() == M1->size();
 }
 
