@@ -374,6 +374,12 @@ bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
     for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
       if (!fit->isDeclaration() || invalidFunctions.contains(fit->getName())) {
         llvm::Function *f2 = M2->getFunction(fit->getName());
+        if (f2 == nullptr || f2->isDeclaration()) {
+          llvm::errs() << "Function: " << fit->getName()
+                       << " can't be found in the optimized module\n";
+          invalidFunctions.insert(fit->getName());
+          continue;
+        }
         verifier->compareFunctions(*fit, *f2);
         // FIX ME: need update
         logStream.str("");
