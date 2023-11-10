@@ -21,6 +21,7 @@ SKIP_TV=0
 
 NEW_ARGS=$@
 VERBOSE=0
+NO_TIMEOUT=0
 for arg in $NEW_ARGS; do
   for p in $SKIP_TV_PASSES; do
     if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
@@ -40,7 +41,14 @@ for arg in $NEW_ARGS; do
     VERBOSE=1
     echo VERBOSE
     NEW_ARGS="${NEW_ARGS/--verbose/}"
-    break
+    continue
+  fi
+  
+  if [[ $arg == "--no-timeout" ]]; then
+    NO_TIMEOUT=1
+    echo NO_TIMEOUT
+    NEW_ARGS="${NEW_ARGS/--no-timeout/}"
+   continue
   fi
   
 done
@@ -52,7 +60,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 else
   # Linux, Cygwin/Msys, or Win32?
   TV_SHAREDLIB=tv.so
-  if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
+  if [[ @FOR_ALIVE2_TEST@ == 0 && $NO_TIMEOUT == 0 ]]; then
     TIMEOUT="timeout 4000"
   fi
 fi
