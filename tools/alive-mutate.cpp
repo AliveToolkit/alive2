@@ -58,13 +58,20 @@ llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
                                    llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<long long> randomSeed(
-    LLVM_ARGS_PREFIX "s",
-    llvm::cl::value_desc("specify the seed of the random number generator"),
+    LLVM_ARGS_PREFIX "seed",
+    llvm::cl::value_desc("the seed of the random number generator"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc(
-        "specify the seed of the random number generator. It will "
-        "set the seed of master RNG if masterRNG argument is specified"),
+    llvm::cl::desc("specify the seed of the random number generator. It will "
+                   "use this seed to generate a bunch of seeds and every "
+                   "generated seed is used for one mutant"),
     llvm::cl::init(-1));
+
+llvm::cl::opt<long long>
+    individualSeed(LLVM_ARGS_PREFIX "individual-seed",
+                   llvm::cl::value_desc("an individual seed of a mutant"),
+                   llvm::cl::cat(mutatorArgs),
+                   llvm::cl::desc("Specify an individual seed of a mutant"),
+                   llvm::cl::init(-1));
 
 llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
                            llvm::cl::value_desc("number of mutants"),
@@ -83,15 +90,6 @@ llvm::cl::opt<bool> removeUndef(
     llvm::cl::desc("This mode is turned off by default. It removes all undef "
                    "in all functions in the input module"),
     llvm::cl::cat(mutatorArgs));
-
-llvm::cl::opt<bool>
-    masterRNG(LLVM_ARGS_PREFIX "masterRNG",
-              llvm::cl::value_desc("turn on master RNG mode"),
-              llvm::cl::desc("Turn on master RNG mode. This mode is turned off "
-                             "by default Alive-mutate will use a master "
-                             "RNG to generate a list of random seeds and use"
-                             " one seed for every mutant"),
-              llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> randomMutate(
     LLVM_ARGS_PREFIX "randomMutate",
@@ -187,7 +185,6 @@ llvm::cl::list<size_t> disableEXT(
                    "instructions on integer type you specified"),
     llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
 
-std::vector<unsigned> RNGseeds;
 unique_ptr<Cache> cache;
 std::stringstream logStream;
 // To eliminate extra verifier construction;
@@ -270,15 +267,11 @@ see alive-mutate --help for more options,
     outputFolder += '/';
 
   if (randomSeed >= 0) {
-    Random::setSeed((unsigned)randomSeed);
-    if (masterRNG) {
-      assert(numCopy > 0 &&
-             "master RNG setting should only be allowed under copy mode!\n");
-      RNGseeds.resize(numCopy);
-      for (int i = 0; i < numCopy; ++i) {
-        RNGseeds[i] = Random::getRandomUnsigned();
-      }
-    }
+    Random::setMasterSeed((unsigned)randomSeed);
+  }
+  if (randomSeed == -1 && individualSeed >= 0) {
+    Random::setSeed((unsigned)individualSeed);
+    numCopy=1;
   }
 
   if (maxError != -1) {
@@ -306,7 +299,14 @@ see alive-mutate --help for more options,
         << " or stores a function pointer inside\n";
   }
 
-  llvm::outs() << "Current random seed: " << Random::getSeed() << "\n";
+  if (randomSeed == -1 && individualSeed >=0) {
+    llvm::outs() << "Current individual random seed: " << Random::getSeed()
+                 << "\n";
+  } else {
+    llvm::outs() << "Current random seed: " << Random::getMasterSeed() << "\n";
+  }
+  llvm::outs().flush();
+
   int totalMutants = 0;
   if (numCopy > 0) {
     totalMutants = copyMode(M1);
@@ -427,15 +427,15 @@ int copyMode(std::shared_ptr<llvm::Module> &pm) {
       pm, invalidFunctions, verbose, onEveryFunction, randomMutate);
   if (bool init = mutator->init(); init) {
     // Eliminate the influence of verifyInput
-    if (!masterRNG && randomSeed >= 0) {
-      Random::setSeed((unsigned)randomSeed);
+    if (randomSeed == -1 && individualSeed >= 0) {
+      Random::setSeed((unsigned)individualSeed);
     }
     for (int i = 0; i < numCopy; ++i) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
       }
-      if (masterRNG) {
-        Random::setSeed(RNGseeds[i]);
+      if (randomSeed != -1) {
+        Random::setSeed(Random::getRandomUnsignedFromMaster());
       }
       runOnce(i, *mutator);
     }
@@ -459,7 +459,13 @@ int timeMode(std::shared_ptr<llvm::Module> &pm) {
   }
   std::chrono::duration<double> sum = std::chrono::duration<double>::zero();
   int cnt = 1;
+  if (randomSeed == -1 && individualSeed >= 0) {
+    Random::setSeed((unsigned)individualSeed);
+  }
   while (sum.count() < timeElapsed) {
+    if (randomSeed != -1) {
+      Random::setSeed(Random::getRandomUnsignedFromMaster());
+    }
     auto t_start = std::chrono::high_resolution_clock::now();
     runOnce(cnt, *mutator);
 
