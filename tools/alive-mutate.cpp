@@ -502,8 +502,9 @@ void runOnce(int ith, Mutator &mutator) {
       std::unique_ptr<llvm::Module> M2 = llvm::CloneModule(*M1);
       llvm_util::optimize_module(M2.get(), optPass);
       llvm::Function *pf2 = M2->getFunction(pf1->getName());
-      assert(pf2 != nullptr && "pf2 clone failed");
-      verifier->compareFunctions(*pf1, *pf2);
+      if (pf2 != nullptr) {
+        verifier->compareFunctions(*pf1, *pf2);
+      }
       if (verifier->num_correct == 0) {
         shouldLog = true;
       }
