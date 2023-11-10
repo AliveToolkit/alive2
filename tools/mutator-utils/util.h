@@ -28,7 +28,9 @@ using std::string;
 class Random {
   static std::random_device rd;
   static unsigned seed;
+  static unsigned masterSeed;
   static std::mt19937 mt;
+  static std::mt19937 masterMt;
   static std::uniform_int_distribution<int> dist;
   static llvm::SmallVector<unsigned> usedInts;
   static llvm::SmallVector<double> usedDoubles;
@@ -46,7 +48,7 @@ public:
     return dist(mt);
   }
 
-  static std::mt19937& getRNG() {
+  static std::mt19937 &getRNG() {
     return mt;
   }
 
@@ -58,6 +60,9 @@ public:
   static unsigned getRandomUnsigned() {
     return abs(dist(mt));
   }
+  static unsigned getRandomUnsignedFromMaster() {
+    return abs(dist(masterMt));
+  }
   static unsigned getRandomUnsigned(unsigned bits) {
     return abs(dist(mt)) % (1u << bits);
   }
@@ -67,10 +72,21 @@ public:
   static unsigned getSeed() {
     return seed;
   }
+
+  static unsigned getMasterSeed() {
+    return masterSeed;
+  }
+
   static void setSeed(unsigned seed_) {
     seed = seed_;
     mt = std::mt19937(seed);
   }
+
+  static void setMasterSeed(unsigned masterSeed_) {
+    masterSeed = masterSeed_;
+    masterMt = std::mt19937(masterSeed);
+  }
+
   static unsigned getRandomLLVMInt(llvm::IntegerType *ty);
   static double getRandomLLVMDouble();
   static float getRandomLLVMFloat();

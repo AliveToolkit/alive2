@@ -271,7 +271,7 @@ see alive-mutate --help for more options,
   }
   if (randomSeed == -1 && individualSeed >= 0) {
     Random::setSeed((unsigned)individualSeed);
-    numCopy=1;
+    numCopy = 1;
   }
 
   if (maxError != -1) {
@@ -299,7 +299,7 @@ see alive-mutate --help for more options,
         << " or stores a function pointer inside\n";
   }
 
-  if (randomSeed == -1 && individualSeed >=0) {
+  if (randomSeed == -1 && individualSeed >= 0) {
     llvm::outs() << "Current individual random seed: " << Random::getSeed()
                  << "\n";
   } else {

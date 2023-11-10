@@ -2,7 +2,9 @@
 
 std::random_device Random::rd;
 std::uniform_int_distribution<int> Random::dist(0, 2147483647u);
+unsigned Random::masterSeed(rd());
 unsigned Random::seed(rd());
+std::mt19937 Random::masterMt(Random::masterSeed);
 std::mt19937 Random::mt(Random::seed);
 
 llvm::SmallVector<unsigned> Random::usedInts;
