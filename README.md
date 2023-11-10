@@ -318,8 +318,7 @@ this is guaranteed to contain an unsoundness report.  Many log files, however,
 contain only “Source: \<stdin\>” rather than a file path; the names of these
 files begin with “in_”.
 * Do a verbose run of Lit for just that file, with the `opt`  option
-`--print-after-all` appended, e.g. (as of Alive2 commit 43c51831 and LLVM
-b2417f51dbbd):
+`--print-after-all` appended, e.g.:
 ```
 $LLVM2_BUILD/bin/llvm-lit -vva "-Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh --print-after-all" $LLVM2_HOME/llvm/test/Transforms/InstCombine/insert-const-shuf.ll
 ```
