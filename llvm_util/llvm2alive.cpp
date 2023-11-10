@@ -328,7 +328,7 @@ public:
 					       { llvm::Type::getInt1Ty(ctx) },
 					       false);
       if (fn->getFunctionType() == assertTy)
-	return make_unique<Assume>(*args[0], Assume::WellDefined);
+	return make_unique<Assume>(*args[0], Assume::AndNonPoison);
     }
 
     parse_fn_attrs(i, attrs, true);
