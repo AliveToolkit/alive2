@@ -80,29 +80,32 @@ llvm::cl::opt<int> timeElapsed(
 llvm::cl::opt<bool> removeUndef(
     LLVM_ARGS_PREFIX "removeUndef",
     llvm::cl::value_desc("a flag for turning on removeUndef"),
-    llvm::cl::desc("remove all undef in all functions in the input module"),
+    llvm::cl::desc("This mode is turned off by default. It removes all undef "
+                   "in all functions in the input module"),
     llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<bool> masterRNG(
-    LLVM_ARGS_PREFIX "masterRNG",
-    llvm::cl::value_desc("turn on master RNG mode"),
-    llvm::cl::desc("Turn on master RNG mode. Alive-mutate will use a master "
-                   "RNG to generate a list of random seeds and use"
-                   " one seed for every mutant"),
-    llvm::cl::cat(mutatorArgs));
+llvm::cl::opt<bool>
+    masterRNG(LLVM_ARGS_PREFIX "masterRNG",
+              llvm::cl::value_desc("turn on master RNG mode"),
+              llvm::cl::desc("Turn on master RNG mode. This mode is turned off "
+                             "by default Alive-mutate will use a master "
+                             "RNG to generate a list of random seeds and use"
+                             " one seed for every mutant"),
+              llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> randomMutate(
     LLVM_ARGS_PREFIX "randomMutate",
     llvm::cl::value_desc("turn on randomMutate mode"),
-    llvm::cl::desc(
-        "Random mutate mode will randomly mutate an instruction in the"
-        " function instead of linearly"),
+    llvm::cl::desc("This mode is turned off by default. Random mutate mode "
+                   "will randomly mutate an instruction in the"
+                   " function instead of linearly"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool>
     disableAlive(LLVM_ARGS_PREFIX "disableAlive",
                  llvm::cl::value_desc("a flag to disable alive2 verifications"),
-                 llvm::cl::desc("don't verify mutants by alive2 and "
+                 llvm::cl::desc("THis mode is turned off by default. Don't "
+                                "verify mutants by alive2 and "
                                 "save all mutants to output folder"),
                  llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
@@ -110,29 +113,31 @@ llvm::cl::opt<bool> verifyInputModule(
     LLVM_ARGS_PREFIX "verifyInputModule",
     llvm::cl::value_desc("a flag to verify input module"),
     llvm::cl::desc(
-        "Perform an initial check on all functions in the input "
+        "This mode is turned on by default. Perform an initial check on all "
+        "functions in the input "
         "module by Alive2. Functions failed in the check will be skipped in "
         "the next fuzzing stage"),
     llvm::cl::cat(mutatorArgs), llvm::cl::init(true));
 
 llvm::cl::opt<bool>
     verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
-            llvm::cl::desc("turn on verbose mode, the detail of mutations and "
+            llvm::cl::desc("This mode is turned off by default. After turning "
+                           "on verbose mode, the detail of mutations and "
                            "module will be printed"),
             llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<bool>
-    saveAll(LLVM_ARGS_PREFIX "saveAll",
-            llvm::cl::value_desc("save all mutants"),
-            llvm::cl::desc(
-                "save all mutants including correct ones before alive2 checks"),
-            llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
+llvm::cl::opt<bool> saveAll(
+    LLVM_ARGS_PREFIX "saveAll", llvm::cl::value_desc("save all mutants"),
+    llvm::cl::desc("This mode is turned off by default. It saves all mutants "
+                   "including correct ones before alive2 checks"),
+    llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
                          "in the module would be mutated"),
-    llvm::cl::desc("Alive-mutate will perform mutations on every function in "
+    llvm::cl::desc("This mode is turned off by default. Alive-mutate will "
+                   "perform mutations on every function in "
                    "the module when generating one mutant, otherwise only one "
                    "function will be mutated in one mutant"),
     llvm::cl::cat(mutatorArgs));
@@ -151,6 +156,14 @@ llvm::cl::opt<int> copyFunctions(
     llvm::cl::desc(
         "duplicate every function in the module with specified number."),
     llvm::cl::init(0));
+
+llvm::cl::opt<int> maxError(
+    LLVM_ARGS_PREFIX "maxError",
+    llvm::cl::value_desc("the number of max error allowed"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("Specify the max error allowed in running mutators. It "
+                   "automatically exits after the error number reached."),
+    llvm::cl::init(-1));
 } // namespace
 
 llvm::cl::list<size_t> disableSEXT(
@@ -181,6 +194,7 @@ std::stringstream logStream;
 std::optional<llvm::TargetLibraryInfoWrapperPass> TLI;
 std::optional<smt::smt_initializer> smt_init;
 std::optional<Verifier> verifier;
+int maxErrorAllowed = -1;
 
 void initVerifier(llvm::Triple targetTriple) {
   TLI.emplace(targetTriple);
@@ -265,6 +279,10 @@ see alive-mutate --help for more options,
         RNGseeds[i] = Random::getRandomUnsigned();
       }
     }
+  }
+
+  if (maxError != -1) {
+    maxErrorAllowed = maxError;
   }
 
   if (numCopy < 0 && timeElapsed < 0) {
@@ -502,5 +520,12 @@ void runOnce(int ith, Mutator &mutator) {
     logFile << "Source file:" << M1->getSourceFileName() << "\n";
     logFile << logStream.rdbuf();
     logStream.str("");
+    if (verifier->num_errors != 0) {
+      if (maxErrorAllowed == 0) {
+        llvm::errs() << "Max number of errors reached. Program ends.\n";
+        exit(1);
+      }
+      --maxErrorAllowed;
+    }
   }
 }
