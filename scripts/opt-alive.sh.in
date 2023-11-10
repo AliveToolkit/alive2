@@ -19,7 +19,9 @@ FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atom
 NPM_TV=1
 SKIP_TV=0
 
-for arg in $@; do
+NEW_ARGS=$@
+VERBOSE=0
+for arg in $NEW_ARGS; do
   for p in $SKIP_TV_PASSES; do
     if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
       SKIP_TV=1
@@ -33,6 +35,14 @@ for arg in $@; do
       break
     fi
   done
+  
+  if [[ $arg == "--verbose" ]]; then
+    VERBOSE=1
+    echo VERBOSE
+    NEW_ARGS="${NEW_ARGS/--verbose/}"
+    break
+  fi
+  
 done
 
 TIMEOUT=""
@@ -66,4 +76,11 @@ if [[ $SKIP_TV == 0 && $NPM_TV == 1 ]]; then
   NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
 fi
 
-$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $@ $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS
+COMMAND="$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $NEW_ARGS $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS"
+
+if [[ $VERBOSE == 1 ]]; then
+  echo COMMAND: $COMMAND
+  echo
+fi
+
+$COMMAND
