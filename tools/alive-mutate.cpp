@@ -59,36 +59,40 @@ llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
 
 llvm::cl::opt<long long> randomSeed(
     LLVM_ARGS_PREFIX "seed",
-    llvm::cl::value_desc("the seed of the random number generator"),
+    llvm::cl::value_desc("overall-seed"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc("specify the seed of the random number generator. It will "
-                   "use this seed to generate a bunch of seeds and every "
-                   "generated seed is used for one mutant"),
+    llvm::cl::desc("The overall PRNG seed; it is used to compute an "
+	        "individual seed for each mutant, which is part of "
+		      "the output. Use this seed to repeat an entire run "
+		      "of alive-mutate and -individual-seed to regenerate "
+		      "a specific mutant (default=random)."),
     llvm::cl::init(-1));
 
 llvm::cl::opt<long long>
     individualSeed(LLVM_ARGS_PREFIX "individual-seed",
-                   llvm::cl::value_desc("an individual seed of a mutant"),
+                   llvm::cl::value_desc("individual seed"),
                    llvm::cl::cat(mutatorArgs),
-                   llvm::cl::desc("Specify an individual seed of a mutant"),
+                   llvm::cl::desc("Use this option, along with a specific mutant's "
+				         "seed, to regenerate a specific mutant. Be careful "
+				         "that all other command line arguments are the same "
+				         "as those that were used originally."),
                    llvm::cl::init(-1));
 
 llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
                            llvm::cl::value_desc("number of mutants"),
-                           llvm::cl::desc("specify the number of mutants"),
+                           llvm::cl::desc("Number of mutants to generate, before exiting "),
                            llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
 
 llvm::cl::opt<int> timeElapsed(
     LLVM_ARGS_PREFIX "t", llvm::cl::value_desc("seconds"),
     llvm::cl::cat(mutatorArgs),
-    llvm::cl::desc("specify how long the mutator should run in seconds"),
+    llvm::cl::desc("Number of seconds alive-mutate will run, before exiting"),
     llvm::cl::init(-1));
 
 llvm::cl::opt<bool> removeUndef(
     LLVM_ARGS_PREFIX "removeUndef",
-    llvm::cl::value_desc("a flag for turning on removeUndef"),
-    llvm::cl::desc("This mode is turned off by default. It removes all undef "
-                   "in all functions in the input module"),
+    llvm::cl::value_desc("remove undef"),
+    llvm::cl::desc("Suppress undef values in mutants (default=false)"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> randomMutate(
