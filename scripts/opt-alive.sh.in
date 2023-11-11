@@ -13,7 +13,7 @@ set -e
 SKIP_TV_PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization =tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner globals-aa debug-pass-manager"
 
 # see opt.cpp: shouldForceLegacyPM()
-FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem structurizecfg fix-irreducible"
+FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem expand-large-fp-convert structurizecfg fix-irreducible"
 
 # opt enables NPM by default.
 NPM_TV=1
