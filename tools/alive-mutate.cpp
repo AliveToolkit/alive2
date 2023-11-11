@@ -58,30 +58,28 @@ llvm::cl::opt<string> outputFolder(llvm::cl::Positional,
                                    llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<long long> randomSeed(
-    LLVM_ARGS_PREFIX "seed",
-    llvm::cl::value_desc("overall-seed"),
+    LLVM_ARGS_PREFIX "seed", llvm::cl::value_desc("overall-seed"),
     llvm::cl::cat(mutatorArgs),
     llvm::cl::desc("The overall PRNG seed; it is used to compute an "
-	        "individual seed for each mutant, which is part of "
-		      "the output. Use this seed to repeat an entire run "
-		      "of alive-mutate and -individual-seed to regenerate "
-		      "a specific mutant (default=random)."),
+                   "individual seed for each mutant, which is part of "
+                   "the output. Use this seed to repeat an entire run "
+                   "of alive-mutate and -individual-seed to regenerate "
+                   "a specific mutant (default=random)."),
     llvm::cl::init(-1));
 
-llvm::cl::opt<long long>
-    individualSeed(LLVM_ARGS_PREFIX "individual-seed",
-                   llvm::cl::value_desc("individual seed"),
-                   llvm::cl::cat(mutatorArgs),
-                   llvm::cl::desc("Use this option, along with a specific mutant's "
-				         "seed, to regenerate a specific mutant. Be careful "
-				         "that all other command line arguments are the same "
-				         "as those that were used originally."),
-                   llvm::cl::init(-1));
+llvm::cl::opt<long long> individualSeed(
+    LLVM_ARGS_PREFIX "individual-seed", llvm::cl::value_desc("individual seed"),
+    llvm::cl::cat(mutatorArgs),
+    llvm::cl::desc("Use this option, along with a specific mutant's "
+                   "seed, to regenerate a specific mutant. Be careful "
+                   "that all other command line arguments are the same "
+                   "as those that were used originally."),
+    llvm::cl::init(-1));
 
-llvm::cl::opt<int> numCopy(LLVM_ARGS_PREFIX "n",
-                           llvm::cl::value_desc("number of mutants"),
-                           llvm::cl::desc("Number of mutants to generate, before exiting "),
-                           llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
+llvm::cl::opt<int>
+    numCopy(LLVM_ARGS_PREFIX "n", llvm::cl::value_desc("number of mutants"),
+            llvm::cl::desc("Number of mutants to generate, before exiting "),
+            llvm::cl::cat(mutatorArgs), llvm::cl::init(-1));
 
 llvm::cl::opt<int> timeElapsed(
     LLVM_ARGS_PREFIX "t", llvm::cl::value_desc("seconds"),
@@ -90,8 +88,7 @@ llvm::cl::opt<int> timeElapsed(
     llvm::cl::init(-1));
 
 llvm::cl::opt<bool> removeUndef(
-    LLVM_ARGS_PREFIX "removeUndef",
-    llvm::cl::value_desc("remove undef"),
+    LLVM_ARGS_PREFIX "removeUndef", llvm::cl::value_desc("remove undef"),
     llvm::cl::desc("Suppress undef values in mutants (default=false)"),
     llvm::cl::cat(mutatorArgs));
 
@@ -114,28 +111,29 @@ llvm::cl::opt<bool> verifyInputModule(
     llvm::cl::value_desc("verify the input module"),
     llvm::cl::desc(
         "As a preprocessing step, ensure that each un-mutated function "
-	"in the input module can be verified by Alive2. Functions that "
-	"cannot be verified will not be mutated later (default=true)"),
+        "in the input module can be verified by Alive2. Functions that "
+        "cannot be verified will not be mutated later (default=true)"),
     llvm::cl::cat(mutatorArgs), llvm::cl::init(true));
 
 llvm::cl::opt<bool>
     verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
             llvm::cl::desc("Print details about mutations that are "
-	      "being performed (default=false)"),
+                           "being performed (default=false)"),
             llvm::cl::cat(mutatorArgs));
 
-llvm::cl::opt<bool> saveAll(
-    LLVM_ARGS_PREFIX "saveAll", llvm::cl::value_desc("save all mutants"),
-    llvm::cl::desc("Save mutatnts to disk (default=false)"),
-    llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
+llvm::cl::opt<bool>
+    saveAll(LLVM_ARGS_PREFIX "saveAll",
+            llvm::cl::value_desc("save all mutants"),
+            llvm::cl::desc("Save mutatnts to disk (default=false)"),
+            llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
                          "in the module would be mutated"),
     llvm::cl::desc("When mutating a module, mutate every function in it, "
-		   "instead of mutating just one function per iteration "
-		   "(default=false)"),
+                   "instead of mutating just one function per iteration "
+                   "(default=false)"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<string> optPass(
