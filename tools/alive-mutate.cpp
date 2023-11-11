@@ -105,43 +105,37 @@ llvm::cl::opt<bool> randomMutate(
 
 llvm::cl::opt<bool>
     disableAlive(LLVM_ARGS_PREFIX "disableAlive",
-                 llvm::cl::value_desc("a flag to disable alive2 verifications"),
-                 llvm::cl::desc("THis mode is turned off by default. Don't "
-                                "verify mutants by alive2 and "
-                                "save all mutants to output folder"),
+                 llvm::cl::value_desc("disable Alive"),
+                 llvm::cl::desc("Disable Alive2 verification (default=false)"),
                  llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
 llvm::cl::opt<bool> verifyInputModule(
     LLVM_ARGS_PREFIX "verifyInputModule",
-    llvm::cl::value_desc("a flag to verify input module"),
+    llvm::cl::value_desc("verify the input module"),
     llvm::cl::desc(
-        "This mode is turned on by default. Perform an initial check on all "
-        "functions in the input "
-        "module by Alive2. Functions failed in the check will be skipped in "
-        "the next fuzzing stage"),
+        "As a preprocessing step, ensure that each un-mutated function "
+	"in the input module can be verified by Alive2. Functions that "
+	"cannot be verified will not be mutated later (default=true)"),
     llvm::cl::cat(mutatorArgs), llvm::cl::init(true));
 
 llvm::cl::opt<bool>
     verbose(LLVM_ARGS_PREFIX "v", llvm::cl::value_desc("verbose mode"),
-            llvm::cl::desc("This mode is turned off by default. After turning "
-                           "on verbose mode, the detail of mutations and "
-                           "module will be printed"),
+            llvm::cl::desc("Print details about mutations that are "
+	      "being performed (default=false)"),
             llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<bool> saveAll(
     LLVM_ARGS_PREFIX "saveAll", llvm::cl::value_desc("save all mutants"),
-    llvm::cl::desc("This mode is turned off by default. It saves all mutants "
-                   "including correct ones before alive2 checks"),
+    llvm::cl::desc("Save mutatnts to disk (default=false)"),
     llvm::cl::cat(mutatorArgs), llvm::cl::init(false));
 
 llvm::cl::opt<bool> onEveryFunction(
     LLVM_ARGS_PREFIX "onEveryFunction",
     llvm::cl::value_desc("instead of mutating a single function, all function "
                          "in the module would be mutated"),
-    llvm::cl::desc("This mode is turned off by default. Alive-mutate will "
-                   "perform mutations on every function in "
-                   "the module when generating one mutant, otherwise only one "
-                   "function will be mutated in one mutant"),
+    llvm::cl::desc("When mutating a module, mutate every function in it, "
+		   "instead of mutating just one function per iteration "
+		   "(default=false)"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<string> optPass(
