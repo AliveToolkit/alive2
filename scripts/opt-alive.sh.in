@@ -19,10 +19,10 @@ FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atom
 NPM_TV=1
 SKIP_TV=0
 
-NEW_ARGS=$@
+OPT_ARGS=$@
 VERBOSE=0
 NO_TIMEOUT=0
-for arg in $NEW_ARGS; do
+for arg in $OPT_ARGS; do
   for p in $SKIP_TV_PASSES; do
     if [[ $arg == *"$p"* || $arg == "-tbaa" ]]; then
       SKIP_TV=1
@@ -40,14 +40,14 @@ for arg in $NEW_ARGS; do
   if [[ $arg == "--verbose" ]]; then
     VERBOSE=1
     echo VERBOSE
-    NEW_ARGS="${NEW_ARGS/--verbose/}"
+    OPT_ARGS="${OPT_ARGS/--verbose/}"
     continue
   fi
   
   if [[ $arg == "--no-timeout" ]]; then
     NO_TIMEOUT=1
     echo NO_TIMEOUT
-    NEW_ARGS="${NEW_ARGS/--no-timeout/}"
+    OPT_ARGS="${OPT_ARGS/--no-timeout/}"
    continue
   fi
   
@@ -84,7 +84,7 @@ if [[ $SKIP_TV == 0 && $NPM_TV == 1 ]]; then
   NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
 fi
 
-COMMAND="$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $NEW_ARGS $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS"
+COMMAND="$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $OPT_ARGS $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS"
 
 if [[ $VERBOSE == 1 ]]; then
   echo COMMAND: $COMMAND
