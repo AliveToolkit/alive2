@@ -44,6 +44,8 @@ extern unsigned max_offset_bits;
 // size and size of pointers (not to be confused with program pointer size).
 extern unsigned max_sizet_bits;
 
+extern bool refine_tgt;
+
 std::ostream &dbg();
 void set_debug(std::ostream &os);
 

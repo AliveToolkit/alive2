@@ -185,4 +185,9 @@ llvm::cl::opt<bool> opt_disallow_ub_exploitation(
   llvm::cl::desc("Disallow UB exploitation by optimizations (default=allow)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> opt_refine_tgt(
+  LLVM_ARGS_PREFIX "refine-tgt",
+  llvm::cl::desc("Allow poison generating flags inference for target"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 }

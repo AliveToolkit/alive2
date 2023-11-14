@@ -927,6 +927,7 @@ reduced using llvm-reduce.
   verifier.always_verify = opt_always_verify;
   verifier.print_dot = opt_print_dot;
   verifier.bidirectional = opt_bidirectional;
+  verifier.refine_tgt = opt_refine_tgt;
 
   function<unique_ptr<Fuzzer>(Module &, long)> makeFuzzer;
   if (opt_fuzzer == "value") {
