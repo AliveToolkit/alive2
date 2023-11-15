@@ -46,7 +46,6 @@ for arg in $OPT_ARGS; do
   
   if [[ $arg == "--no-timeout" ]]; then
     NO_TIMEOUT=1
-    echo NO_TIMEOUT
     OPT_ARGS="${OPT_ARGS/--no-timeout/}"
    continue
   fi
