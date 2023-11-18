@@ -540,6 +540,21 @@ bool expr::isLoad(expr &array, expr &idx) const {
   return isBinOp(array, idx, Z3_OP_SELECT);
 }
 
+bool expr::isLambda(expr &body) const {
+  C();
+  if (Z3_is_lambda(ctx(), ast())) {
+    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
+    body = Z3_get_quantifier_body(ctx(), ast());
+    return true;
+  }
+  return false;
+}
+expr expr::lambdaIdxType() const {
+  C();
+  assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
+  return ::mkVar("sort", Z3_get_quantifier_bound_sort(ctx(), ast(), 0));
+}
+
 bool expr::isFPAdd(expr &rounding, expr &lhs, expr &rhs) const {
   return isTernaryOp(rounding, lhs, rhs, Z3_OP_FPA_ADD);
 }
@@ -1998,11 +2013,8 @@ expr expr::load(const expr &idx) const {
 
   } else if (isConstArray(val)) {
     return val;
-
-  } else if (Z3_is_lambda(ctx(), ast())) {
-    assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
-    expr body = Z3_get_quantifier_body(ctx(), ast());
-    return body.subst({ idx }).foldTopLevel();
+  } else if (isLambda(val)) {
+    return val.subst({ idx }).foldTopLevel();
   }
 
   return Z3_mk_select(ctx(), ast(), idx());

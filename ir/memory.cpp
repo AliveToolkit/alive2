@@ -2371,6 +2371,40 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
     os << "\t" name ": " << v;  \
   } while(0)
 
+void Memory::print_array(ostream &os, const expr &a, unsigned indent) const {
+  expr idx, val, a2, cond, then, els;
+  if (a.isConstArray(val)) {
+    os << "else: " << Byte(*this, std::move(val)) << '\n';
+  }
+  else if (a.isStore(a2, idx, val)) {
+    os << idx << ": " << Byte(*this, std::move(val)) << '\n';
+    print_array(os, a2);
+  }
+  else if (a.isLambda(val)) {
+    print_array(os, val.subst({expr::mkVar("idx", a.lambdaIdxType())}));
+  }
+  else if (a.isBV() && a.isConst() && a.bits() == Byte::bitsByte()) {
+    os << Byte(*this, expr(a)) << '\n';
+  }
+  else if (a.isIf(cond, then, els)) {
+    auto print_spaces = [&](unsigned limit) {
+      for (unsigned i = 0; i < limit; ++i) {
+        os << "  ";
+      }
+    };
+    os << "if " << cond << '\n';
+    print_spaces(indent + 1);
+    print_array(os, then, indent + 1);
+    print_spaces(indent);
+    os << "else\n";
+    print_spaces(indent + 1);
+    print_array(os, els, indent + 1);
+  }
+  else {
+    os << a << '\n';
+  }
+}
+
 void Memory::print(ostream &os, const Model &m) const {
   if (memory_unused())
     return;
@@ -2390,6 +2424,12 @@ void Memory::print(ostream &os, const Model &m) const {
       if (!local && is_constglb(bid))
         os << "\tconst";
       os << '\n';
+
+      if (!local && bid < numNonlocals()) {
+        os << "Contents:\n";
+        print_array(os, m[mk_block_val_array(bid)].simplify());
+        os << '\n';
+      }
     }
   };
 

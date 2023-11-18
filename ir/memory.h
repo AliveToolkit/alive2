@@ -355,6 +355,10 @@ public:
   friend std::ostream& operator<<(std::ostream &os, const Memory &m);
 
   friend class Pointer;
+
+private:
+  void print_array(std::ostream &os, const smt::expr &a,
+                   unsigned indent = 0) const;
 };
 
 }
