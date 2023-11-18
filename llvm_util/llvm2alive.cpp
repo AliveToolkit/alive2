@@ -12,6 +12,7 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ModRef.h"

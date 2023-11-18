@@ -362,6 +362,12 @@ Clang versions and vendors.
 * Building older source on an up-to-date machine may require adjustments.  For
 example, the now-deleted file `scripts/rewritepass.py` depended on the
 deprecated Python 2; update the shebang line to `python3`.
+* The `opt` wrapper script `build/opt-alive.sh` accepts a `--verbose` option,
+which outputs the command passed to `opt`.  Note that this may interfere 
+with tests which check output.
+* The script also accepts a `--no-timeout` option, which disables the `opt`
+process timeout.  This timeout is not supported on Macintosh.  To change the
+SMT timeout, instead adjust the `query_timeout` constant in `smt/smt.cpp`.
 
 LLVM Bugs Found by Alive2
 --------
