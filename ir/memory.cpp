@@ -2101,7 +2101,9 @@ expr Memory::int2ptr(const expr &val0) const {
             }
           }
         } else {
-          bid = fn.getFnArg(0);
+          // non-local block
+          assert(fn.fn_name() == "blk_addr");
+          bid = Pointer::mkLongBid(fn.getFnArg(0), false);
         }
         assert(bid.isValid());
         Pointer base(*this, bid, expr::mkUInt(0, bits_for_offset));
