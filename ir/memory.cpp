@@ -283,7 +283,7 @@ expr Byte::nonptrValue() const {
 
 expr Byte::isPoison() const {
   if (!does_int_mem_access)
-    return !ptrNonpoison();
+    return  does_ptr_mem_access ? !ptrNonpoison() : true;
 
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
@@ -2426,8 +2426,15 @@ void Memory::print(ostream &os, const Model &m) const {
       os << '\n';
 
       if (!local && bid < numNonlocals()) {
+        expr array = m[mk_block_val_array(bid)].simplify();
+        // don't bother with all-poison blocks
+        expr val;
+        if (array.isConstArray(val) &&
+            Byte(*this, std::move(val)).isPoison().isTrue())
+          continue;
+
         os << "Contents:\n";
-        print_array(os, m[mk_block_val_array(bid)].simplify());
+        print_array(os, array);
         os << '\n';
       }
     }
