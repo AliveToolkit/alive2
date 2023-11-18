@@ -102,7 +102,7 @@ string value_name(const llvm::Value &v) {
   if (!v.getName().empty())
     return name = '%' + v.getName().str();
   return name = v.getType()->isVoidTy() ? "<void>"
-                                        : '%' + to_string(value_id_counter++);
+                                        : "%#" + to_string(value_id_counter++);
 }
 
 Type& get_int_type(unsigned bits) {
