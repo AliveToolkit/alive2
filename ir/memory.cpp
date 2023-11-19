@@ -2057,7 +2057,9 @@ Pointer Memory::searchPointer(const expr &val0) const {
       Pointer p(*this, i, local);
       Pointer p_end = p + p.blockSize();
       ret.add((p + (val - p.getAddress())).release(),
-              val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
+              !local && i == 0 && has_null_block
+                ? val == 0
+                : val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
     }
   };
   add(numLocals(), true);
