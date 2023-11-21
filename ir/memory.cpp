@@ -1294,9 +1294,12 @@ void Memory::markByVal(unsigned bid, bool is_const) {
   byval_blks.emplace_back(bid, is_const);
 }
 
-expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
+expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
   unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
+
+  auto attrs = attrs0;
+  attrs.set(ParamAttrs::IsArg);
   Pointer p(*this, name, false, false, false, attrs);
   auto bid = p.getShortBid();
 
@@ -1314,8 +1317,8 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs) {
   return std::move(p).release();
 }
 
-pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
-  bool nonnull = attrs.has(ParamAttrs::NonNull);
+pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs0) const {
+  bool nonnull = attrs0.has(ParamAttrs::NonNull);
   unsigned log_offset = ilog2_ceil(bits_for_offset, false);
   unsigned bits_undef = bits_for_offset + nonnull * log_offset;
   expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));
@@ -1329,6 +1332,8 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs) const {
                           one << var.zextOrTrunc(bits_for_offset));
     offset = undef.extract(bits_undef - 1, log_offset) | shl;
   }
+  auto attrs = attrs0;
+  attrs.set(ParamAttrs::IsArg);
   return
     { Pointer(*this, expr::mkUInt(0, bits_for_bid), offset, attrs).release(),
       std::move(undef) };

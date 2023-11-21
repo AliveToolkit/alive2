@@ -121,6 +121,7 @@ public:
   smt::expr isNocapture(bool simplify = true) const;
   smt::expr isNoRead() const;
   smt::expr isNoWrite() const;
+  smt::expr isBasedOnArg() const;
 
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,

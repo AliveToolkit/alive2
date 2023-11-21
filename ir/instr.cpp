@@ -2227,18 +2227,6 @@ static void eq_bids(OrExpr &acc, Memory &m, const Type &t,
   }
 }
 
-static expr ptr_only_args(State &s, const Pointer &p) {
-  expr bid = p.getBid();
-  auto &m  = s.getMemory();
-
-  OrExpr e;
-  for (auto &in : s.getFn().getInputs()) {
-    if (hasPtr(in.getType()))
-      eq_bids(e, m, in.getType(), s[in], bid);
-  }
-  return e();
-}
-
 static void check_can_load(State &s, const expr &p0) {
   auto &attrs = s.getFn().getFnAttrs();
   if (attrs.mem.canReadAnything())
@@ -2251,10 +2239,10 @@ static void check_can_load(State &s, const expr &p0) {
   expr nonreadable = false;
 
   (attrs.mem.canRead(MemoryAccess::Globals) ? readable : nonreadable)
-    |= p.isWritableGlobal();
+    |= p.isWritableGlobal() && !p.isBasedOnArg();
 
   (attrs.mem.canRead(MemoryAccess::Args) ? readable : nonreadable)
-    |= ptr_only_args(s, p);
+    |= p.isBasedOnArg();
 
   s.addUB(std::move(readable));
   s.addUB(!nonreadable);
@@ -2273,10 +2261,10 @@ static void check_can_store(State &s, const expr &p0) {
   expr nonwritable = false;
 
   (attrs.mem.canWrite(MemoryAccess::Globals) ? writable : nonwritable)
-    |= p.isWritableGlobal();
+    |= p.isWritableGlobal() && !p.isBasedOnArg();
 
   (attrs.mem.canWrite(MemoryAccess::Args) ? writable : nonwritable)
-    |= ptr_only_args(s, p);
+    |= p.isBasedOnArg();
 
   s.addUB(std::move(writable));
   s.addUB(!nonwritable);

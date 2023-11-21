@@ -161,6 +161,10 @@ bool MemoryAccess::canOnlyWrite(AccessType ty) const {
   return canWrite(ty);
 }
 
+bool MemoryAccess::canAccessAnything() const {
+  return canReadAnything() && canWriteAnything();
+}
+
 bool MemoryAccess::canReadAnything() const {
   for (unsigned i = 0; i < NumTypes; ++i) {
     if (!canRead(AccessType(i)))

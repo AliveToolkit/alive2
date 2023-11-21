@@ -955,6 +955,7 @@ static void calculateAndInitConstants(Transform &t) {
   observes_addresses  = false;
   bool does_any_byte_access = false;
   has_indirect_fncalls = false;
+  has_ptr_arg = false;
 
   set<string> inaccessiblememonly_fns;
   num_inaccessiblememonly_fns = 0;
@@ -986,6 +987,8 @@ static void calculateAndInitConstants(Transform &t) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (!i)
         continue;
+
+      has_ptr_arg |= hasPtr(i->getType());
 
       update_min_vect_sz(i->getType());
 
@@ -1151,7 +1154,9 @@ static void calculateAndInitConstants(Transform &t) {
   has_nocapture = has_attr(ParamAttrs::NoCapture);
   has_noread = has_attr(ParamAttrs::NoRead);
   has_nowrite = has_attr(ParamAttrs::NoWrite);
-  bits_for_ptrattrs = has_nocapture + has_noread + has_nowrite;
+  has_ptr_arg &= !t.src.getFnAttrs().mem.canAccessAnything() ||
+                 !t.tgt.getFnAttrs().mem.canAccessAnything();
+  bits_for_ptrattrs = has_nocapture + has_noread + has_nowrite + has_ptr_arg;
 
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals), false))
@@ -1231,6 +1236,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\ndoes_mem_access: " << does_mem_access
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
+                  << "\nhas_ptr_arg: " << has_ptr_arg
                   << '\n';
 }
 

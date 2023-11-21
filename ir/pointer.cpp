@@ -45,6 +45,7 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
   bits |= to_bit(has_nocapture, ParamAttrs::NoCapture);
   bits |= to_bit(has_noread, ParamAttrs::NoRead);
   bits |= to_bit(has_nowrite, ParamAttrs::NoWrite);
+  bits |= to_bit(has_ptr_arg, ParamAttrs::IsArg);
   return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
@@ -621,17 +622,23 @@ expr Pointer::isNocapture(bool simplify) const {
   return p.extract(0, 0) == 1;
 }
 
+#define GET_ATTR(attr, idx)          \
+  if (!attr)                         \
+    return false;                    \
+  unsigned idx_ = idx;               \
+  return p.extract(idx_, idx_) == 1;
+
 expr Pointer::isNoRead() const {
-  if (!has_noread)
-    return false;
-  return p.extract(has_nocapture, has_nocapture) == 1;
+  GET_ATTR(has_noread, (unsigned)has_nocapture);
 }
 
 expr Pointer::isNoWrite() const {
-  if (!has_nowrite)
-    return false;
-  unsigned idx = (unsigned)has_nocapture + (unsigned)has_noread;
-  return p.extract(idx, idx) == 1;
+  GET_ATTR(has_nowrite, (unsigned)has_nocapture + (unsigned)has_noread);
+}
+
+expr Pointer::isBasedOnArg() const {
+  GET_ATTR(has_ptr_arg, (unsigned)has_nocapture + (unsigned)has_noread +
+                        (unsigned)has_nowrite);
 }
 
 Pointer Pointer::mkNullPointer(const Memory &m) {

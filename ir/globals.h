@@ -71,6 +71,7 @@ extern bool has_write_fncall;
 extern bool has_nocapture;
 extern bool has_noread;
 extern bool has_nowrite;
+extern bool has_ptr_arg;
 
 /// Whether there null pointers appear in the program
 extern bool has_null_pointer;
