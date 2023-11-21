@@ -1099,7 +1099,8 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
 
   // Users may request the initial memory to be non-poisonous
-  if (config::disable_poison_input && state->isSource() &&
+  if (((config::disable_poison_input && state->isSource()) ||
+       state->getFn().has(FnAttrs::Asm)) &&
       (does_int_mem_access || does_ptr_mem_access)) {
     for (auto &block : non_local_block_val) {
       if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
