@@ -228,6 +228,8 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   auto undef_mask = getUndefVar(ty, child);
   if (config::disable_undef_input || attrs.poisonImpliesUB()) {
     s.addUB(undef_mask == 0);
+  } else if (s.getFn().has(FnAttrs::Asm)) {
+    // do nothing; there's no undef in assembly
   } else {
     auto [undef, var] = ty.mkUndefInput(s, attrs);
     if (undef_mask.bits() == 1)
@@ -243,6 +245,9 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   expr np = expr::mkBoolVar(("np_" + getSMTName(child)).c_str());
   if (never_poison) {
     s.addUB(std::move(np));
+    np = true;
+  } else if (s.getFn().has(FnAttrs::Asm)) {
+    // There's no poison in assembly
     np = true;
   }
 
