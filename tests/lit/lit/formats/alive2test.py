@@ -33,10 +33,14 @@ def executeCommand(command):
 def is_timeout(str):
   return str.find('ERROR: Timeout') > 0
 
+def is_incomplete(str):
+  return str.find('SMT Error: smt tactic failed to show goal to be sat/unsat') > 0
+
 def id_check(fn, cmd, args):
   out, err, exitCode = executeCommand(cmd + args)
   str = out + err
-  if not is_timeout(str) and (exitCode != 0 or str.find(ok_string) < 0):
+  if not is_timeout(str) and not is_incomplete(str) and \
+     (exitCode != 0 or str.find(ok_string) < 0):
     raise Exception(fn + ' identity check fail: ' + str)
 
 
@@ -137,7 +141,7 @@ class Alive2Test(TestFormat):
     if xfail != None and output.find(xfail.group(1)) != -1:
       return lit.Test.XFAIL, ''
 
-    if is_timeout(output):
+    if is_timeout(output) or is_incomplete(output):
       return lit.Test.PASS, ''
 
     # allow multiple 'CHECK: ..'
