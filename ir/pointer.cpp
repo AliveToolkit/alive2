@@ -539,7 +539,9 @@ expr Pointer::refined(const Pointer &other) const {
 
   return expr::mkIf(isNull(), other.isNull(),
                     expr::mkIf(isLocal(), std::move(local), nonlocal) &&
-                      isBlockAlive().implies(other_deref.isBlockAlive()));
+                      // FIXME: this should be disabled just for phy pointers
+                      (is_asm ? expr(true)
+                        : isBlockAlive().implies(other_deref.isBlockAlive())));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
