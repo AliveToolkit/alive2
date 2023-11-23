@@ -146,7 +146,6 @@ llvm::cl::opt<string> optPass(
 llvm::cl::opt<int> copyFunctions(
     LLVM_ARGS_PREFIX "duplicate",
     llvm::cl::value_desc("the number of functions duplicated"),
-    llvm::cl::cat(mutatorArgs),
     llvm::cl::desc(
         "duplicate every function in the module with specified number."),
     llvm::cl::init(0));
@@ -179,7 +178,7 @@ llvm::cl::list<size_t> disableEXT(
     llvm::cl::value_desc("list of integer width"),
     llvm::cl::desc("option list -- This option would disable all ext "
                    "instructions on integer type you specified"),
-    llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+    llvm::cl::CommaSeparated);
 
 unique_ptr<Cache> cache;
 std::stringstream logStream;
@@ -430,7 +429,7 @@ int copyMode(std::shared_ptr<llvm::Module> &pm) {
       if (verbose) {
         std::cout << "Running " << i << "th copies." << std::endl;
       }
-      if (randomSeed != -1) {
+      if (individualSeed == -1) {
         Random::setSeed(Random::getRandomUnsignedFromMaster());
       }
       runOnce(i, *mutator);
@@ -459,7 +458,7 @@ int timeMode(std::shared_ptr<llvm::Module> &pm) {
     Random::setSeed((unsigned)individualSeed);
   }
   while (sum.count() < timeElapsed) {
-    if (randomSeed != -1) {
+    if (individualSeed == -1) {
       Random::setSeed(Random::getRandomUnsignedFromMaster());
     }
     auto t_start = std::chrono::high_resolution_clock::now();
