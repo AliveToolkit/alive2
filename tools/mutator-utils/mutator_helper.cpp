@@ -172,7 +172,8 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
   for (size_t i = 0; i < inst->getNumOperands(); ++i, ++pos) {
     if (pos == inst->getNumOperands())
       pos = 0;
-    if (inst->getOperand(pos)->getType()->isIntegerTy()) {
+    if (inst->getOperand(pos)->getType()->isIntegerTy() ||
+        inst->getOperand(pos)->getType()->isFloatingPointTy()) {
       ty = inst->getOperand(pos)->getType();
       break;
     }
