@@ -42,7 +42,7 @@ float Random::getExtremeFloat() {
 }
 
 double Random::getRandomDouble() {
-  return 0;
+  return (double)getRandomUnsigned();
 }
 
 float Random::getRandomFloat() {
