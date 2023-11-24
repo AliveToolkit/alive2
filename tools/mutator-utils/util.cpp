@@ -318,7 +318,7 @@ mutator_util::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
          "should be a floating point to get a float instruction!");
   return Random::getRandomBool()
              ? getRandomFloatBinaryInstruction(val1, val2, insertBefore)
-             : getRandomFloatInstrinsic(val1, val2, insertBefore);
+             : getRandomFloatIntrinsic(val1, val2, insertBefore);
 }
 
 llvm::Instruction *mutator_util::getRandomIntegerBinaryInstruction(
@@ -367,7 +367,7 @@ mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
 }
 
 llvm::Instruction *
-mutator_util::getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
+mutator_util::getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
                                        llvm::Instruction *insertBefore) {
   std::vector<llvm::Type *> tys{val1->getType()};
   llvm::Module *M = insertBefore->getModule();

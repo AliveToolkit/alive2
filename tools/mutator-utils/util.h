@@ -307,7 +307,7 @@ public:
   getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
                             llvm::Instruction *insertBefore);
   static llvm::Instruction *
-  getRandomFloatInstrinsic(llvm::Value *val1, llvm::Value *val2,
+  getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
                            llvm::Instruction *insertBefore);
 
   template <typename EleTy, typename T>
