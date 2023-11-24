@@ -838,7 +838,30 @@ llvm::Type *ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context,
   return result;
 }
 
-std::vector<llvm::Instruction *>
+llvm::Type *ResizeIntegerHelper::getNewFPTy(llvm::LLVMContext &context,
+                                                 llvm::Type *FPTy) {
+  assert(FPTy->isHalfTy() || FPTy->isBFloatTy()
+         || FPTy->isFloatTy() || FPTy->isDoubleTy());
+  static llvm::SmallVector<llvm::Type*> FPTypes;
+  if(FPTypes.size()!=4){
+    FPTypes={llvm::Type::getHalfTy(context), llvm::Type::getBFloatTy(context),
+    llvm::Type::getFloatTy(context), llvm::Type::getDoubleTy(context)};
+  }
+
+  auto it=FPTypes.begin();
+  for(size_t i=Random::getRandomUnsigned()%FPTypes.size();i!=0;--i,++it);
+  for(size_t i=0;i<FPTypes.size();++i,++it){
+    if(it==FPTypes.end()){
+      it=FPTypes.begin();
+    }
+    if(*it!=FPTy){
+      return *it;
+    }
+  }
+  return nullptr;
+}
+
+    std::vector<llvm::Instruction *>
 ResizeIntegerHelper::constructUseChain(llvm::Instruction *startPoint) {
   std::vector<llvm::Instruction *> res;
   llvm::Instruction *cur = startPoint;

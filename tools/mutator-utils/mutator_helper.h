@@ -315,6 +315,8 @@ class ResizeIntegerHelper : public MutationHelper {
   constructUseChain(llvm::Instruction *startPoint);
   static llvm::Type *getNewIntegerTy(llvm::LLVMContext &context,
                                      llvm::Type *intTy);
+  static llvm::Type* getNewFPTy(llvm::LLVMContext& context,
+                                llvm::Type* FPty);
   llvm::Instruction *updateNode(llvm::Instruction *val,
                                 llvm::ArrayRef<llvm::Value *> args);
   void updateChain(std::vector<llvm::Instruction *> &chain,
