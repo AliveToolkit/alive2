@@ -172,8 +172,8 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
   for (size_t i = 0; i < inst->getNumOperands(); ++i, ++pos) {
     if (pos == inst->getNumOperands())
       pos = 0;
-    if (inst->getOperand(pos)->getType()->isIntegerTy() ||
-        inst->getOperand(pos)->getType()->isFloatingPointTy()) {
+    if (inst->getOperand(pos)->getType()->isIntOrIntVectorTy() ||
+        inst->getOperand(pos)->getType()->isFPOrFPVectorTy()) {
       ty = inst->getOperand(pos)->getType();
       break;
     }
@@ -183,11 +183,11 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
     return false;
   }
 
-  if (!ty->isFloatingPointTy() && !ty->isIntegerTy()) {
+  if (!ty->isIntOrIntVectorTy() && !ty->isFPOrFPVectorTy()) {
     return false;
   }
 
-  bool isFloat = ty->isFloatingPointTy();
+  bool isFloat = ty->isFPOrFPVectorTy();
 
   llvm::Value *val1 = mutator->getRandomValue(ty),
               *val2 = mutator->getRandomValue(ty);
