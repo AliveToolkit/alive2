@@ -300,9 +300,9 @@ const std::vector<llvm::Intrinsic::ID> mutator_util::floatUnaryIntrinsic{
 llvm::Instruction *
 mutator_util::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
                                           llvm::Instruction *insertBefore) {
-  assert(val1->getType()->isIntegerTy() &&
+  assert(val1->getType()->isIntOrIntVectorTy() &&
          "should be an integer to get an int instruction!");
-  assert(val2->getType()->isIntegerTy() &&
+  assert(val2->getType()->isIntOrIntVectorTy() &&
          "should be an integer to get an int instruction!");
   return Random::getRandomBool()
              ? getRandomIntegerBinaryInstruction(val1, val2, insertBefore)
@@ -312,9 +312,9 @@ mutator_util::getRandomIntegerInstruction(llvm::Value *val1, llvm::Value *val2,
 llvm::Instruction *
 mutator_util::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
                                         llvm::Instruction *insertBefore) {
-  assert(val1->getType()->isFloatingPointTy() &&
+  assert(val1->getType()->isFPOrFPVectorTy() &&
          "should be a floating point to get a float instruction!");
-  assert(val2->getType()->isFloatingPointTy() &&
+  assert(val2->getType()->isFPOrFPVectorTy() &&
          "should be a floating point to get a float instruction!");
   return Random::getRandomBool()
              ? getRandomFloatBinaryInstruction(val1, val2, insertBefore)
@@ -323,9 +323,9 @@ mutator_util::getRandomFloatInstruction(llvm::Value *val1, llvm::Value *val2,
 
 llvm::Instruction *mutator_util::getRandomIntegerBinaryInstruction(
     llvm::Value *val1, llvm::Value *val2, llvm::Instruction *insertBefore) {
-  assert(val1->getType()->isIntegerTy() &&
+  assert(val1->getType()->isIntOrIntVectorTy() &&
          "should be an integer to get an int instruction!");
-  assert(val2->getType()->isIntegerTy() &&
+  assert(val2->getType()->isIntOrIntVectorTy() &&
          "should be an integer to get an int instruction!");
   llvm::Instruction::BinaryOps Op =
       integerBinaryOps[Random::getRandomUnsigned() % integerBinaryOps.size()];
@@ -334,9 +334,9 @@ llvm::Instruction *mutator_util::getRandomIntegerBinaryInstruction(
 
 llvm::Instruction *mutator_util::getRandomFloatBinaryInstruction(
     llvm::Value *val1, llvm::Value *val2, llvm::Instruction *insertBefore) {
-  assert(val1->getType()->isFloatingPointTy() &&
+  assert(val1->getType()->isFPOrFPVectorTy() &&
          "should be a floating point to get a float instruction!");
-  assert(val2->getType()->isFloatingPointTy() &&
+  assert(val2->getType()->isFPOrFPVectorTy() &&
          "should be a floating point to get a float instruction!");
   llvm::Instruction::BinaryOps Op =
       floatBinaryOps[Random::getRandomUnsigned() % floatBinaryOps.size()];
