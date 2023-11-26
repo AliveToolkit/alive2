@@ -297,6 +297,13 @@ expr Byte::isZero() const {
   return expr::mkIf(isPtr(), ptr().isNull(), nonptrValue() == 0);
 }
 
+expr Byte::forceCastToInt() const {
+  auto offset = ptrByteoffset().zextOrTrunc(bits_ptr_address);
+       offset = offset * expr::mkUInt(bits_byte, offset);
+  auto addr   = ptr().getAddress().lshr(offset);
+  return expr::mkIf(isPtr(), addr.trunc(bits_byte), nonptrValue());
+}
+
 expr Byte::refined(const Byte &other) const {
   if (eq(other))
     return true;
@@ -361,7 +368,7 @@ ostream& operator<<(ostream &os, const Byte &byte) {
   if (byte.isPtr().isTrue()) {
     if (byte.ptrNonpoison().isTrue()) {
       os << byte.ptr() << ", byte offset=";
-      byte.ptrByteoffset().printSigned(os);
+      byte.ptrByteoffset().printUnsigned(os);
     } else {
       os << "poison";
     }
@@ -530,6 +537,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
+    bool is_asm = m.getState().getFn().getFnAttrs().has(FnAttrs::Asm);
 
     StateValue val;
     bool first = true;
@@ -537,25 +545,13 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
 
     for (auto &b: bytes) {
       expr isptr = ub_pre(!b.isPtr());
-      StateValue v(b.nonptrValue(),
-                   ibyteTy.combine_poison(isptr, b.nonptrNonpoison()));
+      StateValue v(is_asm ? b.forceCastToInt() : b.nonptrValue(),
+                   is_asm ? !b.isPoison()
+                          : ibyteTy.combine_poison(isptr, b.nonptrNonpoison()));
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-    val = toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
-
-    // allow ptr->int type punning in Assembly mode
-    if (bitsize == bits_program_pointer &&
-        has_null_block && // a ptr load in src sets this to true
-        does_ptr_mem_access &&
-        m.getState().getFn().getFnAttrs().has(FnAttrs::Asm)) {
-      StateValue ptr_val = bytesToValue(m, bytes, PtrType(0));
-      ptr_val.value = Pointer(m, ptr_val.value).getAddress();
-      expr is_ptr = bytes[0].isPtr();
-      val = StateValue::mkIf(is_ptr, ptr_val.subst(is_ptr, true),
-                             val.subst(is_ptr, false)).simplify();
-    }
-    return val;
+    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
   }
 }
 

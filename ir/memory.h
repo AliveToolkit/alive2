@@ -64,6 +64,7 @@ public:
   smt::expr nonptrValue() const;
   smt::expr isPoison() const;
   smt::expr isZero() const; // zero or null
+  smt::expr forceCastToInt() const;
 
   smt::expr&& operator()() && { return std::move(p); }
 
