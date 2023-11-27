@@ -63,6 +63,7 @@ public:
   smt::expr nonptrNonpoison() const;
   smt::expr nonptrValue() const;
   smt::expr isPoison() const;
+  smt::expr nonPoison() const;
   smt::expr isZero() const; // zero or null
   smt::expr forceCastToInt() const;
 

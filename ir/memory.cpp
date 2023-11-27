@@ -293,6 +293,18 @@ expr Byte::isPoison() const {
   return expr::mkIf(isPtr(), !ptrNonpoison(), np != expr::mkInt(-1, np));
 }
 
+expr Byte::nonPoison() const {
+  expr np = nonptrNonpoison();
+  if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
+    assert(!np.isValid() || ptrNonpoison().eq(np == 1));
+    return np;
+  }
+  return expr::mkIf(isPtr(),
+                    expr::mkIf(ptrNonpoison(), expr::mkInt(-1, np),
+                                               expr::mkUInt(0, np)),
+                    np);
+}
+
 expr Byte::isZero() const {
   return expr::mkIf(isPtr(), ptr().isNull(), nonptrValue() == 0);
 }
@@ -546,7 +558,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     for (auto &b: bytes) {
       expr isptr = ub_pre(!b.isPtr());
       StateValue v(is_asm ? b.forceCastToInt() : b.nonptrValue(),
-                   is_asm ? (!b.isPoison()).toBVBool()
+                   is_asm ? b.nonPoison()
                           : ibyteTy.combine_poison(isptr, b.nonptrNonpoison()));
       val = first ? std::move(v) : v.concat(val);
       first = false;
@@ -1674,7 +1686,6 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     nooverflow = size->bits() <= bits_size_t ? true :
                    size->extract(size->bits()-1, bits_size_t) == 0;
   }
-
 
   expr allocated = precond && nooverflow;
   state->addPre(nonnull.implies(allocated));
