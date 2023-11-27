@@ -255,6 +255,10 @@ public:
       flags |= BinOp::NUW;
     if (isa<llvm::PossiblyExactOperator>(i) && i.isExact())
       flags = BinOp::Exact;
+    if (const auto *PDI = dyn_cast<llvm::PossiblyDisjointInst>(&i)) {
+      if (PDI->isDisjoint())
+        flags |= BinOp::Disjoint;
+    }
     RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
                                          flags));
   }

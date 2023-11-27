@@ -122,6 +122,9 @@ BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
   case LShr:
     assert((flags & Exact) == flags);
     break;
+  case Or:
+    assert((flags & Disjoint) == flags);
+    break;
   default:
     assert(flags == 0);
     break;
@@ -190,6 +193,8 @@ void BinOp::print(ostream &os) const {
     os << "nuw ";
   if (flags & Exact)
     os << "exact ";
+  if (flags & Disjoint)
+    os << "disjoint ";
   os << *lhs << ", " << rhs->getName();
 }
 
@@ -349,8 +354,8 @@ StateValue BinOp::toSMT(State &s) const {
     break;
 
   case Or:
-    fn = [](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
-      return { a | b, true };
+    fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
+      return { a | b, flags & Disjoint ? (a & b).isZero() : true };
     };
     break;
 
