@@ -199,8 +199,8 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
   /*
    * handleVector case;
    */
-  if (Random::getRandomUnsigned() % 4 == 0 && ty->isVectorTy()) {
-    int choice = Random::getRandomUnsigned() % 2;
+  if (Random::getRandomUnsigned() % 1 == 0 && ty->isVectorTy()) {
+    size_t choice = Random::getRandomUnsigned() % 2;
     llvm::Type *eleType = nullptr;
     llvm::IntegerType *i32Ty = llvm::Type::getInt32Ty(inst->getContext());
     if (choice == 0) {
@@ -242,9 +242,12 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
       } else {
         val3 = llvm::Constant::getNullValue(ty);
       }
-      llvm::ShuffleVectorInst shuffleVectorInst(val1, val2, val3);
-      shuffleVectorInst.insertBefore(inst);
-      inst->setOperand(pos, &shuffleVectorInst);
+      assert(val3 != nullptr);
+      // llvm::ShuffleVectorInst shuffleVectorInst(val1, val2, val3);
+      // shuffleVectorInst.insertBefore(inst);
+      // inst->setOperand(pos, &shuffleVectorInst);
+      newInst = new llvm::ShuffleVectorInst(val1, val2, val3);
+      newInst->insertBefore(inst);
     }
 
   } else {
