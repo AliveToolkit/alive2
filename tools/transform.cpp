@@ -1133,6 +1133,9 @@ static void calculateAndInitConstants(Transform &t) {
   if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
     does_int_mem_access = true;
 
+  if (does_int_mem_access && t.tgt.has(FnAttrs::Asm))
+    does_ptr_mem_access = true;
+
   auto has_attr = [&](ParamAttrs::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
       for (auto &v : fn->getInputs()) {
