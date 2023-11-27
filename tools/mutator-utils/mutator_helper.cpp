@@ -759,24 +759,60 @@ const std::vector<std::vector<llvm::Instruction::BinaryOps>>
                                              {Ops::And, Ops::Or, Ops::Xor}});
 #undef attr
 
+#define Pred llvm::CmpInst::Predicate
+const std::vector<llvm::CmpInst::Predicate>
+    BinaryInstructionHelper::ICmpPredicates({Pred::ICMP_EQ, Pred::ICMP_NE,
+                                             Pred::ICMP_SGE, Pred::ICMP_SGT,
+                                             Pred::ICMP_SLE, Pred::ICMP_SLT,
+                                             Pred::ICMP_UGE, Pred::ICMP_UGT,
+                                             Pred::ICMP_ULE, Pred::ICMP_ULT});
+const std::vector<llvm::CmpInst::Predicate>
+    BinaryInstructionHelper::FCmpPredicates(
+        {Pred::FCMP_OEQ, Pred::FCMP_ONE, Pred::FCMP_OGE, Pred::FCMP_OGE,
+         Pred::FCMP_OLT, Pred::FCMP_OLE, Pred::FCMP_ORD, Pred::FCMP_UNO,
+         Pred::FCMP_UEQ, Pred::FCMP_UNE, Pred::FCMP_UGE, Pred::FCMP_UGT,
+         Pred::FCMP_ULT, Pred::FCMP_ULE});
+#undef Pred
+
 void BinaryInstructionHelper::mutate() {
-  llvm::BinaryOperator *binInst = (llvm::BinaryOperator *)(&*mutator->iitInTmp);
-  if (Random::getRandomBool()) {
-    swapOperands(binInst);
+  if (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp)) {
+    llvm::BinaryOperator *binInst =
+        (llvm::BinaryOperator *)(&*mutator->iitInTmp);
+    if (Random::getRandomBool()) {
+      swapOperands(binInst);
+    }
+    int opIndex = getOpIndex(binInst);
+    llvm::Instruction::BinaryOps op = getNewOperator(opIndex);
+    llvm::BinaryOperator *newInst = llvm::BinaryOperator::Create(
+        op, binInst->getOperand(0), binInst->getOperand(1), "", binInst);
+    resetMathFlags(newInst, opIndex);
+    binInst->replaceAllUsesWith(newInst);
+    binInst->eraseFromParent();
+    mutator->iitInTmp = newInst->getIterator();
+  } else if (llvm::isa<llvm::CmpInst>(&*mutator->iitInTmp)) {
+    llvm::CmpInst *binInst = (llvm::CmpInst *)(&*mutator->iitInTmp);
+    if (Random::getRandomBool()) {
+      binInst->swapOperands();
+    }
+    bool isFloat = binInst->getOperand(0)->getType()->isFPOrFPVectorTy();
+    const std::vector<llvm::CmpInst::Predicate> &preds =
+        isFloat ? FCmpPredicates : ICmpPredicates;
+    size_t newP = Random::getRandomUnsigned() % preds.size();
+    if (preds[newP] == binInst->getPredicate()) {
+      newP += 1;
+      newP %= preds.size();
+    }
+    binInst->setPredicate(preds[newP]);
+  } else {
+    assert(false && "not supported binary instruction");
   }
-  int opIndex = getOpIndex(binInst);
-  llvm::Instruction::BinaryOps op = getNewOperator(opIndex);
-  llvm::BinaryOperator *newInst = llvm::BinaryOperator::Create(
-      op, binInst->getOperand(0), binInst->getOperand(1), "", binInst);
-  resetMathFlags(newInst, opIndex);
-  binInst->replaceAllUsesWith(newInst);
-  binInst->eraseFromParent();
-  mutator->iitInTmp = newInst->getIterator();
+  updated = true;
 }
 
 bool BinaryInstructionHelper::canMutate(llvm::Function *func) {
   for (auto it = inst_begin(func); it != inst_end(func); ++it) {
-    if (llvm::isa<llvm::BinaryOperator>(&*it)) {
+    if (llvm::isa<llvm::BinaryOperator>(&*it) ||
+        llvm::isa<llvm::CmpInst>(&*it)) {
       return true;
     }
   }
@@ -784,7 +820,8 @@ bool BinaryInstructionHelper::canMutate(llvm::Function *func) {
 }
 
 bool BinaryInstructionHelper::shouldMutate() {
-  return !updated && llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp);
+  return !updated && (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp) ||
+                      llvm::isa<llvm::CmpInst>(&*mutator->iitInTmp));
 }
 
 void BinaryInstructionHelper::debug() {
@@ -839,29 +876,32 @@ llvm::Type *ResizeIntegerHelper::getNewIntegerTy(llvm::LLVMContext &context,
 }
 
 llvm::Type *ResizeIntegerHelper::getNewFPTy(llvm::LLVMContext &context,
-                                                 llvm::Type *FPTy) {
-  assert(FPTy->isHalfTy() || FPTy->isBFloatTy()
-         || FPTy->isFloatTy() || FPTy->isDoubleTy());
-  static llvm::SmallVector<llvm::Type*> FPTypes;
-  if(FPTypes.size()!=4){
-    FPTypes={llvm::Type::getHalfTy(context), llvm::Type::getBFloatTy(context),
-    llvm::Type::getFloatTy(context), llvm::Type::getDoubleTy(context)};
+                                            llvm::Type *FPTy) {
+  assert(FPTy->isHalfTy() || FPTy->isBFloatTy() || FPTy->isFloatTy() ||
+         FPTy->isDoubleTy());
+  static llvm::SmallVector<llvm::Type *> FPTypes;
+  if (FPTypes.size() != 4) {
+    FPTypes = {llvm::Type::getHalfTy(context), llvm::Type::getBFloatTy(context),
+               llvm::Type::getFloatTy(context),
+               llvm::Type::getDoubleTy(context)};
   }
 
-  auto it=FPTypes.begin();
-  for(size_t i=Random::getRandomUnsigned()%FPTypes.size();i!=0;--i,++it);
-  for(size_t i=0;i<FPTypes.size();++i,++it){
-    if(it==FPTypes.end()){
-      it=FPTypes.begin();
+  auto it = FPTypes.begin();
+  for (size_t i = Random::getRandomUnsigned() % FPTypes.size(); i != 0;
+       --i, ++it)
+    ;
+  for (size_t i = 0; i < FPTypes.size(); ++i, ++it) {
+    if (it == FPTypes.end()) {
+      it = FPTypes.begin();
     }
-    if(*it!=FPTy){
+    if (*it != FPTy) {
       return *it;
     }
   }
   return nullptr;
 }
 
-    std::vector<llvm::Instruction *>
+std::vector<llvm::Instruction *>
 ResizeIntegerHelper::constructUseChain(llvm::Instruction *startPoint) {
   std::vector<llvm::Instruction *> res;
   llvm::Instruction *cur = startPoint;
