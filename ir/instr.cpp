@@ -355,7 +355,7 @@ StateValue BinOp::toSMT(State &s) const {
 
   case Or:
     fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
-      return { a | b, flags & Disjoint ? (a & b).isZero() : true };
+      return { a | b, (flags & Disjoint) ? (a & b) == 0 : true };
     };
     break;
 
