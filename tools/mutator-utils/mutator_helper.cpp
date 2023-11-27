@@ -187,17 +187,76 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
     return false;
   }
 
-  bool isFloat = ty->isFPOrFPVectorTy();
+  /*
+   * ExtractElement
+   * InsertElement
+   * ShuffleElement
+   */
 
-  llvm::Value *val1 = mutator->getRandomValue(ty),
-              *val2 = mutator->getRandomValue(ty);
+  bool isFloat = ty->isFPOrFPVectorTy();
   llvm::Instruction *newInst = nullptr;
-  if (isFloat) {
-    newInst = mutator_util::getRandomFloatInstruction(val1, val2, inst);
+
+  /*
+   * handleVector case;
+   */
+  if (Random::getRandomUnsigned() % 4 == 0 && ty->isVectorTy()) {
+    int choice = Random::getRandomUnsigned() % 2;
+    llvm::Type *eleType = nullptr;
+    llvm::IntegerType *i32Ty = llvm::Type::getInt32Ty(inst->getContext());
+    if (choice == 0) {
+      size_t idx = 0;
+      if (llvm::isa<llvm::FixedVectorType>(ty)) {
+        llvm::FixedVectorType *fixedVectorType = (llvm::FixedVectorType *)ty;
+        idx = Random::getRandomUnsigned() % fixedVectorType->getNumElements();
+        eleType = fixedVectorType->getElementType();
+      } else {
+        llvm::ScalableVectorType *scalableVectorType =
+            (llvm::ScalableVectorType *)ty;
+        idx = Random::getRandomUnsigned() %
+              scalableVectorType->getMinNumElements();
+        eleType = scalableVectorType->getElementType();
+      }
+      llvm::Value *val1 = mutator->getRandomValue(ty),
+                  *val2 = llvm::UndefValue::get(eleType),
+                  *val3 = llvm::ConstantInt::get(i32Ty, idx);
+      newInst = llvm::InsertElementInst::Create(val1, val2, val3);
+      newInst->insertBefore(inst);
+      inst->setOperand(pos, newInst);
+      mutator->setOperandRandomValue(newInst, 1);
+      llvm::SmallVector<llvm::Value *> vals;
+      mutator->fixAllValues(vals);
+    } else if (choice == 1) {
+      llvm::Value *val1 = mutator->getRandomValue(ty),
+                  *val2 = mutator->getRandomValue(ty);
+      llvm::Value *val3 = nullptr;
+      if (llvm::isa<llvm::FixedVectorType>(ty)) {
+        llvm::FixedVectorType *fixedVectorType = (llvm::FixedVectorType *)ty;
+        size_t nums = fixedVectorType->getNumElements();
+        size_t nums2 = nums << 1;
+        llvm::SmallVector<llvm::Constant *> vals;
+        for (size_t i = 0; i < nums; ++i) {
+          vals.push_back(llvm::ConstantInt::get(
+              i32Ty, Random::getRandomUnsigned() % nums2));
+        }
+        val3 = llvm::ConstantVector::get(vals);
+      } else {
+        val3 = llvm::Constant::getNullValue(ty);
+      }
+      llvm::ShuffleVectorInst shuffleVectorInst(val1, val2, val3);
+      shuffleVectorInst.insertBefore(inst);
+      inst->setOperand(pos, &shuffleVectorInst);
+    }
+
   } else {
-    newInst = mutator_util::getRandomIntegerInstruction(val1, val2, inst);
+    llvm::Value *val1 = mutator->getRandomValue(ty),
+                *val2 = mutator->getRandomValue(ty);
+
+    if (isFloat) {
+      newInst = mutator_util::getRandomFloatInstruction(val1, val2, inst);
+    } else {
+      newInst = mutator_util::getRandomIntegerInstruction(val1, val2, inst);
+    }
   }
-  inst->setOperand(pos, newInst);
   return true;
 }
 

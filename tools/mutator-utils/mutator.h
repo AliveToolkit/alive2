@@ -158,6 +158,7 @@ class FunctionMutator {
   llvm::Value *getRandomFromGlobal(llvm::Type *ty);
   llvm::SmallVector<llvm::Value *(FunctionMutator::*)(llvm::Type *)> valueFuncs;
   llvm::Value *getRandomValue(llvm::Type *ty);
+  llvm::Value *getRandomValue(std::function<bool(llvm::Type *)> predicate);
   bool debug;
 
 public:
