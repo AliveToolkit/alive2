@@ -1,3 +1,5 @@
+; TEST-ARGS: -tgt-is-asm
+
 target datalayout = "e-i64:64"
 
 @g = external global i64

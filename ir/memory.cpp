@@ -546,7 +546,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     for (auto &b: bytes) {
       expr isptr = ub_pre(!b.isPtr());
       StateValue v(is_asm ? b.forceCastToInt() : b.nonptrValue(),
-                   is_asm ? !b.isPoison()
+                   is_asm ? (!b.isPoison()).toBVBool()
                           : ibyteTy.combine_poison(isptr, b.nonptrNonpoison()));
       val = first ? std::move(v) : v.concat(val);
       first = false;
