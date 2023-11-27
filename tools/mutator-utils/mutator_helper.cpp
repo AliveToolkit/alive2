@@ -199,7 +199,7 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
   /*
    * handleVector case;
    */
-  if (Random::getRandomUnsigned() % 1 == 0 && ty->isVectorTy()) {
+  if (Random::getRandomUnsigned() % 4 == 0 && ty->isVectorTy()) {
     size_t choice = Random::getRandomUnsigned() % 2;
     llvm::Type *eleType = nullptr;
     llvm::IntegerType *i32Ty = llvm::Type::getInt32Ty(inst->getContext());
