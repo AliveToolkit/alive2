@@ -1671,7 +1671,7 @@ expr expr::ugt(const expr &rhs) const {
 }
 
 expr expr::sle(const expr &rhs) const {
-  if (eq(rhs))
+  if (eq(rhs) || rhs.isSMax())
     return true;
 
   return binop_fold(rhs, Z3_mk_bvsle);
