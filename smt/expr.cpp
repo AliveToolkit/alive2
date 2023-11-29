@@ -743,7 +743,7 @@ expr expr::udiv(const expr &rhs) const {
 }
 
 expr expr::srem(const expr &rhs) const {
-  if (eq(rhs) || (isSMin() && rhs.isAllOnes()))
+  if (eq(rhs) || isZero() || (isSMin() && rhs.isAllOnes()))
     return mkUInt(0, sort());
 
   if (rhs.isZero())
@@ -757,7 +757,7 @@ expr expr::srem(const expr &rhs) const {
 
 expr expr::urem(const expr &rhs) const {
   C();
-  if (eq(rhs))
+  if (eq(rhs) || isZero())
     return mkUInt(0, sort());
 
   uint64_t n, log;

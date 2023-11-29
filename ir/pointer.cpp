@@ -355,12 +355,10 @@ expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
 }
 
 expr Pointer::isAligned(uint64_t align) {
-  if (align == 0)
+  if (align == 0 || !is_power2(align))
     return isNull();
   if (align == 1)
     return true;
-  if (!is_power2(align))
-    return false;
 
   auto offset = getOffset();
   if (isUndef(offset))
@@ -395,10 +393,9 @@ expr Pointer::isAligned(const expr &align) {
     return isAligned(n);
 
   return
-    expr::mkIf(align == 0,
+    expr::mkIf(align == 0 || !align.isPowerOf2(),
                isNull(),
-               align.isPowerOf2() &&
-                 getAddress().urem(align.zextOrTrunc(bits_ptr_address)) == 0);
+               getAddress().urem(align.zextOrTrunc(bits_ptr_address)) == 0);
 }
 
 static pair<expr, expr> is_dereferenceable(Pointer &p,
