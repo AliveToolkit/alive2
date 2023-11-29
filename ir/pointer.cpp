@@ -502,11 +502,11 @@ expr Pointer::getAllocType() const {
                    expr::mkUInt(0, 2));
 }
 
-expr Pointer::isStackAllocated() const {
+expr Pointer::isStackAllocated(bool simplify) const {
   // 1) if a stack object is returned by a callee it's UB
   // 2) if a stack object is given as argument by the caller, we can upgrade it
   //    to a global object, so we can do POR here.
-  if (!has_alloca || isLocal().isFalse())
+  if (simplify && (!has_alloca || isLocal().isFalse()))
     return false;
   return getAllocType() == STACK;
 }

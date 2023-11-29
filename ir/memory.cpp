@@ -1313,6 +1313,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
   auto bid = p.getShortBid();
 
   state->addAxiom(bid.ule(max_bid));
+  state->addAxiom(!Pointer(*this, max_bid, false).isStackAllocated(false));
 
   AliasSet alias(*this);
   alias.setMayAliasUpTo(false, max_bid);
