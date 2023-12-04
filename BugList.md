@@ -89,6 +89,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 82. SimpleLoopUnswitch reverses branch condition incorrectly (https://llvm.org/PR63962)
 83. Vectorization of loop reduction introduces an aligned store incorrectly (https://llvm.org/PR65212)
 84. InstCombine: incorrect sink of FP math through select changes NaN payload (https://llvm.org/PR74297)
+85. InstCombine: fold of shuffle into fadd changes NaN payload (https://llvm.org/PR74326)
 
 
 ### Bugs found in Z3
