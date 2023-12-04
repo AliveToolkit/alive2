@@ -1797,6 +1797,10 @@ expr expr::concat(const expr &rhs) const {
       l == h2+1 && c.eq(d))
     return a.concat(c.extract(h, l2));
 
+  // (concat const (concat const2 x))
+  if (isConst() && rhs.isConcat(a, b) && a.isConst())
+    return concat(a).concat(b);
+
   return binop_fold(rhs, Z3_mk_concat);
 }
 
@@ -2042,12 +2046,21 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
 
   expr lhs, rhs;
   // (ite (= x 1) 1 0) -> x
-  if (then.isBV() && then.bits() == 1 && then.isOne() && els.isZero() &&
-      cond.isEq(lhs, rhs) && lhs.isBV() && lhs.bits() == 1) {
-    if (lhs.isOne())
-      return rhs;
-    if (rhs.isOne())
-      return lhs;
+  // (ite (= x 1) 0 1) -> (not x)
+  if (then.isBV() && then.bits() == 1 && cond.isEq(lhs, rhs) &&
+      lhs.isBV() && lhs.bits() == 1) {
+    if (then.isOne() && els.isZero()) {
+      if (lhs.isOne())
+        return rhs;
+      if (rhs.isOne())
+        return lhs;
+    }
+    if (then.isZero() && els.isOne()) {
+      if (lhs.isOne())
+        return ~rhs;
+      if (rhs.isOne())
+        return ~lhs;
+    }
   }
 
   // (ite c a (ite c2 a b)) -> (ite (or c c2) a b)

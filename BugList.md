@@ -88,6 +88,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 81. InstCombine introduces UB when moving rem instructions (https://llvm.org/PR60906)
 82. SimpleLoopUnswitch reverses branch condition incorrectly (https://llvm.org/PR63962)
 83. Vectorization of loop reduction introduces an aligned store incorrectly (https://llvm.org/PR65212)
+84. InstCombine: incorrect sink of FP math through select changes NaN payload (https://llvm.org/PR74297)
 
 
 ### Bugs found in Z3
