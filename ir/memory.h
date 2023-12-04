@@ -237,6 +237,7 @@ public:
   Memory& operator=(Memory&&) = default;
 
   Memory dup() const { return *this; }
+  Memory dupNoRead() const;
 
   void mkAxioms(const Memory &other) const;
 

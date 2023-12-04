@@ -1196,6 +1196,13 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   }
 }
 
+Memory Memory::dupNoRead() const {
+  Memory ret(*state);
+  // minimal state to allow fn calls to compare input fn ptrs that can't be read
+  ret.local_blk_addr = local_blk_addr;
+  return ret;
+}
+
 void Memory::mkAxioms(const Memory &tgt) const {
   assert(state->isSource() && !tgt.state->isSource());
   if (memory_unused())
