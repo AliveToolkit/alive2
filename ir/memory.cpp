@@ -274,6 +274,11 @@ expr Byte::nonptrNonpoison() const {
   return p.extract(start + bits_poison_per_byte - 1, start);
 }
 
+expr Byte::boolNonptrNonpoison() const {
+  expr np = nonptrNonpoison();
+  return np == expr::mkInt(-1, np);
+}
+
 expr Byte::nonptrValue() const {
   if (!does_int_mem_access)
     return expr::mkUInt(0, bits_byte);
@@ -317,9 +322,6 @@ expr Byte::forceCastToInt() const {
 }
 
 expr Byte::refined(const Byte &other) const {
-  if (eq(other))
-    return true;
-
   // refinement if offset had non-ptr value
   expr v1 = nonptrValue();
   expr v2 = other.nonptrValue();
@@ -348,20 +350,36 @@ expr Byte::refined(const Byte &other) const {
     }
   }
 
-  // fast path: if we didn't do any ptr store, then all ptrs in memory were
-  // already there and don't need checking
   expr is_ptr = isPtr();
   expr is_ptr2 = other.isPtr();
+  bool asm_mode = other.m.getState().getFn().has(FnAttrs::Asm);
   expr ptr_cnstr;
-  if (!does_ptr_store || is_ptr.isFalse() || is_ptr2.isFalse()) {
+
+  // fast path: if we didn't do any ptr store, then all ptrs in memory were
+  // already there and don't need checking
+  if (!does_ptr_store || is_ptr.isFalse() || (!asm_mode && is_ptr2.isFalse())) {
     ptr_cnstr = *this == other;
   } else {
-    ptr_cnstr = !ptrNonpoison() ||
+    // allow ptr -> int type punning in asm mode
+    expr extra = false;
+    if (asm_mode) {
+      extra = !is_ptr2 &&
+              other.boolNonptrNonpoison() &&
+              forceCastToInt() == v2;
+    }
+    ptr_cnstr = ptrNonpoison().implies(
                   (other.ptrNonpoison() &&
                    ptrByteoffset() == other.ptrByteoffset() &&
-                   ptr().refined(other.ptr()));
+                   ptr().refined(other.ptr())) ||
+                  extra);
   }
-  return expr::mkIf(is_ptr == is_ptr2,
+
+  expr same_type = is_ptr == is_ptr2;
+  // allow ptr -> int type punning in asm mode
+  if (asm_mode)
+    same_type = is_ptr || !is_ptr2;
+
+  return expr::mkIf(same_type,
                     expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
                     // allow null ptr <-> zero
                     isPoison() ||
