@@ -330,7 +330,7 @@ RUN command separately may give better results.
 versions of the misoptimized function.  The Alive2 IR function body may
 indicate the problem to a human, but for the Alive2 Compiler Explorer instance
 you will need LLVM IR.  Search for the function name in the terminal output.
-* Copy the first function definition and necessary declarations to
+* Copy the first function definition and necessary declarations and metadata to
 [https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).  Without a second
 version of the function to compare, it just runs some standard optimizations;
 if it reports an error, your fork’s optimizations are not to blame.
