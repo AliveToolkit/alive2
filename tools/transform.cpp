@@ -528,23 +528,20 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     return;
   }
 
-  {
-    if (auto sink_src = src_state.sinkDomain(false);
-        !sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
-      errs.add("The source program doesn't reach a return instruction.\n"
-               "Consider increasing the unroll factor if it has loops", false);
-      return;
-    }
-
-    auto sink_tgt = tgt_state.sinkDomain(true);
-    if (!sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
-      errs.add("The target program doesn't reach a return instruction.\n"
-               "Consider increasing the unroll factor if it has loops", false);
-      return;
-    }
-
-    pre_tgt &= !sink_tgt;
+  if (auto sink_src = src_state.sinkDomain(false);
+      !sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
+    errs.add("The source program doesn't reach a return instruction.\n"
+              "Consider increasing the unroll factor if it has loops", false);
+    return;
   }
+
+  if (auto sink_tgt = tgt_state.sinkDomain(false);
+      !sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
+    errs.add("The target program doesn't reach a return instruction.\n"
+              "Consider increasing the unroll factor if it has loops", false);
+    return;
+  }
+  pre_tgt &= !tgt_state.sinkDomain(true);
 
   expr pre, pre_src_forall;
   {
@@ -670,9 +667,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   // 6. Check memory
   auto &src_mem = src_state.returnMemory();
   auto &tgt_mem = tgt_state.returnMemory();
-  auto [memory_cnstr0, ptr_refinement0, mem_undef]
+  auto [memory_cnstr, ptr_refinement, mem_undef]
     = src_mem.refined(tgt_mem, false);
-  auto &ptr_refinement = ptr_refinement0;
   qvars.insert(mem_undef.begin(), mem_undef.end());
 
   auto print_ptr_load = [&](ostream &s, const Model &m) {
@@ -683,8 +679,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.raw_load(p, undef)()]);
   };
 
-  CHECK(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
-                                        : value_cnstr && memory_cnstr0),
+  CHECK(dom && !(memory_cnstr.isTrue() ? memory_cnstr
+                                       : value_cnstr && memory_cnstr),
         print_ptr_load, "Mismatch in memory");
 
 #undef CHECK
