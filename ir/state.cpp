@@ -1231,14 +1231,14 @@ void State::saveReturnedInput() {
   }
 }
 
-expr State::sinkDomain() const {
+expr State::sinkDomain(bool include_ub) const {
   auto I = predecessor_data.find(&f.getSinkBB());
   if (I == predecessor_data.end())
     return false;
 
   OrExpr ret;
   for (auto &[src, data] : I->second) {
-    ret.add(data.path() && *data.UB());
+    ret.add(data.path() && (include_ub ? *data.UB() : true));
   }
   return ret();
 }

@@ -494,22 +494,28 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   auto &fn_qvars = tgt_state.getFnQuantVars();
   qvars.insert(fn_qvars.begin(), fn_qvars.end());
 
-  AndExpr axioms = src_state.getAxioms();
-  axioms.add(tgt_state.getAxioms());
-  expr axioms_expr = axioms();
+  expr axioms_expr;
+  {
+    AndExpr axioms = src_state.getAxioms();
+    axioms.add(tgt_state.getAxioms());
+    axioms_expr = std::move(axioms)();
+  }
 
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
   // FIXME: broken handling of transformation precondition
   //src_state.startParsingPre();
   //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  auto pre_src_and = src_state.getPre();
-  auto &pre_tgt_and = tgt_state.getPre();
+  expr pre_src, pre_tgt;
+  {
+    auto pre_src_and = src_state.getPre();
+    auto &pre_tgt_and = tgt_state.getPre();
 
-  // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src = tgt
-  pre_src_and.del(pre_tgt_and);
-  expr pre_src = pre_src_and();
-  expr pre_tgt = pre_tgt_and();
+    // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src = tgt
+    pre_src_and.del(pre_tgt_and);
+    pre_src = std::move(pre_src_and)();
+    pre_tgt = pre_tgt_and();
+  }
 
   if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
     errs.add("Precondition is always false", false);
@@ -523,14 +529,14 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   }
 
   {
-    auto sink_src = src_state.sinkDomain();
-    if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
+    if (auto sink_src = src_state.sinkDomain(false);
+        !sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
       errs.add("The source program doesn't reach a return instruction.\n"
                "Consider increasing the unroll factor if it has loops", false);
       return;
     }
 
-    auto sink_tgt = tgt_state.sinkDomain();
+    auto sink_tgt = tgt_state.sinkDomain(true);
     if (!sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
       errs.add("The target program doesn't reach a return instruction.\n"
                "Consider increasing the unroll factor if it has loops", false);
@@ -540,7 +546,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     pre_tgt &= !sink_tgt;
   }
 
-  expr pre_src_exists, pre_src_forall;
+  expr pre, pre_src_forall;
   {
     vector<pair<expr,expr>> repls;
     auto vars_pre = pre_src.vars();
@@ -548,11 +554,15 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       if (vars_pre.count(v))
         repls.emplace_back(v, expr::mkFreshVar("#exists", v));
     }
-    pre_src_exists = pre_src.subst(repls);
+    auto pre_src_exists = pre_src.subst(repls);
     pre_src_forall = pre_src_exists.eq(pre_src) ? true : pre_src;
+    pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   }
-  expr pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   pre_src_forall &= tgt_state.getFnPre();
+
+  // cleanup
+  pre_src = {};
+  pre_tgt = {};
 
   auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that
@@ -641,6 +651,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     CHECK(dom && !poison_cnstr,
           print_value, "Target is more poisonous than source");
   }
+  poison_cnstr = {};
 
   // 4. Check undef
   if (config::disallow_ub_exploitation) {

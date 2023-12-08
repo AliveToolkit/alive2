@@ -294,7 +294,7 @@ public:
     return returned_input;
   }
 
-  smt::expr sinkDomain() const;
+  smt::expr sinkDomain(bool include_ub) const;
   Memory& returnMemory();
 
   ValTy returnVal() {
