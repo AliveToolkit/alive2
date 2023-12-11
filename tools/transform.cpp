@@ -501,51 +501,57 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     axioms_expr = std::move(axioms)();
   }
 
-  // note that precondition->toSMT() may add stuff to getPre,
-  // so order here matters
-  // FIXME: broken handling of transformation precondition
-  //src_state.startParsingPre();
-  //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
-  expr pre_src, pre_tgt;
-  {
-    auto pre_src_and = src_state.getPre();
-    auto &pre_tgt_and = tgt_state.getPre();
-
-    // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src = tgt
-    pre_src_and.del(pre_tgt_and);
-    pre_src = std::move(pre_src_and)();
-    pre_tgt = pre_tgt_and();
-  }
-
-  if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
-    errs.add("Precondition is always false", false);
-    return;
-  }
-
   if (config::check_if_src_is_ub &&
       check_expr(axioms_expr && fndom_a).isUnsat()) {
     errs.add("Source function is always UB", false);
     return;
   }
 
-  if (auto sink_src = src_state.sinkDomain(false);
-      !sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
-    errs.add("The source program doesn't reach a return instruction.\n"
-              "Consider increasing the unroll factor if it has loops", false);
-    return;
+  bool eq_sink_src_tgt;
+  {
+    auto sink_src = src_state.sinkDomain(false);
+    if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
+      errs.add("The source program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
+
+    auto sink_tgt = tgt_state.sinkDomain(false);
+    eq_sink_src_tgt = sink_src.eq(sink_tgt);
+    sink_src = {};
+
+    if (!eq_sink_src_tgt &&
+        !sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
+      errs.add("The target program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
   }
 
-  if (auto sink_tgt = tgt_state.sinkDomain(false);
-      !sink_tgt.isTrue() && check_expr(axioms_expr && !sink_tgt).isUnsat()) {
-    errs.add("The target program doesn't reach a return instruction.\n"
-              "Consider increasing the unroll factor if it has loops", false);
-    return;
-  }
-  pre_tgt &= !tgt_state.sinkDomain(true);
-
+  // note that precondition->toSMT() may add stuff to getPre,
+  // so order here matters
+  // FIXME: broken handling of transformation precondition
+  //src_state.startParsingPre();
+  //expr pre = t.precondition ? t.precondition->toSMT(src_state) : true;
   expr pre, pre_src_forall;
   {
-    vector<pair<expr,expr>> repls;
+    expr pre_src, pre_tgt;
+    {
+      auto pre_src_and = src_state.getPre();
+      auto &pre_tgt_and = tgt_state.getPre();
+
+      // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src=tgt
+      pre_src_and.del(pre_tgt_and);
+      pre_src = std::move(pre_src_and)();
+      pre_tgt = pre_tgt_and();
+    }
+
+    if (check_expr(axioms_expr && (pre_src && pre_tgt)).isUnsat()) {
+      errs.add("Precondition is always false", false);
+      return;
+    }
+  
+    vector<pair<expr, expr>> repls;
     auto vars_pre = pre_src.vars();
     for (auto &v : qvars) {
       if (vars_pre.count(v))
@@ -556,10 +562,6 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   }
   pre_src_forall &= tgt_state.getFnPre();
-
-  // cleanup
-  pre_src = {};
-  pre_tgt = {};
 
   auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that
@@ -608,9 +610,18 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
           [](ostream&, const Model&){}, "Target has reachable unreachable");
   }
 
-  // 1. Check UB
-  CHECK(fndom_a.notImplies(fndom_b),
-        [](ostream&, const Model&){}, "Source is more defined than target");
+  {
+    // avoid false-positives in refinement query 1 due to bounded unrolling
+    expr pre_old = pre;
+    if (!eq_sink_src_tgt)
+      pre &= !tgt_state.sinkDomain(true);
+
+    // 1. Check UB
+    CHECK(fndom_a.notImplies(fndom_b),
+          [](ostream&, const Model&){}, "Source is more defined than target");
+
+    pre = std::move(pre_old);
+  }
 
   // 2. Check return domain (noreturn check)
   {

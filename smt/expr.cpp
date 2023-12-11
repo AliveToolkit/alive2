@@ -2075,7 +2075,7 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
   if (vars.empty() || val.isConst() || !val.isValid())
     return std::move(val);
 
-  unique_ptr<Z3_app[]> vars_ast(new Z3_app[vars.size()]);
+  auto vars_ast = make_unique<Z3_app[]>(vars.size());
   unsigned i = 0;
   for (auto &v : vars) {
     vars_ast[i++] = (Z3_app)v();
@@ -2137,8 +2137,8 @@ expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   if (repls.empty())
     return *this;
 
-  unique_ptr<Z3_ast[]> from(new Z3_ast[repls.size()]);
-  unique_ptr<Z3_ast[]> to(new Z3_ast[repls.size()]);
+  auto from = make_unique<Z3_ast[]>(repls.size());
+  auto to   = make_unique<Z3_ast[]>(repls.size());
 
   unsigned i = 0;
   for (auto &p : repls) {
