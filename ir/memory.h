@@ -168,6 +168,7 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
+  void mkNonPoisonAxioms(bool local);
   void mkNonlocalValAxioms(bool skip_consts);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
@@ -353,6 +354,7 @@ public:
     AliasSet::printStats(os);
   }
 
+  bool isAsmMode() const;
   State& getState() const { return *state; }
 
   void print(std::ostream &os, const smt::Model &m) const;

@@ -352,7 +352,7 @@ expr Byte::refined(const Byte &other) const {
 
   expr is_ptr = isPtr();
   expr is_ptr2 = other.isPtr();
-  bool asm_mode = other.m.getState().getFn().has(FnAttrs::Asm);
+  bool asm_mode = other.m.isAsmMode();
   expr ptr_cnstr;
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
@@ -567,7 +567,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
-    bool is_asm = m.getState().getFn().getFnAttrs().has(FnAttrs::Asm);
+    bool is_asm = m.isAsmMode();
 
     StateValue val;
     bool first = true;
@@ -1120,24 +1120,30 @@ static expr mk_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mkNonlocalValAxioms(bool skip_consts) {
+void Memory::mkNonPoisonAxioms(bool local) {
   expr offset
     = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
 
+  for (auto &block : local ? local_block_val : non_local_block_val) {
+    if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
+      state->addAxiom(
+        expr::mkForAll({ offset },
+                       !Byte(*this, block.val.load(offset)).isPoison()));
+  }
+}
+
+void Memory::mkNonlocalValAxioms(bool skip_consts) {
   // Users may request the initial memory to be non-poisonous
-  if (((config::disable_poison_input && state->isSource()) ||
-       state->getFn().has(FnAttrs::Asm)) &&
+  if (((config::disable_poison_input && state->isSource()) || isAsmMode()) &&
       (does_int_mem_access || does_ptr_mem_access)) {
-    for (auto &block : non_local_block_val) {
-      if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
-        state->addAxiom(
-          expr::mkForAll({ offset },
-                         !Byte(*this, block.val.load(offset)).isPoison()));
-    }
+    mkNonPoisonAxioms(false);
   }
 
   if (!does_ptr_mem_access)
     return;
+
+  expr offset
+    = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
     if (always_noread(i, true))
@@ -1173,6 +1179,10 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
   }
 }
 
+bool Memory::isAsmMode() const {
+  return state->getFn().has(FnAttrs::Asm);
+}
+
 Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
   if (memory_unused())
     return;
@@ -1197,11 +1207,19 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
+  // Unless we are in asm mode, in which memory is nondet data.
   if (numLocals() > 0) {
-    auto poison_array
-      = expr::mkConstArray(expr::mkUInt(0, Pointer::bitsShortOffset()),
-                           Byte::mkPoisonByte(*this)());
-    local_block_val.resize(numLocals(), { std::move(poison_array), DATA_NONE });
+    if (isAsmMode()) {
+      for (unsigned bid = 0, e = numLocals(); bid != e; ++bid) {
+        local_block_val.emplace_back(mk_block_val_array(bid));
+      }
+      mkNonPoisonAxioms(true);
+    } else {
+      auto poison_array
+        = expr::mkConstArray(expr::mkUInt(0, Pointer::bitsShortOffset()),
+                             Byte::mkPoisonByte(*this)());
+      local_block_val.resize(numLocals(), {std::move(poison_array), DATA_NONE});
+    }
 
     // all local blocks are dead in the beginning
     local_block_liveness = expr::mkUInt(0, numLocals());
@@ -2108,7 +2126,7 @@ Pointer Memory::searchPointer(const expr &val0) const {
 
 expr Memory::int2ptr(const expr &val0) const {
   assert(!memory_unused() && observesAddresses());
-  if (state->getFn().has(FnAttrs::Asm)) {
+  if (isAsmMode()) {
     DisjointExpr<expr> ret(Pointer::mkNullPointer(*this).release());
     expr val = val0;
     OrExpr domain;
