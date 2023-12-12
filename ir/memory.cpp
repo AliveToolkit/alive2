@@ -2436,7 +2436,8 @@ void Memory::print_array(ostream &os, const expr &a, unsigned indent) const {
     os << "else: " << Byte(*this, std::move(val)) << '\n';
   }
   else if (a.isStore(a2, idx, val)) {
-    os << idx << ": " << Byte(*this, std::move(val)) << '\n';
+    idx.printUnsigned(os);
+    os << ": " << Byte(*this, std::move(val)) << '\n';
     print_array(os, a2);
   }
   else if (a.isLambda(val)) {
