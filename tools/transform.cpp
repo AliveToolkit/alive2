@@ -507,7 +507,6 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     return;
   }
 
-  bool eq_sink_src_tgt;
   {
     auto sink_src = src_state.sinkDomain(false);
     if (!sink_src.isTrue() && check_expr(axioms_expr && !sink_src).isUnsat()) {
@@ -517,7 +516,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     }
 
     auto sink_tgt = tgt_state.sinkDomain(false);
-    eq_sink_src_tgt = sink_src.eq(sink_tgt);
+    bool eq_sink_src_tgt = sink_src.eq(sink_tgt);
     sink_src = {};
 
     if (!eq_sink_src_tgt &&
@@ -613,8 +612,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   {
     // avoid false-positives in refinement query 1 due to bounded unrolling
     expr pre_old = pre;
-    if (!eq_sink_src_tgt)
-      pre &= !tgt_state.sinkDomain(true);
+    pre &= !tgt_state.sinkDomain(true);
 
     // 1. Check UB
     CHECK(fndom_a.notImplies(fndom_b),
