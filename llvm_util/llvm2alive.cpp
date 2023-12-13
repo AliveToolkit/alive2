@@ -58,6 +58,14 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   }
 }
 
+Value* get_ptr(Instr &i) {
+  for (auto *op : i.operands()) {
+    if (op->getType().isPtrType())
+      return op;
+  }
+  UNREACHABLE();
+}
+
 bool hit_limits;
 unsigned constexpr_idx;
 unsigned copy_idx;
@@ -1281,6 +1289,17 @@ public:
       case LLVMContext::MD_noundef:
         BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
         break;
+
+      case LLVMContext::MD_dereferenceable:
+      case LLVMContext::MD_dereferenceable_or_null: {
+        auto kind = ID == LLVMContext::MD_dereferenceable
+                      ? Assume::Dereferenceable : Assume::DereferenceableOrNull;
+        auto bytes = get_operand(
+          llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
+        BB->addInstr(
+          make_unique<Assume>(vector<Value*>{get_ptr(*i), bytes}, kind));
+        break;
+      }
 
       // non-relevant for correctness
       case LLVMContext::MD_loop:

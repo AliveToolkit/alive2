@@ -328,11 +328,6 @@ void ParamAttrs::merge(const ParamAttrs &other) {
   align            = max(align, other.align);
 }
 
-static expr merge(pair<AndExpr, expr> e) {
-  e.first.add(std::move(e.second));
-  return std::move(e.first)();
-}
-
 static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,

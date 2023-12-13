@@ -587,9 +587,11 @@ class Assume final : public Instr {
 public:
   enum Kind {
     AndNonPoison, /// cond should be non-poison and hold
-    WellDefined, /// cond only needs to be well defined (can be false)
-    Align,       /// args[0] satisfies alignment args[1]
-    NonNull      /// args[0] is a nonnull pointer
+    WellDefined,  /// cond only needs to be well defined (can be false)
+    Align,        /// args[0] satisfies alignment args[1]
+    Dereferenceable,       /// args[0] is dereferenceable at least args[1]
+    DereferenceableOrNull, /// args[0] is null or deref least args[1]
+    NonNull       /// args[0] is a nonnull pointer
   };
 
 private:

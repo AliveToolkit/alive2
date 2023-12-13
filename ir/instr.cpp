@@ -3164,10 +3164,18 @@ Assume::Assume(Value &cond, Kind kind)
 
 Assume::Assume(vector<Value *> &&args0, Kind kind)
     : Instr(Type::voidTy, "assume"), args(std::move(args0)), kind(kind) {
-  if (args.size() == 1)
-    assert(kind == AndNonPoison || kind == WellDefined || kind == NonNull);
-  else {
-    assert(kind == Align && args.size() == 2);
+  switch (kind) {
+    case AndNonPoison:
+    case WellDefined:
+    case NonNull:
+      assert(args.size() == 1);
+      break;
+
+    case Align:
+    case Dereferenceable:
+    case DereferenceableOrNull:
+      assert(args.size() == 2);
+      break;
   }
 }
 
@@ -3191,10 +3199,12 @@ void Assume::rauw(const Value &what, Value &with) {
 void Assume::print(ostream &os) const {
   const char *str = nullptr;
   switch (kind) {
-  case AndNonPoison: str = "assume "; break;
-  case WellDefined:  str = "assume_welldefined "; break;
-  case Align:        str = "assume_align "; break;
-  case NonNull:      str = "assume_nonnull "; break;
+  case AndNonPoison:          str = "assume "; break;
+  case WellDefined:           str = "assume_welldefined "; break;
+  case Align:                 str = "assume_align "; break;
+  case Dereferenceable:       str = "assume_dereferenceable "; break;
+  case DereferenceableOrNull: str = "assume_dereferenceable_or_null "; break;
+  case NonNull:               str = "assume_nonnull "; break;
   }
   os << str;
 
@@ -3226,11 +3236,19 @@ StateValue Assume::toSMT(State &s) const {
     s.addGuardableUB(Pointer(s.getMemory(), ptr).isAligned(align));
     break;
   }
+  case Dereferenceable:
+  case DereferenceableOrNull: {
+    const auto &vptr  = s.getAndAddPoisonUB(*args[0]).value;
+    const auto &bytes = s.getAndAddPoisonUB(*args[1]).value;
+    Pointer ptr(s.getMemory(), vptr);
+    expr nonnull = kind == DereferenceableOrNull ? !ptr.isNull() : false;
+    s.addUB(nonnull || merge(ptr.isDereferenceable(bytes, 1, false)));
+    break;
+  }
   case NonNull: {
     // assume(ptr)
-    const auto &vptr = s.getAndAddPoisonUB(*args[0]);
-    Pointer ptr(s.getMemory(), vptr.value);
-    s.addGuardableUB(!ptr.isNull());
+    const auto &ptr = s.getAndAddPoisonUB(*args[0]).value;
+    s.addGuardableUB(!Pointer(s.getMemory(), ptr).isNull());
     break;
   }
   }
@@ -3244,6 +3262,8 @@ expr Assume::getTypeConstraints(const Function &f) const {
   case AndNonPoison:
     return args[0]->getType().enforceIntType();
   case Align:
+  case Dereferenceable:
+  case DereferenceableOrNull:
     return args[0]->getType().enforcePtrType() &&
            args[1]->getType().enforceIntType();
   case NonNull:

@@ -212,3 +212,8 @@ public:
 };
 
 }
+
+static inline smt::expr merge(std::pair<smt::AndExpr, smt::expr> e) {
+  e.first.add(std::move(e.second));
+  return std::move(e.first)();
+}
