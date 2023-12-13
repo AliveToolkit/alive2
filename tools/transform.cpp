@@ -1618,8 +1618,32 @@ static void optimize_ptrcmp(Function &f) {
 }
 
 void Transform::preprocess() {
-  if (config::tgt_is_asm)
+  if (config::tgt_is_asm) {
     tgt.getFnAttrs().set(FnAttrs::Asm);
+
+    // all memory blocks are considered to have a size multiple of alignment
+    // since asm memory accesses won't trap as it won't cross the page boundary
+    vector<pair<const Instr*, unique_ptr<Instr>>> to_add;
+    for (auto &bb : src.getBBs()) {
+      for (auto &i : bb->instrs()) {
+        if (auto *load = dynamic_cast<const Load*>(&i)) {
+          auto align = load->getAlign();
+          if (align != 1) {
+            static IntType i64("i64", 64);
+            auto bytes = make_unique<IntConst>(i64, align);
+            to_add.emplace_back(load, make_unique<Assume>(
+              vector<Value*>{&load->getPtr(), bytes.get()},
+              Assume::Dereferenceable));
+            src.addConstant(std::move(bytes));
+          }
+        }
+      }
+      for (auto &[i, assume] : to_add) {
+        bb->addInstrAt(std::move(assume), i, false);
+      }
+      to_add.clear();
+    }
+  }
 
   remove_unreachable_bbs(src);
   remove_unreachable_bbs(tgt);
