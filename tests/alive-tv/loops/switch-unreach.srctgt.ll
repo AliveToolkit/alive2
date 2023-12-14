@@ -1,3 +1,5 @@
+; SKIP-IDENTITY
+
 declare void @c1()
 
 define i8 @src(i8 %spec.select) {
