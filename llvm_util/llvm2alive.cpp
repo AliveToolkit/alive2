@@ -58,14 +58,6 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   }
 }
 
-Value* get_ptr(Instr &i) {
-  for (auto *op : i.operands()) {
-    if (op->getType().isPtrType())
-      return op;
-  }
-  UNREACHABLE();
-}
-
 bool hit_limits;
 unsigned constexpr_idx;
 unsigned copy_idx;
@@ -1297,7 +1289,7 @@ public:
         auto bytes = get_operand(
           llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
         BB->addInstr(
-          make_unique<Assume>(vector<Value*>{get_ptr(*i), bytes}, kind));
+          make_unique<Assume>(vector<Value*>{i, bytes}, kind));
         break;
       }
 
