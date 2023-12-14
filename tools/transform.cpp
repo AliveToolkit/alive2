@@ -1624,6 +1624,7 @@ void Transform::preprocess() {
     // all memory blocks are considered to have a size multiple of alignment
     // since asm memory accesses won't trap as it won't cross the page boundary
     vector<pair<const Instr*, unique_ptr<Instr>>> to_add;
+    vector<Instr*> to_remove;
     for (auto &bb : src.getBBs()) {
       for (auto &i : bb->instrs()) {
         if (auto *load = dynamic_cast<const Load*>(&i)) {
@@ -1636,12 +1637,20 @@ void Transform::preprocess() {
               Assume::Dereferenceable));
             src.addConstant(std::move(bytes));
           }
+        } else if (auto *call = dynamic_cast<const FnCall*>(&i)) {
+          if (call->getFnName() == "#sideeffect") {
+            to_remove.emplace_back(const_cast<Instr*>(&i));
+          }
         }
       }
       for (auto &[i, assume] : to_add) {
         bb->addInstrAt(std::move(assume), i, false);
       }
+      for (auto &i : to_remove) {
+        bb->delInstr(i);
+      }
       to_add.clear();
+      to_remove.clear();
     }
   }
 
