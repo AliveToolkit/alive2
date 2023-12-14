@@ -314,20 +314,29 @@ expr Byte::isZero() const {
   return expr::mkIf(isPtr(), ptr().isNull(), nonptrValue() == 0);
 }
 
-expr Byte::forceCastToInt() const {
+expr Byte::castPtrToInt() const {
   auto offset = ptrByteoffset().zextOrTrunc(bits_ptr_address);
        offset = offset * expr::mkUInt(bits_byte, offset);
-  auto addr   = ptr().getAddress().lshr(offset);
-  return expr::mkIf(isPtr(), addr.trunc(bits_byte), nonptrValue());
+  return ptr().getAddress().lshr(offset).trunc(bits_byte);
+}
+
+expr Byte::forceCastToInt() const {
+  return expr::mkIf(isPtr(), castPtrToInt(), nonptrValue());
 }
 
 expr Byte::refined(const Byte &other) const {
-  // refinement if offset had non-ptr value
-  expr v1 = nonptrValue();
-  expr v2 = other.nonptrValue();
-  expr np1 = nonptrNonpoison();
-  expr np2 = other.nonptrNonpoison();
+  bool asm_mode = other.m.isAsmMode();
+  expr is_ptr = isPtr();
+  expr is_ptr2 = other.isPtr();
 
+  // allow int -> ptr type punning in asm mode
+  // this is only need to support removal of 'store int undef'
+  expr v1 = nonptrValue();
+  expr v2 = asm_mode ? other.forceCastToInt() : other.nonptrValue();
+  expr np1 = nonptrNonpoison();
+  expr np2 = asm_mode ? other.nonPoison() : other.nonptrNonpoison();
+
+  // int byte
   expr int_cnstr = true;
   if (does_int_mem_access) {
     if (bits_poison_per_byte == bits_byte) {
@@ -350,9 +359,6 @@ expr Byte::refined(const Byte &other) const {
     }
   }
 
-  expr is_ptr = isPtr();
-  expr is_ptr2 = other.isPtr();
-  bool asm_mode = other.m.isAsmMode();
   expr ptr_cnstr;
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
@@ -365,7 +371,7 @@ expr Byte::refined(const Byte &other) const {
     if (asm_mode) {
       extra = !is_ptr2 &&
               other.boolNonptrNonpoison() &&
-              forceCastToInt() == v2;
+              castPtrToInt() == v2;
     }
     ptr_cnstr = ptrNonpoison().implies(
                   (other.ptrNonpoison() &&
@@ -374,13 +380,12 @@ expr Byte::refined(const Byte &other) const {
                   extra);
   }
 
-  expr same_type = is_ptr == is_ptr2;
-  // allow ptr -> int type punning in asm mode
+  expr constr = expr::mkIf(is_ptr, ptr_cnstr, int_cnstr);
   if (asm_mode)
-    same_type = is_ptr || !is_ptr2;
+    return constr;
 
-  return expr::mkIf(same_type,
-                    expr::mkIf(is_ptr, ptr_cnstr, int_cnstr),
+  return expr::mkIf(is_ptr == is_ptr2,
+                    constr,
                     // allow null ptr <-> zero
                     isPoison() ||
                       (isZero() && !other.isPoison() && other.isZero()));
