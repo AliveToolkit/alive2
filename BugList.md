@@ -112,3 +112,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 17. Crash with FP<->BV conversions (https://github.com/Z3Prover/z3/issues/6460)
 18. Integer overflow (https://github.com/Z3Prover/z3/commit/a96f5a9b425b6f5ba7e8ce1c1a75db6683c4bdc9)
 19. Memory leak with arrays on timeout (https://github.com/Z3Prover/z3/commit/dda0c8ff4200faa6a441855716b47ec7f93e026e)
+20. Unsoundness in elim-uncnstr2 (https://github.com/Z3Prover/z3/issues/6488)
+21. Unsoundness in elim-uncnstr2 (https://github.com/Z3Prover/z3/issues/6506)
+22. Unsound NaN encoding (https://github.com/Z3Prover/z3/issues/6972)
+23. fp.roundToIntegral gives invalid zero_extend application (https://github.com/Z3Prover/z3/issues/7056)
