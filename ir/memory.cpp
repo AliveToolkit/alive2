@@ -140,6 +140,11 @@ static bool align_ge_size(const expr &align, const expr &size) {
   return align.isUInt(algn) && size.isUInt(sz) && (1ull << algn) >= sz;
 }
 
+static bool align_gt_size(const expr &align, const expr &size) {
+  uint64_t algn, sz;
+  return align.isUInt(algn) && size.isUInt(sz) && (1ull << algn) > sz;
+}
+
 // Assumes that both begin + len don't overflow
 static expr disjoint(const expr &begin1, const expr &len1, const expr &align1,
                      const expr &begin2, const expr &len2, const expr &align2) {
@@ -1293,7 +1298,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(Pointer::mkNullPointer(*this).getAddress(false) == 0);
 
   // Non-local blocks are disjoint.
-  auto one = expr::mkUInt(1, bits_ptr_address);
+  auto zero = expr::mkUInt(0, bits_ptr_address);
+  auto one  = expr::mkUInt(1, bits_ptr_address);
   for (unsigned bid = 0; bid < num_nonlocals; ++bid) {
     if (skip_bid(bid))
       continue;
@@ -1304,17 +1310,29 @@ void Memory::mkAxioms(const Memory &tgt) const {
     auto align = p1.blockAlignment();
 
     if (!has_null_block || bid != 0)
-      state->addAxiom(addr != 0);
+      state->addAxiom(addr != zero);
 
     // address must be properly aligned
-    state->addAxiom(
-      (addr & ((one << align.zextOrTrunc(bits_ptr_address)) - one)) == 0);
+    auto align_bytes = one << align.zextOrTrunc(bits_ptr_address);
+    state->addAxiom((addr & (align_bytes - one)) == zero);
 
-    state->addAxiom(
-      Pointer::hasLocalBit()
-        // don't spill to local addr section
-        ? (addr + sz).sign() == 0
-        : addr.add_no_uoverflow(sz));
+    if (align_gt_size(align, sz)) {
+      // if address is aligned and size < alignment, then it can't overflow
+    } else if (align_ge_size(align, sz)) {
+      // if size == alignment, addr+size can overflow only if addr == last
+      auto last = zero - align_bytes;
+      state->addAxiom(
+        Pointer::hasLocalBit()
+         ? addr.ult(
+             expr::mkUInt(0, 1).concat(last.extract(bits_ptr_address-2, 0)))
+         : addr != last);
+    } else {
+      state->addAxiom(
+        Pointer::hasLocalBit()
+          // don't spill to local addr section
+          ? (addr + sz).sign() == 0
+          : addr.add_no_uoverflow(sz));
+    }
 
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {

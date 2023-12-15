@@ -843,8 +843,7 @@ expr expr::add_no_uoverflow(const expr &rhs) const {
   if (isConst())
     return rhs.add_no_uoverflow(*this);
 
-  auto bw = bits();
-  return (zext(1) + rhs.zext(1)).extract(bw, bw) == 0;
+  return (zext(1) + rhs.zext(1)).sign() == 0;
 }
 
 expr expr::sub_no_soverflow(const expr &rhs) const {
@@ -854,8 +853,7 @@ expr expr::sub_no_soverflow(const expr &rhs) const {
 }
 
 expr expr::sub_no_uoverflow(const expr &rhs) const {
-  auto bw = bits();
-  return (zext(1) - rhs.zext(1)).extract(bw, bw) == 0;
+  return (zext(1) - rhs.zext(1)).sign() == 0;
 }
 
 expr expr::mul_no_soverflow(const expr &rhs) const {
