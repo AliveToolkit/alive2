@@ -304,6 +304,9 @@ expr Byte::isPoison() const {
 }
 
 expr Byte::nonPoison() const {
+  if (!does_int_mem_access)
+    return  ptrNonpoison();
+
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
     assert(!np.isValid() || ptrNonpoison().eq(np == 1));
