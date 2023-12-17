@@ -805,10 +805,6 @@ Pointer Pointer::toLogical() const {
   return mkIf(isLogical(), *this, *std::move(ret)());
 }
 
-Pointer Pointer::toLogicalIfNotPhy() const {
-  return isLogical().isFalse() ? *this : toLogical();
-}
-
 Pointer
 Pointer::mkIf(const expr &cond, const Pointer &then, const Pointer &els) {
   assert(&then.m == &els.m);

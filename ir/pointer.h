@@ -37,7 +37,6 @@ class Pointer {
                       const smt::expr &ret_type, bool src_name = false) const;
 
   Pointer toLogical() const;
-  Pointer toLogicalIfNotPhy() const;
 
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
