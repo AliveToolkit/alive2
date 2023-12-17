@@ -187,7 +187,8 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
         // this *may* be a pointer
         if (bw == Pointer::totalBits()) {
           Pointer p(src_state.returnMemory(), var);
-          reduce(p.getOffset());
+          if (try_reduce(p.isLogical()))
+            reduce(p.getOffset());
           reduce(p.getAddress());
         }
       }

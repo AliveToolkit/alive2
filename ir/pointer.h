@@ -17,7 +17,8 @@ class Memory;
 class Pointer {
   const Memory &m;
 
-  // [bid, offset, attributes (1 bit for each)]
+  // [0, padding, bid, offset, attributes (1 bit for each)] -- logical pointer
+  // [1, padding, address, attributes] -- physical pointer
   // The top bit of bid is 1 if the block is local, 0 otherwise.
   // A local memory block is a memory block that is
   // allocated by an instruction during the current function call. This does
@@ -35,6 +36,9 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
+  Pointer toLogical() const;
+  Pointer toLogicalIfNotPhy() const;
+
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
@@ -45,6 +49,10 @@ public:
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const ParamAttrs &attr = {});
+
+  static Pointer mkPhysical(const Memory &m, const smt::expr &addr);
+  static Pointer mkPhysical(const Memory &m, const smt::expr &addr,
+                            const smt::expr &attr);
 
   Pointer(const Pointer &other) noexcept = default;
   Pointer(Pointer &&other) noexcept = default;
@@ -59,9 +67,18 @@ public:
   static unsigned zeroBitsShortOffset();
   static bool hasLocalBit();
 
+  smt::expr isLogical() const;
+
   smt::expr isLocal(bool simplify = true) const;
   smt::expr isConstGlobal() const;
   smt::expr isWritableGlobal() const;
+
+  // these assume the pointer is logical
+  smt::expr isLogLocal(bool simplify = true) const;
+  smt::expr getLogBid() const;
+  smt::expr getLogShortBid() const;
+  smt::expr getLogOffset() const;
+  smt::expr getLogAddress(bool simplify = true) const;
 
   smt::expr getBid() const;
   smt::expr getShortBid() const; // same as getBid but ignoring is_local bit
@@ -71,6 +88,7 @@ public:
   smt::expr getAttrs() const;
   smt::expr getBlockBaseAddress(bool simplify = true) const;
   smt::expr getAddress(bool simplify = true) const;
+  smt::expr getPhysicalAddress() const;
 
   smt::expr blockSize() const;
   smt::expr blockSizeOffsetT() const; // to compare with offsets
