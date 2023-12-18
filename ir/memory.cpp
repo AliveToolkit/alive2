@@ -2160,25 +2160,6 @@ expr Memory::ptr2int(const expr &ptr) const {
   return p.getAddress();
 }
 
-Pointer Memory::searchPointer(const expr &val0) const {
-  DisjointExpr<Pointer> ret;
-  expr val = val0.zextOrTrunc(bits_ptr_address);
-
-  auto add = [&](unsigned limit, bool local) {
-    for (unsigned i = 0; i != limit; ++i) {
-      Pointer p(*this, i, local);
-      Pointer p_end = p + p.blockSize();
-      ret.add(p + (val - p.getAddress()),
-              !local && i == 0 && has_null_block
-                ? val == 0
-                : val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
-    }
-  };
-  add(numLocals(), true);
-  add(numNonlocals(), false);
-  return *std::move(ret)();
-}
-
 expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused() && observesAddresses());
   return

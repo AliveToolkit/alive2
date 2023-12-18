@@ -66,6 +66,11 @@ ostream &operator<<(ostream &os, const AndExpr &e) {
 }
 
 
+void OrExpr::add(const expr &e) {
+  if (!e.isFalse())
+    exprs.emplace(e);
+}
+
 void OrExpr::add(expr &&e) {
   if (!e.isFalse())
     exprs.insert(std::move(e));

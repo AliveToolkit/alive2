@@ -3672,12 +3672,14 @@ StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
                     vector<pair<uint64_t, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
+    Pointer ptr_log = inbounds ? ptr.toLogical().first : ptr;
     AndExpr non_poison(ptrval.non_poison);
     AndExpr inbounds_np;
     AndExpr idx_all_zeros;
 
+    // FIXME: this is only partially implemented for physical pointers
     if (inbounds)
-      inbounds_np.add(ptr.inbounds());
+      inbounds_np.add(ptr_log.inbounds());
 
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
@@ -3691,7 +3693,7 @@ StateValue GEP::toSMT(State &s) const {
           non_poison.add(val.sextOrTrunc(v.bits()) == v);
         }
         non_poison.add(multiplier.mul_no_soverflow(val));
-        non_poison.add(ptr.addNoOverflow(inc));
+        non_poison.add(ptr_log.addNoOverflow(inc));
       }
 
 #ifndef NDEBUG
@@ -3703,8 +3705,10 @@ StateValue GEP::toSMT(State &s) const {
       ptr += inc;
       non_poison.add(np);
 
-      if (inbounds)
-        inbounds_np.add(ptr.inbounds());
+      if (inbounds) {
+        ptr_log += inc;
+        inbounds_np.add(ptr_log.inbounds());
+      }
     }
 
     if (inbounds) {
