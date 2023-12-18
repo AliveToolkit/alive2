@@ -3774,12 +3774,14 @@ StateValue GEP::toSMT(State &s) const {
   auto scalar = [&](const StateValue &ptrval,
                     vector<pair<uint64_t, StateValue>> &offsets) -> StateValue {
     Pointer ptr(s.getMemory(), ptrval.value);
+    Pointer ptr_log = inbounds ? ptr.toLogical().first : ptr;
     AndExpr non_poison(ptrval.non_poison);
     AndExpr inbounds_np;
     AndExpr idx_all_zeros;
 
+    // FIXME: this is only partially implemented for physical pointers
     if (inbounds)
-      inbounds_np.add(ptr.inbounds());
+      inbounds_np.add(ptr_log.inbounds());
 
     expr offset_sum = expr::mkUInt(0, bits_for_offset);
     for (auto &[sz, idx] : offsets) {
@@ -3794,7 +3796,7 @@ StateValue GEP::toSMT(State &s) const {
       if (nusw) {
         non_poison.add(val.sextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_soverflow(val));
-        non_poison.add(ptr.addNoUSOverflow(inc, inbounds));
+        non_poison.add(ptr_log.addNoUSOverflow(inc, inbounds));
         if (!inbounds) {
           // For non-inbounds gep, we have to explicitly check that adding the
           // offsets without the base address also doesn't wrap.
@@ -3806,7 +3808,7 @@ StateValue GEP::toSMT(State &s) const {
       if (nuw) {
         non_poison.add(val.zextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_uoverflow(val));
-        non_poison.add(ptr.addNoUOverflow(inc, inbounds));
+        non_poison.add(ptr_log.addNoUOverflow(inc, inbounds));
       }
 
 #ifndef NDEBUG
@@ -3818,8 +3820,10 @@ StateValue GEP::toSMT(State &s) const {
       ptr += inc;
       non_poison.add(np);
 
-      if (inbounds)
-        inbounds_np.add(ptr.inbounds());
+      if (inbounds) {
+        ptr_log += inc;
+        inbounds_np.add(ptr_log.inbounds());
+      }
     }
 
     if (inbounds) {

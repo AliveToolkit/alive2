@@ -36,8 +36,6 @@ class Pointer {
                       const smt::FunctionExpr &nonlocal_fn,
                       const smt::expr &ret_type, bool src_name = false) const;
 
-  Pointer toLogical() const;
-
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
@@ -56,6 +54,10 @@ public:
   Pointer(const Pointer &other) noexcept = default;
   Pointer(Pointer &&other) noexcept = default;
   void operator=(Pointer &&rhs) noexcept { p = std::move(rhs.p); }
+
+  // returns (log-ptr, domain of inboundness)
+  std::pair<Pointer, smt::expr> findLogicalPointer(const smt::expr &addr) const;
+  std::pair<Pointer, smt::expr> toLogical() const;
 
   static smt::expr mkLongBid(const smt::expr &short_bid, bool local);
   static smt::expr mkUndef(State &s);
