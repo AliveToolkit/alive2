@@ -13,8 +13,6 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
-static unsigned ptr_next_idx;
-
 static expr prepend_if(const expr &pre, expr &&e, bool prepend) {
   return prepend ? pre.concat(e) : std::move(e);
 }
@@ -39,13 +37,13 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
 
   uint64_t bits = 0;
   auto idx = 0;
-  auto to_bit = [&](bool b, const ParamAttrs::Attribute &a) -> uint64_t {
-    return b ? ((attrs.has(a) ? 1 : 0) << idx++) : 0;
+  auto add = [&](bool b, const ParamAttrs::Attribute &a) {
+    bits |= b ? (attrs.has(a) << idx++) : 0;
   };
-  bits |= to_bit(has_nocapture, ParamAttrs::NoCapture);
-  bits |= to_bit(has_noread, ParamAttrs::NoRead);
-  bits |= to_bit(has_nowrite, ParamAttrs::NoWrite);
-  bits |= to_bit(has_ptr_arg, ParamAttrs::IsArg);
+  add(has_nocapture, ParamAttrs::NoCapture);
+  add(has_noread, ParamAttrs::NoRead);
+  add(has_nowrite, ParamAttrs::NoWrite);
+  add(has_ptr_arg, ParamAttrs::IsArg);
   return expr::mkUInt(bits, bits_for_ptrattrs);
 }
 
@@ -60,13 +58,9 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 
 Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
                  bool unique_name, bool align, const ParamAttrs &attr) : m(m) {
-  string name = var_name;
-  if (unique_name)
-    name += '!' + to_string(ptr_next_idx++);
-
   unsigned bits = total_bits_short() + !align * zeroBitsShortOffset();
   p = prepend_if(local.toBVBool(),
-                 expr::mkVar(name.c_str(), bits), hasLocalBit());
+                 expr::mkVar(var_name, bits, unique_name), hasLocalBit());
   if (align)
     p = p.concat_zeros(zeroBitsShortOffset());
   if (bits_for_ptrattrs)
@@ -654,8 +648,10 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
-void Pointer::resetGlobals() {
-  ptr_next_idx = 0;
+Pointer
+Pointer::mkIf(const expr &cond, const Pointer &then, const Pointer &els) {
+  assert(&then.m == &els.m);
+  return Pointer(then.m, expr::mkIf(cond, then.p, els.p));
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
@@ -668,9 +664,13 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   else                 \
     os << field
 
-  os << "pointer(" << (p.isLocal().isTrue() ? "local" : "non-local")
-     << ", block_id=";
-  P(p.getBid(), printUnsigned);
+  os << "pointer(";
+  if (p.isLocal().isConst())
+    os << (p.isLocal().isTrue() ? "local" : "non-local");
+  else
+    os << "local=" << p.isLocal();
+  os << ", block_id=";
+  P(p.getShortBid(), printUnsigned);
 
   os << ", offset=";
   P(p.getOffset(), printSigned);

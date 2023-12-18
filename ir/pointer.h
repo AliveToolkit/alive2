@@ -46,6 +46,10 @@ public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const ParamAttrs &attr = {});
 
+  Pointer(const Pointer &other) noexcept = default;
+  Pointer(Pointer &&other) noexcept = default;
+  void operator=(Pointer &&rhs) noexcept { p = std::move(rhs.p); }
+
   static smt::expr mkLongBid(const smt::expr &short_bid, bool local);
   static smt::expr mkUndef(State &s);
 
@@ -132,7 +136,8 @@ public:
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
 
-  static void resetGlobals();
+  static Pointer mkIf(const smt::expr &cond, const Pointer &then,
+                      const Pointer &els);
 
   auto operator<=>(const Pointer &rhs) const { return p <=> rhs.p; }
 

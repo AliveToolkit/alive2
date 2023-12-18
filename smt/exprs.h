@@ -44,6 +44,7 @@ public:
   void add(expr &&e);
   void add(const OrExpr &other);
   expr operator()() const;
+  bool empty() const { return exprs.empty(); }
   friend std::ostream &operator<<(std::ostream &os, const OrExpr &e);
 };
 

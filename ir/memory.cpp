@@ -305,7 +305,7 @@ expr Byte::isPoison() const {
 
 expr Byte::nonPoison() const {
   if (!does_int_mem_access)
-    return  ptrNonpoison();
+    return ptrNonpoison();
 
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
@@ -1275,6 +1275,11 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == -1u);
   }
 
+  for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
+    Pointer p(bid < num_nonlocals_src ? *this : tgt, bid, false);
+    state->addAxiom(p.blockSize() != 0);
+  }
+
   for (unsigned bid = 0; bid < num_nonlocals_src; ++bid) {
     if (skip_bid(bid))
       continue;
@@ -1312,8 +1317,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
-    if (!has_null_block || bid != 0)
-      state->addAxiom(addr != zero);
+    state->addAxiom(addr != zero);
 
     // address must be properly aligned
     auto align_bytes = one << align.zextOrTrunc(bits_ptr_address);
@@ -1350,7 +1354,6 @@ void Memory::mkAxioms(const Memory &tgt) const {
 }
 
 void Memory::resetGlobals() {
-  Pointer::resetGlobals();
   next_const_bid  = has_null_block;
   next_global_bid = has_null_block + num_consts_src;
   next_local_bid = 0;
@@ -1787,8 +1790,6 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     // support for 0-sized arrays like [0 x i8], which are arbitrarily sized
     if (size)
       state->addAxiom(p.blockSize() == size_zext);
-    else
-      state->addAxiom(p.blockSize().uge(1));
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 
@@ -2132,14 +2133,14 @@ expr Memory::ptr2int(const expr &ptr) const {
 }
 
 Pointer Memory::searchPointer(const expr &val0) const {
-  DisjointExpr<expr> ret;
-  expr val = val0.zextOrTrunc(bits_program_pointer);
+  DisjointExpr<Pointer> ret;
+  expr val = val0.zextOrTrunc(bits_ptr_address);
 
   auto add = [&](unsigned limit, bool local) {
     for (unsigned i = 0; i != limit; ++i) {
       Pointer p(*this, i, local);
       Pointer p_end = p + p.blockSize();
-      ret.add((p + (val - p.getAddress())).release(),
+      ret.add(p + (val - p.getAddress()),
               !local && i == 0 && has_null_block
                 ? val == 0
                 : val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
@@ -2147,7 +2148,7 @@ Pointer Memory::searchPointer(const expr &val0) const {
   };
   add(numLocals(), true);
   add(numNonlocals(), false);
-  return Pointer(*this, *std::move(ret)());
+  return *std::move(ret)();
 }
 
 expr Memory::int2ptr(const expr &val0) const {
@@ -2459,7 +2460,7 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
 void Memory::print_array(ostream &os, const expr &a, unsigned indent) const {
   expr idx, val, a2, cond, then, els;
   if (a.isConstArray(val)) {
-    os << "else: " << Byte(*this, std::move(val)) << '\n';
+    os << "*: " << Byte(*this, std::move(val)) << '\n';
   }
   else if (a.isStore(a2, idx, val)) {
     idx.printUnsigned(os);

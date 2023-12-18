@@ -295,8 +295,10 @@ expr expr::mkVar(const char *name, const expr &type) {
   return ::mkVar(name, type.sort());
 }
 
-expr expr::mkVar(const char *name, unsigned bits) {
-  return ::mkVar(name, mkBVSort(bits));
+expr expr::mkVar(const char *name, unsigned bits, bool fresh) {
+  auto sort = mkBVSort(bits);
+  return fresh ? Z3_mk_fresh_const(ctx(), name, sort)
+               : ::mkVar(name, sort);
 }
 
 expr expr::mkBoolVar(const char *name) {
