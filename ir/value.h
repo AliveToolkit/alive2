@@ -95,6 +95,7 @@ public:
   bool isArbitrarySize() const { return arbitrary_size; }
   unsigned getAlignment() const { return align; }
   bool isConst() const { return isconst; }
+  void increaseSize(uint64_t newsize);
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

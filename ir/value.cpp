@@ -81,6 +81,12 @@ StateValue NullPointerValue::toSMT(State &s) const {
 }
 
 
+void GlobalVariable::increaseSize(uint64_t newsize) {
+  assert(!arbitrary_size);
+  assert(newsize >= allocsize);
+  allocsize = newsize;
+}
+
 void GlobalVariable::print(ostream &os) const {
   os << getName() << " = " << (isconst ? "constant " : "global ");
   if (arbitrary_size)

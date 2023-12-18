@@ -1650,6 +1650,19 @@ void Transform::preprocess() {
       to_add.clear();
       to_remove.clear();
     }
+
+    // increase size of global variables to be a multiple of alignment
+    for (auto p : { &src, &tgt }) {
+      for (auto gv : p->getGlobalVars()) {
+        if (gv->isArbitrarySize())
+          continue;
+        auto align = gv->getAlignment();
+        auto sz = gv->size();
+        auto newsize = round_up(sz, align);
+        if (newsize != sz)
+          gv->increaseSize(newsize);
+      }
+    }
   }
 
   remove_unreachable_bbs(src);
