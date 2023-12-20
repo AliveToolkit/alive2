@@ -40,9 +40,9 @@ llvm::cl::opt<bool> opt_disable_poison(LLVM_ARGS_PREFIX "disable-poison-input",
   llvm::cl::desc("Assume inputs are not poison (default=false)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<bool> opt_check_if_src_is_ub(
-  LLVM_ARGS_PREFIX "check-src-ub",
-  llvm::cl::desc("Check if source function is always UB (default=false)"),
+llvm::cl::opt<bool> opt_fail_if_src_is_ub(
+  LLVM_ARGS_PREFIX "fail-src-ub",
+  llvm::cl::desc("Fail if source function is always UB (default=false)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<bool> opt_tgt_is_asm(
