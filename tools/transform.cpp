@@ -503,15 +503,14 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   }
 
   if (check_expr(axioms_expr && fndom_a).isUnsat()) {
-    cout << "\n"
-      "****************************************\n"
-      "WARNING: Source function is always UB.\n"
-      "It can be refined by any target function.\n"
-      "Please make sure this is what you wanted.\n"
-      "****************************************\n\n";
     if (config::fail_if_src_is_ub) {
       errs.add("Source function is always UB", false);
       return;
+    } else {
+      errs.addWarning(
+        "Source function is always UB.\n"
+        "It can be refined by any target function.\n"
+        "Please make sure this is what you wanted.");
     }
   }
 
