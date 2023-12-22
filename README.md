@@ -63,7 +63,13 @@ Building and Running Translation Validation
 
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
 RTTI and exceptions turned on.
-LLVM can be built targeting X86 in the following way.  (You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the CMake step if your default compiler is `gcc`.)
+LLVM can be built targeting X86 in the following way.  
+* You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the CMake step if your default compiler is `gcc`.
+* Explicitly setting the target may not be necessary.
+* `BUILD_SHARED_LIBS` may not be necessary, and for LLVM forks not normally
+built with the option, may interfere with CMake files’ use of `USEDLIBS` and
+`LLVMLIBS`, and perhaps `dd_llvm_target`.
+
 ```
 cd $LLVM2_HOME
 mkdir build
@@ -353,9 +359,6 @@ runtime errors with “symbol not found in flat namespace.”  Setting
 [CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html)
 as a cache entry to 11.0 or less at the beginning of CMakeLists.txt may work
 around this.
-* Building for Translation Validation requires enabling `BUILD_SHARED_LIBS`. 
-For LLVM forks not normally built with the option, this may interfere with
-CMake files’ use of `USEDLIBS` and `LLVMLIBS` and perhaps `dd_llvm_target`. 
 * Building for Translation Validation is tightly coupled to LLVM top of tree
 source.  Building a fork with older source may require reverting to the
 corresponding Alive2 commit.  This in turn may require experimentation with
