@@ -966,7 +966,8 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   unsigned bytesz = (bits_byte / 8);
   unsigned loaded_bytes = bytes / bytesz;
   vector<DisjointExpr<expr>> loaded;
-  loaded.resize(loaded_bytes, Byte::mkPoisonByte(*this)());
+  expr poison = Byte::mkPoisonByte(*this)();
+  loaded.resize(loaded_bytes, poison);
 
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
@@ -976,8 +977,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
     for (unsigned i = 0; i < loaded_bytes; ++i) {
       unsigned idx = left2right ? i : (loaded_bytes - i - 1);
       expr off = offset + expr::mkUInt(idx, off_bits);
-      loaded[i].add(is_poison ? Byte::mkPoisonByte(*this)()
-                              : blk.val.load(off), cond);
+      loaded[i].add(is_poison ? poison : blk.val.load(off), std::move(cond));
       if (!is_poison)
         undef.insert(blk.undef.begin(), blk.undef.end());
     }
