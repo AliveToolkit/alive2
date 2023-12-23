@@ -6,6 +6,7 @@
 #if defined(__clang__) && defined(__APPLE__)
 
 #include <compare>
+#include <map>
 
 #if (__clang_major__ < 14 || (__clang_major__ == 14 && __clang_patchlevel__ == 0))
 
