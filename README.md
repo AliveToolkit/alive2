@@ -209,7 +209,7 @@ IR file. For example, let's prove that removing `nsw` is correct
 for addition:
 
 ```
-$ alive-tv src.ll tgt.ll
+$ALIVE2_HOME/alive2/build/alive-tv src.ll tgt.ll
 
 ----------------------------------------
 define i32 @f(i32 %a, i32 %b) {
@@ -239,7 +239,8 @@ For example, as of February 6 2020, the `release/10.x` branch contains
 an optimizer bug that can be triggered as follows:
 
 ```
-$ cat foo.ll
+cat foo.ll
+
 define i3 @foo(i3) {
   %x1 = sub i3 0, %0
   %x2 = icmp ne i3 %0, 0
@@ -248,7 +249,8 @@ define i3 @foo(i3) {
   %x5 = lshr i3 %x4, %x3
   ret i3 %x5
 }
-$ alive-tv foo.ll
+
+$ALIVE2_HOME/alive2/build/alive-tv foo.ll
 
 ----------------------------------------
 define i3 @foo(i3 %0) {
@@ -289,7 +291,7 @@ Summary:
 ```
 
 Please keep in mind that you do not have to compile Alive2 in order to
-try out alive-tv; it is available online: https://alive2.llvm.org/ce/
+try out alive-tv; it is available online: [https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/)
 
 
 Running the Standalone LLVM Execution Tool (alive-exec)
