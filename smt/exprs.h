@@ -189,14 +189,11 @@ public:
 
 class FunctionExpr {
   std::map<expr, expr> fn; // key -> val
-  std::optional<expr> default_val;
 
 public:
   FunctionExpr() = default;
-  FunctionExpr(expr &&default_val) : default_val(std::move(default_val)) {}
   void add(const expr &key, expr &&val);
   void add(const FunctionExpr &other);
-  void del(const expr &key);
 
   std::optional<expr> operator()(const expr &key) const;
   const expr* lookup(const expr &key) const;
@@ -205,9 +202,9 @@ public:
 
   auto begin() const { return fn.begin(); }
   auto end() const { return fn.end(); }
-  bool empty() const { return fn.empty() && !default_val; }
+  bool empty() const { return fn.empty(); }
 
-  std::weak_ordering operator<=>(const FunctionExpr &rhs) const;
+  auto operator<=>(const FunctionExpr &rhs) const = default;
 
   friend std::ostream& operator<<(std::ostream &os, const FunctionExpr &e);
 };
