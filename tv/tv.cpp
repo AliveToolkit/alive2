@@ -324,22 +324,28 @@ struct TVLegacyPass final : public llvm::ModulePass {
       assert(types.hasSingleTyping());
     }
 
-    if (Errors errs = verifier.verify()) {
-      *out << "Transformation doesn't verify!" <<
-              (errs.isUnsound() ? " (unsound)\n" : " (not unsound)\n")
-           << errs;
-      if (errs.isUnsound()) {
-        has_failure = true;
-        *out << "\nPass: " << pass_name << '\n';
-        emitCommandLine(out);
-        if (!SavedBitcode.empty())
-          writeBitcode(report_filename);
-        *out << "\n";
+    {
+      Errors errs = verifier.verify();
+      if (errs.hasWarnings())
+        errs.printWarnings(*out);
+
+      if (errs) {
+        *out << "Transformation doesn't verify!" <<
+                (errs.isUnsound() ? " (unsound)\n" : " (not unsound)\n")
+            << errs;
+        if (errs.isUnsound()) {
+          has_failure = true;
+          *out << "\nPass: " << pass_name << '\n';
+          emitCommandLine(out);
+          if (!SavedBitcode.empty())
+            writeBitcode(report_filename);
+          *out << "\n";
+        }
+        if (opt_error_fatal && has_failure)
+          finalize();
+      } else {
+        *out << "Transformation seems to be correct!\n\n";
       }
-      if (opt_error_fatal && has_failure)
-        finalize();
-    } else {
-      *out << "Transformation seems to be correct!\n\n";
     }
 
   done:

@@ -22,6 +22,7 @@ public:
 
 class Errors {
   std::set<std::pair<std::string, bool>> errs;
+  std::set<std::string> warnings;
 
 public:
   Errors() = default;
@@ -32,11 +33,14 @@ public:
   void add(const char *str, bool is_unsound);
   void add(std::string &&str, bool is_unsound);
   void add(AliveException &&e);
+  void addWarning(const char *str);
 
   explicit operator bool() const { return !errs.empty(); }
   bool isUnsound() const;
+  bool hasWarnings() const { return !warnings.empty(); }
 
   friend std::ostream& operator<<(std::ostream &os, const Errors &e);
+  void printWarnings(std::ostream &os) const;
 };
 
 }

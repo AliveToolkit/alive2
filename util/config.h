@@ -21,7 +21,7 @@ extern bool disable_undef_input;
 
 extern bool tgt_is_asm;
 
-extern bool check_if_src_is_ub;
+extern bool fail_if_src_is_ub;
 
 /// This is a special mode to verify that LLVM's optimizations are not
 /// exploiting UB. In particular, we disallow any UB related with arithmetic,

@@ -145,7 +145,7 @@ and "tgt5" will unused.
       if (F1.isDeclaration())
         continue;
       auto SrcFName = F1.getName();
-      if (!SrcFName.startswith(opt_src_fn))
+      if (!SrcFName.starts_with(opt_src_fn))
         continue;
 
       // Check src{+d}/tgt{+d} variant

@@ -16,7 +16,7 @@ string smt_benchmark_dir;
 bool disable_poison_input = false;
 bool disable_undef_input = false;
 bool tgt_is_asm = false;
-bool check_if_src_is_ub = false;
+bool fail_if_src_is_ub = false;
 bool disallow_ub_exploitation = false;
 bool debug = false;
 unsigned src_unroll_cnt = 0;

@@ -33,6 +33,10 @@ void Errors::add(AliveException &&e) {
   add(std::move(e.msg), e.is_unsound);
 }
 
+void Errors::addWarning(const char *str) {
+  warnings.emplace(str);
+}
+
 bool Errors::isUnsound() const {
   for (auto &[msg, unsound] : errs) {
     if (unsound)
@@ -46,6 +50,14 @@ ostream& operator<<(ostream &os, const Errors &errs) {
     os << "ERROR: " << msg << '\n';
   }
   return os;
+}
+
+void Errors::printWarnings(std::ostream &os) const {
+  for (auto &str : warnings) {
+    os << "\n****************************************\n"
+          "WARNING: " << str
+       << "\n****************************************\n\n";
+  }
 }
 
 }

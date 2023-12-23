@@ -1305,6 +1305,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
   if (has_null_block)
     state->addAxiom(Pointer::mkNullPointer(*this).getAddress(false) == 0);
 
+  const unsigned max_quadratic_disjoint = 75;
+
   // Non-local blocks are disjoint.
   auto zero = expr::mkUInt(0, bits_ptr_address);
   auto one  = expr::mkUInt(1, bits_ptr_address);
@@ -1341,6 +1343,9 @@ void Memory::mkAxioms(const Memory &tgt) const {
           : addr.add_no_uoverflow(sz));
     }
 
+    if (num_nonlocals > max_quadratic_disjoint)
+      continue;
+
     // disjointness constraint
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
       if (skip_bid(bid2))
@@ -1350,6 +1355,23 @@ void Memory::mkAxioms(const Memory &tgt) const {
                                p2.blockSize().zextOrTrunc(bits_ptr_address),
                                p2.blockAlignment()));
     }
+  }
+
+  // tame down quadratic explosion in disjointness constraint with a quantifier.
+  if (num_nonlocals > max_quadratic_disjoint) {
+    auto bid_ty = expr::mkUInt(0, Pointer::bitsShortBid());
+    expr bid1 = expr::mkFreshVar("#bid1", bid_ty);
+    expr bid2 = expr::mkFreshVar("#bid2", bid_ty);
+    expr offset = expr::mkUInt(0, bits_for_offset);
+    Pointer p1(*this, Pointer::mkLongBid(bid1, false), offset);
+    Pointer p2(*this, Pointer::mkLongBid(bid2, false), offset);
+    state->addAxiom(
+      expr::mkForAll({bid1, bid2},
+        bid1 == bid2 ||
+        disjoint(p1.getAddress(), p1.blockSize().zextOrTrunc(bits_ptr_address),
+                 p1.blockAlignment(),
+                 p2.getAddress(), p2.blockSize().zextOrTrunc(bits_ptr_address),
+                 p2.blockAlignment())));
   }
 }
 

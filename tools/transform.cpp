@@ -502,10 +502,16 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     axioms_expr = std::move(axioms)();
   }
 
-  if (config::check_if_src_is_ub &&
-      check_expr(axioms_expr && fndom_a).isUnsat()) {
-    errs.add("Source function is always UB", false);
-    return;
+  if (check_expr(axioms_expr && fndom_a).isUnsat()) {
+    if (config::fail_if_src_is_ub) {
+      errs.add("Source function is always UB", false);
+      return;
+    } else {
+      errs.addWarning(
+        "Source function is always UB.\n"
+        "It can be refined by any target function.\n"
+        "Please make sure this is what you wanted.");
+    }
   }
 
   {

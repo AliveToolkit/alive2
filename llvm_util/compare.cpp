@@ -108,6 +108,9 @@ bool Verifier::compareFunctions(llvm::Function &F1, llvm::Function &F2) {
     r.t.tgt.writeDot("tgt");
   }
 
+  if (r.errs.hasWarnings())
+    r.errs.printWarnings(out);
+
   switch (r.status) {
   case Results::ERROR:
     UNREACHABLE();
