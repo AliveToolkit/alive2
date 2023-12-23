@@ -5,6 +5,7 @@
 
 #include "smt/expr.h"
 #include "util/compiler.h"
+#include "util/spaceship.h"
 #include <cassert>
 #include <compare>
 #include <map>
