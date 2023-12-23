@@ -918,9 +918,9 @@ end:
   return aliasing;
 }
 
-template <typename Fn>
 void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
-                    bool write, Fn &fn) {
+                    bool write, const
+                      function<void(MemBlock&, unsigned, bool, expr&&)> &fn) {
   auto aliasing = computeAliasing(ptr, bytes, align, write);
   unsigned has_local = aliasing.numMayAlias(true);
   unsigned has_nonlocal = aliasing.numMayAlias(false);
@@ -972,12 +972,12 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   expr offset = ptr.getShortOffset();
   unsigned off_bits = Pointer::bitsShortOffset();
 
-  auto fn = [&](const MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+  auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
     bool is_poison = (type & blk.type) == DATA_NONE;
     for (unsigned i = 0; i < loaded_bytes; ++i) {
       unsigned idx = left2right ? i : (loaded_bytes - i - 1);
       expr off = offset + expr::mkUInt(idx, off_bits);
-      loaded[i].add(is_poison ? poison : blk.val.load(off), std::move(cond));
+      loaded[i].add(is_poison ? poison : blk.val.load(off), cond);
       if (!is_poison)
         undef.insert(blk.undef.begin(), blk.undef.end());
     }

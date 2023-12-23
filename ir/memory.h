@@ -179,9 +179,9 @@ class Memory {
   AliasSet computeAliasing(const Pointer &ptr, unsigned bytes, uint64_t align,
                            bool write) const;
 
-  template <typename Fn>
   void access(const Pointer &ptr, unsigned btyes, uint64_t align, bool write,
-              Fn &fn);
+              const std::function<void(MemBlock&, unsigned, bool,
+                                       smt::expr&&)> &fn);
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
                          std::set<smt::expr> &undef, uint64_t align,
