@@ -1543,7 +1543,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
         return a == b;
 
       // (sext a) == 0 -> a == 0
-      if (b.isZero())
+      if (rhs.isZero())
         return a == mkUInt(0, a);
     }
   }
