@@ -838,7 +838,9 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
     expr offset = offset0.sextOrTrunc(bits_size_t);
-    if (offset.uge(*sz).isTrue() || (*sz - offset).ult(bytes).isTrue())
+    if (offset.uge(*sz).isTrue() ||
+        sz->ult(bytes).isTrue() ||
+        (*sz - offset).ult(bytes).isTrue())
       return false;
   } else if (local) // allocated in another branch
     return false;
