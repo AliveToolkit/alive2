@@ -2001,17 +2001,22 @@ expr expr::store(const expr &idx, const expr &val) const {
   return Z3_mk_store(ctx(), ast(), idx(), val());
 }
 
-expr expr::load(const expr &idx) const {
+expr expr::load(const expr &idx, uint64_t max_idx) const {
   C(idx);
 
   // TODO: add support for alias analysis plugin
   expr array, str_idx, val;
   if (isStore(array, str_idx, val)) { // store(array, idx, val)
+    uint64_t str_idx_val;
+    // loaded idx can't possibly match the stored idx; there's UB otherwise
+    if (str_idx.isUInt(str_idx_val) && str_idx_val > max_idx)
+      return array.load(idx, max_idx);
+
     expr cmp = idx == str_idx;
     if (cmp.isTrue())
       return val;
 
-    auto loaded = array.load(idx);
+    auto loaded = array.load(idx, max_idx);
     if (cmp.isFalse() || val.eq(loaded))
       return loaded;
 
