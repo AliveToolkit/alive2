@@ -1634,7 +1634,7 @@ void Transform::preprocess() {
       for (auto &i : bb->instrs()) {
         if (auto *load = dynamic_cast<const Load*>(&i)) {
           auto align = load->getAlign();
-          if (align != 1) {
+          if (align > load->getMaxAccessSize()) {
             static IntType i64("i64", 64);
             auto bytes = make_unique<IntConst>(i64, align);
             to_add.emplace_back(load, make_unique<Assume>(
