@@ -848,14 +848,11 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMax:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
       expr ndet = s.getFreshNondetVar("maxminnondet", true);
-      auto ndz = expr::mkIf(ndet, expr::mkNumber("0", a),
-                            expr::mkNumber("-0", a));
-
-      expr z = a.isFPZero() && b.isFPZero();
       expr cmp = op == FMin ? a.fole(b) : a.foge(b);
       return expr::mkIf(a.isNaN(), b,
                         expr::mkIf(b.isNaN(), a,
-                                   expr::mkIf(z, ndz,
+                                   expr::mkIf(a.foeq(b),
+                                              expr::mkIf(ndet, a, b),
                                               expr::mkIf(cmp, a, b))));
     };
     break;
