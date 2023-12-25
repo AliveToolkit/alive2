@@ -339,10 +339,11 @@ static void add_users(Function::UsersTy &users, Value *i, BasicBlock *bb,
                       Value *val) {
   if (auto *agg = dynamic_cast<AggregateValue*>(val)) {
     for (auto elem : agg->getVals()) {
-      add_users(users, i, bb, elem);
+      add_users(users, val, bb, elem);
     }
   }
-  users[val].emplace(i, bb);
+  if (i != val)
+    users[val].emplace(i, bb);
 }
 
 void Function::addFnDecl(FnDecl &&decl) {
