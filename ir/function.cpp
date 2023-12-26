@@ -225,7 +225,7 @@ void Function::addConstant(unique_ptr<Value> &&c) {
   constants.emplace_back(std::move(c));
 }
 
-Value* Function::getConstant(string_view name) const {
+Value* Function::getGlobalVar(string_view name) const {
   for (auto &c : constants) {
     if (c->getName() == name)
       return c.get();
@@ -300,7 +300,7 @@ void Function::syncDataWithSrc(Function &src) {
   auto copy_fns = [](const auto &src, auto &dst) {
     for (auto &c : src.getConstants()) {
       auto *gv = dynamic_cast<const GlobalVariable*>(&c);
-      if (gv && gv->isArbitrarySize() && !dst.getConstant(gv->getName()))
+      if (gv && gv->isArbitrarySize() && !dst.getGlobalVar(gv->getName()))
         dst.addConstant(make_unique<GlobalVariable>(*gv));
     }
   };

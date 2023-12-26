@@ -2329,7 +2329,7 @@ StateValue FnCall::toSMT(State &s) const {
   // This is a direct call, but check if there are indirect calls elsewhere
   // to this function. If so, call it indirectly to match the other calls.
   if (!ptr)
-    ptr = s.getFn().getConstant(string_view(fnName).substr(1));
+    ptr = s.getFn().getGlobalVar(string_view(fnName).substr(1));
 
   ostringstream fnName_mangled;
   if (ptr) {
