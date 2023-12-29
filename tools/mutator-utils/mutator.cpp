@@ -216,7 +216,7 @@ bool FunctionMutator::canMutate(const llvm::Instruction &inst,
     if (llvm::Function *func = ((llvm::CallBase *)&inst)->getCalledFunction();
         func != nullptr &&
         (filterSet.find(func->getName().str()) != filterSet.end() ||
-         func->getName().startswith("llvm"))) {
+         func->getName().starts_with("llvm"))) {
       return false;
     }
   }
