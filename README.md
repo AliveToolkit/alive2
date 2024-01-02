@@ -230,6 +230,9 @@ to add `nsw`.
 If you are not interested in counterexamples using `undef`, you can use the
 command-line argument `-disable-undef-input`.
 
+You can also use the first mode on a single file containing a function called
+“src” and also a function called “tgt”.
+
 In the second mode, specify a single unoptimized IR file. alive-tv
 will optimize it using an optimization pipeline similar to -O2, but
 without any interprocedural passes, and then attempt to validate the
