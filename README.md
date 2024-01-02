@@ -204,8 +204,9 @@ Running the Standalone Translation Validation Tool (alive-tv)
 
 This tool has two modes.
 
-In the first mode, specify a source (original) and target (optimized)
-IR file. For example, let's prove that removing `nsw` is correct
+In the first mode, specify either a source (original) and target (optimized)
+IR file, or a single file containing a function called
+“src” and also a function called “tgt”. For example, let's prove that removing `nsw` is correct
 for addition:
 
 ```
@@ -229,9 +230,6 @@ Flipping the inputs yields a counterexample, since it's not correct, in general,
 to add `nsw`.
 If you are not interested in counterexamples using `undef`, you can use the
 command-line argument `-disable-undef-input`.
-
-You can also use the first mode on a single file containing a function called
-“src” and also a function called “tgt”.
 
 In the second mode, specify a single unoptimized IR file. alive-tv
 will optimize it using an optimization pipeline similar to -O2, but
