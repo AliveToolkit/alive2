@@ -204,10 +204,10 @@ Running the Standalone Translation Validation Tool (alive-tv)
 
 This tool has two modes.
 
-In the first mode, specify either a source (original) and target (optimized)
-IR file, or a single file containing a function called
-“src” and also a function called “tgt”. For example, let's prove that removing `nsw` is correct
-for addition:
+In the first mode, specify either a source (original) and target (optimized) IR
+file, or a single file containing a function called “src” and also a function
+called “tgt”. For example, let’s prove that removing `nsw` is correct for
+addition:
 
 ```
 $ALIVE2_HOME/alive2/build/alive-tv src.ll tgt.ll
