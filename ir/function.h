@@ -142,7 +142,7 @@ public:
   }
   unsigned numConstants() const { return constants.size(); }
   Value &getConstant(int idx) const { return *constants[idx]; }
-  Value* getConstant(std::string_view name) const;
+  Value* getGlobalVar(std::string_view name) const;
 
   std::vector<GlobalVariable *> getGlobalVars() const;
   std::vector<std::string_view> getGlobalVarNames() const;

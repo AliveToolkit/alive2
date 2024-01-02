@@ -4,7 +4,6 @@
 #include "smt/exprs.h"
 #include "smt/smt.h"
 #include "util/compiler.h"
-#include "util/spaceship.h"
 #include <vector>
 
 using namespace std;
@@ -189,12 +188,8 @@ void FunctionExpr::add(const FunctionExpr &other) {
   fn.insert(other.fn.begin(), other.fn.end());
 }
 
-void FunctionExpr::del(const expr &key) {
-  fn.erase(key);
-}
-
 optional<expr> FunctionExpr::operator()(const expr &key) const {
-  DisjointExpr disj(default_val);
+  DisjointExpr<expr> disj;
   for (auto &[k, v] : fn) {
     disj.add(v, k == key);
   }
@@ -208,26 +203,10 @@ const expr* FunctionExpr::lookup(const expr &key) const {
 
 FunctionExpr FunctionExpr::simplify() const {
   FunctionExpr newfn;
-  if (default_val)
-    newfn.default_val = default_val->simplify();
-
   for (auto &[k, v] : fn) {
     newfn.add(k.simplify(), v.simplify());
   }
   return newfn;
-}
-
-weak_ordering FunctionExpr::operator<=>(const FunctionExpr &rhs) const {
-  if (auto cmp = fn <=> rhs.fn;
-      is_neq(cmp))
-    return cmp;
-
-  // libstdc++'s optional::operator<=> is buggy
-  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98842
-  if (default_val && rhs.default_val)
-    return *default_val <=> *rhs.default_val;
-
-  return (bool)default_val <=> (bool)rhs.default_val;
 }
 
 ostream& operator<<(ostream &os, const FunctionExpr &f) {
@@ -235,8 +214,6 @@ ostream& operator<<(ostream &os, const FunctionExpr &f) {
   for (auto &[k, v] : f) {
     os << k << ": " << v << '\n';
   }
-  if (f.default_val)
-    os << "default: " << *f.default_val << '\n';
   return os << '}';
 }
 
