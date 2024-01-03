@@ -292,7 +292,7 @@ Summary:
 ```
 
 Please keep in mind that you do not have to compile Alive2 in order to
-try out alive-tv; it is available online: [https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/)
+try out alive-tv; it is available online: https://alive2.llvm.org/ce/
 
 
 Running the Standalone LLVM Execution Tool (alive-exec)
