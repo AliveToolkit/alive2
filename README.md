@@ -64,7 +64,12 @@ Building and Running Translation Validation
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
 RTTI and exceptions turned on.
 LLVM can be built in the following way.
-(You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON` to the CMake step if your default compiler is `gcc`.)
+* You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the CMake step if your default compiler is `gcc`.
+* Explicitly setting the target may not be necessary.
+* `BUILD_SHARED_LIBS` may not be necessary, and for LLVM forks not normally
+built with the option, may interfere with CMake files’ use of `USEDLIBS` and
+`LLVMLIBS`, and perhaps `dd_llvm_target`.
+
 ```
 cd $LLVM2_HOME
 mkdir build
@@ -199,12 +204,13 @@ Running the Standalone Translation Validation Tool (alive-tv)
 
 This tool has two modes.
 
-In the first mode, specify a source (original) and target (optimized)
-IR file. For example, let's prove that removing `nsw` is correct
-for addition:
+In the first mode, specify either a source (original) and target (optimized) IR
+file, or a single file containing a function called “src” and also a function
+called “tgt”. For example, let’s prove that removing `nsw` is correct for
+addition:
 
 ```
-$ alive-tv src.ll tgt.ll
+$ALIVE2_HOME/alive2/build/alive-tv src.ll tgt.ll
 
 ----------------------------------------
 define i32 @f(i32 %a, i32 %b) {
@@ -234,7 +240,8 @@ For example, as of February 6 2020, the `release/10.x` branch contains
 an optimizer bug that can be triggered as follows:
 
 ```
-$ cat foo.ll
+cat foo.ll
+
 define i3 @foo(i3) {
   %x1 = sub i3 0, %0
   %x2 = icmp ne i3 %0, 0
@@ -243,7 +250,8 @@ define i3 @foo(i3) {
   %x5 = lshr i3 %x4, %x3
   ret i3 %x5
 }
-$ alive-tv foo.ll
+
+$ALIVE2_HOME/alive2/build/alive-tv foo.ll
 
 ----------------------------------------
 define i3 @foo(i3 %0) {
@@ -354,9 +362,6 @@ runtime errors with “symbol not found in flat namespace.”  Setting
 [CMAKE_OSX_DEPLOYMENT_TARGET](https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html)
 as a cache entry to 11.0 or less at the beginning of CMakeLists.txt may work
 around this.
-* Building for Translation Validation requires enabling `BUILD_SHARED_LIBS`. 
-For LLVM forks not normally built with the option, this may interfere with
-CMake files’ use of `USEDLIBS` and `LLVMLIBS` and perhaps `dd_llvm_target`. 
 * Building for Translation Validation is tightly coupled to LLVM top of tree
 source.  Building a fork with older source may require reverting to the
 corresponding Alive2 commit.  This in turn may require experimentation with
@@ -369,7 +374,7 @@ which outputs the command passed to `opt`.  Note that this may interfere
 with tests which check output.
 * The script also accepts a `--no-timeout` option, which disables the `opt`
 process timeout.  This timeout is not supported on Macintosh.  To change the
-SMT timeout, instead adjust the `query_timeout` constant in `smt/smt.cpp`.
+SMT timeout, instead pass an `-smt-to:` option to the `alive` executable.
 
 LLVM Bugs Found by Alive2
 --------

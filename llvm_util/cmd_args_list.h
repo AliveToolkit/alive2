@@ -59,7 +59,7 @@ llvm::cl::opt<bool> opt_se_verbose(LLVM_ARGS_PREFIX "se-verbose",
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<unsigned> opt_smt_to(LLVM_ARGS_PREFIX "smt-to",
-  llvm::cl::desc("Timeout for SMT queries (default=10000)"),
+  llvm::cl::desc("Timeout for SMT queries in ms (default=10000)"),
   llvm::cl::init(10000), llvm::cl::value_desc("ms"),
   llvm::cl::cat(alive_cmdargs));
 
