@@ -31,7 +31,7 @@ for arg in $OPT_ARGS; do
   done
 
   for p in $FORCE_OLD_NPM; do
-    if [[ $arg == "-$p" ]]; then
+    if [[ $arg == "-$p" || $arg == "--$p" ]]; then
       NPM_TV=0
       break
     fi
