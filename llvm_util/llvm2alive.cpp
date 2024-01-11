@@ -628,7 +628,7 @@ public:
         continue;
       }
 
-      gep->addIdx(I.getSequentialElementStride(DL()), *op);
+      gep->addIdx(I.getSequentialElementStride(DL()).getKnownMinValue(), *op);
     }
     RETURN_IDENTIFIER(std::move(gep));
   }
