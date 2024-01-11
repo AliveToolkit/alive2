@@ -1591,7 +1591,9 @@ public:
     }
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
-    attrs.mem = handleMemAttrs(i.getMemoryEffects());
+    attrs.mem.setFullAccess();
+    if (!decl_only)
+      attrs.mem &= handleMemAttrs(i.getMemoryEffects());
     if (fn)
       attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
     attrs.inferImpliedAttributes();
