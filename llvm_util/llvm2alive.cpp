@@ -619,7 +619,7 @@ public:
           }
 
           auto ofs_vector = llvm::ConstantVector::get(
-	      { offsets.data(), offsets.size() });
+            { offsets.data(), offsets.size() });
           gep->addIdx(1, *get_operand(ofs_vector));
         } else {
           gep->addIdx(1, *make_intconst(
@@ -628,8 +628,7 @@ public:
         continue;
       }
 
-      gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()).getKnownMinValue(),
-                  *op);
+      gep->addIdx(I.getSequentialElementStride(DL()), *op);
     }
     RETURN_IDENTIFIER(std::move(gep));
   }
