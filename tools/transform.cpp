@@ -1635,9 +1635,10 @@ void Transform::preprocess() {
       for (auto &i : bb->instrs()) {
         if (auto *load = dynamic_cast<const Load*>(&i)) {
           auto align = load->getAlign();
-          if (align > load->getMaxAccessSize()) {
+          auto size  = load->getMaxAccessSize();
+          if (size % align) {
             static IntType i64("i64", 64);
-            auto bytes = make_unique<IntConst>(i64, align);
+            auto bytes = make_unique<IntConst>(i64, round_up(size, align));
             to_add.emplace_back(load, make_unique<Assume>(
               vector<Value*>{&load->getPtr(), bytes.get()},
               Assume::Dereferenceable));
