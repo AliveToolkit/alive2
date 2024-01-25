@@ -2679,6 +2679,10 @@ void FCmp::print(ostream &os) const {
   }
   os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
      << b->getName();
+  if (signaling)
+    os << ", signaling";
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
 }
 
 StateValue FCmp::toSMT(State &s) const {
