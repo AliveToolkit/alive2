@@ -13,7 +13,7 @@ set -e
 SKIP_TV_PASSES="argpromotion deadargelim globalopt hotcoldsplit inline ipconstprop ipsccp mergefunc partial-inliner function-specialization =tbaa loop-extract extract-blocks safe-stack place-safepoints attributor function-attrs metarenamer sample-profile lowertypetests extract-blocks openmp-opt-cgscc prune-eh tailcallelim iroutliner globals-aa debug-pass-manager"
 
 # see opt.cpp: shouldForceLegacyPM()
-FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand hardware-loops interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expandmemcmp expand-large-div-rem expand-large-fp-convert structurizecfg fix-irreducible"
+FORCE_OLD_NPM="codegenprepare interleaved-load-combine unreachableblockelim atomic-expand expandvp interleaved-access global-merge expand-reductions indirectbr-expand pre-isel-intrinsic-lowering loop-reduce expand-large-div-rem expand-large-fp-convert structurizecfg fix-irreducible expand-memcmp amdgpu-aa-wrapper aarch64-lit"
 
 # opt enables NPM by default.
 NPM_TV=1
@@ -31,25 +31,25 @@ for arg in $OPT_ARGS; do
   done
 
   for p in $FORCE_OLD_NPM; do
-    if [[ $arg == "-$p" ]]; then
+    if [[ $arg == "-$p" || $arg == "--$p" ]]; then
       NPM_TV=0
       break
     fi
   done
-  
+
   if [[ $arg == "--verbose" ]]; then
     VERBOSE=1
     echo VERBOSE
     OPT_ARGS="${OPT_ARGS/--verbose/}"
     continue
   fi
-  
+
   if [[ $arg == "--no-timeout" ]]; then
     NO_TIMEOUT=1
     OPT_ARGS="${OPT_ARGS/--no-timeout/}"
    continue
   fi
-  
+
 done
 
 TIMEOUT=""

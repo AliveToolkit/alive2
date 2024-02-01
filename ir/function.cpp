@@ -848,7 +848,7 @@ void Function::print(ostream &os, bool print_header) const {
         os << input.second << *input.first;
         first = false;
       }
-      os << ")\n";
+      os << ')' << decl.attrs << '\n';
     }
     os << '\n';
   }

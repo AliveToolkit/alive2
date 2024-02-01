@@ -18,6 +18,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <queue>
 #include <set>
 #include <sstream>
 #include <unordered_map>
@@ -1634,9 +1635,10 @@ void Transform::preprocess() {
       for (auto &i : bb->instrs()) {
         if (auto *load = dynamic_cast<const Load*>(&i)) {
           auto align = load->getAlign();
-          if (align > load->getMaxAccessSize()) {
+          auto size  = load->getMaxAccessSize();
+          if (size % align) {
             static IntType i64("i64", 64);
-            auto bytes = make_unique<IntConst>(i64, align);
+            auto bytes = make_unique<IntConst>(i64, round_up(size, align));
             to_add.emplace_back(load, make_unique<Assume>(
               vector<Value*>{&load->getPtr(), bytes.get()},
               Assume::Dereferenceable));
@@ -1732,7 +1734,7 @@ void Transform::preprocess() {
 
   // infer alignment of memory operations
   unordered_map<const Value*, uint64_t> aligns;
-  unordered_set<const Value*> worklist;
+  queue<const Value*> worklist;
   for (auto fn : { &src, &tgt }) {
     for (auto &in0 : fn->getInputs()) {
       auto *in = dynamic_cast<const Input*>(&in0);
@@ -1752,11 +1754,10 @@ void Transform::preprocess() {
     auto users = fn->getUsers();
 
     do {
-      auto I = worklist.begin();
-      auto *i = *I;
-      worklist.erase(I);
+      auto *i = worklist.front();
+      worklist.pop();
 
-      uint64_t align = 0;
+      uint64_t align = 1;
       if (auto *alloc = dynamic_cast<const Alloc*>(i)) {
         align = alloc->getAlign();
       } else if (auto *call = dynamic_cast<const FnCall*>(i)) {
@@ -1786,15 +1787,18 @@ void Transform::preprocess() {
       } else if (auto *phi = dynamic_cast<const Phi*>(i)) {
         // optimistic handling of phis: unreachable predecessors don't
         // contribute to the result. This is revisited once they become reach
+        align = 0;
         for (auto &[val, bb] : phi->getValues()) {
           if (auto phi_align = aligns[val])
             align = align ? min(align, phi_align) : phi_align;
         }
-      } else {
+      } else if (!i->getType().isPtrType()) {
         continue;
       }
-      if (align != aligns[i]) {
-        aligns[i] = align;
+
+      auto &old_align = aligns[i];
+      if (align != old_align) {
+        old_align = align;
         for (auto [user, BB] : users[i]) {
           worklist.emplace(user);
         }

@@ -58,6 +58,31 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   }
 }
 
+FCmp::Cond parse_fcmp_cond(llvm::FCmpInst::Predicate pred) {
+  FCmp::Cond cond;
+  switch (pred) {
+  case llvm::CmpInst::FCMP_OEQ:   cond = FCmp::OEQ; break;
+  case llvm::CmpInst::FCMP_OGT:   cond = FCmp::OGT; break;
+  case llvm::CmpInst::FCMP_OGE:   cond = FCmp::OGE; break;
+  case llvm::CmpInst::FCMP_OLT:   cond = FCmp::OLT; break;
+  case llvm::CmpInst::FCMP_OLE:   cond = FCmp::OLE; break;
+  case llvm::CmpInst::FCMP_ONE:   cond = FCmp::ONE; break;
+  case llvm::CmpInst::FCMP_ORD:   cond = FCmp::ORD; break;
+  case llvm::CmpInst::FCMP_UEQ:   cond = FCmp::UEQ; break;
+  case llvm::CmpInst::FCMP_UGT:   cond = FCmp::UGT; break;
+  case llvm::CmpInst::FCMP_UGE:   cond = FCmp::UGE; break;
+  case llvm::CmpInst::FCMP_ULT:   cond = FCmp::ULT; break;
+  case llvm::CmpInst::FCMP_ULE:   cond = FCmp::ULE; break;
+  case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
+  case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
+  case llvm::CmpInst::FCMP_TRUE:  cond = FCmp::TRUE; break;
+  case llvm::CmpInst::FCMP_FALSE: cond = FCmp::FALSE; break;
+  default:
+    UNREACHABLE();
+  }
+  return cond;
+}
+
 bool hit_limits;
 unsigned constexpr_idx;
 unsigned copy_idx;
@@ -485,27 +510,7 @@ public:
 
   RetTy visitFCmpInst(llvm::FCmpInst &i) {
     PARSE_BINOP();
-    FCmp::Cond cond;
-    switch (i.getPredicate()) {
-    case llvm::CmpInst::FCMP_OEQ:   cond = FCmp::OEQ; break;
-    case llvm::CmpInst::FCMP_OGT:   cond = FCmp::OGT; break;
-    case llvm::CmpInst::FCMP_OGE:   cond = FCmp::OGE; break;
-    case llvm::CmpInst::FCMP_OLT:   cond = FCmp::OLT; break;
-    case llvm::CmpInst::FCMP_OLE:   cond = FCmp::OLE; break;
-    case llvm::CmpInst::FCMP_ONE:   cond = FCmp::ONE; break;
-    case llvm::CmpInst::FCMP_ORD:   cond = FCmp::ORD; break;
-    case llvm::CmpInst::FCMP_UEQ:   cond = FCmp::UEQ; break;
-    case llvm::CmpInst::FCMP_UGT:   cond = FCmp::UGT; break;
-    case llvm::CmpInst::FCMP_UGE:   cond = FCmp::UGE; break;
-    case llvm::CmpInst::FCMP_ULT:   cond = FCmp::ULT; break;
-    case llvm::CmpInst::FCMP_ULE:   cond = FCmp::ULE; break;
-    case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
-    case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
-    case llvm::CmpInst::FCMP_TRUE:  cond = FCmp::TRUE; break;
-    case llvm::CmpInst::FCMP_FALSE: cond = FCmp::FALSE; break;
-    default:
-      UNREACHABLE();
-    }
+    auto cond = parse_fcmp_cond(i.getPredicate());
     RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b,
                                         parse_fmath(i)));
   }
@@ -619,7 +624,7 @@ public:
           }
 
           auto ofs_vector = llvm::ConstantVector::get(
-	      { offsets.data(), offsets.size() });
+            { offsets.data(), offsets.size() });
           gep->addIdx(1, *get_operand(ofs_vector));
         } else {
           gep->addIdx(1, *make_intconst(
@@ -628,8 +633,7 @@ public:
         continue;
       }
 
-      gep->addIdx(DL().getTypeAllocSize(I.getIndexedType()).getKnownMinValue(),
-                  *op);
+      gep->addIdx(I.getSequentialElementStride(DL()).getKnownMinValue(), *op);
     }
     RETURN_IDENTIFIER(std::move(gep));
   }
@@ -1110,6 +1114,16 @@ public:
         make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
                                     parse_rounding(i), parse_exceptions(i)),
         attrs);
+    }
+    case llvm::Intrinsic::experimental_constrained_fcmp:
+    case llvm::Intrinsic::experimental_constrained_fcmps:
+    {
+      PARSE_BINOP();
+      auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
+      auto cond = parse_fcmp_cond(fcmp->getPredicate());
+      RETURN_IDENTIFIER(
+        make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
+                          parse_exceptions(i), fcmp->isSignaling()));
     }
     case llvm::Intrinsic::is_fpclass:
     {
@@ -1592,7 +1606,9 @@ public:
     }
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
-    attrs.mem = handleMemAttrs(i.getMemoryEffects());
+    attrs.mem.setFullAccess();
+    if (!decl_only)
+      attrs.mem &= handleMemAttrs(i.getMemoryEffects());
     if (fn)
       attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
     attrs.inferImpliedAttributes();

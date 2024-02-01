@@ -422,11 +422,14 @@ private:
   Value *a, *b;
   Cond cond;
   FastMathFlags fmath;
+  FpExceptionMode ex;
+  bool signaling;
 
 public:
   FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
-       FastMathFlags fmath)
-    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath) {}
+       FastMathFlags fmath, FpExceptionMode ex = {}, bool signaling = false)
+    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath),
+      ex(ex), signaling(signaling) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
