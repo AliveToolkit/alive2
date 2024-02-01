@@ -69,6 +69,10 @@ LLVM can be built in the following way.
 * `BUILD_SHARED_LIBS` may not be necessary, and for LLVM forks not normally
 built with the option, may interfere with CMake files’ use of `USEDLIBS` and
 `LLVMLIBS`, and perhaps `dd_llvm_target`.
+* To build with Xcode rather than Ninja, replace `-GNinja` with `-GXcode` in
+the `cmake` step below, and append `-DLLVM_MAIN_SRC_DIR=$LLVM2_HOME/llvm`. 
+Xcode may place `tv.dylib` in a different location; a symbolic link from the
+actual location to that in the resultant error message may help.
 
 ```
 cd $LLVM2_HOME
