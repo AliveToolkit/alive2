@@ -71,7 +71,8 @@ built with the option, may interfere with CMake files’ use of `USEDLIBS` and
 `LLVMLIBS`, and perhaps `dd_llvm_target`.
 * To build with Xcode rather than Ninja, replace `-GNinja` with `-GXcode` in
 the `cmake` step below, and append `-DLLVM_MAIN_SRC_DIR=$LLVM2_HOME/llvm`. 
-  * It may be necessary to disable warnings for “Implicit Conversion to 32 Bit Type” in the project build settings.
+  * It may be necessary to disable warnings for “Implicit Conversion to 32 Bit
+  Type” in the project build settings.
   * Xcode may place `tv.dylib` in a different location; a symbolic link from the
 actual location to that in the resultant error message may help.
 
