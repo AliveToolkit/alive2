@@ -10,14 +10,14 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-22.04]
-        compiler:   [g++-13, clang++-17, clang++-18]
+        compiler:   [g++-13, clang++-18, clang++-19]
         build_type: [Release, Debug]
         cache:      ['', Redis]
         include:
-          - os: macos-13
+          - os: macos-14
             compiler: clang++
             build_type: Release
-          - os: macos-13
+          - os: macos-14
             compiler: clang++
             build_type: Debug
 
@@ -29,19 +29,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          if [[ ${{ matrix.compiler }} == "clang++-17" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main"
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-18" ]]; then
+            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-19" ]]; then
             sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
           fi
           sudo apt-get update
           sudo apt-get install z3 re2c ninja-build
-          if [[ ${{ matrix.compiler }} == "clang++-17" ]]; then
-            sudo apt-get install clang++-17
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-18" ]]; then
             sudo apt-get install clang++-18
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-19" ]]; then
+            sudo apt-get install clang++-19
           fi
           if [[ "${{ matrix.cache }}" == "Redis" ]]; then
             sudo apt-get install libhiredis-dev
