@@ -250,7 +250,7 @@ public:
 
   void markByVal(unsigned bid, bool is_const);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);
-  std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs) const;
+  std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs);
 
   struct PtrInput {
     unsigned idx;

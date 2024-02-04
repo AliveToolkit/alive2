@@ -511,7 +511,7 @@ expr Pointer::isHeapAllocated() const {
 }
 
 expr Pointer::refined(const Pointer &other) const {
-  bool is_asm = other.m.state->getFn().has(FnAttrs::Asm);
+  bool is_asm = other.m.isAsmMode();
 
   // This refers to a block that was malloc'ed within the function
   expr local = other.isLocal();
@@ -537,7 +537,7 @@ expr Pointer::refined(const Pointer &other) const {
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
                              const expr &byval_bytes) const {
-  bool is_asm = other.m.state->getFn().has(FnAttrs::Asm);
+  bool is_asm = other.m.isAsmMode();
   expr size = blockSizeOffsetT();
   expr off = getOffsetSizet();
   expr size2 = other.blockSizeOffsetT();
@@ -573,7 +573,9 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
 
   return expr::mkIf(isNull(), other.isNull(),
                     expr::mkIf(isLocal(), local, nonlocal) &&
-                      isBlockAlive().implies(other_deref.isBlockAlive()));
+                      // FIXME: this should be disabled just for phy pointers
+                      (is_asm ? expr(true)
+                        : isBlockAlive().implies(other_deref.isBlockAlive())));
 }
 
 expr Pointer::isWritable() const {

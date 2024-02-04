@@ -1433,26 +1433,20 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
   return std::move(p).release();
 }
 
-pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs0) const {
-  bool nonnull = attrs0.has(ParamAttrs::NonNull);
-  unsigned log_offset = ilog2_ceil(bits_for_offset, false);
-  unsigned bits_undef = bits_for_offset + nonnull * log_offset;
-  expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits_undef));
-  expr offset = undef;
+pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs0) {
+  unsigned bits = bits_for_offset + bits_for_bid - Pointer::hasLocalBit();
+  expr undef = expr::mkFreshVar("undef", expr::mkUInt(0, bits));
 
-  if (nonnull) {
-    expr var = undef.extract(log_offset - 1, 0);
-    expr one = expr::mkUInt(1, bits_for_offset);
-    expr shl = expr::mkIf(var.ugt(bits_for_offset-1),
-                          one,
-                          one << var.zextOrTrunc(bits_for_offset));
-    offset = undef.extract(bits_undef - 1, log_offset) | shl;
-  }
   auto attrs = attrs0;
   attrs.set(ParamAttrs::IsArg);
-  return
-    { Pointer(*this, expr::mkUInt(0, bits_for_bid), offset, attrs).release(),
-      std::move(undef) };
+  Pointer ptr(*this,
+              Pointer::mkLongBid(undef.extract(bits-1, bits_for_offset), false),
+              undef.extract(bits_for_offset-1, 0), attrs);
+
+  if (attrs0.has(ParamAttrs::NonNull))
+    state->addPre(!ptr.isNull());
+
+  return { std::move(ptr).release(), std::move(undef) };
 }
 
 expr Memory::PtrInput::implies(const PtrInput &rhs) const {
