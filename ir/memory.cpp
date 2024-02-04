@@ -325,7 +325,7 @@ expr Byte::isZero() const {
 expr Byte::castPtrToInt() const {
   auto offset = ptrByteoffset().zextOrTrunc(bits_ptr_address);
        offset = offset * expr::mkUInt(bits_byte, offset);
-  return ptr().getAddress().lshr(offset).trunc(bits_byte);
+  return ptr().getAddress().lshr(offset).zextOrTrunc(bits_byte);
 }
 
 expr Byte::forceCastToInt() const {
