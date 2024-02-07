@@ -50,7 +50,6 @@ if (!report_dir_created && !opt_report_dir.empty()) {
         newname = "in";
       newname += "_" + get_random_str(8) + ".txt";
       path.replace_filename(newname);
-      std::cerr << "\n\nWriting report to: " << newname <<  endl << endl;
     } while (fs::exists(path));
   }
 
