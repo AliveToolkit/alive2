@@ -625,6 +625,10 @@ bool State::isUndef(const expr &e) const {
   return undef_vars.count(e) != 0;
 }
 
+bool State::isAsmMode() const {
+  return getFn().has(FnAttrs::Asm);
+}
+
 void State::cleanup(const Value &val) {
   values.erase(&val);
   seen_bbs.clear();
@@ -1195,8 +1199,9 @@ void State::addUndefVar(expr &&var) {
   undef_vars.emplace(std::move(var));
 }
 
-void State::resetUndefVars() {
-  quantified_vars.insert(undef_vars.begin(), undef_vars.end());
+void State::resetUndefVars(bool quantify) {
+  ((isSource() || !quantify) ? quantified_vars : fn_call_qvars)
+    .insert(undef_vars.begin(), undef_vars.end());
   undef_vars.clear();
 }
 
@@ -1224,10 +1229,9 @@ void State::finishInitializer() {
 }
 
 void State::saveReturnedInput() {
-  assert(isSource());
   if (auto *ret = getFn().getReturnedInput()) {
     returned_input = (*this)[*ret];
-    resetUndefVars();
+    resetUndefVars(true);
   }
 }
 
@@ -1292,8 +1296,6 @@ void State::syncSEdataWithSrc(State &src) {
   glbvar_bids = src.glbvar_bids;
   for (auto &itm : glbvar_bids)
     itm.second.second = false;
-
-  returned_input = src.returned_input;
 
   fn_call_data = std::move(src.fn_call_data);
   inaccessiblemem_bids = std::move(src.inaccessiblemem_bids);

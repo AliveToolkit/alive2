@@ -1,4 +1,4 @@
-; ERROR: Value mismatch
+; ERROR: Source is more defined than target
 
 define <2 x i4> @src(<2 x i4> %0) {
   ret <2 x i4> %0

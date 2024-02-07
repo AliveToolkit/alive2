@@ -234,7 +234,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   auto undef_mask = getUndefVar(ty, child);
   if (config::disable_undef_input || attrs.poisonImpliesUB()) {
     s.addUB(undef_mask == 0);
-  } else if (s.getFn().has(FnAttrs::Asm)) {
+  } else if (s.isAsmMode()) {
     // do nothing; there's no undef in assembly
   } else {
     auto [undef, var] = ty.mkUndefInput(s, attrs);
@@ -252,7 +252,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (never_poison) {
     s.addUB(std::move(np));
     np = true;
-  } else if (s.getFn().has(FnAttrs::Asm)) {
+  } else if (s.isAsmMode()) {
     // There's no poison in assembly
     np = true;
   }

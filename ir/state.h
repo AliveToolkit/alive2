@@ -216,6 +216,8 @@ public:
   const ValTy* at(const Value &val) const;
   bool isUndef(const smt::expr &e) const;
 
+  bool isAsmMode() const;
+
   // only used by alive-exec to support execution of the same BB multiple times
   void cleanup(const Value &val);
   void cleanupPredecessorData();
@@ -266,7 +268,7 @@ public:
   void addFnQuantVar(const smt::expr &var);
   void addUndefVar(smt::expr &&var);
   auto& getUndefVars() const { return undef_vars; }
-  void resetUndefVars();
+  void resetUndefVars(bool quantify = false);
 
   StateValue rewriteUndef(StateValue &&val,
                           const std::set<smt::expr> &undef_vars);

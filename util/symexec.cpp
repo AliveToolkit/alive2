@@ -36,9 +36,7 @@ void sym_exec_init(State &s) {
     }
   }
 
-  if (s.isSource())
-    s.saveReturnedInput();
-
+  s.saveReturnedInput();
   s.exec(Value::voidVal);
 }
 
