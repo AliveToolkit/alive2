@@ -63,14 +63,14 @@ static bool is_constglb(unsigned bid, bool src_only = false) {
 // Return true if bid is the nonlocal block used to encode function calls' side
 // effects
 static unsigned get_fncallmem_bid() {
-  assert(has_write_fncall);
-  return num_nonlocals_src - num_inaccessiblememonly_fns - 1;
+  assert(has_write_fncall || num_inaccessiblememonly_fns > 0);
+  return num_nonlocals_src - num_inaccessiblememonly_fns - has_write_fncall;
 }
 
 static bool is_fncall_mem(unsigned bid) {
-  if (!has_write_fncall)
+  if (!has_write_fncall && num_inaccessiblememonly_fns == 0)
     return false;
-  return bid == get_fncallmem_bid();
+  return bid >= get_fncallmem_bid() && bid < num_nonlocals_src;
 }
 
 static void ensure_non_fncallmem(const Pointer &p) {
@@ -1612,7 +1612,7 @@ void Memory::setState(const Memory::CallState &st,
     assert(st.non_local_block_val.size() == 1);
     unsigned bid
       = num_nonlocals_src - num_inaccessiblememonly_fns + inaccessible_bid;
-    assert(bid < num_nonlocals_src);
+    assert(is_fncall_mem(bid));
     assert(non_local_block_val[bid].undef.empty());
     non_local_block_val[bid].val = st.non_local_block_val[0];
   }
