@@ -344,16 +344,20 @@ output may not contain useful LLVM IR, in which case executing the output
 RUN command separately may give better results.
 * The Alive2 unsoundness report in the corresponding log file will have two
 versions of the misoptimized function.  The Alive2 IR function body may
-indicate the problem to a human, but for the Alive2 Compiler Explorer instance
+indicate the problem to a human, but for Alive2 translation validation
 you will need LLVM IR.  Search for the function name in the terminal output.
 * Copy the first function definition and necessary declarations and metadata to
-[https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).  Without a second
-version of the function to compare, it just runs some standard optimizations;
-if it reports an error, your fork’s optimizations are not to blame.
+either a new file or to the Alive2 Compiler Explorer instance,
+[https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).  
+The Alive2 Compiler Explorer instance will run automatically;
+to check with the standalone `alive-tv`, see its instructions above.
+Without a second
+version of the function to compare, Alive2 just runs some standard optimizations;
+if it reports unsoundness, your fork’s optimizations are not to blame.
 * If there is a second, unsound, function definition in the LLVM IR terminal
-output, copy it and necessary declarations to Compiler Explorer, and change the
+output, copy it and necessary declarations, and change the
 second function name.
-* If it now reports a miscompilation, presumably your fork has a bug,
+* If it now reports a misoptimization, presumably your fork has a bug,
 demonstrated by the provided examples.
 
 
