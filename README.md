@@ -359,6 +359,16 @@ output, copy it and necessary declarations, and change the
 second function name.
 * If it now reports a misoptimization, presumably your fork has a bug,
 demonstrated by the provided examples.
+* To screen out exact duplicate reports when comparing different test runs, 
+move the `logs` directory out of the way before each run.  After each run, 
+copy the relevant logs to a separate destination directory.  (Systems with a non-GNU version of `cp` will need to use coreutils’ `gcp` instead.)
+```
+fgrep --files-with-matches --recursive "(unsound)" $ALIVE2_HOME/alive2/build/logs/ |  xargs cp -p --target-directory=<Destination>
+
+```
+* Unique unsoundness reports can then be found with a utility such as [jdupes](https://codeberg.org/jbruchon/jdupes) `--print-unique`.  
+If the tests are run from different directories, the `Source:` line at the beginning of files whose 
+name does not begin with “in_” should be stripped before comparison.
 
 
 Troubleshooting
