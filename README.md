@@ -369,7 +369,7 @@ fgrep --files-with-matches --recursive "(unsound)" $ALIVE2_HOME/alive2/build/log
 ```
 * Unique unsoundness reports can then be found with a utility such as 
 [jdupes](https://codeberg.org/jbruchon/jdupes) `--print-unique`.  
-  * If the tests are run on different LLVM directories, the `Source:` line in
+  * If the tests are run on different LLVM directories, the “Source:” line in
   files whose name does not begin with “in_”, as well as “Command line:” lines
   on Linux, should be stripped before comparison.
 
