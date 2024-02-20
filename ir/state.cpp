@@ -1127,6 +1127,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       addUB(std::move(d.ub));
       addNoReturn(std::move(d.noreturns));
 
+      // functions never return poison in assembly
+      if (isAsmMode())
+        d.retval.setNotPoison();
+
       if (noalias) {
         // no alias functions in tgt must allocate a local block on each call
         // bid may be different from that of src

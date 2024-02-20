@@ -27,6 +27,8 @@ struct StateValue {
   StateValue zextOrTrunc(unsigned tobw) const;
   StateValue concat(const StateValue &other) const;
 
+  void setNotPoison();
+
   bool isValid() const;
 
   smt::expr operator==(const StateValue &other) const;

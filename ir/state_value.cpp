@@ -41,6 +41,17 @@ StateValue StateValue::concat(const StateValue &other) const {
                                : non_poison.concat(other.non_poison) };
 }
 
+void StateValue::setNotPoison() {
+  if (non_poison.isValid()) {
+    if (non_poison.isBool())
+      non_poison = true;
+    else {
+      assert(non_poison.isBV());
+      non_poison = expr::mkInt(-1, non_poison);
+    }
+  }
+}
+
 bool StateValue::isValid() const {
   return value.isValid() && non_poison.isValid();
 }
