@@ -210,7 +210,7 @@ public:
     case 0: {
       auto *LHS = getVal(Ty);
       auto *RHS = getVal(Ty);
-      Val = new ICmpInst(*BB, randomPred(), LHS, RHS);
+      Val = new ICmpInst(BB, randomPred(), LHS, RHS);
     } break;
     case 1: {
       auto *LHS = getVal(Ty);
@@ -852,7 +852,7 @@ void BBFuzzer::go() {
                         ? new LoadInst(IntTy, Counters[C.choose(NumCounters)],
                                        "", BBs[i])
                         : (Value *)ConstantInt::get(IntTy, C.choose(20));
-        Cond = new ICmpInst(*BBs[i], VG.randomPred(), LHS, RHS);
+        Cond = new ICmpInst(BBs[i], VG.randomPred(), LHS, RHS);
       }
       BranchInst::Create(Dest1, Dest2, Cond, BBs[i]);
     } break;
