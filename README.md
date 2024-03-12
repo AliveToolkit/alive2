@@ -349,6 +349,9 @@ you will need LLVM IR.  Search for the function name in the terminal output.
 * Copy the first function definition and necessary declarations and metadata to
 either a new file or to the Alive2 Compiler Explorer instance,
 [https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).
+(The `-allow-incomplete-ir` flag, available as of
+[LLVM PR #78421](https://github.com/llvm/llvm-project/pull/78421),
+may make copying declarations and metadata unnecessary.)
 The Alive2 Compiler Explorer instance will run automatically;
 to check with the standalone `alive-tv`, see its instructions above.
 Without a second
