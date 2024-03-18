@@ -344,17 +344,35 @@ output may not contain useful LLVM IR, in which case executing the output
 RUN command separately may give better results.
 * The Alive2 unsoundness report in the corresponding log file will have two
 versions of the misoptimized function.  The Alive2 IR function body may
-indicate the problem to a human, but for the Alive2 Compiler Explorer instance
+indicate the problem to a human, but for Alive2 translation validation
 you will need LLVM IR.  Search for the function name in the terminal output.
 * Copy the first function definition and necessary declarations and metadata to
-[https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).  Without a second
-version of the function to compare, it just runs some standard optimizations;
-if it reports an error, your fork’s optimizations are not to blame.
+either a new file or to the Alive2 Compiler Explorer instance,
+[https://alive2.llvm.org/ce/](https://alive2.llvm.org/ce/).
+(The `-allow-incomplete-ir` flag may make copying declarations and metadata
+unnecessary.)
+The Alive2 Compiler Explorer instance will run automatically;
+to check with the standalone `alive-tv`, see its instructions above.
+Without a second version of the function to compare, Alive2 just runs the
+`-O2` optimizations;
+if it reports unsoundness, your fork’s optimizations are not to blame.
 * If there is a second, unsound, function definition in the LLVM IR terminal
-output, copy it and necessary declarations to Compiler Explorer, and change the
+output, copy it and necessary declarations, and change the
 second function name.
-* If it now reports a miscompilation, presumably your fork has a bug,
+* If it now reports a misoptimization, presumably your fork has a bug,
 demonstrated by the provided examples.
+* To screen out exact duplicate reports when comparing different test runs,
+move the `logs` directory out of the way before each run.  After each run, copy
+the relevant logs to a separate destination directory.  (Systems with a non-GNU
+version of `cp` will need to use coreutils’ `gcp` instead.)
+```
+fgrep --files-with-matches --recursive "(unsound)" $ALIVE2_HOME/alive2/build/logs/ |  xargs cp -p --target-directory=<Destination>
+
+```
+* Unique unsoundness reports can then be found with a utility such as `jdupes --print-unique`.  
+  * If the tests are run on different LLVM directories, the “Source:” line in
+  files whose name does not begin with “in_”, as well as “Command line:” lines
+  on Linux, should be stripped before comparison.
 
 
 Troubleshooting
