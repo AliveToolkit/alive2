@@ -13,6 +13,38 @@ using namespace smt;
 using namespace std;
 using namespace util;
 
+#define return_mkIf_phy(T, phy, log) \
+  auto islogical = isLogical();      \
+  if (islogical.isTrue())            \
+    return log;                      \
+  if (islogical.isFalse())           \
+    return phy;                      \
+  return T::mkIf(islogical, log, phy)
+
+static bool hasLogicalBit() {
+  return true;
+}
+
+static unsigned total_bits_logical() {
+  return hasLogicalBit() + bits_for_ptrattrs + bits_for_bid + bits_for_offset;
+}
+
+static unsigned total_bits_physical() {
+  return hasLogicalBit() * (1 + bits_for_ptrattrs + bits_ptr_address);
+}
+
+static unsigned padding_logical() {
+  auto l = total_bits_logical();
+  auto p = total_bits_physical();
+  return l > p ? 0 : p - l;
+}
+
+static unsigned padding_physical() {
+  auto l = total_bits_logical();
+  auto p = total_bits_physical();
+  return p > l ? 0 : l - p;
+}
+
 static expr prepend_if(const expr &pre, expr &&e, bool prepend) {
   return prepend ? pre.concat(e) : std::move(e);
 }
@@ -50,7 +82,9 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
-                 const expr &attr) : m(m), p(bid.concat(offset)) {
+                 const expr &attr) : m(m),
+  p(prepend_if(expr::mkUInt(0, 1 + padding_logical()),
+               bid.concat(offset), hasLogicalBit())) {
   if (bits_for_ptrattrs)
     p = p.concat(attr);
   assert(!bid.isValid() || !offset.isValid() || p.bits() == totalBits());
@@ -59,8 +93,10 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
                  bool unique_name, bool align, const ParamAttrs &attr) : m(m) {
   unsigned bits = total_bits_short() + !align * zeroBitsShortOffset();
-  p = prepend_if(local.toBVBool(),
-                 expr::mkVar(var_name, bits, unique_name), hasLocalBit());
+  p = prepend_if(expr::mkUInt(0, 1 + padding_logical()),
+                 prepend_if(local.toBVBool(),
+                   expr::mkVar(var_name, bits, unique_name), hasLocalBit()),
+                 hasLogicalBit());
   if (align)
     p = p.concat_zeros(zeroBitsShortOffset());
   if (bits_for_ptrattrs)
@@ -74,10 +110,12 @@ Pointer::Pointer(const Memory &m, expr repr) : m(m), p(std::move(repr)) {
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local)
   : m(m), p(
-    prepend_if(expr::mkUInt(local, 1),
-               expr::mkUInt(bid, bitsShortBid())
-                 .concat_zeros(bits_for_offset + bits_for_ptrattrs),
-               hasLocalBit())) {
+    prepend_if(expr::mkUInt(0, 1 + padding_logical()),
+      prepend_if(expr::mkUInt(local, 1),
+                 expr::mkUInt(bid, bitsShortBid())
+                   .concat_zeros(bits_for_offset + bits_for_ptrattrs),
+                 hasLocalBit()),
+              hasLogicalBit())) {
   assert((local && bid < m.numLocals()) || (!local && bid < num_nonlocals));
   assert(p.bits() == totalBits());
 }
@@ -85,6 +123,22 @@ Pointer::Pointer(const Memory &m, unsigned bid, bool local)
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
                  const ParamAttrs &attr)
   : Pointer(m, bid, offset, attr_to_bitvec(attr)) {}
+
+Pointer Pointer::mkPhysical(const Memory &m, const expr &addr) {
+  return mkPhysical(m, addr, expr::mkUInt(0, bits_for_ptrattrs));
+}
+
+Pointer Pointer::mkPhysical(const Memory &m, const expr &addr,
+                            const expr &attr) {
+  assert(hasLogicalBit());
+  assert(addr.bits() == bits_ptr_address);
+  auto p = expr::mkUInt(1, 1)
+           .concat_zeros(padding_physical())
+           .concat(addr);
+  if (bits_for_ptrattrs)
+    p = p.concat(attr);
+  return { m, std::move(p) };
+}
 
 expr Pointer::mkLongBid(const expr &short_bid, bool local) {
   assert((local  && (num_locals_src || num_locals_tgt)) ||
@@ -111,11 +165,13 @@ expr Pointer::mkUndef(State &s) {
   if (force_local || force_nonlocal)
     var = mkLongBid(var, force_local);
 
-  return var.concat_zeros(bits_for_ptrattrs);
+  // TODO: support undef phy pointers
+  return expr::mkUInt(0, 1 + padding_logical())
+           .concat(var).concat_zeros(bits_for_ptrattrs);
 }
 
 unsigned Pointer::totalBits() {
-  return bits_for_ptrattrs + bits_for_bid + bits_for_offset;
+  return max(total_bits_logical(), total_bits_physical());
 }
 
 unsigned Pointer::bitsShortBid() {
@@ -135,13 +191,17 @@ bool Pointer::hasLocalBit() {
   return (num_locals_src || num_locals_tgt) && num_nonlocals;
 }
 
-expr Pointer::isLocal(bool simplify) const {
+expr Pointer::isLogical() const {
+  return hasLogicalBit() ? p.sign() == 0 : true;
+}
+
+expr Pointer::isLogLocal(bool simplify) const {
   if (m.numLocals() == 0)
     return false;
   if (m.numNonlocals() == 0)
     return true;
 
-  auto bit = totalBits() - 1;
+  auto bit = bits_for_bid - 1 + bits_for_offset + bits_for_ptrattrs;
   expr local = p.extract(bit, bit);
 
   if (simplify) {
@@ -159,6 +219,15 @@ expr Pointer::isLocal(bool simplify) const {
   }
 
   return local == 1;
+}
+
+expr Pointer::isLocal(bool simplify) const {
+  if (m.numLocals() == 0)
+    return false;
+  if (m.numNonlocals() == 0)
+    return true;
+
+  return toLogical().first.isLogLocal(simplify);
 }
 
 expr Pointer::isConstGlobal() const {
@@ -180,17 +249,30 @@ expr Pointer::isWritableGlobal() const {
          bid.ule(has_null_block + num_globals_src - 1);
 }
 
+expr Pointer::getLogBid() const {
+  auto start = bits_for_offset + bits_for_ptrattrs;
+  return p.extract(start + bits_for_bid - 1, start);
+}
+
+expr Pointer::getLogShortBid() const {
+  auto start = bits_for_offset + bits_for_ptrattrs;
+  return p.extract(start + bits_for_bid - 1 - hasLocalBit(), start);
+}
+
+expr Pointer::getLogOffset() const {
+  return p.extract(bits_for_offset + bits_for_ptrattrs - 1, bits_for_ptrattrs);
+}
+
 expr Pointer::getBid() const {
-  return p.extract(totalBits() - 1, bits_for_offset + bits_for_ptrattrs);
+  return toLogical().first.getLogBid();
 }
 
 expr Pointer::getShortBid() const {
-  return p.extract(totalBits() - 1 - hasLocalBit(),
-                   bits_for_offset + bits_for_ptrattrs);
+  return toLogical().first.getLogShortBid();
 }
 
 expr Pointer::getOffset() const {
-  return p.extract(bits_for_offset + bits_for_ptrattrs - 1, bits_for_ptrattrs);
+  return toLogical().first.getLogOffset();
 }
 
 expr Pointer::getOffsetSizet() const {
@@ -199,8 +281,8 @@ expr Pointer::getOffsetSizet() const {
 }
 
 expr Pointer::getShortOffset() const {
-  return p.extract(bits_for_offset + bits_for_ptrattrs - 1,
-                   bits_for_ptrattrs + zeroBitsShortOffset());
+  return toLogical().first.p.extract(bits_for_offset + bits_for_ptrattrs - 1,
+                                     bits_for_ptrattrs + zeroBitsShortOffset());
 }
 
 expr Pointer::getAttrs() const {
@@ -231,7 +313,7 @@ expr Pointer::getValue(const char *name, const FunctionExpr &local_fn,
 expr Pointer::getBlockBaseAddress(bool simplify) const {
   assert(Memory::observesAddresses());
 
-  auto bid = getShortBid();
+  auto bid = getLogShortBid();
   auto zero = expr::mkUInt(0, bits_ptr_address - hasLocalBit());
   // fast path for null ptrs
   auto non_local
@@ -244,14 +326,22 @@ expr Pointer::getBlockBaseAddress(bool simplify) const {
   if (auto local = m.local_blk_addr(bid)) {
     // Local block area is the upper half of the memory
     expr lc = hasLocalBit() ? expr::mkUInt(1, 1).concat(*local) : *local;
-    return expr::mkIf(isLocal(), lc, non_local);
+    return expr::mkIf(isLogLocal(), lc, non_local);
   } else
     return non_local;
 }
 
+expr Pointer::getLogAddress(bool simplify) const {
+  return getBlockBaseAddress(simplify)
+           + getLogOffset().zextOrTrunc(bits_ptr_address);
+}
+
 expr Pointer::getAddress(bool simplify) const {
-  return
-    getBlockBaseAddress(simplify) + getOffset().zextOrTrunc(bits_ptr_address);
+  return_mkIf_phy(expr, getPhysicalAddress(), getLogAddress(simplify));
+}
+
+expr Pointer::getPhysicalAddress() const {
+  return p.extract(bits_for_ptrattrs + bits_ptr_address - 1, bits_for_ptrattrs);
 }
 
 expr Pointer::blockSize() const {
@@ -273,8 +363,11 @@ Pointer Pointer::mkPointerFromNoAttrs(const Memory &m, const expr &e) {
 }
 
 Pointer Pointer::operator+(const expr &bytes) const {
-  return { m, getBid(), getOffset() + bytes.zextOrTrunc(bits_for_offset),
-           getAttrs() };
+  return_mkIf_phy(Pointer,
+    mkPhysical(m, getPhysicalAddress() + bytes.zextOrTrunc(bits_ptr_address),
+               getAttrs()),
+    (Pointer{m, getLogBid(),
+             getLogOffset() + bytes.zextOrTrunc(bits_for_offset), getAttrs()}));
 }
 
 Pointer Pointer::operator+(unsigned bytes) const {
@@ -282,14 +375,17 @@ Pointer Pointer::operator+(unsigned bytes) const {
 }
 
 void Pointer::operator+=(const expr &bytes) {
-  p = (*this + bytes).p;
+  *this = *this + bytes;
 }
 
 Pointer Pointer::maskOffset(const expr &mask) const {
-  return { m, getBid(),
-           ((getAddress() & mask.zextOrTrunc(bits_ptr_address))
-               - getBlockBaseAddress()).zextOrTrunc(bits_for_offset),
-           getAttrs() };
+  return_mkIf_phy(Pointer,
+    mkPhysical(m, getPhysicalAddress() & mask.zextOrTrunc(bits_ptr_address),
+               getAttrs()),
+    (Pointer{ m, getLogBid(),
+              ((getLogAddress() & mask.zextOrTrunc(bits_ptr_address))
+                 - getBlockBaseAddress()).zextOrTrunc(bits_for_offset),
+              getAttrs() }));
 }
 
 expr Pointer::addNoOverflow(const expr &offset) const {
@@ -364,7 +460,7 @@ expr Pointer::isAligned(uint64_t align) {
 
   // TODO: allow this in more cases. for example when the block is local
   // and addresses are not observed.
-  if (blk_align.isConst() && offset.isConst()) {
+  if (blk_align.isConst() && offset.isConst() && isLogical().isTrue()) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
     // getAddress()
@@ -433,7 +529,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
-    Pointer ptr(m, ptr_expr);
+    auto [ptr, inboundsd] = Pointer(m, ptr_expr).toLogical();
     auto [ub, aligned] = ::is_dereferenceable(ptr, bytes_off, bytes, align,
                                               iswrite, ignore_accessability);
 
@@ -441,8 +537,8 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.blockSize().isZero())
       all_ptrs.add(std::move(ptr).release(), domain);
 
-    UB.add(std::move(ub), domain);
-    is_aligned.add(std::move(aligned), domain);
+    UB.add(ub && inboundsd, domain);
+    is_aligned.add(std::move(aligned), std::move(domain));
   }
 
   AndExpr exprs;
@@ -512,27 +608,32 @@ expr Pointer::isHeapAllocated() const {
 
 expr Pointer::refined(const Pointer &other) const {
   bool is_asm = other.m.isAsmMode();
+  auto [p1l, d1] = toLogical();
+  auto [p2l, d2] = other.toLogical();
 
   // This refers to a block that was malloc'ed within the function
-  expr local = other.isLocal();
-  local &= getAllocType() == other.getAllocType();
-  local &= blockSize() == other.blockSize();
-  local &= getOffset() == other.getOffset();
+  expr local = p2l.isLocal();
+  local &= p1l.getAllocType() == p2l.getAllocType();
+  local &= p1l.blockSize() == p2l.blockSize();
+  local &= p1l.getOffset() == p2l.getOffset();
   // Attributes are ignored at refinement.
 
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
-  expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
+  auto l1 = isLogical();
+  auto l2 = other.isLogical();
 
-  Pointer other_deref
-    = is_asm ? other.m.searchPointer(other.getAddress()) : other;
+  // FIXME: physical pointer refinement
+  expr nonlocal = expr::mkIf((l1 && l2) && !is_asm,
+                             *this == other,
+                             getAddress() == other.getAddress());
 
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(isLocal(), std::move(local), nonlocal) &&
-                      // FIXME: this should be disabled just for phy pointers
+                    expr::mkIf(p1l.isLocal(), std::move(local), nonlocal) &&
                       (is_asm ? expr(true)
-                        : isBlockAlive().implies(other_deref.isBlockAlive())));
+                              : (d1 && p1l.isBlockAlive())
+                                  .implies(p2l.isBlockAlive())));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
@@ -566,16 +667,18 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   // TODO: this induces an infinite loop
   // block_refined(other);
 
-  expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
+  auto l1 = isLogical();
+  auto l2 = other.isLogical();
 
-  Pointer other_deref
-    = is_asm ? other.m.searchPointer(other.getAddress()) : other;
+  // FIXME: physical pointer refinement
+  expr nonlocal = expr::mkIf((l1 && l2) && !is_asm,
+                             *this == other,
+                             getAddress() == other.getAddress());
 
   return expr::mkIf(isNull(), other.isNull(),
                     expr::mkIf(isLocal(), local, nonlocal) &&
-                      // FIXME: this should be disabled just for phy pointers
                       (is_asm ? expr(true)
-                        : isBlockAlive().implies(other_deref.isBlockAlive())));
+                              : isBlockAlive().implies(other.isBlockAlive())));
 }
 
 expr Pointer::isWritable() const {
@@ -650,6 +753,79 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
+pair<Pointer, expr> Pointer::findLogicalPointer(const expr &addr) const {
+  DisjointExpr<Pointer> ret;
+  expr val = addr.zextOrTrunc(bits_ptr_address);
+
+  auto add = [&](unsigned limit, bool local) {
+    for (unsigned i = 0; i != limit; ++i) {
+      Pointer p(m, i, local);
+      Pointer p_end = p + p.blockSize();
+      ret.add(p + (val - p.getAddress()),
+              !local && i == 0 && has_null_block
+                ? val == 0
+                : val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
+    }
+  };
+  add(m.numLocals(), true);
+  add(m.numNonlocals(), false);
+  return { *std::move(ret)(), ret.domain() };
+}
+
+pair<Pointer, expr> Pointer::toLogical() const {
+  if (isLogical().isTrue())
+    return { *this, true };
+
+  DisjointExpr<Pointer> ret;
+  DisjointExpr<expr> leftover;
+
+  // Try to optimize the conversion
+  for (auto [e, cond] : DisjointExpr<expr>(p, 5)) {
+    Pointer p(m, e);
+    if (p.isLogical().isTrue()) {
+      ret.add(std::move(p), std::move(cond));
+      continue;
+    }
+
+    // (ptr2int p) + offset
+    // FIXME: this also matches arg + ((ptr2int p) - arg2)
+    auto blks = e.get_apps_of("blk_addr", "local_addr!");
+    // There's only one possible bid in this expression
+    if (blks.size() == 1) {
+      auto &fn = *blks.begin();
+      expr bid;
+      if (fn.fn_name().starts_with("local_addr!")) {
+        for (auto &[bid0, addr] : m.local_blk_addr) {
+          auto blks = addr.get_apps_of("blk_addr", "local_addr!");
+          assert(blks.size() == 1);
+          if (blks.begin()->eq(fn)) {
+            bid = Pointer::mkLongBid(bid0, true);
+            break;
+          }
+        }
+      } else {
+        // non-local block
+        assert(fn.fn_name() == "blk_addr");
+        bid = Pointer::mkLongBid(fn.getFnArg(0), false);
+      }
+      assert(bid.isValid());
+      Pointer base(m, bid, expr::mkUInt(0, bits_for_offset));
+      expr offset = (p.getAddress() - base.getAddress())
+                      .sextOrTrunc(bits_for_offset);
+      ret.add(Pointer(m, bid, offset), std::move(cond));
+    } else {
+      leftover.add(std::move(e), std::move(cond));
+    }
+  }
+
+  if (!leftover.empty()) {
+    auto [ptr, domain] = findLogicalPointer(*std::move(leftover)());
+    ret.add(std::move(ptr), leftover.domain() && domain);
+  }
+
+  return { mkIf(isLogical(), *this, *std::move(ret)()), ret.domain() };
+}
+
 Pointer
 Pointer::mkIf(const expr &cond, const Pointer &then, const Pointer &els) {
   assert(&then.m == &els.m);
@@ -657,8 +833,10 @@ Pointer::mkIf(const expr &cond, const Pointer &then, const Pointer &els) {
 }
 
 ostream& operator<<(ostream &os, const Pointer &p) {
+  auto logical = p.isLogical();
+
   if (p.isNull().isTrue())
-    return os << "null";
+    return os << (logical.isFalse() ? "0x0" : "null");
 
 #define P(field, fn)   \
   if (field.isConst()) \
@@ -666,16 +844,25 @@ ostream& operator<<(ostream &os, const Pointer &p) {
   else                 \
     os << field
 
-  os << "pointer(";
-  if (p.isLocal().isConst())
-    os << (p.isLocal().isTrue() ? "local" : "non-local");
-  else
-    os << "local=" << p.isLocal();
-  os << ", block_id=";
-  P(p.getShortBid(), printUnsigned);
+  os << (logical.isFalse() ? "phy-ptr(" : "pointer(");
 
-  os << ", offset=";
-  P(p.getOffset(), printSigned);
+  if (!logical.isFalse()) {
+    if (p.isLocal().isConst())
+      os << (p.isLocal().isTrue() ? "local" : "non-local");
+    else
+      os << "local=" << p.isLocal();
+    os << ", block_id=";
+    P(p.getShortBid(), printUnsigned);
+
+    os << ", offset=";
+    P(p.getOffset(), printSigned);
+  }
+  if (!logical.isTrue()) {
+    if (!logical.isConst())
+      os << ", ";
+    os << "address=";
+    P(p.getPhysicalAddress(), printUnsigned);
+  }
 
   if (bits_for_ptrattrs && !p.getAttrs().isZero()) {
     os << ", attrs=";
