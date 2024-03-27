@@ -259,7 +259,7 @@ public:
 class ConversionOp final : public Instr {
 public:
   enum Op { SExt, ZExt, Trunc, BitCast, Ptr2Int, Int2Ptr };
-  enum Flags { None = 0, NNEG = 1 << 0 };
+  enum Flags { None = 0, NNEG = 1 << 0, NSW = 1 << 1, NUW = 1 << 2 };
 
 private:
   Value *val;
@@ -268,8 +268,7 @@ private:
 
 public:
   ConversionOp(Type &type, std::string &&name, Value &val, Op op,
-               unsigned flags = None)
-    : Instr(type, std::move(name)), val(&val), op(op), flags(flags) {}
+               unsigned flags = None);
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }

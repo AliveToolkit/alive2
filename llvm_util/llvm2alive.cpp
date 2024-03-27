@@ -12,8 +12,9 @@
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ModRef.h"
 #include <sstream>
@@ -308,6 +309,11 @@ public:
         if (const auto *NNI = dyn_cast<llvm::PossiblyNonNegInst>(&i)) {
           if (NNI->hasNonNeg())
             flags |= ConversionOp::NNEG;
+        } else if (const auto *TI = dyn_cast<llvm::TruncInst>(&i)) {
+          if (TI->hasNoUnsignedWrap())
+            flags |= ConversionOp::NUW;
+          if (TI->hasNoSignedWrap())
+            flags |= ConversionOp::NSW;
         }
         RETURN_IDENTIFIER(
           make_unique<ConversionOp>(*ty, value_name(i), *val, op, flags));
