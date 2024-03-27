@@ -1507,6 +1507,21 @@ unique_ptr<Instr> TestOp::dup(Function &f, const string &suffix) const {
   return make_unique<TestOp>(getType(), getName() + suffix, *lhs, *rhs, op);
 }
 
+ConversionOp::ConversionOp(Type &type, std::string &&name, Value &val, Op op,
+                           unsigned flags)
+    : Instr(type, std::move(name)), val(&val), op(op), flags(flags) {
+  switch (op) {
+  case ZExt:
+    assert((flags & NNEG) == flags);
+    break;
+  case Trunc:
+    assert((flags & (NSW | NUW)) == flags);
+    break;
+  default:
+    assert(flags == 0);
+    break;
+  }
+}
 
 vector<Value*> ConversionOp::operands() const {
   return { val };
@@ -1538,6 +1553,10 @@ void ConversionOp::print(ostream &os) const {
   os << getName() << " = " << str;
   if (flags & NNEG)
     os << "nneg ";
+  if (flags & NSW)
+    os << "nsw ";
+  if (flags & NUW)
+    os << "nuw ";
   os << *val << print_type(getType(), " to ", "");
 }
 
@@ -1558,8 +1577,16 @@ StateValue ConversionOp::toSMT(State &s) const {
     };
     break;
   case Trunc:
-    fn = [](auto &&val, auto &to_type) -> StateValue {
-      return {val.trunc(to_type.bits()), true};
+    fn = [this](auto &&val, auto &to_type) -> StateValue {
+      AndExpr non_poison;
+      unsigned orig_bits = val.bits();
+      unsigned trunc_bits = to_type.bits();
+      expr val_truncated = val.trunc(trunc_bits);
+      if (flags & NUW)
+        non_poison.add(val_truncated.zext(orig_bits - trunc_bits) == val);
+      if (flags & NSW)
+        non_poison.add(val_truncated.sext(orig_bits - trunc_bits) == val);
+      return {std::move(val_truncated), non_poison()};
     };
     break;
   case BitCast:
