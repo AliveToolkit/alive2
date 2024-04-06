@@ -65,8 +65,8 @@ public:
                    NoUndef = 1<<6, Align = 1<<7, Returned = 1<<8,
                    NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
                    AllocPtr = 1<<11, AllocAlign = 1<<12,
-                   ZeroExt = 1<<13, SignExt = 1<<14, NoFPClass = 1<<15,
-                   IsArg = 1<<16 };
+                   ZeroExt = 1<<13, SignExt = 1<<14, InReg = 1<<15,
+                   NoFPClass = 1<<16, IsArg = 1<<17 };
 
   ParamAttrs(unsigned bits = None) : bits(bits) {}
 

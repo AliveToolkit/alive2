@@ -1352,11 +1352,8 @@ public:
         continue;
 
       switch (llvmattr.getKindAsEnum()) {
-
-        // TODO: SignExt, ZeroExt, and InReg are not important for IR
-        // verification, but we should check that they don't change
-
       case llvm::Attribute::InReg:
+      attrs.set(ParamAttrs::InReg);
         break;
 
       case llvm::Attribute::SExt:

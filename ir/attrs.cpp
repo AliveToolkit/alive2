@@ -42,6 +42,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "zeroext ";
   if (attr.has(ParamAttrs::SignExt))
     os << "signext ";
+  if (attr.has(ParamAttrs::InReg))
+    os << "inreg ";
   if (attr.has(ParamAttrs::AllocPtr))
     os << "allocptr ";
   if (attr.has(ParamAttrs::AllocAlign))
@@ -297,6 +299,15 @@ bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
 
   auto other_params = (other.bits & attrs);
   if ((bits & other_params) != other_params)
+    return false;
+
+  // check attributes that cannot change
+  attrs =
+    SignExt |
+    ZeroExt |
+    InReg
+  ;
+  if ((bits & attrs) != (other.bits & attrs))
     return false;
 
   return derefBytes == other.derefBytes &&
