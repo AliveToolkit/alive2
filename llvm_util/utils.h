@@ -9,6 +9,7 @@
 #include <string>
 
 namespace llvm {
+class APInt;
 class BasicBlock;
 class ConstantExpr;
 class DataLayout;
@@ -40,6 +41,7 @@ IR::Type& get_int_type(unsigned bits);
 IR::Type* llvm_type2alive(const llvm::Type *ty);
 
 IR::Value* make_intconst(uint64_t val, int bits);
+IR::Value* make_intconst(const llvm::APInt &val);
 IR::Value* get_operand(llvm::Value *v,
   std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
   std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);

@@ -89,17 +89,12 @@ optional<StateValue> exec(llvm::Function &F,
     sym_exec_init(state);
 
     const BasicBlock *curr_bb = &Func->getFirstBB();
-    state.startBB(*curr_bb);
 
-    // initialize global variables
+    // #init block has been executed already by sym_exec_init
     if (curr_bb->getName() == "#init") {
-      for (auto &i : curr_bb->instrs()) {
-        state.exec(i);
-      }
-      curr_bb = Func->getBBs()[1];
-      state.startBB(*curr_bb);
+      curr_bb = &Func->getBB(1);
     }
-    state.finishInitializer();
+    state.startBB(*curr_bb);
 
     auto It = curr_bb->instrs().begin();
     Solver solver(true);

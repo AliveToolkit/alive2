@@ -247,6 +247,19 @@ Value* make_intconst(uint64_t val, int bits) {
   return ret;
 }
 
+IR::Value* make_intconst(const llvm::APInt &val) {
+  unique_ptr<IntConst> c;
+  auto bw = val.getBitWidth();
+  auto &ty = get_int_type(bw);
+  if (bw <= 64)
+    c = make_unique<IntConst>(ty, val.getZExtValue());
+  else
+    c = make_unique<IntConst>(ty, toString(val, 10, false));
+  auto ret = c.get();
+  current_fn->addConstant(std::move(c));
+  return ret;
+}
+
 #define RETURN_CACHE(val)                           \
   do {                                              \
     auto val_cpy = val;                             \
@@ -267,14 +280,7 @@ Value* get_operand(llvm::Value *v,
     return nullptr;
 
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
-    unique_ptr<IntConst> c;
-    if (cnst->getBitWidth() <= 64)
-      c = make_unique<IntConst>(*ty, cnst->getZExtValue());
-    else
-      c = make_unique<IntConst>(*ty, toString(cnst->getValue(), 10, false));
-    auto ret = c.get();
-    current_fn->addConstant(std::move(c));
-    RETURN_CACHE(ret);
+    RETURN_CACHE(make_intconst(cnst->getValue()));
   }
 
   if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {

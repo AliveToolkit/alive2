@@ -379,7 +379,7 @@ public:
         assert(fn->getFunctionType() ==
                llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
                                        { llvm::Type::getInt1Ty(ctx) }, false));
-        return make_unique<Assume>(*args[0], Assume::AndNonPoison);
+        return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
       Function::FnDecl decl;
@@ -395,8 +395,10 @@ public:
           return error(i);
 
         unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
+        auto &arg = args.at(idx);
         ParamAttrs pattr;
-        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, true);
+        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr,
+                         *arg, arg, true);
         decl.inputs.emplace_back(ty, std::move(pattr));
       }
       alive_fn->addFnDecl(std::move(decl));
@@ -444,16 +446,16 @@ public:
     unique_ptr<Instr> ret_val;
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
-      auto *arg = args[argidx];
+      auto &arg = args.at(argidx);
       ParamAttrs pattr = argidx < param_attrs.size() ? param_attrs[argidx]
                                                      : ParamAttrs();
 
       unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
       approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
-                                  pattr, true);
+                                  pattr, *arg, arg, true);
       if (fn && argidx < fn->arg_size())
         approx |= !handleParamAttrs(attrs_fndef.getAttributes(attr_argidx),
-                                    pattr, true);
+                                    pattr, *arg, arg, true);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NoUndef)) {
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
@@ -710,6 +712,10 @@ public:
     auto val = get_operand(i.getOperand(0));
     if (!ty || !val)
       return error(i);
+
+    auto *Fn = i.getFunction();
+    if (Fn->hasRetAttribute(llvm::Attribute::Range))
+      val = handleRangeAttr(Fn->getRetAttribute(llvm::Attribute::Range), *val);
 
     return make_unique<Return>(*ty, *val);
   }
@@ -1336,24 +1342,29 @@ public:
     return true;
   }
 
+  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val) {
+    auto CR = attr.getValueAsConstantRange();
+    vector<Value *> bounds{ make_intconst(CR.getLower()),
+                            make_intconst(CR.getUpper()) };
+    auto assume
+      = make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(), val,
+                               std::move(bounds), AssumeVal::Range);
+    auto ret = assume.get();
+    BB->addInstr(std::move(assume));
+    return ret;
+  }
+
   // If is_callsite is true, encode attributes at call sites' params
   // Otherwise, encode attributes at function definition's arguments
   // TODO: Once attributes at a call site are fully supported, we should
   // remove is_callsite flag
   bool handleParamAttrs(const llvm::AttributeSet &aset, ParamAttrs &attrs,
-                        bool is_callsite) {
+                        Value &val, Value* &newval, bool is_callsite) {
     bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
-      // To call getKindAsEnum, llvmattr should be enum or int attribute
-      // llvm/include/llvm/IR/Attributes.td has attribute types
-      if (!llvmattr.isEnumAttribute() && // e.g. nonnull
-          !llvmattr.isIntAttribute() &&  // e.g. dereferenceable
-          !llvmattr.isTypeAttribute())   // e.g. byval
-        continue;
-
       switch (llvmattr.getKindAsEnum()) {
       case llvm::Attribute::InReg:
-      attrs.set(ParamAttrs::InReg);
+        attrs.set(ParamAttrs::InReg);
         break;
 
       case llvm::Attribute::SExt:
@@ -1416,6 +1427,10 @@ public:
 
       case llvm::Attribute::NoUndef:
         attrs.set(ParamAttrs::NoUndef);
+        break;
+
+      case llvm::Attribute::Range:
+        newval = handleRangeAttr(llvmattr, val);
         break;
 
       case llvm::Attribute::NoFPClass:
@@ -1641,6 +1656,7 @@ public:
     reset_state(Fn);
 
     alive_fn = &Fn;
+    BB = &Fn.getBB("#init", true);
 
     auto &attrs = Fn.getFnAttrs();
     vector<ParamAttrs> param_attrs;
@@ -1653,15 +1669,18 @@ public:
 
       auto ty = llvm_type2alive(arg.getType());
       ParamAttrs attrs;
-      if (!ty || !handleParamAttrs(argattr, attrs, false))
+      auto val = make_unique<Input>(*ty, value_name(arg));
+      Value *newval = val.get();
+
+      if (!ty || !handleParamAttrs(argattr, attrs, *val, newval, false))
         return {};
-      auto val = make_unique<Input>(*ty, value_name(arg), std::move(attrs));
-      add_identifier(arg, *val.get());
+      val->setAttributes(std::move(attrs));
+      add_identifier(arg, *newval);
 
       if (arg.hasReturnedAttr()) {
         // Cache this to avoid linear lookup at return
         assert(Fn.getReturnedInput() == nullptr);
-        Fn.setReturnedInput(val.get());
+        Fn.setReturnedInput(newval);
       }
       Fn.addInput(std::move(val));
     }
@@ -1770,7 +1789,7 @@ public:
     };
 
     // If there is a global variable with initializer, put them at init block.
-    auto &entry_name = Fn.getFirstBB().getName();
+    auto &entry_name = Fn.getBB(1).getName();
     BB = &Fn.getBB("#init", true);
     insert_constexpr_before = nullptr;
 

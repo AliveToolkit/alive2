@@ -119,7 +119,8 @@ class Input final : public Value {
   std::string getSMTName(unsigned child) const;
   StateValue mkInput(State &s, const Type &ty, unsigned child) const;
 public:
-  Input(Type &type, std::string &&name, ParamAttrs &&attrs = ParamAttrs::None);
+  Input(Type &type, std::string &&name);
+  void setAttributes(ParamAttrs &&new_attrs);
   void copySMTName(const Input &other);
   void print(std::ostream &os) const override;
   bool hasAttribute(ParamAttrs::Attribute a) const { return attrs.has(a); }

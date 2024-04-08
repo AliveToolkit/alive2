@@ -11,6 +11,20 @@ using namespace IR;
 using namespace std;
 using util::config::dbg;
 
+static void sym_exec_instr(State &s, const Instr &i) {
+  auto &val = s.exec(i);
+
+  if (util::config::symexec_print_each_value) {
+    auto &name = i.getName();
+    dbg() << name;
+    if (name[0] == '%')
+      dbg() << " = " << val.val << " /";
+    dbg() << " UB=" << val.domain << '\n';
+    if (!val.return_domain.isTrue())
+      dbg() << " RET=" << val.return_domain  << '\n';
+  }
+}
+
 namespace util {
 
 void sym_exec_init(State &s) {
@@ -36,6 +50,13 @@ void sym_exec_init(State &s) {
     }
   }
 
+  if (f.getFirstBB().getName() == "#init") {
+    for (auto &i : f.getFirstBB().instrs()) {
+      sym_exec_instr(s, i);
+    }
+  }
+  s.finishInitializer();
+
   s.saveReturnedInput();
   s.exec(Value::voidVal);
 }
@@ -45,33 +66,13 @@ void sym_exec(State &s) {
 
   Function &f = const_cast<Function&>(s.getFn());
 
-  bool first = true;
-  if (f.getFirstBB().getName() != "#init") {
-    s.finishInitializer();
-    first = false;
-  }
-
   for (auto &bb : f.getBBs()) {
-    if (!s.startBB(*bb))
+    if (!s.startBB(*bb) || bb->getName() == "#init")
       continue;
 
     for (auto &i : bb->instrs()) {
-      if (first && dynamic_cast<const JumpInstr *>(&i))
-        s.finishInitializer();
-      auto &val = s.exec(i);
-      auto &name = i.getName();
-
-      if (config::symexec_print_each_value) {
-        dbg() << name;
-        if (name[0] == '%')
-          dbg() << " = " << val.val << " /";
-        dbg() << " UB=" << val.domain << '\n';
-        if (!val.return_domain.isTrue())
-          dbg() << " RET=" << val.return_domain  << '\n';
-      }
+      sym_exec_instr(s, i);
     }
-
-    first = false;
   }
 
   if (config::symexec_print_each_value) {

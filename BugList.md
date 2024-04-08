@@ -90,6 +90,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 83. Vectorization of loop reduction introduces an aligned store incorrectly (https://llvm.org/PR65212)
 84. InstCombine: incorrect sink of FP math through select changes NaN payload (https://llvm.org/PR74297)
 85. InstCombine: fold of shuffle into fadd changes NaN payload (https://llvm.org/PR74326)
+86. Attributor & Function-attrs mark function as noundef incorrectly due to return value not in range (https://llvm.org/PR88026)
 
 
 ### Bugs found in Z3

@@ -187,9 +187,13 @@ static string attr_str(const ParamAttrs &attr) {
   return std::move(ss).str();
 }
 
-Input::Input(Type &type, string &&name, ParamAttrs &&attributes)
-  : Value(type, attr_str(attributes) + name), smt_name(std::move(name)),
-    attrs(std::move(attributes)) {}
+Input::Input(Type &type, string &&name)
+  : Value(type, std::string(name)), smt_name(std::move(name)) {}
+
+void Input::setAttributes(ParamAttrs &&new_attrs) {
+  attrs = std::move(new_attrs);
+  setName(attr_str(attrs) + getName());
+}
 
 void Input::copySMTName(const Input &other) {
   smt_name = other.smt_name;
