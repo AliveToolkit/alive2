@@ -218,6 +218,10 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return make_unique<Assume>(*true_val, Assume::AndNonPoison);
   }
 
+  RetTy mkUnreach() {
+    return make_unique<Assume>(*make_intconst(0, 1), Assume::AndNonPoison);
+  }
+
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
               const vector<string_view> &gvnamesInSrc)
@@ -360,6 +364,10 @@ public:
         attrs.set(FnAttrs::NNaN);
     }
 
+    auto ty = llvm_type2alive(i.getType());
+    if (!ty)
+      return error(i);
+
     // record fn decl in case there are indirect calls to this function
     // elsewhere
     auto fn_decl = fn;
@@ -388,6 +396,18 @@ public:
       if (!(decl.output = llvm_type2alive(fn_decl->getReturnType())))
         return error(i);
 
+      // it's UB if there's a mismatch in the number of function arguments
+      if (( fn_decl->isVarArg() && i.arg_size() < fn_decl->arg_size()) ||
+          (!fn_decl->isVarArg() && i.arg_size() != fn_decl->arg_size())) {
+        auto unreach = mkUnreach();
+        if (ty->isVoid())
+          return unreach;
+        BB->addInstr(std::move(unreach));
+        RETURN_IDENTIFIER(
+          make_unique<UnaryOp>(*ty, value_name(i), *get_poison(*ty),
+                               UnaryOp::Copy));
+      }
+
       auto attrs_fndef = fn_decl->getAttributes();
       for (uint64_t idx = 0, nargs = fn_decl->arg_size(); idx < nargs; ++idx) {
         auto ty = llvm_type2alive(fn_decl->getArg(idx)->getType());
@@ -413,10 +433,6 @@ public:
       if (known)
         RETURN_IDENTIFIER(std::move(known));
     }
-
-    auto ty = llvm_type2alive(i.getType());
-    if (!ty)
-      return error(i);
 
     unique_ptr<FnCall> call;
     Value *fnptr = nullptr;
@@ -721,8 +737,7 @@ public:
   }
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
-    auto fals = get_operand(llvm::ConstantInt::getFalse(i.getContext()));
-    return make_unique<Assume>(*fals, Assume::AndNonPoison);
+    return mkUnreach();
   }
 
   enum LifetimeKind {

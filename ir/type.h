@@ -61,6 +61,7 @@ public:
   virtual bool isStructType() const;
   virtual bool isVectorType() const;
   bool isAggregateType() const;
+  bool isVoid() const;
 
   virtual smt::expr enforceIntType(unsigned bits = 0) const;
   smt::expr enforceIntOrPtrType() const;

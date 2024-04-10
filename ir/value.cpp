@@ -18,10 +18,6 @@ namespace IR {
 
 VoidValue Value::voidVal;
 
-bool Value::isVoid() const {
-  return &getType() == &Type::voidTy;
-}
-
 void Value::rauw(const Value &what, Value &with) {
   UNREACHABLE();
 }

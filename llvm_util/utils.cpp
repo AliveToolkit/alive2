@@ -260,6 +260,13 @@ IR::Value* make_intconst(const llvm::APInt &val) {
   return ret;
 }
 
+IR::Value* get_poison(Type &ty) {
+  auto val = make_unique<PoisonValue>(ty);
+  auto ret = val.get();
+  current_fn->addConstant(std::move(val));
+  return ret;
+}
+
 #define RETURN_CACHE(val)                           \
   do {                                              \
     auto val_cpy = val;                             \
@@ -295,10 +302,7 @@ Value* get_operand(llvm::Value *v,
   }
 
   if (isa<llvm::PoisonValue>(v)) {
-    auto val = make_unique<PoisonValue>(*ty);
-    auto ret = val.get();
-    current_fn->addConstant(std::move(val));
-    RETURN_CACHE(ret);
+    RETURN_CACHE(get_poison(*ty));
   }
 
   if (isa<llvm::UndefValue>(v)) {

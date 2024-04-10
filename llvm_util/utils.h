@@ -42,6 +42,7 @@ IR::Type* llvm_type2alive(const llvm::Type *ty);
 
 IR::Value* make_intconst(uint64_t val, int bits);
 IR::Value* make_intconst(const llvm::APInt &val);
+IR::Value* get_poison(IR::Type &ty);
 IR::Value* get_operand(llvm::Value *v,
   std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
   std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);

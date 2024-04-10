@@ -114,6 +114,10 @@ bool Type::isAggregateType() const {
   return isArrayType() || isStructType() || isVectorType();
 }
 
+bool Type::isVoid() const {
+  return this == &voidTy;
+}
+
 expr Type::enforceIntType(unsigned bits) const {
   return false;
 }

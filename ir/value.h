@@ -32,7 +32,7 @@ public:
   auto bits() const { return type.bits(); }
   auto& getName() const { return name; }
   auto& getType() const { return type; }
-  bool isVoid() const;
+  bool isVoid() const { return type.isVoid(); }
 
   virtual void rauw(const Value &what, Value &with);
   virtual void print(std::ostream &os) const = 0;
