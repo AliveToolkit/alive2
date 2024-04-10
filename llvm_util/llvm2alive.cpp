@@ -89,12 +89,6 @@ unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
 
-#if 0
-string_view s(llvm::StringRef str) {
-  return { str.data(), str.size() };
-}
-#endif
-
 #define PARSE_UNOP()                       \
   auto ty = llvm_type2alive(i.getType());  \
   auto val = get_operand(i.getOperand(0)); \
@@ -116,14 +110,7 @@ string_view s(llvm::StringRef str) {
   if (!ty || !a || !b || !c)              \
     return error(i)
 
-#define RETURN_IDENTIFIER(op)      \
-  do {                             \
-    auto ret = op;                 \
-    add_identifier(i, *ret.get()); \
-    return ret;                    \
-  } while (0)
-
-#define RETURN_IDENTIFIER_FNATTRS(op, attrs)                 \
+#define RETURN_FNATTRS(op, attrs)                            \
   do {                                                       \
     auto ret = op;                                           \
     add_identifier(i, *ret.get());                           \
@@ -214,8 +201,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   RetTy NOP(llvm::Instruction &i) {
     // some NOP instruction
     assert(i.getType()->isVoidTy());
-    auto true_val = get_operand(llvm::ConstantInt::getTrue(i.getContext()));
-    return make_unique<Assume>(*true_val, Assume::AndNonPoison);
+    return make_unique<Assume>(*make_intconst(0, 1), Assume::WellDefined);
   }
 
   RetTy mkUnreach() {
@@ -243,8 +229,7 @@ public:
     default:
       return error(i);
     }
-    RETURN_IDENTIFIER(
-      make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i)));
+    return make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i));
   }
 
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
@@ -276,8 +261,8 @@ public:
     }
 
     if (is_fp)
-      RETURN_IDENTIFIER(make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op,
-                                             parse_fmath(i)));
+      return
+        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op, parse_fmath(i));
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
@@ -290,8 +275,7 @@ public:
       if (PDI->isDisjoint())
         flags |= BinOp::Disjoint;
     }
-    RETURN_IDENTIFIER(make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op,
-                                         flags));
+    return make_unique<BinOp>(*ty, value_name(i), *a, *b, alive_op, flags);
   }
 
   RetTy visitCastInst(llvm::CastInst &i) {
@@ -319,8 +303,7 @@ public:
           if (TI->hasNoSignedWrap())
             flags |= ConversionOp::NSW;
         }
-        RETURN_IDENTIFIER(
-          make_unique<ConversionOp>(*ty, value_name(i), *val, op, flags));
+        return make_unique<ConversionOp>(*ty, value_name(i), *val, op, flags);
       }
     }
 
@@ -335,13 +318,12 @@ public:
     default:
       return error(i);
     }
-    RETURN_IDENTIFIER(
-      make_unique<FpConversionOp>(*ty, value_name(i), *val, op));
+    return make_unique<FpConversionOp>(*ty, value_name(i), *val, op);
   }
 
   RetTy visitFreezeInst(llvm::FreezeInst &i) {
     PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<Freeze>(*ty, value_name(i), *val));
+    return make_unique<Freeze>(*ty, value_name(i), *val);
   }
 
   RetTy visitCallInst(llvm::CallInst &i, bool approx = false) {
@@ -403,9 +385,8 @@ public:
         if (ty->isVoid())
           return unreach;
         BB->addInstr(std::move(unreach));
-        RETURN_IDENTIFIER(
-          make_unique<UnaryOp>(*ty, value_name(i), *get_poison(*ty),
-                               UnaryOp::Copy));
+        return make_unique<UnaryOp>(*ty, value_name(i), *get_poison(*ty),
+                                    UnaryOp::Copy);
       }
 
       auto attrs_fndef = fn_decl->getAttributes();
@@ -431,7 +412,7 @@ public:
         = known_call(i, TLI, *BB, args, std::move(attrs), param_attrs);
       approx = approx0;
       if (known)
-        RETURN_IDENTIFIER(std::move(known));
+        return std::move(known);
     }
 
     unique_ptr<FnCall> call;
@@ -483,7 +464,7 @@ public:
     }
 
     call->setApproximated(approx);
-    RETURN_IDENTIFIER(std::move(call));
+    return call;
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
@@ -494,8 +475,8 @@ public:
     if (!ptr || !val || !bytes)
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<Memset>(*ptr, *val, *bytes,
-                                          i.getDestAlign().valueOrOne().value()));
+    return make_unique<Memset>(*ptr, *val, *bytes,
+                               i.getDestAlign().valueOrOne().value());
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -506,10 +487,10 @@ public:
     if (!dst || !src || !bytes)
       return error(i);
 
-    RETURN_IDENTIFIER(make_unique<Memcpy>(*dst, *src, *bytes,
-                                          i.getDestAlign().valueOrOne().value(),
-                                          i.getSourceAlign().valueOrOne().value(),
-                                          isa<llvm::MemMoveInst>(&i)));
+    return make_unique<Memcpy>(*dst, *src, *bytes,
+                               i.getDestAlign().valueOrOne().value(),
+                               i.getSourceAlign().valueOrOne().value(),
+                               isa<llvm::MemMoveInst>(&i));
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {
@@ -529,20 +510,18 @@ public:
     default:
       UNREACHABLE();
     }
-    RETURN_IDENTIFIER(make_unique<ICmp>(*ty, value_name(i), cond, *a, *b));
+    return make_unique<ICmp>(*ty, value_name(i), cond, *a, *b);
   }
 
   RetTy visitFCmpInst(llvm::FCmpInst &i) {
     PARSE_BINOP();
     auto cond = parse_fcmp_cond(i.getPredicate());
-    RETURN_IDENTIFIER(make_unique<FCmp>(*ty, value_name(i), cond, *a, *b,
-                                        parse_fmath(i)));
+    return make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, parse_fmath(i));
   }
 
   RetTy visitSelectInst(llvm::SelectInst &i) {
     PARSE_TRIOP();
-    RETURN_IDENTIFIER(make_unique<Select>(*ty, value_name(i), *a, *b, *c,
-                                          parse_fmath(i)));
+    return make_unique<Select>(*ty, value_name(i), *a, *b, *c, parse_fmath(i));
   }
 
   RetTy visitExtractValueInst(llvm::ExtractValueInst &i) {
@@ -561,7 +540,7 @@ public:
       valty = &aty->getChild(idx_with_paddings);
     }
 
-    RETURN_IDENTIFIER(std::move(inst));
+    return inst;
   }
 
   RetTy visitInsertValueInst(llvm::InsertValueInst &i) {
@@ -580,7 +559,7 @@ public:
       ty = &aty->getChild(idx_with_paddings);
     }
 
-    RETURN_IDENTIFIER(std::move(inst));
+    return inst;
   }
 
   RetTy visitAllocaInst(llvm::AllocaInst &i) {
@@ -602,7 +581,7 @@ public:
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
                       pref_alignment(i, i.getAllocatedType()));
     allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
-    RETURN_IDENTIFIER(std::move(alloc));
+    return alloc;
   }
 
   RetTy visitGetElementPtrInst(llvm::GetElementPtrInst &i) {
@@ -659,7 +638,7 @@ public:
 
       gep->addIdx(I.getSequentialElementStride(DL()).getKnownMinValue(), *op);
     }
-    RETURN_IDENTIFIER(std::move(gep));
+    return gep;
   }
 
   RetTy visitLoadInst(llvm::LoadInst &i) {
@@ -667,8 +646,8 @@ public:
     if (!i.isSimple())
       return error(i);
     PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<Load>(*ty, value_name(i), *val,
-                                        alignment(i, i.getType())));
+    return
+      make_unique<Load>(*ty, value_name(i), *val, alignment(i, i.getType()));
   }
 
   RetTy visitStoreInst(llvm::StoreInst &i) {
@@ -679,8 +658,8 @@ public:
     auto ptr = get_operand(i.getPointerOperand());
     if (!val || !ptr)
       return error(i);
-    RETURN_IDENTIFIER(make_unique<Store>(*ptr, *val,
-                        alignment(i, i.getValueOperand()->getType())));
+    return make_unique<Store>(*ptr, *val,
+                              alignment(i, i.getValueOperand()->getType()));
   }
 
   RetTy visitPHINode(llvm::PHINode &i) {
@@ -690,7 +669,7 @@ public:
 
     auto phi = make_unique<Phi>(*ty, value_name(i), parse_fmath(i));
     todo_phis.emplace_back(phi.get(), &i);
-    RETURN_IDENTIFIER(std::move(phi));
+    return phi;
   }
 
   RetTy visitBranchInst(llvm::BranchInst &i) {
@@ -926,8 +905,7 @@ public:
       }
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
-      RETURN_IDENTIFIER_FNATTRS(
-        make_unique<BinOp>(*ty, value_name(i), *a, *b, op), attrs);
+      RETURN_FNATTRS(make_unique<BinOp>(*ty, value_name(i), *a, *b, op), attrs);
     }
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
@@ -949,7 +927,7 @@ public:
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<UnaryOp>(*ty, value_name(i), *val, op));
+      return make_unique<UnaryOp>(*ty, value_name(i), *val, op);
     }
     case llvm::Intrinsic::vector_reduce_add:
     case llvm::Intrinsic::vector_reduce_mul:
@@ -974,8 +952,7 @@ public:
       case llvm::Intrinsic::vector_reduce_umin: op = UnaryReductionOp::UMin; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(
-        make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op));
+      return make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
@@ -995,8 +972,7 @@ public:
       case llvm::Intrinsic::umul_fix_sat: op = TernaryOp::UMulFixSat; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(
-        make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op));
+      return make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op);
     }
     case llvm::Intrinsic::fma:
     case llvm::Intrinsic::fmuladd:
@@ -1012,10 +988,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_fmuladd: op = FpTernaryOp::MulAdd; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(
-        make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
-                                 parse_fmath(i), parse_rounding(i),
-                                 parse_exceptions(i)));
+      return make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
+                                      parse_fmath(i), parse_rounding(i),
+                                      parse_exceptions(i));
     }
     case llvm::Intrinsic::copysign:
     case llvm::Intrinsic::minnum:
@@ -1049,9 +1024,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_fdiv:    op = FpBinOp::FDiv; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(
+      return
         make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
-                             parse_rounding(i), parse_exceptions(i)));
+                             parse_rounding(i), parse_exceptions(i));
     }
     case llvm::Intrinsic::canonicalize:
     case llvm::Intrinsic::fabs:
@@ -1095,9 +1070,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(
+      return
         make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
-                               parse_rounding(i), parse_exceptions(i)));
+                               parse_rounding(i), parse_exceptions(i));
     }
     case llvm::Intrinsic::experimental_constrained_sitofp:
     case llvm::Intrinsic::experimental_constrained_uitofp:
@@ -1137,7 +1112,7 @@ public:
       }
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
-      RETURN_IDENTIFIER_FNATTRS(
+      RETURN_FNATTRS(
         make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
                                     parse_rounding(i), parse_exceptions(i)),
         attrs);
@@ -1148,9 +1123,9 @@ public:
       PARSE_BINOP();
       auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
       auto cond = parse_fcmp_cond(fcmp->getPredicate());
-      RETURN_IDENTIFIER(
+      return
         make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
-                          parse_exceptions(i), fcmp->isSignaling()));
+                          parse_exceptions(i), fcmp->isSignaling());
     }
     case llvm::Intrinsic::is_fpclass:
     {
@@ -1160,7 +1135,7 @@ public:
       case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
       default: UNREACHABLE();
       }
-      RETURN_IDENTIFIER(make_unique<TestOp>(*ty, value_name(i), *a, *b, op));
+      return make_unique<TestOp>(*ty, value_name(i), *a, *b, op);
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:
@@ -1168,14 +1143,14 @@ public:
       PARSE_BINOP();
       switch (getLifetimeKind(i)) {
       case LIFETIME_START:
-        RETURN_IDENTIFIER(make_unique<StartLifetime>(*b));
+        return make_unique<StartLifetime>(*b);
       case LIFETIME_START_FILLPOISON:
         BB->addInstr(make_unique<StartLifetime>(*b));
-        RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+        return make_unique<FillPoison>(*b);
       case LIFETIME_FREE:
-        RETURN_IDENTIFIER(make_unique<EndLifetime>(*b));
+        return make_unique<EndLifetime>(*b);
       case LIFETIME_FILLPOISON:
-        RETURN_IDENTIFIER(make_unique<FillPoison>(*b));
+        return make_unique<FillPoison>(*b);
       case LIFETIME_NOP:
         return NOP(i);
       case LIFETIME_UNKNOWN:
@@ -1185,7 +1160,7 @@ public:
     case llvm::Intrinsic::ptrmask:
     {
       PARSE_BINOP();
-      RETURN_IDENTIFIER(make_unique<PtrMask>(*ty, value_name(i), *a, *b));
+      return make_unique<PtrMask>(*ty, value_name(i), *a, *b);
     }
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
@@ -1235,13 +1210,12 @@ public:
 
   RetTy visitExtractElementInst(llvm::ExtractElementInst &i) {
     PARSE_BINOP();
-    RETURN_IDENTIFIER(make_unique<ExtractElement>(*ty, value_name(i), *a, *b));
+    return make_unique<ExtractElement>(*ty, value_name(i), *a, *b);
   }
 
   RetTy visitInsertElementInst(llvm::InsertElementInst &i) {
     PARSE_TRIOP();
-    RETURN_IDENTIFIER(make_unique<InsertElement>(*ty, value_name(i), *a, *b,
-                                                 *c));
+    return make_unique<InsertElement>(*ty, value_name(i), *a, *b, *c);
   }
 
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
@@ -1249,13 +1223,13 @@ public:
     vector<unsigned> mask;
     for (auto m : i.getShuffleMask())
       mask.push_back(m);
-    RETURN_IDENTIFIER(make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
-                                                 std::move(mask)));
+    return
+      make_unique<ShuffleVector>(*ty, value_name(i), *a, *b, std::move(mask));
   }
 
   RetTy visitVAArg(llvm::VAArgInst &i) {
     PARSE_UNOP();
-    RETURN_IDENTIFIER(make_unique<VaArg>(*ty, value_name(i), *val));
+    return make_unique<VaArg>(*ty, value_name(i), *val);
   }
 
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
@@ -1757,6 +1731,10 @@ public:
         if (auto I = visit(i)) {
           auto alive_i = I.get();
           BB->addInstr(std::move(I));
+
+          if (!alive_i->isVoid()) {
+            add_identifier(i, *alive_i);
+          }
 
           if (i.hasMetadataOtherThanDebugLoc() &&
               !handleMetadata(Fn, i, alive_i))
