@@ -464,7 +464,20 @@ public:
     }
 
     call->setApproximated(approx);
-    return call;
+
+    unique_ptr<Instr> val = std::move(call);
+    auto range_check = [&](const auto &attr) {
+      auto *ptr = val.get();
+      BB->addInstr(std::move(val));
+      val = handleRangeAttrNoInsert(attr, *ptr);
+    };
+
+    if (fn_decl && fn_decl->hasRetAttribute(llvm::Attribute::Range))
+      range_check(fn_decl->getRetAttribute(llvm::Attribute::Range));
+    if (i.hasRetAttr(llvm::Attribute::Range))
+      range_check(i.getRetAttr(llvm::Attribute::Range));
+
+    return val;
   }
 
   RetTy visitMemSetInst(llvm::MemSetInst &i) {
@@ -820,8 +833,7 @@ public:
             if (!av)
               return error(i);
 
-            BB->addInstr(
-              make_unique<Assume>(*av, Assume::WellDefined));
+            BB->addInstr(make_unique<Assume>(*av, Assume::WellDefined));
           }
         } else if (name == "align") {
           llvm::Value *ptr = bundle.Inputs[0].get();
@@ -850,8 +862,7 @@ public:
           if (!aptr)
             return error(i);
 
-          BB->addInstr(
-            make_unique<Assume>(*aptr, Assume::NonNull));
+          BB->addInstr(make_unique<Assume>(*aptr, Assume::NonNull));
         } else {
           return error(i);
         }
@@ -1303,8 +1314,7 @@ public:
                       ? Assume::Dereferenceable : Assume::DereferenceableOrNull;
         auto bytes = get_operand(
           llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
-        BB->addInstr(
-          make_unique<Assume>(vector<Value*>{i, bytes}, kind));
+        BB->addInstr(make_unique<Assume>(vector<Value*>{i, bytes}, kind));
         break;
       }
 
@@ -1331,13 +1341,18 @@ public:
     return true;
   }
 
-  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val) {
+  unique_ptr<Instr>
+  handleRangeAttrNoInsert(const llvm::Attribute &attr, Value &val) {
     auto CR = attr.getValueAsConstantRange();
-    vector<Value *> bounds{ make_intconst(CR.getLower()),
-                            make_intconst(CR.getUpper()) };
-    auto assume
-      = make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(), val,
-                               std::move(bounds), AssumeVal::Range);
+    vector<Value*> bounds{ make_intconst(CR.getLower()),
+                           make_intconst(CR.getUpper()) };
+    return
+      make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(), val,
+                             std::move(bounds), AssumeVal::Range);
+  }
+
+  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val) {
+    auto assume = handleRangeAttrNoInsert(attr, val);
     auto ret = assume.get();
     BB->addInstr(std::move(assume));
     return ret;
