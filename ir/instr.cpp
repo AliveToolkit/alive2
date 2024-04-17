@@ -1671,6 +1671,20 @@ unique_ptr<Instr> ConversionOp::dup(Function &f, const string &suffix) const {
     make_unique<ConversionOp>(getType(), getName() + suffix, *val, op, flags);
 }
 
+FpConversionOp::FpConversionOp(Type &type, std::string &&name, Value &val,
+                               Op op, FpRoundingMode rm, FpExceptionMode ex,
+                               unsigned flags)
+    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
+      flags(flags) {
+  switch (op) {
+  case UIntToFP:
+    assert((flags & NNEG) == flags);
+    break;
+  default:
+    assert(flags == 0);
+    break;
+  }
+}
 
 vector<Value*> FpConversionOp::operands() const {
   return { val };
@@ -1701,7 +1715,10 @@ void FpConversionOp::print(ostream &os) const {
   case LRound:   str = "lround "; break;
   }
 
-  os << getName() << " = " << str << *val << print_type(getType(), " to ", "");
+  os << getName() << " = " << str;
+  if (flags & NNEG)
+    os << "nneg ";
+  os << *val << print_type(getType(), " to ", "");
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1720,9 +1737,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
     };
     break;
   case UIntToFP:
-    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
-      return { val.uint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
-               true };
+    fn = [&](auto &val, auto &to_type, auto &rm) -> StateValue {
+      return {val.uint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
+              (flags & NNEG) ? !val.isNegative() : true};
     };
     break;
   case FPToSInt:
