@@ -308,6 +308,11 @@ public:
     }
 
     FpConversionOp::Op op;
+    unsigned flags = 0;
+    if (const auto *NNI = dyn_cast<llvm::PossiblyNonNegInst>(&i)) {
+      if (NNI->hasNonNeg())
+        flags |= FpConversionOp::NNEG;
+    }
     switch (i.getOpcode()) {
     case llvm::Instruction::SIToFP:  op = FpConversionOp::SIntToFP; break;
     case llvm::Instruction::UIToFP:  op = FpConversionOp::UIntToFP; break;
@@ -318,7 +323,9 @@ public:
     default:
       return error(i);
     }
-    return make_unique<FpConversionOp>(*ty, value_name(i), *val, op);
+    return make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
+                                       FpRoundingMode{}, FpExceptionMode{},
+                                       flags);
   }
 
   RetTy visitFreezeInst(llvm::FreezeInst &i) {
