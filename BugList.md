@@ -91,6 +91,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 84. InstCombine: incorrect sink of FP math through select changes NaN payload (https://llvm.org/PR74297)
 85. InstCombine: fold of shuffle into fadd changes NaN payload (https://llvm.org/PR74326)
 86. Attributor & Function-attrs mark function as noundef incorrectly due to return value not in range (https://llvm.org/PR88026)
+87. InstCombine: incorrect vector fshr->shl transformation (https://llvm.org/PR89338)
+88. VectorCombine: shufflevector reorder leads to srem by poison (https://llvm.org/PR89390)
 
 
 ### Bugs found in Z3
