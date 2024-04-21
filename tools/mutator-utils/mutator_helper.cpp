@@ -629,6 +629,7 @@ void FunctionAttributeHelper::init() {
     } else if (ait->getType()->isIntegerTy()) {
       llvm::IntegerType *intTy = (llvm::IntegerType *)ait->getType();
       size_t bitWidth = intTy->getBitWidth();
+      rangePos.push_back(index);
       if (disableEXT.find(bitWidth) != disableEXT.end()) {
         // do nothing
       } else if (disableSEXT.find(bitWidth) != disableSEXT.end()) {
@@ -672,6 +673,16 @@ void FunctionAttributeHelper::mutate() {
   if (func->getReturnType()->isIntegerTy()) {
     llvm::IntegerType *intTy = (llvm::IntegerType *)func->getReturnType();
     size_t bitWidth = intTy->getBitWidth();
+    if (Random::getRandomBool()) {
+      llvm::Attribute constRange = llvm::Attribute::get(
+          func->getContext(), llvm::Attribute::AttrKind::Range,
+          Random::getRandomLLVMConstantRange(intTy));
+      if (func->hasRetAttribute(llvm::Attribute::AttrKind::Range)) {
+        func->removeRetAttr(llvm::Attribute::AttrKind::Range);
+      }
+      func->addRetAttr(constRange);
+    }
+
     if (disableEXT.find(bitWidth) == disableEXT.end()) {
       setFuncRetAttr(llvm::Attribute::AttrKind::ZExt, false);
       setFuncRetAttr(llvm::Attribute::AttrKind::SExt, false);
@@ -714,6 +725,20 @@ void FunctionAttributeHelper::mutate() {
                      Random::getRandomBool() ? llvm::Attribute::AttrKind::ZExt
                                              : llvm::Attribute::AttrKind::SExt,
                      Random::getRandomBool());
+  }
+
+  for (size_t index : rangePos) {
+    llvm::IntegerType *intTy =
+        (llvm::IntegerType *)func->getArg(index)->getType();
+    if (Random::getRandomBool()) {
+      llvm::Attribute constRange = llvm::Attribute::get(
+          func->getContext(), llvm::Attribute::AttrKind::Range,
+          Random::getRandomLLVMConstantRange(intTy));
+      if (func->hasRetAttribute(llvm::Attribute::AttrKind::Range)) {
+        func->removeRetAttr(llvm::Attribute::AttrKind::Range);
+      }
+      func->addRetAttr(constRange);
+    }
   }
 }
 

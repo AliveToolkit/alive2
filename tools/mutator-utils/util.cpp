@@ -116,6 +116,17 @@ float Random::getRandomLLVMFloat() {
   }
 }
 
+llvm::ConstantRange Random::getRandomLLVMConstantRange(llvm::IntegerType *ty) {
+  unsigned width = ty->getBitWidth();
+  unsigned num1 = getRandomUnsigned(width), num2 = getRandomUnsigned(width);
+  if (num1 == num2) {
+    ++num2;
+  }
+  llvm::APInt lower(width, std::min(num1, num2)),
+      upper(width, std::max(num1, num2));
+  return llvm::ConstantRange(lower, upper);
+}
+
 llvm::Value *mutator_util::insertGlobalVariable(llvm::Module *m,
                                                 llvm::Type *ty) {
   static const std::string GLOBAL_VAR_NAME_PREFIX = "aliveMutateGlobalVar";
@@ -368,7 +379,7 @@ mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
 
 llvm::Instruction *
 mutator_util::getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
-                                       llvm::Instruction *insertBefore) {
+                                      llvm::Instruction *insertBefore) {
   std::vector<llvm::Type *> tys{val1->getType()};
   llvm::Module *M = insertBefore->getModule();
   size_t pos = Random::getRandomUnsigned() %

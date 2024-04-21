@@ -28,15 +28,16 @@ protected:
   std::shared_ptr<FunctionMutator> mutator;
 
 public:
-  MutationHelper(std::shared_ptr<FunctionMutator> mutator) : mutator(mutator){};
-  virtual ~MutationHelper(){};
+  MutationHelper(std::shared_ptr<FunctionMutator> mutator)
+      : mutator(mutator) {};
+  virtual ~MutationHelper() {};
   virtual void init() = 0;
   virtual void reset() = 0;
   virtual void mutate() = 0;
   virtual bool shouldMutate() = 0;
-  virtual void whenMoveToNextInst(){};
-  virtual void whenMoveToNextBasicBlock(){};
-  virtual void whenMoveToNextFunction(){};
+  virtual void whenMoveToNextInst() {};
+  virtual void whenMoveToNextBasicBlock() {};
+  virtual void whenMoveToNextFunction() {};
   virtual void debug() {
     llvm::errs() << "Default debug, extended helpers should provide more "
                     "exhaustive information\n";
@@ -55,7 +56,7 @@ class ShuffleHelper : public MutationHelper {
 
 public:
   ShuffleHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), shuffleUnitIndex(0){};
+      : MutationHelper(mutator), shuffleUnitIndex(0) {};
   // we know this value after calculation in init, so return ture for now for
   // every function
   static bool canMutate(llvm::Function *func) {
@@ -98,7 +99,7 @@ class MutateInstructionHelper : public MutationHelper {
 
 public:
   MutateInstructionHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), mutated(false), newAdded(false){};
+      : MutationHelper(mutator), mutated(false), newAdded(false) {};
   static bool canMutate(llvm::Function *func);
   virtual void init() override {
     mutated = newAdded = false;
@@ -123,7 +124,7 @@ class RandomMoveHelper : public MutationHelper {
 
 public:
   RandomMoveHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), moved(false){};
+      : MutationHelper(mutator), moved(false) {};
   virtual void init() override {
     moved = false;
   };
@@ -187,7 +188,7 @@ class VoidFunctionCallRemoveHelper : public MutationHelper {
 
 public:
   VoidFunctionCallRemoveHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), removed(false){};
+      : MutationHelper(mutator), removed(false) {};
   virtual void init() override {}
   virtual void reset() override {
     removed = false;
@@ -205,7 +206,8 @@ public:
 
 class FunctionAttributeHelper : public MutationHelper {
   bool updated;
-  llvm::SmallVector<size_t> ptrPos, onlySEXTPos, onlyZEXTPos, bothEXTPos;
+  llvm::SmallVector<size_t> ptrPos, onlySEXTPos, onlyZEXTPos, bothEXTPos,
+      rangePos;
   std::unordered_set<size_t> disableSEXT, disableZEXT, disableEXT;
 
 public:
@@ -214,7 +216,7 @@ public:
                           const std::unordered_set<size_t> &disableZEXT,
                           const std::unordered_set<size_t> &disableEXT)
       : MutationHelper(mutator), updated(false), disableSEXT(disableSEXT),
-        disableZEXT(disableZEXT), disableEXT(disableEXT){};
+        disableZEXT(disableZEXT), disableEXT(disableEXT) {};
   virtual void init() override;
   virtual void reset() override {
     updated = false;
@@ -237,7 +239,7 @@ class GEPHelper : public MutationHelper {
 
 public:
   GEPHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), updated(false){};
+      : MutationHelper(mutator), updated(false) {};
   virtual void init() override {}
   virtual void whenMoveToNextInst() override {
     updated = false;
@@ -255,7 +257,7 @@ class BinaryInstructionHelper : public MutationHelper {
   bool updated;
   const static std::vector<std::function<void(llvm::BinaryOperator *)>>
       flagFunctions;
-  static void doNothing(llvm::BinaryOperator *){};
+  static void doNothing(llvm::BinaryOperator *) {};
   static void resetFastMathFlags(llvm::BinaryOperator *inst);
   static void resetNUWNSWFlags(llvm::BinaryOperator *inst);
   static void resetExactFlag(llvm::BinaryOperator *inst);
@@ -296,8 +298,8 @@ class BinaryInstructionHelper : public MutationHelper {
 
 public:
   BinaryInstructionHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), updated(false){};
-  virtual void init() override{};
+      : MutationHelper(mutator), updated(false) {};
+  virtual void init() override {};
   virtual void reset() override {
     updated = false;
   }
@@ -326,8 +328,8 @@ class ResizeIntegerHelper : public MutationHelper {
 
 public:
   ResizeIntegerHelper(std::shared_ptr<FunctionMutator> mutator)
-      : MutationHelper(mutator), updated(false){};
-  virtual void init() override{};
+      : MutationHelper(mutator), updated(false) {};
+  virtual void init() override {};
   virtual void reset() override {
     updated = false;
   }

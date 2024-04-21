@@ -1,6 +1,7 @@
 #pragma once
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/MemorySSA.h"
+#include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
@@ -17,6 +18,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <ctime>
 #include <memory>
 #include <random>
@@ -90,6 +92,7 @@ public:
   static unsigned getRandomLLVMInt(llvm::IntegerType *ty);
   static double getRandomLLVMDouble();
   static float getRandomLLVMFloat();
+  static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);
 };
 
 /*
@@ -120,7 +123,7 @@ class DominatedValueVector {
   bool hasBackup;
 
 public:
-  DominatedValueVector() : hasBackup(false){};
+  DominatedValueVector() : hasBackup(false) {};
   ~DominatedValueVector() {
     domInst.clear();
     backup.clear();
@@ -245,7 +248,7 @@ public:
   FunctionComparatorWrapper(const llvm::Function *func1,
                             const llvm::Function *func2,
                             llvm::GlobalNumberState *GN)
-      : llvm::FunctionComparator(func1, func2, GN){};
+      : llvm::FunctionComparator(func1, func2, GN) {};
   bool isSameSignature() const {
     return compareSignature() == 0;
   }
@@ -308,7 +311,7 @@ public:
                             llvm::Instruction *insertBefore);
   static llvm::Instruction *
   getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
-                           llvm::Instruction *insertBefore);
+                          llvm::Instruction *insertBefore);
 
   template <typename EleTy, typename T>
   static EleTy findRandomInArray(llvm::ArrayRef<EleTy> array, T val,
