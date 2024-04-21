@@ -728,16 +728,16 @@ void FunctionAttributeHelper::mutate() {
   }
 
   for (size_t index : rangePos) {
-    llvm::IntegerType *intTy =
-        (llvm::IntegerType *)func->getArg(index)->getType();
     if (Random::getRandomBool()) {
+      llvm::IntegerType *intTy =
+          (llvm::IntegerType *)func->getArg(index)->getType();
       llvm::Attribute constRange = llvm::Attribute::get(
           func->getContext(), llvm::Attribute::AttrKind::Range,
           Random::getRandomLLVMConstantRange(intTy));
-      if (func->hasRetAttribute(llvm::Attribute::AttrKind::Range)) {
-        func->removeRetAttr(llvm::Attribute::AttrKind::Range);
+      if (func->hasParamAttribute(index, llvm::Attribute::AttrKind::Range)) {
+        func->removeParamAttr(index, llvm::Attribute::AttrKind::Range);
       }
-      func->addRetAttr(constRange);
+      func->addParamAttr(index, constRange);
     }
   }
 }

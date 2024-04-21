@@ -66,7 +66,7 @@ public:
     return abs(dist(masterMt));
   }
   static unsigned getRandomUnsigned(unsigned bits) {
-    return abs(dist(mt)) % (1u << bits);
+    return abs(dist(mt)) % (1ull << bits);
   }
   static bool getRandomBool() {
     return dist(mt) & 1;
@@ -89,7 +89,7 @@ public:
     masterMt = std::mt19937(masterSeed);
   }
 
-  static unsigned getRandomLLVMInt(llvm::IntegerType *ty);
+  static llvm::APInt getRandomLLVMInt(llvm::IntegerType *ty);
   static double getRandomLLVMDouble();
   static float getRandomLLVMFloat();
   static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);

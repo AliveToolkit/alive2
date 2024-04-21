@@ -467,7 +467,7 @@ llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
   if (ty->isIntegerTy()) {
     return llvm::ConstantInt::get(ty, Random::getRandomUnsigned());
   }
-  if (ty->isFloatingPointTy()){
+  if (ty->isFloatingPointTy()) {
     return llvm::ConstantFP::get(ty, Random::getRandomDouble());
   }
   return llvm::UndefValue::get(ty);

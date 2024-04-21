@@ -74,19 +74,19 @@ float Random::getUsedFloat() {
   return 0;
 }
 
-unsigned Random::getRandomLLVMInt(llvm::IntegerType *ty) {
+llvm::APInt Random::getRandomLLVMInt(llvm::IntegerType *ty) {
+  unsigned width = ty->getBitWidth();
   switch (getRandomUnsigned(2)) {
   case 0:
-    return getUsedInt(ty);
+    return llvm::APInt(width, getUsedInt(ty));
   case 1:
-    return getBitmask(ty);
-    ;
+    return llvm::APInt(width, getBitmask(ty));
   case 2:
-    return getExtremeInt(ty);
+    return llvm::APInt(width, getExtremeInt(ty));
   case 3:
-    return getRandomUnsigned(ty->getBitWidth());
+    return llvm::APInt(width, getRandomUnsigned(width));
   default:
-    return getRandomUnsigned(ty->getBitWidth());
+    return llvm::APInt(width, getRandomUnsigned(width));
   }
 }
 
@@ -118,7 +118,8 @@ float Random::getRandomLLVMFloat() {
 
 llvm::ConstantRange Random::getRandomLLVMConstantRange(llvm::IntegerType *ty) {
   unsigned width = ty->getBitWidth();
-  unsigned num1 = getRandomUnsigned(width), num2 = getRandomUnsigned(width);
+  unsigned num1 = getRandomUnsigned(std::min(width, 32u)),
+           num2 = getRandomUnsigned(std::min(width, 32u));
   if (num1 == num2) {
     ++num2;
   }
