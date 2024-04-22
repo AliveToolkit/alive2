@@ -465,10 +465,16 @@ void FunctionMutator::fixAllValues(llvm::SmallVector<llvm::Value *> &vals) {
 
 llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
   if (ty->isIntegerTy()) {
-    return llvm::ConstantInt::get(ty, Random::getRandomUnsigned());
+    return llvm::ConstantInt::get(
+        ty->getContext(),
+        mutator_util::getRandomLLVMInt((llvm::IntegerType *)ty));
   }
   if (ty->isFloatingPointTy()) {
     return llvm::ConstantFP::get(ty, Random::getRandomDouble());
+  }
+  if (auto vecTy = llvm::dyn_cast<llvm::FixedVectorType>(ty);
+      vecTy && vecTy->getElementType()) {
+    return mutator_util::getRandomLLVMIntegerVector(vecTy);
   }
   return llvm::UndefValue::get(ty);
 }

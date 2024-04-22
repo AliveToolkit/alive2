@@ -74,58 +74,99 @@ float Random::getUsedFloat() {
   return 0;
 }
 
-llvm::APInt Random::getRandomLLVMInt(llvm::IntegerType *ty) {
+llvm::APInt mutator_util::getRandomLLVMInt(llvm::IntegerType *ty) {
   unsigned width = ty->getBitWidth();
-  switch (getRandomUnsigned(2)) {
+  switch (Random::getRandomUnsigned(2)) {
   case 0:
-    return llvm::APInt(width, getUsedInt(ty));
+    return llvm::APInt(width, Random::getUsedInt(ty));
   case 1:
-    return llvm::APInt(width, getBitmask(ty));
+    return llvm::APInt(width, Random::getBitmask(ty));
   case 2:
-    return llvm::APInt(width, getExtremeInt(ty));
+    return llvm::APInt(width, Random::getExtremeInt(ty));
   case 3:
-    return llvm::APInt(width, getRandomUnsigned(width));
+    return llvm::APInt(width, Random::getRandomUnsigned(width));
   default:
-    return llvm::APInt(width, getRandomUnsigned(width));
+    return llvm::APInt(width, Random::getRandomUnsigned(width));
   }
 }
 
-double Random::getRandomLLVMDouble() {
-  switch (getRandomUnsigned() % 3) {
+double mutator_util::getRandomLLVMDouble() {
+  switch (Random::getRandomUnsigned() % 3) {
   case 0:
-    return getUsedDouble();
+    return Random::getUsedDouble();
   case 1:
-    return getExtremeDouble();
+    return Random::getExtremeDouble();
   case 2:
-    return getRandomDouble();
+    return Random::getRandomDouble();
   default:
-    return getRandomDouble();
+    return Random::getRandomDouble();
   }
 }
 
-float Random::getRandomLLVMFloat() {
-  switch (getRandomUnsigned() % 3) {
+float mutator_util::getRandomLLVMFloat() {
+  switch (Random::getRandomUnsigned() % 3) {
   case 0:
-    return getUsedFloat();
+    return Random::getUsedFloat();
   case 1:
-    return getExtremeFloat();
+    return Random::getExtremeFloat();
   case 2:
-    return getRandomFloat();
+    return Random::getRandomFloat();
   default:
-    return getRandomFloat();
+    return Random::getRandomFloat();
   }
 }
 
-llvm::ConstantRange Random::getRandomLLVMConstantRange(llvm::IntegerType *ty) {
+llvm::ConstantRange
+mutator_util::getRandomLLVMConstantRange(llvm::IntegerType *ty) {
   unsigned width = ty->getBitWidth();
-  unsigned num1 = getRandomUnsigned(std::min(width, 32u)),
-           num2 = getRandomUnsigned(std::min(width, 32u));
+  unsigned num1 = Random::getRandomUnsigned(std::min(width, 32u)),
+           num2 = Random::getRandomUnsigned(std::min(width, 32u));
   if (num1 == num2) {
     ++num2;
   }
   llvm::APInt lower(width, std::min(num1, num2)),
       upper(width, std::max(num1, num2));
   return llvm::ConstantRange(lower, upper);
+}
+
+llvm::Constant *
+mutator_util::getRandomLLVMIntegerVector(llvm::FixedVectorType *ty) {
+  assert(ty->getElementType()->isIntegerTy() && "expect an integer vector");
+  llvm::IntegerType *intTy = (llvm::IntegerType *)ty->getElementType();
+  unsigned length = ty->getNumElements();
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    result.push_back(llvm::ConstantInt::get(intTy, getRandomLLVMInt(intTy)));
+  }
+  // we set threshold to 5, if p is less than threshold , we assign poison to
+  // the vector
+  unsigned threshold = 5, p = Random::getRandomUnsigned() % 100;
+  if (p < threshold) {
+    unsigned poisonNum = Random::getRandomUnsigned(2) + 1;
+    poisonNum = std::min(poisonNum, length);
+    for (size_t times = 0; times < poisonNum; ++times) {
+      result[Random::getRandomUnsigned() % length] =
+          llvm::PoisonValue::get(intTy);
+    }
+  }
+  return llvm::ConstantVector::get(result);
+}
+
+llvm::Constant *mutator_util::updateIntegerVector(llvm::ConstantVector *ty) {
+  unsigned length = ty->getType()->getNumElements();
+  assert(ty->getType()->getElementType()->isIntegerTy() &&
+         "only support for updating integer type");
+  llvm::IntegerType *intTy =
+      (llvm::IntegerType *)ty->getType()->getElementType();
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    if (Random::getRandomBool()) {
+      result.push_back(llvm::ConstantInt::get(intTy, getRandomLLVMInt(intTy)));
+    } else {
+      result.push_back(ty->getAggregateElement(i));
+    }
+  }
+  return llvm::ConstantVector::get(result);
 }
 
 llvm::Value *mutator_util::insertGlobalVariable(llvm::Module *m,

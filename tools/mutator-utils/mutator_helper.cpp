@@ -155,7 +155,7 @@ void MutateInstructionHelper::mutate() {
     if (!isGEPInst) {
       res = insertRandomBinaryInstruction(&*(mutator->iitInTmp));
     }
-    if (!res) {
+    if (res) {
       replaceRandomUsage(&*(mutator->iitInTmp));
     }
     newAdded = res;
@@ -676,7 +676,7 @@ void FunctionAttributeHelper::mutate() {
     if (Random::getRandomBool()) {
       llvm::Attribute constRange = llvm::Attribute::get(
           func->getContext(), llvm::Attribute::AttrKind::Range,
-          Random::getRandomLLVMConstantRange(intTy));
+          mutator_util::getRandomLLVMConstantRange(intTy));
       if (func->hasRetAttribute(llvm::Attribute::AttrKind::Range)) {
         func->removeRetAttr(llvm::Attribute::AttrKind::Range);
       }
@@ -733,7 +733,7 @@ void FunctionAttributeHelper::mutate() {
           (llvm::IntegerType *)func->getArg(index)->getType();
       llvm::Attribute constRange = llvm::Attribute::get(
           func->getContext(), llvm::Attribute::AttrKind::Range,
-          Random::getRandomLLVMConstantRange(intTy));
+          mutator_util::getRandomLLVMConstantRange(intTy));
       if (func->hasParamAttribute(index, llvm::Attribute::AttrKind::Range)) {
         func->removeParamAttr(index, llvm::Attribute::AttrKind::Range);
       }

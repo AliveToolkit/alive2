@@ -37,6 +37,8 @@ class Random {
   static llvm::SmallVector<unsigned> usedInts;
   static llvm::SmallVector<double> usedDoubles;
   static llvm::SmallVector<float> usedFloats;
+
+public:
   static unsigned getExtremeInt(llvm::IntegerType *ty);
   static unsigned getBitmask(llvm::IntegerType *ty);
   static double getExtremeDouble();
@@ -44,8 +46,6 @@ class Random {
   static unsigned getUsedInt(llvm::IntegerType *ty);
   static double getUsedDouble();
   static float getUsedFloat();
-
-public:
   static int getRandomInt() {
     return dist(mt);
   }
@@ -88,11 +88,6 @@ public:
     masterSeed = masterSeed_;
     masterMt = std::mt19937(masterSeed);
   }
-
-  static llvm::APInt getRandomLLVMInt(llvm::IntegerType *ty);
-  static double getRandomLLVMDouble();
-  static float getRandomLLVMFloat();
-  static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);
 };
 
 /*
@@ -334,4 +329,11 @@ public:
            llvm::isa<llvm::CleanupPadInst>(inst) ||
            llvm::isa<llvm::CatchPadInst>(inst);
   }
+
+  static llvm::APInt getRandomLLVMInt(llvm::IntegerType *ty);
+  static double getRandomLLVMDouble();
+  static float getRandomLLVMFloat();
+  static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);
+  static llvm::Constant *getRandomLLVMIntegerVector(llvm::FixedVectorType *ty);
+  static llvm::Constant *updateIntegerVector(llvm::ConstantVector *ty);
 };
