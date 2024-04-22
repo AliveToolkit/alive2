@@ -211,6 +211,7 @@ class FunctionAttributeHelper : public MutationHelper {
   std::unordered_set<size_t> disableSEXT, disableZEXT, disableEXT;
 
 public:
+  static bool mutateRangeAttr;
   FunctionAttributeHelper(std::shared_ptr<FunctionMutator> mutator,
                           const std::unordered_set<size_t> &disableSEXT,
                           const std::unordered_set<size_t> &disableZEXT,

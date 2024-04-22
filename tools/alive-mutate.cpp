@@ -8,22 +8,19 @@
 #include "llvm_util/utils.h"
 #include "smt/smt.h"
 #include "tools/mutator-utils/mutator.h"
+#include "tools/mutator-utils/mutator_helper.h"
 #include "tools/transform.h"
 #include "util/version.h"
 
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -134,6 +131,15 @@ llvm::cl::opt<bool> onEveryFunction(
     llvm::cl::desc("When mutating a module, mutate every function in it, "
                    "instead of mutating just one function per iteration "
                    "(default=false)"),
+    llvm::cl::cat(mutatorArgs));
+
+llvm::cl::opt<bool> mutateRangeAttr(
+    LLVM_ARGS_PREFIX "range-attr",
+    llvm::cl::value_desc(
+        "mutate range attribute on function arguments and return values "),
+    llvm::cl::desc(
+        "When mutating function attributes, add or remove range attribute "
+        "(default=false)"),
     llvm::cl::cat(mutatorArgs));
 
 llvm::cl::opt<string> optPass(
@@ -247,6 +253,8 @@ see alive-mutate --help for more options,
 
   llvm::cl::HideUnrelatedOptions(mutatorArgs);
   llvm::cl::ParseCommandLineOptions(argc, argv, Usage);
+  // Some initial setting of mutation helpers:
+  FunctionAttributeHelper::mutateRangeAttr = mutateRangeAttr;
 
   auto uni_M1 = openInputFile(Context, inputFile);
   std::shared_ptr M1 = std::move(uni_M1);
