@@ -636,6 +636,17 @@ expr Pointer::isBasedOnArg() const {
                         (unsigned)has_nowrite);
 }
 
+Pointer Pointer::setAttrs(const ParamAttrs &attr) const {
+  return { m, getBid(), getOffset(), getAttrs() | attr_to_bitvec(attr) };
+}
+
+Pointer Pointer::setIsBasedOnArg() const {
+  unsigned idx = (unsigned)has_nocapture + (unsigned)has_noread +
+                 (unsigned)has_nowrite;
+  auto attrs = getAttrs();
+  return { m, getBid(), getOffset(), attrs | expr::mkUInt(1 << idx, attrs) };
+}
+
 Pointer Pointer::mkNullPointer(const Memory &m) {
   assert(has_null_block);
   // A null pointer points to block 0 without any attribute.

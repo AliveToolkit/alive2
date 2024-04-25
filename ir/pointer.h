@@ -127,6 +127,9 @@ public:
   smt::expr isNoWrite() const;
   smt::expr isBasedOnArg() const;
 
+  Pointer setAttrs(const ParamAttrs &attr) const;
+  Pointer setIsBasedOnArg() const;
+
   smt::expr refined(const Pointer &other) const;
   smt::expr fninputRefined(const Pointer &other, std::set<smt::expr> &undef,
                            const smt::expr &byval_bytes) const;
