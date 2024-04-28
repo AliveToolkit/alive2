@@ -1,9 +1,9 @@
-define dereferenceable(4) ptr @src() {
+define dereferenceable(90) ptr @src() {
   %p = call ptr @malloc(i64 3)
   ret ptr %p
 }
 
-define dereferenceable(4) ptr @tgt() {
+define dereferenceable(90) ptr @tgt() {
   unreachable
 }
 

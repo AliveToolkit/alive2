@@ -1783,7 +1783,8 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   expr size_zext;
   expr nooverflow = true;
   if (size) {
-    size_zext  = size->zextOrTrunc(bits_size_t);
+    size_zext  = size->zextOrTrunc(bits_size_t)
+                      .round_up(expr::mkUInt(align, bits_size_t));
     nooverflow = size->bits() <= bits_size_t ? true :
                    size->extract(size->bits()-1, bits_size_t) == 0;
   }

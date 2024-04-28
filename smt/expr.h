@@ -218,6 +218,8 @@ public:
 
   expr abs() const;
 
+  expr round_up(const expr &power_of_two) const;
+
   expr isNaN() const;
   expr isInf() const;
   expr isFPZero() const;

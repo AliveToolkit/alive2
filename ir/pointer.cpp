@@ -428,8 +428,10 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
 pair<AndExpr, expr>
 Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
                            bool iswrite, bool ignore_accessability) {
-  expr bytes_off = bytes0.zextOrTrunc(bits_for_offset);
-  expr bytes = bytes0.zextOrTrunc(bits_size_t);
+  expr bytes = bytes0.zextOrTrunc(bits_size_t)
+                     .round_up(expr::mkUInt(align, bits_size_t));
+  expr bytes_off = bytes.zextOrTrunc(bits_for_offset);
+
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {

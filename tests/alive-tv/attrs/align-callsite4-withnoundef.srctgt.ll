@@ -1,5 +1,3 @@
-; ERROR: Source is more defined than target
-
 define void @src(ptr %p) {
   call void @g(ptr %p)
   load i8, ptr %p
@@ -12,4 +10,4 @@ define void @tgt(ptr %p) {
   ret void
 }
 
-declare void @g(ptr align(4) noundef)
+declare void @g(ptr align(4) dereferenceable(4) noundef)

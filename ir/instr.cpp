@@ -3893,7 +3893,7 @@ DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize);
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
 
 uint64_t Load::getMaxAccessSize() const {
-  return Memory::getStoreByteSize(getType());
+  return round_up(Memory::getStoreByteSize(getType()), align);
 }
 
 MemInstr::ByteAccessInfo Load::getByteAccessInfo() const {
@@ -3939,7 +3939,7 @@ DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize);
 DEFINE_AS_RETZERO(Store, getMaxGEPOffset);
 
 uint64_t Store::getMaxAccessSize() const {
-  return Memory::getStoreByteSize(val->getType());
+  return round_up(Memory::getStoreByteSize(val->getType()), align);
 }
 
 MemInstr::ByteAccessInfo Store::getByteAccessInfo() const {
@@ -3992,7 +3992,7 @@ DEFINE_AS_RETZEROALIGN(Memset, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
 
 uint64_t Memset::getMaxAccessSize() const {
-  return getIntOr(*bytes, UINT64_MAX);
+  return round_up(getIntOr(*bytes, UINT64_MAX), align);
 }
 
 MemInstr::ByteAccessInfo Memset::getByteAccessInfo() const {
@@ -4160,7 +4160,7 @@ DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
 
 uint64_t Memcpy::getMaxAccessSize() const {
-  return getIntOr(*bytes, UINT64_MAX);
+  return round_up(getIntOr(*bytes, UINT64_MAX), max(align_src, align_dst));
 }
 
 MemInstr::ByteAccessInfo Memcpy::getByteAccessInfo() const {

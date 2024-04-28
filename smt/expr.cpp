@@ -1117,6 +1117,11 @@ expr expr::abs() const {
   return mkIf(sge(mkUInt(0, s)), *this, mkInt(-1, s) * *this);
 }
 
+expr expr::round_up(const expr &power_of_two) const {
+  expr minus_1 = power_of_two - mkUInt(1, power_of_two);
+  return (*this + minus_1) & ~minus_1;
+}
+
 #define fold_fp_neg(fn)                                  \
   do {                                                   \
   expr cond, neg, v, v2;                                 \

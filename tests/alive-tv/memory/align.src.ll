@@ -1,3 +1,5 @@
+; ERROR: Source is more defined than target
+
 define i32 @foo1(ptr %a) {
   %v = load i32, ptr %a, align 4
   %ptrint = ptrtoint ptr %a to i64

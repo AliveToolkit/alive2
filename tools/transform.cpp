@@ -1627,52 +1627,20 @@ void Transform::preprocess() {
   if (config::tgt_is_asm) {
     tgt.getFnAttrs().set(FnAttrs::Asm);
 
-    // all memory blocks are considered to have a size multiple of alignment
-    // since asm memory accesses won't trap as it won't cross the page boundary
-    vector<pair<const Instr*, unique_ptr<Instr>>> to_add;
+    // there are no #side-effect things in assembly
     vector<Instr*> to_remove;
     for (auto &bb : src.getBBs()) {
       for (auto &i : bb->instrs()) {
-        if (auto *load = dynamic_cast<const Load*>(&i)) {
-          auto align = load->getAlign();
-          auto size  = load->getMaxAccessSize();
-          if (size % align) {
-            static IntType i64("i64", 64);
-            auto bytes = make_unique<IntConst>(i64, round_up(size, align));
-            to_add.emplace_back(load, make_unique<Assume>(
-              vector<Value*>{&load->getPtr(), bytes.get()},
-              Assume::Dereferenceable));
-            src.addConstant(std::move(bytes));
-          }
-        } else if (auto *call = dynamic_cast<const FnCall*>(&i)) {
+        if (auto *call = dynamic_cast<const FnCall*>(&i)) {
           if (call->getFnName() == "#sideeffect") {
             to_remove.emplace_back(const_cast<Instr*>(&i));
           }
         }
       }
-      for (auto &[i, assume] : to_add) {
-        bb->addInstrAt(std::move(assume), i, false);
-      }
       for (auto &i : to_remove) {
         bb->delInstr(i);
       }
-      to_add.clear();
       to_remove.clear();
-    }
-
-    // increase size of global variables to be a multiple of alignment
-    for (auto gv : tgt.getGlobalVars()) {
-      if (gv->isArbitrarySize())
-        continue;
-      auto align = gv->getAlignment();
-      auto sz = gv->size();
-      auto newsize = round_up(sz, align);
-      if (newsize != sz) {
-        gv->increaseSize(newsize);
-        if (auto src_gv = dynamic_cast<GlobalVariable*>(
-            src.getGlobalVar(gv->getName())))
-          src_gv->increaseSize(newsize);
-      }
     }
   }
 
