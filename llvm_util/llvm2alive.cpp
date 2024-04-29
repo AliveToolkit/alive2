@@ -1781,14 +1781,14 @@ public:
     }
 
     auto getGlobalVariable =
-      [this](const string &name) -> llvm::GlobalVariable* {
+      [this](const string_view name) -> llvm::GlobalVariable* {
       auto M = f.getParent();
       // If name is a numeric value, the result should be manually found
       const char *chrs = name.data();
       char *end_ptr;
       auto numeric_id = strtoul(chrs, &end_ptr, 10);
 
-      if ((unsigned)(end_ptr - chrs) != (unsigned)name.size())
+      if (size_t(end_ptr - chrs) != name.size())
         return M->getGlobalVariable(name, true);
       else {
         auto itr = M->global_begin(), end = M->global_end();
@@ -1810,7 +1810,7 @@ public:
 
     // Ensure all src globals exist in target as well
     for (auto &gvname : gvnamesInSrc) {
-      if (auto gv = getGlobalVariable(string(gvname)))
+      if (auto gv = getGlobalVariable(gvname))
         get_operand(gv);
     }
 
@@ -1821,7 +1821,7 @@ public:
       auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
       if (!GV)
         continue;
-      auto gv = getGlobalVariable(GV->getName().substr(1));
+      auto gv = getGlobalVariable(string_view(GV->getName()).substr(1));
       if (!gv || !gv->isConstant() || !gv->hasDefinitiveInitializer())
         continue;
 
