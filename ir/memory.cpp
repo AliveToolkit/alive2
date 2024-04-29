@@ -492,10 +492,7 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     // constant global can't store pointers that alias with local blocks
     if (s->isInitializationPhase() && !p.isLocal().isFalse()) {
       expr bid  = expr::mkUInt(0, 1).concat(p.getShortBid());
-      expr off  = p.getOffset();
-      expr attr = p.getAttrs();
-      p.~Pointer();
-      new (&p) Pointer(mem, bid, off, attr);
+      p = Pointer(mem, bid, p.getOffset(), p.getAttrs());
     }
 
     for (unsigned i = 0; i < bytesize; ++i)
@@ -1051,13 +1048,18 @@ void Memory::store(const Pointer &ptr,
     auto mem = blk.val;
 
     uint64_t blk_size;
-    bool full_write = false;
+    bool full_write
+      = Pointer(*this, bid, local).blockSize().isUInt(blk_size) &&
+        blk_size == bytes;
+
     // optimization: if fully rewriting the block, don't bother with the old
     // contents. Pick a value as the default one.
-    if (Pointer(*this, bid, local).blockSize().isUInt(blk_size) &&
-        blk_size == bytes) {
-      mem = expr::mkConstArray(offset, data[0].second);
-      full_write = true;
+    // If we are initializing const globals, the size may be larger than the
+    // init because the size is rounded up to the alignment.
+    // The remaining bytes are poison.
+    if (full_write || state->isInitializationPhase()) {
+      mem = expr::mkConstArray(offset,
+              full_write ? data[0].second : Byte::mkPoisonByte(*this)());
       if (cond.isTrue()) {
         blk.undef.clear();
         blk.type = stored_ty_full;
