@@ -1,6 +1,10 @@
 Alive2
 ======
 
+![Alive2 logo](imgs/alive2.png)
+
+Introduction
+------------
 Alive2 consists of several libraries and tools for analysis and verification
 of LLVM code and transformations.
 Alive2 includes the following libraries:
@@ -26,6 +30,21 @@ WARNING
 -------
 Alive2 does not support inter-procedural transformations. Alive2 may produce
 spurious counterexamples if run with such passes.
+
+
+Sponsors
+--------
+We thank the continuous support of all of our sponsors! Alive2 wouldn't be possible without their support.
+
+[![Google](imgs/google.svg)](https://research.google)
+&nbsp;&nbsp;&nbsp;&nbsp;
+[![NLNet](imgs/nlnet.svg)](https://nlnet.nl)
+&nbsp;&nbsp;&nbsp;&nbsp;
+[![Woven by Toyota](imgs/woven.svg)](https://woven.toyota)
+&nbsp;&nbsp;&nbsp;&nbsp;
+[![Matter Labs](imgs/matterlabs.svg)](https://matter-labs.io)
+
+If your company has benefitted from Alive2 (including having a less buggy LLVM), please consider sponsoring our research lab.
 
 
 Prerequisites
@@ -143,7 +162,7 @@ fgrep -r "(unsound)" $ALIVE2_HOME/alive2/build/logs/
 
 
 Running Alive2 as a Clang Plugin
---------
+--------------------------------
 
 This plugin tries to validate every IR-level transformation performed
 by LLVM.  Invoke the plugin like this:
@@ -302,7 +321,7 @@ try out alive-tv; it is available online: https://alive2.llvm.org/ce/
 
 
 Running the Standalone LLVM Execution Tool (alive-exec)
---------
+-------------------------------------------------------
 
 This tool uses Alive2 as an interpreter for an LLVM function. It is
 currently highly experimental and has many restrictions. For example,
@@ -325,7 +344,7 @@ and stop, as appropriate, a Redis server instance on localhost. Alive2
 should be the only user of this server.
 
 Diagnosing Unsoundness Reports
---------
+------------------------------
 
 * Select a failing test file. It may be convenient to choose one whose path is
 given at the beginning of a log file containing the text "(unsound)" as above;
@@ -376,7 +395,7 @@ fgrep --files-with-matches --recursive "(unsound)" $ALIVE2_HOME/alive2/build/log
 
 
 Troubleshooting
---------
+---------------
 * Check the “LLVMConfig.cmake” and “CMAKE_PREFIX_PATH” output from CMake in
 case of build problems. CMake may look for configuration information in old
 installations of LLVM, e.g., under `/opt/`, if these are not set properly.
@@ -401,6 +420,6 @@ process timeout.  This timeout is not supported on Macintosh.  To change the
 SMT timeout, instead pass an `-smt-to:` option to the `alive` executable.
 
 LLVM Bugs Found by Alive2
---------
+-------------------------
 
 [BugList.md](BugList.md) shows the list of LLVM bugs found by Alive2.
