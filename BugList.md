@@ -97,6 +97,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 90. InstCombine: incorrect swap of select vector operands (https://llvm.org/89669)
 91. SimplifyCFG: coallesced store retains the wrong alignment (https://llvm.org/PR89672)
 92. LoopVectorize introduces division by zero (https://llvm.org/PR89958)
+93. InstCombine: align attribute doesn't dereferenceability (https://llvm.org/PR90446)
 
 
 ### Bugs found in Z3
