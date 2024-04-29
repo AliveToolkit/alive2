@@ -2087,8 +2087,8 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
   unsigned bytesz = bits_byte / 8;
 
   Pointer dst(*this, d), src(*this, s);
-  state->addUB(dst.isDereferenceable(bytesize, align_dst, true));
-  state->addUB(src.isDereferenceable(bytesize, align_src, false));
+  state->addUB(dst.isDereferenceable(bytesize, align_dst, true, false, false));
+  state->addUB(src.isDereferenceable(bytesize, align_src, false, false, false));
   if (!is_move)
     src.isDisjointOrEqual(bytesize, dst, bytesize);
 

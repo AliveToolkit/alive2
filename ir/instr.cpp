@@ -4160,7 +4160,7 @@ DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
 
 uint64_t Memcpy::getMaxAccessSize() const {
-  return round_up(getIntOr(*bytes, UINT64_MAX), max(align_src, align_dst));
+  return getIntOr(*bytes, UINT64_MAX);
 }
 
 MemInstr::ByteAccessInfo Memcpy::getByteAccessInfo() const {
