@@ -10,6 +10,7 @@
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <algorithm>
 #include <functional>
 #include <numeric>
 #include <sstream>
@@ -2225,8 +2226,7 @@ vector<Value*> FnCall::operands() const {
   vector<Value*> output;
   if (fnptr)
     output.emplace_back(fnptr);
-  transform(args.begin(), args.end(), back_inserter(output),
-            [](auto &p){ return p.first; });
+  ranges::transform(args, back_inserter(output), [](auto &p){ return p.first;});
   return output;
 }
 
