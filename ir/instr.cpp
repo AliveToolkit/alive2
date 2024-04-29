@@ -3992,7 +3992,7 @@ DEFINE_AS_RETZEROALIGN(Memset, getMaxAllocSize);
 DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
 
 uint64_t Memset::getMaxAccessSize() const {
-  return round_up(getIntOr(*bytes, UINT64_MAX), align);
+  return getIntOr(*bytes, UINT64_MAX);
 }
 
 MemInstr::ByteAccessInfo Memset::getByteAccessInfo() const {

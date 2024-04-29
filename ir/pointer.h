@@ -102,10 +102,12 @@ public:
   smt::expr isAligned(const smt::expr &align);
   std::pair<smt::AndExpr, smt::expr>
   isDereferenceable(uint64_t bytes, uint64_t align, bool iswrite = false,
-                    bool ignore_accessability = false);
+                    bool ignore_accessability = false,
+                    bool round_size_to_align = true);
   std::pair<smt::AndExpr, smt::expr>
   isDereferenceable(const smt::expr &bytes, uint64_t align, bool iswrite,
-                    bool ignore_accessability = false);
+                    bool ignore_accessability = false,
+                    bool round_size_to_align = true);
 
   void isDisjointOrEqual(const smt::expr &len1, const Pointer &ptr2,
                          const smt::expr &len2) const;

@@ -2022,7 +2022,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   unsigned bytesz = bits_byte / 8;
   Pointer ptr(*this, p);
   if (deref_check)
-    state->addUB(ptr.isDereferenceable(bytesize, align, true));
+    state->addUB(ptr.isDereferenceable(bytesize, align, true, false, false));
 
   auto wval = val;
   for (unsigned i = 1; i < bytesz; ++i) {
