@@ -3179,13 +3179,13 @@ StateValue Return::toSMT(State &s) const {
     args.emplace_back(const_cast<Value*>(&arg), ParamAttrs());
   }
 
+  if (auto &val_returned = s.getReturnedInput())
+    eq_val_rec(s, getType(), retval, *val_returned);
+
   retval = check_ret_attributes(s, std::move(retval), getType(), attrs, args);
 
   if (attrs.has(FnAttrs::NoReturn))
     s.addGuardableUB(expr(false));
-
-  if (auto &val_returned = s.getReturnedInput())
-    eq_val_rec(s, getType(), retval, *val_returned);
 
   s.addReturn(std::move(retval));
   return {};
