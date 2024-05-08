@@ -98,6 +98,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 91. SimplifyCFG: coallesced store retains the wrong alignment (https://llvm.org/PR89672)
 92. LoopVectorize introduces division by zero (https://llvm.org/PR89958)
 93. InstCombine: align attribute doesn't dereferenceability (https://llvm.org/PR90446)
+94. Reassociate: invalid propagation of overflow attributes at low bit-width (https://llvm.org/PR91417)
 
 
 ### Bugs found in Z3
