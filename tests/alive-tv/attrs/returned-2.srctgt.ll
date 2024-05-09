@@ -31,7 +31,7 @@ define i32 @tgt2(i32 returned %x) {
   %c = icmp eq i32 %x, 10
   br i1 %c, label %A, label %B
 A:
-  unreachable
+  ret i32 poison
 B:
   ret i32 0
 }

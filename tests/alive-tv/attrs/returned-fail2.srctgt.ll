@@ -1,4 +1,4 @@
-; ERROR: Source is more defined than target
+; ERROR: Target is more poisonous than source
 
 define <2 x i4> @src(<2 x i4> %0) {
   ret <2 x i4> %0

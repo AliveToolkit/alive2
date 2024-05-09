@@ -3127,8 +3127,8 @@ void Return::print(ostream &os) const {
 }
 
 static StateValue
-check_ret_attributes(State &s, StateValue &&sv, const Type &t,
-                     const FnAttrs &attrs,
+check_ret_attributes(State &s, StateValue &&sv, const StateValue &returned_arg,
+                     const Type &t, const FnAttrs &attrs,
                      const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = t.getAsAggregateType()) {
     vector<StateValue> vals;
@@ -3136,6 +3136,7 @@ check_ret_attributes(State &s, StateValue &&sv, const Type &t,
       if (agg->isPadding(i))
         continue;
       vals.emplace_back(check_ret_attributes(s, agg->extract(sv, i),
+                                             agg->extract(returned_arg, i),
                                              agg->getChild(i), attrs, args));
     }
     return agg->aggregateVals(vals);
@@ -3147,20 +3148,10 @@ check_ret_attributes(State &s, StateValue &&sv, const Type &t,
     sv.non_poison &= !p.isNocapture();
   }
 
-  return check_return_value(s, std::move(sv), t, attrs, args);
-}
-
-static void eq_val_rec(State &s, const Type &t, const StateValue &a,
-                       const StateValue &b) {
-  if (auto agg = t.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (agg->isPadding(i))
-        continue;
-      eq_val_rec(s, agg->getChild(i), agg->extract(a, i), agg->extract(b, i));
-    }
-    return;
-  }
-  s.addGuardableUB(a == b);
+  auto newsv = check_return_value(s, std::move(sv), t, attrs, args);
+  if (returned_arg.isValid())
+    newsv.non_poison &= newsv.value == returned_arg.value;
+  return newsv;
 }
 
 StateValue Return::toSMT(State &s) const {
@@ -3179,15 +3170,12 @@ StateValue Return::toSMT(State &s) const {
     args.emplace_back(const_cast<Value*>(&arg), ParamAttrs());
   }
 
-  if (auto &val_returned = s.getReturnedInput())
-    eq_val_rec(s, getType(), retval, *val_returned);
-
-  retval = check_ret_attributes(s, std::move(retval), getType(), attrs, args);
-
   if (attrs.has(FnAttrs::NoReturn))
     s.addGuardableUB(expr(false));
 
-  s.addReturn(std::move(retval));
+  s.addReturn(check_ret_attributes(s, std::move(retval),
+                                   s.getReturnedInput().value_or(StateValue()),
+                                   getType(), attrs, args));
   return {};
 }
 
