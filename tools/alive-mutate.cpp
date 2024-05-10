@@ -186,6 +186,13 @@ llvm::cl::list<size_t> disableEXT(
                    "instructions on integer type you specified"),
     llvm::cl::CommaSeparated);
 
+llvm::cl::list<string> mutateFunctions(
+    LLVM_ARGS_PREFIX "mutate-functions",
+    llvm::cl::value_desc("list of function name"),
+    llvm::cl::desc("option list -- By providing a list of function names,"
+                   "Alive-mutate will only mutate those functions specified"),
+    llvm::cl::CommaSeparated, llvm::cl::cat(mutatorArgs));
+
 unique_ptr<Cache> cache;
 std::stringstream logStream;
 // To eliminate extra verifier construction;
@@ -300,6 +307,19 @@ see alive-mutate --help for more options,
            "They might are only function declarations, "
         << (verifyInputModule ? "can't pass alive2 initial checks, " : "")
         << " or stores a function pointer inside\n";
+  }
+
+  if (!mutateFunctions.empty()) {
+    // std::unordered_set<string> mutateFunctionsSet;
+    llvm::StringSet<> mutateFunctionsSet;
+    mutateFunctionsSet.insert(mutateFunctions.begin(), mutateFunctions.end());
+    // For all functions not in specified function list, we think they are
+    // invalid.
+    for (auto fit = M1->begin(); fit != M1->end(); ++fit) {
+      if (!mutateFunctionsSet.contains(fit->getName())) {
+        invalidFunctions.insert(fit->getName());
+      }
+    }
   }
 
   if (randomSeed == -1 && individualSeed >= 0) {
