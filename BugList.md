@@ -99,6 +99,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 92. LoopVectorize introduces division by zero (https://llvm.org/PR89958)
 93. InstCombine: align attribute doesn't dereferenceability (https://llvm.org/PR90446)
 94. Reassociate: invalid propagation of overflow attributes at low bit-width (https://llvm.org/PR91417)
+95. InstCombine: removes a select, making the code more poisonous (https://llvm.org/PR91691)
 
 
 ### Bugs found in Z3
