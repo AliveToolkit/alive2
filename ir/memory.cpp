@@ -2335,8 +2335,8 @@ Memory::refined(const Memory &other, bool fncall,
 
   AliasSet block_alias(*this, other);
   auto min_read_sz = bits_byte / 8;
-  for (const auto &[mem, set]
-         : { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2)}) {
+  auto sets = { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2) };
+  for (const auto &[mem, set] : sets) {
     if (set) {
       for (auto &it: *set_ptrs) {
         block_alias.unionWith(computeAliasing(Pointer(*mem, it.val.value),
