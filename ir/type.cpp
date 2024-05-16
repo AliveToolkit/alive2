@@ -438,10 +438,9 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
     return val;
 
   unsigned fraction_bits = fractionBits();
-  unsigned var_bits = fraction_bits-1 + 1 /* sign */;
 
   // sign bit, exponent (-1), qnan bit (1) or snan (0), rest of fraction
-  expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
+  expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, 2));
 
   ChoiceExpr<expr> exprs;
 
@@ -480,8 +479,9 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
 
   // 4) target specific preferred QNaN (a set, possibly empty)
   // approximated by adding just one more value
-  exprs.add(expr::mkUInt(1, 1).concat(var.extract(fraction_bits - 2, 0)),
-            expr(true));
+  auto preferred_qnan_fraction
+    = expr::mkVar("#preferred_qnan", expr::mkUInt(0, fraction_bits - 1));
+  exprs.add(expr::mkUInt(1, 1).concat(preferred_qnan_fraction), expr(true));
 
   auto [fraction, domain, choice_var, pre] = std::move(exprs)();
   assert(!domain.isValid() || domain.isTrue());
@@ -528,8 +528,7 @@ bool FloatType::isNaNInt(const expr &e) const {
   if (!e.isValid())
     return false;
 
-  // unsigned var_bits = fraction_bits-1 + 1 /* sign */;
-  // expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, var_bits));
+  // expr var = s.getFreshNondetVar("#NaN", expr::mkUInt(0, 2));
   // var.sign().concat(expr::mkInt(-1, exp_bits)).concat(fraction)
   auto bw = bits();
 
@@ -540,7 +539,7 @@ bool FloatType::isNaNInt(const expr &e) const {
   unsigned h, l;
   return exponent.isAllOnes() &&
          e.sign().isExtract(nan, h, l) &&
-         h == l && h == fractionBits() - 1 &&
+         h == 1 && h == 1 &&
          nan.fn_name().starts_with("#NaN");
 }
 
