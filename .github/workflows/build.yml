@@ -30,10 +30,10 @@ jobs:
         run: |
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           if [[ ${{ matrix.compiler }} == "clang++-18" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+            sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-18 main"
           fi
           if [[ ${{ matrix.compiler }} == "clang++-19" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
+            sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble main"
           fi
           sudo apt-get update
           sudo apt-get install z3 re2c ninja-build
