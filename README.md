@@ -81,7 +81,9 @@ Building and Running Translation Validation
 --------
 
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
-RTTI and exceptions turned on.
+RTTI and exceptions turned on. The latest version of Alive2 is always intended
+to be built against the latest version of LLVM, using the main branch from
+the LLVM repo on Github.
 LLVM can be built in the following way.
 * You may prefer to add `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` to the CMake step if your default compiler is `gcc`.
 * Explicitly setting the target may not be necessary.
