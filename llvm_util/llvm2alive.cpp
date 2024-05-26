@@ -1756,6 +1756,8 @@ public:
 
           if (!alive_i->isVoid()) {
             add_identifier(i, *alive_i);
+          } else {
+            alive_i = static_cast<Instr *>(get_operand(&i));
           }
 
           if (i.hasMetadataOtherThanDebugLoc() &&
