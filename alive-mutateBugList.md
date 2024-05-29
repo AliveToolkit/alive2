@@ -20,6 +20,16 @@ This category is for bugs that generating wrong codes from passes
 17. miscompile of a frozen poison by AArch64 backend (https://github.com/llvm/llvm-project/issues/58321)
 18. miscompile from aarch64 backend with global isel (https://github.com/llvm/llvm-project/issues/58431)
 19. i34 miscompile in miscombine (https://github.com/llvm/llvm-project/issues/59836)
+20. AArch64 DAG selection miscompile (https://github.com/llvm/llvm-project/issues/90936)
+21. AArch64 global isel miscompile (https://github.com/llvm/llvm-project/issues/90242)
+22. AArch64 global isel miscompile (https://github.com/llvm/llvm-project/issues/90245)
+23. Loop vectorization miscompile (https://github.com/llvm/llvm-project/issues/89958)
+24. Miscompile of negation of selection (https://github.com/llvm/llvm-project/issues/89669)
+25. Miscompile by SimplifyCFG (https://github.com/llvm/llvm-project/issues/89672)
+26. VectorCombine transform leading to srem by poison  (https://github.com/llvm/llvm-project/issues/89390)
+27. miscompile of vanilla integer code by InstCombine (https://github.com/llvm/llvm-project/issues/89516)
+28. instcombine is wrong about a vector fshr->shl transformation (https://github.com/llvm/llvm-project/issues/89338)
+29. AArch64 miscompile of i1 arithmetic with global isel (https://github.com/llvm/llvm-project/issues/72475)
 
 
 ## Category 2
