@@ -7,7 +7,6 @@
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "util/compiler.h"
-#include <iostream>
 
 using namespace IR;
 using namespace smt;
