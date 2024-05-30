@@ -3693,6 +3693,10 @@ void GEP::print(ostream &os) const {
   os << getName() << " = gep ";
   if (inbounds)
     os << "inbounds ";
+  else if (nusw)
+    os << "nusw ";
+  if (nuw)
+    os << "nuw ";
   os << *ptr;
 
   for (auto &[sz, idx] : idxs) {
@@ -3717,13 +3721,19 @@ StateValue GEP::toSMT(State &s) const {
       auto val = v.sextOrTrunc(bits_for_offset);
       auto inc = multiplier * val;
 
-      if (inbounds) {
-        if (sz != 0) {
-          idx_all_zeros.add(v == 0);
-          non_poison.add(val.sextOrTrunc(v.bits()) == v);
-        }
+      if (inbounds && sz != 0)
+        idx_all_zeros.add(v == 0);
+
+      if (nusw) {
+        non_poison.add(val.sextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_soverflow(val));
-        non_poison.add(ptr.addNoOverflow(inc));
+        non_poison.add(ptr.addNoSOverflow(inc));
+      }
+
+      if (nuw) {
+        non_poison.add(val.zextOrTrunc(v.bits()) == v);
+        non_poison.add(multiplier.mul_no_uoverflow(val));
+        non_poison.add(ptr.addNoUOverflow(inc));
       }
 
 #ifndef NDEBUG
@@ -3793,7 +3803,7 @@ expr GEP::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
-  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds);
+  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds, nusw, nuw);
   for (auto &[sz, idx] : idxs) {
     dup->addIdx(sz, *idx);
   }

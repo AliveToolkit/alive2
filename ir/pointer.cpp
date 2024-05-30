@@ -7,6 +7,7 @@
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "util/compiler.h"
+#include <iostream>
 
 using namespace IR;
 using namespace smt;
@@ -292,8 +293,12 @@ Pointer Pointer::maskOffset(const expr &mask) const {
            getAttrs() };
 }
 
-expr Pointer::addNoOverflow(const expr &offset) const {
+expr Pointer::addNoSOverflow(const expr &offset) const {
   return getOffset().add_no_soverflow(offset);
+}
+
+expr Pointer::addNoUOverflow(const expr &offset) const {
+  return getAddress().zextOrTrunc(offset.bits()).add_no_uoverflow(offset);
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {

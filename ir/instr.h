@@ -768,14 +768,18 @@ class GEP final : public MemInstr {
   Value *ptr;
   std::vector<std::pair<uint64_t, Value*>> idxs;
   bool inbounds;
+  bool nusw;
+  bool nuw;
 public:
-  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds)
-    : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds) {}
+  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds, bool nusw, bool nuw)
+    : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds), nusw(nusw), nuw(nuw) {}
 
   void addIdx(uint64_t obj_size, Value &idx);
   Value& getPtr() const { return *ptr; }
   auto& getIdxs() const { return idxs; }
   bool isInBounds() const { return inbounds; }
+  bool hasNoUnsignedSignedWrap() const { return nusw; }
+  bool hasNoUnsignedWrap() const { return nuw; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
