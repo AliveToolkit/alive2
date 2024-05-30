@@ -6,7 +6,7 @@ config::src_unroll_cnt = opt_src_unrolling_factor;
 config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
 #else
 config::src_unroll_cnt = opt_unrolling_factor;
-config::src_unroll_cnt = opt_unrolling_factor;
+config::tgt_unroll_cnt = opt_unrolling_factor;
 #endif
 config::disable_undef_input = opt_disable_undef;
 config::disable_poison_input = opt_disable_poison;
