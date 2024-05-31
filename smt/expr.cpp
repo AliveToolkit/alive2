@@ -854,6 +854,13 @@ expr expr::add_no_uoverflow(const expr &rhs) const {
   return (zext(1) + rhs.zext(1)).sign() == 0;
 }
 
+expr expr::add_no_usoverflow(const expr &rhs) const {
+  if (min_leading_zeros() >= 1 && rhs.min_leading_zeros() >= 1)
+    return true;
+
+  return (zext(1) + rhs.sext(1)).sign() == 0;
+}
+
 expr expr::sub_no_soverflow(const expr &rhs) const {
   if (min_leading_zeros() >= 1 && rhs.min_leading_zeros() >= 1)
     return true;

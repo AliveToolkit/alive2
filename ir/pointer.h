@@ -88,8 +88,8 @@ public:
 
   Pointer maskOffset(const smt::expr &mask) const;
 
-  smt::expr addNoSOverflow(const smt::expr &offset) const;
-  smt::expr addNoUOverflow(const smt::expr &offset) const;
+  smt::expr addNoUSOverflow(const smt::expr &offset, bool offset_only) const;
+  smt::expr addNoUOverflow(const smt::expr &offset, bool offset_only) const;
 
   smt::expr operator==(const Pointer &rhs) const;
   smt::expr operator!=(const Pointer &rhs) const;

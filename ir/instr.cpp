@@ -3715,6 +3715,7 @@ StateValue GEP::toSMT(State &s) const {
     if (inbounds)
       inbounds_np.add(ptr.inbounds());
 
+    expr offset_sum = expr::mkUInt(0, bits_for_offset);
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
       auto multiplier = expr::mkUInt(sz, bits_for_offset);
@@ -3727,13 +3728,19 @@ StateValue GEP::toSMT(State &s) const {
       if (nusw) {
         non_poison.add(val.sextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_soverflow(val));
-        non_poison.add(ptr.addNoSOverflow(inc));
+        non_poison.add(ptr.addNoUSOverflow(inc, inbounds));
+        if (!inbounds) {
+          // For non-inbounds gep, we have to explicitly check that adding the offsets
+          // without the base address also doesn't wrap.
+          non_poison.add(offset_sum.add_no_soverflow(inc));
+          offset_sum = offset_sum + inc;
+        }
       }
 
       if (nuw) {
         non_poison.add(val.zextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_uoverflow(val));
-        non_poison.add(ptr.addNoUOverflow(inc));
+        non_poison.add(ptr.addNoUOverflow(inc, inbounds));
       }
 
 #ifndef NDEBUG
