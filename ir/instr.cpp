@@ -3810,7 +3810,8 @@ expr GEP::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
-  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds, nusw, nuw);
+  auto dup= make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds,
+                             nusw, nuw);
   for (auto &[sz, idx] : idxs) {
     dup->addIdx(sz, *idx);
   }

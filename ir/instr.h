@@ -771,8 +771,12 @@ class GEP final : public MemInstr {
   bool nusw;
   bool nuw;
 public:
-  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds, bool nusw, bool nuw)
-    : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds), nusw(nusw), nuw(nuw) {}
+  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds, bool nusw,
+      bool nuw)
+    : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds),
+      nusw(nusw), nuw(nuw) {
+    nusw |= inbounds;
+  }
 
   void addIdx(uint64_t obj_size, Value &idx);
   Value& getPtr() const { return *ptr; }
