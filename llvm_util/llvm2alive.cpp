@@ -610,7 +610,9 @@ public:
     if (!ty || !ptr)
       return error(i);
 
-    auto gep = make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds());
+    auto gep =
+        make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds(),
+                         i.hasNoUnsignedSignedWrap(), i.hasNoUnsignedWrap());
     auto gep_struct_ofs = [&i, this](llvm::StructType *sty, llvm::Value *ofs) {
       llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()), ofs };
       return this->DL().getIndexedOffsetInType(sty, { vals, 2 });
@@ -854,7 +856,7 @@ public:
             auto gep = make_unique<GEP>(
                 aptr->getType(),
                 "#align_adjustedptr" + to_string(alignopbundle_idx++),
-                *aptr, false);
+                *aptr, false, false, false);
             gep->addIdx(-1ull, *get_operand(bundle.Inputs[2].get()));
 
             aptr = gep.get();

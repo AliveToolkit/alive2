@@ -292,8 +292,16 @@ Pointer Pointer::maskOffset(const expr &mask) const {
            getAttrs() };
 }
 
-expr Pointer::addNoOverflow(const expr &offset) const {
-  return getOffset().add_no_soverflow(offset);
+expr Pointer::addNoUSOverflow(const expr &offset, bool offset_only) const {
+  if (offset_only)
+    return getOffset().add_no_soverflow(offset);
+  return getAddress().zextOrTrunc(offset.bits()).add_no_usoverflow(offset);
+}
+
+expr Pointer::addNoUOverflow(const expr &offset, bool offset_only) const {
+  if (offset_only)
+    return getOffset().add_no_uoverflow(offset);
+  return getAddress().zextOrTrunc(offset.bits()).add_no_uoverflow(offset);
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {

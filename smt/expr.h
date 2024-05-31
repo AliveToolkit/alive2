@@ -178,6 +178,7 @@ public:
 
   expr add_no_soverflow(const expr &rhs) const;
   expr add_no_uoverflow(const expr &rhs) const;
+  expr add_no_usoverflow(const expr &rhs) const;
   expr sub_no_soverflow(const expr &rhs) const;
   expr sub_no_uoverflow(const expr &rhs) const;
   expr mul_no_soverflow(const expr &rhs) const;
