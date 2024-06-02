@@ -295,13 +295,13 @@ Pointer Pointer::maskOffset(const expr &mask) const {
 expr Pointer::addNoUSOverflow(const expr &offset, bool offset_only) const {
   if (offset_only)
     return getOffset().add_no_soverflow(offset);
-  return getAddress().zextOrTrunc(offset.bits()).add_no_usoverflow(offset);
+  return getAddress().add_no_usoverflow(offset.sextOrTrunc(bits_ptr_address));
 }
 
 expr Pointer::addNoUOverflow(const expr &offset, bool offset_only) const {
   if (offset_only)
     return getOffset().add_no_uoverflow(offset);
-  return getAddress().zextOrTrunc(offset.bits()).add_no_uoverflow(offset);
+  return getAddress().add_no_uoverflow(offset.sextOrTrunc(bits_ptr_address));
 }
 
 expr Pointer::operator==(const Pointer &rhs) const {

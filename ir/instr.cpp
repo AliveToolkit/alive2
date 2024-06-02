@@ -3730,8 +3730,8 @@ StateValue GEP::toSMT(State &s) const {
         non_poison.add(multiplier.mul_no_soverflow(val));
         non_poison.add(ptr.addNoUSOverflow(inc, inbounds));
         if (!inbounds) {
-          // For non-inbounds gep, we have to explicitly check that adding the offsets
-          // without the base address also doesn't wrap.
+          // For non-inbounds gep, we have to explicitly check that adding the
+          // offsets without the base address also doesn't wrap.
           non_poison.add(offset_sum.add_no_soverflow(inc));
           offset_sum = offset_sum + inc;
         }
@@ -3810,8 +3810,8 @@ expr GEP::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
-  auto dup= make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds,
-                             nusw, nuw);
+  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds,
+                              nusw, nuw);
   for (auto &[sz, idx] : idxs) {
     dup->addIdx(sz, *idx);
   }

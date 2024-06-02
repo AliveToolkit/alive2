@@ -1,5 +1,3 @@
-; TEST_ARGS: -disable-undef-input
-
 target datalayout = "p:8:8"
 
 define ptr @src_refine_inbounds_to_nusw(ptr %x, i8 %i) {
