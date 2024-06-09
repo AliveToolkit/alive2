@@ -3155,13 +3155,8 @@ check_ret_attributes(State &s, StateValue &&sv, const StateValue &returned_arg,
 }
 
 StateValue Return::toSMT(State &s) const {
-  StateValue retval;
-
   auto &attrs = s.getFn().getFnAttrs();
-  if (attrs.poisonImpliesUB())
-    retval = s.getAndAddPoisonUB(*val, true);
-  else
-    retval = s[*val];
+  StateValue retval = s.getMaybeUB(*val, attrs.poisonImpliesUB());
 
   s.addGuardableUB(s.getMemory().checkNocapture());
 
@@ -3311,9 +3306,9 @@ unique_ptr<Instr> Assume::dup(Function &f, const string &suffix) const {
 
 
 AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
-                     vector<Value *> &&args0, Kind kind)
+                     vector<Value *> &&args0, Kind kind, bool is_welldefined)
     : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
-      kind(kind) {
+      kind(kind), is_welldefined(is_welldefined) {
   switch (kind) {
   case Align:
     assert(args.size() == 1);
@@ -3360,6 +3355,9 @@ void AssumeVal::print(ostream &os) const {
   for (auto &arg: args) {
     os << ", " << *arg;
   }
+
+  if (is_welldefined)
+    os << ", welldefined";
 }
 
 StateValue AssumeVal::toSMT(State &s) const {
@@ -3401,7 +3399,7 @@ StateValue AssumeVal::toSMT(State &s) const {
     break;
   }
 
-  auto &v = s[*val];
+  auto &v = s.getMaybeUB(*val, is_welldefined);
   if (auto agg = getType().getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
@@ -3415,6 +3413,11 @@ StateValue AssumeVal::toSMT(State &s) const {
 
   if (config::disallow_ub_exploitation)
     s.addGuardableUB(expr(np));
+
+  if (is_welldefined) {
+    s.addUB(std::move(np));
+    np = true;
+  }
 
   return { expr(v.value), v.non_poison && np };
 }
@@ -3441,7 +3444,7 @@ expr AssumeVal::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> AssumeVal::dup(Function &f, const string &suffix) const {
   return make_unique<AssumeVal>(getType(), getName() + suffix, *val,
-                                vector<Value*>(args), kind);
+                                vector<Value*>(args), kind, is_welldefined);
 }
 
 

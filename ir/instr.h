@@ -631,10 +631,12 @@ private:
   Value *val;
   std::vector<Value*> args;
   Kind kind;
+  bool is_welldefined;
 
 public:
   AssumeVal(Type &type, std::string &&name, Value &val,
-            std::vector<Value *> &&args, Kind kind);
+            std::vector<Value *> &&args, Kind kind,
+            bool is_welldefined = false);
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

@@ -1351,17 +1351,20 @@ public:
   }
 
   unique_ptr<Instr>
-  handleRangeAttrNoInsert(const llvm::Attribute &attr, Value &val) {
+  handleRangeAttrNoInsert(const llvm::Attribute &attr, Value &val,
+                          bool is_welldefined = false) {
     auto CR = attr.getValueAsConstantRange();
     vector<Value*> bounds{ make_intconst(CR.getLower()),
                            make_intconst(CR.getUpper()) };
     return
       make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(), val,
-                             std::move(bounds), AssumeVal::Range);
+                             std::move(bounds), AssumeVal::Range,
+                             is_welldefined);
   }
 
-  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val) {
-    auto assume = handleRangeAttrNoInsert(attr, val);
+  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val,
+                         bool is_welldefined = false) {
+    auto assume = handleRangeAttrNoInsert(attr, val, is_welldefined);
     auto ret = assume.get();
     BB->addInstr(std::move(assume));
     return ret;
@@ -1443,7 +1446,8 @@ public:
         break;
 
       case llvm::Attribute::Range:
-        newval = handleRangeAttr(llvmattr, val);
+        newval = handleRangeAttr(llvmattr, val,
+                                 aset.hasAttribute(llvm::Attribute::NoUndef));
         break;
 
       case llvm::Attribute::NoFPClass:
