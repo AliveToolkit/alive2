@@ -1584,7 +1584,7 @@ StateValue ConversionOp::toSMT(State &s) const {
       unsigned trunc_bits = to_type.bits();
       expr val_truncated = val.trunc(trunc_bits);
       if (flags & NUW)
-        non_poison.add(val_truncated.zext(orig_bits - trunc_bits) == val);
+        non_poison.add(val.extract(orig_bits-1, trunc_bits) == 0);
       if (flags & NSW)
         non_poison.add(val_truncated.sext(orig_bits - trunc_bits) == val);
       return {std::move(val_truncated), non_poison()};
