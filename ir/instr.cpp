@@ -184,6 +184,8 @@ void BinOp::print(ostream &os) const {
   case SMin:          str = "smin "; break;
   case SMax:          str = "smax "; break;
   case Abs:           str = "abs "; break;
+  case UCmp:          str = "ucmp "; break;
+  case SCmp:          str = "scmp "; break;
   }
 
   os << getName() << " = " << str;
@@ -196,6 +198,9 @@ void BinOp::print(ostream &os) const {
     os << "exact ";
   if (flags & Disjoint)
     os << "disjoint ";
+
+  if (op == UCmp || op == SCmp)
+    os << getType() << ' ';
   os << *lhs << ", " << rhs->getName();
 }
 
@@ -453,6 +458,18 @@ StateValue BinOp::toSMT(State &s) const {
       return { a.abs(), ap && bp && (b == 0 || a != expr::IntSMin(a.bits())) };
     };
     break;
+
+  case UCmp:
+  case SCmp:
+    fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
+      uint32_t resBits = getType().bits();
+      return {expr::mkIf(a == b, expr::mkUInt(0, resBits),
+                         expr::mkIf(op == UCmp ? a.ult(b) : a.slt(b),
+                                    expr::mkInt(-1, resBits),
+                                    expr::mkInt(1, resBits))),
+              ap && bp};
+    };
+    break;
   }
 
   function<pair<StateValue,StateValue>(const expr&, const expr&, const expr&,
@@ -556,6 +573,14 @@ expr BinOp::getTypeConstraints(const Function &f) const {
     instrconstr = getType().enforceIntOrVectorType() &&
                   getType() == lhs->getType() &&
                   rhs->getType().enforceIntType(1);
+    break;
+  case UCmp:
+  case SCmp:
+    instrconstr = getType().enforceScalarOrVectorType([&](auto &ty) {
+      return ty.enforceIntType() && ty.sizeVar() >= 2;
+    }) && getType().enforceVectorTypeEquiv(lhs->getType()) &&
+                  lhs->getType().enforceIntOrVectorType() &&
+                  lhs->getType() == rhs->getType();
     break;
   default:
     instrconstr = getType().enforceIntOrVectorType() &&
