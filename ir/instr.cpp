@@ -462,23 +462,11 @@ StateValue BinOp::toSMT(State &s) const {
   case UCmp:
   case SCmp:
     fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
-      expr lt, gt;
-      switch (op) {
-      case UCmp:
-        lt = a.ult(b);
-        gt = a.ugt(b);
-        break;
-      case SCmp:
-        lt = a.slt(b);
-        gt = a.sgt(b);
-        break;
-      default:
-        UNREACHABLE();
-      }
       uint32_t resBits = getType().bits();
-      return {expr::mkIf(std::move(lt), expr::mkInt(-1, resBits),
-                         expr::mkIf(std::move(gt), expr::mkInt(1, resBits),
-                                    expr::mkUInt(0U, resBits))),
+      return {expr::mkIf(a == b, expr::mkUInt(0, resBits),
+                         expr::mkIf(op == UCmp ? a.ult(b) : a.slt(b),
+                                    expr::mkInt(-1, resBits),
+                                    expr::mkInt(1, resBits))),
               ap && bp};
     };
     break;
