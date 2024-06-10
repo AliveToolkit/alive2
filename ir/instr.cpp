@@ -462,7 +462,10 @@ StateValue BinOp::toSMT(State &s) const {
   case UCmp:
   case SCmp:
     fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
-      uint32_t resBits = getType().bits();
+      auto &ty = getType();
+      uint32_t resBits =
+          (ty.isVectorType() ? ty.getAsAggregateType()->getChild(0) : ty)
+              .bits();
       return {expr::mkIf(a == b, expr::mkUInt(0, resBits),
                          expr::mkIf(op == UCmp ? a.ult(b) : a.slt(b),
                                     expr::mkInt(-1, resBits),
@@ -515,8 +518,9 @@ StateValue BinOp::toSMT(State &s) const {
       vals.emplace_back(val2ty->aggregateVals(vals2));
     } else {
       StateValue tmp;
-      for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
-        auto ai = retty->extract(a, i);
+      auto opty = lhs->getType().getAsAggregateType();
+      for (unsigned i = 0, e = opty->numElementsConst(); i != e; ++i) {
+        auto ai = opty->extract(a, i);
         const StateValue *bi;
         switch (op) {
         case Abs:
@@ -525,7 +529,7 @@ StateValue BinOp::toSMT(State &s) const {
           bi = &b;
           break;
         default:
-          tmp = retty->extract(b, i);
+          tmp = opty->extract(b, i);
           bi = &tmp;
           break;
         }
