@@ -184,12 +184,8 @@ void BinOp::print(ostream &os) const {
   case SMin:          str = "smin "; break;
   case SMax:          str = "smax "; break;
   case Abs:           str = "abs "; break;
-  case UCmp:
-    str = "ucmp ";
-    break;
-  case SCmp:
-    str = "scmp ";
-    break;
+  case UCmp:          str = "ucmp "; break;
+  case SCmp:          str = "scmp "; break;
   }
 
   os << getName() << " = " << str;

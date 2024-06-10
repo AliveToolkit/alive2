@@ -30,42 +30,12 @@ public:
 
 class BinOp final : public Instr {
 public:
-  enum Op {
-    Add,
-    Sub,
-    Mul,
-    SDiv,
-    UDiv,
-    SRem,
-    URem,
-    Shl,
-    AShr,
-    LShr,
-    SAdd_Sat,
-    UAdd_Sat,
-    SSub_Sat,
-    USub_Sat,
-    SShl_Sat,
-    UShl_Sat,
-    SAdd_Overflow,
-    UAdd_Overflow,
-    SSub_Overflow,
-    USub_Overflow,
-    SMul_Overflow,
-    UMul_Overflow,
-    And,
-    Or,
-    Xor,
-    Cttz,
-    Ctlz,
-    UMin,
-    UMax,
-    SMin,
-    SMax,
-    Abs,
-    UCmp,
-    SCmp
-  };
+  enum Op { Add, Sub, Mul, SDiv, UDiv, SRem, URem, Shl, AShr, LShr,
+            SAdd_Sat, UAdd_Sat, SSub_Sat, USub_Sat, SShl_Sat, UShl_Sat,
+            SAdd_Overflow, UAdd_Overflow, SSub_Overflow, USub_Overflow,
+            SMul_Overflow, UMul_Overflow,
+            And, Or, Xor, Cttz, Ctlz, UMin, UMax, SMin, SMax, Abs,
+            UCmp, SCmp };
   enum Flags { None = 0, NSW = 1 << 0, NUW = 1 << 1, Exact = 1 << 2, Disjoint = 1 << 3 };
 
 private:

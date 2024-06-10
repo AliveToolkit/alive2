@@ -922,12 +922,8 @@ public:
       case llvm::Intrinsic::smin:     op = BinOp::SMin; break;
       case llvm::Intrinsic::smax:     op = BinOp::SMax; break;
       case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
-      case llvm::Intrinsic::ucmp:
-        op = BinOp::UCmp;
-        break;
-      case llvm::Intrinsic::scmp:
-        op = BinOp::SCmp;
-        break;
+      case llvm::Intrinsic::ucmp:     op = BinOp::UCmp; break;
+      case llvm::Intrinsic::scmp:     op = BinOp::SCmp; break;
       default: UNREACHABLE();
       }
       FnAttrs attrs;

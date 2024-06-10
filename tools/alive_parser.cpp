@@ -759,12 +759,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case SMIN: op = BinOp::SMin; break;
   case SMAX: op = BinOp::SMax; break;
   case ABS:  op = BinOp::Abs; break;
-  case UCMP:
-    op = BinOp::UCmp;
-    break;
-  case SCMP:
-    op = BinOp::SCmp;
-    break;
+  case UCMP: op = BinOp::UCmp; break;
+  case SCMP: op = BinOp::SCmp; break;
   default:
     UNREACHABLE();
   }
