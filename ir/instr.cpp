@@ -2369,6 +2369,7 @@ StateValue FnCall::toSMT(State &s) const {
   vector<StateValue> inputs;
   vector<Memory::PtrInput> ptr_inputs;
 
+  unsigned indirect_hash = 0;
   auto ptr = fnptr;
   // This is a direct call, but check if there are indirect calls elsewhere
   // to this function. If so, call it indirectly to match the other calls.
@@ -2389,7 +2390,7 @@ StateValue FnCall::toSMT(State &s) const {
       decl.inputs.emplace_back(&arg->getType(), params);
     }
     s.addUB(expr::mkUF("#fndeclty", { inputs[0].value }, expr::mkUInt(0, 32)) ==
-            decl.hash());
+            (indirect_hash = decl.hash()));
   } else {
     fnName_mangled << fnName;
   }
@@ -2513,7 +2514,7 @@ StateValue FnCall::toSMT(State &s) const {
 
   auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
                          std::move(ptr_inputs), getType(), std::move(ret_val),
-                         ret_arg_ty, std::move(ret_vals), attrs);
+                         ret_arg_ty, std::move(ret_vals), attrs, indirect_hash);
 
   return isVoid() ? StateValue()
                   : pack_return(s, getType(), std::move(ret), attrs, args);

@@ -3,8 +3,6 @@ Alive2
 
 ![Alive2 logo](imgs/alive2.png)
 
-Introduction
-------------
 Alive2 consists of several libraries and tools for analysis and verification
 of LLVM code and transformations.
 Alive2 includes the following libraries:

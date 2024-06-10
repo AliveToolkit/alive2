@@ -26,6 +26,44 @@ class JumpInstr;
 class BasicBlock;
 class Function;
 
+class SMTMemoryAccess {
+  smt::expr val;
+  SMTMemoryAccess(smt::expr &&val) : val(std::move(val)) {}
+
+public:
+  SMTMemoryAccess() : SMTMemoryAccess(MemoryAccess()) {}
+  SMTMemoryAccess(const MemoryAccess &val);
+
+  using AccessType = MemoryAccess::AccessType;
+
+  smt::expr canAccess(AccessType ty) const;
+  smt::expr canRead(AccessType ty) const;
+  smt::expr canWrite(AccessType ty) const;
+  smt::expr canOnlyRead(AccessType ty) const;
+  smt::expr canOnlyWrite(AccessType ty) const;
+  smt::expr canReadSomething() const;
+  smt::expr canWriteSomething() const;
+
+  void operator&=(const SMTMemoryAccess &rhs) { val = val & rhs.val; }
+  void operator|=(const SMTMemoryAccess &rhs) { val = val | rhs.val; }
+  SMTMemoryAccess operator|(const SMTMemoryAccess &rhs) const {
+    return val | rhs.val;
+  }
+
+  smt::expr refinedBy(const SMTMemoryAccess &other) const;
+
+  static SMTMemoryAccess mkIf(const smt::expr &cond,
+                              const SMTMemoryAccess &then,
+                              const SMTMemoryAccess &els);
+
+  auto operator<=>(const SMTMemoryAccess &rhs) const = default;
+  bool operator==(const SMTMemoryAccess &rhs) const {
+    return is_eq(val <=> rhs.val);
+  }
+
+  friend class State;
+};
+
 class State {
 public:
   struct ValTy {
@@ -57,9 +95,10 @@ private:
     // This is an over-approximation, union over all predecessors
     struct FnCallRanges
       : public std::map<std::string, std::pair<std::set<unsigned>,
-                        MemoryAccess>> {
-      void inc(const std::string &name, MemoryAccess access);
-      bool overlaps(const std::string &callee, MemoryAccess call_access,
+                        SMTMemoryAccess>> {
+      void inc(const std::string &name, const SMTMemoryAccess &access);
+      bool overlaps(const std::string &callee,
+                    const SMTMemoryAccess &call_access,
                     const FnCallRanges &other) const;
       // remove all ranges but name
       FnCallRanges project(const std::string &name) const;
@@ -159,7 +198,7 @@ private:
     std::vector<Memory::PtrInput> args_ptr;
     ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
-    MemoryAccess memaccess;
+    SMTMemoryAccess memaccess;
     bool noret, willret;
 
     smt::expr implies(const FnCallInput &rhs) const;
@@ -168,8 +207,8 @@ private:
                         const std::vector<StateValue> &args_nonptr,
                         const std::vector<Memory::PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
-                        const Memory &m, MemoryAccess memaccess, bool noret,
-                        bool willret) const;
+                        const Memory &m, const SMTMemoryAccess &memaccess,
+                        bool noret, bool willret) const;
 
     auto operator<=>(const FnCallInput &rhs) const = default;
   };
@@ -258,7 +297,8 @@ public:
               std::vector<Memory::PtrInput> &&ptr_inputs,
               const Type &out_type,
               StateValue &&ret_arg, const Type *ret_arg_ty,
-              std::vector<StateValue> &&ret_args, const FnAttrs &attrs);
+              std::vector<StateValue> &&ret_args, const FnAttrs &attrs,
+              unsigned indirect_call_hash);
 
   auto& getVarArgsData() { return var_args_data.data; }
 

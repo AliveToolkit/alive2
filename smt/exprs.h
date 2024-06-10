@@ -89,6 +89,14 @@ public:
     }
   }
 
+  expr domain() const {
+    expr ret(false);
+    for (auto &p : vals) {
+      ret |= p.second;
+    }
+    return ret;
+  }
+
   std::optional<T> operator()() const& {
     std::optional<T> ret;
     for (auto &[val, domain] : vals) {

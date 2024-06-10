@@ -1053,7 +1053,6 @@ static void calculateAndInitConstants(Transform &t) {
 
       if (auto fn = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
-        has_indirect_fncalls |= fn->isIndirect();
         if (!fn->getAttributes().isAlloc()) {
           if (fn->getAttributes().mem.canOnlyWrite(MemoryAccess::Inaccessible)) {
             if (inaccessiblememonly_fns.emplace(fn->getName()).second)
@@ -1066,6 +1065,10 @@ static void calculateAndInitConstants(Transform &t) {
             }
             has_write_fncall |= fn->getAttributes().mem.canWriteSomething();
           }
+        }
+        if (fn->isIndirect()) {
+          has_indirect_fncalls = true;
+          num_inaccessiblememonly_fns += is_src;
         }
       }
 

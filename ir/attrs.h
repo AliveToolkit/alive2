@@ -53,6 +53,7 @@ public:
 
   auto operator<=>(const MemoryAccess &rhs) const = default;
   friend std::ostream& operator<<(std::ostream &os, const MemoryAccess &a);
+  friend class SMTMemoryAccess;
 };
 
 

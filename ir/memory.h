@@ -23,6 +23,7 @@ namespace smt { class Model; }
 namespace IR {
 
 class Memory;
+class SMTMemoryAccess;
 class State;
 
 
@@ -285,8 +286,8 @@ public:
   mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs,
           bool is_local, const FnRetData *data = nullptr);
   CallState mkCallState(const std::string &fnname, bool nofree,
-                        MemoryAccess access);
-  void setState(const CallState &st, MemoryAccess access,
+                        const SMTMemoryAccess &access);
+  void setState(const CallState &st, const SMTMemoryAccess &access,
                 const std::vector<PtrInput> &ptr_inputs,
                 unsigned inaccessible_bid);
 
