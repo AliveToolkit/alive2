@@ -277,6 +277,8 @@ space+ {
 "smin" { return SMIN; }
 "smax" { return SMAX; }
 "abs" { return ABS; }
+"ucmp" { return UCMP; }
+"scmp" { return SCMP; }
 "oeq" { return OEQ; }
 "ogt" { return OGT; }
 "oge" { return OGE; }

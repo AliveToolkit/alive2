@@ -898,7 +898,8 @@ public:
     case llvm::Intrinsic::smin:
     case llvm::Intrinsic::smax:
     case llvm::Intrinsic::abs:
-    {
+    case llvm::Intrinsic::ucmp:
+    case llvm::Intrinsic::scmp: {
       PARSE_BINOP();
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
@@ -921,6 +922,12 @@ public:
       case llvm::Intrinsic::smin:     op = BinOp::SMin; break;
       case llvm::Intrinsic::smax:     op = BinOp::SMax; break;
       case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
+      case llvm::Intrinsic::ucmp:
+        op = BinOp::UCmp;
+        break;
+      case llvm::Intrinsic::scmp:
+        op = BinOp::SCmp;
+        break;
       default: UNREACHABLE();
       }
       FnAttrs attrs;

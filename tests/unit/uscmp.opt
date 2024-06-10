@@ -1,0 +1,49 @@
+Name: s0
+%t = scmp i2 i8 0, i8 1
+  =>
+%t = -1
+
+Name: s1
+%t = scmp i2 i8 0, i8 0
+  =>
+%t = 0
+
+Name: s2
+%t = scmp i2 i8 0, i8 -1
+  =>
+%t = 1
+
+Name: s3
+%t = scmp i2 i8 0, i8 undef
+  =>
+%t = 0
+
+Name: s4
+%t = scmp i2 i8 0, i8 poison
+  =>
+%t = poison
+
+Name: u0
+%t = ucmp i2 i8 0, i8 1
+  =>
+%t = -1
+
+Name: u1
+%t = ucmp i2 i8 0, i8 0
+  =>
+%t = 0
+
+Name: u2
+%t = ucmp i2 i8 1, i8 0
+  =>
+%t = 1
+
+Name: u3
+%t = ucmp i2 i8 0, i8 undef
+  =>
+%t = 0
+
+Name: u4
+%t = ucmp i2 i8 0, i8 poison
+  =>
+%t = poison

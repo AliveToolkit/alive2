@@ -687,6 +687,8 @@ static unsigned parse_binop_flags(token op_token) {
   case SMIN:
   case SMAX:
   case ABS:
+  case UCMP:
+  case SCMP:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -695,12 +697,15 @@ static unsigned parse_binop_flags(token op_token) {
 
 static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   auto flags = parse_binop_flags(op_token);
+  auto *explicit_rettype =
+      op_token == UCMP || op_token == SCMP ? &parse_type() : nullptr;
   auto &type = parse_type();
   auto &a = parse_operand(type);
   parse_comma();
   Type &type_rhs = try_parse_type(type);
   auto &b = parse_operand(type_rhs);
-  Type *rettype = &type;
+  Type *rettype =
+      op_token == UCMP || op_token == SCMP ? explicit_rettype : &type;
 
   BinOp::Op op;
   switch (op_token) {
@@ -754,6 +759,12 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case SMIN: op = BinOp::SMin; break;
   case SMAX: op = BinOp::SMax; break;
   case ABS:  op = BinOp::Abs; break;
+  case UCMP:
+    op = BinOp::UCmp;
+    break;
+  case SCMP:
+    op = BinOp::SCmp;
+    break;
   default:
     UNREACHABLE();
   }
@@ -1201,6 +1212,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case SMIN:
   case SMAX:
   case ABS:
+  case UCMP:
+  case SCMP:
     return parse_binop(name, t);
   case FADD:
   case FSUB:
