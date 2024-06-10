@@ -578,7 +578,8 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   case SCmp:
     instrconstr = getType().enforceScalarOrVectorType([&](auto &ty) {
       return ty.enforceIntType() && ty.sizeVar() >= 2;
-    }) && lhs->getType().enforceIntOrVectorType() &&
+    }) && getType().enforceVectorTypeEquiv(lhs->getType()) &&
+                  lhs->getType().enforceIntOrVectorType() &&
                   lhs->getType() == rhs->getType();
     break;
   default:
