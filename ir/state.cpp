@@ -1056,13 +1056,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       }
     }
 
-    expr uf = expr::mkUF("#access_" + name, { fn_ptr }, memaccess.val);
-    if (auto acc = std::move(decl_access)()) {
-      memaccess &= SMTMemoryAccess::mkIf(decl_access.domain(), *acc,
-                                         std::move(uf));
-    } else {
-      memaccess &= std::move(uf);
-    }
+    memaccess &= *std::move(decl_access).mk(SMTMemoryAccess{
+      expr::mkUF("#access_" + name, { fn_ptr }, memaccess.val)});
   }
 
   if (!memaccess.canWrite(MemoryAccess::Args).isFalse() ||

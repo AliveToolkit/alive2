@@ -89,14 +89,6 @@ public:
     }
   }
 
-  expr domain() const {
-    expr ret(false);
-    for (auto &p : vals) {
-      ret |= p.second;
-    }
-    return ret;
-  }
-
   std::optional<T> operator()() const& {
     std::optional<T> ret;
     for (auto &[val, domain] : vals) {
@@ -110,8 +102,9 @@ public:
     return default_val;
   }
 
-  std::optional<T> operator()() && {
-    std::optional<T> ret;
+  // argument is the value used if the domain is false
+  // not the same as default, which is used only if no element is present
+  std::optional<T> mk(std::optional<T> ret) && {
     for (auto &[val0, domain] : vals) {
       auto &val = const_cast<T&>(val0);
       if (domain.isTrue())
@@ -124,6 +117,8 @@ public:
       return ret;
     return std::move(default_val);
   }
+
+  std::optional<T> operator()() && { return std::move(*this).mk({}); }
 
   std::optional<T> lookup(const expr &domain) const {
     for (auto &[v, d] : vals) {
