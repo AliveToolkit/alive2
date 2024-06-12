@@ -1275,10 +1275,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
   auto skip_bid = [&](unsigned bid) {
     if (bid == 0 && has_null_block)
       return true;
-    if (is_globalvar(bid, true))
+    if (is_globalvar(bid, true) || is_fncall_mem(bid))
       return false;
-    if (is_fncall_mem(bid))
-      return true;
     return bid >= tgt.next_nonlocal_bid;
   };
 
@@ -1286,8 +1284,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
   expr align = expr::mkUInt(ilog2(heap_block_alignment), 6);
 
   if (null_is_dereferenceable && has_null_block) {
-    state->addAxiom(Pointer::mkNullPointer(*this).blockAlignment() == -1u);
-    state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == -1u);
+    state->addAxiom(Pointer::mkNullPointer(*this).blockAlignment()==UINT64_MAX);
+    state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == UINT64_MAX);
   }
 
   for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
