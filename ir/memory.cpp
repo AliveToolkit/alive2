@@ -1587,7 +1587,7 @@ Memory::mkCallState(const string &fnname, bool nofree,
   auto blk_type = mk_block_val_array(1);
   expr only_write_inaccess = access.canOnlyWrite(MemoryAccess::Inaccessible);
 
-  // innaccessible memory block
+  // inaccessible memory block
   st.non_local_block_val.emplace_back(expr::mkFreshVar("blk_val", blk_type));
 
   if (!only_write_inaccess.isTrue()) {
