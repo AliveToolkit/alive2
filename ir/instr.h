@@ -682,6 +682,8 @@ public:
     // Otherwise, bytes of a memory can be widened to this size.
     unsigned byteSize = 0;
 
+    unsigned subByteAccess = 0;
+
     bool doesMemAccess() const { return byteSize; }
 
     static ByteAccessInfo intOnly(unsigned byteSize);

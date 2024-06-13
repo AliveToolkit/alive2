@@ -3,19 +3,15 @@ target datalayout = "E"
 
 define i32 @src(ptr %p) {
   %u = alloca i32
-  %a = bitcast ptr %u to ptr
-  %b = bitcast ptr %u to ptr
-  store i32 -1, ptr %a
-  store i12 20, ptr %b
+  store i32 -1, ptr %u
+  store i12 20, ptr %u
   %v = load i32, ptr %u
   ret i32 %v
 }
 
 define i32 @tgt(ptr %p) {
   %u = alloca i32
-  %a = bitcast ptr %u to ptr
-  store i32 22020095, ptr %a
+  store i32 22020095, ptr %u
   %v = load i32, ptr %u
   ret i32 %v
-} 
-; ERROR: Value mismatch
+}

@@ -3503,11 +3503,13 @@ MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
   info.doesPtrStore     = ptr_access && store;
   info.doesPtrLoad      = ptr_access && !store;
   info.byteSize         = gcd(align, getCommonAccessSize(t));
+  if (auto intTy = t.getAsIntType())
+    info.subByteAccess  = intTy->maxSubBitAccess();
   return info;
 }
 
 MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
-  return { true, true, true, true, byteSize };
+  return { true, true, true, true, byteSize, 0 };
 }
 
 

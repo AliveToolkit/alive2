@@ -26,6 +26,7 @@ unsigned bits_program_pointer = 64;
 unsigned bits_size_t = 64;
 unsigned bits_ptr_address = 64;
 unsigned bits_byte = 8;
+unsigned num_sub_byte_bits = 6;
 unsigned strlen_unroll_cnt = 8;
 unsigned memcmp_unroll_cnt = 8;
 bool little_endian = true;

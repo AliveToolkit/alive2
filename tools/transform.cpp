@@ -979,6 +979,7 @@ static void calculateAndInitConstants(Transform &t) {
   bool does_any_byte_access = false;
   has_indirect_fncalls = false;
   has_ptr_arg = false;
+  num_sub_byte_bits = 0;
 
   set<string> inaccessiblememonly_fns;
   num_inaccessiblememonly_fns = 0;
@@ -1087,6 +1088,8 @@ static void calculateAndInitConstants(Transform &t) {
         does_mem_access      |= info.doesMemAccess();
         observes_addresses   |= info.observesAddresses;
         min_access_size       = gcd(min_access_size, info.byteSize);
+        num_sub_byte_bits     = max(num_sub_byte_bits,
+                                    (unsigned)bit_width(info.subByteAccess));
         if (info.doesMemAccess() && !info.hasIntByteAccess &&
             !info.doesPtrLoad && !info.doesPtrStore)
           does_any_byte_access = true;
@@ -1266,6 +1269,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\ndoes_mem_access: " << does_mem_access
                   << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
                   << "\ndoes_int_mem_access: " << does_int_mem_access
+                  << "\nnum_sub_byte_bits: " << num_sub_byte_bits
                   << "\nhas_ptr_arg: " << has_ptr_arg
                   << '\n';
 }

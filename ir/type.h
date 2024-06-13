@@ -20,6 +20,7 @@ namespace IR {
 
 class AggregateType;
 class FloatType;
+class IntType;
 class StructType;
 class SymbolicType;
 class VectorType;
@@ -88,6 +89,7 @@ public:
   smt::expr enforceFloatOrVectorType() const;
   smt::expr enforcePtrOrVectorType() const;
 
+  virtual const IntType* getAsIntType() const;
   virtual const FloatType* getAsFloatType() const;
   virtual const AggregateType* getAsAggregateType() const;
   virtual const StructType* getAsStructType() const;
@@ -157,6 +159,7 @@ public:
   IntType(std::string &&name, unsigned bitwidth)
     : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
 
+  unsigned maxSubBitAccess() const;
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
@@ -165,6 +168,7 @@ public:
   void fixup(const smt::Model &m) override;
   bool isIntType() const override;
   smt::expr enforceIntType(unsigned bits = 0) const override;
+  const IntType* getAsIntType() const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -399,6 +403,7 @@ public:
   smt::expr enforceFloatType() const override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
+  const IntType* getAsIntType() const override;
   const FloatType* getAsFloatType() const override;
   const AggregateType* getAsAggregateType() const override;
   const StructType* getAsStructType() const override;

@@ -51,6 +51,10 @@ extern unsigned bits_ptr_address;
 /// Number of bits for a byte.
 extern unsigned bits_byte;
 
+/// Required bits to store the size of sub-byte accesses
+/// (e.g., store i5 -> we record 4, so 3 bits)
+extern unsigned num_sub_byte_bits;
+
 extern unsigned strlen_unroll_cnt;
 extern unsigned memcmp_unroll_cnt;
 

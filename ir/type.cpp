@@ -204,6 +204,10 @@ expr Type::enforcePtrOrVectorType() const {
            [&](auto &ty) { return ty.enforcePtrType(); });
 }
 
+const IntType* Type::getAsIntType() const {
+  return nullptr;
+}
+
 const FloatType* Type::getAsFloatType() const {
   return nullptr;
 }
@@ -321,6 +325,14 @@ void VoidType::print(ostream &os) const {
 }
 
 
+unsigned IntType::maxSubBitAccess() const {
+  if (!defined)
+    return 63;
+  if (bitwidth % 8)
+    return bitwidth;
+  return 0;
+}
+
 unsigned IntType::bits() const {
   return bitwidth;
 }
@@ -357,6 +369,10 @@ bool IntType::isIntType() const {
 
 expr IntType::enforceIntType(unsigned bits) const {
   return bits ? sizeVar() == bits : true;
+}
+
+const IntType* IntType::getAsIntType() const {
+  return this;
 }
 
 pair<expr, expr>
@@ -1355,6 +1371,10 @@ expr SymbolicType::enforceFloatType() const {
 expr SymbolicType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return v ? (isVector() && v->enforceVectorType(enforceElem)) : false;
+}
+
+const IntType* SymbolicType::getAsIntType() const {
+  return &*i;
 }
 
 const FloatType* SymbolicType::getAsFloatType() const {
