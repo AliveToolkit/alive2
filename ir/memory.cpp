@@ -638,9 +638,11 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     // initial memory is not for ASM.
     // It also means we need to ensure the ABI is respected on stores.
     if (is_asm && num_sub_byte_bits) {
-      auto shift
-       = expr::mkUInt(bitsize, val.value) - stored_bits.zextOrTrunc(val.bits());
-      val.value = val.value & (expr::mkInt(-1, shift).lshr(shift));
+      auto shift = expr::mkUInt(bitsize, val.value)
+                     - stored_bits.zextOrTrunc(val.bits());
+      val.value = expr::mkIf(stored_bits == 0 && (bitsize % 8) == 0,
+                             val.value,
+                             val.value & (expr::mkInt(-1, shift).lshr(shift)));
     }
     return val;
   }
