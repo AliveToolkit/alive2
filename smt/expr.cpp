@@ -2054,7 +2054,7 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   if (cond.isFalse())
     return els;
 
-  if (then.isTrue())
+  if (then.isTrue() || cond.eq(then))
     return cond || els;
   if (then.isFalse())
     return !cond && els;
