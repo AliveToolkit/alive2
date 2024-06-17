@@ -629,21 +629,24 @@ void FpBinOp::rauw(const Value &what, Value &with) {
   RAUW(rhs);
 }
 
-void FpBinOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpBinOp::getOpName() const {
   switch (op) {
-  case FAdd:     str = "fadd "; break;
-  case FSub:     str = "fsub "; break;
-  case FMul:     str = "fmul "; break;
-  case FDiv:     str = "fdiv "; break;
-  case FRem:     str = "frem "; break;
-  case FMax:     str = "fmax "; break;
-  case FMin:     str = "fmin "; break;
-  case FMaximum: str = "fmaximum "; break;
-  case FMinimum: str = "fminimum "; break;
-  case CopySign: str = "copysign "; break;
+  case FAdd:     return "fadd"; break;
+  case FSub:     return "fsub"; break;
+  case FMul:     return "fmul"; break;
+  case FDiv:     return "fdiv"; break;
+  case FRem:     return "frem"; break;
+  case FMax:     return "fmax"; break;
+  case FMin:     return "fmin"; break;
+  case FMaximum: return "fmaximum"; break;
+  case FMinimum: return "fminimum"; break;
+  case CopySign: return "copysign"; break;
   }
-  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
+  UNREACHABLE();
+}
+
+void FpBinOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1094,23 +1097,25 @@ void FpUnaryOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
 
-void FpUnaryOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpUnaryOp::getOpName() const {
   switch (op) {
-  case FAbs:         str = "fabs "; break;
-  case FNeg:         str = "fneg "; break;
-  case Canonicalize: str = "canonicalize "; break;
-  case Ceil:         str = "ceil "; break;
-  case Floor:        str = "floor "; break;
-  case RInt:         str = "rint "; break;
-  case NearbyInt:    str = "nearbyint "; break;
-  case Round:        str = "round "; break;
-  case RoundEven:    str = "roundeven "; break;
-  case Trunc:        str = "trunc "; break;
-  case Sqrt:         str = "sqrt "; break;
+  case FAbs:         return "fabs"; break;
+  case FNeg:         return "fneg"; break;
+  case Canonicalize: return "canonicalize"; break;
+  case Ceil:         return "ceil"; break;
+  case Floor:        return "floor"; break;
+  case RInt:         return "rint"; break;
+  case NearbyInt:    return "nearbyint"; break;
+  case Round:        return "round"; break;
+  case RoundEven:    return "roundeven"; break;
+  case Trunc:        return "trunc"; break;
+  case Sqrt:         return "sqrt"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << fmath << *val;
+void FpUnaryOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *val;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1400,14 +1405,16 @@ void FpTernaryOp::rauw(const Value &what, Value &with) {
   RAUW(c);
 }
 
-void FpTernaryOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpTernaryOp::getOpName() const {
   switch (op) {
-  case FMA:    str = "fma "; break;
-  case MulAdd: str = "fmuladd "; break;
+  case FMA:    return "fma"; break;
+  case MulAdd: return "fmuladd"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
+void FpTernaryOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *a << ", " << *b << ", " << *c;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1485,13 +1492,15 @@ void TestOp::rauw(const Value &what, Value &with) {
   RAUW(rhs);
 }
 
-void TestOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* TestOp::getOpName() const {
   switch (op) {
-  case Is_FPClass: str = "is.fpclass "; break;
+  case Is_FPClass: return "is.fpclass"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << *lhs << ", " << *rhs;
+void TestOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << *lhs << ", " << *rhs;
 }
 
 StateValue TestOp::toSMT(State &s) const {
@@ -1732,20 +1741,22 @@ void FpConversionOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
 
-void FpConversionOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpConversionOp::getOpName() const {
   switch (op) {
-  case SIntToFP: str = "sitofp "; break;
-  case UIntToFP: str = "uitofp "; break;
-  case FPToSInt: str = "fptosi "; break;
-  case FPToUInt: str = "fptoui "; break;
-  case FPExt:    str = "fpext "; break;
-  case FPTrunc:  str = "fptrunc "; break;
-  case LRInt:    str = "lrint "; break;
-  case LRound:   str = "lround "; break;
+  case SIntToFP: return "sitofp"; break;
+  case UIntToFP: return "uitofp"; break;
+  case FPToSInt: return "fptosi"; break;
+  case FPToUInt: return "fptoui"; break;
+  case FPExt:    return "fpext"; break;
+  case FPTrunc:  return "fptrunc"; break;
+  case LRInt:    return "lrint"; break;
+  case LRound:   return "lround"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str;
+void FpConversionOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " ";
   if (flags & NNEG)
     os << "nneg ";
   os << *val << print_type(getType(), " to ", "");
@@ -2731,27 +2742,30 @@ void FCmp::rauw(const Value &what, Value &with) {
   RAUW(b);
 }
 
-void FCmp::print(ostream &os) const {
-  const char *condtxt = nullptr;
+const char* FCmp::getCondName() const {
   switch (cond) {
-  case OEQ:   condtxt = "oeq "; break;
-  case OGT:   condtxt = "ogt "; break;
-  case OGE:   condtxt = "oge "; break;
-  case OLT:   condtxt = "olt "; break;
-  case OLE:   condtxt = "ole "; break;
-  case ONE:   condtxt = "one "; break;
-  case ORD:   condtxt = "ord "; break;
-  case UEQ:   condtxt = "ueq "; break;
-  case UGT:   condtxt = "ugt "; break;
-  case UGE:   condtxt = "uge "; break;
-  case ULT:   condtxt = "ult "; break;
-  case ULE:   condtxt = "ule "; break;
-  case UNE:   condtxt = "une "; break;
-  case UNO:   condtxt = "uno "; break;
-  case TRUE:  condtxt = "true "; break;
-  case FALSE: condtxt = "false "; break;
+  case OEQ:   return "oeq"; break;
+  case OGT:   return "ogt"; break;
+  case OGE:   return "oge"; break;
+  case OLT:   return "olt"; break;
+  case OLE:   return "ole"; break;
+  case ONE:   return "one"; break;
+  case ORD:   return "ord"; break;
+  case UEQ:   return "ueq"; break;
+  case UGT:   return "ugt"; break;
+  case UGE:   return "uge"; break;
+  case ULT:   return "ult"; break;
+  case ULE:   return "ule"; break;
+  case UNE:   return "une"; break;
+  case UNO:   return "uno"; break;
+  case TRUE:  return "true"; break;
+  case FALSE: return "false"; break;
   }
-  os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
+  UNREACHABLE();
+}
+
+void FCmp::print(ostream &os) const {
+  os << getName() << " = fcmp " << fmath << getCondName() << " " << *a << ", "
      << b->getName();
   if (signaling)
     os << ", signaling";
