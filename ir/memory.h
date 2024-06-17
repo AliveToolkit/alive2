@@ -69,6 +69,8 @@ public:
   smt::expr nonPoison() const;
   smt::expr isZero() const; // zero or null
 
+  bool isAsmMode() const;
+
   smt::expr castPtrToInt() const;
   smt::expr forceCastToInt() const;
 

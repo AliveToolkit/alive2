@@ -256,7 +256,7 @@ expr Byte::isPtr() const {
 
 expr Byte::ptrNonpoison() const {
   auto bit = p.bits() - 1 - byte_has_ptr_bit();
-  return p.extract(bit, bit) == 1;
+  return isAsmMode() ? expr(true) : p.extract(bit, bit) == 1;
 }
 
 Pointer Byte::ptr() const {
@@ -284,6 +284,9 @@ expr Byte::ptrByteoffset() const {
 expr Byte::nonptrNonpoison() const {
   if (!does_int_mem_access)
     return expr::mkUInt(0, 1);
+  if (isAsmMode())
+    return expr::mkInt(-1, bits_poison_per_byte);
+
   unsigned start = padding_nonptr_byte() + bits_byte + num_sub_byte_bits;
   return p.extract(start + bits_poison_per_byte - 1, start);
 }
@@ -308,6 +311,8 @@ expr Byte::numStoredBits() const {
 expr Byte::isPoison() const {
   if (!does_int_mem_access)
     return  does_ptr_mem_access ? !ptrNonpoison() : true;
+  if (isAsmMode())
+    return false;
 
   expr np = nonptrNonpoison();
   if (byte_has_ptr_bit() && bits_poison_per_byte == 1) {
@@ -318,6 +323,8 @@ expr Byte::isPoison() const {
 }
 
 expr Byte::nonPoison() const {
+  if (isAsmMode())
+    return expr::mkInt(-1, bits_poison_per_byte);
   if (!does_int_mem_access)
     return ptrNonpoison();
 
@@ -334,6 +341,10 @@ expr Byte::nonPoison() const {
 
 expr Byte::isZero() const {
   return expr::mkIf(isPtr(), ptr().isNull(), nonptrValue() == 0);
+}
+
+bool Byte::isAsmMode() const {
+  return m.isAsmMode();
 }
 
 expr Byte::castPtrToInt() const {
@@ -556,6 +567,8 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     return std::move(e);
   };
 
+  bool is_asm = m.isAsmMode();
+
   if (toType.isPtrType()) {
     assert(bytes.size() == bits_program_pointer / bits_byte);
     expr loaded_ptr, is_ptr;
@@ -585,6 +598,8 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
                           b.nonptrValue() == 0));
       non_poison &= !b.isPoison();
     }
+    if (is_asm)
+      non_poison = true;
 
     // if bits of loaded ptr are a subset of the non-ptr value,
     // we know they must be zero otherwise the value is poison.
@@ -604,7 +619,6 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     assert(!toType.isAggregateType() || isNonPtrVector(toType));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
-    bool is_asm = m.isAsmMode();
 
     StateValue val;
     expr stored_bits;
@@ -621,11 +635,11 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
         if (first)
           stored_bits = std::move(this_stored_bits);
       }
+      if (is_asm)
+        expr_np = true;
 
       StateValue v(is_asm ? b.forceCastToInt() : b.nonptrValue(),
-                   is_asm ? b.nonPoison()
-                          : ibyteTy.combine_poison(
-                              expr_np, b.nonptrNonpoison()));
+                   ibyteTy.combine_poison(expr_np, b.nonptrNonpoison()));
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
@@ -1214,7 +1228,7 @@ void Memory::mkNonPoisonAxioms(bool local) {
 
 void Memory::mkNonlocalValAxioms(bool skip_consts) {
   // Users may request the initial memory to be non-poisonous
-  if (((config::disable_poison_input && state->isSource()) || isAsmMode()) &&
+  if ((config::disable_poison_input && state->isSource()) &&
       (does_int_mem_access || does_ptr_mem_access)) {
     mkNonPoisonAxioms(false);
   }
@@ -1287,19 +1301,11 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
-  // Unless we are in asm mode, in which memory is nondet data.
   if (numLocals() > 0) {
-    if (isAsmMode()) {
-      for (unsigned bid = 0, e = numLocals(); bid != e; ++bid) {
-        local_block_val.emplace_back(mk_block_val_array(bid));
-      }
-      mkNonPoisonAxioms(true);
-    } else {
-      auto poison_array
-        = expr::mkConstArray(expr::mkUInt(0, Pointer::bitsShortOffset()),
-                             Byte::mkPoisonByte(*this)());
-      local_block_val.resize(numLocals(), {std::move(poison_array), DATA_NONE});
-    }
+    auto poison_array
+      = expr::mkConstArray(expr::mkUInt(0, Pointer::bitsShortOffset()),
+                           Byte::mkPoisonByte(*this)());
+    local_block_val.resize(numLocals(), {std::move(poison_array), DATA_NONE});
 
     // all local blocks are dead in the beginning
     local_block_liveness = expr::mkUInt(0, numLocals());
