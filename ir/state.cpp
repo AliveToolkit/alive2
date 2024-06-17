@@ -1095,8 +1095,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     auto call_data_pair
       = calls_fn.try_emplace(
           { std::move(inputs), std::move(ptr_inputs), std::move(call_ranges),
-            mkIf_fold(memaccess.canReadSomething(), memory.dup(),
-                      memory.dupNoRead()),
+            memaccess.canReadSomething().isFalse()
+              ? memory.dupNoRead() : memory.dup(),
             memaccess, noret, willret });
     auto &I = call_data_pair.first;
     bool inserted = call_data_pair.second;
