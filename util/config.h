@@ -53,5 +53,6 @@ extern FpMappingMode fp_mapping_mode;
 
 std::ostream &dbg();
 void set_debug(std::ostream &os);
+bool is_uf_float();
 
 }

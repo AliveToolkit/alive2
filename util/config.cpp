@@ -33,4 +33,8 @@ void set_debug(ostream &os) {
   debug_os = &os;
 }
 
+bool is_uf_float() {
+  return fp_mapping_mode == FpMappingMode::UninterpretedFunctions;
+}
+
 }
