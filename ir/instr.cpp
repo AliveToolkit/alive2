@@ -645,6 +645,20 @@ const char* FpBinOp::getOpName() const {
   UNREACHABLE();
 }
 
+bool FpBinOp::isCommutative() const {
+  switch (op) {
+  case FAdd:
+  case FMin:
+  case FMax:
+  case FMinimum:
+  case FMaximum:
+    return true;
+  default:
+    return false;
+  }
+  UNREACHABLE();
+}
+
 void FpBinOp::print(ostream &os) const {
   os << getName() << " = " << getOpName() << " " << fmath << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
@@ -847,17 +861,24 @@ StateValue FpBinOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &a, const StateValue &b, const Type &ty) -> StateValue {
       s.doesApproximation("uf_float", true);
-      
+
       ostringstream os;
       os << getOpName() << "." << getType();
       auto value = expr::mkUF(os.str(), {a.value, b.value}, a.value);
+      if (isCommutative()) {
+        value = value & expr::mkUF(os.str(), {b.value, a.value}, a.value);
+      }
 
       AndExpr non_poison;
       non_poison.add(a.non_poison);
       non_poison.add(b.non_poison);
       if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
         os << ".np";
-        non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false));
+        auto poison_uf = expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false);
+        if (isCommutative()) {
+          poison_uf &= expr::mkUF(os.str(), {b.non_poison, a.non_poison}, false);
+        }
+        non_poison.add(poison_uf);
       }
 
       return { move(value), non_poison() };
