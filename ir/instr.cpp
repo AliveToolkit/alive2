@@ -881,7 +881,7 @@ StateValue FpBinOp::toSMT(State &s) const {
         non_poison.add(poison_uf);
       }
 
-      return { move(value), non_poison() };
+      return { std::move(value), non_poison() };
     };
   } else {
     switch (op) {
@@ -1183,7 +1183,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
         non_poison &= expr::mkUF(os.str(), {v.non_poison}, false);
       }
       
-      return {move(value), move(non_poison)};
+      return {std::move(value), std::move(non_poison)};
     };
   } else {
     switch (op) {
@@ -1504,7 +1504,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
         non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison, c.non_poison}, false));
       }
 
-      return {move(value), non_poison()};
+      return {std::move(value), non_poison()};
     };
   } else {
     switch (op) {
@@ -1881,7 +1881,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
         non_poison.add(expr::mkUF(os.str(), {v.non_poison}, false));
       }
 
-      return { move(value), non_poison() };
+      return { std::move(value), non_poison() };
     };
   } else {
     switch (op) {
@@ -2914,7 +2914,7 @@ StateValue FCmp::toSMT(State &s) const {
           non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false));
         }
 
-        return {move(value), non_poison()};
+        return {std::move(value), non_poison()};
       }
       }
     };
