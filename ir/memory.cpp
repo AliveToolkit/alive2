@@ -1243,8 +1243,10 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
         expr::mkForAll({ offset, offset2 },
           byte.isPtr() ||
           stored_bits == 0 ||
-          (offset2.uge(offset) &&
-           offset2 == offset + num_bytes &&
+          // There's no risk of overflow below since num_bytes is derived from
+          // a previous store. If it did overflow, then UB would have happened
+          // before
+          (offset2 == offset + num_bytes &&
            stored_bits == byte2.numStoredBits()
           ).implies(byte2.nonptrValue().lshr(leftover_bits) == 0)
         ));
