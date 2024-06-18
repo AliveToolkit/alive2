@@ -621,7 +621,6 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     assert(divide_up(bitsize, bits_byte) == bytes.size());
 
     StateValue val;
-    expr stored_bits;
     bool first = true;
     IntType ibyteTy("", bits_byte);
 
@@ -630,10 +629,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
 
       if (num_sub_byte_bits) {
         unsigned bits = (bitsize % 8) == 0 ? 0 : bitsize;
-        auto this_stored_bits = b.numStoredBits();
-        expr_np &= this_stored_bits == bits;
-        if (first)
-          stored_bits = std::move(this_stored_bits);
+        expr_np &= b.numStoredBits() == bits;
       }
       if (is_asm)
         expr_np = true;
@@ -643,22 +639,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-
-    val = toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
-
-    // Assume that in ASM mode, the ABI mandates that stores of non-byte-aligned
-    // stores are zero extended to the next byte boundary
-    // So here we need to zero out any bit that may not be zero since the
-    // initial memory is not for ASM.
-    // It also means we need to ensure the ABI is respected on stores.
-    if (is_asm && num_sub_byte_bits) {
-      auto shift = expr::mkUInt(bitsize, val.value)
-                     - stored_bits.zextOrTrunc(val.bits());
-      val.value = expr::mkIf(stored_bits == 0 && (bitsize % 8) == 0,
-                             val.value,
-                             val.value & (expr::mkInt(-1, shift).lshr(shift)));
-    }
-    return val;
+    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
   }
 }
 
@@ -1233,17 +1214,45 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     mkNonPoisonAxioms(false);
   }
 
-  if (!does_ptr_mem_access)
+  if (!does_ptr_mem_access && !(num_sub_byte_bits && isAsmMode()))
     return;
 
   expr offset
     = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+  expr offset2 = num_sub_byte_bits && isAsmMode()
+                  ? expr::mkFreshVar("#off2", offset) : expr();
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
     if (always_noread(i, true))
       continue;
 
     Byte byte(*this, non_local_block_val[i].val.load(offset));
+
+    // in ASM mode, non-byte-aligned values are expected to be zero-extended
+    // per the ABI.
+    if (num_sub_byte_bits && isAsmMode()) {
+      Byte byte2(*this, non_local_block_val[i].val.load(offset2));
+
+      auto stored_bits   = byte.numStoredBits();
+      auto num_bytes     = stored_bits.udiv(expr::mkUInt(8, stored_bits))
+                             .zextOrTrunc(Pointer::bitsShortOffset());
+      auto leftover_bits = stored_bits.urem(expr::mkUInt(8, stored_bits))
+                             .zextOrTrunc(bits_byte);
+
+      state->addAxiom(
+        expr::mkForAll({ offset, offset2 },
+          byte.isPtr() ||
+          stored_bits == 0 ||
+          (offset2.uge(offset) &&
+           offset2 == offset + num_bytes &&
+           stored_bits == byte2.numStoredBits()
+          ).implies(byte2.nonptrValue().lshr(leftover_bits) == 0)
+        ));
+    }
+
+    if (!does_ptr_mem_access)
+      continue;
+
     Pointer loadedptr = byte.ptr();
     expr bid = loadedptr.getShortBid();
 
