@@ -1166,14 +1166,24 @@ void FpUnaryOp::print(ostream &os) const {
 
 StateValue FpUnaryOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&)> fn = nullptr;
+  function<StateValue(const StateValue&, const Type&)> scalar = nullptr;
   bool bitwise = false;
 
   if (config::is_uf_float()) {
-    fn = [&](const expr &v, const expr &rm) {
+    scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
       s.doesApproximation("uf_float", true);
+
       ostringstream os;
       os << getOpName() << "." << getType();
-      return expr::mkUF(os.str(), {v}, v);
+      auto value = expr::mkUF(os.str(), {v.value}, v.value);
+
+      auto non_poison = v.non_poison;
+      if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
+        os << ".np";
+        non_poison &= expr::mkUF(os.str(), {v.non_poison}, false);
+      }
+      
+      return {move(value), move(non_poison)};
     };
   } else {
     switch (op) {
@@ -1212,13 +1222,13 @@ StateValue FpUnaryOp::toSMT(State &s) const {
       fn = [](const expr &v, const expr &rm) { return v.sqrt(rm); };
       break;
     }
-  }
 
-  auto scalar = [&](const StateValue &v, const Type &ty) {
-    return fm_poison(s, v.value, v.non_poison,
-                     [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
-                     bitwise, false);
-  };
+    scalar = [&](const StateValue &v, const Type &ty) {
+      return fm_poison(s, v.value, v.non_poison,
+                      [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
+                      bitwise, false);
+    };
+  }
 
   auto &v = s[*val];
 
@@ -1474,13 +1484,27 @@ void FpTernaryOp::print(ostream &os) const {
 
 StateValue FpTernaryOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const StateValue&, const StateValue&, const StateValue&, const Type&)> scalar;
 
   if (config::is_uf_float()) {
-    fn = [&](const expr &a, const expr &b, const expr &c, const expr &rm) {
+    scalar = [&](const StateValue &a, const StateValue &b,
+                      const StateValue &c, const Type &ty) -> StateValue {
       s.doesApproximation("uf_float", true);
+
       ostringstream os;
       os << getOpName() << "." << getType();
-      return expr::mkUF(os.str(), {a, b, c}, a);
+      auto value = expr::mkUF(os.str(), {a.value, b.value, c.value}, a.value);
+
+      AndExpr non_poison;
+      non_poison.add(a.non_poison);
+      non_poison.add(b.non_poison);
+      non_poison.add(c.non_poison);
+      if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
+        os << ".np";
+        non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison, c.non_poison}, false));
+      }
+
+      return {move(value), non_poison()};
     };
   } else {
     switch (op) {
@@ -1496,13 +1520,13 @@ StateValue FpTernaryOp::toSMT(State &s) const {
       };
       break;
     }
+    
+    scalar = [&](const StateValue &a, const StateValue &b,
+                      const StateValue &c, const Type &ty) {
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                      c.value, c.non_poison, fn, ty, fmath, rm, false);
+    };
   }
-
-  auto scalar = [&](const StateValue &a, const StateValue &b,
-                    const StateValue &c, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     c.value, c.non_poison, fn, ty, fmath, rm, false);
-  };
 
   auto &av = s[*a];
   auto &bv = s[*b];
@@ -1838,14 +1862,26 @@ void FpConversionOp::print(ostream &os) const {
 StateValue FpConversionOp::toSMT(State &s) const {
   auto &v = s[*val];
   function<StateValue(const expr &, const Type &, const expr&)> fn;
+  function<StateValue(const StateValue &, const Type &, const Type&)> scalar;
 
   if (config::is_uf_float()) {
-    fn = [&](auto &v, auto &to_type, auto &rm) -> StateValue {
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                      const Type &to_type) -> StateValue {
       s.doesApproximation("uf_float", true);
+
       ostringstream os;
-      os << getOpName() << "." << val->getType() << ".to." << to_type;
-      expr range = to_type.getAsFloatType()->getDummyFloat(); // TODO
-      return { expr::mkUF(os.str(), {v}, range), true };
+      os << getOpName() << "." << from_type << ".to." << to_type;
+      expr range = to_type.getDummyValue(true).value;
+      auto value = expr::mkUF(os.str(), {sv.value}, range);
+
+      AndExpr non_poison;
+      non_poison.add(sv.non_poison);
+      if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) && op != FPTrunc && op != FPExt) {
+        os << ".np";
+        non_poison.add(expr::mkUF(os.str(), {v.non_poison}, false));
+      }
+
+      return { move(value), non_poison() };
     };
   } else {
     switch (op) {
@@ -1915,32 +1951,32 @@ StateValue FpConversionOp::toSMT(State &s) const {
       };
       break;
     }
+
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                      const Type &to_type) -> StateValue {
+      auto val = sv.value;
+
+      if (from_type.isFloatType()) {
+        auto ty = from_type.getAsFloatType();
+        val     = ty->getFloat(val);
+      }
+
+      function<StateValue(const expr&)> fn_rm
+        = [&](auto &rm) { return fn(val, to_type, rm); };
+      AndExpr np;
+      np.add(sv.non_poison);
+
+      StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
+                                            : fn(val, to_type, rm.toSMT());
+      np.add(std::move(ret.non_poison));
+
+      return { to_type.isFloatType()
+                ? to_type.getAsFloatType()
+                    ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
+                                sv.value)
+                : std::move(ret.value), np()};
+    };
   }
-
-  auto scalar = [&](const StateValue &sv, const Type &from_type,
-                    const Type &to_type) -> StateValue {
-    auto val = sv.value;
-
-    if (from_type.isFloatType()) {
-      auto ty = from_type.getAsFloatType();
-      val     = ty->getFloat(val);
-    }
-
-    function<StateValue(const expr&)> fn_rm
-      = [&](auto &rm) { return fn(val, to_type, rm); };
-    AndExpr np;
-    np.add(sv.non_poison);
-
-    StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
-                                           : fn(val, to_type, rm.toSMT());
-    np.add(std::move(ret.non_poison));
-
-    return { to_type.isFloatType()
-               ? to_type.getAsFloatType()
-                   ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
-                               sv.value)
-               : std::move(ret.value), np()};
-  };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -2856,47 +2892,60 @@ StateValue FCmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  auto fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
-    function<expr(const expr &, const expr &, const expr &)> cmp;
-    if (config::is_uf_float()) {
-      cmp = [&](const expr &a, const expr &b, auto &rm) {
-        switch (cond) {
-        case TRUE:  return expr(true);
-        case FALSE: return expr(false);
-        default: {
-          s.doesApproximation("uf_float", true);
-          ostringstream os;
-          os << getCondName() << "." << this->a->getType();
-          return expr::mkUF(os.str(), {a, b}, false);
+  function<expr(const expr &, const expr &, const expr &)> cmp;
+  function<StateValue(const StateValue &, const StateValue &, const Type &)> fn;
+  if (config::is_uf_float()) {
+    fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
+      switch (cond) {
+      case TRUE:  return {true, true};
+      case FALSE: return {false, true};
+      default: {
+        s.doesApproximation("uf_float", true);
+
+        ostringstream os;
+        os << getCondName() << "." << this->a->getType();
+        auto value = expr::mkUF(os.str(), {a.value, b.value}, false);
+
+        AndExpr non_poison;
+        non_poison.add(a.non_poison);
+        non_poison.add(b.non_poison);
+        if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
+          os << ".np";
+          non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false));
         }
-        }
-      };
-    } else {
-      cmp = [&](const expr &a, const expr &b, auto &rm) {
-        switch (cond) {
-        case OEQ: return a.foeq(b);
-        case OGT: return a.fogt(b);
-        case OGE: return a.foge(b);
-        case OLT: return a.folt(b);
-        case OLE: return a.fole(b);
-        case ONE: return a.fone(b);
-        case ORD: return a.ford(b);
-        case UEQ: return a.fueq(b);
-        case UGT: return a.fugt(b);
-        case UGE: return a.fuge(b);
-        case ULT: return a.fult(b);
-        case ULE: return a.fule(b);
-        case UNE: return a.fune(b);
-        case UNO: return a.funo(b);
-        case TRUE:  return expr(true);
-        case FALSE: return expr(false);
-        }
-      };
-    }
-    auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, ty, fmath, {}, false, true);
-    return { val.toBVBool(), std::move(np) };
-  };
+
+        return {move(value), non_poison()};
+      }
+      }
+    };
+  } else {
+    cmp = [&](const expr &a, const expr &b, auto &rm) {
+      switch (cond) {
+      case OEQ: return a.foeq(b);
+      case OGT: return a.fogt(b);
+      case OGE: return a.foge(b);
+      case OLT: return a.folt(b);
+      case OLE: return a.fole(b);
+      case ONE: return a.fone(b);
+      case ORD: return a.ford(b);
+      case UEQ: return a.fueq(b);
+      case UGT: return a.fugt(b);
+      case UGE: return a.fuge(b);
+      case ULT: return a.fult(b);
+      case ULE: return a.fule(b);
+      case UNE: return a.fune(b);
+      case UNO: return a.funo(b);
+      case TRUE:  return expr(true);
+      case FALSE: return expr(false);
+      }
+    };
+
+    fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {  
+      auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                                cmp, ty, fmath, {}, false, true);
+      return { val.toBVBool(), std::move(np) };
+    };
+  }
 
   if (auto agg = a->getType().getAsAggregateType()) {
     vector<StateValue> vals;
