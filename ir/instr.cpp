@@ -2904,7 +2904,7 @@ StateValue FCmp::toSMT(State &s) const {
 
         ostringstream os;
         os << getCondName() << "." << this->a->getType();
-        auto value = expr::mkUF(os.str(), {a.value, b.value}, false);
+        auto value = expr::mkUF(os.str(), {a.value, b.value}, expr::mkUInt(0, 1));
 
         AndExpr non_poison;
         non_poison.add(a.non_poison);
