@@ -841,14 +841,26 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
 
 StateValue FpBinOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const StateValue&, const StateValue&, const Type&)> scalar;
   bool bitwise = false;
 
   if (config::is_uf_float()) {
-    fn = [&](const expr &a, const expr &b, const expr &rm) {
+    scalar = [&](const StateValue &a, const StateValue &b, const Type &ty) -> StateValue {
       s.doesApproximation("uf_float", true);
+      
       ostringstream os;
       os << getOpName() << "." << getType();
-      return expr::mkUF(os.str(), {a, b}, a);
+      auto value = expr::mkUF(os.str(), {a.value, b.value}, a.value);
+
+      AndExpr non_poison;
+      non_poison.add(a.non_poison);
+      non_poison.add(b.non_poison);
+      if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
+        os << ".np";
+        non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false));
+      }
+
+      return { move(value), non_poison() };
     };
   } else {
     switch (op) {
@@ -920,13 +932,13 @@ StateValue FpBinOp::toSMT(State &s) const {
       };
       break;
     }
-  }
 
-  auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
-                     ty, fmath, rm, bitwise);
-  };
+    scalar = [&](const StateValue &a, const StateValue &b, const Type &ty) {
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                      [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
+                      ty, fmath, rm, bitwise);
+    };
+  }
 
   auto &a = s[*lhs];
   auto &b = s[*rhs];
