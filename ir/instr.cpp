@@ -2900,18 +2900,55 @@ StateValue FCmp::toSMT(State &s) const {
       case TRUE:  return {true, true};
       case FALSE: return {false, true};
       default: {
+        // All conditions are encoded using only 5 uninterpreted functions:
+        // oeq, ueq, olt, ult, ord
+
         s.doesApproximation("uf_float", true);
 
+        StateValue lhs = a;
+        StateValue rhs = b;
+
+        const char *name = nullptr;
+        bool negate = false;
+        bool commutative = false;
+        switch (cond) {
+        case OEQ: name = "oeq"; commutative = true; break;
+        case OGT: name = "olt"; std::swap(lhs, rhs); break;
+        case OGE: name = "ult"; negate = true; break;
+        case OLT: name = "olt"; break;
+        case OLE: name = "ult"; std::swap(lhs, rhs); negate = true; break;
+        case ONE: name = "ueq"; negate = true; commutative = true; break;
+        case ORD: name = "ord"; commutative = true; break;
+        case UEQ: name = "ueq"; commutative = true; break;
+        case UGT: name = "olt"; std::swap(lhs, rhs); break;
+        case UGE: name = "ult"; negate = true; break;
+        case ULT: name = "ult"; break;
+        case ULE: name = "olt"; negate = true; std::swap(lhs, rhs); break;
+        case UNE: name = "oeq"; negate = true; commutative = true; break;
+        case UNO: name = "ord"; negate = true; commutative = true; break;
+        default: UNREACHABLE();
+        }
+
         ostringstream os;
-        os << getCondName() << "." << ty;
-        auto value = expr::mkUF(os.str(), {a.value, b.value}, expr::mkUInt(0, 1));
+        os << name << "." << ty;
+        auto value = expr::mkUF(os.str(), {lhs.value, rhs.value}, expr::mkUInt(0, 1));
+        if (commutative) {
+          value = value & expr::mkUF(os.str(), {rhs.value, lhs.value}, expr::mkUInt(0, 1));
+        }
+        if (negate) {
+          value = ~value;
+        }
 
         AndExpr non_poison;
         non_poison.add(a.non_poison);
         non_poison.add(b.non_poison);
         if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
           os << ".np";
-          non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false));
+          auto poison_uf = expr::mkUF(os.str(), {lhs.non_poison, rhs.non_poison}, false);
+          if (commutative) {
+            poison_uf &= expr::mkUF(os.str(), {rhs.non_poison, lhs.non_poison}, false);
+          }
+          non_poison.add(poison_uf);
         }
 
         return {std::move(value), non_poison()};
