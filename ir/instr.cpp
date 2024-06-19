@@ -874,9 +874,9 @@ StateValue FpBinOp::toSMT(State &s) const {
       non_poison.add(b.non_poison);
       if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
         os << ".np";
-        auto poison_uf = expr::mkUF(os.str(), {a.non_poison, b.non_poison}, false);
+        auto poison_uf = expr::mkUF(os.str(), {a.value, b.value}, false);
         if (isCommutative()) {
-          poison_uf &= expr::mkUF(os.str(), {b.non_poison, a.non_poison}, false);
+          poison_uf &= expr::mkUF(os.str(), {b.value, a.value}, false);
         }
         non_poison.add(poison_uf);
       }
@@ -1180,7 +1180,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
       auto non_poison = v.non_poison;
       if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
         os << ".np";
-        non_poison &= expr::mkUF(os.str(), {v.non_poison}, false);
+        non_poison &= expr::mkUF(os.str(), {v.value}, false);
       }
       
       return {std::move(value), std::move(non_poison)};
@@ -1501,7 +1501,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
       non_poison.add(c.non_poison);
       if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
         os << ".np";
-        non_poison.add(expr::mkUF(os.str(), {a.non_poison, b.non_poison, c.non_poison}, false));
+        non_poison.add(expr::mkUF(os.str(), {a.value, b.value, c.value}, false));
       }
 
       return {std::move(value), non_poison()};
@@ -1878,7 +1878,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
       non_poison.add(sv.non_poison);
       if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) && op != FPTrunc && op != FPExt) {
         os << ".np";
-        non_poison.add(expr::mkUF(os.str(), {v.non_poison}, false));
+        non_poison.add(expr::mkUF(os.str(), {v.value}, false));
       }
 
       return { std::move(value), non_poison() };
@@ -2944,9 +2944,9 @@ StateValue FCmp::toSMT(State &s) const {
         non_poison.add(b.non_poison);
         if ((fmath.flags & FastMathFlags::NNaN) || (fmath.flags & FastMathFlags::NInf)) {
           os << ".np";
-          auto poison_uf = expr::mkUF(os.str(), {lhs.non_poison, rhs.non_poison}, false);
+          auto poison_uf = expr::mkUF(os.str(), {lhs.value, rhs.value}, false);
           if (commutative) {
-            poison_uf &= expr::mkUF(os.str(), {rhs.non_poison, lhs.non_poison}, false);
+            poison_uf &= expr::mkUF(os.str(), {rhs.value, lhs.value}, false);
           }
           non_poison.add(poison_uf);
         }
