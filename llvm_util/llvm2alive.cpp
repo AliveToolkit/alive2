@@ -1470,6 +1470,10 @@ public:
         attrs.set(ParamAttrs::AllocAlign);
         break;
 
+      case llvm::Attribute::DeadOnUnwind:
+        attrs.set(ParamAttrs::DeadOnUnwind);
+        break;
+
       default:
         // If it is call site, it should be added at approximation list
         if (!is_callsite)

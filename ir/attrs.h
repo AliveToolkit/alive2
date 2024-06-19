@@ -67,7 +67,7 @@ public:
                    NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
                    AllocPtr = 1<<11, AllocAlign = 1<<12,
                    ZeroExt = 1<<13, SignExt = 1<<14, InReg = 1<<15,
-                   NoFPClass = 1<<16,
+                   NoFPClass = 1<<16, DeadOnUnwind = 1<<17,
                    IsArg = 1<<31 // used internally to make values as arguments
                   };
 

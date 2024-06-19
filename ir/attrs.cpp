@@ -48,6 +48,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "allocptr ";
   if (attr.has(ParamAttrs::AllocAlign))
     os << "allocalign ";
+  if (attr.has(ParamAttrs::DeadOnUnwind))
+    os << "dead_on_unwind ";
   return os;
 }
 
