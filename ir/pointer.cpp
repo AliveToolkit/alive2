@@ -416,12 +416,10 @@ static pair<expr, expr> is_dereferenceable(Pointer &p,
 
   cond &= p.isBlockAlive();
 
-  if (!ignore_accessability) {
-    if (iswrite)
-      cond &= p.isWritable() && !p.isNoWrite();
-    else
-      cond &= !p.isNoRead();
-  }
+  if (iswrite)
+    cond &= p.isWritable() && !p.isNoWrite();
+  else if (!ignore_accessability)
+    cond &= !p.isNoRead();
 
   // try some constant folding; these are implied by the conditions above
   if (bytes.ugt(p.blockSize()).isTrue() ||
@@ -600,6 +598,8 @@ expr Pointer::isWritable() const {
     non_local &= bid.ult(num_nonlocals_src);
   if (has_null_block && null_is_dereferenceable)
     non_local |= bid == 0;
+
+  non_local &= expr::mkUF("#is_writable", {bid}, expr(false));
 
   // check for non-writable byval blocks (which are non-local)
   for (auto [byval, is_const] : m.byval_blks) {

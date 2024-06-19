@@ -1439,6 +1439,10 @@ public:
                                      llvmattr.getDereferenceableOrNullBytes());
         break;
 
+      case llvm::Attribute::Writable:
+        attrs.set(ParamAttrs::Writable);
+        break;
+
       case llvm::Attribute::Alignment:
         attrs.set(ParamAttrs::Align);
         attrs.align = max(attrs.align, llvmattr.getAlignment()->value());

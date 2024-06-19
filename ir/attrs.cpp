@@ -50,6 +50,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "allocalign ";
   if (attr.has(ParamAttrs::DeadOnUnwind))
     os << "dead_on_unwind ";
+  if (attr.has(ParamAttrs::Writable))
+    os << "writable ";
   return os;
 }
 
@@ -295,8 +297,9 @@ bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
   unsigned attrs =
     ByVal |
     Dereferenceable |
+    DereferenceableOrNull |
     NoUndef |
-    DereferenceableOrNull
+    Writable
   ;
 
   auto other_params = (other.bits & attrs);
@@ -319,8 +322,11 @@ bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
 }
 
 bool ParamAttrs::poisonImpliesUB() const {
-  return has(Dereferenceable) || has(NoUndef) || has(ByVal) ||
-         has(DereferenceableOrNull);
+  return has(ByVal) ||
+         has(Dereferenceable) ||
+         has(DereferenceableOrNull) ||
+         has(NoUndef) ||
+         has(Writable);
 }
 
 uint64_t ParamAttrs::getDerefBytes() const {
@@ -344,7 +350,8 @@ void ParamAttrs::merge(const ParamAttrs &other) {
 static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
-               bool nocapture, const expr &allocsize, Value *allocalign) {
+               bool nocapture, bool writable, const expr &allocsize,
+               Value *allocalign) {
   auto &m = s.getMemory();
   Pointer p(m, ptrvalue);
   expr non_poison(true);
@@ -358,15 +365,16 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
       s.addUB(merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(derefBytes, align, false, true)));
+                      .isDereferenceable(derefBytes, align, writable, true)));
     if (derefOrNullBytes)
       s.addUB(p.isNull() ||
               merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(derefOrNullBytes, align, false,true)));
+                      .isDereferenceable(derefOrNullBytes, align, writable,
+                                         true)));
     if (allocsize.isValid())
       s.addUB(p.isNull() ||
               merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(allocsize, align, false, true)));
+                      .isDereferenceable(allocsize, align, writable, true)));
   } else if (align != 1)
     non_poison &= Pointer(m, ptrvalue).isAligned(align);
 
@@ -393,7 +401,7 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty) const{
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                     has(NonNull), has(NoCapture), {}, nullptr);
+                     has(NonNull), has(NoCapture), has(Writable), {}, nullptr);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
@@ -496,7 +504,7 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
-                     has(NonNull), false, allocsize, allocalign);
+                     has(NonNull), false, false, allocsize, allocalign);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
