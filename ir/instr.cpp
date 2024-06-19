@@ -863,7 +863,7 @@ StateValue FpBinOp::toSMT(State &s) const {
       s.doesApproximation("uf_float", true);
 
       ostringstream os;
-      os << getOpName() << "." << getType();
+      os << getOpName() << "." << ty;
       auto value = expr::mkUF(os.str(), {a.value, b.value}, a.value);
       if (isCommutative()) {
         value = value & expr::mkUF(os.str(), {b.value, a.value}, a.value);
@@ -1174,7 +1174,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
       s.doesApproximation("uf_float", true);
 
       ostringstream os;
-      os << getOpName() << "." << getType();
+      os << getOpName() << "." << ty;
       auto value = expr::mkUF(os.str(), {v.value}, v.value);
 
       auto non_poison = v.non_poison;
@@ -1492,7 +1492,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
       s.doesApproximation("uf_float", true);
 
       ostringstream os;
-      os << getOpName() << "." << getType();
+      os << getOpName() << "." << ty;
       auto value = expr::mkUF(os.str(), {a.value, b.value, c.value}, a.value);
 
       AndExpr non_poison;
@@ -1596,7 +1596,7 @@ StateValue TestOp::toSMT(State &s) const {
     fn = [&](const expr &v, const Type &ty) -> expr {
       s.doesApproximation("uf_float", true);
       ostringstream os;
-      os << getOpName() << "." << lhs->getType();
+      os << getOpName() << "." << ty;
       return expr::mkUF(os.str(), {v}, expr::mkUInt(0, 1));
     };
   } else {
@@ -2903,7 +2903,7 @@ StateValue FCmp::toSMT(State &s) const {
         s.doesApproximation("uf_float", true);
 
         ostringstream os;
-        os << getCondName() << "." << this->a->getType();
+        os << getCondName() << "." << ty;
         auto value = expr::mkUF(os.str(), {a.value, b.value}, expr::mkUInt(0, 1));
 
         AndExpr non_poison;
