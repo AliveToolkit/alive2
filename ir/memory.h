@@ -30,15 +30,17 @@ class State;
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
 // Pointer byte's representation:
-//   +-+-------------+-----------+---------------+----------------------+
-//   |1| non-poison? |  Pointer  | byte offset   |        padding       |
-//   | | (1 bit)     |           | (0 or 3 bits) |                      |
-//   +-+-------------+-----------+---------------+----------------------+
+//   +-+-------------+-----------+---------------+------------------------+
+//   |1| non-poison? |  Pointer  | byte offset   |         padding        |
+//   | | (1 bit)     |           | (0 or 3 bits) |                        |
+//   +-+-------------+-----------+---------------+------------------------+
 // Non-pointer byte's representation:
-//   +-+-------------------+-------------+--------------------+---------+
-//   |0| non-poison bit(s) | data        | stored bits        | padding |
-//   | | (bits_byte)       | (bits_byte) | (num_subbyte_bits) |         |
-//   +-+-------------------+-------------+--------------------+---------+
+//   +-+-------------------+-------------+-------------+--------+---------+
+//   |0| non-poison bit(s) | data        | stored bits | byte   | padding |
+//   | | (bits_byte)       | (bits_byte) | (sub-byte)  | number |         |
+//   +-+-------------------+-------------+-------------+--------+---------+
+// The last 2 fields are only present if the program contains sub-byte accesses
+
 
 class Byte {
   const Memory &m;
@@ -52,7 +54,8 @@ public:
   // non_poison should be an one-bit vector or boolean.
   Byte(const Memory &m, const StateValue &ptr, unsigned i);
 
-  Byte(const Memory &m, const StateValue &v, unsigned bits_read, bool);
+  Byte(const Memory &m, const StateValue &v, unsigned bits_read,
+       unsigned byte_number);
 
   static Byte mkPoisonByte(const Memory &m);
 
@@ -64,7 +67,10 @@ public:
   smt::expr nonptrNonpoison() const;
   smt::expr boolNonptrNonpoison() const;
   smt::expr nonptrValue() const;
+
   smt::expr numStoredBits() const;
+  smt::expr byteNumber() const;
+
   smt::expr isPoison() const;
   smt::expr nonPoison() const;
   smt::expr isZero() const; // zero or null
