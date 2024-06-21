@@ -19,7 +19,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -74,9 +74,8 @@ unique_ptr<Cache> cache;
 
 int main(int argc, char **argv) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
-  llvm::PrettyStackTraceProgram X(argc, argv);
+  llvm::InitLLVM X(argc, argv);
   llvm::EnableDebugBuffering = true;
-  llvm::llvm_shutdown_obj llvm_shutdown; // Call llvm_shutdown() on exit.
   llvm::LLVMContext Context;
   unsigned M1_anon_count = 0;
 
