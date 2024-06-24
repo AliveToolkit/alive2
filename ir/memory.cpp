@@ -1230,7 +1230,13 @@ void Memory::mkNonPoisonAxioms(bool local) {
   }
 }
 
-static expr mk_sub_byte_zext_store_cond(const Byte &val, const Byte &val2) {
+expr Memory::mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const {
+  bool mk_axiom = &val == &val2;
+
+  // optimization: the initial block is assumed to follow the ABI already.
+  if (!mk_axiom && isInitialMemBlock(val.p, true))
+    return true;
+
   bool always_1_byte = bits_byte >= (1u << num_sub_byte_bits);
   auto stored_bits   = val.numStoredBits();
   auto num_bytes
@@ -1243,6 +1249,7 @@ static expr mk_sub_byte_zext_store_cond(const Byte &val, const Byte &val2) {
       ).zextOrTrunc(bits_byte);
 
   return val.isPtr() ||
+         (mk_axiom ? expr(false) : !val.boolNonptrNonpoison()) ||
          stored_bits == 0 ||
          val.byteNumber() != num_bytes ||
          val2.nonptrValue().lshr(leftover_bits) == 0;
@@ -1271,7 +1278,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     // per the ABI.
     if (num_sub_byte_bits && isAsmMode()) {
       state->addAxiom(
-        expr::mkForAll({ offset }, mk_sub_byte_zext_store_cond(byte, byte)));
+        expr::mkForAll({ offset }, mkSubByteZExtStoreCond(byte, byte)));
     }
 
     if (!does_ptr_mem_access)
@@ -2385,7 +2392,7 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
 
   // The ABI requires that sub-byte stores zero extend the stored value
   if (num_sub_byte_bits && other.isAsmMode())
-    r &= mk_sub_byte_zext_store_cond(val, val2);
+    r &= mkSubByteZExtStoreCond(val, val2);
 
   return r;
 }

@@ -95,6 +95,7 @@ public:
   static unsigned bitsByte();
 
   friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
+  friend class Memory;
 };
 
 
@@ -181,6 +182,7 @@ class Memory {
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
   void mkNonPoisonAxioms(bool local);
+  smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
   void mkNonlocalValAxioms(bool skip_consts);
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
