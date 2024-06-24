@@ -949,7 +949,16 @@ vector<Value*> UnaryOp::operands() const {
 }
 
 bool UnaryOp::propagatesPoison() const {
-  return true;
+  switch (op) {
+  case Copy:
+  case BitReverse:
+  case BSwap:
+  case Ctpop:
+  case FFS:
+    return true;
+  case IsConstant: return false;
+  }
+  UNREACHABLE();
 }
 
 bool UnaryOp::hasSideEffects() const {
