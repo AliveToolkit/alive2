@@ -37,13 +37,20 @@ FpRoundingMode parse_rounding(llvm::Instruction &i) {
   if (!fp || !fp->getRoundingMode().has_value())
     return {};
   switch (*fp->getRoundingMode()) {
-  case llvm::RoundingMode::Dynamic:           return FpRoundingMode::Dynamic;
-  case llvm::RoundingMode::NearestTiesToAway: return FpRoundingMode::RNA;
-  case llvm::RoundingMode::NearestTiesToEven: return FpRoundingMode::RNE;
-  case llvm::RoundingMode::TowardNegative:    return FpRoundingMode::RTN;
-  case llvm::RoundingMode::TowardPositive:    return FpRoundingMode::RTP;
-  case llvm::RoundingMode::TowardZero:        return FpRoundingMode::RTZ;
-  default: UNREACHABLE();
+  case llvm::RoundingMode::Dynamic:
+    return FpRoundingMode::Dynamic;
+  case llvm::RoundingMode::NearestTiesToAway:
+    return FpRoundingMode::RNA;
+  case llvm::RoundingMode::NearestTiesToEven:
+    return FpRoundingMode::RNE;
+  case llvm::RoundingMode::TowardNegative:
+    return FpRoundingMode::RTN;
+  case llvm::RoundingMode::TowardPositive:
+    return FpRoundingMode::RTP;
+  case llvm::RoundingMode::TowardZero:
+    return FpRoundingMode::RTZ;
+  default:
+    UNREACHABLE();
   }
 }
 
@@ -52,32 +59,68 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   if (!fp || !fp->getExceptionBehavior().has_value())
     return {};
   switch (*fp->getExceptionBehavior()) {
-  case llvm::fp::ebIgnore:  return FpExceptionMode::Ignore;
-  case llvm::fp::ebMayTrap: return FpExceptionMode::MayTrap;
-  case llvm::fp::ebStrict:  return FpExceptionMode::Strict;
-  default: UNREACHABLE();
+  case llvm::fp::ebIgnore:
+    return FpExceptionMode::Ignore;
+  case llvm::fp::ebMayTrap:
+    return FpExceptionMode::MayTrap;
+  case llvm::fp::ebStrict:
+    return FpExceptionMode::Strict;
+  default:
+    UNREACHABLE();
   }
 }
 
 FCmp::Cond parse_fcmp_cond(llvm::FCmpInst::Predicate pred) {
   FCmp::Cond cond;
   switch (pred) {
-  case llvm::CmpInst::FCMP_OEQ:   cond = FCmp::OEQ; break;
-  case llvm::CmpInst::FCMP_OGT:   cond = FCmp::OGT; break;
-  case llvm::CmpInst::FCMP_OGE:   cond = FCmp::OGE; break;
-  case llvm::CmpInst::FCMP_OLT:   cond = FCmp::OLT; break;
-  case llvm::CmpInst::FCMP_OLE:   cond = FCmp::OLE; break;
-  case llvm::CmpInst::FCMP_ONE:   cond = FCmp::ONE; break;
-  case llvm::CmpInst::FCMP_ORD:   cond = FCmp::ORD; break;
-  case llvm::CmpInst::FCMP_UEQ:   cond = FCmp::UEQ; break;
-  case llvm::CmpInst::FCMP_UGT:   cond = FCmp::UGT; break;
-  case llvm::CmpInst::FCMP_UGE:   cond = FCmp::UGE; break;
-  case llvm::CmpInst::FCMP_ULT:   cond = FCmp::ULT; break;
-  case llvm::CmpInst::FCMP_ULE:   cond = FCmp::ULE; break;
-  case llvm::CmpInst::FCMP_UNE:   cond = FCmp::UNE; break;
-  case llvm::CmpInst::FCMP_UNO:   cond = FCmp::UNO; break;
-  case llvm::CmpInst::FCMP_TRUE:  cond = FCmp::TRUE; break;
-  case llvm::CmpInst::FCMP_FALSE: cond = FCmp::FALSE; break;
+  case llvm::CmpInst::FCMP_OEQ:
+    cond = FCmp::OEQ;
+    break;
+  case llvm::CmpInst::FCMP_OGT:
+    cond = FCmp::OGT;
+    break;
+  case llvm::CmpInst::FCMP_OGE:
+    cond = FCmp::OGE;
+    break;
+  case llvm::CmpInst::FCMP_OLT:
+    cond = FCmp::OLT;
+    break;
+  case llvm::CmpInst::FCMP_OLE:
+    cond = FCmp::OLE;
+    break;
+  case llvm::CmpInst::FCMP_ONE:
+    cond = FCmp::ONE;
+    break;
+  case llvm::CmpInst::FCMP_ORD:
+    cond = FCmp::ORD;
+    break;
+  case llvm::CmpInst::FCMP_UEQ:
+    cond = FCmp::UEQ;
+    break;
+  case llvm::CmpInst::FCMP_UGT:
+    cond = FCmp::UGT;
+    break;
+  case llvm::CmpInst::FCMP_UGE:
+    cond = FCmp::UGE;
+    break;
+  case llvm::CmpInst::FCMP_ULT:
+    cond = FCmp::ULT;
+    break;
+  case llvm::CmpInst::FCMP_ULE:
+    cond = FCmp::ULE;
+    break;
+  case llvm::CmpInst::FCMP_UNE:
+    cond = FCmp::UNE;
+    break;
+  case llvm::CmpInst::FCMP_UNO:
+    cond = FCmp::UNO;
+    break;
+  case llvm::CmpInst::FCMP_TRUE:
+    cond = FCmp::TRUE;
+    break;
+  case llvm::CmpInst::FCMP_FALSE:
+    cond = FCmp::FALSE;
+    break;
   default:
     UNREACHABLE();
   }
@@ -89,39 +132,38 @@ unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
 
-#define PARSE_UNOP()                       \
-  auto ty = llvm_type2alive(i.getType());  \
-  auto val = get_operand(i.getOperand(0)); \
-  if (!ty || !val)                         \
-    return error(i)
+#define PARSE_UNOP()                                                           \
+  auto ty = llvm_type2alive(i.getType());                                      \
+  auto val = get_operand(i.getOperand(0));                                     \
+  if (!ty || !val)                                                             \
+  return error(i)
 
-#define PARSE_BINOP()                     \
-  auto ty = llvm_type2alive(i.getType()); \
-  auto a = get_operand(i.getOperand(0));  \
-  auto b = get_operand(i.getOperand(1));  \
-  if (!ty || !a || !b)                    \
-    return error(i)
+#define PARSE_BINOP()                                                          \
+  auto ty = llvm_type2alive(i.getType());                                      \
+  auto a = get_operand(i.getOperand(0));                                       \
+  auto b = get_operand(i.getOperand(1));                                       \
+  if (!ty || !a || !b)                                                         \
+  return error(i)
 
-#define PARSE_TRIOP()                     \
-  auto ty = llvm_type2alive(i.getType()); \
-  auto a = get_operand(i.getOperand(0));  \
-  auto b = get_operand(i.getOperand(1));  \
-  auto c = get_operand(i.getOperand(2));  \
-  if (!ty || !a || !b || !c)              \
-    return error(i)
+#define PARSE_TRIOP()                                                          \
+  auto ty = llvm_type2alive(i.getType());                                      \
+  auto a = get_operand(i.getOperand(0));                                       \
+  auto b = get_operand(i.getOperand(1));                                       \
+  auto c = get_operand(i.getOperand(2));                                       \
+  if (!ty || !a || !b || !c)                                                   \
+  return error(i)
 
-#define RETURN_FNATTRS(op, attrs)                            \
-  do {                                                       \
-    auto ret = op;                                           \
-    add_identifier(i, *ret.get());                           \
-    if (attrs.has(FnAttrs::NoUndef)) {                       \
-      auto &ptr = *ret;                                      \
-      BB->addInstr(std::move(ret));                          \
-      return make_unique<Assume>(ptr, Assume::WellDefined);  \
-    }                                                        \
-    return ret;                                              \
+#define RETURN_FNATTRS(op, attrs)                                              \
+  do {                                                                         \
+    auto ret = op;                                                             \
+    add_identifier(i, *ret.get());                                             \
+    if (attrs.has(FnAttrs::NoUndef)) {                                         \
+      auto &ptr = *ret;                                                        \
+      BB->addInstr(std::move(ret));                                            \
+      return make_unique<Assume>(ptr, Assume::WellDefined);                    \
+    }                                                                          \
+    return ret;                                                                \
   } while (0)
-
 
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
@@ -131,32 +173,31 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   /// True if converting a source function, false when converting a target
   /// function.
   bool IsSrc;
-  vector<llvm::Instruction*> i_constexprs;
+  vector<llvm::Instruction *> i_constexprs;
   const vector<string_view> &gvnamesInSrc;
-  vector<pair<Phi*, llvm::PHINode*>> todo_phis;
+  vector<pair<Phi *, llvm::PHINode *>> todo_phis;
   const Instr *insert_constexpr_before = nullptr;
   ostream *out;
   // (LLVM alloca, (Alive2 alloc, has lifetime.start?))
   map<const llvm::AllocaInst *, std::pair<Alloc *, bool>> allocs;
 
-
   using RetTy = unique_ptr<Instr>;
 
-  auto DL() const { return f.getParent()->getDataLayout(); }
+  auto DL() const {
+    return f.getParent()->getDataLayout();
+  }
 
-  template <typename T>
-  uint64_t alignment(T &i, llvm::Type *ty) const {
+  template <typename T> uint64_t alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlign().value();
     return a != 0 ? a : DL().getABITypeAlign(ty).value();
   }
 
-  template <typename T>
-  uint64_t pref_alignment(T &i, llvm::Type *ty) const {
+  template <typename T> uint64_t pref_alignment(T &i, llvm::Type *ty) const {
     auto a = i.getAlign().value();
     return a != 0 ? a : DL().getPrefTypeAlign(ty).value();
   }
 
-  Value* convert_constexpr(llvm::ConstantExpr *cexpr) {
+  Value *convert_constexpr(llvm::ConstantExpr *cexpr) {
     llvm::Instruction *newI = cexpr->getAsInstruction();
     newI->setName("__constexpr_" + to_string(constexpr_idx++));
     i_constexprs.push_back(newI);
@@ -180,7 +221,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return i;
   }
 
-  Value* copy_inserter(AggregateValue *ag) {
+  Value *copy_inserter(AggregateValue *ag) {
     auto v = make_unique<UnaryOp>(*const_cast<Type *>(&ag->getType()),
                                   "%__copy_" + to_string(copy_idx++), *ag,
                                   UnaryOp::Copy);
@@ -193,8 +234,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   }
 
   auto get_operand(llvm::Value *v) {
-    return llvm_util::get_operand(v,
-        [this](auto I) { return convert_constexpr(I); },
+    return llvm_util::get_operand(
+        v, [this](auto I) { return convert_constexpr(I); },
         [&](auto ag) { return copy_inserter(ag); });
   }
 
@@ -225,7 +266,9 @@ public:
     PARSE_UNOP();
     FpUnaryOp::Op op;
     switch (i.getOpcode()) {
-    case llvm::Instruction::FNeg: op = FpUnaryOp::FNeg; break;
+    case llvm::Instruction::FNeg:
+      op = FpUnaryOp::FNeg;
+      break;
     default:
       return error(i);
     }
@@ -238,31 +281,72 @@ public:
     FpBinOp::Op fp_op;
     bool is_fp = false;
     switch (i.getOpcode()) {
-    case llvm::Instruction::Add:  alive_op = BinOp::Add; break;
-    case llvm::Instruction::Sub:  alive_op = BinOp::Sub; break;
-    case llvm::Instruction::Mul:  alive_op = BinOp::Mul; break;
-    case llvm::Instruction::SDiv: alive_op = BinOp::SDiv; break;
-    case llvm::Instruction::UDiv: alive_op = BinOp::UDiv; break;
-    case llvm::Instruction::SRem: alive_op = BinOp::SRem; break;
-    case llvm::Instruction::URem: alive_op = BinOp::URem; break;
-    case llvm::Instruction::Shl:  alive_op = BinOp::Shl; break;
-    case llvm::Instruction::AShr: alive_op = BinOp::AShr; break;
-    case llvm::Instruction::LShr: alive_op = BinOp::LShr; break;
-    case llvm::Instruction::And:  alive_op = BinOp::And; break;
-    case llvm::Instruction::Or:   alive_op = BinOp::Or; break;
-    case llvm::Instruction::Xor:  alive_op = BinOp::Xor; break;
-    case llvm::Instruction::FAdd: fp_op = FpBinOp::FAdd; is_fp = true; break;
-    case llvm::Instruction::FSub: fp_op = FpBinOp::FSub; is_fp = true; break;
-    case llvm::Instruction::FMul: fp_op = FpBinOp::FMul; is_fp = true; break;
-    case llvm::Instruction::FDiv: fp_op = FpBinOp::FDiv; is_fp = true; break;
-    case llvm::Instruction::FRem: fp_op = FpBinOp::FRem; is_fp = true; break;
+    case llvm::Instruction::Add:
+      alive_op = BinOp::Add;
+      break;
+    case llvm::Instruction::Sub:
+      alive_op = BinOp::Sub;
+      break;
+    case llvm::Instruction::Mul:
+      alive_op = BinOp::Mul;
+      break;
+    case llvm::Instruction::SDiv:
+      alive_op = BinOp::SDiv;
+      break;
+    case llvm::Instruction::UDiv:
+      alive_op = BinOp::UDiv;
+      break;
+    case llvm::Instruction::SRem:
+      alive_op = BinOp::SRem;
+      break;
+    case llvm::Instruction::URem:
+      alive_op = BinOp::URem;
+      break;
+    case llvm::Instruction::Shl:
+      alive_op = BinOp::Shl;
+      break;
+    case llvm::Instruction::AShr:
+      alive_op = BinOp::AShr;
+      break;
+    case llvm::Instruction::LShr:
+      alive_op = BinOp::LShr;
+      break;
+    case llvm::Instruction::And:
+      alive_op = BinOp::And;
+      break;
+    case llvm::Instruction::Or:
+      alive_op = BinOp::Or;
+      break;
+    case llvm::Instruction::Xor:
+      alive_op = BinOp::Xor;
+      break;
+    case llvm::Instruction::FAdd:
+      fp_op = FpBinOp::FAdd;
+      is_fp = true;
+      break;
+    case llvm::Instruction::FSub:
+      fp_op = FpBinOp::FSub;
+      is_fp = true;
+      break;
+    case llvm::Instruction::FMul:
+      fp_op = FpBinOp::FMul;
+      is_fp = true;
+      break;
+    case llvm::Instruction::FDiv:
+      fp_op = FpBinOp::FDiv;
+      is_fp = true;
+      break;
+    case llvm::Instruction::FRem:
+      fp_op = FpBinOp::FRem;
+      is_fp = true;
+      break;
     default:
       return error(i);
     }
 
     if (is_fp)
-      return
-        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op, parse_fmath(i));
+      return make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op,
+                                  parse_fmath(i));
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
@@ -284,13 +368,27 @@ public:
       ConversionOp::Op op;
       bool has_non_fp = true;
       switch (i.getOpcode()) {
-      case llvm::Instruction::SExt:     op = ConversionOp::SExt; break;
-      case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
-      case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
-      case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
-      case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
-      case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
-      default: has_non_fp = false; break;
+      case llvm::Instruction::SExt:
+        op = ConversionOp::SExt;
+        break;
+      case llvm::Instruction::ZExt:
+        op = ConversionOp::ZExt;
+        break;
+      case llvm::Instruction::Trunc:
+        op = ConversionOp::Trunc;
+        break;
+      case llvm::Instruction::BitCast:
+        op = ConversionOp::BitCast;
+        break;
+      case llvm::Instruction::PtrToInt:
+        op = ConversionOp::Ptr2Int;
+        break;
+      case llvm::Instruction::IntToPtr:
+        op = ConversionOp::Int2Ptr;
+        break;
+      default:
+        has_non_fp = false;
+        break;
       }
       if (has_non_fp) {
         unsigned flags = 0;
@@ -314,12 +412,24 @@ public:
         flags |= FpConversionOp::NNEG;
     }
     switch (i.getOpcode()) {
-    case llvm::Instruction::SIToFP:  op = FpConversionOp::SIntToFP; break;
-    case llvm::Instruction::UIToFP:  op = FpConversionOp::UIntToFP; break;
-    case llvm::Instruction::FPToSI:  op = FpConversionOp::FPToSInt; break;
-    case llvm::Instruction::FPToUI:  op = FpConversionOp::FPToUInt; break;
-    case llvm::Instruction::FPExt:   op = FpConversionOp::FPExt; break;
-    case llvm::Instruction::FPTrunc: op = FpConversionOp::FPTrunc; break;
+    case llvm::Instruction::SIToFP:
+      op = FpConversionOp::SIntToFP;
+      break;
+    case llvm::Instruction::UIToFP:
+      op = FpConversionOp::UIntToFP;
+      break;
+    case llvm::Instruction::FPToSI:
+      op = FpConversionOp::FPToSInt;
+      break;
+    case llvm::Instruction::FPToUI:
+      op = FpConversionOp::FPToUInt;
+      break;
+    case llvm::Instruction::FPExt:
+      op = FpConversionOp::FPExt;
+      break;
+    case llvm::Instruction::FPTrunc:
+      op = FpConversionOp::FPTrunc;
+      break;
     default:
       return error(i);
     }
@@ -375,18 +485,18 @@ public:
         auto &ctx = i.getContext();
         assert(fn->getFunctionType() ==
                llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
-                                       { llvm::Type::getInt1Ty(ctx) }, false));
+                                       {llvm::Type::getInt1Ty(ctx)}, false));
         return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
       Function::FnDecl decl;
-      decl.name  = '@' + fn_decl->getName().str();
+      decl.name = '@' + fn_decl->getName().str();
       decl.attrs = attrs;
       if (!(decl.output = llvm_type2alive(fn_decl->getReturnType())))
         return error(i);
 
       // it's UB if there's a mismatch in the number of function arguments
-      if (( fn_decl->isVarArg() && i.arg_size() < fn_decl->arg_size()) ||
+      if ((fn_decl->isVarArg() && i.arg_size() < fn_decl->arg_size()) ||
           (!fn_decl->isVarArg() && i.arg_size() != fn_decl->arg_size())) {
         auto unreach = mkUnreach();
         if (ty->isVoid())
@@ -405,8 +515,8 @@ public:
         unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
         auto &arg = args.at(idx);
         ParamAttrs pattr;
-        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr,
-                         *arg, arg, true);
+        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, *arg,
+                         arg, true);
         decl.inputs.emplace_back(ty, std::move(pattr));
       }
       alive_fn->addFnDecl(std::move(decl));
@@ -415,8 +525,8 @@ public:
     parse_fn_attrs(i, attrs);
 
     if (!approx) {
-      auto [known, approx0]
-        = known_call(i, TLI, *BB, args, std::move(attrs), param_attrs);
+      auto [known, approx0] =
+          known_call(i, TLI, *BB, args, std::move(attrs), param_attrs);
       approx = approx0;
       if (known)
         return std::move(known);
@@ -429,9 +539,9 @@ public:
       assert(!approx);
       if (!iasm->canThrow())
         attrs.set(FnAttrs::NoThrow);
-      call = make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
-                                    iasm->getConstraintString(),
-                                    std::move(attrs));
+      call =
+          make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
+                                 iasm->getConstraintString(), std::move(attrs));
     } else {
       if (!fn) {
         if (!(fnptr = get_operand(i.getCalledOperand())))
@@ -451,8 +561,8 @@ public:
 
     for (uint64_t argidx = 0, nargs = i.arg_size(); argidx < nargs; ++argidx) {
       auto &arg = args.at(argidx);
-      ParamAttrs pattr = argidx < param_attrs.size() ? param_attrs[argidx]
-                                                     : ParamAttrs();
+      ParamAttrs pattr =
+          argidx < param_attrs.size() ? param_attrs[argidx] : ParamAttrs();
 
       unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
       approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
@@ -465,7 +575,8 @@ public:
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
           // TODO: noundef aggregate should be supported; it can have undef
           // padding
-          return errorAttr(i.getAttributeAtIndex(argidx, llvm::Attribute::NoUndef));
+          return errorAttr(
+              i.getAttributeAtIndex(argidx, llvm::Attribute::NoUndef));
       }
       call->addArg(*arg, std::move(pattr));
     }
@@ -507,26 +618,45 @@ public:
     if (!dst || !src || !bytes)
       return error(i);
 
-    return make_unique<Memcpy>(*dst, *src, *bytes,
-                               i.getDestAlign().valueOrOne().value(),
-                               i.getSourceAlign().valueOrOne().value(),
-                               isa<llvm::MemMoveInst>(&i));
+    return make_unique<Memcpy>(
+        *dst, *src, *bytes, i.getDestAlign().valueOrOne().value(),
+        i.getSourceAlign().valueOrOne().value(), isa<llvm::MemMoveInst>(&i));
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {
     PARSE_BINOP();
     ICmp::Cond cond;
     switch (i.getPredicate()) {
-    case llvm::CmpInst::ICMP_EQ:  cond = ICmp::EQ; break;
-    case llvm::CmpInst::ICMP_NE:  cond = ICmp::NE; break;
-    case llvm::CmpInst::ICMP_UGT: cond = ICmp::UGT; break;
-    case llvm::CmpInst::ICMP_UGE: cond = ICmp::UGE; break;
-    case llvm::CmpInst::ICMP_ULT: cond = ICmp::ULT; break;
-    case llvm::CmpInst::ICMP_ULE: cond = ICmp::ULE; break;
-    case llvm::CmpInst::ICMP_SGT: cond = ICmp::SGT; break;
-    case llvm::CmpInst::ICMP_SGE: cond = ICmp::SGE; break;
-    case llvm::CmpInst::ICMP_SLT: cond = ICmp::SLT; break;
-    case llvm::CmpInst::ICMP_SLE: cond = ICmp::SLE; break;
+    case llvm::CmpInst::ICMP_EQ:
+      cond = ICmp::EQ;
+      break;
+    case llvm::CmpInst::ICMP_NE:
+      cond = ICmp::NE;
+      break;
+    case llvm::CmpInst::ICMP_UGT:
+      cond = ICmp::UGT;
+      break;
+    case llvm::CmpInst::ICMP_UGE:
+      cond = ICmp::UGE;
+      break;
+    case llvm::CmpInst::ICMP_ULT:
+      cond = ICmp::ULT;
+      break;
+    case llvm::CmpInst::ICMP_ULE:
+      cond = ICmp::ULE;
+      break;
+    case llvm::CmpInst::ICMP_SGT:
+      cond = ICmp::SGT;
+      break;
+    case llvm::CmpInst::ICMP_SGE:
+      cond = ICmp::SGE;
+      break;
+    case llvm::CmpInst::ICMP_SLT:
+      cond = ICmp::SLT;
+      break;
+    case llvm::CmpInst::ICMP_SLE:
+      cond = ICmp::SLE;
+      break;
     default:
       UNREACHABLE();
     }
@@ -599,7 +729,7 @@ public:
 
     auto size = make_intconst(typesz, 64);
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
-                      pref_alignment(i, i.getAllocatedType()));
+                                    pref_alignment(i, i.getAllocatedType()));
     allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
     return alloc;
   }
@@ -612,13 +742,13 @@ public:
 
     auto gep = make_unique<GEP>(*ty, value_name(i), *ptr, i.isInBounds());
     auto gep_struct_ofs = [&i, this](llvm::StructType *sty, llvm::Value *ofs) {
-      llvm::Value *vals[] = { llvm::ConstantInt::getFalse(i.getContext()), ofs };
-      return this->DL().getIndexedOffsetInType(sty, { vals, 2 });
+      llvm::Value *vals[] = {llvm::ConstantInt::getFalse(i.getContext()), ofs};
+      return this->DL().getIndexedOffsetInType(sty, {vals, 2});
     };
 
     // reference: GEPOperator::accumulateConstantOffset()
-    for (auto I = llvm::gep_type_begin(i), E = llvm::gep_type_end(i);
-         I != E; ++I) {
+    for (auto I = llvm::gep_type_begin(i), E = llvm::gep_type_end(i); I != E;
+         ++I) {
       auto op = get_operand(I.getOperand());
       if (!op)
         return error(i);
@@ -637,21 +767,21 @@ public:
             if (auto cdv = dyn_cast<llvm::ConstantDataVector>(I.getOperand())) {
               constofs = cdv->getElementAsConstant(i);
             } else if (auto cv = dyn_cast<llvm::ConstantAggregateZero>(
-                I.getOperand())) {
+                           I.getOperand())) {
               constofs = cv->getSequentialElement();
             } else {
               assert(false);
             }
-            offsets.push_back(llvm::ConstantInt::get(ofs_ty,
-                (uint64_t)gep_struct_ofs(structTy, constofs)));
+            offsets.push_back(llvm::ConstantInt::get(
+                ofs_ty, (uint64_t)gep_struct_ofs(structTy, constofs)));
           }
 
-          auto ofs_vector = llvm::ConstantVector::get(
-            { offsets.data(), offsets.size() });
+          auto ofs_vector =
+              llvm::ConstantVector::get({offsets.data(), offsets.size()});
           gep->addIdx(1, *get_operand(ofs_vector));
         } else {
-          gep->addIdx(1, *make_intconst(
-              gep_struct_ofs(structTy, I.getOperand()), 64));
+          gep->addIdx(
+              1, *make_intconst(gep_struct_ofs(structTy, I.getOperand()), 64));
         }
         continue;
       }
@@ -666,8 +796,8 @@ public:
     if (!i.isSimple())
       return error(i);
     PARSE_UNOP();
-    return
-      make_unique<Load>(*ty, value_name(i), *val, alignment(i, i.getType()));
+    return make_unique<Load>(*ty, value_name(i), *val,
+                             alignment(i, i.getType()));
   }
 
   RetTy visitStoreInst(llvm::StoreInst &i) {
@@ -758,11 +888,11 @@ public:
     llvm::getUnderlyingObjects(Ptr, Objs);
 
     if (llvm::all_of(Objs, [](const llvm::Value *V) {
-        // Stack coloring algorithm doesn't assign slots for global variables
-        // or objects passed as pointer arguments
-        return llvm::isa<llvm::Argument,
-                         llvm::GlobalVariable,
-                         llvm::CallInst>(V); }))
+          // Stack coloring algorithm doesn't assign slots for global variables
+          // or objects passed as pointer arguments
+          return llvm::isa<llvm::Argument, llvm::GlobalVariable,
+                           llvm::CallInst>(V);
+        }))
       return LIFETIME_FILLPOISON;
 
     Objs.clear();
@@ -778,18 +908,18 @@ public:
       Objs.emplace_back(Ptr);
 
     if (!llvm::all_of(Objs, [](const llvm::Value *V) {
-         return llvm::isa<llvm::AllocaInst>(V->stripPointerCasts()); })) {
+          return llvm::isa<llvm::AllocaInst>(V->stripPointerCasts());
+        })) {
       // If it is gep(alloca, const) where const != 0, it is fillpoison.
       // Since such pattern is rare, check the simplest case and just return
       // unknown otherwise
       if (Objs.size() == 1) {
         const auto *GEPI = llvm::dyn_cast<llvm::GetElementPtrInst>(Objs[0]);
         if (GEPI && llvm::isa<llvm::AllocaInst>(
-                            GEPI->getPointerOperand()->stripPointerCasts())) {
+                        GEPI->getPointerOperand()->stripPointerCasts())) {
           unsigned BitWidth = DL().getIndexTypeSizeInBits(GEPI->getType());
           llvm::APInt Offset(BitWidth, 0);
-          if (GEPI->accumulateConstantOffset(DL(), Offset) &&
-              !Offset.isZero())
+          if (GEPI->accumulateConstantOffset(DL(), Offset) && !Offset.isZero())
             return LIFETIME_FILLPOISON;
         }
       }
@@ -825,8 +955,7 @@ public:
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
     switch (i.getIntrinsicID()) {
-    case llvm::Intrinsic::assume:
-    {
+    case llvm::Intrinsic::assume: {
       unsigned n = i.getNumOperandBundles();
       for (unsigned j = 0; j < n; ++j) {
         auto bundle = i.getOperandBundleAt(j);
@@ -851,10 +980,10 @@ public:
 
           if (bundle.Inputs.size() >= 3) {
             assert(bundle.Inputs.size() == 3);
-            auto gep = make_unique<GEP>(
-                aptr->getType(),
-                "#align_adjustedptr" + to_string(alignopbundle_idx++),
-                *aptr, false);
+            auto gep = make_unique<GEP>(aptr->getType(),
+                                        "#align_adjustedptr" +
+                                            to_string(alignopbundle_idx++),
+                                        *aptr, false);
             gep->addIdx(-1ull, *get_operand(bundle.Inputs[2].get()));
 
             aptr = gep.get();
@@ -895,31 +1024,69 @@ public:
     case llvm::Intrinsic::umax:
     case llvm::Intrinsic::smin:
     case llvm::Intrinsic::smax:
-    case llvm::Intrinsic::abs:
-    {
+    case llvm::Intrinsic::abs: {
       PARSE_BINOP();
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::sadd_with_overflow: op=BinOp::SAdd_Overflow; break;
-      case llvm::Intrinsic::uadd_with_overflow: op=BinOp::UAdd_Overflow; break;
-      case llvm::Intrinsic::ssub_with_overflow: op=BinOp::SSub_Overflow; break;
-      case llvm::Intrinsic::usub_with_overflow: op=BinOp::USub_Overflow; break;
-      case llvm::Intrinsic::smul_with_overflow: op=BinOp::SMul_Overflow; break;
-      case llvm::Intrinsic::umul_with_overflow: op=BinOp::UMul_Overflow; break;
-      case llvm::Intrinsic::sadd_sat: op = BinOp::SAdd_Sat; break;
-      case llvm::Intrinsic::uadd_sat: op = BinOp::UAdd_Sat; break;
-      case llvm::Intrinsic::ssub_sat: op = BinOp::SSub_Sat; break;
-      case llvm::Intrinsic::usub_sat: op = BinOp::USub_Sat; break;
-      case llvm::Intrinsic::sshl_sat: op = BinOp::SShl_Sat; break;
-      case llvm::Intrinsic::ushl_sat: op = BinOp::UShl_Sat; break;
-      case llvm::Intrinsic::cttz:     op = BinOp::Cttz; break;
-      case llvm::Intrinsic::ctlz:     op = BinOp::Ctlz; break;
-      case llvm::Intrinsic::umin:     op = BinOp::UMin; break;
-      case llvm::Intrinsic::umax:     op = BinOp::UMax; break;
-      case llvm::Intrinsic::smin:     op = BinOp::SMin; break;
-      case llvm::Intrinsic::smax:     op = BinOp::SMax; break;
-      case llvm::Intrinsic::abs:      op = BinOp::Abs; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::sadd_with_overflow:
+        op = BinOp::SAdd_Overflow;
+        break;
+      case llvm::Intrinsic::uadd_with_overflow:
+        op = BinOp::UAdd_Overflow;
+        break;
+      case llvm::Intrinsic::ssub_with_overflow:
+        op = BinOp::SSub_Overflow;
+        break;
+      case llvm::Intrinsic::usub_with_overflow:
+        op = BinOp::USub_Overflow;
+        break;
+      case llvm::Intrinsic::smul_with_overflow:
+        op = BinOp::SMul_Overflow;
+        break;
+      case llvm::Intrinsic::umul_with_overflow:
+        op = BinOp::UMul_Overflow;
+        break;
+      case llvm::Intrinsic::sadd_sat:
+        op = BinOp::SAdd_Sat;
+        break;
+      case llvm::Intrinsic::uadd_sat:
+        op = BinOp::UAdd_Sat;
+        break;
+      case llvm::Intrinsic::ssub_sat:
+        op = BinOp::SSub_Sat;
+        break;
+      case llvm::Intrinsic::usub_sat:
+        op = BinOp::USub_Sat;
+        break;
+      case llvm::Intrinsic::sshl_sat:
+        op = BinOp::SShl_Sat;
+        break;
+      case llvm::Intrinsic::ushl_sat:
+        op = BinOp::UShl_Sat;
+        break;
+      case llvm::Intrinsic::cttz:
+        op = BinOp::Cttz;
+        break;
+      case llvm::Intrinsic::ctlz:
+        op = BinOp::Ctlz;
+        break;
+      case llvm::Intrinsic::umin:
+        op = BinOp::UMin;
+        break;
+      case llvm::Intrinsic::umax:
+        op = BinOp::UMax;
+        break;
+      case llvm::Intrinsic::smin:
+        op = BinOp::SMin;
+        break;
+      case llvm::Intrinsic::smax:
+        op = BinOp::SMax;
+        break;
+      case llvm::Intrinsic::abs:
+        op = BinOp::Abs;
+        break;
+      default:
+        UNREACHABLE();
       }
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
@@ -935,15 +1102,25 @@ public:
       PARSE_UNOP();
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
-      case llvm::Intrinsic::bswap:       op = UnaryOp::BSwap; break;
-      case llvm::Intrinsic::ctpop:       op = UnaryOp::Ctpop; break;
+      case llvm::Intrinsic::bitreverse:
+        op = UnaryOp::BitReverse;
+        break;
+      case llvm::Intrinsic::bswap:
+        op = UnaryOp::BSwap;
+        break;
+      case llvm::Intrinsic::ctpop:
+        op = UnaryOp::Ctpop;
+        break;
       case llvm::Intrinsic::arithmetic_fence:
       case llvm::Intrinsic::expect:
       case llvm::Intrinsic::expect_with_probability:
-        op = UnaryOp::Copy; break;
-      case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
-      default: UNREACHABLE();
+        op = UnaryOp::Copy;
+        break;
+      case llvm::Intrinsic::is_constant:
+        op = UnaryOp::IsConstant;
+        break;
+      default:
+        UNREACHABLE();
       }
       return make_unique<UnaryOp>(*ty, value_name(i), *val, op);
     }
@@ -959,16 +1136,35 @@ public:
       PARSE_UNOP();
       UnaryReductionOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::vector_reduce_add: op = UnaryReductionOp::Add; break;
-      case llvm::Intrinsic::vector_reduce_mul: op = UnaryReductionOp::Mul; break;
-      case llvm::Intrinsic::vector_reduce_and: op = UnaryReductionOp::And; break;
-      case llvm::Intrinsic::vector_reduce_or:  op = UnaryReductionOp::Or;  break;
-      case llvm::Intrinsic::vector_reduce_xor: op = UnaryReductionOp::Xor; break;
-      case llvm::Intrinsic::vector_reduce_smax: op = UnaryReductionOp::SMax; break;
-      case llvm::Intrinsic::vector_reduce_smin: op = UnaryReductionOp::SMin; break;
-      case llvm::Intrinsic::vector_reduce_umax: op = UnaryReductionOp::UMax; break;
-      case llvm::Intrinsic::vector_reduce_umin: op = UnaryReductionOp::UMin; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::vector_reduce_add:
+        op = UnaryReductionOp::Add;
+        break;
+      case llvm::Intrinsic::vector_reduce_mul:
+        op = UnaryReductionOp::Mul;
+        break;
+      case llvm::Intrinsic::vector_reduce_and:
+        op = UnaryReductionOp::And;
+        break;
+      case llvm::Intrinsic::vector_reduce_or:
+        op = UnaryReductionOp::Or;
+        break;
+      case llvm::Intrinsic::vector_reduce_xor:
+        op = UnaryReductionOp::Xor;
+        break;
+      case llvm::Intrinsic::vector_reduce_smax:
+        op = UnaryReductionOp::SMax;
+        break;
+      case llvm::Intrinsic::vector_reduce_smin:
+        op = UnaryReductionOp::SMin;
+        break;
+      case llvm::Intrinsic::vector_reduce_umax:
+        op = UnaryReductionOp::UMax;
+        break;
+      case llvm::Intrinsic::vector_reduce_umin:
+        op = UnaryReductionOp::UMin;
+        break;
+      default:
+        UNREACHABLE();
       }
       return make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
     }
@@ -977,34 +1173,50 @@ public:
     case llvm::Intrinsic::smul_fix:
     case llvm::Intrinsic::umul_fix:
     case llvm::Intrinsic::smul_fix_sat:
-    case llvm::Intrinsic::umul_fix_sat:
-    {
+    case llvm::Intrinsic::umul_fix_sat: {
       PARSE_TRIOP();
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
-      case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
-      case llvm::Intrinsic::smul_fix: op = TernaryOp::SMulFix; break;
-      case llvm::Intrinsic::umul_fix: op = TernaryOp::UMulFix; break;
-      case llvm::Intrinsic::smul_fix_sat: op = TernaryOp::SMulFixSat; break;
-      case llvm::Intrinsic::umul_fix_sat: op = TernaryOp::UMulFixSat; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::fshl:
+        op = TernaryOp::FShl;
+        break;
+      case llvm::Intrinsic::fshr:
+        op = TernaryOp::FShr;
+        break;
+      case llvm::Intrinsic::smul_fix:
+        op = TernaryOp::SMulFix;
+        break;
+      case llvm::Intrinsic::umul_fix:
+        op = TernaryOp::UMulFix;
+        break;
+      case llvm::Intrinsic::smul_fix_sat:
+        op = TernaryOp::SMulFixSat;
+        break;
+      case llvm::Intrinsic::umul_fix_sat:
+        op = TernaryOp::UMulFixSat;
+        break;
+      default:
+        UNREACHABLE();
       }
       return make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op);
     }
     case llvm::Intrinsic::fma:
     case llvm::Intrinsic::fmuladd:
     case llvm::Intrinsic::experimental_constrained_fma:
-    case llvm::Intrinsic::experimental_constrained_fmuladd:
-    {
+    case llvm::Intrinsic::experimental_constrained_fmuladd: {
       PARSE_TRIOP();
       FpTernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fma:
-      case llvm::Intrinsic::experimental_constrained_fma:     op = FpTernaryOp::FMA; break;
+      case llvm::Intrinsic::experimental_constrained_fma:
+        op = FpTernaryOp::FMA;
+        break;
       case llvm::Intrinsic::fmuladd:
-      case llvm::Intrinsic::experimental_constrained_fmuladd: op = FpTernaryOp::MulAdd; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::experimental_constrained_fmuladd:
+        op = FpTernaryOp::MulAdd;
+        break;
+      default:
+        UNREACHABLE();
       }
       return make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
                                       parse_fmath(i), parse_rounding(i),
@@ -1022,29 +1234,47 @@ public:
     case llvm::Intrinsic::experimental_constrained_minnum:
     case llvm::Intrinsic::experimental_constrained_maxnum:
     case llvm::Intrinsic::experimental_constrained_minimum:
-    case llvm::Intrinsic::experimental_constrained_maximum:
-    {
+    case llvm::Intrinsic::experimental_constrained_maximum: {
       PARSE_BINOP();
       FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::copysign:                         op = FpBinOp::CopySign; break;
+      case llvm::Intrinsic::copysign:
+        op = FpBinOp::CopySign;
+        break;
       case llvm::Intrinsic::minnum:
-      case llvm::Intrinsic::experimental_constrained_minnum:  op = FpBinOp::FMin; break;
+      case llvm::Intrinsic::experimental_constrained_minnum:
+        op = FpBinOp::FMin;
+        break;
       case llvm::Intrinsic::maxnum:
-      case llvm::Intrinsic::experimental_constrained_maxnum:  op = FpBinOp::FMax; break;
+      case llvm::Intrinsic::experimental_constrained_maxnum:
+        op = FpBinOp::FMax;
+        break;
       case llvm::Intrinsic::minimum:
-      case llvm::Intrinsic::experimental_constrained_minimum: op = FpBinOp::FMinimum; break;
+      case llvm::Intrinsic::experimental_constrained_minimum:
+        op = FpBinOp::FMinimum;
+        break;
       case llvm::Intrinsic::maximum:
-      case llvm::Intrinsic::experimental_constrained_maximum: op = FpBinOp::FMaximum; break;
-      case llvm::Intrinsic::experimental_constrained_fadd:    op = FpBinOp::FAdd; break;
-      case llvm::Intrinsic::experimental_constrained_fsub:    op = FpBinOp::FSub; break;
-      case llvm::Intrinsic::experimental_constrained_fmul:    op = FpBinOp::FMul; break;
-      case llvm::Intrinsic::experimental_constrained_fdiv:    op = FpBinOp::FDiv; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::experimental_constrained_maximum:
+        op = FpBinOp::FMaximum;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fadd:
+        op = FpBinOp::FAdd;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fsub:
+        op = FpBinOp::FSub;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fmul:
+        op = FpBinOp::FMul;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fdiv:
+        op = FpBinOp::FDiv;
+        break;
+      default:
+        UNREACHABLE();
       }
-      return
-        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
-                             parse_rounding(i), parse_exceptions(i));
+      return make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op,
+                                  parse_fmath(i), parse_rounding(i),
+                                  parse_exceptions(i));
     }
     case llvm::Intrinsic::canonicalize:
     case llvm::Intrinsic::fabs:
@@ -1063,34 +1293,54 @@ public:
     case llvm::Intrinsic::sqrt:
     case llvm::Intrinsic::experimental_constrained_sqrt:
     case llvm::Intrinsic::trunc:
-    case llvm::Intrinsic::experimental_constrained_trunc:
-    {
+    case llvm::Intrinsic::experimental_constrained_trunc: {
       PARSE_UNOP();
       FpUnaryOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::canonicalize:                       op = FpUnaryOp::Canonicalize; break;
-      case llvm::Intrinsic::fabs:                               op = FpUnaryOp::FAbs; break;
+      case llvm::Intrinsic::canonicalize:
+        op = FpUnaryOp::Canonicalize;
+        break;
+      case llvm::Intrinsic::fabs:
+        op = FpUnaryOp::FAbs;
+        break;
       case llvm::Intrinsic::ceil:
-      case llvm::Intrinsic::experimental_constrained_ceil:      op = FpUnaryOp::Ceil; break;
+      case llvm::Intrinsic::experimental_constrained_ceil:
+        op = FpUnaryOp::Ceil;
+        break;
       case llvm::Intrinsic::floor:
-      case llvm::Intrinsic::experimental_constrained_floor:     op = FpUnaryOp::Floor; break;
+      case llvm::Intrinsic::experimental_constrained_floor:
+        op = FpUnaryOp::Floor;
+        break;
       case llvm::Intrinsic::rint:
-      case llvm::Intrinsic::experimental_constrained_rint:      op = FpUnaryOp::RInt; break;
+      case llvm::Intrinsic::experimental_constrained_rint:
+        op = FpUnaryOp::RInt;
+        break;
       case llvm::Intrinsic::nearbyint:
-      case llvm::Intrinsic::experimental_constrained_nearbyint: op = FpUnaryOp::NearbyInt; break;
+      case llvm::Intrinsic::experimental_constrained_nearbyint:
+        op = FpUnaryOp::NearbyInt;
+        break;
       case llvm::Intrinsic::round:
-      case llvm::Intrinsic::experimental_constrained_round:     op = FpUnaryOp::Round; break;
+      case llvm::Intrinsic::experimental_constrained_round:
+        op = FpUnaryOp::Round;
+        break;
       case llvm::Intrinsic::roundeven:
-      case llvm::Intrinsic::experimental_constrained_roundeven: op = FpUnaryOp::RoundEven; break;
+      case llvm::Intrinsic::experimental_constrained_roundeven:
+        op = FpUnaryOp::RoundEven;
+        break;
       case llvm::Intrinsic::sqrt:
-      case llvm::Intrinsic::experimental_constrained_sqrt:      op = FpUnaryOp::Sqrt; break;
+      case llvm::Intrinsic::experimental_constrained_sqrt:
+        op = FpUnaryOp::Sqrt;
+        break;
       case llvm::Intrinsic::trunc:
-      case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::experimental_constrained_trunc:
+        op = FpUnaryOp::Trunc;
+        break;
+      default:
+        UNREACHABLE();
       }
-      return
-        make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
-                               parse_rounding(i), parse_exceptions(i));
+      return make_unique<FpUnaryOp>(*ty, value_name(i), *val, op,
+                                    parse_fmath(i), parse_rounding(i),
+                                    parse_exceptions(i));
     }
     case llvm::Intrinsic::experimental_constrained_sitofp:
     case llvm::Intrinsic::experimental_constrained_uitofp:
@@ -1106,58 +1356,74 @@ public:
     case llvm::Intrinsic::lround:
     case llvm::Intrinsic::experimental_constrained_lround:
     case llvm::Intrinsic::llround:
-    case llvm::Intrinsic::experimental_constrained_llround:
-    {
+    case llvm::Intrinsic::experimental_constrained_llround: {
       PARSE_UNOP();
       FpConversionOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::experimental_constrained_sitofp:  op = FpConversionOp::SIntToFP; break;
-      case llvm::Intrinsic::experimental_constrained_uitofp:  op = FpConversionOp::UIntToFP; break;
-      case llvm::Intrinsic::experimental_constrained_fptosi:  op = FpConversionOp::FPToSInt; break;
-      case llvm::Intrinsic::experimental_constrained_fptoui:  op = FpConversionOp::FPToUInt; break;
-      case llvm::Intrinsic::experimental_constrained_fpext:   op = FpConversionOp::FPExt; break;
+      case llvm::Intrinsic::experimental_constrained_sitofp:
+        op = FpConversionOp::SIntToFP;
+        break;
+      case llvm::Intrinsic::experimental_constrained_uitofp:
+        op = FpConversionOp::UIntToFP;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fptosi:
+        op = FpConversionOp::FPToSInt;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fptoui:
+        op = FpConversionOp::FPToUInt;
+        break;
+      case llvm::Intrinsic::experimental_constrained_fpext:
+        op = FpConversionOp::FPExt;
+        break;
       case llvm::Intrinsic::fptrunc_round:
-      case llvm::Intrinsic::experimental_constrained_fptrunc: op = FpConversionOp::FPTrunc; break;
+      case llvm::Intrinsic::experimental_constrained_fptrunc:
+        op = FpConversionOp::FPTrunc;
+        break;
       case llvm::Intrinsic::lrint:
       case llvm::Intrinsic::experimental_constrained_lrint:
       case llvm::Intrinsic::llrint:
-      case llvm::Intrinsic::experimental_constrained_llrint:  op = FpConversionOp::LRInt; break;
+      case llvm::Intrinsic::experimental_constrained_llrint:
+        op = FpConversionOp::LRInt;
+        break;
       case llvm::Intrinsic::lround:
       case llvm::Intrinsic::experimental_constrained_lround:
       case llvm::Intrinsic::llround:
-      case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::experimental_constrained_llround:
+        op = FpConversionOp::LRound;
+        break;
+      default:
+        UNREACHABLE();
       }
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
-      RETURN_FNATTRS(
-        make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
-                                    parse_rounding(i), parse_exceptions(i)),
-        attrs);
+      RETURN_FNATTRS(make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
+                                                 parse_rounding(i),
+                                                 parse_exceptions(i)),
+                     attrs);
     }
     case llvm::Intrinsic::experimental_constrained_fcmp:
-    case llvm::Intrinsic::experimental_constrained_fcmps:
-    {
+    case llvm::Intrinsic::experimental_constrained_fcmps: {
       PARSE_BINOP();
       auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
       auto cond = parse_fcmp_cond(fcmp->getPredicate());
-      return
-        make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
-                          parse_exceptions(i), fcmp->isSignaling());
+      return make_unique<FCmp>(*ty, value_name(i), cond, *a, *b,
+                               FastMathFlags(), parse_exceptions(i),
+                               fcmp->isSignaling());
     }
-    case llvm::Intrinsic::is_fpclass:
-    {
+    case llvm::Intrinsic::is_fpclass: {
       PARSE_BINOP();
       TestOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
-      default: UNREACHABLE();
+      case llvm::Intrinsic::is_fpclass:
+        op = TestOp::Is_FPClass;
+        break;
+      default:
+        UNREACHABLE();
       }
       return make_unique<TestOp>(*ty, value_name(i), *a, *b, op);
     }
     case llvm::Intrinsic::lifetime_start:
-    case llvm::Intrinsic::lifetime_end:
-    {
+    case llvm::Intrinsic::lifetime_end: {
       PARSE_BINOP();
       switch (getLifetimeKind(i)) {
       case LIFETIME_START:
@@ -1175,8 +1441,7 @@ public:
         return error(i);
       }
     }
-    case llvm::Intrinsic::ptrmask:
-    {
+    case llvm::Intrinsic::ptrmask: {
       PARSE_BINOP();
       return make_unique<PtrMask>(*ty, value_name(i), *a, *b);
     }
@@ -1185,8 +1450,8 @@ public:
       parse_fn_attrs(i, attrs);
       attrs.set(FnAttrs::WillReturn);
       attrs.set(FnAttrs::NoThrow);
-      return
-        make_unique<FnCall>(Type::voidTy, "", "#sideeffect", std::move(attrs));
+      return make_unique<FnCall>(Type::voidTy, "", "#sideeffect",
+                                 std::move(attrs));
     }
     case llvm::Intrinsic::trap: {
       FnAttrs attrs;
@@ -1241,8 +1506,8 @@ public:
     vector<unsigned> mask;
     for (auto m : i.getShuffleMask())
       mask.push_back(m);
-    return
-      make_unique<ShuffleVector>(*ty, value_name(i), *a, *b, std::move(mask));
+    return make_unique<ShuffleVector>(*ty, value_name(i), *a, *b,
+                                      std::move(mask));
   }
 
   RetTy visitVAArg(llvm::VAArgInst &i) {
@@ -1250,7 +1515,9 @@ public:
     return make_unique<VaArg>(*ty, value_name(i), *val);
   }
 
-  RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
+  RetTy visitInstruction(llvm::Instruction &i) {
+    return error(i);
+  }
 
   RetTy error(llvm::Instruction &i) {
     if (hit_limits)
@@ -1268,19 +1535,18 @@ public:
   }
 
   bool handleMetadata(Function &Fn, llvm::Instruction &llvm_i, Instr *i) {
-    llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
+    llvm::SmallVector<pair<unsigned, llvm::MDNode *>, 8> MDs;
     llvm_i.getAllMetadataOtherThanDebugLoc(MDs);
 
     for (auto &[ID, Node] : MDs) {
       switch (ID) {
       case LLVMContext::MD_align:
       case LLVMContext::MD_nonnull:
-      case LLVMContext::MD_range:
-      {
-        vector<Value*> args;
+      case LLVMContext::MD_range: {
+        vector<Value *> args;
         for (auto &Op : Node->operands()) {
-          args.emplace_back(get_operand(
-            llvm::mdconst::extract<llvm::ConstantInt>(Op)));
+          args.emplace_back(
+              get_operand(llvm::mdconst::extract<llvm::ConstantInt>(Op)));
         }
 
         AssumeVal::Kind op;
@@ -1293,7 +1559,7 @@ public:
         case LLVMContext::MD_nonnull:
           op = AssumeVal::NonNull;
           str = "_nonnull";
-        break;
+          break;
         case LLVMContext::MD_range:
           op = AssumeVal::Range;
           str = "_range";
@@ -1302,9 +1568,8 @@ public:
           UNREACHABLE();
         }
 
-        auto assume
-          = make_unique<AssumeVal>(i->getType(), i->getName() + str, *i,
-                                   std::move(args), op);
+        auto assume = make_unique<AssumeVal>(i->getType(), i->getName() + str,
+                                             *i, std::move(args), op);
         replace_identifier(llvm_i, *assume);
         i = assume.get();
         BB->addInstr(std::move(assume));
@@ -1315,13 +1580,60 @@ public:
         BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
         break;
 
+      case LLVMContext::MD_callees: {
+        Value *result = nullptr;
+        unsigned int counter{0};
+        string value_name_c = value_name(llvm_i);
+        vector<ICmp *> icmps;
+        Type &ty_icmp = llvm_util::get_int_type(1);
+
+        for (auto &Op : Node->operands()) {
+          llvm::Function *CalleeLlvm =
+              llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op);
+
+          auto *Callee = get_operand(CalleeLlvm);
+
+          unique_ptr<ICmp> icmp = make_unique<ICmp>(
+              ty_icmp, value_name_c + "#cmp" + to_string(counter++), ICmp::EQ,
+              *i, *Callee);
+
+          icmps.push_back(icmp.get());
+          auto *IcmpPtr = icmp.get();
+          BB->addInstr(std::move(icmp));
+
+          if (result) {
+            BinOp::Op op;
+            op = BinOp::Or;
+
+            Type &ty_binop = llvm_util::get_int_type(1);
+
+            unique_ptr<BinOp> binop = make_unique<BinOp>(
+                ty_binop, value_name_c + "#binop" + to_string(counter), *result,
+                *IcmpPtr, op);
+            auto *BinopPtr = binop.get();
+            BB->addInstr(std::move(binop));
+            result = BinopPtr;
+            auto &BinopRef = *BinopPtr;
+            BB->addInstr(make_unique<Assume>(BinopRef, Assume::AndNonPoison));
+          } else {
+            result = IcmpPtr;
+          }
+        }
+
+        if (icmps.size() == 1) {
+          auto &ICmpRef = *icmps[0];
+          BB->addInstr(make_unique<Assume>(ICmpRef, Assume::AndNonPoison));
+        }
+        break;
+      }
       case LLVMContext::MD_dereferenceable:
       case LLVMContext::MD_dereferenceable_or_null: {
         auto kind = ID == LLVMContext::MD_dereferenceable
-                      ? Assume::Dereferenceable : Assume::DereferenceableOrNull;
+                        ? Assume::Dereferenceable
+                        : Assume::DereferenceableOrNull;
         auto bytes = get_operand(
-          llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
-        BB->addInstr(make_unique<Assume>(vector<Value*>{i, bytes}, kind));
+            llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
+        BB->addInstr(make_unique<Assume>(vector<Value *>{i, bytes}, kind));
         break;
       }
 
@@ -1348,17 +1660,16 @@ public:
     return true;
   }
 
-  unique_ptr<Instr>
-  handleRangeAttrNoInsert(const llvm::Attribute &attr, Value &val) {
+  unique_ptr<Instr> handleRangeAttrNoInsert(const llvm::Attribute &attr,
+                                            Value &val) {
     auto CR = attr.getValueAsConstantRange();
-    vector<Value*> bounds{ make_intconst(CR.getLower()),
-                           make_intconst(CR.getUpper()) };
-    return
-      make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(), val,
-                             std::move(bounds), AssumeVal::Range);
+    vector<Value *> bounds{make_intconst(CR.getLower()),
+                           make_intconst(CR.getUpper())};
+    return make_unique<AssumeVal>(val.getType(), "%#range_" + val.getName(),
+                                  val, std::move(bounds), AssumeVal::Range);
   }
 
-  Value* handleRangeAttr(const llvm::Attribute &attr, Value &val) {
+  Value *handleRangeAttr(const llvm::Attribute &attr, Value &val) {
     auto assume = handleRangeAttrNoInsert(attr, val);
     auto ret = assume.get();
     BB->addInstr(std::move(assume));
@@ -1370,7 +1681,7 @@ public:
   // TODO: Once attributes at a call site are fully supported, we should
   // remove is_callsite flag
   bool handleParamAttrs(const llvm::AttributeSet &aset, ParamAttrs &attrs,
-                        Value &val, Value* &newval, bool is_callsite) {
+                        Value &val, Value *&newval, bool is_callsite) {
     bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
       switch (llvmattr.getKindAsEnum()) {
@@ -1421,8 +1732,8 @@ public:
 
       case llvm::Attribute::Dereferenceable:
         attrs.set(ParamAttrs::Dereferenceable);
-        attrs.derefBytes = max(attrs.derefBytes,
-                               llvmattr.getDereferenceableBytes());
+        attrs.derefBytes =
+            max(attrs.derefBytes, llvmattr.getDereferenceableBytes());
         break;
 
       case llvm::Attribute::DereferenceableOrNull:
@@ -1478,16 +1789,26 @@ public:
         continue;
 
       switch (llvmattr.getKindAsEnum()) {
-      case llvm::Attribute::SExt: attrs.set(FnAttrs::SignExt); break;
-      case llvm::Attribute::ZExt: attrs.set(FnAttrs::ZeroExt); break;
-      case llvm::Attribute::NoAlias: attrs.set(FnAttrs::NoAlias); break;
-      case llvm::Attribute::NonNull: attrs.set(FnAttrs::NonNull); break;
-      case llvm::Attribute::NoUndef: attrs.set(FnAttrs::NoUndef); break;
+      case llvm::Attribute::SExt:
+        attrs.set(FnAttrs::SignExt);
+        break;
+      case llvm::Attribute::ZExt:
+        attrs.set(FnAttrs::ZeroExt);
+        break;
+      case llvm::Attribute::NoAlias:
+        attrs.set(FnAttrs::NoAlias);
+        break;
+      case llvm::Attribute::NonNull:
+        attrs.set(FnAttrs::NonNull);
+        break;
+      case llvm::Attribute::NoUndef:
+        attrs.set(FnAttrs::NoUndef);
+        break;
 
       case llvm::Attribute::Dereferenceable:
         attrs.set(FnAttrs::Dereferenceable);
-        attrs.derefBytes = max(attrs.derefBytes,
-                              llvmattr.getDereferenceableBytes());
+        attrs.derefBytes =
+            max(attrs.derefBytes, llvmattr.getDereferenceableBytes());
         break;
       case llvm::Attribute::DereferenceableOrNull:
         attrs.set(FnAttrs::DereferenceableOrNull);
@@ -1505,16 +1826,21 @@ public:
         attrs.nofpclass = (uint16_t)llvmattr.getNoFPClass();
         break;
 
-      default: break;
+      default:
+        break;
       }
     }
   }
 
   static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
-    if (str == "dynamic")       return FPDenormalAttrs::Dynamic;
-    if (str == "ieee")          return FPDenormalAttrs::IEEE;
-    if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
-    if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;
+    if (str == "dynamic")
+      return FPDenormalAttrs::Dynamic;
+    if (str == "ieee")
+      return FPDenormalAttrs::IEEE;
+    if (str == "preserve-sign")
+      return FPDenormalAttrs::PreserveSign;
+    if (str == "positive-zero")
+      return FPDenormalAttrs::PositiveZero;
     UNREACHABLE();
   }
 
@@ -1525,7 +1851,7 @@ public:
       attr.input = attr.output = parse_fp_denormal_str(str);
     } else {
       attr.output = parse_fp_denormal_str(string_view(str.data(), comma));
-      attr.input  = parse_fp_denormal_str(str.data() + comma + 1);
+      attr.input = parse_fp_denormal_str(str.data() + comma + 1);
     }
     return attr;
   }
@@ -1569,8 +1895,8 @@ public:
           attrs.add(AllocKind::Realloc);
         if ((kind & llvm::AllocFnKind::Free) != llvm::AllocFnKind::Unknown)
           attrs.add(AllocKind::Free);
-        if ((kind & llvm::AllocFnKind::Uninitialized)
-              != llvm::AllocFnKind::Unknown)
+        if ((kind & llvm::AllocFnKind::Uninitialized) !=
+            llvm::AllocFnKind::Unknown)
           attrs.add(AllocKind::Uninitialized);
         if ((kind & llvm::AllocFnKind::Zeroed) != llvm::AllocFnKind::Unknown)
           attrs.add(AllocKind::Zeroed);
@@ -1600,14 +1926,13 @@ public:
     MemoryAccess attrs;
     attrs.setNoAccess();
 
-    array<pair<llvm::IRMemLocation, MemoryAccess::AccessType>, 5> tys
-    {
-      make_pair(llvm::IRMemLocation::ArgMem,          MemoryAccess::Args),
-      make_pair(llvm::IRMemLocation::InaccessibleMem,
-                MemoryAccess::Inaccessible),
-      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Other),
-      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Globals),
-      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Errno),
+    array<pair<llvm::IRMemLocation, MemoryAccess::AccessType>, 5> tys{
+        make_pair(llvm::IRMemLocation::ArgMem, MemoryAccess::Args),
+        make_pair(llvm::IRMemLocation::InaccessibleMem,
+                  MemoryAccess::Inaccessible),
+        make_pair(llvm::IRMemLocation::Other, MemoryAccess::Other),
+        make_pair(llvm::IRMemLocation::Other, MemoryAccess::Globals),
+        make_pair(llvm::IRMemLocation::Other, MemoryAccess::Errno),
     };
 
     for (auto &[ef, ty] : tys) {
@@ -1624,8 +1949,8 @@ public:
                       bool decl_only = false) {
     auto fn = i.getCalledFunction();
     llvm::AttributeList attrs_callsite = i.getAttributes();
-    llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
-                                          : llvm::AttributeList();
+    llvm::AttributeList attrs_fndef =
+        fn ? fn->getAttributes() : llvm::AttributeList();
     auto ret = llvm::AttributeList::ReturnIndex;
     auto fnidx = llvm::AttributeList::FunctionIndex;
 
@@ -1642,7 +1967,6 @@ public:
       attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
     attrs.inferImpliedAttributes();
   }
-
 
   optional<Function> run() {
     hit_limits = false;
@@ -1696,9 +2020,9 @@ public:
       Fn.addInput(std::move(val));
     }
     {
-      vector<Value*> args;
+      vector<Value *> args;
       for (auto &in : Fn.getInputs()) {
-        args.emplace_back(const_cast<Value*>(&in));
+        args.emplace_back(const_cast<Value *>(&in));
       }
       vector<ParamAttrs> param_attrs;
       (void)llvm_implict_attrs(f, TLI, attrs, param_attrs, args);
@@ -1708,7 +2032,7 @@ public:
       for (auto *in : args) {
         if (idx == param_attrs.size())
           break;
-        static_cast<Input*>(in)->merge(param_attrs[idx++]);
+        static_cast<Input *>(in)->merge(param_attrs[idx++]);
       }
     }
     const auto &ridx = llvm::AttributeList::ReturnIndex;
@@ -1719,11 +2043,11 @@ public:
     attrs.inferImpliedAttributes();
 
     // create all BBs upfront in topological order
-    vector<pair<BasicBlock*, llvm::BasicBlock*>> sorted_bbs;
+    vector<pair<BasicBlock *, llvm::BasicBlock *>> sorted_bbs;
     {
       edgesTy edges;
-      vector<llvm::BasicBlock*> bbs;
-      unordered_map<llvm::BasicBlock*, unsigned> bb_map;
+      vector<llvm::BasicBlock *> bbs;
+      unordered_map<llvm::BasicBlock *, unsigned> bb_map;
 
       auto bb_num = [&](llvm::BasicBlock *bb) {
         auto [I, inserted] = bb_map.emplace(bb, bbs.size());
@@ -1769,7 +2093,7 @@ public:
     // patch phi nodes for recursive defs
     for (auto &[phi, i] : todo_phis) {
       insert_constexpr_before = phi;
-      BB = const_cast<BasicBlock*>(&Fn.bbOf(*phi));
+      BB = const_cast<BasicBlock *>(&Fn.bbOf(*phi));
       for (unsigned idx = 0, e = i->getNumIncomingValues(); idx != e; ++idx) {
         if (auto op = get_operand(i->getIncomingValue(idx))) {
           phi->addValue(*op, value_name(*i->getIncomingBlock(idx)));
@@ -1781,7 +2105,7 @@ public:
     }
 
     auto getGlobalVariable =
-      [this](const string_view name) -> llvm::GlobalVariable* {
+        [this](const string_view name) -> llvm::GlobalVariable * {
       auto M = f.getParent();
       // If name is a numeric value, the result should be manually found
       const char *chrs = name.data();
@@ -1854,7 +2178,7 @@ public:
     return Fn;
   }
 };
-}
+} // namespace
 
 namespace llvm_util {
 
@@ -1868,4 +2192,4 @@ optional<IR::Function> llvm2alive(llvm::Function &F,
                                   const vector<string_view> &gvnamesInSrc) {
   return llvm2alive_(F, TLI, IsSrc, gvnamesInSrc).run();
 }
-}
+} // namespace llvm_util
