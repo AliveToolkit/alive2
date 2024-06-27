@@ -3255,6 +3255,17 @@ bool Assume::propagatesPoison() const {
 }
 
 bool Assume::hasSideEffects() const {
+  switch (kind) {
+  // assume(true) is NOP
+  case AndNonPoison:
+  case WellDefined:
+    if (auto *c = dynamic_cast<IntConst*>(args[0]))
+      if (auto n = c->getInt())
+        return *n != 1;
+    break;
+  default:
+    break;
+  }
   return true;
 }
 
