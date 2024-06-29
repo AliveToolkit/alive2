@@ -2141,9 +2141,9 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
 
 FnCall::FnCall(Type &type, string &&name, string &&fnName, FnAttrs &&attrs,
-               Value *fnptr)
+               Value *fnptr, unsigned var_arg_idx)
   : MemInstr(type, std::move(name)), fnName(std::move(fnName)), fnptr(fnptr),
-    attrs(std::move(attrs)) {
+    attrs(std::move(attrs)), var_arg_idx(var_arg_idx) {
   if (config::disallow_ub_exploitation)
     this->attrs.set(FnAttrs::NoUndef);
   assert(!fnptr || this->fnName.empty());
@@ -2287,7 +2287,11 @@ void FnCall::print(ostream &os) const {
      << (fnptr ? fnptr->getName() : fnName) << '(';
 
   bool first = true;
+  unsigned idx = 0;
   for (auto &[arg, attrs] : args) {
+    if (idx++ == var_arg_idx)
+      os << "...";
+
     if (!first)
       os << ", ";
 
@@ -2411,7 +2415,7 @@ StateValue FnCall::toSMT(State &s) const {
   auto ptr = fnptr;
   // This is a direct call, but check if there are indirect calls elsewhere
   // to this function. If so, call it indirectly to match the other calls.
-  if (!ptr)
+  if (!ptr && has_indirect_fncalls)
     ptr = s.getFn().getGlobalVar(string_view(fnName).substr(1));
 
   ostringstream fnName_mangled;
@@ -2419,15 +2423,22 @@ StateValue FnCall::toSMT(State &s) const {
     fnName_mangled << "#indirect_call";
 
     Pointer p(s.getMemory(), s.getAndAddPoisonUB(*ptr, true).value);
-    inputs.emplace_back(p.reprWithoutAttrs(), true);
+    auto bid = p.getShortBid();
+    inputs.emplace_back(expr(bid), true);
     s.addUB(p.isDereferenceable(1, 1, false));
 
     Function::FnDecl decl;
     decl.output = &getType();
+    unsigned idx = 0;
     for (auto &[arg, params] : args) {
+      if (idx++ == var_arg_idx)
+        break;
       decl.inputs.emplace_back(&arg->getType(), params);
     }
-    s.addUB(expr::mkUF("#fndeclty", { inputs[0].value }, expr::mkUInt(0, 32)) ==
+    decl.is_varargs = var_arg_idx != -1u;
+    s.addUB(!p.isLocal());
+    s.addUB(p.getOffset() == 0);
+    s.addUB(expr::mkUF("#fndeclty", { std::move(bid) }, expr::mkUInt(0, 32)) ==
             (indirect_hash = decl.hash()));
   } else {
     fnName_mangled << fnName;
@@ -2568,7 +2579,7 @@ expr FnCall::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FnCall::dup(Function &f, const string &suffix) const {
   auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               FnAttrs(attrs), fnptr);
+                               FnAttrs(attrs), fnptr, var_arg_idx);
   r->args = args;
   r->approx = approx;
   return r;

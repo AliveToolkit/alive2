@@ -1000,10 +1000,10 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool noalias = attrs.has(FnAttrs::NoAlias);
   bool is_indirect = name.starts_with("#indirect_call");
 
-  expr fn_ptr;
+  expr fn_ptr_bid;
   if (is_indirect) {
     assert(inputs.size() >= 1);
-    fn_ptr = inputs[0].value;
+    fn_ptr_bid = inputs[0].value;
   }
 
   assert(!noret || !willret);
@@ -1020,8 +1020,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   auto isgvar = [&](const auto &decl) {
     if (auto gv = getFn().getGlobalVar(string_view(decl.name).substr(1)))
-      return Pointer::mkPointerFromNoAttrs(memory, fn_ptr).getAddress() ==
-             Pointer(memory, (*this)[*gv].value).getAddress();
+      return fn_ptr_bid == Pointer(memory, (*this)[*gv].value).getShortBid();
     return expr();
   };
 
@@ -1042,7 +1041,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       decl_access.add(decl.attrs.mem, cmp);
 
       for (auto &ptr : ptr_inputs) {
-        if (decl.inputs.size() != ret_args.size())
+        if (decl.inputs.size() != ret_args.size() ||
+            (decl.is_varargs && ptr.idx < decl.inputs.size()))
           continue;
         auto &attrs = decl.inputs[ptr.idx].second;
         ptr.byval   = expr::mkIf(cmp, expr::mkUInt(attrs.blockSize, 64),
@@ -1057,7 +1057,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     }
 
     memaccess &= *std::move(decl_access).mk(SMTMemoryAccess{
-      expr::mkUF("#access_" + name, { fn_ptr }, memaccess.val)});
+      expr::mkUF("#access_" + name, { fn_ptr_bid }, memaccess.val)});
   }
 
   if (!memaccess.canWrite(MemoryAccess::Args).isFalse() ||
@@ -1081,9 +1081,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   if (!memaccess.canRead(MemoryAccess::Inaccessible).isFalse() ||
       !memaccess.canRead(MemoryAccess::Errno).isFalse() ||
       !memaccess.canRead(MemoryAccess::Other).isFalse())
-    call_ranges = memaccess.canOnlyRead(MemoryAccess::Inaccessible).isFalse()
-                    ? analysis.ranges_fn_calls
-                    : analysis.ranges_fn_calls.project(name);
+    call_ranges = memaccess.canOnlyRead(MemoryAccess::Inaccessible).isTrue()
+                    ? analysis.ranges_fn_calls.project(name)
+                    : analysis.ranges_fn_calls;
 
   if (ret_arg_ty && (*ret_arg_ty == out_type).isFalse()) {
     ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)));
@@ -1142,7 +1142,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       // to limit the behavior of the SMT var.
       if (is_indirect) {
         for (auto &decl : getFn().getFnDecls()) {
-          if (decl.inputs.size() != ret_args.size())
+          if (decl.inputs.size() != ret_args.size() || decl.is_varargs)
             continue;
           unsigned idx = 0;
           for (auto &[ty, attrs] : decl.inputs) {
@@ -1387,11 +1387,14 @@ void State::mkAxioms(State &tgt) {
 
   if (has_indirect_fncalls) {
     for (auto &decl : f.getFnDecls()) {
-      if (auto gv = f.getGlobalVar(string_view(decl.name).substr(1)))
+      if (auto gv = f.getGlobalVar(string_view(decl.name).substr(1))) {
+        Pointer ptr(memory, (*this)[*gv].value);
+        addAxiom(!ptr.isLocal());
+        addAxiom(ptr.getOffset() == 0);
         addAxiom(
-          expr::mkUF("#fndeclty",
-                     { Pointer(memory, (*this)[*gv].value).reprWithoutAttrs() },
-                     expr::mkUInt(0, 32)) == decl.hash());
+          expr::mkUF("#fndeclty", { ptr.getShortBid() }, expr::mkUInt(0, 32))
+            == decl.hash());
+      }
     }
   }
 }

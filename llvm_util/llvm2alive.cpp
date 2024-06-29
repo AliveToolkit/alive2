@@ -357,6 +357,8 @@ public:
     if (!ty)
       return error(i);
 
+    unsigned vararg_idx = -1u;
+
     // record fn decl in case there are indirect calls to this function
     // elsewhere
     auto fn_decl = fn;
@@ -382,8 +384,12 @@ public:
       Function::FnDecl decl;
       decl.name  = '@' + fn_decl->getName().str();
       decl.attrs = attrs;
+      decl.is_varargs = fn_decl->isVarArg();
       if (!(decl.output = llvm_type2alive(fn_decl->getReturnType())))
         return error(i);
+
+      if (fn_decl->isVarArg())
+        vararg_idx = fn_decl->arg_size();
 
       // it's UB if there's a mismatch in the number of function arguments
       if (( fn_decl->isVarArg() && i.arg_size() < fn_decl->arg_size()) ||
@@ -441,7 +447,7 @@ public:
 
       call = make_unique<FnCall>(*ty, value_name(i),
                                  fn ? '@' + fn->getName().str() : string(),
-                                 std::move(attrs), fnptr);
+                                 std::move(attrs), fnptr, vararg_idx);
     }
 
     auto attrs_callsite = i.getAttributes();

@@ -1052,22 +1052,27 @@ static void calculateAndInitConstants(Transform &t) {
 
       update_min_vect_sz(i.getType());
 
-      if (auto fn = dynamic_cast<const FnCall*>(&i)) {
+      if (auto call = dynamic_cast<const FnCall*>(&i)) {
         has_fncall |= true;
-        if (!fn->getAttributes().isAlloc()) {
-          if (fn->getAttributes().mem.canOnlyWrite(MemoryAccess::Inaccessible)) {
-            if (inaccessiblememonly_fns.emplace(fn->getName()).second)
+        auto &attrs = call->getAttributes();
+        if (!attrs.isAlloc()) {
+          if (attrs.mem.canOnlyWrite(MemoryAccess::Inaccessible)) {
+            if (inaccessiblememonly_fns.emplace(call->getName()).second)
               ++num_inaccessiblememonly_fns;
           } else {
-            if (fn->getAttributes().mem
-                                   .canOnlyRead(MemoryAccess::Inaccessible)) {
-              if (inaccessiblememonly_fns.emplace(fn->getName()).second)
+            if (attrs.mem.canOnlyRead(MemoryAccess::Inaccessible)) {
+              if (inaccessiblememonly_fns.emplace(call->getName()).second)
                 ++num_inaccessiblememonly_fns;
             }
-            has_write_fncall |= fn->getAttributes().mem.canWriteSomething();
+            has_write_fncall |= attrs.mem.canWriteSomething();
           }
+          // we do an indirect call if the fn is address taken
+          if (!call->isIndirect() &&
+              fn->getGlobalVar(string_view(call->getFnName()).substr(1)) &&
+              inaccessiblememonly_fns.emplace(call->getName()).second)
+            ++num_inaccessiblememonly_fns;
         }
-        if (fn->isIndirect()) {
+        if (call->isIndirect()) {
           has_indirect_fncalls = true;
           num_inaccessiblememonly_fns += is_src;
         }
