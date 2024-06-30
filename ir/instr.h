@@ -1049,7 +1049,7 @@ public:
          FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr);
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
-  Value* getFnPtr() const {return fnptr;}
+  Value* getFnPtr() const { return fnptr; }
   const auto& getArgs() const { return args; }
   const auto& getAttributes() const { return attrs; }
   bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
