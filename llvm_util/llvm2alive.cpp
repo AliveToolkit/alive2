@@ -1270,8 +1270,6 @@ public:
   bool handleMetadata(Function &Fn, llvm::Instruction &llvm_i, Instr *i) {
     llvm::SmallVector<pair<unsigned, llvm::MDNode*>, 8> MDs;
     llvm_i.getAllMetadataOtherThanDebugLoc(MDs);
-    Instr &before_call_expr = BB->back();
-    FnCall *fn_call = dynamic_cast<FnCall *>(&BB->back());
 
     for (auto &[ID, Node] : MDs) {
       switch (ID) {
@@ -1318,50 +1316,44 @@ public:
         break;
 
       case LLVMContext::MD_callees: {
-        Value *result = nullptr;
-        unsigned int counter{0};
-        string value_name_c = value_name(llvm_i);
-        vector<ICmp *> icmps;
-        Type &ty_icmp = llvm_util::get_int_type(1);
+            auto *fn_call = dynamic_cast<FnCall*>(i);
+        assert(fn_call);
+        auto &i1_type = get_int_type(1);
+        auto &instr_name = fn_call->getName();
+        unsigned int counter = 0;
+        Value *last_value = nullptr;
 
         for (auto &Op : Node->operands()) {
-          llvm::Function *CalleeLlvm =
-              llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op);
+          auto *callee =
+            get_operand(llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op));
 
-          auto *Callee = get_operand(CalleeLlvm);
-
-          unique_ptr<ICmp> icmp = make_unique<ICmp>(
-              ty_icmp, value_name_c + "#cmp" + to_string(counter++), ICmp::EQ,
-              *fn_call->getFnPtr(), *Callee);
-
-          icmps.push_back(icmp.get());
-          auto *IcmpPtr = icmp.get();
-          BB->addInstrAt(std::move(icmp), &before_call_expr, true);
-
-          if (result) {
-            BinOp::Op op;
-            op = BinOp::Or;
-
-            Type &ty_binop = llvm_util::get_int_type(1);
-
-            unique_ptr<BinOp> binop = make_unique<BinOp>(
-                ty_binop, value_name_c + "#binop" + to_string(counter), *result,
-                *IcmpPtr, op);
-            auto *BinopPtr = binop.get();
-            BB->addInstrAt(std::move(binop), &before_call_expr, true);
-            result = BinopPtr;
-            auto &BinopRef = *BinopPtr;
-            BB->addInstrAt(make_unique<Assume>(BinopRef, Assume::AndNonPoison),
-                           &before_call_expr, true);
-          } else {
-            result = IcmpPtr;
+          if (!callee) {
+            *out << "ERROR: Unsupported !callee metadata\n";
+            return false;
           }
+
+          auto icmp = make_unique<ICmp>(i1_type,
+                                        instr_name + '#' + to_string(counter),
+                                        ICmp::EQ, *fn_call->getFnPtr(),
+                                        *callee);
+          auto *icmp_ptr = icmp.get();
+          BB->addInstrAt(std::move(icmp), fn_call, true);
+
+          if (last_value) {
+            auto or_i
+              = make_unique<BinOp>(i1_type,
+                                   instr_name + "#or#" + to_string(counter),
+                                   *last_value, *icmp_ptr, BinOp::Or);
+            last_value = or_i.get();
+            BB->addInstrAt(std::move(or_i), fn_call, true);
+          } else {
+            last_value = icmp_ptr;
+          }
+          ++counter;
         }
-        if (icmps.size() == 1) {
-          auto &ICmpRef = *icmps[0];
-          BB->addInstrAt(make_unique<Assume>(ICmpRef, Assume::AndNonPoison),
-                         &before_call_expr, true);
-        }
+        auto val = last_value ? last_value : make_intconst(0, 1);
+        BB->addInstrAt(make_unique<Assume>(*val, Assume::AndNonPoison),
+                       fn_call, true);
         break;
       }
 
