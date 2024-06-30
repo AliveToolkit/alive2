@@ -1,18 +1,15 @@
-declare i32 @test()
-@fptr = internal global ptr @test
+declare i8 @test()
+@fptr = external global ptr
 
-define i32 @src() {
- entry:
-   %0 = load ptr, ptr @fptr, align 8
-   %1 = call i32 %0(), !callees !0
-   ret i32 0
+define i8 @src() {
+  %p = load ptr, ptr @fptr, align 8
+  %ret = call i8 %p(), !callees !0
+  ret i8 %ret
 }
 
-define i32 @tgt() {
-    entry:
-       %0 = load ptr, ptr @fptr, align 8
-       %1 = call i32 %0(), !callees !0
-       ret i32 0
+define i8 @tgt() {
+  %ret = call i8 @test()
+  ret i8 %ret
 }
 
 !0 = !{ptr @test, ptr @test}
