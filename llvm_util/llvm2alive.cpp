@@ -1326,6 +1326,48 @@ public:
         BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
         break;
 
+      case LLVMContext::MD_callees: {
+        auto *fn_call = dynamic_cast<FnCall*>(i);
+        assert(fn_call);
+        auto &i1_type = get_int_type(1);
+        auto &instr_name = fn_call->getName();
+        unsigned int counter = 0;
+        Value *last_value = nullptr;
+
+        for (auto &Op : Node->operands()) {
+          auto *callee =
+            get_operand(llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op));
+
+          if (!callee) {
+            *out << "ERROR: Unsupported !callee metadata\n";
+            return false;
+          }
+
+          auto icmp = make_unique<ICmp>(i1_type,
+                                        instr_name + '#' + to_string(counter),
+                                        ICmp::EQ, *fn_call->getFnPtr(),
+                                        *callee);
+          auto *icmp_ptr = icmp.get();
+          BB->addInstrAt(std::move(icmp), fn_call, true);
+
+          if (last_value) {
+            auto or_i
+              = make_unique<BinOp>(i1_type,
+                                   instr_name + "#or#" + to_string(counter),
+                                   *last_value, *icmp_ptr, BinOp::Or);
+            last_value = or_i.get();
+            BB->addInstrAt(std::move(or_i), fn_call, true);
+          } else {
+            last_value = icmp_ptr;
+          }
+          ++counter;
+        }
+        auto val = last_value ? last_value : make_intconst(0, 1);
+        BB->addInstrAt(make_unique<Assume>(*val, Assume::AndNonPoison),
+                       fn_call, true);
+        break;
+      }
+
       case LLVMContext::MD_dereferenceable:
       case LLVMContext::MD_dereferenceable_or_null: {
         auto kind = ID == LLVMContext::MD_dereferenceable
