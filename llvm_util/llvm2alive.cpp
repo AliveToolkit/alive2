@@ -1316,7 +1316,7 @@ public:
         break;
 
       case LLVMContext::MD_callees: {
-            auto *fn_call = dynamic_cast<FnCall*>(i);
+        auto *fn_call = dynamic_cast<FnCall*>(i);
         assert(fn_call);
         auto &i1_type = get_int_type(1);
         auto &instr_name = fn_call->getName();
