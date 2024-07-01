@@ -42,6 +42,7 @@ class OrExpr {
   std::set<expr> exprs;
 
 public:
+  void add(const expr &e);
   void add(expr &&e);
   void add(const OrExpr &other);
   expr operator()() const;
@@ -120,6 +121,14 @@ public:
 
   std::optional<T> operator()() && { return std::move(*this).mk({}); }
 
+  expr domain() const {
+    OrExpr ret;
+    for (auto &[val, domain] : vals) {
+      ret.add(domain);
+    }
+    return std::move(ret)();
+  }
+
   std::optional<T> lookup(const expr &domain) const {
     for (auto &[v, d] : vals) {
       if (d.eq(domain))
@@ -131,6 +140,7 @@ public:
   auto begin() const { return vals.begin(); }
   auto end() const   { return vals.end(); }
   auto size() const  { return vals.size(); }
+  bool empty() const { return vals.empty() && !default_val; }
 };
 
 

@@ -1512,6 +1512,9 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
   unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
 
+  // FIXME: doesn't consider physical ptrs
+  // consider how to do POR?
+
   auto attrs = attrs0;
   attrs.set(ParamAttrs::IsArg);
   Pointer p(*this, name, false, false, false, attrs);
@@ -2274,86 +2277,10 @@ expr Memory::ptr2int(const expr &ptr) const {
   return p.getAddress();
 }
 
-Pointer Memory::searchPointer(const expr &val0) const {
-  DisjointExpr<Pointer> ret;
-  expr val = val0.zextOrTrunc(bits_ptr_address);
-
-  auto add = [&](unsigned limit, bool local) {
-    for (unsigned i = 0; i != limit; ++i) {
-      Pointer p(*this, i, local);
-      Pointer p_end = p + p.blockSize();
-      ret.add(p + (val - p.getAddress()),
-              !local && i == 0 && has_null_block
-                ? val == 0
-                : val.uge(p.getAddress()) && val.ult(p_end.getAddress()));
-    }
-  };
-  add(numLocals(), true);
-  add(numNonlocals(), false);
-  return *std::move(ret)();
-}
-
-expr Memory::int2ptr(const expr &val0) const {
+expr Memory::int2ptr(const expr &val) const {
   assert(!memory_unused() && observesAddresses());
-  if (isAsmMode()) {
-    DisjointExpr<expr> ret(Pointer::mkNullPointer(*this).release());
-    expr val = val0;
-    OrExpr domain;
-    bool processed_all = true;
-
-    // Try to optimize the conversion
-    // Note that the result of int2ptr is always used to dereference the ptr
-    // Hence we can throw away null & OOB pointers
-    // Also, these pointers must have originated from ptr->int type punning
-    // so they must have a (blk_addr bid) expression in them (+ some offset)
-    for (auto [e, cond] : DisjointExpr<expr>(val, 5)) {
-      auto blks = e.get_apps_of("blk_addr", "local_addr!");
-      if (blks.empty()) {
-        expr subst = false;
-        if (cond.isNot(cond))
-          subst = true;
-        val = val.subst(cond, subst);
-        continue;
-      }
-      // There's only one possible bid in this expression
-      if (blks.size() == 1) {
-        auto &fn = *blks.begin();
-        expr bid;
-        if (fn.fn_name().starts_with("local_addr!")) {
-          for (auto &[bid0, addr] : local_blk_addr) {
-            auto blks = addr.get_apps_of("blk_addr", "local_addr!");
-            assert(blks.size() == 1);
-            if (blks.begin()->eq(fn)) {
-              bid = Pointer::mkLongBid(bid0, true);
-              break;
-            }
-          }
-        } else {
-          // non-local block
-          assert(fn.fn_name() == "blk_addr");
-          bid = Pointer::mkLongBid(fn.getFnArg(0), false);
-        }
-        assert(bid.isValid());
-        Pointer base(*this, bid, expr::mkUInt(0, bits_for_offset));
-        expr offset = (e - base.getAddress()).sextOrTrunc(bits_for_offset);
-        ret.add(Pointer(*this, bid, offset).release(), cond);
-      } else {
-        processed_all = false;
-      }
-      domain.add(std::move(cond));
-    }
-    state->addUB(std::move(domain)());
-
-    if (processed_all)
-      return std::move(ret)()->simplify();
-
-    return searchPointer(val.simplify()).release();
-  }
-
-  expr null = Pointer::mkNullPointer(*this).release();
-  expr fn = expr::mkUF("int2ptr", { val0 }, null);
-  state->doesApproximation("inttoptr", fn);
-  return expr::mkIf(val0 == 0, null, fn);
+  return
+    Pointer::mkPhysical(*this, val.zextOrTrunc(bits_ptr_address)).release();
 }
 
 expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
