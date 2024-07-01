@@ -88,6 +88,7 @@ bool hit_limits;
 unsigned constexpr_idx;
 unsigned copy_idx;
 unsigned alignopbundle_idx;
+unsigned metadata_idx;
 
 #define PARSE_UNOP()                       \
   auto ty = llvm_type2alive(i.getType());  \
@@ -1330,8 +1331,6 @@ public:
         auto *fn_call = dynamic_cast<FnCall*>(i);
         assert(fn_call);
         auto &i1_type = get_int_type(1);
-        auto &instr_name = fn_call->getName();
-        unsigned int counter = 0;
         Value *last_value = nullptr;
 
         for (auto &Op : Node->operands()) {
@@ -1344,7 +1343,7 @@ public:
           }
 
           auto icmp = make_unique<ICmp>(i1_type,
-                                        instr_name + '#' + to_string(counter),
+                                        "#cmp#" + to_string(metadata_idx),
                                         ICmp::EQ, *fn_call->getFnPtr(),
                                         *callee);
           auto *icmp_ptr = icmp.get();
@@ -1353,14 +1352,14 @@ public:
           if (last_value) {
             auto or_i
               = make_unique<BinOp>(i1_type,
-                                   instr_name + "#or#" + to_string(counter),
+                                   "#or#" + to_string(metadata_idx),
                                    *last_value, *icmp_ptr, BinOp::Or);
             last_value = or_i.get();
             BB->addInstrAt(std::move(or_i), fn_call, true);
           } else {
             last_value = icmp_ptr;
           }
-          ++counter;
+          ++metadata_idx;
         }
         auto val = last_value ? last_value : make_intconst(0, 1);
         BB->addInstrAt(make_unique<Assume>(*val, Assume::AndNonPoison),
@@ -1714,6 +1713,7 @@ public:
     constexpr_idx = 0;
     copy_idx = 0;
     alignopbundle_idx = 0;
+    metadata_idx = 0;
 
     // don't even bother if number of BBs or instructions is huge..
     if (distance(f.begin(), f.end()) > 5000 ||
@@ -1821,8 +1821,8 @@ public:
 
           if (!alive_i->isVoid()) {
             add_identifier(i, *alive_i);
-          } else {
-            alive_i = static_cast<Instr *>(get_operand(&i));
+          } else if (auto *ptr = static_cast<Instr*>(get_identifier(i))) {
+            alive_i = ptr;
           }
 
           if (i.hasMetadataOtherThanDebugLoc() &&

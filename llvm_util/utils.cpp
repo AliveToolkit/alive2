@@ -278,9 +278,8 @@ IR::Value* get_poison(Type &ty) {
 Value* get_operand(llvm::Value *v,
                    function<Value*(llvm::ConstantExpr*)> constexpr_conv,
                    function<Value*(AggregateValue*)> copy_inserter) {
-  if (auto I = value_cache.find(v);
-      I != value_cache.end())
-    return I->second;
+  if (auto ptr = get_identifier(*v))
+    return ptr;
 
   auto ty = llvm_type2alive(v->getType());
   if (!ty)
@@ -446,6 +445,11 @@ void add_identifier(const llvm::Value &llvm, Value &v) {
 
 void replace_identifier(const llvm::Value &llvm, Value &v) {
   value_cache[&llvm] =  &v;
+}
+
+Value* get_identifier(const llvm::Value &llvm) {
+  auto I = value_cache.find(&llvm);
+  return I != value_cache.end() ? I->second : nullptr;
 }
 
 

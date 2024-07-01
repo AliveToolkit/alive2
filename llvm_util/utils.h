@@ -49,6 +49,7 @@ IR::Value* get_operand(llvm::Value *v,
 
 void add_identifier(const llvm::Value &llvm, IR::Value &v);
 void replace_identifier(const llvm::Value &llvm, IR::Value &v);
+IR::Value* get_identifier(const llvm::Value &llvm);
 
 #define PRINT(T) std::ostream& operator<<(std::ostream &os, const T &x);
 PRINT(llvm::Type)
