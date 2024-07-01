@@ -516,6 +516,9 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
 
 
 expr isfpclass(const expr &v, const Type &ty, uint16_t mask) {
+  if (mask == 1023)
+    return true;
+
   auto *fpty = ty.getAsFloatType();
   auto a = fpty->getFloat(v);
   OrExpr result;
@@ -523,22 +526,29 @@ expr isfpclass(const expr &v, const Type &ty, uint16_t mask) {
     result.add(fpty->isNaN(v, true));
   if (mask & (1 << 1))
     result.add(fpty->isNaN(v, false));
-  if (mask & (1 << 2))
-    result.add(a.isFPNegative() && a.isInf());
-  if (mask & (1 << 3))
-    result.add(a.isFPNegative() && a.isFPNormal());
-  if (mask & (1 << 4))
-    result.add(a.isFPNegative() && a.isFPSubNormal());
-  if (mask & (1 << 5))
-    result.add(a.isFPNegZero());
-  if (mask & (1 << 6))
-    result.add(a.isFPZero() && !a.isFPNegative());
-  if (mask & (1 << 7))
-    result.add(!a.isFPNegative() && a.isFPSubNormal());
-  if (mask & (1 << 8))
-    result.add(!a.isFPNegative() && a.isFPNormal());
-  if (mask & (1 << 9))
-    result.add(!a.isFPNegative() && a.isInf());
+
+  auto check = [&](unsigned idx_neg, unsigned idx_pos, auto test) {
+    unsigned mask_neg  = 1u << idx_neg;
+    unsigned mask_pos  = 1u << idx_pos;
+    unsigned mask_both = mask_neg | mask_pos;
+
+    if ((mask & mask_both) == mask_both) {
+      result.add(test());
+    } else if (mask & mask_neg) {
+      result.add(a.isFPNegative() && test());
+    } else if (mask & mask_pos) {
+      result.add(!a.isFPNegative() && test());
+    }
+  };
+#define CHECK(neg, pos, fn) check(neg, pos, [&a]() { return a.fn(); })
+
+  CHECK(5, 6, isFPZero);
+  CHECK(4, 7, isFPSubNormal);
+  CHECK(3, 8, isFPNormal);
+  CHECK(2, 9, isInf);
+
+#undef CHECK
+
   return std::move(result)();
 }
 
