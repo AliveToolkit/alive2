@@ -29,7 +29,7 @@ if ((config::disallow_ub_exploitation = opt_disallow_ub_exploitation)) {
   config::disable_poison_input = true;
 }
 
-config::fp_mapping_mode = opt_uf_float ? config::FpMappingMode::UninterpretedFunctions : config::FpMappingMode::FloatingPoint;
+config::fp_encoding_mode = opt_uf_float ? config::FpEncodingMode::UninterpretedFunctions : config::FpEncodingMode::FloatingPoint;
 
 func_names.insert(opt_funcs.begin(), opt_funcs.end());
 

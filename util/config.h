@@ -44,12 +44,12 @@ extern unsigned max_offset_bits;
 // size and size of pointers (not to be confused with program pointer size).
 extern unsigned max_sizet_bits;
 
-enum FpMappingMode {
+enum FpEncodingMode {
   FloatingPoint,
   UninterpretedFunctions
 };
 
-extern FpMappingMode fp_mapping_mode;
+extern FpEncodingMode fp_encoding_mode;
 
 std::ostream &dbg();
 void set_debug(std::ostream &os);
