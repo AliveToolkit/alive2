@@ -1512,6 +1512,9 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
   unsigned max_bid = has_null_block + num_globals_src + next_ptr_input++;
   assert(max_bid < num_nonlocals_src);
 
+  // FIXME: doesn't consider physical ptrs
+  // consider how to do POR?
+
   auto attrs = attrs0;
   attrs.set(ParamAttrs::IsArg);
   Pointer p(*this, name, false, false, false, attrs);

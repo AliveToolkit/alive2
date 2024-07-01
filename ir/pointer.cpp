@@ -870,6 +870,7 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 
   os << (logical.isFalse() ? "phy-ptr(" : "pointer(");
 
+  bool needs_comma = false;
   if (!logical.isFalse()) {
     if (p.isLocal().isConst())
       os << (p.isLocal().isTrue() ? "local" : "non-local");
@@ -880,12 +881,14 @@ ostream& operator<<(ostream &os, const Pointer &p) {
 
     os << ", offset=";
     P(p.getOffset(), printSigned);
+    needs_comma = true;
   }
-  if (!logical.isTrue()) {
-    if (!logical.isConst())
+  if (auto addr = p.getPhysicalAddress();
+      addr.isConst() || logical.isFalse()) {
+    if (needs_comma)
       os << ", ";
     os << "address=";
-    P(p.getPhysicalAddress(), printUnsigned);
+    P(addr, printUnsigned);
   }
 
   if (bits_for_ptrattrs && !p.getAttrs().isZero()) {

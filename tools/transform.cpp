@@ -1210,6 +1210,10 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
   bits_for_offset = min(bits_for_offset, bits_program_pointer);
 
+  // we may have an implicit ptr2int through memory. Ensure we have enough bits
+  if (has_ptr_load && does_int_mem_access && t.tgt.has(FnAttrs::Asm))
+    bits_for_offset = bits_program_pointer;
+
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
@@ -1231,7 +1235,7 @@ static void calculateAndInitConstants(Transform &t) {
                              bits_ptr_address) + has_local_bit,
                          bits_program_pointer);
 
-  if (config::tgt_is_asm)
+  if (t.tgt.has(FnAttrs::Asm))
     bits_ptr_address = bits_program_pointer;
 
   bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
