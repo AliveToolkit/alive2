@@ -862,7 +862,7 @@ public:
             assert(bundle.Inputs.size() == 3);
             auto gep = make_unique<GEP>(
                 aptr->getType(),
-                "#align_adjustedptr" + to_string(alignopbundle_idx++),
+                "%#align_adjustedptr" + to_string(alignopbundle_idx++),
                 *aptr, false, false, false);
             gep->addIdx(-1ull, *get_operand(bundle.Inputs[2].get()));
 
@@ -1343,7 +1343,7 @@ public:
           }
 
           auto icmp = make_unique<ICmp>(i1_type,
-                                        "#cmp#" + to_string(metadata_idx),
+                                        "%#cmp#" + to_string(metadata_idx),
                                         ICmp::EQ, *fn_call->getFnPtr(),
                                         *callee);
           auto *icmp_ptr = icmp.get();
@@ -1352,7 +1352,7 @@ public:
           if (last_value) {
             auto or_i
               = make_unique<BinOp>(i1_type,
-                                   "#or#" + to_string(metadata_idx),
+                                   "%#or#" + to_string(metadata_idx),
                                    *last_value, *icmp_ptr, BinOp::Or);
             last_value = or_i.get();
             BB->addInstrAt(std::move(or_i), fn_call, true);

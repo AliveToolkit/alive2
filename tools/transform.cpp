@@ -688,11 +688,22 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
   qvars.insert(mem_undef.begin(), mem_undef.end());
 
   auto print_ptr_load = [&](ostream &s, const Model &m) {
+    Pointer p1(src_mem, m[ptr_refinement()]);
+    Pointer p2(tgt_mem, m[ptr_refinement()]);
+
+    expr alive1 = m[p1.isBlockAlive()];
+    expr alive2 = m[p2.isBlockAlive()];
+    if (alive1.isConst() && alive2.isConst() && !alive1.eq(alive2)) {
+      auto p = [](const expr &a) { return a.isTrue() ? "alive" : "dead"; };
+      s << "\nMismatch is liveness of blocks. Source: " << p(alive1)
+        << " / Target: " << p(alive2);
+      return;
+    }
+
     set<expr> undef;
-    Pointer p(src_mem, m[ptr_refinement()]);
-    s << "\nMismatch in " << p
-      << "\nSource value: " << Byte(src_mem, m[src_mem.raw_load(p, undef)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.raw_load(p, undef)()]);
+    s << "\nMismatch in " << p1
+      << "\nSource value: " << Byte(src_mem, m[src_mem.raw_load(p1, undef)()])
+      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.raw_load(p2, undef)()]);
   };
 
   CHECK(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
