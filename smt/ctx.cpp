@@ -19,7 +19,7 @@ static void z3_error_handler(Z3_context ctx, Z3_error_code err) {
   if (str == "canceled")
     return;
 
-  dbg() << "Severe Z3 error: " << str << " [code=" << err << "]\n";
+  dbg() << "Severe Z3 error: " << str << " [code=" << err << ']' << endl;
   _Exit(-1);
 }
 
