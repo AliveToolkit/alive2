@@ -629,21 +629,38 @@ void FpBinOp::rauw(const Value &what, Value &with) {
   RAUW(rhs);
 }
 
-void FpBinOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpBinOp::getOpName() const {
   switch (op) {
-  case FAdd:     str = "fadd "; break;
-  case FSub:     str = "fsub "; break;
-  case FMul:     str = "fmul "; break;
-  case FDiv:     str = "fdiv "; break;
-  case FRem:     str = "frem "; break;
-  case FMax:     str = "fmax "; break;
-  case FMin:     str = "fmin "; break;
-  case FMaximum: str = "fmaximum "; break;
-  case FMinimum: str = "fminimum "; break;
-  case CopySign: str = "copysign "; break;
+  case FAdd:     return "fadd"; break;
+  case FSub:     return "fsub"; break;
+  case FMul:     return "fmul"; break;
+  case FDiv:     return "fdiv"; break;
+  case FRem:     return "frem"; break;
+  case FMax:     return "fmax"; break;
+  case FMin:     return "fmin"; break;
+  case FMaximum: return "fmaximum"; break;
+  case FMinimum: return "fminimum"; break;
+  case CopySign: return "copysign"; break;
   }
-  os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
+  UNREACHABLE();
+}
+
+bool FpBinOp::isCommutative() const {
+  switch (op) {
+  case FAdd:
+  case FMin:
+  case FMax:
+  case FMinimum:
+  case FMaximum:
+    return true;
+  default:
+    return false;
+  }
+  UNREACHABLE();
+}
+
+void FpBinOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -836,85 +853,138 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
                    ty, fmath, rm, bitwise, flags_in_only, 1);
 }
 
-StateValue FpBinOp::toSMT(State &s) const {
-  function<expr(const expr&, const expr&, const expr&)> fn;
-  bool bitwise = false;
-
-  switch (op) {
-  case FAdd:
-    fn = [](const expr &a, const expr &b, const expr &rm) {
-      return a.fadd(b, rm);
-    };
-    break;
-
-  case FSub:
-    fn = [](const expr &a, const expr &b, const expr &rm) {
-      return a.fsub(b, rm);
-    };
-    break;
-
-  case FMul:
-    fn = [](const expr &a, const expr &b, const expr &rm) {
-      return a.fmul(b, rm);
-    };
-    break;
-
-  case FDiv:
-    fn = [](const expr &a, const expr &b, const expr &rm) {
-      return a.fdiv(b, rm);
-    };
-    break;
-
-  case FRem:
-    fn = [&](const expr &a, const expr &b, const expr &rm) {
-      // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      auto val = a.frem(b);
-      s.doesApproximation("frem", val);
-      return val;
-    };
-    break;
-
-  case FMin:
-  case FMax:
-    fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr ndet = s.getFreshNondetVar("maxminnondet", true);
-      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
-      return expr::mkIf(a.isNaN(), b,
-                        expr::mkIf(b.isNaN(), a,
-                                   expr::mkIf(a.foeq(b),
-                                              expr::mkIf(ndet, a, b),
-                                              expr::mkIf(cmp, a, b))));
-    };
-    break;
-
-  case FMinimum:
-  case FMaximum:
-    fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-      expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
-      expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
-                                     : (a.isFPNegative() && b.isFPNegative());
-      expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
-                          expr::mkIf(neg_cond, zneg, zpos),
-                          expr::mkIf(cmp, a, b));
-
-      return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
-    };
-    break;
-
-  case CopySign:
-    bitwise = true;
-    fn = [](const expr &a, const expr &b, const expr &rm) {
-      return a.copysign(b);
-    };
-    break;
+static StateValue uf_float(const string &name,
+                           const vector<StateValue> &args,
+                           const expr &res,
+                           FastMathFlags fmath = FastMathFlags(),
+                           bool is_commutative = false) {
+  
+  vector<expr> arg_values;
+  arg_values.reserve(args.size());
+  for (auto &arg : args) {
+    arg_values.push_back(arg.value);
   }
 
-  auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
-                     ty, fmath, rm, bitwise);
+  auto value = expr::mkUF(name, arg_values, res);
+  if (is_commutative) {
+    assert(args.size() == 2);
+    value = value & expr::mkUF(name, {arg_values[1], arg_values[0]}, res);
+  }
+
+  AndExpr non_poison;
+  for (auto &arg : args) {
+    non_poison.add(arg.non_poison);
+  }
+
+  auto fast_math_flag = [&](unsigned flag, const char* suffix){
+    if (fmath.flags & flag) {
+      auto np_name = name + ".np_" + suffix;
+      auto poison_uf = expr::mkUF(np_name, arg_values, false);
+      if (is_commutative) {
+        assert(args.size() == 2);
+        poison_uf &= expr::mkUF(np_name, {arg_values[1], arg_values[0]}, false);
+      }
+      non_poison.add(poison_uf);
+    }
   };
+  
+  fast_math_flag(FastMathFlags::NNaN, "nnan");
+  fast_math_flag(FastMathFlags::NInf, "ninf");
+
+  return { std::move(value), non_poison() };
+}
+
+StateValue FpBinOp::toSMT(State &s) const {
+  function<expr(const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const StateValue&, const StateValue&, const Type&)> scalar;
+  bool bitwise = false;
+
+  if (config::is_uf_float()) {
+    scalar = [&](const StateValue &a, const StateValue &b,
+                 const Type &ty) -> StateValue {
+      s.doesApproximation("uf_float", true);
+
+      ostringstream name;
+      name << getOpName() << "." << ty;
+      return uf_float(name.str(), {a, b}, a.value, fmath, isCommutative());
+    };
+  } else {
+    switch (op) {
+    case FAdd:
+      fn = [](const expr &a, const expr &b, const expr &rm) {
+        return a.fadd(b, rm);
+      };
+      break;
+
+    case FSub:
+      fn = [](const expr &a, const expr &b, const expr &rm) {
+        return a.fsub(b, rm);
+      };
+      break;
+
+    case FMul:
+      fn = [](const expr &a, const expr &b, const expr &rm) {
+        return a.fmul(b, rm);
+      };
+      break;
+
+    case FDiv:
+      fn = [](const expr &a, const expr &b, const expr &rm) {
+        return a.fdiv(b, rm);
+      };
+      break;
+
+    case FRem:
+      fn = [&](const expr &a, const expr &b, const expr &rm) {
+        // TODO; Z3 has no support for LLVM's frem which is actually an fmod
+        auto val = a.frem(b);
+        s.doesApproximation("frem", val);
+        return val;
+      };
+      break;
+
+    case FMin:
+    case FMax:
+      fn = [&](const expr &a, const expr &b, const expr &rm) {
+        expr ndet = s.getFreshNondetVar("maxminnondet", true);
+        expr cmp = op == FMin ? a.fole(b) : a.foge(b);
+        return expr::mkIf(a.isNaN(), b,
+                          expr::mkIf(b.isNaN(), a,
+                                    expr::mkIf(a.foeq(b),
+                                                expr::mkIf(ndet, a, b),
+                                                expr::mkIf(cmp, a, b))));
+      };
+      break;
+
+    case FMinimum:
+    case FMaximum:
+      fn = [&](const expr &a, const expr &b, const expr &rm) {
+        expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+        expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
+        expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
+                                      : (a.isFPNegative() && b.isFPNegative());
+        expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
+                            expr::mkIf(neg_cond, zneg, zpos),
+                            expr::mkIf(cmp, a, b));
+
+        return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+      };
+      break;
+
+    case CopySign:
+      bitwise = true;
+      fn = [](const expr &a, const expr &b, const expr &rm) {
+        return a.copysign(b);
+      };
+      break;
+    }
+
+    scalar = [&](const StateValue &a, const StateValue &b, const Type &ty) {
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                      [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
+                      ty, fmath, rm, bitwise);
+    };
+  }
 
   auto &a = s[*lhs];
   auto &b = s[*rhs];
@@ -1103,23 +1173,25 @@ void FpUnaryOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
 
-void FpUnaryOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpUnaryOp::getOpName() const {
   switch (op) {
-  case FAbs:         str = "fabs "; break;
-  case FNeg:         str = "fneg "; break;
-  case Canonicalize: str = "canonicalize "; break;
-  case Ceil:         str = "ceil "; break;
-  case Floor:        str = "floor "; break;
-  case RInt:         str = "rint "; break;
-  case NearbyInt:    str = "nearbyint "; break;
-  case Round:        str = "round "; break;
-  case RoundEven:    str = "roundeven "; break;
-  case Trunc:        str = "trunc "; break;
-  case Sqrt:         str = "sqrt "; break;
+  case FAbs:         return "fabs"; break;
+  case FNeg:         return "fneg"; break;
+  case Canonicalize: return "canonicalize"; break;
+  case Ceil:         return "ceil"; break;
+  case Floor:        return "floor"; break;
+  case RInt:         return "rint"; break;
+  case NearbyInt:    return "nearbyint"; break;
+  case Round:        return "round"; break;
+  case RoundEven:    return "roundeven"; break;
+  case Trunc:        return "trunc"; break;
+  case Sqrt:         return "sqrt"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << fmath << *val;
+void FpUnaryOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *val;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1127,51 +1199,62 @@ void FpUnaryOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
-  expr (*fn)(const expr&, const expr&) = nullptr;
+  function<expr(const expr&, const expr&)> fn = nullptr;
+  function<StateValue(const StateValue&, const Type&)> scalar = nullptr;
   bool bitwise = false;
 
-  switch (op) {
-  case FAbs:
-    bitwise = true;
-    fn = [](const expr &v, const expr &rm) { return v.fabs(); };
-    break;
-  case FNeg:
-    bitwise = true;
-    fn = [](const expr &v, const expr &rm) { return v.fneg(); };
-    break;
-  case Canonicalize:
-    fn = [](const expr &v, const expr &rm) { return v; };
-    break;
-  case Ceil:
-    fn = [](const expr &v, const expr &rm) { return v.ceil(); };
-    break;
-  case Floor:
-    fn = [](const expr &v, const expr &rm) { return v.floor(); };
-    break;
-  case RInt:
-  case NearbyInt:
-    // TODO: they differ in exception behavior
-    fn = [](const expr &v, const expr &rm) { return v.round(rm); };
-    break;
-  case Round:
-    fn = [](const expr &v, const expr &rm) { return v.round(expr::rna()); };
-    break;
-  case RoundEven:
-    fn = [](const expr &v, const expr &rm) { return v.round(expr::rne()); };
-    break;
-  case Trunc:
-    fn = [](const expr &v, const expr &rm) { return v.round(expr::rtz()); };
-    break;
-  case Sqrt:
-    fn = [](const expr &v, const expr &rm) { return v.sqrt(rm); };
-    break;
-  }
+  if (config::is_uf_float()) {
+    scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
+      s.doesApproximation("uf_float", true);
 
-  auto scalar = [&](const StateValue &v, const Type &ty) {
-    return fm_poison(s, v.value, v.non_poison,
-                     [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
-                     bitwise, false);
-  };
+      ostringstream name;
+      name << getOpName() << "." << ty;
+      return uf_float(name.str(), {v}, v.value, fmath, false);
+    };
+  } else {
+    switch (op) {
+    case FAbs:
+      bitwise = true;
+      fn = [](const expr &v, const expr &rm) { return v.fabs(); };
+      break;
+    case FNeg:
+      bitwise = true;
+      fn = [](const expr &v, const expr &rm) { return v.fneg(); };
+      break;
+    case Canonicalize:
+      fn = [](const expr &v, const expr &rm) { return v; };
+      break;
+    case Ceil:
+      fn = [](const expr &v, const expr &rm) { return v.ceil(); };
+      break;
+    case Floor:
+      fn = [](const expr &v, const expr &rm) { return v.floor(); };
+      break;
+    case RInt:
+    case NearbyInt:
+      // TODO: they differ in exception behavior
+      fn = [](const expr &v, const expr &rm) { return v.round(rm); };
+      break;
+    case Round:
+      fn = [](const expr &v, const expr &rm) { return v.round(expr::rna()); };
+      break;
+    case RoundEven:
+      fn = [](const expr &v, const expr &rm) { return v.round(expr::rne()); };
+      break;
+    case Trunc:
+      fn = [](const expr &v, const expr &rm) { return v.round(expr::rtz()); };
+      break;
+    case Sqrt:
+      fn = [](const expr &v, const expr &rm) { return v.sqrt(rm); };
+      break;
+    }
+
+    scalar = [&](const StateValue &v, const Type &ty) {
+      return fm_poison(s, v.value, v.non_poison,
+                      [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
+                      bitwise, false);
+    };
+  }
 
   auto &v = s[*val];
 
@@ -1409,14 +1492,16 @@ void FpTernaryOp::rauw(const Value &what, Value &with) {
   RAUW(c);
 }
 
-void FpTernaryOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpTernaryOp::getOpName() const {
   switch (op) {
-  case FMA:    str = "fma "; break;
-  case MulAdd: str = "fmuladd "; break;
+  case FMA:    return "fma"; break;
+  case MulAdd: return "fmuladd"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << fmath << *a << ", " << *b << ", " << *c;
+void FpTernaryOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << fmath << *a << ", " << *b << ", " << *c;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1425,26 +1510,38 @@ void FpTernaryOp::print(ostream &os) const {
 
 StateValue FpTernaryOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&, const expr&, const expr&)> fn;
+  function<StateValue(const StateValue&, const StateValue&, const StateValue&, const Type&)> scalar;
 
-  switch (op) {
-  case FMA:
-    fn = [](const expr &a, const expr &b, const expr &c, const expr &rm) {
-      return expr::fma(a, b, c, rm);
+  if (config::is_uf_float()) {
+    scalar = [&](const StateValue &a, const StateValue &b,
+                      const StateValue &c, const Type &ty) -> StateValue {
+      s.doesApproximation("uf_float", true);
+
+      ostringstream name;
+      name << getOpName() << "." << ty;
+      return uf_float(name.str(), {a, b, c}, a.value, fmath);
     };
-    break;
-  case MulAdd:
-    fn = [&](const expr &a, const expr &b, const expr &c, const expr &rm) {
-      expr var = s.getFreshNondetVar("nondet", expr(false));
-      return expr::mkIf(var, expr::fma(a, b, c, rm), a.fmul(b, rm).fadd(c, rm));
+  } else {
+    switch (op) {
+    case FMA:
+      fn = [](const expr &a, const expr &b, const expr &c, const expr &rm) {
+        return expr::fma(a, b, c, rm);
+      };
+      break;
+    case MulAdd:
+      fn = [&](const expr &a, const expr &b, const expr &c, const expr &rm) {
+        expr var = s.getFreshNondetVar("nondet", expr(false));
+        return expr::mkIf(var, expr::fma(a, b, c, rm), a.fmul(b, rm).fadd(c, rm));
+      };
+      break;
+    }
+    
+    scalar = [&](const StateValue &a, const StateValue &b,
+                      const StateValue &c, const Type &ty) {
+      return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                      c.value, c.non_poison, fn, ty, fmath, rm, false);
     };
-    break;
   }
-
-  auto scalar = [&](const StateValue &a, const StateValue &b,
-                    const StateValue &c, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     c.value, c.non_poison, fn, ty, fmath, rm, false);
-  };
 
   auto &av = s[*a];
   auto &bv = s[*b];
@@ -1494,33 +1591,45 @@ void TestOp::rauw(const Value &what, Value &with) {
   RAUW(rhs);
 }
 
-void TestOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* TestOp::getOpName() const {
   switch (op) {
-  case Is_FPClass: str = "is.fpclass "; break;
+  case Is_FPClass: return "is.fpclass"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str << *lhs << ", " << *rhs;
+void TestOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " " << *lhs << ", " << *rhs;
 }
 
 StateValue TestOp::toSMT(State &s) const {
   auto &a = s[*lhs];
   auto &b = s[*rhs];
   function<expr(const expr&, const Type&)> fn;
+  function<StateValue(const StateValue&, const Type&)> scalar;
 
-  switch (op) {
-  case Is_FPClass:
-    fn = [&](const expr &v, const Type &ty) -> expr {
-      uint64_t mask;
-      ENSURE(b.value.isUInt(mask) && b.non_poison.isTrue());
-      return isfpclass(v, ty, mask).toBVBool();
+  if (config::is_uf_float()) {
+    scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
+      s.doesApproximation("uf_float", true);
+      ostringstream name;
+      name << getOpName() << "." << ty;
+      return uf_float(name.str(), {v}, expr::mkUInt(0, 1));
     };
-    break;
-  }
+  } else {
+    switch (op) {
+    case Is_FPClass:
+      fn = [&](const expr &v, const Type &ty) -> expr {
+        uint64_t mask;
+        ENSURE(b.value.isUInt(mask) && b.non_poison.isTrue());
+        return isfpclass(v, ty, mask).toBVBool();
+      };
+      break;
+    }
 
-  auto scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
-    return { fn(v.value, ty), expr(v.non_poison) };
-  };
+    scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
+      return { fn(v.value, ty), expr(v.non_poison) };
+    };
+  }
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -1741,20 +1850,22 @@ void FpConversionOp::rauw(const Value &what, Value &with) {
   RAUW(val);
 }
 
-void FpConversionOp::print(ostream &os) const {
-  const char *str = nullptr;
+const char* FpConversionOp::getOpName() const {
   switch (op) {
-  case SIntToFP: str = "sitofp "; break;
-  case UIntToFP: str = "uitofp "; break;
-  case FPToSInt: str = "fptosi "; break;
-  case FPToUInt: str = "fptoui "; break;
-  case FPExt:    str = "fpext "; break;
-  case FPTrunc:  str = "fptrunc "; break;
-  case LRInt:    str = "lrint "; break;
-  case LRound:   str = "lround "; break;
+  case SIntToFP: return "sitofp"; break;
+  case UIntToFP: return "uitofp"; break;
+  case FPToSInt: return "fptosi"; break;
+  case FPToUInt: return "fptoui"; break;
+  case FPExt:    return "fpext"; break;
+  case FPTrunc:  return "fptrunc"; break;
+  case LRInt:    return "lrint"; break;
+  case LRound:   return "lround"; break;
   }
+  UNREACHABLE();
+}
 
-  os << getName() << " = " << str;
+void FpConversionOp::print(ostream &os) const {
+  os << getName() << " = " << getOpName() << " ";
   if (flags & NNEG)
     os << "nneg ";
   os << *val << print_type(getType(), " to ", "");
@@ -1767,99 +1878,121 @@ void FpConversionOp::print(ostream &os) const {
 StateValue FpConversionOp::toSMT(State &s) const {
   auto &v = s[*val];
   function<StateValue(const expr &, const Type &, const expr&)> fn;
+  function<StateValue(const StateValue &, const Type &, const Type&)> scalar;
 
-  switch (op) {
-  case SIntToFP:
-    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
-      return { val.sint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
-               true };
-    };
-    break;
-  case UIntToFP:
-    fn = [&](auto &val, auto &to_type, auto &rm) -> StateValue {
-      return {val.uint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
-              (flags & NNEG) ? !val.isNegative() : true};
-    };
-    break;
-  case FPToSInt:
-  case LRInt:
-  case LRound:
-    fn = [&](auto &val, auto &to_type, auto &rm_in) -> StateValue {
-      expr rm;
-      bool is_poison = false;
-      switch (op) {
-      case FPToSInt:
-        rm = expr::rtz();
-        is_poison = true;
-        break;
-      case LRInt:
-        rm = rm_in;
-        break;
-      case LRound:
-        rm = expr::rna();
-        break;
-      default: UNREACHABLE();
-      }
-      expr bv  = val.fp2sint(to_type.bits(), rm);
-      expr fp2 = bv.sint2fp(val, rm);
-      // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
-      expr val_rounded = val.round(rm);
-      expr overflow = val_rounded.isFPZero() || fp2 == val_rounded;
+  if (config::is_uf_float()) {
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                 const Type &to_type) -> StateValue {
+      s.doesApproximation("uf_float", true);
 
-      expr np;
-      if (is_poison) {
-        np = std::move(overflow);
-      } else {
-        np = true;
-        bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
+      ostringstream os;
+      os << getOpName() << "." << from_type << ".to." << to_type;
+      expr range = to_type.getDummyValue(true).value;
+      auto value = expr::mkUF(os.str(), {sv.value}, range);
+
+      AndExpr non_poison;
+      non_poison.add(sv.non_poison);
+      if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) && op != FPTrunc && op != FPExt) {
+        os << ".np";
+        non_poison.add(expr::mkUF(os.str(), {v.value}, false));
       }
 
-      return { std::move(bv), std::move(np) };
+      return { std::move(value), non_poison() };
     };
-    break;
-  case FPToUInt:
-    fn = [](auto &val, auto &to_type, auto &rm_) -> StateValue {
-      expr rm = expr::rtz();
-      expr bv  = val.fp2uint(to_type.bits(), rm);
-      expr fp2 = bv.uint2fp(val, rm);
-      // -0.xx must be converted to 0, not poison.
-      expr val_rounded = val.round(rm);
-      return { std::move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
-    };
-    break;
-  case FPExt:
-  case FPTrunc:
-    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
-      return { val.float2Float(to_type.getAsFloatType()->getDummyFloat(), rm),
-               true };
-    };
-    break;
-  }
+  } else {
+    switch (op) {
+    case SIntToFP:
+      fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
+        return { val.sint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
+                true };
+      };
+      break;
+    case UIntToFP:
+      fn = [&](auto &val, auto &to_type, auto &rm) -> StateValue {
+        return {val.uint2fp(to_type.getAsFloatType()->getDummyFloat(), rm),
+                (flags & NNEG) ? !val.isNegative() : true};
+      };
+      break;
+    case FPToSInt:
+    case LRInt:
+    case LRound:
+      fn = [&](auto &val, auto &to_type, auto &rm_in) -> StateValue {
+        expr rm;
+        bool is_poison = false;
+        switch (op) {
+        case FPToSInt:
+          rm = expr::rtz();
+          is_poison = true;
+          break;
+        case LRInt:
+          rm = rm_in;
+          break;
+        case LRound:
+          rm = expr::rna();
+          break;
+        default: UNREACHABLE();
+        }
+        expr bv  = val.fp2sint(to_type.bits(), rm);
+        expr fp2 = bv.sint2fp(val, rm);
+        // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
+        expr val_rounded = val.round(rm);
+        expr overflow = val_rounded.isFPZero() || fp2 == val_rounded;
 
-  auto scalar = [&](const StateValue &sv, const Type &from_type,
-                    const Type &to_type) -> StateValue {
-    auto val = sv.value;
+        expr np;
+        if (is_poison) {
+          np = std::move(overflow);
+        } else {
+          np = true;
+          bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
+        }
 
-    if (from_type.isFloatType()) {
-      auto ty = from_type.getAsFloatType();
-      val     = ty->getFloat(val);
+        return { std::move(bv), std::move(np) };
+      };
+      break;
+    case FPToUInt:
+      fn = [](auto &val, auto &to_type, auto &rm_) -> StateValue {
+        expr rm = expr::rtz();
+        expr bv  = val.fp2uint(to_type.bits(), rm);
+        expr fp2 = bv.uint2fp(val, rm);
+        // -0.xx must be converted to 0, not poison.
+        expr val_rounded = val.round(rm);
+        return { std::move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
+      };
+      break;
+    case FPExt:
+    case FPTrunc:
+      fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
+        return { val.float2Float(to_type.getAsFloatType()->getDummyFloat(), rm),
+                true };
+      };
+      break;
     }
 
-    function<StateValue(const expr&)> fn_rm
-      = [&](auto &rm) { return fn(val, to_type, rm); };
-    AndExpr np;
-    np.add(sv.non_poison);
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                      const Type &to_type) -> StateValue {
+      auto val = sv.value;
 
-    StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
-                                           : fn(val, to_type, rm.toSMT());
-    np.add(std::move(ret.non_poison));
+      if (from_type.isFloatType()) {
+        auto ty = from_type.getAsFloatType();
+        val     = ty->getFloat(val);
+      }
 
-    return { to_type.isFloatType()
-               ? to_type.getAsFloatType()
-                   ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
-                               sv.value)
-               : std::move(ret.value), np()};
-  };
+      function<StateValue(const expr&)> fn_rm
+        = [&](auto &rm) { return fn(val, to_type, rm); };
+      AndExpr np;
+      np.add(sv.non_poison);
+
+      StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
+                                            : fn(val, to_type, rm.toSMT());
+      np.add(std::move(ret.non_poison));
+
+      return { to_type.isFloatType()
+                ? to_type.getAsFloatType()
+                    ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
+                                sv.value)
+                : std::move(ret.value), np()};
+    };
+  }
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -2751,27 +2884,30 @@ void FCmp::rauw(const Value &what, Value &with) {
   RAUW(b);
 }
 
-void FCmp::print(ostream &os) const {
-  const char *condtxt = nullptr;
+const char* FCmp::getCondName() const {
   switch (cond) {
-  case OEQ:   condtxt = "oeq "; break;
-  case OGT:   condtxt = "ogt "; break;
-  case OGE:   condtxt = "oge "; break;
-  case OLT:   condtxt = "olt "; break;
-  case OLE:   condtxt = "ole "; break;
-  case ONE:   condtxt = "one "; break;
-  case ORD:   condtxt = "ord "; break;
-  case UEQ:   condtxt = "ueq "; break;
-  case UGT:   condtxt = "ugt "; break;
-  case UGE:   condtxt = "uge "; break;
-  case ULT:   condtxt = "ult "; break;
-  case ULE:   condtxt = "ule "; break;
-  case UNE:   condtxt = "une "; break;
-  case UNO:   condtxt = "uno "; break;
-  case TRUE:  condtxt = "true "; break;
-  case FALSE: condtxt = "false "; break;
+  case OEQ:   return "oeq"; break;
+  case OGT:   return "ogt"; break;
+  case OGE:   return "oge"; break;
+  case OLT:   return "olt"; break;
+  case OLE:   return "ole"; break;
+  case ONE:   return "one"; break;
+  case ORD:   return "ord"; break;
+  case UEQ:   return "ueq"; break;
+  case UGT:   return "ugt"; break;
+  case UGE:   return "uge"; break;
+  case ULT:   return "ult"; break;
+  case ULE:   return "ule"; break;
+  case UNE:   return "une"; break;
+  case UNO:   return "uno"; break;
+  case TRUE:  return "true"; break;
+  case FALSE: return "false"; break;
   }
-  os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
+  UNREACHABLE();
+}
+
+void FCmp::print(ostream &os) const {
+  os << getName() << " = fcmp " << fmath << getCondName() << " " << *a << ", "
      << b->getName();
   if (signaling)
     os << ", signaling";
@@ -2783,8 +2919,56 @@ StateValue FCmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  auto fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
-    auto cmp = [&](const expr &a, const expr &b, auto &rm) {
+  function<expr(const expr &, const expr &, const expr &)> cmp;
+  function<StateValue(const StateValue &, const StateValue &, const Type &)> fn;
+  if (config::is_uf_float()) {
+    fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
+      switch (cond) {
+      case TRUE:  return {true, true};
+      case FALSE: return {false, true};
+      default: {
+        // All conditions are encoded using only 5 uninterpreted functions:
+        // oeq, ueq, olt, ult, ord
+
+        s.doesApproximation("uf_float", true);
+
+        StateValue lhs = a;
+        StateValue rhs = b;
+
+        const char *name = nullptr;
+        bool negate = false;
+        bool commutative = false;
+        switch (cond) {
+        case OEQ: name = "oeq"; commutative = true; break;
+        case OGT: name = "olt"; std::swap(lhs, rhs); break;
+        case OGE: name = "ult"; negate = true; break;
+        case OLT: name = "olt"; break;
+        case OLE: name = "ult"; std::swap(lhs, rhs); negate = true; break;
+        case ONE: name = "ueq"; negate = true; commutative = true; break;
+        case ORD: name = "ord"; commutative = true; break;
+        case UEQ: name = "ueq"; commutative = true; break;
+        case UGT: name = "olt"; std::swap(lhs, rhs); break;
+        case UGE: name = "ult"; negate = true; break;
+        case ULT: name = "ult"; break;
+        case ULE: name = "olt"; negate = true; std::swap(lhs, rhs); break;
+        case UNE: name = "oeq"; negate = true; commutative = true; break;
+        case UNO: name = "ord"; negate = true; commutative = true; break;
+        default: UNREACHABLE();
+        }
+
+        ostringstream os;
+        os << name << "." << ty;
+        auto value = uf_float(os.str(), {lhs, rhs}, expr::mkUInt(0, 1), fmath, commutative);
+
+        if (negate) {
+          value.value = ~value.value;
+        }
+        return value;
+      }
+      }
+    };
+  } else {
+    cmp = [&](const expr &a, const expr &b, auto &rm) {
       switch (cond) {
       case OEQ: return a.foeq(b);
       case OGT: return a.fogt(b);
@@ -2804,10 +2988,13 @@ StateValue FCmp::toSMT(State &s) const {
       case FALSE: return expr(false);
       }
     };
-    auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                               cmp, ty, fmath, {}, false, true);
-    return { val.toBVBool(), std::move(np) };
-  };
+
+    fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {  
+      auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
+                                cmp, ty, fmath, {}, false, true);
+      return { val.toBVBool(), std::move(np) };
+    };
+  }
 
   if (auto agg = a->getType().getAsAggregateType()) {
     vector<StateValue> vals;

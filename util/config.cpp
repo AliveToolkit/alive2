@@ -23,6 +23,7 @@ unsigned src_unroll_cnt = 0;
 unsigned tgt_unroll_cnt = 0;
 unsigned max_offset_bits = 64;
 unsigned max_sizet_bits = 64;
+FpEncodingMode fp_encoding_mode = FpEncodingMode::FloatingPoint;
 
 ostream &dbg() {
   return *debug_os;
@@ -30,6 +31,10 @@ ostream &dbg() {
 
 void set_debug(ostream &os) {
   debug_os = &os;
+}
+
+bool is_uf_float() {
+  return fp_encoding_mode == FpEncodingMode::UninterpretedFunctions;
 }
 
 }
