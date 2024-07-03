@@ -2569,18 +2569,18 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   for (unsigned bid = 0, end = ret.numNonlocals(); bid < end; ++bid) {
     if (always_nowrite(bid, false, true))
       continue;
+    auto &blk   = ret.non_local_block_val[bid];
     auto &other = els.non_local_block_val[bid];
-    ret.non_local_block_val[bid].val
-      = expr::mkIf(cond, then.non_local_block_val[bid].val, other.val);
-    ret.non_local_block_val[bid].undef.insert(other.undef.begin(),
-                                              other.undef.end());
+    blk.val   = expr::mkIf(cond, blk.val, other.val);
+    blk.type |= other.type;
+    blk.undef.insert(other.undef.begin(), other.undef.end());
   }
   for (unsigned bid = 0, end = ret.numLocals(); bid < end; ++bid) {
+    auto &blk   = ret.local_block_val[bid];
     auto &other = els.local_block_val[bid];
-    ret.local_block_val[bid].val
-      = expr::mkIf(cond, then.local_block_val[bid].val, other.val);
-    ret.local_block_val[bid].undef.insert(other.undef.begin(),
-                                          other.undef.end());
+    blk.val   = expr::mkIf(cond, blk.val, other.val);
+    blk.type |= other.type;
+    blk.undef.insert(other.undef.begin(), other.undef.end());
   }
   ret.non_local_block_liveness = expr::mkIf(cond, then.non_local_block_liveness,
                                             els.non_local_block_liveness);
