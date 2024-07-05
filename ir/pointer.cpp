@@ -251,7 +251,7 @@ expr Pointer::getBlockBaseAddress(bool simplify) const {
 
 expr Pointer::getAddress(bool simplify) const {
   return
-    getBlockBaseAddress(simplify) + getOffset().zextOrTrunc(bits_ptr_address);
+    getBlockBaseAddress(simplify) + getOffset().sextOrTrunc(bits_ptr_address);
 }
 
 expr Pointer::blockSize() const {

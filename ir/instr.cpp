@@ -3721,7 +3721,7 @@ uint64_t GEP::getMaxGEPOffset() const {
       return UINT64_MAX;
 
     if (auto n = getInt(*v)) {
-      off = add_saturate(off, abs((int64_t)mul * *n));
+      off = add_saturate(off, (int64_t)mul * *n);
       continue;
     }
 
