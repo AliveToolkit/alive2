@@ -103,6 +103,24 @@ static bool always_nowrite(unsigned bid, bool src_only = false,
   return always_noread(bid, is_fncall_accessible) || is_constglb(bid, src_only);
 }
 
+static expr mk_block_if(const expr &cond, expr then, expr els) {
+  if (cond.isTrue())
+    return then;
+  if (cond.isFalse())
+    return els;
+
+  bool is_bv1 = then.isBV();
+  bool is_bv2 = els.isBV();
+  if (is_bv1 != is_bv2) {
+    expr offset = expr::mkUInt(0, Pointer::bitsShortOffset());
+    if (is_bv1)
+      then = expr::mkConstArray(offset, then);
+    else
+      els  = expr::mkConstArray(offset, els);
+  }
+  return expr::mkIf(cond, then, els);
+}
+
 
 static unsigned next_local_bid;
 static unsigned next_const_bid;
@@ -1028,6 +1046,22 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
   }
 }
 
+static expr raw_load(const expr &block, const expr &offset,
+                     uint64_t max_idx = UINT64_MAX) {
+  return block.isBV() ? block : block.load(offset, max_idx);
+}
+
+static expr mk_store(expr mem, const expr &offset, const expr &val) {
+  if (mem.isBV())
+    mem = expr::mkConstArray(offset, mem);
+  return mem.store(offset, val);
+}
+
+Byte Memory::raw_load(bool local, unsigned bid, const expr &offset) const {
+  auto &block = (local ? local_block_val : non_local_block_val)[bid].val;
+  return {*this, ::raw_load(block, offset) };
+}
+
 vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
                           uint64_t align, bool left2right, DataType type) {
   if (bytes == 0)
@@ -1057,7 +1091,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
         assert(idx < blk_size);
         uint64_t max_idx = blk_size - bytes + idx;
         expr off = blk_offset + expr::mkUInt(idx, offset);
-        loaded[i].add(blk.val.load(off, max_idx), cond);
+        loaded[i].add(::raw_load(blk.val, off, max_idx), cond);
       }
       undef.insert(blk.undef.begin(), blk.undef.end());
     }
@@ -1110,7 +1144,6 @@ void Memory::store(const Pointer &ptr,
 
   unsigned bytes = data.size() * (bits_byte/8);
   expr offset = ptr.getShortOffset();
-  unsigned off_bits = Pointer::bitsShortOffset();
 
   auto stored_ty = data_type(data, false);
   auto stored_ty_full = data_type(data, true);
@@ -1129,8 +1162,13 @@ void Memory::store(const Pointer &ptr,
     // init because the size is rounded up to the alignment.
     // The remaining bytes are poison.
     if (full_write || state->isInitializationPhase()) {
-      mem = expr::mkConstArray(offset,
-              full_write ? data[0].second : Byte::mkPoisonByte(*this)());
+      // optimization: if the access size == byte size, then we don't store
+      // data as arrays, but simply as a BV
+      if (data.size() == 1) {
+        mem = data[0].second;
+      } else {
+        mem = full_write ? data[0].second : Byte::mkPoisonByte(*this)();
+      }
       if (cond.isTrue()) {
         blk.undef.clear();
         blk.type = stored_ty_full;
@@ -1145,10 +1183,10 @@ void Memory::store(const Pointer &ptr,
       if (full_write && val.eq(data[0].second))
         continue;
       expr off
-       = offset + expr::mkUInt(idx >> Pointer::zeroBitsShortOffset(), off_bits);
-      mem = mem.store(off, val);
+        = offset + expr::mkUInt(idx >> Pointer::zeroBitsShortOffset(), offset);
+      mem = mk_store(std::move(mem), off, val);
     }
-    blk.val = expr::mkIf(cond, mem, blk.val);
+    blk.val = mk_block_if(cond, std::move(mem), std::move(blk.val));
     blk.undef.insert(undef.begin(), undef.end());
   };
 
@@ -1160,9 +1198,6 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
                          const vector<pair<unsigned, expr>> &data,
                          const set<expr> &undef, uint64_t align) {
   assert(!state->isInitializationPhase());
-  // offset in [ptr, ptr+sz)
-  auto offset_cond = offset.uge(ptr.getShortOffset()) &&
-                     offset.ult((ptr + bytes).getShortOffset());
 
   bool val_no_offset = data.size() == 1 && !data[0].second.vars().count(offset);
   auto stored_ty = data_type(data, false);
@@ -1174,20 +1209,31 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
   }
 
   auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+    auto orig_val = ::raw_load(blk.val, offset);
+
     // optimization: full rewrite
     if (bytes.eq(Pointer(*this, bid, local).blockSize())) {
-      blk.val = val_no_offset && data.size() == 1
-        ? expr::mkIf(cond, expr::mkConstArray(offset, val), blk.val)
-        : expr::mkLambda(offset, expr::mkIf(cond, val, blk.val.load(offset)));
+      blk.val = val_no_offset
+        ? mk_block_if(cond, val, std::move(blk.val))
+        : expr::mkLambda(offset, mk_block_if(cond, val, std::move(orig_val)));
 
       if (cond.isTrue()) {
         blk.undef.clear();
         blk.type = stored_ty;
       }
     } else {
-      blk.val = expr::mkLambda(offset, expr::mkIf(cond && offset_cond, val,
-                                                  blk.val.load(offset)));
+      // offset in [ptr, ptr+sz)
+      auto offset_cond = offset.uge(ptr.getShortOffset()) &&
+                         offset.ult((ptr + bytes).getShortOffset());
+
+      blk.val
+        = expr::mkLambda(offset,
+                         mk_block_if(cond && offset_cond, val,
+                                     std::move(orig_val)));
     }
+    // const array -> BV
+    blk.val.isConstArray(blk.val);
+
     blk.type |= stored_ty;
     blk.undef.insert(undef.begin(), undef.end());
   };
@@ -1202,11 +1248,13 @@ static bool memory_unused() {
   return num_locals_src == 0 && num_locals_tgt == 0 && num_nonlocals == 0;
 }
 
-static expr mk_block_val_array(unsigned bid) {
+expr Memory::mk_block_val_array(unsigned bid) const {
   auto str = "init_mem_" + to_string(bid);
-  return expr::mkArray(str.c_str(),
-                       expr::mkUInt(0, Pointer::bitsShortOffset()),
-                       expr::mkUInt(0, Byte::bitsByte()));
+  return Pointer(*this, bid, false).isBlkSingleByte()
+    ? expr::mkVar(str.c_str(), Byte::bitsByte())
+    : expr::mkArray(str.c_str(),
+                    expr::mkUInt(0, Pointer::bitsShortOffset()),
+                    expr::mkUInt(0, Byte::bitsByte()));
 }
 
 static expr mk_liveness_array() {
@@ -1218,15 +1266,17 @@ static expr mk_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mkNonPoisonAxioms(bool local) {
+void Memory::mkNonPoisonAxioms(bool local) const {
   expr offset
     = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
 
+  unsigned bid = 0;
   for (auto &block : local ? local_block_val : non_local_block_val) {
     if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
       state->addAxiom(
         expr::mkForAll({ offset },
-                       !Byte(*this, block.val.load(offset)).isPoison()));
+                       !raw_load(local, bid, offset).isPoison()));
+    ++bid;
   }
 }
 
@@ -1255,7 +1305,7 @@ expr Memory::mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const {
          val2.nonptrValue().lshr(leftover_bits) == 0;
 }
 
-void Memory::mkNonlocalValAxioms(bool skip_consts) {
+void Memory::mkNonlocalValAxioms(bool skip_consts) const {
   // Users may request the initial memory to be non-poisonous
   if ((config::disable_poison_input && state->isSource()) &&
       (does_int_mem_access || does_ptr_mem_access)) {
@@ -1272,7 +1322,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) {
     if (always_noread(i, true))
       continue;
 
-    Byte byte(*this, non_local_block_val[i].val.load(offset));
+    Byte byte = raw_load(false, i, offset);
 
     // in ASM mode, non-byte-aligned values are expected to be zero-extended
     // per the ABI.
@@ -1335,10 +1385,6 @@ Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
 
   non_local_block_liveness = mk_liveness_array();
 
-  // Non-local blocks cannot initially contain pointers to local blocks
-  // and no-capture pointers.
-  mkNonlocalValAxioms(false);
-
   // initialize all local blocks as non-pointer, poison value
   // This is okay because loading a pointer as non-pointer is also poison.
   if (numLocals() > 0) {
@@ -1369,6 +1415,18 @@ void Memory::mkAxioms(const Memory &tgt) const {
   assert(state->isSource() && !tgt.state->isSource());
   if (memory_unused())
     return;
+
+  // Non-local blocks cannot initially contain pointers to local blocks
+  // and no-capture pointers.
+  for (auto m_ptr : { this, &tgt }) {
+    auto &m = const_cast<Memory&>(*m_ptr);
+    auto old_vals = m.non_local_block_val;
+    for (unsigned i = 0, e = old_vals.size(); i != e; ++i) {
+      m.non_local_block_val.at(i).val = m.mk_block_val_array(i);
+    }
+    m.mkNonlocalValAxioms(false);
+    m.non_local_block_val = std::move(old_vals);
+  }
 
   auto skip_bid = [&](unsigned bid) {
     if (bid == 0 && has_null_block)
@@ -1682,11 +1740,12 @@ Memory::mkCallState(const string &fnname, bool nofree,
 
   // TODO: handle havoc of local blocks
 
-  auto blk_type = mk_block_val_array(1);
-  expr only_write_inaccess = access.canOnlyWrite(MemoryAccess::Inaccessible);
-
   // inaccessible memory block
-  st.non_local_block_val.emplace_back(expr::mkFreshVar("blk_val", blk_type));
+  unsigned innaccess_bid = num_nonlocals_src - 1;
+  st.non_local_block_val.emplace_back(
+    expr::mkFreshVar("blk_val", non_local_block_val[innaccess_bid].val));
+
+  expr only_write_inaccess = access.canOnlyWrite(MemoryAccess::Inaccessible);
 
   if (!only_write_inaccess.isTrue()) {
     unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
@@ -1694,7 +1753,7 @@ Memory::mkCallState(const string &fnname, bool nofree,
       if (always_nowrite(i, true, true))
         continue;
       st.non_local_block_val.emplace_back(
-        expr::mkFreshVar("blk_val", blk_type));
+        expr::mkFreshVar("blk_val", non_local_block_val[i].val));
     }
   }
 
@@ -1770,7 +1829,8 @@ void Memory::setState(const Memory::CallState &st,
       if (always_nowrite(bid, true, true))
         continue;
       auto &cur_val = non_local_block_val[bid].val;
-      cur_val = expr::mkIf(cond, st.non_local_block_val[idx++], cur_val);
+      cur_val
+        = mk_block_if(cond, st.non_local_block_val[idx++], std::move(cur_val));
       if (cond.isTrue())
         non_local_block_val[bid].undef.clear();
     }
@@ -1802,13 +1862,11 @@ void Memory::setState(const Memory::CallState &st,
   // TODO: havoc local blocks
   // for now, zero out if in non UB-exploitation mode to avoid false positives
   if (config::disallow_ub_exploitation) {
-    expr raw_byte = Byte(*this, {expr::mkUInt(0, bits_byte), true}, 0, true)();
-    expr array = expr::mkConstArray(expr::mkUInt(0, bits_for_offset),
-                                    raw_byte);
+    expr zero_byte = Byte(*this, {expr::mkUInt(0, bits_byte), true}, 0, true)();
 
     for (unsigned i = 0; i < next_local_bid; ++i) {
       if (escaped_local_blks.mayAlias(true, i)) {
-        local_block_val[i] = expr(array);
+        local_block_val[i] = expr(zero_byte);
       }
     }
   }
@@ -1949,6 +2007,13 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     .add(short_bid, std::move(align_expr));
   (is_local ? local_blk_kind : non_local_blk_kind)
     .add(short_bid, expr::mkUInt(alloc_ty, 2));
+
+  if (Pointer(*this, bid, is_local).isBlkSingleByte()) {
+    if (is_local)
+      local_block_val[bid].val = Byte::mkPoisonByte(*this)();
+    else
+      non_local_block_val[bid].val = mk_block_val_array(bid);
+  }
 
   if (!nonnull.isTrue()) {
     expr nondet_nonnull = expr::mkFreshVar("#alloc_nondet_nonnull", true);
@@ -2245,8 +2310,9 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   dst_blk.undef.clear();
   dst_blk.type = DATA_NONE;
 
+  unsigned has_bv_val = 0;
   auto offset = expr::mkUInt(0, Pointer::bitsShortOffset());
-  DisjointExpr val(expr::mkConstArray(offset, Byte::mkPoisonByte(*this)()));
+  DisjointExpr val(Byte::mkPoisonByte(*this)());
 
   auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
     // we assume src != dst
@@ -2255,8 +2321,18 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
     val.add(blk.val, std::move(cond));
     dst_blk.undef.insert(blk.undef.begin(), blk.undef.end());
     dst_blk.type |= blk.type;
+    has_bv_val   |= 1u << blk.val.isBV();
   };
   access(src, bits_byte/8, bits_byte/8, false, fn);
+
+  // if we have mixed array/non-array blocks, switch them all to array
+  if (has_bv_val == 3) {
+    DisjointExpr<expr> newval;
+    for (auto &[v, cond] : val) {
+      newval.add(v.isBV() ? expr::mkConstArray(offset, v) : v, cond);
+    }
+    val = std::move(newval);
+  }
   dst_blk.val = *std::move(val)();
 }
 
@@ -2380,8 +2456,8 @@ expr Memory::blockValRefined(const Memory &other, unsigned bid, bool local,
     return false;
   }
 
-  Byte val(*this, mem1.val.load(offset));
-  Byte val2(other, mem2.load(offset));
+  Byte val  = raw_load(false, bid, offset);
+  Byte val2 = other.raw_load(false, bid, offset);
 
   if (val.eq(val2))
     return true;
@@ -2528,7 +2604,7 @@ expr Memory::checkNocapture() const {
     if (always_nowrite(bid))
       continue;
     Pointer p(*this, bid, false);
-    Byte b(*this, non_local_block_val[bid].val.load(offset));
+    Byte b = raw_load(false, bid, offset);
     Pointer loadp(*this, b.ptrValue());
     res &= (p.isBlockAlive() && b.isPtr() && b.ptrNonpoison())
              .implies(!loadp.isNocapture());
@@ -2571,15 +2647,15 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
       continue;
     auto &blk   = ret.non_local_block_val[bid];
     auto &other = els.non_local_block_val[bid];
-    blk.val   = expr::mkIf(cond, blk.val, other.val);
-    blk.type |= other.type;
+    blk.val     = mk_block_if(cond, blk.val, other.val);
+    blk.type   |= other.type;
     blk.undef.insert(other.undef.begin(), other.undef.end());
   }
   for (unsigned bid = 0, end = ret.numLocals(); bid < end; ++bid) {
     auto &blk   = ret.local_block_val[bid];
     auto &other = els.local_block_val[bid];
-    blk.val   = expr::mkIf(cond, blk.val, other.val);
-    blk.type |= other.type;
+    blk.val     = mk_block_if(cond, blk.val, other.val);
+    blk.type   |= other.type;
     blk.undef.insert(other.undef.begin(), other.undef.end());
   }
   ret.non_local_block_liveness = expr::mkIf(cond, then.non_local_block_liveness,

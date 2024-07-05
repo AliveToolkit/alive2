@@ -142,6 +142,8 @@ public:
   static Pointer mkNullPointer(const Memory &m);
   smt::expr isNull() const;
 
+  bool isBlkSingleByte() const;
+
   static Pointer mkIf(const smt::expr &cond, const Pointer &then,
                       const Pointer &els);
 

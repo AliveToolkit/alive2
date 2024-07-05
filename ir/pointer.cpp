@@ -674,6 +674,11 @@ expr Pointer::isNull() const {
   return *this == mkNullPointer(m);
 }
 
+bool Pointer::isBlkSingleByte() const {
+  uint64_t blk_size;
+  return blockSize().isUInt(blk_size) && blk_size == bits_byte/8;
+}
+
 Pointer
 Pointer::mkIf(const expr &cond, const Pointer &then, const Pointer &els) {
   assert(&then.m == &els.m);

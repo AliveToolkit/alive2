@@ -181,9 +181,9 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  void mkNonPoisonAxioms(bool local);
+  void mkNonPoisonAxioms(bool local) const;
   smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
-  void mkNonlocalValAxioms(bool skip_consts);
+  void mkNonlocalValAxioms(bool skip_consts) const;
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
                 unsigned bytes, uint64_t align, bool write) const;
@@ -377,6 +377,8 @@ public:
   friend class Pointer;
 
 private:
+  smt::expr mk_block_val_array(unsigned bid) const;
+  Byte raw_load(bool local, unsigned bid, const smt::expr &offset) const;
   void print_array(std::ostream &os, const smt::expr &a,
                    unsigned indent = 0) const;
 };

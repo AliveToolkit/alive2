@@ -208,8 +208,8 @@ struct TVLegacyPass final : public llvm::ModulePass {
       return false;
 
     auto fn = llvm2alive(F, *TLI, first,
-                         first ? vector<string_view>()
-                               : I->second.fn.getGlobalVarNames());
+                         first ? vector<GlobalVariable*>()
+                               : I->second.fn.getGlobalVars());
     if (!fn) {
       fns.erase(I);
       return false;

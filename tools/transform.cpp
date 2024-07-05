@@ -64,6 +64,15 @@ static void print_single_varval(ostream &os, const State &st, const Model &m,
 
   type.printVal(os, st, m.eval(val.value, true));
 
+  if (dynamic_cast<const PtrType*>(&type)) {
+    auto addr = Pointer(st.getMemory(), m.eval(val.value, true)).getAddress();
+    addr = m.eval(addr);
+    if (addr.isConst()) {
+      os << " / Address=";
+      addr.printHexadecimal(os);
+    }
+  }
+
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
   if (!partial.isConst()) {

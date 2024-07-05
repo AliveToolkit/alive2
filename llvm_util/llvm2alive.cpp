@@ -133,7 +133,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   /// function.
   bool IsSrc;
   vector<llvm::Instruction*> i_constexprs;
-  const vector<string_view> &gvnamesInSrc;
+  const vector<GlobalVariable*> &gvsInSrc;
   vector<pair<Phi*, llvm::PHINode*>> todo_phis;
   const Instr *insert_constexpr_before = nullptr;
   ostream *out;
@@ -211,8 +211,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
 
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
-              const vector<string_view> &gvnamesInSrc)
-      : f(f), TLI(TLI), IsSrc(IsSrc), gvnamesInSrc(gvnamesInSrc),
+              const vector<GlobalVariable*> &gvsInSrc)
+      : f(f), TLI(TLI), IsSrc(IsSrc), gvsInSrc(gvsInSrc),
         out(&get_outs()) {}
 
   ~llvm2alive_() {
@@ -1854,8 +1854,7 @@ public:
       const char *chrs = name.data();
       char *end_ptr;
       auto numeric_id = strtoul(chrs, &end_ptr, 10);
-
-      if (size_t(end_ptr - chrs) != name.size())
+      if (end_ptr != name.end())
         return M->getGlobalVariable(name, true);
       else {
         auto itr = M->global_begin(), end = M->global_end();
@@ -1876,9 +1875,16 @@ public:
     insert_constexpr_before = nullptr;
 
     // Ensure all src globals exist in target as well
-    for (auto &gvname : gvnamesInSrc) {
-      if (auto gv = getGlobalVariable(gvname))
-        get_operand(gv);
+    for (auto *gv : gvsInSrc) {
+      string_view name = string_view(gv->getName()).substr(1);
+      if (auto llvm_gv = getGlobalVariable(name);
+          llvm_gv && get_operand(llvm_gv)) {
+        // do nothing
+      } else {
+        // import from src
+        // FIXME: this is wrong for IPO
+        Fn.addConstant(make_unique<GlobalVariable>(*gv));
+      }
     }
 
     map<string, unique_ptr<Store>> stores;
@@ -1929,10 +1935,9 @@ initializer::initializer(ostream &os, const llvm::DataLayout &DL) {
   init_llvm_utils(os, DL);
 }
 
-optional<IR::Function> llvm2alive(llvm::Function &F,
-                                  const llvm::TargetLibraryInfo &TLI,
-                                  bool IsSrc,
-                                  const vector<string_view> &gvnamesInSrc) {
-  return llvm2alive_(F, TLI, IsSrc, gvnamesInSrc).run();
+optional<IR::Function>
+llvm2alive(llvm::Function &F, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
+           const vector<GlobalVariable*> &gvsInSrc) {
+  return llvm2alive_(F, TLI, IsSrc, gvsInSrc).run();
 }
 }
