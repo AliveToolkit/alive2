@@ -1019,7 +1019,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   }
 
   auto isgvar = [&](const auto &decl) {
-    if (auto gv = getFn().getGlobalVar(string_view(decl.name).substr(1)))
+    if (auto gv = getFn().getGlobalVar(decl.name))
       return fn_ptr_bid == Pointer(memory, (*this)[*gv].value).getShortBid();
     return expr();
   };
@@ -1136,6 +1136,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       };
 
       output = ret_arg_ty ? std::move(ret_arg) : mk_output(out_type);
+      if (ret_arg_ty && ret_arg_ty->isPtrType())
+        ret_data.emplace_back(Memory::FnRetData());
 
       // Indirect calls may be changed into direct in tgt
       // Account for this if we have declarations with a returned argument
@@ -1387,7 +1389,7 @@ void State::mkAxioms(State &tgt) {
 
   if (has_indirect_fncalls) {
     for (auto &decl : f.getFnDecls()) {
-      if (auto gv = f.getGlobalVar(string_view(decl.name).substr(1))) {
+      if (auto gv = f.getGlobalVar(decl.name)) {
         Pointer ptr(memory, (*this)[*gv].value);
         addAxiom(!ptr.isLocal());
         addAxiom(ptr.getOffset() == 0);

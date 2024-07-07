@@ -1876,7 +1876,6 @@ public:
 
     // Ensure all src globals exist in target as well
     for (auto *gv : gvsInSrc) {
-      string_view name = string_view(gv->getName()).substr(1);
       if (Fn.getGlobalVar(gv->getName())) {
         // do nothing
       } else {
