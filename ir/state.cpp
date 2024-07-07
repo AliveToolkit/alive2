@@ -256,7 +256,7 @@ State::State(const Function &f, bool source)
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
     return_val(DisjointExpr(f.getType().getDummyValue(false))),
-    return_memory(DisjointExpr(memory.dup())) {}
+    return_memory(DisjointExpr<Memory>()) {}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -1335,8 +1335,10 @@ const StateValue& State::returnValCached() {
 }
 
 Memory& State::returnMemory() {
-  if (auto *m = get_if<DisjointExpr<Memory>>(&return_memory))
-    return_memory = *std::move(*m)();
+  if (auto *m = get_if<DisjointExpr<Memory>>(&return_memory)) {
+    auto val = std::move(*m)();
+    return_memory = val ? *std::move(val) : memory.dup();
+  }
   return get<Memory>(return_memory);
 }
 
