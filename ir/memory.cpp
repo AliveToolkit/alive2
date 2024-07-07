@@ -1709,8 +1709,8 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
       ret.non_local_block_val.emplace_back(then.non_local_block_val[i]);
     } else {
       ret.non_local_block_val.emplace_back(
-        expr::mkIf(cond, then.non_local_block_val[i],
-                   els.non_local_block_val[i]));
+        mk_block_if(cond, then.non_local_block_val[i],
+                    els.non_local_block_val[i]));
     }
   }
   ret.non_local_liveness = expr::mkIf(cond, then.non_local_liveness,
