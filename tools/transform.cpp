@@ -1253,6 +1253,9 @@ static void calculateAndInitConstants(Transform &t) {
   if (config::tgt_is_asm)
     bits_ptr_address = bits_program_pointer;
 
+  // TODO: this is only needed if some program pointer is observable
+  bits_for_offset = max(bits_program_pointer, bits_for_offset);
+
   bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
 
   bits_poison_per_byte = 1;
