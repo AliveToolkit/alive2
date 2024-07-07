@@ -356,7 +356,7 @@ Value* get_operand(llvm::Value *v,
 
   if (auto fn = dyn_cast<llvm::Function>(v)) {
     auto val = make_unique<GlobalVariable>(
-      *ty, fn->getName().str(), 0,
+      *ty, '@' + fn->getName().str(), 0,
       fn->getAlign().value_or(llvm::Align(8)).value(), true, true);
     auto gvar = val.get();
     current_fn->addConstant(std::move(val));
