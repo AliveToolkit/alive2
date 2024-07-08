@@ -1254,7 +1254,7 @@ static void calculateAndInitConstants(Transform &t) {
     bits_ptr_address = bits_program_pointer;
 
   // TODO: this is only needed if some program pointer is observable
-  bits_for_offset = max(bits_program_pointer, bits_for_offset);
+  bits_for_offset = max(bits_ptr_address, bits_for_offset);
 
   bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
 

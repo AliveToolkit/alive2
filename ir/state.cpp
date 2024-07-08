@@ -1307,7 +1307,13 @@ expr State::rewriteUndef(expr &&val, const set<expr> &undef_vars) {
 void State::finishInitializer() {
   is_initialization_phase = false;
 
-  return_memory = DisjointExpr(memory.dup());
+  const Memory *mem = &memory;
+  // if we have an init block, the unconditional jump std::moved the memory
+  if (!predecessor_data.empty()) {
+    assert(predecessor_data.size() == 1);
+    mem = &predecessor_data.begin()->second.begin()->second.mem.begin()->first;
+  }
+  return_memory = DisjointExpr(mem->dup());
 
   if (auto *ret = getFn().getReturnedInput()) {
     returned_input = (*this)[*ret];
