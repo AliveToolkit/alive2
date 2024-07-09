@@ -1760,16 +1760,15 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
     }
   }
 
-  if (num_ptr_args)
-    st.writes_args
-      = expr::mkFreshVar("writes_args", expr::mkUInt(0, num_ptr_args));
+  st.writes_args
+    = expr::mkFreshVar("writes_args", expr::mkUInt(0, num_ptr_args));
 
   st.non_local_liveness = mk_liveness_array();
   if (num_nonlocals_src && !nofree)
     st.non_local_liveness
-      = expr::mkIf(only_write_inaccess,
-                   st.non_local_liveness,
-                   expr::mkFreshVar("blk_liveness", st.non_local_liveness));
+      = mkIf_fold(only_write_inaccess,
+                  st.non_local_liveness,
+                  expr::mkFreshVar("blk_liveness", st.non_local_liveness));
 
   return st;
 }
@@ -1779,6 +1778,11 @@ void Memory::setState(const Memory::CallState &st,
                       const vector<PtrInput> &ptr_inputs,
                       unsigned inaccessible_bid) {
   assert(has_fncall);
+
+  if (access.canWriteSomething().isFalse())
+    return;
+
+  assert(!st.empty);
 
   // 1) Havoc memory
 
@@ -1792,46 +1796,47 @@ void Memory::setState(const Memory::CallState &st,
     assert(non_local_block_val[bid].undef.empty());
     auto &cur_val = non_local_block_val[bid].val;
     cur_val
-      = expr::mkIf(only_write_inaccess, st.non_local_block_val[0], cur_val);
+      = mk_block_if(only_write_inaccess, st.non_local_block_val[0], cur_val);
   }
 
   // TODO: MemoryAccess::Errno
 
-  unsigned idx = 1;
-  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
-  for (unsigned bid = 0; bid < limit; ++bid) {
-    if (always_nowrite(bid, true, true))
-      continue;
+  if (!only_write_inaccess.isTrue()) {
+    unsigned idx = 1;
+    unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+    for (unsigned bid = 0; bid < limit; ++bid) {
+      if (always_nowrite(bid, true, true))
+        continue;
 
-    expr modifies = access.canWrite(MemoryAccess::Other);
+      expr modifies = access.canWrite(MemoryAccess::Other);
 
-    if (!is_fncall_mem(bid)) {
-      unsigned arg_idx = 0;
-      for (auto &ptr_in : ptr_inputs) {
-        if (bid < next_nonlocal_bid) {
-          expr writes = st.writes_args.extract(arg_idx, arg_idx) == 1;
-          expr cond = !ptr_in.nowrite &&
-                      ptr_in.byval == 0 &&
-                      access.canWrite(MemoryAccess::Args) &&
-                      writes;
+      if (!is_fncall_mem(bid)) {
+        unsigned arg_idx = 0;
+        for (auto &ptr_in : ptr_inputs) {
+          if (bid < next_nonlocal_bid) {
+            expr writes = st.writes_args.extract(arg_idx, arg_idx) == 1;
+            expr cond = !ptr_in.nowrite &&
+                        ptr_in.byval == 0 &&
+                        access.canWrite(MemoryAccess::Args) &&
+                        writes;
 
-          modifies |= cond &&
-                      Pointer(*this, ptr_in.val.value).getBid() == bid;
-          state->addUB(cond.implies(ptr_in.val.non_poison));
-          state->addUB(ptr_in.nowrite.implies(!writes));
-          ++arg_idx;
+            modifies |= cond &&
+                        Pointer(*this, ptr_in.val.value).getBid() == bid;
+            state->addUB(cond.implies(ptr_in.val.non_poison));
+            state->addUB(ptr_in.nowrite.implies(!writes));
+            ++arg_idx;
+          }
         }
       }
-    }
 
-    auto &cur_val = non_local_block_val[bid].val;
-    auto &new_val = st.non_local_block_val[idx++];
-    cur_val = mk_block_if(modifies, new_val, std::move(cur_val));
-    if (modifies.isTrue())
-      non_local_block_val[bid].undef.clear();
+      auto &cur_val = non_local_block_val[bid].val;
+      auto &new_val = st.non_local_block_val[idx++];
+      cur_val = mk_block_if(modifies, new_val, std::move(cur_val));
+      if (modifies.isTrue())
+        non_local_block_val[bid].undef.clear();
+    }
+    assert(idx == st.non_local_block_val.size());
   }
-  assert((idx == 1 && st.non_local_block_val.empty()) ||
-         idx == st.non_local_block_val.size());
 
   if (!st.non_local_liveness.isAllOnes()) {
     expr one  = expr::mkUInt(1, num_nonlocals);
