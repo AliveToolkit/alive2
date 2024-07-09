@@ -1809,14 +1809,16 @@ void Memory::setState(const Memory::CallState &st,
       unsigned arg_idx = 0;
       for (auto &ptr_in : ptr_inputs) {
         if (bid < next_nonlocal_bid) {
+          expr writes = st.writes_args.extract(arg_idx, arg_idx) == 1;
           expr cond = !ptr_in.nowrite &&
                       ptr_in.byval == 0 &&
                       access.canWrite(MemoryAccess::Args) &&
-                      st.writes_args.extract(arg_idx, arg_idx) == 1;
+                      writes;
 
           modifies |= cond &&
                       Pointer(*this, ptr_in.val.value).getBid() == bid;
           state->addUB(cond.implies(ptr_in.val.non_poison));
+          state->addUB(ptr_in.nowrite.implies(!writes));
           ++arg_idx;
         }
       }
