@@ -1782,8 +1782,6 @@ void Memory::setState(const Memory::CallState &st,
   if (access.canWriteSomething().isFalse())
     return;
 
-  assert(!st.empty);
-
   // 1) Havoc memory
 
   expr only_write_inaccess = access.canOnlyWrite(MemoryAccess::Inaccessible);
