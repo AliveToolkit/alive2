@@ -1830,7 +1830,8 @@ void Memory::setState(const Memory::CallState &st,
     if (modifies.isTrue())
       non_local_block_val[bid].undef.clear();
   }
-  assert(idx == st.non_local_block_val.size());
+  assert((idx == 1 && st.non_local_block_val.empty()) ||
+         idx == st.non_local_block_val.size());
 
   if (!st.non_local_liveness.isAllOnes()) {
     expr one  = expr::mkUInt(1, num_nonlocals);
