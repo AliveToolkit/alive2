@@ -238,6 +238,7 @@ public:
   class CallState {
     std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_liveness;
+    smt::expr writes_args;
     bool empty = true;
 
   public:
@@ -297,7 +298,7 @@ public:
   mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs,
           bool is_local, const FnRetData *data = nullptr);
   CallState mkCallState(const std::string &fnname, bool nofree,
-                        const SMTMemoryAccess &access);
+                        unsigned num_ptr_args, const SMTMemoryAccess &access);
   void setState(const CallState &st, const SMTMemoryAccess &access,
                 const std::vector<PtrInput> &ptr_inputs,
                 unsigned inaccessible_bid);

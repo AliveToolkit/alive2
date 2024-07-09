@@ -1713,6 +1713,7 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
                     els.non_local_block_val[i]));
     }
   }
+  ret.writes_args = expr::mkIf(cond, then.writes_args, els.writes_args);
   ret.non_local_liveness = expr::mkIf(cond, then.non_local_liveness,
                                       els.non_local_liveness);
   return ret;
@@ -1728,11 +1729,13 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
   for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
     ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
   }
+  if (writes_args.isValid())
+    ret &= writes_args == rhs.writes_args;
   return ret;
 }
 
 Memory::CallState
-Memory::mkCallState(const string &fnname, bool nofree,
+Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
                     const SMTMemoryAccess &access) {
   assert(has_fncall);
   CallState st;
@@ -1757,6 +1760,10 @@ Memory::mkCallState(const string &fnname, bool nofree,
     }
   }
 
+  if (num_ptr_args)
+    st.writes_args
+      = expr::mkFreshVar("writes_args", expr::mkUInt(0, num_ptr_args));
+
   st.non_local_liveness = mk_liveness_array();
   if (num_nonlocals_src && !nofree)
     st.non_local_liveness
@@ -1773,8 +1780,6 @@ void Memory::setState(const Memory::CallState &st,
                       unsigned inaccessible_bid) {
   assert(has_fncall);
 
-  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
-
   // 1) Havoc memory
 
   expr only_write_inaccess = access.canOnlyWrite(MemoryAccess::Inaccessible);
@@ -1790,52 +1795,40 @@ void Memory::setState(const Memory::CallState &st,
       = expr::mkIf(only_write_inaccess, st.non_local_block_val[0], cur_val);
   }
 
-  expr cond = access.canWrite(MemoryAccess::Args) &&
-              !access.canOnlyWrite(MemoryAccess::Other);
-  if (!cond.isFalse()) {
-    unsigned idx = 1;
-    for (unsigned bid = 0; bid < limit - has_write_fncall; ++bid) {
-      if (always_nowrite(bid, true, true))
-        continue;
+  // TODO: MemoryAccess::Errno
 
-      expr modifies(false);
+  unsigned idx = 1;
+  unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+  for (unsigned bid = 0; bid < limit; ++bid) {
+    if (always_nowrite(bid, true, true))
+      continue;
+
+    expr modifies = access.canWrite(MemoryAccess::Other);
+
+    if (!is_fncall_mem(bid)) {
+      unsigned arg_idx = 0;
       for (auto &ptr_in : ptr_inputs) {
         if (bid < next_nonlocal_bid) {
-          modifies |= cond &&
-                      ptr_in.val.non_poison &&
-                      !ptr_in.nowrite &&
+          expr cond = !ptr_in.nowrite &&
                       ptr_in.byval == 0 &&
+                      access.canWrite(MemoryAccess::Args) &&
+                      st.writes_args.extract(arg_idx, arg_idx) == 1;
+
+          modifies |= cond &&
                       Pointer(*this, ptr_in.val.value).getBid() == bid;
+          state->addUB(cond.implies(ptr_in.val.non_poison));
+          ++arg_idx;
         }
       }
-
-      auto &new_val = st.non_local_block_val[idx++];
-      auto &cur_val = non_local_block_val[bid].val;
-      cur_val = expr::mkIf(modifies, new_val, cur_val);
-      if (modifies.isTrue())
-        non_local_block_val[bid].undef.clear();
     }
-    assert(idx == st.non_local_block_val.size() - has_write_fncall);
-  }
 
-  if (!access.canWrite(MemoryAccess::Errno).isFalse()) {
-    // TODO
-   }
-
-  cond = access.canWrite(MemoryAccess::Other);
-  if (!cond.isFalse()) {
-    unsigned idx = 1;
-    for (unsigned bid = 0; bid < limit; ++bid) {
-      if (always_nowrite(bid, true, true))
-        continue;
-      auto &cur_val = non_local_block_val[bid].val;
-      cur_val
-        = mk_block_if(cond, st.non_local_block_val[idx++], std::move(cur_val));
-      if (cond.isTrue())
-        non_local_block_val[bid].undef.clear();
-    }
-    assert(idx == st.non_local_block_val.size());
+    auto &cur_val = non_local_block_val[bid].val;
+    auto &new_val = st.non_local_block_val[idx++];
+    cur_val = mk_block_if(modifies, new_val, std::move(cur_val));
+    if (modifies.isTrue())
+      non_local_block_val[bid].undef.clear();
   }
+  assert(idx == st.non_local_block_val.size());
 
   if (!st.non_local_liveness.isAllOnes()) {
     expr one  = expr::mkUInt(1, num_nonlocals);
