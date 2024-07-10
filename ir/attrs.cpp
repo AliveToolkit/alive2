@@ -341,7 +341,7 @@ uint64_t ParamAttrs::getDerefBytes() const {
   return bytes;
 }
 
-uint64_t ParamAttrs::maxAccesSize() const {
+uint64_t ParamAttrs::maxAccessSize() const {
   uint64_t bytes = getDerefBytes();
   if (has(ParamAttrs::DereferenceableOrNull))
     bytes = max(bytes, derefOrNullBytes);

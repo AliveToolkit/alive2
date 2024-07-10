@@ -1035,7 +1035,8 @@ static void calculateAndInitConstants(Transform &t) {
       has_ptr_arg |= hasPtr(i->getType());
 
       update_min_vect_sz(i->getType());
-      max_access_size = max(max_access_size, i->getAttributes().maxAccesSize());
+      max_access_size
+        = max(max_access_size, i->getAttributes().maxAccessSize());
 
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
