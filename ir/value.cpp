@@ -249,7 +249,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     s.addUndefVar(std::move(var));
   }
 
-  auto state_val = attrs.encode(s, {std::move(val), expr(true)}, ty);
+  auto state_val = attrs.encode(s, {std::move(val), expr(true)}, ty, true);
 
   bool never_poison = config::disable_poison_input || attrs.poisonImpliesUB();
   expr np = expr::mkBoolVar(("np_" + getSMTName(child)).c_str());

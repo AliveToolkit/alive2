@@ -6,7 +6,6 @@
 #include "ir/memory.h"
 #include "ir/globals.h"
 #include "ir/state.h"
-#include "util/compiler.h"
 
 using namespace IR;
 using namespace smt;
@@ -54,11 +53,9 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 
 Pointer::Pointer(const Memory &m, const char *var_name,
                  const ParamAttrs &attr) : m(m) {
-  unsigned align_bits = ilog2(attr.align);
-  unsigned bits = bitsShortBid() + bits_for_offset - align_bits;
+  unsigned bits = bitsShortBid() + bits_for_offset;
   p = prepend_if(expr::mkUInt(0, 1),
-                 expr::mkVar(var_name, bits, false), hasLocalBit())
-      .concat_zeros(align_bits);
+                 expr::mkVar(var_name, bits, false), hasLocalBit());
   if (bits_for_ptrattrs)
     p = p.concat(attr_to_bitvec(attr));
   assert(p.bits() == totalBits());
@@ -331,7 +328,7 @@ expr Pointer::inbounds(bool simplify_ptr, bool strict) {
 
   // trim set of valid ptrs
   if (auto ptrs = std::move(all_ptrs)())
-    p = *ptrs;
+    p = *std::move(ptrs);
   else
     p = expr::mkUInt(0, totalBits());
 
@@ -433,7 +430,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
                            bool round_size_to_align) {
   expr bytes = bytes0.zextOrTrunc(bits_size_t);
   if (round_size_to_align)
-    bytes = bytes.round_up(expr::mkUInt(align, bits_size_t));
+    bytes = bytes.round_up(expr::mkUInt(align, bytes));
   expr bytes_off = bytes.zextOrTrunc(bits_for_offset);
 
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;

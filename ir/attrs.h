@@ -95,7 +95,8 @@ public:
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 
   // Encodes the semantics of attributes using UB and poison.
-  StateValue encode(State &s, StateValue &&val, const Type &ty) const;
+  StateValue encode(State &s, StateValue &&val, const Type &ty,
+                    bool isdecl = false) const;
 };
 
 struct FPDenormalAttrs {

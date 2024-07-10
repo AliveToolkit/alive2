@@ -360,7 +360,7 @@ static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
                bool nocapture, bool writable, const expr &allocsize,
-               Value *allocalign) {
+               Value *allocalign, bool isdecl) {
   auto &m = s.getMemory();
   Pointer p(m, ptrvalue);
   expr non_poison(true);
@@ -373,19 +373,20 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   if (derefBytes || derefOrNullBytes || allocsize.isValid()) {
     // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
     if (derefBytes)
-      s.addUB(merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(derefBytes, align, writable, true)));
+      s.addUB(merge(p.isDereferenceable(derefBytes, align, writable, true)));
     if (derefOrNullBytes)
       s.addUB(p.isNull() ||
-              merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(derefOrNullBytes, align, writable,
-                                         true)));
+              merge(p.isDereferenceable(derefOrNullBytes, align, writable,
+                                        true)));
     if (allocsize.isValid())
       s.addUB(p.isNull() ||
-              merge(Pointer(m, ptrvalue)
-                      .isDereferenceable(allocsize, align, writable, true)));
-  } else if (align != 1)
-    non_poison &= Pointer(m, ptrvalue).isAligned(align);
+              merge(p.isDereferenceable(allocsize, align, writable, true)));
+  } else if (align != 1) {
+    non_poison &= p.isAligned(align);
+    if (isdecl)
+      s.addUB(merge(p.isDereferenceable(1, 1, false, true))
+                .implies(merge(p.isDereferenceable(1, align, false, true))));
+  }
 
   if (allocalign) {
     Pointer p(m, ptrvalue);
@@ -401,7 +402,8 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   return non_poison;
 }
 
-StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty) const{
+StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty,
+                              bool isdecl) const{
   if (has(NoFPClass)) {
     assert(ty.isFloatType());
     val.non_poison &= !isfpclass(val.value, ty, nofpclass);
@@ -410,7 +412,8 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty) const{
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                     has(NonNull), has(NoCapture), has(Writable), {}, nullptr);
+                     has(NonNull), has(NoCapture), has(Writable), {}, nullptr,
+                     isdecl);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
@@ -513,7 +516,7 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
-                     has(NonNull), false, false, allocsize, allocalign);
+                     has(NonNull), false, false, allocsize, allocalign, false);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
