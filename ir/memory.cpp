@@ -1572,7 +1572,7 @@ expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
 
   auto attrs = attrs0;
   attrs.set(ParamAttrs::IsArg);
-  Pointer p(*this, name, false, false, false, attrs);
+  Pointer p(*this, name, attrs);
   auto bid = p.getShortBid();
 
   state->addAxiom(bid.ule(max_bid));

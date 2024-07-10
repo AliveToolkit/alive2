@@ -38,9 +38,7 @@ class Pointer {
 public:
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,
           const smt::expr &attr);
-  Pointer(const Memory &m, const char *var_name,
-          const smt::expr &local = false, bool unique_name = true,
-          bool align = true, const ParamAttrs &attr = {});
+  Pointer(const Memory &m, const char *var_name, const ParamAttrs &attr);
   Pointer(const Memory &m, smt::expr p);
   Pointer(const Memory &m, unsigned bid, bool local);
   Pointer(const Memory &m, const smt::expr &bid, const smt::expr &offset,

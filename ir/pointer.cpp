@@ -27,10 +27,6 @@ static expr disjoint(const expr &begin1, const expr &len1, const expr &begin2,
   return begin1.uge(begin2 + len2) || begin2.uge(begin1 + len1);
 }
 
-static unsigned total_bits_short() {
-  return Pointer::bitsShortBid() + Pointer::bitsShortOffset();
-}
-
 static expr attr_to_bitvec(const ParamAttrs &attrs) {
   if (!bits_for_ptrattrs)
     return {};
@@ -56,16 +52,16 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
   assert(!bid.isValid() || !offset.isValid() || p.bits() == totalBits());
 }
 
-Pointer::Pointer(const Memory &m, const char *var_name, const expr &local,
-                 bool unique_name, bool align, const ParamAttrs &attr) : m(m) {
-  unsigned bits = total_bits_short() + !align * zeroBitsShortOffset();
-  p = prepend_if(local.toBVBool(),
-                 expr::mkVar(var_name, bits, unique_name), hasLocalBit());
-  if (align)
-    p = p.concat_zeros(zeroBitsShortOffset());
+Pointer::Pointer(const Memory &m, const char *var_name,
+                 const ParamAttrs &attr) : m(m) {
+  unsigned align_bits = ilog2(attr.align);
+  unsigned bits = bitsShortBid() + bits_for_offset - align_bits;
+  p = prepend_if(expr::mkUInt(0, 1),
+                 expr::mkVar(var_name, bits, false), hasLocalBit())
+      .concat_zeros(align_bits);
   if (bits_for_ptrattrs)
     p = p.concat(attr_to_bitvec(attr));
-  assert(!local.isValid() || p.bits() == totalBits());
+  assert(p.bits() == totalBits());
 }
 
 Pointer::Pointer(const Memory &m, expr repr) : m(m), p(std::move(repr)) {
