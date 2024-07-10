@@ -196,7 +196,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   auto get_operand(llvm::Value *v) {
     return llvm_util::get_operand(v,
         [this](auto I) { return convert_constexpr(I); },
-        [&](auto ag) { return copy_inserter(ag); });
+        [this](auto ag) { return copy_inserter(ag); },
+        [this](auto fn) { return register_fn_decl(fn, nullptr); });
   }
 
   RetTy NOP(llvm::Instruction &i) {
@@ -344,15 +345,6 @@ public:
     }
 
     auto fn = i.getCalledFunction();
-    FnAttrs attrs;
-    vector<ParamAttrs> param_attrs;
-
-    parse_fn_attrs(i, attrs, true);
-
-    if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
-      if (op->hasNoNaNs())
-        attrs.set(FnAttrs::NNaN);
-    }
 
     auto ty = llvm_type2alive(i.getType());
     if (!ty)
@@ -382,13 +374,6 @@ public:
         return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
-      Function::FnDecl decl;
-      decl.name  = '@' + fn_decl->getName().str();
-      decl.attrs = attrs;
-      decl.is_varargs = fn_decl->isVarArg();
-      if (!(decl.output = llvm_type2alive(fn_decl->getReturnType())))
-        return error(i);
-
       if (fn_decl->isVarArg())
         vararg_idx = fn_decl->arg_size();
 
@@ -403,23 +388,19 @@ public:
                                     UnaryOp::Copy);
       }
 
-      auto attrs_fndef = fn_decl->getAttributes();
-      for (uint64_t idx = 0, nargs = fn_decl->arg_size(); idx < nargs; ++idx) {
-        auto ty = llvm_type2alive(fn_decl->getArg(idx)->getType());
-        if (!ty)
-          return error(i);
-
-        unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
-        auto &arg = args.at(idx);
-        ParamAttrs pattr;
-        handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr,
-                         *arg, arg, true);
-        decl.inputs.emplace_back(ty, std::move(pattr));
-      }
-      alive_fn->addFnDecl(std::move(decl));
+      if (!register_fn_decl(fn_decl, &args))
+        return error(i);
     }
 
+    FnAttrs attrs;
+    vector<ParamAttrs> param_attrs;
+
     parse_fn_attrs(i, attrs);
+
+    if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
+      if (op->hasNoNaNs())
+        attrs.set(FnAttrs::NNaN);
+    }
 
     if (!approx) {
       auto [known, approx0]
@@ -463,10 +444,10 @@ public:
 
       unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + argidx;
       approx |= !handleParamAttrs(attrs_callsite.getAttributes(attr_argidx),
-                                  pattr, *arg, arg, true);
+                                  pattr, &arg, true);
       if (fn && argidx < fn->arg_size())
         approx |= !handleParamAttrs(attrs_fndef.getAttributes(attr_argidx),
-                                    pattr, *arg, arg, true);
+                                    pattr, &arg, true);
 
       if (i.paramHasAttr(argidx, llvm::Attribute::NoUndef)) {
         if (i.getArgOperand(argidx)->getType()->isAggregateType())
@@ -1453,7 +1434,7 @@ public:
   // TODO: Once attributes at a call site are fully supported, we should
   // remove is_callsite flag
   bool handleParamAttrs(const llvm::AttributeSet &aset, ParamAttrs &attrs,
-                        Value &val, Value* &newval, bool is_callsite) {
+                        Value **val, bool is_callsite) {
     bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
       switch (llvmattr.getKindAsEnum()) {
@@ -1528,7 +1509,8 @@ public:
         break;
 
       case llvm::Attribute::Range:
-        newval = handleRangeAttr(llvmattr, val,
+        if (val)
+          *val = handleRangeAttr(llvmattr, **val,
                                  aset.hasAttribute(llvm::Attribute::NoUndef));
         break;
 
@@ -1723,22 +1705,45 @@ public:
     attrs.inferImpliedAttributes();
   }
 
-  static void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs,
-                             bool decl_only = false) {
+  static void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs) {
+    attrs.mem.setFullAccess();
+
     if (auto fn = i.getCalledFunction())
       parse_fn_decl_attrs(fn, attrs);
-    else
-      attrs.mem.setFullAccess();
 
-    if (!decl_only) {
-      llvm::AttributeList attrs_callsite = i.getAttributes();
-      auto ret = llvm::AttributeList::ReturnIndex;
-      auto fnidx = llvm::AttributeList::FunctionIndex;
-      handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
-      handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
-      attrs.mem &= handleMemAttrs(i.getMemoryEffects());
-      attrs.inferImpliedAttributes();
+    llvm::AttributeList attrs_callsite = i.getAttributes();
+    auto ret = llvm::AttributeList::ReturnIndex;
+    auto fnidx = llvm::AttributeList::FunctionIndex;
+    handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
+    handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
+    attrs.mem &= handleMemAttrs(i.getMemoryEffects());
+    attrs.inferImpliedAttributes();
+  }
+
+  bool register_fn_decl(llvm::Function *fn, vector<Value*> *args) {
+    Function::FnDecl decl;
+    decl.name       = '@' + fn->getName().str();
+    decl.is_varargs = fn->isVarArg();
+    if (!(decl.output = llvm_type2alive(fn->getReturnType())))
+      return false;
+
+    parse_fn_decl_attrs(fn, decl.attrs);
+
+    const auto &attrs_fndef = fn->getAttributes();
+    for (uint64_t idx = 0, nargs = fn->arg_size(); idx < nargs; ++idx) {
+      auto ty = llvm_type2alive(fn->getArg(idx)->getType());
+      if (!ty)
+        return false;
+
+      unsigned attr_argidx = llvm::AttributeList::FirstArgIndex + idx;
+      auto **arg = args ? &args->at(idx) : nullptr;
+      ParamAttrs pattr;
+      handleParamAttrs(attrs_fndef.getAttributes(attr_argidx), pattr, arg,
+                       true);
+      decl.inputs.emplace_back(ty, std::move(pattr));
     }
+    alive_fn->addFnDecl(std::move(decl));
+    return true;
   }
 
 
@@ -1782,7 +1787,7 @@ public:
       auto val = make_unique<Input>(*ty, value_name(arg));
       Value *newval = val.get();
 
-      if (!ty || !handleParamAttrs(argattr, attrs, *val, newval, false))
+      if (!ty || !handleParamAttrs(argattr, attrs, &newval, false))
         return {};
       val->setAttributes(std::move(attrs));
       add_identifier(arg, *newval);

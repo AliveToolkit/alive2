@@ -277,7 +277,8 @@ IR::Value* get_poison(Type &ty) {
 
 Value* get_operand(llvm::Value *v,
                    function<Value*(llvm::ConstantExpr*)> constexpr_conv,
-                   function<Value*(AggregateValue*)> copy_inserter) {
+                   function<Value*(AggregateValue*)> copy_inserter,
+                   function<bool(llvm::Function*)> register_fn_decl) {
   if (auto ptr = get_identifier(*v))
     return ptr;
 
@@ -360,6 +361,10 @@ Value* get_operand(llvm::Value *v,
       fn->getAlign().value_or(llvm::Align(8)).value(), true, true);
     auto gvar = val.get();
     current_fn->addConstant(std::move(val));
+
+    if (!register_fn_decl(fn))
+      return nullptr;
+
     RETURN_CACHE(gvar);
   }
 
@@ -370,7 +375,8 @@ Value* get_operand(llvm::Value *v,
 
     for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
       if (!aty->isPadding(i)) {
-        if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter))
+        if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter,
+                                  register_fn_decl))
           vals.emplace_back(op);
         else
           return false;
