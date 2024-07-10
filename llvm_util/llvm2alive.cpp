@@ -1264,7 +1264,8 @@ public:
 
   RetTy visitInstruction(llvm::Instruction &i) { return error(i); }
 
-  RetTy error(llvm::Instruction &i) {
+  template <typename RetType = RetTy>
+  RetType error(llvm::Instruction &i) {
     if (hit_limits)
       return {};
     stringstream ss;
@@ -1274,6 +1275,7 @@ public:
          << string_view(std::move(ss).str()).substr(0, 80) << '\n';
     return {};
   }
+
   RetTy errorAttr(const llvm::Attribute &attr) {
     *out << "ERROR: Unsupported attribute: " << attr.getAsString() << '\n';
     return {};
@@ -1397,6 +1399,32 @@ public:
         return false;
       }
     }
+    return true;
+  }
+
+  bool handleOpBundles(llvm::Instruction &llvm_i, Instr *i) {
+    auto *call = dyn_cast<llvm::CallBase>(&llvm_i);
+    if (!call)
+      return true;
+
+    for (auto &bundle0 : call->bundle_op_infos()) {
+      auto bundle = call->operandBundleFromBundleOpInfo(bundle0);
+      if (bundle.getTagName() == "clang.arc.attachedcall") {
+        assert(bundle.Inputs.size() == 1);
+        auto *fn = dyn_cast<llvm::Function>(bundle.Inputs[0].get());
+        auto ty = llvm_type2alive(fn->getReturnType());
+        if (!ty)
+          return error<bool>(llvm_i);
+
+        FnAttrs attrs;
+        parse_fn_decl_attrs(fn, attrs);
+
+        BB->addInstr(
+          make_unique<FnCall>(*ty, i->getName() + "#arc",
+                              '@' + fn->getName().str(), std::move(attrs)));
+      }
+    }
+
     return true;
   }
 
@@ -1535,7 +1563,7 @@ public:
     return precise;
   }
 
-  void handleRetAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
+  static void handleRetAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
     for (const llvm::Attribute &llvmattr : aset) {
       if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
           !llvmattr.isTypeAttribute())
@@ -1594,7 +1622,7 @@ public:
     return attr;
   }
 
-  void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
+  static void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
     for (const llvm::Attribute &llvmattr : aset) {
       if (llvmattr.isStringAttribute()) {
         auto str = llvmattr.getKindAsString();
@@ -1660,7 +1688,7 @@ public:
     }
   }
 
-  MemoryAccess handleMemAttrs(const llvm::MemoryEffects &e) {
+  static MemoryAccess handleMemAttrs(const llvm::MemoryEffects &e) {
     MemoryAccess attrs;
     attrs.setNoAccess();
 
@@ -1684,27 +1712,33 @@ public:
     return attrs;
   }
 
-  void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs,
-                      bool decl_only = false) {
-    auto fn = i.getCalledFunction();
-    llvm::AttributeList attrs_callsite = i.getAttributes();
-    llvm::AttributeList attrs_fndef = fn ? fn->getAttributes()
-                                          : llvm::AttributeList();
+  static void parse_fn_decl_attrs(const llvm::Function *fn, FnAttrs &attrs) {
+    llvm::AttributeList attrs_fndef = fn->getAttributes();
     auto ret = llvm::AttributeList::ReturnIndex;
     auto fnidx = llvm::AttributeList::FunctionIndex;
-
-    if (!decl_only) {
-      handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
-      handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
-    }
     handleRetAttrs(attrs_fndef.getAttributes(ret), attrs);
     handleFnAttrs(attrs_fndef.getAttributes(fnidx), attrs);
     attrs.mem.setFullAccess();
-    if (!decl_only)
-      attrs.mem &= handleMemAttrs(i.getMemoryEffects());
-    if (fn)
-      attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
+    attrs.mem &= handleMemAttrs(fn->getMemoryEffects());
     attrs.inferImpliedAttributes();
+  }
+
+  static void parse_fn_attrs(const llvm::CallInst &i, FnAttrs &attrs,
+                             bool decl_only = false) {
+    if (auto fn = i.getCalledFunction())
+      parse_fn_decl_attrs(fn, attrs);
+    else
+      attrs.mem.setFullAccess();
+
+    if (!decl_only) {
+      llvm::AttributeList attrs_callsite = i.getAttributes();
+      auto ret = llvm::AttributeList::ReturnIndex;
+      auto fnidx = llvm::AttributeList::FunctionIndex;
+      handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
+      handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
+      attrs.mem &= handleMemAttrs(i.getMemoryEffects());
+      attrs.inferImpliedAttributes();
+    }
   }
 
 
@@ -1827,6 +1861,9 @@ public:
 
           if (i.hasMetadataOtherThanDebugLoc() &&
               !handleMetadata(Fn, i, alive_i))
+            return {};
+
+          if (!handleOpBundles(i, alive_i))
             return {};
         } else
           return {};
