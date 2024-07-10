@@ -1035,11 +1035,10 @@ static void calculateAndInitConstants(Transform &t) {
       has_ptr_arg |= hasPtr(i->getType());
 
       update_min_vect_sz(i->getType());
+      max_access_size = max(max_access_size, i->getAttributes().maxAccesSize());
 
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
-        uint64_t deref_bytes = i->getAttributes().derefBytes;
-        max_access_size = max(max_access_size, deref_bytes);
       }
       if (i->hasAttribute(ParamAttrs::DereferenceableOrNull)) {
         // Optimization: unless explicitly compared with a null pointer, don't
@@ -1048,13 +1047,10 @@ static void calculateAndInitConstants(Transform &t) {
         // Note that dereferenceable_or_null implies num_ptrinputs > 0,
         // which may turn has_null_block on.
         does_mem_access = true;
-        uint64_t deref_bytes = i->getAttributes().derefOrNullBytes;
-        max_access_size = max(max_access_size, deref_bytes);
       }
       if (i->hasAttribute(ParamAttrs::ByVal)) {
         does_mem_access = true;
         uint64_t sz = i->getAttributes().blockSize;
-        max_access_size = max(max_access_size, sz);
         min_global_size = min_global_size != UINT64_MAX
                             ? gcd(sz, min_global_size)
                             : sz;

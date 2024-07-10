@@ -7,10 +7,12 @@
 #include "ir/state.h"
 #include "ir/state_value.h"
 #include "ir/type.h"
+#include "util/compiler.h"
 #include <cassert>
 
 using namespace std;
 using namespace smt;
+using namespace util;
 
 namespace IR {
 ostream& operator<<(ostream &os, const ParamAttrs &attr) {
@@ -337,6 +339,13 @@ uint64_t ParamAttrs::getDerefBytes() const {
   if (has(ParamAttrs::ByVal))
     bytes = max(bytes, blockSize);
   return bytes;
+}
+
+uint64_t ParamAttrs::maxAccesSize() const {
+  uint64_t bytes = getDerefBytes();
+  if (has(ParamAttrs::DereferenceableOrNull))
+    bytes = max(bytes, derefOrNullBytes);
+  return round_up(bytes, align);
 }
 
 void ParamAttrs::merge(const ParamAttrs &other) {

@@ -88,6 +88,7 @@ public:
   bool poisonImpliesUB() const;
 
   uint64_t getDerefBytes() const;
+  uint64_t maxAccesSize() const;
 
   void merge(const ParamAttrs &other);
 
