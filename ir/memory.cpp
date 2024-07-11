@@ -1756,7 +1756,7 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
       if (always_nowrite(i, true, true))
         continue;
       st.non_local_block_val.emplace_back(
-        expr::mkFreshVar("blk_val", non_local_block_val[i].val));
+        expr::mkFreshVar("blk_val", mk_block_val_array(i)));
     }
   }
 
