@@ -907,27 +907,23 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
     if ( write && always_nowrite(bid0)) return false;
   }
 
-  if (offset0.isNegative().isTrue())
+  if (!isAsmMode() && offset0.isNegative().isTrue())
     return false;
 
   assert(!isUndef(offset0));
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
-  if (auto algn = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
-    int64_t offset = 0;
-    uint64_t blk_align;
-    if (algn->isUInt(blk_align) &&
-        align > (1ull << blk_align) &&
-        (!observesAddresses() || offset0.isInt(offset)))
-      return false;
-  }
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
     expr offset = offset0.sextOrTrunc(bits_size_t);
-    if (offset.uge(*sz).isTrue() ||
-        sz->ult(bytes).isTrue() ||
-        (*sz - offset).ult(bytes).isTrue())
+    if (sz->ult(bytes).isTrue())
       return false;
+
+    if (!isAsmMode()) {
+      if (offset.uge(*sz).isTrue() ||
+          (*sz - offset).ult(bytes).isTrue())
+        return false;
+    }
   } else if (local) // allocated in another branch
     return false;
 
@@ -1008,13 +1004,15 @@ end:
 
 void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
                     bool write, const
-                      function<void(MemBlock&, unsigned, bool, expr&&)> &fn) {
+                      function<void(MemBlock&, const Pointer&, expr&&)> &fn) {
   auto aliasing = computeAliasing(ptr, bytes, align, write);
   unsigned has_local = aliasing.numMayAlias(true);
   unsigned has_nonlocal = aliasing.numMayAlias(false);
   bool has_both = has_local && has_nonlocal;
   bool is_singleton = has_local + has_nonlocal == 1;
 
+  expr addr = ptr.getAddress();
+  expr offset = ptr.getOffset();
   expr is_local = ptr.isLocal();
   expr bid = has_both ? ptr.getBid() : ptr.getShortBid();
   expr one = expr::mkUInt(1, 1);
@@ -1023,26 +1021,49 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
   auto sz_nonlocal = aliasing.size(false);
 
   for (unsigned i = 0; i < sz_local; ++i) {
-    if (aliasing.mayAlias(true, i)) {
+    if (!aliasing.mayAlias(true, i))
+      continue;
+
+    Pointer this_ptr(*this, i, true);
+    expr cond_eq;
+
+    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+      // in asm mode, all pointers have full provenance
+      cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
+      this_ptr += addr - this_ptr.getAddress();
+    } else {
       auto n = expr::mkUInt(i, Pointer::bitsShortBid());
-      fn(local_block_val[i], i, true,
-         is_singleton ? true
-                      : (has_local == 1
-                           ? is_local
-                           : bid == (has_both ? one.concat(n) : n)));
+      cond_eq
+        = has_local == 1 ? is_local : (bid == (has_both ? one.concat(n) : n));
+      this_ptr += offset;
     }
+
+    fn(local_block_val[i], ptr, is_singleton ? expr(true) : std::move(cond_eq));
   }
 
   for (unsigned i = 0; i < sz_nonlocal; ++i) {
-    if (aliasing.mayAlias(false, i)) {
-      // A nonlocal block for encoding fn calls' side effects cannot be
-      // accessed.
-      // If aliasing info says it can, either imprecise analysis or incorrect
-      // block id encoding is happening.
-      assert(!is_fncall_mem(i));
-      fn(non_local_block_val[i], i, false,
-         is_singleton ? true : (has_nonlocal == 1 ? !is_local : bid == i));
+    if (!aliasing.mayAlias(false, i))
+      continue;
+
+    // A nonlocal block for encoding fn calls' side effects cannot be
+    // accessed.
+    // If aliasing info says it can, either imprecise analysis or incorrect
+    // block id encoding is happening.
+    assert(!is_fncall_mem(i));
+    Pointer this_ptr(*this, i, false);
+    expr cond_eq;
+
+    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+      // in asm mode, all pointers have full provenance
+      cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
+      this_ptr += addr - this_ptr.getAddress();
+    } else {
+      cond_eq   = has_nonlocal == 1 ? !is_local : bid == i;
+      this_ptr += offset;
     }
+
+    fn(non_local_block_val[i], this_ptr,
+       is_singleton ? expr(true) : std::move(cond_eq));
   }
 }
 
@@ -1073,18 +1094,17 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
   expr poison = Byte::mkPoisonByte(*this)();
   loaded.resize(loaded_bytes, poison);
 
-  expr offset = ptr.getShortOffset();
-
-  auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+  auto fn = [&](MemBlock &blk, const Pointer &ptr, expr &&cond) {
     bool is_poison = (type & blk.type) == DATA_NONE;
     if (is_poison) {
       for (unsigned i = 0; i < loaded_bytes; ++i) {
         loaded[i].add(poison, cond);
       }
     } else {
-      uint64_t blk_size = UINT64_MAX;
-      Pointer(*this, bid, local).blockSize().isUInt(blk_size);
-      expr blk_offset = blk_size == bytes ? expr::mkUInt(0, offset) : offset;
+      uint64_t blk_size;
+      bool single_load = ptr.blockSize().isUInt(blk_size) && blk_size == bytes;
+      auto offset      = ptr.getShortOffset();
+      expr blk_offset  = single_load ? expr::mkUInt(0, offset) : offset;
 
       for (unsigned i = 0; i < loaded_bytes; ++i) {
         unsigned idx = left2right ? i : (loaded_bytes - i - 1);
@@ -1143,18 +1163,15 @@ void Memory::store(const Pointer &ptr,
   }
 
   unsigned bytes = data.size() * (bits_byte/8);
-  expr offset = ptr.getShortOffset();
 
   auto stored_ty = data_type(data, false);
   auto stored_ty_full = data_type(data, true);
 
-  auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+  auto fn = [&](MemBlock &blk, const Pointer &ptr, expr &&cond) {
     auto mem = blk.val;
 
     uint64_t blk_size;
-    bool full_write
-      = Pointer(*this, bid, local).blockSize().isUInt(blk_size) &&
-        blk_size == bytes;
+    bool full_write = ptr.blockSize().isUInt(blk_size) && blk_size == bytes;
 
     // optimization: if fully rewriting the block, don't bother with the old
     // contents. Pick a value as the default one.
@@ -1178,6 +1195,8 @@ void Memory::store(const Pointer &ptr,
     } else {
       blk.type |= stored_ty;
     }
+
+    expr offset = ptr.getShortOffset();
 
     for (auto &[idx, val] : data) {
       if (full_write && val.eq(data[0].second))
@@ -1208,11 +1227,11 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
     val = expr::mkIf(offset.urem(mod) == I->first, I->second, val);
   }
 
-  auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+  auto fn = [&](MemBlock &blk, const Pointer &ptr, expr &&cond) {
     auto orig_val = ::raw_load(blk.val, offset);
 
     // optimization: full rewrite
-    if (bytes.eq(Pointer(*this, bid, local).blockSize())) {
+    if (bytes.eq(ptr.blockSize())) {
       blk.val = val_no_offset
         ? mk_block_if(cond, val, std::move(blk.val))
         : expr::mkLambda(offset, mk_block_if(cond, val, std::move(orig_val)));
@@ -2285,8 +2304,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
       = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
     Pointer ptr_src = src + (offset - dst.getShortOffset());
     set<expr> undef;
-    auto val = raw_load(ptr_src, undef);
-    storeLambda(dst, offset, bytesize, {{0, std::move(val)()}}, undef,
+    storeLambda(dst, offset, bytesize, {{0, raw_load(ptr_src, undef)()}}, undef,
                 align_dst);
   }
 }
@@ -2304,7 +2322,8 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   assert(local.isConst());
   bool dst_local = local.isTrue();
   uint64_t dst_bid;
-  ENSURE(dst.getShortBid().isUInt(dst_bid));
+  expr dst_bid_expr = dst.getShortBid();
+  ENSURE(dst_bid_expr.isUInt(dst_bid));
   auto &dst_blk = (dst_local ? local_block_val : non_local_block_val)[dst_bid];
   dst_blk.undef.clear();
   dst_blk.type = DATA_NONE;
@@ -2313,9 +2332,9 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   auto offset = expr::mkUInt(0, Pointer::bitsShortOffset());
   DisjointExpr val(Byte::mkPoisonByte(*this)());
 
-  auto fn = [&](MemBlock &blk, unsigned bid, bool local, expr &&cond) {
+  auto fn = [&](MemBlock &blk, const Pointer &ptr, expr &&cond) {
     // we assume src != dst
-    if (local == dst_local && bid == dst_bid)
+    if (ptr.isLocal().eq(local) && ptr.getShortBid().eq(dst_bid_expr))
       return;
     val.add(blk.val, std::move(cond));
     dst_blk.undef.insert(blk.undef.begin(), blk.undef.end());

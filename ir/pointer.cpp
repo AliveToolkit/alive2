@@ -305,32 +305,48 @@ expr Pointer::operator!=(const Pointer &rhs) const {
   return !operator==(rhs);
 }
 
-static expr inbounds(const Pointer &p, bool strict) {
-  if (isUndef(p.getOffset()))
+expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0) const {
+  assert(block.getOffset().isZero());
+  expr bytes = bytes0.zextOrTrunc(bits_ptr_address);
+  expr addr  = getAddress();
+  expr block_addr = block.getAddress();
+  expr block_size = block.blockSize().zextOrTrunc(bits_ptr_address);
+
+  if (bytes.eq(block_size))
+    return addr == block_addr;
+  if (bytes.ugt(block_size).isTrue())
     return false;
 
-  auto offset = p.getOffsetSizet();
-  auto size   = p.blockSizeOffsetT();
+  return addr.uge(block_addr) &&
+         addr.add_no_uoverflow(bytes) &&
+         (addr + bytes).ule(block_addr + block_size);
+}
+
+expr Pointer::isInboundsOf(const Pointer &block, unsigned bytes) const {
+  return isInboundsOf(block, expr::mkUInt(bytes, bits_ptr_address));
+}
+
+expr Pointer::isInbounds(bool strict) const {
+  if (isUndef(getOffset()))
+    return false;
+
+  auto offset = getOffsetSizet();
+  auto size   = blockSizeOffsetT();
   return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
 }
 
-expr Pointer::inbounds(bool simplify_ptr, bool strict) {
-  if (!simplify_ptr)
-    return ::inbounds(*this, strict);
-
+expr Pointer::inbounds() {
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
-    expr inb = ::inbounds(Pointer(m, ptr_expr), strict);
+    expr inb = Pointer(m, ptr_expr).isInbounds(false);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
     ret.add(std::move(inb), domain);
   }
 
   // trim set of valid ptrs
-  if (auto ptrs = std::move(all_ptrs)())
-    p = *std::move(ptrs);
-  else
-    p = expr::mkUInt(0, totalBits());
+  auto ptrs = std::move(all_ptrs)();
+  p = ptrs ? *std::move(ptrs) : expr::mkUInt(0, totalBits());
 
   return *std::move(ret)();
 }
@@ -376,10 +392,10 @@ expr Pointer::isAligned(uint64_t align) {
       newp = newp.concat(getAttrs());
     p = std::move(newp);
     assert(!p.isValid() || p.bits() == totalBits());
-    return { blk_align && offset.extract(bits - 1, 0) == zero };
+    return { blk_align && offset.trunc(bits) == zero };
   }
 
-  return getAddress().extract(bits - 1, 0) == 0;
+  return getAddress().trunc(bits) == 0;
 }
 
 expr Pointer::isAligned(const expr &align) {
@@ -393,36 +409,6 @@ expr Pointer::isAligned(const expr &align) {
                isNull());
 }
 
-static pair<expr, expr> is_dereferenceable(Pointer &p,
-                                           const expr &bytes_off,
-                                           const expr &bytes,
-                                           uint64_t align, bool iswrite,
-                                           bool ignore_accessability) {
-  expr block_sz = p.blockSizeOffsetT();
-  expr offset = p.getOffset();
-
-  // check that offset is within bounds and that arith doesn't overflow
-  expr cond = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
-  cond &= !offset.isNegative();
-  if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
-    cond &= offset.add_no_soverflow(bytes_off);
-
-  cond &= p.isBlockAlive();
-
-  if (iswrite)
-    cond &= p.isWritable() && !p.isNoWrite();
-  else if (!ignore_accessability)
-    cond &= !p.isNoRead();
-
-  // try some constant folding; these are implied by the conditions above
-  if (bytes.ugt(p.blockSize()).isTrue() ||
-      p.getOffsetSizet().uge(block_sz).isTrue() ||
-      isUndef(offset))
-    cond = false;
-
-  return { std::move(cond), p.isAligned(align) };
-}
-
 // When bytes is 0, pointer is always dereferenceable
 pair<AndExpr, expr>
 Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
@@ -433,12 +419,55 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     bytes = bytes.round_up(expr::mkUInt(align, bytes));
   expr bytes_off = bytes.zextOrTrunc(bits_for_offset);
 
+  auto block_constraints = [=](const Pointer &p) {
+    expr ret = p.isBlockAlive();
+    if (iswrite)
+      ret &= p.isWritable() && !p.isNoWrite();
+    else if (!ignore_accessability)
+      ret &= !p.isNoRead();
+    return ret;
+  };
+
+  auto is_dereferenceable = [&](Pointer &p) {
+    expr block_sz = p.blockSizeOffsetT();
+    expr offset   = p.getOffset();
+    expr cond;
+
+    if (m.state->isAsmMode()) {
+      // Pointers have full provenance in ASM mode
+      auto check = [&](unsigned limit, bool local) {
+        for (unsigned i = 0; i != limit; ++i) {
+          Pointer this_ptr(m, i, local);
+          cond |= p.isInboundsOf(this_ptr, bytes) &&
+                  block_constraints(this_ptr);
+        }
+      };
+      cond = false;
+      check(m.numLocals(), true);
+      check(m.numNonlocals(), false);
+
+    // try some constant folding
+    } else if (bytes.ugt(p.blockSize()).isTrue() ||
+              p.getOffsetSizet().uge(block_sz).isTrue() ||
+              isUndef(offset)) {
+      cond = false;
+    } else {
+      // check that the offset is within bounds and that arith doesn't overflow
+      cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
+      cond &= !offset.isNegative();
+      if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
+        cond &= offset.add_no_soverflow(bytes_off);
+
+      cond &= block_constraints(p);
+    }
+    return make_pair(std::move(cond), p.isAligned(align));
+  };
+
   DisjointExpr<expr> UB(expr(false)), is_aligned(expr(false)), all_ptrs;
 
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
     Pointer ptr(m, ptr_expr);
-    auto [ub, aligned] = ::is_dereferenceable(ptr, bytes_off, bytes, align,
-                                              iswrite, ignore_accessability);
+    auto [ub, aligned] = is_dereferenceable(ptr);
 
     // record pointer if not definitely unfeasible
     if (!ub.isFalse() && !aligned.isFalse() && !ptr.blockSize().isZero())
@@ -572,14 +601,11 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
 
-  Pointer other_deref
-    = is_asm ? other.m.searchPointer(other.getAddress()) : other;
-
   return expr::mkIf(isNull(), other.isNull(),
                     expr::mkIf(isLocal(), local, nonlocal) &&
                       // FIXME: this should be disabled just for phy pointers
                       (is_asm ? expr(true)
-                        : isBlockAlive().implies(other_deref.isBlockAlive())));
+                        : isBlockAlive().implies(other.isBlockAlive())));
 }
 
 expr Pointer::isWritable() const {

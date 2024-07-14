@@ -192,7 +192,7 @@ class Memory {
                            bool write) const;
 
   void access(const Pointer &ptr, unsigned btyes, uint64_t align, bool write,
-              const std::function<void(MemBlock&, unsigned, bool,
+              const std::function<void(MemBlock&, const Pointer&,
                                        smt::expr&&)> &fn);
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
