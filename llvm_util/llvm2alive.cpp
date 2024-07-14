@@ -832,10 +832,20 @@ public:
 
             BB->addInstr(make_unique<Assume>(*av, Assume::WellDefined));
           }
-        } else if (name == "align") {
-          llvm::Value *ptr = bundle.Inputs[0].get();
+        }
+        else if (name == "dereferenceable") {
+          auto *ptr   = get_operand(bundle.Inputs[0].get());
+          auto *bytes = get_operand(bundle.Inputs[1].get());
+          if (!ptr || !bytes)
+            return error(i);
+
+          BB->addInstr(make_unique<Assume>(vector<Value*>{ptr, bytes},
+                                           Assume::Dereferenceable));
+        }
+        else if (name == "align") {
+          auto *aptr         = get_operand(bundle.Inputs[0].get());
           llvm::Value *align = bundle.Inputs[1].get();
-          auto *aptr = get_operand(ptr), *aalign = get_operand(align);
+          auto *aalign       = get_operand(align);
           if (!aptr || !aalign || align->getType()->getIntegerBitWidth() > 64)
             return error(i);
 
@@ -851,15 +861,18 @@ public:
             BB->addInstr(std::move(gep));
           }
 
-          vector<Value *> args = {aptr, aalign};
-          BB->addInstr(make_unique<Assume>(std::move(args), Assume::Align));
-        } else if (name == "nonnull") {
-          llvm::Value *ptr = bundle.Inputs[0].get();
-          auto *aptr = get_operand(ptr);
-          if (!aptr)
+          BB->addInstr(make_unique<Assume>(vector<Value*>{aptr, aalign},
+                                           Assume::Align));
+        }
+        else if (name == "nonnull") {
+          auto *ptr = get_operand(bundle.Inputs[0].get());
+          if (!ptr)
             return error(i);
 
-          BB->addInstr(make_unique<Assume>(*aptr, Assume::NonNull));
+          BB->addInstr(make_unique<Assume>(*ptr, Assume::NonNull));
+        }
+        else if (name == "cold") {
+          // Not relevant for correctness
         } else {
           return error(i);
         }
