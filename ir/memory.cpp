@@ -1101,7 +1101,7 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
         loaded[i].add(poison, cond);
       }
     } else {
-      uint64_t blk_size;
+      uint64_t blk_size = UINT64_MAX;
       bool single_load = ptr.blockSize().isUInt(blk_size) && blk_size == bytes;
       auto offset      = ptr.getShortOffset();
       expr blk_offset  = single_load ? expr::mkUInt(0, offset) : offset;
