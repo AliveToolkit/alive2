@@ -1268,7 +1268,7 @@ void State::addNonDetVar(const expr &var) {
 
 expr State::getFreshNondetVar(const char *prefix, const expr &type) {
   expr var = expr::mkFreshVar(prefix, type);
-  nondet_vars.emplace(var);
+  addNonDetVar(var);
   return var;
 }
 

@@ -475,7 +475,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
 
     if (orig_bw > fraction_bits) {
       fraction = fraction.extract(orig_bw-1, orig_bw - fraction_bits);
-      truncated_is_nan = fraction.trunc(fraction_bits - 1) != 0;
+      truncated_is_nan = fraction != 0;
     } else if (orig_bw < fraction_bits) {
       fraction = fraction.concat_zeros(fraction_bits - fraction.bits());
     }
