@@ -597,6 +597,16 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     e = expr();
     auto res = s.check();
 
+    // Some non-deterministic vars have preconditions. These preconditions are
+    // under the forall quantifier, hence they have no effect when we fetch
+    // the vars from the model (as in fact these are different vars -- they
+    // are implicitly existentially quantified).
+    if (res.isSat()) {
+      s.add(pre_src_forall);
+      res = s.check();
+      assert(!res.isUnsat());
+    }
+
     if (!res.isUnsat() &&
         !error(errs, src_state, tgt_state, res, s, var, msg, check_each_var,
                printer))
