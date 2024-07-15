@@ -1413,9 +1413,14 @@ public:
         FnAttrs attrs;
         parse_fn_decl_attrs(fn, attrs);
 
-        BB->addInstr(
-          make_unique<FnCall>(*ty, i->getName() + "#arc",
-                              '@' + fn->getName().str(), std::move(attrs)));
+        auto call
+          = make_unique<FnCall>(*ty, i->getName() + "#arc",
+                                '@' + fn->getName().str(), std::move(attrs));
+
+        if (fn->isIntrinsic())
+          call->setApproximated(true);
+
+        BB->addInstr(std::move(call));
       }
     }
 

@@ -153,7 +153,7 @@ public:
 
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
-  bool isAlloc() const { return allockind != 0; }
+  bool isAlloc() const { return allockind != 0 || has(AllocSize); }
 
   void inferImpliedAttributes();
 
