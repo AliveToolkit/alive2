@@ -298,8 +298,6 @@ bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
   // check attributes that may give UB to the caller if added
   unsigned attrs =
     ByVal |
-    Dereferenceable |
-    DereferenceableOrNull |
     NoUndef |
     Writable
   ;
@@ -317,10 +315,7 @@ bool ParamAttrs::refinedBy(const ParamAttrs &other) const {
   if ((bits & attrs) != (other.bits & attrs))
     return false;
 
-  return derefBytes == other.derefBytes &&
-         derefOrNullBytes == other.derefOrNullBytes &&
-         blockSize == other.blockSize &&
-         align == other.align;
+  return blockSize == other.blockSize;
 }
 
 bool ParamAttrs::poisonImpliesUB() const {

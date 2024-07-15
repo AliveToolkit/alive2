@@ -1,4 +1,4 @@
-; ERROR: Parameter attributes not refined
+; ERROR: Source is more defined than target
 
 define ptr @src(ptr %p) {
   ret ptr %p

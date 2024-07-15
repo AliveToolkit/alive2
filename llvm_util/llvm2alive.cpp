@@ -871,7 +871,7 @@ public:
 
           BB->addInstr(make_unique<Assume>(*ptr, Assume::NonNull));
         }
-        else if (name == "cold") {
+        else if (name == "cold" || name == "ignore") {
           // Not relevant for correctness
         } else {
           return error(i);
