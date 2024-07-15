@@ -2489,7 +2489,9 @@ StateValue FnCall::toSMT(State &s) const {
     UNREACHABLE();
   };
 
-  if (attrs.has(AllocKind::Alloc) || attrs.has(AllocKind::Realloc)) {
+  if (attrs.has(AllocKind::Alloc) ||
+      attrs.has(AllocKind::Realloc) ||
+      attrs.has(FnAttrs::AllocSize)) {
     auto [size, np_size] = attrs.computeAllocSize(s, args);
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
