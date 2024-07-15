@@ -504,7 +504,7 @@ Result Solver::check(const char *query_name) const {
   if (print_queries) {
     dbg() << "\nSMT query";
     if (query_name != nullptr) {
-      dbg() << " (" << query_name << ")";
+      dbg() << " (" << query_name << ')';
     }
     dbg() << ":\n" << Z3_solver_to_string(ctx(), s) << endl;
   }

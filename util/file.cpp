@@ -35,7 +35,7 @@ string get_random_filename(const string &dir, const char *extension, const char 
       name << prefix << '_';
     }
     name << get_random_str(12) << '.' << extension;
-    return name.str();
+    return std::move(name).str();
   };
   fs::path path = fs::path(dir) / newname();
   while (fs::exists(path)) {
