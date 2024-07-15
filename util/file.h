@@ -23,6 +23,6 @@ public:
 
 struct FileIOException {};
 
-std::string get_random_filename(const std::string &dir, const char *extension);
+std::string get_random_filename(const std::string &dir, const char *extension, const char *prefix = nullptr);
 
 }

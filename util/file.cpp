@@ -6,6 +6,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -26,9 +27,16 @@ file_reader::file_reader(const char *filename, unsigned padding) {
 }
 
 
-string get_random_filename(const string &dir, const char *extension) {
+string get_random_filename(const string &dir, const char *extension, const char *prefix) {
   // there's a low probability of race here
-  auto newname = [&]() { return get_random_str(12) + '.' + extension; };
+  auto newname = [&]() {
+    ostringstream name;
+    if (prefix) {
+      name << prefix << '_';
+    }
+    name << get_random_str(12) << '.' << extension;
+    return name.str();
+  };
   fs::path path = fs::path(dir) / newname();
   while (fs::exists(path)) {
     path.replace_filename(newname());

@@ -162,12 +162,12 @@ public:
 
   expr assertions() const;
 
-  Result check() const;
+  Result check(const char *query_name = nullptr) const;
 
   friend class SolverPush;
 };
 
-Result check_expr(const expr &e);
+Result check_expr(const expr &e, const char *query_name = nullptr);
 
 
 class SolverPush {
