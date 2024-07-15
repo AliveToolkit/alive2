@@ -1885,7 +1885,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
       non_poison.add(sv.non_poison);
       if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) && op != FPTrunc && op != FPExt) {
         os << ".np";
-        non_poison.add(expr::mkUF(os.str(), {v.value}, false));
+        non_poison.add(expr::mkUF(os.str(), {sv.value}, false));
       }
 
       return { std::move(value), non_poison() };
