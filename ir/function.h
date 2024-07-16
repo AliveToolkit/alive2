@@ -96,6 +96,7 @@ public:
   struct FnDecl {
     std::string name;
     std::vector<std::pair<Type*, ParamAttrs>> inputs;
+    bool is_varargs = false;
     Type *output;
     FnAttrs attrs;
     unsigned hash() const;

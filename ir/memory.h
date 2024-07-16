@@ -30,15 +30,17 @@ class State;
 // A data structure that represents a byte.
 // A byte is either a pointer byte or a non-pointer byte.
 // Pointer byte's representation:
-//   +-+-------------+-----------+---------------+----------------------+
-//   |1| non-poison? |  Pointer  | byte offset   |        padding       |
-//   | | (1 bit)     |           | (0 or 3 bits) |                      |
-//   +-+-------------+-----------+---------------+----------------------+
+//   +-+-------------+-----------+---------------+------------------------+
+//   |1| non-poison? |  Pointer  | byte offset   |         padding        |
+//   | | (1 bit)     |           | (0 or 3 bits) |                        |
+//   +-+-------------+-----------+---------------+------------------------+
 // Non-pointer byte's representation:
-//   +-+-------------------+-------------+--------------------+---------+
-//   |0| non-poison bit(s) | data        | stored bits        | padding |
-//   | | (bits_byte)       | (bits_byte) | (num_subbyte_bits) |         |
-//   +-+-------------------+-------------+--------------------+---------+
+//   +-+-------------------+-------------+-------------+--------+---------+
+//   |0| non-poison bit(s) | data        | stored bits | byte   | padding |
+//   | | (bits_byte)       | (bits_byte) | (sub-byte)  | number |         |
+//   +-+-------------------+-------------+-------------+--------+---------+
+// The last 2 fields are only present if the program contains sub-byte accesses
+
 
 class Byte {
   const Memory &m;
@@ -52,7 +54,8 @@ public:
   // non_poison should be an one-bit vector or boolean.
   Byte(const Memory &m, const StateValue &ptr, unsigned i);
 
-  Byte(const Memory &m, const StateValue &v, unsigned bits_read, bool);
+  Byte(const Memory &m, const StateValue &v, unsigned bits_read,
+       unsigned byte_number);
 
   static Byte mkPoisonByte(const Memory &m);
 
@@ -64,7 +67,10 @@ public:
   smt::expr nonptrNonpoison() const;
   smt::expr boolNonptrNonpoison() const;
   smt::expr nonptrValue() const;
+
   smt::expr numStoredBits() const;
+  smt::expr byteNumber() const;
+
   smt::expr isPoison() const;
   smt::expr nonPoison() const;
   smt::expr isZero() const; // zero or null
@@ -89,6 +95,7 @@ public:
   static unsigned bitsByte();
 
   friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
+  friend class Memory;
 };
 
 
@@ -174,8 +181,9 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  void mkNonPoisonAxioms(bool local);
-  void mkNonlocalValAxioms(bool skip_consts);
+  void mkNonPoisonAxioms(bool local) const;
+  smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
+  void mkNonlocalValAxioms(bool skip_consts) const;
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
                 unsigned bytes, uint64_t align, bool write) const;
@@ -184,7 +192,7 @@ class Memory {
                            bool write) const;
 
   void access(const Pointer &ptr, unsigned btyes, uint64_t align, bool write,
-              const std::function<void(MemBlock&, unsigned, bool,
+              const std::function<void(MemBlock&, const Pointer&,
                                        smt::expr&&)> &fn);
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
@@ -230,6 +238,7 @@ public:
   class CallState {
     std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_liveness;
+    smt::expr writes_args;
     bool empty = true;
 
   public:
@@ -289,7 +298,7 @@ public:
   mkFnRet(const char *name, const std::vector<PtrInput> &ptr_inputs,
           bool is_local, const FnRetData *data = nullptr);
   CallState mkCallState(const std::string &fnname, bool nofree,
-                        const SMTMemoryAccess &access);
+                        unsigned num_ptr_args, const SMTMemoryAccess &access);
   void setState(const CallState &st, const SMTMemoryAccess &access,
                 const std::vector<PtrInput> &ptr_inputs,
                 unsigned inaccessible_bid);
@@ -369,6 +378,8 @@ public:
   friend class Pointer;
 
 private:
+  smt::expr mk_block_val_array(unsigned bid) const;
+  Byte raw_load(bool local, unsigned bid, const smt::expr &offset) const;
   void print_array(std::ostream &os, const smt::expr &a,
                    unsigned indent = 0) const;
 };

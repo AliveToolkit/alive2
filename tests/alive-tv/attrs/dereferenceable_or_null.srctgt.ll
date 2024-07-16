@@ -6,4 +6,4 @@ define ptr @tgt(ptr dereferenceable(4) %p) {
   ret ptr %p
 }
 
-; ERROR: Parameter attributes not refined
+; ERROR: Source is more defined than target

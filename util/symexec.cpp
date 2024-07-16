@@ -57,7 +57,6 @@ void sym_exec_init(State &s) {
   }
   s.finishInitializer();
 
-  s.saveReturnedInput();
   s.exec(Value::voidVal);
 }
 

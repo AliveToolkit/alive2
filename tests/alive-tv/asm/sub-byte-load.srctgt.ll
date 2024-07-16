@@ -1,12 +1,12 @@
 ; TEST-ARGS: -tgt-is-asm
 
-define i16 @src(ptr %p) {
+define i8 @src(ptr %p) {
   %x = load i5, ptr %p, align 2
-  %y = zext i5 %x to i16
-  ret i16 %y
+  %y = zext i5 %x to i8
+  ret i8 %y
 }
 
-define i16 @tgt(ptr %p) {
-  %x = load i16, ptr %p, align 2
-  ret i16 %x
+define i8 @tgt(ptr %p) {
+  %x = load i8, ptr %p, align 2
+  ret i8 %x
 }

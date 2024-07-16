@@ -45,10 +45,12 @@ IR::Value* make_intconst(const llvm::APInt &val);
 IR::Value* get_poison(IR::Type &ty);
 IR::Value* get_operand(llvm::Value *v,
   std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
-  std::function<IR::Value*(IR::AggregateValue *)> copy_inserter);
+  std::function<IR::Value*(IR::AggregateValue *)> copy_inserter,
+  std::function<bool(llvm::Function*)> register_fn_decl);
 
 void add_identifier(const llvm::Value &llvm, IR::Value &v);
 void replace_identifier(const llvm::Value &llvm, IR::Value &v);
+IR::Value* get_identifier(const llvm::Value &llvm);
 
 #define PRINT(T) std::ostream& operator<<(std::ostream &os, const T &x);
 PRINT(llvm::Type)

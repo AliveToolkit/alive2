@@ -1,4 +1,4 @@
-; ERROR: Parameter attributes not refined
+; ERROR: Source is more defined than target
 
 define i32 @src(ptr dereferenceable(4) %p) {
   ret i32 0

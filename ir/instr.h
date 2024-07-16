@@ -1060,15 +1060,18 @@ private:
   Value *fnptr;
   std::vector<std::pair<Value*, ParamAttrs>> args;
   FnAttrs attrs;
+  unsigned var_arg_idx;
   bool approx = false;
 
   Value* getAlignArg() const;
 
 public:
   FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr);
+         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr,
+         unsigned var_arg_idx = -1u);
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
+  Value* getFnPtr() const { return fnptr; }
   const auto& getArgs() const { return args; }
   const auto& getAttributes() const { return attrs; }
   bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }

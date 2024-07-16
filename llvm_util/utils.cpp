@@ -277,10 +277,10 @@ IR::Value* get_poison(Type &ty) {
 
 Value* get_operand(llvm::Value *v,
                    function<Value*(llvm::ConstantExpr*)> constexpr_conv,
-                   function<Value*(AggregateValue*)> copy_inserter) {
-  if (auto I = value_cache.find(v);
-      I != value_cache.end())
-    return I->second;
+                   function<Value*(AggregateValue*)> copy_inserter,
+                   function<bool(llvm::Function*)> register_fn_decl) {
+  if (auto ptr = get_identifier(*v))
+    return ptr;
 
   auto ty = llvm_type2alive(v->getType());
   if (!ty)
@@ -357,10 +357,14 @@ Value* get_operand(llvm::Value *v,
 
   if (auto fn = dyn_cast<llvm::Function>(v)) {
     auto val = make_unique<GlobalVariable>(
-      *ty, fn->getName().str(), 0,
+      *ty, '@' + fn->getName().str(), 0,
       fn->getAlign().value_or(llvm::Align(8)).value(), true, true);
     auto gvar = val.get();
     current_fn->addConstant(std::move(val));
+
+    if (!register_fn_decl(fn))
+      return nullptr;
+
     RETURN_CACHE(gvar);
   }
 
@@ -371,7 +375,8 @@ Value* get_operand(llvm::Value *v,
 
     for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
       if (!aty->isPadding(i)) {
-        if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter))
+        if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter,
+                                  register_fn_decl))
           vals.emplace_back(op);
         else
           return false;
@@ -446,6 +451,11 @@ void add_identifier(const llvm::Value &llvm, Value &v) {
 
 void replace_identifier(const llvm::Value &llvm, Value &v) {
   value_cache[&llvm] =  &v;
+}
+
+Value* get_identifier(const llvm::Value &llvm) {
+  auto I = value_cache.find(&llvm);
+  return I != value_cache.end() ? I->second : nullptr;
 }
 
 

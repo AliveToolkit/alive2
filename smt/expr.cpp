@@ -715,9 +715,9 @@ expr expr::operator-(const expr &rhs) const {
 expr expr::operator*(const expr &rhs) const {
   unsigned power;
   if (rhs.isConst() && is_power2(rhs, power))
-    return *this << expr::mkUInt(power, sort());
+    return *this << mkUInt(power, sort());
   if (isConst() && is_power2(*this, power))
-    return rhs << expr::mkUInt(power, sort());
+    return rhs << mkUInt(power, sort());
   return binopc(Z3_mk_bvmul, operator*, Z3_OP_BMUL, isOne, isZero);
 }
 
@@ -834,7 +834,7 @@ expr expr::add_no_soverflow(const expr &rhs) const {
   if (rhs.isConst()) {
     auto v = IntSMin(bits()) - rhs;
     return rhs.isNegative().isTrue() ? sge(v)
-                                     : sle(v - expr::mkUInt(1, rhs.sort()));
+                                     : sle(v - mkUInt(1, rhs.sort()));
   }
   if (isConst())
     return rhs.add_no_soverflow(*this);
@@ -1032,7 +1032,7 @@ static expr log2_rec(const expr &e, unsigned idx, unsigned bw) {
 }
 
 expr expr::isPowerOf2() const {
-  return *this != 0 && (*this & (*this - expr::mkUInt(1, *this))) == 0;
+  return *this != 0 && (*this & (*this - mkUInt(1, *this))) == 0;
 }
 
 expr expr::log2(unsigned bw_output) const {
@@ -1225,7 +1225,7 @@ expr expr::frem(const expr &rhs) const {
 
 expr expr::fabs() const {
   if (isBV())
-    return expr::mkUInt(0, 1).concat(extract(bits() - 2, 0));
+    return mkUInt(0, 1).concat(extract(bits() - 2, 0));
 
   fold_fp_neg(fabs);
   return unop_fold(Z3_mk_fpa_abs);
@@ -1234,7 +1234,7 @@ expr expr::fabs() const {
 expr expr::fneg() const {
   if (isBV()) {
     auto signbit = bits() - 1;
-    return (extract(signbit, signbit) ^ expr::mkUInt(1, 1))
+    return (extract(signbit, signbit) ^ mkUInt(1, 1))
              .concat(extract(signbit - 1, 0));
   }
   return unop_fold(Z3_mk_fpa_neg);
@@ -1823,7 +1823,7 @@ expr expr::concat(const expr &rhs) const {
 }
 
 expr expr::concat_zeros(unsigned bits) const {
-  return bits ? concat(expr::mkUInt(0, bits)) : *this;
+  return bits ? concat(mkUInt(0, bits)) : *this;
 }
 
 expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
@@ -2054,7 +2054,7 @@ expr expr::mkIf(const expr &cond, const expr &then, const expr &els) {
   if (cond.isFalse())
     return els;
 
-  if (then.isTrue())
+  if (then.isTrue() || cond.eq(then))
     return cond || els;
   if (then.isFalse())
     return !cond && els;

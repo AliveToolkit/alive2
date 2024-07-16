@@ -67,7 +67,8 @@ public:
                    NoAlias = 1<<9, DereferenceableOrNull = 1<<10,
                    AllocPtr = 1<<11, AllocAlign = 1<<12,
                    ZeroExt = 1<<13, SignExt = 1<<14, InReg = 1<<15,
-                   NoFPClass = 1<<16,
+                   NoFPClass = 1<<16, DeadOnUnwind = 1<<17,
+                   Writable = 1<<18,
                    IsArg = 1<<31 // used internally to make values as arguments
                   };
 
@@ -87,13 +88,15 @@ public:
   bool poisonImpliesUB() const;
 
   uint64_t getDerefBytes() const;
+  uint64_t maxAccessSize() const;
 
   void merge(const ParamAttrs &other);
 
   friend std::ostream& operator<<(std::ostream &os, const ParamAttrs &attr);
 
   // Encodes the semantics of attributes using UB and poison.
-  StateValue encode(State &s, StateValue &&val, const Type &ty) const;
+  StateValue encode(State &s, StateValue &&val, const Type &ty,
+                    bool isdecl = false) const;
 };
 
 struct FPDenormalAttrs {
@@ -150,7 +153,7 @@ public:
 
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
-  bool isAlloc() const { return allockind != 0; }
+  bool isAlloc() const { return allockind != 0 || has(AllocSize); }
 
   void inferImpliedAttributes();
 
