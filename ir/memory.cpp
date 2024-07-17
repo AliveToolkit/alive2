@@ -1052,7 +1052,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
     Pointer this_ptr(*this, i, true);
     expr cond_eq;
 
-    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+    if (!is_singleton && isAsmMode() && !ptr.isInbounds(true).isTrue()) {
       // in asm mode, all pointers have full provenance
       cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
       this_ptr += addr - this_ptr.getAddress();
@@ -1078,7 +1078,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
     Pointer this_ptr(*this, i, false);
     expr cond_eq;
 
-    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+    if (!is_singleton && isAsmMode() && !ptr.isInbounds(true).isTrue()) {
       // in asm mode, all pointers have full provenance
       cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
       this_ptr += addr - this_ptr.getAddress();
