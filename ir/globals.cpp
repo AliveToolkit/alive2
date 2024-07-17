@@ -48,8 +48,12 @@ bool has_indirect_fncalls = true;
 
 
 bool isUndef(const expr &e) {
-  auto name = e.fn_name();
-  return string_view(name).substr(0, 6) == "undef!";
+  expr var;
+  unsigned h, l;
+  if (e.isExtract(var, h, l))
+    return isUndef(var);
+
+  return string_view(e.fn_name()).substr(0, 6) == "undef!";
 }
 
 }

@@ -512,14 +512,16 @@ bool Memory::observesAddresses() {
 }
 
 static bool isFnReturnValue(const expr &e) {
-  string name;
+  expr arr, idx;
+  if (e.isLoad(arr, idx))
+    return isFnReturnValue(arr);
+
   expr val;
   unsigned hi, lo;
   if (e.isExtract(val, hi, lo))
-    name = val.fn_name();
-  else
-    name = e.fn_name();
-  return name.starts_with("#fnret_");
+    return isFnReturnValue(val);
+
+  return e.fn_name().starts_with("#fnret_");
 }
 
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
@@ -535,6 +537,19 @@ int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
     return 1;
 
   return match_any_init && name.starts_with("blk_val!") ? 2 : 0;
+}
+
+bool Memory::isInitialMemoryOrLoad(const expr &e, bool match_any_init) {
+  expr arr, idx;
+  if (e.isLoad(arr, idx))
+    return isInitialMemoryOrLoad(arr, match_any_init);
+
+  expr val;
+  unsigned hi, lo;
+  if (e.isExtract(val, hi, lo))
+    return isInitialMemoryOrLoad(val, match_any_init);
+
+  return isInitialMemBlock(e, match_any_init) != 0;
 }
 }
 
@@ -907,10 +922,11 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
     if ( write && always_nowrite(bid0)) return false;
   }
 
-  if (!isAsmMode() && offset0.isNegative().isTrue())
+  if (isUndef(offset0))
     return false;
 
-  assert(!isUndef(offset0));
+  if (!isAsmMode() && offset0.isNegative().isTrue())
+    return false;
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
 
@@ -963,7 +979,7 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
     auto shortbid = p.getShortBid();
     expr offset = p.getOffset();
     uint64_t bid;
-    if (shortbid.isUInt(bid)) {
+    if (shortbid.isUInt(bid) && (!isAsmMode() || p.isInbounds(true).isTrue())) {
       if (!is_local.isFalse() && bid < sz_local)
         check_alias(this_alias, true, bid, offset);
       if (!is_local.isTrue() && bid < sz_nonlocal)
@@ -971,16 +987,25 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
       goto end;
     }
 
+    {
+    bool is_init_memory = isInitialMemoryOrLoad(shortbid, false);
+    bool is_from_fn     = !is_init_memory &&
+                          (isInitialMemoryOrLoad(shortbid, true) ||
+                           isFnReturnValue(shortbid));
+
     for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
         continue;
       for (unsigned i = 0, e = local ? sz_local : sz_nonlocal; i < e; ++i) {
-        if (write && !local && always_nowrite(i))
+        // initial memory doesn't have local ptrs stored
+        if (local && is_init_memory)
           continue;
-        if (!write && !local && always_noread(i))
+        // functions can only return escaped ptrs
+        if (local && is_from_fn && !escaped_local_blks.mayAlias(true, i))
           continue;
         check_alias(this_alias, local, i, offset);
       }
+    }
     }
 
 end:
@@ -2587,7 +2612,7 @@ Memory::refined(const Memory &other, bool fncall,
     // Hence we may not have all initializers if tgt doesn't reference them.
     if (other.isAsmMode() &&
         is_constglb(bid) &&
-        isInitialMemBlock(other.non_local_block_val[bid].val))
+        isInitialMemBlock(other.non_local_block_val[bid].val, false))
       continue;
 
     ret &= (ptr_bid == bid_expr).implies(blockRefined(p, q, bid, undef_vars));
@@ -2645,11 +2670,18 @@ void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
     if (bid_expr.isUInt(bid)) {
       if (bid < next_local_bid)
         escaped_local_blks.setMayAlias(true, bid);
-    } else if (isInitialMemBlock(bid_expr)) {
+    } else if (isInitialMemBlock(bid_expr, true)) {
       // initial non local block bytes don't contain local pointers.
     } else if (isFnReturnValue(bid_expr)) {
       // Function calls have already escaped whatever they needed to.
     } else {
+      expr val, arr, idx;
+      unsigned h, l;
+      if (bid_expr.isExtract(val, h, l) && val.isLoad(arr, idx)) {
+        // if this a load, it can't escape anything that hasn't escaped before
+        continue;
+      }
+
       // may escape a local ptr, but we don't know which one
       escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
       break;

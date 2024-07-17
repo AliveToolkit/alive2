@@ -174,7 +174,8 @@ class Memory {
   unsigned nextNonlocalBid();
 
   static bool observesAddresses();
-  static int isInitialMemBlock(const smt::expr &e, bool match_any_init = false);
+  static int isInitialMemBlock(const smt::expr &e, bool match_any_init);
+  static bool isInitialMemoryOrLoad(const smt::expr &e, bool match_any_init);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
