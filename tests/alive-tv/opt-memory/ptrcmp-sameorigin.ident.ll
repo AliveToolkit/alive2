@@ -6,5 +6,5 @@ define i1 @f(ptr %p) {
   ret i1 %c
 }
 
-; CHECK: use_provenance
+; CHECK: offsetonly
 ; CHECK: observes_addresses: 0
