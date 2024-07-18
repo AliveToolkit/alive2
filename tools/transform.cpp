@@ -1662,9 +1662,8 @@ static void optimize_ptrcmp(Function &f) {
     auto base0 = get_base_ptr(op0);
     auto base1 = get_base_ptr(op1);
     if (base0 && base0 == base1) {
-      if (is_eq)
-        const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::PROVENANCE);
-      else if (is_inbounds(*op0) && is_inbounds(*op1) && !is_signed_cmp)
+      if (is_eq ||
+          (is_inbounds(*op0) && is_inbounds(*op1) && !is_signed_cmp))
         // Even if op0 and op1 are inbounds, 'icmp slt op0, op1' must
         // compare underlying addresses because it is possible for the block
         // to span across [a, b] where a >s 0 && b <s 0.
