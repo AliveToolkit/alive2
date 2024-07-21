@@ -2204,12 +2204,21 @@ MemInstr::ByteAccessInfo FnCall::getByteAccessInfo() const {
   if (attrs.has(AllocKind::Uninitialized) || attrs.has(AllocKind::Free))
     return {};
 
+  bool has_ptr_args = any_of(args.begin(), args.end(),
+    [](const auto &pair) {
+      auto &[val, attrs] = pair;
+      return hasPtr(val->getType()) &&
+             !attrs.has(ParamAttrs::ByVal) &&
+             !attrs.has(ParamAttrs::NoCapture);
+    });
+
   // calloc style
   if (attrs.has(AllocKind::Zeroed)) {
     auto info = ByteAccessInfo::intOnly(1);
     auto [alloc, align] = getMaxAllocSize();
     if (alloc)
       info.byteSize = gcd(alloc, align);
+    info.observesAddresses = has_ptr_args;
     return info;
   }
 
@@ -2248,11 +2257,10 @@ MemInstr::ByteAccessInfo FnCall::getByteAccessInfo() const {
   }
 #undef UPDATE
 
-  // No dereferenceable attribute
-  if (bytesize == 0)
-    return {};
-
-  return ByteAccessInfo::anyType(bytesize);
+  ByteAccessInfo info;
+  info.byteSize = bytesize;
+  info.observesAddresses = has_ptr_args;
+  return info;
 }
 
 
