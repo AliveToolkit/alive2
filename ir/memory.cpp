@@ -925,16 +925,23 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   if (isUndef(offset0))
     return false;
 
+  // FIXME: this is for logical pointers
   if (!isAsmMode() && offset0.isNegative().isTrue())
     return false;
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    expr offset = offset0.sextOrTrunc(bits_size_t);
-    if (sz->ult(bytes).isTrue())
+    uint64_t min_size = bytes;
+    // globals' size is extended to alignment
+    if (!local)
+      min_size = max(min_size, align);
+    if (sz->ult(min_size).isTrue())
       return false;
 
+    expr offset = offset0.sextOrTrunc(bits_size_t);
+
+    // FIXME: this is for logical pointers
     if (!isAsmMode()) {
       if (offset.uge(*sz).isTrue() ||
           (*sz - offset).ult(bytes).isTrue())
