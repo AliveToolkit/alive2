@@ -2698,8 +2698,12 @@ StateValue ICmp::toSMT(State &s) const {
 
   if (isPtrCmp()) {
     fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
-      Pointer lhs(s.getMemory(), av);
-      Pointer rhs(s.getMemory(), bv);
+      auto &m = s.getMemory();
+      Pointer lhs(m, av);
+      Pointer rhs(m, bv);
+      m.observesAddr(lhs);
+      m.observesAddr(rhs);
+
       switch (pcmode) {
       case INTEGRAL:
         return fn(lhs.getAddress(), rhs.getAddress(), cond);

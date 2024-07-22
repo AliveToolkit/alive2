@@ -607,6 +607,7 @@ public:
   Assume(Value &cond, Kind kind);
   Assume(std::vector<Value *> &&args, Kind kind);
 
+  Kind getKind() const { return kind; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;

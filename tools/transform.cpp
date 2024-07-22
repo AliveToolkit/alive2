@@ -1044,12 +1044,17 @@ static void calculateAndInitConstants(Transform &t) {
     uint64_t &loc_alloc_aligned_size
       = is_src ? loc_src_alloc_aligned_size : loc_tgt_alloc_aligned_size;
 
+    observes_addresses |= fn->getFnAttrs().has(FnAttrs::Asm);
+
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (!i)
         continue;
 
       has_ptr_arg |= hasPtr(i->getType());
+      observes_addresses |= i->hasAttribute(ParamAttrs::Align) ||
+                            i->hasAttribute(ParamAttrs::Dereferenceable) ||
+                            i->hasAttribute(ParamAttrs::DereferenceableOrNull);
 
       update_min_vect_sz(i->getType());
       max_access_size
@@ -1149,6 +1154,8 @@ static void calculateAndInitConstants(Transform &t) {
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
         observes_addresses |= ic->isPtrCmp() &&
                               ic->getPtrCmpMode() == ICmp::INTEGRAL;
+      } else if (auto *assume = dynamic_cast<const Assume*>(&i)) {
+        observes_addresses |= assume->getKind() == Assume::Align;
       }
     }
   }

@@ -925,28 +925,47 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   if (isUndef(offset0))
     return false;
 
-  // FIXME: this is for logical pointers
-  if (!isAsmMode() && offset0.isNegative().isTrue())
-    return false;
-
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    uint64_t min_size = bytes;
-    // globals' size is extended to alignment
-    if (!local)
-      min_size = max(min_size, align);
-    if (sz->ult(min_size).isTrue())
+    if (sz->ult(bytes).isTrue())
       return false;
 
-    expr offset = offset0.sextOrTrunc(bits_size_t);
+    //expr offset = offset0.sextOrTrunc(bits_size_t);
 
+#if 0
+    // Never hits in practice
+    // FIXME: this is for logical pointers
+    if (auto blk_align0
+          = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
+      int64_t off;
+      uint64_t blk_align;
+      if (offset0.isInt(off) && off > 0 &&
+          blk_align0->isUInt(blk_align) &&
+          ((uint64_t)off % align) % (1ull << blk_align) != 0)
+        return false;
+    }
+#endif
+
+    if (local && !observed_addrs.mayAlias(true, bid0)) {
+      // block align must be >= access align if the address hasn't been observed
+      if (auto blk_align0 = local_blk_align.lookup(bid)) {
+        uint64_t blk_align;
+        if (blk_align0->isUInt(blk_align) &&
+            (1ull << blk_align) < align)
+          return false;
+      }
+    }
+
+#if 0
+    // Never hits in practice
     // FIXME: this is for logical pointers
     if (!isAsmMode()) {
       if (offset.uge(*sz).isTrue() ||
           (*sz - offset).ult(bytes).isTrue())
         return false;
     }
+#endif
   } else if (local) // allocated in another branch
     return false;
 
@@ -1418,7 +1437,8 @@ bool Memory::isAsmMode() const {
   return state->getFn().has(FnAttrs::Asm);
 }
 
-Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
+Memory::Memory(State &state)
+  : state(&state), escaped_local_blks(*this), observed_addrs(*this) {
   if (memory_unused())
     return;
 
@@ -2664,19 +2684,21 @@ expr Memory::checkNocapture() const {
   return res;
 }
 
-void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
-  if (is_ptr.isFalse())
-    return;
+void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
+  assert(observesAddresses());
 
   if (next_local_bid == 0 ||
-      escaped_local_blks.isFullUpToAlias(true) == (int)next_local_bid-1)
+      set1.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;
 
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
-      if (bid < next_local_bid)
-        escaped_local_blks.setMayAlias(true, bid);
+      if (bid < next_local_bid) {
+        set1.setMayAlias(true, bid);
+        if (set2)
+          set2->setMayAlias(true, bid);
+      }
     } else if (isInitialMemBlock(bid_expr, true)) {
       // initial non local block bytes don't contain local pointers.
     } else if (isFnReturnValue(bid_expr)) {
@@ -2690,10 +2712,23 @@ void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
       }
 
       // may escape a local ptr, but we don't know which one
-      escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
+      set1.setMayAliasUpTo(true, next_local_bid-1);
+      if (set2)
+        set2->setMayAliasUpTo(true, next_local_bid-1);
       break;
     }
   }
+}
+
+void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
+  if (is_ptr.isFalse())
+    return;
+
+  escape_helper(ptr, escaped_local_blks, &observed_addrs);
+}
+
+void Memory::observesAddr(const Pointer &ptr) {
+  escape_helper(ptr(), observed_addrs);
 }
 
 Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
@@ -2727,6 +2762,7 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.escaped_local_blks.unionWith(els.escaped_local_blks);
+  ret.observed_addrs.unionWith(els.observed_addrs);
 
   for (const auto &[expr, alias] : els.ptr_alias) {
     auto [I, inserted] = ret.ptr_alias.try_emplace(expr, alias);
