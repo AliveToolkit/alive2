@@ -32,22 +32,9 @@ class Value;
 namespace llvm_util {
 
 IR::FastMathFlags parse_fmath(llvm::Instruction &i);
-std::string value_name(const llvm::Value &v);
 
 IR::Type& get_int_type(unsigned bits);
 IR::Type* llvm_type2alive(const llvm::Type *ty);
-
-IR::Value* make_intconst(uint64_t val, int bits);
-IR::Value* make_intconst(const llvm::APInt &val);
-IR::Value* get_poison(IR::Type &ty);
-IR::Value* get_operand(llvm::Value *v,
-  std::function<IR::Value*(llvm::ConstantExpr *)> constexpr_conv,
-  std::function<IR::Value*(IR::AggregateValue *)> copy_inserter,
-  std::function<bool(llvm::Function*)> register_fn_decl);
-
-void add_identifier(const llvm::Value &llvm, IR::Value &v);
-void replace_identifier(const llvm::Value &llvm, IR::Value &v);
-IR::Value* get_identifier(const llvm::Value &llvm);
 
 #define PRINT(T) std::ostream& operator<<(std::ostream &os, const T &x);
 PRINT(llvm::Type)
@@ -59,8 +46,7 @@ void init_llvm_utils(std::ostream &os, const llvm::DataLayout &DL);
 std::ostream& get_outs();
 void set_outs(std::ostream &os);
 
-void reset_state();
-void reset_state(IR::Function &f);
+bool hasOpaqueType(llvm::Type *ty);
 
 std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
                                             const std::string &InputFilename);
