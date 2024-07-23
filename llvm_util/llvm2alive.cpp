@@ -682,6 +682,10 @@ public:
     return phi;
   }
 
+  IR::BasicBlock& getBB(const llvm::BasicBlock *bb) {
+    return alive_fn->getBB(value_name(*bb));
+  }
+
   RetTy visitBranchInst(llvm::BranchInst &i) {
     auto &dst_true = getBB(i.getSuccessor(0));
     if (i.isUnconditional())

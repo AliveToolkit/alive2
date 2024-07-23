@@ -32,9 +32,6 @@ class Value;
 namespace llvm_util {
 
 IR::FastMathFlags parse_fmath(llvm::Instruction &i);
-
-IR::BasicBlock& getBB(const llvm::BasicBlock *bb);
-
 std::string value_name(const llvm::Value &v);
 
 IR::Type& get_int_type(unsigned bits);

@@ -90,10 +90,6 @@ FastMathFlags parse_fmath(llvm::Instruction &i) {
   return fmath;
 }
 
-BasicBlock& getBB(const llvm::BasicBlock *bb) {
-  return current_fn->getBB(value_name(*bb));
-}
-
 string value_name(const llvm::Value &v) {
   auto &name = value_names[&v];
   if (!name.empty())
