@@ -206,7 +206,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return ret;
   }
 
-  IR::Value* make_intconst(const llvm::APInt &val) {
+  Value* make_intconst(const llvm::APInt &val) {
     unique_ptr<IntConst> c;
     auto bw = val.getBitWidth();
     auto &ty = get_int_type(bw);
@@ -219,7 +219,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return ret;
   }
 
-  IR::Value* get_poison(Type &ty) {
+  Value* get_poison(Type &ty) {
     auto val = make_unique<PoisonValue>(ty);
     auto ret = val.get();
     alive_fn->addConstant(std::move(val));
@@ -908,7 +908,7 @@ public:
     return phi;
   }
 
-  IR::BasicBlock& getBB(const llvm::BasicBlock *bb) {
+  BasicBlock& getBB(const llvm::BasicBlock *bb) {
     return alive_fn->getBB(value_name(*bb));
   }
 
