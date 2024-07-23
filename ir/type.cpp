@@ -24,6 +24,12 @@ namespace IR {
 
 VoidType Type::voidTy;
 
+FloatType Type::halfTy("half", FloatType::Half);
+FloatType Type::floatTy("float", FloatType::Float);
+FloatType Type::doubleTy("double", FloatType::Double);
+FloatType Type::quadTy("fp128", FloatType::Quad);
+FloatType Type::bfloatTy("bfloat", FloatType::BFloat);
+
 unsigned Type::np_bits(bool fromInt) const {
   if (!fromInt)
     return 1;

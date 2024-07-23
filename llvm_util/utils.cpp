@@ -32,11 +32,6 @@ unsigned value_id_counter = 0; // for %0, %1, etc..
 
 vector<unique_ptr<IntType>> int_types;
 vector<unique_ptr<PtrType>> ptr_types;
-FloatType half_type("half", FloatType::Half);
-FloatType float_type("float", FloatType::Float);
-FloatType double_type("double", FloatType::Double);
-FloatType quad_type("fp128", FloatType::Quad);
-FloatType bfloat_type("bfloat", FloatType::BFloat);
 
 // cache complex types
 unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
@@ -116,15 +111,15 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   case llvm::Type::IntegerTyID:
     return &get_int_type(cast<llvm::IntegerType>(ty)->getBitWidth());
   case llvm::Type::HalfTyID:
-    return &half_type;
+    return &Type::halfTy;
   case llvm::Type::FloatTyID:
-    return &float_type;
+    return &Type::floatTy;
   case llvm::Type::DoubleTyID:
-    return &double_type;
+    return &Type::doubleTy;
   case llvm::Type::FP128TyID:
-    return &quad_type;
+    return &Type::quadTy;
   case llvm::Type::BFloatTyID:
-    return &bfloat_type;
+    return &Type::bfloatTy;
 
   case llvm::Type::PointerTyID: {
     // TODO: support for non-64 bits pointers

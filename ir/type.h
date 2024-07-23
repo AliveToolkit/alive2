@@ -127,6 +127,11 @@ public:
   std::string toString() const;
 
   static VoidType voidTy;
+  static FloatType halfTy;
+  static FloatType floatTy;
+  static FloatType doubleTy;
+  static FloatType quadTy;
+  static FloatType bfloatTy;
 
   virtual ~Type();
 };
