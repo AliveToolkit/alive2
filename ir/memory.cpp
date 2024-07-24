@@ -983,8 +983,9 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
   assert(bytes % (bits_byte/8) == 0);
 
   AliasSet aliasing(*this);
-  auto sz_local = aliasing.size(true);
+  auto sz_local = next_local_bid;
   auto sz_nonlocal = aliasing.size(false);
+  assert(sz_local <= aliasing.size(true));
 
   auto check_alias = [&](AliasSet &alias, bool local, unsigned bid,
                          const expr &offset) {
@@ -1078,7 +1079,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
     Pointer this_ptr(*this, i, true);
     expr cond_eq;
 
-    if (!is_singleton && isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
       // in asm mode, all pointers have full provenance
       cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
       this_ptr += addr - this_ptr.getAddress();
@@ -1104,7 +1105,7 @@ void Memory::access(const Pointer &ptr, unsigned bytes, uint64_t align,
     Pointer this_ptr(*this, i, false);
     expr cond_eq;
 
-    if (!is_singleton && isAsmMode() && !ptr.isInbounds(true).isTrue()) {
+    if (isAsmMode() && !ptr.isInbounds(true).isTrue()) {
       // in asm mode, all pointers have full provenance
       cond_eq   = ptr.isInboundsOf(this_ptr, bytes);
       this_ptr += addr - this_ptr.getAddress();
