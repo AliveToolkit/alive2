@@ -72,7 +72,8 @@ struct LoopLikeFunctionApproximator {
     prefix.add(ub_i);
 
     // Keep going if the function is being applied to a constant input
-    is_last &= !continue_i.isConst();
+    if (i < 512)
+      is_last &= !continue_i.isConst();
 
     if (is_last)
       s.addPre(prefix().implies(!continue_i));
