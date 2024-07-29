@@ -61,6 +61,10 @@ void BasicBlock::delInstr(const Instr *i) {
   }
 }
 
+void BasicBlock::popInstr() {
+  m_instrs.pop_back();
+}
+
 void BasicBlock::addExitBlock(BasicBlock* bb) {
     exit_blocks.emplace(bb);
 }
@@ -172,6 +176,14 @@ void Function::fixupTypes(const Model &m) {
     for (auto &v : l) {
       const_cast<Value&>(v).fixupTypes(m);
     }
+  }
+}
+
+BasicBlock& Function::getEntryBB() {
+  if (BB_order[0]->getName() == "#init") {
+    return *BB_order[1];
+  } else {
+    return *BB_order[0];
   }
 }
 
