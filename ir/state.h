@@ -260,6 +260,8 @@ public:
 
   bool isAsmMode() const;
 
+  smt::expr getPath(BasicBlock &bb) const;
+
   // only used by alive-exec to support execution of the same BB multiple times
   void cleanup(const Value &val);
   void cleanupPredecessorData();

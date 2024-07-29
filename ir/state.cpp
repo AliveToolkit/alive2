@@ -694,6 +694,21 @@ bool State::isAsmMode() const {
   return getFn().has(FnAttrs::Asm);
 }
 
+expr State::getPath(BasicBlock &bb) const {
+  if (&f.getFirstBB() == &bb)
+    return true;
+  
+  auto I = predecessor_data.find(&bb);
+  if (I == predecessor_data.end())
+    return false; // Block is unreachable
+
+  OrExpr path;
+  for (auto &[src, data] : I->second) {
+    path.add(data.path);
+  }
+  return std::move(path)();
+}
+
 void State::cleanup(const Value &val) {
   values.erase(&val);
   seen_bbs.clear();
