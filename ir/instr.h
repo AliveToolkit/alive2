@@ -48,6 +48,8 @@ public:
   BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
         unsigned flags = None);
 
+  Op getOp() const { return op; }
+  unsigned getFlags() const { return flags; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -78,6 +80,10 @@ public:
   : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
     rm(rm), ex(ex) {}
 
+  Op getOp() const { return op; }
+  FastMathFlags getFastMathFlags() const { return fmath; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -139,6 +145,11 @@ public:
     : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm),
       ex(ex) {}
 
+  Op getOp() const { return op; }
+  Value& getValue() const { return *val; }
+  FastMathFlags getFastMathFlags() const { return fmath; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -166,6 +177,8 @@ public:
   UnaryReductionOp(Type &type, std::string &&name, Value &val, Op op)
     : Instr(type, std::move(name)), val(&val), op(op) {}
 
+  Op getOp() const { return op; }
+  Value& getValue() const { return *val; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -191,6 +204,7 @@ public:
             Op op)
     : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
 
+  Op getOp() const { return op; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -221,6 +235,10 @@ public:
     : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath),
       rm(rm), ex(ex) {}
 
+  Op getOp() const { return op; }
+  FastMathFlags getFastMathFlags() const { return fmath; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -245,6 +263,7 @@ public:
   TestOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op)
     : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op) {}
 
+  Op getOp() const { return op; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -273,6 +292,7 @@ public:
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
+  unsigned getFlags() const { return flags; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -303,6 +323,11 @@ public:
                  FpRoundingMode rm = {}, FpExceptionMode ex = {},
                  unsigned flags = None);
 
+  Op getOp() const { return op; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
+  unsigned getFlags() const { return flags; }
+
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -323,8 +348,10 @@ public:
          FastMathFlags fmath = {})
     : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b), fmath(fmath) {}
 
+  Value& getCond() const { return *cond; }
   Value *getTrueValue() const { return a; }
   Value *getFalseValue() const { return b; }
+  FastMathFlags getFastMathFlags() const { return fmath; }
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -344,6 +371,8 @@ class ExtractValue final : public Instr {
 public:
   ExtractValue(Type &type, std::string &&name, Value &val)
     : Instr(type, std::move(name)), val(&val) {}
+  
+  const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
   std::vector<Value*> operands() const override;
@@ -364,6 +393,8 @@ class InsertValue final : public Instr {
 public:
   InsertValue(Type &type, std::string &&name, Value &val, Value &elt)
           : Instr(type, std::move(name)), val(&val), elt(&elt) {}
+  
+  const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
   std::vector<Value*> operands() const override;
@@ -433,6 +464,11 @@ public:
     : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath),
       ex(ex), signaling(signaling) {}
 
+  Cond getCond() const { return cond; }
+  FastMathFlags getFastMathFlags() const { return fmath; }
+  FpExceptionMode getExceptionMode() const { return ex; }
+  bool isSignaling() const { return signaling; }
+
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -477,6 +513,8 @@ public:
 
   const auto& getValues() const { return values; }
   std::vector<std::string> sources() const;
+
+  FastMathFlags getFastMathFlags() const { return fmath; }
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -531,6 +569,7 @@ public:
   Branch(Value &cond, const BasicBlock &dst_true, const BasicBlock &dst_false)
     : JumpInstr("br"), cond(&cond), dst_true(&dst_true), dst_false(&dst_false){}
 
+  Value* getCond() const { return cond; }
   auto& getTrue() const { return *dst_true; }
   auto getFalse() const { return dst_false; }
 
@@ -640,6 +679,8 @@ public:
             std::vector<Value *> &&args, Kind kind,
             bool is_welldefined = false);
 
+  Kind getKind() const { return kind; }
+  bool isWellDefined() const { return is_welldefined; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -927,6 +968,8 @@ public:
   MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
                 unsigned pattern_length);
 
+  unsigned getPatternLength() const { return pattern_length; }
+
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
   uint64_t getMaxGEPOffset() const override;
@@ -981,6 +1024,7 @@ public:
   uint64_t getDstAlign() const { return align_dst; }
   void setSrcAlign(uint64_t align) { align_src = align; }
   void setDstAlign(uint64_t align) { align_dst = align; }
+  bool isMove() const { return move; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1007,6 +1051,7 @@ public:
                         ptr2(&ptr2), num(&num), is_bcmp(is_bcmp) {}
 
   Value &getBytes() const { return *num; }
+  bool isBCmp() const { return is_bcmp; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1068,7 +1113,9 @@ public:
   Value* getFnPtr() const { return fnptr; }
   const auto& getArgs() const { return args; }
   const auto& getAttributes() const { return attrs; }
+  unsigned getVarArgIdx() const { return var_arg_idx; }
   bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
+  bool isApproximated() const { return approx; }
   void setApproximated(bool flag) { approx = flag; }
   uint64_t getAlign() const;
   bool isIndirect() const { return fnptr != nullptr; }
@@ -1203,6 +1250,8 @@ public:
   ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
                 std::vector<unsigned> mask)
     : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
+  
+  const auto& getMask() const { return mask; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
