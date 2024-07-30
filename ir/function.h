@@ -41,9 +41,8 @@ public:
   const Instr& at(size_t index) const { return *m_instrs.at(index); }
   Instr& at(size_t index) { return *m_instrs.at(index); }
 
-  void setInstrs(std::vector<std::unique_ptr<Instr>> &&instrs) {
-    m_instrs = std::move(instrs);
-  }
+  std::unique_ptr<Instr>& getInstr(size_t index);
+  void setInstrs(std::vector<std::unique_ptr<Instr>> &&instrs);
 
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
