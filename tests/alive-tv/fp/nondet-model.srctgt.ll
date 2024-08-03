@@ -1,3 +1,4 @@
+; TEST-ARGS: -disable-undef-input
 ; ERROR: Value mismatch
 ; CHECK: %m = #x7e00
 
