@@ -51,6 +51,7 @@ void sym_exec_init(State &s) {
   }
 
   if (f.getFirstBB().getName() == "#init") {
+    s.startBB(f.getFirstBB());
     for (auto &i : f.getFirstBB().instrs()) {
       sym_exec_instr(s, i);
     }
@@ -66,7 +67,7 @@ void sym_exec(State &s) {
   Function &f = const_cast<Function&>(s.getFn());
 
   for (auto &bb : f.getBBs()) {
-    if (!s.startBB(*bb) || bb->getName() == "#init")
+    if (bb->getName() == "#init" || !s.startBB(*bb))
       continue;
 
     for (auto &i : bb->instrs()) {
