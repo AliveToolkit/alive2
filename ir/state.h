@@ -172,7 +172,7 @@ private:
   std::optional<StateValue> returned_input;
 
   // temp state
-  const BasicBlock *current_bb;
+  const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
   Memory memory;
   smt::expr fp_rounding_mode;
