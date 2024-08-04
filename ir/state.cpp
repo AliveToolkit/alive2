@@ -252,10 +252,10 @@ State::VarArgsData::mkIf(const expr &cond, VarArgsData &&then,
 }
 
 State::State(const Function &f, bool source)
-    : f(f), source(source), current_bb(&f.getFirstBB()), memory(*this),
-      fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
-      fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
-      return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+  : f(f), source(source), memory(*this),
+    fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
+    fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
+    return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
