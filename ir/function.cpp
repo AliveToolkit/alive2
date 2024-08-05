@@ -18,6 +18,14 @@ using namespace std;
 
 namespace IR {
 
+void BasicBlock::setInstrs(std::vector<std::unique_ptr<Instr>> &&instrs) {
+  m_instrs = std::move(instrs);
+}
+
+std::unique_ptr<Instr>& BasicBlock::getInstr(size_t index) {
+  return m_instrs.at(index);
+}
+
 expr BasicBlock::getTypeConstraints(const Function &f) const {
   expr t(true);
   for (auto &i : instrs()) {
@@ -59,6 +67,10 @@ void BasicBlock::delInstr(const Instr *i) {
       return;
     }
   }
+}
+
+void BasicBlock::popInstr() {
+  m_instrs.pop_back();
 }
 
 void BasicBlock::addExitBlock(BasicBlock* bb) {
@@ -172,6 +184,14 @@ void Function::fixupTypes(const Model &m) {
     for (auto &v : l) {
       const_cast<Value&>(v).fixupTypes(m);
     }
+  }
+}
+
+BasicBlock& Function::getEntryBB() {
+  if (BB_order[0]->getName() == "#init") {
+    return *BB_order[1];
+  } else {
+    return *BB_order[0];
   }
 }
 
