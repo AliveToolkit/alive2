@@ -139,8 +139,8 @@ public:
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getFirstBB() { return *BB_order[0]; }
   BasicBlock& getEntryBB();
-  const BasicBlock& getLastBB() const { return *BB_order[BB_order.size() - 1]; }
-  BasicBlock& getLastBB() { return *BB_order[BB_order.size() - 1]; }
+  const BasicBlock& getLastBB() const { return *BB_order.back(); }
+  BasicBlock& getLastBB() { return *BB_order.back(); }
   const BasicBlock& getSinkBB() const { return sink_bb; }
   BasicBlock& getBB(unsigned idx) { return *BB_order.at(idx); }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
