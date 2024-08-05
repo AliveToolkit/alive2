@@ -37,12 +37,20 @@ public:
 
   const std::string& getName() const { return name; }
 
+  size_t size() const { return m_instrs.size(); }
+  const Instr& at(size_t index) const { return *m_instrs.at(index); }
+  Instr& at(size_t index) { return *m_instrs.at(index); }
+
+  std::unique_ptr<Instr>& getInstr(size_t index);
+  void setInstrs(std::vector<std::unique_ptr<Instr>> &&instrs);
+
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 
   void addInstr(std::unique_ptr<Instr> &&i, bool push_front = false);
   void addInstrAt(std::unique_ptr<Instr> &&i, const Instr *other, bool before);
   void delInstr(const Instr *i);
+  void popInstr();
 
   void addExitBlock(BasicBlock* bb);
   const std::unordered_set<BasicBlock*>& getExitBlocks() const {
@@ -52,6 +60,7 @@ public:
   util::const_strip_unique_ptr<decltype(m_instrs)> instrs() const {
     return m_instrs;
   }
+  const Instr& back() const { return *m_instrs.back(); }
   Instr& back() { return *m_instrs.back(); }
   std::vector<Phi*> phis() const;
 
@@ -126,8 +135,12 @@ public:
   void fixupTypes(const smt::Model &m);
   void rauw(const Value &what, Value &with);
 
+  size_t getNumBBs() const { return BB_order.size(); }
   const BasicBlock& getFirstBB() const { return *BB_order[0]; }
   BasicBlock& getFirstBB() { return *BB_order[0]; }
+  BasicBlock& getEntryBB();
+  const BasicBlock& getLastBB() const { return *BB_order.back(); }
+  BasicBlock& getLastBB() { return *BB_order.back(); }
   const BasicBlock& getSinkBB() const { return sink_bb; }
   BasicBlock& getBB(unsigned idx) { return *BB_order.at(idx); }
   BasicBlock& getBB(std::string_view name, bool push_front = false);

@@ -1044,12 +1044,17 @@ static void calculateAndInitConstants(Transform &t) {
     uint64_t &loc_alloc_aligned_size
       = is_src ? loc_src_alloc_aligned_size : loc_tgt_alloc_aligned_size;
 
+    observes_addresses |= fn->getFnAttrs().has(FnAttrs::Asm);
+
     for (auto &v : fn->getInputs()) {
       auto *i = dynamic_cast<const Input *>(&v);
       if (!i)
         continue;
 
       has_ptr_arg |= hasPtr(i->getType());
+      observes_addresses |= i->hasAttribute(ParamAttrs::Align) ||
+                            i->hasAttribute(ParamAttrs::Dereferenceable) ||
+                            i->hasAttribute(ParamAttrs::DereferenceableOrNull);
 
       update_min_vect_sz(i->getType());
       max_access_size
@@ -1149,6 +1154,8 @@ static void calculateAndInitConstants(Transform &t) {
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
         observes_addresses |= ic->isPtrCmp() &&
                               ic->getPtrCmpMode() == ICmp::INTEGRAL;
+      } else if (auto *assume = dynamic_cast<const Assume*>(&i)) {
+        observes_addresses |= assume->getKind() == Assume::Align;
       }
     }
   }
@@ -1662,9 +1669,8 @@ static void optimize_ptrcmp(Function &f) {
     auto base0 = get_base_ptr(op0);
     auto base1 = get_base_ptr(op1);
     if (base0 && base0 == base1) {
-      if (is_eq)
-        const_cast<ICmp*>(icmp)->setPtrCmpMode(ICmp::PROVENANCE);
-      else if (is_inbounds(*op0) && is_inbounds(*op1) && !is_signed_cmp)
+      if (is_eq ||
+          (is_inbounds(*op0) && is_inbounds(*op1) && !is_signed_cmp))
         // Even if op0 and op1 are inbounds, 'icmp slt op0, op1' must
         // compare underlying addresses because it is possible for the block
         // to span across [a, b] where a >s 0 && b <s 0.

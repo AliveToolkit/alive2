@@ -164,6 +164,10 @@ class Memory {
 
   std::vector<std::pair<unsigned, bool>> byval_blks; /// <bid, is_const>
   AliasSet escaped_local_blks;
+  AliasSet observed_addrs;
+
+  void escape_helper(const smt::expr &ptr, AliasSet &set1,
+                     AliasSet *set2 = nullptr);
 
   bool hasEscapedLocals() const {
     return escaped_local_blks.numMayAlias(true) > 0;
@@ -174,7 +178,8 @@ class Memory {
   unsigned nextNonlocalBid();
 
   static bool observesAddresses();
-  static int isInitialMemBlock(const smt::expr &e, bool match_any_init = false);
+  static int isInitialMemBlock(const smt::expr &e, bool match_any_init);
+  static bool isInitialMemoryOrLoad(const smt::expr &e, bool match_any_init);
 
   unsigned numLocals() const;
   unsigned numNonlocals() const;
@@ -360,6 +365,7 @@ public:
   // Returns true if a nocapture pointer byte is not in the memory.
   smt::expr checkNocapture() const;
   void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
+  void observesAddr(const Pointer &ptr);
 
   static Memory mkIf(const smt::expr &cond, Memory &&then, Memory &&els);
 

@@ -72,7 +72,8 @@ struct LoopLikeFunctionApproximator {
     prefix.add(ub_i);
 
     // Keep going if the function is being applied to a constant input
-    is_last &= !continue_i.isConst();
+    if (i < 512)
+      is_last &= !continue_i.isConst();
 
     if (is_last)
       s.addPre(prefix().implies(!continue_i));
@@ -106,6 +107,9 @@ expr Instr::getTypeConstraints() const {
   return {};
 }
 
+bool Instr::isTerminator() const {
+  return false;
+}
 
 BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
              unsigned flags)
@@ -2337,12 +2341,21 @@ MemInstr::ByteAccessInfo FnCall::getByteAccessInfo() const {
   if (attrs.has(AllocKind::Uninitialized) || attrs.has(AllocKind::Free))
     return {};
 
+  bool has_ptr_args = any_of(args.begin(), args.end(),
+    [](const auto &pair) {
+      auto &[val, attrs] = pair;
+      return hasPtr(val->getType()) &&
+             !attrs.has(ParamAttrs::ByVal) &&
+             !attrs.has(ParamAttrs::NoCapture);
+    });
+
   // calloc style
   if (attrs.has(AllocKind::Zeroed)) {
     auto info = ByteAccessInfo::intOnly(1);
     auto [alloc, align] = getMaxAllocSize();
     if (alloc)
       info.byteSize = gcd(alloc, align);
+    info.observesAddresses = has_ptr_args;
     return info;
   }
 
@@ -2381,11 +2394,10 @@ MemInstr::ByteAccessInfo FnCall::getByteAccessInfo() const {
   }
 #undef UPDATE
 
-  // No dereferenceable attribute
-  if (bytesize == 0)
-    return {};
-
-  return ByteAccessInfo::anyType(bytesize);
+  ByteAccessInfo info;
+  info.byteSize = bytesize;
+  info.observesAddresses = has_ptr_args;
+  return info;
 }
 
 
@@ -2823,8 +2835,12 @@ StateValue ICmp::toSMT(State &s) const {
 
   if (isPtrCmp()) {
     fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
-      Pointer lhs(s.getMemory(), av);
-      Pointer rhs(s.getMemory(), bv);
+      auto &m = s.getMemory();
+      Pointer lhs(m, av);
+      Pointer rhs(m, bv);
+      m.observesAddr(lhs);
+      m.observesAddr(rhs);
+
       switch (pcmode) {
       case INTEGRAL:
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
@@ -3223,6 +3239,10 @@ JumpInstr::target_iterator JumpInstr::it_helper::end() const {
   return { instr, idx };
 }
 
+bool JumpInstr::isTerminator() const {
+  return true;
+}
+
 
 void Branch::replaceTargetWith(const BasicBlock *from, const BasicBlock *to) {
   if (dst_true == from)
@@ -3424,6 +3444,9 @@ unique_ptr<Instr> Return::dup(Function &f, const string &suffix) const {
   return make_unique<Return>(getType(), *val);
 }
 
+bool Return::isTerminator() const {
+  return true;
+}
 
 Assume::Assume(Value &cond, Kind kind)
     : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {

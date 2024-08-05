@@ -512,14 +512,16 @@ bool Memory::observesAddresses() {
 }
 
 static bool isFnReturnValue(const expr &e) {
-  string name;
+  expr arr, idx;
+  if (e.isLoad(arr, idx))
+    return isFnReturnValue(arr);
+
   expr val;
   unsigned hi, lo;
   if (e.isExtract(val, hi, lo))
-    name = val.fn_name();
-  else
-    name = e.fn_name();
-  return name.starts_with("#fnret_");
+    return isFnReturnValue(val);
+
+  return e.fn_name().starts_with("#fnret_");
 }
 
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
@@ -535,6 +537,19 @@ int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
     return 1;
 
   return match_any_init && name.starts_with("blk_val!") ? 2 : 0;
+}
+
+bool Memory::isInitialMemoryOrLoad(const expr &e, bool match_any_init) {
+  expr arr, idx;
+  if (e.isLoad(arr, idx))
+    return isInitialMemoryOrLoad(arr, match_any_init);
+
+  expr val;
+  unsigned hi, lo;
+  if (e.isExtract(val, hi, lo))
+    return isInitialMemoryOrLoad(val, match_any_init);
+
+  return isInitialMemBlock(e, match_any_init) != 0;
 }
 }
 
@@ -907,23 +922,50 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
     if ( write && always_nowrite(bid0)) return false;
   }
 
-  if (!isAsmMode() && offset0.isNegative().isTrue())
+  if (isUndef(offset0))
     return false;
-
-  assert(!isUndef(offset0));
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
 
   if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    expr offset = offset0.sextOrTrunc(bits_size_t);
     if (sz->ult(bytes).isTrue())
       return false;
 
+    //expr offset = offset0.sextOrTrunc(bits_size_t);
+
+#if 0
+    // Never hits in practice
+    // FIXME: this is for logical pointers
+    if (auto blk_align0
+          = (local ? local_blk_align : non_local_blk_align).lookup(bid)) {
+      int64_t off;
+      uint64_t blk_align;
+      if (offset0.isInt(off) && off > 0 &&
+          blk_align0->isUInt(blk_align) &&
+          ((uint64_t)off % align) % (1ull << blk_align) != 0)
+        return false;
+    }
+#endif
+
+    if (local && !observed_addrs.mayAlias(true, bid0)) {
+      // block align must be >= access align if the address hasn't been observed
+      if (auto blk_align0 = local_blk_align.lookup(bid)) {
+        uint64_t blk_align;
+        if (blk_align0->isUInt(blk_align) &&
+            (1ull << blk_align) < align)
+          return false;
+      }
+    }
+
+#if 0
+    // Never hits in practice
+    // FIXME: this is for logical pointers
     if (!isAsmMode()) {
       if (offset.uge(*sz).isTrue() ||
           (*sz - offset).ult(bytes).isTrue())
         return false;
     }
+#endif
   } else if (local) // allocated in another branch
     return false;
 
@@ -941,8 +983,9 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
   assert(bytes % (bits_byte/8) == 0);
 
   AliasSet aliasing(*this);
-  auto sz_local = aliasing.size(true);
+  auto sz_local = next_local_bid;
   auto sz_nonlocal = aliasing.size(false);
+  assert(sz_local <= aliasing.size(true));
 
   auto check_alias = [&](AliasSet &alias, bool local, unsigned bid,
                          const expr &offset) {
@@ -963,7 +1006,7 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
     auto shortbid = p.getShortBid();
     expr offset = p.getOffset();
     uint64_t bid;
-    if (shortbid.isUInt(bid)) {
+    if (shortbid.isUInt(bid) && (!isAsmMode() || p.isInbounds(true).isTrue())) {
       if (!is_local.isFalse() && bid < sz_local)
         check_alias(this_alias, true, bid, offset);
       if (!is_local.isTrue() && bid < sz_nonlocal)
@@ -971,16 +1014,25 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, unsigned bytes,
       goto end;
     }
 
+    {
+    bool is_init_memory = isInitialMemoryOrLoad(shortbid, false);
+    bool is_from_fn     = !is_init_memory &&
+                          (isInitialMemoryOrLoad(shortbid, true) ||
+                           isFnReturnValue(shortbid));
+
     for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
         continue;
       for (unsigned i = 0, e = local ? sz_local : sz_nonlocal; i < e; ++i) {
-        if (write && !local && always_nowrite(i))
+        // initial memory doesn't have local ptrs stored
+        if (local && is_init_memory)
           continue;
-        if (!write && !local && always_noread(i))
+        // functions can only return escaped ptrs
+        if (local && is_from_fn && !escaped_local_blks.mayAlias(true, i))
           continue;
         check_alias(this_alias, local, i, offset);
       }
+    }
     }
 
 end:
@@ -1386,7 +1438,8 @@ bool Memory::isAsmMode() const {
   return state->getFn().has(FnAttrs::Asm);
 }
 
-Memory::Memory(State &state) : state(&state), escaped_local_blks(*this) {
+Memory::Memory(State &state)
+  : state(&state), escaped_local_blks(*this), observed_addrs(*this) {
   if (memory_unused())
     return;
 
@@ -2587,7 +2640,7 @@ Memory::refined(const Memory &other, bool fncall,
     // Hence we may not have all initializers if tgt doesn't reference them.
     if (other.isAsmMode() &&
         is_constglb(bid) &&
-        isInitialMemBlock(other.non_local_block_val[bid].val))
+        isInitialMemBlock(other.non_local_block_val[bid].val, false))
       continue;
 
     ret &= (ptr_bid == bid_expr).implies(blockRefined(p, q, bid, undef_vars));
@@ -2632,29 +2685,51 @@ expr Memory::checkNocapture() const {
   return res;
 }
 
-void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
-  if (is_ptr.isFalse())
-    return;
+void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
+  assert(observesAddresses());
 
   if (next_local_bid == 0 ||
-      escaped_local_blks.isFullUpToAlias(true) == (int)next_local_bid-1)
+      set1.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;
 
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
-      if (bid < next_local_bid)
-        escaped_local_blks.setMayAlias(true, bid);
-    } else if (isInitialMemBlock(bid_expr)) {
+      if (bid < next_local_bid) {
+        set1.setMayAlias(true, bid);
+        if (set2)
+          set2->setMayAlias(true, bid);
+      }
+    } else if (isInitialMemBlock(bid_expr, true)) {
       // initial non local block bytes don't contain local pointers.
     } else if (isFnReturnValue(bid_expr)) {
       // Function calls have already escaped whatever they needed to.
     } else {
+      expr val, arr, idx;
+      unsigned h, l;
+      if (bid_expr.isExtract(val, h, l) && val.isLoad(arr, idx)) {
+        // if this a load, it can't escape anything that hasn't escaped before
+        continue;
+      }
+
       // may escape a local ptr, but we don't know which one
-      escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
+      set1.setMayAliasUpTo(true, next_local_bid-1);
+      if (set2)
+        set2->setMayAliasUpTo(true, next_local_bid-1);
       break;
     }
   }
+}
+
+void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
+  if (is_ptr.isFalse())
+    return;
+
+  escape_helper(ptr, escaped_local_blks, &observed_addrs);
+}
+
+void Memory::observesAddr(const Pointer &ptr) {
+  escape_helper(ptr(), observed_addrs);
 }
 
 Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
@@ -2688,6 +2763,7 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.escaped_local_blks.unionWith(els.escaped_local_blks);
+  ret.observed_addrs.unionWith(els.observed_addrs);
 
   for (const auto &[expr, alias] : els.ptr_alias) {
     auto [I, inserted] = ret.ptr_alias.try_emplace(expr, alias);

@@ -111,19 +111,6 @@ unsigned metadata_idx;
   if (!ty || !a || !b || !c)              \
     return error(i)
 
-#define RETURN_FNATTRS(op, attrs)                            \
-  do {                                                       \
-    auto ret = op;                                           \
-    add_identifier(i, *ret.get());                           \
-    if (attrs.has(FnAttrs::NoUndef)) {                       \
-      auto &ptr = *ret;                                      \
-      BB->addInstr(std::move(ret));                          \
-      return make_unique<Assume>(ptr, Assume::WellDefined);  \
-    }                                                        \
-    return ret;                                              \
-  } while (0)
-
-
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   Function *alive_fn;
@@ -814,6 +801,7 @@ public:
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
+    RetTy ret;
     switch (i.getIntrinsicID()) {
     case llvm::Intrinsic::assume:
     {
@@ -927,9 +915,8 @@ public:
       case llvm::Intrinsic::scmp:     op = BinOp::SCmp; break;
       default: UNREACHABLE();
       }
-      FnAttrs attrs;
-      parse_fn_attrs(i, attrs);
-      RETURN_FNATTRS(make_unique<BinOp>(*ty, value_name(i), *a, *b, op), attrs);
+      ret = make_unique<BinOp>(*ty, value_name(i), *a, *b, op);
+      break;
     }
     case llvm::Intrinsic::bitreverse:
     case llvm::Intrinsic::bswap:
@@ -951,7 +938,8 @@ public:
       case llvm::Intrinsic::is_constant: op = UnaryOp::IsConstant; break;
       default: UNREACHABLE();
       }
-      return make_unique<UnaryOp>(*ty, value_name(i), *val, op);
+      ret = make_unique<UnaryOp>(*ty, value_name(i), *val, op);
+      break;
     }
     case llvm::Intrinsic::vector_reduce_add:
     case llvm::Intrinsic::vector_reduce_mul:
@@ -976,7 +964,8 @@ public:
       case llvm::Intrinsic::vector_reduce_umin: op = UnaryReductionOp::UMin; break;
       default: UNREACHABLE();
       }
-      return make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
+      ret = make_unique<UnaryReductionOp>(*ty, value_name(i), *val, op);
+      break;
     }
     case llvm::Intrinsic::fshl:
     case llvm::Intrinsic::fshr:
@@ -996,7 +985,8 @@ public:
       case llvm::Intrinsic::umul_fix_sat: op = TernaryOp::UMulFixSat; break;
       default: UNREACHABLE();
       }
-      return make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op);
+      ret = make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op);
+      break;
     }
     case llvm::Intrinsic::fma:
     case llvm::Intrinsic::fmuladd:
@@ -1012,9 +1002,10 @@ public:
       case llvm::Intrinsic::experimental_constrained_fmuladd: op = FpTernaryOp::MulAdd; break;
       default: UNREACHABLE();
       }
-      return make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
-                                      parse_fmath(i), parse_rounding(i),
-                                      parse_exceptions(i));
+      ret = make_unique<FpTernaryOp>(*ty, value_name(i), *a, *b, *c, op,
+                                     parse_fmath(i), parse_rounding(i),
+                                     parse_exceptions(i));
+      break;
     }
     case llvm::Intrinsic::copysign:
     case llvm::Intrinsic::minnum:
@@ -1048,9 +1039,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_fdiv:    op = FpBinOp::FDiv; break;
       default: UNREACHABLE();
       }
-      return
-        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
-                             parse_rounding(i), parse_exceptions(i));
+      ret = make_unique<FpBinOp>(*ty, value_name(i), *a, *b, op, parse_fmath(i),
+                                 parse_rounding(i), parse_exceptions(i));
+      break;
     }
     case llvm::Intrinsic::canonicalize:
     case llvm::Intrinsic::fabs:
@@ -1094,9 +1085,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_trunc:     op = FpUnaryOp::Trunc; break;
       default: UNREACHABLE();
       }
-      return
-        make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
-                               parse_rounding(i), parse_exceptions(i));
+      ret = make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
+                                   parse_rounding(i), parse_exceptions(i));
+      break;
     }
     case llvm::Intrinsic::experimental_constrained_sitofp:
     case llvm::Intrinsic::experimental_constrained_uitofp:
@@ -1134,12 +1125,9 @@ public:
       case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
       default: UNREACHABLE();
       }
-      FnAttrs attrs;
-      parse_fn_attrs(i, attrs);
-      RETURN_FNATTRS(
-        make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
-                                    parse_rounding(i), parse_exceptions(i)),
-        attrs);
+      ret = make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
+                                        parse_rounding(i), parse_exceptions(i));
+      break;
     }
     case llvm::Intrinsic::experimental_constrained_fcmp:
     case llvm::Intrinsic::experimental_constrained_fcmps:
@@ -1147,9 +1135,9 @@ public:
       PARSE_BINOP();
       auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
       auto cond = parse_fcmp_cond(fcmp->getPredicate());
-      return
-        make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
-                          parse_exceptions(i), fcmp->isSignaling());
+      ret = make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
+                              parse_exceptions(i), fcmp->isSignaling());
+      break;
     }
     case llvm::Intrinsic::is_fpclass:
     {
@@ -1159,7 +1147,8 @@ public:
       case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
       default: UNREACHABLE();
       }
-      return make_unique<TestOp>(*ty, value_name(i), *a, *b, op);
+      ret = make_unique<TestOp>(*ty, value_name(i), *a, *b, op);
+      break;
     }
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:
@@ -1184,7 +1173,8 @@ public:
     case llvm::Intrinsic::ptrmask:
     {
       PARSE_BINOP();
-      return make_unique<PtrMask>(*ty, value_name(i), *a, *b);
+      ret = make_unique<PtrMask>(*ty, value_name(i), *a, *b);
+      break;
     }
     case llvm::Intrinsic::sideeffect: {
       FnAttrs attrs;
@@ -1228,6 +1218,17 @@ public:
 
     default:
       break;
+    }
+    if (ret) {
+      FnAttrs attrs;
+      parse_fn_attrs(i, attrs);
+      add_identifier(i, *ret.get());
+      if (attrs.has(FnAttrs::NoUndef)) {
+        auto &ptr = *ret;
+        BB->addInstr(std::move(ret));
+        return make_unique<Assume>(ptr, Assume::WellDefined);
+      }
+      return ret;
     }
     return visitCallInst(i, true);
   }

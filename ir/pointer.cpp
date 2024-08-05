@@ -327,9 +327,6 @@ expr Pointer::isInboundsOf(const Pointer &block, unsigned bytes) const {
 }
 
 expr Pointer::isInbounds(bool strict) const {
-  if (isUndef(getOffset()))
-    return false;
-
   auto offset = getOffsetSizet();
   auto size   = blockSizeOffsetT();
   return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
@@ -379,8 +376,8 @@ expr Pointer::isAligned(uint64_t align) {
 
   expr blk_align = isBlockAligned(align);
 
-  // TODO: allow this in more cases. for example when the block is local
-  // and addresses are not observed.
+  // FIXME: this is not sound; the function may be called only when a global
+  // has a better alignment at run time
   if (blk_align.isConst() && offset.isConst()) {
     // This is stricter than checking getAddress(), but as addresses are not
     // observed, program shouldn't be able to distinguish this from checking
@@ -433,7 +430,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     expr offset   = p.getOffset();
     expr cond;
 
-    if (m.state->isAsmMode()) {
+    if (isUndef(offset) || isUndef(p.getBid())) {
+      cond = false;
+    } else if (m.state->isAsmMode()) {
       // Pointers have full provenance in ASM mode
       auto check = [&](unsigned limit, bool local) {
         for (unsigned i = 0; i != limit; ++i) {
@@ -448,8 +447,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
     // try some constant folding
     } else if (bytes.ugt(p.blockSize()).isTrue() ||
-              p.getOffsetSizet().uge(block_sz).isTrue() ||
-              isUndef(offset)) {
+               p.getOffsetSizet().uge(block_sz).isTrue()) {
       cond = false;
     } else {
       // check that the offset is within bounds and that arith doesn't overflow
