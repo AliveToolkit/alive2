@@ -993,7 +993,8 @@ StateValue FpBinOp::toSMT(State &s) const {
 
       ostringstream name;
       name << getOpName() << "." << ty;
-      return uf_float(std::move(name).str(), {a, b}, a.value, fmath, isCommutative());
+      return uf_float(std::move(name).str(), {a, b}, a.value,
+                      fmath, isCommutative());
     };
   }
 
@@ -1996,7 +1997,8 @@ StateValue FpConversionOp::toSMT(State &s) const {
 
       AndExpr non_poison;
       non_poison.add(sv.non_poison);
-      if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) && op != FPTrunc && op != FPExt) {
+      if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) &&
+          op != FPTrunc && op != FPExt) {
         os << ".np";
         non_poison.add(expr::mkUF(os.str(), {sv.value}, false));
       }
