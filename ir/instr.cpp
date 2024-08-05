@@ -664,7 +664,8 @@ bool FpBinOp::isCommutative() const {
 }
 
 void FpBinOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " " << fmath << *lhs << ", " << rhs->getName();
+  os << getName() << " = " << getOpName() << " " << fmath
+     << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
