@@ -872,6 +872,12 @@ static StateValue uf_float(const string &name,
 
   auto value = expr::mkUF(name, arg_values, res);
   if (is_commutative) {
+    // Commutative functions are encoded as
+    //   op(x, y) = op'(x, y) & op'(y, x)
+    // where & is the bitwise and operator and op' is an uninterpreted function.
+    // This encoding comes from "SMT-based Translation Validation for Machine
+    // Learning Compiler" by Seongwon Bang, Seunghyeon Nam, Inwhan Chun,
+    // Ho Young Jhoo, and Juneyoung Lee
     assert(args.size() == 2);
     value = value & expr::mkUF(name, {arg_values[1], arg_values[0]}, res);
   }
