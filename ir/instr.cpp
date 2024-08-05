@@ -2938,31 +2938,29 @@ StateValue FCmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  function<expr(const expr &, const expr &, const expr &)> cmp;
   function<StateValue(const StateValue &, const StateValue &, const Type &)> fn;
 
-  cmp = [&](const expr &a, const expr &b, auto &rm) {
-    switch (cond) {
-    case OEQ: return a.foeq(b);
-    case OGT: return a.fogt(b);
-    case OGE: return a.foge(b);
-    case OLT: return a.folt(b);
-    case OLE: return a.fole(b);
-    case ONE: return a.fone(b);
-    case ORD: return a.ford(b);
-    case UEQ: return a.fueq(b);
-    case UGT: return a.fugt(b);
-    case UGE: return a.fuge(b);
-    case ULT: return a.fult(b);
-    case ULE: return a.fule(b);
-    case UNE: return a.fune(b);
-    case UNO: return a.funo(b);
-    case TRUE:  return expr(true);
-    case FALSE: return expr(false);
-    }
-  };
-
   fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {  
+    auto cmp = [&](const expr &a, const expr &b, auto &rm) {
+      switch (cond) {
+      case OEQ: return a.foeq(b);
+      case OGT: return a.fogt(b);
+      case OGE: return a.foge(b);
+      case OLT: return a.folt(b);
+      case OLE: return a.fole(b);
+      case ONE: return a.fone(b);
+      case ORD: return a.ford(b);
+      case UEQ: return a.fueq(b);
+      case UGT: return a.fugt(b);
+      case UGE: return a.fuge(b);
+      case ULT: return a.fult(b);
+      case ULE: return a.fule(b);
+      case UNE: return a.fune(b);
+      case UNO: return a.funo(b);
+      case TRUE:  return expr(true);
+      case FALSE: return expr(false);
+      }
+    };
     auto [val, np] = fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
                                cmp, ty, fmath, {}, false, true);
     return { val.toBVBool(), std::move(np) };
