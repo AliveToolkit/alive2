@@ -862,7 +862,8 @@ static StateValue uf_float(State &s, const string &name,
                            const vector<StateValue> &args,
                            const expr &res,
                            FastMathFlags fmath = FastMathFlags(),
-                           bool is_commutative = false) {
+                           bool is_commutative = false,
+                           bool is_partial = false) {
   
   vector<expr> arg_values;
   arg_values.reserve(args.size());
@@ -888,21 +889,25 @@ static StateValue uf_float(State &s, const string &name,
     non_poison.add(arg.non_poison);
   }
 
-  auto fast_math_flag = [&](unsigned flag, const char* suffix){
-    if (fmath.flags & flag) {
-      auto np_name = name + ".np_" + suffix;
-      auto poison_uf = expr::mkUF(np_name, arg_values, false);
-      s.doesApproximation("uf_float", poison_uf);
-      if (is_commutative) {
-        assert(args.size() == 2);
-        poison_uf &= expr::mkUF(np_name, {arg_values[1], arg_values[0]}, false);
-      }
-      non_poison.add(poison_uf);
+  auto poison_condition = [&](const char* suffix){
+    auto np_name = name + ".np_" + suffix;
+    auto poison_uf = expr::mkUF(np_name, arg_values, false);
+    s.doesApproximation("uf_float", poison_uf);
+    if (is_commutative) {
+      assert(args.size() == 2);
+      poison_uf &= expr::mkUF(np_name, {arg_values[1], arg_values[0]}, false);
     }
+    non_poison.add(poison_uf);
   };
   
-  fast_math_flag(FastMathFlags::NNaN, "nnan");
-  fast_math_flag(FastMathFlags::NInf, "ninf");
+  if (fmath.flags & FastMathFlags::NNaN)
+    poison_condition("nnan");
+  if (fmath.flags & FastMathFlags::NInf)
+    poison_condition("ninf");
+
+  // Partial functions may produce poison for inputs where they are not defined.
+  if (is_partial)
+    poison_condition("partial");
 
   return { std::move(value), non_poison() };
 }
@@ -1983,23 +1988,15 @@ StateValue FpConversionOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &sv, const Type &from_type,
                  const Type &to_type) -> StateValue {
-      ostringstream os;
-      os << getOpName() << "." << from_type << ".to." << to_type;
+      ostringstream name;
+      name << getOpName() << "." << from_type << ".to." << to_type;
       expr range = to_type.getDummyValue(true).value;
-      auto value = expr::mkUF(os.str(), {sv.value}, range);
-      s.doesApproximation("uf_float", value);
-
-      AndExpr non_poison;
-      non_poison.add(sv.non_poison);
-      if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) &&
-          op != FPTrunc && op != FPExt) {
-        os << ".np";
-        auto poison_uf = expr::mkUF(os.str(), {sv.value}, false);
-        s.doesApproximation("uf_float", poison_uf);
-        non_poison.add(poison_uf);
-      }
-
-      return { std::move(value), non_poison() };
+      bool is_partial = (op == UIntToFP && (flags & NNEG)) ||
+                        op == FPToSInt ||
+                        op == FPToUInt;
+      
+      return uf_float(s, std::move(name).str(), {sv}, range,
+                      FastMathFlags(), false, is_partial);
     };
   }
 
