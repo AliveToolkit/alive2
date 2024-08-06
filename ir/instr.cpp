@@ -914,7 +914,6 @@ static StateValue uf_float(State &s, const string &name,
 
 StateValue FpBinOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&, const expr&)> fn;
-  function<StateValue(const StateValue&, const StateValue&, const Type&)> scalar;
   bool bitwise = false;
 
   switch (op) {
@@ -987,7 +986,8 @@ StateValue FpBinOp::toSMT(State &s) const {
     break;
   }
 
-  scalar = [&](const StateValue &a, const StateValue &b, const Type &ty) {
+  function<StateValue(const StateValue&, const StateValue&, const Type&)> scalar =
+      [&](const StateValue &a, const StateValue &b, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
                      [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
                      ty, fmath, rm, bitwise);
@@ -1525,7 +1525,6 @@ void FpTernaryOp::print(ostream &os) const {
 
 StateValue FpTernaryOp::toSMT(State &s) const {
   function<expr(const expr&, const expr&, const expr&, const expr&)> fn;
-  function<StateValue(const StateValue&, const StateValue&, const StateValue&, const Type&)> scalar;
 
   switch (op) {
   case FMA:
@@ -1541,8 +1540,10 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     break;
   }
 
-  scalar = [&](const StateValue &a, const StateValue &b,
-               const StateValue &c, const Type &ty) {
+  function<StateValue(const StateValue&, const StateValue&,
+                      const StateValue&, const Type&)> scalar =
+    [&](const StateValue &a, const StateValue &b,
+        const StateValue &c, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
                      c.value, c.non_poison, fn, ty, fmath, rm, false);
   };
@@ -1619,7 +1620,6 @@ StateValue TestOp::toSMT(State &s) const {
   auto &a = s[*lhs];
   auto &b = s[*rhs];
   function<expr(const expr&, const Type&)> fn;
-  function<StateValue(const StateValue&, const Type&)> scalar;
 
   switch (op) {
   case Is_FPClass:
@@ -1631,7 +1631,8 @@ StateValue TestOp::toSMT(State &s) const {
     break;
   }
 
-  scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
+  function<StateValue(const StateValue&, const Type&)> scalar =
+      [&](const StateValue &v, const Type &ty) -> StateValue {
     return { fn(v.value, ty), expr(v.non_poison) };
   };
 
@@ -1890,7 +1891,6 @@ void FpConversionOp::print(ostream &os) const {
 StateValue FpConversionOp::toSMT(State &s) const {
   auto &v = s[*val];
   function<StateValue(const expr &, const Type &, const expr&)> fn;
-  function<StateValue(const StateValue &, const Type &, const Type&)> scalar;
 
   switch (op) {
   case SIntToFP:
@@ -1960,8 +1960,9 @@ StateValue FpConversionOp::toSMT(State &s) const {
     break;
   }
 
-  scalar = [&](const StateValue &sv, const Type &from_type,
-               const Type &to_type) -> StateValue {
+  function<StateValue(const StateValue &, const Type &, const Type&)> scalar =
+      [&](const StateValue &sv, const Type &from_type,
+          const Type &to_type) -> StateValue {
     auto val = sv.value;
 
     if (from_type.isFloatType()) {
