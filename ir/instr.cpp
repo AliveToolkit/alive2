@@ -858,7 +858,7 @@ static StateValue fm_poison(State &s, expr a, const expr &ap,
                    ty, fmath, rm, bitwise, flags_in_only, 1);
 }
 
-static StateValue uf_float(const string &name,
+static StateValue uf_float(State &s, const string &name,
                            const vector<StateValue> &args,
                            const expr &res,
                            FastMathFlags fmath = FastMathFlags(),
@@ -871,6 +871,7 @@ static StateValue uf_float(const string &name,
   }
 
   auto value = expr::mkUF(name, arg_values, res);
+  s.doesApproximation("uf_float", value);
   if (is_commutative) {
     // Commutative functions are encoded as
     //   op(x, y) = op'(x, y) & op'(y, x)
@@ -891,6 +892,7 @@ static StateValue uf_float(const string &name,
     if (fmath.flags & flag) {
       auto np_name = name + ".np_" + suffix;
       auto poison_uf = expr::mkUF(np_name, arg_values, false);
+      s.doesApproximation("uf_float", poison_uf);
       if (is_commutative) {
         assert(args.size() == 2);
         poison_uf &= expr::mkUF(np_name, {arg_values[1], arg_values[0]}, false);
@@ -989,11 +991,9 @@ StateValue FpBinOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &a, const StateValue &b,
                  const Type &ty) -> StateValue {
-      s.doesApproximation("uf_float", true);
-
       ostringstream name;
       name << getOpName() << "." << ty;
-      return uf_float(std::move(name).str(), {a, b}, a.value,
+      return uf_float(s, std::move(name).str(), {a, b}, a.value,
                       fmath, isCommutative());
     };
   }
@@ -1260,11 +1260,9 @@ StateValue FpUnaryOp::toSMT(State &s) const {
 
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
-      s.doesApproximation("uf_float", true);
-
       ostringstream name;
       name << getOpName() << "." << ty;
-      return uf_float(std::move(name).str(), {v}, v.value, fmath, false);
+      return uf_float(s, std::move(name).str(), {v}, v.value, fmath, false);
     };
   }
 
@@ -1547,11 +1545,9 @@ StateValue FpTernaryOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &a, const StateValue &b,
                  const StateValue &c, const Type &ty) -> StateValue {
-      s.doesApproximation("uf_float", true);
-
       ostringstream name;
       name << getOpName() << "." << ty;
-      return uf_float(std::move(name).str(), {a, b, c}, a.value, fmath);
+      return uf_float(s, std::move(name).str(), {a, b, c}, a.value, fmath);
     };
   }
 
@@ -1636,10 +1632,9 @@ StateValue TestOp::toSMT(State &s) const {
 
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
-      s.doesApproximation("uf_float", true);
       ostringstream name;
       name << getOpName() << "." << ty;
-      return uf_float(std::move(name).str(), {v}, expr::mkUInt(0, 1));
+      return uf_float(s, std::move(name).str(), {v}, expr::mkUInt(0, 1));
     };
   }
 
@@ -1988,19 +1983,20 @@ StateValue FpConversionOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &sv, const Type &from_type,
                  const Type &to_type) -> StateValue {
-      s.doesApproximation("uf_float", true);
-
       ostringstream os;
       os << getOpName() << "." << from_type << ".to." << to_type;
       expr range = to_type.getDummyValue(true).value;
       auto value = expr::mkUF(os.str(), {sv.value}, range);
+      s.doesApproximation("uf_float", value);
 
       AndExpr non_poison;
       non_poison.add(sv.non_poison);
       if (op != SIntToFP && !(op == UIntToFP && !(flags & NNEG)) &&
           op != FPTrunc && op != FPExt) {
         os << ".np";
-        non_poison.add(expr::mkUF(os.str(), {sv.value}, false));
+        auto poison_uf = expr::mkUF(os.str(), {sv.value}, false);
+        s.doesApproximation("uf_float", poison_uf);
+        non_poison.add(poison_uf);
       }
 
       return { std::move(value), non_poison() };
@@ -2983,8 +2979,6 @@ StateValue FCmp::toSMT(State &s) const {
         // All conditions are encoded using only 5 uninterpreted functions:
         // oeq, ueq, olt, ult, ord
 
-        s.doesApproximation("uf_float", true);
-
         StateValue lhs = a;
         StateValue rhs = b;
 
@@ -3011,7 +3005,7 @@ StateValue FCmp::toSMT(State &s) const {
 
         ostringstream os;
         os << name << "." << ty;
-        auto value = uf_float(std::move(os).str(), {lhs, rhs},
+        auto value = uf_float(s, std::move(os).str(), {lhs, rhs},
                               expr::mkUInt(0, 1), fmath, commutative);
 
         if (negate) {
