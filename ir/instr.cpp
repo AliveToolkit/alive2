@@ -1537,7 +1537,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     };
     break;
   }
-  
+
   scalar = [&](const StateValue &a, const StateValue &b,
                const StateValue &c, const Type &ty) {
     return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
@@ -1546,7 +1546,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
 
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &a, const StateValue &b,
-                      const StateValue &c, const Type &ty) -> StateValue {
+                 const StateValue &c, const Type &ty) -> StateValue {
       s.doesApproximation("uf_float", true);
 
       ostringstream name;
