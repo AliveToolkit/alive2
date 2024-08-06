@@ -1970,6 +1970,9 @@ void Memory::mkLocalDisjAddrAxioms(const expr &allocated, const expr &short_bid,
   auto addr_var = expr::mkFreshVar("local_addr", expr::mkUInt(0, var_bw));
   state->addQuantVar(addr_var);
 
+  if (!Pointer::hasLocalBit())
+    state->addPre(addr_var != 0);
+
   expr blk_addr = addr_var.concat_zeros(align_bits);
   expr full_addr = Pointer::hasLocalBit()
                      ? expr::mkUInt(1, 1).concat(blk_addr) : blk_addr;

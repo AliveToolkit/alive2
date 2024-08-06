@@ -743,7 +743,7 @@ PtrType::mkUndefInput(State &s, const ParamAttrs &attrs) const {
 }
 
 void PtrType::printVal(ostream &os, const State &s, const expr &e) const {
-  os << Pointer(s.getMemory(), e);
+  os << Pointer(const_cast<State&>(s).returnMemory(), e);
 }
 
 void PtrType::print(ostream &os) const {

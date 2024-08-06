@@ -30,7 +30,7 @@ using namespace util;
 using namespace std;
 using util::config::dbg;
 
-static void print_single_varval(ostream &os, const State &st, const Model &m,
+static void print_single_varval(ostream &os, State &st, const Model &m,
                                 const Value *var, const Type &type,
                                 const StateValue &val, unsigned child) {
   if (dynamic_cast<const VoidType*>(&type)) {
@@ -65,9 +65,9 @@ static void print_single_varval(ostream &os, const State &st, const Model &m,
   type.printVal(os, st, m.eval(val.value, true));
 
   if (dynamic_cast<const PtrType*>(&type)) {
-    auto addr = Pointer(st.getMemory(), m.eval(val.value, true)).getAddress();
-    addr = m.eval(addr);
-    if (addr.isConst()) {
+    Pointer ptr(st.returnMemory(), m.eval(val.value, true));
+    auto addr = m.eval(ptr.getAddress());
+    if (addr.isConst() && !ptr.isNull().isTrue()) {
       os << " / Address=";
       addr.printHexadecimal(os);
     }
@@ -87,7 +87,7 @@ static void print_single_varval(ostream &os, const State &st, const Model &m,
   }
 }
 
-void tools::print_model_val(ostream &os, const State &st, const Model &m,
+void tools::print_model_val(ostream &os, State &st, const Model &m,
                             const Value *var, const Type &type,
                             const StateValue &val, unsigned child) {
   if (!type.isAggregateType()) {

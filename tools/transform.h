@@ -64,7 +64,7 @@ public:
 };
 
 
-void print_model_val(std::ostream &os, const IR::State &st, const smt::Model &m,
+void print_model_val(std::ostream &os, IR::State &st, const smt::Model &m,
                      const IR::Value *var, const IR::Type &type,
                      const IR::StateValue &val, unsigned child = 0);
 
