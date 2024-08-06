@@ -2907,30 +2907,27 @@ void FCmp::rauw(const Value &what, Value &with) {
   RAUW(b);
 }
 
-const char* FCmp::getCondName() const {
-  switch (cond) {
-  case OEQ:   return "oeq"; break;
-  case OGT:   return "ogt"; break;
-  case OGE:   return "oge"; break;
-  case OLT:   return "olt"; break;
-  case OLE:   return "ole"; break;
-  case ONE:   return "one"; break;
-  case ORD:   return "ord"; break;
-  case UEQ:   return "ueq"; break;
-  case UGT:   return "ugt"; break;
-  case UGE:   return "uge"; break;
-  case ULT:   return "ult"; break;
-  case ULE:   return "ule"; break;
-  case UNE:   return "une"; break;
-  case UNO:   return "uno"; break;
-  case TRUE:  return "true"; break;
-  case FALSE: return "false"; break;
-  }
-  UNREACHABLE();
-}
-
 void FCmp::print(ostream &os) const {
-  os << getName() << " = fcmp " << fmath << getCondName() << " " << *a << ", "
+  const char *condtxt = nullptr;
+  switch (cond) {
+  case OEQ:   condtxt = "oeq "; break;
+  case OGT:   condtxt = "ogt "; break;
+  case OGE:   condtxt = "oge "; break;
+  case OLT:   condtxt = "olt "; break;
+  case OLE:   condtxt = "ole "; break;
+  case ONE:   condtxt = "one "; break;
+  case ORD:   condtxt = "ord "; break;
+  case UEQ:   condtxt = "ueq "; break;
+  case UGT:   condtxt = "ugt "; break;
+  case UGE:   condtxt = "uge "; break;
+  case ULT:   condtxt = "ult "; break;
+  case ULE:   condtxt = "ule "; break;
+  case UNE:   condtxt = "une "; break;
+  case UNO:   condtxt = "uno "; break;
+  case TRUE:  condtxt = "true "; break;
+  case FALSE: condtxt = "false "; break;
+  }
+  os << getName() << " = fcmp " << fmath << condtxt << *a << ", "
      << b->getName();
   if (signaling)
     os << ", signaling";
@@ -2944,7 +2941,7 @@ StateValue FCmp::toSMT(State &s) const {
 
   function<StateValue(const StateValue &, const StateValue &, const Type &)> fn;
 
-  fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {  
+  fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
     auto cmp = [&](const expr &a, const expr &b, auto &rm) {
       switch (cond) {
       case OEQ: return a.foeq(b);

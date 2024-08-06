@@ -480,7 +480,6 @@ public:
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
   void rauw(const Value &what, Value &with) override;
-  const char* getCondName() const;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
