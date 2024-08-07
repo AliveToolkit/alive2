@@ -635,16 +635,16 @@ void FpBinOp::rauw(const Value &what, Value &with) {
 
 const char* FpBinOp::getOpName() const {
   switch (op) {
-  case FAdd:     return "fadd"; break;
-  case FSub:     return "fsub"; break;
-  case FMul:     return "fmul"; break;
-  case FDiv:     return "fdiv"; break;
-  case FRem:     return "frem"; break;
-  case FMax:     return "fmax"; break;
-  case FMin:     return "fmin"; break;
-  case FMaximum: return "fmaximum"; break;
-  case FMinimum: return "fminimum"; break;
-  case CopySign: return "copysign"; break;
+  case FAdd:     return "fadd";
+  case FSub:     return "fsub";
+  case FMul:     return "fmul";
+  case FDiv:     return "fdiv";
+  case FRem:     return "frem";
+  case FMax:     return "fmax";
+  case FMin:     return "fmin";
+  case FMaximum: return "fmaximum";
+  case FMinimum: return "fminimum";
+  case CopySign: return "copysign";
   }
   UNREACHABLE();
 }
@@ -664,7 +664,7 @@ bool FpBinOp::isCommutative() const {
 }
 
 void FpBinOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " " << fmath
+  os << getName() << " = " << getOpName() << ' ' << fmath
      << *lhs << ", " << rhs->getName();
   if (!rm.isDefault())
     os << ", rounding=" << rm;
@@ -889,7 +889,7 @@ static StateValue uf_float(State &s, const string &name,
     non_poison.add(arg.non_poison);
   }
 
-  auto poison_condition = [&](const char* suffix){
+  auto poison_condition = [&](const char* suffix) {
     auto np_name = name + ".np_" + suffix;
     auto poison_uf = expr::mkUF(np_name, arg_values, false);
     s.doesApproximation("uf_float", poison_uf);
@@ -997,7 +997,7 @@ StateValue FpBinOp::toSMT(State &s) const {
     scalar = [&](const StateValue &a, const StateValue &b,
                  const Type &ty) -> StateValue {
       ostringstream name;
-      name << getOpName() << "." << ty;
+      name << getOpName() << '.' << ty;
       return uf_float(s, std::move(name).str(), {a, b}, a.value,
                       fmath, isCommutative());
     };
@@ -1192,23 +1192,23 @@ void FpUnaryOp::rauw(const Value &what, Value &with) {
 
 const char* FpUnaryOp::getOpName() const {
   switch (op) {
-  case FAbs:         return "fabs"; break;
-  case FNeg:         return "fneg"; break;
-  case Canonicalize: return "canonicalize"; break;
-  case Ceil:         return "ceil"; break;
-  case Floor:        return "floor"; break;
-  case RInt:         return "rint"; break;
-  case NearbyInt:    return "nearbyint"; break;
-  case Round:        return "round"; break;
-  case RoundEven:    return "roundeven"; break;
-  case Trunc:        return "trunc"; break;
-  case Sqrt:         return "sqrt"; break;
+  case FAbs:         return "fabs";
+  case FNeg:         return "fneg";
+  case Canonicalize: return "canonicalize";
+  case Ceil:         return "ceil";
+  case Floor:        return "floor";
+  case RInt:         return "rint";
+  case NearbyInt:    return "nearbyint";
+  case Round:        return "round";
+  case RoundEven:    return "roundeven";
+  case Trunc:        return "trunc";
+  case Sqrt:         return "sqrt";
   }
   UNREACHABLE();
 }
 
 void FpUnaryOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " " << fmath << *val;
+  os << getName() << " = " << getOpName() << ' ' << fmath << *val;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1216,8 +1216,7 @@ void FpUnaryOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryOp::toSMT(State &s) const {
-  function<expr(const expr&, const expr&)> fn = nullptr;
-  function<StateValue(const StateValue&, const Type&)> scalar = nullptr;
+  expr (*fn)(const expr&, const expr&) = nullptr;
   bool bitwise = false;
 
   switch (op) {
@@ -1257,7 +1256,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
     break;
   }
 
-  scalar = [&](const StateValue &v, const Type &ty) {
+  function<StateValue(const StateValue&, const Type&)> scalar =
+      [&](const StateValue &v, const Type &ty) {
     return fm_poison(s, v.value, v.non_poison,
                      [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
                      bitwise, false);
@@ -1266,7 +1266,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
       ostringstream name;
-      name << getOpName() << "." << ty;
+      name << getOpName() << '.' << ty;
       return uf_float(s, std::move(name).str(), {v}, v.value, fmath, false);
     };
   }
@@ -1509,14 +1509,15 @@ void FpTernaryOp::rauw(const Value &what, Value &with) {
 
 const char* FpTernaryOp::getOpName() const {
   switch (op) {
-  case FMA:    return "fma"; break;
-  case MulAdd: return "fmuladd"; break;
+  case FMA:    return "fma";
+  case MulAdd: return "fmuladd";
   }
   UNREACHABLE();
 }
 
 void FpTernaryOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " " << fmath << *a << ", " << *b << ", " << *c;
+  os << getName() << " = " << getOpName() << ' ' << fmath
+     << *a << ", " << *b << ", " << *c;
   if (!rm.isDefault())
     os << ", rounding=" << rm;
   if (!ex.ignore())
@@ -1552,7 +1553,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     scalar = [&](const StateValue &a, const StateValue &b,
                  const StateValue &c, const Type &ty) -> StateValue {
       ostringstream name;
-      name << getOpName() << "." << ty;
+      name << getOpName() << '.' << ty;
       return uf_float(s, std::move(name).str(), {a, b, c}, a.value, fmath);
     };
   }
@@ -1607,13 +1608,13 @@ void TestOp::rauw(const Value &what, Value &with) {
 
 const char* TestOp::getOpName() const {
   switch (op) {
-  case Is_FPClass: return "is.fpclass"; break;
+  case Is_FPClass: return "is.fpclass";
   }
   UNREACHABLE();
 }
 
 void TestOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " " << *lhs << ", " << *rhs;
+  os << getName() << " = " << getOpName() << ' ' << *lhs << ", " << *rhs;
 }
 
 StateValue TestOp::toSMT(State &s) const {
@@ -1639,7 +1640,7 @@ StateValue TestOp::toSMT(State &s) const {
   if (config::is_uf_float()) {
     scalar = [&](const StateValue &v, const Type &ty) -> StateValue {
       ostringstream name;
-      name << getOpName() << "." << ty;
+      name << getOpName() << '.' << ty;
       return uf_float(s, std::move(name).str(), {v}, expr::mkUInt(0, 1));
     };
   }
@@ -1865,20 +1866,20 @@ void FpConversionOp::rauw(const Value &what, Value &with) {
 
 const char* FpConversionOp::getOpName() const {
   switch (op) {
-  case SIntToFP: return "sitofp"; break;
-  case UIntToFP: return "uitofp"; break;
-  case FPToSInt: return "fptosi"; break;
-  case FPToUInt: return "fptoui"; break;
-  case FPExt:    return "fpext"; break;
-  case FPTrunc:  return "fptrunc"; break;
-  case LRInt:    return "lrint"; break;
-  case LRound:   return "lround"; break;
+  case SIntToFP: return "sitofp";
+  case UIntToFP: return "uitofp";
+  case FPToSInt: return "fptosi";
+  case FPToUInt: return "fptoui";
+  case FPExt:    return "fpext";
+  case FPTrunc:  return "fptrunc";
+  case LRInt:    return "lrint";
+  case LRound:   return "lround";
   }
   UNREACHABLE();
 }
 
 void FpConversionOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName() << " ";
+  os << getName() << " = " << getOpName() << ' ';
   if (flags & NNEG)
     os << "nneg ";
   os << *val << print_type(getType(), " to ", "");
@@ -1990,7 +1991,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     scalar = [&](const StateValue &sv, const Type &from_type,
                  const Type &to_type) -> StateValue {
       ostringstream name;
-      name << getOpName() << "." << from_type << ".to." << to_type;
+      name << getOpName() << '.' << from_type << ".to." << to_type;
       expr range = to_type.getDummyValue(true).value;
       bool is_partial = (op == UIntToFP && (flags & NNEG)) ||
                         op == FPToSInt ||
@@ -2937,9 +2938,8 @@ StateValue FCmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  function<StateValue(const StateValue &, const StateValue &, const Type &)> fn;
-
-  fn = [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
+  function<StateValue(const StateValue &, const StateValue &, const Type &)> fn =
+      [&](const auto &a, const auto &b, const Type &ty) -> StateValue {
     auto cmp = [&](const expr &a, const expr &b, auto &rm) {
       switch (cond) {
       case OEQ: return a.foeq(b);
@@ -2999,7 +2999,7 @@ StateValue FCmp::toSMT(State &s) const {
         }
 
         ostringstream os;
-        os << name << "." << ty;
+        os << name << '.' << ty;
         auto value = uf_float(s, std::move(os).str(), {lhs, rhs},
                               expr::mkUInt(0, 1), fmath, commutative);
 
