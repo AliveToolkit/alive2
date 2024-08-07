@@ -13,7 +13,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 
 if (MSVC)
-  set(CMAKE_CXX_FLAGS                "/GL /EHsc /W2 ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS                "/GL /EHsc /W2 /Zc:__cplusplus ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS_DEBUG          "/Od /Zi ${CMAKE_CXX_FLAGS_DEBUG}")
   set(CMAKE_CXX_FLAGS_RELEASE        "/O2 /Oi /Oy /Zc:inline ${CMAKE_CXX_FLAGS_RELEASE}")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2 /Oi /Zi ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
@@ -130,10 +130,6 @@ set(UTIL_SRCS
   util/crc.cpp
   util/errors.cpp
   util/file.cpp
-  util/parallel.cpp
-  util/parallel_fifo.cpp
-  util/parallel_null.cpp
-  util/parallel_unrestricted.cpp
   util/random.cpp
   util/sort.cpp
   util/stopwatch.cpp
@@ -141,6 +137,16 @@ set(UTIL_SRCS
   util/unionfind.cpp
   util/version.cpp
 )
+
+if (BUILD_TV)
+  set(UTIL_SRCS
+    ${UTIL_SRCS}
+    util/parallel.cpp
+    util/parallel_fifo.cpp
+    util/parallel_null.cpp
+    util/parallel_unrestricted.cpp
+  )
+endif()
 
 add_library(util STATIC ${UTIL_SRCS})
 add_dependencies(util generate_version)

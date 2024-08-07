@@ -67,7 +67,7 @@ if (!report_dir_created && !opt_report_dir.empty()) {
   if (opt_smt_log) {
     fs::path path_z3log = path;
     path_z3log.replace_extension("z3_log.txt");
-    smt::start_logging(path_z3log.c_str());
+    smt::start_logging(path_z3log.string().c_str());
   }
 } else if (opt_report_dir.empty()) {
   out = &cout;
