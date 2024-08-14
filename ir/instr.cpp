@@ -3803,6 +3803,7 @@ StateValue GEP::toSMT(State &s) const {
     AndExpr inbounds_np;
     AndExpr idx_all_zeros;
 
+    // FIXME: not implemented for physical pointers
     if (inbounds)
       inbounds_np.add(ptr.inbounds());
 

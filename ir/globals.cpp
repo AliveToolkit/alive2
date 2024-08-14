@@ -31,6 +31,7 @@ unsigned strlen_unroll_cnt = 8;
 unsigned memcmp_unroll_cnt = 8;
 bool little_endian = true;
 bool observes_addresses = true;
+bool has_int2ptr = true;
 bool has_alloca = true;
 bool has_fncall = true;
 bool has_write_fncall = true;
