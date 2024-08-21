@@ -34,19 +34,30 @@ unsigned Random::getBitmask(llvm::IntegerType *ty) {
 }
 
 double Random::getExtremeDouble() {
-  return 0;
+  std::random_device rd; // Seed with a real random value, if available
+  std::mt19937 gen(rd()); // Choose a random number generator
+  std::uniform_real_distribution<double> dist(0, __DBL_MAX__); // Create a distribution in the specified range
+  double random_double = dist(gen); // Generate a random double
+  if (getRandomBool()) {
+    return random_double * -1.0;
+  }
+return random_double;
 }
 
 float Random::getExtremeFloat() {
-  return 0;
+  return (float)getExtremeDouble();
 }
 
 double Random::getRandomDouble() {
-  return (double)getRandomUnsigned();
+  std::random_device rd; 
+  std::mt19937 gen(rd()); 
+  std::uniform_real_distribution<double> dist(-1.0, 1.0); 
+  double random_double = dist(gen); 
+  return random_double;
 }
 
 float Random::getRandomFloat() {
-  return 0;
+  return (float)getRandomDouble();
 }
 
 unsigned Random::getUsedInt(llvm::IntegerType *ty) {
@@ -67,11 +78,29 @@ unsigned Random::getUsedInt(llvm::IntegerType *ty) {
 }
 
 double Random::getUsedDouble() {
-  return 0;
+  if (usedDoubles.empty()) {
+    return getRandomDouble();
+  } else {
+    std::random_device rd; 
+    std::mt19937 gen(rd()); 
+    std::uniform_int_distribution<int> dist(0, usedDoubles.size() - 1); 
+    int index = dist(gen); 
+    return usedDoubles[index];
+  }
+  return getRandomDouble();
 }
 
 float Random::getUsedFloat() {
-  return 0;
+  if (usedFloats.empty()) {
+    return getRandomFloat();
+  } else {
+    std::random_device rd; 
+    std::mt19937 gen(rd()); 
+    std::uniform_int_distribution<int> dist(0, usedFloats.size() - 1); 
+    int index = dist(gen); 
+    return usedFloats[index];
+  }
+  return getRandomFloat();
 }
 
 llvm::APInt mutator_util::getRandomLLVMInt(llvm::IntegerType *ty) {
@@ -90,29 +119,29 @@ llvm::APInt mutator_util::getRandomLLVMInt(llvm::IntegerType *ty) {
   }
 }
 
-double mutator_util::getRandomLLVMDouble() {
-  switch (Random::getRandomUnsigned() % 3) {
+llvm::APFloat mutator_util::getRandomLLVMDouble() {
+  switch (Random::getRandomUnsigned(2)) {
   case 0:
-    return Random::getUsedDouble();
+    return llvm::APFloat(Random::getRandomDouble()); 
   case 1:
-    return Random::getExtremeDouble();
+    return llvm::APFloat(Random::getExtremeDouble()); 
   case 2:
-    return Random::getRandomDouble();
+    return llvm::APFloat(Random::getUsedDouble());
   default:
-    return Random::getRandomDouble();
+    return llvm::APFloat(Random::getRandomDouble());
   }
 }
 
-float mutator_util::getRandomLLVMFloat() {
-  switch (Random::getRandomUnsigned() % 3) {
+llvm::APFloat mutator_util::getRandomLLVMFloat() {
+  switch (Random::getRandomUnsigned(2)) {
   case 0:
-    return Random::getUsedFloat();
+    return llvm::APFloat(Random::getRandomFloat());
   case 1:
-    return Random::getExtremeFloat();
+    return llvm::APFloat(Random::getExtremeFloat());
   case 2:
-    return Random::getRandomFloat();
+    return llvm::APFloat(Random::getUsedFloat());
   default:
-    return Random::getRandomFloat();
+    return llvm::APFloat(Random::getRandomFloat());
   }
 }
 

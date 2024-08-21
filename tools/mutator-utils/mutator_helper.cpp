@@ -1,5 +1,7 @@
 #include "mutator_helper.h"
 #include "mutator.h"
+#include <iostream>
+#include <random>
 
 void ShuffleHelper::init() {
   llvm::Function *func = mutator->currentFunction;
@@ -1132,3 +1134,52 @@ void ResizeIntegerHelper::debug() {
   mutator->iitInTmp->getParent()->print(llvm::errs());
   llvm::errs() << "\n";
 }
+
+void UnaryInstHelper::init() {
+  updated = false;
+}
+
+void UnaryInstHelper::mutate() {
+  if (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp)) {
+    llvm::BinaryOperator *binInst =
+        (llvm::BinaryOperator *)(&*mutator->iitInTmp);
+
+    if (Random::getRandomBool()) {
+      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
+        llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(0), "", binInst);
+      binInst->replaceAllUsesWith(newInst);
+      binInst->eraseFromParent();
+      mutator->iitInTmp = newInst->getIterator(); 
+    } else {
+      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
+        llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(1), "", binInst);
+      binInst->replaceAllUsesWith(newInst);
+      binInst->eraseFromParent();
+      mutator->iitInTmp = newInst->getIterator();
+    }
+
+  } else {
+    assert(false && "not supported binary instruction");
+  }
+  updated = true;
+}
+
+bool UnaryInstHelper::shouldMutate() {
+  if (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp)) {
+    llvm::BinaryOperator *binInst = (llvm::BinaryOperator *)(&*mutator->iitInTmp);
+    return binInst->getOperand(0)->getType()->isFPOrFPVectorTy() &&  
+          binInst->getOperand(1)->getType()->isFPOrFPVectorTy() && !updated;
+  }
+  return false;
+}
+
+bool UnaryInstHelper::canMutate(llvm::Function *func) {
+  return true;
+}
+
+void UnaryInstHelper::debug() {
+  llvm::errs() << "unary inst created\n";
+  mutator->iitInTmp->getParent()->print(llvm::errs());
+  llvm::errs() << "\n";
+}
+

@@ -57,6 +57,12 @@ public:
   static void addUsedInt(unsigned i) {
     usedInts.push_back(i);
   }
+  static void addUsedFloat(float i) {
+    usedFloats.push_back(i);
+  }
+  static void addUsedDouble(double i) {
+    usedDoubles.push_back(i);
+  }
   static double getRandomDouble();
   static float getRandomFloat();
   static unsigned getRandomUnsigned() {
@@ -331,8 +337,8 @@ public:
   }
 
   static llvm::APInt getRandomLLVMInt(llvm::IntegerType *ty);
-  static double getRandomLLVMDouble();
-  static float getRandomLLVMFloat();
+  static llvm::APFloat getRandomLLVMDouble();
+  static llvm::APFloat getRandomLLVMFloat();
   static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);
   static llvm::Constant *getRandomLLVMIntegerVector(llvm::FixedVectorType *ty);
   static llvm::Constant *updateIntegerVector(llvm::ConstantVector *ty);

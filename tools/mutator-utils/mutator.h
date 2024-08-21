@@ -5,6 +5,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Config/llvm-config.h.cmake"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
@@ -31,8 +32,8 @@
 
 class Mutator {
 protected:
-  bool debug;
 
+  bool debug;
   llvm::LLVMContext context;
   llvm::ExitOnError ExitOnErr;
   std::shared_ptr<llvm::Module> pm;
@@ -110,6 +111,7 @@ class FunctionMutator {
   friend class BinaryInstructionHelper;
   friend class EliminateUndefHelper;
   friend class ResizeIntegerHelper;
+  friend class UnaryInstHelper;
 
   llvm::Function *currentFunction, *functionInTmp;
   llvm::ValueToValueMapTy &vMap;

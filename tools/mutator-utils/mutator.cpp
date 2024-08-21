@@ -116,6 +116,17 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
       if (llvm::Value *val = it->getOperand(i);
           val != nullptr && llvm::isa<llvm::ConstantInt>(*val)) {
         Random::addUsedInt(((llvm::ConstantInt *)val)->getLimitedValue());
+
+      } 
+      // if value is a FP value send it to either the used floats or used doubles array
+      else if (llvm::Value *val = it->getOperand(i);
+          val != nullptr && llvm::isa<llvm::ConstantFP>(*val)) {
+          if (it->getOperand(i)->getType()->isDoubleTy()) {
+            Random::addUsedDouble(llvm::dyn_cast<llvm::ConstantFP>(val)->getValueAPF().convertToDouble());
+          }
+          else if (it->getOperand(i)->getType()->isFloatTy()) {
+            Random::addUsedFloat(llvm::dyn_cast<llvm::ConstantFP>(val)->getValueAPF().convertToFloat());  
+          }
       }
     }
   }
@@ -179,6 +190,11 @@ void FunctionMutator::init(std::shared_ptr<FunctionMutator> self) {
 
   if (VoidFunctionCallRemoveHelper::canMutate(currentFunction)) {
     helpers.push_back(std::make_unique<VoidFunctionCallRemoveHelper>(self));
+    whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
+  }
+
+  if (UnaryInstHelper::canMutate(currentFunction)) {
+    helpers.push_back(std::make_unique<UnaryInstHelper>(self));
     whenMoveToNextInstFuncs.push_back(helpers.size() - 1);
   }
 
@@ -466,12 +482,20 @@ void FunctionMutator::fixAllValues(llvm::SmallVector<llvm::Value *> &vals) {
 llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
   if (ty->isIntegerTy()) {
     return llvm::ConstantInt::get(
-        ty->getContext(),
-        mutator_util::getRandomLLVMInt((llvm::IntegerType *)ty));
+      ty->getContext(),
+      mutator_util::getRandomLLVMInt((llvm::IntegerType *)ty));
   }
-  if (ty->isFloatingPointTy()) {
-    return llvm::ConstantFP::get(ty, Random::getRandomDouble());
+  if (ty->isDoubleTy()) {
+    return llvm::ConstantFP::get(
+      ty->getContext(),
+      mutator_util::getRandomLLVMDouble());
   }
+  if (ty->isFloatTy()) {
+    return llvm::ConstantFP::get(
+      ty->getContext(),
+      mutator_util::getRandomLLVMFloat());
+  }
+
   if (auto vecTy = llvm::dyn_cast<llvm::FixedVectorType>(ty);
       vecTy && vecTy->getElementType()) {
     return mutator_util::getRandomLLVMIntegerVector(vecTy);
