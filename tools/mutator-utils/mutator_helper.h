@@ -345,18 +345,21 @@ public:
 
 class UnaryInstHelper : public MutationHelper {
   bool updated;
+
 public:
- UnaryInstHelper(std::shared_ptr<FunctionMutator> mutator)
+  UnaryInstHelper(std::shared_ptr<FunctionMutator> mutator)
       : MutationHelper(mutator), updated(false) {};
-  virtual void init() override;
-  virtual void reset() override { 
-    updated = false; 
-    }
+  virtual void init() override {
+    updated = false;
+  };
+  virtual void reset() override {
+    updated = false;
+  }
   static bool canMutate(llvm::Function *func);
   virtual void mutate() override;
   virtual bool shouldMutate() override;
   virtual void debug() override;
   virtual void whenMoveToNextInst() override {
-    updated = false; 
-    }
+    updated = false;
+  }
 };

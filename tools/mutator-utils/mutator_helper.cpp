@@ -1135,24 +1135,22 @@ void ResizeIntegerHelper::debug() {
   llvm::errs() << "\n";
 }
 
-void UnaryInstHelper::init() {
-  updated = false;
-}
-
 void UnaryInstHelper::mutate() {
   if (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp)) {
     llvm::BinaryOperator *binInst =
         (llvm::BinaryOperator *)(&*mutator->iitInTmp);
 
     if (Random::getRandomBool()) {
-      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
-        llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(0), "", binInst);
+      llvm::UnaryOperator *newInst =
+          llvm::UnaryOperator::Create(llvm::AddrSpaceCastInst::UnaryOps::FNeg,
+                                      binInst->getOperand(0), "", binInst);
       binInst->replaceAllUsesWith(newInst);
       binInst->eraseFromParent();
-      mutator->iitInTmp = newInst->getIterator(); 
+      mutator->iitInTmp = newInst->getIterator();
     } else {
-      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
-        llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(1), "", binInst);
+      llvm::UnaryOperator *newInst =
+          llvm::UnaryOperator::Create(llvm::AddrSpaceCastInst::UnaryOps::FNeg,
+                                      binInst->getOperand(1), "", binInst);
       binInst->replaceAllUsesWith(newInst);
       binInst->eraseFromParent();
       mutator->iitInTmp = newInst->getIterator();
@@ -1166,9 +1164,10 @@ void UnaryInstHelper::mutate() {
 
 bool UnaryInstHelper::shouldMutate() {
   if (llvm::isa<llvm::BinaryOperator>(&*mutator->iitInTmp)) {
-    llvm::BinaryOperator *binInst = (llvm::BinaryOperator *)(&*mutator->iitInTmp);
-    return binInst->getOperand(0)->getType()->isFPOrFPVectorTy() &&  
-          binInst->getOperand(1)->getType()->isFPOrFPVectorTy() && !updated;
+    llvm::BinaryOperator *binInst =
+        (llvm::BinaryOperator *)(&*mutator->iitInTmp);
+    return binInst->getOperand(0)->getType()->isFPOrFPVectorTy() &&
+           binInst->getOperand(1)->getType()->isFPOrFPVectorTy() && !updated;
   }
   return false;
 }
@@ -1182,4 +1181,3 @@ void UnaryInstHelper::debug() {
   mutator->iitInTmp->getParent()->print(llvm::errs());
   llvm::errs() << "\n";
 }
-
