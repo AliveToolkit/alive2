@@ -33,12 +33,11 @@ unsigned Random::getBitmask(llvm::IntegerType *ty) {
   return result ^ le ^ ri;
 }
 
-double Random::getExtremeDouble() {
-  std::random_device rd;  // Seed with a real random value, if available
-  std::mt19937 gen(rd()); // Choose a random number generator
+double Random::getExtremeDouble() { // Seed with a real random value, if available
+  std::mt19937 mt; // Choose a random number generator
   std::uniform_real_distribution<double> dist(
       0, __DBL_MAX__); // Create a distribution in the specified range
-  double random_double = dist(gen); // Generate a random double
+  double random_double = dist(mt); // Generate a random double
   if (getRandomBool()) {
     return random_double * -1.0;
   }
@@ -46,19 +45,28 @@ double Random::getExtremeDouble() {
 }
 
 float Random::getExtremeFloat() {
-  return (float)getExtremeDouble();
+  std::mt19937 mt; // Choose a random number generator
+  std::uniform_real_distribution<float> dist(
+      0, __FLT_MAX__); // Create a distribution in the specified range
+  double random_float = dist(mt); // Generate a random double
+  if (getRandomBool()) {
+    return random_float * -1.0;
+  }
+  return random_float;
 }
 
 double Random::getRandomDouble() {
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  std::mt19937 mt;
   std::uniform_real_distribution<double> dist(-1.0, 1.0);
-  double random_double = dist(gen);
+  double random_double = dist(mt);
   return random_double;
 }
 
 float Random::getRandomFloat() {
-  return (float)getRandomDouble();
+  std::mt19937 mt;
+  std::uniform_real_distribution<float> dist(-1.0, 1.0);
+  double random_float = dist(mt);
+  return random_float;
 }
 
 unsigned Random::getUsedInt(llvm::IntegerType *ty) {
@@ -82,10 +90,9 @@ double Random::getUsedDouble() {
   if (usedDoubles.empty()) {
     return getRandomDouble();
   } else {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 mt;
     std::uniform_int_distribution<int> dist(0, usedDoubles.size() - 1);
-    int index = dist(gen);
+    int index = dist(mt);
     return usedDoubles[index];
   }
   return getRandomDouble();
@@ -95,10 +102,9 @@ float Random::getUsedFloat() {
   if (usedFloats.empty()) {
     return getRandomFloat();
   } else {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 mt;
     std::uniform_int_distribution<int> dist(0, usedFloats.size() - 1);
-    int index = dist(gen);
+    int index = dist(mt);
     return usedFloats[index];
   }
   return getRandomFloat();

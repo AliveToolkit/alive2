@@ -1,7 +1,5 @@
 #include "mutator_helper.h"
 #include "mutator.h"
-// #include <iostream>
-// #include <random>
 
 void ShuffleHelper::init() {
   llvm::Function *func = mutator->currentFunction;
