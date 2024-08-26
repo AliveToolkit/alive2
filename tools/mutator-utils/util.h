@@ -342,4 +342,8 @@ public:
   static llvm::ConstantRange getRandomLLVMConstantRange(llvm::IntegerType *ty);
   static llvm::Constant *getRandomLLVMIntegerVector(llvm::FixedVectorType *ty);
   static llvm::Constant *updateIntegerVector(llvm::ConstantVector *ty);
+  static llvm::Constant *getRandomLLVMFloatVector(llvm::FixedVectorType *ty);
+  static llvm::Constant *updateFloatVector(llvm::ConstantVector *ty);
+  static llvm::Constant *getRandomLLVMDoubleVector(llvm::FixedVectorType *ty);
+  static llvm::Constant *updateDoubleVector(llvm::ConstantVector *ty);
 };

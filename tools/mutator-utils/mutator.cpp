@@ -499,8 +499,18 @@ llvm::Value *FunctionMutator::getRandomConstant(llvm::Type *ty) {
   }
 
   if (auto vecTy = llvm::dyn_cast<llvm::FixedVectorType>(ty);
-      vecTy && vecTy->getElementType()) {
+      vecTy && vecTy->getElementType()->isIntegerTy()) {
     return mutator_util::getRandomLLVMIntegerVector(vecTy);
+  }
+
+  if (auto vecTy = llvm::dyn_cast<llvm::FixedVectorType>(ty);
+      vecTy && vecTy->getElementType()->isFloatTy()) {
+    return mutator_util::getRandomLLVMFloatVector(vecTy);
+  }
+
+  if (auto vecTy = llvm::dyn_cast<llvm::FixedVectorType>(ty);
+      vecTy && vecTy->getElementType()->isDoubleTy()) {
+    return mutator_util::getRandomLLVMDoubleVector(vecTy);
   }
   return llvm::UndefValue::get(ty);
 }

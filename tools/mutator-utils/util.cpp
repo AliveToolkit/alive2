@@ -180,6 +180,84 @@ mutator_util::getRandomLLVMIntegerVector(llvm::FixedVectorType *ty) {
   return llvm::ConstantVector::get(result);
 }
 
+llvm::Constant *
+mutator_util::getRandomLLVMFloatVector(llvm::FixedVectorType *ty) {
+  assert(ty->getElementType()->isFloatTy() && "expect a float vector");
+  llvm::Type *floatTy = llvm::Type::getFloatTy(ty->getContext());
+  unsigned length = ty->getNumElements();
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    result.push_back(llvm::ConstantFP::get(floatTy, getRandomLLVMFloat()));
+  }
+  // we set threshold to 5, if p is less than threshold , we assign poison to
+  // the vector
+  unsigned threshold = 5, p = Random::getRandomUnsigned() % 100;
+  if (p < threshold) {
+    unsigned poisonNum = Random::getRandomUnsigned(2) + 1;
+    poisonNum = std::min(poisonNum, length);
+    for (size_t times = 0; times < poisonNum; ++times) {
+      result[Random::getRandomUnsigned() % length] =
+          llvm::PoisonValue::get(floatTy);
+    }
+  }
+  return llvm::ConstantVector::get(result);
+}
+
+llvm::Constant *mutator_util::updateFloatVector(llvm::ConstantVector *ty) {
+  unsigned length = ty->getType()->getNumElements();
+  assert(ty->getType()->getElementType()->isFloatTy() &&
+         "only support for updating float type");
+  llvm::Type *floatTy = llvm::Type::getFloatTy(ty->getContext());
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    if (Random::getRandomBool()) {
+      result.push_back(llvm::ConstantFP::get(floatTy, getRandomLLVMFloat()));
+    } else {
+      result.push_back(ty->getAggregateElement(i));
+    }
+  }
+  return llvm::ConstantVector::get(result);
+}
+
+llvm::Constant *
+mutator_util::getRandomLLVMDoubleVector(llvm::FixedVectorType *ty) {
+  assert(ty->getElementType()->isDoubleTy() && "expect a double vector");
+  llvm::Type *doubleTy = llvm::Type::getDoubleTy(ty->getContext());
+  unsigned length = ty->getNumElements();
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    result.push_back(llvm::ConstantFP::get(doubleTy, getRandomLLVMDouble()));
+  }
+  // we set threshold to 5, if p is less than threshold , we assign poison to
+  // the vector
+  unsigned threshold = 5, p = Random::getRandomUnsigned() % 100;
+  if (p < threshold) {
+    unsigned poisonNum = Random::getRandomUnsigned(2) + 1;
+    poisonNum = std::min(poisonNum, length);
+    for (size_t times = 0; times < poisonNum; ++times) {
+      result[Random::getRandomUnsigned() % length] =
+          llvm::PoisonValue::get(doubleTy);
+    }
+  }
+  return llvm::ConstantVector::get(result);
+}
+
+llvm::Constant *mutator_util::updateDoubleVector(llvm::ConstantVector *ty) {
+  unsigned length = ty->getType()->getNumElements();
+  assert(ty->getType()->getElementType()->isDoubleTy() &&
+         "only support for updating double type");
+  llvm::Type *doubleTy = llvm::Type::getDoubleTy(ty->getContext());
+  llvm::SmallVector<llvm::Constant *> result;
+  for (size_t i = 0; i < length; ++i) {
+    if (Random::getRandomBool()) {
+      result.push_back(llvm::ConstantFP::get(doubleTy, getRandomLLVMDouble()));
+    } else {
+      result.push_back(ty->getAggregateElement(i));
+    }
+  }
+  return llvm::ConstantVector::get(result);
+}
+
 llvm::Constant *mutator_util::updateIntegerVector(llvm::ConstantVector *ty) {
   unsigned length = ty->getType()->getNumElements();
   assert(ty->getType()->getElementType()->isIntegerTy() &&
