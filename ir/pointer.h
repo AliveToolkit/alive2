@@ -95,7 +95,7 @@ public:
   smt::expr isInboundsOf(const Pointer &block, const smt::expr &bytes) const;
   smt::expr isInboundsOf(const Pointer &block, unsigned bytes) const;
   smt::expr isInbounds(bool strict) const;
-  smt::expr inbounds();
+  smt::expr inbounds(bool simplify_ptr = false);
 
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(uint64_t align, bool exact = false) const;

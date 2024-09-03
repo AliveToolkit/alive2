@@ -1338,8 +1338,7 @@ static expr mk_liveness_array() {
 }
 
 void Memory::mkNonPoisonAxioms(bool local) const {
-  expr offset
-    = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+  expr offset = expr::mkVar("#axoff", Pointer::bitsShortOffset());
 
   unsigned bid = 0;
   for (auto &block : local ? local_block_val : non_local_block_val) {
@@ -1386,8 +1385,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) const {
   if (!does_ptr_mem_access && !(num_sub_byte_bits && isAsmMode()))
     return;
 
-  expr offset
-    = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+  expr offset = expr::mkVar("#axoff", Pointer::bitsShortOffset());
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
     if (always_noread(i, true))

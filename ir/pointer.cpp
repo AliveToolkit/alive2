@@ -332,7 +332,10 @@ expr Pointer::isInbounds(bool strict) const {
   return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
 }
 
-expr Pointer::inbounds() {
+expr Pointer::inbounds(bool simplify_ptr) {
+  if (!simplify_ptr)
+    return isInbounds(false);
+
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
     expr inb = Pointer(m, ptr_expr).isInbounds(false);
