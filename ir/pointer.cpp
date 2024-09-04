@@ -867,7 +867,7 @@ bool Pointer::isBlkSingleByte() const {
 }
 
 pair<Pointer, expr> Pointer::findLogicalPointer(const expr &addr) const {
-  DisjointExpr<Pointer> ret;
+  DisjointExpr<Pointer> ret(mkNullPointer(m));
 
   auto add = [&](unsigned limit, bool local) {
     for (unsigned i = 0; i != limit; ++i) {
