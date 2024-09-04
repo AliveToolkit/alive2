@@ -547,7 +547,8 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   bool observes_local = m.observed_addrs.numMayAlias(true) > 0;
 
   auto phy_ptr = [&](Pointer &p, bool is_phy) -> pair<expr, Pointer> {
-    DisjointExpr<expr> bids, addrs;
+    DisjointExpr<expr> bids(expr::mkUInt(0, bitsShortBid()));
+    DisjointExpr<expr> addrs(expr::mkUInt(0, bits_ptr_address));
     expr ub = false;
     bool all_same_size = true;
 
