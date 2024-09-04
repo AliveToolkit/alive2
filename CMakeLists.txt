@@ -286,3 +286,9 @@ add_custom_target("check"
 if (BUILD_TV)
   add_dependencies("check" "alive-tv" "quick-fuzz" "tv")
 endif()
+
+foreach(PROJECT IN LISTS EXTERNAL_PROJECTS)
+  canonicalize_tool_name(${PROJECT} PROJECT_CANON)
+  message(STATUS "Adding external project ${PROJECT} at ${EXTERNAL_${PROJECT_CANON}_SOURCE_DIR}")
+  add_subdirectory(${EXTERNAL_${PROJECT_CANON}_SOURCE_DIR} ${PROJECT})
+endforeach()
