@@ -54,8 +54,9 @@ public:
   void operator=(Pointer &&rhs) noexcept { p = std::move(rhs.p); }
 
   // returns (log-ptr, domain of inboundness)
-  std::pair<Pointer, smt::expr> findLogicalPointer(const smt::expr &addr) const;
-  std::pair<Pointer, smt::expr> toLogical() const;
+  std::pair<Pointer, smt::expr>
+    findLogicalLocalPointer(const smt::expr &addr) const;
+  std::pair<Pointer, smt::expr> toLogicalLocal() const;
 
   static smt::expr mkLongBid(const smt::expr &short_bid, bool local);
   static smt::expr mkUndef(State &s);

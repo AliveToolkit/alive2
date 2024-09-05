@@ -716,8 +716,8 @@ expr Pointer::isHeapAllocated() const {
 
 expr Pointer::refined(const Pointer &other) const {
   bool is_asm = other.m.isAsmMode();
-  auto [p1l, d1] = toLogical();
-  auto [p2l, d2] = other.toLogical();
+  auto [p1l, d1] = toLogicalLocal();
+  auto [p2l, d2] = other.toLogicalLocal();
 
   // This refers to a block that was malloc'ed within the function
   expr local = d2 && p2l.isLocal();
@@ -727,21 +727,23 @@ expr Pointer::refined(const Pointer &other) const {
   local &= p1l.isBlockAlive().implies(p2l.isBlockAlive());
   // Attributes are ignored at refinement.
 
+  if (is_asm)
+    local &= isLogical() == other.isLogical();
+
   // TODO: this induces an infinite loop
   //local &= block_refined(other);
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
 
   return expr::mkIf(isNull(), other.isNull(),
-                    (is_asm ? expr(true) : isLogical() == other.isLogical()) &&
-                      expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
+                    expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
                              const expr &byval_bytes) const {
   bool is_asm = other.m.isAsmMode();
-  auto [p1l, d1] = toLogical();
-  auto [p2l, d2] = other.toLogical();
+  auto [p1l, d1] = toLogicalLocal();
+  auto [p2l, d2] = other.toLogicalLocal();
   expr size = p1l.blockSizeOffsetT();
   expr off = p1l.getOffsetSizet();
   expr size2 = p2l.blockSizeOffsetT();
@@ -767,14 +769,16 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
                             off == off2 && size2.uge(size)));
   local = d2 && (p2l.isLocal() || p2l.isByval()) && local;
 
+  if (is_asm)
+    local &= isLogical() == other.isLogical();
+
   // TODO: this induces an infinite loop
   // block_refined(other);
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
 
   return expr::mkIf(isNull(), other.isNull(),
-                    (is_asm ? expr(true) : isLogical() == other.isLogical()) &&
-                      expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
+                    expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
 }
 
 expr Pointer::isWritable() const {
@@ -867,31 +871,25 @@ bool Pointer::isBlkSingleByte() const {
   return blockSize().isUInt(blk_size) && blk_size == bits_byte/8;
 }
 
-pair<Pointer, expr> Pointer::findLogicalPointer(const expr &addr) const {
+pair<Pointer, expr> Pointer::findLogicalLocalPointer(const expr &addr) const {
   DisjointExpr<Pointer> ret(mkNullPointer(m));
 
-  auto add = [&](unsigned limit, bool local) {
-    for (unsigned i = 0; i != limit; ++i) {
-      // address not observed; can't alias with that
-      if (local && !m.observed_addrs.mayAlias(true, i))
-        continue;
+  for (unsigned i = 0, e = m.numLocals(); i != e; ++i) {
+    // address not observed; can't alias with that
+    if (!m.observed_addrs.mayAlias(true, i))
+      continue;
 
-      Pointer p(m, i, local);
-      expr blk_addr = p.getLogAddress();
+    Pointer p(m, i, true);
+    expr blk_addr = p.getLogAddress();
 
-      ret.add(p + (addr - blk_addr),
-              !local && i == 0 && has_null_block
-                ? addr == 0
-                : addr.uge(blk_addr) &&
-                    addr.ult((p + p.blockSize()).getLogAddress()));
-    }
-  };
-  add(m.numLocals(), true);
-  add(m.numNonlocals(), false);
+    ret.add(p + (addr - blk_addr),
+            addr.uge(blk_addr) &&
+              addr.ult((p + p.blockSize()).getLogAddress()));
+  }
   return { *std::move(ret)(), ret.domain() };
 }
 
-pair<Pointer, expr> Pointer::toLogical() const {
+pair<Pointer, expr> Pointer::toLogicalLocal() const {
   if (isLogical().isTrue())
     return { *this, true };
 
@@ -907,8 +905,8 @@ pair<Pointer, expr> Pointer::toLogical() const {
     return { *this, true };
 
   expr addr = Pointer(m, *std::move(leftover)()).getPhysicalAddress();
-  auto [ptr, domain] = findLogicalPointer(addr);
-  return {Pointer::mkIf(isLogical(), *this, ptr), leftover.domain() && domain};
+  auto [ptr, domain] = findLogicalLocalPointer(addr);
+  return { mkIf(isLogical(), *this, ptr), leftover.domain() && domain };
 }
 
 Pointer
