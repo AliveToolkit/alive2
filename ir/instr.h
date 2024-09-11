@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/attrs.h"
 #include "ir/value.h"
 #include <string>
 #include <utility>
@@ -934,14 +935,55 @@ public:
     dup(Function &f, const std::string &suffix) const override;
 };
 
+class FnCall : public MemInstr {
+private:
+  std::string fnName;
+  Value *fnptr;
+  std::vector<std::pair<Value *, ParamAttrs>> args;
+  FnAttrs attrs;
+  unsigned var_arg_idx;
+  bool approx = false;
 
-class Memset final : public MemInstr {
+  Value *getAlignArg() const;
+
+public:
+  FnCall(Type &type, std::string &&name, std::string &&fnName,
+         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr,
+         unsigned var_arg_idx = -1u);
+  void addArg(Value &arg, ParamAttrs &&attrs);
+  const auto &getFnName() const { return fnName; }
+  Value *getFnPtr() const { return fnptr; }
+  const auto &getArgs() const { return args; }
+  const auto &getAttributes() const { return attrs; }
+  unsigned getVarArgIdx() const { return var_arg_idx; }
+  bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
+  bool isApproximated() const { return approx; }
+  void setApproximated(bool flag) { approx = flag; }
+  uint64_t getAlign() const;
+  bool isIndirect() const { return fnptr != nullptr; }
+
+  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  std::vector<Value *> operands() const override;
+  bool propagatesPoison() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+class Memset final : public FnCall {
   Value *ptr, *val, *bytes;
   uint64_t align;
 public:
-  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align)
-    : MemInstr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
-            align(align) {}
+  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align, FnAttrs &&attrs)
+    : FnCall(Type::voidTy, "memset", "llvm.memset.p0.*", std::move(attrs)),
+      ptr(&ptr), val(&val), bytes(&bytes), align(align) {}
 
   Value& getPtr() const { return *ptr; }
   Value& getBytes() const { return *bytes; }
@@ -963,13 +1005,12 @@ public:
     dup(Function &f, const std::string &suffix) const override;
 };
 
-
-class MemsetPattern final : public MemInstr {
+class MemsetPattern final : public FnCall {
   Value *ptr, *pattern, *bytes;
   unsigned pattern_length;
 public:
   MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
-                unsigned pattern_length);
+                unsigned pattern_length, FnAttrs &&attrs);
 
   unsigned getPatternLength() const { return pattern_length; }
 
@@ -987,7 +1028,6 @@ public:
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
-
 
 class FillPoison final : public MemInstr {
   Value *ptr;
@@ -1009,16 +1049,16 @@ public:
     dup(Function &f, const std::string &suffix) const override;
 };
 
-
-class Memcpy final : public MemInstr {
+class Memcpy final : public FnCall {
   Value *dst, *src, *bytes;
   uint64_t align_dst, align_src;
   bool move;
 public:
-  Memcpy(Value &dst, Value &src, Value &bytes,
-         uint64_t align_dst, uint64_t align_src, bool move)
-    : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
-            align_dst(align_dst), align_src(align_src), move(move) {}
+  Memcpy(Value &dst, Value &src, Value &bytes, uint64_t align_dst,
+         uint64_t align_src, FnAttrs &&attrs, bool move)
+    : FnCall(Type::voidTy, "memcpy", "llvm.memcpy.p0.p0.*", std::move(attrs)),
+      dst(&dst), src(&src), bytes(&bytes), align_dst(align_dst),
+      align_src(align_src), move(move) {}
 
   Value& getSrc() const { return *src; }
   Value& getDst() const { return *dst; }
@@ -1044,14 +1084,14 @@ public:
     dup(Function &f, const std::string &suffix) const override;
 };
 
-
-class Memcmp final : public MemInstr {
+class Memcmp final : public FnCall {
   Value *ptr1, *ptr2, *num;
   bool is_bcmp;
 public:
   Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
-         bool is_bcmp): MemInstr(type, std::move(name)), ptr1(&ptr1),
-                        ptr2(&ptr2), num(&num), is_bcmp(is_bcmp) {}
+         FnAttrs &&attrs, bool is_bcmp)
+    : FnCall(type, std::move(name), "memcmp", std::move(attrs)), ptr1(&ptr1),
+      ptr2(&ptr2), num(&num), is_bcmp(is_bcmp) {}
 
   Value &getBytes() const { return *num; }
   bool isBCmp() const { return is_bcmp; }
@@ -1070,7 +1110,6 @@ public:
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
-
 
 class Strlen final : public MemInstr {
   Value *ptr;
@@ -1094,50 +1133,6 @@ public:
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
-
-
-class FnCall : public MemInstr {
-private:
-  std::string fnName;
-  Value *fnptr;
-  std::vector<std::pair<Value*, ParamAttrs>> args;
-  FnAttrs attrs;
-  unsigned var_arg_idx;
-  bool approx = false;
-
-  Value* getAlignArg() const;
-
-public:
-  FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr,
-         unsigned var_arg_idx = -1u);
-  void addArg(Value &arg, ParamAttrs &&attrs);
-  const auto& getFnName() const { return fnName; }
-  Value* getFnPtr() const { return fnptr; }
-  const auto& getArgs() const { return args; }
-  const auto& getAttributes() const { return attrs; }
-  unsigned getVarArgIdx() const { return var_arg_idx; }
-  bool hasAttribute(const FnAttrs::Attribute &i) const { return attrs.has(i); }
-  bool isApproximated() const { return approx; }
-  void setApproximated(bool flag) { approx = flag; }
-  uint64_t getAlign() const;
-  bool isIndirect() const { return fnptr != nullptr; }
-
-  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
-  uint64_t getMaxAccessSize() const override;
-  uint64_t getMaxGEPOffset() const override;
-  ByteAccessInfo getByteAccessInfo() const override;
-
-  std::vector<Value*> operands() const override;
-  bool propagatesPoison() const override;
-  void rauw(const Value &what, Value &with) override;
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
-};
-
 
 class InlineAsm final : public FnCall {
 public:

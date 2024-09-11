@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/instr.h"
+#include "ir/attrs.h"
 #include "ir/function.h"
 #include "ir/globals.h"
 #include "ir/type.h"
@@ -4148,7 +4149,8 @@ expr Memset::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
-  return make_unique<Memset>(*ptr, *val, *bytes, align);
+  return make_unique<Memset>(*ptr, *val, *bytes, align,
+                             FnAttrs(getAttributes()));
 }
 
 
@@ -4156,8 +4158,9 @@ DEFINE_AS_RETZEROALIGN(MemsetPattern, getMaxAllocSize);
 DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset);
 
 MemsetPattern::MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
-                             unsigned pattern_length)
-  : MemInstr(Type::voidTy, "memset_pattern" + to_string(pattern_length)),
+                             unsigned pattern_length, FnAttrs &&attrs)
+  : FnCall(Type::voidTy, "memset_pattern" + to_string(pattern_length),
+            "memset_pattern", std::move(attrs)),
     ptr(&ptr), pattern(&pattern), bytes(&bytes),
     pattern_length(pattern_length) {}
 
@@ -4207,7 +4210,8 @@ expr MemsetPattern::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
-  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length);
+  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length,
+                                    FnAttrs(getAttributes()));
 }
 
 
@@ -4333,7 +4337,8 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
-  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
+  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src,
+                             FnAttrs(getAttributes()), move);
 }
 
 
@@ -4441,7 +4446,7 @@ expr Memcmp::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
   return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
-                             is_bcmp);
+                             FnAttrs(getAttributes()), is_bcmp);
 }
 
 

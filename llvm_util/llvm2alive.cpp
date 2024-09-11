@@ -470,8 +470,14 @@ public:
     if (!ptr || !val || !bytes)
       return error(i);
 
+    FnAttrs attrs;
+    parse_fn_attrs(i, attrs);
+    attrs.set(FnAttrs::WillReturn);
+    attrs.set(FnAttrs::NoThrow);
+
     return make_unique<Memset>(*ptr, *val, *bytes,
-                               i.getDestAlign().valueOrOne().value());
+                               i.getDestAlign().valueOrOne().value(),
+                               std::move(attrs));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -482,10 +488,15 @@ public:
     if (!dst || !src || !bytes)
       return error(i);
 
+    FnAttrs attrs;
+    parse_fn_attrs(i, attrs);
+    attrs.set(FnAttrs::WillReturn);
+    attrs.set(FnAttrs::NoThrow);
+
     return make_unique<Memcpy>(*dst, *src, *bytes,
                                i.getDestAlign().valueOrOne().value(),
                                i.getSourceAlign().valueOrOne().value(),
-                               isa<llvm::MemMoveInst>(&i));
+                               std::move(attrs), isa<llvm::MemMoveInst>(&i));
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {
