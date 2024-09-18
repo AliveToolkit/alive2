@@ -23,7 +23,7 @@ define i32 @tgt(i32 %0) {
 
 4:                                                ; preds = %1
   %5 = and i32 %0, 8388607
-  %6 = tail call i32 @llvm.ctlz.i32(i32 %5, i1 true)
+  %6 = call i32 @llvm.ctlz.i32(i32 %5, i1 true)
   %7 = add nsw i32 %6, -8
   %8 = shl i32 %0, %7
   br label %9

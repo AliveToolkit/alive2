@@ -11,7 +11,7 @@ if.then5:
 do.end:
   %call14 = call ptr @readnone()
   store i32 0, ptr %call14, align 4
-  tail call void @read_error()
+  call void @read_error()
   unreachable
 }
 
@@ -28,7 +28,7 @@ if.then5:
 do.end:
   %call14 = call ptr @readnone()
   store i32 0, ptr %call14, align 4
-  tail call void @read_error()
+  call void @read_error()
   unreachable
 }
 

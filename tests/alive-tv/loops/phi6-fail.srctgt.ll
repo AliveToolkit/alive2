@@ -23,7 +23,7 @@ entry:
   br label %header
 
 header:
-  %a = tail call i32 @f()
+  %a = call i32 @f()
   br i1 %brmerge.demorgan, label %header, label %return
 
 return:

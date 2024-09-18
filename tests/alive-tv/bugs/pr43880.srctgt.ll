@@ -5,7 +5,7 @@ target triple = "x86_64-unknown-unknown"
 declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
 
 define i32 @src(ptr nocapture readonly %x, ptr nocapture readonly %y)  {
-  %call = tail call i32 @memcmp(ptr %x, ptr %y, i64 2)
+  %call = call i32 @memcmp(ptr %x, ptr %y, i64 2)
   ret i32 %call
 }
 

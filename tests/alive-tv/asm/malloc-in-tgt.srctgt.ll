@@ -9,7 +9,7 @@ define i32 @src() {
 
 define i32 @tgt() {
 f:
-  %stack = tail call dereferenceable(64) ptr @myalloc(i32 64)
+  %stack = call dereferenceable(64) ptr @myalloc(i32 64)
   %0 = getelementptr inbounds i8, ptr %stack, i64 48
   %1 = ptrtoint ptr %0 to i64
   %a0_38 = add i64 %1, -16

@@ -9,17 +9,17 @@ entry:
   %add = add i64 %call, 1
   %add2 = add i64 %add, %call1
   %add3 = add i64 %add2, 1
-  %call4 = tail call noalias ptr @malloc(i64 %add3) nounwind
+  %call4 = call noalias ptr @malloc(i64 %add3) nounwind
   store ptr %call4, ptr %s, align 8
   %tobool = icmp eq ptr %call4, null
   br i1 %tobool, label %return, label %if.end
 
 if.end:                                           ; preds = %entry
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(ptr %call4, ptr %name, i64 %call, i32 1, i1 false)
+  call void @llvm.memcpy.p0i8.p0i8.i64(ptr %call4, ptr %name, i64 %call, i32 1, i1 false)
   %arrayidx = getelementptr inbounds i8, ptr %call4, i64 %call
   store i8 46, ptr %arrayidx, align 1
   %add.ptr5 = getelementptr inbounds i8, ptr %call4, i64 %add
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(ptr %add.ptr5, ptr %domain, i64 %call1, i32 1, i1 false)
+  call void @llvm.memcpy.p0i8.p0i8.i64(ptr %add.ptr5, ptr %domain, i64 %call1, i32 1, i1 false)
   %arrayidx8 = getelementptr inbounds i8, ptr %call4, i64 %add2
   store i8 0, ptr %arrayidx8, align 1
   br label %return
@@ -33,15 +33,15 @@ entry:
   %add = add i64 %call, 1
   %add2 = add i64 %add, %call1
   %add3 = add i64 %add2, 1
-  %call4 = tail call noalias ptr @malloc(i64 %add3) nounwind
+  %call4 = call noalias ptr @malloc(i64 %add3) nounwind
   store ptr %call4, ptr %s, align 8
   %tobool = icmp eq ptr %call4, null
   br i1 %tobool, label %return, label %if.end
 
 if.end:                                           ; preds = %entry
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(ptr %call4, ptr %name, i64 %call, i32 1, i1 false)
+  call void @llvm.memcpy.p0i8.p0i8.i64(ptr %call4, ptr %name, i64 %call, i32 1, i1 false)
   %add.ptr5 = getelementptr inbounds i8, ptr %call4, i64 %add
-  tail call void @llvm.memcpy.p0i8.p0i8.i64(ptr %add.ptr5, ptr %domain, i64 %call1, i32 1, i1 false)
+  call void @llvm.memcpy.p0i8.p0i8.i64(ptr %add.ptr5, ptr %domain, i64 %call1, i32 1, i1 false)
   %arrayidx8 = getelementptr inbounds i8, ptr %call4, i64 %add2
   store i8 0, ptr %arrayidx8, align 1
   br label %return

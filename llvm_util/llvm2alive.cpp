@@ -471,7 +471,8 @@ public:
       return error(i);
 
     return make_unique<Memset>(*ptr, *val, *bytes,
-                               i.getDestAlign().valueOrOne().value());
+                               i.getDestAlign().valueOrOne().value(),
+                               i.isTailCall());
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -485,7 +486,7 @@ public:
     return make_unique<Memcpy>(*dst, *src, *bytes,
                                i.getDestAlign().valueOrOne().value(),
                                i.getSourceAlign().valueOrOne().value(),
-                               isa<llvm::MemMoveInst>(&i));
+                               isa<llvm::MemMoveInst>(&i), i.isTailCall());
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {
@@ -1737,6 +1738,7 @@ public:
     handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
     handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
     attrs.mem &= handleMemAttrs(i.getMemoryEffects());
+    attrs.setTailCallSite(i.isTailCall());
     attrs.inferImpliedAttributes();
   }
 

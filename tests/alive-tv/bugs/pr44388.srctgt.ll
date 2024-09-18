@@ -3,10 +3,10 @@
 define void @src(ptr nocapture %P) nounwind {
 entry:
   %0 = bitcast ptr %P to ptr
-  tail call void @llvm.memset.p0i8.i64(ptr %0, i8 0, i64 12, i1 false)
+  call void @llvm.memset.p0i8.i64(ptr %0, i8 0, i64 12, i1 false)
   %add.ptr = getelementptr inbounds i32, ptr %P, i64 3
   %1 = bitcast ptr %add.ptr to ptr
-  tail call void @llvm.memset.p0i8.i64(ptr %1, i8 0, i64 12, i1 false)
+  call void @llvm.memset.p0i8.i64(ptr %1, i8 0, i64 12, i1 false)
   ret void
 }
 

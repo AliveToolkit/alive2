@@ -171,6 +171,9 @@ private:
   // The value of a 'returned' input
   std::optional<StateValue> returned_input;
 
+  // Used to keep track of the current instruction
+  const Value *current_value = nullptr;
+
   // temp state
   const BasicBlock *current_bb = nullptr;
   CurrentDomain domain;
@@ -366,6 +369,8 @@ public:
   void syncSEdataWithSrc(State &src);
 
   void mkAxioms(State &tgt);
+
+  auto& getCurrentValue() const { return current_value; }
 
 private:
   smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e,

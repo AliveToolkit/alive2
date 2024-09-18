@@ -2313,6 +2313,35 @@ void FnCall::print(ostream &os) const {
   os << ')' << attrs;
 }
 
+static void check_tailcall(State &s) {
+  auto *call = static_cast<const Instr *>(s.getCurrentValue());
+  if (!call)
+    return;
+
+  auto it = s.getFn().bbOf(*call).instrs().begin();
+  bool found = false;
+  for (auto e = s.getFn().bbOf(*call).instrs().end(); it != e; ++it) {
+    if (&*it == call) {
+      found = true;
+      break;
+    }
+  }
+  assert(found);
+
+  auto call_ret_val = call->operands()[0];
+  ++it;
+  auto &next_instr = *it;
+  if (auto *ret = dynamic_cast<const Return *>(&next_instr)) {
+    if (ret->getType().isVoid() && call->getType().isVoid())
+      return;
+    auto *ret_val = ret->operands()[0];
+    if (ret_val == call_ret_val)
+      return;
+  }
+
+  s.addUB(expr(false));
+}
+
 static void check_can_load(State &s, const expr &p0) {
   auto &attrs = s.getFn().getFnAttrs();
   if (attrs.mem.canReadAnything())
@@ -2492,6 +2521,9 @@ StateValue FnCall::toSMT(State &s) const {
   if (s.getFn().has(FnAttrs::WillReturn) &&
       !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
+
+  if (getAttributes().isTailCall())
+    check_tailcall(s);
 
   auto get_alloc_ptr = [&]() -> Value& {
     for (auto &[arg, flags] : args) {
@@ -4136,6 +4168,9 @@ StateValue Memset::toSMT(State &s) const {
     vptr = sv_ptr.value;
   }
   check_can_store(s, vptr);
+  if (isTailCall())
+    check_tailcall(s);
+
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
   return {};
@@ -4148,7 +4183,7 @@ expr Memset::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
-  return make_unique<Memset>(*ptr, *val, *bytes, align);
+  return make_unique<Memset>(*ptr, *val, *bytes, align, is_tailcall);
 }
 
 
@@ -4156,10 +4191,10 @@ DEFINE_AS_RETZEROALIGN(MemsetPattern, getMaxAllocSize);
 DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset);
 
 MemsetPattern::MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
-                             unsigned pattern_length)
+                             unsigned pattern_length, bool is_tailcall)
   : MemInstr(Type::voidTy, "memset_pattern" + to_string(pattern_length)),
     ptr(&ptr), pattern(&pattern), bytes(&bytes),
-    pattern_length(pattern_length) {}
+    pattern_length(pattern_length), is_tailcall(is_tailcall) {}
 
 uint64_t MemsetPattern::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -4196,6 +4231,9 @@ StateValue MemsetPattern::toSMT(State &s) const {
   auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
   check_can_store(s, vptr);
   check_can_load(s, vpattern);
+  if (isTailCall())
+    check_tailcall(s);
+
   s.getMemory().memset_pattern(vptr, vpattern, vbytes, pattern_length);
   return {};
 }
@@ -4207,7 +4245,7 @@ expr MemsetPattern::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
-  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length);
+  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length, is_tailcall);
 }
 
 
@@ -4322,6 +4360,9 @@ StateValue Memcpy::toSMT(State &s) const {
 
   check_can_load(s, vsrc);
   check_can_store(s, vdst);
+  if (isTailCall())
+    check_tailcall(s);
+
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
 }
@@ -4333,7 +4374,7 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
-  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move);
+  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move, is_tailcall);
 }
 
 
@@ -4378,6 +4419,8 @@ StateValue Memcmp::toSMT(State &s) const {
 
   check_can_load(s, vptr1);
   check_can_load(s, vptr2);
+  if (isTailCall())
+    check_tailcall(s);
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
   // memcmp can be optimized to load & icmps, and it requires this
@@ -4441,7 +4484,7 @@ expr Memcmp::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
   return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
-                             is_bcmp);
+                             is_bcmp, is_tailcall);
 }
 
 
@@ -4475,6 +4518,8 @@ void Strlen::print(ostream &os) const {
 StateValue Strlen::toSMT(State &s) const {
   auto &eptr = s.getWellDefinedPtr(*ptr);
   check_can_load(s, eptr);
+  if (isTailCall())
+    check_tailcall(s);
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();
@@ -4501,7 +4546,7 @@ expr Strlen::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Strlen::dup(Function &f, const string &suffix) const {
-  return make_unique<Strlen>(getType(), getName() + suffix, *ptr);
+  return make_unique<Strlen>(getType(), getName() + suffix, *ptr, is_tailcall);
 }
 
 

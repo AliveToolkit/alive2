@@ -23,7 +23,7 @@ entry:
   br label %loop
 
 loop:                                             ; preds = %loop, %entry
-  %c = tail call i1 @use(i32 undef)
+  %c = call i1 @use(i32 undef)
   br i1 %c, label %loop, label %exit
 
 exit:                                             ; preds = %loop

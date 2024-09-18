@@ -39,7 +39,7 @@ if.end:                                           ; preds = %delete.end, %entry
 define i32 @tgt(ptr %bp) {
 entry:
   %add.ptr = getelementptr inbounds i32, ptr %bp, i64 1
-  tail call void @_ZdaPv(ptr %add.ptr)
+  call void @_ZdaPv(ptr %add.ptr)
   ret i32 0
 }
 
