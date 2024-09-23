@@ -1453,6 +1453,9 @@ Memory Memory::dupNoRead() const {
   Memory ret(*state);
   // minimal state to allow fn calls to compare input fn ptrs that can't be read
   ret.local_blk_addr = local_blk_addr;
+  ret.local_blk_align = local_blk_align;
+  ret.local_blk_size = local_blk_size;
+  ret.local_blk_kind = local_blk_kind;
   return ret;
 }
 
