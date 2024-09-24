@@ -1321,8 +1321,10 @@ public:
         break;
       }
 
+      // these need to go last
       case LLVMContext::MD_noundef:
-        BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
+      case LLVMContext::MD_dereferenceable:
+      case LLVMContext::MD_dereferenceable_or_null:
         break;
 
       case LLVMContext::MD_callees: {
@@ -1365,16 +1367,6 @@ public:
         break;
       }
 
-      case LLVMContext::MD_dereferenceable:
-      case LLVMContext::MD_dereferenceable_or_null: {
-        auto kind = ID == LLVMContext::MD_dereferenceable
-                      ? Assume::Dereferenceable : Assume::DereferenceableOrNull;
-        auto bytes = get_operand(
-          llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
-        BB->addInstr(make_unique<Assume>(vector<Value*>{i, bytes}, kind));
-        break;
-      }
-
       // non-relevant for correctness
       case LLVMContext::MD_loop:
       case LLVMContext::MD_nosanitize:
@@ -1395,6 +1387,33 @@ public:
         return false;
       }
     }
+
+    auto get_md = [&](unsigned id) -> llvm::MDNode* {
+      for (auto &[node_id, node] : MDs) {
+        if (id == node_id)
+          return node;
+      }
+      return nullptr;
+    };
+
+    // these produce UB, so need to go after the value transformers above
+    if (get_md(LLVMContext::MD_noundef))
+      BB->addInstr(make_unique<Assume>(*i, Assume::WellDefined));
+
+    if (auto *Node = get_md(LLVMContext::MD_dereferenceable)) {
+      auto kind = Assume::Dereferenceable;
+      auto bytes = get_operand(
+        llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
+      BB->addInstr(make_unique<Assume>(vector<Value*>{i, bytes}, kind));
+    }
+
+    if (auto *Node = get_md(LLVMContext::MD_dereferenceable_or_null)) {
+      auto kind = Assume::DereferenceableOrNull;
+      auto bytes = get_operand(
+        llvm::mdconst::extract<llvm::ConstantInt>(Node->getOperand(0)));
+      BB->addInstr(make_unique<Assume>(vector<Value*>{i, bytes}, kind));
+    }
+
     return true;
   }
 
