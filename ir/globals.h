@@ -62,6 +62,7 @@ extern bool little_endian;
 
 /// Whether pointer addresses are observed
 extern bool observes_addresses;
+extern bool has_int2ptr;
 
 /// Whether there is an alloca
 extern bool has_alloca;

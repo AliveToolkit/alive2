@@ -5,6 +5,10 @@
 #include <algorithm>
 #include <bit>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 using namespace std;
 
 #if defined(__clang__) && __clang_major__ < 13 && defined(__apple_build_version__)
@@ -43,6 +47,17 @@ unsigned num_sign_bits(uint64_t n) {
   return max(countl_zero(n), countl_one(n)) -1;
 }
 
+#ifdef _MSC_VER
+uint64_t add_saturate(uint64_t a, uint64_t b) {
+  unsigned __int64 res;
+  static_assert(sizeof(res) == sizeof(uint64_t));
+  return _addcarry_u64(0, a, b, &res) ? UINT64_MAX : res;
+}
+
+uint64_t mul_saturate(uint64_t a, uint64_t b) {
+  return __umulh(a, b) ? UINT64_MAX : a * b;
+}
+#else
 uint64_t add_saturate(uint64_t a, uint64_t b) {
   unsigned long long res;
   static_assert(sizeof(res) == sizeof(uint64_t));
@@ -54,6 +69,7 @@ uint64_t mul_saturate(uint64_t a, uint64_t b) {
   static_assert(sizeof(res) == sizeof(uint64_t));
   return __builtin_umulll_overflow(a, b, &res) ? UINT64_MAX : res;
 }
+#endif
 
 uint64_t divide_up(uint64_t n, uint64_t amount) {
   return (n + amount - 1) / amount;

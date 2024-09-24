@@ -1210,6 +1210,7 @@ public:
     case llvm::Intrinsic::dbg_label:
     case llvm::Intrinsic::dbg_value:
     case llvm::Intrinsic::donothing:
+    case llvm::Intrinsic::fake_use:
     case llvm::Intrinsic::instrprof_increment:
     case llvm::Intrinsic::instrprof_increment_step:
     case llvm::Intrinsic::instrprof_value_profile:
@@ -1915,7 +1916,7 @@ public:
       const char *chrs = name.data();
       char *end_ptr;
       auto numeric_id = strtoul(chrs, &end_ptr, 10);
-      if (end_ptr != name.end())
+      if (end_ptr != chrs + name.size())
         return M->getGlobalVariable(name, true);
       else {
         auto itr = M->global_begin(), end = M->global_end();
