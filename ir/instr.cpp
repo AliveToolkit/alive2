@@ -2939,6 +2939,14 @@ void Phi::replaceSourceWith(const string &from, const string &to) {
   }
 }
 
+void Phi::setValue(size_t index, Value &val) {
+  values[index].first = &val;
+}
+
+void Phi::setSource(size_t index, string &&BB_name) {
+  values[index].second = std::move(BB_name);
+}
+
 vector<Value*> Phi::operands() const {
   vector<Value*> v;
   for (auto &[val, bb] : values) {
