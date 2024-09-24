@@ -893,7 +893,8 @@ void BinaryInstructionHelper::mutate() {
     int opIndex = getOpIndex(binInst);
     llvm::Instruction::BinaryOps op = getNewOperator(opIndex);
     llvm::BinaryOperator *newInst = llvm::BinaryOperator::Create(
-        op, binInst->getOperand(0), binInst->getOperand(1), "", binInst);
+        op, binInst->getOperand(0), binInst->getOperand(1), "",
+        binInst->getIterator());
     resetMathFlags(newInst, opIndex);
     binInst->replaceAllUsesWith(newInst);
     binInst->eraseFromParent();
@@ -1053,7 +1054,7 @@ ResizeIntegerHelper::updateNode(llvm::Instruction *val,
     llvm::BinaryOperator *op = (llvm::BinaryOperator *)val;
     llvm::Instruction *nextInst = op->getNextNonDebugInstruction();
     llvm::BinaryOperator *newOp = llvm::BinaryOperator::Create(
-        op->getOpcode(), args[0], args[1], "", nextInst);
+        op->getOpcode(), args[0], args[1], "", nextInst->getIterator());
     assert(newOp->getType()->isIntOrIntVectorTy());
     llvm::IntegerType *newIntTy = (llvm::IntegerType *)newOp->getType();
     for (size_t i = 0; i < newOp->getNumOperands(); ++i) {
@@ -1139,16 +1140,16 @@ void UnaryInstHelper::mutate() {
         (llvm::BinaryOperator *)(&*mutator->iitInTmp);
 
     if (Random::getRandomBool()) {
-      llvm::UnaryOperator *newInst =
-          llvm::UnaryOperator::Create(llvm::AddrSpaceCastInst::UnaryOps::FNeg,
-                                      binInst->getOperand(0), "", binInst);
+      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
+          llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(0), "",
+          binInst->getIterator());
       binInst->replaceAllUsesWith(newInst);
       binInst->eraseFromParent();
       mutator->iitInTmp = newInst->getIterator();
     } else {
-      llvm::UnaryOperator *newInst =
-          llvm::UnaryOperator::Create(llvm::AddrSpaceCastInst::UnaryOps::FNeg,
-                                      binInst->getOperand(1), "", binInst);
+      llvm::UnaryOperator *newInst = llvm::UnaryOperator::Create(
+          llvm::AddrSpaceCastInst::UnaryOps::FNeg, binInst->getOperand(1), "",
+          binInst->getIterator());
       binInst->replaceAllUsesWith(newInst);
       binInst->eraseFromParent();
       mutator->iitInTmp = newInst->getIterator();

@@ -379,10 +379,12 @@ llvm::Value *mutator_util::updateIntegerSize(llvm::Value *integer,
 
   if (oldSize < newSize) {
     return llvm::CastInst::Create(llvm::Instruction::CastOps::ZExt, integer,
-                                  newIntOrVecTy, "", insertBefore);
+                                  newIntOrVecTy, "",
+                                  insertBefore->getIterator());
   } else if (oldSize > newSize) {
     return llvm::CastInst::Create(llvm::Instruction::CastOps::Trunc, integer,
-                                  newIntOrVecTy, "", insertBefore);
+                                  newIntOrVecTy, "",
+                                  insertBefore->getIterator());
   } else {
     return integer;
   }
@@ -488,7 +490,8 @@ llvm::Instruction *mutator_util::getRandomIntegerBinaryInstruction(
          "should be an integer to get an int instruction!");
   llvm::Instruction::BinaryOps Op =
       integerBinaryOps[Random::getRandomUnsigned() % integerBinaryOps.size()];
-  return llvm::BinaryOperator::Create(Op, val1, val2, "", insertBefore);
+  return llvm::BinaryOperator::Create(Op, val1, val2, "",
+                                      insertBefore->getIterator());
 }
 
 llvm::Instruction *mutator_util::getRandomFloatBinaryInstruction(
@@ -499,7 +502,8 @@ llvm::Instruction *mutator_util::getRandomFloatBinaryInstruction(
          "should be a floating point to get a float instruction!");
   llvm::Instruction::BinaryOps Op =
       floatBinaryOps[Random::getRandomUnsigned() % floatBinaryOps.size()];
-  return llvm::BinaryOperator::Create(Op, val1, val2, "", insertBefore);
+  return llvm::BinaryOperator::Create(Op, val1, val2, "",
+                                      insertBefore->getIterator());
 }
 
 llvm::Instruction *
@@ -520,8 +524,8 @@ mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
-  llvm::CallInst *inst = llvm::CallInst::Create(func->getFunctionType(), func,
-                                                args, "", insertBefore);
+  llvm::CallInst *inst = llvm::CallInst::Create(
+      func->getFunctionType(), func, args, "", insertBefore->getIterator());
   return inst;
 }
 
@@ -543,7 +547,7 @@ mutator_util::getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
-  llvm::CallInst *inst = llvm::CallInst::Create(func->getFunctionType(), func,
-                                                args, "", insertBefore);
+  llvm::CallInst *inst = llvm::CallInst::Create(
+      func->getFunctionType(), func, args, "", insertBefore->getIterator());
   return inst;
 }
