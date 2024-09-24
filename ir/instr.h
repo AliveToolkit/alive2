@@ -512,6 +512,9 @@ public:
   void removeValue(const std::string &BB_name);
   void replaceSourceWith(const std::string &from, const std::string &to);
 
+  void setValue(size_t index, Value &val);
+  void setSource(size_t index, std::string &&BB_name);
+
   const auto& getValues() const { return values; }
   std::vector<std::string> sources() const;
 
