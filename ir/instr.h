@@ -1062,9 +1062,9 @@ class Memcmp final : public MemInstr {
 
 public:
   Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
-         bool is_bcmp, bool is_tailcall): MemInstr(type, std::move(name)), ptr1(&ptr1),
-                        ptr2(&ptr2), num(&num), is_bcmp(is_bcmp),
-                        is_tailcall(is_tailcall) {}
+         bool is_bcmp, bool is_tailcall) : MemInstr(type, std::move(name)),
+                ptr1(&ptr1), ptr2(&ptr2), num(&num), is_bcmp(is_bcmp),
+                is_tailcall(is_tailcall) {}
 
   Value &getBytes() const { return *num; }
   bool isBCmp() const { return is_bcmp; }

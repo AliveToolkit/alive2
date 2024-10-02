@@ -264,7 +264,6 @@ void State::resetGlobals() {
 const State::ValTy& State::exec(const Value &v) {
   assert(undef_vars.empty());
   domain.noreturn = true;
-  current_value = &v;
   auto val = v.toSMT(*this);
 
   auto value_ub = domain.UB();
