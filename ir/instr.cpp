@@ -2295,7 +2295,7 @@ void FnCall::print(ostream &os) const {
   if (!isVoid())
     os << getName() << " = ";
 
-  os << (getAttributes().isTailCall() ? "tail" : "")
+  os << (getAttributes().isTailCall() ? "tail " : "")
      << "call " << print_type(getType())
      << (fnptr ? fnptr->getName() : fnName) << '(';
 
