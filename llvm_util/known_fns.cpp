@@ -520,26 +520,27 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   if (!decl || !TLI.getLibFunc(*decl, libfn))
     RETURN_EXACT();
 
+  bool is_tailcall = i.isTailCall();
   switch (libfn) {
   case llvm::LibFunc_memset: // void* memset(void *ptr, int val, size_t bytes)
-    BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1));
+    BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1, is_tailcall));
     RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
                                     UnaryOp::Copy));
 
   // void memset_pattern4(void *ptr, void *pattern, size_t bytes)
   case llvm::LibFunc_memset_pattern4:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 4));
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 4, is_tailcall));
   case llvm::LibFunc_memset_pattern8:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 8));
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 8, is_tailcall));
   case llvm::LibFunc_memset_pattern16:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 16));
+    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 16, is_tailcall));
   case llvm::LibFunc_strlen:
-    RETURN_VAL(make_unique<Strlen>(*ty, value_name(i), *args[0]));
+    RETURN_VAL(make_unique<Strlen>(*ty, value_name(i), *args[0], is_tailcall));
   case llvm::LibFunc_memcmp:
   case llvm::LibFunc_bcmp: {
     RETURN_VAL(
       make_unique<Memcmp>(*ty, value_name(i), *args[0], *args[1], *args[2],
-                          libfn == llvm::LibFunc_bcmp));
+                          libfn == llvm::LibFunc_bcmp, is_tailcall));
   }
   case llvm::LibFunc_ffs:
   case llvm::LibFunc_ffsl:

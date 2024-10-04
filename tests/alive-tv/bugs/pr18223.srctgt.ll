@@ -74,7 +74,7 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
   store i32 1, ptr @d, align 4
   store i32 %inc.lcssa, ptr @b, align 4
   store i32 %conv.lcssa, ptr @f, align 4
-  %call = tail call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
+  %call = call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 
@@ -131,7 +131,7 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
   store i32 1, ptr @d, align 4
   store i32 %inc.lcssa, ptr @b, align 4
   store i32 %conv.lcssa, ptr @f, align 4
-  %call = tail call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
+  %call = call i32 (ptr, ...) @myprintf(ptr getelementptr inbounds ([4 x i8], ptr @.str, i64 0, i64 0), i32 %conv.lcssa)
   ret i32 0
 }
 

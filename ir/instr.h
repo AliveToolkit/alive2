@@ -941,15 +941,18 @@ public:
 class Memset final : public MemInstr {
   Value *ptr, *val, *bytes;
   uint64_t align;
+  bool is_tailcall;
+
 public:
-  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align)
+  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align, bool is_tailcall)
     : MemInstr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
-            align(align) {}
+            align(align), is_tailcall(is_tailcall) {}
 
   Value& getPtr() const { return *ptr; }
   Value& getBytes() const { return *bytes; }
   uint64_t getAlign() const { return align; }
   void setAlign(uint64_t align) { this->align = align; }
+  bool isTailCall() const { return is_tailcall; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -970,11 +973,14 @@ public:
 class MemsetPattern final : public MemInstr {
   Value *ptr, *pattern, *bytes;
   unsigned pattern_length;
+  bool is_tailcall;
+
 public:
   MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
-                unsigned pattern_length);
+                unsigned pattern_length, bool is_tailcall);
 
   unsigned getPatternLength() const { return pattern_length; }
+  bool isTailCall() const { return is_tailcall; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1017,11 +1023,14 @@ class Memcpy final : public MemInstr {
   Value *dst, *src, *bytes;
   uint64_t align_dst, align_src;
   bool move;
+  bool is_tailcall;
+
 public:
   Memcpy(Value &dst, Value &src, Value &bytes,
-         uint64_t align_dst, uint64_t align_src, bool move)
+         uint64_t align_dst, uint64_t align_src, bool move, bool is_tailcall)
     : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
-            align_dst(align_dst), align_src(align_src), move(move) {}
+            align_dst(align_dst), align_src(align_src), move(move),
+            is_tailcall(is_tailcall) {}
 
   Value& getSrc() const { return *src; }
   Value& getDst() const { return *dst; }
@@ -1031,6 +1040,7 @@ public:
   void setSrcAlign(uint64_t align) { align_src = align; }
   void setDstAlign(uint64_t align) { align_dst = align; }
   bool isMove() const { return move; }
+  bool isTailCall() const { return is_tailcall; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1051,13 +1061,17 @@ public:
 class Memcmp final : public MemInstr {
   Value *ptr1, *ptr2, *num;
   bool is_bcmp;
+  bool is_tailcall;
+
 public:
   Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
-         bool is_bcmp): MemInstr(type, std::move(name)), ptr1(&ptr1),
-                        ptr2(&ptr2), num(&num), is_bcmp(is_bcmp) {}
+         bool is_bcmp, bool is_tailcall) : MemInstr(type, std::move(name)),
+                ptr1(&ptr1), ptr2(&ptr2), num(&num), is_bcmp(is_bcmp),
+                is_tailcall(is_tailcall) {}
 
   Value &getBytes() const { return *num; }
   bool isBCmp() const { return is_bcmp; }
+  bool isTailCall() const { return is_tailcall; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1077,11 +1091,14 @@ public:
 
 class Strlen final : public MemInstr {
   Value *ptr;
+  bool is_tailcall;
+
 public:
-  Strlen(Type &type, std::string &&name, Value &ptr)
-    : MemInstr(type, std::move(name)), ptr(&ptr) {}
+  Strlen(Type &type, std::string &&name, Value &ptr, bool is_tailcall)
+    : MemInstr(type, std::move(name)), ptr(&ptr), is_tailcall(is_tailcall) {}
 
   Value *getPointer() const { return ptr; }
+  bool isTailCall() const { return is_tailcall; }
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;

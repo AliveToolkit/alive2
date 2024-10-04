@@ -24,7 +24,7 @@ for.body:                                         ; preds = %entry, %for.body
 
 for.end:                                          ; preds = %for.body
   %3 = load i32, ptr @b, align 4
-  %call = tail call i32 (ptr, ...) @print(ptr nonnull dereferenceable(1) getelementptr inbounds ([15 x i8], ptr @.str, i64 0, i64 0), i32 %3)
+  %call = call i32 (ptr, ...) @print(ptr nonnull dereferenceable(1) getelementptr inbounds ([15 x i8], ptr @.str, i64 0, i64 0), i32 %3)
   ret i32 0
 }
 
@@ -49,7 +49,7 @@ for.body:                                         ; preds = %entry, %for.body
 
 for.end:                                          ; preds = %for.body
   %3 = load i32, ptr @b, align 4
-  %call = tail call i32 (ptr, ...) @print(ptr nonnull dereferenceable(1) getelementptr inbounds ([15 x i8], ptr @.str, i64 0, i64 0), i32 %3)
+  %call = call i32 (ptr, ...) @print(ptr nonnull dereferenceable(1) getelementptr inbounds ([15 x i8], ptr @.str, i64 0, i64 0), i32 %3)
   ret i32 0
 }
 
