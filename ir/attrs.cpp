@@ -2,7 +2,9 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include "ir/function.h"
 #include "ir/globals.h"
+#include "ir/instr.h"
 #include "ir/memory.h"
 #include "ir/state.h"
 #include "ir/state_value.h"
@@ -617,6 +619,82 @@ ostream& operator<<(std::ostream &os, FpExceptionMode ex) {
   case FpExceptionMode::Strict:  str = "strict"; break;
   }
   return os << str;
+}
+
+ostream& operator<<(std::ostream &os, const TailCallInfo &tci) {
+  const char *str = nullptr;
+  switch (tci.type) {
+    case TailCallInfo::None:     str = ""; break;
+    case TailCallInfo::Tail:     str = "tail "; break;
+    case TailCallInfo::MustTail: str = "musttail "; break;
+  }
+  return os << str;
+}
+
+void TailCallInfo::checkTailCall(const Instr &i, State &s) const {
+  bool preconditions_OK = true;
+  assert(type != TailCallInfo::None);
+
+  auto *callee = dynamic_cast<const FnCall *>(&i);
+  if (callee) {
+    for (const auto &[arg, attrs] : callee->getArgs()) {
+      bool callee_has_byval = attrs.has(ParamAttrs::ByVal);
+      if (dynamic_cast<const Alloc *>(arg) && !callee_has_byval) {
+        preconditions_OK = false;
+        break;
+      }
+      if (auto *input = dynamic_cast<const Input *>(arg)) {
+        bool caller_has_byval = input->hasAttribute(ParamAttrs::ByVal);
+        if (callee_has_byval != caller_has_byval) {
+          preconditions_OK = false;
+          break;
+        }
+      }
+    }
+  } else {
+    // Handling memcpy / memcmp et alia.
+    for (const auto &op : i.operands()) {
+      if (dynamic_cast<const Alloc *>(op)) {
+        preconditions_OK = false;
+        break;
+      }
+    }
+  }
+
+  if (callee && type == TailCallInfo::MustTail) {
+    bool callee_is_vararg = callee->getVarArgIdx() != -1u;
+    bool caller_is_vararg = s.getFn().isVarArgs();
+    if (!has_same_calling_convention || (callee_is_vararg && !caller_is_vararg))
+      preconditions_OK = false;
+  }
+
+  if (preconditions_OK && type == TailCallInfo::MustTail) {
+    bool found = false;
+    const auto &instrs = s.getFn().bbOf(i).instrs();
+    auto it = instrs.begin();
+    for (auto e = instrs.end(); it != e; ++it) {
+      if (&*it == &i) {
+        found = true;
+        break;
+      }
+    }
+    assert(found);
+
+    ++it;
+    auto &next_instr = *it;
+    if (auto *ret = dynamic_cast<const Return *>(&next_instr)) {
+      if (ret->getType().isVoid() && i.getType().isVoid())
+        return;
+      auto *ret_val = ret->operands()[0];
+      if (ret_val == &i)
+        return;
+    }
+  }
+
+  if (!preconditions_OK) {
+    // Preconditions unsatifisfied or refinement for musttail failed, hence UB.
+    s.addUB(expr(false));
+  }
 }
 
 }
