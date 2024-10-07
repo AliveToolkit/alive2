@@ -1,3 +1,5 @@
+; ERROR: Source is more defined than target
+
 define i4 @src(ptr %p) {
   %v = load i4, ptr %p
   call void @fn()

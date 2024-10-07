@@ -246,6 +246,7 @@ public:
     smt::expr non_local_liveness;
     smt::expr writes_block;
     smt::expr writes_args;
+    smt::expr frees_block;
 
   public:
     smt::expr writes(unsigned idx) const;

@@ -1769,6 +1769,7 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
     }
   }
   ret.writes_block = expr::mkIf(cond, then.writes_block, els.writes_block);
+  ret.frees_block = expr::mkIf(cond, then.frees_block, els.frees_block);
   ret.writes_args = expr::mkIf(cond, then.writes_args, els.writes_args);
   ret.non_local_liveness = expr::mkIf(cond, then.non_local_liveness,
                                       els.non_local_liveness);
@@ -1776,16 +1777,14 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
 }
 
 expr Memory::CallState::operator==(const CallState &rhs) const {
-  if (non_local_liveness.isValid() != rhs.non_local_liveness.isValid())
-    return false;
-  if (!non_local_liveness.isValid())
-    return true;
-
   expr ret = non_local_liveness == rhs.non_local_liveness;
-  for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
-    ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
+  if (non_local_block_val.size() == rhs.non_local_block_val.size()) {
+    for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
+      ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
+    }
   }
   ret &= writes_block == rhs.writes_block;
+  ret &= frees_block == rhs.frees_block;
   if (writes_args.isValid())
     ret &= writes_args == rhs.writes_args;
   return ret;
@@ -1796,6 +1795,8 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
                     const SMTMemoryAccess &access) {
   assert(has_fncall);
   CallState st;
+  st.non_local_liveness = mk_liveness_array();
+  st.frees_block = expr::mkUInt(0, st.non_local_liveness);
 
   {
     unsigned num_blocks = 1;
@@ -1843,12 +1844,18 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
   st.writes_args
     = expr::mkFreshVar("writes_args", expr::mkUInt(0, num_ptr_args));
 
-  st.non_local_liveness = mk_liveness_array();
-  if (num_nonlocals_src && !nofree)
+  if (num_nonlocals_src && !nofree) {
+    auto may_free = access.canAccess(MemoryAccess::Other) ||
+                    access.canAccess(MemoryAccess::Inaccessible);
+    st.frees_block
+      = mkIf_fold(may_free,
+                  expr::mkFreshVar("frees_block", st.non_local_liveness),
+                  st.frees_block);
     st.non_local_liveness
-      = mkIf_fold(only_write_inaccess,
-                  st.non_local_liveness,
-                  expr::mkFreshVar("blk_liveness", st.non_local_liveness));
+      = mkIf_fold(may_free,
+                  expr::mkFreshVar("blk_liveness", st.non_local_liveness),
+                  st.non_local_liveness);
+  }
 
   return st;
 }
@@ -1923,11 +1930,13 @@ void Memory::setState(const Memory::CallState &st,
     expr one  = expr::mkUInt(1, num_nonlocals);
     expr zero = expr::mkUInt(0, num_nonlocals);
     expr mask = always_nowrite(0) ? one : zero;
-    expr may_free = access.canAccess(MemoryAccess::Other);
+    expr may_free = access.canAccess(MemoryAccess::Other) ||
+                    access.canAccess(MemoryAccess::Inaccessible);
 
     for (unsigned bid = always_nowrite(0); bid < num_nonlocals; ++bid) {
       expr heap = Pointer(*this, bid, false).isHeapAllocated();
-      mask = mask | expr::mkIf(heap && may_free && !is_fncall_mem(bid),
+      mask = mask | expr::mkIf(heap && may_free && !is_fncall_mem(bid) &&
+                                 st.frees_block.extract(bid, bid) == 1,
                                zero,
                                one << expr::mkUInt(bid, one));
     }
