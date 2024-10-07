@@ -72,7 +72,7 @@ expr SMTMemoryAccess::canWriteSomething() const {
 }
 
 expr SMTMemoryAccess::refinedBy(const SMTMemoryAccess &other) const {
-  return val == other.val;
+  return (val & other.val) == val;
 }
 
 SMTMemoryAccess

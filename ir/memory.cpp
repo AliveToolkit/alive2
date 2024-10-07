@@ -1853,7 +1853,8 @@ void Memory::setState(const Memory::CallState &st,
   if (!only_write_inaccess.isTrue()) {
     unsigned idx = 1;
     unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
-    for (unsigned bid = 0; bid < limit; ++bid) {
+    const auto written_blocks = st.non_local_block_val.size();
+    for (unsigned bid = 0; bid < limit && idx < written_blocks; ++bid) {
       if (always_nowrite(bid, true, true))
         continue;
 
@@ -1884,7 +1885,7 @@ void Memory::setState(const Memory::CallState &st,
       if (modifies.isTrue())
         non_local_block_val[bid].undef.clear();
     }
-    assert(idx == st.non_local_block_val.size());
+    assert(written_blocks == 0 || idx == written_blocks);
   }
 
   if (!st.non_local_liveness.isAllOnes()) {
