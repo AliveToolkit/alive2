@@ -1747,6 +1747,10 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
   return { std::move(p).release(), {} };
 }
 
+expr Memory::CallState::writes(unsigned idx) const {
+  return writes_block.extract(idx, idx) == 1;
+}
+
 Memory::CallState Memory::CallState::mkIf(const expr &cond,
                                           const CallState &then,
                                           const CallState &els) {
@@ -1764,6 +1768,7 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
                     els.non_local_block_val[i]));
     }
   }
+  ret.writes_block = expr::mkIf(cond, then.writes_block, els.writes_block);
   ret.writes_args = expr::mkIf(cond, then.writes_args, els.writes_args);
   ret.non_local_liveness = expr::mkIf(cond, then.non_local_liveness,
                                       els.non_local_liveness);
@@ -1771,15 +1776,16 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
 }
 
 expr Memory::CallState::operator==(const CallState &rhs) const {
-  if (empty != rhs.empty)
+  if (non_local_liveness.isValid() != rhs.non_local_liveness.isValid())
     return false;
-  if (empty)
+  if (!non_local_liveness.isValid())
     return true;
 
   expr ret = non_local_liveness == rhs.non_local_liveness;
   for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
     ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
   }
+  ret &= writes_block == rhs.writes_block;
   if (writes_args.isValid())
     ret &= writes_args == rhs.writes_args;
   return ret;
@@ -1790,7 +1796,21 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
                     const SMTMemoryAccess &access) {
   assert(has_fncall);
   CallState st;
-  st.empty = false;
+
+  {
+    unsigned num_blocks = 1;
+    unsigned limit = num_nonlocals_src - num_inaccessiblememonly_fns;
+    for (unsigned i = 0; i < limit; ++i) {
+      if (!always_nowrite(i, true, true))
+        ++num_blocks;
+    }
+    st.writes_block = expr::mkUInt(0, num_blocks);
+  }
+
+  if (access.canWriteSomething().isFalse()) {
+    st.writes_args = expr::mkUInt(0, num_ptr_args);
+    return st;
+  }
 
   // TODO: handle havoc of local blocks
 
@@ -1809,6 +1829,15 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
       st.non_local_block_val.emplace_back(
         expr::mkFreshVar("blk_val", mk_block_val_array(i)));
     }
+    st.writes_block = expr::mkFreshVar("writes_block", st.writes_block);
+    assert(st.writes_block.bits() == st.non_local_block_val.size());
+  }
+  else if (!only_write_inaccess.isFalse()) {
+    auto var = expr::mkFreshVar("writes_block", expr::mkUInt(0, 1));
+    if (st.writes_block.bits() > 1)
+      st.writes_block = expr::mkUInt(0, st.writes_block.bits()-1).concat(var);
+    else
+      st.writes_block = std::move(var);
   }
 
   st.writes_args
@@ -1844,8 +1873,8 @@ void Memory::setState(const Memory::CallState &st,
     assert(is_fncall_mem(bid));
     assert(non_local_block_val[bid].undef.empty());
     auto &cur_val = non_local_block_val[bid].val;
-    cur_val
-      = mk_block_if(only_write_inaccess, st.non_local_block_val[0], cur_val);
+    cur_val = mk_block_if(only_write_inaccess && st.writes(0),
+                          st.non_local_block_val[0], cur_val);
   }
 
   // TODO: MemoryAccess::Errno
@@ -1858,7 +1887,7 @@ void Memory::setState(const Memory::CallState &st,
       if (always_nowrite(bid, true, true))
         continue;
 
-      expr modifies = access.canWrite(MemoryAccess::Other);
+      expr modifies = access.canWrite(MemoryAccess::Other) && st.writes(idx);
 
       if (!is_fncall_mem(bid)) {
         unsigned arg_idx = 0;
@@ -1870,8 +1899,10 @@ void Memory::setState(const Memory::CallState &st,
                         access.canWrite(MemoryAccess::Args) &&
                         writes;
 
+            Pointer ptr(*this, ptr_in.val.value);
             modifies |= cond &&
-                        Pointer(*this, ptr_in.val.value).getBid() == bid;
+                        !ptr.isNull() &&
+                        ptr.getBid() == bid;
             state->addUB(cond.implies(ptr_in.val.non_poison));
             state->addUB(ptr_in.nowrite.implies(!writes));
             ++arg_idx;

@@ -244,10 +244,11 @@ public:
   class CallState {
     std::vector<smt::expr> non_local_block_val;
     smt::expr non_local_liveness;
+    smt::expr writes_block;
     smt::expr writes_args;
-    bool empty = true;
 
   public:
+    smt::expr writes(unsigned idx) const;
     static CallState mkIf(const smt::expr &cond, const CallState &then,
                           const CallState &els);
     smt::expr operator==(const CallState &rhs) const;
