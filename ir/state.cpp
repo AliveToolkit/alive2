@@ -257,7 +257,8 @@ State::State(const Function &f, bool source)
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
     return_val(DisjointExpr(f.getType().getDummyValue(false))) {
 
-  doesApproximation("uf-float");
+  if (get_uf_float())
+    doesApproximation("uf-float");
 }
 
 void State::resetGlobals() {
