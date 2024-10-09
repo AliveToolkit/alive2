@@ -338,9 +338,6 @@ public:
     return mkUF(name.data(), args, range);
   }
 
-  static expr mkCommutativeUF(const std::string &name, std::vector<expr> args,
-                              const expr &range);
-
   static expr mkArray(const char *name, const expr &domain, const expr &range);
   static expr mkConstArray(const expr &domain, const expr &value);
 
@@ -373,6 +370,7 @@ public:
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
+  void printSort(std::ostream &os) const;
   std::string numeral_string() const;
   std::string fn_name() const; // empty if not a function
   unsigned getFnNumArgs() const;
