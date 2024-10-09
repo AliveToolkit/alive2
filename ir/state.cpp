@@ -255,7 +255,10 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
-    return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+    return_val(DisjointExpr(f.getType().getDummyValue(false))) {
+
+  doesApproximation("uf-float");
+}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
