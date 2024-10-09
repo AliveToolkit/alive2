@@ -23,6 +23,8 @@ void set_query_timeout(std::string ms);
 const char* get_query_timeout();
 void set_random_seed(std::string seed);
 const char *get_random_seed();
+void set_uf_float(bool enable);
+bool get_uf_float();
 
 void set_memory_limit(uint64_t limit);
 bool hit_memory_limit();
