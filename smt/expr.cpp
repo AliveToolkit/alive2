@@ -219,13 +219,20 @@ expr expr::mkInt(const char *n, unsigned bits) {
   return bits ? Z3_mk_numeral(ctx(), n, mkBVSort(bits)) : expr();
 }
 
+static expr to_uf_float_sort(expr&& e) {
+  if (get_uf_float() && e.isFloat())
+    return e.float2BV();
+  return e;
+}
+
 expr expr::mkFloat(double n, const expr &type) {
   C2(type);
-  return Z3_mk_fpa_numeral_double(ctx(), n, type.sort());
+  return to_uf_float_sort(Z3_mk_fpa_numeral_double(ctx(), n, type.sort()));
 }
 
 expr expr::mkHalf(float n) {
-  return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_half(ctx()));
+  return to_uf_float_sort(
+    Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_half(ctx())));
 }
 
 static Z3_sort mk_bfloat_sort() {
@@ -233,29 +240,32 @@ static Z3_sort mk_bfloat_sort() {
 }
 
 expr expr::mkBFloat(float n) {
-  return Z3_mk_fpa_numeral_float(ctx(), n, mk_bfloat_sort());
+  return to_uf_float_sort(Z3_mk_fpa_numeral_float(ctx(), n, mk_bfloat_sort()));
 }
 
 expr expr::mkFloat(float n) {
-  return Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_single(ctx()));
+  return to_uf_float_sort(
+    Z3_mk_fpa_numeral_float(ctx(), n, Z3_mk_fpa_sort_single(ctx())));
 }
 
 expr expr::mkDouble(double n) {
-  return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx()));
+  return to_uf_float_sort(
+    Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_double(ctx())));
 }
 
 expr expr::mkQuad(double n) {
-  return Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_quadruple(ctx()));
+  return to_uf_float_sort(
+    Z3_mk_fpa_numeral_double(ctx(), n, Z3_mk_fpa_sort_quadruple(ctx())));
 }
 
 expr expr::mkNaN(const expr &type) {
   C2(type);
-  return Z3_mk_fpa_nan(ctx(), type.sort());
+  return to_uf_float_sort(Z3_mk_fpa_nan(ctx(), type.sort()));
 }
 
 expr expr::mkNumber(const char *n, const expr &type) {
   C2(type);
-  return Z3_mk_numeral(ctx(), n, type.sort());
+  return to_uf_float_sort(Z3_mk_numeral(ctx(), n, type.sort()));
 }
 
 expr expr::mkConst(Z3_decl decl) {
