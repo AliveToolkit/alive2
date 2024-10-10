@@ -447,6 +447,7 @@ public:
     }
 
     call->setApproximated(approx);
+    call->setTailCallSite(parse_fn_tailcall(i));
 
     unique_ptr<Instr> val = std::move(call);
     auto range_check = [&](const auto &attr) {
@@ -473,7 +474,7 @@ public:
 
     return make_unique<Memset>(*ptr, *val, *bytes,
                                i.getDestAlign().valueOrOne().value(),
-                               i.isTailCall());
+                               parse_fn_tailcall(i));
   }
 
   RetTy visitMemTransferInst(llvm::MemTransferInst &i) {
@@ -487,7 +488,8 @@ public:
     return make_unique<Memcpy>(*dst, *src, *bytes,
                                i.getDestAlign().valueOrOne().value(),
                                i.getSourceAlign().valueOrOne().value(),
-                               isa<llvm::MemMoveInst>(&i), i.isTailCall());
+                               isa<llvm::MemMoveInst>(&i),
+                               parse_fn_tailcall(i));
   }
 
   RetTy visitICmpInst(llvm::ICmpInst &i) {
@@ -1759,7 +1761,6 @@ public:
     handleRetAttrs(attrs_callsite.getAttributes(ret), attrs);
     handleFnAttrs(attrs_callsite.getAttributes(fnidx), attrs);
     attrs.mem &= handleMemAttrs(i.getMemoryEffects());
-    attrs.setTailCallSite(i.isTailCall());
     attrs.inferImpliedAttributes();
   }
 
