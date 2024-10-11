@@ -632,8 +632,10 @@ ostream& operator<<(std::ostream &os, const TailCallInfo &tci) {
 }
 
 void TailCallInfo::checkTailCall(const Instr &i, State &s) const {
+  if (type == TailCallInfo::None)
+    return;
+
   bool preconditions_OK = true;
-  assert(type != TailCallInfo::None);
 
   auto *callee = dynamic_cast<const FnCall *>(&i);
   if (callee) {
