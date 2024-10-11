@@ -3,8 +3,6 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include "llvm/IR/Instructions.h"
-
 #include "ir/instr.h"
 #include <functional>
 #include <ostream>
@@ -13,6 +11,7 @@
 namespace llvm {
 class APInt;
 class BasicBlock;
+class CallInst;
 class ConstantExpr;
 class DataLayout;
 class Instruction;
@@ -70,8 +69,6 @@ void reset_state(IR::Function &f);
 std::unique_ptr<llvm::Module> openInputFile(llvm::LLVMContext &Context,
                                             const std::string &InputFilename);
 llvm::Function *findFunction(llvm::Module &M, const std::string &FName);
-
-bool are_tailcall_preconditions_met(const llvm::CallInst &i);
 
 IR::TailCallInfo parse_fn_tailcall(const llvm::CallInst &i);
 }
