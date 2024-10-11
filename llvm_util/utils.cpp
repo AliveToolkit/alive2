@@ -288,8 +288,7 @@ Value* get_operand(llvm::Value *v,
 
   // automatic splat of constant values
   if (auto vty = dyn_cast<llvm::FixedVectorType>(v->getType());
-      vty && !isa<llvm::ConstantAggregate, llvm::ConstantAggregateZero,
-                  llvm::ConstantDataSequential>(v)) {
+      vty && isa<llvm::ConstantInt, llvm::ConstantFP>(v)) {
     llvm::Value *llvm_splat = nullptr;
     if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
       llvm_splat
@@ -298,7 +297,7 @@ Value* get_operand(llvm::Value *v,
       llvm_splat
         = llvm::ConstantFP::get(vty->getElementType(), cnst->getValue());
     } else
-      return nullptr;
+      UNREACHABLE();
 
     auto splat = get_operand(llvm_splat, constexpr_conv, copy_inserter,
                              register_fn_decl);
