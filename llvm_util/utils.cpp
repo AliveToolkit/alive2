@@ -528,6 +528,6 @@ TailCallInfo parse_fn_tailcall(const llvm::CallInst &i) {
   auto tail_type =
       i.isMustTailCall() ? TailCallInfo::MustTail : TailCallInfo::Tail;
   bool has_same_cc = i.getCallingConv() == i.getCaller()->getCallingConv();
-  return TailCallInfo(tail_type, has_same_cc);
+  return {tail_type, has_same_cc};
 }
 }
