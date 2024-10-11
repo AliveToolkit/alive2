@@ -2494,8 +2494,7 @@ StateValue FnCall::toSMT(State &s) const {
     s.addGuardableUB(expr(false));
 
   const auto &attrs = getAttributes();
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   auto get_alloc_ptr = [&]() -> Value& {
     for (auto &[arg, flags] : args) {
@@ -4149,8 +4148,7 @@ StateValue Memset::toSMT(State &s) const {
     vptr = sv_ptr.value;
   }
   check_can_store(s, vptr);
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
@@ -4212,8 +4210,7 @@ StateValue MemsetPattern::toSMT(State &s) const {
   auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
   check_can_store(s, vptr);
   check_can_load(s, vpattern);
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   s.getMemory().memset_pattern(vptr, vpattern, vbytes, pattern_length);
   return {};
@@ -4342,8 +4339,7 @@ StateValue Memcpy::toSMT(State &s) const {
 
   check_can_load(s, vsrc);
   check_can_store(s, vdst);
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
@@ -4402,8 +4398,7 @@ StateValue Memcmp::toSMT(State &s) const {
 
   check_can_load(s, vptr1);
   check_can_load(s, vptr2);
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
   // memcmp can be optimized to load & icmps, and it requires this
@@ -4501,8 +4496,7 @@ void Strlen::print(ostream &os) const {
 StateValue Strlen::toSMT(State &s) const {
   auto &eptr = s.getWellDefinedPtr(*ptr);
   check_can_load(s, eptr);
-  if (tci.isTailCall())
-    tci.checkTailCall(*this, s);
+  tci.checkTailCall(*this, s);
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();
