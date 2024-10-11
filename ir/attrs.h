@@ -11,12 +11,12 @@
 
 namespace IR {
 
+class Instr;
 class ParamAttrs;
 class State;
 struct StateValue;
 class Type;
 class Value;
-class Instr;
 
 class MemoryAccess final {
   unsigned val = 0;
@@ -217,17 +217,12 @@ struct FpExceptionMode final {
 
 smt::expr isfpclass(const smt::expr &v, const Type &ty, uint16_t mask);
 
+
 struct TailCallInfo final {
-  enum TailCallType { None, Tail, MustTail } type;
+  enum TailCallType { None, Tail, MustTail } type = None;
   // Determine if callee and caller have the same calling convention.
-  bool has_same_calling_convention;
+  bool has_same_calling_convention = false;
 
-  TailCallInfo() : type(None), has_same_calling_convention(false) {}
-  TailCallInfo(TailCallType type, bool has_same_calling_convention)
-      : type(type), has_same_calling_convention(has_same_calling_convention) {}
-
-  TailCallType getType() const { return type; }
-  bool isTailCall() const { return type != None; }
   void checkTailCall(const Instr &i, State &s) const;
   friend std::ostream& operator<<(std::ostream &os, const TailCallInfo &tci);
 };
