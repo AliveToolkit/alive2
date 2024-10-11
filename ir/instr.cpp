@@ -2493,7 +2493,6 @@ StateValue FnCall::toSMT(State &s) const {
       !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
 
-  const auto &attrs = getAttributes();
   tci.checkTailCall(*this, s);
 
   auto get_alloc_ptr = [&]() -> Value& {
@@ -4171,9 +4170,9 @@ DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset);
 
 MemsetPattern::MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
                              unsigned pattern_length, TailCallInfo tci)
-    : MemInstr(Type::voidTy, "memset_pattern" + to_string(pattern_length)),
-      ptr(&ptr), pattern(&pattern), bytes(&bytes),
-      pattern_length(pattern_length), tci(tci) {}
+  : MemInstr(Type::voidTy, "memset_pattern" + to_string(pattern_length)),
+    ptr(&ptr), pattern(&pattern), bytes(&bytes),
+    pattern_length(pattern_length), tci(tci) {}
 
 uint64_t MemsetPattern::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
