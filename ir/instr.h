@@ -1026,7 +1026,7 @@ class Memcpy final : public MemInstr {
 
 public:
   Memcpy(Value &dst, Value &src, Value &bytes, uint64_t align_dst,
-         uint64_t align_src, bool move, TailCallInfo &&tci)
+         uint64_t align_src, bool move, TailCallInfo tci)
       : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
         align_dst(align_dst), align_src(align_src), move(move), tci(tci) {}
 
