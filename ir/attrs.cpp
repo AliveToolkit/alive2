@@ -689,6 +689,8 @@ void TailCallInfo::checkTailCall(const Instr &i, State &s) const {
       if (ret_val == &i)
         return;
     }
+
+    preconditions_OK = false;
   }
 
   if (!preconditions_OK) {
