@@ -2599,7 +2599,7 @@ unique_ptr<Instr> FnCall::dup(Function &f, const string &suffix) const {
                                FnAttrs(attrs), fnptr, var_arg_idx);
   r->args = args;
   r->approx = approx;
-  r->tci = TailCallInfo(tci);
+  r->tci = tci;
   return r;
 }
 
@@ -4162,7 +4162,7 @@ expr Memset::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
-  return make_unique<Memset>(*ptr, *val, *bytes, align, TailCallInfo(tci));
+  return make_unique<Memset>(*ptr, *val, *bytes, align, tci);
 }
 
 
@@ -4223,8 +4223,7 @@ expr MemsetPattern::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
-  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length,
-                                    TailCallInfo(tci));
+  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length, tci);
 }
 
 
@@ -4352,8 +4351,8 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
-  return make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move,
-                             TailCallInfo(tci));
+  return
+    make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move, tci);
 }
 
 
@@ -4462,7 +4461,7 @@ expr Memcmp::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
   return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
-                             is_bcmp, TailCallInfo(tci));
+                             is_bcmp, tci);
 }
 
 
@@ -4523,8 +4522,7 @@ expr Strlen::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Strlen::dup(Function &f, const string &suffix) const {
-  return make_unique<Strlen>(getType(), getName() + suffix, *ptr,
-                             TailCallInfo(tci));
+  return make_unique<Strlen>(getType(), getName() + suffix, *ptr, tci);
 }
 
 
