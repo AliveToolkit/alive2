@@ -1225,6 +1225,12 @@ public:
     if (ret) {
       FnAttrs attrs;
       parse_fn_attrs(i, attrs);
+      if (i.hasRetAttr(llvm::Attribute::Range)) {
+        auto &ptr = *ret;
+        BB->addInstr(std::move(ret));
+        ret =
+            handleRangeAttrNoInsert(i.getRetAttr(llvm::Attribute::Range), ptr);
+      }
       add_identifier(i, *ret.get());
       if (attrs.has(FnAttrs::NoUndef)) {
         auto &ptr = *ret;
