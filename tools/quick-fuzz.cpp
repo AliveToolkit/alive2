@@ -546,7 +546,7 @@ private:
     if (Op == Intrinsic::abs || Op == Intrinsic::ctlz || Op == Intrinsic::cttz)
       Args.push_back(ConstantInt::get(Type::getInt1Ty(Ctx), C.flip() ? 1 : 0));
 
-    auto Decl = Intrinsic::getDeclaration(M, Op, Ty);
+    auto Decl = Intrinsic::getOrInsertDeclaration(M, Op, Ty);
     auto *I = CallInst::Create(Decl, Args, "", BB);
     return I;
   }
@@ -610,7 +610,7 @@ private:
       assert(false);
     }
 
-    auto Decl = Intrinsic::getDeclaration(M, Op, Ty);
+    auto Decl = Intrinsic::getOrInsertDeclaration(M, Op, Ty);
     auto *I = CallInst::Create(Decl, {LHS, RHS}, "", BB);
     if (Op == Intrinsic::ssub_with_overflow ||
         Op == Intrinsic::usub_with_overflow ||
@@ -664,7 +664,7 @@ private:
                                  Type::getInt32Ty(BB->getContext()))
                   : getVal(Ty);
 
-    auto Decl = Intrinsic::getDeclaration(M, Op, Ty);
+    auto Decl = Intrinsic::getOrInsertDeclaration(M, Op, Ty);
     auto *I = CallInst::Create(Decl, {A, B, C}, "", BB);
     return I;
   }
