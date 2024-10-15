@@ -2635,8 +2635,11 @@ InlineAsm::InlineAsm(Type &type, string &&name, const string &asm_str,
            std::move(attrs)) {}
 
 
-ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b)
-  : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), defined(cond != Any) {
+ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b,
+           unsigned flags)
+    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), flags(flags),
+      defined(cond != Any) {
+  assert((flags & SameSign) == flags);
   if (!defined)
     cond_name = getName() + "_cond";
 }
@@ -2684,7 +2687,10 @@ void ICmp::print(ostream &os) const {
   case UGT: condtxt = "ugt "; break;
   case Any: condtxt = ""; break;
   }
-  os << getName() << " = icmp " << condtxt << *a << ", " << b->getName();
+  os << getName() << " = icmp ";
+  if (flags & SameSign)
+    os << "samesign ";
+  os << condtxt << *a << ", " << b->getName();
   switch (pcmode) {
   case INTEGRAL: break;
   case PROVENANCE: os << ", use_provenance"; break;
@@ -2729,6 +2735,13 @@ StateValue ICmp::toSMT(State &s) const {
     UNREACHABLE();
   };
 
+  fn = [this, fn](const expr &av, const expr &bv, Cond cond) {
+    return fn(av, bv, cond)
+        .toBVBool()
+        .concat(flags & SameSign ? (av.sign() == bv.sign()).toBVBool()
+                                 : expr::mkUInt(1, 1));
+  };
+
   if (isPtrCmp()) {
     fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
       auto &m = s.getMemory();
@@ -2742,7 +2755,9 @@ StateValue ICmp::toSMT(State &s) const {
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
       case PROVENANCE:
         assert(cond == EQ || cond == NE);
-        return cond == EQ ? lhs == rhs : lhs != rhs;
+        return (cond == EQ ? lhs == rhs : lhs != rhs)
+            .toBVBool()
+            .concat(expr::mkUInt(1, 1));
       case OFFSETONLY:
         return fn(lhs.getOffset(), rhs.getOffset(), cond);
       }
@@ -2753,7 +2768,8 @@ StateValue ICmp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
     auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
-    return { v.toBVBool(), a.non_poison && b.non_poison };
+    return {v.extract(1, 1),
+            a.non_poison && b.non_poison && v.extract(0, 0).isOne()};
   };
 
   auto &elem_ty = a->getType();
@@ -2777,7 +2793,7 @@ expr ICmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ICmp::dup(Function &f, const string &suffix) const {
-  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b);
+  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b, flags);
 }
 
 
