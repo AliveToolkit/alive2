@@ -8,7 +8,6 @@
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include "smt/solver.h"
-#include "state_value.h"
 #include "util/compiler.h"
 #include "util/config.h"
 #include <algorithm>
@@ -2699,17 +2698,17 @@ void ICmp::print(ostream &os) const {
   }
 }
 
-static StateValue build_icmp_chain(const expr &var,
-                                   const function<StateValue(ICmp::Cond)> &fn,
-                                   ICmp::Cond cond = ICmp::Any,
-                                   StateValue last = StateValue()) {
+static expr build_icmp_chain(const expr &var,
+                             const function<expr(ICmp::Cond)> &fn,
+                             ICmp::Cond cond = ICmp::Any,
+                             expr last = expr()) {
   auto old_cond = cond;
   cond = ICmp::Cond(cond - 1);
 
   if (old_cond == ICmp::Any)
     return build_icmp_chain(var, fn, cond, fn(cond));
 
-  auto e = StateValue::mkIf(var == cond, fn(cond), last);
+  auto e = expr::mkIf(var == cond, fn(cond), last);
   return cond == 0 ? e : build_icmp_chain(var, fn, cond, std::move(e));
 }
 
@@ -2717,7 +2716,8 @@ StateValue ICmp::toSMT(State &s) const {
   auto &a_eval = s[*a];
   auto &b_eval = s[*b];
 
-  auto cmp = [](const expr &av, const expr &bv, Cond cond) {
+  function<expr(const expr&, const expr&, Cond)> fn =
+      [](auto &av, auto &bv, Cond cond) {
     switch (cond) {
     case EQ:  return av == bv;
     case NE:  return av != bv;
@@ -2735,15 +2735,8 @@ StateValue ICmp::toSMT(State &s) const {
     UNREACHABLE();
   };
 
-  function<StateValue(const expr &, const expr &, Cond)> fn =
-      [&](auto &av, auto &bv, Cond cond) -> StateValue {
-    return {cmp(av, bv, cond),
-            flags & SameSign ? av.sign() == bv.sign() : expr(true)};
-  };
-
   if (isPtrCmp()) {
-    fn = [this, &s, fn](const expr &av, const expr &bv,
-                        Cond cond) -> StateValue {
+    fn = [this, &s, fn](const expr &av, const expr &bv, Cond cond) {
       auto &m = s.getMemory();
       Pointer lhs(m, av);
       Pointer rhs(m, bv);
@@ -2755,7 +2748,7 @@ StateValue ICmp::toSMT(State &s) const {
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
       case PROVENANCE:
         assert(cond == EQ || cond == NE);
-        return {cond == EQ ? lhs == rhs : lhs != rhs, true};
+        return cond == EQ ? lhs == rhs : lhs != rhs;
       case OFFSETONLY:
         return fn(lhs.getOffset(), rhs.getOffset(), cond);
       }
@@ -2766,8 +2759,8 @@ StateValue ICmp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
     auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
-    return {v.value.toBVBool(),
-            a.non_poison && b.non_poison && std::move(v.non_poison)};
+    auto np = flags & SameSign ? a.value.sign() == b.value.sign() : true;
+    return { v.toBVBool(), a.non_poison && b.non_poison && np };
   };
 
   auto &elem_ty = a->getType();
