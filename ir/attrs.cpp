@@ -641,7 +641,7 @@ void TailCallInfo::check(State &s, const Instr &i,
   for (const auto &arg : args) {
     Pointer ptr(s.getMemory(), arg.val.value);
     s.addUB(arg.val.non_poison.implies(
-      (ptr.isStackAllocated() || ptr.isByval()).implies(arg.byval) &&
+      (ptr.isStackAllocated() || ptr.isByval()).implies(arg.byval != 0) &&
       true // TODO: check for !var_args
     ));
   }

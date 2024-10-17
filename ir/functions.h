@@ -11,7 +11,7 @@ namespace IR {
 struct PtrInput {
   unsigned idx = 0;
   StateValue val;
-  smt::expr byval = false;
+  smt::expr byval = smt::expr::mkUInt(0, 1);
   smt::expr noread = false;
   smt::expr nowrite = false;
   smt::expr nocapture = false;
