@@ -4,6 +4,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/attrs.h"
+#include "ir/functions.h"
 #include "ir/pointer.h"
 #include "ir/state_value.h"
 #include "ir/type.h"
@@ -272,25 +273,6 @@ public:
   void markByVal(unsigned bid, bool is_const);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs);
-
-  struct PtrInput {
-    unsigned idx;
-    StateValue val;
-    smt::expr byval;
-    smt::expr noread;
-    smt::expr nowrite;
-    smt::expr nocapture;
-
-    PtrInput(unsigned idx, StateValue &&val, smt::expr &&byval,
-             smt::expr &&noread, smt::expr &&nowrite, smt::expr &&nocapture) :
-      idx(idx), val(std::move(val)), byval(std::move(byval)),
-      noread(std::move(noread)), nowrite(std::move(nowrite)),
-      nocapture(std::move(nocapture)) {}
-
-    smt::expr implies(const PtrInput &rhs) const;
-    smt::expr implies_attrs(const PtrInput &rhs) const;
-    auto operator<=>(const PtrInput &rhs) const = default;
-  };
 
   struct FnRetData {
     smt::expr size;

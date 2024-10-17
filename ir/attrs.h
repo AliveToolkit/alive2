@@ -3,6 +3,7 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
+#include "ir/functions.h"
 #include "smt/exprs.h"
 #include <optional>
 #include <ostream>
@@ -221,9 +222,9 @@ smt::expr isfpclass(const smt::expr &v, const Type &ty, uint16_t mask);
 struct TailCallInfo final {
   enum TailCallType { None, Tail, MustTail } type = None;
   // Determine if callee and caller have the same calling convention.
-  bool has_same_calling_convention = false;
+  bool has_same_calling_convention = true;
 
-  void checkTailCall(const Instr &i, State &s) const;
+  void check(State &s, const Instr &i, const std::vector<PtrInput> &args) const;
   friend std::ostream& operator<<(std::ostream &os, const TailCallInfo &tci);
 };
 

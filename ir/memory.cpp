@@ -1657,17 +1657,6 @@ pair<expr, expr> Memory::mkUndefInput(const ParamAttrs &attrs0) {
   return { std::move(ptr).release(), std::move(undef) };
 }
 
-expr Memory::PtrInput::implies(const PtrInput &rhs) const {
-  return implies_attrs(rhs) && val == rhs.val && idx == rhs.idx;
-}
-
-expr Memory::PtrInput::implies_attrs(const PtrInput &rhs) const {
-  return byval == rhs.byval &&
-         rhs.noread   .implies(noread) &&
-         rhs.nowrite  .implies(nowrite) &&
-         rhs.nocapture.implies(nocapture);
-}
-
 Memory::FnRetData Memory::FnRetData::mkIf(const expr &cond, const FnRetData &a,
                                           const FnRetData &b) {
   return { expr::mkIf(cond, a.size, b.size),

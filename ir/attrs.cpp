@@ -631,74 +631,81 @@ ostream& operator<<(std::ostream &os, const TailCallInfo &tci) {
   return os << str;
 }
 
-void TailCallInfo::checkTailCall(const Instr &i, State &s) const {
+void TailCallInfo::check(State &s, const Instr &i,
+                         const vector<PtrInput> &args) const {
   if (type == TailCallInfo::None)
     return;
 
-  bool preconditions_OK = true;
+  // Cannot access allocas, va_args, or byval arguments from the caller.
+  // Exception: alloca or byval arg may be passed to the callee as byval
+  for (const auto &arg : args) {
+    Pointer ptr(s.getMemory(), arg.val.value);
+    s.addUB(arg.val.non_poison.implies(
+      (ptr.isStackAllocated() || ptr.isByval()).implies(arg.byval) &&
+      true // TODO: check for !var_args
+    ));
+  }
 
-  auto *callee = dynamic_cast<const FnCall *>(&i);
-  if (callee) {
-    for (const auto &[arg, attrs] : callee->getArgs()) {
-      bool callee_has_byval = attrs.has(ParamAttrs::ByVal);
-      if (dynamic_cast<const Alloc *>(arg) && !callee_has_byval) {
-        preconditions_OK = false;
-        break;
-      }
-      if (auto *input = dynamic_cast<const Input *>(arg)) {
-        bool caller_has_byval = input->hasAttribute(ParamAttrs::ByVal);
-        if (callee_has_byval != caller_has_byval) {
-          preconditions_OK = false;
-          break;
+  if (type != TailCallInfo::MustTail)
+    return;
+
+  // additional rules for musttail
+
+  auto *call = dynamic_cast<const FnCall*>(&i);
+
+  // - The call must immediately precede a ret instruction, or a bitcast
+  // - The ret instruction must return the (possibly bitcasted) value produced
+  // by the call, undef/poison, or void.
+
+  bool found_instr = false, found_ret = false;
+  const Value *val = &i;
+  for (auto &instr : s.getFn().bbOf(i).instrs()) {
+    if (&instr == val) {
+      assert(!found_instr);
+      found_instr = true;
+      continue;
+    }
+
+    if (found_instr) {
+      if (auto *cast = isCast(ConversionOp::BitCast, instr)) {
+        if (&cast->getValue() != val) {
+          s.addUB(expr(false));
+          return;
         }
+        val = cast;
+        continue;
       }
-    }
-  } else {
-    // Handling memcpy / memcmp et alia.
-    for (const auto &op : i.operands()) {
-      if (dynamic_cast<const Alloc *>(op)) {
-        preconditions_OK = false;
-        break;
+      if (auto *ret = dynamic_cast<const Return*>(&instr)) {
+        found_ret = true;
+        if (ret->getType().isVoid() && i.getType().isVoid())
+          break;
+        auto *ret_val = ret->operands()[0];
+        if (dynamic_cast<UndefValue*>(ret_val) ||
+            dynamic_cast<PoisonValue*>(ret_val) ||
+            ret_val == val)
+          break;
       }
+      s.addUB(expr(false));
     }
   }
-
-  if (callee && type == TailCallInfo::MustTail) {
-    bool callee_is_vararg = callee->getVarArgIdx() != -1u;
-    bool caller_is_vararg = s.getFn().isVarArgs();
-    if (!has_same_calling_convention || (callee_is_vararg && !caller_is_vararg))
-      preconditions_OK = false;
-  }
-
-  if (preconditions_OK && type == TailCallInfo::MustTail) {
-    bool found = false;
-    const auto &instrs = s.getFn().bbOf(i).instrs();
-    auto it = instrs.begin();
-    for (auto e = instrs.end(); it != e; ++it) {
-      if (&*it == &i) {
-        found = true;
-        break;
-      }
-    }
-    assert(found);
-
-    ++it;
-    auto &next_instr = *it;
-    if (auto *ret = dynamic_cast<const Return *>(&next_instr)) {
-      if (ret->getType().isVoid() && i.getType().isVoid())
-        return;
-      auto *ret_val = ret->operands()[0];
-      if (ret_val == &i)
-        return;
-    }
-
-    preconditions_OK = false;
-  }
-
-  if (!preconditions_OK) {
-    // Preconditions unsatifisfied or refinement for musttail failed, hence UB.
+  ENSURE(found_instr);
+  if (!found_ret)
     s.addUB(expr(false));
+
+  // The calling conventions of the caller and callee must match.
+  if (!has_same_calling_convention)
+    s.addUB(expr(false));
+
+  // The callee must be varargs iff the caller is varargs.
+  if (call) {
+    bool callee_is_vararg = call->getVarArgIdx() != -1u;
+    bool caller_is_vararg = s.getFn().isVarArgs();
+    if (callee_is_vararg && !caller_is_vararg)
+      s.addUB(expr(false));
   }
+
+  // TODO:
+  // - The return type must not undergo automatic conversion to an sret pointer.
 }
 
 }

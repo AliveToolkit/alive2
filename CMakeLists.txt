@@ -94,6 +94,7 @@ set(IR_SRCS
   ir/constant.cpp
   ir/fast_math.cpp
   ir/function.cpp
+  ir/functions.cpp
   ir/globals.cpp
   ir/instr.cpp
   ir/memory.cpp

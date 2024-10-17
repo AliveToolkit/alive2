@@ -2359,8 +2359,7 @@ static void check_can_store(State &s, const expr &p0) {
 static void unpack_inputs(State &s, Value &argv, Type &ty,
                           const ParamAttrs &argflag, StateValue value,
                           StateValue value2, vector<StateValue> &inputs,
-                          vector<Memory::PtrInput> &ptr_inputs,
-                          unsigned idx) {
+                          vector<PtrInput> &ptr_inputs, unsigned idx) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
       if (agg->isPadding(i))
@@ -2421,7 +2420,7 @@ StateValue FnCall::toSMT(State &s) const {
   auto &m = s.getMemory();
 
   vector<StateValue> inputs;
-  vector<Memory::PtrInput> ptr_inputs;
+  vector<PtrInput> ptr_inputs;
 
   unsigned indirect_hash = 0;
   auto ptr = fnptr;
@@ -2493,7 +2492,7 @@ StateValue FnCall::toSMT(State &s) const {
       !attrs.has(FnAttrs::WillReturn))
     s.addGuardableUB(expr(false));
 
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, ptr_inputs);
 
   auto get_alloc_ptr = [&]() -> Value& {
     for (auto &[arg, flags] : args) {
@@ -4154,7 +4153,7 @@ StateValue Memset::toSMT(State &s) const {
     vptr = sv_ptr.value;
   }
   check_can_store(s, vptr);
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, { vptr });
 
   s.getMemory().memset(vptr, s[*val].zextOrTrunc(8), vbytes, align,
                        s.getUndefVars());
@@ -4216,7 +4215,7 @@ StateValue MemsetPattern::toSMT(State &s) const {
   auto &vbytes = s.getAndAddPoisonUB(*bytes, true).value;
   check_can_store(s, vptr);
   check_can_load(s, vpattern);
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, { vptr });
 
   s.getMemory().memset_pattern(vptr, vpattern, vbytes, pattern_length);
   return {};
@@ -4344,7 +4343,7 @@ StateValue Memcpy::toSMT(State &s) const {
 
   check_can_load(s, vsrc);
   check_can_store(s, vdst);
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, { vsrc, vdst });
 
   s.getMemory().memcpy(vdst, vsrc, vbytes, align_dst, align_src, move);
   return {};
@@ -4396,14 +4395,16 @@ void Memcmp::print(ostream &os) const {
 }
 
 StateValue Memcmp::toSMT(State &s) const {
-  auto &[vptr1, np1] = s[*ptr1];
-  auto &[vptr2, np2] = s[*ptr2];
+  auto &stptr1 = s[*ptr1];
+  auto &stptr2 = s[*ptr2];
+  auto &[vptr1, np1] = stptr1;
+  auto &[vptr2, np2] = stptr2;
   auto &vnum = s.getAndAddPoisonUB(*num).value;
   s.addGuardableUB((vnum != 0).implies(np1 && np2));
 
   check_can_load(s, vptr1);
   check_can_load(s, vptr2);
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, { stptr1, stptr2 });
 
   Pointer p1(s.getMemory(), vptr1), p2(s.getMemory(), vptr2);
   // memcmp can be optimized to load & icmps, and it requires this
@@ -4501,7 +4502,7 @@ void Strlen::print(ostream &os) const {
 StateValue Strlen::toSMT(State &s) const {
   auto &eptr = s.getWellDefinedPtr(*ptr);
   check_can_load(s, eptr);
-  tci.checkTailCall(*this, s);
+  tci.check(s, *this, { eptr });
 
   Pointer p(s.getMemory(), eptr);
   Type &ty = getType();

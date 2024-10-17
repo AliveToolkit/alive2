@@ -195,7 +195,7 @@ private:
 
   struct FnCallInput {
     std::vector<StateValue> args_nonptr;
-    std::vector<Memory::PtrInput> args_ptr;
+    std::vector<PtrInput> args_ptr;
     ValueAnalysis::FnCallRanges fncall_ranges;
     Memory m;
     SMTMemoryAccess memaccess;
@@ -205,7 +205,7 @@ private:
     smt::expr refinedBy(State &s, const std::string &callee,
                         unsigned inaccessible_bid,
                         const std::vector<StateValue> &args_nonptr,
-                        const std::vector<Memory::PtrInput> &args_ptr,
+                        const std::vector<PtrInput> &args_ptr,
                         const ValueAnalysis::FnCallRanges &fncall_ranges,
                         const Memory &m, const SMTMemoryAccess &memaccess,
                         bool noret, bool willret) const;
@@ -296,7 +296,7 @@ public:
 
   StateValue
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
-              std::vector<Memory::PtrInput> &&ptr_inputs,
+              std::vector<PtrInput> &&ptr_inputs,
               const Type &out_type,
               StateValue &&ret_arg, const Type *ret_arg_ty,
               std::vector<StateValue> &&ret_args, const FnAttrs &attrs,
