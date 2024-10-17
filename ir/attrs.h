@@ -11,6 +11,7 @@
 
 namespace IR {
 
+class Instr;
 class ParamAttrs;
 class State;
 struct StateValue;
@@ -122,7 +123,6 @@ class FnAttrs final {
   std::optional<FPDenormalAttrs> fp_denormal32;
   unsigned bits;
   uint8_t allockind = 0;
-  bool is_tailcall = false;
 
 public:
   enum Attribute { None = 0, NNaN = 1 << 0, NoReturn = 1 << 1,
@@ -155,8 +155,6 @@ public:
   void add(AllocKind k) { allockind |= (uint8_t)k; }
   bool has(AllocKind k) const { return allockind & (uint8_t)k; }
   bool isAlloc() const { return allockind != 0 || has(AllocSize); }
-  void setTailCallSite(bool is_tc) { is_tailcall = is_tc; }
-  bool isTailCall() const { return is_tailcall; }
 
   void inferImpliedAttributes();
 
@@ -218,5 +216,15 @@ struct FpExceptionMode final {
 };
 
 smt::expr isfpclass(const smt::expr &v, const Type &ty, uint16_t mask);
+
+
+struct TailCallInfo final {
+  enum TailCallType { None, Tail, MustTail } type = None;
+  // Determine if callee and caller have the same calling convention.
+  bool has_same_calling_convention = false;
+
+  void checkTailCall(const Instr &i, State &s) const;
+  friend std::ostream& operator<<(std::ostream &os, const TailCallInfo &tci);
+};
 
 }

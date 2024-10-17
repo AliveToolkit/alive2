@@ -9,6 +9,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IRReader/IRReader.h"
@@ -546,4 +547,13 @@ llvm::Function *findFunction(llvm::Module &M, const string &FName) {
   return F && !F->isDeclaration() ? F : nullptr;
 }
 
+TailCallInfo parse_fn_tailcall(const llvm::CallInst &i) {
+  bool is_tailcall = i.isTailCall() || i.isMustTailCall();
+  if (!is_tailcall)
+    return {};
+  auto tail_type =
+      i.isMustTailCall() ? TailCallInfo::MustTail : TailCallInfo::Tail;
+  bool has_same_cc = i.getCallingConv() == i.getCaller()->getCallingConv();
+  return {tail_type, has_same_cc};
+}
 }
