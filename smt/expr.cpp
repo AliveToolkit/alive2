@@ -497,6 +497,10 @@ bool expr::isSignExt(expr &val) const {
   return isUnOp(val, Z3_OP_SIGN_EXT);
 }
 
+bool expr::isAShr(expr &a, expr &b) const {
+  return isBinOp(a, b, Z3_OP_BASHR);
+}
+
 bool expr::isAnd(expr &a, expr &b) const {
   return isBinOp(a, b, Z3_OP_AND);
 }
@@ -1849,6 +1853,15 @@ expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
       if (high < val_bits)
         return val.extract(high, 0);
       return val.sext(high - val_bits + 1);
+    }
+  }
+  {
+    expr a, b;
+    if (isAShr(a, b)) {
+      uint64_t shift;
+      if (b.isUInt(shift) && high + shift < a.bits()) {
+        return a.extract(high + shift, low + shift);
+      }
     }
   }
   {
