@@ -135,6 +135,7 @@ public:
   bool isConcat(expr &a, expr &b) const;
   bool isExtract(expr &e, unsigned &high, unsigned &low) const;
   bool isSignExt(expr &val) const;
+  bool isAShr(expr &a, expr &b) const;
   bool isAnd(expr &a, expr &b) const;
   bool isNot(expr &neg) const;
   bool isAdd(expr &a, expr &b) const;
