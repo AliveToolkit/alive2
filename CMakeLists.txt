@@ -287,3 +287,10 @@ add_custom_target("check"
 if (BUILD_TV)
   add_dependencies("check" "alive-tv" "quick-fuzz" "tv")
 endif()
+
+# EXTERNAL_PROJECTS option that works analogous to LLVM's LLVM_EXTERNAL_PROJECTS option
+foreach(EXTERNAL_PROJECT IN LISTS EXTERNAL_PROJECTS)
+  canonicalize_tool_name(${EXTERNAL_PROJECT} PROJECT_CANON)
+  message(STATUS "Adding external project ${EXTERNAL_PROJECT} at ${EXTERNAL_${PROJECT_CANON}_SOURCE_DIR}")
+  add_subdirectory(${EXTERNAL_${PROJECT_CANON}_SOURCE_DIR} ${EXTERNAL_PROJECT})
+endforeach()
