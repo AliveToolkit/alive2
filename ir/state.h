@@ -363,6 +363,7 @@ public:
   bool hasGlobalVarBid(const std::string &glbvar, unsigned &bid,
                        bool &allocated) const;
   void markGlobalAsAllocated(const std::string &glbvar);
+  bool isGVUsed(unsigned bid) const;
   void syncSEdataWithSrc(State &src);
 
   void mkAxioms(State &tgt);

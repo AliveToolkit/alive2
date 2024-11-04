@@ -1392,13 +1392,22 @@ void State::markGlobalAsAllocated(const string &glbvar) {
   itr->second.second = true;
 }
 
+bool State::isGVUsed(unsigned bid) const {
+  for (auto &[gv_name, data] : glbvar_bids) {
+    if (bid == data.first)
+      return getFn().getUsers().count(getFn().getGlobalVar(gv_name));
+  }
+  assert(false);
+  return false;
+}
+
 void State::syncSEdataWithSrc(State &src) {
   assert(glbvar_bids.empty());
   assert(src.isSource() && !isSource());
   glbvar_bids = src.glbvar_bids;
-  for (auto &itm : glbvar_bids)
-    itm.second.second = false;
-
+  for (auto &[gv_name, data] : glbvar_bids) {
+    data.second = false;
+  }
   fn_call_data = std::move(src.fn_call_data);
   inaccessiblemem_bids = std::move(src.inaccessiblemem_bids);
   memory.syncWithSrc(src.returnMemory());
