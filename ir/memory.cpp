@@ -1492,11 +1492,6 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == UINT64_MAX);
   }
 
-  for (unsigned bid = has_null_block; bid < num_nonlocals; ++bid) {
-    Pointer p(bid < num_nonlocals_src ? *this : tgt, bid, false);
-    state->addAxiom(p.blockSize() != 0);
-  }
-
   for (unsigned bid = 0; bid < num_nonlocals_src; ++bid) {
     if (skip_bid(bid))
       continue;
