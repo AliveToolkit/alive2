@@ -497,10 +497,6 @@ bool expr::isSignExt(expr &val) const {
   return isUnOp(val, Z3_OP_SIGN_EXT);
 }
 
-bool expr::isZeroExt(expr &val) const {
-  return isUnOp(val, Z3_OP_ZERO_EXT);
-}
-
 bool expr::isAShr(expr &a, expr &b) const {
   return isBinOp(a, b, Z3_OP_BASHR);
 }
@@ -1356,11 +1352,6 @@ expr expr::operator&(const expr &rhs) const {
         lhsVal.bits() == rhsVal.bits()) {
       return (lhsVal & rhsVal).sext(bits() - lhsVal.bits());
     }
-
-    if (isZeroExt(lhsVal) && rhs.isZeroExt(rhsVal) &&
-        lhsVal.bits() == rhsVal.bits()) {
-      return (lhsVal & rhsVal).zext(bits() - lhsVal.bits());
-    }
   }
 
   auto fold_extract = [](auto &a, auto &b) {
@@ -1414,11 +1405,6 @@ expr expr::operator|(const expr &rhs) const {
         lhsVal.bits() == rhsVal.bits()) {
       return (lhsVal | rhsVal).sext(bits() - lhsVal.bits());
     }
-
-    if (isZeroExt(lhsVal) && rhs.isZeroExt(rhsVal) &&
-        lhsVal.bits() == rhsVal.bits()) {
-      return (lhsVal | rhsVal).zext(bits() - lhsVal.bits());
-    }
   }
 
   if (bits() == 1) {
@@ -1445,11 +1431,6 @@ expr expr::operator^(const expr &rhs) const {
     if (isSignExt(lhsVal) && rhs.isSignExt(rhsVal) &&
         lhsVal.bits() == rhsVal.bits()) {
       return (lhsVal ^ rhsVal).sext(bits() - lhsVal.bits());
-    }
-
-    if (isZeroExt(lhsVal) && rhs.isZeroExt(rhsVal) &&
-        lhsVal.bits() == rhsVal.bits()) {
-      return (lhsVal ^ rhsVal).zext(bits() - lhsVal.bits());
     }
   }
 
