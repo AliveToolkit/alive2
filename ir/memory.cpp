@@ -2010,7 +2010,7 @@ void Memory::mkLocalDisjAddrAxioms(const expr &allocated, const expr &short_bid,
 pair<expr, expr>
 Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
               const expr &precond, const expr &nonnull,
-              optional<unsigned> bidopt, unsigned *bid_out) {
+              optional<unsigned> bidopt, unsigned *bid_out, bool is_function) {
   assert(!memory_unused());
 
   // Produce a local block if blockKind is heap or stack.
@@ -2068,6 +2068,8 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     // support for 0-sized arrays like [0 x i8], which are arbitrarily sized
     if (size)
       state->addAxiom(p.blockSize() == size_zext);
+    if (is_function)
+      state->addAxiom(p.blockSize() != 0);
     state->addAxiom(p.isBlockAligned(align, true));
     state->addAxiom(p.getAllocType() == alloc_ty);
 

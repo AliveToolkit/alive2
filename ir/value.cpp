@@ -89,11 +89,15 @@ void GlobalVariable::print(ostream &os) const {
     os << '?';
   else
     os << allocsize;
-  os << " bytes, align " << align;
+  os << " bytes";
+  if (is_function)
+    os << ", exec";
+  os << ", align " << align;
 }
 
 static expr get_global(State &s, const string &name, const expr *size,
-                       unsigned align, bool isconst, unsigned &bid) {
+                       unsigned align, bool isconst, bool is_function,
+                       unsigned &bid) {
   expr ptr;
   bool allocated;
   auto blkkind = isconst ? Memory::CONSTGLOBAL : Memory::GLOBAL;
@@ -102,14 +106,15 @@ static expr get_global(State &s, const string &name, const expr *size,
     if (!allocated) {
       // Use the same block id that is used by src
       assert(!s.isSource());
-      ptr = s.getMemory().alloc(size, align, blkkind, true, true, bid).first;
+      ptr = s.getMemory().alloc(size, align, blkkind, true, true, bid, nullptr,
+                                is_function).first;
       s.markGlobalAsAllocated(name);
     } else {
       ptr = Pointer(s.getMemory(), bid, false).release();
     }
   } else {
     ptr = s.getMemory().alloc(size, align, blkkind, true, true, nullopt,
-                              &bid).first;
+                              &bid, is_function).first;
     s.addGlobalVarBid(name, bid);
   }
   return ptr;
@@ -119,7 +124,7 @@ StateValue GlobalVariable::toSMT(State &s) const {
   unsigned bid;
   expr size = expr::mkUInt(allocsize, bits_size_t);
   return { get_global(s, getName(), arbitrary_size ? nullptr : &size, align,
-                      isconst, bid),
+                      isconst, is_function, bid),
            true };
 }
 
@@ -223,7 +228,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
     unsigned bid;
     expr size = expr::mkUInt(attrs.blockSize, bits_size_t);
     val = Pointer(s.getMemory(),
-                  get_global(s, smt_name, &size, attrs.align, false, bid))
+                  get_global(s, smt_name, &size, attrs.align, false, false,bid))
           .setAttrs(attrs)
           .setIsBasedOnArg()
           .release();

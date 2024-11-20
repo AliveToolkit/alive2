@@ -303,7 +303,8 @@ public:
   std::pair<smt::expr, smt::expr> alloc(const smt::expr *size, uint64_t align,
       BlockKind blockKind, const smt::expr &precond = true,
       const smt::expr &nonnull = false,
-      std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr);
+      std::optional<unsigned> bid = std::nullopt, unsigned *bid_out = nullptr,
+      bool is_function = false);
 
   // Start lifetime of a local block.
   void startLifetime(const smt::expr &ptr_local);
