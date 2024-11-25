@@ -73,17 +73,17 @@ TV_REPORT_DIR=""
 TV_SMT_TO=""
 TV_SMT_STATS=""
 if [[ @FOR_ALIVE2_TEST@ == 0 ]]; then
-  TV_REPORT_DIR=-tv-report-dir=@CMAKE_BINARY_DIR@/logs
+  TV_REPORT_DIR=-tv-report-dir=@PROJECT_BINARY_DIR@/logs
   TV_SMT_TO=-tv-smt-to=20000
   TV_SMT_STATS=-tv-smt-stats
 fi
 
 NPM_PLUGIN=""
 if [[ $SKIP_TV == 0 && $NPM_TV == 1 ]]; then
-  NPM_PLUGIN="-load-pass-plugin=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB"
+  NPM_PLUGIN="-load-pass-plugin=@PROJECT_BINARY_DIR@/tv/$TV_SHAREDLIB"
 fi
 
-COMMAND="$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@CMAKE_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $OPT_ARGS $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS"
+COMMAND="$TIMEOUT @LLVM_BINARY_DIR@/bin/opt -load=@PROJECT_BINARY_DIR@/tv/$TV_SHAREDLIB  $NPM_PLUGIN -tv-exit-on-error $TV $OPT_ARGS $TV $TV_SMT_TO $TV_REPORT_DIR $TV_SMT_STATS"
 
 if [[ $VERBOSE == 1 ]]; then
   echo COMMAND: $COMMAND >&2

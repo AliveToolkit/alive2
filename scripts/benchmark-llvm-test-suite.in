@@ -16,8 +16,8 @@ WORK=$1
 
 CORES=`nproc`
 
-ALIVECC=@CMAKE_BINARY_DIR@/alivecc
-JOBSERVER=@CMAKE_BINARY_DIR@/alive-jobserver
+ALIVECC=@PROJECT_BINARY_DIR@/alivecc
+JOBSERVER=@PROJECT_BINARY_DIR@/alive-jobserver
 ALIVEPP=@LLVM_BINARY_DIR@/bin/clang++ # don't use alive for C++ until we support exceptions!
 
 export ALIVECC_OVERWRITE_REPORTS=1

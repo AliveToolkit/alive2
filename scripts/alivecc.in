@@ -127,8 +127,8 @@ if (compiling()) {
         $TV_SHAREDLIB = "tv.so";
     }
 
-    push @ARGV, "-fpass-plugin=@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}";
-    push @ARGV, ("-Xclang", "-load", "-Xclang", "@CMAKE_BINARY_DIR@/tv/${TV_SHAREDLIB}");
+    push @ARGV, "-fpass-plugin=@PROJECT_BINARY_DIR@/tv/${TV_SHAREDLIB}";
+    push @ARGV, ("-Xclang", "-load", "-Xclang", "@PROJECT_BINARY_DIR@/tv/${TV_SHAREDLIB}");
 }
 
 if ($print_cmd) {
