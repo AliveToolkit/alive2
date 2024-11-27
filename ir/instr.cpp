@@ -1340,8 +1340,6 @@ StateValue TernaryOp::toSMT(State &s) const {
     e = expr::umul_fix_sat(a.value, b.value, c.value);
     np = true;
     break;
-  default:
-    UNREACHABLE();
   }
   return { std::move(e), np && a.non_poison && b.non_poison && c.non_poison };
   };
@@ -1384,8 +1382,6 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
       c->getType().enforceIntType(32) &&
       getType().enforceIntOrVectorType();
     break;
-  default:
-    UNREACHABLE();
   }
   return Value::getTypeConstraints() && instrconstr;
 }
@@ -2142,7 +2138,7 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset);
+DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset)
 
 FnCall::FnCall(Type &type, string &&name, string &&fnName, FnAttrs &&attrs,
                Value *fnptr, unsigned var_arg_idx)
@@ -3586,9 +3582,9 @@ MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
 }
 
 
-DEFINE_AS_RETZERO(Alloc, getMaxAccessSize);
-DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset);
-DEFINE_AS_EMPTYACCESS(Alloc);
+DEFINE_AS_RETZERO(Alloc, getMaxAccessSize)
+DEFINE_AS_RETZERO(Alloc, getMaxGEPOffset)
+DEFINE_AS_EMPTYACCESS(Alloc)
 
 pair<uint64_t, uint64_t> Alloc::getMaxAllocSize() const {
   if (auto bytes = getInt(*size)) {
@@ -3664,10 +3660,10 @@ unique_ptr<Instr> Alloc::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(StartLifetime, getMaxAllocSize);
-DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize);
-DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset);
-DEFINE_AS_EMPTYACCESS(StartLifetime);
+DEFINE_AS_RETZEROALIGN(StartLifetime, getMaxAllocSize)
+DEFINE_AS_RETZERO(StartLifetime, getMaxAccessSize)
+DEFINE_AS_RETZERO(StartLifetime, getMaxGEPOffset)
+DEFINE_AS_EMPTYACCESS(StartLifetime)
 
 vector<Value*> StartLifetime::operands() const {
   return { ptr };
@@ -3700,10 +3696,10 @@ unique_ptr<Instr> StartLifetime::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(EndLifetime, getMaxAllocSize);
-DEFINE_AS_RETZERO(EndLifetime, getMaxAccessSize);
-DEFINE_AS_RETZERO(EndLifetime, getMaxGEPOffset);
-DEFINE_AS_EMPTYACCESS(EndLifetime);
+DEFINE_AS_RETZEROALIGN(EndLifetime, getMaxAllocSize)
+DEFINE_AS_RETZERO(EndLifetime, getMaxAccessSize)
+DEFINE_AS_RETZERO(EndLifetime, getMaxGEPOffset)
+DEFINE_AS_EMPTYACCESS(EndLifetime)
 
 vector<Value*> EndLifetime::operands() const {
   return { ptr };
@@ -3740,9 +3736,9 @@ void GEP::addIdx(uint64_t obj_size, Value &idx) {
   idxs.emplace_back(obj_size, &idx);
 }
 
-DEFINE_AS_RETZEROALIGN(GEP, getMaxAllocSize);
-DEFINE_AS_RETZERO(GEP, getMaxAccessSize);
-DEFINE_AS_EMPTYACCESS(GEP);
+DEFINE_AS_RETZEROALIGN(GEP, getMaxAllocSize)
+DEFINE_AS_RETZERO(GEP, getMaxAccessSize)
+DEFINE_AS_EMPTYACCESS(GEP)
 
 static unsigned off_used_bits(const Value &v) {
   if (auto c = isCast(ConversionOp::SExt, v))
@@ -3928,9 +3924,9 @@ unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(PtrMask, getMaxAllocSize);
-DEFINE_AS_RETZERO(PtrMask, getMaxAccessSize);
-DEFINE_AS_EMPTYACCESS(PtrMask);
+DEFINE_AS_RETZEROALIGN(PtrMask, getMaxAllocSize)
+DEFINE_AS_RETZERO(PtrMask, getMaxAccessSize)
+DEFINE_AS_EMPTYACCESS(PtrMask)
 
 uint64_t PtrMask::getMaxGEPOffset() const {
   if (auto n = getInt(*mask))
@@ -4004,8 +4000,8 @@ unique_ptr<Instr> PtrMask::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize);
-DEFINE_AS_RETZERO(Load, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize)
+DEFINE_AS_RETZERO(Load, getMaxGEPOffset)
 
 uint64_t Load::getMaxAccessSize() const {
   return round_up(Memory::getStoreByteSize(getType()), align);
@@ -4050,8 +4046,8 @@ unique_ptr<Instr> Load::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize);
-DEFINE_AS_RETZERO(Store, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize)
+DEFINE_AS_RETZERO(Store, getMaxGEPOffset)
 
 uint64_t Store::getMaxAccessSize() const {
   return round_up(Memory::getStoreByteSize(val->getType()), align);
@@ -4103,8 +4099,8 @@ unique_ptr<Instr> Store::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Memset, getMaxAllocSize);
-DEFINE_AS_RETZERO(Memset, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Memset, getMaxAllocSize)
+DEFINE_AS_RETZERO(Memset, getMaxGEPOffset)
 
 uint64_t Memset::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -4171,8 +4167,8 @@ unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(MemsetPattern, getMaxAllocSize);
-DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(MemsetPattern, getMaxAllocSize)
+DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset)
 
 MemsetPattern::MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
                              unsigned pattern_length, TailCallInfo tci)
@@ -4232,8 +4228,8 @@ unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(FillPoison, getMaxAllocSize);
-DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(FillPoison, getMaxAllocSize)
+DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset)
 
 uint64_t FillPoison::getMaxAccessSize() const {
   return getGlobalVarSize(ptr);
@@ -4275,8 +4271,8 @@ unique_ptr<Instr> FillPoison::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize);
-DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize)
+DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset)
 
 uint64_t Memcpy::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -4362,8 +4358,8 @@ unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
 
 
 
-DEFINE_AS_RETZEROALIGN(Memcmp, getMaxAllocSize);
-DEFINE_AS_RETZERO(Memcmp, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Memcmp, getMaxAllocSize)
+DEFINE_AS_RETZERO(Memcmp, getMaxGEPOffset)
 
 uint64_t Memcmp::getMaxAccessSize() const {
   return getIntOr(*num, UINT64_MAX);
@@ -4472,8 +4468,8 @@ unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(Strlen, getMaxAllocSize);
-DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset);
+DEFINE_AS_RETZEROALIGN(Strlen, getMaxAllocSize)
+DEFINE_AS_RETZERO(Strlen, getMaxGEPOffset)
 
 uint64_t Strlen::getMaxAccessSize() const {
   return getGlobalVarSize(ptr);
