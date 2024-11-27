@@ -55,7 +55,6 @@ FpExceptionMode parse_exceptions(llvm::Instruction &i) {
   case llvm::fp::ebIgnore:  return FpExceptionMode::Ignore;
   case llvm::fp::ebMayTrap: return FpExceptionMode::MayTrap;
   case llvm::fp::ebStrict:  return FpExceptionMode::Strict;
-  default: UNREACHABLE();
   }
 }
 

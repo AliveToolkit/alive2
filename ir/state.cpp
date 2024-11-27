@@ -255,7 +255,7 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
-    return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+    return_val(DisjointExpr<StateValue>(f.getType().getDummyValue(false))) {}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -697,7 +697,7 @@ bool State::isAsmMode() const {
 expr State::getPath(BasicBlock &bb) const {
   if (&f.getFirstBB() == &bb)
     return true;
-  
+
   auto I = predecessor_data.find(&bb);
   if (I == predecessor_data.end())
     return false; // Block is unreachable
@@ -1327,7 +1327,7 @@ void State::finishInitializer() {
     assert(predecessor_data.size() == 1);
     mem = &predecessor_data.begin()->second.begin()->second.mem.begin()->first;
   }
-  return_memory = DisjointExpr(mem->dup());
+  return_memory = DisjointExpr<Memory>(mem->dup());
 
   if (auto *ret = getFn().getReturnedInput()) {
     returned_input = (*this)[*ret];

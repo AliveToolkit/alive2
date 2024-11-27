@@ -2392,7 +2392,7 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
 
   unsigned has_bv_val = 0;
   auto offset = expr::mkUInt(0, Pointer::bitsShortOffset());
-  DisjointExpr val(Byte::mkPoisonByte(*this)());
+  DisjointExpr<expr> val(Byte::mkPoisonByte(*this)());
 
   auto fn = [&](MemBlock &blk, const Pointer &ptr, expr &&cond) {
     // we assume src != dst

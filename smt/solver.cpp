@@ -527,9 +527,8 @@ Result Solver::check(const char *query_name) const {
     ++num_errors;
     return { Result::ERROR, string(reason) };
   }
-  default:
-    UNREACHABLE();
   }
+  UNREACHABLE();
 }
 
 Result check_expr(const expr &e, const char *query_name) {
