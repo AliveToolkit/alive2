@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <numeric>
@@ -447,6 +448,9 @@ expr FloatType::getFloat(const expr &v) const {
 expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
                           unsigned nary, const expr &a, const expr &b,
                           const expr &c) const {
+  if (config::use_exact_fp)
+    return fp.float2BV();
+
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 

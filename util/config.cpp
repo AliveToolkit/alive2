@@ -15,6 +15,7 @@ bool skip_smt = false;
 string smt_benchmark_dir;
 bool disable_poison_input = false;
 bool disable_undef_input = false;
+bool use_exact_fp = false;
 bool tgt_is_asm = false;
 bool fail_if_src_is_ub = false;
 bool disallow_ub_exploitation = false;
