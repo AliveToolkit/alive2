@@ -2,12 +2,12 @@ Solver efficiency testing
 =========================
 
 The `test.pl` script is intended to evaluate how well some particular
-version of alive-tv works together with some particular version of
+version of Alive-tv works together with some particular version of
 Z3. The strategy is to have a collection of test cases that are
 parameterized by a value and then to see how high this value can be
 pushed without triggering a solver timeout.
 
-The m4 macro processor is used to replace every occurrence of `X` in a
+The M4 macro processor is used to replace every occurrence of `X` in a
 test case with the value of the parameter. Since m4 considers `iX` to
 be a single token, we use a special case to replace, for example, `iX`
 with `i32` when the value of X is 32.
