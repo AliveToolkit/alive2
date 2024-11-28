@@ -287,31 +287,6 @@ Value* get_operand(llvm::Value *v,
   if (!ty)
     return nullptr;
 
-  // automatic splat of constant values
-  if (auto vty = dyn_cast<llvm::FixedVectorType>(v->getType());
-      vty && isa<llvm::ConstantInt, llvm::ConstantFP>(v)) {
-    llvm::Value *llvm_splat = nullptr;
-    if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
-      llvm_splat
-        = llvm::ConstantInt::get(vty->getElementType(), cnst->getValue());
-    } else if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
-      llvm_splat
-        = llvm::ConstantFP::get(vty->getElementType(), cnst->getValue());
-    } else
-      UNREACHABLE();
-
-    auto splat = get_operand(llvm_splat, constexpr_conv, copy_inserter,
-                             register_fn_decl);
-    if (!splat)
-      return nullptr;
-
-    vector<Value*> vals(vty->getNumElements(), splat);
-    auto val = make_unique<AggregateValue>(*ty, std::move(vals));
-    auto ret = val.get();
-    current_fn->addConstant(std::move(val));
-    RETURN_CACHE(ret);
-  }
-
   if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
     RETURN_CACHE(make_intconst(cnst->getValue()));
   }
