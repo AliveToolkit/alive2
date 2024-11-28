@@ -198,7 +198,6 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
-  // TODO: non-fixed sized vectors
   case llvm::Type::FixedVectorTyID: {
     auto &cache = type_cache[ty];
     if (!cache) {
@@ -209,6 +208,19 @@ Type* llvm_type2alive(const llvm::Type *ty) {
         return nullptr;
       cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
                                       elems, *ety);
+    }
+    return cache.get();
+  }
+  case llvm::Type::ScalableVectorTyID: {
+    auto &cache = type_cache[ty];
+    if (!cache) {
+      auto vty = cast<llvm::VectorType>(ty);
+      auto minelems = vty->getElementCount().getKnownMinValue();
+      auto ety = llvm_type2alive(vty->getElementType());
+      if (!ety || minelems > 1024)
+        return nullptr;
+      cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
+                                      minelems, *ety, true);
     }
     return cache.get();
   }

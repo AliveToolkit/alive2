@@ -332,9 +332,12 @@ public:
 
 
 class VectorType final : public AggregateType {
+  bool isScalableTy = false;
+
 public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
-  VectorType(std::string &&name, unsigned elements, Type &elementTy);
+  VectorType(std::string &&name, unsigned minElts, Type &elementTy,
+             bool isScalableTy = false);
 
   IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index) const;
@@ -344,6 +347,10 @@ public:
   smt::expr getTypeConstraints() const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
+  smt::expr operator==(const VectorType &rhs) const;
+
+  // TODO: handle vscale values other than 1.
+  bool isScalable() const;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
