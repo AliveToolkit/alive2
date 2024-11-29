@@ -1,7 +1,7 @@
 Alive2 unit tests
 =================
 
-three test file formats are supported:
+Three test file formats are supported:
 
 - if a unit test has the suffix ".srctgt.ll" then this file will be sent to
   alive-tv. it should stand on its own.
