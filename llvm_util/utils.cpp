@@ -205,7 +205,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       auto vty = cast<llvm::VectorType>(ty);
       auto elems = vty->getElementCount().getKnownMinValue();
       auto ety = llvm_type2alive(vty->getElementType());
-      if (!ety || elems > 1024)
+      if (!ety || elems > 2048)
         return nullptr;
       cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
                                       elems, *ety);

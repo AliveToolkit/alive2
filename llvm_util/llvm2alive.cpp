@@ -15,6 +15,7 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ModRef.h"
 #include <sstream>
@@ -1221,6 +1222,45 @@ public:
     case llvm::Intrinsic::instrprof_value_profile:
     case llvm::Intrinsic::prefetch:
       return NOP(i);
+
+      // intel x86 intrinsics
+#define PROCESS(NAME, A, B, C, D, E, F) case llvm::Intrinsic::NAME:
+#include "ir/intrinsics_binop.h"
+#undef PROCESS
+      {
+        PARSE_BINOP();
+        X86IntrinBinOp::Op op;
+        switch (i.getIntrinsicID()) {
+#define PROCESS(NAME, A, B, C, D, E, F)                                        \
+  case llvm::Intrinsic::NAME:                                                  \
+    op = X86IntrinBinOp::NAME;                                                 \
+    break;
+#include "ir/intrinsics_binop.h"
+#undef PROCESS
+        default:
+          UNREACHABLE();
+        }
+        return make_unique<X86IntrinBinOp>(*ty, value_name(i), *a, *b, op);
+      }
+
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) case llvm::Intrinsic::NAME:
+#include "ir/intrinsics_terop.h"
+#undef PROCESS
+      {
+        PARSE_TRIOP();
+        X86IntrinTerOp::Op op;
+        switch (i.getIntrinsicID()) {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H)                                  \
+  case llvm::Intrinsic::NAME:                                                  \
+    op = X86IntrinTerOp::NAME;                                                 \
+    break;
+#include "ir/intrinsics_terop.h"
+#undef PROCESS
+        default:
+          UNREACHABLE();
+        }
+        return make_unique<X86IntrinTerOp>(*ty, value_name(i), *a, *b, *c, op);
+      }
 
     default:
       break;
