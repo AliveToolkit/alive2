@@ -517,10 +517,10 @@ mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
   llvm::Function *func = nullptr;
   std::vector<llvm::Value *> args{val1};
   if (isUnary) {
-    func = llvm::Intrinsic::getDeclaration(M, integerUnaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, integerUnaryIntrinsic[pos], tys);
   } else {
     pos -= integerUnaryIntrinsic.size();
-    func = llvm::Intrinsic::getDeclaration(M, integerBinaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, integerBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
@@ -540,10 +540,11 @@ mutator_util::getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
   llvm::Function *func = nullptr;
   std::vector<llvm::Value *> args{val1};
   if (isUnary) {
-    func = llvm::Intrinsic::getDeclaration(M, floatUnaryIntrinsic[pos], tys);
+
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatUnaryIntrinsic[pos], tys);
   } else {
     pos -= floatUnaryIntrinsic.size();
-    func = llvm::Intrinsic::getDeclaration(M, floatBinaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
