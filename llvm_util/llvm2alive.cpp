@@ -1038,6 +1038,8 @@ public:
       case llvm::Intrinsic::experimental_constrained_minimum: op = FpBinOp::FMinimum; break;
       case llvm::Intrinsic::maximum:
       case llvm::Intrinsic::experimental_constrained_maximum: op = FpBinOp::FMaximum; break;
+      case llvm::Intrinsic::minimumnum:                       op = FpBinOp::FMinimumnum; break;
+      case llvm::Intrinsic::maximumnum:                       op = FpBinOp::FMaximumnum; break;
       case llvm::Intrinsic::experimental_constrained_fadd:    op = FpBinOp::FAdd; break;
       case llvm::Intrinsic::experimental_constrained_fsub:    op = FpBinOp::FSub; break;
       case llvm::Intrinsic::experimental_constrained_fmul:    op = FpBinOp::FMul; break;

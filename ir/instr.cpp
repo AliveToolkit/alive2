@@ -645,6 +645,8 @@ void FpBinOp::print(ostream &os) const {
   case FMin:     str = "fmin "; break;
   case FMaximum: str = "fmaximum "; break;
   case FMinimum: str = "fminimum "; break;
+  case FMaximumnum: str = "fmaximumnum "; break;
+  case FMinimumnum: str = "fminimumnum "; break;
   case CopySign: str = "copysign "; break;
   }
   os << getName() << " = " << str << fmath << *lhs << ", " << rhs->getName();
@@ -903,6 +905,21 @@ StateValue FpBinOp::toSMT(State &s) const {
                           expr::mkIf(cmp, a, b));
 
       return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+    };
+    break;
+
+  case FMinimumnum:
+  case FMaximumnum:
+    fn = [&](const expr &a, const expr &b, const expr &rm) {
+      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+      expr cmp = (op == FMinimumnum) ? a.fole(b) : a.foge(b);
+      expr neg_cond = op == FMinimumnum ? (a.isFPNegative() || b.isFPNegative())
+                                     : (a.isFPNegative() && b.isFPNegative());
+      expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
+                          expr::mkIf(neg_cond, zneg, zpos),
+                          expr::mkIf(cmp, a, b));
+
+      return expr::mkIf(a.isNaN(), b, expr::mkIf(b.isNaN(), a, e));
     };
     break;
 

@@ -237,6 +237,8 @@ space+ {
 "fmin" { return FMIN; }
 "fmaximum" { return FMAXIMUM; }
 "fminimum" { return FMINIMUM; }
+"fmaximumnum" { return FMAXIMUMNUM; }
+"fminimumnum" { return FMINIMUMNUM; }
 "extractelement" { return EXTRACTELEMENT; }
 "insertelement" { return INSERTELEMENT; }
 "shufflevector" { return SHUFFLEVECTOR; }
