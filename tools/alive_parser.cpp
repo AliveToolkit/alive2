@@ -663,6 +663,8 @@ static unsigned parse_binop_flags(token op_token) {
   case FMIN:
   case FMAXIMUM:
   case FMINIMUM:
+  case FMAXIMUMNUM:
+  case FMINIMUMNUM:
   case SREM:
   case UREM:
   case UADD_SAT:
@@ -787,6 +789,8 @@ static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
   case FMIN:     op = FpBinOp::FMin; break;
   case FMAXIMUM: op = FpBinOp::FMaximum; break;
   case FMINIMUM: op = FpBinOp::FMinimum; break;
+  case FMAXIMUMNUM: op = FpBinOp::FMaximumnum; break;
+  case FMINIMUMNUM: op = FpBinOp::FMinimumnum; break;
   default:
     UNREACHABLE();
   }
@@ -1220,6 +1224,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FMIN:
   case FMAXIMUM:
   case FMINIMUM:
+  case FMAXIMUMNUM:
+  case FMINIMUMNUM:
     return parse_fp_binop(name, t);
   case BITREVERSE:
   case BSWAP:

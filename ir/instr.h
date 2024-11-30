@@ -67,7 +67,7 @@ public:
 class FpBinOp final : public Instr {
 public:
   enum Op { FAdd, FSub, FMul, FDiv, FRem, FMax, FMin, FMaximum, FMinimum,
-            CopySign };
+            FMaximumnum, FMinimumnum, CopySign };
 
 private:
   Value *lhs, *rhs;

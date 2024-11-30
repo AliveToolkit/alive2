@@ -155,3 +155,71 @@ Name: fminimum, -0, +0
 %t = fminimum float -0.0, float +0.0
   =>
 %t = float -0.0
+
+Name: fmaximumnum, constant prop.
+%t = fmaximumnum float 1.0, float 3.0
+  =>
+%t = float 3.0
+
+Name: fminimumnum, constant prop.
+%t = fminimumnum float 1.0, float 3.0
+  =>
+%t = float 1.0
+
+Name: fmaximumnum, LHS NaN
+%v = fdiv float 0.0, 0.0
+%t = fmaximumnum float %v, float 3.0
+  =>
+%t = float 3.0
+
+Name: fmaximumnum, RHS NaN
+%v = fdiv float 0.0, 0.0
+%t = fmaximumnum float 3.0, float %v
+  =>
+%t = float 3.0
+
+Name: fmaximumnum, BOTH NaN
+%v = fdiv float 0.0, 0.0
+%t = fmaximumnum float %v, float %v
+  =>
+%v = fdiv float 0.0, 0.0
+%t = float %v
+
+Name: fminimumnum, LHS NaN
+%v = fdiv float 0.0, 0.0
+%t = fminimumnum float %v, float 3.0
+  =>
+%t = float 3.0
+
+Name: fminimumnum, RHS NaN
+%v = fdiv float 0.0, 0.0
+%t = fminimumnum float 3.0, float %v
+  =>
+%t = float 3.0
+
+Name: fminimumnum, BOTH NaN
+%v = fdiv float 0.0, 0.0
+%t = fminimumnum float %v, float %v
+  =>
+%v = fdiv float 0.0, 0.0
+%t = float %v
+
+Name: fmaximumnum, +0, -0
+%t = fmaximumnum float +0.0, float -0.0
+  =>
+%t = float +0.0
+
+Name: fmaximumnum, -0, +0
+%t = fmaximumnum float -0.0, float +0.0
+  =>
+%t = float +0.0
+
+Name: fminimumnum, +0, -0
+%t = fminimumnum float +0.0, float -0.0
+  =>
+%t = float -0.0
+
+Name: fminimumnum, -0, +0
+%t = fminimumnum float -0.0, float +0.0
+  =>
+%t = float -0.0
