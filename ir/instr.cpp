@@ -897,7 +897,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMaximum:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
       expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-      expr cmp = (op == FMinimum) ? a.fole(b) : a.foge(b);
+      expr cmp = op == FMinimum ? a.fole(b) : a.foge(b);
       expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
                                      : (a.isFPNegative() && b.isFPNegative());
       expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
@@ -912,7 +912,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMaximumnum:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
       expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-      expr cmp = óp == FMinimumnum ? a.fole(b) : a.foge(b);
+      expr cmp = op == FMinimumnum ? a.fole(b) : a.foge(b);
       expr neg_cond = op == FMinimumnum ? (a.isFPNegative() || b.isFPNegative())
                                         : (a.isFPNegative() && b.isFPNegative());
       expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
