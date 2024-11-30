@@ -1017,6 +1017,8 @@ public:
     case llvm::Intrinsic::maxnum:
     case llvm::Intrinsic::minimum:
     case llvm::Intrinsic::maximum:
+    case llvm::Intrinsic::minimumnum:
+    case llvm::Intrinsic::maximumnum:
     case llvm::Intrinsic::experimental_constrained_fadd:
     case llvm::Intrinsic::experimental_constrained_fsub:
     case llvm::Intrinsic::experimental_constrained_fmul:
