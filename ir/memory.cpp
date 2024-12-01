@@ -1693,7 +1693,7 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
                                         expr::mkUInt(0, bits_size_t-1)).zext(1);
     expr align = data ? data->align
                       : expr::mkFreshVar((name + string("#align")).c_str(),
-                                         expr::mkUInt(0, 6));
+                                         expr::mkUInt(0, bitsAlignmentInfo()));
 
     expr var
       = data ? data->var
