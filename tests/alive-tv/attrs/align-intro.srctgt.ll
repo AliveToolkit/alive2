@@ -1,4 +1,4 @@
-; ERROR: Source is more defined than target
+; ERROR: Target is more poisonous
 
 define ptr @src(ptr %p) {
   ret ptr %p

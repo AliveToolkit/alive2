@@ -1133,6 +1133,16 @@ expr expr::round_up(const expr &power_of_two) const {
   return (*this + minus_1) & ~minus_1;
 }
 
+expr expr::round_up_bits(const expr &nbits) const {
+  return round_up(mkUInt(1, *this) << nbits.zextOrTrunc(bits()));
+}
+
+expr expr::round_up_bits_no_overflow(const expr &nbits) const {
+  expr power_2 = mkUInt(1, *this) << nbits.zextOrTrunc(bits());
+  expr minus_1 = power_2 - mkUInt(1, power_2);
+  return add_no_uoverflow(minus_1);
+}
+
 #define fold_fp_neg(fn)                                  \
   do {                                                   \
   expr cond, neg, v, v2;                                 \
@@ -1722,6 +1732,13 @@ expr expr::sgt(const expr &rhs) const {
 expr expr::ule(uint64_t rhs) const {
   C();
   return ule(mkUInt(rhs, sort()));
+}
+
+expr expr::ule_extend(uint64_t rhs) const {
+  C();
+  if ((unsigned)bit_width(rhs) > bits())
+    return true;
+  return ule(rhs);
 }
 
 expr expr::ult(uint64_t rhs) const {

@@ -507,6 +507,10 @@ ostream& operator<<(ostream &os, const Byte &byte) {
   return os;
 }
 
+unsigned Memory::bitsAlignmentInfo() {
+  return ilog2_ceil(bits_size_t, false);
+}
+
 bool Memory::observesAddresses() {
   return true; //observes_addresses;
 }
@@ -1131,7 +1135,8 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
       }
     } else {
       uint64_t blk_size = UINT64_MAX;
-      bool single_load = ptr.blockSize().isUInt(blk_size) && blk_size == bytes;
+      bool single_load
+        = ptr.blockSizeAligned().isUInt(blk_size) && blk_size == bytes;
       auto offset      = ptr.getShortOffset();
       expr blk_offset  = single_load ? expr::mkUInt(0, offset) : offset;
 
@@ -1200,7 +1205,8 @@ void Memory::store(const Pointer &ptr,
     auto mem = blk.val;
 
     uint64_t blk_size;
-    bool full_write = ptr.blockSize().isUInt(blk_size) && blk_size == bytes;
+    bool full_write
+      = ptr.blockSizeAligned().isUInt(blk_size) && blk_size == bytes;
 
     // optimization: if fully rewriting the block, don't bother with the old
     // contents. Pick a value as the default one.
@@ -1261,7 +1267,7 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
     auto orig_val = ::raw_load(blk.val, offset);
 
     // optimization: full rewrite
-    if (bytes.eq(ptr.blockSize())) {
+    if (bytes.eq(ptr.blockSizeAligned())) {
       blk.val = val_no_offset
         ? mk_block_if(cond, val, std::move(blk.val))
         : expr::mkLambda(offset, mk_block_if(cond, val, std::move(orig_val)));
@@ -1485,11 +1491,11 @@ void Memory::mkAxioms(const Memory &tgt) const {
   };
 
   // transformation can increase alignment
-  expr align = expr::mkUInt(ilog2(heap_block_alignment), 6);
+  expr align = expr::mkUInt(ilog2(heap_block_alignment), bitsAlignmentInfo());
 
   if (null_is_dereferenceable && has_null_block) {
-    state->addAxiom(Pointer::mkNullPointer(*this).blockAlignment()==UINT64_MAX);
-    state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == UINT64_MAX);
+    state->addAxiom(Pointer::mkNullPointer(*this).blockAlignment() == 0);
+    state->addAxiom(Pointer::mkNullPointer(tgt).blockAlignment() == 0);
   }
 
   for (unsigned bid = 0; bid < num_nonlocals_src; ++bid) {
@@ -1526,10 +1532,15 @@ void Memory::mkAxioms(const Memory &tgt) const {
     if (skip_bid(bid))
       continue;
 
-    Pointer p1(bid < num_nonlocals_src ? *this : tgt, bid, false);
+    // because tgt's align >= src's align, it's sufficient to have these
+    // constraints for tgt.
+    Pointer p1(tgt, bid, false);
     auto addr  = p1.getAddress();
     auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
+
+    // limit max alignment so that aligning block size doesn't overflow
+    state->addAxiom(align.ule_extend(bits_ptr_address-1));
 
     state->addAxiom(addr != zero);
 
@@ -1548,12 +1559,16 @@ void Memory::mkAxioms(const Memory &tgt) const {
              expr::mkUInt(0, 1).concat(last.extract(bits_ptr_address-2, 0)))
          : addr != last);
     } else {
+      sz = p1.blockSizeAligned().zextOrTrunc(bits_ptr_address);
       state->addAxiom(
         Pointer::hasLocalBit()
           // don't spill to local addr section
           ? (addr + sz).sign() == 0
           : addr.add_no_uoverflow(sz));
     }
+
+    state->addAxiom(p1.blockSize()
+                      .round_up_bits_no_overflow(p1.blockAlignment()));
 
     if (num_nonlocals > max_quadratic_disjoint)
       continue;
@@ -1562,9 +1577,10 @@ void Memory::mkAxioms(const Memory &tgt) const {
     for (unsigned bid2 = bid + 1; bid2 < num_nonlocals; ++bid2) {
       if (skip_bid(bid2))
         continue;
-      Pointer p2(bid2 < num_nonlocals_src ? *this : tgt, bid2, false);
+      Pointer p2(tgt, bid2, false);
       state->addAxiom(disjoint(addr, sz, align, p2.getAddress(),
-                               p2.blockSize().zextOrTrunc(bits_ptr_address),
+                               p2.blockSizeAligned()
+                                 .zextOrTrunc(bits_ptr_address),
                                p2.blockAlignment()));
     }
   }
@@ -1575,14 +1591,16 @@ void Memory::mkAxioms(const Memory &tgt) const {
     expr bid1 = expr::mkFreshVar("#bid1", bid_ty);
     expr bid2 = expr::mkFreshVar("#bid2", bid_ty);
     expr offset = expr::mkUInt(0, bits_for_offset);
-    Pointer p1(*this, Pointer::mkLongBid(bid1, false), offset);
-    Pointer p2(*this, Pointer::mkLongBid(bid2, false), offset);
+    Pointer p1(tgt, Pointer::mkLongBid(bid1, false), offset);
+    Pointer p2(tgt, Pointer::mkLongBid(bid2, false), offset);
     state->addAxiom(
       expr::mkForAll({bid1, bid2},
         bid1 == bid2 ||
-        disjoint(p1.getAddress(), p1.blockSize().zextOrTrunc(bits_ptr_address),
+        disjoint(p1.getAddress(),
+                 p1.blockSizeAligned().zextOrTrunc(bits_ptr_address),
                  p1.blockAlignment(),
-                 p2.getAddress(), p2.blockSize().zextOrTrunc(bits_ptr_address),
+                 p2.getAddress(),
+                 p2.blockSizeAligned().zextOrTrunc(bits_ptr_address),
                  p2.blockAlignment())));
   }
 }
@@ -1958,7 +1976,8 @@ static expr disjoint_local_blocks(const Memory &m, const expr &addr,
     Pointer p2(m, Pointer::mkLongBid(sbid, true), zero);
     disj &= p2.isBlockAlive()
               .implies(disjoint(addr, sz, align, p2.getAddress(),
-                                p2.blockSize().zextOrTrunc(bits_ptr_address),
+                                p2.blockSizeAligned()
+                                  .zextOrTrunc(bits_ptr_address),
                                 p2.blockAlignment()));
   }
   return disj;
@@ -2032,8 +2051,7 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   expr size_zext;
   expr nooverflow = true;
   if (size) {
-    size_zext  = size->zextOrTrunc(bits_size_t)
-                      .round_up(expr::mkUInt(align, bits_size_t));
+    size_zext  = size->zextOrTrunc(bits_size_t);
     nooverflow = size->bits() <= bits_size_t ? true :
                    size->extract(size->bits()-1, bits_size_t) == 0;
   }
@@ -2057,7 +2075,7 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
 
   assert(align != 0);
   auto align_bits = ilog2(align);
-  expr align_expr = expr::mkUInt(align_bits, 6);
+  expr align_expr = expr::mkUInt(align_bits, bitsAlignmentInfo());
   bool is_null = !is_local && has_null_block && bid == 0;
 
   if (is_local) {
@@ -2111,7 +2129,7 @@ void Memory::startLifetime(const expr &ptr_local) {
   if (observesAddresses())
     state->addPre(p.isBlockAlive() ||
       disjoint_local_blocks(*this, p.getAddress(),
-                            p.blockSize().zextOrTrunc(bits_ptr_address),
+                            p.blockSizeAligned().zextOrTrunc(bits_ptr_address),
                             p.blockAlignment(), local_blk_addr));
 
   store_bv(p, true, local_block_liveness, non_local_block_liveness, true);
@@ -2418,7 +2436,7 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
 
 void Memory::fillPoison(const expr &bid) {
   Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
-  expr blksz = p.blockSize();
+  expr blksz = p.blockSizeAligned();
   memset(std::move(p).release(), IntType("i8", 8).getDummyValue(false),
          std::move(blksz), bits_byte / 8, {}, false);
 }

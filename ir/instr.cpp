@@ -3835,7 +3835,7 @@ StateValue GEP::toSMT(State &s) const {
 
     // FIXME: not implemented for physical pointers
     if (inbounds)
-      inbounds_np.add(ptr.inbounds());
+      inbounds_np.add(ptr.inbounds(false, config::disallow_ub_exploitation));
 
     expr offset_sum = expr::mkUInt(0, bits_for_offset);
     for (auto &[sz, idx] : offsets) {
@@ -3875,7 +3875,7 @@ StateValue GEP::toSMT(State &s) const {
       non_poison.add(np);
 
       if (inbounds)
-        inbounds_np.add(ptr.inbounds());
+        inbounds_np.add(ptr.inbounds(false, config::disallow_ub_exploitation));
     }
 
     if (inbounds) {

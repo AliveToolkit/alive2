@@ -221,6 +221,8 @@ public:
   expr abs() const;
 
   expr round_up(const expr &power_of_two) const;
+  expr round_up_bits(const expr &nbits) const;
+  expr round_up_bits_no_overflow(const expr &nbits) const;
 
   expr isNaN() const;
   expr isInf() const;
@@ -300,6 +302,7 @@ public:
   expr sgt(const expr &rhs) const;
 
   expr ule(uint64_t rhs) const;
+  expr ule_extend(uint64_t rhs) const;
   expr ult(uint64_t rhs) const;
   expr uge(uint64_t rhs) const;
   expr ugt(uint64_t rhs) const;

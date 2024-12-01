@@ -88,6 +88,8 @@ public:
 
   smt::expr blockSize() const;
   smt::expr blockSizeOffsetT() const; // to compare with offsets
+  smt::expr blockSizeAligned() const;
+  smt::expr blockSizeAlignedOffsetT() const; // to compare with offsets
 
   const smt::expr& operator()() const { return p; }
   smt::expr release() && { return std::move(p); }
@@ -112,8 +114,8 @@ public:
                       bool is_phy) const;
   smt::expr isInboundsOf(const Pointer &block, const smt::expr &bytes,
                          bool is_phy) const;
-  smt::expr isInbounds(bool strict) const;
-  smt::expr inbounds(bool simplify_ptr = false);
+  smt::expr isInbounds(bool strict, bool align_size = false) const;
+  smt::expr inbounds(bool simplify_ptr = false, bool align_size = false);
 
   smt::expr blockAlignment() const; // log(bits)
   smt::expr isBlockAligned(uint64_t align, bool exact = false) const;

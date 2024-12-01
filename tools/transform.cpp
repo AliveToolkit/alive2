@@ -1080,6 +1080,7 @@ static void calculateAndInitConstants(Transform &t) {
                             : sz;
       }
     }
+    max_access_size = round_up(max_access_size, heap_block_alignment);
 
     for (auto &i : fn->instrs()) {
       if (returns_local(i))

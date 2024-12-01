@@ -826,6 +826,16 @@ void State::addReturn(StateValue &&val) {
   addUB(expr(false));
 }
 
+void State::addAxiom(AndExpr &&ands) {
+  assert(ands);
+  axioms.add(std::move(ands));
+}
+
+void State::addAxiom(expr &&axiom) {
+  assert(!axiom.isFalse());
+  axioms.add(std::move(axiom));
+}
+
 void State::addUB(pair<AndExpr, expr> &&ub) {
   addUB(std::move(ub.first));
   addGuardableUB(std::move(ub.second));

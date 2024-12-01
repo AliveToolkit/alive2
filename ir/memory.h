@@ -369,6 +369,7 @@ public:
   friend class Pointer;
 
 private:
+  static unsigned bitsAlignmentInfo();
   smt::expr mk_block_val_array(unsigned bid) const;
   Byte raw_load(bool local, unsigned bid, const smt::expr &offset) const;
   void print_array(std::ostream &os, const smt::expr &a,

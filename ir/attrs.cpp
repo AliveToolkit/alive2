@@ -381,8 +381,8 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
   } else if (align != 1) {
     non_poison &= p.isAligned(align);
     if (isdecl)
-      s.addUB(merge(p.isDereferenceable(1, 1, false, true))
-                .implies(merge(p.isDereferenceable(1, align, false, true))));
+      s.addAxiom(merge(p.isDereferenceable(1, 1, false, true))
+                   .implies(merge(p.isDereferenceable(1, align, false, true))));
   }
 
   if (allocalign) {
