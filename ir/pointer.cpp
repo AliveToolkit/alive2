@@ -616,7 +616,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
       }
     };
     add(m.numLocals(), true);
-    add(m.numNonlocals(), false);
+    add(m.nextNonlocalBid(), false);
 
     expr bid = *std::move(bids)();
     if (!observes_local)
