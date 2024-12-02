@@ -82,6 +82,8 @@ public:
   uint64_t align = 1;
   uint16_t nofpclass = 0;
 
+  std::vector<std::pair<uint64_t, uint64_t>> initializes;
+
   bool has(Attribute a) const { return (bits & a) != 0; }
   void set(Attribute a) { bits |= (unsigned)a; }
   bool refinedBy(const ParamAttrs &other) const;

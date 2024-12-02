@@ -69,7 +69,7 @@ static expr attr_to_bitvec(const ParamAttrs &attrs) {
 namespace IR {
 
 Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
-                 const expr &attr) : m(m),
+                 const expr &attr) : m(const_cast<Memory&>(m)),
   p(prepend_if(expr::mkUInt(0, 1 + padding_logical()),
                bid.concat(offset), hasLogicalBit())) {
   if (bits_for_ptrattrs)
@@ -78,7 +78,7 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 }
 
 Pointer::Pointer(const Memory &m, const char *var_name,
-                 const ParamAttrs &attr) : m(m) {
+                 const ParamAttrs &attr) : m(const_cast<Memory&>(m)) {
   unsigned bits = bitsShortBid() + bits_for_offset;
   p = expr::mkVar(var_name, bits, false)
         .zext(hasLocalBit() + (1 + padding_logical()) * hasLogicalBit());
@@ -87,12 +87,13 @@ Pointer::Pointer(const Memory &m, const char *var_name,
   assert(p.bits() == totalBits());
 }
 
-Pointer::Pointer(const Memory &m, expr repr) : m(m), p(std::move(repr)) {
+Pointer::Pointer(const Memory &m, expr repr)
+  : m(const_cast<Memory&>(m)), p(std::move(repr)) {
   assert(!p.isValid() || p.bits() == totalBits());
 }
 
 Pointer::Pointer(const Memory &m, unsigned bid, bool local, expr attr)
-  : m(m), p(
+  : m(const_cast<Memory&>(m)), p(
     prepend_if(expr::mkUInt(0, 1 + padding_logical()),
       prepend_if(expr::mkUInt(local, 1),
                  expr::mkUInt(bid, bitsShortBid())
@@ -522,12 +523,35 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     bytes = bytes.round_up(expr::mkUInt(align, bytes));
   expr bytes_off = bytes.zextOrTrunc(bits_for_offset);
 
-  auto block_constraints = [=](const Pointer &p) {
+  auto block_constraints = [&](const Pointer &p) {
     expr ret = p.isBlockAlive();
     if (iswrite)
       ret &= p.isWritable() && !p.isNoWrite();
     else if (!ignore_accessability)
       ret &= !p.isNoRead();
+
+    // If we are loading from an argument and it has the 'initializes'
+    // attribute, make sure we have already stored to it before.
+    if (!ignore_accessability && !iswrite) {
+      auto &s = m.getState();
+      for (auto &input0 : s.getFn().getInputs()) {
+        auto &input = static_cast<const Input&>(input0);
+        auto &inits = input.getAttributes().initializes;
+        if (inits.empty())
+          continue;
+
+        Pointer arg(m, s[input].value);
+        expr offsets = true;
+        for (auto [l, h] : inits) {
+          offsets &= (p.getOffset().uge((arg + l).getOffset()) &&
+                      p.getOffset().ult((arg + h).getOffset())
+                     ).implies(m.hasStored(p, bytes));
+        }
+        // TODO: isBasedOnArg is not sufficient; we have to store the arg number
+        // in the pointer as we can have 2 args with same initializes attr
+        ret&= (p.isBasedOnArg() && p.getBid() == arg.getBid()).implies(offsets);
+      }
+    }
     return ret;
   };
 
@@ -560,6 +584,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     DisjointExpr<expr> addrs(expr::mkUInt(0, bits_ptr_address));
     expr ub = false;
     bool all_same_size = true;
+    expr addr = is_phy ? p.getPhysicalAddress() : p.getAddress();
 
     auto add = [&](unsigned limit, bool local) {
       for (unsigned i = 0; i != limit; ++i) {
@@ -569,8 +594,13 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
         Pointer this_ptr(m, i, local, p.getAttrs());
 
+        bool same_size = bytes.eq(this_ptr.blockSizeAligned());
+        expr this_addr = this_ptr.getLogAddress();
+        expr offset
+          = same_size ? expr::mkUInt(0, bits_for_offset) : addr - this_addr;
+
         expr cond = p.isInboundsOf(this_ptr, bytes, is_phy) &&
-                    block_constraints(this_ptr);
+                    block_constraints(this_ptr + offset);
         if (cond.isFalse())
           continue;
 
@@ -578,11 +608,11 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
         cond = p.isOfBlock(this_ptr, bytes, is_phy);
 
-        all_same_size &= bytes.eq(this_ptr.blockSizeAligned());
+        all_same_size &= same_size;
 
         bids.add(
           observes_local ? this_ptr.getBid() : this_ptr.getShortBid(), cond);
-        addrs.add(this_ptr.getLogAddress(), std::move(cond));
+        addrs.add(std::move(this_addr), std::move(cond));
       }
     };
     add(m.numLocals(), true);
@@ -591,8 +621,6 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     expr bid = *std::move(bids)();
     if (!observes_local)
       bid = mkLongBid(bid, false);
-
-    expr addr = is_phy ? p.getPhysicalAddress() : p.getAddress();
 
     return { std::move(ub),
              Pointer(m, std::move(bid),
@@ -670,6 +698,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   // trim set of valid ptrs
   auto ptrs = std::move(all_ptrs)();
   p = ptrs ? *std::move(ptrs) : expr::mkUInt(0, totalBits());
+
+  if (!ignore_accessability && iswrite)
+    m.record_store(*this, bytes);
 
   return { std::move(exprs), *std::move(is_aligned)() };
 }

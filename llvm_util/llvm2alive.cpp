@@ -17,6 +17,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ModRef.h"
+#include <algorithm>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -1466,7 +1467,7 @@ public:
   unique_ptr<Instr>
   handleRangeAttrNoInsert(const llvm::Attribute &attr, Value &val,
                           bool is_welldefined = false) {
-    auto CR = attr.getValueAsConstantRange();
+    auto &CR = attr.getValueAsConstantRange();
     vector<Value*> bounds{ make_intconst(CR.getLower()),
                            make_intconst(CR.getUpper()) };
     string name = "%#range_" + to_string(range_idx++) + "_" + val.getName();
@@ -1588,6 +1589,19 @@ public:
 
       case llvm::Attribute::DeadOnUnwind:
         attrs.set(ParamAttrs::DeadOnUnwind);
+        break;
+
+      case llvm::Attribute::Initializes:
+        for (auto &CR : llvmattr.getInitializes()) {
+          auto l = CR.getLower().tryZExtValue();
+          auto h = CR.getUpper().tryZExtValue();
+          if (!l || !h) {
+            errorAttr(llvmattr);
+            return false;
+          }
+          attrs.initializes.emplace_back(*l, *h);
+        }
+        ranges::sort(attrs.initializes);
         break;
 
       default:

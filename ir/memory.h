@@ -154,6 +154,9 @@ class Memory {
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
 
+  // TODO: change from short idx to arg number
+  smt::expr has_stored_arg; // (short idx, short offset) -> bool
+
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
   smt::FunctionExpr local_blk_align;
@@ -222,6 +225,10 @@ class Memory {
                    const smt::expr &bytes,
                    const std::vector<std::pair<unsigned, smt::expr>> &data,
                    const std::set<smt::expr> &undef, uint64_t align);
+
+  // to implement the 'initializes' parameter attribute
+  smt::expr hasStored(const Pointer &p, const smt::expr &bytes) const;
+  void record_store(const Pointer &p, const smt::expr &bytes);
 
   smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
                             const smt::expr &offset,

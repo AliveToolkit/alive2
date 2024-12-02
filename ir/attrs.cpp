@@ -10,6 +10,7 @@
 #include "ir/state_value.h"
 #include "ir/type.h"
 #include "util/compiler.h"
+#include <algorithm>
 #include <cassert>
 
 using namespace std;
@@ -56,6 +57,17 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "dead_on_unwind ";
   if (attr.has(ParamAttrs::Writable))
     os << "writable ";
+  if (!attr.initializes.empty()) {
+    os << "initializes(";
+    bool first = true;
+    for (auto [low, high] : attr.initializes) {
+      if (!first)
+        os << ", ";
+      first = false;
+      os << '(' << low << ", " << high << ')';
+    }
+    os << ") ";
+  }
   return os;
 }
 
@@ -342,6 +354,9 @@ uint64_t ParamAttrs::maxAccessSize() const {
   uint64_t bytes = getDerefBytes();
   if (has(ParamAttrs::DereferenceableOrNull))
     bytes = max(bytes, derefOrNullBytes);
+  for (auto [low, high] : initializes) {
+    bytes = max(bytes, high);
+  }
   return round_up(bytes, align);
 }
 
@@ -351,6 +366,10 @@ void ParamAttrs::merge(const ParamAttrs &other) {
   derefOrNullBytes = max(derefOrNullBytes, other.derefOrNullBytes);
   blockSize        = max(blockSize, other.blockSize);
   align            = max(align, other.align);
+
+  decltype(initializes) tmp;
+  ranges::set_union(initializes, other.initializes, std::back_inserter(tmp));
+  initializes = std::move(tmp);
 }
 
 static expr
@@ -406,11 +425,18 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty,
     val.non_poison &= !isfpclass(val.value, ty, nofpclass);
   }
 
-  if (ty.isPtrType())
+  if (ty.isPtrType()) {
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
                      has(NonNull), has(NoCapture), has(Writable), {}, nullptr,
                      isdecl);
+
+    if (!initializes.empty()) {
+      Pointer p(s.getMemory(), val.value);
+      uint64_t high = initializes.back().second;
+      s.addUB(p.addNoUSOverflow(expr::mkUInt(high, bits_for_offset), false));
+    }
+  }
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));
