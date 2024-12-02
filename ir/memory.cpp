@@ -1305,7 +1305,7 @@ expr Memory::hasStored(const Pointer &p, const expr &bytes) const {
   if (bytes.isUInt(bytes_i) && (bytes_i / bytes_per_byte) <= 8) {
     expr ret = true;
     for (uint64_t off = 0; off < (bytes_i / bytes_per_byte); ++off) {
-      expr off_expr = expr::mkUInt(off, bid);
+      expr off_expr = expr::mkUInt(off, offset);
       ret &= has_stored_arg.load(bid.concat(offset + off_expr));
     }
     return ret;
