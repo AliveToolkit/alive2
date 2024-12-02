@@ -897,6 +897,12 @@ unsigned Memory::nextNonlocalBid() {
   return next;
 }
 
+unsigned Memory::numCurrentNonLocals() const {
+  unsigned bids = min(next_nonlocal_bid, max_program_nonlocal_bid());
+  assert(!is_fncall_mem(bids));
+  return bids + 1;
+}
+
 unsigned Memory::numLocals() const {
   return state->isSource() ? num_locals_src : num_locals_tgt;
 }
@@ -2517,8 +2523,9 @@ expr Memory::ptr2int(const expr &ptr) {
   return p.getAddress();
 }
 
-expr Memory::int2ptr(const expr &val) const {
+expr Memory::int2ptr(const expr &val) {
   assert(!memory_unused() && observesAddresses());
+  nextNonlocalBid();
   return
     Pointer::mkPhysical(*this, val.zextOrTrunc(bits_ptr_address)).release();
 }

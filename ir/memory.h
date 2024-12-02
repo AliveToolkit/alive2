@@ -180,6 +180,7 @@ class Memory {
   std::map<smt::expr, AliasSet> ptr_alias; // blockid -> alias
   unsigned next_nonlocal_bid = 0;
   unsigned nextNonlocalBid();
+  unsigned numCurrentNonLocals() const;
 
   static bool observesAddresses();
   static int isInitialMemBlock(const smt::expr &e, bool match_any_init);
@@ -347,7 +348,7 @@ public:
   void fillPoison(const smt::expr &bid);
 
   smt::expr ptr2int(const smt::expr &ptr);
-  smt::expr int2ptr(const smt::expr &val) const;
+  smt::expr int2ptr(const smt::expr &val);
 
   std::tuple<smt::expr, Pointer, std::set<smt::expr>>
     refined(const Memory &other, bool fncall,

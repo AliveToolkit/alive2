@@ -596,8 +596,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
         bool same_size = bytes.eq(this_ptr.blockSizeAligned());
         expr this_addr = this_ptr.getLogAddress();
-        expr offset
-          = same_size ? expr::mkUInt(0, bits_for_offset) : addr - this_addr;
+        expr offset = same_size ? expr::mkUInt(0, addr) : addr - this_addr;
 
         expr cond = p.isInboundsOf(this_ptr, bytes, is_phy) &&
                     block_constraints(this_ptr + offset);
@@ -616,7 +615,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
       }
     };
     add(m.numLocals(), true);
-    add(m.nextNonlocalBid(), false);
+    add(m.numCurrentNonLocals(), false);
 
     expr bid = *std::move(bids)();
     if (!observes_local)
