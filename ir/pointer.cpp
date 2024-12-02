@@ -428,19 +428,19 @@ expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0,
          (addr + bytes).ule(block_addr + block_size);
 }
 
-expr Pointer::isInbounds(bool strict, bool align_size) const {
+expr Pointer::isInbounds(bool strict) const {
   auto offset = getOffsetSizet();
-  auto size   = align_size ? blockSizeAlignedOffsetT() : blockSizeOffsetT();
+  auto size   = blockSizeAlignedOffsetT();
   return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
 }
 
-expr Pointer::inbounds(bool simplify_ptr, bool align_size) {
+expr Pointer::inbounds(bool simplify_ptr) {
   if (!simplify_ptr)
-    return isInbounds(false, align_size);
+    return isInbounds(false);
 
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
-    expr inb = Pointer(m, ptr_expr).isInbounds(false, align_size);
+    expr inb = Pointer(m, ptr_expr).isInbounds(false);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
     ret.add(std::move(inb), domain);
