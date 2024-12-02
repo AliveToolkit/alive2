@@ -77,6 +77,7 @@ extern bool has_nocapture;
 extern bool has_noread;
 extern bool has_nowrite;
 extern bool has_ptr_arg;
+extern bool has_initializes_attr;
 
 /// Whether there null pointers appear in the program
 extern bool has_null_pointer;

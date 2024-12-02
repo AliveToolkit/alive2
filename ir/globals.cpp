@@ -39,6 +39,7 @@ bool has_nocapture = true;
 bool has_noread = true;
 bool has_nowrite = true;
 bool has_ptr_arg = true;
+bool has_initializes_attr = true;
 bool has_null_block = true;
 bool null_is_dereferenceable = false;
 bool does_int_mem_access = true;

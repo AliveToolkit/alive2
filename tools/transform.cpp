@@ -1017,6 +1017,7 @@ static void calculateAndInitConstants(Transform &t) {
   bool does_any_byte_access = false;
   has_indirect_fncalls = false;
   has_ptr_arg = false;
+  has_initializes_attr = false;
   num_sub_byte_bits = 0;
 
   set<string> inaccessiblememonly_fns;
@@ -1060,6 +1061,8 @@ static void calculateAndInitConstants(Transform &t) {
       update_min_vect_sz(i->getType());
       max_access_size
         = max(max_access_size, i->getAttributes().maxAccessSize());
+
+      has_initializes_attr |= !i->getAttributes().initializes.empty();
 
       if (i->hasAttribute(ParamAttrs::Dereferenceable)) {
         does_mem_access = true;
