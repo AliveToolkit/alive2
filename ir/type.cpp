@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <numeric>
@@ -450,7 +451,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
-  if (isnan.isFalse())
+  if (config::use_exact_fp || isnan.isFalse())
     return val;
 
   unsigned fraction_bits = fractionBits();
