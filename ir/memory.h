@@ -355,10 +355,12 @@ public:
             const std::vector<PtrInput> *set_ptrs = nullptr,
             const std::vector<PtrInput> *set_ptrs_other = nullptr) const;
 
-  // Returns true if a nocapture pointer byte is not in the memory.
-  smt::expr checkNocapture() const;
   void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
   void observesAddr(const Pointer &ptr);
+
+  smt::expr returnChecks() const;
+  smt::expr checkNocapture() const;
+  smt::expr checkInitializes() const;
 
   static Memory mkIf(const smt::expr &cond, Memory &&then, Memory &&els);
 

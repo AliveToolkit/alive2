@@ -3260,7 +3260,7 @@ StateValue Return::toSMT(State &s) const {
   auto &attrs = s.getFn().getFnAttrs();
   StateValue retval = s.getMaybeUB(*val, attrs.poisonImpliesUB());
 
-  s.addGuardableUB(s.getMemory().checkNocapture());
+  s.addGuardableUB(s.getMemory().returnChecks());
 
   vector<pair<Value*, ParamAttrs>> args;
   for (auto &arg : s.getFn().getInputs()) {

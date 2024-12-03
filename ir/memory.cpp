@@ -2689,6 +2689,11 @@ Memory::refined(const Memory &other, bool fncall,
   return { std::move(ret), std::move(ptr), std::move(undef_vars) };
 }
 
+expr Memory::returnChecks() const {
+  return checkNocapture() &&
+         checkInitializes();
+}
+
 expr Memory::checkNocapture() const {
   if (!does_ptr_store || !has_nocapture)
     return true;
@@ -2709,6 +2714,26 @@ expr Memory::checkNocapture() const {
   if (!res.isTrue())
     state->addQuantVar(offset);
   return res;
+}
+
+expr Memory::checkInitializes() const {
+  if (!has_initializes_attr)
+    return true;
+
+  expr ret = true;
+
+  for (auto &input0 : state->getFn().getInputs()) {
+    auto &input = static_cast<const Input&>(input0);
+    auto &inits = input.getAttributes().initializes;
+    if (inits.empty())
+      continue;
+
+    Pointer arg(*this, (*state)[input].value);
+    for (auto [l, h] : inits) {
+      ret &= hasStored(arg + l, expr::mkUInt(h - l, bits_size_t));
+    }
+  }
+  return ret;
 }
 
 void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
