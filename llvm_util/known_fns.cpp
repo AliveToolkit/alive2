@@ -5,6 +5,7 @@
 #include "llvm_util/utils.h"
 #include "ir/function.h"
 #include "ir/instr.h"
+#include "ir/x86_intrinsics.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -516,8 +517,16 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_EXACT();
 
   auto decl = i.getCalledFunction();
+  if (!decl)
+    RETURN_EXACT();
+
+  // Intel X86 intrinsics
+  if (decl->hasName() && decl->getName().starts_with("__fksv"))
+    RETURN_VAL(make_unique<FakeShuffle>(*ty, value_name(i), *args[0], *args[1],
+                                        *args[2]));
+
   llvm::LibFunc libfn;
-  if (!decl || !TLI.getLibFunc(*decl, libfn))
+  if (!TLI.getLibFunc(*decl, libfn))
     RETURN_EXACT();
 
   auto tci = parse_fn_tailcall(i);

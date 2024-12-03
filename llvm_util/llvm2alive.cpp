@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "ir/x86_intrinsics.h"
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
 #include "util/sort.h"
@@ -15,6 +16,7 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicsX86.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/ModRef.h"
 #include <algorithm>
@@ -1226,6 +1228,45 @@ public:
     case llvm::Intrinsic::instrprof_value_profile:
     case llvm::Intrinsic::prefetch:
       return NOP(i);
+
+      // Intel X86 intrinsics
+#define PROCESS(NAME, A, B, C, D, E, F) case llvm::Intrinsic::NAME:
+#include "ir/x86_intrinsics_binop.inc"
+#undef PROCESS
+      {
+        PARSE_BINOP();
+        X86IntrinBinOp::Op op;
+        switch (i.getIntrinsicID()) {
+#define PROCESS(NAME, A, B, C, D, E, F)                                        \
+  case llvm::Intrinsic::NAME:                                                  \
+    op = X86IntrinBinOp::NAME;                                                 \
+    break;
+#include "ir/x86_intrinsics_binop.inc"
+#undef PROCESS
+        default:
+          UNREACHABLE();
+        }
+        return make_unique<X86IntrinBinOp>(*ty, value_name(i), *a, *b, op);
+      }
+
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) case llvm::Intrinsic::NAME:
+#include "ir/x86_intrinsics_terop.inc"
+#undef PROCESS
+      {
+        PARSE_TRIOP();
+        X86IntrinTerOp::Op op;
+        switch (i.getIntrinsicID()) {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H)                                  \
+  case llvm::Intrinsic::NAME:                                                  \
+    op = X86IntrinTerOp::NAME;                                                 \
+    break;
+#include "ir/x86_intrinsics_terop.inc"
+#undef PROCESS
+        default:
+          UNREACHABLE();
+        }
+        return make_unique<X86IntrinTerOp>(*ty, value_name(i), *a, *b, *c, op);
+      }
 
     default:
       break;
