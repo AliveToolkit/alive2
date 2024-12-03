@@ -1,5 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
 define <4 x i32> @src(<4 x i32> %v) {
   %1 = call <4 x i32> @llvm.x86.sse2.psrl.d(<4 x i32> %v, <4 x i32> <i32 15, i32 0, i32 9999, i32 9999>)
   ret <4 x i32> %1
