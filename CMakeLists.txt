@@ -180,10 +180,6 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
     message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_RTTI=ON'")
   endif()
 
-  if (NOT LLVM_ENABLE_EH)
-    message(FATAL_ERROR "LLVM must be built with '-DLLVM_ENABLE_EH=ON'")
-  endif()
-
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   include(AddLLVM)
 
@@ -206,14 +202,17 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
   )
+  target_compile_options(alive-tv PRIVATE -fexceptions)
 
   add_llvm_executable(quick-fuzz
     "tools/quick-fuzz.cpp"
   )
+  target_compile_options(quick-fuzz PRIVATE -fexceptions)
 
   add_llvm_executable(alive-exec
     "tools/alive-exec.cpp"
   )
+  target_compile_options(alive-exec PRIVATE -fexceptions)
 
 else()
   set(LLVM_UTIL_SRCS "")

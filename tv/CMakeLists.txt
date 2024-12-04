@@ -22,6 +22,7 @@ configure_file(
 )
 
 target_link_libraries(tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES})
+target_compile_options(tv PRIVATE -fexceptions)
 
 if(APPLE)
     set_target_properties(tv PROPERTIES
