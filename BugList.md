@@ -94,7 +94,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 87. InstCombine: incorrect vector fshr->shl transformation (https://llvm.org/PR89338)
 88. VectorCombine: shufflevector reorder leads to srem by poison (https://llvm.org/PR89390)
 89. InstCombine: incorrect srem rewrite (https://llvm.org/PR89516)
-90. InstCombine: incorrect swap of select vector operands (https://llvm.org/89669)
+90. InstCombine: incorrect swap of select vector operands (https://llvm.org/PR89669)
 91. SimplifyCFG: coalesced store retains the wrong alignment (https://llvm.org/PR89672)
 92. LoopVectorize introduces division by zero (https://llvm.org/PR89958)
 93. InstCombine: align attribute doesn't dereferenceability (https://llvm.org/PR90446)
