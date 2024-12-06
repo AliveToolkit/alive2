@@ -63,7 +63,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 56. LoopUnroll: runtime check introduces branch on poison if fn call doesn't return (https://llvm.org/PR51670)
 57. MergeICmps reorders comparisons and introduces UB (https://llvm.org/PR51845)
 58. Sink: moves calls that may not return (https://llvm.org/PR51846)
-59. LIVM introduces load in writeonly function (https://llvm.org/PR51906)
+59. LLVM introduces load in writeonly function (https://llvm.org/PR51906)
 60. InstSimplify incorrectly folds signed comparisons of 'gep inbounds' (https://llvm.org/PR52429)
 61. LoadStoreVectorizer assumes non-willreturn calls always return (https://llvm.org/PR52950)
 62. SROA sub-vector memcpy w/subsequent load loses the store (https://llvm.org/PR52971)
