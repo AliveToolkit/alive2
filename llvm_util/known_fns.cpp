@@ -524,94 +524,97 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
 
   switch (libfn) {
   case llvm::LibFunc_memset: // void* memset(void *ptr, int val, size_t bytes)
-    BB.addInstr(make_unique<Memset>(*args[0], *args[1], *args[2], 1, tci));
-    RETURN_VAL(make_unique<UnaryOp>(*ty, value_name(i), *args[0],
-                                    UnaryOp::Copy));
+    BB.addInstr<Memset>(*args[0], *args[1], *args[2], 1, tci);
+    RETURN_VAL(
+        make_unique<UnaryOp>(BB, *ty, value_name(i), *args[0], UnaryOp::Copy));
 
   // void memset_pattern4(void *ptr, void *pattern, size_t bytes)
   case llvm::LibFunc_memset_pattern4:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 4, tci));
+    RETURN_VAL(
+        make_unique<MemsetPattern>(BB, *args[0], *args[1], *args[2], 4, tci));
   case llvm::LibFunc_memset_pattern8:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 8, tci));
+    RETURN_VAL(
+        make_unique<MemsetPattern>(BB, *args[0], *args[1], *args[2], 8, tci));
   case llvm::LibFunc_memset_pattern16:
-    RETURN_VAL(make_unique<MemsetPattern>(*args[0], *args[1], *args[2], 16, tci));
+    RETURN_VAL(
+        make_unique<MemsetPattern>(BB, *args[0], *args[1], *args[2], 16, tci));
   case llvm::LibFunc_strlen:
-    RETURN_VAL(make_unique<Strlen>(*ty, value_name(i), *args[0], tci));
+    RETURN_VAL(make_unique<Strlen>(BB, *ty, value_name(i), *args[0], tci));
   case llvm::LibFunc_memcmp:
   case llvm::LibFunc_bcmp: {
-    RETURN_VAL(make_unique<Memcmp>(*ty, value_name(i), *args[0], *args[1],
+    RETURN_VAL(make_unique<Memcmp>(BB, *ty, value_name(i), *args[0], *args[1],
                                    *args[2], libfn == llvm::LibFunc_bcmp, tci));
   }
   case llvm::LibFunc_ffs:
   case llvm::LibFunc_ffsl:
   case llvm::LibFunc_ffsll: {
     bool needs_trunc = &args[0]->getType() != ty;
-    auto *Op = new UnaryOp(args[0]->getType(),
+    auto *Op = new UnaryOp(BB, args[0]->getType(),
                            value_name(i) + (needs_trunc ? "#beftrunc" : ""),
                            *args[0], UnaryOp::FFS);
     if (!needs_trunc)
       RETURN_VAL(unique_ptr<UnaryOp>(Op));
 
     BB.addInstr(unique_ptr<UnaryOp>(Op));
-    RETURN_VAL(
-      make_unique<ConversionOp>(*ty, value_name(i), *Op, ConversionOp::Trunc));
+    RETURN_VAL(make_unique<ConversionOp>(BB, *ty, value_name(i), *Op,
+                                         ConversionOp::Trunc));
   }
 
   case llvm::LibFunc_abs:
   case llvm::LibFunc_labs:
   case llvm::LibFunc_llabs:
-    RETURN_VAL(make_unique<BinOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<BinOp>(BB, *ty, value_name(i), *args[0],
                                   *make_intconst(1, 1), BinOp::Abs));
 
   case llvm::LibFunc_fabs:
   case llvm::LibFunc_fabsf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::FAbs, parse_fmath(i)));
 
   case llvm::LibFunc_ceil:
   case llvm::LibFunc_ceilf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::Ceil, parse_fmath(i)));
 
   case llvm::LibFunc_floor:
   case llvm::LibFunc_floorf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::Floor, parse_fmath(i)));
 
   case llvm::LibFunc_nearbyint:
   case llvm::LibFunc_nearbyintf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::NearbyInt, parse_fmath(i)));
 
   case llvm::LibFunc_rint:
   case llvm::LibFunc_rintf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::RInt, parse_fmath(i)));
 
   case llvm::LibFunc_round:
   case llvm::LibFunc_roundf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::Round, parse_fmath(i)));
 
   case llvm::LibFunc_roundeven:
   case llvm::LibFunc_roundevenf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::RoundEven, parse_fmath(i)));
 
   case llvm::LibFunc_trunc:
   case llvm::LibFunc_truncf:
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::Trunc, parse_fmath(i)));
 
   case llvm::LibFunc_copysign:
   case llvm::LibFunc_copysignf:
-    RETURN_VAL(make_unique<FpBinOp>(*ty, value_name(i), *args[0], *args[1],
+    RETURN_VAL(make_unique<FpBinOp>(BB, *ty, value_name(i), *args[0], *args[1],
                                     FpBinOp::CopySign, parse_fmath(i)));
 
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
-    BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));
-    RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
+    BB.addInstr(make_unique<Assume>(BB, *args[0], Assume::WellDefined));
+    RETURN_VAL(make_unique<FpUnaryOp>(BB, *ty, value_name(i), *args[0],
                                       FpUnaryOp::Sqrt, parse_fmath(i)));
   case llvm::LibFunc_fwrite: {
     auto size = getInt(*args[1]);
@@ -619,9 +622,9 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     if (size || count) {
       // size_t fwrite(const void *ptr, 0, 0, FILE *stream) -> 0
       if ((size && *size == 0) || (count && *count == 0))
-        RETURN_VAL(
-          make_unique<UnaryOp>(*ty, value_name(i),
-                               *make_intconst(0, ty->bits()), UnaryOp::Copy));
+        RETURN_VAL(make_unique<UnaryOp>(BB, *ty, value_name(i),
+                                        *make_intconst(0, ty->bits()),
+                                        UnaryOp::Copy));
     }
     if (size && count) {
       auto bytes = *size * *count;
@@ -630,16 +633,15 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       if (bytes == 1 && i.use_empty() && TLI.has(llvm::LibFunc_fputc)) {
         auto &byteTy = get_int_type(8); // FIXME
         auto &i32 = get_int_type(32);
-        auto load
-          = make_unique<Load>(byteTy, value_name(i) + "#load", *args[0], 1);
-        auto load_zext
-           = make_unique<ConversionOp>(i32, value_name(i) + "#zext", *load,
-                                       ConversionOp::ZExt);
+        auto load =
+            make_unique<Load>(BB, byteTy, value_name(i) + "#load", *args[0], 1);
+        auto load_zext = make_unique<ConversionOp>(
+            BB, i32, value_name(i) + "#zext", *load, ConversionOp::ZExt);
 
         ENSURE(!implict_attrs_(llvm::LibFunc_fputc, attrs, param_attrs, false,
                                {load_zext.get(), args[3]}));
-        auto call
-          = make_unique<FnCall>(i32, value_name(i), "@fputc", std::move(attrs));
+        auto call = make_unique<FnCall>(BB, i32, value_name(i), "@fputc",
+                                        std::move(attrs));
         call->addArg(*load_zext, std::move(param_attrs[0]));
         call->addArg(*args[3], std::move(param_attrs[1]));
         BB.addInstr(std::move(load));

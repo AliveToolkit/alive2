@@ -27,15 +27,18 @@ class Function;
 class BasicBlock final {
   std::string name;
   std::vector<std::unique_ptr<Instr>> m_instrs;
+  const Function &p_function;
 
   // If the basic block is a header, this holds all exit blocks of its loop
   // TODO: remove this..
   std::unordered_set<BasicBlock*> exit_blocks;
 
 public:
-  BasicBlock(std::string_view name) : name(name) {}
+  BasicBlock(const Function &parent, std::string_view name)
+      : name(name), p_function(parent) {}
 
   const std::string& getName() const { return name; }
+  const Function &getFn() const { return p_function; }
 
   size_t size() const { return m_instrs.size(); }
   const Instr& at(size_t index) const { return *m_instrs.at(index); }
@@ -46,6 +49,11 @@ public:
 
   smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
+
+  template <typename T, class... Args> void addInstr(Args &&...args) {
+    m_instrs.emplace_back(
+        std::make_unique<T>(*this, std::forward<Args>(args)...));
+  }
 
   void addInstr(std::unique_ptr<Instr> &&i, bool push_front = false);
   void addInstrAt(std::unique_ptr<Instr> &&i, const Instr *other, bool before);
@@ -68,7 +76,7 @@ public:
   JumpInstr::it_helper targets() const;
   void replaceTargetWith(const BasicBlock *from, const BasicBlock *to);
 
-  std::unique_ptr<BasicBlock> dup(Function &f, const std::string &suffix) const;
+  std::unique_ptr<BasicBlock> dup(const std::string &suffix) const;
   void rauw(const Value &what, Value &with);
 
   friend std::ostream& operator<<(std::ostream &os, const BasicBlock &bb);
@@ -81,7 +89,7 @@ class Function final {
   std::unordered_map<std::string, BasicBlock> BBs;
   std::vector<BasicBlock*> BB_order;
 
-  static BasicBlock sink_bb;
+  std::unique_ptr<BasicBlock> sink_bb;
 
   unsigned bits_pointers = 64;
   unsigned bits_ptr_offset = 64;
@@ -114,13 +122,14 @@ private:
   std::vector<FnDecl> fn_decls;
 
 public:
-  Function() = default;
+  Function() : sink_bb(std::make_unique<BasicBlock>(*this, "sink")) {}
   Function(Type &type, std::string &&name, unsigned bits_pointers = 64,
            unsigned bits_ptr_offset = 64, bool little_endian = true,
            bool is_var_args = false)
-    : type(&type), name(std::move(name)), bits_pointers(bits_pointers),
-      bits_ptr_offset(bits_ptr_offset), little_endian(little_endian),
-      is_var_args(is_var_args) {}
+      : type(&type), name(std::move(name)),
+        sink_bb(std::make_unique<BasicBlock>(*this, "sink")),
+        bits_pointers(bits_pointers), bits_ptr_offset(bits_ptr_offset),
+        little_endian(little_endian), is_var_args(is_var_args) {}
 
   const IR::Type& getType() const { return type ? *type : Type::voidTy; }
   void setType(IR::Type &t) { type = &t; }
@@ -141,7 +150,7 @@ public:
   BasicBlock& getEntryBB();
   const BasicBlock& getLastBB() const { return *BB_order.back(); }
   BasicBlock& getLastBB() { return *BB_order.back(); }
-  const BasicBlock& getSinkBB() const { return sink_bb; }
+  const BasicBlock& getSinkBB() const { return *sink_bb; }
   BasicBlock& getBB(unsigned idx) { return *BB_order.at(idx); }
   BasicBlock& getBB(std::string_view name, bool push_front = false);
   const BasicBlock& getBB(std::string_view name) const;

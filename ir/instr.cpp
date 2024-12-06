@@ -102,6 +102,10 @@ uint64_t getGlobalVarSize(const IR::Value *V) {
 
 namespace IR {
 
+const Function &Instr::getFn() const {
+  return p_bb.getFn();
+}
+
 expr Instr::getTypeConstraints() const {
   UNREACHABLE();
   return {};
@@ -111,9 +115,10 @@ bool Instr::isTerminator() const {
   return false;
 }
 
-BinOp::BinOp(Type &type, string &&name, Value &lhs, Value &rhs, Op op,
-             unsigned flags)
-  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), flags(flags) {
+BinOp::BinOp(const BasicBlock &parent, Type &type, string &&name, Value &lhs,
+             Value &rhs, Op op, unsigned flags)
+    : Instr(parent, type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op),
+      flags(flags) {
   switch (op) {
   case Add:
   case Sub:
@@ -599,8 +604,9 @@ expr BinOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() && std::move(instrconstr);
 }
 
-unique_ptr<Instr> BinOp::dup(Function &f, const string &suffix) const {
-  return make_unique<BinOp>(getType(), getName()+suffix, *lhs, *rhs, op, flags);
+unique_ptr<Instr> BinOp::dup(const string &suffix) const {
+  return make_unique<BinOp>(p_bb, getType(), getName() + suffix, *lhs, *rhs, op,
+                            flags);
 }
 
 bool BinOp::isDivOrRem() const {
@@ -964,9 +970,9 @@ expr FpBinOp::getTypeConstraints(const Function &f) const {
          getType() == rhs->getType();
 }
 
-unique_ptr<Instr> FpBinOp::dup(Function &f, const string &suffix) const {
-  return make_unique<FpBinOp>(getType(), getName()+suffix, *lhs, *rhs, op,
-                              fmath);
+unique_ptr<Instr> FpBinOp::dup(const string &suffix) const {
+  return make_unique<FpBinOp>(p_bb, getType(), getName() + suffix, *lhs, *rhs,
+                              op, fmath);
 }
 
 
@@ -1104,12 +1110,12 @@ static Value* dup_aggregate(Function &f, Value *val) {
   return val;
 }
 
-unique_ptr<Instr> UnaryOp::dup(Function &f, const string &suffix) const {
+unique_ptr<Instr> UnaryOp::dup(const string &suffix) const {
   auto *newval = val;
   if (dynamic_cast<AggregateValue*>(val) != nullptr && op == Copy)
-    newval = dup_aggregate(f, val);
+    newval = dup_aggregate(const_cast<Function &>(p_bb.getFn()), val);
 
-  return make_unique<UnaryOp>(getType(), getName() + suffix, *newval, op);
+  return make_unique<UnaryOp>(p_bb, getType(), getName() + suffix, *newval, op);
 }
 
 
@@ -1218,9 +1224,9 @@ expr FpUnaryOp::getTypeConstraints(const Function &f) const {
          getType().enforceFloatOrVectorType();
 }
 
-unique_ptr<Instr> FpUnaryOp::dup(Function &f, const string &suffix) const {
-  return
-    make_unique<FpUnaryOp>(getType(), getName() + suffix, *val, op, fmath, rm);
+unique_ptr<Instr> FpUnaryOp::dup(const string &suffix) const {
+  return make_unique<FpUnaryOp>(p_bb, getType(), getName() + suffix, *val, op,
+                                fmath, rm);
 }
 
 
@@ -1292,9 +1298,9 @@ expr UnaryReductionOp::getTypeConstraints(const Function &f) const {
            [this](auto &scalar) { return scalar == getType(); });
 }
 
-unique_ptr<Instr>
-UnaryReductionOp::dup(Function &f, const string &suffix) const {
-  return make_unique<UnaryReductionOp>(getType(), getName() + suffix, *val, op);
+unique_ptr<Instr> UnaryReductionOp::dup(const string &suffix) const {
+  return make_unique<UnaryReductionOp>(p_bb, getType(), getName() + suffix,
+                                       *val, op);
 }
 
 
@@ -1408,8 +1414,9 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() && instrconstr;
 }
 
-unique_ptr<Instr> TernaryOp::dup(Function &f, const string &suffix) const {
-  return make_unique<TernaryOp>(getType(), getName() + suffix, *a, *b, *c, op);
+unique_ptr<Instr> TernaryOp::dup(const string &suffix) const {
+  return make_unique<TernaryOp>(p_bb, getType(), getName() + suffix, *a, *b, *c,
+                                op);
 }
 
 
@@ -1493,9 +1500,9 @@ expr FpTernaryOp::getTypeConstraints(const Function &f) const {
          getType().enforceFloatOrVectorType();
 }
 
-unique_ptr<Instr> FpTernaryOp::dup(Function &f, const string &suffix) const {
-  return make_unique<FpTernaryOp>(getType(), getName() + suffix, *a, *b, *c, op,
-                                  fmath, rm);
+unique_ptr<Instr> FpTernaryOp::dup(const string &suffix) const {
+  return make_unique<FpTernaryOp>(p_bb, getType(), getName() + suffix, *a, *b,
+                                  *c, op, fmath, rm);
 }
 
 
@@ -1564,13 +1571,15 @@ expr TestOp::getTypeConstraints(const Function &f) const {
          getType().enforceVectorTypeEquiv(lhs->getType());
 }
 
-unique_ptr<Instr> TestOp::dup(Function &f, const string &suffix) const {
-  return make_unique<TestOp>(getType(), getName() + suffix, *lhs, *rhs, op);
+unique_ptr<Instr> TestOp::dup(const string &suffix) const {
+  return make_unique<TestOp>(p_bb, getType(), getName() + suffix, *lhs, *rhs,
+                             op);
 }
 
-ConversionOp::ConversionOp(Type &type, std::string &&name, Value &val, Op op,
+ConversionOp::ConversionOp(const BasicBlock &parent, Type &type,
+                           std::string &&name, Value &val, Op op,
                            unsigned flags)
-    : Instr(type, std::move(name)), val(&val), op(op), flags(flags) {
+    : Instr(parent, type, std::move(name)), val(&val), op(op), flags(flags) {
   switch (op) {
   case ZExt:
     assert((flags & NNEG) == flags);
@@ -1727,15 +1736,16 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
   return c;
 }
 
-unique_ptr<Instr> ConversionOp::dup(Function &f, const string &suffix) const {
-  return
-    make_unique<ConversionOp>(getType(), getName() + suffix, *val, op, flags);
+unique_ptr<Instr> ConversionOp::dup(const string &suffix) const {
+  return make_unique<ConversionOp>(p_bb, getType(), getName() + suffix, *val,
+                                   op, flags);
 }
 
-FpConversionOp::FpConversionOp(Type &type, std::string &&name, Value &val,
-                               Op op, FpRoundingMode rm, FpExceptionMode ex,
+FpConversionOp::FpConversionOp(const BasicBlock &parent, Type &type,
+                               std::string &&name, Value &val, Op op,
+                               FpRoundingMode rm, FpExceptionMode ex,
                                unsigned flags, FastMathFlags fmath)
-    : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
+    : Instr(parent, type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
       flags(flags), fmath(fmath) {
   switch (op) {
   case UIntToFP:
@@ -1943,11 +1953,10 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() && c;
 }
 
-unique_ptr<Instr> FpConversionOp::dup(Function &f, const string &suffix) const {
-  return make_unique<FpConversionOp>(getType(), getName() + suffix, *val, op,
-                                     rm, ex, flags, fmath);
+unique_ptr<Instr> FpConversionOp::dup(const string &suffix) const {
+  return make_unique<FpConversionOp>(p_bb, getType(), getName() + suffix, *val,
+                                     op, rm, ex, flags, fmath);
 }
-
 
 vector<Value*> Select::operands() const {
   return { cond, a, b };
@@ -2010,8 +2019,9 @@ expr Select::getTypeConstraints(const Function &f) const {
          getType() == b->getType();
 }
 
-unique_ptr<Instr> Select::dup(Function &f, const string &suffix) const {
-  return make_unique<Select>(getType(), getName() + suffix, *cond, *a, *b);
+unique_ptr<Instr> Select::dup(const string &suffix) const {
+  return make_unique<Select>(p_bb, getType(), getName() + suffix, *cond, *a,
+                             *b);
 }
 
 
@@ -2075,8 +2085,9 @@ expr ExtractValue::getTypeConstraints(const Function &f) const {
   return c;
 }
 
-unique_ptr<Instr> ExtractValue::dup(Function &f, const string &suffix) const {
-  auto ret = make_unique<ExtractValue>(getType(), getName() + suffix, *val);
+unique_ptr<Instr> ExtractValue::dup(const string &suffix) const {
+  auto ret =
+      make_unique<ExtractValue>(p_bb, getType(), getName() + suffix, *val);
   for (auto idx : idxs) {
     ret->addIdx(idx);
   }
@@ -2168,8 +2179,9 @@ expr InsertValue::getTypeConstraints(const Function &f) const {
   return c;
 }
 
-unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
-  auto ret = make_unique<InsertValue>(getType(), getName() + suffix, *val, *elt);
+unique_ptr<Instr> InsertValue::dup(const string &suffix) const {
+  auto ret =
+      make_unique<InsertValue>(p_bb, getType(), getName() + suffix, *val, *elt);
   for (auto idx : idxs) {
     ret->addIdx(idx);
   }
@@ -2179,10 +2191,11 @@ unique_ptr<Instr> InsertValue::dup(Function &f, const string &suffix) const {
 
 DEFINE_AS_RETZERO(FnCall, getMaxGEPOffset)
 
-FnCall::FnCall(Type &type, string &&name, string &&fnName, FnAttrs &&attrs,
-               Value *fnptr, unsigned var_arg_idx)
-  : MemInstr(type, std::move(name)), fnName(std::move(fnName)), fnptr(fnptr),
-    attrs(std::move(attrs)), var_arg_idx(var_arg_idx) {
+FnCall::FnCall(const BasicBlock &parent, Type &type, string &&name,
+               string &&fnName, FnAttrs &&attrs, Value *fnptr,
+               unsigned var_arg_idx)
+    : MemInstr(parent, type, std::move(name)), fnName(std::move(fnName)),
+      fnptr(fnptr), attrs(std::move(attrs)), var_arg_idx(var_arg_idx) {
   if (config::disallow_ub_exploitation)
     this->attrs.set(FnAttrs::NoUndef);
   assert(!fnptr || this->fnName.empty());
@@ -2627,26 +2640,26 @@ expr FnCall::getTypeConstraints(const Function &f) const {
   return ret;
 }
 
-unique_ptr<Instr> FnCall::dup(Function &f, const string &suffix) const {
-  auto r = make_unique<FnCall>(getType(), getName() + suffix, string(fnName),
-                               FnAttrs(attrs), fnptr, var_arg_idx);
+unique_ptr<Instr> FnCall::dup(const string &suffix) const {
+  auto r =
+      make_unique<FnCall>(p_bb, getType(), getName() + suffix, string(fnName),
+                          FnAttrs(attrs), fnptr, var_arg_idx);
   r->args = args;
   r->approx = approx;
   r->tci = tci;
   return r;
 }
 
+InlineAsm::InlineAsm(const BasicBlock &parent, Type &type, string &&name,
+                     const string &asm_str, const string &constraints,
+                     FnAttrs &&attrs)
+    : FnCall(parent, type, std::move(name),
+             "asm " + asm_str + ", " + constraints, std::move(attrs)) {}
 
-InlineAsm::InlineAsm(Type &type, string &&name, const string &asm_str,
-                     const string &constraints, FnAttrs &&attrs)
-  : FnCall(type, std::move(name), "asm " + asm_str + ", " + constraints,
-           std::move(attrs)) {}
-
-
-ICmp::ICmp(Type &type, string &&name, Cond cond, Value &a, Value &b,
-           unsigned flags)
-    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), flags(flags),
-      defined(cond != Any) {
+ICmp::ICmp(const BasicBlock &parent, Type &type, string &&name, Cond cond,
+           Value &a, Value &b, unsigned flags)
+    : Instr(parent, type, std::move(name)), a(&a), b(&b), cond(cond),
+      flags(flags), defined(cond != Any) {
   assert((flags & SameSign) == flags);
   if (!defined)
     cond_name = getName() + "_cond";
@@ -2791,8 +2804,9 @@ expr ICmp::getTypeConstraints(const Function &f) const {
          a->getType() == b->getType();
 }
 
-unique_ptr<Instr> ICmp::dup(Function &f, const string &suffix) const {
-  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b, flags);
+unique_ptr<Instr> ICmp::dup(const string &suffix) const {
+  return make_unique<ICmp>(p_bb, getType(), getName() + suffix, cond, *a, *b,
+                           flags);
 }
 
 
@@ -2890,8 +2904,9 @@ expr FCmp::getTypeConstraints(const Function &f) const {
          a->getType() == b->getType();
 }
 
-unique_ptr<Instr> FCmp::dup(Function &f, const string &suffix) const {
-  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, fmath);
+unique_ptr<Instr> FCmp::dup(const string &suffix) const {
+  return make_unique<FCmp>(p_bb, getType(), getName() + suffix, cond, *a, *b,
+                           fmath);
 }
 
 
@@ -2947,8 +2962,8 @@ expr Freeze::getTypeConstraints(const Function &f) const {
          getType() == val->getType();
 }
 
-unique_ptr<Instr> Freeze::dup(Function &f, const string &suffix) const {
-  return make_unique<Freeze>(getType(), getName() + suffix, *val);
+unique_ptr<Instr> Freeze::dup(const string &suffix) const {
+  return make_unique<Freeze>(p_bb, getType(), getName() + suffix, *val);
 }
 
 
@@ -3062,8 +3077,8 @@ expr Phi::getTypeConstraints(const Function &f) const {
   return c;
 }
 
-unique_ptr<Instr> Phi::dup(Function &f, const string &suffix) const {
-  auto phi = make_unique<Phi>(getType(), getName() + suffix);
+unique_ptr<Instr> Phi::dup(const string &suffix) const {
+  auto phi = make_unique<Phi>(p_bb, getType(), getName() + suffix);
   for (auto &[val, bb] : values) {
     phi->addValue(*val, string(bb));
   }
@@ -3150,10 +3165,10 @@ expr Branch::getTypeConstraints(const Function &f) const {
   return cond->getType().enforceIntType(1);
 }
 
-unique_ptr<Instr> Branch::dup(Function &f, const string &suffix) const {
+unique_ptr<Instr> Branch::dup(const string &suffix) const {
   if (dst_false)
-    return make_unique<Branch>(*cond, *dst_true, *dst_false);
-  return make_unique<Branch>(*dst_true);
+    return make_unique<Branch>(p_bb, *cond, *dst_true, *dst_false);
+  return make_unique<Branch>(p_bb, *dst_true);
 }
 
 
@@ -3218,8 +3233,8 @@ expr Switch::getTypeConstraints(const Function &f) const {
   return typ;
 }
 
-unique_ptr<Instr> Switch::dup(Function &f, const string &suffix) const {
-  auto sw = make_unique<Switch>(*value, *default_target);
+unique_ptr<Instr> Switch::dup(const string &suffix) const {
+  auto sw = make_unique<Switch>(p_bb, *value, *default_target);
   for (auto &[value_cond, bb] : targets) {
     sw->addTarget(*value_cond, *bb);
   }
@@ -3304,21 +3319,22 @@ expr Return::getTypeConstraints(const Function &f) const {
          f.getType() == getType();
 }
 
-unique_ptr<Instr> Return::dup(Function &f, const string &suffix) const {
-  return make_unique<Return>(getType(), *val);
+unique_ptr<Instr> Return::dup(const string &suffix) const {
+  return make_unique<Return>(p_bb, getType(), *val);
 }
 
 bool Return::isTerminator() const {
   return true;
 }
 
-Assume::Assume(Value &cond, Kind kind)
-    : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
+Assume::Assume(const BasicBlock &parent, Value &cond, Kind kind)
+    : Instr(parent, Type::voidTy, "assume"), args({&cond}), kind(kind) {
   assert(kind == AndNonPoison || kind == WellDefined || kind == NonNull);
 }
 
-Assume::Assume(vector<Value *> &&args0, Kind kind)
-    : Instr(Type::voidTy, "assume"), args(std::move(args0)), kind(kind) {
+Assume::Assume(const BasicBlock &parent, vector<Value *> &&args0, Kind kind)
+    : Instr(parent, Type::voidTy, "assume"), args(std::move(args0)),
+      kind(kind) {
   switch (kind) {
     case AndNonPoison:
     case WellDefined:
@@ -3438,14 +3454,14 @@ expr Assume::getTypeConstraints(const Function &f) const {
   UNREACHABLE();
 }
 
-unique_ptr<Instr> Assume::dup(Function &f, const string &suffix) const {
-  return make_unique<Assume>(vector<Value *>(args), kind);
+unique_ptr<Instr> Assume::dup(const string &suffix) const {
+  return make_unique<Assume>(p_bb, vector<Value *>(args), kind);
 }
 
-
-AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
-                     vector<Value *> &&args0, Kind kind, bool is_welldefined)
-    : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
+AssumeVal::AssumeVal(const BasicBlock &parent, Type &type, string &&name,
+                     Value &val, vector<Value *> &&args0, Kind kind,
+                     bool is_welldefined)
+    : Instr(parent, type, std::move(name)), val(&val), args(std::move(args0)),
       kind(kind), is_welldefined(is_welldefined) {
   switch (kind) {
   case Align:
@@ -3580,8 +3596,8 @@ expr AssumeVal::getTypeConstraints(const Function &f) const {
   return getType() == val->getType() && e;
 }
 
-unique_ptr<Instr> AssumeVal::dup(Function &f, const string &suffix) const {
-  return make_unique<AssumeVal>(getType(), getName() + suffix, *val,
+unique_ptr<Instr> AssumeVal::dup(const string &suffix) const {
+  return make_unique<AssumeVal>(p_bb, getType(), getName() + suffix, *val,
                                 vector<Value*>(args), kind, is_welldefined);
 }
 
@@ -3691,8 +3707,9 @@ expr Alloc::getTypeConstraints(const Function &f) const {
          size->getType().enforceIntType();
 }
 
-unique_ptr<Instr> Alloc::dup(Function &f, const string &suffix) const {
-  auto a = make_unique<Alloc>(getType(), getName() + suffix, *size, mul, align);
+unique_ptr<Instr> Alloc::dup(const string &suffix) const {
+  auto a = make_unique<Alloc>(p_bb, getType(), getName() + suffix, *size, mul,
+                              align);
   if (initially_dead)
     a->markAsInitiallyDead();
   return a;
@@ -3730,8 +3747,8 @@ expr StartLifetime::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> StartLifetime::dup(Function &f, const string &suffix) const {
-  return make_unique<StartLifetime>(*ptr);
+unique_ptr<Instr> StartLifetime::dup(const string &suffix) const {
+  return make_unique<StartLifetime>(p_bb, *ptr);
 }
 
 
@@ -3766,8 +3783,8 @@ expr EndLifetime::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> EndLifetime::dup(Function &f, const string &suffix) const {
-  return make_unique<EndLifetime>(*ptr);
+unique_ptr<Instr> EndLifetime::dup(const string &suffix) const {
+  return make_unique<EndLifetime>(p_bb, *ptr);
 }
 
 
@@ -3953,9 +3970,9 @@ expr GEP::getTypeConstraints(const Function &f) const {
   return c;
 }
 
-unique_ptr<Instr> GEP::dup(Function &f, const string &suffix) const {
-  auto dup = make_unique<GEP>(getType(), getName() + suffix, *ptr, inbounds,
-                              nusw, nuw);
+unique_ptr<Instr> GEP::dup(const string &suffix) const {
+  auto dup = make_unique<GEP>(p_bb, getType(), getName() + suffix, *ptr,
+                              inbounds, nusw, nuw);
   for (auto &[sz, idx] : idxs) {
     dup->addIdx(sz, *idx);
   }
@@ -4034,8 +4051,8 @@ expr PtrMask::getTypeConstraints(const Function &f) const {
          ptr->getType().enforceVectorTypeIff(mask->getType());
 }
 
-unique_ptr<Instr> PtrMask::dup(Function &f, const string &suffix) const {
-  return make_unique<PtrMask>(getType(), getName() + suffix, *ptr, *mask);
+unique_ptr<Instr> PtrMask::dup(const string &suffix) const {
+  return make_unique<PtrMask>(p_bb, getType(), getName() + suffix, *ptr, *mask);
 }
 
 
@@ -4080,8 +4097,8 @@ expr Load::getTypeConstraints(const Function &f) const {
          ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> Load::dup(Function &f, const string &suffix) const {
-  return make_unique<Load>(getType(), getName() + suffix, *ptr, align);
+unique_ptr<Instr> Load::dup(const string &suffix) const {
+  return make_unique<Load>(p_bb, getType(), getName() + suffix, *ptr, align);
 }
 
 
@@ -4133,8 +4150,8 @@ expr Store::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> Store::dup(Function &f, const string &suffix) const {
-  return make_unique<Store>(*ptr, *val, align);
+unique_ptr<Instr> Store::dup(const string &suffix) const {
+  return make_unique<Store>(p_bb, *ptr, *val, align);
 }
 
 
@@ -4201,19 +4218,21 @@ expr Memset::getTypeConstraints(const Function &f) const {
          bytes->getType().enforceIntType();
 }
 
-unique_ptr<Instr> Memset::dup(Function &f, const string &suffix) const {
-  return make_unique<Memset>(*ptr, *val, *bytes, align, tci);
+unique_ptr<Instr> Memset::dup(const string &suffix) const {
+  return make_unique<Memset>(p_bb, *ptr, *val, *bytes, align, tci);
 }
 
 
 DEFINE_AS_RETZEROALIGN(MemsetPattern, getMaxAllocSize)
 DEFINE_AS_RETZERO(MemsetPattern, getMaxGEPOffset)
 
-MemsetPattern::MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
+MemsetPattern::MemsetPattern(const BasicBlock &parent, Value &ptr,
+                             Value &pattern, Value &bytes,
                              unsigned pattern_length, TailCallInfo tci)
-  : MemInstr(Type::voidTy, "memset_pattern" + to_string(pattern_length)),
-    ptr(&ptr), pattern(&pattern), bytes(&bytes),
-    pattern_length(pattern_length), tci(tci) {}
+    : MemInstr(parent, Type::voidTy,
+               "memset_pattern" + to_string(pattern_length)),
+      ptr(&ptr), pattern(&pattern), bytes(&bytes),
+      pattern_length(pattern_length), tci(tci) {}
 
 uint64_t MemsetPattern::getMaxAccessSize() const {
   return getIntOr(*bytes, UINT64_MAX);
@@ -4262,8 +4281,9 @@ expr MemsetPattern::getTypeConstraints(const Function &f) const {
          bytes->getType().enforceIntType();
 }
 
-unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
-  return make_unique<MemsetPattern>(*ptr, *pattern, *bytes, pattern_length, tci);
+unique_ptr<Instr> MemsetPattern::dup(const string &suffix) const {
+  return make_unique<MemsetPattern>(p_bb, *ptr, *pattern, *bytes,
+                                    pattern_length, tci);
 }
 
 
@@ -4305,8 +4325,8 @@ expr FillPoison::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> FillPoison::dup(Function &f, const string &suffix) const {
-  return make_unique<FillPoison>(*ptr);
+unique_ptr<Instr> FillPoison::dup(const string &suffix) const {
+  return make_unique<FillPoison>(p_bb, *ptr);
 }
 
 
@@ -4390,9 +4410,9 @@ expr Memcpy::getTypeConstraints(const Function &f) const {
          bytes->getType().enforceIntType();
 }
 
-unique_ptr<Instr> Memcpy::dup(Function &f, const string &suffix) const {
-  return
-    make_unique<Memcpy>(*dst, *src, *bytes, align_dst, align_src, move, tci);
+unique_ptr<Instr> Memcpy::dup(const string &suffix) const {
+  return make_unique<Memcpy>(p_bb, *dst, *src, *bytes, align_dst, align_src,
+                             move, tci);
 }
 
 
@@ -4501,9 +4521,9 @@ expr Memcmp::getTypeConstraints(const Function &f) const {
          num->getType().enforceIntType();
 }
 
-unique_ptr<Instr> Memcmp::dup(Function &f, const string &suffix) const {
-  return make_unique<Memcmp>(getType(), getName() + suffix, *ptr1, *ptr2, *num,
-                             is_bcmp, tci);
+unique_ptr<Instr> Memcmp::dup(const string &suffix) const {
+  return make_unique<Memcmp>(p_bb, getType(), getName() + suffix, *ptr1, *ptr2,
+                             *num, is_bcmp, tci);
 }
 
 
@@ -4563,8 +4583,8 @@ expr Strlen::getTypeConstraints(const Function &f) const {
          getType().enforceIntType();
 }
 
-unique_ptr<Instr> Strlen::dup(Function &f, const string &suffix) const {
-  return make_unique<Strlen>(getType(), getName() + suffix, *ptr, tci);
+unique_ptr<Instr> Strlen::dup(const string &suffix) const {
+  return make_unique<Strlen>(p_bb, getType(), getName() + suffix, *ptr, tci);
 }
 
 
@@ -4624,8 +4644,8 @@ expr VaStart::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> VaStart::dup(Function &f, const string &suffix) const {
-  return make_unique<VaStart>(*ptr);
+unique_ptr<Instr> VaStart::dup(const string &suffix) const {
+  return make_unique<VaStart>(p_bb, *ptr);
 }
 
 
@@ -4693,8 +4713,8 @@ expr VaEnd::getTypeConstraints(const Function &f) const {
   return ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> VaEnd::dup(Function &f, const string &suffix) const {
-  return make_unique<VaEnd>(*ptr);
+unique_ptr<Instr> VaEnd::dup(const string &suffix) const {
+  return make_unique<VaEnd>(p_bb, *ptr);
 }
 
 
@@ -4758,8 +4778,8 @@ expr VaCopy::getTypeConstraints(const Function &f) const {
          src->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> VaCopy::dup(Function &f, const string &suffix) const {
-  return make_unique<VaCopy>(*dst, *src);
+unique_ptr<Instr> VaCopy::dup(const string &suffix) const {
+  return make_unique<VaCopy>(p_bb, *dst, *src);
 }
 
 
@@ -4825,8 +4845,8 @@ expr VaArg::getTypeConstraints(const Function &f) const {
          ptr->getType().enforcePtrType();
 }
 
-unique_ptr<Instr> VaArg::dup(Function &f, const string &suffix) const {
-  return make_unique<VaArg>(getType(), getName() + suffix, *ptr);
+unique_ptr<Instr> VaArg::dup(const string &suffix) const {
+  return make_unique<VaArg>(p_bb, getType(), getName() + suffix, *ptr);
 }
 
 
@@ -4867,8 +4887,9 @@ expr ExtractElement::getTypeConstraints(const Function &f) const {
          idx->getType().enforceIntType();
 }
 
-unique_ptr<Instr> ExtractElement::dup(Function &f, const string &suffix) const {
-  return make_unique<ExtractElement>(getType(), getName() + suffix, *v, *idx);
+unique_ptr<Instr> ExtractElement::dup(const string &suffix) const {
+  return make_unique<ExtractElement>(p_bb, getType(), getName() + suffix, *v,
+                                     *idx);
 }
 
 
@@ -4911,11 +4932,10 @@ expr InsertElement::getTypeConstraints(const Function &f) const {
          idx->getType().enforceIntType();
 }
 
-unique_ptr<Instr> InsertElement::dup(Function &f, const string &suffix) const {
-  return make_unique<InsertElement>(getType(), getName() + suffix,
-                                    *v, *e, *idx);
+unique_ptr<Instr> InsertElement::dup(const string &suffix) const {
+  return make_unique<InsertElement>(p_bb, getType(), getName() + suffix, *v, *e,
+                                    *idx);
 }
-
 
 vector<Value*> ShuffleVector::operands() const {
   return { v1, v2 };
@@ -4966,9 +4986,9 @@ expr ShuffleVector::getTypeConstraints(const Function &f) const {
          v1->getType() == v2->getType();
 }
 
-unique_ptr<Instr> ShuffleVector::dup(Function &f, const string &suffix) const {
-  return make_unique<ShuffleVector>(getType(), getName() + suffix,
-                                    *v1, *v2, mask);
+unique_ptr<Instr> ShuffleVector::dup(const string &suffix) const {
+  return make_unique<ShuffleVector>(p_bb, getType(), getName() + suffix, *v1,
+                                    *v2, mask);
 }
 
 

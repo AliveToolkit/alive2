@@ -16,17 +16,20 @@ class Function;
 
 class Instr : public Value {
 protected:
-  Instr(Type &type, std::string &&name) : Value(type, std::move(name)) {}
+  const BasicBlock &p_bb;
+  Instr(const BasicBlock &parent, Type &type, std::string &&name)
+      : Value(type, std::move(name)), p_bb(parent) {}
 
 public:
+  const BasicBlock &getBB() const { return p_bb; }
+  const Function &getFn() const;
   virtual std::vector<Value*> operands() const = 0;
   virtual bool propagatesPoison() const = 0;
   virtual bool hasSideEffects() const = 0;
   virtual bool isTerminator() const;
   smt::expr getTypeConstraints() const override;
   virtual smt::expr getTypeConstraints(const Function &f) const = 0;
-  virtual std::unique_ptr<Instr> dup(Function &f,
-                                     const std::string &suffix) const = 0;
+  virtual std::unique_ptr<Instr> dup(const std::string &suffix) const = 0;
 };
 
 
@@ -47,8 +50,8 @@ private:
   bool isDivOrRem() const;
 
 public:
-  BinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-        unsigned flags = None);
+  BinOp(const BasicBlock &parent, Type &type, std::string &&name, Value &lhs,
+        Value &rhs, Op op, unsigned flags = None);
 
   Op getOp() const { return op; }
   unsigned getFlags() const { return flags; }
@@ -59,8 +62,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -77,10 +79,11 @@ private:
   FpExceptionMode ex;
 
 public:
-  FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-          FastMathFlags fmath, FpRoundingMode rm = {}, FpExceptionMode ex = {})
-  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
-    rm(rm), ex(ex) {}
+  FpBinOp(const BasicBlock &parent, Type &type, std::string &&name, Value &lhs,
+          Value &rhs, Op op, FastMathFlags fmath, FpRoundingMode rm = {},
+          FpExceptionMode ex = {})
+      : Instr(parent, type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op),
+        fmath(fmath), rm(rm), ex(ex) {}
 
   Op getOp() const { return op; }
   FastMathFlags getFastMathFlags() const { return fmath; }
@@ -93,8 +96,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -109,8 +111,9 @@ private:
   Op op;
 
 public:
-  UnaryOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(&val), op(op) {}
+  UnaryOp(const BasicBlock &parent, Type &type, std::string &&name, Value &val,
+          Op op)
+      : Instr(parent, type, std::move(name)), val(&val), op(op) {}
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
@@ -121,8 +124,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -141,11 +143,11 @@ private:
   FpExceptionMode ex;
 
 public:
-  FpUnaryOp(Type &type, std::string &&name, Value &val, Op op,
-            FastMathFlags fmath, FpRoundingMode rm = {},
+  FpUnaryOp(const BasicBlock &parent, Type &type, std::string &&name,
+            Value &val, Op op, FastMathFlags fmath, FpRoundingMode rm = {},
             FpExceptionMode ex = {})
-    : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm),
-      ex(ex) {}
+      : Instr(parent, type, std::move(name)), val(&val), op(op), fmath(fmath),
+        rm(rm), ex(ex) {}
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
@@ -159,8 +161,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -176,8 +177,9 @@ private:
   Op op;
 
 public:
-  UnaryReductionOp(Type &type, std::string &&name, Value &val, Op op)
-    : Instr(type, std::move(name)), val(&val), op(op) {}
+  UnaryReductionOp(const BasicBlock &parent, Type &type, std::string &&name,
+                   Value &val, Op op)
+      : Instr(parent, type, std::move(name)), val(&val), op(op) {}
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
@@ -188,8 +190,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -202,9 +203,9 @@ private:
   Op op;
 
 public:
-  TernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
-            Op op)
-    : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
+  TernaryOp(const BasicBlock &parent, Type &type, std::string &&name, Value &a,
+            Value &b, Value &c, Op op)
+      : Instr(parent, type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
 
   Op getOp() const { return op; }
   std::vector<Value*> operands() const override;
@@ -214,8 +215,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -231,11 +231,11 @@ private:
   FpExceptionMode ex;
 
 public:
-  FpTernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
-              Op op, FastMathFlags fmath, FpRoundingMode rm = {},
-              FpExceptionMode ex = {})
-    : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath),
-      rm(rm), ex(ex) {}
+  FpTernaryOp(const BasicBlock &parent, Type &type, std::string &&name,
+              Value &a, Value &b, Value &c, Op op, FastMathFlags fmath,
+              FpRoundingMode rm = {}, FpExceptionMode ex = {})
+      : Instr(parent, type, std::move(name)), a(&a), b(&b), c(&c), op(op),
+        fmath(fmath), rm(rm), ex(ex) {}
 
   Op getOp() const { return op; }
   FastMathFlags getFastMathFlags() const { return fmath; }
@@ -248,8 +248,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -262,8 +261,9 @@ private:
   Op op;
 
 public:
-  TestOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op)
-    : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op) {}
+  TestOp(const BasicBlock &parent, Type &type, std::string &&name, Value &lhs,
+         Value &rhs, Op op)
+      : Instr(parent, type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op) {}
 
   Op getOp() const { return op; }
   std::vector<Value*> operands() const override;
@@ -273,8 +273,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -289,8 +288,8 @@ private:
   unsigned flags;
 
 public:
-  ConversionOp(Type &type, std::string &&name, Value &val, Op op,
-               unsigned flags = None);
+  ConversionOp(const BasicBlock &parent, Type &type, std::string &&name,
+               Value &val, Op op, unsigned flags = None);
 
   Op getOp() const { return op; }
   Value& getValue() const { return *val; }
@@ -302,8 +301,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -322,9 +320,10 @@ private:
   FastMathFlags fmath;
 
 public:
-  FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
-                 FpRoundingMode rm = {}, FpExceptionMode ex = {},
-                 unsigned flags = None, FastMathFlags fmath = {});
+  FpConversionOp(const BasicBlock &parent, Type &type, std::string &&name,
+                 Value &val, Op op, FpRoundingMode rm = {},
+                 FpExceptionMode ex = {}, unsigned flags = None,
+                 FastMathFlags fmath = {});
 
   Op getOp() const { return op; }
   FpRoundingMode getRoundingMode() const { return rm; }
@@ -341,8 +340,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -350,9 +348,10 @@ class Select final : public Instr {
   Value *cond, *a, *b;
   FastMathFlags fmath;
 public:
-  Select(Type &type, std::string &&name, Value &cond, Value &a, Value &b,
-         FastMathFlags fmath = {})
-    : Instr(type, std::move(name)), cond(&cond), a(&a), b(&b), fmath(fmath) {}
+  Select(const BasicBlock &parent, Type &type, std::string &&name, Value &cond,
+         Value &a, Value &b, FastMathFlags fmath = {})
+      : Instr(parent, type, std::move(name)), cond(&cond), a(&a), b(&b),
+        fmath(fmath) {}
 
   Value& getCond() const { return *cond; }
   Value *getTrueValue() const { return a; }
@@ -366,8 +365,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -375,9 +373,10 @@ class ExtractValue final : public Instr {
   Value *val;
   std::vector<unsigned> idxs;
 public:
-  ExtractValue(Type &type, std::string &&name, Value &val)
-    : Instr(type, std::move(name)), val(&val) {}
-  
+  ExtractValue(const BasicBlock &parent, Type &type, std::string &&name,
+               Value &val)
+      : Instr(parent, type, std::move(name)), val(&val) {}
+
   const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
@@ -388,8 +387,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -397,9 +395,10 @@ class InsertValue final : public Instr {
   Value *val, *elt;
   std::vector<unsigned> idxs;
 public:
-  InsertValue(Type &type, std::string &&name, Value &val, Value &elt)
-          : Instr(type, std::move(name)), val(&val), elt(&elt) {}
-  
+  InsertValue(const BasicBlock &parent, Type &type, std::string &&name,
+              Value &val, Value &elt)
+      : Instr(parent, type, std::move(name)), val(&val), elt(&elt) {}
+
   const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
@@ -410,8 +409,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -435,8 +433,8 @@ private:
   smt::expr cond_var() const;
 
 public:
-  ICmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
-       unsigned flags = None);
+  ICmp(const BasicBlock &parent, Type &type, std::string &&name, Cond cond,
+       Value &a, Value &b, unsigned flags = None);
 
   bool isPtrCmp() const;
   PtrCmpMode getPtrCmpMode() const { return pcmode; }
@@ -450,8 +448,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -468,10 +465,11 @@ private:
   bool signaling;
 
 public:
-  FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
-       FastMathFlags fmath, FpExceptionMode ex = {}, bool signaling = false)
-    : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath),
-      ex(ex), signaling(signaling) {}
+  FCmp(const BasicBlock &parent, Type &type, std::string &&name, Cond cond,
+       Value &a, Value &b, FastMathFlags fmath, FpExceptionMode ex = {},
+       bool signaling = false)
+      : Instr(parent, type, std::move(name)), a(&a), b(&b), cond(cond),
+        fmath(fmath), ex(ex), signaling(signaling) {}
 
   Cond getCond() const { return cond; }
   FastMathFlags getFastMathFlags() const { return fmath; }
@@ -485,16 +483,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class Freeze final : public Instr {
   Value *val;
 public:
-  Freeze(Type &type, std::string &&name, Value &val)
-    : Instr(type, std::move(name)), val(&val) {}
+  Freeze(const BasicBlock &parent, Type &type, std::string &&name, Value &val)
+      : Instr(parent, type, std::move(name)), val(&val) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -503,8 +500,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -513,8 +509,9 @@ class Phi final : public Instr {
   FastMathFlags fmath;
 
 public:
-  Phi(Type &type, std::string &&name, FastMathFlags fmath = {})
-    : Instr(type, std::move(name)), fmath(fmath) {}
+  Phi(const BasicBlock &parent, Type &type, std::string &&name,
+      FastMathFlags fmath = {})
+      : Instr(parent, type, std::move(name)), fmath(fmath) {}
 
   void addValue(Value &val, std::string &&BB_name);
   void removeValue(const std::string &BB_name);
@@ -536,14 +533,14 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr> 
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class JumpInstr : public Instr {
 public:
-  JumpInstr(const char *name) : Instr(Type::voidTy, name) {}
+  JumpInstr(const BasicBlock &parent, const char *name)
+      : Instr(parent, Type::voidTy, name) {}
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
 
@@ -577,10 +574,13 @@ class Branch final : public JumpInstr {
   Value *cond = nullptr;
   const BasicBlock *dst_true, *dst_false = nullptr;
 public:
-  Branch(const BasicBlock &dst) : JumpInstr("br"), dst_true(&dst) {}
+  Branch(const BasicBlock &parent, const BasicBlock &dst)
+      : JumpInstr(parent, "br"), dst_true(&dst) {}
 
-  Branch(Value &cond, const BasicBlock &dst_true, const BasicBlock &dst_false)
-    : JumpInstr("br"), cond(&cond), dst_true(&dst_true), dst_false(&dst_false){}
+  Branch(const BasicBlock &parent, Value &cond, const BasicBlock &dst_true,
+         const BasicBlock &dst_false)
+      : JumpInstr(parent, "br"), cond(&cond), dst_true(&dst_true),
+        dst_false(&dst_false) {}
 
   Value* getCond() const { return cond; }
   auto& getTrue() const { return *dst_true; }
@@ -592,8 +592,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -603,8 +602,10 @@ class Switch final : public JumpInstr {
   std::vector<std::pair<Value*, const BasicBlock*>> targets;
 
 public:
-  Switch(Value &value, const BasicBlock &default_target)
-    : JumpInstr("switch"), value(&value), default_target(&default_target) {}
+  Switch(const BasicBlock &parent, Value &value,
+         const BasicBlock &default_target)
+      : JumpInstr(parent, "switch"), value(&value),
+        default_target(&default_target) {}
 
   void addTarget(Value &val, const BasicBlock &target);
 
@@ -618,15 +619,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class Return final : public Instr {
   Value *val;
 public:
-  Return(Type &type, Value &val) : Instr(type, "return"), val(&val) {}
+  Return(const BasicBlock &parent, Type &type, Value &val)
+      : Instr(parent, type, "return"), val(&val) {}
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -635,8 +636,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
   bool isTerminator() const override;
 };
 
@@ -657,8 +657,8 @@ private:
   Kind kind;
 
 public:
-  Assume(Value &cond, Kind kind);
-  Assume(std::vector<Value *> &&args, Kind kind);
+  Assume(const BasicBlock &parent, Value &cond, Kind kind);
+  Assume(const BasicBlock &parent, std::vector<Value *> &&args, Kind kind);
 
   Kind getKind() const { return kind; }
   std::vector<Value*> operands() const override;
@@ -668,8 +668,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -689,8 +688,8 @@ private:
   bool is_welldefined;
 
 public:
-  AssumeVal(Type &type, std::string &&name, Value &val,
-            std::vector<Value *> &&args, Kind kind,
+  AssumeVal(const BasicBlock &parent, Type &type, std::string &&name,
+            Value &val, std::vector<Value *> &&args, Kind kind,
             bool is_welldefined = false);
 
   Kind getKind() const { return kind; }
@@ -702,14 +701,14 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class MemInstr : public Instr {
 public:
-  MemInstr(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
+  MemInstr(const BasicBlock &parent, Type &type, std::string &&name)
+      : Instr(parent, type, std::move(name)) {}
 
   bool hasSideEffects() const override;
 
@@ -757,8 +756,10 @@ class Alloc final : public MemInstr {
   uint64_t align;
   bool initially_dead = false;
 public:
-  Alloc(Type &type, std::string &&name, Value &size, Value *mul, uint64_t align)
-    : MemInstr(type, std::move(name)), size(&size), mul(mul), align(align) {}
+  Alloc(const BasicBlock &parent, Type &type, std::string &&name, Value &size,
+        Value *mul, uint64_t align)
+      : MemInstr(parent, type, std::move(name)), size(&size), mul(mul),
+        align(align) {}
 
   Value& getSize() const { return *size; }
   Value* getMul() const { return mul; }
@@ -777,16 +778,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class StartLifetime final : public MemInstr {
   Value *ptr;
 public:
-  StartLifetime(Value &ptr) : MemInstr(Type::voidTy, "start_lifetime"),
-      ptr(&ptr) {}
+  StartLifetime(const BasicBlock &parent, Value &ptr)
+      : MemInstr(parent, Type::voidTy, "start_lifetime"), ptr(&ptr) {}
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -799,15 +799,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class EndLifetime final : public MemInstr {
   Value *ptr;
 public:
-  EndLifetime(Value &ptr) : MemInstr(Type::voidTy, "end_lifetime"), ptr(&ptr) {}
+  EndLifetime(const BasicBlock &parent, Value &ptr)
+      : MemInstr(parent, Type::voidTy, "end_lifetime"), ptr(&ptr) {}
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -820,8 +820,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -832,10 +831,10 @@ class GEP final : public MemInstr {
   bool nusw;
   bool nuw;
 public:
-  GEP(Type &type, std::string &&name, Value &ptr, bool inbounds, bool nusw,
-      bool nuw)
-    : MemInstr(type, std::move(name)), ptr(&ptr), inbounds(inbounds),
-      nusw(nusw), nuw(nuw) {
+  GEP(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr,
+      bool inbounds, bool nusw, bool nuw)
+      : MemInstr(parent, type, std::move(name)), ptr(&ptr), inbounds(inbounds),
+        nusw(nusw), nuw(nuw) {
     nusw |= inbounds;
   }
 
@@ -858,8 +857,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -867,8 +865,9 @@ class PtrMask final : public MemInstr {
   Value *ptr;
   Value *mask;
 public:
-  PtrMask(Type &type, std::string &&name, Value &ptr, Value &mask)
-    : MemInstr(type, std::move(name)), ptr(&ptr), mask(&mask) {}
+  PtrMask(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr,
+          Value &mask)
+      : MemInstr(parent, type, std::move(name)), ptr(&ptr), mask(&mask) {}
 
   Value& getPtr() const { return *ptr; }
   std::optional<uint64_t> getExactAlign() const;
@@ -885,8 +884,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -894,8 +892,9 @@ class Load final : public MemInstr {
   Value *ptr;
   uint64_t align;
 public:
-  Load(Type &type, std::string &&name, Value &ptr, uint64_t align)
-    : MemInstr(type, std::move(name)), ptr(&ptr), align(align) {}
+  Load(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr,
+       uint64_t align)
+      : MemInstr(parent, type, std::move(name)), ptr(&ptr), align(align) {}
 
   Value& getPtr() const { return *ptr; }
   uint64_t getAlign() const { return align; }
@@ -912,8 +911,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -921,8 +919,9 @@ class Store final : public MemInstr {
   Value *ptr, *val;
   uint64_t align;
 public:
-  Store(Value &ptr, Value &val, uint64_t align)
-    : MemInstr(Type::voidTy, "store"), ptr(&ptr), val(&val), align(align) {}
+  Store(const BasicBlock &parent, Value &ptr, Value &val, uint64_t align)
+      : MemInstr(parent, Type::voidTy, "store"), ptr(&ptr), val(&val),
+        align(align) {}
 
   Value& getValue() const { return *val; }
   Value& getPtr() const { return *ptr; }
@@ -941,8 +940,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -952,9 +950,10 @@ class Memset final : public MemInstr {
   TailCallInfo tci;
 
 public:
-  Memset(Value &ptr, Value &val, Value &bytes, uint64_t align, TailCallInfo tci)
-      : MemInstr(Type::voidTy, "memset"), ptr(&ptr), val(&val), bytes(&bytes),
-        align(align), tci(tci) {}
+  Memset(const BasicBlock &parent, Value &ptr, Value &val, Value &bytes,
+         uint64_t align, TailCallInfo tci)
+      : MemInstr(parent, Type::voidTy, "memset"), ptr(&ptr), val(&val),
+        bytes(&bytes), align(align), tci(tci) {}
 
   Value& getPtr() const { return *ptr; }
   Value& getBytes() const { return *bytes; }
@@ -972,8 +971,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -983,8 +981,8 @@ class MemsetPattern final : public MemInstr {
   TailCallInfo tci;
 
 public:
-  MemsetPattern(Value &ptr, Value &pattern, Value &bytes,
-                unsigned pattern_length, TailCallInfo tci);
+  MemsetPattern(const BasicBlock &parent, Value &ptr, Value &pattern,
+                Value &bytes, unsigned pattern_length, TailCallInfo tci);
 
   unsigned getPatternLength() const { return pattern_length; }
 
@@ -999,15 +997,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class FillPoison final : public MemInstr {
   Value *ptr;
 public:
-  FillPoison(Value &ptr) : MemInstr(Type::voidTy, "fillpoison"), ptr(&ptr) {}
+  FillPoison(const BasicBlock &parent, Value &ptr)
+      : MemInstr(parent, Type::voidTy, "fillpoison"), ptr(&ptr) {}
 
   std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
   uint64_t getMaxAccessSize() const override;
@@ -1020,8 +1018,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -1032,10 +1029,11 @@ class Memcpy final : public MemInstr {
   TailCallInfo tci;
 
 public:
-  Memcpy(Value &dst, Value &src, Value &bytes, uint64_t align_dst,
-         uint64_t align_src, bool move, TailCallInfo tci)
-      : MemInstr(Type::voidTy, "memcpy"), dst(&dst), src(&src), bytes(&bytes),
-        align_dst(align_dst), align_src(align_src), move(move), tci(tci) {}
+  Memcpy(const BasicBlock &parent, Value &dst, Value &src, Value &bytes,
+         uint64_t align_dst, uint64_t align_src, bool move, TailCallInfo tci)
+      : MemInstr(parent, Type::voidTy, "memcpy"), dst(&dst), src(&src),
+        bytes(&bytes), align_dst(align_dst), align_src(align_src), move(move),
+        tci(tci) {}
 
   Value& getSrc() const { return *src; }
   Value& getDst() const { return *dst; }
@@ -1057,8 +1055,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -1068,10 +1065,10 @@ class Memcmp final : public MemInstr {
   TailCallInfo tci;
 
 public:
-  Memcmp(Type &type, std::string &&name, Value &ptr1, Value &ptr2, Value &num,
-         bool is_bcmp, TailCallInfo tci)
-      : MemInstr(type, std::move(name)), ptr1(&ptr1), ptr2(&ptr2), num(&num),
-        is_bcmp(is_bcmp), tci(tci) {}
+  Memcmp(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr1,
+         Value &ptr2, Value &num, bool is_bcmp, TailCallInfo tci)
+      : MemInstr(parent, type, std::move(name)), ptr1(&ptr1), ptr2(&ptr2),
+        num(&num), is_bcmp(is_bcmp), tci(tci) {}
 
   Value &getBytes() const { return *num; }
   bool isBCmp() const { return is_bcmp; }
@@ -1087,8 +1084,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -1097,8 +1093,9 @@ class Strlen final : public MemInstr {
   TailCallInfo tci;
 
 public:
-  Strlen(Type &type, std::string &&name, Value &ptr, TailCallInfo tci)
-      : MemInstr(type, std::move(name)), ptr(&ptr), tci(tci) {}
+  Strlen(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr,
+         TailCallInfo tci)
+      : MemInstr(parent, type, std::move(name)), ptr(&ptr), tci(tci) {}
 
   Value *getPointer() const { return ptr; }
 
@@ -1113,8 +1110,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -1131,9 +1127,9 @@ private:
   Value* getAlignArg() const;
 
 public:
-  FnCall(Type &type, std::string &&name, std::string &&fnName,
-         FnAttrs &&attrs = FnAttrs::None, Value *fnptr = nullptr,
-         unsigned var_arg_idx = -1u);
+  FnCall(const BasicBlock &parent, Type &type, std::string &&name,
+         std::string &&fnName, FnAttrs &&attrs = FnAttrs::None,
+         Value *fnptr = nullptr, unsigned var_arg_idx = -1u);
   void addArg(Value &arg, ParamAttrs &&attrs);
   const auto& getFnName() const { return fnName; }
   Value* getFnPtr() const { return fnptr; }
@@ -1158,22 +1154,23 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class InlineAsm final : public FnCall {
 public:
-  InlineAsm(Type &type, std::string &&name, const std::string &asm_str,
-            const std::string &constraints, FnAttrs &&attrs = FnAttrs::None);
+  InlineAsm(const BasicBlock &parent, Type &type, std::string &&name,
+            const std::string &asm_str, const std::string &constraints,
+            FnAttrs &&attrs = FnAttrs::None);
 };
 
 
 class VaStart final : public Instr {
   Value *ptr;
 public:
-  VaStart(Value &ptr) : Instr(Type::voidTy, "va_start"), ptr(&ptr) {}
+  VaStart(const BasicBlock &parent, Value &ptr)
+      : Instr(parent, Type::voidTy, "va_start"), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1181,15 +1178,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class VaEnd final : public Instr {
   Value *ptr;
 public:
-  VaEnd(Value &ptr) : Instr(Type::voidTy, "va_end"), ptr(&ptr) {}
+  VaEnd(const BasicBlock &parent, Value &ptr)
+      : Instr(parent, Type::voidTy, "va_end"), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1197,16 +1194,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class VaCopy final : public Instr {
   Value *dst, *src;
 public:
-  VaCopy(Value &dst, Value &src)
-    : Instr(Type::voidTy, "va_copy"), dst(&dst), src(&src) {}
+  VaCopy(const BasicBlock &parent, Value &dst, Value &src)
+      : Instr(parent, Type::voidTy, "va_copy"), dst(&dst), src(&src) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1214,16 +1210,15 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class VaArg final : public Instr {
   Value *ptr;
 public:
-  VaArg(Type &type, std::string &&name, Value &ptr)
-    : Instr(type, std::move(name)), ptr(&ptr) {}
+  VaArg(const BasicBlock &parent, Type &type, std::string &&name, Value &ptr)
+      : Instr(parent, type, std::move(name)), ptr(&ptr) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1231,16 +1226,16 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class ExtractElement final : public Instr {
   Value *v, *idx;
 public:
-  ExtractElement(Type &type, std::string &&name, Value &v, Value &idx)
-    : Instr(type, std::move(name)), v(&v), idx(&idx) {}
+  ExtractElement(const BasicBlock &parent, Type &type, std::string &&name,
+                 Value &v, Value &idx)
+      : Instr(parent, type, std::move(name)), v(&v), idx(&idx) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1248,16 +1243,16 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
 class InsertElement final : public Instr {
   Value *v, *e, *idx;
 public:
-  InsertElement(Type &type, std::string &&name, Value &v, Value &e, Value &idx)
-    : Instr(type, std::move(name)), v(&v), e(&e), idx(&idx) {}
+  InsertElement(const BasicBlock &parent, Type &type, std::string &&name,
+                Value &v, Value &e, Value &idx)
+      : Instr(parent, type, std::move(name)), v(&v), e(&e), idx(&idx) {}
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
   bool hasSideEffects() const override;
@@ -1265,8 +1260,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 
@@ -1274,10 +1268,11 @@ class ShuffleVector final : public Instr {
   Value *v1, *v2;
   std::vector<unsigned> mask;
 public:
-  ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
-                std::vector<unsigned> mask)
-    : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
-  
+  ShuffleVector(const BasicBlock &parent, Type &type, std::string &&name,
+                Value &v1, Value &v2, std::vector<unsigned> mask)
+      : Instr(parent, type, std::move(name)), v1(&v1), v2(&v2),
+        mask(std::move(mask)) {}
+
   const auto& getMask() const { return mask; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
@@ -1286,8 +1281,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
+  std::unique_ptr<Instr> dup(const std::string &suffix) const override;
 };
 
 

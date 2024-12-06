@@ -479,7 +479,7 @@ static Value& get_or_copy_instr(const string &name) {
 
   auto instr_src = dynamic_cast<Instr*>(val_src);
   assert(instr_src);
-  auto tgt_instr = instr_src->dup(*fn, "");
+  auto tgt_instr = instr_src->dup("");
 
   for (auto &op : instr_src->operands()) {
     if (dynamic_cast<Input*>(op)) {
@@ -766,7 +766,7 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<BinOp>(*rettype, string(name), a, b, op, flags);
+  return make_unique<BinOp>(*bb, *rettype, string(name), a, b, op, flags);
 }
 
 static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
@@ -794,7 +794,7 @@ static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<FpBinOp>(*rettype, string(name), a, b, op, fmath);
+  return make_unique<FpBinOp>(*bb, *rettype, string(name), a, b, op, fmath);
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -810,7 +810,7 @@ static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
 
   auto &ty = parse_type();
   auto &a = parse_operand(ty);
-  return make_unique<UnaryOp>(ty, string(name), a, op);
+  return make_unique<UnaryOp>(*bb, ty, string(name), a, op);
 }
 
 static unique_ptr<Instr> parse_fp_unaryop(string_view name, token op_token) {
@@ -826,7 +826,7 @@ static unique_ptr<Instr> parse_fp_unaryop(string_view name, token op_token) {
 
   auto &ty = parse_type();
   auto &a = parse_operand(ty);
-  return make_unique<FpUnaryOp>(ty, string(name), a, op, fmath);
+  return make_unique<FpUnaryOp>(*bb, ty, string(name), a, op, fmath);
 }
 
 static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
@@ -850,7 +850,7 @@ static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
       op_ty.isVectorType() ? op_ty.getAsAggregateType()->getChild(0) : op_ty;
 
   auto &a = parse_operand(op_ty);
-  return make_unique<UnaryReductionOp>(ty, string(name), a, op);
+  return make_unique<UnaryReductionOp>(*bb, ty, string(name), a, op);
 }
 
 static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
@@ -874,7 +874,7 @@ static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
   parse_comma();
   auto &cty = parse_type();
   auto &c = parse_operand(cty);
-  return make_unique<TernaryOp>(aty, string(name), a, b, c, op);
+  return make_unique<TernaryOp>(*bb, aty, string(name), a, b, c, op);
 }
 
 static unique_ptr<Instr> parse_fp_ternary(string_view name, token op_token) {
@@ -895,7 +895,7 @@ static unique_ptr<Instr> parse_fp_ternary(string_view name, token op_token) {
   parse_comma();
   auto &cty = parse_type();
   auto &c = parse_operand(cty);
-  return make_unique<FpTernaryOp>(aty, string(name), a, b, c, op, fmath);
+  return make_unique<FpTernaryOp>(*bb, aty, string(name), a, b, c, op, fmath);
 }
 
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
@@ -914,7 +914,7 @@ static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<ConversionOp>(ty2, string(name), val, op);
+  return make_unique<ConversionOp>(*bb, ty2, string(name), val, op);
 }
 
 static unique_ptr<Instr>
@@ -935,7 +935,7 @@ parse_fp_conversionop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<FpConversionOp>(ty2, string(name), val, op);
+  return make_unique<FpConversionOp>(*bb, ty2, string(name), val, op);
 }
 
 static unique_ptr<Instr> parse_select(string_view name) {
@@ -948,13 +948,14 @@ static unique_ptr<Instr> parse_select(string_view name) {
   parse_comma();
   auto &bty = parse_type();
   auto &b = parse_operand(bty);
-  return make_unique<Select>(aty, string(name), cond, a, b);
+  return make_unique<Select>(*bb, aty, string(name), cond, a, b);
 }
 
 static unique_ptr<Instr> parse_extractvalue(string_view name) {
   auto &type = parse_type();
   auto &val = parse_operand(type);
-  auto instr = make_unique<ExtractValue>(get_sym_type(), string(name), val);
+  auto instr =
+      make_unique<ExtractValue>(*bb, get_sym_type(), string(name), val);
 
   while (true) {
     if (!tokenizer.consumeIf(COMMA))
@@ -971,7 +972,7 @@ static unique_ptr<Instr> parse_insertvalue(string_view name) {
   parse_comma();
   auto &elt_ty = parse_type();
   auto &elt = parse_operand(elt_ty);
-  auto instr = make_unique<InsertValue>(type, string(name), val, elt);
+  auto instr = make_unique<InsertValue>(*bb, type, string(name), val, elt);
 
   while (true) {
     if (!tokenizer.consumeIf(COMMA))
@@ -1007,7 +1008,7 @@ static unique_ptr<Instr> parse_icmp(string_view name) {
   auto &a = parse_operand(ty);
   parse_comma();
   auto &b = parse_operand(ty);
-  return make_unique<ICmp>(*int_types[1].get(), string(name), cond, a, b);
+  return make_unique<ICmp>(*bb, *int_types[1].get(), string(name), cond, a, b);
 }
 
 static unique_ptr<Instr> parse_fcmp(string_view name) {
@@ -1044,11 +1045,11 @@ static unique_ptr<Instr> parse_fcmp(string_view name) {
   switch (cond_t) {
   case TRUE:
   case FALSE:
-    return make_unique<UnaryOp>(bool_ty, string(name),
+    return make_unique<UnaryOp>(*bb, bool_ty, string(name),
                                 get_constant(cond_t == TRUE, bool_ty),
                                 UnaryOp::Copy);
   default:
-    return make_unique<FCmp>(bool_ty, string(name), cond, a, b,
+    return make_unique<FCmp>(*bb, bool_ty, string(name), cond, a, b,
                              parse_fast_math(FCMP));
   }
   UNREACHABLE();
@@ -1058,7 +1059,7 @@ static unique_ptr<Instr> parse_freeze(string_view name) {
   // freeze ty %op
   auto &ty = parse_type();
   auto &op = parse_operand(ty);
-  return make_unique<Freeze>(ty, string(name), op);
+  return make_unique<Freeze>(*bb, ty, string(name), op);
 }
 
 static void parse_memory_access(MemoryAccess &mem) {
@@ -1123,7 +1124,7 @@ static unique_ptr<Instr> parse_call(string_view name) {
   }
 exit:
   attrs.inferImpliedAttributes();
-  auto call = make_unique<FnCall>(ret_ty, string(name), std::move(fn_name),
+  auto call = make_unique<FnCall>(*bb, ret_ty, string(name), std::move(fn_name),
                                   std::move(attrs));
 
   for (auto arg : args) {
@@ -1139,7 +1140,7 @@ static unique_ptr<Instr> parse_extractelement(string_view name) {
   parse_comma();
   auto &ty_idx = parse_type();
   auto &idx = parse_operand(ty_idx);
-  return make_unique<ExtractElement>(get_sym_type(), string(name), a, idx);
+  return make_unique<ExtractElement>(*bb, get_sym_type(), string(name), a, idx);
 }
 
 static unique_ptr<Instr> parse_insertelement(string_view name) {
@@ -1152,7 +1153,8 @@ static unique_ptr<Instr> parse_insertelement(string_view name) {
   parse_comma();
   auto &ty_idx = parse_type();
   auto &idx = parse_operand(ty_idx);
-  return make_unique<InsertElement>(get_sym_type(), string(name), a, e, idx);
+  return make_unique<InsertElement>(*bb, get_sym_type(), string(name), a, e,
+                                    idx);
 }
 
 static unique_ptr<Instr> parse_shufflevector(string_view name) {
@@ -1167,7 +1169,7 @@ static unique_ptr<Instr> parse_shufflevector(string_view name) {
   while (tokenizer.consumeIf(COMMA)) {
     mask.push_back((unsigned)parse_number());
   }
-  return make_unique<ShuffleVector>(get_sym_type(), string(name), a, b,
+  return make_unique<ShuffleVector>(*bb, get_sym_type(), string(name), a, b,
                                     std::move(mask));
 }
 
@@ -1175,7 +1177,7 @@ static unique_ptr<Instr> parse_copyop(string_view name, token t) {
   tokenizer.unget(t);
   auto &ty = parse_type();
   auto &op = parse_operand(ty);
-  return make_unique<UnaryOp>(ty, string(name), op, UnaryOp::Copy);
+  return make_unique<UnaryOp>(*bb, ty, string(name), op, UnaryOp::Copy);
 }
 
 static unique_ptr<Instr> parse_instr(string_view name) {
@@ -1313,13 +1315,13 @@ static unique_ptr<Instr> parse_assume() {
   tokenizer.ensure(LPAREN);
   auto &val = parse_operand(*int_types[1].get());
   tokenizer.ensure(RPAREN);
-  return make_unique<Assume>(val, Assume::AndNonPoison);
+  return make_unique<Assume>(*bb, val, Assume::AndNonPoison);
 }
 
 static unique_ptr<Instr> parse_return() {
   auto &type = parse_type();
   auto &val = parse_operand(type);
-  return make_unique<Return>(type, val);
+  return make_unique<Return>(*bb, type, val);
 }
 
 static void parse_fn(Function &f) {
@@ -1343,8 +1345,8 @@ static void parse_fn(Function &f) {
       break;
     }
     case UNREACH:
-      bb->addInstr(make_unique<Assume>(get_constant(0, *int_types[1].get()),
-                                       Assume::AndNonPoison));
+      bb->addInstr<Assume>(get_constant(0, *int_types[1].get()),
+                           Assume::AndNonPoison);
       break;
     default:
       string_view name;
@@ -1376,7 +1378,7 @@ exit:
       error("Block cannot be empty");
 
     auto &val = bb->back();
-    bb->addInstr(make_unique<Return>(val.getType(), val));
+    bb->addInstr<Return>(val.getType(), val);
     f.setType(val.getType());
   }
 }

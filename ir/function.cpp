@@ -101,11 +101,10 @@ void BasicBlock::replaceTargetWith(const BasicBlock *from,
   }
 }
 
-unique_ptr<BasicBlock>
-BasicBlock::dup(Function &f, const string &suffix) const {
-  auto newbb = make_unique<BasicBlock>(name + suffix);
+unique_ptr<BasicBlock> BasicBlock::dup(const string &suffix) const {
+  auto newbb = make_unique<BasicBlock>(p_function, name + suffix);
   for (auto &i : instrs()) {
-    newbb->addInstr(i.dup(f, suffix));
+    newbb->addInstr(i.dup(suffix));
   }
   return newbb;
 }
@@ -127,8 +126,6 @@ ostream& operator<<(ostream &os, const BasicBlock &bb) {
   return os;
 }
 
-
-BasicBlock Function::sink_bb("#sink");
 
 unsigned Function::FnDecl::hash() const {
   GenHash hash;
@@ -197,7 +194,7 @@ BasicBlock& Function::getEntryBB() {
 
 BasicBlock& Function::getBB(string_view name, bool push_front) {
   assert(name != "#sink");
-  auto p = BBs.try_emplace(string(name), name);
+  auto p = BBs.try_emplace(string(name), BasicBlock{*this, name});
   if (p.second) {
     if (push_front)
       BB_order.insert(BB_order.begin(), &p.first->second);
@@ -222,7 +219,7 @@ const BasicBlock& Function::bbOf(const Instr &i) const {
 }
 
 BasicBlock& Function::insertBBAfter(string_view name, const BasicBlock &bb) {
-  auto p = BBs.try_emplace(string(name), name);
+  auto p = BBs.try_emplace(string(name), BasicBlock{*this, name});
   if (p.second) {
     auto I = find(BB_order.begin(), BB_order.end(), &bb);
     assert(I != BB_order.end());
@@ -516,7 +513,7 @@ cloneBB(Function &F, const BasicBlock &BB, const char *suffix,
     if (dynamic_cast<const Phi *>(&i))
       phis_from_orig_bb.insert(&i);
 
-    auto d = i.dup(F, suffix);
+    auto d = i.dup(suffix);
     for (auto &op : d->operands()) {
       rauw_op(vmap, phis_from_orig_bb, d.get(), op);
     }
@@ -766,7 +763,7 @@ void Function::unroll(unsigned k) {
           auto &newphi = new_phis[make_pair(dst, val)];
           if (!newphi) {
             auto name = val->getName() + "#phi#" + to_string(phi_counter++);
-            auto phi = make_unique<Phi>(val->getType(), std::move(name));
+            auto phi = make_unique<Phi>(*dst, val->getType(), std::move(name));
             newphi = phi.get();
             dst->addInstr(std::move(phi), true);
           }
@@ -814,13 +811,13 @@ void Function::unroll(unsigned k) {
 
           unsigned align = 16;
           auto name = val->getName() + "#ptr#" + to_string(phi_counter++);
-          auto alloca = make_unique<Alloc>(ptr_type, string(name), *size,
-                                           nullptr, align);
+          auto alloca = make_unique<Alloc>(getFirstBB(), ptr_type, string(name),
+                                           *size, nullptr, align);
 
           auto store = [&](auto *bb, const auto *val) {
-            bb->addInstrAt(make_unique<Store>(*alloca.get(),
-                                              *const_cast<Value*>(val), align),
-                           static_cast<const Instr*>(val), false);
+            bb->addInstrAt(make_unique<Store>(*bb, *alloca.get(),
+                                              *const_cast<Value *>(val), align),
+                           static_cast<const Instr *>(val), false);
           };
 
           store(bb_val, val);
@@ -828,8 +825,8 @@ void Function::unroll(unsigned k) {
             store(bb, val);
           }
 
-          auto load
-            = make_unique<Load>(type, name + "#load", *alloca.get(), align);
+          auto load = make_unique<Load>(*user_bb, type, name + "#load",
+                                        *alloca.get(), align);
           auto *i = static_cast<Instr*>(user);
           i->rauw(*first_added_phi, *load.get());
           user_bb->addInstrAt(std::move(load), i, true);
