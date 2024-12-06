@@ -256,7 +256,7 @@ State::State(const Function &f, bool source)
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
     vscale_data(vscaleFromAttr(f.getFnAttrs().vscaleRange)),
-    return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+    return_val(DisjointExpr(f.getType().getDummyValue(false, vscale_data))) {}
 
 expr State::vscaleFromAttr(
     std::optional<std::pair<uint16_t, uint16_t>> vscaleAttr) {
@@ -309,13 +309,15 @@ static expr eq_except_padding(const Memory &m, const Type &ty, const expr &e1,
   StateValue sv1{expr(e1), expr()};
   StateValue sv2{expr(e2), expr()};
   expr result = true;
+  auto vscaleRange = m.getState().getVscale();
 
-  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+  for (unsigned i = 0; i < aty->numElementsConst(vscaleRange); ++i) {
     if (aty->isPadding(i))
       continue;
 
-    result &= eq_except_padding(m, aty->getChild(i), aty->extract(sv1, i).value,
-                                aty->extract(sv2, i).value, ptr_compare);
+    result &= eq_except_padding(
+        m, aty->getChild(i), aty->extract(sv1, i, vscaleRange).value,
+        aty->extract(sv2, i, vscaleRange).value, ptr_compare);
   }
   return result;
 }
@@ -609,7 +611,8 @@ const StateValue& State::getAndAddUndefs(const Value &val) {
   return v;
 }
 
-static expr not_poison_except_padding(const Type &ty, const expr &np) {
+static expr not_poison_except_padding(const State &s, const Type &ty,
+                                      const expr &np) {
   const auto *aty = ty.getAsAggregateType();
   if (!aty) {
     assert(!np.isValid() || np.isBool());
@@ -619,12 +622,12 @@ static expr not_poison_except_padding(const Type &ty, const expr &np) {
   StateValue sv{expr(), expr(np)};
   expr result = true;
 
-  for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+  for (unsigned i = 0; i < aty->numElementsConst(s.getVscale()); ++i) {
     if (aty->isPadding(i))
       continue;
 
-    result &= not_poison_except_padding(aty->getChild(i),
-                                        aty->extract(sv, i).non_poison);
+    result &= not_poison_except_padding(
+        s, aty->getChild(i), aty->extract(sv, i, s.getVscale()).non_poison);
   }
   return result;
 }
@@ -671,7 +674,7 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
     }
 
     // If val is an aggregate, all elements should be non-poison
-    addUB(not_poison_except_padding(val.getType(), sv.non_poison));
+    addUB(not_poison_except_padding(*this, val.getType(), sv.non_poison));
   }
 
   check_enough_tmp_slots();
@@ -1123,7 +1126,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                     : analysis.ranges_fn_calls;
 
   if (ret_arg_ty && (*ret_arg_ty == out_type).isFalse()) {
-    ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)));
+    ret_arg = out_type.fromInt(ret_arg_ty->toInt(*this, std::move(ret_arg)),
+                               getVscale());
   }
 
   // source may create new fn symbols, target just references src symbols
@@ -1156,8 +1160,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
           return { std::move(val), mk_np(true) };
         }
 
-        if (!hasPtr(ty)) {
-          auto dummy = ty.getDummyValue(true);
+        if (!hasPtr(ty, getVscale())) {
+          auto dummy = ty.getDummyValue(true, getVscale());
           return { expr::mkFreshVar(name.c_str(), dummy.value),
                    mk_np(std::move(dummy.non_poison)) };
         }
@@ -1165,11 +1169,12 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         assert(ty.isAggregateType());
         auto agg = ty.getAsAggregateType();
         vector<StateValue> vals;
-        for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+        for (unsigned i = 0, e = agg->numElementsConst(getVscale()); i != e;
+             ++i) {
           if (!agg->isPadding(i))
             vals.emplace_back(mk_output(agg->getChild(i)));
         }
-        return agg->aggregateVals(vals);
+        return agg->aggregateVals(vals, getVscale());
       };
 
       output = ret_arg_ty ? std::move(ret_arg) : mk_output(out_type);
@@ -1199,14 +1204,14 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         }
       }
 
-      I->second
-        = { std::move(output), expr::mkFreshVar((name + "#ub").c_str(), false),
-            (noret || willret)
-              ? expr(noret)
-              : expr::mkFreshVar((name + "#noreturn").c_str(), false),
-            memory.mkCallState(name, attrs.has(FnAttrs::NoFree),
-                               I->first.args_ptr.size(), memaccess),
-            std::move(ret_data) };
+      I->second = {std::move(output),
+                   expr::mkFreshVar((name + "#ub").c_str(), false),
+                   (noret || willret)
+                       ? expr(noret)
+                       : expr::mkFreshVar((name + "#noreturn").c_str(), false),
+                   memory.mkCallState(name, attrs.has(FnAttrs::NoFree),
+                                      I->first.args_ptr.size(), memaccess),
+                   std::move(ret_data)};
 
       // add equality constraints between source's function calls
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
@@ -1258,17 +1263,18 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
                      std::move(val.non_poison) };
           }
 
-          if (!hasPtr(ty))
+          if (!hasPtr(ty, getVscale()))
             return std::move(val);
 
           assert(ty.isAggregateType());
           auto agg = ty.getAsAggregateType();
           vector<StateValue> vals;
-          for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+          for (unsigned i = 0, e = agg->numElementsConst(getVscale()); i != e;
+               ++i) {
             vals.emplace_back(
-              mk_output(agg->getChild(i), agg->extract(val, i)));
+                mk_output(agg->getChild(i), agg->extract(val, i, getVscale())));
           }
-          return agg->aggregateVals(vals);
+          return agg->aggregateVals(vals, getVscale());
         };
         retval = mk_output(out_type, std::move(d.retval));
       } else
@@ -1281,7 +1287,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         fn_call_qvars.emplace(std::move(qvar));
     } else {
       addUB(expr(false));
-      retval = out_type.getDummyValue(false);
+      retval = out_type.getDummyValue(false, getVscale());
     }
   }
 

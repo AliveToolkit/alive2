@@ -104,7 +104,7 @@ StateValue FloatConst::toSMT(State &s) const {
 
 
 StateValue ConstantInput::toSMT(State &s) const {
-  auto type = getType().getDummyValue(false).value;
+  auto type = getType().getDummyValue(false, s.getVscale()).value;
   return { expr::mkVar(getName().c_str(), type), true };
 }
 

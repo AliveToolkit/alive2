@@ -469,7 +469,7 @@ StateValue BinOp::toSMT(State &s) const {
       auto &ty = getType();
       uint32_t resBits =
           (ty.isVectorType() ? ty.getAsAggregateType()->getChild(0) : ty)
-              .bits();
+              .bits(s.getVscale());
       return {expr::mkIf(a == b, expr::mkUInt(0, resBits),
                          expr::mkIf(op == UCmp ? a.ult(b) : a.slt(b),
                                     expr::mkInt(-1, resBits),
@@ -510,21 +510,23 @@ StateValue BinOp::toSMT(State &s) const {
       auto val1ty = retty->getChild(0).getAsAggregateType();
       auto val2ty = retty->getChild(val2idx).getAsAggregateType();
 
-      for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-        auto ai = ty->extract(a, i);
-        auto bi = ty->extract(b, i);
+      for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e;
+           ++i) {
+        auto ai = ty->extract(a, i, s.getVscale());
+        auto bi = ty->extract(b, i, s.getVscale());
         auto [v1, v2] = zip_op(ai.value, ai.non_poison, bi.value,
                                bi.non_poison);
         vals1.emplace_back(std::move(v1));
         vals2.emplace_back(std::move(v2));
       }
-      vals.emplace_back(val1ty->aggregateVals(vals1));
-      vals.emplace_back(val2ty->aggregateVals(vals2));
+      vals.emplace_back(val1ty->aggregateVals(vals1, s.getVscale()));
+      vals.emplace_back(val2ty->aggregateVals(vals2, s.getVscale()));
     } else {
       StateValue tmp;
       auto opty = lhs->getType().getAsAggregateType();
-      for (unsigned i = 0, e = opty->numElementsConst(); i != e; ++i) {
-        auto ai = opty->extract(a, i);
+      for (unsigned i = 0, e = opty->numElementsConst(s.getVscale()); i != e;
+           ++i) {
+        auto ai = opty->extract(a, i, s.getVscale());
         const StateValue *bi;
         switch (op) {
         case Abs:
@@ -533,7 +535,7 @@ StateValue BinOp::toSMT(State &s) const {
           bi = &b;
           break;
         default:
-          tmp = opty->extract(b, i);
+          tmp = opty->extract(b, i, s.getVscale());
           bi = &tmp;
           break;
         }
@@ -541,7 +543,7 @@ StateValue BinOp::toSMT(State &s) const {
                                     bi->non_poison));
       }
     }
-    return retty->aggregateVals(vals);
+    return retty->aggregateVals(vals, s.getVscale());
   }
 
   if (vertical_zip) {
@@ -549,7 +551,7 @@ StateValue BinOp::toSMT(State &s) const {
     auto [v1, v2] = zip_op(a.value, a.non_poison, b.value, b.non_poison);
     vals.emplace_back(std::move(v1));
     vals.emplace_back(std::move(v2));
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return scalar_op(a.value, a.non_poison, b.value, b.non_poison);
 }
@@ -948,11 +950,13 @@ StateValue FpBinOp::toSMT(State &s) const {
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
     vector<StateValue> vals;
-    for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(retty->extract(a, i), retty->extract(b, i),
+    for (unsigned i = 0, e = retty->numElementsConst(s.getVscale()); i != e;
+         ++i) {
+      vals.emplace_back(scalar(retty->extract(a, i, s.getVscale()),
+                               retty->extract(b, i, s.getVscale()),
                                retty->getChild(i)));
     }
-    return retty->aggregateVals(vals);
+    return retty->aggregateVals(vals, s.getVscale());
   }
   return scalar(a, b, getType());
 }
@@ -1056,11 +1060,11 @@ StateValue UnaryOp::toSMT(State &s) const {
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto ty = val->getType().getAsAggregateType();
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      auto vi = ty->extract(v, i);
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      auto vi = ty->extract(v, i, s.getVscale());
       vals.emplace_back(fn(vi.value, vi.non_poison));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return fn(v.value, v.non_poison);
 }
@@ -1095,8 +1099,8 @@ static Value* dup_aggregate(Function &f, Value *val) {
     for (auto v : agg->getVals()) {
       elems.emplace_back(dup_aggregate(f, v));
     }
-    auto agg_new
-      = make_unique<AggregateValue>(agg->getType(), std::move(elems));
+    auto agg_new =
+        make_unique<AggregateValue>(agg->getType(), std::move(elems));
     auto ret = agg_new.get();
     f.addAggregate(std::move(agg_new));
     return ret;
@@ -1204,10 +1208,11 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto ty = val->getType().getAsAggregateType();
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(v, i), ty->getChild(i)));
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      vals.emplace_back(
+          scalar(ty->extract(v, i, s.getVscale()), ty->getChild(i)));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return scalar(v, getType());
 }
@@ -1262,8 +1267,8 @@ StateValue UnaryReductionOp::toSMT(State &s) const {
   auto &v = s[*val];
   auto vty = val->getType().getAsAggregateType();
   StateValue res;
-  for (unsigned i = 0, e = vty->numElementsConst(); i != e; ++i) {
-    auto ith = vty->extract(v, i);
+  for (unsigned i = 0, e = vty->numElementsConst(s.getVscale()); i != e; ++i) {
+    auto ith = vty->extract(v, i, s.getVscale());
     if (i == 0) {
       res = std::move(ith);
       continue;
@@ -1370,12 +1375,12 @@ StateValue TernaryOp::toSMT(State &s) const {
     vector<StateValue> vals;
     auto ty = getType().getAsAggregateType();
 
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(av, i), ty->extract(bv, i),
-                               (op == FShl || op == FShr) ?
-                               ty->extract(cv, i) : cv));
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      vals.emplace_back(scalar(
+          ty->extract(av, i, s.getVscale()), ty->extract(bv, i, s.getVscale()),
+          (op == FShl || op == FShr) ? ty->extract(cv, i, s.getVscale()) : cv));
     }
-    return ty->aggregateVals(vals);
+    return ty->aggregateVals(vals, s.getVscale());
   }
   return scalar(av, bv, cv);
 }
@@ -1476,11 +1481,12 @@ StateValue FpTernaryOp::toSMT(State &s) const {
     vector<StateValue> vals;
     auto ty = getType().getAsAggregateType();
 
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(av, i), ty->extract(bv, i),
-                               ty->extract(cv, i), ty->getChild(i)));
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      vals.emplace_back(scalar(
+          ty->extract(av, i, s.getVscale()), ty->extract(bv, i, s.getVscale()),
+          ty->extract(cv, i, s.getVscale()), ty->getChild(i)));
     }
-    return ty->aggregateVals(vals);
+    return ty->aggregateVals(vals, s.getVscale());
   }
   return scalar(av, bv, cv, getType());
 }
@@ -1548,10 +1554,11 @@ StateValue TestOp::toSMT(State &s) const {
     vector<StateValue> vals;
     auto ty = lhs->getType().getAsAggregateType();
 
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(a, i), ty->getChild(i)));
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      vals.emplace_back(
+          scalar(ty->extract(a, i, s.getVscale()), ty->getChild(i)));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return scalar(a, lhs->getType());
 }
@@ -1627,21 +1634,21 @@ StateValue ConversionOp::toSMT(State &s) const {
 
   switch (op) {
   case SExt:
-    fn = [](auto &&val, auto &to_type) -> StateValue {
-      return {val.sext(to_type.bits() - val.bits()), true};
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return {val.sext(to_type.bits(s.getVscale()) - val.bits()), true};
     };
     break;
   case ZExt:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
-      return { val.zext(to_type.bits() - val.bits()),
+      return { val.zext(to_type.bits(s.getVscale()) - val.bits()),
                (flags & NNEG) ? !val.isNegative() : true };
     };
     break;
   case Trunc:
-    fn = [this](auto &&val, auto &to_type) -> StateValue {
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
       AndExpr non_poison;
       unsigned orig_bits = val.bits();
-      unsigned trunc_bits = to_type.bits();
+      unsigned trunc_bits = to_type.bits(s.getVscale());
       expr val_truncated = val.trunc(trunc_bits);
       if (flags & NUW)
         non_poison.add(val.extract(orig_bits-1, trunc_bits) == 0);
@@ -1656,11 +1663,14 @@ StateValue ConversionOp::toSMT(State &s) const {
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
-    return getType().fromInt(val->getType().toInt(s, std::move(v)));
+    return getType().fromInt(val->getType().toInt(s, std::move(v)),
+                             s.getVscale());
 
   case Ptr2Int:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
-      return {s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true};
+      return {
+          s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits(s.getVscale())),
+          true};
     };
     break;
   case Int2Ptr:
@@ -1678,13 +1688,14 @@ StateValue ConversionOp::toSMT(State &s) const {
   if (getType().isVectorType()) {
     vector<StateValue> vals;
     auto retty = getType().getAsAggregateType();
-    auto elems = retty->numElementsConst();
+    auto elems = retty->numElementsConst(s.getVscale());
     auto valty = val->getType().getAsAggregateType();
 
     for (unsigned i = 0; i != elems; ++i) {
-      vals.emplace_back(scalar(valty->extract(v, i), retty->getChild(i)));
+      vals.emplace_back(
+          scalar(valty->extract(v, i, s.getVscale()), retty->getChild(i)));
     }
-    return retty->aggregateVals(vals);
+    return retty->aggregateVals(vals, s.getVscale());
   }
 
   return scalar(std::move(v), getType());
@@ -1837,7 +1848,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
         break;
       default: UNREACHABLE();
       }
-      auto bits = to_type.bits();
+      auto bits = to_type.bits(s.getVscale());
       expr bv  = val.fp2sint(bits, rm);
       expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
@@ -1867,7 +1878,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case FPToUInt:
   case FPToUInt_Sat:
     fn = [&](auto &val, auto &to_type, auto &rm_) -> StateValue {
-      auto bits = to_type.bits();
+      auto bits = to_type.bits(s.getVscale());
       expr rm = expr::rtz();
       expr bv  = val.fp2uint(bits, rm);
       expr fp2 = bv.uint2fp(val, rm);
@@ -1928,11 +1939,11 @@ StateValue FpConversionOp::toSMT(State &s) const {
     auto ty = val->getType().getAsAggregateType();
     auto retty = getType().getAsAggregateType();
 
-    for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(ty->extract(v, i), ty->getChild(i),
-                               retty->getChild(i)));
+    for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
+      vals.emplace_back(scalar(ty->extract(v, i, s.getVscale()),
+                               ty->getChild(i), retty->getChild(i)));
     }
-    return retty->aggregateVals(vals);
+    return retty->aggregateVals(vals, s.getVscale());
   }
   return scalar(v, val->getType(), getType());
 }
@@ -2015,13 +2026,16 @@ StateValue Select::toSMT(State &s) const {
     vector<StateValue> vals;
     auto cond_agg = cond->getType().getAsAggregateType();
 
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       if (!agg->isPadding(i))
-        vals.emplace_back(scalar(agg->extract(av, i), agg->extract(bv, i),
-                                 cond_agg ? cond_agg->extract(cv, i) : cv,
-                                 agg->getChild(i)));
+        vals.emplace_back(
+            scalar(agg->extract(av, i, s.getVscale()),
+                   agg->extract(bv, i, s.getVscale()),
+                   cond_agg ? cond_agg->extract(cv, i, s.getVscale()) : cv,
+                   agg->getChild(i)));
     }
-    return agg->aggregateVals(vals);
+    return agg->aggregateVals(vals, s.getVscale());
   }
   return scalar(av, bv, cv, getType());
 }
@@ -2073,7 +2087,7 @@ StateValue ExtractValue::toSMT(State &s) const {
   Type *type = &val->getType();
   for (auto idx : idxs) {
     auto ty = type->getAsAggregateType();
-    v = ty->extract(v, idx);
+    v = ty->extract(v, idx, s.getVscale());
     type = &ty->getChild(idx);
   }
   return v;
@@ -2082,6 +2096,7 @@ StateValue ExtractValue::toSMT(State &s) const {
 expr ExtractValue::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints(f) &&
            val->getType().enforceAggregateType();
+  expr vscaleRange = State::vscaleFromAttr(f.getFnAttrs().vscaleRange);
 
   Type *type = &val->getType();
   unsigned i = 0;
@@ -2093,8 +2108,8 @@ expr ExtractValue::getTypeConstraints(const Function &f) const {
     }
     type = &ty->getChild(idx);
 
-    c &= ty->numElements().ugt(idx);
-    if (++i == idxs.size() && idx < ty->numElementsConst())
+    c &= ty->numElements(vscaleRange).ugt(idx);
+    if (++i == idxs.size() && idx < ty->numElementsConst(vscaleRange))
       c &= ty->getChild(idx) == getType();
   }
   return c;
@@ -2137,7 +2152,8 @@ void InsertValue::print(ostream &os) const {
   }
 }
 
-static StateValue update_repack(Type *type,
+static StateValue update_repack(const State &s,
+                                Type *type,
                                 const StateValue &val,
                                 const StateValue &elem,
                                 vector<unsigned> &indices) {
@@ -2145,21 +2161,21 @@ static StateValue update_repack(Type *type,
   unsigned cur_idx = indices.back();
   indices.pop_back();
   vector<StateValue> vals;
-  for (unsigned i = 0, e = ty->numElementsConst(); i < e; ++i) {
+  for (unsigned i = 0, e = ty->numElementsConst(s.getVscale()); i != e; ++i) {
     if (ty->isPadding(i))
       continue;
 
-    auto v = ty->extract(val, i);
+    auto v = ty->extract(val, i, s.getVscale());
     if (i == cur_idx) {
-      vals.emplace_back(indices.empty() ?
-                        elem :
-                        update_repack(&ty->getChild(i), v, elem, indices));
+      vals.emplace_back(indices.empty() ? elem
+                                        : update_repack(s, &ty->getChild(i), v,
+                                                        elem, indices));
     } else {
       vals.emplace_back(std::move(v));
     }
   }
 
-  return ty->aggregateVals(vals);
+  return ty->aggregateVals(vals, s.getVscale());
 }
 
 StateValue InsertValue::toSMT(State &s) const {
@@ -2168,13 +2184,14 @@ StateValue InsertValue::toSMT(State &s) const {
 
   Type *type = &val->getType();
   vector<unsigned> idxs_reverse(idxs.rbegin(), idxs.rend());
-  return update_repack(type, sv, elem, idxs_reverse);
+  return update_repack(s, type, sv, elem, idxs_reverse);
 }
 
 expr InsertValue::getTypeConstraints(const Function &f) const {
   auto c = Value::getTypeConstraints(f) &&
            val->getType().enforceAggregateType() &&
            val->getType() == getType();
+  expr vscaleRange = State::vscaleFromAttr(f.getFnAttrs().vscaleRange);
 
   Type *type = &val->getType();
   unsigned i = 0;
@@ -2185,8 +2202,8 @@ expr InsertValue::getTypeConstraints(const Function &f) const {
 
     type = &ty->getChild(idx);
 
-    c &= ty->numElements().ugt(idx);
-    if (++i == idxs.size() && idx < ty->numElementsConst())
+    c &= ty->numElements(vscaleRange).ugt(idx);
+    if (++i == idxs.size() && idx < ty->numElementsConst(vscaleRange))
       c &= ty->getChild(idx) == elt->getType();
   }
 
@@ -2421,11 +2438,14 @@ static void unpack_inputs(State &s, Value &argv, Type &ty,
                           StateValue value2, vector<StateValue> &inputs,
                           vector<PtrInput> &ptr_inputs, unsigned idx) {
   if (auto agg = ty.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       if (agg->isPadding(i))
         continue;
-      unpack_inputs(s, argv, agg->getChild(i), argflag, agg->extract(value, i),
-                    agg->extract(value2, i), inputs, ptr_inputs, idx);
+      unpack_inputs(s, argv, agg->getChild(i), argflag,
+                    agg->extract(value, i, s.getVscale()),
+                    agg->extract(value2, i, s.getVscale()), inputs, ptr_inputs,
+                    idx);
     }
     return;
   }
@@ -2462,12 +2482,14 @@ pack_return(State &s, Type &ty, StateValue &&val, const FnAttrs &attrs,
             const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vs;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       if (!agg->isPadding(i))
-        vs.emplace_back(
-          pack_return(s, agg->getChild(i), agg->extract(val, i), attrs, args));
+        vs.emplace_back(pack_return(s, agg->getChild(i),
+                                    agg->extract(val, i, s.getVscale()), attrs,
+                                    args));
     }
-    return agg->aggregateVals(vs);
+    return agg->aggregateVals(vs, s.getVscale());
   }
 
   return check_return_value(s, std::move(val), ty, attrs, args);
@@ -2799,11 +2821,12 @@ StateValue ICmp::toSMT(State &s) const {
   auto &elem_ty = a->getType();
   if (auto agg = elem_ty.getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(agg->extract(a_eval, i),
-                               agg->extract(b_eval, i)));
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
+      vals.emplace_back(scalar(agg->extract(a_eval, i, s.getVscale()),
+                               agg->extract(b_eval, i, s.getVscale())));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return scalar(a_eval, b_eval);
 }
@@ -2898,11 +2921,13 @@ StateValue FCmp::toSMT(State &s) const {
 
   if (auto agg = a->getType().getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(fn(agg->extract(a_eval, i), agg->extract(b_eval, i),
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
+      vals.emplace_back(fn(agg->extract(a_eval, i, s.getVscale()),
+                           agg->extract(b_eval, i, s.getVscale()),
                            agg->getChild(i)));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   return fn(a_eval, b_eval, a->getType());
 }
@@ -2943,18 +2968,20 @@ void Freeze::print(ostream &os) const {
 static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       if (agg->isPadding(i))
         continue;
-      vals.emplace_back(freeze_elems(s, agg->getChild(i), agg->extract(v, i)));
+      vals.emplace_back(
+          freeze_elems(s, agg->getChild(i), agg->extract(v, i, s.getVscale())));
     }
-    return agg->aggregateVals(vals);
+    return agg->aggregateVals(vals, s.getVscale());
   }
 
   if (v.non_poison.isTrue())
     return v;
 
-  StateValue ret_type = ty.getDummyValue(true);
+  StateValue ret_type = ty.getDummyValue(true, s.getVscale());
   expr nondet = expr::mkFreshVar("nondet", ret_type.value);
   s.addQuantVar(nondet);
   return { expr::mkIf(v.non_poison, v.value, nondet),
@@ -3060,7 +3087,7 @@ void Phi::print(ostream &os) const {
 }
 
 StateValue Phi::toSMT(State &s) const {
-  DisjointExpr<StateValue> ret(getType().getDummyValue(false));
+  DisjointExpr<StateValue> ret(getType().getDummyValue(false, s.getVscale()));
   map<Value*, StateValue> cache;
 
   for (auto &[val, bb] : values) {
@@ -3281,14 +3308,16 @@ check_ret_attributes(State &s, StateValue &&sv, const StateValue &returned_arg,
                      const vector<pair<Value*, ParamAttrs>> &args) {
   if (auto agg = t.getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       if (agg->isPadding(i))
         continue;
-      vals.emplace_back(check_ret_attributes(s, agg->extract(sv, i),
-                                             agg->extract(returned_arg, i),
-                                             agg->getChild(i), attrs, args));
+      vals.emplace_back(
+          check_ret_attributes(s, agg->extract(sv, i, s.getVscale()),
+                               agg->extract(returned_arg, i, s.getVscale()),
+                               agg->getChild(i), attrs, args));
     }
-    return agg->aggregateVals(vals);
+    return agg->aggregateVals(vals, s.getVscale());
   }
 
   if (t.isPtrType()) {
@@ -3565,11 +3594,12 @@ StateValue AssumeVal::toSMT(State &s) const {
   auto &v = s.getMaybeUB(*val, is_welldefined);
   if (auto agg = getType().getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      auto elem = agg->extract(v, i);
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
+      auto elem = agg->extract(v, i, s.getVscale());
       vals.emplace_back(expr(elem.value), elem.non_poison && fn(elem.value));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
 
   expr np = fn(v.value);
@@ -3947,18 +3977,21 @@ StateValue GEP::toSMT(State &s) const {
     auto &ptrval = s[*ptr];
     bool ptr_isvect = ptr->getType().isVectorType();
 
-    for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
+    for (unsigned i = 0, e = aty->numElementsConst(s.getVscale()); i != e;
+         ++i) {
       vector<pair<uint64_t, StateValue>> offsets;
       for (auto &[sz, idx] : idxs) {
         if (auto idx_aty = idx->getType().getAsAggregateType())
-          offsets.emplace_back(sz, idx_aty->extract(s[*idx], i));
+          offsets.emplace_back(sz, idx_aty->extract(s[*idx], i, s.getVscale()));
         else
           offsets.emplace_back(sz, s[*idx]);
       }
-      vals.emplace_back(scalar(ptr_isvect ? aty->extract(ptrval, i) :
-                               (i == 0 ? ptrval : s[*ptr]), offsets));
+      vals.emplace_back(scalar(ptr_isvect
+                                   ? aty->extract(ptrval, i, s.getVscale())
+                                   : (i == 0 ? ptrval : s[*ptr]),
+                               offsets));
     }
-    return getType().getAsAggregateType()->aggregateVals(vals);
+    return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
   }
   vector<pair<uint64_t, StateValue>> offsets;
   for (auto &[sz, idx] : idxs)
@@ -4042,11 +4075,12 @@ StateValue PtrMask::toSMT(State &s) const {
     auto maskTy = mask->getType().getAsAggregateType();
     assert(maskTy);
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(fn(agg->extract(ptrval, i),
-                           maskTy->extract(maskval, i)));
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i != e;
+         ++i) {
+      vals.emplace_back(fn(agg->extract(ptrval, i, s.getVscale()),
+                           maskTy->extract(maskval, i, s.getVscale())));
     }
-    return agg->aggregateVals(vals);
+    return agg->aggregateVals(vals, s.getVscale());
   }
   return fn(ptrval, maskval);
 }
@@ -4068,7 +4102,8 @@ DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize)
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset)
 
 uint64_t Load::getMaxAccessSize() const {
-  return round_up(Memory::getStoreByteSize(getType()), align);
+  return round_up(Memory::getStoreByteSize(getType(), expr::mkVscaleMin()),
+                  align);
 }
 
 MemInstr::ByteAccessInfo Load::getByteAccessInfo() const {
@@ -4114,7 +4149,8 @@ DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize)
 DEFINE_AS_RETZERO(Store, getMaxGEPOffset)
 
 uint64_t Store::getMaxAccessSize() const {
-  return round_up(Memory::getStoreByteSize(val->getType()), align);
+  return round_up(Memory::getStoreByteSize(val->getType(), expr::mkVscaleMin()),
+                  align);
 }
 
 MemInstr::ByteAccessInfo Store::getByteAccessInfo() const {
@@ -4142,7 +4178,9 @@ StateValue Store::toSMT(State &s) const {
   // skip large initializers. FIXME: this should be moved to memory so it can
   // fold subsequent trivial loads
   if (s.isInitializationPhase() &&
-      Memory::getStoreByteSize(val->getType()) / (bits_byte / 8) > 128) {
+      Memory::getStoreByteSize(val->getType(), s.getVscale()) /
+              (bits_byte / 8) >
+          128) {
     s.doesApproximation("Large constant initializer removed");
     return {};
   }
@@ -4574,7 +4612,8 @@ StateValue Strlen::toSMT(State &s) const {
     ub.add(std::move(ub_load.first));
     ub.add(std::move(ub_load.second));
     ub.add(std::move(val.non_poison));
-    return { expr::mkUInt(i, ty.bits()), true, std::move(ub), val.value != 0 };
+    return {expr::mkUInt(i, ty.bits(s.getVscale())), true, std::move(ub),
+            val.value != 0};
   };
   auto [val, _, ub]
     = LoopLikeFunctionApproximator(ith_exec).encode(s, strlen_unroll_cnt);
@@ -4817,7 +4856,7 @@ StateValue VaArg::toSMT(State &s) const {
   ensure_varargs_ptr(data, s, raw_p);
 
   DisjointExpr<StateValue> ret(StateValue{});
-  expr value_kind = getType().getDummyValue(false).value;
+  expr value_kind = getType().getDummyValue(false, s.getVscale()).value;
   expr one = expr::mkUInt(1, VARARG_BITS);
 
   for (auto &[ptr, entry] : data) {
@@ -4880,8 +4919,8 @@ void ExtractElement::print(ostream &os) const {
 StateValue ExtractElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = static_cast<const VectorType*>(v->getType().getAsAggregateType());
-  expr inbounds = iv.ult(vty->numElementsConst());
-  auto [rv, rp] = vty->extract(s[*v], iv);
+  expr inbounds = iv.ult(vty->numElementsConst(s.getVscale()));
+  auto [rv, rp] = vty->extract(s[*v], iv, s.getVscale());
   return { std::move(rv), ip && inbounds && rp };
 }
 
@@ -4922,10 +4961,11 @@ void InsertElement::print(ostream &os) const {
 StateValue InsertElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = static_cast<const VectorType*>(v->getType().getAsAggregateType());
-  expr inbounds = iv.ult(vty->numElementsConst());
-  auto [rv, rp] = vty->update(s[*v], s[*e], iv);
-  return { std::move(rv), expr::mkIf(ip && inbounds, std::move(rp),
-                                vty->getDummyValue(false).non_poison) };
+  expr inbounds = iv.ult(vty->numElementsConst(s.getVscale()));
+  auto [rv, rp] = vty->update(s[*v], s[*e], iv, s.getVscale());
+  return {std::move(rv),
+          expr::mkIf(ip && inbounds, std::move(rp),
+                     vty->getDummyValue(false, s.getVscale()).non_poison)};
 }
 
 expr InsertElement::getTypeConstraints(const Function &f) const {
@@ -4968,19 +5008,19 @@ void ShuffleVector::print(ostream &os) const {
 
 StateValue ShuffleVector::toSMT(State &s) const {
   auto vty = v1->getType().getAsAggregateType();
-  auto sz = vty->numElementsConst();
+  auto sz = vty->numElementsConst(s.getVscale());
   vector<StateValue> vals;
 
   for (auto m : mask) {
     if (m >= 2 * sz) {
-      vals.emplace_back(vty->getChild(0).getDummyValue(false));
+      vals.emplace_back(vty->getChild(0).getDummyValue(false, s.getVscale()));
     } else {
       auto *vect = &s[m < sz ? *v1 : *v2];
-      vals.emplace_back(vty->extract(*vect, m % sz));
+      vals.emplace_back(vty->extract(*vect, m % sz, s.getVscale()));
     }
   }
 
-  return getType().getAsAggregateType()->aggregateVals(vals);
+  return getType().getAsAggregateType()->aggregateVals(vals, s.getVscale());
 }
 
 expr ShuffleVector::getTypeConstraints(const Function &f) const {

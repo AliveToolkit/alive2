@@ -448,7 +448,7 @@ static vector<BasicBlock*> top_sort(const vector<BasicBlock*> &bbs) {
     // in order to account for some transitive dependencies we may have
     // missed due to compression of its inner loops.
     // If there are no inner loops, this is redundant and if `bb` is not
-    // a loop header, the set of its exit blocks is empty. 
+    // a loop header, the set of its exit blocks is empty.
     for (auto &dst : bb->getExitBlocks()) {
       auto dst_I = bb_map.find(dst);
       if (dst_I != bb_map.end())
@@ -807,8 +807,8 @@ void Function::unroll(unsigned k) {
           static PtrType ptr_type(0);
           static IntType i32(string("i32"), 32);
           auto &type = val->getType();
-          auto size_alloc
-            = make_unique<IntConst>(i32, Memory::getStoreByteSize(type));
+          auto size_alloc = make_unique<IntConst>(
+              i32, Memory::getStoreByteSize(type, expr::mkVscaleMin()));
           auto *size = size_alloc.get();
           addConstant(std::move(size_alloc));
 
@@ -1017,7 +1017,7 @@ void DomTree::buildDominators(const CFG &cfg) {
   auto &entry = doms.at(&f.getFirstBB());
   entry.dominator = &entry;
 
-  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001). 
+  // Cooper, Keith D.; Harvey, Timothy J.; and Kennedy, Ken (2001).
   // A Simple, Fast Dominance Algorithm
   // http://www.cs.rice.edu/~keith/EMBED/dom.pdf
   // Makes multiple passes when CFG is cyclic to update incorrect initial
@@ -1220,5 +1220,5 @@ void LoopAnalysis::printDot(ostream &os) const {
   os << "}\n";
 }
 
-} 
+}
 

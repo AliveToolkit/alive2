@@ -321,7 +321,7 @@ public:
   // are not checked.
   void free(const smt::expr &ptr, bool unconstrained);
 
-  static unsigned getStoreByteSize(const Type &ty);
+  static unsigned getStoreByteSize(const Type &ty, smt::expr vscaleRange);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,
              uint64_t align, const std::set<smt::expr> &undef_vars);
   std::pair<StateValue, std::pair<smt::AndExpr, smt::expr>>

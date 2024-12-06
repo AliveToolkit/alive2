@@ -306,7 +306,7 @@ public:
               unsigned indirect_call_hash);
 
   auto& getVarArgsData() { return var_args_data.data; }
-  smt::expr getVscale() const { return vscale_data; }
+  const smt::expr &getVscale() const { return vscale_data; }
   static smt::expr
   vscaleFromAttr(std::optional<std::pair<uint16_t, uint16_t>> vscaleAttr);
 

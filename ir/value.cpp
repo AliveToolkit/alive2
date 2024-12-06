@@ -55,7 +55,7 @@ void PoisonValue::print(ostream &os) const {
 }
 
 StateValue PoisonValue::toSMT(State &s) const {
-  return getType().getDummyValue(false);
+  return getType().getDummyValue(false, s.getVscale());
 }
 
 
@@ -128,12 +128,12 @@ StateValue GlobalVariable::toSMT(State &s) const {
            true };
 }
 
-
-static string agg_str(const Type &ty, vector<Value*> &vals) {
+static string agg_str(const Type &ty, vector<Value *> &vals,
+                      expr vscaleRange = expr::mkVscaleMin()) {
   auto agg = ty.getAsAggregateType();
   string r = "{ ";
   unsigned j = 0;
-  for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+  for (unsigned i = 0, e = agg->numElementsConst(vscaleRange); i != e; ++i) {
     if (i != 0)
       r += ", ";
     if (agg->isPadding(i))
@@ -144,15 +144,17 @@ static string agg_str(const Type &ty, vector<Value*> &vals) {
   return r + " }";
 }
 
-AggregateValue::AggregateValue(Type &type, vector<Value*> &&vals)
-  : Value(type, agg_str(type, vals)), vals(std::move(vals)) {}
+AggregateValue::AggregateValue(Type &type, vector<Value *> &&vals,
+                               expr vscaleRange)
+    : Value(type, agg_str(type, vals, vscaleRange)), vals(std::move(vals)) {}
 
 StateValue AggregateValue::toSMT(State &s) const {
   vector<StateValue> state_vals;
   for (auto *val : vals) {
     state_vals.emplace_back(val->toSMT(s));
   }
-  return getType().getAsAggregateType()->aggregateVals(state_vals);
+  return getType().getAsAggregateType()->aggregateVals(state_vals,
+                                                       s.getVscale());
 }
 
 void AggregateValue::rauw(const Value &what, Value &with) {
@@ -214,13 +216,13 @@ string Input::getSMTName(unsigned child) const {
 StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
+    for (unsigned i = 0, e = agg->numElementsConst(s.getVscale()); i < e; ++i) {
       if (agg->isPadding(i))
         continue;
       auto name = getSMTName(child + i);
       vals.emplace_back(mkInput(s, agg->getChild(i), child + i));
     }
-    return agg->aggregateVals(vals);
+    return agg->aggregateVals(vals, s.getVscale());
   }
 
   expr val;

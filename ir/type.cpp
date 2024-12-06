@@ -24,7 +24,7 @@ namespace IR {
 
 VoidType Type::voidTy;
 
-unsigned Type::np_bits(bool fromInt) const {
+unsigned Type::np_bits(bool fromInt, expr) const {
   if (!fromInt)
     return 1;
   auto bw = bits();
@@ -242,7 +242,7 @@ expr Type::toInt(State &s, expr v) const {
 }
 
 StateValue Type::toInt(State &s, StateValue v) const {
-  auto bw = np_bits(true);
+  auto bw = np_bits(true, s.getVscale());
   return { toInt(s, std::move(v.value)),
            expr::mkIf(v.non_poison, expr::mkInt(-1, bw), expr::mkUInt(0, bw)) };
 }
@@ -251,7 +251,7 @@ expr Type::fromInt(expr e) const {
   return fromBV(std::move(e));
 }
 
-StateValue Type::fromInt(StateValue v) const {
+StateValue Type::fromInt(StateValue v, expr) const {
   return { fromInt(std::move(v.value)),
            v.non_poison.isBool()
              ? expr(v.non_poison)
@@ -264,7 +264,7 @@ expr Type::combine_poison(const expr &boolean, const expr &orig) const {
 }
 
 StateValue Type::mkUndef(State &s) const {
-  auto val = getDummyValue(true);
+  auto val = getDummyValue(true, s.getVscale());
   expr var = expr::mkFreshVar("undef", val.value);
   s.addUndefVar(expr(var));
   return { std::move(var), std::move(val.non_poison) };
@@ -289,11 +289,11 @@ string Type::toString() const {
 Type::~Type() {}
 
 
-unsigned VoidType::bits() const {
+unsigned VoidType::bits(expr) const {
   UNREACHABLE();
 }
 
-StateValue VoidType::getDummyValue(bool non_poison) const {
+StateValue VoidType::getDummyValue(bool non_poison, expr) const {
   return { false, non_poison };
 }
 
@@ -333,11 +333,11 @@ unsigned IntType::maxSubBitAccess() const {
   return 0;
 }
 
-unsigned IntType::bits() const {
+unsigned IntType::bits(expr) const {
   return bitwidth;
 }
 
-StateValue IntType::getDummyValue(bool non_poison) const {
+StateValue IntType::getDummyValue(bool non_poison, expr) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
@@ -525,7 +525,7 @@ expr FloatType::isNaN(const expr &v, bool signalling) const {
   }
 }
 
-unsigned FloatType::bits() const {
+unsigned FloatType::bits(expr) const {
   assert(fpType != Unknown);
   return float_sizes[fpType].first;
 }
@@ -566,7 +566,7 @@ expr FloatType::sizeVar() const {
   return defined ? expr::mkUInt(bits(), var_bw_bits) : Type::sizeVar();
 }
 
-StateValue FloatType::getDummyValue(bool non_poison) const {
+StateValue FloatType::getDummyValue(bool non_poison, expr) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
@@ -663,15 +663,15 @@ expr PtrType::ASVar() const {
   return defined ? expr::mkUInt(addr_space, 2) : var("as", 2);
 }
 
-unsigned PtrType::bits() const {
+unsigned PtrType::bits(expr) const {
   return Pointer::totalBits();
 }
 
-unsigned PtrType::np_bits(bool fromInt) const {
+unsigned PtrType::np_bits(bool fromInt, expr) const {
   return 1;
 }
 
-StateValue PtrType::getDummyValue(bool non_poison) const {
+StateValue PtrType::getDummyValue(bool non_poison, expr) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
@@ -713,7 +713,7 @@ expr PtrType::fromInt(expr v) const {
   return v;
 }
 
-StateValue PtrType::fromInt(StateValue v) const {
+StateValue PtrType::fromInt(StateValue v, expr) const {
   return Type::fromInt(std::move(v));
 }
 
@@ -781,13 +781,15 @@ AggregateType::AggregateType(string &&name, vector<Type*> &&vchildren,
   elements = children.size();
 }
 
-expr AggregateType::numElements() const {
-  return defined ? expr::mkUInt(elements, var_vector_elements) :
-                   var("elements", var_vector_elements);
+expr AggregateType::numElements(expr vscaleRange) const {
+  return defined
+             ? expr::mkUInt(numElementsConst(vscaleRange), var_vector_elements)
+             : var("elements", var_vector_elements);
 }
 
-unsigned AggregateType::numPaddingsConst() const {
-  return is_padding.empty() ? 0 : countPaddings(is_padding.size() - 1);
+unsigned AggregateType::numPaddingsConst(expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
+  return elems ? countPaddings(elems - 1) : 0;
 }
 
 unsigned AggregateType::countPaddings(unsigned to_idx) const {
@@ -797,22 +799,24 @@ unsigned AggregateType::countPaddings(unsigned to_idx) const {
   return count;
 }
 
-expr AggregateType::numElementsExcludingPadding() const {
-  auto elems = numElements();
-  return numElements() - expr::mkInt(numPaddingsConst(), elems);
+expr AggregateType::numElementsExcludingPadding(expr vscaleRange) const {
+  auto elems = numElements(vscaleRange);
+  return elems - expr::mkInt(numPaddingsConst(vscaleRange), elems);
 }
 
-StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
-  assert(vals.size() + numPaddingsConst() == elements);
+StateValue AggregateType::aggregateVals(const vector<StateValue> &vals,
+                                        expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
+  assert(vals.size() + numPaddingsConst(vscaleRange) == elems);
   // structs can be empty
-  if (elements == 0)
+  if (elems == 0)
     return { expr::mkUInt(0, 1), expr::mkUInt(0, 1) };
 
   StateValue v;
   bool first = true;
   unsigned val_idx = 0;
-  for (unsigned idx = 0; idx < elements; ++idx) {
-    if (children[idx]->bits() == 0) {
+  for (unsigned idx = 0; idx < elems; ++idx) {
+    if (children[idx]->bits(vscaleRange) == 0) {
       assert(!isPadding(idx));
       val_idx++;
       continue;
@@ -820,7 +824,7 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
 
     StateValue vv;
     if (isPadding(idx))
-      vv = children[idx]->getDummyValue(false);
+      vv = children[idx]->getDummyValue(false, vscaleRange);
     else
       vv = vals[val_idx++];
     vv = children[idx]->toBV(std::move(vv));
@@ -831,26 +835,26 @@ StateValue AggregateType::aggregateVals(const vector<StateValue> &vals) const {
 }
 
 StateValue AggregateType::extract(const StateValue &val, unsigned index,
-                                  bool fromInt) const {
+                                  expr vscaleRange, bool fromInt) const {
   unsigned total_value = 0, total_np = 0;
   for (unsigned i = 0; i < index; ++i) {
-    total_value += children[i]->bits();
+    total_value += children[i]->bits(vscaleRange);
     total_np += children[i]->np_bits(fromInt);
   }
 
   unsigned h_val, l_val, h_np, l_np;
   if (fromInt && little_endian) {
-    h_val = total_value + children[index]->bits() - 1;
+    h_val = total_value + children[index]->bits(vscaleRange) - 1;
     l_val = total_value;
 
     h_np = total_np + children[index]->np_bits(fromInt) - 1;
     l_np = total_np;
   } else {
-    unsigned high_val = bits() - total_value;
+    unsigned high_val = bits(vscaleRange) - total_value;
     h_val = high_val - 1;
-    l_val = high_val - children[index]->bits();
+    l_val = high_val - children[index]->bits(vscaleRange);
 
-    unsigned high_np = np_bits(fromInt) - total_np;
+    unsigned high_np = np_bits(fromInt, vscaleRange) - total_np;
     h_np = high_np - 1;
     l_np = high_np - children[index]->np_bits(fromInt);
   }
@@ -861,37 +865,41 @@ StateValue AggregateType::extract(const StateValue &val, unsigned index,
                    children[index]->fromBV(std::move(sv));
 }
 
-unsigned AggregateType::bits() const {
-  if (elements == 0)
+unsigned AggregateType::bits(expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
+  if (elems == 0)
     // It is set as 1 because zero-width bitvector is invalid.
     return 1;
 
   unsigned bw = 0;
-  for (unsigned i = 0; i < elements; ++i) {
-    bw += children[i]->bits();
+  for (unsigned i = 0; i < elems; ++i) {
+    bw += children[i]->bits(vscaleRange);
   }
   return bw;
 }
 
-unsigned AggregateType::np_bits(bool fromInt) const {
-  if (elements == 0)
+unsigned AggregateType::np_bits(bool fromInt, expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
+  if (elems == 0)
     // It is set as 1 because zero-width bitvector is invalid.
     return 1;
 
   unsigned bw = 0;
-  for (unsigned i = 0; i < elements; ++i) {
+  for (unsigned i = 0; i < elems; ++i) {
     bw += children[i]->np_bits(fromInt);
   }
   return bw;
 }
 
-StateValue AggregateType::getDummyValue(bool non_poison) const {
+StateValue AggregateType::getDummyValue(bool non_poison,
+                                        expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
   vector<StateValue> vals;
-  for (unsigned i = 0; i < elements; ++i) {
+  for (unsigned i = 0; i < elems; ++i) {
     if (!isPadding(i))
-      vals.emplace_back(children[i]->getDummyValue(non_poison));
+      vals.emplace_back(children[i]->getDummyValue(non_poison, vscaleRange));
   }
-  return aggregateVals(vals);
+  return aggregateVals(vals, vscaleRange);
 }
 
 expr AggregateType::getTypeConstraints(const Function &f) const {
@@ -970,13 +978,15 @@ expr AggregateType::toInt(State &s, expr v) const {
 }
 
 StateValue AggregateType::toInt(State &s, StateValue v) const {
+  unsigned elems = numElementsConst(s.getVscale());
+
   // structs can be empty
-  if (elements == 0)
+  if (elems == 0)
     return { expr::mkUInt(0, 1), expr::mkUInt(1, 1) };
 
   StateValue ret;
-  for (unsigned i = 0; i < elements; ++i) {
-    auto vv = children[i]->toInt(s, extract(v, i));
+  for (unsigned i = 0; i < elems; ++i) {
+    auto vv = children[i]->toInt(s, extract(v, i, s.getVscale()));
     ret = i == 0 ? std::move(vv) : (little_endian ? vv.concat(ret) : ret.concat(vv));
   }
   return ret;
@@ -986,10 +996,11 @@ expr AggregateType::fromInt(expr v) const {
   UNREACHABLE();
 }
 
-StateValue AggregateType::fromInt(StateValue v) const {
+StateValue AggregateType::fromInt(StateValue v, expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
   vector<StateValue> child_vals;
-  for (unsigned i = 0; i < elements; ++i)
-    child_vals.emplace_back(extract(v, i, true));
+  for (unsigned i = 0; i < elems; ++i)
+    child_vals.emplace_back(extract(v, i, vscaleRange, true));
   return this->aggregateVals(child_vals);
 }
 
@@ -997,9 +1008,11 @@ pair<expr, expr>
 AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
                        const StateValue &tgt) const {
   set<expr> poison, value;
-  for (unsigned i = 0; i < elements; ++i) {
-    auto [p, v] = children[i]->refines(src_s, tgt_s, extract(src, i),
-                                       extract(tgt, i));
+  expr vscaleRange = src_s.getVscale();
+  for (unsigned i = 0; i < numElementsConst(vscaleRange); ++i) {
+    auto [p, v] =
+        children[i]->refines(src_s, tgt_s, extract(src, i, vscaleRange),
+                             extract(tgt, i, vscaleRange));
     poison.insert(std::move(p));
     value.insert(std::move(v));
   }
@@ -1007,12 +1020,13 @@ AggregateType::refines(State &src_s, State &tgt_s, const StateValue &src,
 }
 
 StateValue AggregateType::mkUndef(State &s) const {
+  unsigned elems = numElementsConst(s.getVscale());
   vector<StateValue> vals;
-  for (unsigned i = 0; i < elements; ++i) {
+  for (unsigned i = 0; i < elems; ++i) {
     if (!isPadding(i))
       vals.emplace_back(children[i]->mkUndef(s));
   }
-  return aggregateVals(vals);
+  return aggregateVals(vals, s.getVscale());
 }
 
 expr AggregateType::mkInput(State &s, const char *name,
@@ -1089,19 +1103,20 @@ VectorType::VectorType(string &&name, unsigned minElems, Type &elementTy,
 }
 
 StateValue VectorType::extract(const StateValue &vector,
-                               const expr &index) const {
+                               const expr &index, expr vscaleRange) const {
+  unsigned elems = numElementsConst(vscaleRange);
   auto &elementTy = *children[0];
-  unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = bw_elem * elements;
+  unsigned bw_elem = elementTy.bits(vscaleRange);
+  unsigned bw_val = bw_elem * elems;
   expr idx_v = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
-  unsigned h_val = elements * bw_elem - 1;
-  unsigned l_val = (elements - 1) * bw_elem;
+  unsigned h_val = elems * bw_elem - 1;
+  unsigned l_val = (elems - 1) * bw_elem;
 
-  unsigned bw_np_elem = elementTy.np_bits(false);
-  unsigned bw_np = bw_np_elem * elements;
+  unsigned bw_np_elem = elementTy.np_bits(false, vscaleRange);
+  unsigned bw_np = bw_np_elem * elems;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
-  unsigned h_np = elements * bw_np_elem - 1;
-  unsigned l_np = (elements - 1) * bw_np_elem;
+  unsigned h_np = elems * bw_np_elem - 1;
+  unsigned l_np = (elems - 1) * bw_np_elem;
 
   return elementTy.fromBV({(vector.value << idx_v).extract(h_val, l_val),
                            (vector.non_poison << idx_np).extract(h_np, l_np)});
@@ -1109,22 +1124,24 @@ StateValue VectorType::extract(const StateValue &vector,
 
 StateValue VectorType::update(const StateValue &vector,
                               const StateValue &val,
-                              const expr &index) const {
+                              const expr &index,
+                              expr vscaleRange) const {
   auto &elementTy = *children[0];
   StateValue val_bv = elementTy.toBV(val);
+  unsigned elems = numElementsConst(vscaleRange);
 
-  if (elements == 1)
+  if (elems == 1)
     return val_bv;
 
-  unsigned bw_elem = elementTy.bits();
-  unsigned bw_val = bw_elem * elements;
+  unsigned bw_elem = elementTy.bits(vscaleRange);
+  unsigned bw_val = bw_elem * elems;
   expr idx_v = index.zextOrTrunc(bw_val) * expr::mkUInt(bw_elem, bw_val);
   expr fill_v = expr::mkUInt(0, bw_val - bw_elem);
   expr mask_v = ~expr::mkInt(-1, bw_elem).concat(fill_v).lshr(idx_v);
   expr nv_shifted = val_bv.value.concat(fill_v).lshr(idx_v);
 
-  unsigned bw_np_elem = elementTy.np_bits(false);
-  unsigned bw_np = bw_np_elem * elements;
+  unsigned bw_np_elem = elementTy.np_bits(false, vscaleRange);
+  unsigned bw_np = bw_np_elem * elems;
   expr idx_np = index.zextOrTrunc(bw_np) * expr::mkUInt(bw_np_elem, bw_np);
   expr fill_np = expr::mkUInt(0, bw_np - bw_np_elem);
   expr mask_np = ~expr::mkInt(-1, bw_np_elem).concat(fill_np).lshr(idx_np);
@@ -1146,15 +1163,17 @@ expr VectorType::getTypeConstraints(const Function &f) const {
   }
 
   auto &elementTy = *children[0];
+  expr vscaleRange = State::vscaleFromAttr(vscaleAttr);
+  expr elems = numElements(vscaleRange);
   expr r = AggregateType::getTypeConstraints(f) &&
            (elementTy.enforceIntType() ||
             elementTy.enforceFloatType() ||
             elementTy.enforcePtrType()) &&
-           numElements() != 0;
+           elems != 0;
 
   // all elements have the same type
   for (unsigned i = 1, e = children.size(); i != e; ++i) {
-    r &= numElements().ugt(i).implies(elementTy == *children[i]);
+    r &= elems.ugt(i).implies(elementTy == *children[i]);
   }
 
   // TODO: remove once scalable vectors are supported.
@@ -1271,16 +1290,16 @@ SymbolicType::SymbolicType(string &&name, unsigned type_mask)
     ret = ret.isValid() ? expr::mkIf(isStruct(), s->call, ret) : s->call; \
   return ret
 
-unsigned SymbolicType::bits() const {
-  DISPATCH(bits(), UNREACHABLE());
+unsigned SymbolicType::bits(expr dummy) const {
+  DISPATCH(bits(dummy), UNREACHABLE());
 }
 
-unsigned SymbolicType::np_bits(bool fromInt) const {
-  DISPATCH(np_bits(fromInt), UNREACHABLE());
+unsigned SymbolicType::np_bits(bool fromInt, expr dummy) const {
+  DISPATCH(np_bits(fromInt, dummy), UNREACHABLE());
 }
 
-StateValue SymbolicType::getDummyValue(bool non_poison) const {
-  DISPATCH(getDummyValue(non_poison), UNREACHABLE());
+StateValue SymbolicType::getDummyValue(bool non_poison, expr dummy) const {
+  DISPATCH(getDummyValue(non_poison, dummy), UNREACHABLE());
 }
 
 expr SymbolicType::getTypeConstraints(const Function &fn) const {
@@ -1455,8 +1474,8 @@ expr SymbolicType::fromInt(expr e) const {
   DISPATCH(fromInt(std::move(e)), UNREACHABLE());
 }
 
-StateValue SymbolicType::fromInt(StateValue val) const {
-  DISPATCH(fromInt(std::move(val)), UNREACHABLE());
+StateValue SymbolicType::fromInt(StateValue val, expr dummy) const {
+  DISPATCH(fromInt(std::move(val), dummy), UNREACHABLE());
 }
 
 pair<expr, expr>
@@ -1488,34 +1507,35 @@ void SymbolicType::print(ostream &os) const {
 }
 
 
-bool hasPtr(const Type &t) {
+bool hasPtr(const Type &t, expr vscaleRange) {
   if (t.isPtrType())
     return true;
 
   if (auto agg = t.getAsAggregateType()) {
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (hasPtr(agg->getChild(i)))
+    for (unsigned i = 0, e = agg->numElementsConst(vscaleRange); i != e; ++i) {
+      if (hasPtr(agg->getChild(i), vscaleRange))
         return true;
     }
   }
   return false;
 }
 
-bool isNonPtrVector(const Type &t) {
+bool isNonPtrVector(const Type &t, expr vscaleRange) {
   auto vty = dynamic_cast<const VectorType *>(&t);
   return vty && !vty->getChild(0).isPtrType();
 }
 
-unsigned minVectorElemSize(const Type &t) {
+unsigned minVectorElemSize(const Type &t, expr vscaleRange) {
   if (auto agg = t.getAsAggregateType()) {
     if (t.isVectorType()) {
       auto &elemTy = agg->getChild(0);
-      return elemTy.isPtrType() ? IR::bits_program_pointer : elemTy.bits();
+      return elemTy.isPtrType() ? IR::bits_program_pointer
+                                : elemTy.bits(vscaleRange);
     }
 
     unsigned val = 0;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e;  ++i) {
-      if (auto ch = minVectorElemSize(agg->getChild(i))) {
+    for (unsigned i = 0, e = agg->numElementsConst(vscaleRange); i != e; ++i) {
+      if (auto ch = minVectorElemSize(agg->getChild(i), vscaleRange)) {
         val = val ? gcd(val, ch) : ch;
       }
     }
@@ -1524,24 +1544,25 @@ unsigned minVectorElemSize(const Type &t) {
   return 0;
 }
 
-uint64_t getCommonAccessSize(const IR::Type &ty) {
+uint64_t getCommonAccessSize(const IR::Type &ty, expr vscaleRange) {
   if (auto agg = ty.getAsAggregateType()) {
     // non-pointer vectors are stored/loaded all at once
     if (agg->isVectorType()) {
       auto &elemTy = agg->getChild(0);
       if (!elemTy.isPtrType())
-        return divide_up(agg->numElementsConst() * elemTy.bits(), 8);
+        return divide_up(
+            agg->numElementsConst(vscaleRange) * elemTy.bits(vscaleRange), 8);
     }
 
     uint64_t sz = 1;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      auto n = getCommonAccessSize(agg->getChild(i));
+    for (unsigned i = 0, e = agg->numElementsConst(vscaleRange); i != e; ++i) {
+      auto n = getCommonAccessSize(agg->getChild(i), vscaleRange);
       sz = i == 0 ? n : gcd(sz, n);
     }
     return sz;
   }
   if (ty.isPtrType())
     return IR::bits_program_pointer / 8;
-  return divide_up(ty.bits(), 8);
+  return divide_up(ty.bits(vscaleRange), 8);
 }
 }

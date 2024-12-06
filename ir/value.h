@@ -107,7 +107,8 @@ public:
 class AggregateValue final : public Value {
   std::vector<Value*> vals;
 public:
-  AggregateValue(Type &type, std::vector<Value*> &&vals);
+  AggregateValue(Type &type, std::vector<Value *> &&vals,
+                 smt::expr vscaleRange = smt::expr::mkVscaleMin());
   auto& getVals() const { return vals; }
   void rauw(const Value &what, Value &with) override;
   smt::expr getTypeConstraints(const Function &f) const override;

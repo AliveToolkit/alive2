@@ -589,7 +589,8 @@ static vector<Byte> valueToBytes(const StateValue &val, const Type &fromType,
     for (unsigned i = 0; i < bytesize; ++i)
       bytes.emplace_back(mem, StateValue(expr(p()), expr(val.non_poison)), i);
   } else {
-    assert(!fromType.isAggregateType() || isNonPtrVector(fromType));
+    assert(!fromType.isAggregateType() ||
+           isNonPtrVector(fromType, s.getVscale()));
     StateValue bvval = fromType.toInt(s, val);
     unsigned bitsize = bvval.bits();
     unsigned bytesize = divide_up(bitsize, bits_byte);
@@ -674,7 +675,8 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
     return { std::move(loaded_ptr), std::move(non_poison) };
 
   } else {
-    assert(!toType.isAggregateType() || isNonPtrVector(toType));
+    assert(!toType.isAggregateType() ||
+           isNonPtrVector(toType, m.getState().getVscale()));
     auto bitsize = toType.bits();
     assert(divide_up(bitsize, bits_byte) == bytes.size());
 
@@ -699,7 +701,8 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       val = first ? std::move(v) : v.concat(val);
       first = false;
     }
-    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)));
+    return toType.fromInt(val.trunc(bitsize, toType.np_bits(true)),
+                          m.getState().getVscale());
   }
 }
 
@@ -2230,20 +2233,20 @@ void Memory::free(const expr &ptr, bool unconstrained) {
   }
 }
 
-unsigned Memory::getStoreByteSize(const Type &ty) {
+unsigned Memory::getStoreByteSize(const Type &ty, expr vscaleRange) {
   assert(bits_program_pointer != 0);
 
   if (ty.isPtrType())
     return divide_up(bits_program_pointer, 8);
 
   auto aty = ty.getAsAggregateType();
-  if (aty && !isNonPtrVector(ty)) {
+  if (aty && !isNonPtrVector(ty, vscaleRange)) {
     unsigned sz = 0;
-    for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i)
-      sz += getStoreByteSize(aty->getChild(i));
+    for (unsigned i = 0, e = aty->numElementsConst(vscaleRange); i < e; ++i)
+      sz += getStoreByteSize(aty->getChild(i), vscaleRange);
     return sz;
   }
-  return divide_up(ty.bits(), 8);
+  return divide_up(ty.bits(vscaleRange), 8);
 }
 
 void Memory::store(const StateValue &v, const Type &type, unsigned offset0,
@@ -2251,20 +2254,23 @@ void Memory::store(const StateValue &v, const Type &type, unsigned offset0,
   unsigned bytesz = bits_byte / 8;
 
   auto aty = type.getAsAggregateType();
-  if (aty && !isNonPtrVector(type)) {
+  if (aty && !isNonPtrVector(type, state->getVscale())) {
     unsigned byteofs = 0;
-    for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
+    for (unsigned i = 0, e = aty->numElementsConst(state->getVscale()); i < e;
+         ++i) {
       auto &child = aty->getChild(i);
-      if (child.bits() == 0)
+      if (child.bits(state->getVscale()) == 0)
         continue;
-      store(aty->extract(v, i), child, offset0 + byteofs, data);
-      byteofs += getStoreByteSize(child);
+      store(aty->extract(v, i, state->getVscale()), child, offset0 + byteofs,
+            data);
+      byteofs += getStoreByteSize(child, state->getVscale());
     }
-    assert(byteofs == getStoreByteSize(type));
+    assert(byteofs == getStoreByteSize(type, state->getVscale()));
 
   } else {
     vector<Byte> bytes = valueToBytes(v, type, *this, *state);
-    assert(!v.isValid() || bytes.size() * bytesz == getStoreByteSize(type));
+    assert(!v.isValid() ||
+           bytes.size() * bytesz == getStoreByteSize(type, state->getVscale()));
 
     for (unsigned i = 0, e = bytes.size(); i < e; ++i) {
       unsigned offset = little_endian ? i * bytesz : (e - i - 1) * bytesz;
@@ -2280,7 +2286,8 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 
   // initializer stores are ok by construction
   if (!state->isInitializationPhase())
-    state->addUB(ptr.isDereferenceable(getStoreByteSize(type), align, true));
+    state->addUB(ptr.isDereferenceable(
+        getStoreByteSize(type, state->getVscale()), align, true));
 
   vector<pair<unsigned, expr>> to_store;
   store(v, type, 0, to_store);
@@ -2289,26 +2296,27 @@ void Memory::store(const expr &p, const StateValue &v, const Type &type,
 
 StateValue Memory::load(const Pointer &ptr, const Type &type, set<expr> &undef,
                         uint64_t align) {
-  unsigned bytecount = getStoreByteSize(type);
+  unsigned bytecount = getStoreByteSize(type, state->getVscale());
 
   auto aty = type.getAsAggregateType();
-  if (aty && !isNonPtrVector(type)) {
+  if (aty && !isNonPtrVector(type, state->getVscale())) {
     vector<StateValue> member_vals;
     unsigned byteofs = 0;
-    for (unsigned i = 0, e = aty->numElementsConst(); i < e; ++i) {
+    for (unsigned i = 0, e = aty->numElementsConst(state->getVscale()); i < e;
+         ++i) {
       // Padding is filled with poison.
       if (aty->isPadding(i)) {
-        byteofs += getStoreByteSize(aty->getChild(i));
+        byteofs += getStoreByteSize(aty->getChild(i), state->getVscale());
         continue;
       }
 
       auto ptr_i = ptr + byteofs;
       auto align_i = gcd(align, byteofs % align);
       member_vals.emplace_back(load(ptr_i, aty->getChild(i), undef, align_i));
-      byteofs += getStoreByteSize(aty->getChild(i));
+      byteofs += getStoreByteSize(aty->getChild(i), state->getVscale());
     }
     assert(byteofs == bytecount);
-    return aty->aggregateVals(member_vals);
+    return aty->aggregateVals(member_vals, state->getVscale());
   }
 
   bool is_ptr = type.isPtrType();
@@ -2350,7 +2358,8 @@ Memory::load(const expr &p, const Type &type, uint64_t align) {
   assert(!memory_unused());
 
   Pointer ptr(*this, p);
-  auto ubs = ptr.isDereferenceable(getStoreByteSize(type), align, false);
+  auto ubs = ptr.isDereferenceable(getStoreByteSize(type, state->getVscale()),
+                                   align, false);
   set<expr> undef_vars;
   auto ret = load(ptr, type, undef_vars, align);
   return { state->rewriteUndef(std::move(ret), undef_vars), std::move(ubs) };
@@ -2514,7 +2523,8 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
 void Memory::fillPoison(const expr &bid) {
   Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
   expr blksz = p.blockSizeAligned();
-  memset(std::move(p).release(), IntType("i8", 8).getDummyValue(false),
+  memset(std::move(p).release(),
+         IntType("i8", 8).getDummyValue(false, state->getVscale()),
          std::move(blksz), bits_byte / 8, {}, false);
 }
 

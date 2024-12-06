@@ -376,7 +376,7 @@ class ExtractValue final : public Instr {
 public:
   ExtractValue(Type &type, std::string &&name, Value &val)
     : Instr(type, std::move(name)), val(&val) {}
-  
+
   const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
@@ -398,7 +398,7 @@ class InsertValue final : public Instr {
 public:
   InsertValue(Type &type, std::string &&name, Value &val, Value &elt)
           : Instr(type, std::move(name)), val(&val), elt(&elt) {}
-  
+
   const auto& getIdxs() const { return idxs; }
   void addIdx(unsigned idx);
 
@@ -535,7 +535,7 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr> 
+  std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
 
@@ -1276,7 +1276,7 @@ public:
   ShuffleVector(Type &type, std::string &&name, Value &v1, Value &v2,
                 std::vector<unsigned> mask)
     : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(std::move(mask)) {}
-  
+
   const auto& getMask() const { return mask; }
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;

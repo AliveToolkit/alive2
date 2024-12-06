@@ -44,11 +44,15 @@ protected:
 
 public:
   Type(std::string &&name) : name(std::move(name)) {}
-  virtual unsigned bits() const = 0;
-  virtual unsigned np_bits(bool fromInt) const;
+  virtual unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const = 0;
+  virtual unsigned
+  np_bits(bool fromInt, smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
 
   // to use when one needs the corresponding SMT type
-  virtual IR::StateValue getDummyValue(bool non_poison) const = 0;
+  virtual IR::StateValue
+  getDummyValue(bool non_poison,
+                smt::expr vscaleRange = smt::expr::mkVscaleMin()) const = 0;
 
   virtual smt::expr getTypeConstraints(const Function &f) const = 0;
   virtual smt::expr sizeVar() const;
@@ -103,7 +107,9 @@ public:
   virtual smt::expr toInt(State &s, smt::expr v) const;
   virtual IR::StateValue toInt(State &s, IR::StateValue v) const;
   virtual smt::expr fromInt(smt::expr v) const;
-  virtual IR::StateValue fromInt(IR::StateValue v) const;
+  virtual IR::StateValue
+  fromInt(IR::StateValue v,
+          smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
 
   // combine existing poison value in BV repr with a new boolean expr
   smt::expr combine_poison(const smt::expr &boolean,
@@ -136,8 +142,9 @@ public:
 class VoidType final : public Type {
 public:
   VoidType() : Type("void") {}
-  unsigned bits() const override;
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const override;
+  IR::StateValue getDummyValue(bool non_poison, smt::expr) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   void fixup(const smt::Model &m) override;
   std::pair<smt::expr, smt::expr>
@@ -161,8 +168,9 @@ public:
     : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
 
   unsigned maxSubBitAccess() const;
-  unsigned bits() const override;
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const override;
+  IR::StateValue getDummyValue(bool non_poison, smt::expr) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
@@ -199,7 +207,8 @@ public:
   FloatType(std::string &&name) : Type(std::move(name)) {}
   FloatType(std::string &&name, FpType fpType)
     : Type(std::move(name)), fpType(fpType), defined(true) {}
-  unsigned bits() const override;
+  unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const override;
   FpType getFpType() const { return fpType; };
 
   smt::expr getDummyFloat() const;
@@ -209,7 +218,7 @@ public:
                       const smt::expr &b = {}, const smt::expr &c = {}) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
 
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  IR::StateValue getDummyValue(bool non_poison, smt::expr) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const FloatType &rhs) const;
@@ -237,9 +246,11 @@ public:
   PtrType(std::string &&name) : Type(std::move(name)) {}
 
   PtrType(unsigned addr_space);
-  unsigned bits() const override;
-  unsigned np_bits(bool fromInt) const override;
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const override;
+  unsigned np_bits(bool fromInt, smt::expr vscaleRange = smt::expr::mkUInt(
+                                     1, var_vector_elements)) const override;
+  IR::StateValue getDummyValue(bool non_poison, smt::expr) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const PtrType &rhs) const;
@@ -249,7 +260,7 @@ public:
   smt::expr toInt(State &s, smt::expr v) const override;
   IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromInt(smt::expr v) const override;
-  IR::StateValue fromInt(IR::StateValue v) const override;
+  IR::StateValue fromInt(IR::StateValue v, smt::expr) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -278,22 +289,30 @@ protected:
                 std::vector<bool> &&is_padding);
 
 public:
-  smt::expr numElements() const;
-  smt::expr numElementsExcludingPadding() const;
-  unsigned numElementsConst() const { return elements; }
-  unsigned numPaddingsConst() const;
+  smt::expr numElements(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
+  smt::expr numElementsExcludingPadding(
+      smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
+  unsigned
+  numElementsConst(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const {
+    return elements;
+  }
+  unsigned numPaddingsConst(smt::expr vscaleRange) const;
 
-  StateValue aggregateVals(const std::vector<StateValue> &vals) const;
+  StateValue
+  aggregateVals(const std::vector<StateValue> &vals,
+                smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
   StateValue extract(const StateValue &val, unsigned index,
+                     smt::expr vscaleRange = smt::expr::mkVscaleMin(),
                      bool fromInt = false) const;
   Type& getChild(unsigned index) const { return *children[index]; }
   bool isPadding(unsigned i) const { return is_padding[i]; }
   unsigned countPaddings(unsigned to_idx) const;
 
-  unsigned bits() const override;
-  unsigned np_bits(bool fromInt) const override;
+  unsigned bits(smt::expr vscaleRange) const override;
+  unsigned np_bits(bool fromInt, smt::expr vscaleRange) const override;
   // Padding is filled with poison regardless of non_poison.
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  IR::StateValue getDummyValue(bool non_poison,
+                               smt::expr vscaleRange) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const AggregateType &rhs) const;
@@ -307,7 +326,8 @@ public:
   smt::expr toInt(State &s, smt::expr v) const override;
   IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromInt(smt::expr v) const override;
-  IR::StateValue fromInt(IR::StateValue v) const override;
+  IR::StateValue fromInt(IR::StateValue v,
+                         smt::expr vscaleRange) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -341,10 +361,12 @@ public:
              bool isScalableTy = false);
 
   IR::StateValue extract(const IR::StateValue &vector,
-                         const smt::expr &index) const;
+                         const smt::expr &index,
+                         smt::expr vscaleRange) const;
   IR::StateValue update(const IR::StateValue &vector,
                         const IR::StateValue &val,
-                        const smt::expr &idx) const;
+                        const smt::expr &idx,
+                        smt::expr vscaleRange) const;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
@@ -387,9 +409,11 @@ public:
   // use mask of (1 << TypeNum)
   SymbolicType(std::string &&name, unsigned type_mask);
 
-  unsigned bits() const override;
-  unsigned np_bits(bool fromInt) const override;
-  IR::StateValue getDummyValue(bool non_poison) const override;
+  unsigned
+  bits(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const override;
+  unsigned np_bits(bool fromInt, smt::expr vscaleRange = smt::expr::mkUInt(
+                                     1, var_vector_elements)) const override;
+  IR::StateValue getDummyValue(bool non_poison, smt::expr) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr scalarSize() const override;
@@ -420,7 +444,7 @@ public:
   smt::expr toInt(State &s, smt::expr v) const override;
   IR::StateValue toInt(State &s, IR::StateValue v) const override;
   smt::expr fromInt(smt::expr v) const override;
-  IR::StateValue fromInt(IR::StateValue v) const override;
+  IR::StateValue fromInt(IR::StateValue v, smt::expr) const override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
             const StateValue &tgt) const override;
@@ -434,9 +458,10 @@ public:
   void print(std::ostream &os) const override;
 };
 
-
-bool hasPtr(const Type &t);
-bool isNonPtrVector(const Type &t);
-unsigned minVectorElemSize(const Type &t);
-uint64_t getCommonAccessSize(const Type &ty);
+bool hasPtr(const Type &t, smt::expr vscaleRange = smt::expr::mkVscaleMin());
+bool isNonPtrVector(const Type &t, smt::expr vscaleRange);
+unsigned minVectorElemSize(const Type &t,
+                           smt::expr vscaleRange = smt::expr::mkVscaleMin());
+uint64_t getCommonAccessSize(const Type &ty,
+                             smt::expr vscaleRange = smt::expr::mkVscaleMin());
 }
