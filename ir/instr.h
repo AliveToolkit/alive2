@@ -319,16 +319,20 @@ private:
   FpRoundingMode rm;
   FpExceptionMode ex;
   unsigned flags;
+  FastMathFlags fmath;
 
 public:
   FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
                  FpRoundingMode rm = {}, FpExceptionMode ex = {},
-                 unsigned flags = None);
+                 unsigned flags = None, FastMathFlags fmath = {});
 
   Op getOp() const { return op; }
   FpRoundingMode getRoundingMode() const { return rm; }
   FpExceptionMode getExceptionMode() const { return ex; }
   unsigned getFlags() const { return flags; }
+  FastMathFlags getFastMathFlags() const {
+    return fmath;
+  }
 
   std::vector<Value*> operands() const override;
   bool propagatesPoison() const override;
