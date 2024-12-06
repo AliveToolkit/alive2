@@ -734,9 +734,10 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             const expr &bp, expr c, const expr &cp,
                             function<expr(const expr&, const expr&,
                                           const expr&, const expr&)> fn,
-                            const Type &ty, FastMathFlags fmath,
+                            const Type &from_ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false, int nary = 3) {
+                            bool flags_in_only = false,
+                            const Type *to_ty = nullptr, int nary = 3) {
   AndExpr non_poison;
   non_poison.add(ap);
   if (nary >= 2)
@@ -744,10 +745,10 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   if (nary >= 3)
     non_poison.add(cp);
 
-  if (!ty.isFloatType())
+  if (!from_ty.isFloatType())
     return { fn(a, b, c, {}), non_poison() };
 
-  auto fpty = ty.getAsFloatType();
+  auto &fpty = *from_ty.getAsFloatType();
 
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, a);
@@ -758,12 +759,12 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     }
   }
 
-  expr fp_a = fpty->getFloat(a);
-  expr fp_b = fpty->getFloat(b);
-  expr fp_c = fpty->getFloat(c);
+  expr fp_a = fpty.getFloat(a);
+  expr fp_b = fpty.getFloat(b);
+  expr fp_c = fpty.getFloat(c);
 
   if (!bitwise) {
-    auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
+    auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(from_ty).input;
     fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
     fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
     fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
@@ -811,9 +812,11 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = any_fp_zero(s, std::move(val));
 
   if (!bitwise && val.isFloat()) {
-    val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
+    val = handle_subnormal(s,
+                           s.getFn().getFnAttrs().getFPDenormal(from_ty).output,
                            std::move(val));
-    val = fpty->fromFloat(s, val, *fpty, nary, a, b, c);
+    const FloatType &ty = to_ty ? *to_ty->getAsFloatType() : fpty;
+    val = ty.fromFloat(s, val, fpty, nary, a, b, c);
   }
 
   return { std::move(val), non_poison() };
@@ -825,21 +828,23 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                                           const expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false) {
+                            bool flags_in_only = false,
+                            const Type *to_ty = nullptr) {
   return fm_poison(s, std::move(a), ap, std::move(b), bp, expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto &rm) {
                     return fn(a, b, rm);
-                   }, ty, fmath, rm, bitwise, flags_in_only, 2);
+                   }, ty, fmath, rm, bitwise, flags_in_only, to_ty, 2);
 }
 
 static StateValue fm_poison(State &s, expr a, const expr &ap,
                             function<expr(const expr&, const expr&)> fn,
                             const Type &ty, FastMathFlags fmath,
                             FpRoundingMode rm, bool bitwise,
-                            bool flags_in_only = false) {
+                            bool flags_in_only = false,
+                            const Type *to_ty = nullptr) {
   return fm_poison(s, std::move(a), ap, expr(), expr(), expr(), expr(),
                    [fn](auto &a, auto &b, auto &c, auto &rm) {return fn(a, rm);},
-                   ty, fmath, rm, bitwise, flags_in_only, 1);
+                   ty, fmath, rm, bitwise, flags_in_only, to_ty, 1);
 }
 
 StateValue FpBinOp::toSMT(State &s) const {
@@ -1859,27 +1864,11 @@ StateValue FpConversionOp::toSMT(State &s) const {
   case FPTrunc:
     scalar = [&](const StateValue &sv, const Type &from_type,
                  const Type &to_type) -> StateValue {
-      auto fm_poison_expr = [&](const expr &val, const expr &np,
-                                const Type &ty) {
-        return fm_poison(
-            s, val, np, [](auto &x, auto &) { return x; }, ty, fmath, {}, true,
-            /*flags_out_only=*/true);
+      auto fn = [&](auto &v, auto &rm) {
+        return v.float2Float(to_type.getAsFloatType()->getDummyFloat(), rm);
       };
-      auto [input, input_np] =
-          fm_poison_expr(sv.value, sv.non_poison, from_type);
-      AndExpr np;
-      np.add(std::move(input_np));
-      function<StateValue(const expr &)> fn_rm = [&](auto &rm) -> StateValue {
-        return {from_type.getAsFloatType()->getFloat(input).float2Float(
-                    to_type.getAsFloatType()->getDummyFloat(), rm),
-                true};
-      };
-      auto output = round_value(s, rm, np, fn_rm);
-      np.add(std::move(output.non_poison));
-      return fm_poison_expr(
-          to_type.getAsFloatType()->fromFloat(
-              s, output.value, from_type, from_type.isFloatType(), sv.value),
-          np(), to_type);
+      return fm_poison(s, sv.value, sv.non_poison, fn, from_type, fmath, rm,
+                       false, false, &to_type);
     };
     break;
   }
