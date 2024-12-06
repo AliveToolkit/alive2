@@ -5,6 +5,7 @@
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "smt/solver.h"
+#include "smt/smt.h"
 #include "util/compiler.h"
 #include <array>
 #include <cassert>
@@ -450,7 +451,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
   expr isnan = fp.isNaN();
   expr val = fp.float2BV();
 
-  if (isnan.isFalse())
+  if (isnan.isFalse() || get_uf_float())
     return val;
 
   unsigned fraction_bits = fractionBits();
