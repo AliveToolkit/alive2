@@ -1729,15 +1729,23 @@ unique_ptr<Instr> ConversionOp::dup(Function &f, const string &suffix) const {
 
 FpConversionOp::FpConversionOp(Type &type, std::string &&name, Value &val,
                                Op op, FpRoundingMode rm, FpExceptionMode ex,
-                               unsigned flags)
+                               unsigned flags, FastMathFlags fmath)
     : Instr(type, std::move(name)), val(&val), op(op), rm(rm), ex(ex),
-      flags(flags) {
+      flags(flags), fmath(fmath) {
   switch (op) {
   case UIntToFP:
     assert((flags & NNEG) == flags);
     break;
   default:
     assert(flags == 0);
+    break;
+  }
+  switch (op) {
+  case FPTrunc:
+  case FPExt:
+    break;
+  default:
+    assert(fmath.isNone());
     break;
   }
 }
@@ -1774,6 +1782,8 @@ void FpConversionOp::print(ostream &os) const {
   os << getName() << " = " << str;
   if (flags & NNEG)
     os << "nneg ";
+  if (!fmath.isNone())
+    os << fmath;
   os << *val << print_type(getType(), " to ", "");
   if (!rm.isDefault())
     os << ", rounding=" << rm;
@@ -1783,7 +1793,8 @@ void FpConversionOp::print(ostream &os) const {
 
 StateValue FpConversionOp::toSMT(State &s) const {
   auto &v = s[*val];
-  function<StateValue(const expr &, const Type &, const expr&)> fn;
+  function<StateValue(const expr &, const Type &, const expr &)> fn;
+  function<StateValue(const StateValue &, const Type &, const Type &)> scalar;
 
   switch (op) {
   case SIntToFP:
@@ -1846,37 +1857,59 @@ StateValue FpConversionOp::toSMT(State &s) const {
     break;
   case FPExt:
   case FPTrunc:
-    fn = [](auto &val, auto &to_type, auto &rm) -> StateValue {
-      return { val.float2Float(to_type.getAsFloatType()->getDummyFloat(), rm),
-               true };
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                 const Type &to_type) -> StateValue {
+      auto fm_poison_expr = [&](const expr &val, const expr &np,
+                                const Type &ty) {
+        return fm_poison(
+            s, val, np, [](auto &x, auto &) { return x; }, ty, fmath, {}, true,
+            /*flags_out_only=*/true);
+      };
+      auto [input, input_np] =
+          fm_poison_expr(sv.value, sv.non_poison, from_type);
+      AndExpr np;
+      np.add(std::move(input_np));
+      function<StateValue(const expr &)> fn_rm = [&](auto &rm) -> StateValue {
+        return {from_type.getAsFloatType()->getFloat(input).float2Float(
+                    to_type.getAsFloatType()->getDummyFloat(), rm),
+                true};
+      };
+      auto output = round_value(s, rm, np, fn_rm);
+      np.add(std::move(output.non_poison));
+      return fm_poison_expr(
+          to_type.getAsFloatType()->fromFloat(
+              s, output.value, from_type, from_type.isFloatType(), sv.value),
+          np(), to_type);
     };
     break;
   }
 
-  auto scalar = [&](const StateValue &sv, const Type &from_type,
-                    const Type &to_type) -> StateValue {
-    auto val = sv.value;
+  if (!scalar)
+    scalar = [&](const StateValue &sv, const Type &from_type,
+                 const Type &to_type) -> StateValue {
+      auto val = sv.value;
 
-    if (from_type.isFloatType()) {
-      auto ty = from_type.getAsFloatType();
-      val     = ty->getFloat(val);
-    }
+      if (from_type.isFloatType()) {
+        auto ty = from_type.getAsFloatType();
+        val = ty->getFloat(val);
+      }
 
-    function<StateValue(const expr&)> fn_rm
-      = [&](auto &rm) { return fn(val, to_type, rm); };
-    AndExpr np;
-    np.add(sv.non_poison);
+      function<StateValue(const expr &)> fn_rm = [&](auto &rm) {
+        return fn(val, to_type, rm);
+      };
+      AndExpr np;
+      np.add(sv.non_poison);
 
-    StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
-                                           : fn(val, to_type, rm.toSMT());
-    np.add(std::move(ret.non_poison));
+      StateValue ret = to_type.isFloatType() ? round_value(s, rm, np, fn_rm)
+                                             : fn(val, to_type, rm.toSMT());
+      np.add(std::move(ret.non_poison));
 
-    return { to_type.isFloatType()
-               ? to_type.getAsFloatType()
-                   ->fromFloat(s, ret.value, from_type, from_type.isFloatType(),
-                               sv.value)
-               : std::move(ret.value), np()};
-  };
+      return {to_type.isFloatType() ? to_type.getAsFloatType()->fromFloat(
+                                          s, ret.value, from_type,
+                                          from_type.isFloatType(), sv.value)
+                                    : std::move(ret.value),
+              np()};
+    };
 
   if (getType().isVectorType()) {
     vector<StateValue> vals;
@@ -1922,8 +1955,8 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FpConversionOp::dup(Function &f, const string &suffix) const {
-  return
-    make_unique<FpConversionOp>(getType(), getName() + suffix, *val, op, rm);
+  return make_unique<FpConversionOp>(getType(), getName() + suffix, *val, op,
+                                     rm, ex, flags, fmath);
 }
 
 
