@@ -358,9 +358,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
       auto [b, bp] = bty->extract(bv, i);
       expr id = (b & expr::mkUInt(0x0F, 8)) + (expr::mkUInt(i & 0x30, 8));
       auto [r, rp] = avty->extract(av, id);
-      auto ai = expr::mkIf(b.extract(7, 7) == expr::mkUInt(0, 1), r,
-                           expr::mkUInt(0, 8));
-
+      auto ai = expr::mkIf(b.extract(7, 7) == 0, r, expr::mkUInt(0, 8));
       vals.emplace_back(std::move(ai), bp && rp);
     }
     return rty->aggregateVals(vals);
@@ -674,7 +672,7 @@ StateValue X86IntrinTerOp::toSMT(State &s) const {
       auto [a, ap] = aty->extract(av, i);
       auto [b, bp] = bty->extract(bv, i);
       auto [c, cp] = cty->extract(cv, i);
-      auto v = expr::mkIf(c.extract(7, 7) == expr::mkUInt(0, 1), a, b);
+      auto v = expr::mkIf(c.extract(7, 7) == 0, a, b);
       vals.emplace_back(std::move(v), ap && bp && cp);
     }
     return rty->aggregateVals(vals);
