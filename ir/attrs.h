@@ -137,6 +137,8 @@ public:
                    AllocSize = 1 << 12, ZeroExt = 1<<13,
                    SignExt = 1<<14, NoFPClass = 1<<15, Asm = 1<<16 };
 
+  std::optional<std::pair<uint16_t, uint16_t>> vscaleRange;
+
   FnAttrs(unsigned bits = None) : bits(bits) {}
 
   bool has(Attribute a) const { return (bits & a) != 0; }

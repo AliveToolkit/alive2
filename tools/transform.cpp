@@ -1497,7 +1497,7 @@ TypingAssignments TransformVerify::getTypings() const {
   auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
 
   if (t.precondition)
-    c &= t.precondition->getTypeConstraints();
+    c &= t.precondition->getTypeConstraints(t.src);
 
   // return type
   c &= t.src.getType() == t.tgt.getType();

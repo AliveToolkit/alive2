@@ -35,12 +35,12 @@ StateValue IntConst::toSMT(State &s) const {
   return { expr::mkInt(get<string>(val).c_str(), bits()), true };
 }
 
-expr IntConst::getTypeConstraints() const {
+expr IntConst::getTypeConstraints(const Function &f) const {
   unsigned min_bits = 0;
   if (auto v = get_if<int64_t>(&val))
     min_bits = (*v >= 0 ? 63 : 64) - num_sign_bits(*v);
 
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceIntType() &&
          getType().sizeVar().uge(min_bits);
 }
@@ -86,8 +86,8 @@ FloatConst::FloatConst(Type &type, string val, bool bit_value)
   : Constant(type, bit_value ? int_to_readable_float(type, val) : val),
   val(std::move(val)), bit_value(bit_value) {}
 
-expr FloatConst::getTypeConstraints() const {
-  return Value::getTypeConstraints() &&
+expr FloatConst::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints(f) &&
          getType().enforceFloatType();
 }
 
@@ -108,8 +108,8 @@ StateValue ConstantInput::toSMT(State &s) const {
   return { expr::mkVar(getName().c_str(), type), true };
 }
 
-expr ConstantInput::getTypeConstraints() const {
-  return Value::getTypeConstraints() &&
+expr ConstantInput::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints(f) &&
          (getType().enforceIntType() || getType().enforceFloatType());
 }
 
@@ -157,8 +157,8 @@ StateValue ConstantBinOp::toSMT(State &s) const {
   return { std::move(val), ap && bp };
 }
 
-expr ConstantBinOp::getTypeConstraints() const {
-  return Value::getTypeConstraints() &&
+expr ConstantBinOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints(f) &&
          getType().enforceIntType() &&
          getType() == lhs.getType() &&
          getType() == rhs.getType();
@@ -210,10 +210,10 @@ StateValue ConstantFn::toSMT(State &s) const {
   return { std::move(r), true };
 }
 
-expr ConstantFn::getTypeConstraints() const {
-  expr r = Value::getTypeConstraints();
+expr ConstantFn::getTypeConstraints(const Function &f) const {
+  expr r = Value::getTypeConstraints(f);
   for (auto a : args) {
-    r &= a->getTypeConstraints();
+    r &= a->getTypeConstraints(f);
   }
 
   Type &ty = getType();

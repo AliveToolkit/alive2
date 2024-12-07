@@ -255,7 +255,20 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
+    vscale_data(vscaleFromAttr(f.getFnAttrs().vscaleRange)),
     return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+
+expr State::vscaleFromAttr(
+    std::optional<std::pair<uint16_t, uint16_t>> vscaleAttr) {
+  if (vscaleAttr) {
+    auto [low, high] = *vscaleAttr;
+    unsigned r = 0;
+    for (unsigned i = ilog2(low); i <= ilog2(high); ++i)
+      r |= 1 << i;
+    return expr::mkUInt(r, var_vector_elements);
+  }
+  return expr::mkVscaleMin();
+}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -697,7 +710,7 @@ bool State::isAsmMode() const {
 expr State::getPath(BasicBlock &bb) const {
   if (&f.getFirstBB() == &bb)
     return true;
-  
+
   auto I = predecessor_data.find(&bb);
   if (I == predecessor_data.end())
     return false; // Block is unreachable

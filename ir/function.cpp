@@ -165,7 +165,7 @@ expr Function::getTypeConstraints() const {
   }
   for (auto &l : { getConstants(), getInputs(), getUndefs() }) {
     for (auto &v : l) {
-      t &= v.getTypeConstraints();
+      t &= v.getTypeConstraints(*this);
     }
   }
   return t;

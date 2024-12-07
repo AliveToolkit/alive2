@@ -182,6 +182,9 @@ private:
   std::array<StateValue, 64> tmp_values;
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
+  // for scalable vectors
+  smt::expr vscale_data;
+
   void check_enough_tmp_slots();
 
   // return_domain: a boolean expression describing return condition
@@ -303,6 +306,9 @@ public:
               unsigned indirect_call_hash);
 
   auto& getVarArgsData() { return var_args_data.data; }
+  smt::expr getVscale() const { return vscale_data; }
+  static smt::expr
+  vscaleFromAttr(std::optional<std::pair<uint16_t, uint16_t>> vscaleAttr);
 
   void doesApproximation(std::string &&name, std::optional<smt::expr> e = {});
   auto& getApproximations() const { return used_approximations; }

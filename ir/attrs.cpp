@@ -148,6 +148,10 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
       os << ", " << attr.allocsize_1;
     os << ')';
   }
+  if (attr.vscaleRange) {
+    auto [low, high] = *attr.vscaleRange;
+    os << " vscale_range(" << low << ", " << high << ')';
+  }
 
   attr.fp_denormal.print(os);
   if (attr.fp_denormal32)

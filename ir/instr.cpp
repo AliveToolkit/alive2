@@ -102,7 +102,7 @@ uint64_t getGlobalVarSize(const IR::Value *V) {
 
 namespace IR {
 
-expr Instr::getTypeConstraints() const {
+expr Instr::getTypeConstraints(const Function &f) const {
   UNREACHABLE();
   return {};
 }
@@ -596,7 +596,7 @@ expr BinOp::getTypeConstraints(const Function &f) const {
                   getType() == rhs->getType();
     break;
   }
-  return Value::getTypeConstraints() && std::move(instrconstr);
+  return Value::getTypeConstraints(f) && std::move(instrconstr);
 }
 
 unique_ptr<Instr> BinOp::dup(Function &f, const string &suffix) const {
@@ -958,7 +958,7 @@ StateValue FpBinOp::toSMT(State &s) const {
 }
 
 expr FpBinOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceFloatOrVectorType() &&
          getType() == lhs->getType() &&
          getType() == rhs->getType();
@@ -1086,7 +1086,7 @@ expr UnaryOp::getTypeConstraints(const Function &f) const {
     break;
   }
 
-  return Value::getTypeConstraints() && std::move(instrconstr);
+  return Value::getTypeConstraints(f) && std::move(instrconstr);
 }
 
 static Value* dup_aggregate(Function &f, Value *val) {
@@ -1213,7 +1213,7 @@ StateValue FpUnaryOp::toSMT(State &s) const {
 }
 
 expr FpUnaryOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType() == val->getType() &&
          getType().enforceFloatOrVectorType();
 }
@@ -1286,7 +1286,7 @@ StateValue UnaryReductionOp::toSMT(State &s) const {
 }
 
 expr UnaryReductionOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceIntType() &&
          val->getType().enforceVectorType(
            [this](auto &scalar) { return scalar == getType(); });
@@ -1405,7 +1405,7 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
       getType().enforceIntOrVectorType();
     break;
   }
-  return Value::getTypeConstraints() && instrconstr;
+  return Value::getTypeConstraints(f) && instrconstr;
 }
 
 unique_ptr<Instr> TernaryOp::dup(Function &f, const string &suffix) const {
@@ -1486,7 +1486,7 @@ StateValue FpTernaryOp::toSMT(State &s) const {
 }
 
 expr FpTernaryOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType() == a->getType() &&
          getType() == b->getType() &&
          getType() == c->getType() &&
@@ -1557,7 +1557,7 @@ StateValue TestOp::toSMT(State &s) const {
 }
 
 expr TestOp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          lhs->getType().enforceFloatOrVectorType() &&
          rhs->getType().enforceIntType(32) &&
          getType().enforceIntOrVectorType(1) &&
@@ -1721,7 +1721,7 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
     break;
   }
 
-  c &= Value::getTypeConstraints();
+  c &= Value::getTypeConstraints(f);
   if (op != BitCast)
     c &= getType().enforceVectorTypeEquiv(val->getType());
   return c;
@@ -1965,7 +1965,7 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
         val->getType().scalarSize().ugt(getType().scalarSize());
     break;
   }
-  return Value::getTypeConstraints() && c;
+  return Value::getTypeConstraints(f) && c;
 }
 
 unique_ptr<Instr> FpConversionOp::dup(Function &f, const string &suffix) const {
@@ -2027,7 +2027,7 @@ StateValue Select::toSMT(State &s) const {
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          cond->getType().enforceIntOrVectorType(1) &&
          getType().enforceVectorTypeIff(cond->getType()) &&
          (fmath.isNone() ? expr(true) : getType().enforceFloatOrVectorType()) &&
@@ -2080,7 +2080,7 @@ StateValue ExtractValue::toSMT(State &s) const {
 }
 
 expr ExtractValue::getTypeConstraints(const Function &f) const {
-  auto c = Value::getTypeConstraints() &&
+  auto c = Value::getTypeConstraints(f) &&
            val->getType().enforceAggregateType();
 
   Type *type = &val->getType();
@@ -2172,7 +2172,7 @@ StateValue InsertValue::toSMT(State &s) const {
 }
 
 expr InsertValue::getTypeConstraints(const Function &f) const {
-  auto c = Value::getTypeConstraints() &&
+  auto c = Value::getTypeConstraints(f) &&
            val->getType().enforceAggregateType() &&
            val->getType() == getType();
 
@@ -2646,7 +2646,7 @@ StateValue FnCall::toSMT(State &s) const {
 
 expr FnCall::getTypeConstraints(const Function &f) const {
   // TODO : also need to name each arg type smt var uniquely
-  expr ret = Value::getTypeConstraints();
+  expr ret = Value::getTypeConstraints(f);
   if (fnptr)
     ret &= fnptr->getType().enforcePtrType();
   return ret;
@@ -2809,7 +2809,7 @@ StateValue ICmp::toSMT(State &s) const {
 }
 
 expr ICmp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceIntOrVectorType(1) &&
          getType().enforceVectorTypeEquiv(a->getType()) &&
          a->getType().enforceIntOrPtrOrVectorType() &&
@@ -2908,7 +2908,7 @@ StateValue FCmp::toSMT(State &s) const {
 }
 
 expr FCmp::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceIntOrVectorType(1) &&
          getType().enforceVectorTypeEquiv(a->getType()) &&
          a->getType().enforceFloatOrVectorType() &&
@@ -2968,7 +2968,7 @@ StateValue Freeze::toSMT(State &s) const {
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType() == val->getType();
 }
 
@@ -3080,7 +3080,7 @@ StateValue Phi::toSMT(State &s) const {
 }
 
 expr Phi::getTypeConstraints(const Function &f) const {
-  auto c = Value::getTypeConstraints();
+  auto c = Value::getTypeConstraints(f);
   for (auto &[val, bb] : values) {
     c &= val->getType() == getType();
   }
@@ -3324,7 +3324,7 @@ StateValue Return::toSMT(State &s) const {
 }
 
 expr Return::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType() == val->getType() &&
          f.getType() == getType();
 }
@@ -3711,7 +3711,7 @@ StateValue Alloc::toSMT(State &s) const {
 }
 
 expr Alloc::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforcePtrType() &&
          size->getType().enforceIntType();
 }
@@ -3967,7 +3967,7 @@ StateValue GEP::toSMT(State &s) const {
 }
 
 expr GEP::getTypeConstraints(const Function &f) const {
-  auto c = Value::getTypeConstraints() &&
+  auto c = Value::getTypeConstraints(f) &&
            getType().enforceVectorTypeIff(ptr->getType()) &&
            getType().enforcePtrOrVectorType();
   for (auto &[sz, idx] : idxs) {
@@ -4052,7 +4052,7 @@ StateValue PtrMask::toSMT(State &s) const {
 }
 
 expr PtrMask::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          ptr->getType().enforcePtrOrVectorType() &&
          getType() == ptr->getType() &&
          mask->getType().enforceIntOrVectorType() &&
@@ -4101,7 +4101,7 @@ StateValue Load::toSMT(State &s) const {
 }
 
 expr Load::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          ptr->getType().enforcePtrType();
 }
 
@@ -4583,7 +4583,7 @@ StateValue Strlen::toSMT(State &s) const {
 }
 
 expr Strlen::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          ptr->getType().enforcePtrType() &&
          getType().enforceIntType();
 }
@@ -4886,7 +4886,7 @@ StateValue ExtractElement::toSMT(State &s) const {
 }
 
 expr ExtractElement::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          v->getType().enforceVectorType([&](auto &ty)
                                         { return ty == getType(); }) &&
          idx->getType().enforceIntType();
@@ -4929,7 +4929,7 @@ StateValue InsertElement::toSMT(State &s) const {
 }
 
 expr InsertElement::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType() == v->getType() &&
          v->getType().enforceVectorType([&](auto &ty)
                                         { return ty == e->getType(); }) &&
@@ -4984,7 +4984,7 @@ StateValue ShuffleVector::toSMT(State &s) const {
 }
 
 expr ShuffleVector::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
+  return Value::getTypeConstraints(f) &&
          getType().enforceVectorTypeSameChildTy(v1->getType()) &&
          getType().getAsAggregateType()->numElements() == mask.size() &&
          v1->getType().enforceVectorType() &&

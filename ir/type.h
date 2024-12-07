@@ -26,6 +26,7 @@ class SymbolicType;
 class VectorType;
 class VoidType;
 class State;
+class Function;
 struct StateValue;
 
 class Type {
@@ -49,7 +50,7 @@ public:
   // to use when one needs the corresponding SMT type
   virtual IR::StateValue getDummyValue(bool non_poison) const = 0;
 
-  virtual smt::expr getTypeConstraints() const = 0;
+  virtual smt::expr getTypeConstraints(const Function &f) const = 0;
   virtual smt::expr sizeVar() const;
   virtual smt::expr scalarSize() const;
   smt::expr operator==(const Type &rhs) const;
@@ -137,7 +138,7 @@ public:
   VoidType() : Type("void") {}
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   void fixup(const smt::Model &m) override;
   std::pair<smt::expr, smt::expr>
     refines(State &src_s, State &tgt_s, const StateValue &src,
@@ -162,7 +163,7 @@ public:
   unsigned maxSubBitAccess() const;
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const IntType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -209,7 +210,7 @@ public:
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
 
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const FloatType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -239,7 +240,7 @@ public:
   unsigned bits() const override;
   unsigned np_bits(bool fromInt) const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const PtrType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -293,7 +294,7 @@ public:
   unsigned np_bits(bool fromInt) const override;
   // Padding is filled with poison regardless of non_poison.
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr operator==(const AggregateType &rhs) const;
   void fixup(const smt::Model &m) override;
@@ -332,18 +333,23 @@ public:
 
 
 class VectorType final : public AggregateType {
+  bool isScalableTy = false;
+
 public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
-  VectorType(std::string &&name, unsigned elements, Type &elementTy);
+  VectorType(std::string &&name, unsigned minElems, Type &elementTy,
+             bool isScalableTy = false);
 
   IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index) const;
   IR::StateValue update(const IR::StateValue &vector,
                         const IR::StateValue &val,
                         const smt::expr &idx) const;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
+  smt::expr operator==(const VectorType &rhs) const;
+  bool isScalable() const;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
@@ -384,7 +390,7 @@ public:
   unsigned bits() const override;
   unsigned np_bits(bool fromInt) const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   smt::expr sizeVar() const override;
   smt::expr scalarSize() const override;
   smt::expr operator==(const Type &rhs) const;
