@@ -292,7 +292,7 @@ public:
   smt::expr numElements(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
   smt::expr numElementsExcludingPadding(
       smt::expr vscaleRange = smt::expr::mkVscaleMin()) const;
-  unsigned
+  virtual unsigned
   numElementsConst(smt::expr vscaleRange = smt::expr::mkVscaleMin()) const {
     return elements;
   }
@@ -360,6 +360,7 @@ public:
   VectorType(std::string &&name, unsigned minElems, Type &elementTy,
              bool isScalableTy = false);
 
+  virtual unsigned numElementsConst(smt::expr vscaleRange) const override;
   IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index,
                          smt::expr vscaleRange) const;

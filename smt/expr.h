@@ -166,6 +166,7 @@ public:
   // best effort; returns number of statically known bits
   unsigned min_leading_zeros() const;
   unsigned min_trailing_ones() const;
+  unsigned active_bits() const;
 
   expr operator+(const expr &rhs) const;
   expr operator-(const expr &rhs) const;

@@ -1098,8 +1098,15 @@ VectorType::VectorType(string &&name, unsigned minElems, Type &elementTy,
   this->isScalableTy = isScalableTy;
   this->elements = minElems;
   defined = true;
-  children.resize(elements, &elementTy);
-  is_padding.resize(elements, false);
+  unsigned scaleFactor = isScalableTy ? var_vector_max_vscale : 1;
+  children.resize(elements * scaleFactor, &elementTy);
+  is_padding.resize(elements * scaleFactor, false);
+}
+
+unsigned VectorType::numElementsConst(expr vscaleRange) const {
+  unsigned scaleFactor =
+      isScalable() ? 1 << (vscaleRange.active_bits() - 1) : 1;
+  return elements * scaleFactor;
 }
 
 StateValue VectorType::extract(const StateValue &vector,
@@ -1176,8 +1183,8 @@ expr VectorType::getTypeConstraints(const Function &f) const {
     r &= elems.ugt(i).implies(elementTy == *children[i]);
   }
 
-  // TODO: remove once scalable vectors are supported.
-  r &= !isScalable();
+  // TODO: remove once scalable vectors are fully supported.
+  r &= vscaleRange.isPowerOf2();
 
   return r;
 }

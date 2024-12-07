@@ -643,6 +643,10 @@ unsigned expr::min_trailing_ones() const {
   return 0;
 }
 
+unsigned expr::active_bits() const {
+  return bits() - min_leading_zeros();
+}
+
 expr expr::binop_commutative(const expr &rhs,
                              Z3_ast (*op)(Z3_context, Z3_ast, Z3_ast),
                              expr (expr::*expr_op)(const expr &) const,

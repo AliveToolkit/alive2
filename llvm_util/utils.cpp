@@ -299,8 +299,11 @@ Value* get_operand(llvm::Value *v,
   if (!ty)
     return nullptr;
 
+  smt::expr vscaleRange =
+      State::vscaleFromAttr(current_fn->getFnAttrs().vscaleRange);
+
   // automatic splat of constant values
-  if (auto vty = dyn_cast<llvm::FixedVectorType>(v->getType());
+  if (auto vty = dyn_cast<llvm::VectorType>(v->getType());
       vty && isa<llvm::ConstantInt, llvm::ConstantFP>(v)) {
     llvm::Value *llvm_splat = nullptr;
     if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
@@ -317,8 +320,9 @@ Value* get_operand(llvm::Value *v,
     if (!splat)
       return nullptr;
 
-    vector<Value*> vals(vty->getNumElements(), splat);
-    auto val = make_unique<AggregateValue>(*ty, std::move(vals));
+    unsigned ec = ty->getAsAggregateType()->numElementsConst(vscaleRange);
+    vector<Value *> vals(ec, splat);
+    auto val = make_unique<AggregateValue>(*ty, std::move(vals), vscaleRange);
     auto ret = val.get();
     current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
@@ -411,7 +415,7 @@ Value* get_operand(llvm::Value *v,
   {
     unsigned opi = 0;
 
-    for (unsigned i = 0; i < aty->numElementsConst(); ++i) {
+    for (unsigned i = 0; i < aty->numElementsConst(vscaleRange); ++i) {
       if (!aty->isPadding(i)) {
         if (auto op = get_operand(get_elem(opi), constexpr_conv, copy_inserter,
                                   register_fn_decl))
