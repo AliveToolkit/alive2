@@ -42,6 +42,7 @@ bool has_ptr_arg = true;
 bool has_initializes_attr = true;
 bool has_null_block = true;
 bool null_is_dereferenceable = false;
+bool has_globals_diff_align = true;
 bool does_int_mem_access = true;
 bool does_ptr_mem_access = true;
 bool does_ptr_store = true;

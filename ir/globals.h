@@ -87,6 +87,9 @@ extern bool has_null_block;
 
 extern bool null_is_dereferenceable;
 
+/// Whether there is at least one global with different alignment in src/tgt
+extern bool has_globals_diff_align;
+
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;

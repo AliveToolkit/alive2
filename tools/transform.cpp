@@ -960,6 +960,7 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t glb_alloc_aligned_size = 0;
 
   num_consts_src = 0;
+  has_globals_diff_align = false;
 
   for (auto GV : globals_src) {
     if (GV->isConst())
@@ -974,7 +975,10 @@ static void calculateAndInitConstants(Transform &t) {
       [GVT](auto *GV) -> bool { return GVT->getName() == GV->getName(); });
     if (I == globals_src.end()) {
       ++num_globals;
+    } else {
+      has_globals_diff_align |= GVT->getAlignment() != (*I)->getAlignment();
     }
+
     glb_alloc_aligned_size
       = add_saturate(glb_alloc_aligned_size,
                      aligned_alloc_size(GVT->size(), GVT->getAlignment()));

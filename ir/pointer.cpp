@@ -331,7 +331,11 @@ expr Pointer::blockSizeOffsetT() const {
 }
 
 expr Pointer::blockSizeAligned() const {
-  return blockSize().round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
+  auto size = blockSize();
+  // programs can't observe whether the size was increased up to alignment
+  if (!has_globals_diff_align)
+    return size;
+  return size.round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
 }
 
 expr Pointer::blockSizeAlignedOffsetT() const {
@@ -456,7 +460,8 @@ expr Pointer::inbounds(bool simplify_ptr) {
 
 expr Pointer::blockAlignment() const {
   return getValue("blk_align", m.local_blk_align, m.non_local_blk_align,
-                   expr::mkUInt(0, Memory::bitsAlignmentInfo()), true);
+                   expr::mkUInt(0, Memory::bitsAlignmentInfo()),
+                   has_globals_diff_align);
 }
 
 expr Pointer::isBlockAligned(uint64_t align, bool exact) const {
