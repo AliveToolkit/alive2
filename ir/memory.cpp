@@ -1582,7 +1582,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(
       p.isHeapAllocated().implies(p_align == align && q_align == align));
     if (!p_align.isConst() || !q_align.isConst())
-      state->addAxiom(p_align.ule(q_align));
+      state->addAxiom(p_align == q_align);
   }
   for (unsigned bid = num_nonlocals_src; bid < num_nonlocals; ++bid) {
     if (skip_bid(bid))
