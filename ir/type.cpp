@@ -1077,14 +1077,15 @@ void ArrayType::print(ostream &os) const {
   }
 }
 
-
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
-  assert(elements != 0);
-  this->elements = elements;
+VectorType::VectorType(string &&name, unsigned minElts, Type &elementTy,
+                       bool isScalableTy)
+    : AggregateType(std::move(name), false) {
+  assert(minElts != 0);
+  this->elements = minElts;
+  this->isScalableTy = isScalableTy;
   defined = true;
-  children.resize(elements, &elementTy);
-  is_padding.resize(elements, false);
+  children.resize(minElts, &elementTy);
+  is_padding.resize(minElts, false);
 }
 
 StateValue VectorType::extract(const StateValue &vector,
@@ -1157,6 +1158,16 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
+expr VectorType::operator==(const VectorType &rhs) const {
+  expr res = this->AggregateType::operator==(rhs);
+  res &= isScalable() == rhs.isScalable();
+  return res;
+}
+
+bool VectorType::isScalable() const {
+  return isScalableTy;
+}
+
 expr VectorType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return enforceElem(*children[0]);
@@ -1164,7 +1175,8 @@ expr VectorType::enforceVectorType(
 
 void VectorType::print(ostream &os) const {
   if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+    os << '<' << (isScalable() ? "vscale x " : "") << elements << " x "
+       << *children[0] << '>';
 }
 
 
