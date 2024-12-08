@@ -277,8 +277,8 @@ expr Pointer::getValue(const char *name, const FunctionExpr &local_fn,
   if (auto val = nonlocal_fn.lookup(bid))
     non_local = *val;
   else {
-    string uf = src_name ? local_name(m.state, name) : name;
-    non_local = expr::mkUF(uf.c_str(), { bid }, ret_type);
+    non_local = expr::mkUF(src_name ? local_name(m.state, name).c_str() : name,
+                           { bid }, ret_type);
   }
 
   if (auto local = local_fn(bid))
@@ -778,9 +778,15 @@ expr Pointer::refined(const Pointer &other) const {
   //local &= block_refined(other);
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
+  expr is_local = d1 && p1l.isLocal();
+
+  // short-circuit to avoid the constraint below:
+  // addr == 0 ? addr' == 0 : addr == addr'
+  if (is_asm && is_local.isFalse())
+    return nonlocal;
 
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
+                    expr::mkIf(is_local, local, nonlocal));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
