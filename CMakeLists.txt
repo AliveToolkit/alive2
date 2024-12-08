@@ -104,6 +104,7 @@ set(IR_SRCS
   ir/state_value.cpp
   ir/type.cpp
   ir/value.cpp
+  ir/x86_intrinsics.cpp
 )
 
 add_library(ir STATIC ${IR_SRCS})
