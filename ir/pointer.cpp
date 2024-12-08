@@ -360,7 +360,7 @@ Pointer Pointer::operator+(const expr &bytes) const {
     );
 }
 
-Pointer Pointer::operator+(unsigned bytes) const {
+Pointer Pointer::operator+(uint64_t bytes) const {
   return *this + expr::mkUInt(bytes, bits_for_offset);
 }
 
