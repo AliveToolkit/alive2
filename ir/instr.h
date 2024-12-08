@@ -309,8 +309,8 @@ public:
 
 class FpConversionOp final : public Instr {
 public:
-  enum Op { SIntToFP, UIntToFP, FPToSInt, FPToUInt, FPExt, FPTrunc, LRInt,
-            LRound };
+  enum Op { SIntToFP, UIntToFP, FPToSInt, FPToSInt_Sat, FPToUInt, FPToUInt_Sat,
+            FPExt, FPTrunc, LRInt, LRound };
   enum Flags { None = 0, NNEG = 1 << 0 };
 
 private:

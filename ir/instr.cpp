@@ -1774,14 +1774,16 @@ void FpConversionOp::rauw(const Value &what, Value &with) {
 void FpConversionOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case SIntToFP: str = "sitofp "; break;
-  case UIntToFP: str = "uitofp "; break;
-  case FPToSInt: str = "fptosi "; break;
-  case FPToUInt: str = "fptoui "; break;
-  case FPExt:    str = "fpext "; break;
-  case FPTrunc:  str = "fptrunc "; break;
-  case LRInt:    str = "lrint "; break;
-  case LRound:   str = "lround "; break;
+  case SIntToFP:     str = "sitofp "; break;
+  case UIntToFP:     str = "uitofp "; break;
+  case FPToSInt:     str = "fptosi "; break;
+  case FPToSInt_Sat: str = "fptosi_sat "; break;
+  case FPToUInt:     str = "fptoui "; break;
+  case FPToUInt_Sat: str = "fptoui_sat "; break;
+  case FPExt:        str = "fpext "; break;
+  case FPTrunc:      str = "fptrunc "; break;
+  case LRInt:        str = "lrint "; break;
+  case LRound:       str = "lround "; break;
   }
 
   os << getName() << " = " << str;
@@ -1815,6 +1817,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
     };
     break;
   case FPToSInt:
+  case FPToSInt_Sat:
   case LRInt:
   case LRound:
     fn = [&](auto &val, auto &to_type, auto &rm_in) -> StateValue {
@@ -1822,6 +1825,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
       bool is_poison = false;
       switch (op) {
       case FPToSInt:
+      case FPToSInt_Sat:
         rm = expr::rtz();
         is_poison = true;
         break;
@@ -1833,7 +1837,8 @@ StateValue FpConversionOp::toSMT(State &s) const {
         break;
       default: UNREACHABLE();
       }
-      expr bv  = val.fp2sint(to_type.bits(), rm);
+      auto bits = to_type.bits();
+      expr bv  = val.fp2sint(bits, rm);
       expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
       expr val_rounded = val.round(rm);
@@ -1847,17 +1852,28 @@ StateValue FpConversionOp::toSMT(State &s) const {
         bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
       }
 
+      if (op == FPToSInt_Sat)
+        return { expr::mkIf(np, bv, expr::mkIf(val.isFPNegative(),
+                                               expr::IntSMin(bits),
+                                               expr::IntSMax(bits))),
+                 true };
+
       return { std::move(bv), std::move(np) };
     };
     break;
   case FPToUInt:
-    fn = [](auto &val, auto &to_type, auto &rm_) -> StateValue {
+  case FPToUInt_Sat:
+    fn = [&](auto &val, auto &to_type, auto &rm_) -> StateValue {
+      auto bits = to_type.bits();
       expr rm = expr::rtz();
-      expr bv  = val.fp2uint(to_type.bits(), rm);
+      expr bv  = val.fp2uint(bits, rm);
       expr fp2 = bv.uint2fp(val, rm);
       // -0.xx must be converted to 0, not poison.
       expr val_rounded = val.round(rm);
-      return { std::move(bv), val_rounded.isFPZero() || fp2 == val_rounded };
+      expr no_overflow = val_rounded.isFPZero() || fp2 == val_rounded;
+      if (op == FPToUInt)
+        return { std::move(bv), std::move(no_overflow) };
+      return { expr::mkIf(no_overflow, bv, expr::IntUMax(bits)), true };
     };
     break;
   case FPExt:
@@ -1923,7 +1939,9 @@ expr FpConversionOp::getTypeConstraints(const Function &f) const {
         val->getType().enforceIntOrVectorType();
     break;
   case FPToSInt:
+  case FPToSInt_Sat:
   case FPToUInt:
+  case FPToUInt_Sat:
   case LRInt:
   case LRound:
     c = getType().enforceIntOrVectorType() &&

@@ -1114,6 +1114,8 @@ public:
     case llvm::Intrinsic::experimental_constrained_lround:
     case llvm::Intrinsic::llround:
     case llvm::Intrinsic::experimental_constrained_llround:
+    case llvm::Intrinsic::fptoui_sat:
+    case llvm::Intrinsic::fptosi_sat:
     {
       PARSE_UNOP();
       FpConversionOp::Op op;
@@ -1133,6 +1135,8 @@ public:
       case llvm::Intrinsic::experimental_constrained_lround:
       case llvm::Intrinsic::llround:
       case llvm::Intrinsic::experimental_constrained_llround: op = FpConversionOp::LRound; break;
+      case llvm::Intrinsic::fptosi_sat:                       op = FpConversionOp::FPToSInt_Sat; break;
+      case llvm::Intrinsic::fptoui_sat:                       op = FpConversionOp::FPToUInt_Sat; break;
       default: UNREACHABLE();
       }
       ret = make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
