@@ -12,6 +12,9 @@
 #include <utility>
 #include <vector>
 
+static constexpr unsigned var_vector_elements = 16;
+static constexpr unsigned var_vector_max_vscale = 16;
+
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_func_decl* Z3_decl;
 typedef struct _Z3_app* Z3_app;
@@ -97,6 +100,9 @@ public:
   static expr mkQuadVar(const char *name);
   static expr mkFreshVar(const char *prefix, const expr &type);
 
+  // vscale-specific functions
+  static expr mkVscaleMin() { return expr::mkUInt(1, var_vector_elements); }
+
   // return a constant value of the given type
   static expr some(const expr &type);
 
@@ -160,6 +166,7 @@ public:
   // best effort; returns number of statically known bits
   unsigned min_leading_zeros() const;
   unsigned min_trailing_ones() const;
+  unsigned active_bits() const;
 
   expr operator+(const expr &rhs) const;
   expr operator-(const expr &rhs) const;
