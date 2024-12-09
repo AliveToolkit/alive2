@@ -591,8 +591,8 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     bool all_same_size = true;
     expr addr = is_phy ? p.getPhysicalAddress() : p.getAddress();
 
-    auto add = [&](unsigned limit, bool local) {
-      for (unsigned i = 0; i != limit; ++i) {
+    auto add = [&](unsigned start, unsigned limit, bool local) {
+      for (unsigned i = start; i < limit; ++i) {
         // address not observed; can't alias with that
         if (local && !m.observed_addrs.mayAlias(true, i))
           continue;
@@ -619,8 +619,10 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
         addrs.add(std::move(this_addr), std::move(cond));
       }
     };
-    add(m.numLocals(), true);
-    add(m.numCurrentNonLocals(), false);
+    add(0, m.numLocals(), true);
+    add(0, m.numCurrentNonLocals(), false);
+    if (!m.getState().isSource())
+      add(num_nonlocals_src, num_nonlocals, false);
 
     expr bid = *std::move(bids)();
     if (!observes_local)
