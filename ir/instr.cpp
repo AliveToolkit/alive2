@@ -1853,10 +1853,13 @@ StateValue FpConversionOp::toSMT(State &s) const {
       }
 
       if (op == FPToSInt_Sat)
-        return { expr::mkIf(np, bv, expr::mkIf(val.isFPNegative(),
-                                               expr::IntSMin(bits),
-                                               expr::IntSMax(bits))),
-                 true };
+        return
+          { expr::mkIf(val.isNaN(),
+                       expr::mkUInt(0, bv),
+                       expr::mkIf(np, bv, expr::mkIf(val.isFPNegative(),
+                                                     expr::IntSMin(bits),
+                                                     expr::IntSMax(bits)))),
+            true };
 
       return { std::move(bv), std::move(np) };
     };
@@ -1873,7 +1876,11 @@ StateValue FpConversionOp::toSMT(State &s) const {
       expr no_overflow = val_rounded.isFPZero() || fp2 == val_rounded;
       if (op == FPToUInt)
         return { std::move(bv), std::move(no_overflow) };
-      return { expr::mkIf(no_overflow, bv, expr::IntUMax(bits)), true };
+
+      return { expr::mkIf(val.isNaN() || val.isFPNegative(),
+                          expr::mkUInt(0, bv),
+                          expr::mkIf(no_overflow, bv, expr::IntUMax(bits))),
+               true };
     };
     break;
   case FPExt:
