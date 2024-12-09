@@ -2,6 +2,8 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "ir/type.h"
+#include "ir/attrs.h"
+#include "ir/function.h"
 #include "ir/globals.h"
 #include "ir/state.h"
 #include "smt/solver.h"
@@ -17,8 +19,6 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 11;
-static constexpr unsigned var_vector_elements = 16;
-
 
 namespace IR {
 
@@ -297,7 +297,7 @@ StateValue VoidType::getDummyValue(bool non_poison) const {
   return { false, non_poison };
 }
 
-expr VoidType::getTypeConstraints() const {
+expr VoidType::getTypeConstraints(const Function &f) const {
   return true;
 }
 
@@ -341,7 +341,7 @@ StateValue IntType::getDummyValue(bool non_poison) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
-expr IntType::getTypeConstraints() const {
+expr IntType::getTypeConstraints(const Function &f) const {
   // since size cannot be unbounded, limit it between 1 and 64 bits if undefined
   auto bw = sizeVar();
   auto r = bw != 0;
@@ -570,7 +570,7 @@ StateValue FloatType::getDummyValue(bool non_poison) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
-expr FloatType::getTypeConstraints() const {
+expr FloatType::getTypeConstraints(const Function &f) const {
   if (defined)
     return true;
 
@@ -675,7 +675,7 @@ StateValue PtrType::getDummyValue(bool non_poison) const {
   return { expr::mkUInt(0, bits()), non_poison };
 }
 
-expr PtrType::getTypeConstraints() const {
+expr PtrType::getTypeConstraints(const Function &f) const {
   return sizeVar() == bits();
 }
 
@@ -894,10 +894,10 @@ StateValue AggregateType::getDummyValue(bool non_poison) const {
   return aggregateVals(vals);
 }
 
-expr AggregateType::getTypeConstraints() const {
+expr AggregateType::getTypeConstraints(const Function &f) const {
   expr r(true), elems = numElements();
   for (unsigned i = 0, e = children.size(); i != e; ++i) {
-    r &= elems.ugt(i).implies(children[i]->getTypeConstraints());
+    r &= elems.ugt(i).implies(children[i]->getTypeConstraints(f));
   }
   if (!defined)
     r &= elems.ule(4);
@@ -1077,11 +1077,12 @@ void ArrayType::print(ostream &os) const {
   }
 }
 
-
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
-  assert(elements != 0);
-  this->elements = elements;
+VectorType::VectorType(string &&name, unsigned minElems, Type &elementTy,
+                       bool isScalableTy)
+    : AggregateType(std::move(name), false) {
+  assert(minElems != 0);
+  this->isScalableTy = isScalableTy;
+  this->elements = minElems;
   defined = true;
   children.resize(elements, &elementTy);
   is_padding.resize(elements, false);
@@ -1133,9 +1134,19 @@ StateValue VectorType::update(const StateValue &vector,
                   (vector.non_poison & mask_np) | np_shifted});
 }
 
-expr VectorType::getTypeConstraints() const {
+expr VectorType::getTypeConstraints(const Function &f) const {
+  auto vscaleAttr = f.getFnAttrs().vscaleRange;
+  if (isScalable()) {
+    // TODO: if we don't have a vscale_range on the function, fail the type
+    // check for now.
+    // If we don't havethe underlying storage for the high range of the vscale,
+    // fail the type check.
+    if (!vscaleAttr || vscaleAttr->second > var_vector_max_vscale)
+      return false;
+  }
+
   auto &elementTy = *children[0];
-  expr r = AggregateType::getTypeConstraints() &&
+  expr r = AggregateType::getTypeConstraints(f) &&
            (elementTy.enforceIntType() ||
             elementTy.enforceFloatType() ||
             elementTy.enforcePtrType()) &&
@@ -1145,6 +1156,9 @@ expr VectorType::getTypeConstraints() const {
   for (unsigned i = 1, e = children.size(); i != e; ++i) {
     r &= numElements().ugt(i).implies(elementTy == *children[i]);
   }
+
+  // TODO: remove once scalable vectors are supported.
+  r &= !isScalable();
 
   return r;
 }
@@ -1157,6 +1171,16 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
+expr VectorType::operator==(const VectorType &rhs) const {
+  expr res = this->AggregateType::operator==(rhs);
+  res &= isScalable() == rhs.isScalable();
+  return res;
+}
+
+bool VectorType::isScalable() const {
+  return isScalableTy;
+}
+
 expr VectorType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return enforceElem(*children[0]);
@@ -1164,7 +1188,8 @@ expr VectorType::enforceVectorType(
 
 void VectorType::print(ostream &os) const {
   if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+    os << '<' << (isScalable() ? "vscale x " : "") << elements << " x "
+       << *children[0] << '>';
 }
 
 
@@ -1258,14 +1283,14 @@ StateValue SymbolicType::getDummyValue(bool non_poison) const {
   DISPATCH(getDummyValue(non_poison), UNREACHABLE());
 }
 
-expr SymbolicType::getTypeConstraints() const {
+expr SymbolicType::getTypeConstraints(const Function &fn) const {
   expr c(false);
-  if (i) c |= isInt()    && i->getTypeConstraints();
-  if (f) c |= isFloat()  && f->getTypeConstraints();
-  if (p) c |= isPtr()    && p->getTypeConstraints();
-  if (a) c |= isArray()  && a->getTypeConstraints();
-  if (v) c |= isVector() && v->getTypeConstraints();
-  if (s) c |= isStruct() && s->getTypeConstraints();
+  if (i) c |= isInt()    && i->getTypeConstraints(fn);
+  if (f) c |= isFloat()  && f->getTypeConstraints(fn);
+  if (p) c |= isPtr()    && p->getTypeConstraints(fn);
+  if (a) c |= isArray()  && a->getTypeConstraints(fn);
+  if (v) c |= isVector() && v->getTypeConstraints(fn);
+  if (s) c |= isStruct() && s->getTypeConstraints(fn);
   return c;
 }
 

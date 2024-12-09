@@ -7,11 +7,11 @@
 #include "ir/functions.h"
 #include "ir/pointer.h"
 #include "ir/state_value.h"
-#include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include "util/spaceship.h"
 #include <compare>
+#include <functional>
 #include <map>
 #include <optional>
 #include <ostream>
