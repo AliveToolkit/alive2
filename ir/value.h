@@ -16,6 +16,7 @@ namespace smt { class Model; }
 namespace IR {
 
 class VoidValue;
+class Function;
 
 
 class Value {
@@ -37,7 +38,7 @@ public:
   virtual void rauw(const Value &what, Value &with);
   virtual void print(std::ostream &os) const = 0;
   virtual StateValue toSMT(State &s) const = 0;
-  virtual smt::expr getTypeConstraints() const;
+  virtual smt::expr getTypeConstraints(const Function &f) const;
   void fixupTypes(const smt::Model &m);
 
   static VoidValue voidVal;
@@ -106,10 +107,11 @@ public:
 class AggregateValue final : public Value {
   std::vector<Value*> vals;
 public:
-  AggregateValue(Type &type, std::vector<Value*> &&vals);
+  AggregateValue(Type &type, std::vector<Value *> &&vals,
+                 smt::expr vscaleRange = smt::expr::mkVscaleMin());
   auto& getVals() const { return vals; }
   void rauw(const Value &what, Value &with) override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
 };

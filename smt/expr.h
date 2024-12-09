@@ -12,6 +12,9 @@
 #include <utility>
 #include <vector>
 
+static constexpr unsigned var_vector_elements = 16;
+static constexpr unsigned var_vector_max_vscale = 16;
+
 typedef struct _Z3_context* Z3_context;
 typedef struct _Z3_func_decl* Z3_decl;
 typedef struct _Z3_app* Z3_app;
@@ -96,6 +99,9 @@ public:
   static expr mkDoubleVar(const char *name);
   static expr mkQuadVar(const char *name);
   static expr mkFreshVar(const char *prefix, const expr &type);
+
+  // vscale-specific functions
+  static expr mkVscaleMin() { return expr::mkUInt(1, var_vector_elements); }
 
   // return a constant value of the given type
   static expr some(const expr &type);

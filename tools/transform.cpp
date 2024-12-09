@@ -97,11 +97,11 @@ void tools::print_model_val(ostream &os, State &st, const Model &m,
 
   os << (type.isStructType() ? "{ " : "< ");
   auto agg = type.getAsAggregateType();
-  for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
+  for (unsigned i = 0, e = agg->numElementsConst(st.getVscale()); i < e; ++i) {
     if (i != 0)
       os << ", ";
     tools::print_model_val(os, st, m, var, agg->getChild(i),
-                           agg->extract(val, i), child + i);
+                           agg->extract(val, i, st.getVscale()), child + i);
   }
   os << (type.isStructType() ? " }" : " >");
 }
@@ -566,7 +566,7 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       errs.add("Precondition is always false", false);
       return;
     }
-  
+
     vector<pair<expr, expr>> repls;
     auto vars_pre = pre_src.vars();
     for (auto &v : qvars) {
@@ -1497,7 +1497,7 @@ TypingAssignments TransformVerify::getTypings() const {
   auto c = t.src.getTypeConstraints() && t.tgt.getTypeConstraints();
 
   if (t.precondition)
-    c &= t.precondition->getTypeConstraints();
+    c &= t.precondition->getTypeConstraints(t.src);
 
   // return type
   c &= t.src.getType() == t.tgt.getType();
