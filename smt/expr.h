@@ -374,6 +374,7 @@ public:
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
+  void printSort(std::ostream &os) const;
   std::string numeral_string() const;
   std::string fn_name() const; // empty if not a function
   unsigned getFnNumArgs() const;
