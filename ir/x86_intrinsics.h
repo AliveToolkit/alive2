@@ -11,20 +11,12 @@ public:
 #undef PROCESS
   };
 
-  // the shape of a vector is stored as <# of lanes, element bits>
-  static std::pair<unsigned, unsigned> shape_op0[];
-  static std::pair<unsigned, unsigned> shape_op1[];
-  static std::pair<unsigned, unsigned> shape_ret[];
-  static unsigned ret_width[];
-
 private:
   Value *a, *b;
   Op op;
 
 public:
-  static unsigned getRetWidth(Op op) {
-    return ret_width[op];
-  }
+  static unsigned getRetWidth(Op op);
   X86IntrinBinOp(Type &type, std::string &&name, Value &a, Value &b, Op op)
       : Instr(type, std::move(name)), a(&a), b(&b), op(op) {}
   std::vector<Value *> operands() const override;
@@ -47,21 +39,12 @@ public:
 #undef PROCESS
   };
 
-  // the shape of a vector is stored as <# of lanes, element bits>
-  static std::pair<unsigned, unsigned> shape_op0[];
-  static std::pair<unsigned, unsigned> shape_op1[];
-  static std::pair<unsigned, unsigned> shape_op2[];
-  static std::pair<unsigned, unsigned> shape_ret[];
-  static unsigned ret_width[];
-
 private:
   Value *a, *b, *c;
   Op op;
 
 public:
-  static unsigned getRetWidth(Op op) {
-    return ret_width[op];
-  }
+  static unsigned getRetWidth(Op op);
   X86IntrinTerOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
                  Op op)
       : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}

@@ -5,33 +5,38 @@ using namespace smt;
 using namespace std;
 
 namespace IR {
-vector<Value *> X86IntrinBinOp::operands() const {
-  return {a, b};
-}
-
-std::pair<unsigned, unsigned> X86IntrinBinOp::shape_op0[] = {
+// the shape of a vector is stored as <# of lanes, element bits>
+static constexpr std::pair<unsigned, unsigned> binop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(C, D),
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
 
-std::pair<unsigned, unsigned> X86IntrinBinOp::shape_op1[] = {
+static constexpr std::pair<unsigned, unsigned> binop_shape_op1[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(E, F),
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
 
-std::pair<unsigned, unsigned> X86IntrinBinOp::shape_ret[] = {
+static constexpr std::pair<unsigned, unsigned> binop_shape_ret[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(A, B),
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
 
-unsigned X86IntrinBinOp::ret_width[] = {
+static constexpr unsigned binop_ret_width[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) A *B,
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
+
+unsigned X86IntrinBinOp::getRetWidth(Op op) {
+  return binop_ret_width[op];
+}
+
+vector<Value *> X86IntrinBinOp::operands() const {
+  return {a, b};
+}
 
 bool X86IntrinBinOp::propagatesPoison() const {
   return true;
@@ -318,7 +323,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx512_pshuf_b_512: {
     auto avty = static_cast<const VectorType *>(aty);
     vector<StateValue> vals;
-    unsigned laneCount = shape_ret[op].first;
+    unsigned laneCount = binop_shape_ret[op].first;
     for (unsigned i = 0; i != laneCount; ++i) {
       auto [b, bp] = bty->extract(bv, i);
       expr id = (b & expr::mkUInt(0x0F, 8)) + (expr::mkUInt(i & 0x30, 8));
@@ -342,8 +347,8 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx2_phsub_d:
   case x86_avx2_phsub_sw: {
     vector<StateValue> vals;
-    unsigned laneCount = shape_ret[op].first;
-    unsigned groupsize = 128 / shape_ret[op].second;
+    unsigned laneCount = binop_shape_ret[op].first;
+    unsigned groupsize = 128 / binop_shape_ret[op].second;
     function<expr(const expr &, const expr &)> fn;
     switch (op) {
     case x86_ssse3_phadd_w_128:
@@ -484,7 +489,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx2_pmadd_ub_sw:
   case x86_avx512_pmaddubs_w_512: {
     vector<StateValue> vals;
-    for (unsigned i = 0, e = shape_ret[op].first; i != e; ++i) {
+    for (unsigned i = 0, e = binop_shape_ret[op].first; i != e; ++i) {
       auto [a1, a1p] = aty->extract(av, i * 2);
       auto [a2, a2p] = aty->extract(av, i * 2 + 1);
       auto [b1, b1p] = bty->extract(bv, i * 2);
@@ -537,8 +542,8 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
       };
     }
 
-    unsigned groupsize = 128 / shape_op1[op].second;
-    unsigned laneCount = shape_op1[op].first;
+    unsigned groupsize = 128 / binop_shape_op1[op].second;
+    unsigned laneCount = binop_shape_op1[op].first;
     for (unsigned j = 0; j != laneCount / groupsize; j++) {
       for (unsigned i = 0; i != groupsize; i++) {
         auto [a1, p1] = aty->extract(av, j * groupsize + i);
@@ -554,7 +559,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_sse2_psad_bw:
   case x86_avx2_psad_bw:
   case x86_avx512_psad_bw_512: {
-    unsigned ngroup = shape_ret[op].first;
+    unsigned ngroup = binop_shape_ret[op].first;
     vector<StateValue> vals;
     for (unsigned j = 0; j < ngroup; ++j) {
       expr np = true;
@@ -578,58 +583,59 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
 
 expr X86IntrinBinOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         (shape_op0[op].first != 1
+         (binop_shape_op0[op].first != 1
               ? a->getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_op0[op].second);
+                  return ty.enforceIntType(binop_shape_op0[op].second);
                 }) &&
                     a->getType().getAsAggregateType()->numElements() ==
-                        shape_op0[op].first
-              : a->getType().enforceIntType(shape_op0[op].second)) &&
-         (shape_op1[op].first != 1
+                        binop_shape_op0[op].first
+              : a->getType().enforceIntType(binop_shape_op0[op].second)) &&
+         (binop_shape_op1[op].first != 1
               ? b->getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_op1[op].second);
+                  return ty.enforceIntType(binop_shape_op1[op].second);
                 }) &&
                     b->getType().getAsAggregateType()->numElements() ==
-                        shape_op1[op].first
-              : b->getType().enforceIntType(shape_op1[op].second)) &&
-         (shape_ret[op].first != 1
+                        binop_shape_op1[op].first
+              : b->getType().enforceIntType(binop_shape_op1[op].second)) &&
+         (binop_shape_ret[op].first != 1
               ? getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_ret[op].second);
+                  return ty.enforceIntType(binop_shape_ret[op].second);
                 }) &&
                     getType().getAsAggregateType()->numElements() ==
-                        shape_ret[op].first
-              : getType().enforceIntType(shape_ret[op].second));
+                        binop_shape_ret[op].first
+              : getType().enforceIntType(binop_shape_ret[op].second));
 }
 
 unique_ptr<Instr> X86IntrinBinOp::dup(Function &f, const string &suffix) const {
   return make_unique<X86IntrinBinOp>(getType(), getName() + suffix, *a, *b, op);
 }
 
-std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op0[] = {
+// the shape of a vector is stored as <# of lanes, element bits>
+static constexpr std::pair<unsigned, unsigned> terop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(C, D),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op1[] = {
+static constexpr std::pair<unsigned, unsigned> terop_shape_op1[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(E, F),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op2[] = {
+static constexpr std::pair<unsigned, unsigned> terop_shape_op2[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(G, H),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-std::pair<unsigned, unsigned> X86IntrinTerOp::shape_ret[] = {
+static constexpr std::pair<unsigned, unsigned> terop_shape_ret[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(A, B),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-unsigned X86IntrinTerOp::ret_width[] = {
+static constexpr unsigned terop_ret_width[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) A *B,
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
@@ -644,6 +650,10 @@ string X86IntrinTerOp::getOpName(Op op) {
 #undef PROCESS
   }
   UNREACHABLE();
+}
+
+unsigned X86IntrinTerOp::getRetWidth(Op op) {
+  return terop_ret_width[op];
 }
 
 void X86IntrinTerOp::print(ostream &os) const {
@@ -678,34 +688,34 @@ StateValue X86IntrinTerOp::toSMT(State &s) const {
 
 expr X86IntrinTerOp::getTypeConstraints(const Function &f) const {
   return Value::getTypeConstraints() &&
-         (shape_op0[op].first != 1
+         (terop_shape_op0[op].first != 1
               ? a->getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_op0[op].second);
+                  return ty.enforceIntType(terop_shape_op0[op].second);
                 }) &&
                     a->getType().getAsAggregateType()->numElements() ==
-                        shape_op0[op].first
-              : a->getType().enforceIntType(shape_op0[op].second)) &&
-         (shape_op1[op].first != 1
+                        terop_shape_op0[op].first
+              : a->getType().enforceIntType(terop_shape_op0[op].second)) &&
+         (terop_shape_op1[op].first != 1
               ? b->getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_op1[op].second);
+                  return ty.enforceIntType(terop_shape_op1[op].second);
                 }) &&
                     b->getType().getAsAggregateType()->numElements() ==
-                        shape_op1[op].first
-              : b->getType().enforceIntType(shape_op1[op].second)) &&
-         (shape_op2[op].first != 1
+                        terop_shape_op1[op].first
+              : b->getType().enforceIntType(terop_shape_op1[op].second)) &&
+         (terop_shape_op2[op].first != 1
               ? b->getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_op2[op].second);
+                  return ty.enforceIntType(terop_shape_op2[op].second);
                 }) &&
                     b->getType().getAsAggregateType()->numElements() ==
-                        shape_op2[op].first
-              : b->getType().enforceIntType(shape_op2[op].second)) &&
-         (shape_ret[op].first != 1
+                        terop_shape_op2[op].first
+              : b->getType().enforceIntType(terop_shape_op2[op].second)) &&
+         (terop_shape_ret[op].first != 1
               ? getType().enforceVectorType([this](auto &ty) {
-                  return ty.enforceIntType(shape_ret[op].second);
+                  return ty.enforceIntType(terop_shape_ret[op].second);
                 }) &&
                     getType().getAsAggregateType()->numElements() ==
-                        shape_ret[op].first
-              : getType().enforceIntType(shape_ret[op].second));
+                        terop_shape_ret[op].first
+              : getType().enforceIntType(terop_shape_ret[op].second));
 }
 
 unique_ptr<Instr> X86IntrinTerOp::dup(Function &f, const string &suffix) const {
