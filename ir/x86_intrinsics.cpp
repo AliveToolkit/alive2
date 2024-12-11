@@ -4,26 +4,20 @@ using namespace smt;
 using namespace std;
 
 // the shape of a vector is stored as <# of lanes, element bits>
-static constexpr std::pair<unsigned, unsigned> binop_shape_op0[] = {
+static constexpr std::pair<uint8_t, uint8_t> binop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(C, D),
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
 
-static constexpr std::pair<unsigned, unsigned> binop_shape_op1[] = {
+static constexpr std::pair<uint8_t, uint8_t> binop_shape_op1[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(E, F),
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
 
-static constexpr std::pair<unsigned, unsigned> binop_shape_ret[] = {
+static constexpr std::pair<uint8_t, uint8_t> binop_shape_ret[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(A, B),
-#include "x86_intrinsics_binop.inc"
-#undef PROCESS
-};
-
-static constexpr unsigned binop_ret_width[] = {
-#define PROCESS(NAME, A, B, C, D, E, F) A *B,
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
 };
@@ -605,32 +599,26 @@ unique_ptr<Instr> X86IntrinBinOp::dup(Function &f, const string &suffix) const {
 }
 
 // the shape of a vector is stored as <# of lanes, element bits>
-static constexpr std::pair<unsigned, unsigned> terop_shape_op0[] = {
+static constexpr std::pair<uint8_t, uint8_t> terop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(C, D),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-static constexpr std::pair<unsigned, unsigned> terop_shape_op1[] = {
+static constexpr std::pair<uint8_t, uint8_t> terop_shape_op1[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(E, F),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-static constexpr std::pair<unsigned, unsigned> terop_shape_op2[] = {
+static constexpr std::pair<uint8_t, uint8_t> terop_shape_op2[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(G, H),
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
 
-static constexpr std::pair<unsigned, unsigned> terop_shape_ret[] = {
+static constexpr std::pair<uint8_t, uint8_t> terop_shape_ret[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(A, B),
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-};
-
-static constexpr unsigned terop_ret_width[] = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) A *B,
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
 };
@@ -645,7 +633,7 @@ void X86IntrinTerOp::print(ostream &os) const {
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
   }
-  os << getName() << " = " << name << ' ' << *a << ", " << *b;
+  os << getName() << " = " << name << ' ' << *a << ", " << *b << ", " << *c;
 }
 
 StateValue X86IntrinTerOp::toSMT(State &s) const {
