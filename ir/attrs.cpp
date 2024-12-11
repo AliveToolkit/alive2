@@ -377,7 +377,7 @@ static expr
 encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
                uint64_t derefOrNullBytes, uint64_t align, bool nonnull,
                bool nocapture, bool writable, const expr &allocsize,
-               Value *allocalign, bool isdecl) {
+               Value *allocalign, bool isdecl, bool isret) {
   auto &m = s.getMemory();
   Pointer p(m, ptrvalue);
   expr non_poison(true);
@@ -387,8 +387,10 @@ encodePtrAttrs(State &s, const expr &ptrvalue, uint64_t derefBytes,
 
   non_poison &= p.isNocapture().implies(nocapture);
 
+  // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
   if (derefBytes || derefOrNullBytes || allocsize.isValid()) {
-    // dereferenceable, byval (ParamAttrs), dereferenceable_or_null
+    if (isret)
+      s.addUB(!p.isStackAllocated());
     if (derefBytes)
       s.addUB(merge(p.isDereferenceable(derefBytes, align, writable, true)));
     if (derefOrNullBytes)
@@ -430,7 +432,7 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty,
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
                      has(NonNull), has(NoCapture), has(Writable), {}, nullptr,
-                     isdecl);
+                     isdecl, false);
 
     if (!initializes.empty()) {
       Pointer p(s.getMemory(), val.value);
@@ -540,7 +542,8 @@ StateValue FnAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType())
     val.non_poison &=
       encodePtrAttrs(s, val.value, derefBytes, derefOrNullBytes, align,
-                     has(NonNull), false, false, allocsize, allocalign, false);
+                     has(NonNull), false, false, allocsize, allocalign, false,
+                     true);
 
   if (poisonImpliesUB()) {
     s.addUB(std::move(val.non_poison));

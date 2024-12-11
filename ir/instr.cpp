@@ -3277,7 +3277,6 @@ check_ret_attributes(State &s, StateValue &&sv, const StateValue &returned_arg,
 
   if (t.isPtrType()) {
     Pointer p(s.getMemory(), sv.value);
-    sv.non_poison &= !p.isStackAllocated();
     sv.non_poison &= !p.isNocapture();
   }
 
