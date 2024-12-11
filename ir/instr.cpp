@@ -19,22 +19,6 @@ using namespace smt;
 using namespace util;
 using namespace std;
 
-#define RAUW(val)    \
-  if (val == &what)  \
-    val = &with
-#define DEFINE_AS_RETZERO(cls, method) \
-  uint64_t cls::method() const { return 0; }
-#define DEFINE_AS_RETZEROALIGN(cls, method) \
-  pair<uint64_t, uint64_t> cls::method() const { return { 0, 1 }; }
-#define DEFINE_AS_RETFALSE(cls, method) \
-  bool cls::method() const { return false; }
-#define DEFINE_AS_EMPTYACCESS(cls) \
-  MemInstr::ByteAccessInfo cls::getByteAccessInfo() const \
-  { return {}; }
-
-// log2 of max number of var args per function
-#define VARARG_BITS 8
-
 namespace {
 struct print_type {
   IR::Type &ty;
