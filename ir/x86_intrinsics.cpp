@@ -68,6 +68,30 @@ vector<Value *> X86IntrinBinOp::operands() const {
   return {a, b};
 }
 
+std::pair<unsigned, unsigned> X86IntrinBinOp::shape_op0[] = {
+#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(C, D),
+#include "x86_intrinsics_binop.inc"
+#undef PROCESS
+};
+
+std::pair<unsigned, unsigned> X86IntrinBinOp::shape_op1[] = {
+#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(E, F),
+#include "x86_intrinsics_binop.inc"
+#undef PROCESS
+};
+
+std::pair<unsigned, unsigned> X86IntrinBinOp::shape_ret[] = {
+#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(A, B),
+#include "x86_intrinsics_binop.inc"
+#undef PROCESS
+};
+
+unsigned X86IntrinBinOp::ret_width[] = {
+#define PROCESS(NAME, A, B, C, D, E, F) A *B,
+#include "x86_intrinsics_binop.inc"
+#undef PROCESS
+};
+
 bool X86IntrinBinOp::propagatesPoison() const {
   return true;
 }
@@ -639,6 +663,36 @@ expr X86IntrinBinOp::getTypeConstraints(const Function &f) const {
 unique_ptr<Instr> X86IntrinBinOp::dup(Function &f, const string &suffix) const {
   return make_unique<X86IntrinBinOp>(getType(), getName() + suffix, *a, *b, op);
 }
+
+std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op0[] = {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(C, D),
+#include "x86_intrinsics_terop.inc"
+#undef PROCESS
+};
+
+std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op1[] = {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(E, F),
+#include "x86_intrinsics_terop.inc"
+#undef PROCESS
+};
+
+std::pair<unsigned, unsigned> X86IntrinTerOp::shape_op2[] = {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(G, H),
+#include "x86_intrinsics_terop.inc"
+#undef PROCESS
+};
+
+std::pair<unsigned, unsigned> X86IntrinTerOp::shape_ret[] = {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(A, B),
+#include "x86_intrinsics_terop.inc"
+#undef PROCESS
+};
+
+unsigned X86IntrinTerOp::ret_width[] = {
+#define PROCESS(NAME, A, B, C, D, E, F, G, H) A *B,
+#include "x86_intrinsics_terop.inc"
+#undef PROCESS
+};
 
 string X86IntrinTerOp::getOpName(Op op) {
   switch (op) {

@@ -22,7 +22,6 @@ public:
 
 class X86IntrinBinOp final : public Instr {
 public:
-  static constexpr unsigned numOfX86Intrinsics = 135;
   enum Op {
 #define PROCESS(NAME, A, B, C, D, E, F) NAME,
 #include "x86_intrinsics_binop.inc"
@@ -30,29 +29,10 @@ public:
   };
 
   // the shape of a vector is stored as <# of lanes, element bits>
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_op0 = {
-#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(C, D),
-#include "x86_intrinsics_binop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_op1 = {
-#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(E, F),
-#include "x86_intrinsics_binop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_ret = {
-#define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(A, B),
-#include "x86_intrinsics_binop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<unsigned, numOfX86Intrinsics> ret_width = {
-#define PROCESS(NAME, A, B, C, D, E, F) A *B,
-#include "x86_intrinsics_binop.inc"
-#undef PROCESS
-  };
+  static std::pair<unsigned, unsigned> shape_op0[];
+  static std::pair<unsigned, unsigned> shape_op1[];
+  static std::pair<unsigned, unsigned> shape_ret[];
+  static unsigned ret_width[];
 
 private:
   Value *a, *b;
@@ -78,7 +58,6 @@ public:
 
 class X86IntrinTerOp final : public Instr {
 public:
-  static constexpr unsigned numOfX86Intrinsics = 1;
   enum Op {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) NAME,
 #include "x86_intrinsics_terop.inc"
@@ -86,35 +65,11 @@ public:
   };
 
   // the shape of a vector is stored as <# of lanes, element bits>
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_op0 = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(C, D),
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_op1 = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(E, F),
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_op2 = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(G, H),
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<std::pair<unsigned, unsigned>, numOfX86Intrinsics>
-      shape_ret = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(A, B),
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-      };
-  static constexpr std::array<unsigned, numOfX86Intrinsics> ret_width = {
-#define PROCESS(NAME, A, B, C, D, E, F, G, H) A *B,
-#include "x86_intrinsics_terop.inc"
-#undef PROCESS
-  };
+  static std::pair<unsigned, unsigned> shape_op0[];
+  static std::pair<unsigned, unsigned> shape_op1[];
+  static std::pair<unsigned, unsigned> shape_op2[];
+  static std::pair<unsigned, unsigned> shape_ret[];
+  static unsigned ret_width[];
 
 private:
   Value *a, *b, *c;
