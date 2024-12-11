@@ -90,7 +90,6 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx512_psll_w_512:
   case x86_avx512_psll_d_512:
   case x86_avx512_psll_q_512: {
-    vector<StateValue> vals;
     unsigned elem_bw = bty->getChild(0).bits();
 
     expr shift_np = true;
@@ -98,7 +97,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     // extract lower 64 bits from b
     for (unsigned i = 0, e = 64 / elem_bw; i != e; ++i) {
       StateValue vv = bty->extract(bv, i);
-      shift_v = (i == 0) ? vv.value : vv.value.concat(shift_v);
+      shift_v = i == 0 ? std::move(vv.value) : vv.value.concat(shift_v);
       // if any elements in lower 64 bits is poison, the result is poison
       shift_np &= vv.non_poison;
     }
@@ -114,8 +113,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psrl_d_512:
     case x86_avx512_psrl_q_512:
       fn = [&](auto a, auto b) -> expr {
-        return expr::mkIf(shift_v.uge(expr::mkUInt(elem_bw, 64)),
-                          expr::mkUInt(0, elem_bw), a.lshr(b));
+        return expr::mkIf(shift_v.uge(elem_bw), expr::mkUInt(0, a), a.lshr(b));
       };
       break;
     case x86_sse2_psra_w:
@@ -128,9 +126,9 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psra_d_512:
     case x86_avx512_psra_q_512:
       fn = [&](auto a, auto b) -> expr {
-        return expr::mkIf(shift_v.uge(expr::mkUInt(elem_bw, 64)),
-                          expr::mkIf(a.isNegative(), expr::mkUInt(-1, elem_bw),
-                                     expr::mkUInt(0, elem_bw)),
+        return expr::mkIf(shift_v.uge(elem_bw),
+                          expr::mkIf(a.isNegative(), expr::mkInt(-1, a),
+                                     expr::mkUInt(0, a)),
                           a.ashr(b));
       };
       break;
@@ -144,17 +142,18 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psll_d_512:
     case x86_avx512_psll_q_512:
       fn = [&](auto a, auto b) -> expr {
-        return expr::mkIf(shift_v.uge(expr::mkUInt(elem_bw, 64)),
-                          expr::mkUInt(0, elem_bw), a << b);
+        return expr::mkIf(shift_v.uge(elem_bw),
+                          expr::mkUInt(0, a), a << b);
       };
       break;
     default:
       UNREACHABLE();
     }
+    vector<StateValue> vals;
     for (unsigned i = 0, e = aty->numElementsConst(); i != e; ++i) {
       auto ai = aty->extract(av, i);
-      expr shift = fn(ai.value, shift_v.trunc(elem_bw));
-      vals.emplace_back(std::move(shift), shift_np && ai.non_poison);
+      vals.emplace_back(fn(ai.value, shift_v.trunc(elem_bw)),
+                        shift_np && ai.non_poison);
     }
     return rty->aggregateVals(vals);
   }
@@ -204,8 +203,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_sse2_pmulhu_w:
   case x86_avx2_pmulhu_w:
   case x86_avx512_pmulhu_w_512: {
-    vector<StateValue> vals;
-    function<expr(const expr &, const expr &)> fn;
+    expr (*fn)(const expr &, const expr &);
     switch (op) {
     case x86_sse2_pavg_w:
     case x86_sse2_pavg_b:
@@ -213,7 +211,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx2_pavg_b:
     case x86_avx512_pavg_w_512:
     case x86_avx512_pavg_b_512:
-      fn = [&](auto a, auto b) -> expr {
+      fn = [](auto a, auto b) {
         unsigned bw = a.bits();
         return (a.zext(1) + b.zext(1) + expr::mkUInt(1, bw + 1))
             .lshr(expr::mkUInt(1, bw + 1))
@@ -226,10 +224,10 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx2_psign_b:
     case x86_avx2_psign_w:
     case x86_avx2_psign_d:
-      fn = [&](auto a, auto b) -> expr {
+      fn = [](auto a, auto b) {
         return expr::mkIf(
             b.isZero(), b,
-            expr::mkIf(b.isNegative(), expr::mkUInt(0, a.bits()) - a, a));
+            expr::mkIf(b.isNegative(), expr::mkUInt(0, a) - a, a));
       };
       break;
     case x86_avx2_psrlv_d:
@@ -241,10 +239,8 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psrlv_w_128:
     case x86_avx512_psrlv_w_256:
     case x86_avx512_psrlv_w_512:
-      fn = [&](auto a, auto b) -> expr {
-        unsigned bw = a.bits();
-        return expr::mkIf(b.uge(expr::mkUInt(bw, bw)), expr::mkUInt(0, bw),
-                          a.lshr(b));
+      fn = [](auto a, auto b) {
+        return expr::mkIf(b.uge(a.bits()), expr::mkUInt(0, a), a.lshr(b));
       };
       break;
     case x86_avx2_psrav_d:
@@ -256,11 +252,10 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psrav_w_128:
     case x86_avx512_psrav_w_256:
     case x86_avx512_psrav_w_512:
-      fn = [&](auto a, auto b) -> expr {
-        unsigned bw = a.bits();
-        return expr::mkIf(b.uge(expr::mkUInt(bw, bw)),
-                          expr::mkIf(a.isNegative(), expr::mkUInt(-1, bw),
-                                     expr::mkUInt(0, bw)),
+      fn = [](auto a, auto b) {
+        return expr::mkIf(b.uge(a.bits()),
+                          expr::mkIf(a.isNegative(), expr::mkInt(-1, a),
+                                     expr::mkUInt(0, a)),
                           a.ashr(b));
       };
       break;
@@ -273,31 +268,28 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psllv_w_128:
     case x86_avx512_psllv_w_256:
     case x86_avx512_psllv_w_512:
-      fn = [&](auto a, auto b) -> expr {
-        unsigned bw = a.bits();
-        return expr::mkIf(b.uge(expr::mkUInt(bw, bw)), expr::mkUInt(0, bw),
-                          a << b);
+      fn = [](auto a, auto b) {
+        return expr::mkIf(b.uge( a.bits()), expr::mkUInt(0, a), a << b);
       };
       break;
     case x86_sse2_pmulh_w:
     case x86_avx2_pmulh_w:
     case x86_avx512_pmulh_w_512:
-      fn = [&](auto a, auto b) -> expr {
-        expr mul = a.sext(16) * b.sext(16);
-        return mul.extract(31, 16);
+      fn = [](auto a, auto b) {
+        return (a.sext(16) * b.sext(16)).extract(31, 16);
       };
       break;
     case x86_sse2_pmulhu_w:
     case x86_avx2_pmulhu_w:
     case x86_avx512_pmulhu_w_512:
-      fn = [&](auto a, auto b) -> expr {
-        expr mul = a.zext(16) * b.zext(16);
-        return mul.extract(31, 16);
+      fn = [](auto a, auto b) {
+        return (a.zext(16) * b.zext(16)).extract(31, 16);
       };
       break;
     default:
       UNREACHABLE();
     }
+    vector<StateValue> vals;
     for (unsigned i = 0, e = rty->numElementsConst(); i != e; ++i) {
       auto ai = aty->extract(av, i);
       auto bi = bty->extract(bv, i);
@@ -314,10 +306,10 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     unsigned laneCount = binop_shape_ret[op].first;
     for (unsigned i = 0; i != laneCount; ++i) {
       auto [b, bp] = bty->extract(bv, i);
-      expr id = (b & expr::mkUInt(0x0F, 8)) + (expr::mkUInt(i & 0x30, 8));
+      expr id = (b & expr::mkUInt(0x0F, b)) + expr::mkUInt(i & 0x30, b);
       auto [r, rp] = avty->extract(av, id);
-      auto ai = expr::mkIf(b.extract(7, 7) == 0, r, expr::mkUInt(0, 8));
-      vals.emplace_back(std::move(ai), bp && rp);
+      vals.emplace_back(expr::mkIf(b.extract(7, 7) == 0, r, expr::mkUInt(0, r)),
+                        bp && rp);
     }
     return rty->aggregateVals(vals);
   }
@@ -337,27 +329,27 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     vector<StateValue> vals;
     unsigned laneCount = binop_shape_ret[op].first;
     unsigned groupsize = 128 / binop_shape_ret[op].second;
-    function<expr(const expr &, const expr &)> fn;
+    expr (*fn)(const expr &, const expr &);
     switch (op) {
     case x86_ssse3_phadd_w_128:
     case x86_ssse3_phadd_d_128:
     case x86_avx2_phadd_w:
     case x86_avx2_phadd_d:
-      fn = [&](auto a, auto b) -> expr { return a + b; };
+      fn = [](auto a, auto b) { return a + b; };
       break;
     case x86_ssse3_phadd_sw_128:
     case x86_avx2_phadd_sw:
-      fn = [&](auto a, auto b) -> expr { return a.sadd_sat(b); };
+      fn = [](auto a, auto b) { return a.sadd_sat(b); };
       break;
     case x86_ssse3_phsub_w_128:
     case x86_ssse3_phsub_d_128:
     case x86_avx2_phsub_w:
     case x86_avx2_phsub_d:
-      fn = [&](auto a, auto b) -> expr { return a - b; };
+      fn = [](auto a, auto b) { return a - b; };
       break;
     case x86_ssse3_phsub_sw_128:
     case x86_avx2_phsub_sw:
-      fn = [&](auto a, auto b) -> expr { return a.ssub_sat(b); };
+      fn = [](auto a, auto b) { return a.ssub_sat(b); };
       break;
     default:
       UNREACHABLE();
@@ -403,8 +395,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx512_pslli_w_512:
   case x86_avx512_pslli_d_512:
   case x86_avx512_pslli_q_512: {
-    vector<StateValue> vals;
-    function<expr(const expr &, const expr &)> fn;
+    expr (*fn)(const expr &, const expr &);
     switch (op) {
     case x86_sse2_psrai_w:
     case x86_sse2_psrai_d:
@@ -415,14 +406,12 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psrai_q_128:
     case x86_avx512_psrai_q_256:
     case x86_avx512_psrai_q_512:
-      fn = [&](auto a, auto b) -> expr {
+      fn = [](auto a, auto b) {
         unsigned sz_a = a.bits();
-        expr check = b.uge(expr::mkUInt(sz_a, 32));
-        expr outbounds = expr::mkIf(a.isNegative(), expr::mkInt(-1, sz_a),
-                                    expr::mkUInt(0, sz_a));
+        expr outbounds = expr::mkIf(a.isNegative(), expr::mkInt(-1, a),
+                                    expr::mkUInt(0, a));
         expr inbounds = a.ashr(b.zextOrTrunc(sz_a));
-        return expr::mkIf(std::move(check), std::move(outbounds),
-                          std::move(inbounds));
+        return expr::mkIf(b.uge(sz_a), outbounds, inbounds);
       };
       break;
     case x86_sse2_psrli_w:
@@ -434,13 +423,12 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psrli_w_512:
     case x86_avx512_psrli_d_512:
     case x86_avx512_psrli_q_512:
-      fn = [&](auto a, auto b) -> expr {
+      fn = [](auto a, auto b) {
         unsigned sz_a = a.bits();
-        expr check = b.uge(expr::mkUInt(sz_a, 32));
-        expr outbounds = expr::mkUInt(0, sz_a);
+        expr check = b.uge(sz_a);
+        expr outbounds = expr::mkUInt(0, a);
         expr inbounds = a.lshr(b.zextOrTrunc(sz_a));
-        return expr::mkIf(std::move(check), std::move(outbounds),
-                          std::move(inbounds));
+        return expr::mkIf(b.uge(sz_a), outbounds, inbounds);
       };
       break;
     case x86_sse2_pslli_w:
@@ -452,18 +440,17 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_pslli_w_512:
     case x86_avx512_pslli_d_512:
     case x86_avx512_pslli_q_512:
-      fn = [&](auto a, auto b) -> expr {
+      fn = [](auto a, auto b) {
         unsigned sz_a = a.bits();
-        expr check = b.uge(expr::mkUInt(sz_a, 32));
-        expr outbounds = expr::mkUInt(0, sz_a);
+        expr outbounds = expr::mkUInt(0, a);
         expr inbounds = a << b.zextOrTrunc(sz_a);
-        return expr::mkIf(std::move(check), std::move(outbounds),
-                          std::move(inbounds));
+        return expr::mkIf(b.uge(sz_a), outbounds, inbounds);
       };
       break;
     default:
       UNREACHABLE();
     }
+    vector<StateValue> vals;
     for (unsigned i = 0, e = rty->numElementsConst(); i != e; ++i) {
       auto ai = aty->extract(av, i);
       vals.emplace_back(fn(ai.value, bv.value), ai.non_poison && bv.non_poison);
@@ -487,11 +474,12 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
 
       if (op == x86_sse2_pmadd_wd || op == x86_avx2_pmadd_wd ||
           op == x86_avx512_pmaddw_d_512) {
-        expr v = a1.sext(16) * b1.sext(16) + a2.sext(16) * b2.sext(16);
-        vals.emplace_back(std::move(v), std::move(np));
+        vals.emplace_back(a1.sext(16) * b1.sext(16) + a2.sext(16) * b2.sext(16),
+                          std::move(np));
       } else {
-        expr v = (a1.zext(8) * b1.sext(8)).sadd_sat(a2.zext(8) * b2.sext(8));
-        vals.emplace_back(std::move(v), std::move(np));
+        vals.emplace_back(
+          (a1.zext(8) * b1.sext(8)).sadd_sat(a2.zext(8) * b2.sext(8)),
+          std::move(np));
       }
     }
     return rty->aggregateVals(vals);
@@ -508,12 +496,11 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_sse41_packusdw:
   case x86_avx2_packusdw:
   case x86_avx512_packusdw_512: {
-    vector<StateValue> vals;
-    function<expr(const expr &)> fn;
+    expr (*fn)(const expr &);
     if (op == x86_sse2_packsswb_128 || op == x86_avx2_packsswb ||
         op == x86_avx512_packsswb_512 || op == x86_sse2_packssdw_128 ||
         op == x86_avx2_packssdw || op == x86_avx512_packssdw_512) {
-      fn = [&](auto a) -> expr {
+      fn = [](auto a) {
         unsigned bw = a.bits() / 2;
         auto min = expr::IntSMin(bw);
         auto max = expr::IntSMax(bw);
@@ -521,10 +508,10 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
                           expr::mkIf(a.sge(max.sext(bw)), max, a.trunc(bw)));
       };
     } else {
-      fn = [&](auto a) -> expr {
+      fn = [](auto a) {
         unsigned bw = a.bits() / 2;
         auto max = expr::IntUMax(bw);
-        auto zero = expr::mkUInt(0, bw);
+        auto zero = expr::mkUInt(0, max);
         return expr::mkIf(a.sle(zero.zext(bw)), zero,
                           expr::mkIf(a.sge(max.zext(bw)), max, a.trunc(bw)));
       };
@@ -532,14 +519,15 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
 
     unsigned groupsize = 128 / binop_shape_op1[op].second;
     unsigned laneCount = binop_shape_op1[op].first;
+    vector<StateValue> vals;
     for (unsigned j = 0; j != laneCount / groupsize; j++) {
       for (unsigned i = 0; i != groupsize; i++) {
         auto [a1, p1] = aty->extract(av, j * groupsize + i);
-        vals.emplace_back(fn(std::move(a1)), std::move(p1));
+        vals.emplace_back(fn(a1), std::move(p1));
       }
       for (unsigned i = 0; i != groupsize; i++) {
         auto [b1, p1] = aty->extract(bv, j * groupsize + i);
-        vals.emplace_back(fn(std::move(b1)), std::move(p1));
+        vals.emplace_back(fn(b1), std::move(p1));
       }
     }
     return rty->aggregateVals(vals);
@@ -555,7 +543,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
       for (unsigned i = 0; i < 8; ++i) {
         auto [a, ap] = aty->extract(av, 8 * j + i);
         auto [b, bp] = bty->extract(bv, 8 * j + i);
-        np = np && ap && bp;
+        np &= ap && bp;
         if (i == 0)
           v = (a.zext(8) - b.zext(8)).abs();
         else
@@ -648,13 +636,11 @@ StateValue X86IntrinTerOp::toSMT(State &s) const {
   switch (op) {
   case x86_avx2_pblendvb: {
     vector<StateValue> vals;
-
     for (int i = 0; i < 32; ++i) {
       auto [a, ap] = aty->extract(av, i);
       auto [b, bp] = bty->extract(bv, i);
       auto [c, cp] = cty->extract(cv, i);
-      auto v = expr::mkIf(c.extract(7, 7) == 0, a, b);
-      vals.emplace_back(std::move(v), ap && bp && cp);
+      vals.emplace_back(expr::mkIf(c.extract(7, 7) == 0, a, b), ap && bp && cp);
     }
     return rty->aggregateVals(vals);
   }
