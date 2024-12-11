@@ -23,8 +23,7 @@ public:
   virtual bool propagatesPoison() const = 0;
   virtual bool hasSideEffects() const = 0;
   virtual bool isTerminator() const;
-  smt::expr getTypeConstraints() const override;
-  virtual smt::expr getTypeConstraints(const Function &f) const = 0;
+  smt::expr getTypeConstraints(const Function &f) const override;
   virtual std::unique_ptr<Instr> dup(Function &f,
                                      const std::string &suffix) const = 0;
 };
