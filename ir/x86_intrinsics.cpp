@@ -1,10 +1,8 @@
 #include "ir/x86_intrinsics.h"
-#include "smt/expr.h"
 
 using namespace smt;
 using namespace std;
 
-namespace IR {
 // the shape of a vector is stored as <# of lanes, element bits>
 static constexpr std::pair<unsigned, unsigned> binop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F) std::make_pair(C, D),
@@ -30,9 +28,7 @@ static constexpr unsigned binop_ret_width[] = {
 #undef PROCESS
 };
 
-unsigned X86IntrinBinOp::getRetWidth(Op op) {
-  return binop_ret_width[op];
-}
+namespace IR {
 
 vector<Value *> X86IntrinBinOp::operands() const {
   return {a, b};
@@ -51,19 +47,17 @@ void X86IntrinBinOp::rauw(const Value &what, Value &with) {
   RAUW(b);
 }
 
-string X86IntrinBinOp::getOpName(Op op) {
+void X86IntrinBinOp::print(ostream &os) const {
+  const char *name;
   switch (op) {
 #define PROCESS(NAME, A, B, C, D, E, F)                                        \
   case NAME:                                                                   \
-    return #NAME;
+    name = #NAME;                                                              \
+    break;
 #include "x86_intrinsics_binop.inc"
 #undef PROCESS
   }
-  UNREACHABLE();
-}
-
-void X86IntrinBinOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName(op) << " " << *a << ", " << *b;
+  os << getName() << " = " << name << ' ' << *a << ", " << *b;
 }
 
 StateValue X86IntrinBinOp::toSMT(State &s) const {
@@ -641,23 +635,17 @@ static constexpr unsigned terop_ret_width[] = {
 #undef PROCESS
 };
 
-string X86IntrinTerOp::getOpName(Op op) {
+void X86IntrinTerOp::print(ostream &os) const {
+  const char *name;
   switch (op) {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H)                                  \
   case NAME:                                                                   \
-    return #NAME;
+    name = #NAME;                                                              \
+    break;
 #include "x86_intrinsics_terop.inc"
 #undef PROCESS
   }
-  UNREACHABLE();
-}
-
-unsigned X86IntrinTerOp::getRetWidth(Op op) {
-  return terop_ret_width[op];
-}
-
-void X86IntrinTerOp::print(ostream &os) const {
-  os << getName() << " = " << getOpName(op) << " " << *a << ", " << *b;
+  os << getName() << " = " << name << ' ' << *a << ", " << *b;
 }
 
 StateValue X86IntrinTerOp::toSMT(State &s) const {

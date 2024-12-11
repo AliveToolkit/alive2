@@ -16,7 +16,6 @@ private:
   Op op;
 
 public:
-  static unsigned getRetWidth(Op op);
   X86IntrinBinOp(Type &type, std::string &&name, Value &a, Value &b, Op op)
       : Instr(type, std::move(name)), a(&a), b(&b), op(op) {}
   std::vector<Value *> operands() const override;
@@ -44,7 +43,6 @@ private:
   Op op;
 
 public:
-  static unsigned getRetWidth(Op op);
   X86IntrinTerOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
                  Op op)
       : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op) {}
