@@ -3,23 +3,6 @@
 #include "ir/instr.h"
 
 namespace IR {
-class FakeShuffle final : public Instr {
-  Value *v1, *v2, *mask;
-
-public:
-  FakeShuffle(Type &type, std::string &&name, Value &v1, Value &v2, Value &mask)
-      : Instr(type, std::move(name)), v1(&v1), v2(&v2), mask(&mask) {}
-  std::vector<Value *> operands() const override;
-  bool propagatesPoison() const override;
-  bool hasSideEffects() const override;
-  void rauw(const Value &what, Value &with) override;
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr> dup(Function &f,
-                             const std::string &suffix) const override;
-};
-
 class X86IntrinBinOp final : public Instr {
 public:
   enum Op {

@@ -5,65 +5,6 @@ using namespace smt;
 using namespace std;
 
 namespace IR {
-vector<Value *> FakeShuffle::operands() const {
-  return {v1, v2, mask};
-}
-
-bool FakeShuffle::propagatesPoison() const {
-  return false;
-}
-
-bool FakeShuffle::hasSideEffects() const {
-  return false;
-}
-
-void FakeShuffle::rauw(const Value &what, Value &with) {
-  RAUW(v1);
-  RAUW(v2);
-  RAUW(mask);
-}
-
-void FakeShuffle::print(ostream &os) const {
-  os << getName() << " = fakesv " << *v1 << ", " << *v2 << ", " << *mask;
-}
-
-StateValue FakeShuffle::toSMT(State &s) const {
-  auto vty =
-      static_cast<const VectorType *>(v1->getType().getAsAggregateType());
-  auto mty = mask->getType().getAsAggregateType();
-  auto sz = vty->numElementsConst();
-  vector<StateValue> vals;
-
-  for (unsigned i = 0, e = mty->numElementsConst(); i != e; ++i) {
-    auto [m_v, m_p] = mty->extract(s[*mask], i);
-    expr bound = expr::mkUInt(sz, m_v);
-    expr idx = m_v.urem(bound);
-    auto [v1v, v1p] = vty->extract(s[*v1], idx);
-    auto [v2v, v2p] = vty->extract(s[*v2], idx);
-    expr v = expr::mkIf(m_v.ult(bound), v1v, v2v);
-    expr np = expr::mkIf(m_v.ult(bound), v1p, v2p);
-    expr inbounds = m_v.ult(expr::mkUInt(vty->numElementsConst() * 2, m_v));
-
-    vals.emplace_back(std::move(v), inbounds && np);
-  }
-
-  return getType().getAsAggregateType()->aggregateVals(vals);
-}
-
-expr FakeShuffle::getTypeConstraints(const Function &f) const {
-  return Value::getTypeConstraints() &&
-         getType().enforceVectorTypeSameChildTy(v1->getType()) &&
-         getType().getAsAggregateType()->numElements() ==
-             mask->getType().getAsAggregateType()->numElements() &&
-         v1->getType().enforceVectorType() && v1->getType() == v2->getType() &&
-         mask->getType().enforceVectorType();
-}
-
-unique_ptr<Instr> FakeShuffle::dup(Function &f, const string &suffix) const {
-  return make_unique<FakeShuffle>(getType(), getName() + suffix, *v1, *v2,
-                                  *mask);
-}
-
 vector<Value *> X86IntrinBinOp::operands() const {
   return {a, b};
 }
