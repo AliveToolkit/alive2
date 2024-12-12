@@ -269,7 +269,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psllv_w_256:
     case x86_avx512_psllv_w_512:
       fn = [](auto a, auto b) {
-        return expr::mkIf(b.uge( a.bits()), expr::mkUInt(0, a), a << b);
+        return expr::mkIf(b.uge(a.bits()), expr::mkUInt(0, a), a << b);
       };
       break;
     case x86_sse2_pmulh_w:

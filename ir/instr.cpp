@@ -19,6 +19,18 @@ using namespace smt;
 using namespace util;
 using namespace std;
 
+#define DEFINE_AS_RETZERO(cls, method) \
+  uint64_t cls::method() const { return 0; }
+#define DEFINE_AS_RETZEROALIGN(cls, method) \
+  pair<uint64_t, uint64_t> cls::method() const { return { 0, 1 }; }
+#define DEFINE_AS_RETFALSE(cls, method) \
+  bool cls::method() const { return false; }
+#define DEFINE_AS_EMPTYACCESS(cls) \
+  MemInstr::ByteAccessInfo cls::getByteAccessInfo() const { return {}; }
+
+// log2 of max number of var args per function
+#define VARARG_BITS 8
+
 namespace {
 struct print_type {
   IR::Type &ty;
@@ -3321,12 +3333,12 @@ bool Return::isTerminator() const {
 }
 
 Assume::Assume(Value &cond, Kind kind)
-    : Instr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
+    : MemInstr(Type::voidTy, "assume"), args({&cond}), kind(kind) {
   assert(kind == AndNonPoison || kind == WellDefined || kind == NonNull);
 }
 
 Assume::Assume(vector<Value *> &&args0, Kind kind)
-    : Instr(Type::voidTy, "assume"), args(std::move(args0)), kind(kind) {
+    : MemInstr(Type::voidTy, "assume"), args(std::move(args0)), kind(kind) {
   switch (kind) {
     case AndNonPoison:
     case WellDefined:
@@ -3363,6 +3375,24 @@ bool Assume::hasSideEffects() const {
     break;
   }
   return true;
+}
+
+DEFINE_AS_RETZERO(Assume, getMaxGEPOffset)
+DEFINE_AS_RETZEROALIGN(Assume, getMaxAllocSize)
+DEFINE_AS_EMPTYACCESS(Assume)
+
+uint64_t Assume::getMaxAccessSize() const {
+  switch (kind) {
+  case AndNonPoison:
+  case WellDefined:
+  case NonNull:
+    return 0;
+  case Align:
+  case Dereferenceable:
+  case DereferenceableOrNull:
+    return getIntOr(*args[1], UINT64_MAX);
+  }
+  UNREACHABLE();
 }
 
 void Assume::rauw(const Value &what, Value &with) {
@@ -3453,7 +3483,7 @@ unique_ptr<Instr> Assume::dup(Function &f, const string &suffix) const {
 
 AssumeVal::AssumeVal(Type &type, string &&name, Value &val,
                      vector<Value *> &&args0, Kind kind, bool is_welldefined)
-    : Instr(type, std::move(name)), val(&val), args(std::move(args0)),
+    : MemInstr(type, std::move(name)), val(&val), args(std::move(args0)),
       kind(kind), is_welldefined(is_welldefined) {
   switch (kind) {
   case Align:
@@ -3480,6 +3510,21 @@ bool AssumeVal::propagatesPoison() const {
 
 bool AssumeVal::hasSideEffects() const {
   return false;
+}
+
+DEFINE_AS_RETZERO(AssumeVal, getMaxGEPOffset)
+DEFINE_AS_RETZEROALIGN(AssumeVal, getMaxAllocSize)
+DEFINE_AS_EMPTYACCESS(AssumeVal)
+
+uint64_t AssumeVal::getMaxAccessSize() const {
+  switch (kind) {
+  case NonNull:
+  case Range:
+    return 0;
+  case Align:
+    return getIntOr(*args[0], UINT64_MAX);
+  }
+  UNREACHABLE();
 }
 
 void AssumeVal::rauw(const Value &what, Value &with) {

@@ -12,25 +12,6 @@
 #define RAUW(val)                                                              \
   if (val == &what)                                                            \
   val = &with
-#define DEFINE_AS_RETZERO(cls, method)                                         \
-  uint64_t cls::method() const {                                               \
-    return 0;                                                                  \
-  }
-#define DEFINE_AS_RETZEROALIGN(cls, method)                                    \
-  pair<uint64_t, uint64_t> cls::method() const {                               \
-    return {0, 1};                                                             \
-  }
-#define DEFINE_AS_RETFALSE(cls, method)                                        \
-  bool cls::method() const {                                                   \
-    return false;                                                              \
-  }
-#define DEFINE_AS_EMPTYACCESS(cls)                                             \
-  MemInstr::ByteAccessInfo cls::getByteAccessInfo() const {                    \
-    return {};                                                                 \
-  }
-
-// log2 of max number of var args per function
-#define VARARG_BITS 8
 
 namespace IR {
 
@@ -664,72 +645,6 @@ public:
 };
 
 
-class Assume final : public Instr {
-public:
-  enum Kind {
-    AndNonPoison, /// cond should be non-poison and hold
-    WellDefined,  /// cond only needs to be well defined (can be false)
-    Align,        /// args[0] satisfies alignment args[1]
-    Dereferenceable,       /// args[0] is dereferenceable at least args[1]
-    DereferenceableOrNull, /// args[0] is null or deref least args[1]
-    NonNull       /// args[0] is a nonnull pointer
-  };
-
-private:
-  std::vector<Value*> args;
-  Kind kind;
-
-public:
-  Assume(Value &cond, Kind kind);
-  Assume(std::vector<Value *> &&args, Kind kind);
-
-  Kind getKind() const { return kind; }
-  std::vector<Value*> operands() const override;
-  bool propagatesPoison() const override;
-  bool hasSideEffects() const override;
-  void rauw(const Value &what, Value &with) override;
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
-};
-
-
-// yields poison if invalid
-class AssumeVal final : public Instr {
-public:
-  enum Kind {
-    Align,
-    NonNull,
-    Range,
-  };
-
-private:
-  Value *val;
-  std::vector<Value*> args;
-  Kind kind;
-  bool is_welldefined;
-
-public:
-  AssumeVal(Type &type, std::string &&name, Value &val,
-            std::vector<Value *> &&args, Kind kind,
-            bool is_welldefined = false);
-
-  Kind getKind() const { return kind; }
-  bool isWellDefined() const { return is_welldefined; }
-  std::vector<Value*> operands() const override;
-  bool propagatesPoison() const override;
-  bool hasSideEffects() const override;
-  void rauw(const Value &what, Value &with) override;
-  void print(std::ostream &os) const override;
-  StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints(const Function &f) const override;
-  std::unique_ptr<Instr>
-    dup(Function &f, const std::string &suffix) const override;
-};
-
-
 class MemInstr : public Instr {
 public:
   MemInstr(Type &type, std::string &&name) : Instr(type, std::move(name)) {}
@@ -772,6 +687,82 @@ public:
   };
 
   virtual ByteAccessInfo getByteAccessInfo() const = 0;
+};
+
+
+class Assume final : public MemInstr {
+public:
+  enum Kind {
+    AndNonPoison, /// cond should be non-poison and hold
+    WellDefined,  /// cond only needs to be well defined (can be false)
+    Align,        /// args[0] satisfies alignment args[1]
+    Dereferenceable,       /// args[0] is dereferenceable at least args[1]
+    DereferenceableOrNull, /// args[0] is null or deref least args[1]
+    NonNull       /// args[0] is a nonnull pointer
+  };
+
+private:
+  std::vector<Value*> args;
+  Kind kind;
+
+public:
+  Assume(Value &cond, Kind kind);
+  Assume(std::vector<Value *> &&args, Kind kind);
+
+  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  Kind getKind() const { return kind; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
+// yields poison if invalid
+class AssumeVal final : public MemInstr {
+public:
+  enum Kind {
+    Align,
+    NonNull,
+    Range,
+  };
+
+private:
+  Value *val;
+  std::vector<Value*> args;
+  Kind kind;
+  bool is_welldefined;
+
+public:
+  AssumeVal(Type &type, std::string &&name, Value &val,
+            std::vector<Value *> &&args, Kind kind,
+            bool is_welldefined = false);
+
+  std::pair<uint64_t, uint64_t> getMaxAllocSize() const override;
+  uint64_t getMaxAccessSize() const override;
+  uint64_t getMaxGEPOffset() const override;
+  ByteAccessInfo getByteAccessInfo() const override;
+
+  Kind getKind() const { return kind; }
+  bool isWellDefined() const { return is_welldefined; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
 };
 
 
