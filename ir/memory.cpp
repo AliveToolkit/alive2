@@ -122,7 +122,6 @@ static expr mk_block_if(const expr &cond, expr then, expr els) {
 }
 
 
-static unsigned next_local_bid;
 static unsigned next_const_bid;
 static unsigned next_global_bid;
 static unsigned next_ptr_input;
@@ -1682,7 +1681,6 @@ void Memory::mkAxioms(const Memory &tgt) const {
 void Memory::resetGlobals() {
   next_const_bid  = has_null_block;
   next_global_bid = has_null_block + num_consts_src;
-  next_local_bid = 0;
   next_ptr_input = 0;
 }
 
