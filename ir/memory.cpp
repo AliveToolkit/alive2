@@ -122,6 +122,7 @@ static expr mk_block_if(const expr &cond, expr then, expr els) {
 }
 
 
+static unsigned next_local_bid;
 static unsigned next_const_bid;
 static unsigned next_global_bid;
 static unsigned next_ptr_input;
@@ -1681,6 +1682,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
 void Memory::resetGlobals() {
   next_const_bid  = has_null_block;
   next_global_bid = has_null_block + num_consts_src;
+  next_local_bid = 0;
   next_ptr_input = 0;
 }
 
@@ -2631,10 +2633,11 @@ Memory::refined(const Memory &other, bool fncall,
   auto sets = { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2) };
   for (const auto &[mem, set] : sets) {
     if (set) {
+      next_local_bid = mem->numLocals();
       for (auto &it: *set_ptrs) {
-        block_alias.unionWith(computeAliasing(Pointer(*mem, it.val.value),
-                                              min_read_sz_expr, min_read_sz,
-                                              false));
+        block_alias.unionWith(
+          mem->computeAliasing(Pointer(*mem, it.val.value), min_read_sz_expr,
+                               min_read_sz, false));
       }
     } else {
       if (mem->next_nonlocal_bid > 0)

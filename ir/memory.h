@@ -154,8 +154,6 @@ class Memory {
   smt::expr non_local_block_liveness; // BV w/ 1 bit per bid (1 if live)
   smt::expr local_block_liveness;
 
-  unsigned next_local_bid = 0;
-
   // TODO: change from short idx to arg number
   smt::expr has_stored_arg; // (short idx, short offset) -> bool
 
