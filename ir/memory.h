@@ -140,7 +140,7 @@ class Memory {
     std::set<smt::expr> undef;
     unsigned char type = DATA_ANY;
 
-    MemBlock() {}
+    MemBlock() = default;
     MemBlock(smt::expr &&val) : val(std::move(val)) {}
     MemBlock(smt::expr &&val, DataType type)
       : val(std::move(val)), type(type) {}
@@ -156,6 +156,13 @@ class Memory {
 
   // TODO: change from short idx to arg number
   smt::expr has_stored_arg; // (short idx, short offset) -> bool
+
+  // record which pointers have been stored to non-local ptrs
+  // bid -> offset*, is_set_incomplete
+  // when used with a lambda, is_set_incomplete becomes true
+  std::vector<std::pair<std::set<smt::expr>, bool>> stored_pointers;
+
+  void record_stored_pointer(uint64_t bid, const smt::expr &offset);
 
   smt::FunctionExpr local_blk_addr; // bid -> (bits_size_t - 1)
   smt::FunctionExpr local_blk_size;
@@ -203,8 +210,8 @@ class Memory {
 
   void access(const Pointer &ptr, const smt::expr &bytes, uint64_t align,
               bool write,
-              const std::function<void(MemBlock&, const Pointer&,
-                                       smt::expr&&)> &fn);
+              const std::function<void(MemBlock&, const Pointer&, unsigned,
+                                       bool, smt::expr&&)> &fn);
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
                          std::set<smt::expr> &undef, uint64_t align,
@@ -231,11 +238,9 @@ class Memory {
   smt::expr hasStored(const Pointer &p, const smt::expr &bytes) const;
   void record_store(const Pointer &p, const smt::expr &bytes);
 
-  smt::expr blockValRefined(const Memory &other, unsigned bid, bool local,
-                            const smt::expr &offset,
-                            std::set<smt::expr> &undef) const;
-  smt::expr blockRefined(const Pointer &src, const Pointer &tgt, unsigned bid,
-                         std::set<smt::expr> &undef) const;
+  smt::expr blockRefined(const Pointer &src, const Pointer &tgt) const;
+  smt::expr blockValRefined(const Pointer &src, const Memory &tgt,
+                            unsigned bid, std::set<smt::expr> &undef) const;
 
   void mkLocalDisjAddrAxioms(const smt::expr &allocated,
                              const smt::expr &short_bid,
