@@ -2658,7 +2658,7 @@ Memory::refined(const Memory &other, bool fncall,
   auto sets = { make_pair(this, set_ptrs), make_pair(&other, set_ptrs2) };
   for (const auto &[mem, set] : sets) {
     if (set) {
-      next_local_bid = mem->numLocals();
+      TmpValueChange tmp(next_local_bid, mem->numLocals());
       for (auto &it: *set_ptrs) {
         block_alias.unionWith(
           mem->computeAliasing(Pointer(*mem, it.val.value), min_read_sz_expr,

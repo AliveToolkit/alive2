@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <utility>
 
 #ifdef _MSC_VER
 # define UNREACHABLE() __assume(0)
@@ -40,6 +41,20 @@ struct const_strip_unique_ptr {
 
   const_iterator begin() const { return container.begin(); }
   const_iterator end() const   { return container.end(); }
+};
+
+template <typename T>
+class TmpValueChange {
+  T &ref;
+  T old_value;
+
+public:
+  TmpValueChange(T &ref, T new_val) : ref(ref), old_value(std::move(ref)) {
+    ref = std::move(new_val);
+  }
+  ~TmpValueChange() {
+    ref = std::move(old_value);
+  }
 };
 
 unsigned ilog2(uint64_t n);
