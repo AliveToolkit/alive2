@@ -185,4 +185,9 @@ llvm::cl::opt<bool> opt_disallow_ub_exploitation(
   llvm::cl::desc("Disallow UB exploitation by optimizations (default=allow)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<bool> opt_uf_float(
+  LLVM_ARGS_PREFIX "uf-float",
+  llvm::cl::desc("Encode floating point operations using uninterpreted functions"),
+  llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
+
 }

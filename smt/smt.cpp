@@ -42,6 +42,7 @@ void smt_initializer::destroy() {
 
 static string query_timeout = "10000";
 static string rand_seed = "0";
+static bool uf_float = false;
 
 void set_query_timeout(string ms) {
   query_timeout = std::move(ms);
@@ -57,6 +58,14 @@ const char* get_query_timeout() {
 
 const char *get_random_seed() {
   return rand_seed.c_str();
+}
+
+void set_uf_float(bool enable) {
+  uf_float = enable;
+}
+
+bool get_uf_float() {
+  return uf_float;
 }
 
 

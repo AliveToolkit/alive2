@@ -23,6 +23,7 @@ smt::solver_tactic_verbose(opt_tactic_verbose);
 config::debug = opt_debug;
 config::max_offset_bits = opt_max_offset_in_bits;
 config::max_sizet_bits  = opt_max_sizet_in_bits;
+smt::set_uf_float(opt_uf_float);
 
 if ((config::disallow_ub_exploitation = opt_disallow_ub_exploitation)) {
   config::disable_undef_input = true;
