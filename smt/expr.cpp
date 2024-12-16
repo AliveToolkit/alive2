@@ -4,6 +4,7 @@
 #include "smt/expr.h"
 #include "smt/exprs.h"
 #include "smt/ctx.h"
+#include "smt/smt.h"
 #include "util/compiler.h"
 #include <algorithm>
 #include <bit>
@@ -61,6 +62,9 @@ static expr simplify_const(expr &&e, const expr &input,
 }
 
 static bool is_power2(const expr &e, unsigned &log) {
+  if (!e.isConst())
+    return false;
+
   if (e.isZero() || !(e & (e - expr::mkUInt(1, e))).isZero())
     return false;
 
@@ -2071,7 +2075,7 @@ expr expr::load(const expr &idx, uint64_t max_idx) const {
 
   } else if (isConstArray(val)) {
     return val;
-  } else if (isLambda(val)) {
+  } else if (isLambda(val) && !hit_half_memory_limit()) {
     return val.subst({ idx }).foldTopLevel();
   }
 
