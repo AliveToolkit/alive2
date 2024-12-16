@@ -5,7 +5,6 @@
 #include "ir/function.h"
 #include "ir/state.h"
 #include "util/config.h"
-#include <iostream>
 
 using namespace IR;
 using namespace std;
