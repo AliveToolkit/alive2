@@ -393,11 +393,15 @@ static expr preprocess(const Transform &t, const set<expr> &qvars0,
     if (hit_half_memory_limit())
       break;
 
-    e = (e.subst(var, true) && e.subst(var, false)).simplify();
+    expr t = e.subst(var, true);
+    if (!t.eq(e)) {
+      e = (t && e.subst(var, false)).simplify();
+      ++num_qvars_subst;
+    }
     I = qvars.erase(I);
 
     // Z3's subst is *super* slow; avoid exponential run-time
-    if (++num_qvars_subst == 5)
+    if (++num_qvars_subst > 9)
       break;
   }
 
