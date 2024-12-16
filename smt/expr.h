@@ -361,8 +361,8 @@ public:
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
 
-  // replace quantified variables in increasing index order
-  expr subst(const std::vector<expr> &repls) const;
+  // replace the 1st quantified variable
+  expr subst_var(const expr &repl) const;
 
   std::set<expr> vars() const;
   static std::set<expr> vars(const std::vector<const expr*> &exprs);

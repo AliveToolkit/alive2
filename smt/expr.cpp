@@ -2076,7 +2076,7 @@ expr expr::load(const expr &idx, uint64_t max_idx) const {
   } else if (isConstArray(val)) {
     return val;
   } else if (isLambda(val) && !hit_half_memory_limit()) {
-    return val.subst({ idx }).foldTopLevel();
+    return val.subst_var(idx).foldTopLevel();
   }
 
   return Z3_mk_select(ctx(), ast(), idx());
@@ -2215,18 +2215,10 @@ expr expr::subst(const expr &from, const expr &to) const {
   return Z3_substitute(ctx(), ast(), 1, &f, &t);
 }
 
-expr expr::subst(const vector<expr> &repls) const {
-  C();
-  if (repls.empty())
-    return *this;
-
-  Z3_ast vars[repls.size()];
-  unsigned i = 0;
-  for (auto &v : repls) {
-    C2(v);
-    vars[i++] = v();
-  }
-  return Z3_substitute_vars(ctx(), ast(), repls.size(), vars);
+expr expr::subst_var(const expr &repl) const {
+  C(repl);
+  auto r = repl();
+  return Z3_substitute_vars(ctx(), ast(), 1, &r);
 }
 
 set<expr> expr::vars() const {

@@ -2929,7 +2929,7 @@ void Memory::print_array(ostream &os, const expr &a, unsigned indent) const {
     print_array(os, a2);
   }
   else if (a.isLambda(val)) {
-    print_array(os, val.subst({expr::mkVar("idx", a.lambdaIdxType())}));
+    print_array(os, val.subst_var(expr::mkVar("idx", a.lambdaIdxType())));
   }
   else if (a.isBV() && a.isConst() && a.bits() == Byte::bitsByte()) {
     os << Byte(*this, expr(a)) << '\n';
