@@ -17,7 +17,7 @@ class Predicate {
 public:
   virtual void print(std::ostream &os) const = 0;
   virtual smt::expr toSMT(State &s) const = 0;
-  virtual smt::expr getTypeConstraints() const;
+  virtual smt::expr getTypeConstraints(const Function &f) const;
   virtual void fixupTypes(const smt::Model &m);
   virtual ~Predicate() {}
 };
@@ -49,7 +49,7 @@ public:
   FnPred(std::string_view name, std::vector<Value*> &&args);
   void print(std::ostream &os) const override;
   smt::expr toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   void fixupTypes(const smt::Model &m) override;
 };
 
@@ -73,7 +73,7 @@ public:
 
   void print(std::ostream &os) const override;
   smt::expr toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   void fixupTypes(const smt::Model &m) override;
 };
 
