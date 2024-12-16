@@ -2220,13 +2220,13 @@ expr expr::subst(const vector<expr> &repls) const {
   if (repls.empty())
     return *this;
 
-  unique_ptr<Z3_ast[]> vars(new Z3_ast[repls.size()]);
+  Z3_ast vars[repls.size()];
   unsigned i = 0;
   for (auto &v : repls) {
     C2(v);
     vars[i++] = v();
   }
-  return Z3_substitute_vars(ctx(), ast(), repls.size(), vars.get());
+  return Z3_substitute_vars(ctx(), ast(), repls.size(), vars);
 }
 
 set<expr> expr::vars() const {
