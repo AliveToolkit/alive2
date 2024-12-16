@@ -19,6 +19,8 @@ extern bool disable_poison_input;
 
 extern bool disable_undef_input;
 
+extern bool use_exact_fp;
+
 extern bool tgt_is_asm;
 
 extern bool fail_if_src_is_ub;
