@@ -14,7 +14,7 @@ using namespace util;
 
 namespace IR {
 
-expr Predicate::getTypeConstraints() const {
+expr Predicate::getTypeConstraints(const Function &f) const {
   return true;
 }
 
@@ -145,10 +145,10 @@ expr FnPred::toSMT(State &s) const {
   return r;
 }
 
-expr FnPred::getTypeConstraints() const {
+expr FnPred::getTypeConstraints(const Function &f) const {
   expr r(true);
   for (auto a : args) {
-    r &= a->getTypeConstraints();
+    r &= a->getTypeConstraints(f);
   }
   switch (fn) {
   case AddNSW:
@@ -210,8 +210,8 @@ expr CmpPred::toSMT(State &s) const {
   return { ap && bp && std::move(r) };
 }
 
-expr CmpPred::getTypeConstraints() const {
-  return lhs.getTypeConstraints() &&
+expr CmpPred::getTypeConstraints(const Function &f) const {
+  return lhs.getTypeConstraints(f) &&
          lhs.getType().enforceIntType() &&
          lhs.getType() == rhs.getType();
 }

@@ -1778,6 +1778,13 @@ public:
         attrs.set(FnAttrs::NullPointerIsValid);
         break;
 
+      case llvm::Attribute::VScaleRange: {
+        auto l = llvmattr.getVScaleRangeMin();
+        auto r = llvmattr.getVScaleRangeMax().value_or(l);
+        attrs.vscaleRange = {l, r};
+        break;
+      }
+
       default:
         break;
       }
