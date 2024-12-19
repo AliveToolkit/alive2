@@ -1285,7 +1285,8 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
     if (bytes.eq(ptr.blockSizeAligned())) {
       blk.val = val_no_offset
         ? mk_block_if(cond, val, std::move(blk.val))
-        : expr::mkLambda(offset, mk_block_if(cond, val, std::move(orig_val)));
+        : expr::mkLambda(offset, "#offset",
+                         mk_block_if(cond, val, std::move(orig_val)));
 
       if (cond.isTrue()) {
         blk.undef.clear();
@@ -1297,7 +1298,7 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
                          offset.ult((ptr + bytes).getShortOffset());
 
       blk.val
-        = expr::mkLambda(offset,
+        = expr::mkLambda(offset, "#offset",
                          mk_block_if(cond && offset_cond, val,
                                      std::move(orig_val)));
     }
@@ -1362,7 +1363,7 @@ void Memory::record_store(const Pointer &p, const smt::expr &bytes) {
                      has_stored_arg.store(bid.concat(offset + off_expr), true));
     }
   } else {
-    expr var     = expr::mkFreshVar("#bid_off", bid.concat(offset));
+    expr var     = expr::mkQVar(0, bid.concat(offset));
     expr var_bid = var.extract(var.bits()-1, offset.bits());
     expr var_off = var.trunc(offset.bits());
 
@@ -1371,7 +1372,7 @@ void Memory::record_store(const Pointer &p, const smt::expr &bytes) {
     has_stored_arg
       = expr::mkIf(is_local,
                    has_stored_arg,
-                   expr::mkLambda(var,
+                   expr::mkLambda(var, "#bid_off",
                      (bid == var_bid &&
                       var_off.uge(offset) &&
                       var_off.ult(offset + bytes_div)) ||
@@ -1402,13 +1403,14 @@ static expr mk_liveness_array() {
 }
 
 void Memory::mkNonPoisonAxioms(bool local) const {
-  expr offset = expr::mkVar("#axoff", Pointer::bitsShortOffset());
+  expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
+  const char *name = "#axoff";
 
   unsigned bid = 0;
   for (auto &block : local ? local_block_val : non_local_block_val) {
     if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
       state->addAxiom(
-        expr::mkForAll({ offset },
+        expr::mkForAll(1, &offset, &name,
                        !raw_load(local, bid, offset).isPoison()));
     ++bid;
   }
@@ -1449,7 +1451,8 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) const {
   if (!does_ptr_mem_access && !(num_sub_byte_bits && isAsmMode()))
     return;
 
-  expr offset = expr::mkVar("#axoff", Pointer::bitsShortOffset());
+  expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
+  const char *name = "#axoff";
 
   for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
     if (always_noread(i, true))
@@ -1461,7 +1464,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) const {
     // per the ABI.
     if (num_sub_byte_bits && isAsmMode()) {
       state->addAxiom(
-        expr::mkForAll({ offset }, mkSubByteZExtStoreCond(byte, byte)));
+        expr::mkForAll(1, &offset, &name, mkSubByteZExtStoreCond(byte, byte)));
     }
 
     if (!does_ptr_mem_access)
@@ -1489,7 +1492,7 @@ void Memory::mkNonlocalValAxioms(bool skip_consts) const {
     bid_cond &= bid.ule(upperbid);
 
     state->addAxiom(
-      expr::mkForAll({ offset },
+      expr::mkForAll(1, &offset, &name,
         byte.isPtr().implies(!loadedptr.isLocal(false) &&
                              !loadedptr.isNocapture(false) &&
                              std::move(bid_cond))));
@@ -1679,13 +1682,15 @@ void Memory::mkAxioms(const Memory &tgt) const {
   // tame down quadratic explosion in disjointness constraint with a quantifier.
   if (num_nonlocals > max_quadratic_disjoint) {
     auto bid_ty = expr::mkUInt(0, Pointer::bitsShortBid());
-    expr bid1 = expr::mkFreshVar("#bid1", bid_ty);
-    expr bid2 = expr::mkFreshVar("#bid2", bid_ty);
+    expr bid1 = expr::mkQVar(0, bid_ty);
+    expr bid2 = expr::mkQVar(1, bid_ty);
     expr offset = expr::mkUInt(0, bits_for_offset);
     Pointer p1(tgt, Pointer::mkLongBid(bid1, false), offset);
     Pointer p2(tgt, Pointer::mkLongBid(bid2, false), offset);
+    expr vars[] = {bid1, bid2};
+    const char *names[] = {"#bid1", "#bid2"};
     state->addAxiom(
-      expr::mkForAll({bid1, bid2},
+      expr::mkForAll(2, vars, names,
         bid1 == bid2 ||
         disjoint(p1.getAddress(),
                  p1.blockSizeAligned().zextOrTrunc(bits_ptr_address),
@@ -2418,8 +2423,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
     }
     store(ptr, to_store, undef_vars, align);
   } else {
-    expr offset
-      = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+    expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
     storeLambda(ptr, offset, bytesize, {{0, raw_byte}}, undef_vars, align);
   }
 }
@@ -2451,8 +2455,7 @@ void Memory::memset_pattern(const expr &ptr0, const expr &pattern0,
     for (unsigned i = 0; i < pattern_length; i += bytesz) {
       to_store.emplace_back(i * bytesz, std::move(bytes[i/bytesz])());
     }
-    expr offset
-      = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+    expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
     storeLambda(ptr, offset, bytesize, to_store, undef_vars, 1);
   }
 }
@@ -2482,8 +2485,7 @@ void Memory::memcpy(const expr &d, const expr &s, const expr &bytesize,
     }
     store(dst, to_store, undef, align_dst);
   } else {
-    expr offset
-      = expr::mkFreshVar("#off", expr::mkUInt(0, Pointer::bitsShortOffset()));
+    expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
     Pointer ptr_src = src + (offset - dst.getShortOffset());
     set<expr> undef;
     storeLambda(dst, offset, bytesize, {{0, raw_load(ptr_src, undef)()}}, undef,

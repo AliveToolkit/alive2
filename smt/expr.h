@@ -87,6 +87,8 @@ public:
   static expr mkQuad(double n);
   static expr mkNaN(const expr &type);
   static expr mkNumber(const char *n, const expr &type);
+  static expr mkQVar(unsigned n, const expr &type);
+  static expr mkQVar(unsigned n, unsigned bits);
   static expr mkVar(const char *name, const expr &type);
   static expr mkVar(const char *name, unsigned bits, bool fresh = false);
   static expr mkBoolVar(const char *name);
@@ -350,7 +352,9 @@ public:
 
   static expr mkIf(const expr &cond, const expr &then, const expr &els);
   static expr mkForAll(const std::set<expr> &vars, expr &&val);
-  static expr mkLambda(const expr &var, const expr &val);
+  static expr mkForAll(unsigned num_vars, const expr *vars, const char **names,
+                       expr &&val);
+  static expr mkLambda(const expr &var, const char *var_name, const expr &val);
 
   expr simplify() const;
   expr simplifyNoTimeout() const;

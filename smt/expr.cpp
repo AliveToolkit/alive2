@@ -294,6 +294,15 @@ bool expr::isTernaryOp(expr &a, expr &b, expr &c, int z3op) const {
   return false;
 }
 
+expr expr::mkQVar(unsigned n, const expr &type) {
+  C2(type);
+  return Z3_mk_bound(ctx(), n, type.sort());
+}
+
+expr expr::mkQVar(unsigned n, unsigned bits) {
+  return Z3_mk_bound(ctx(), n, mkBVSort(bits));
+}
+
 expr expr::mkVar(const char *name, const expr &type) {
   C2(type);
   return ::mkVar(name, type.sort());
@@ -559,6 +568,7 @@ bool expr::isLambda(expr &body) const {
   }
   return false;
 }
+
 expr expr::lambdaIdxType() const {
   C();
   assert(Z3_get_quantifier_num_bound(ctx(), ast()) == 1);
@@ -2142,7 +2152,23 @@ expr expr::mkForAll(const set<expr> &vars, expr &&val) {
                             val());
 }
 
-expr expr::mkLambda(const expr &var, const expr &val) {
+expr expr::mkForAll(unsigned num_vars, const expr *vars, const char **names,
+                    expr &&val) {
+  if (num_vars == 0 || val.isConst() || !val.isValid())
+    return std::move(val);
+
+  const unsigned max_vars = 4;
+  ENSURE(num_vars <= max_vars);
+  Z3_sort sorts[max_vars];
+  Z3_symbol syms[max_vars];
+  for (unsigned i = 0; i < num_vars; ++i) {
+    sorts[i] = vars[i].sort();
+    syms[i]  = Z3_mk_string_symbol(ctx(), names[i]);
+  }
+  return Z3_mk_forall(ctx(), 0, 0, nullptr, num_vars, sorts, syms, val());
+}
+
+expr expr::mkLambda(const expr &var, const char *var_name, const expr &val) {
   C2(var, val);
 
   if (!val.vars().count(var))
@@ -2152,8 +2178,9 @@ expr expr::mkLambda(const expr &var, const expr &val) {
   if (val.isLoad(array, idx) && idx.eq(var))
     return array;
 
-  auto ast = (Z3_app)var();
-  return Z3_mk_lambda_const(ctx(), 1, &ast, val());
+  auto sort = var.sort();
+  auto name = Z3_mk_string_symbol(ctx(), var_name);
+  return Z3_mk_lambda(ctx(), 1, &sort, &name, val());
 }
 
 expr expr::simplify() const {
@@ -2243,6 +2270,9 @@ set<expr> expr::vars(const vector<const expr*> &exprs) {
 
     switch (Z3_get_ast_kind(ctx(), ast)) {
     case Z3_VAR_AST:
+      result.emplace(expr(ast));
+      break;
+
     case Z3_NUMERAL_AST:
       break;
 
