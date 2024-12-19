@@ -26,7 +26,7 @@ public:
   IntConst(Type &type, int64_t val);
   IntConst(Type &type, std::string &&val);
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   auto getInt() const { return std::get_if<int64_t>(&val); }
 };
 
@@ -38,7 +38,7 @@ public:
   FloatConst(Type &type, std::string val, bool bit_value);
 
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -47,7 +47,7 @@ public:
   ConstantInput(Type &type, std::string &&name)
     : Constant(type, std::move(name)) {}
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -62,7 +62,7 @@ private:
 public:
   ConstantBinOp(Type &type, Constant &lhs, Constant &rhs, Op op);
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 
@@ -73,7 +73,7 @@ class ConstantFn final : public Constant {
 public:
   ConstantFn(Type &type, std::string_view name, std::vector<Value*> &&args);
   StateValue toSMT(State &s) const override;
-  smt::expr getTypeConstraints() const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
 };
 
 struct ConstantFnException {
