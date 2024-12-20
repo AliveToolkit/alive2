@@ -2579,7 +2579,8 @@ expr Memory::blockRefined(const Pointer &src, const Pointer &tgt) const {
 }
 
 expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
-                             unsigned bid, set<expr> &undef) const {
+                             unsigned bid, set<expr> &undef,
+                             bool full_check) const {
   auto &mem1 = non_local_block_val[bid];
   auto &mem2 = tgt.non_local_block_val[bid].val;
 
@@ -2590,7 +2591,7 @@ expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
   if (is_fncall_mem(bid))
     return mem1.val == mem2;
 
-  auto refined = [&](const expr &offset) -> expr{
+  auto refined = [&](const expr &offset) -> expr {
     int is_fn1 = isInitialMemBlock(mem1.val, true);
     int is_fn2 = isInitialMemBlock(mem2, true);
     if (is_fn1 && is_fn2) {
@@ -2626,7 +2627,8 @@ expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
   unsigned bytes_per_byte = bits_byte / 8;
   expr ptr_offset = src.getShortOffset();
   uint64_t bytes;
-  if (src.blockSize().isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
+  if (full_check &&
+      src.blockSize().isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
     expr val_refines = true;
     for (unsigned off = 0; off < (bytes / bytes_per_byte); ++off) {
       expr off_expr = expr::mkUInt(off, ptr_offset);
@@ -2635,6 +2637,8 @@ expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
     return val_refines;
   } else {
     expr cnstr = refined(ptr_offset);
+    if (!full_check)
+      return cnstr;
     return src.getOffsetSizet().ult(src.blockSizeOffsetT()).implies(cnstr);
   }
 }
@@ -2711,22 +2715,26 @@ Memory::refined(const Memory &other, bool fncall,
     }
     else if (p.blockSize().isUInt(bytes) && (bytes / (bits_byte / 8)) <= 8) {
       // this is a small block; just check it thoroughly
-      val_refined = blockValRefined(p, other, bid, undef_vars);
+      val_refined = blockValRefined(p, other, bid, undef_vars, true);
     }
     else {
       // else check only the stored offsets
       auto offsets = stored_src.first;
       offsets.insert(stored_tgt.first.begin(), stored_tgt.first.end());
+      bool full_check = false;
       if (stored_src.second ||
           stored_tgt.second ||
-          offsets.size() > MAX_STORED_PTRS_SET)
+          offsets.size() > MAX_STORED_PTRS_SET) {
         offsets = { offset };
+        full_check = true;
+      }
 
       for (auto &off0 : offsets) {
         auto off = off0.concat_zeros(bits_for_offset - off0.bits());
         Pointer p(*this, bid_expr, off);
-        val_refined &= (offset == off).implies(
-                         blockValRefined(p, other, bid, undef_vars));
+        val_refined
+          &= (offset == off)
+               .implies(blockValRefined(p, other, bid, undef_vars, full_check));
       }
     }
     ret &= (ptr_bid == bid_expr).implies(

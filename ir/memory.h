@@ -240,7 +240,8 @@ class Memory {
 
   smt::expr blockRefined(const Pointer &src, const Pointer &tgt) const;
   smt::expr blockValRefined(const Pointer &src, const Memory &tgt,
-                            unsigned bid, std::set<smt::expr> &undef) const;
+                            unsigned bid, std::set<smt::expr> &undef,
+                            bool full_check) const;
 
   void mkLocalDisjAddrAxioms(const smt::expr &allocated,
                              const smt::expr &short_bid,
