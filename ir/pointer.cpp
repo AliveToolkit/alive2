@@ -436,7 +436,10 @@ expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0,
 expr Pointer::isInbounds(bool strict) const {
   auto offset = getOffsetSizet();
   auto size   = blockSizeAlignedOffsetT();
-  return (strict ? offset.ult(size) : offset.ule(size)) && !offset.isNegative();
+  expr ret = strict ? offset.ult(size) : offset.ule(size);
+  if (bits_for_offset <= bits_size_t) // implied
+    ret &= !offset.isNegative();
+  return ret;
 }
 
 expr Pointer::inbounds(bool simplify_ptr) {
