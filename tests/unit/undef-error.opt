@@ -1,4 +1,4 @@
-; ERROR: Target's return value is more undefined for i1 %r
+; ERROR: Target's return value is more undefined
 %r = 0
   =>
 %r = undef
