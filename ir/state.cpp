@@ -94,8 +94,7 @@ State::CurrentDomain::operator bool() const {
 template<class T>
 static T intersect_set(const T &a, const T &b) {
   T results;
-  set_intersection(a.begin(), a.end(), b.begin(), b.end(),
-                   inserter(results, results.begin()));
+  ranges::set_intersection(a, b, inserter(results, results.begin()));
   return results;
 }
 
@@ -255,7 +254,9 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
-    return_val(DisjointExpr(f.getType().getDummyValue(false))) {}
+    return_val(DisjointExpr(f.getType().getDummyValue(false))) {
+  predecessor_data.reserve(f.getNumBBs());
+}
 
 void State::resetGlobals() {
   Memory::resetGlobals();
@@ -628,13 +629,11 @@ State::getAndAddPoisonUB(const Value &val, bool undef_ub_too,
   expr v = sv.value;
 
   if (undef_ub_too) {
-    auto I = analysis.non_undef_vals.find(&val);
-    if (I != analysis.non_undef_vals.end()) {
-      v = I->second;
-    } else {
-      v = strip_undef_and_add_ub(val, v, ptr_compare);
-      analysis.non_undef_vals.emplace(&val, v);
+    auto [I, inserted] = analysis.non_undef_vals.try_emplace(&val);
+    if (inserted) {
+      I->second = strip_undef_and_add_ub(val, v, ptr_compare);
     }
+    v = I->second;
   }
 
   if (!poison_already_added) {
@@ -737,7 +736,7 @@ bool State::startBB(const BasicBlock &bb) {
     throw_oom_exception();
 
   DisjointExpr<Memory> in_memory;
-  DisjointExpr<expr> UB, guardUB;
+  DisjointExpr<AndExpr> UB;
   DisjointExpr<VarArgsData> var_args_in;
   OrExpr path;
 
@@ -746,7 +745,6 @@ bool State::startBB(const BasicBlock &bb) {
     path.add(data.path);
     expr p = data.path();
     UB.add_disj(data.UB, p);
-    guardUB.add_disj(data.guardUB, p);
 
     // This data is never used again, so clean it up to reduce mem consumption
     in_memory.add_disj(std::move(data.mem), p);

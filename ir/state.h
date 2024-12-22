@@ -87,9 +87,9 @@ private:
   struct ValueAnalysis {
     std::set<const Value *> non_poison_vals; // vars that are not poison
     // vars that are not undef (partially undefs are not allowed too)
-    std::map<const Value *, smt::expr> non_undef_vals;
+    std::unordered_map<const Value *, smt::expr> non_undef_vals;
     // vars that have never been used
-    std::set<const Value *> unused_vars;
+    std::unordered_set<const Value *> unused_vars;
 
     // Possible number of calls per function name that occurred so far
     // This is an over-approximation, union over all predecessors
@@ -134,7 +134,7 @@ private:
 
   struct BasicBlockInfo {
     smt::OrExpr path;
-    smt::DisjointExpr<smt::expr> UB, guardUB;
+    smt::DisjointExpr<smt::AndExpr> UB;
     smt::DisjointExpr<Memory> mem;
     std::set<smt::expr> undef_vars;
     ValueAnalysis analysis;
