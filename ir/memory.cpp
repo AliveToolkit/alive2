@@ -40,6 +40,10 @@ using namespace util;
 
 //--- Functions for non-local block analysis based on bid ---//
 
+static bool skip_null() {
+  return has_null_block && !null_is_dereferenceable;
+}
+
 // If include_tgt is true, return true if bid is a global var existing in target
 // only as well
 static bool is_globalvar(unsigned bid, bool include_tgt) {
@@ -1511,12 +1515,11 @@ Memory::Memory(State &state)
   next_nonlocal_bid
     = has_null_block + num_globals_src + num_ptrinputs + has_fncall;
 
-  bool skip_null = has_null_block && !null_is_dereferenceable;
-  if (skip_null)
+  if (skip_null())
     non_local_block_val.emplace_back();
 
   // TODO: should skip initialization of fully initialized constants
-  for (unsigned bid = skip_null, e = numNonlocals(); bid != e; ++bid) {
+  for (unsigned bid = skip_null(), e = numNonlocals(); bid != e; ++bid) {
     non_local_block_val.emplace_back(mk_block_val_array(bid));
   }
 
@@ -1543,7 +1546,7 @@ Memory::Memory(State &state)
   stored_pointers.resize(numNonlocals());
 
   // Initialize a memory block for null pointer.
-  if (skip_null) {
+  if (skip_null()) {
     auto zero = expr::mkUInt(0, bits_size_t);
     alloc(&zero, bits_byte / 8, GLOBAL, false, false, 0);
   }
@@ -1569,7 +1572,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
   for (auto m_ptr : { this, &tgt }) {
     auto &m = const_cast<Memory&>(*m_ptr);
     auto old_vals = m.non_local_block_val;
-    for (unsigned i = 0, e = old_vals.size(); i != e; ++i) {
+    for (unsigned i = skip_null(), e = old_vals.size(); i != e; ++i) {
       m.non_local_block_val.at(i).val = m.mk_block_val_array(i);
     }
     m.mkNonlocalValAxioms(false);
