@@ -736,7 +736,7 @@ bool State::startBB(const BasicBlock &bb) {
     throw_oom_exception();
 
   DisjointExpr<Memory> in_memory;
-  DisjointExpr<AndExpr> UB;
+  DisjointExpr<expr> UB;
   DisjointExpr<VarArgsData> var_args_in;
   OrExpr path;
 
