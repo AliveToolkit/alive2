@@ -1864,6 +1864,66 @@ void Transform::preprocess() {
     aligns.clear();
   }
 
+  // try to align programs to infer alignment in tgt from src
+  if (config::tgt_is_asm) {
+    unordered_set<const BasicBlock*> seen;
+    queue<pair<const BasicBlock*, const BasicBlock*>> worklist;
+    worklist.emplace(&src.getFirstBB(), &tgt.getFirstBB());
+
+    do {
+      auto [src_bb, tgt_bb] = worklist.front();
+      worklist.pop();
+      if (!seen.emplace(src_bb).second)
+        continue;
+
+      auto tgt_instrs = tgt_bb->instrs();
+      auto II = tgt_instrs.begin(), EE = tgt_instrs.end();
+      for (auto &i : src_bb->instrs()) {
+        if (!dynamic_cast<const Load*>(&i) &&
+            !dynamic_cast<const Store*>(&i))
+          continue;
+
+        while (II != EE && !dynamic_cast<const Load*>(&*II) &&
+                           !dynamic_cast<const Store*>(&*II)) {
+          ++II;
+        }
+        if (!(II != EE))
+          break;
+
+        if (auto *src_i = dynamic_cast<const Load*>(&i)) {
+          auto *tgt_i = const_cast<Load*>(dynamic_cast<const Load*>(&*II));
+          if (!tgt_i)
+            break;
+          if (src_i->bits() == tgt_i->bits() &&
+              tgt_i->getAlign() < src_i->getAlign())
+            tgt_i->setAlign(src_i->getAlign());
+        }
+        else if (auto *src_i = dynamic_cast<const Store*>(&i)) {
+          auto *tgt_i = const_cast<Store*>(dynamic_cast<const Store*>(&*II));
+          if (!tgt_i)
+            break;
+          if (src_i->getValue().bits() == tgt_i->getValue().bits() &&
+              tgt_i->getAlign() < src_i->getAlign())
+            tgt_i->setAlign(src_i->getAlign());
+        } else {
+          UNREACHABLE();
+        }
+        ++II;
+      }
+
+      {
+        auto tgt_targets = src_bb->targets();
+        auto II = tgt_targets.begin(), EE = tgt_targets.end();
+        for (auto &s : src_bb->targets()) {
+          if (!(II != EE))
+            break;
+          worklist.emplace(&s, &*II);
+          ++II;
+        }
+      }
+    } while (!worklist.empty());
+  }
+
   // bits_program_pointer is used by unroll. Initialize it in advance
   initBitsProgramPointer(*this);
 
