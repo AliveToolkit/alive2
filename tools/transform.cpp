@@ -168,6 +168,9 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
   optional<Result> newr;
 
   auto try_reduce = [&](const expr &e) {
+    if (e.isTrue())
+      return true;
+
     bool ok = false;
     {
       SolverPush push(solver);
