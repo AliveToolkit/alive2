@@ -34,29 +34,60 @@ found:
   @++$table[$m[1]][$err];
 }
 
-$max_file = 0;
-foreach ($table as $file => $errs) {
-  $max_file = max($max_file, strlen($file));
+$data = `egrep '  [0-9]+ (in)?correct transformations' *.txt`;
+$data = explode("\n", trim($data));
+foreach ($data as $line) {
+  preg_match('/(.+)\.txt:  (\d+) (in)?/S', $line, $m);
+  $col = isset($m[3]) ? 'bugs found' : 'verified';
+  $table[$m[1]][$col] = $m[2];
 }
 
-echo str_repeat(' ', $max_file);
-foreach ($errors as $dummy => $err) {
-  echo ' | ', $err;
+$data = `egrep '^[.0-9]+user [.0-9]+system' *.txt`;
+$data = explode("\n", trim($data));
+foreach ($data as $line) {
+  preg_match('/(.+)\.txt:(\d+)/S', $line, $m);
+  $time[$m[1]] = $m[2];
 }
-echo " | total |\n";
-
 
 foreach ($table as $file => $errs) {
   $total = 0;
-  echo str_pad($file, $max_file), ' | ';
   foreach ($errors as $dummy => $err) {
-    $len = strlen($err);
-    if (isset($errs[$err])) {
-      echo str_pad($errs[$err], $len, ' ', STR_PAD_BOTH), ' | ';
-      $total += $errs[$err];
-    } else {
-       echo str_repeat(' ', $len), ' | ';
-    }
+    $toprint[$file][$err] = @$errs[$err];
+    $total += @$errs[$err];
   }
-  echo str_pad($total, 5, ' ', STR_PAD_BOTH), " |\n";
+  $toprint[$file]['total']      = $total;
+  $toprint[$file]['verified']   = @$table[$file]['verified'];
+  $toprint[$file]['bugs found'] = @$table[$file]['bugs found'];
+  $toprint[$file][' time ']     = @$time[$file];
+}
+print_table($toprint);
+
+echo "\n\nSummary:\n";
+foreach ($table as $file => $errs) {
+  $kind = explode('.', $file)[1];
+  @$summary[$kind]['verified'] += @$errs['verified'];
+  @$summary[$kind]['bugs found'] += @$errs['bugs found'];
+  @$summary[$kind][' time '] += @$time[$file];
+}
+print_table($summary);
+
+
+function print_table($table) {
+  $max_row = 0;
+  foreach ($table as $row => $data) {
+    $max_row = max($max_row, strlen($row));
+  }
+  echo str_repeat(' ', $max_row);
+
+  foreach (current($table) as $col => $n) {
+    echo " | $col";
+  }
+  echo " |\n";
+  foreach ($table as $row => $data) {
+    echo str_pad($row, $max_row);
+    foreach ($data as $col => $n) {
+      echo ' | ', str_pad($n, strlen($col), ' ', STR_PAD_LEFT);
+    }
+    echo " |\n";
+  }
 }
