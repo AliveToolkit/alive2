@@ -156,7 +156,7 @@ optional<StateValue> exec(llvm::Function &F,
         continue;
       }
 
-      solver.add(val.domain);
+      solver.add(val.domain());
       r = solver.check();
       if (error(r))
         return {};

@@ -69,7 +69,7 @@ public:
   struct ValTy {
     StateValue val;
     smt::expr return_domain;
-    smt::expr domain;
+    smt::AndExpr domain;
     std::set<smt::expr> undef_vars;
   };
 
@@ -94,18 +94,24 @@ private:
     // Possible number of calls per function name that occurred so far
     // This is an over-approximation, union over all predecessors
     struct FnCallRanges
-      : public std::map<std::string, std::pair<std::set<unsigned>,
-                        SMTMemoryAccess>> {
+      : public std::map<std::string,
+                        // number of calls & whether it can write
+                        std::pair<std::set<std::pair<unsigned, bool>>,
+                                  SMTMemoryAccess>> {
       void inc(const std::string &name, const SMTMemoryAccess &access);
       bool overlaps(const std::string &callee,
                     const SMTMemoryAccess &call_access,
                     const FnCallRanges &other) const;
+      bool isLargerThanInclReads(const FnCallRanges &other) const;
       // remove all ranges but name
       FnCallRanges project(const std::string &name) const;
+      void keep_only_writes();
+      void meet_with(const FnCallRanges &other);
     };
     FnCallRanges ranges_fn_calls;
 
     void meet_with(const ValueAnalysis &other);
+    void clear_smt();
   };
 
   struct VarArgsEntry {
@@ -134,7 +140,7 @@ private:
 
   struct BasicBlockInfo {
     smt::OrExpr path;
-    smt::DisjointExpr<smt::expr> UB;
+    smt::DisjointExpr<smt::AndExpr> UB;
     smt::DisjointExpr<Memory> mem;
     std::set<smt::expr> undef_vars;
     ValueAnalysis analysis;
@@ -147,6 +153,9 @@ private:
   bool is_initialization_phase = true;
   smt::AndExpr precondition;
   smt::AndExpr axioms;
+
+  State *src_state = nullptr;
+  std::map<smt::expr, std::vector<const BasicBlock*>> src_bb_paths;
 
   // for -disallow-ub-exploitation
   smt::OrExpr unreachable_paths;
@@ -183,6 +192,9 @@ private:
   unsigned i_tmp_values = 0; // next available position in tmp_values
 
   void check_enough_tmp_slots();
+  void copyUBFrom(const BasicBlock &bb);
+  void copyUBFromBB(
+    const std::unordered_map<const BasicBlock*, BasicBlockInfo> &tgt_data);
 
   // return_domain: a boolean expression describing return condition
   smt::OrExpr return_domain;
@@ -367,6 +379,7 @@ public:
   void syncSEdataWithSrc(State &src);
 
   void mkAxioms(State &tgt);
+  void cleanup();
 
 private:
   smt::expr strip_undef_and_add_ub(const Value &val, const smt::expr &e,

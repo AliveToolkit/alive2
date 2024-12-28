@@ -295,7 +295,7 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
         if (m.eval(val.return_domain).isFalse()) {
           s << *var << " = function did not return!\n";
           break;
-        } else if (m.eval(val.domain).isFalse()) {
+        } else if (m.eval(val.domain()).isFalse()) {
           s << "Function " << call->getFnName() << " triggered UB\n";
           break;
         } else if (var->isVoid()) {
@@ -304,8 +304,7 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
         }
       }
 
-      if (!dynamic_cast<const Return*>(var) && // domain always false after exec
-          m.eval(val.domain).isFalse()) {
+      if (m.eval(val.domain()).isFalse()) {
         s << *var << " = UB triggered!\n";
         break;
       }
@@ -497,8 +496,8 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
                  State &tgt_state, const Value *var, const Type &type,
                  const State::ValTy &ap, const State::ValTy &bp,
                  bool check_each_var) {
-  auto &fndom_a  = ap.domain;
-  auto &fndom_b  = bp.domain;
+  auto fndom_a   = ap.domain();
+  auto fndom_b   = bp.domain();
   auto &retdom_a = ap.return_domain;
   auto &retdom_b = bp.return_domain;
   auto &a = ap.val;
@@ -1369,7 +1368,9 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
   auto tgt_state = make_unique<State>(t.tgt, false);
   sym_exec(*src_state);
   tgt_state->syncSEdataWithSrc(*src_state);
+  src_state->cleanup();
   sym_exec(*tgt_state);
+  tgt_state->cleanup();
   src_state->mkAxioms(*tgt_state);
 
   return { std::move(src_state), std::move(tgt_state) };

@@ -28,7 +28,7 @@ using namespace util;
 
 // helpers to check if all input arguments are non-null
 #define C(...)                                                                 \
-  if (!isValid() || !expr::allValid( __VA_ARGS__)) [[unlikely]]                \
+  if (!isValid() || !expr::allValid(__VA_ARGS__)) [[unlikely]]                 \
     return {}
 
 #define C2(...)                                                                \
