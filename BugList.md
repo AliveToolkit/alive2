@@ -101,6 +101,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 94. Reassociate: invalid propagation of overflow attributes at low bit-width (https://llvm.org/PR91417)
 95. InstCombine: removes a select, making the code more poisonous (https://llvm.org/PR91691)
 96. DSE removes store before free() incorrectly (https://llvm.org/PR97956)
+97. GlobalOpt breaks !callees metadata (https://llvm.org/PR121265)
 
 
 ### Bugs found in Z3
