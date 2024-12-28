@@ -522,6 +522,7 @@ public:
 
   void addValue(Value &val, std::string &&BB_name);
   void removeValue(const std::string &BB_name);
+  void removeValue(const Value *value);
   void replaceSourceWith(const std::string &from, const std::string &to);
 
   void setValue(size_t index, Value &val);

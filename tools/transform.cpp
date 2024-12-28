@@ -1624,9 +1624,13 @@ static void remove_unreachable_bbs(Function &f) {
 
   auto all_bbs = f.getBBs(); // copy intended
   vector<string> unreachable;
+  vector<const Value*> removed_instrs;
   for (auto bb : all_bbs) {
     if (!reachable.count(bb)) {
       unreachable.emplace_back(bb->getName());
+      for (auto &i : bb->instrs()) {
+        removed_instrs.emplace_back(&i);
+      }
       f.removeBB(*bb);
     }
   }
@@ -1635,6 +1639,9 @@ static void remove_unreachable_bbs(Function &f) {
     if (auto phi = dynamic_cast<const Phi*>(&i)) {
       for (auto &bb : unreachable) {
         const_cast<Phi*>(phi)->removeValue(bb);
+      }
+      for (auto &i : removed_instrs) {
+        const_cast<Phi*>(phi)->removeValue(i);
       }
     }
   }

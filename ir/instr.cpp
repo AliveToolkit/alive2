@@ -2987,6 +2987,16 @@ void Phi::removeValue(const string &BB_name) {
   }
 }
 
+void Phi::removeValue(const Value *value) {
+  for (auto I = values.begin(); I != values.end(); ) {
+    if (I->first == value) {
+      I = values.erase(I);
+    } else {
+      ++I;
+    }
+  }
+}
+
 vector<string> Phi::sources() const {
   vector<string> s;
   for (auto &[_, bb] : values) {
