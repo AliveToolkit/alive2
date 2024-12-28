@@ -467,7 +467,7 @@ expr Solver::assertions() const {
   return ret;
 }
 
-Result Solver::check(const char *query_name) const {
+Result Solver::check(const char *query_name, bool dont_skip) const {
   if (!valid) {
     ++num_invalid;
     return Result::INVALID;
@@ -495,7 +495,7 @@ Result Solver::check(const char *query_name) const {
     }
   }
 
-  if (config::skip_smt) {
+  if (config::skip_smt && !dont_skip) {
     ++num_skips;
     return Result::SKIP;
   }

@@ -5,6 +5,7 @@
 #include "ir/function.h"
 #include "ir/globals.h"
 #include "smt/smt.h"
+#include "smt/solver.h"
 #include "util/config.h"
 #include "util/errors.h"
 #include <algorithm>
@@ -94,7 +95,7 @@ State::CurrentDomain::operator bool() const {
 template<class T>
 static T intersect_set(const T &a, const T &b) {
   T results;
-  ranges::set_intersection(a, b, inserter(results, results.begin()));
+  ranges::set_intersection(a, b, inserter(results, results.begin()), less{});
   return results;
 }
 
@@ -357,200 +358,108 @@ static expr eq_except_padding(const Memory &m, const Type &ty, const expr &e1,
 
 expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
                                    bool ptr_compare) {
+  if (undef_vars.empty() || e.isConst())
+    return e;
+
   if (isUndef(e)) {
     addUB(expr(false));
-    return expr::mkUInt(0, e);
+    return expr::mkNumber("0", e);
   }
 
-  auto is_undef_cond = [](const expr &e, const expr &var) {
-    expr lhs, rhs;
-    // (= #b0 isundef_%var)
-    if (e.isEq(lhs, rhs)) {
-      return (lhs.isZero() && Input::isUndefMask(rhs)) ||
-             (rhs.isZero() && Input::isUndefMask(lhs));
-    }
-    return false;
-  };
+  auto vars = e.vars();
+  auto undef_vars = intersect_set(vars, this->undef_vars);
+  if (undef_vars.empty())
+    return e;
 
-  // pointer undef vars show up like (concat 0 undef)
-  auto is_undef_or_concat = [&](const expr &e) {
-    if (isUndef(e))
-      return true;
-
-    expr a, b;
-    return e.isConcat(a, b) && a.isZero() && isUndef(b);
-  };
-
-  auto is_if_undef = [&](const expr &e, expr &var, expr &not_undef) {
-    expr undef;
-    // (ite (= #b0 isundef_%var) %var undef)
-    return e.isIf(not_undef, var, undef) &&
-           is_undef_or_concat(undef) &&
-           is_undef_cond(not_undef, var);
-  };
-
-  // e2: stripped expression
-  auto is_if_undef_or_add = [&](const expr &e, expr &var, expr &not_undef,
-                                expr &e2) {
-    // when e = (ite (= #b0 isundef_%var) %var undef):
-    //   var = %var, e2 = %var
-    // when e = (bvadd const (ite (= #b0 isundef_%var) %var undef))
-    //   var = %var, e2 = const + %var
-    if (is_if_undef(e, var, not_undef)) {
-      e2 = var;
-      return true;
-    }
-
-    expr a, b;
-    if (e.isAdd(a, b)) {
-      if (b.isConst() && is_if_undef(a, var, not_undef)) {
-        e2 = b + var;
-        return true;
-      } else if (a.isConst() && is_if_undef(b, var, not_undef)) {
-        e2 = a + var;
-        return true;
-      }
-    }
-    return false;
-  };
-
-  expr c, a, b, lhs, rhs;
-
-  // two variants
-  // 1) boolean
-  if (is_if_undef(e, a, b)) {
-    addUB(std::move(b));
-    return a;
-  }
-
-  auto has_undef = [&](const expr &e) {
-    auto vars = e.vars();
-    return any_of(vars.begin(), vars.end(),
-                  [&](auto &v) { return isUndef(v); });
-  };
-
-  auto mark_notundef = [&](const expr &var) {
-    auto name = var.fn_name();
-    for (auto &[v, _val] : values) {
-      if (v->getName() == name) {
-        analysis.non_undef_vals.emplace(v, var);
-        return;
-      }
-    }
-  };
-
-  if (e.isIf(c, a, b) && a.isConst() && b.isConst()) {
-    expr val, val2, newe, newe2, not_undef, not_undef2;
-    // (ite (= val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-    // (ite (= val (bvadd c (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-    if (c.isEq(lhs, rhs)) {
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        addUB(std::move(not_undef));
-        mark_notundef(val);
-        // %var == rhs
-        // (bvadd c %var) == rhs
-        return expr::mkIf(newe == rhs, a, b);
-      }
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        addUB(std::move(not_undef));
-        mark_notundef(val);
-        return expr::mkIf(lhs == newe, a, b);
-      }
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
-        addUB(std::move(not_undef));
-        addUB(std::move(not_undef2));
-        mark_notundef(val);
-        mark_notundef(val2);
-        return expr::mkIf(newe == newe2, a, b);
-      }
-    }
-
-    if (c.isSLE(lhs, rhs)) {
-      // (ite (bvsle val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      // (ite (bvsle val (bvadd c (ite (= #b0 isundef_%var) %var undef))
-      //       #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        expr cond = lhs == expr::IntSMin(lhs.bits());
-        addUB(not_undef || cond);
-        if (cond.isFalse())
-          mark_notundef(val);
-        // lhs <=s %var
-        // lhs <=s (bvadd c %var)
-        return expr::mkIf(lhs.sle(newe), a, b);
-      }
-
-      // (ite (bvsle (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      // (ite (bvsle (bvadd c (ite (= #b0 isundef_%var) %var undef)) val)
-      //       #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        expr cond = rhs == expr::IntSMax(rhs.bits());
-        addUB(not_undef || cond);
-        if (cond.isFalse())
-          mark_notundef(val);
-        return expr::mkIf(newe.sle(rhs), a, b);
-      }
-
-      // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
-        addUB((not_undef && not_undef2) ||
-              (not_undef && newe == expr::IntSMin(lhs.bits())) ||
-              (not_undef2 && newe2 == expr::IntSMax(rhs.bits())));
-        return expr::mkIf(newe.sle(newe2), a, b);
-      }
-    }
-
-    if (c.isULE(lhs, rhs)) {
-      // (ite (bvule val (ite (= #b0 isundef_%var) %var undef)) #b1 #b0)
-      // (ite (bvule val (bvadd c (ite (= #b0 isundef_%var) %var undef)))
-      //       #b1 #b0)
-      if (is_if_undef_or_add(rhs, val, not_undef, newe) && !has_undef(lhs)) {
-        expr cond = lhs == 0;
-        addUB(not_undef || cond);
-        if (cond.isFalse())
-          mark_notundef(val);
-        // lhs <=u %var
-        // lhs <=u (bvadd c %var)
-        return expr::mkIf(lhs.ule(newe), a, b);
-      }
-
-      // (ite (bvule (ite (= #b0 isundef_%var) %var undef) val) #b1 #b0)
-      // (ite (bvule (bvadd c (ite (= #b0 isundef_%var) %var undef)) %val)
-      //       #b1 #b0)
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) && !has_undef(rhs)) {
-        expr cond = rhs == expr::mkInt(-1, rhs);
-        addUB(not_undef || cond);
-        if (cond.isFalse())
-          mark_notundef(val);
-        return expr::mkIf(newe.ule(rhs), a, b);
-      }
-
-      // undef <= undef
-      if (is_if_undef_or_add(lhs, val, not_undef, newe) &&
-          is_if_undef_or_add(rhs, val2, not_undef2, newe2)) {
-        addUB((not_undef && not_undef2) ||
-              (not_undef && newe == 0) ||
-              (not_undef2 && newe2 == expr::mkInt(-1, rhs)));
-        return expr::mkIf(newe.ule(newe2), a, b);
+  // check if any var is already known to be non-undef
+  vector<pair<expr,expr>> repls;
+  set<expr> missing_tests;
+  expr conds = true;
+  for (auto &var : e.vars()) {
+    if (var.fn_name().starts_with("isundef_")) {
+      expr test = var == 0;
+      if (domain.UB.contains(test)) {
+        conds &= test;
+        repls.emplace_back(std::move(test), true);
+      } else {
+        missing_tests.emplace(var);
       }
     }
   }
 
-  // 2) (or (and |isundef_%var| undef) (and %var (not |isundef_%var|)))
-  // TODO
+  // some sort of undef concatenated with something else
+  if (repls.empty() && missing_tests.empty()) {
+    addUB(expr(false));
+    return expr::mkNumber("0", e);
+  }
+
+  if (missing_tests.empty())
+    return e.subst_simplify(repls);
+
+  expr e2;
+  {
+    auto repls2 = repls;
+    for (auto &u : undef_vars) {
+      repls2.emplace_back(u, expr::mkFreshVar("undef", u));
+    }
+    e2 = e.subst(repls2);
+  }
+
+  Solver s;
+  s.add(conds);
+  s.add(e != e2);
+  bool all_decided = true;
+
+  // check each undef var in turn by making all other vars non-undef
+  // if the expressions yields a different value, then the selected var can't
+  // be undef
+  for (auto &var : missing_tests) {
+    SolverPush push(s);
+    for (auto &miss_var : missing_tests) {
+      expr test = miss_var == 0;
+      if (miss_var.eq(var)) {
+        test = !test;
+      }
+      s.add(test);
+    }
+    auto res = s.check("non-undef inference", true);
+    expr test = var == 0;
+    if (res.isSat()) { // var can't be undef
+      addUB(test);
+      auto var_name = var.fn_name().substr(sizeof("isundef_")-1);
+      // mark the var as non-undef for future uses
+      for (auto &[v, val] : values) {
+        if (v->getName() == var_name) {
+          analysis.non_undef_vals
+                  .emplace(v, val.val.value.subst(test, true).simplify());
+          break;
+        }
+      }
+    }
+    else if (res.isUnsat()) {
+      // can't conclude the var isn't undef, but can simplify the expression
+    } else {
+      // timeout or error
+      all_decided = false;
+      break;
+    }
+    repls.emplace_back(std::move(test), true);
+  }
+
+  if (all_decided)
+    return e.subst_simplify(repls);
 
   // check if original expression is equal to an expression where undefs are
   // fixed to a const value
-  vector<pair<expr,expr>> repls;
+  auto repls2 = repls;
   for (auto &undef : undef_vars) {
     expr newv = expr::mkFreshVar("#undef'", undef);
     addQuantVar(newv);
-    repls.emplace_back(undef, std::move(newv));
+    repls2.emplace_back(undef, std::move(newv));
   }
-  addUB(eq_except_padding(getMemory(), val.getType(), e, e.subst(repls),
+  addUB(eq_except_padding(getMemory(), val.getType(), e, e.subst(repls2),
                           ptr_compare));
-  return e;
+  return e.subst_simplify(repls);
 }
 
 void State::check_enough_tmp_slots() {
