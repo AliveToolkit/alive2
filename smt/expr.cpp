@@ -2385,12 +2385,12 @@ void expr::printHexadecimal(ostream &os) const {
   os << (rem == 0 ? *this : zext(4 - rem));
 }
 
-string expr::numeral_string() const {
+string_view expr::numeral_string() const {
   C();
   return Z3_get_numeral_decimal_string(ctx(), ast(), 12);
 }
 
-string expr::fn_name() const {
+string_view expr::fn_name() const {
   if (isApp())
     return Z3_get_symbol_string(ctx(), Z3_get_decl_name(ctx(), decl()));
   return {};

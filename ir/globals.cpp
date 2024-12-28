@@ -56,7 +56,7 @@ bool isUndef(const expr &e) {
   if (e.isExtract(var, h, l))
     return isUndef(var);
 
-  return string_view(e.fn_name()).substr(0, 6) == "undef!";
+  return e.fn_name().starts_with("undef!");
 }
 
 }

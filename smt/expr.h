@@ -378,8 +378,10 @@ public:
   void printUnsigned(std::ostream &os) const;
   void printSigned(std::ostream &os) const;
   void printHexadecimal(std::ostream &os) const;
-  std::string numeral_string() const;
-  std::string fn_name() const; // empty if not a function
+  // WARNING: these are temporary strings; don't store them
+  std::string_view numeral_string() const;
+  std::string_view fn_name() const; // empty if not a function
+
   unsigned getFnNumArgs() const;
   expr getFnArg(unsigned i) const;
   friend std::ostream &operator<<(std::ostream &os, const expr &e);

@@ -535,7 +535,7 @@ static bool isFnReturnValue(const expr &e) {
 }
 
 int Memory::isInitialMemBlock(const expr &e, bool match_any_init) {
-  string name;
+  string_view name;
   expr load, blk, idx;
   unsigned hi, lo;
   if (e.isExtract(load, hi, lo) && load.isLoad(blk, idx))

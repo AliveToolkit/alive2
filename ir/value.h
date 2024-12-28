@@ -131,7 +131,7 @@ public:
   StateValue toSMT(State &s) const override;
   smt::expr getUndefVar(const Type &ty, unsigned child) const;
 
-  static bool isUndefMask(const smt::expr &e, const smt::expr &var);
+  static bool isUndefMask(const smt::expr &e);
 };
 
 }

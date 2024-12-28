@@ -366,8 +366,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
     expr lhs, rhs;
     // (= #b0 isundef_%var)
     if (e.isEq(lhs, rhs)) {
-      return (lhs.isZero() && Input::isUndefMask(rhs, var)) ||
-             (rhs.isZero() && Input::isUndefMask(lhs, var));
+      return (lhs.isZero() && Input::isUndefMask(rhs)) ||
+             (rhs.isZero() && Input::isUndefMask(lhs));
     }
     return false;
   };
