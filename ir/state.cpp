@@ -446,8 +446,15 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
     repls.emplace_back(std::move(test), true);
   }
 
-  if (all_decided)
-    return e.subst_simplify(repls);
+  if (all_decided) {
+    e2 = e.subst_simplify(repls);
+    auto vars = e2.vars();
+    // if there are still undef variables (not originating from inputs),
+    // we need to account for the extra conditions that make it non-undef
+    auto I = ranges::find_if(vars, [&](auto &var) { return isUndef(var); });
+    if (I == vars.end())
+      return e2;
+  }
 
   // check if original expression is equal to an expression where undefs are
   // fixed to a const value
