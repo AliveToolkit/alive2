@@ -4,6 +4,7 @@
 #include "smt/exprs.h"
 #include "smt/smt.h"
 #include "util/compiler.h"
+#include <algorithm>
 #include <vector>
 
 using namespace std;
@@ -43,6 +44,12 @@ void AndExpr::add(const AndExpr &other) {
 void AndExpr::del(const AndExpr &other) {
   for (auto &e : other.exprs)
     exprs.erase(e);
+}
+
+expr AndExpr::propagate(const AndExpr &other) const {
+  vector<expr> ret;
+  ranges::set_difference(exprs, other.exprs, back_inserter(ret), less{});
+  return expr::mk_and(ret).propagate(other);
 }
 
 void AndExpr::reset() {

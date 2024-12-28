@@ -1464,7 +1464,7 @@ expr expr::cmp_eq(const expr &rhs, bool simplify) const {
       return false;
     return rhs == *this;
   }
-  // constants on rhs from now.
+  // constants on rhs from now on.
 
   if (rhs.isTrue())
     return *this;
@@ -1647,6 +1647,14 @@ void expr::operator&=(const expr &rhs) {
 
 void expr::operator|=(const expr &rhs) {
   *this = *this || rhs;
+}
+
+expr expr::mk_and(const vector<expr> &vals) {
+  expr ret(true);
+  for (auto &e : vals) {
+    ret &= e;
+  }
+  return ret;
 }
 
 expr expr::mk_and(const set<expr> &vals) {
@@ -2235,6 +2243,12 @@ expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   return Z3_substitute(ctx(), ast(), repls.size(), from.get(), to.get());
 }
 
+expr expr::subst_simplify(const vector<pair<expr, expr>> &repls) const {
+  if (repls.empty())
+    return *this;
+  return subst(repls).simplify();
+}
+
 expr expr::subst(const expr &from, const expr &to) const {
   C(from, to);
   auto f = from();
@@ -2246,6 +2260,20 @@ expr expr::subst_var(const expr &repl) const {
   C(repl);
   auto r = repl();
   return Z3_substitute_vars(ctx(), ast(), 1, &r);
+}
+
+expr expr::propagate(const AndExpr &constraints) const {
+  C();
+  auto from = make_unique<Z3_ast[]>(constraints.exprs.size());
+  auto to   = make_unique<Z3_ast[]>(constraints.exprs.size());
+  expr true_expr(true);
+  unsigned i = 0;
+  for (auto &e : constraints.exprs) {
+    C2(e);
+    from[i] = e();
+    to[i++] = true_expr();
+  }
+  return Z3_substitute(ctx(), ast(), i, from.get(), to.get());
 }
 
 set<expr> expr::vars() const {

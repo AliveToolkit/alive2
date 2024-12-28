@@ -29,6 +29,7 @@ public:
   void add(expr &&e, unsigned limit = 16);
   void add(const AndExpr &other);
   void del(const AndExpr &other);
+  expr propagate(const AndExpr &other) const;
   void reset();
   bool contains(const expr &e) const;
   expr operator()() const;
@@ -37,6 +38,7 @@ public:
   auto operator<=>(const AndExpr&) const = default;
   friend std::ostream &operator<<(std::ostream &os, const AndExpr &e);
   template<typename T> friend class DisjointExpr;
+  friend class expr;
 };
 
 

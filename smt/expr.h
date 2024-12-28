@@ -20,6 +20,8 @@ typedef struct _Z3_sort* Z3_sort;
 
 namespace smt {
 
+class AndExpr;
+
 class expr {
   uintptr_t ptr = 0;
 
@@ -288,6 +290,7 @@ public:
   void operator&=(const expr &rhs);
   void operator|=(const expr &rhs);
 
+  static expr mk_and(const std::vector<expr> &vals);
   static expr mk_and(const std::set<expr> &vals);
   static expr mk_or(const std::set<expr> &vals);
 
@@ -363,10 +366,14 @@ public:
 
   // replace v1 -> v2
   expr subst(const std::vector<std::pair<expr, expr>> &repls) const;
+  expr subst_simplify(const std::vector<std::pair<expr, expr>> &repls) const;
   expr subst(const expr &from, const expr &to) const;
 
   // replace the 1st quantified variable
   expr subst_var(const expr &repl) const;
+
+  // turn all expressions in 'constraints' into true
+  expr propagate(const AndExpr &constraints) const;
 
   std::set<expr> vars() const;
   static std::set<expr> vars(const std::vector<const expr*> &exprs);
