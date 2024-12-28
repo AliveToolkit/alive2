@@ -49,14 +49,4 @@ bool does_ptr_store = true;
 unsigned heap_block_alignment = 8;
 bool has_indirect_fncalls = true;
 
-
-bool isUndef(const expr &e) {
-  expr var;
-  unsigned h, l;
-  if (e.isExtract(var, h, l))
-    return isUndef(var);
-
-  return e.fn_name().starts_with("undef!");
-}
-
 }

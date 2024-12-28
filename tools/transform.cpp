@@ -79,7 +79,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
     // some functions / vars may not have an interpretation because it's not
     // needed, not because it's undef
     for (auto &var : partial.vars()) {
-      if (isUndef(var)) {
+      if (st.isUndef(var)) {
         os << "\t[based on undef value]";
         break;
       }

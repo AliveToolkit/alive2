@@ -733,6 +733,10 @@ const OrExpr* State::jumpCondFrom(const BasicBlock &bb) const {
 }
 
 bool State::isUndef(const expr &e) const {
+  expr v;
+  unsigned h, l;
+  if (e.isExtract(v, h, l))
+    return isUndef(v);
   return undef_vars.count(e) != 0;
 }
 

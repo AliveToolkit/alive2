@@ -99,6 +99,4 @@ extern unsigned heap_block_alignment;
 
 extern bool has_indirect_fncalls;
 
-bool isUndef(const smt::expr &e);
-
 }

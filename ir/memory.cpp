@@ -938,7 +938,7 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
     if ( write && always_nowrite(bid0)) return false;
   }
 
-  if (isUndef(offset0))
+  if (state->isUndef(offset0))
     return false;
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());

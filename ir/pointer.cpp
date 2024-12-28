@@ -483,7 +483,7 @@ expr Pointer::isAligned(uint64_t align) {
     return isNull();
 
   auto offset = getOffset();
-  if (isUndef(offset))
+  if (m.state->isUndef(offset))
     return false;
 
   auto bits = min(ilog2(align), bits_for_offset);
@@ -568,8 +568,8 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     expr offset   = p.getOffset();
 
     expr cond;
-    if (isUndef(offset) ||
-        isUndef(p.getBid()) ||
+    if (m.state->isUndef(offset) ||
+        m.state->isUndef(p.getBid()) ||
         bytes.ugt(p.blockSizeAligned()).isTrue() ||
         p.getOffsetSizet().uge(block_sz).isTrue()) {
       cond = false;
