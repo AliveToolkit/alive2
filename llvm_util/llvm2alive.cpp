@@ -359,9 +359,11 @@ public:
       // @llvm.assert, as it is @llvm.assume
       if (fn_decl->getName() == "llvm.assert") {
         auto &ctx = i.getContext();
-        assert(fn->getFunctionType() ==
-               llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
-                                       { llvm::Type::getInt1Ty(ctx) }, false));
+        auto expected_ty
+          = llvm::FunctionType::get(llvm::Type::getVoidTy(ctx),
+                                    { llvm::Type::getInt1Ty(ctx) }, false);
+        if (!fn || fn->getFunctionType() != expected_ty)
+          return error(i);
         return make_unique<Assume>(*args.at(0), Assume::AndNonPoison);
       }
 
