@@ -415,7 +415,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
 
   Solver s;
   s.add(conds);
-  s.add(expr::mkForAll(qvars, e != e2));
+  s.add(expr::mkForAll(qvars, !eq_except_padding(getMemory(), val.getType(), e,
+                                                 e2, ptr_compare)));
   bool all_decided = true;
 
   // check each undef var in turn by making all other vars non-undef
