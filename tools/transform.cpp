@@ -52,7 +52,7 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
 
   if (auto *in = dynamic_cast<const Input*>(var)) {
     auto var = in->getUndefVar(type, child);
-    if (var.isValid() && m.eval(var, false).isAllOnes()) {
+    if (var.isValid() && m.eval(var).isAllOnes()) {
       os << "undef";
       return;
     }
@@ -61,11 +61,17 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
   // TODO: detect undef bits (total or partial) with an SMT query
 
   expr partial = m.eval(val.value);
+  vector<pair<expr,expr>> repls;
+  for (auto &var : partial.vars()) {
+    repls.emplace_back(var, expr::some(var));
+  }
 
-  type.printVal(os, st, m.eval(val.value, true));
+  expr full = partial.subst_simplify(repls);
+  assert(full.isConst());
+  type.printVal(os, st, full);
 
   if (dynamic_cast<const PtrType*>(&type)) {
-    Pointer ptr(st.returnMemory(), m.eval(val.value, true));
+    Pointer ptr(st.returnMemory(), std::move(full));
     auto addr = m.eval(ptr.getAddress());
     if (addr.isConst() && !ptr.isNull().isTrue()) {
       os << " / Address=";
@@ -75,14 +81,10 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
 
   // undef variables may not have a model since each read uses a copy
   // TODO: add intervals of possible values for ints at least?
-  if (!partial.isConst()) {
-    // some functions / vars may not have an interpretation because it's not
-    // needed, not because it's undef
-    for (auto &var : partial.vars()) {
-      if (st.isUndef(var)) {
-        os << "\t[based on undef value]";
-        break;
-      }
+  for (auto &var : partial.vars()) {
+    if (var.fn_name().starts_with("undef!")) {
+      os << "\t[based on undef]";
+      break;
     }
   }
 }
