@@ -375,7 +375,7 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
   vector<pair<expr,expr>> repls;
   set<expr> missing_tests;
   expr conds = true;
-  for (auto &var : e.vars()) {
+  for (auto &var : vars) {
     if (var.fn_name().starts_with("isundef_")) {
       expr test = var == 0;
       if (domain.UB.contains(test)) {
@@ -405,9 +405,17 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
     e2 = e.subst(repls2);
   }
 
+  set<expr> qvars;
+  for (auto &var : vars) {
+    auto name = var.fn_name();
+    if (name.starts_with("isundef_") || name.starts_with("undef!"))
+      continue;
+    qvars.emplace(var);
+  }
+
   Solver s;
   s.add(conds);
-  s.add(e != e2);
+  s.add(expr::mkForAll(qvars, e != e2));
   bool all_decided = true;
 
   // check each undef var in turn by making all other vars non-undef
@@ -435,15 +443,12 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
           break;
         }
       }
-    }
-    else if (res.isUnsat()) {
-      // can't conclude the var isn't undef, but can simplify the expression
+      repls.emplace_back(std::move(test), true);
     } else {
-      // timeout or error
+      // can't conclude anything
       all_decided = false;
       break;
     }
-    repls.emplace_back(std::move(test), true);
   }
 
   if (all_decided) {

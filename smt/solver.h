@@ -18,16 +18,16 @@ namespace smt {
 class FnModel;
 
 class Model {
-  Z3_model m;
+  Z3_model m = nullptr;
 
-  Model() : m(0) {}
+  Model() = default;
   Model(Z3_model m);
   ~Model();
 
   friend class Result;
 
 public:
-  Model(Model &&other) noexcept : m(0) {
+  Model(Model &&other) noexcept {
     std::swap(other.m, m);
   }
 
