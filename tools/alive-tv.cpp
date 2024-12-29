@@ -126,6 +126,11 @@ and "tgt5" will unused.
 #define ARGS_MODULE_VAR M1
 # include "llvm_util/cmd_args_def.h"
 
+  if (llvm::verifyModule(*M1.get(), &llvm::errs())) {
+    *out << "Source file is broken\n";
+    return -1;
+  }
+
   auto &DL = M1.get()->getDataLayout();
   llvm::Triple targetTriple(M1.get()->getTargetTriple());
   llvm::TargetLibraryInfoWrapperPass TLI(targetTriple);
@@ -198,11 +203,6 @@ and "tgt5" will unused.
 
   if (M1.get()->getTargetTriple() != M2.get()->getTargetTriple()) {
     *out << "Modules have different target triples\n";
-    return -1;
-  }
-
-  if (llvm::verifyModule(*M1.get(), &llvm::errs())) {
-    *out << "Source file is broken\n";
     return -1;
   }
 
