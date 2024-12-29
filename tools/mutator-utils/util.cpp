@@ -30,7 +30,7 @@ unsigned Random::getBitmask(llvm::IntegerType *ty) {
   unsigned result = (unsigned)((1ull << size) - 1);
   unsigned le = (unsigned)((1ull << (1 + getRandomUnsigned() % 32)) - 1);
   unsigned ri = (unsigned)((1ull << (getRandomUnsigned() % le)) - 1);
-  return result ^ le ^ ri;
+  return (result ^ le ^ ri) & result;
 }
 
 double Random::getExtremeDouble() {
@@ -517,10 +517,12 @@ mutator_util::getRandomIntegerIntrinsic(llvm::Value *val1, llvm::Value *val2,
   llvm::Function *func = nullptr;
   std::vector<llvm::Value *> args{val1};
   if (isUnary) {
-    func = llvm::Intrinsic::getOrInsertDeclaration(M, integerUnaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(
+        M, integerUnaryIntrinsic[pos], tys);
   } else {
     pos -= integerUnaryIntrinsic.size();
-    func = llvm::Intrinsic::getOrInsertDeclaration(M, integerBinaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(
+        M, integerBinaryIntrinsic[pos], tys);
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");
@@ -541,10 +543,12 @@ mutator_util::getRandomFloatIntrinsic(llvm::Value *val1, llvm::Value *val2,
   std::vector<llvm::Value *> args{val1};
   if (isUnary) {
 
-    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatUnaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatUnaryIntrinsic[pos],
+                                                   tys);
   } else {
     pos -= floatUnaryIntrinsic.size();
-    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatBinaryIntrinsic[pos], tys);
+    func = llvm::Intrinsic::getOrInsertDeclaration(M, floatBinaryIntrinsic[pos],
+                                                   tys);
     args.push_back(val2);
   }
   assert(func != nullptr && "intrinsic function shouldn't be nullptr!");

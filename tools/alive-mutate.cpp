@@ -421,18 +421,18 @@ bool verifyInput(std::shared_ptr<llvm::Module> &M1) {
           continue;
         }
         verifier->compareFunctions(*fit, *f2);
-        // FIX ME: need update
-        logStream.str("");
         // equals to 0 means not correct
         if (verifier->num_correct == 0) {
           invalidFunctions.insert(fit->getName());
           if (incorrect_count <= 10) {
             llvm::errs() << "Function: " << fit->getName()
                          << " failed in alive2 initial checks.\n";
+            llvm::errs() << logStream.str() << "\n";
             ++incorrect_count;
           }
           verifier->num_correct = 0;
         }
+        logStream.str("");
       }
     }
 
