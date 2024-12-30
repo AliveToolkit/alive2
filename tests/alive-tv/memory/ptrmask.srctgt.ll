@@ -1,8 +1,8 @@
 define i1 @src(ptr align(8) %p0) {
-  %p = getelementptr inbounds i8, ptr %p, i8 1
+  %p = getelementptr inbounds i8, ptr %p0, i8 1
   %q = call ptr @llvm.ptrmask(ptr %p, i64 -8)
   %int = ptrtoint ptr %q to i64
-  %r = icmp eq i64 %int, 0
+  %r = icmp ne i64 %int, 0
   ret i1 %r
 }
 
