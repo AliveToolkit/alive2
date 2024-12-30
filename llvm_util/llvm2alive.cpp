@@ -1397,9 +1397,11 @@ public:
         Value *last_value = nullptr;
 
         for (auto &Op : Node->operands()) {
-          auto *callee =
-            get_operand(llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op));
+          auto fn = llvm::mdconst::dyn_extract_or_null<llvm::Function>(Op);
+          if (!fn)
+            continue;
 
+          auto *callee = get_operand(fn);
           if (!callee) {
             *out << "ERROR: Unsupported !callee metadata\n";
             return false;
