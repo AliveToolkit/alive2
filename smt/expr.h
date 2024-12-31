@@ -115,6 +115,7 @@ public:
 
   bool isConst() const;
   bool isVar() const;
+  bool isQVar() const;
   bool isBV() const;
   bool isBool() const;
   bool isFloat() const;

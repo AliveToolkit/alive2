@@ -20,9 +20,9 @@ if.end19:
   br i1 %tobool20, label %if.then21, label %if.then21
 
 if.then21:
-  br label %if.then21
+  br label %if.then22
 
-if.then21:
+if.then22:
   ret i32 0
 }
 

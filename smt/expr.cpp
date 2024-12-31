@@ -387,6 +387,11 @@ bool expr::isVar() const {
   return false;
 }
 
+bool expr::isQVar() const {
+  C();
+  return Z3_get_ast_kind(ctx(), ast()) == Z3_VAR_AST;
+}
+
 bool expr::isBV() const {
   C();
   return Z3_get_sort_kind(ctx(), sort()) == Z3_BV_SORT;

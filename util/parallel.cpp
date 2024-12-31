@@ -5,6 +5,7 @@
 #include "util/compiler.h"
 #include <cassert>
 #include <cstring>
+#include <cstdlib>
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
@@ -214,7 +215,8 @@ bool parallel::emitOutput() {
   std::string line;
   while (getline(parent_ss, line)) {
     if (line.starts_with("include(")) {
-      int index = std::stoi(line.substr(sizeof("include(") - 1));
+      auto index = strtol(string_view(line).substr(sizeof("include(")-1).data(),
+                          nullptr, 10);
       if (children[index].eof) {
         out_file << std::move(children[index].output).str();
         stringstream().swap(children[index].output); // free the RAM
@@ -230,7 +232,7 @@ bool parallel::emitOutput() {
         stringstream new_ss;
         new_ss << line << '\n';
         auto cur = parent_ss.tellg();
-        new_ss << std::move(parent_ss).str().substr(cur);
+        new_ss << string_view(std::move(parent_ss).str()).substr(cur);
         parent_ss = std::move(new_ss);
         return false;
       }

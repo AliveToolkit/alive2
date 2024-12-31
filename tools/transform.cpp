@@ -67,7 +67,8 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
   }
 
   expr full = partial.subst_simplify(repls);
-  assert(full.isConst());
+  if (!full.isConst())
+    full = m.eval(full, true);
   type.printVal(os, st, full);
 
   if (dynamic_cast<const PtrType*>(&type)) {
