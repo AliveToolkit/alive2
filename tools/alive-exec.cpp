@@ -113,7 +113,7 @@ optional<StateValue> exec(llvm::Function &F,
       auto &name = next_instr.getName();
 
       solver.add(val.return_domain);
-      auto r = solver.check();
+      auto r = solver.check("return domain");
       if (error(r))
         return {};
 
@@ -132,7 +132,7 @@ optional<StateValue> exec(llvm::Function &F,
           {
             SolverPush push(solver);
             solver.add(cond);
-            auto r = solver.check();
+            auto r = solver.check("jump condition");
             if (error(r))
               return {};
 
@@ -157,7 +157,7 @@ optional<StateValue> exec(llvm::Function &F,
       }
 
       solver.add(val.domain());
-      r = solver.check();
+      r = solver.check("domain");
       if (error(r))
         return {};
 
