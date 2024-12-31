@@ -1377,6 +1377,17 @@ void State::finishInitializer() {
   }
 }
 
+bool State::isImplied(const expr &e) {
+  if (domain.UB.contains(e))
+    return true;
+
+  if (check_expr(domain.UB().notImplies(e), "UB inference", true).isUnsat()) {
+    domain.UB.add(e);
+    return true;
+  }
+  return false;
+}
+
 expr State::sinkDomain(bool include_ub) const {
   auto I = predecessor_data.find(&f.getSinkBB());
   if (I == predecessor_data.end())

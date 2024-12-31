@@ -645,6 +645,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     expr is_log = ptr.isLogical();
     expr inbounds = is_asm ? ptr.isInbounds(true) : expr(true);
 
+    if (is_asm && !inbounds.isTrue() && m.state->isImplied(inbounds))
+      inbounds = true;
+
     optional<expr> log_expr, phy_expr;
     optional<Pointer> new_log_ptr;
 

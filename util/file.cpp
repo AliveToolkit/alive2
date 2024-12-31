@@ -27,7 +27,8 @@ file_reader::file_reader(const char *filename, unsigned padding) {
 }
 
 
-string get_random_filename(const string &dir, const char *extension, const char *prefix) {
+string get_random_filename(const string &dir, const char *extension,
+                           const char *prefix) {
   // there's a low probability of race here
   auto newname = [&]() {
     ostringstream name;
