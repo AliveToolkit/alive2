@@ -766,6 +766,27 @@ expr Pointer::isHeapAllocated() const {
   return getAllocType().extract(1, 1) == 1;
 }
 
+static expr at_least_same_offseting(const Pointer &p1, const Pointer &p2) {
+  expr size  = p1.blockSizeOffsetT();
+  expr off   = p1.getOffsetSizet();
+  expr size2 = p2.blockSizeOffsetT();
+  expr off2  = p2.getOffsetSizet();
+ return
+   expr::mkIf(p1.isHeapAllocated(),
+              p1.getAllocType() == p2.getAllocType() &&
+                off == off2 && size == size2,
+
+              expr::mkIf(off.sge(0),
+                         off2.sge(0) &&
+                           expr::mkIf(off.ule(size),
+                                      off2.ule(size2) && off2.uge(off) &&
+                                        (size2 - off2).uge(size - off),
+                                      off2.ugt(size2) && off == off2 &&
+                                        size2.uge(size)),
+                          // maintains same dereferenceability before/after
+                          off == off2 && size2.uge(size)));
+}
+
 expr Pointer::refined(const Pointer &other) const {
   bool is_asm = other.m.isAsmMode();
   auto [p1l, d1] = toLogicalLocal();
@@ -774,12 +795,16 @@ expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
   expr local = d2 && p2l.isLocal();
   local &= p1l.getAllocType() == p2l.getAllocType();
-  local &= p1l.blockSize() == p2l.blockSize();
-  local &= p1l.getOffset() == p2l.getOffset();
+  if (is_asm) {
+    local &= at_least_same_offseting(p1l, p2l);
+  } else {
+    local &= p1l.blockSize() == p2l.blockSize();
+    local &= p1l.getOffset() == p2l.getOffset();
+  }
   local &= p1l.isBlockAlive().implies(p2l.isBlockAlive());
   // Attributes are ignored at refinement.
 
-  if (is_asm)
+  if (!is_asm)
     local &= isLogical() == other.isLogical();
 
   // TODO: this induces an infinite loop
@@ -802,30 +827,13 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   bool is_asm = other.m.isAsmMode();
   auto [p1l, d1] = toLogicalLocal();
   auto [p2l, d2] = other.toLogicalLocal();
-  expr size = p1l.blockSizeOffsetT();
-  expr off = p1l.getOffsetSizet();
-  expr size2 = p2l.blockSizeOffsetT();
-  expr off2 = p2l.getOffsetSizet();
 
   // TODO: check block value for byval_bytes
   if (!byval_bytes.isZero())
     return true;
 
-  expr local
-    = expr::mkIf(p1l.isHeapAllocated(),
-                 p1l.getAllocType() == p2l.getAllocType() &&
-                   off == off2 && size == size2,
-
-                 expr::mkIf(off.sge(0),
-                            off2.sge(0) &&
-                              expr::mkIf(off.ule(size),
-                                         off2.ule(size2) && off2.uge(off) &&
-                                           (size2 - off2).uge(size - off),
-                                         off2.ugt(size2) && off == off2 &&
-                                           size2.uge(size)),
-                            // maintains same dereferenceability before/after
-                            off == off2 && size2.uge(size)));
-  local = d2 && (p2l.isLocal() || p2l.isByval()) && local;
+  expr local = d2 && (p2l.isLocal() || p2l.isByval()) &&
+               at_least_same_offseting(p1l, p2l);
 
   if (is_asm)
     local &= isLogical() == other.isLogical();
