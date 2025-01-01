@@ -991,6 +991,16 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   return true;
 }
 
+static bool isDerivedFromLoad(const expr &e) {
+  expr val, val2, _;
+  unsigned h, l;
+  if (e.isExtract(val, h, l))
+    return isDerivedFromLoad(val);
+  if (e.isIf(_, val, val2))
+    return isDerivedFromLoad(val) && isDerivedFromLoad(val2);
+  return e.isLoad(_, _);
+}
+
 Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
                                          uint64_t align, bool write) const {
   AliasSet aliasing(*this);
@@ -1027,10 +1037,11 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
     }
 
     {
-    bool is_init_memory = isInitialMemoryOrLoad(shortbid, false);
-    bool is_from_fn     = !is_init_memory &&
-                          (isInitialMemoryOrLoad(shortbid, true) ||
-                           isFnReturnValue(shortbid));
+    bool is_init_memory     = isInitialMemoryOrLoad(shortbid, false);
+    bool is_from_fn_or_load = !is_init_memory &&
+                              (isInitialMemoryOrLoad(shortbid, true) ||
+                               isFnReturnValue(shortbid) ||
+                               isDerivedFromLoad(shortbid));
 
     for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
@@ -1039,8 +1050,8 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
         // initial memory doesn't have local ptrs stored
         if (local && is_init_memory)
           continue;
-        // functions can only return escaped ptrs
-        if (local && is_from_fn && !escaped_local_blks.mayAlias(true, i))
+        // functions and memory loads can only return escaped ptrs
+        if (is_from_fn_or_load && !escaped_local_blks.mayAlias(true, i))
           continue;
         check_alias(this_alias, local, i, offset);
       }
