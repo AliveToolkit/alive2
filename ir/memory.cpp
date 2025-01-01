@@ -1051,7 +1051,9 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
         if (local && is_init_memory)
           continue;
         // functions and memory loads can only return escaped ptrs
-        if (is_from_fn_or_load && !escaped_local_blks.mayAlias(true, i))
+        if (local &&
+            is_from_fn_or_load &&
+            !escaped_local_blks.mayAlias(true, i))
           continue;
         check_alias(this_alias, local, i, offset);
       }
@@ -2573,7 +2575,7 @@ expr Memory::ptr2int(const expr &ptr) {
 }
 
 expr Memory::int2ptr(const expr &val) {
-  assert(!memory_unused() && observesAddresses());
+  assert(!memory_unused() && has_int2ptr && observesAddresses());
   nextNonlocalBid();
   return
     Pointer::mkPhysical(*this, val.zextOrTrunc(bits_ptr_address)).release();
