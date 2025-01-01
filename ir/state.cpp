@@ -1062,10 +1062,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   assert(!noret || !willret);
 
-  bool all_valid = std::all_of(inputs.begin(), inputs.end(),
-                                [](auto &v) { return v.isValid(); }) &&
-                   std::all_of(ptr_inputs.begin(), ptr_inputs.end(),
-                                [](auto &v) { return v.val.isValid(); });
+  bool all_valid
+    = ranges::all_of(inputs, [](auto &v) { return v.isValid(); }) &&
+      ranges::all_of(ptr_inputs, [](auto &v) { return v.val.isValid(); });
 
   if (!all_valid) {
     addUB(expr());
