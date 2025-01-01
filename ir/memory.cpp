@@ -2841,6 +2841,16 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
       set1.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;
 
+  // If we have a physical pointer, only observed addresses can escape
+  if (has_int2ptr) {
+    Pointer p(*this, ptr);
+    if (p.isLogical().isFalse()) {
+      if (set2)
+        set1.unionWith(*set2);
+      return;
+    }
+  }
+
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
