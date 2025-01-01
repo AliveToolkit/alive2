@@ -116,7 +116,7 @@ Pointer Pointer::mkPhysical(const Memory &m, const expr &addr) {
 Pointer Pointer::mkPhysical(const Memory &m, const expr &addr,
                             const expr &attr) {
   assert(hasLogicalBit());
-  assert(addr.bits() == bits_ptr_address);
+  assert(!addr.isValid() || addr.bits() == bits_ptr_address);
   auto p = expr::mkUInt(1, 1)
            .concat_zeros(padding_physical())
            .concat(addr);
