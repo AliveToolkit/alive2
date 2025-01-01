@@ -2864,9 +2864,7 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
     } else if (isFnReturnValue(bid_expr)) {
       // Function calls have already escaped whatever they needed to.
     } else {
-      expr val, arr, idx;
-      unsigned h, l;
-      if (bid_expr.isExtract(val, h, l) && val.isLoad(arr, idx)) {
+      if (isDerivedFromLoad(bid_expr)) {
         // if this a load, it can't escape anything that hasn't escaped before
         continue;
       }
