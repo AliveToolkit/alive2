@@ -980,13 +980,11 @@ static expr smul_fix_helper(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::smul_fix(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   expr r = smul_fix_helper(a, b, c);
   return r.trunc(a.bits());
 }
 
 expr expr::smul_fix_no_soverflow(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   expr r = smul_fix_helper(a, b, c);
   auto width = a.bits();
   expr result = r.trunc(width);
@@ -994,7 +992,6 @@ expr expr::smul_fix_no_soverflow(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::smul_fix_sat(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   expr r = smul_fix_helper(a, b, c);
   auto width = a.bits();
   return mkIf(smul_fix_no_soverflow(a, b, c),
@@ -1011,13 +1008,11 @@ static expr umul_fix_helper(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::umul_fix(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   expr r = umul_fix_helper(a, b, c);
   return r.trunc(a.bits());
 }
 
 expr expr::umul_fix_no_uoverflow(const expr &a, const expr &b, const expr &c) {
-  C2(a);
   auto width = a.bits();
   return umul_fix_helper(a, b, c).extract(width * 2 - 1, width) == 0;
 }
@@ -1757,8 +1752,7 @@ expr expr::sgt(const expr &rhs) const {
 }
 
 expr expr::ule(uint64_t rhs) const {
-  C();
-  return ule(mkUInt(rhs, sort()));
+  return ule(mkUInt(rhs, *this));
 }
 
 expr expr::ule_extend(uint64_t rhs) const {
@@ -1769,38 +1763,31 @@ expr expr::ule_extend(uint64_t rhs) const {
 }
 
 expr expr::ult(uint64_t rhs) const {
-  C();
-  return ult(mkUInt(rhs, sort()));
+  return ult(mkUInt(rhs, *this));
 }
 
 expr expr::uge(uint64_t rhs) const {
-  C();
-  return uge(mkUInt(rhs, sort()));
+  return uge(mkUInt(rhs, *this));
 }
 
 expr expr::ugt(uint64_t rhs) const {
-  C();
-  return ugt(mkUInt(rhs, sort()));
+  return ugt(mkUInt(rhs, *this));
 }
 
 expr expr::sle(int64_t rhs) const {
-  C();
-  return sle(mkInt(rhs, sort()));
+  return sle(mkInt(rhs, *this));
 }
 
 expr expr::sge(int64_t rhs) const {
-  C();
-  return sge(mkInt(rhs, sort()));
+  return sge(mkInt(rhs, *this));
 }
 
 expr expr::operator==(uint64_t rhs) const {
-  C();
-  return *this == mkUInt(rhs, sort());
+  return *this == mkUInt(rhs, *this);
 }
 
 expr expr::operator!=(uint64_t rhs) const {
-  C();
-  return *this != mkUInt(rhs, sort());
+  return *this != mkUInt(rhs, *this);
 }
 
 expr expr::sext(unsigned amount) const {
@@ -2453,10 +2440,12 @@ strong_ordering expr::operator<=>(const expr &rhs) const {
 }
 
 unsigned expr::id() const {
+  C();
   return Z3_get_ast_id(ctx(), ast());
 }
 
 unsigned expr::hash() const {
+  C();
   return Z3_get_ast_hash(ctx(), ast());
 }
 
