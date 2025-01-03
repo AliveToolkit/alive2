@@ -22,3 +22,13 @@ define i1 @src_offsetonly() {
 define i1 @tgt_offsetonly() {
   ret i1 true
 }
+
+define i1 @src_provenance(ptr %base) {
+  %gep = getelementptr inbounds i8, ptr %base, i64 1
+  %cnd = icmp samesign eq ptr %gep, null
+  ret i1 %cnd
+}
+
+define i1 @tgt_provenance(ptr %base) {
+  ret i1 false
+}

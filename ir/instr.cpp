@@ -2791,16 +2791,12 @@ StateValue ICmp::toSMT(State &s) const {
     expr np = true;
     if (flags & SameSign) {
       if (isPtrCmp()) {
-        assert(pcmode == INTEGRAL || pcmode == OFFSETONLY);
         auto &m = s.getMemory();
         Pointer lhs(m, a.value);
         Pointer rhs(m, b.value);
         m.observesAddr(lhs);
         m.observesAddr(rhs);
-        if (pcmode == INTEGRAL)
-          np = lhs.getAddress().sign() == rhs.getAddress().sign();
-        else
-          np = lhs.getOffset().sign() == rhs.getOffset().sign();
+        np = lhs.getAddress().sign() == rhs.getAddress().sign();
       } else {
         np = a.value.sign() == b.value.sign();
       }
