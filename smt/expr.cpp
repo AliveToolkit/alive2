@@ -1890,10 +1890,8 @@ expr expr::extract(unsigned high, unsigned low, unsigned depth) const {
     expr a, b;
     if (isAShr(a, b)) {
       uint64_t shift;
-      if (b.isUInt(shift) && high + shift < a.bits()) {
-        assert(shift < a.bits());
+      if (b.isUInt(shift) && shift < a.bits() && high + shift < a.bits())
         return a.extract(high + shift, low + shift);
-      }
     }
   }
   {
