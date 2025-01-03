@@ -13,3 +13,12 @@ define i1 @tgt(ptr %a, ptr %b) {
   %cmp = icmp samesign eq ptr %b, null
   ret i1 %cmp
 }
+
+define i1 @src_offsetonly() {
+  %cmp = icmp samesign eq ptr null, null
+  ret i1 %cmp
+}
+
+define i1 @tgt_offsetonly() {
+  ret i1 true
+}
