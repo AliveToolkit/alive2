@@ -2788,7 +2788,20 @@ StateValue ICmp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
     auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
-    auto np = flags & SameSign ? a.value.sign() == b.value.sign() : true;
+    expr np = true;
+    if (flags & SameSign) {
+      if (isPtrCmp()) {
+        assert(pcmode == INTEGRAL);
+        auto &m = s.getMemory();
+        Pointer lhs(m, a.value);
+        Pointer rhs(m, b.value);
+        m.observesAddr(lhs);
+        m.observesAddr(rhs);
+        np = lhs.getAddress().sign() == rhs.getAddress().sign();
+      } else {
+        np = a.value.sign() == b.value.sign();
+      }
+    }
     return { v.toBVBool(), a.non_poison && b.non_poison && np };
   };
 
