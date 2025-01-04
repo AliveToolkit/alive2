@@ -611,8 +611,13 @@ pair<expr, expr>
 FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
                    const StateValue &tgt) const {
   expr non_poison = src.non_poison && tgt.non_poison;
-  return { src.non_poison.implies(tgt.non_poison),
-           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
+  expr equal_payload =
+      src.value.trunc(fractionBits()) == tgt.value.trunc(fractionBits());
+  expr equal = src.value == tgt.value;
+  return {src.non_poison.implies(tgt.non_poison),
+          non_poison.implies(expr::mkIf(getFloat(src.value).isNaN() &&
+                                            getFloat(tgt.value).isNaN(),
+                                        equal_payload, equal))};
 }
 
 expr FloatType::mkInput(State &s, const char *name,
