@@ -1380,7 +1380,7 @@ bool State::isImplied(const expr &e) {
   if (domain.UB.contains(e))
     return true;
 
-  if (check_expr(domain.UB().notImplies(e), "UB inference", true).isUnsat()) {
+  if (check_expr(domain().notImplies(e), "UB inference", true).isUnsat()) {
     domain.UB.add(e);
     return true;
   }
