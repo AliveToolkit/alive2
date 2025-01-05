@@ -1190,6 +1190,9 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
 
 Memory::DataType Memory::data_type(const vector<pair<unsigned, expr>> &data,
                                    bool full_store) const {
+  if (isAsmMode())
+    return DATA_ANY;
+
   unsigned ty = DATA_NONE;
   unsigned num_int_zeros = 0;
   for (auto &[idx, val] : data) {
