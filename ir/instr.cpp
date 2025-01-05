@@ -2794,6 +2794,8 @@ StateValue ICmp::toSMT(State &s) const {
         auto &m = s.getMemory();
         Pointer lhs(m, a.value);
         Pointer rhs(m, b.value);
+        m.observesAddr(lhs);
+        m.observesAddr(rhs);
         np = lhs.getAddress().sign() == rhs.getAddress().sign();
       } else {
         np = a.value.sign() == b.value.sign();
