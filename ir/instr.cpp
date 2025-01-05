@@ -1838,14 +1838,14 @@ StateValue FpConversionOp::toSMT(State &s) const {
       expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
       expr val_rounded = val.round(rm);
-      expr overflow = val_rounded.isFPZero() || fp2 == val_rounded;
+      expr no_overflow = val_rounded.isFPZero() || fp2 == val_rounded;
 
       expr np;
       if (is_poison) {
-        np = std::move(overflow);
+        np = std::move(no_overflow);
       } else {
         np = true;
-        bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
+        bv = expr::mkIf(no_overflow, bv, s.getFreshNondetVar("nondet", bv));
       }
 
       if (op == FPToSInt_Sat)
