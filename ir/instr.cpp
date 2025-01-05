@@ -2769,11 +2769,11 @@ StateValue ICmp::toSMT(State &s) const {
       auto &m = s.getMemory();
       Pointer lhs(m, av);
       Pointer rhs(m, bv);
-      m.observesAddr(lhs);
-      m.observesAddr(rhs);
 
       switch (pcmode) {
       case INTEGRAL:
+        m.observesAddr(lhs);
+        m.observesAddr(rhs);
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
       case PROVENANCE:
         assert(cond == EQ || cond == NE);
