@@ -1376,12 +1376,13 @@ void State::finishInitializer() {
   }
 }
 
-bool State::isImplied(const expr &e) {
+bool State::isImplied(const expr &e, const expr &e_domain) {
   if (domain.UB.contains(e))
     return true;
 
-  if (check_expr(domain().notImplies(e), "UB inference", true).isUnsat()) {
-    domain.UB.add(e);
+  if (check_expr((e_domain && domain()).notImplies(e), "UB inference", true)
+        .isUnsat()) {
+    domain.UB.add(e_domain.implies(e));
     return true;
   }
   return false;

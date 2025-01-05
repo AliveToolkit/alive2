@@ -335,7 +335,7 @@ public:
   bool isInitializationPhase() const { return is_initialization_phase; }
   void finishInitializer();
 
-  bool isImplied(const smt::expr &e);
+  bool isImplied(const smt::expr &e, const smt::expr &domain);
 
   auto& getFn() const { return f; }
   auto& getMemory() const { return memory; }

@@ -1028,7 +1028,7 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
     expr offset   = p.getOffset();
     uint64_t bid;
     if (shortbid.isUInt(bid) &&
-        (!isAsmMode() || state->isImplied(p.isInbounds(true)))) {
+        (!isAsmMode() || state->isImplied(p.isInbounds(true), true))) {
       if (!is_local.isFalse() && bid < sz_local)
         check_alias(this_alias, true, bid, offset);
       if (!is_local.isTrue() && bid < sz_nonlocal)
