@@ -772,25 +772,28 @@ expr Pointer::isHeapAllocated() const {
   return getAllocType().extract(1, 1) == 1;
 }
 
-static expr at_least_same_offseting(const Pointer &p1, const Pointer &p2) {
+static expr at_least_same_offseting(const Pointer &p1, const Pointer &p2,
+                                    bool any_stack) {
   expr size  = p1.blockSizeOffsetT();
   expr off   = p1.getOffsetSizet();
   expr size2 = p2.blockSizeOffsetT();
   expr off2  = p2.getOffsetSizet();
- return
-   expr::mkIf(p1.isHeapAllocated(),
-              p1.getAllocType() == p2.getAllocType() &&
-                off == off2 && size == size2,
+  return
+    expr::mkIf(p1.isHeapAllocated(),
+               p1.getAllocType() == p2.getAllocType() &&
+                 off == off2 && size == size2,
 
-              expr::mkIf(off.sge(0),
-                         off2.sge(0) &&
-                           expr::mkIf(off.ule(size),
-                                      off2.ule(size2) && off2.uge(off) &&
-                                        (size2 - off2).uge(size - off),
-                                      off2.ugt(size2) && off == off2 &&
-                                        size2.uge(size)),
-                          // maintains same dereferenceability before/after
-                          off == off2 && size2.uge(size)));
+               any_stack
+                 ? expr(true)
+                 :expr::mkIf(off.sge(0),
+                             off2.sge(0) &&
+                               expr::mkIf(off.ule(size),
+                                          off2.ule(size2) && off2.uge(off) &&
+                                            (size2 - off2).uge(size - off),
+                                          off2.ugt(size2) && off == off2 &&
+                                            size2.uge(size)),
+                             // maintains same dereferenceability before/after
+                             off == off2 && size2.uge(size)));
 }
 
 expr Pointer::refined(const Pointer &other) const {
@@ -802,7 +805,7 @@ expr Pointer::refined(const Pointer &other) const {
   expr local = d2 && p2l.isLocal();
   local &= p1l.getAllocType() == p2l.getAllocType();
   if (is_asm) {
-    local &= at_least_same_offseting(p1l, p2l);
+    local &= at_least_same_offseting(p1l, p2l, true);
   } else {
     local &= p1l.blockSize() == p2l.blockSize();
     local &= p1l.getOffset() == p2l.getOffset();
@@ -839,7 +842,7 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
     return true;
 
   expr local = d2 && (p2l.isLocal() || p2l.isByval()) &&
-               at_least_same_offseting(p1l, p2l);
+               at_least_same_offseting(p1l, p2l, false);
 
   if (is_asm)
     local &= isLogical() == other.isLogical();
