@@ -574,12 +574,18 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
         p.getOffsetSizet().uge(block_sz).isTrue()) {
       cond = false;
     } else {
-      // check that the offset is within bounds and that arith doesn't overflow
-      cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
-      cond &= !offset.isNegative();
-      if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
-        cond &= offset.add_no_soverflow(bytes_off);
-
+      // optimized conditions that are equivalent to the condition below
+      if (block_sz.isConst() && bytes.isConst()) {
+        cond = offset.ule(block_sz - bytes_off);
+      } else if (bits_for_offset > bits_size_t && bytes.isOne()) {
+        cond = offset.ult(block_sz);
+      } else {
+        // check that the offset is within bounds and that arith doesn't overflow
+        cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
+        cond &= !offset.isNegative();
+        if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
+          cond &= offset.add_no_soverflow(bytes_off);
+      }
       cond &= block_constraints(p);
     }
     return cond;
