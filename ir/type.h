@@ -207,6 +207,8 @@ public:
                       unsigned nary, const smt::expr &a,
                       const smt::expr &b = {}, const smt::expr &c = {}) const;
   smt::expr isNaN(const smt::expr &v, bool signalling) const;
+  smt::expr toInt(State &s, smt::expr v) const override;
+  IR::StateValue toInt(State &s, IR::StateValue v) const override;
 
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
