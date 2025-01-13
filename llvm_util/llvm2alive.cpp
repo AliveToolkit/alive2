@@ -1331,7 +1331,7 @@ public:
     ss << i;
 
     *out << "ERROR: Unsupported instruction: "
-         << string_view(std::move(ss).str()).substr(0, 80) << '\n';
+         << std::move(ss).str() << '\n';
     return {};
   }
 
