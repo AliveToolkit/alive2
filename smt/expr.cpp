@@ -2339,7 +2339,7 @@ set<expr> expr::leafs(unsigned max) const {
     if (!seen.emplace(val()).second)
       continue;
 
-    expr cond, then, els, e;
+    expr cond, then, els, e, array, idx;
     unsigned high, low;
     if (val.isIf(cond, then, els)) {
       worklist.emplace_back(std::move(then));
@@ -2347,6 +2347,16 @@ set<expr> expr::leafs(unsigned max) const {
     } else if (val.isExtract(e, high, low) && e.isIf(cond, then, els)) {
       worklist.emplace_back(then.extract(high, low));
       worklist.emplace_back(els.extract(high, low));
+    } else if (val.isLoad(array, idx)) {
+      if (array.isStore(array, idx, e)) {
+        worklist.emplace_back(array.load(idx));
+        worklist.emplace_back(std::move(e));
+      } else if (array.isIf(cond, then, els)) {
+        worklist.emplace_back(then.load(idx));
+        worklist.emplace_back(els.load(idx));
+      } else {
+        ret.emplace(std::move(val));
+      }
     } else {
       ret.emplace(std::move(val));
     }
