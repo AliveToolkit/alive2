@@ -431,7 +431,7 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType()) {
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                     has(NonNull), has(NoCapture) | has(ByVal), has(Writable),
+                     has(NonNull), has(NoCapture) || has(ByVal), has(Writable),
                      {}, nullptr, isdecl, false);
 
     if (!initializes.empty()) {
