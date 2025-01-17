@@ -431,8 +431,8 @@ StateValue ParamAttrs::encode(State &s, StateValue &&val, const Type &ty,
   if (ty.isPtrType()) {
     val.non_poison &=
       encodePtrAttrs(s, val.value, getDerefBytes(), derefOrNullBytes, align,
-                     has(NonNull), has(NoCapture), has(Writable), {}, nullptr,
-                     isdecl, false);
+                     has(NonNull), has(NoCapture) | has(ByVal), has(Writable),
+                     {}, nullptr, isdecl, false);
 
     if (!initializes.empty()) {
       Pointer p(s.getMemory(), val.value);
