@@ -1902,11 +1902,13 @@ public:
           attrlist.getAttributes(llvm::AttributeList::FirstArgIndex + idx);
 
       auto ty = llvm_type2alive(arg.getType());
+      if (!ty)
+        return {};
       ParamAttrs attrs;
       auto val = make_unique<Input>(*ty, value_name(arg));
       Value *newval = val.get();
 
-      if (!ty || !handleParamAttrs(argattr, attrs, &newval, false))
+      if (!handleParamAttrs(argattr, attrs, &newval, false))
         return {};
       val->setAttributes(std::move(attrs));
       add_identifier(arg, *newval);
