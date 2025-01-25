@@ -248,7 +248,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     if (!opt_always_verify) {
       // Compare Alive2 IR and skip if syntactically equal
       if (src_tostr == tgt_tostr) {
-        if (!opt_quiet) {
+        if (!config::quiet) {
           TransformPrintOpts print_opts;
           print_opts.skip_tgt = true;
           t.print(*out, print_opts);
@@ -311,7 +311,7 @@ struct TVLegacyPass final : public llvm::ModulePass {
     smt_init->reset();
     t.preprocess();
     TransformVerify verifier(t, false);
-    if (!opt_quiet)
+    if (!config::quiet)
       t.print(*out);
 
     {
