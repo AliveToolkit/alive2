@@ -6,6 +6,7 @@
 #include "llvm_util/llvm_optimizer.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
+#include "util/config.h"
 
 #include <sstream>
 #include <utility>
@@ -96,7 +97,7 @@ Results verify(llvm::Function &F1, llvm::Function &F2,
 } // namespace
 
 bool Verifier::compareFunctions(llvm::Function &F1, llvm::Function &F2) {
-  auto r = verify(F1, F2, TLI, smt_init, out, !quiet, always_verify);
+  auto r = verify(F1, F2, TLI, smt_init, out, !config::quiet, always_verify);
   if (r.status == Results::ERROR) {
     out << "ERROR: " << r.error;
     ++num_errors;
@@ -134,7 +135,7 @@ bool Verifier::compareFunctions(llvm::Function &F1, llvm::Function &F2) {
 
   case Results::UNSOUND:
     out << "Transformation doesn't verify!\n\n";
-    if (!quiet)
+    if (!config::quiet)
       out << r.errs << endl;
     ++num_unsound;
     return false;
@@ -160,13 +161,13 @@ bool Verifier::compareFunctions(llvm::Function &F1, llvm::Function &F2) {
 
     case Results::FAILED_TO_PROVE:
       out << "Failed to verify the reverse transformation\n\n";
-      if (!quiet)
+      if (!config::quiet)
         out << r.errs << endl;
       return true;
 
     case Results::UNSOUND:
       out << "Reverse transformation doesn't verify!\n\n";
-      if (!quiet)
+      if (!config::quiet)
         out << r.errs << endl;
       return false;
     }

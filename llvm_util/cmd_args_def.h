@@ -21,6 +21,7 @@ config::smt_benchmark_dir = opt_smt_bench_dir;
 smt::solver_print_queries(opt_smt_verbose);
 smt::solver_tactic_verbose(opt_tactic_verbose);
 config::debug = opt_debug;
+config::quiet = opt_quiet;
 config::max_offset_bits = opt_max_offset_in_bits;
 config::max_sizet_bits  = opt_max_sizet_in_bits;
 
