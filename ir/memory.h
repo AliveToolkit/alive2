@@ -198,9 +198,8 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  void mkNonPoisonAxioms(bool local) const;
   smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
-  void mkNonlocalValAxioms(bool skip_consts) const;
+  void mkNonlocalValAxioms(const smt::expr &block) const;
 
   bool mayalias(bool local, unsigned bid, const smt::expr &offset,
                 const smt::expr &bytes, uint64_t align, bool write) const;
