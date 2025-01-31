@@ -31,6 +31,8 @@ extern bool disallow_ub_exploitation;
 
 extern bool debug;
 
+extern bool quiet;
+
 extern unsigned src_unroll_cnt;
 
 extern unsigned tgt_unroll_cnt;

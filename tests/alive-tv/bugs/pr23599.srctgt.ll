@@ -7,7 +7,7 @@ target triple = "x86_64-unknown-linux-gnu"
 %struct.ether_addr = type { [6 x i8] }
 %struct.ether_header = type { [6 x i8], [6 x i8] }
 
-define void @src(ptr nocapture readonly %ether_src, ptr nocapture readonly %ether_dst) {
+define void @src(ptr captures(none) readonly %ether_src, ptr captures(none) readonly %ether_dst) {
 entry:
   %eth = alloca %struct.ether_header, align 1
   %0 = getelementptr inbounds %struct.ether_header, ptr %eth, i64 0, i32 0, i64 0
@@ -23,7 +23,7 @@ entry:
   ret void
 }
 
-define void @tgt(ptr nocapture readonly %ether_src, ptr nocapture readonly %ether_dst) {
+define void @tgt(ptr captures(none) readonly %ether_src, ptr captures(none) readonly %ether_dst) {
 entry:
   %eth = alloca %struct.ether_header, align 1
   %0 = getelementptr inbounds %struct.ether_header, ptr %eth, i64 0, i32 0, i64 0
@@ -41,8 +41,8 @@ entry:
 }
 
 
-declare void @llvm.lifetime.start(i64, ptr nocapture)
-declare void @llvm.memset.p0i8.i64(ptr nocapture, i8, i64, i32, i1)
-declare void @llvm.memcpy.p0i8.p0i8.i64(ptr nocapture, ptr nocapture readonly, i64, i32, i1)
+declare void @llvm.lifetime.start(i64, ptr captures(none))
+declare void @llvm.memset.p0i8.i64(ptr captures(none), i8, i64, i32, i1)
+declare void @llvm.memcpy.p0i8.p0i8.i64(ptr captures(none), ptr captures(none) readonly, i64, i32, i1)
 declare void @_Z5PrintRK12ether_header(ptr dereferenceable(12))
-declare void @llvm.lifetime.end(i64, ptr nocapture)
+declare void @llvm.lifetime.end(i64, ptr captures(none))

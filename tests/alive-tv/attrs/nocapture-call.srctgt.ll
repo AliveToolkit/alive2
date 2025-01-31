@@ -1,9 +1,9 @@
-define void @src(ptr nocapture %p) {
+define void @src(ptr captures(none) %p) {
   call ptr @g(ptr %p)
   ret void
 }
 
-define void @tgt(ptr nocapture %p) {
+define void @tgt(ptr captures(none) %p) {
   call ptr @g(ptr poison)
   ret void
 }

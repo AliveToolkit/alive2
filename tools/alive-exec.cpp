@@ -54,7 +54,7 @@ optional<StateValue> exec(llvm::Function &F,
     return {};
   }
 
-  if (!opt_quiet)
+  if (!config::quiet)
     Func->print(cout << "\n----------------------------------------\n");
 
   {
@@ -99,7 +99,7 @@ optional<StateValue> exec(llvm::Function &F,
     auto It = curr_bb->instrs().begin();
     Solver solver(true);
 
-    if (!opt_quiet)
+    if (!config::quiet)
       cout << "Executing " << curr_bb->getName() << '\n';
 
     while (true) {
@@ -113,14 +113,14 @@ optional<StateValue> exec(llvm::Function &F,
       auto &name = next_instr.getName();
 
       solver.add(val.return_domain);
-      auto r = solver.check();
+      auto r = solver.check("return domain");
       if (error(r))
         return {};
 
       if (dynamic_cast<const Return*>(&next_instr)) {
         assert(r.isSat());
         auto ret = eval(r, state.returnVal().val);
-        if (!opt_quiet)
+        if (!config::quiet)
           cout << "Returned " << ret << '\n';
         return ret;
       }
@@ -132,12 +132,12 @@ optional<StateValue> exec(llvm::Function &F,
           {
             SolverPush push(solver);
             solver.add(cond);
-            auto r = solver.check();
+            auto r = solver.check("jump condition");
             if (error(r))
               return {};
 
             if (r.isSat()) {
-              if (!opt_quiet)
+              if (!config::quiet)
                 cout << "  >> Jump to " << dst.getName() << "\n\n";
               curr_bb = &dst;
               state.startBB(dst);
@@ -157,7 +157,7 @@ optional<StateValue> exec(llvm::Function &F,
       }
 
       solver.add(val.domain());
-      r = solver.check();
+      r = solver.check("domain");
       if (error(r))
         return {};
 
@@ -166,7 +166,7 @@ optional<StateValue> exec(llvm::Function &F,
         return {};
       }
 
-      if (!opt_quiet) {
+      if (!config::quiet) {
         cout << name;
         if (name[0] == '%') {
           auto v = eval(r, val.val);

@@ -991,6 +991,16 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
   return true;
 }
 
+static bool isDerivedFromLoad(const expr &e) {
+  expr val, val2, _;
+  unsigned h, l;
+  if (e.isExtract(val, h, l))
+    return isDerivedFromLoad(val);
+  if (e.isIf(_, val, val2))
+    return isDerivedFromLoad(val) && isDerivedFromLoad(val2);
+  return e.isLoad(_, _);
+}
+
 Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
                                          uint64_t align, bool write) const {
   AliasSet aliasing(*this);
@@ -1017,7 +1027,8 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
     auto shortbid = p.getShortBid();
     expr offset   = p.getOffset();
     uint64_t bid;
-    if (shortbid.isUInt(bid) && (!isAsmMode() || p.isInbounds(true).isTrue())) {
+    if (shortbid.isUInt(bid) &&
+        (!isAsmMode() || state->isImplied(p.isInbounds(true), true))) {
       if (!is_local.isFalse() && bid < sz_local)
         check_alias(this_alias, true, bid, offset);
       if (!is_local.isTrue() && bid < sz_nonlocal)
@@ -1026,10 +1037,11 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
     }
 
     {
-    bool is_init_memory = isInitialMemoryOrLoad(shortbid, false);
-    bool is_from_fn     = !is_init_memory &&
-                          (isInitialMemoryOrLoad(shortbid, true) ||
-                           isFnReturnValue(shortbid));
+    bool is_init_memory     = isInitialMemoryOrLoad(shortbid, false);
+    bool is_from_fn_or_load = !is_init_memory &&
+                              (isInitialMemoryOrLoad(shortbid, true) ||
+                               isFnReturnValue(shortbid) ||
+                               isDerivedFromLoad(shortbid));
 
     for (auto local : { true, false }) {
       if ((local && is_local.isFalse()) || (!local && is_local.isTrue()))
@@ -1038,8 +1050,10 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
         // initial memory doesn't have local ptrs stored
         if (local && is_init_memory)
           continue;
-        // functions can only return escaped ptrs
-        if (local && is_from_fn && !escaped_local_blks.mayAlias(true, i))
+        // functions and memory loads can only return escaped ptrs
+        if (local &&
+            is_from_fn_or_load &&
+            !escaped_local_blks.mayAlias(true, i))
           continue;
         check_alias(this_alias, local, i, offset);
       }
@@ -1176,6 +1190,9 @@ vector<Byte> Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
 
 Memory::DataType Memory::data_type(const vector<pair<unsigned, expr>> &data,
                                    bool full_store) const {
+  if (isAsmMode())
+    return DATA_ANY;
+
   unsigned ty = DATA_NONE;
   unsigned num_int_zeros = 0;
   for (auto &[idx, val] : data) {
@@ -1406,20 +1423,6 @@ static expr mk_liveness_array() {
   return expr::mkInt(-1, num_nonlocals);
 }
 
-void Memory::mkNonPoisonAxioms(bool local) const {
-  expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
-  const char *name = "#axoff";
-
-  unsigned bid = 0;
-  for (auto &block : local ? local_block_val : non_local_block_val) {
-    if (isInitialMemBlock(block.val, config::disallow_ub_exploitation))
-      state->addAxiom(
-        expr::mkForAll(1, &offset, &name,
-                       !raw_load(local, bid, offset).isPoison()));
-    ++bid;
-  }
-}
-
 expr Memory::mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const {
   bool mk_axiom = &val == &val2;
 
@@ -1445,62 +1448,56 @@ expr Memory::mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const {
          val2.nonptrValue().lshr(leftover_bits) == 0;
 }
 
-void Memory::mkNonlocalValAxioms(bool skip_consts) const {
+void Memory::mkNonlocalValAxioms(const expr &block) const {
+  expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
+  const char *name = "#axoff";
+  Byte byte(*this, ::raw_load(block, offset));
+
   // Users may request the initial memory to be non-poisonous
   if ((config::disable_poison_input && state->isSource()) &&
       (does_int_mem_access || does_ptr_mem_access)) {
-    mkNonPoisonAxioms(false);
+    state->addAxiom(expr::mkForAll(1, &offset, &name, !byte.isPoison()));
   }
 
-  if (!does_ptr_mem_access && !(num_sub_byte_bits && isAsmMode()))
+  if (!does_ptr_mem_access && !(num_sub_byte_bits && config::tgt_is_asm))
     return;
 
-  expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
-  const char *name = "#axoff";
-
-  for (unsigned i = 0, e = numNonlocals(); i != e; ++i) {
-    if (always_noread(i, true))
-      continue;
-
-    Byte byte = raw_load(false, i, offset);
-
-    // in ASM mode, non-byte-aligned values are expected to be zero-extended
-    // per the ABI.
-    if (num_sub_byte_bits && isAsmMode()) {
-      state->addAxiom(
-        expr::mkForAll(1, &offset, &name, mkSubByteZExtStoreCond(byte, byte)));
-    }
-
-    if (!does_ptr_mem_access)
-      continue;
-
-    Pointer loadedptr = byte.ptr();
-    expr bid = loadedptr.getShortBid();
-
-    unsigned upperbid = numNonlocals() - 1;
-    expr bid_cond(true);
-    if (has_fncall) {
-      // initial memory cannot contain a pointer to fncall mem block.
-      if (is_fncall_mem(upperbid)) {
-        upperbid--;
-      } else if (has_write_fncall && !num_inaccessiblememonly_fns) {
-        assert(!state->isSource()); // target-only glb vars exist
-        bid_cond = bid != get_fncallmem_bid();
-      } else if (num_inaccessiblememonly_fns) {
-        bid_cond = bid.ult(num_nonlocals_src - num_inaccessiblememonly_fns
-                                             - has_write_fncall);
-        if (upperbid > num_nonlocals_src)
-          bid_cond |= bid.ugt(num_nonlocals_src - 1);
-      }
-    }
-    bid_cond &= bid.ule(upperbid);
-
+  // in ASM mode, non-byte-aligned values are expected to be zero-extended
+  // per the ABI.
+  if (num_sub_byte_bits && config::tgt_is_asm) {
     state->addAxiom(
-      expr::mkForAll(1, &offset, &name,
-        byte.isPtr().implies(!loadedptr.isLocal(false) &&
-                             !loadedptr.isNocapture(false) &&
-                             std::move(bid_cond))));
+      expr::mkForAll(1, &offset, &name, mkSubByteZExtStoreCond(byte, byte)));
   }
+
+  if (!does_ptr_mem_access)
+    return;
+
+  Pointer loadedptr = byte.ptr();
+  expr bid = loadedptr.getShortBid();
+
+  unsigned upperbid = numNonlocals() - 1;
+  expr bid_cond(true);
+  if (has_fncall) {
+    // initial memory cannot contain a pointer to fncall mem block.
+    if (is_fncall_mem(upperbid)) {
+      upperbid--;
+    } else if (has_write_fncall && !num_inaccessiblememonly_fns) {
+      assert(!state->isSource()); // target-only glb vars exist
+      bid_cond = bid != get_fncallmem_bid();
+    } else if (num_inaccessiblememonly_fns) {
+      bid_cond = bid.ult(num_nonlocals_src - num_inaccessiblememonly_fns
+                                            - has_write_fncall);
+      if (upperbid > num_nonlocals_src)
+        bid_cond |= bid.ugt(num_nonlocals_src - 1);
+    }
+  }
+  bid_cond &= bid.ule(upperbid);
+
+  state->addAxiom(
+    expr::mkForAll(1, &offset, &name,
+      byte.isPtr().implies(!loadedptr.isLocal(false) &&
+                           !loadedptr.isNocapture(false) &&
+                           bid_cond)));
 }
 
 bool Memory::isAsmMode() const {
@@ -1569,14 +1566,8 @@ void Memory::mkAxioms(const Memory &tgt) const {
 
   // Non-local blocks cannot initially contain pointers to local blocks
   // and no-capture pointers.
-  for (auto m_ptr : { this, &tgt }) {
-    auto &m = const_cast<Memory&>(*m_ptr);
-    auto old_vals = m.non_local_block_val;
-    for (unsigned i = skip_null(), e = old_vals.size(); i != e; ++i) {
-      m.non_local_block_val.at(i).val = m.mk_block_val_array(i);
-    }
-    m.mkNonlocalValAxioms(false);
-    m.non_local_block_val = std::move(old_vals);
+  for (unsigned i = skip_null(), e = numNonlocals(); i != e; ++i) {
+    mkNonlocalValAxioms(mk_block_val_array(i));
   }
 
   auto skip_bid = [&](unsigned bid) {
@@ -1958,6 +1949,10 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
                   st.non_local_liveness);
   }
 
+  for (auto &block : st.non_local_block_val) {
+    mkNonlocalValAxioms(block);
+  }
+
   return st;
 }
 
@@ -2056,8 +2051,6 @@ void Memory::setState(const Memory::CallState &st,
   }
 
   // TODO: function calls can also free local objects passed by argument
-
-  mkNonlocalValAxioms(true);
 
   // TODO: havoc local blocks
   // for now, zero out if in non UB-exploitation mode to avoid false positives
@@ -2561,7 +2554,7 @@ expr Memory::ptr2int(const expr &ptr) {
 }
 
 expr Memory::int2ptr(const expr &val) {
-  assert(!memory_unused() && observesAddresses());
+  assert(!memory_unused() && has_int2ptr && observesAddresses());
   nextNonlocalBid();
   return
     Pointer::mkPhysical(*this, val.zextOrTrunc(bits_ptr_address)).release();
@@ -2827,6 +2820,16 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
       set1.isFullUpToAlias(true) == (int)next_local_bid-1)
     return;
 
+  // If we have a physical pointer, only observed addresses can escape
+  if (has_int2ptr) {
+    Pointer p(*this, ptr);
+    if (p.isLogical().isFalse()) {
+      if (set2)
+        set1.unionWith(*set2);
+      return;
+    }
+  }
+
   uint64_t bid;
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
@@ -2840,9 +2843,7 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
     } else if (isFnReturnValue(bid_expr)) {
       // Function calls have already escaped whatever they needed to.
     } else {
-      expr val, arr, idx;
-      unsigned h, l;
-      if (bid_expr.isExtract(val, h, l) && val.isLoad(arr, idx)) {
+      if (isDerivedFromLoad(bid_expr)) {
         // if this a load, it can't escape anything that hasn't escaped before
         continue;
       }

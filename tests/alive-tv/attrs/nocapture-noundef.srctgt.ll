@@ -1,4 +1,4 @@
-define ptr @src(ptr %a, ptr nocapture %b) {
+define ptr @src(ptr %a, ptr captures(none) %b) {
   %cmp = icmp eq ptr %a, %b
   br i1 %cmp, label %t, label %f
 
@@ -10,7 +10,7 @@ f:
   ret ptr null
 }
 
-define ptr @tgt(ptr %a, ptr nocapture %b) {
+define ptr @tgt(ptr %a, ptr captures(none) %b) {
   %cmp = icmp eq ptr %a, %b
   br i1 %cmp, label %t, label %f
 
@@ -23,7 +23,7 @@ f:
 }
 
 
-declare ptr @g(ptr nocapture)
+declare ptr @g(ptr captures(none))
 
 ; If %a = %b + n, this is wrong.
 ; ERROR: Source is more defined than target

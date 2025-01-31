@@ -116,7 +116,7 @@ Pointer Pointer::mkPhysical(const Memory &m, const expr &addr) {
 Pointer Pointer::mkPhysical(const Memory &m, const expr &addr,
                             const expr &attr) {
   assert(hasLogicalBit());
-  assert(addr.bits() == bits_ptr_address);
+  assert(!addr.isValid() || addr.bits() == bits_ptr_address);
   auto p = expr::mkUInt(1, 1)
            .concat_zeros(padding_physical())
            .concat(addr);
@@ -574,12 +574,18 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
         p.getOffsetSizet().uge(block_sz).isTrue()) {
       cond = false;
     } else {
-      // check that the offset is within bounds and that arith doesn't overflow
-      cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
-      cond &= !offset.isNegative();
-      if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
-        cond &= offset.add_no_soverflow(bytes_off);
-
+      // optimized conditions that are equivalent to the condition below
+      if (block_sz.isConst() && bytes.isConst()) {
+        cond = offset.ule(block_sz - bytes_off);
+      } else if (bits_for_offset > bits_size_t && bytes.isOne()) {
+        cond = offset.ult(block_sz);
+      } else {
+        // check that the offset is within bounds and that arith doesn't overflow
+        cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
+        cond &= !offset.isNegative();
+        if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
+          cond &= offset.add_no_soverflow(bytes_off);
+      }
       cond &= block_constraints(p);
     }
     return cond;
@@ -644,6 +650,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     Pointer ptr(m, ptr_expr);
     expr is_log = ptr.isLogical();
     expr inbounds = is_asm ? ptr.isInbounds(true) : expr(true);
+
+    if (is_asm && !inbounds.isTrue() && m.state->isImplied(inbounds, domain))
+      inbounds = true;
 
     optional<expr> log_expr, phy_expr;
     optional<Pointer> new_log_ptr;
@@ -763,6 +772,30 @@ expr Pointer::isHeapAllocated() const {
   return getAllocType().extract(1, 1) == 1;
 }
 
+static expr at_least_same_offseting(const Pointer &p1, const Pointer &p2,
+                                    bool any_stack) {
+  expr size  = p1.blockSizeOffsetT();
+  expr off   = p1.getOffsetSizet();
+  expr size2 = p2.blockSizeOffsetT();
+  expr off2  = p2.getOffsetSizet();
+  return
+    expr::mkIf(p1.isHeapAllocated(),
+               p1.getAllocType() == p2.getAllocType() &&
+                 off == off2 && size == size2,
+
+               any_stack
+                 ? expr(true)
+                 :expr::mkIf(off.sge(0),
+                             off2.sge(0) &&
+                               expr::mkIf(off.ule(size),
+                                          off2.ule(size2) && off2.uge(off) &&
+                                            (size2 - off2).uge(size - off),
+                                          off2.ugt(size2) && off == off2 &&
+                                            size2.uge(size)),
+                             // maintains same dereferenceability before/after
+                             off == off2 && size2.uge(size)));
+}
+
 expr Pointer::refined(const Pointer &other) const {
   bool is_asm = other.m.isAsmMode();
   auto [p1l, d1] = toLogicalLocal();
@@ -771,12 +804,16 @@ expr Pointer::refined(const Pointer &other) const {
   // This refers to a block that was malloc'ed within the function
   expr local = d2 && p2l.isLocal();
   local &= p1l.getAllocType() == p2l.getAllocType();
-  local &= p1l.blockSize() == p2l.blockSize();
-  local &= p1l.getOffset() == p2l.getOffset();
+  if (is_asm) {
+    local &= at_least_same_offseting(p1l, p2l, true);
+  } else {
+    local &= p1l.blockSize() == p2l.blockSize();
+    local &= p1l.getOffset() == p2l.getOffset();
+  }
   local &= p1l.isBlockAlive().implies(p2l.isBlockAlive());
   // Attributes are ignored at refinement.
 
-  if (is_asm)
+  if (!is_asm)
     local &= isLogical() == other.isLogical();
 
   // TODO: this induces an infinite loop
@@ -799,30 +836,13 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   bool is_asm = other.m.isAsmMode();
   auto [p1l, d1] = toLogicalLocal();
   auto [p2l, d2] = other.toLogicalLocal();
-  expr size = p1l.blockSizeOffsetT();
-  expr off = p1l.getOffsetSizet();
-  expr size2 = p2l.blockSizeOffsetT();
-  expr off2 = p2l.getOffsetSizet();
 
   // TODO: check block value for byval_bytes
   if (!byval_bytes.isZero())
     return true;
 
-  expr local
-    = expr::mkIf(p1l.isHeapAllocated(),
-                 p1l.getAllocType() == p2l.getAllocType() &&
-                   off == off2 && size == size2,
-
-                 expr::mkIf(off.sge(0),
-                            off2.sge(0) &&
-                              expr::mkIf(off.ule(size),
-                                         off2.ule(size2) && off2.uge(off) &&
-                                           (size2 - off2).uge(size - off),
-                                         off2.ugt(size2) && off == off2 &&
-                                           size2.uge(size)),
-                            // maintains same dereferenceability before/after
-                            off == off2 && size2.uge(size)));
-  local = d2 && (p2l.isLocal() || p2l.isByval()) && local;
+  expr local = d2 && (p2l.isLocal() || p2l.isByval()) &&
+               at_least_same_offseting(p1l, p2l, false);
 
   if (is_asm)
     local &= isLogical() == other.isLogical();

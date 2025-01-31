@@ -1838,14 +1838,14 @@ StateValue FpConversionOp::toSMT(State &s) const {
       expr fp2 = bv.sint2fp(val, rm);
       // -0.xx is converted to 0 and then to 0.0, though -0.xx is ok to convert
       expr val_rounded = val.round(rm);
-      expr overflow = val_rounded.isFPZero() || fp2 == val_rounded;
+      expr no_overflow = val_rounded.isFPZero() || fp2 == val_rounded;
 
       expr np;
       if (is_poison) {
-        np = std::move(overflow);
+        np = std::move(no_overflow);
       } else {
         np = true;
-        bv = expr::mkIf(overflow, s.getFreshNondetVar("nondet", bv), bv);
+        bv = expr::mkIf(no_overflow, bv, s.getFreshNondetVar("nondet", bv));
       }
 
       if (op == FPToSInt_Sat)
@@ -2769,11 +2769,11 @@ StateValue ICmp::toSMT(State &s) const {
       auto &m = s.getMemory();
       Pointer lhs(m, av);
       Pointer rhs(m, bv);
-      m.observesAddr(lhs);
-      m.observesAddr(rhs);
 
       switch (pcmode) {
       case INTEGRAL:
+        m.observesAddr(lhs);
+        m.observesAddr(rhs);
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
       case PROVENANCE:
         assert(cond == EQ || cond == NE);
@@ -2788,7 +2788,19 @@ StateValue ICmp::toSMT(State &s) const {
   auto scalar = [&](const StateValue &a, const StateValue &b) -> StateValue {
     auto fn2 = [&](Cond c) { return fn(a.value, b.value, c); };
     auto v = cond != Any ? fn2(cond) : build_icmp_chain(cond_var(), fn2);
-    auto np = flags & SameSign ? a.value.sign() == b.value.sign() : true;
+    expr np = true;
+    if (flags & SameSign) {
+      if (isPtrCmp()) {
+        auto &m = s.getMemory();
+        Pointer lhs(m, a.value);
+        Pointer rhs(m, b.value);
+        m.observesAddr(lhs);
+        m.observesAddr(rhs);
+        np = lhs.getAddress().sign() == rhs.getAddress().sign();
+      } else {
+        np = a.value.sign() == b.value.sign();
+      }
+    }
     return { v.toBVBool(), a.non_poison && b.non_poison && np };
   };
 

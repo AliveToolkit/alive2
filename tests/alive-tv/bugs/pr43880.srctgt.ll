@@ -2,14 +2,14 @@
 
 target datalayout = "e-i8:8:8-i16:16:16"
 target triple = "x86_64-unknown-unknown"
-declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
+declare i32 @memcmp(ptr captures(none), ptr captures(none), i64)
 
-define i32 @src(ptr nocapture readonly %x, ptr nocapture readonly %y)  {
+define i32 @src(ptr captures(none) readonly %x, ptr captures(none) readonly %y)  {
   %call = tail call i32 @memcmp(ptr %x, ptr %y, i64 2)
   ret i32 %call
 }
 
-define i32 @tgt(ptr nocapture readonly %x, ptr nocapture readonly %y) {
+define i32 @tgt(ptr captures(none) readonly %x, ptr captures(none) readonly %y) {
   %1 = bitcast ptr %x to ptr
   %2 = bitcast ptr %y to ptr
   %3 = load i16, ptr %1

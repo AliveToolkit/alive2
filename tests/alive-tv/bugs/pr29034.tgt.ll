@@ -8,7 +8,7 @@ target triple = "aarch64"
 
 @.str = external hidden unnamed_addr constant [10 x i8], align 1
 
-define void @music_task(ptr nocapture readnone %p) #0 {
+define void @music_task(ptr captures(none) readnone %p) #0 {
 entry:
   %mapi = alloca ptr, align 8
   %0 = bitcast ptr %mapi to ptr
@@ -66,10 +66,10 @@ while.cond2.backedge:                             ; preds = %sw.default, %sw.bb1
   br label %while.cond2
 }
 
-declare void @llvm.lifetime.start(i64, ptr nocapture) #1
+declare void @llvm.lifetime.start(i64, ptr captures(none)) #1
 declare i32 @music_decoder_init(ptr)
 declare i32 @music_play_api(ptr, i32, i32, i32, ptr)
-declare i32 @printf(ptr nocapture readonly, ...) #3
+declare i32 @printf(ptr captures(none) readonly, ...) #3
 
 attributes #0 = { noreturn nounwind }
 attributes #1 = { memory(argmem: readwrite) nounwind }

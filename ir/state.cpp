@@ -1062,10 +1062,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
 
   assert(!noret || !willret);
 
-  bool all_valid = std::all_of(inputs.begin(), inputs.end(),
-                                [](auto &v) { return v.isValid(); }) &&
-                   std::all_of(ptr_inputs.begin(), ptr_inputs.end(),
-                                [](auto &v) { return v.val.isValid(); });
+  bool all_valid
+    = ranges::all_of(inputs, [](auto &v) { return v.isValid(); }) &&
+      ranges::all_of(ptr_inputs, [](auto &v) { return v.val.isValid(); });
 
   if (!all_valid) {
     addUB(expr());
@@ -1375,6 +1374,18 @@ void State::finishInitializer() {
     returned_input = (*this)[*ret];
     resetUndefVars(true);
   }
+}
+
+bool State::isImplied(const expr &e, const expr &e_domain) {
+  if (domain.UB.contains(e))
+    return true;
+
+  if (check_expr((e_domain && domain()).notImplies(e), "UB inference", true)
+        .isUnsat()) {
+    domain.UB.add(e_domain.implies(e));
+    return true;
+  }
+  return false;
 }
 
 expr State::sinkDomain(bool include_ub) const {

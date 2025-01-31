@@ -19,6 +19,7 @@ bool tgt_is_asm = false;
 bool fail_if_src_is_ub = false;
 bool disallow_ub_exploitation = false;
 bool debug = false;
+bool quiet = false;
 unsigned src_unroll_cnt = 0;
 unsigned tgt_unroll_cnt = 0;
 unsigned max_offset_bits = 64;

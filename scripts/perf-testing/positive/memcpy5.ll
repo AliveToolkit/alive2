@@ -1,5 +1,5 @@
 declare void @llvm.memcpy.p0i8.p0i8.i32(i8*, i8*, i32, i1)
-declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)
+declare i32 @memcmp(i8* captures(none), i8* captures(none), i64)
 
 @a = external global [X x i8]
 @b = external global [X x i8]

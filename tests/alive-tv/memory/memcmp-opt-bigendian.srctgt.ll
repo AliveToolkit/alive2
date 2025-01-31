@@ -20,4 +20,4 @@ define i32 @tgt(i16 noundef %x, i16 noundef %y) {
   ret i32 %res
 }
 
-declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
+declare i32 @memcmp(ptr captures(none), ptr captures(none), i64)

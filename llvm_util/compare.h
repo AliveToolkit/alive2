@@ -18,7 +18,6 @@ struct Verifier {
   unsigned num_unsound = 0;
   unsigned num_failed = 0;
   unsigned num_errors = 0;
-  bool quiet = false;
   bool always_verify = false;
   bool print_dot = false;
   bool bidirectional = false;

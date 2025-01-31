@@ -167,6 +167,12 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
     }
   }
 
+  // Return early if instance reporting is not requested.
+  if (config::quiet) {
+    errs.add(msg, true);
+    return false;
+  }
+
   // minimize the model
   optional<Result> newr;
 

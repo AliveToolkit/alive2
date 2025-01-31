@@ -21,5 +21,5 @@ define i1 @tgt(i64 %x, i64 %y, i64 %n) {
   ret i1 %c
 }
 
-declare i32 @bcmp(ptr nocapture, ptr nocapture, i64)
-declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
+declare i32 @bcmp(ptr captures(none), ptr captures(none), i64)
+declare i32 @memcmp(ptr captures(none), ptr captures(none), i64)

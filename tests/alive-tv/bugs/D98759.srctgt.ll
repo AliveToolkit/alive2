@@ -1,6 +1,6 @@
 ; Reported by https://reviews.llvm.org/D90529#2619492
 
-define i32 @src(ptr nocapture %a) nounwind memory(read) {
+define i32 @src(ptr captures(none) %a) nounwind memory(read) {
 entry:
   call void @llvm.assume(i1 true) ["align"(ptr %a, i32 32, i32 28)]
   %arrayidx = getelementptr inbounds i32, ptr %a, i64 -1
@@ -8,7 +8,7 @@ entry:
   ret i32 %.0
 }
 
-define i32 @tgt(ptr nocapture %a) nounwind memory(read) {
+define i32 @tgt(ptr captures(none) %a) nounwind memory(read) {
 entry:
   call void @llvm.assume(i1 true) ["align"(ptr %a, i32 32, i32 28)]
   %arrayidx = getelementptr inbounds i32, ptr %a, i64 -1

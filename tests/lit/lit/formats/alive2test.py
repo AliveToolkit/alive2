@@ -4,31 +4,9 @@
 import lit.TestRunner
 import lit.util
 from .base import TestFormat
-import os, re, signal, string, subprocess
+import os, re
 
 ok_string = 'Transformation seems to be correct!'
-
-def executeCommand(command):
-  p = subprocess.Popen(command,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE)
-  out,err = p.communicate()
-  exitCode = p.wait()
-
-  # Detect Ctrl-C in subprocess.
-  if exitCode == -signal.SIGINT:
-    raise KeyboardInterrupt
-
-  # Ensure the resulting output is always of string type.
-  try:
-    out = str(out.decode('ascii'))
-  except:
-    out = str(out)
-  try:
-    err = str(err.decode('ascii'))
-  except:
-    err = str(err)
-  return out, err, exitCode
 
 def is_timeout(str):
   return str.find('ERROR: Timeout') > 0
@@ -37,7 +15,7 @@ def is_incomplete(str):
   return str.find('SMT Error: smt tactic failed to show goal to be sat/unsat') > 0
 
 def id_check(fn, cmd, args):
-  out, err, exitCode = executeCommand(cmd + args)
+  out, err, exitCode = lit.util.executeCommand(cmd + args)
   str = out + err
   if not is_timeout(str) and not is_incomplete(str) and \
      (exitCode != 0 or str.find(ok_string) < 0):
@@ -134,7 +112,7 @@ class Alive2Test(TestFormat):
     elif alive_tv_3:
       cmd.append(test)
 
-    out, err, exitCode = executeCommand(cmd)
+    out, err, exitCode = lit.util.executeCommand(cmd)
     output = out + err
 
     xfail = self.regex_xfail.search(input)

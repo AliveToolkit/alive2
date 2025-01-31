@@ -5,7 +5,7 @@ define void @src(ptr %p) {
         ret void
 }
 
-declare void @llvm.memcpy.i32(ptr nocapture, ptr nocapture, i32, i1)
+declare void @llvm.memcpy.i32(ptr captures(none), ptr captures(none), i32, i1)
 
 define void @tgt(ptr %p) {
         store i16 1, ptr %p

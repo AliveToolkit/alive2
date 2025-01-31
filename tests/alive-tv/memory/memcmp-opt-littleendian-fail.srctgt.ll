@@ -21,4 +21,4 @@ define i32 @tgt(i64 %x, i64 %y) {
 
 ; ERROR: Value mismatch
 
-declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
+declare i32 @memcmp(ptr captures(none), ptr captures(none), i64)

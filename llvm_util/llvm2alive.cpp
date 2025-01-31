@@ -1570,8 +1570,11 @@ public:
         attrs.set(ParamAttrs::NonNull);
         break;
 
-      case llvm::Attribute::NoCapture:
-        attrs.set(ParamAttrs::NoCapture);
+      case llvm::Attribute::Captures:
+        if (capturesNothing(llvmattr.getCaptureInfo().getOtherComponents()))
+          attrs.set(ParamAttrs::NoCapture);
+        else
+          errorAttr(llvmattr); // TODO: support other captures
         break;
 
       case llvm::Attribute::ReadOnly:
@@ -1902,11 +1905,13 @@ public:
           attrlist.getAttributes(llvm::AttributeList::FirstArgIndex + idx);
 
       auto ty = llvm_type2alive(arg.getType());
+      if (!ty)
+        return {};
       ParamAttrs attrs;
       auto val = make_unique<Input>(*ty, value_name(arg));
       Value *newval = val.get();
 
-      if (!ty || !handleParamAttrs(argattr, attrs, &newval, false))
+      if (!handleParamAttrs(argattr, attrs, &newval, false))
         return {};
       val->setAttributes(std::move(attrs));
       add_identifier(arg, *newval);
@@ -2015,7 +2020,7 @@ public:
       const char *chrs = name.data();
       char *end_ptr;
       auto numeric_id = strtoul(chrs, &end_ptr, 10);
-      if (end_ptr != chrs + name.size())
+      if (end_ptr != name.end())
         return M->getGlobalVariable(name, true);
       else {
         auto itr = M->global_begin(), end = M->global_end();
@@ -2035,27 +2040,11 @@ public:
     BB = &Fn.getBB("#init", true);
     insert_constexpr_before = nullptr;
 
-    // Ensure all src globals exist in target as well
-    for (auto *gv : gvsInSrc) {
-      if (Fn.getGlobalVar(gv->getName())) {
-        // do nothing
-      } else {
-        // import from src
-        // FIXME: this is wrong for IPO
-        Fn.addConstant(make_unique<GlobalVariable>(*gv));
-      }
-    }
-
     map<string, unique_ptr<Store>> stores;
-    // Converting initializer may add new global variables to Fn
-    // (Fn.numConstants() increases in that case)
-    for (unsigned i = 0; i != Fn.numConstants(); ++i) {
-      auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
-      if (!GV)
-        continue;
+    auto gen_initializer = [&](GlobalVariable *GV) {
       auto gv = getGlobalVariable(string_view(GV->getName()).substr(1));
       if (!gv || !gv->isConstant() || !gv->hasDefinitiveInitializer())
-        continue;
+        return true;
 
       auto storedval = get_operand(gv->getInitializer());
       if (!storedval) {
@@ -2067,11 +2056,37 @@ public:
           *out << "[too large]\n";
         else
           *out << str << '\n';
-        return {};
+        return false;
       }
 
       stores.emplace(GV->getName(),
                      make_unique<Store>(*GV, *storedval, GV->getAlignment()));
+      return true;
+    };
+
+    // Ensure all src globals exist in target as well
+    for (auto *gv : gvsInSrc) {
+      auto name = string_view(gv->getName()).substr(1);
+      if (Fn.getGlobalVar(gv->getName())) {
+        // ok
+      } else if (auto *tgt_gv = getGlobalVariable(name)) {
+        if (!get_operand(tgt_gv))
+          return {};
+      } else {
+        // import from src
+        // FIXME: this is wrong for IPO
+        auto new_var = make_unique<GlobalVariable>(*gv);
+        gen_initializer(new_var.get());
+        Fn.addConstant(std::move(new_var));
+      }
+    }
+
+    // Converting initializer may add new global variables to Fn
+    // (Fn.numConstants() increases in that case)
+    for (unsigned i = 0; i != Fn.numConstants(); ++i) {
+      auto GV = dynamic_cast<GlobalVariable *>(&Fn.getConstant(i));
+      if (GV && !gen_initializer(GV))
+        return {};
     }
 
     for (auto &itm : stores)
