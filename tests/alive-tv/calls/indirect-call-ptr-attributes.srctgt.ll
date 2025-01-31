@@ -1,9 +1,9 @@
-define i8 @src(ptr nocapture %0) {
+define i8 @src(ptr captures(none) %0) {
   %2 = call i8 %0(ptr null)
   ret i8 %2
 }
 
-define i8 @tgt(ptr nocapture %0) {
+define i8 @tgt(ptr captures(none) %0) {
   %2 = icmp eq ptr %0, @_Z3fooPi
   br i1 %2, label %then, label %else
 

@@ -23,4 +23,4 @@ define i32 @ub_oob2() {
   ret i32 %res
 }
 
-declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
+declare i32 @memcmp(ptr captures(none), ptr captures(none), i64)
