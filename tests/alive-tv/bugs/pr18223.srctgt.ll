@@ -135,4 +135,4 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
   ret i32 0
 }
 
-declare i32 @myprintf(ptr nocapture readonly, ...)
+declare i32 @myprintf(ptr captures(none) readonly, ...)

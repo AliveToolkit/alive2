@@ -1,4 +1,4 @@
-declare void @f_nocapture(ptr nocapture %p)
+declare void @f_nocapture(ptr captures(none) %p)
 declare ptr @g()
 
 define i8 @src() {

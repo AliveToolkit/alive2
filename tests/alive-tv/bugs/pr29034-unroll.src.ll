@@ -7,7 +7,7 @@
 
 @.str = external hidden unnamed_addr constant [10 x i8], align 1
 
-define void @music_task(ptr nocapture readnone %p, ptr %mapi_init) {
+define void @music_task(ptr captures(none) readnone %p, ptr %mapi_init) {
 entry:
   %mapi = alloca ptr, align 8
   %0 = bitcast ptr %mapi to ptr
@@ -79,9 +79,9 @@ return:
   ret void
 }
 
-declare void @llvm.lifetime.start(i64, ptr nocapture)
+declare void @llvm.lifetime.start(i64, ptr captures(none))
 declare i32 @music_decoder_init(ptr)
 declare i32 @music_play_api(ptr, i32, i32, i32, ptr)
-declare i32 @myprintf(ptr nocapture readonly, ...)
+declare i32 @myprintf(ptr captures(none) readonly, ...)
 
 ; ERROR: Source is more defined than target

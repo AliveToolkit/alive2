@@ -42,6 +42,6 @@ define void @tgt(ptr) {
   ret void
 }
 
-declare i32 @f(ptr nocapture readonly, ...) local_unnamed_addr
+declare i32 @f(ptr captures(none) readonly, ...) local_unnamed_addr
 
 ; ERROR: Source is more defined than target

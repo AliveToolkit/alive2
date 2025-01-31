@@ -1,4 +1,4 @@
-define ptr @src(ptr nocapture %p, ptr %q) {
+define ptr @src(ptr captures(none) %p, ptr %q) {
   %c = icmp eq ptr %p, %q
   br i1 %c, label %A, label %B
 A:
@@ -6,7 +6,7 @@ A:
 B:
   ret ptr null
 }
-define ptr @tgt(ptr nocapture %p, ptr %q) {
+define ptr @tgt(ptr captures(none) %p, ptr %q) {
   %c = icmp eq ptr %p, %q
   br i1 %c, label %A, label %B
 A:

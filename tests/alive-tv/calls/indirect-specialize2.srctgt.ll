@@ -16,4 +16,4 @@ else:
   ret i8 %v2
 }
 
-declare i8 @fn(ptr nocapture)
+declare i8 @fn(ptr captures(none))

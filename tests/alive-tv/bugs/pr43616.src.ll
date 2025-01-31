@@ -1,7 +1,7 @@
 ; https://bugs.llvm.org/show_bug.cgi?id=43616
 ; This miscompilation is detected by Alive2 in the past, but not now because
 ; changing a global variable into constant is not supported anymore.
-declare ptr @llvm.invariant.start.p0i8(i64 %size, ptr nocapture %ptr)
+declare ptr @llvm.invariant.start.p0i8(i64 %size, ptr captures(none) %ptr)
 
 declare void @test1(ptr)
 

@@ -1,8 +1,8 @@
-define i64 @src(ptr nocapture %p) {
+define i64 @src(ptr captures(none) %p) {
   %v = ptrtoint ptr %p to i64
   ret i64 %v
 }
 
-define i64 @tgt(ptr nocapture %p) {
+define i64 @tgt(ptr captures(none) %p) {
   unreachable
 }
