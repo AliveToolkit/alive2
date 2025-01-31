@@ -1570,8 +1570,11 @@ public:
         attrs.set(ParamAttrs::NonNull);
         break;
 
-      case llvm::Attribute::NoCapture:
-        attrs.set(ParamAttrs::NoCapture);
+      case llvm::Attribute::Captures:
+        if (capturesNothing(llvmattr.getCaptureInfo().getOtherComponents()))
+          attrs.set(ParamAttrs::NoCapture);
+        else
+          errorAttr(llvmattr); // TODO: support other captures
         break;
 
       case llvm::Attribute::ReadOnly:
