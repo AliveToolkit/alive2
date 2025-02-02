@@ -1571,7 +1571,7 @@ public:
         break;
 
       case llvm::Attribute::Captures:
-        if (capturesNothing(llvmattr.getCaptureInfo().getOtherComponents()))
+        if (capturesNothing(llvmattr.getCaptureInfo()))
           attrs.set(ParamAttrs::NoCapture);
         else
           errorAttr(llvmattr); // TODO: support other captures
