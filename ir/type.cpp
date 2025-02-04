@@ -525,6 +525,22 @@ expr FloatType::isNaN(const expr &v, bool signalling) const {
   }
 }
 
+smt::expr FloatType::toInt(State &s, smt::expr v) const {
+  expr isnan = v.BV2float(getDummyFloat()).isNaN();
+
+  if (isnan.isFalse())
+    return v;
+
+  expr sign = s.getFreshNondetVar("#sign", expr::mkUInt(0, 1));
+  expr nan = sign.concat(v.trunc(bits() - 1));
+
+  return expr::mkIf(isnan, nan, v);
+}
+
+IR::StateValue FloatType::toInt(State &s, IR::StateValue v) const {
+  return Type::toInt(s, std::move(v));
+}
+
 unsigned FloatType::bits() const {
   assert(fpType != Unknown);
   return float_sizes[fpType].first;
@@ -611,8 +627,13 @@ pair<expr, expr>
 FloatType::refines(State &src_s, State &tgt_s, const StateValue &src,
                    const StateValue &tgt) const {
   expr non_poison = src.non_poison && tgt.non_poison;
-  return { src.non_poison.implies(tgt.non_poison),
-           (src.non_poison && tgt.non_poison).implies(src.value == tgt.value) };
+  expr equal_payload =
+      src.value.trunc(fractionBits()) == tgt.value.trunc(fractionBits());
+  expr equal = src.value == tgt.value;
+  return {src.non_poison.implies(tgt.non_poison),
+          non_poison.implies(expr::mkIf(getFloat(src.value).isNaN() &&
+                                            getFloat(tgt.value).isNaN(),
+                                        equal_payload, equal))};
 }
 
 expr FloatType::mkInput(State &s, const char *name,
