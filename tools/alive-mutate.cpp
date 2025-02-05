@@ -206,7 +206,6 @@ void initVerifier(llvm::Triple targetTriple) {
 
   smt_init.emplace();
   verifier.emplace(TLI.value(), smt_init.value(), logStream);
-  verifier->quiet = opt_quiet;
   verifier->always_verify = opt_always_verify;
   verifier->print_dot = opt_print_dot;
   verifier->bidirectional = opt_bidirectional;

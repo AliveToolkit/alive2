@@ -103,7 +103,8 @@ void ShuffleHelper::shuffleCurrentBlock() {
   }
 
   for (llvm::Instruction *p : sv) {
-    ((llvm::Instruction *)&*(mutator->vMap)[p])->insertBefore(nextInst);
+    ((llvm::Instruction *)&*(mutator->vMap)[p])
+        ->insertBefore(nextInst->getIterator());
   }
   mutator->iitInTmp = llvm::BasicBlock::iterator(
       (llvm::Instruction *)&*mutator->vMap[&*mutator->iit]);
@@ -220,7 +221,7 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
                   *val2 = llvm::UndefValue::get(eleType),
                   *val3 = llvm::ConstantInt::get(i32Ty, idx);
       newInst = llvm::InsertElementInst::Create(val1, val2, val3);
-      newInst->insertBefore(inst);
+      newInst->insertBefore(inst->getIterator());
       inst->setOperand(pos, newInst);
       mutator->setOperandRandomValue(newInst, 1);
       llvm::SmallVector<llvm::Value *> vals;
@@ -247,7 +248,7 @@ bool MutateInstructionHelper::insertRandomBinaryInstruction(
       // shuffleVectorInst.insertBefore(inst);
       // inst->setOperand(pos, &shuffleVectorInst);
       newInst = new llvm::ShuffleVectorInst(val1, val2, val3);
-      newInst->insertBefore(inst);
+      newInst->insertBefore(inst->getIterator());
     }
 
   } else {
@@ -417,7 +418,8 @@ void RandomMoveHelper::randomMoveInstructionForward(llvm::Instruction *inst) {
   }
   newPosInst = &*newPosIt;
 
-  inst->moveBefore(newPosInst);
+  inst->removeFromParent();
+  inst->insertBefore(newPosInst->getIterator());
   mutator->iitInTmp = inst->getIterator();
 
   for (size_t i = 0; i < inst->getNumOperands(); ++i) {
@@ -485,7 +487,8 @@ void RandomMoveHelper::randomMoveInstructionBackward(llvm::Instruction *inst) {
   ++newPosIt;
   newPosInst = &*newPosIt;
   inst = (llvm::Instruction *)extraVals[0];
-  inst->moveBefore(newPosInst);
+  inst->removeFromParent();
+  inst->insertBefore(newPosInst->getIterator());
   mutator->iitInTmp = inst->getIterator();
 }
 
@@ -717,8 +720,14 @@ void FunctionAttributeHelper::mutate() {
     }
   }
   for (size_t index : ptrPos) {
-    setFuncParamAttr(index, llvm::Attribute::AttrKind::NoCapture,
-                     Random::getRandomBool());
+    if (func->hasParamAttribute(index, llvm::Attribute::AttrKind::Captures)) {
+      func->removeParamAttr(index, llvm::Attribute::AttrKind::Captures);
+    }
+    if (Random::getRandomBool()) {
+      func->addParamAttr(
+          index, llvm::Attribute::get(func->getContext(),
+                                      llvm::Attribute::AttrKind::Captures));
+    }
     func->removeParamAttr(index, llvm::Attribute::AttrKind::Dereferenceable);
     func->addDereferenceableParamAttr(index,
                                       1 << (Random::getRandomUnsigned() % 4));
