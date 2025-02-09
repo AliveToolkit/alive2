@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <sstream>
 
-using namespace st;
+using namespace smt;
 using namespace std;
 using namespace util;
 
