@@ -167,9 +167,8 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
     }
   }
 
-  // Return early if instance reporting is not requested.
   if (config::quiet) {
-    s << msg << " in " << src_state.getFn().getName() << "\n";
+    s << msg << " in " << src_state.getFn().getName() << '\n';
     errs.add(std::move(s).str(), true);
     return false;
   }
