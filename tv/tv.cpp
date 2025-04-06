@@ -514,6 +514,7 @@ const char* nop_pass_prefixes[] {
 
 const char* terminate_execution[] {
   "RequireAnalysisPass<llvm::GlobalsAA",
+  "RequireAnalysisPass<GlobalsAA",
 };
 
 bool is_unsupported_pass(const llvm::StringRef &pass0) {
