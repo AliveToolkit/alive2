@@ -571,10 +571,15 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
       auto pre_src_and = src_state.getPre();
       auto &pre_tgt_and = tgt_state.getPre();
 
-      // optimization: rewrite "tgt /\ (src -> foo)" to "tgt /\ foo" if src=tgt
-      pre_src_and.del(pre_tgt_and);
-      pre_src = std::move(pre_src_and)();
-      pre_tgt = pre_tgt_and();
+      if(tgt_state.sinkDomain(false).eq(src_state.sinkDomain(false))){
+        pre_src = std::move(pre_src_and)();
+        pre_tgt = pre_tgt_and();
+      }
+      else{
+        pre_src_and.del(pre_tgt_and);
+        pre_src = std::move(pre_src_and)();
+        pre_tgt = pre_tgt_and();
+      }
     }
 
     if (check_expr(axioms_expr && (pre_src && pre_tgt), "pre").isUnsat()) {
