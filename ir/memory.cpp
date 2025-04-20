@@ -1709,6 +1709,7 @@ void Memory::syncWithSrc(const Memory &src) {
   // tgt can only have new const globals, but it allocates input ptrs
   next_global_bid = num_nonlocals_src;
   next_nonlocal_bid = src.next_nonlocal_bid;
+  ptr_alias = src.ptr_alias;
   // TODO: copy alias info for fn return ptrs from src?
 }
 
