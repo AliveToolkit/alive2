@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies (MacOS)
         if: runner.os == 'macOS'
         run: |
-          brew install z3 re2c ninja
+          brew install z3 re2c ninja llvm
 
       - name: Compile
         run: ./.github/scripts/build.sh
