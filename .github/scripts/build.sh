@@ -5,7 +5,7 @@ cd build
 
 if [[ "$RUNNER_OS" == "Linux" ]]; then
   LLVM_VERSION="${CMAKE_CXX_COMPILER##*-}"   # extracts 20 or 21
-  LLVM_DIR="usr/lib/llvm-${LLVM_VERSION}/lib/cmake"
+  LLVM_DIR="/usr/lib/llvm-${LLVM_VERSION}/lib/cmake"
 elif [[ "$RUNNER_OS" == "macOS" ]]; then
   LLVM_DIR="$(brew --prefix llvm)/lib/cmake/llvm"
 fi
