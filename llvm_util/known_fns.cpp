@@ -161,14 +161,22 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     set_param(0, ParamAttrs::AllocPtr);
     RETURN_EXACT();
 
-  case llvm::LibFunc_fwrite:
-  case llvm::LibFunc_fwrite_unlocked:
   case llvm::LibFunc_fread:
   case llvm::LibFunc_fread_unlocked:
     ret_and_args_no_undef();
     attrs.set(FnAttrs::NoThrow);
     attrs.set(FnAttrs::NoFree);
     set_param(0, ParamAttrs::NoCapture);
+    set_param(3, ParamAttrs::NoCapture);
+    RETURN_EXACT();
+
+  case llvm::LibFunc_fwrite:
+  case llvm::LibFunc_fwrite_unlocked:
+    ret_and_args_no_undef();
+    attrs.set(FnAttrs::NoThrow);
+    attrs.set(FnAttrs::NoFree);
+    set_param(0, ParamAttrs::NoCapture);
+    set_param(0, ParamAttrs::NoWrite);
     set_param(3, ParamAttrs::NoCapture);
     RETURN_EXACT();
 
