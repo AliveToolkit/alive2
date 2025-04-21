@@ -3686,8 +3686,7 @@ MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
   info.doesPtrStore     = ptr_access && store;
   info.doesPtrLoad      = ptr_access && !store;
   info.byteSize         = gcd(align, getCommonAccessSize(t));
-  if (auto intTy = t.getAsIntType())
-    info.subByteAccess  = intTy->maxSubBitAccess();
+  info.subByteAccess    = t.maxSubBitAccess();
   return info;
 }
 

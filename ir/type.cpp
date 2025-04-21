@@ -31,6 +31,10 @@ unsigned Type::np_bits(bool fromInt) const {
   return min(bw, (unsigned)divide_up(bw * bits_poison_per_byte, bits_byte));
 }
 
+unsigned Type::maxSubBitAccess() const {
+  return 0;
+}
+
 expr Type::var(const char *var, unsigned bits) const {
   auto str = name + '_' + var;
   return expr::mkVar(str.c_str(), bits);
@@ -883,6 +887,13 @@ unsigned AggregateType::np_bits(bool fromInt) const {
     bw += children[i]->np_bits(fromInt);
   }
   return bw;
+}
+
+unsigned AggregateType::maxSubBitAccess() const {
+  return std::accumulate(children.begin(), children.end(), 0,
+            [](unsigned acc, const Type *t) {
+              return max(acc, t->maxSubBitAccess());
+            });
 }
 
 StateValue AggregateType::getDummyValue(bool non_poison) const {

@@ -104,6 +104,8 @@ public:
   virtual smt::expr fromInt(smt::expr v) const;
   virtual IR::StateValue fromInt(IR::StateValue v) const;
 
+  virtual unsigned maxSubBitAccess() const;
+
   // combine existing poison value in BV repr with a new boolean expr
   smt::expr combine_poison(const smt::expr &boolean,
                            const smt::expr &orig) const;
@@ -159,7 +161,7 @@ public:
   IntType(std::string &&name, unsigned bitwidth)
     : Type(std::move(name)), bitwidth(bitwidth), defined(true) {}
 
-  unsigned maxSubBitAccess() const;
+  unsigned maxSubBitAccess() const override;
   unsigned bits() const override;
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
@@ -291,6 +293,7 @@ public:
 
   unsigned bits() const override;
   unsigned np_bits(bool fromInt) const override;
+  unsigned maxSubBitAccess() const override;
   // Padding is filled with poison regardless of non_poison.
   IR::StateValue getDummyValue(bool non_poison) const override;
   smt::expr getTypeConstraints() const override;
