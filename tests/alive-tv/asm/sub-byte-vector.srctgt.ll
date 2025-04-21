@@ -1,3 +1,6 @@
+; TEST-ARGS: -tgt-is-asm
+; SKIP-IDENTITY
+
 define void @src(ptr %0, ptr %1, ptr %2) {
   %4 = load <1 x i1>, ptr %1, align 1
   %5 = load <1 x i1>, ptr %2, align 1
