@@ -4,7 +4,7 @@ mkdir build
 cd build
 
 if [[ "$RUNNER_OS" == "Linux" ]]; then
-  LLVM_DIR="/usr/lib/llvm-21/lib/cmake/llvm"
+  LLVM_DIR="/usr/lib/llvm-21"
 elif [[ "$RUNNER_OS" == "macOS" ]]; then
   LLVM_DIR="$(brew --prefix llvm)/lib/cmake/llvm"
 fi
