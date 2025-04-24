@@ -1,0 +1,92 @@
+Name: frem, constant prop.
+%t = frem double 1.5, 1.0
+  =>
+%t = double 0.5
+
+Name: frem, constant prop.
+%t = frem double 0.5, 1.0
+  =>
+%t = double 0.5
+
+Name: frem, constant prop.
+%t = frem double 0.3, 0.01
+  =>
+%t = double 0.009999999999999983
+
+Name: frem, constant prop.
+%t = frem double -4.0, -2.0
+  =>
+%t = double -0.0
+
+Name: frem, constant prop.
+%t = frem double -4.0, 2.0
+  =>
+%t = double -0.0
+
+Name: frem, constant prop.
+%t = frem double 3.0, 2.0
+  =>
+%t = double 1.0
+
+Name: frem, constant prop.
+%t = frem double 5.0, 3.0
+  =>
+%t = double 2.0
+
+Name: frem, constant prop.
+%t = frem double -5.0, 3.0
+  =>
+%t = double -2.0
+
+Name: frem, constant prop.
+%t = frem double 5.0, -3.0
+  =>
+%t = double 2.0
+
+Name: frem, constant prop.
+%t = frem double -5.0, -3.0
+  =>
+%t = double -2.0
+
+Name: frem, rhs zero
+%t = frem double 1.0, 0.0
+  =>
+%v = fdiv double 0.0, 0.0
+%t = double %v
+
+Name: frem, lhs inf, rhs normal
+%v = fdiv double 1.0, 0.0
+%t = frem double %v, 1.0
+  =>
+%s = fdiv double 0.0, 0.0
+%t = double %s
+
+Name: frem, lhs pzero, rhs normal
+%t = frem double 0.0, 1.0
+  =>
+%t = double 0.0
+
+Name: frem, lhs nzero, rhs normal
+%t = frem double -0.0, 1.0
+  =>
+%t = double -0.0
+
+Name: frem, lhs finite, rhs inf
+%v = fdiv double 1.0, 0.0
+%t = frem double 5.0, %v
+  =>
+%t = double 5.0
+
+Name: frem, lhs nan
+%v = fdiv double 0.0, 0.0
+%t = frem double %v, %a
+  =>
+%v = fdiv double 0.0, 0.0
+%t = double %v
+
+Name: frem, rhs nan
+%v = fdiv double 0.0, 0.0
+%t = frem double %a, %v
+  =>
+%v = fdiv double 0.0, 0.0
+%t = double %v

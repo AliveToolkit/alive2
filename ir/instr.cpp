@@ -874,10 +874,15 @@ StateValue FpBinOp::toSMT(State &s) const {
 
   case FRem:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      // TODO; Z3 has no support for LLVM's frem which is actually an fmod
-      auto val = a.frem(b);
-      s.doesApproximation("frem", val);
-      return val;
+      auto rhs = b.fabs();
+      auto rem = a.fabs().frem(rhs);
+      auto signbit = rem.float2BV().sign() == 1;
+      auto res = expr::mkIf(signbit, rem.fadd(rhs, rm), rem)
+                     .float2BV()
+                     .copysign(a.float2BV())
+                     .BV2float(a);
+      auto invalid = a.isInf() || b == 0;
+      return expr::mkIf(invalid, expr::mkNaN(a), expr::mkIf(b.isInf(), a, res));
     };
     break;
 
