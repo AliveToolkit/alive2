@@ -881,7 +881,7 @@ StateValue FpBinOp::toSMT(State &s) const {
                      .float2BV()
                      .copysign(a.float2BV())
                      .BV2float(a);
-      auto invalid = a.isInf() || b.isZero();
+      auto invalid = a.isInf() || b == 0;
       return expr::mkIf(invalid, expr::mkNaN(a), expr::mkIf(b.isInf(), a, res));
     };
     break;
