@@ -128,3 +128,4 @@ Please contact us or submit a PR if something is missing or inaccurate.
 21. Unsoundness in elim-uncnstr2 (https://github.com/Z3Prover/z3/issues/6506)
 22. Unsound NaN encoding (https://github.com/Z3Prover/z3/issues/6972)
 23. fp.roundToIntegral gives invalid zero_extend application (https://github.com/Z3Prover/z3/issues/7056)
+24. Crash with conversion of a signed 1-bit BV to FP (https://github.com/Z3Prover/z3/commit/322e4441b3a170c9c30c747f10b1d3b0c04e2a0b)
