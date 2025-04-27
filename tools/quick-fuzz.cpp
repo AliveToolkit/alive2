@@ -264,6 +264,13 @@ public:
   }
 
 private:
+  long limit(unsigned long v, int w) {
+    if (w < 64)
+      return v & ((1ULL << w) - 1);
+    else
+      return v;
+  }
+
   BinaryOperator *randomBinop(Value *LHS, Value *RHS) {
     switch (C.choose(13)) {
     case 0: {
@@ -339,7 +346,7 @@ private:
 
   // uniformly chosen 16-bit constant -- we'll get them all eventually
   APInt uniform16(int Width) {
-    return APInt(Width, C.choose(0xFFFF + 1));
+    return APInt(Width, limit(C.choose(0xFFFF + 1), Width));
   }
 
   // uniformly choose a Hamming weight and then uniformly select a value
@@ -385,7 +392,7 @@ private:
 
   // uniform random choice from the entire range
   APInt uniformInt(int Width) {
-    return APInt(Width, C.dist());
+    return APInt(Width, limit(C.dist(), Width));
   }
 
   // chosen values
@@ -439,12 +446,12 @@ private:
       auto I = P.at(C.choose(P.size()));
       switch (C.choose(3)) {
       case 0: {
-        APInt Delta(Width, C.choose(8) + 1);
+        APInt Delta(Width, limit(C.choose(8) + 1, Width));
         I += C.flip() ? Delta : -Delta;
         break;
       }
       case 1:
-        I ^= APInt(Width, 1 << C.choose(Width));
+        I ^= APInt(Width, limit(1 << C.choose(Width), Width));
         break;
       case 2:
         I = ~I;
