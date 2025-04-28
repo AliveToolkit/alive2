@@ -260,13 +260,14 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
   expr np = expr::mkBoolVar(("np_" + getSMTName(child)).c_str());
   if (never_poison) {
     s.addUB(std::move(np));
-    np = true;
   } else if (s.isAsmMode()) {
     // There's no poison in assembly
-    np = true;
+    state_val.non_poison = true;
+  } else {
+    state_val.non_poison &= np;
   }
 
-  return { std::move(state_val.value), std::move(state_val.non_poison) && np };
+  return state_val;
 }
 
 bool Input::isUndefMask(const expr &e) {
