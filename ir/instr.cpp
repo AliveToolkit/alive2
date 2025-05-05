@@ -938,8 +938,7 @@ StateValue FpBinOp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison,
-                     [&](auto &a, auto &b, auto &rm){ return fn(a, b, rm); },
+    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison, fn,
                      ty, fmath, rm, bitwise);
   };
 
@@ -1195,9 +1194,8 @@ StateValue FpUnaryOp::toSMT(State &s) const {
   }
 
   auto scalar = [&](const StateValue &v, const Type &ty) {
-    return fm_poison(s, v.value, v.non_poison,
-                     [fn](auto &v, auto &rm) {return fn(v, rm);}, ty, fmath, rm,
-                     bitwise, false);
+    return
+      fm_poison(s, v.value, v.non_poison, fn, ty, fmath, rm, bitwise, false);
   };
 
   auto &v = s[*val];
