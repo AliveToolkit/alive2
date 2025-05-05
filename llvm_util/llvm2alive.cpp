@@ -222,7 +222,8 @@ public:
     default:
       return error(i);
     }
-    return make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i));
+    return make_unique<FpUnaryOp>(*ty, value_name(i), *val, op, parse_fmath(i),
+                                  parse_rounding(i), parse_exceptions(i));
   }
 
   RetTy visitBinaryOperator(llvm::BinaryOperator &i) {
@@ -255,7 +256,8 @@ public:
 
     if (is_fp)
       return
-        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op, parse_fmath(i));
+        make_unique<FpBinOp>(*ty, value_name(i), *a, *b, fp_op, parse_fmath(i),
+                             parse_rounding(i), parse_exceptions(i));
 
     unsigned flags = BinOp::None;
     if (isa<llvm::OverflowingBinaryOperator>(i) && i.hasNoSignedWrap())
@@ -521,7 +523,8 @@ public:
   RetTy visitFCmpInst(llvm::FCmpInst &i) {
     PARSE_BINOP();
     auto cond = parse_fcmp_cond(i.getPredicate());
-    return make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, parse_fmath(i));
+    return make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, parse_fmath(i),
+                             parse_exceptions(i), false);
   }
 
   RetTy visitSelectInst(llvm::SelectInst &i) {
@@ -1144,7 +1147,8 @@ public:
       default: UNREACHABLE();
       }
       ret = make_unique<FpConversionOp>(*ty, value_name(i), *val, op,
-                                        parse_rounding(i), parse_exceptions(i));
+                                        parse_rounding(i), parse_exceptions(i),
+                                        FpConversionOp::None, parse_fmath(i));
       break;
     }
     case llvm::Intrinsic::experimental_constrained_fcmp:

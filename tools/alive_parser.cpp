@@ -794,7 +794,8 @@ static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<FpBinOp>(*rettype, string(name), a, b, op, fmath);
+  return make_unique<FpBinOp>(*rettype, string(name), a, b, op, fmath,
+                              FpRoundingMode(), FpExceptionMode());
 }
 
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
@@ -826,7 +827,8 @@ static unique_ptr<Instr> parse_fp_unaryop(string_view name, token op_token) {
 
   auto &ty = parse_type();
   auto &a = parse_operand(ty);
-  return make_unique<FpUnaryOp>(ty, string(name), a, op, fmath);
+  return make_unique<FpUnaryOp>(ty, string(name), a, op, fmath,
+                                FpRoundingMode(), FpExceptionMode());
 }
 
 static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
@@ -895,7 +897,8 @@ static unique_ptr<Instr> parse_fp_ternary(string_view name, token op_token) {
   parse_comma();
   auto &cty = parse_type();
   auto &c = parse_operand(cty);
-  return make_unique<FpTernaryOp>(aty, string(name), a, b, c, op, fmath);
+  return make_unique<FpTernaryOp>(aty, string(name), a, b, c, op, fmath,
+                                  FpRoundingMode(), FpExceptionMode());
 }
 
 static unique_ptr<Instr> parse_conversionop(string_view name, token op_token) {
@@ -935,7 +938,10 @@ parse_fp_conversionop(string_view name, token op_token) {
   default:
     UNREACHABLE();
   }
-  return make_unique<FpConversionOp>(ty2, string(name), val, op);
+  return make_unique<FpConversionOp>(ty2, string(name), val, op,
+                                     FpRoundingMode(), FpExceptionMode(),
+                                     FpConversionOp::None,
+                                     parse_fast_math(op_token));
 }
 
 static unique_ptr<Instr> parse_select(string_view name) {
@@ -1049,7 +1055,7 @@ static unique_ptr<Instr> parse_fcmp(string_view name) {
                                 UnaryOp::Copy);
   default:
     return make_unique<FCmp>(bool_ty, string(name), cond, a, b,
-                             parse_fast_math(FCMP));
+                             parse_fast_math(FCMP), FpExceptionMode(), false);
   }
   UNREACHABLE();
 }

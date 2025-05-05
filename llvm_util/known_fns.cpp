@@ -574,53 +574,63 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
   case llvm::LibFunc_fabs:
   case llvm::LibFunc_fabsf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::FAbs, parse_fmath(i)));
+                                      FpUnaryOp::FAbs, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_ceil:
   case llvm::LibFunc_ceilf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::Ceil, parse_fmath(i)));
+                                      FpUnaryOp::Ceil, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_floor:
   case llvm::LibFunc_floorf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::Floor, parse_fmath(i)));
+                                      FpUnaryOp::Floor, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_nearbyint:
   case llvm::LibFunc_nearbyintf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::NearbyInt, parse_fmath(i)));
+                                      FpUnaryOp::NearbyInt, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_rint:
   case llvm::LibFunc_rintf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::RInt, parse_fmath(i)));
+                                      FpUnaryOp::RInt, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_round:
   case llvm::LibFunc_roundf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::Round, parse_fmath(i)));
+                                      FpUnaryOp::Round, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_roundeven:
   case llvm::LibFunc_roundevenf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::RoundEven, parse_fmath(i)));
+                                      FpUnaryOp::RoundEven, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_trunc:
   case llvm::LibFunc_truncf:
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::Trunc, parse_fmath(i)));
+                                      FpUnaryOp::Trunc, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_copysign:
   case llvm::LibFunc_copysignf:
     RETURN_VAL(make_unique<FpBinOp>(*ty, value_name(i), *args[0], *args[1],
-                                    FpBinOp::CopySign, parse_fmath(i)));
+                                    FpBinOp::CopySign, parse_fmath(i),
+                                    FpRoundingMode(), FpExceptionMode()));
 
   case llvm::LibFunc_sqrt:
   case llvm::LibFunc_sqrtf:
     BB.addInstr(make_unique<Assume>(*args[0], Assume::WellDefined));
     RETURN_VAL(make_unique<FpUnaryOp>(*ty, value_name(i), *args[0],
-                                      FpUnaryOp::Sqrt, parse_fmath(i)));
+                                      FpUnaryOp::Sqrt, parse_fmath(i),
+                                      FpRoundingMode(), FpExceptionMode()));
   case llvm::LibFunc_fwrite: {
     auto size = getInt(*args[1]);
     auto count = getInt(*args[2]);

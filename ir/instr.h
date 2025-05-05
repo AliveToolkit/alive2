@@ -82,7 +82,7 @@ private:
 
 public:
   FpBinOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
-          FastMathFlags fmath, FpRoundingMode rm = {}, FpExceptionMode ex = {})
+          FastMathFlags fmath, FpRoundingMode rm, FpExceptionMode ex)
   : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), fmath(fmath),
     rm(rm), ex(ex) {}
 
@@ -146,8 +146,7 @@ private:
 
 public:
   FpUnaryOp(Type &type, std::string &&name, Value &val, Op op,
-            FastMathFlags fmath, FpRoundingMode rm = {},
-            FpExceptionMode ex = {})
+            FastMathFlags fmath, FpRoundingMode rm, FpExceptionMode ex)
     : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm),
       ex(ex) {}
 
@@ -236,8 +235,7 @@ private:
 
 public:
   FpTernaryOp(Type &type, std::string &&name, Value &a, Value &b, Value &c,
-              Op op, FastMathFlags fmath, FpRoundingMode rm = {},
-              FpExceptionMode ex = {})
+              Op op, FastMathFlags fmath, FpRoundingMode rm, FpExceptionMode ex)
     : Instr(type, std::move(name)), a(&a), b(&b), c(&c), op(op), fmath(fmath),
       rm(rm), ex(ex) {}
 
@@ -327,8 +325,8 @@ private:
 
 public:
   FpConversionOp(Type &type, std::string &&name, Value &val, Op op,
-                 FpRoundingMode rm = {}, FpExceptionMode ex = {},
-                 unsigned flags = None, FastMathFlags fmath = {});
+                 FpRoundingMode rm, FpExceptionMode ex, unsigned flags,
+                 FastMathFlags fmath);
 
   Op getOp() const { return op; }
   FpRoundingMode getRoundingMode() const { return rm; }
@@ -473,7 +471,7 @@ private:
 
 public:
   FCmp(Type &type, std::string &&name, Cond cond, Value &a, Value &b,
-       FastMathFlags fmath, FpExceptionMode ex = {}, bool signaling = false)
+       FastMathFlags fmath, FpExceptionMode ex, bool signaling)
     : Instr(type, std::move(name)), a(&a), b(&b), cond(cond), fmath(fmath),
       ex(ex), signaling(signaling) {}
 

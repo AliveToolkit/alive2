@@ -967,7 +967,7 @@ expr FpBinOp::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FpBinOp::dup(Function &f, const string &suffix) const {
   return make_unique<FpBinOp>(getType(), getName()+suffix, *lhs, *rhs, op,
-                              fmath);
+                              fmath, rm, ex);
 }
 
 
@@ -1220,8 +1220,8 @@ expr FpUnaryOp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FpUnaryOp::dup(Function &f, const string &suffix) const {
-  return
-    make_unique<FpUnaryOp>(getType(), getName() + suffix, *val, op, fmath, rm);
+  return make_unique<FpUnaryOp>(getType(), getName() + suffix, *val, op, fmath,
+                                rm, ex);
 }
 
 
@@ -1496,7 +1496,7 @@ expr FpTernaryOp::getTypeConstraints(const Function &f) const {
 
 unique_ptr<Instr> FpTernaryOp::dup(Function &f, const string &suffix) const {
   return make_unique<FpTernaryOp>(getType(), getName() + suffix, *a, *b, *c, op,
-                                  fmath, rm);
+                                  fmath, rm, ex);
 }
 
 
@@ -2037,7 +2037,8 @@ expr Select::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Select::dup(Function &f, const string &suffix) const {
-  return make_unique<Select>(getType(), getName() + suffix, *cond, *a, *b);
+  return
+    make_unique<Select>(getType(), getName() + suffix, *cond, *a, *b, fmath);
 }
 
 
@@ -2929,7 +2930,8 @@ expr FCmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> FCmp::dup(Function &f, const string &suffix) const {
-  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, fmath);
+  return make_unique<FCmp>(getType(), getName() + suffix, cond, *a, *b, fmath,
+                           ex, signaling);
 }
 
 
