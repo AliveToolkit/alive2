@@ -1305,7 +1305,7 @@ std::pair<expr, expr> expr::frexp() const {
   expr restore_bit = expr::mkUInt(1, 1).concat_zeros(bits_mantissa);
   mantissa = expr::mkIf(subnormal, mantissa << shift, mantissa | restore_bit);
   expr shift2 = expr::mkUInt(1, 128) << expr::mkUInt(bits_mantissa+1, 128);
-  mantissa = mantissa.uint2fp(*this, rm).fdiv(shift2.sint2fp(*this, rm), rm);
+  mantissa = mantissa.uint2fp(*this, rm).fdiv(shift2.uint2fp(*this, rm), rm);
   mantissa = expr::mkIf(isFPZero(), *this,
                         expr::mkIf(sign == 0, mantissa, mantissa.fneg()));
 
