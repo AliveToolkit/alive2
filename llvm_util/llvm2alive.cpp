@@ -1106,6 +1106,17 @@ public:
                                    parse_rounding(i), parse_exceptions(i));
       break;
     }
+    case llvm::Intrinsic::frexp:
+    {
+      PARSE_UNOP();
+      FpUnaryOpVerticalZip::Op op;
+      switch (i.getIntrinsicID()) {
+      case llvm::Intrinsic::frexp: op = FpUnaryOpVerticalZip::FrExp; break;
+      default: UNREACHABLE();
+      }
+      ret = make_unique<FpUnaryOpVerticalZip>(*ty, value_name(i), *val, op);
+      break;
+    }
     case llvm::Intrinsic::experimental_constrained_sitofp:
     case llvm::Intrinsic::experimental_constrained_uitofp:
     case llvm::Intrinsic::experimental_constrained_fptosi:

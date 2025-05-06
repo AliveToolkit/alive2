@@ -167,6 +167,34 @@ public:
 };
 
 
+class FpUnaryOpVerticalZip final : public Instr {
+public:
+  enum Op {
+    FrExp
+  };
+
+private:
+  Value *val;
+  Op op;
+
+public:
+FpUnaryOpVerticalZip(Type &type, std::string &&name, Value &val, Op op)
+    : Instr(type, std::move(name)), val(&val), op(op) {}
+
+  Op getOp() const { return op; }
+  Value& getValue() const { return *val; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 class UnaryReductionOp final : public Instr {
 public:
   enum Op {

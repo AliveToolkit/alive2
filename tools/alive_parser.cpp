@@ -48,7 +48,12 @@ static Type& get_sym_type();
 static Value& parse_operand(Type &type);
 
 static Value& get_constant(uint64_t n, Type &t) {
-  auto c = make_unique<IntConst>(t, n);
+  unique_ptr<Value> c;
+  if (t.isFloatType()) {
+    c = make_unique<FloatConst>(t, to_string(n), true);
+  } else {
+    c = make_unique<IntConst>(t, n);
+  }
   auto ret = c.get();
   fn->addConstant(std::move(c));
   return *ret;
@@ -281,6 +286,7 @@ static uint64_t parse_number() {
 
 
 static unordered_map<Type*, unique_ptr<StructType>> overflow_aggregate_types;
+static unordered_map<Type*, unique_ptr<StructType>> float_i32_types;
 static vector<unique_ptr<SymbolicType>> sym_types;
 static unsigned sym_num;
 static unsigned struct_num;
@@ -310,6 +316,16 @@ static Type& get_int_type(unsigned size) {
     int_types[size] = make_unique<IntType>("i" + to_string(size), size);
 
   return *int_types[size].get();
+}
+
+static Type& get_float_i32_type(Type &type) {
+  auto p = float_i32_types.try_emplace(&type);
+  auto &st = p.first->second;
+  if (p.second)
+    st = make_unique<StructType>("structty_" + to_string(struct_num++),
+           vector<Type*>({ &type, &get_int_type(32) }),
+           vector<bool>({ false, false }));
+  return *st.get();
 }
 
 static Type& get_pointer_type(unsigned address_space_number) {
@@ -831,6 +847,21 @@ static unique_ptr<Instr> parse_fp_unaryop(string_view name, token op_token) {
                                 FpRoundingMode(), FpExceptionMode());
 }
 
+static unique_ptr<Instr>
+parse_fp_unary_verticalzip(string_view name, token op_token) {
+  FpUnaryOpVerticalZip::Op op;
+  switch (op_token) {
+  case FREXP: op = FpUnaryOpVerticalZip::FrExp; break;
+  default:
+    UNREACHABLE();
+  }
+
+  auto &ty = parse_type();
+  auto &a = parse_operand(ty);
+  return make_unique<FpUnaryOpVerticalZip>(get_float_i32_type(ty), string(name),
+                                           a, op);
+}
+
 static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
                                                   token op_token) {
   UnaryReductionOp::Op op;
@@ -1241,6 +1272,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FABS:
   case FNEG:
     return parse_fp_unaryop(name, t);
+  case FREXP:
+    return parse_fp_unary_verticalzip(name, t);
   case REDUCE_ADD:
   case REDUCE_MUL:
   case REDUCE_AND:
@@ -1449,6 +1482,7 @@ parser_initializer::~parser_initializer() {
   int_types.clear();
   sym_types.clear();
   overflow_aggregate_types.clear();
+  float_i32_types.clear();
 }
 
 }

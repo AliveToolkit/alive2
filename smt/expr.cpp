@@ -1278,6 +1278,40 @@ expr expr::sqrt(const expr &rm) const {
   return simplify_const(Z3_mk_fpa_sqrt(ctx(), rm(), ast()), *this);
 }
 
+std::pair<expr, expr> expr::frexp() const {
+  C();
+  unsigned bits_exponent = Z3_fpa_get_ebits(ctx(), sort());
+  unsigned bits_mantissa = Z3_fpa_get_sbits(ctx(), sort()) - 1;
+  unsigned total_bits    = bits_exponent + bits_mantissa + 1;
+
+  expr rm       = expr::rne();
+  expr bv       = float2BV();
+  unsigned bias = (1 << (bits_exponent - 1)) - 1;
+  expr sign     = bv.sign();
+  expr exponent = bv.extract(total_bits-2, bits_mantissa);
+  expr mantissa = bv.extract(bits_mantissa-1, 0).zext(1);
+
+  expr subnormal = exponent == 0;
+  expr shift = mantissa.ctlz();
+
+  exponent = exponent.zextOrTrunc(32);
+  exponent = expr::mkIf(isFPZero(),
+                        mkUInt(0, exponent),
+                        expr::mkIf(subnormal,
+                          expr::mkInt(1 - bias, 32) - shift.sextOrTrunc(32),
+                          exponent + expr::mkInt(-bias, exponent)
+                        ) + expr::mkUInt(1, exponent));
+
+  expr restore_bit = expr::mkUInt(1, 1).concat_zeros(bits_mantissa);
+  mantissa = expr::mkIf(subnormal, mantissa << shift, mantissa | restore_bit);
+  expr shift2 = expr::mkUInt(1, 128) << expr::mkUInt(bits_mantissa+1, 128);
+  mantissa = mantissa.uint2fp(*this, rm).fdiv(shift2.sint2fp(*this, rm), rm);
+  mantissa = expr::mkIf(isFPZero(), *this,
+                        expr::mkIf(sign == 0, mantissa, mantissa.fneg()));
+
+  return { std::move(mantissa), std::move(exponent) };
+}
+
 expr expr::fma(const expr &a, const expr &b, const expr &c, const expr &rm) {
   C2(a, b, c, rm);
   return simplify_const(Z3_mk_fpa_fma(ctx(), rm(), a(), b(), c()), a, b, c);

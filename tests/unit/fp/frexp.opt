@@ -1,0 +1,71 @@
+Name: frexp 0
+%a = frexp float 0.0
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = 0.0
+%v1 = 0
+
+Name: frexp -0
+%a = frexp float -0.0
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = -0.0
+%v1 = 0
+
+Name: frexp inf
+%a = frexp float 0x7f800000
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0x7f800000
+%v1 = freeze poison
+
+Name: frexp -inf
+%a = frexp float 0xff800000
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0xff800000
+%v1 = freeze poison
+
+Name: frexp nan
+%a = frexp float 0xffc00000
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0xffc00000
+%v1 = freeze poison
+
+Name: frexp subnormal
+%a = frexp float 0x80048841
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0xbf110820
+%v1 = 0xffffff7e
+
+Name: frexp subnormal2
+%a = frexp float 0x80000001
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0xbf000000
+%v1 = 0xffffff6c
+
+Name: frexp normal
+%a = frexp float 0x15088041
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0x3f088041
+%v1 = 0xffffffac
+
+Name: frexp normal2
+%a = frexp float 0x7d0c9244
+%v0 = extractvalue %a, 0
+%v1 = extractvalue %a, 1
+=>
+%v0 = float 0x3f0c9244
+%v1 = 0x7c
