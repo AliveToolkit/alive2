@@ -62,4 +62,4 @@ jobs:
     env:
       CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
       CMAKE_CXX_COMPILER: ${{ matrix.compiler }}
-      CMAKE_CXX_FLAGS: "-fsanitize=address,undefined -fno-sanitize-recover=all"
+      CMAKE_CXX_FLAGS: "-fsanitize=address,undefined -fno-sanitize-recover=undefined"

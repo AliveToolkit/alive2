@@ -465,7 +465,7 @@ expr FloatType::fromFloat(State &s, const expr &fp, const Type &from_type0,
   ChoiceExpr<expr> exprs;
 
   // 1) preferred QNaN (1000..00)
-  exprs.add(expr::mkUInt(1ull << (fraction_bits-1), fraction_bits), expr(true));
+  exprs.add(expr::mkUInt(1, 1).concat_zeros(fraction_bits-1), expr(true));
 
   // 2) input NaN
   // 3) quieted input NaN
