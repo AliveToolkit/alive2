@@ -323,7 +323,16 @@ const State::ValTy& State::exec(const Value &v) {
     = values.try_emplace(&v, ValTy{std::move(val), domain.noreturn,
                                    std::move(value_ub), std::move(undef_vars)});
   assert(inserted);
-  analysis.unused_vars.insert(&v);
+
+  // As an optimization, record that this value has not yet been used, so
+  // we can use this undef variable (if any) on the first use
+  // This saves one rewrite per definition
+  // We cannot do this optimization in ASM mode because an undef value may
+  // trigger a poison value in the source, but since the target does not have
+  // poison values, it must be converted into a non-det value that must be
+  // able to range over the full domain, not just the non-poison domain.
+  if (!config::tgt_is_asm)
+    analysis.unused_vars.insert(&v);
 
   // cleanup potentially used temporary values due to undef rewriting
   while (i_tmp_values > 0) {
@@ -1401,8 +1410,16 @@ expr State::sinkDomain(bool include_ub) const {
 }
 
 const StateValue& State::returnValCached() {
-  if (auto *v = get_if<DisjointExpr<StateValue>>(&return_val))
+  if (auto *v = get_if<DisjointExpr<StateValue>>(&return_val)) {
     return_val = *std::move(*v)();
+    auto &val = get<StateValue>(return_val);
+    if (isAsmMode() && !val.non_poison.isTrue()) {
+      // there is no poison in asm mode
+      val.value = expr::mkIf(
+        val.non_poison, val.value, expr::mkFreshVar("nondet", val.value));
+      val.non_poison = true;
+    }
+  }
   return get<StateValue>(return_val);
 }
 

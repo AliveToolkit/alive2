@@ -3062,11 +3062,10 @@ static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
   if (v.non_poison.isTrue())
     return v;
 
-  StateValue ret_type = ty.getDummyValue(true);
-  expr nondet = expr::mkFreshVar("nondet", ret_type.value);
+  expr nondet = expr::mkFreshVar("nondet", v.value);
   s.addQuantVar(nondet);
   return { expr::mkIf(v.non_poison, v.value, nondet),
-           std::move(ret_type.non_poison) };
+           ty.getDummyValue(true).non_poison };
 }
 
 StateValue Freeze::toSMT(State &s) const {
