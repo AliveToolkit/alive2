@@ -266,6 +266,7 @@ public:
   }
   const StateValue& getVal(const Value &val, bool is_poison_ub);
   const smt::expr& getWellDefinedPtr(const Value &val);
+  StateValue freeze(const Type &type, const StateValue &val);
 
   const ValTy* at(const Value &val) const;
   bool isUndef(const smt::expr &e) const;

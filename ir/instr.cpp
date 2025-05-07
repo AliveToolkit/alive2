@@ -3048,30 +3048,10 @@ void Freeze::print(ostream &os) const {
   os << getName() << " = freeze " << print_type(getType()) << val->getName();
 }
 
-static StateValue freeze_elems(State &s, const Type &ty, const StateValue &v) {
-  if (auto agg = ty.getAsAggregateType()) {
-    vector<StateValue> vals;
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (agg->isPadding(i))
-        continue;
-      vals.emplace_back(freeze_elems(s, agg->getChild(i), agg->extract(v, i)));
-    }
-    return agg->aggregateVals(vals);
-  }
-
-  if (v.non_poison.isTrue())
-    return v;
-
-  expr nondet = expr::mkFreshVar("nondet", v.value);
-  s.addQuantVar(nondet);
-  return { expr::mkIf(v.non_poison, v.value, nondet),
-           ty.getDummyValue(true).non_poison };
-}
-
 StateValue Freeze::toSMT(State &s) const {
   auto &v = s[*val];
   s.resetUndefVars();
-  return freeze_elems(s, getType(), v);
+  return s.freeze(getType(), v);
 }
 
 expr Freeze::getTypeConstraints(const Function &f) const {

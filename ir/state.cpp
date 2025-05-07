@@ -654,6 +654,25 @@ const expr& State::getWellDefinedPtr(const Value &val) {
   return getAndAddPoisonUB(val, true, true).value;
 }
 
+StateValue State::freeze(const Type &ty, const StateValue &v) {
+  if (auto agg = ty.getAsAggregateType()) {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+      if (agg->isPadding(i))
+        continue;
+      vals.emplace_back(freeze(agg->getChild(i), agg->extract(v, i)));
+    }
+    return agg->aggregateVals(vals);
+  }
+
+  if (v.non_poison.isTrue())
+    return v;
+
+  expr nondet = expr::mkFreshVar("nondet", v.value);
+  addQuantVar(nondet);
+  return { expr::mkIf(v.non_poison, v.value, nondet), true };
+}
+
 const State::ValTy* State::at(const Value &val) const {
   auto I = values.find(&val);
   return I == values.end() ? nullptr : &I->second;
@@ -1413,11 +1432,9 @@ const StateValue& State::returnValCached() {
   if (auto *v = get_if<DisjointExpr<StateValue>>(&return_val)) {
     return_val = *std::move(*v)();
     auto &val = get<StateValue>(return_val);
+    // there is no poison in asm mode
     if (isAsmMode() && !val.non_poison.isTrue()) {
-      // there is no poison in asm mode
-      val.value = expr::mkIf(
-        val.non_poison, val.value, expr::mkFreshVar("nondet", val.value));
-      val.non_poison = true;
+      val = freeze(getFn().getType(), val);
     }
   }
   return get<StateValue>(return_val);
