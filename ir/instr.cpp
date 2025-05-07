@@ -1278,7 +1278,7 @@ StateValue FpUnaryOpVerticalZip::toSMT(State &s) const {
                      StateValue(std::move(val2), expr(v.non_poison) ));
   };
 
-  if (getType().isVectorType()) {
+  if (val->getType().isVectorType()) {
     vector<StateValue> v1s, v2s;
     auto ty = val->getType().getAsAggregateType();
     for (unsigned i = 0, e = ty->numElementsConst(); i != e; ++i) {

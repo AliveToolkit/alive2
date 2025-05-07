@@ -102,6 +102,8 @@ Please contact us or submit a PR if something is missing or inaccurate.
 95. InstCombine: removes a select, making the code more poisonous (https://llvm.org/PR91691)
 96. DSE removes store before free() incorrectly (https://llvm.org/PR97956)
 97. GlobalOpt breaks !callees metadata (https://llvm.org/PR121265)
+98: InstCombine: formation of fmax ignores SNaN (https://llvm.org/PR138303)
+99. InstSimplify: incorrect frexp(frexp(x)) -> frexp(x) fold (https://llvm.org/PR138819)
 
 
 ### Bugs found in Z3
