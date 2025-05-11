@@ -412,8 +412,9 @@ public:
       assert(!approx);
       if (!iasm->canThrow())
         attrs.set(FnAttrs::NoThrow);
-      call = make_unique<InlineAsm>(*ty, value_name(i), iasm->getAsmString(),
-                                    iasm->getConstraintString(),
+      call = make_unique<InlineAsm>(*ty, value_name(i),
+                                    (std::string)iasm->getAsmString(),
+                                    (std::string)iasm->getConstraintString(),
                                     std::move(attrs));
     } else {
       if (!fn) {
