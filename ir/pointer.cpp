@@ -404,7 +404,7 @@ expr Pointer::isOfBlock(const Pointer &block, const expr &bytes,
   assert(block.getOffset().isZero());
   expr addr       = is_phy ? getPhysicalAddress() : getAddress();
   expr block_addr = block.getLogAddress();
-  expr block_size = block.blockSizeAligned();
+  expr block_size = block.blockSizeAlignedOffsetT();
 
   if (bytes.eq(block_size))
     return addr == block_addr;
@@ -526,10 +526,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
                            bool iswrite, bool ignore_accessability,
                            bool round_size_to_align) {
   bool is_asm = m.state->isAsmMode();
-  expr bytes = bytes0.zextOrTrunc(bits_size_t);
+  expr bytes = bytes0.zextOrTrunc(bits_for_offset);
   if (round_size_to_align)
     bytes = bytes.round_up(expr::mkUInt(align, bytes));
-  expr bytes_off = bytes.zextOrTrunc(bits_for_offset);
 
   auto block_constraints = [&](const Pointer &p) {
     expr ret = p.isBlockAlive();
@@ -570,21 +569,21 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     expr cond;
     if (m.state->isUndef(offset) ||
         m.state->isUndef(p.getBid()) ||
-        bytes.ugt(p.blockSizeAligned()).isTrue() ||
+        bytes.ugt(block_sz).isTrue() ||
         p.getOffsetSizet().uge(block_sz).isTrue()) {
       cond = false;
     } else {
       // optimized conditions that are equivalent to the condition below
       if (block_sz.isConst() && bytes.isConst()) {
-        cond = offset.ule(block_sz - bytes_off);
+        cond = offset.ule(block_sz - bytes);
       } else if (bits_for_offset > bits_size_t && bytes.isOne()) {
         cond = offset.ult(block_sz);
       } else {
         // check that the offset is within bounds and that arith doesn't overflow
-        cond  = (offset + bytes_off).sextOrTrunc(block_sz.bits()).ule(block_sz);
+        cond  = (offset + bytes).ule(block_sz);
         cond &= !offset.isNegative();
         if (!block_sz.isNegative().isFalse()) // implied if block_sz >= 0
-          cond &= offset.add_no_soverflow(bytes_off);
+          cond &= offset.add_no_soverflow(bytes);
       }
       cond &= block_constraints(p);
     }
@@ -608,7 +607,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
         Pointer this_ptr(m, i, local, p.getAttrs());
 
-        bool same_size = bytes.eq(this_ptr.blockSizeAligned());
+        bool same_size = bytes.eq(this_ptr.blockSizeAlignedOffsetT());
         expr this_addr = this_ptr.getLogAddress();
         expr offset = same_size ? expr::mkUInt(0, addr) : addr - this_addr;
 
