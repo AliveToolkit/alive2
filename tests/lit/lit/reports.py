@@ -137,7 +137,7 @@ class XunitReport(object):
             # \x1b (e.g. if there was some -fcolor-diagnostics output) which are
             # not allowed inside XML files.
             # This causes problems with CI systems: for example, the Jenkins
-            # JUnit XML will throw an exception when ecountering those
+            # JUnit XML will throw an exception when encountering those
             # characters and similar problems also occur with GitLab CI.
             output = remove_invalid_xml_chars(output)
             file.write(output)

@@ -40,7 +40,7 @@ class TerminalController:
 
         >>> term = TerminalController()
         >>> if term.CLEAR_SCREEN:
-        ...     print('This terminal supports clearning the screen.')
+        ...     print('This terminal supports clearing the screen.')
 
     Finally, if the width and height of the terminal are known, then
     they will be stored in the `COLS` and `LINES` attributes.
@@ -242,7 +242,7 @@ class ProgressBar:
         if not (self.term.CLEAR_EOL and self.term.UP and self.term.BOL):
             raise ValueError(
                 "Terminal isn't capable enough -- you "
-                "should use a simpler progress dispaly."
+                "should use a simpler progress display."
             )
         self.BOL = self.term.BOL  # BoL from col#79
         self.XNL = "\n"  # Newline from col#79
