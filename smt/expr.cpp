@@ -2267,6 +2267,28 @@ expr expr::subst(const vector<pair<expr, expr>> &repls) const {
   return Z3_substitute(ctx(), ast(), repls.size(), from.get(), to.get());
 }
 
+expr expr::substTopLevel(const expr &from, const expr &to, unsigned depth) const {
+  if (depth <= 0)
+    return *this;
+
+  if (this->eq(from))
+    return to;
+
+  expr e;
+  unsigned low, high;
+  if (isExtract(e, high, low))
+    return e.substTopLevel(from, to, depth - 1).extract(high, low);
+
+  expr cond, then, els;
+  if (isIf(cond, then, els))
+    return expr::mkIf(
+      cond.substTopLevel(from, to, depth - 1),
+      then.substTopLevel(from, to, depth - 1),
+      els.substTopLevel(from, to, depth - 1));
+
+  return *this;
+}
+
 expr expr::subst_simplify(const vector<pair<expr, expr>> &repls) const {
   if (repls.empty())
     return *this;

@@ -360,7 +360,7 @@ public:
             const std::vector<PtrInput> *set_ptrs = nullptr,
             const std::vector<PtrInput> *set_ptrs_other = nullptr) const;
 
-  void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
+  void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr, const smt::expr &nonpoison);
   void observesAddr(const Pointer &ptr);
 
   smt::expr returnChecks() const;
