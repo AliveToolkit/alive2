@@ -1146,7 +1146,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       !memaccess.canWrite(MemoryAccess::Other).isFalse()) {
     for (auto &v : ptr_inputs) {
       if (!(v.byval == 0).isFalse() && !v.nocapture.isTrue())
-        memory.escapeLocalPtr(v.val.value, v.val.non_poison);
+        memory.escapeLocalPtr(v.val.value, true, v.val.non_poison);
     }
   }
 

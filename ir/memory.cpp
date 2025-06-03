@@ -1224,7 +1224,7 @@ void Memory::store(const Pointer &ptr,
 
   for (auto &[offset, val] : data) {
     Byte byte(*this, expr(val));
-    escapeLocalPtr(byte.ptrValue(), byte.isPtr() && byte.ptrNonpoison());
+    escapeLocalPtr(byte.ptrValue(), byte.isPtr(), byte.ptrNonpoison());
   }
 
   unsigned bytes = data.size() * (bits_byte/8);
@@ -2858,11 +2858,11 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
   }
 }
 
-void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
-  if (is_ptr.isFalse())
+void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr, const expr &nonpoison) {
+  if ((is_ptr && nonpoison).isFalse())
     return;
 
-  escape_helper(ptr, escaped_local_blks, &observed_addrs);
+  escape_helper(ptr.substTopLevel(is_ptr, true, 3), escaped_local_blks, &observed_addrs);
 }
 
 void Memory::observesAddr(const Pointer &ptr) {
