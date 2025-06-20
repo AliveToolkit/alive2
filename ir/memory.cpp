@@ -353,7 +353,7 @@ expr Byte::byteNumber() const {
 
 expr Byte::isPoison() const {
   if (!does_int_mem_access)
-    return  does_ptr_mem_access ? !ptrNonpoison() : true;
+    return does_ptr_mem_access ? !ptrNonpoison() : true;
   if (isAsmMode())
     return false;
 
@@ -659,7 +659,7 @@ static StateValue bytesToValue(const Memory &m, const vector<Byte> &bytes,
       non_poison &=
         ub_pre(expr::mkIf(is_ptr,
                           b.ptrByteoffset() == i && ptr_value == loaded_ptr,
-                          b.nonptrValue() == 0));
+                          b.nonptrValue() == 0 && does_int_mem_access));
       non_poison &= !b.isPoison();
     }
     if (is_asm)
