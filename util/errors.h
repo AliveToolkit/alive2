@@ -35,6 +35,8 @@ public:
   void add(AliveException &&e);
   void addWarning(const char *str);
 
+  void clear();
+
   explicit operator bool() const { return !errs.empty(); }
   bool isUnsound() const;
   bool hasWarnings() const { return !warnings.empty(); }

@@ -548,25 +548,6 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     }
   }
 
-  {
-    auto sink_src = src_state.sinkDomain(false);
-    if (!sink_src.isFalse() &&
-        check_expr(axioms_expr && !sink_src, "return_src").isUnsat()) {
-      errs.add("The source program doesn't reach a return instruction.\n"
-               "Consider increasing the unroll factor if it has loops", false);
-      return;
-    }
-
-    if (auto sink_tgt = tgt_state.sinkDomain(false);
-        !sink_src.eq(sink_tgt) &&
-        !sink_tgt.isFalse() &&
-        check_expr(axioms_expr && (!sink_tgt || sink_src), "return_tgt").isUnsat()) {
-      errs.add("The target program doesn't reach a return instruction.\n"
-               "Consider increasing the unroll factor if it has loops", false);
-      return;
-    }
-  }
-
   // note that precondition->toSMT() may add stuff to getPre,
   // so order here matters
   // FIXME: broken handling of transformation precondition
@@ -601,6 +582,27 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
     pre = pre_src_exists && pre_tgt && src_state.getFnPre();
   }
   pre_src_forall &= tgt_state.getFnPre();
+
+  {
+    auto sink_src = src_state.sinkDomain(false);
+    if (!sink_src.isFalse() &&
+        check_expr(axioms_expr && !sink_src, "return_src").isUnsat()) {
+      errs.clear();
+      errs.add("The source program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
+
+    if (auto sink_tgt = tgt_state.sinkDomain(false);
+        !sink_src.eq(sink_tgt) &&
+        !sink_tgt.isFalse() &&
+        check_expr(axioms_expr && (!sink_tgt || sink_src), "return_tgt").isUnsat()) {
+      errs.clear();
+      errs.add("The target program doesn't reach a return instruction.\n"
+               "Consider increasing the unroll factor if it has loops", false);
+      return;
+    }
+  }
 
   auto mk_fml = [&](expr &&refines) -> expr {
     // from the check above we already know that

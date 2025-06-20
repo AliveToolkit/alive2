@@ -37,6 +37,11 @@ void Errors::addWarning(const char *str) {
   warnings.emplace(str);
 }
 
+void Errors::clear() {
+  errs.clear();
+  warnings.clear();
+}
+
 bool Errors::isUnsound() const {
   for (auto &[msg, unsound] : errs) {
     if (unsound)
