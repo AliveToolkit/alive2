@@ -275,10 +275,15 @@ Byte::Byte(const Memory &m, const StateValue &v, unsigned bits_read,
               : v.non_poison;
   p = concat_if(p, np.concat(v.value));
   if (num_sub_byte_bits) {
-    if ((bits_read % 8) == 0)
-      bits_read = 0;
-    p = p.concat(expr::mkUInt(bits_read, num_sub_byte_bits)
-                   .concat(expr::mkUInt(byte_number, size_byte_number())));
+    // optimization: byte number doesn't matter in assembly
+    if (m.isAsmMode()) {
+      p = p.concat_zeros(sub_byte_bits());
+    } else {
+      if ((bits_read % 8) == 0)
+        bits_read = 0;
+      p = p.concat(expr::mkUInt(bits_read, num_sub_byte_bits)
+                     .concat(expr::mkUInt(byte_number, size_byte_number())));
+    }
   }
   p = p.concat_zeros(padding_nonptr_byte());
   assert(!p.isValid() || p.bits() == bitsByte());

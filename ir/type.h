@@ -345,6 +345,7 @@ public:
                         const IR::StateValue &val,
                         const smt::expr &idx) const;
   smt::expr getTypeConstraints() const override;
+  unsigned maxSubBitAccess() const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
   smt::expr enforceVectorType(

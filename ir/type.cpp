@@ -1160,6 +1160,10 @@ expr VectorType::getTypeConstraints() const {
   return r;
 }
 
+unsigned VectorType::maxSubBitAccess() const {
+  return elements * children[0]->maxSubBitAccess();
+}
+
 expr VectorType::scalarSize() const {
   return children[0]->sizeVar();
 }
