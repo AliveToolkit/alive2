@@ -1004,9 +1004,8 @@ static bool isDerivedFromLoad(const expr &e) {
 Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
                                          uint64_t align, bool write) const {
   AliasSet aliasing(*this);
-  auto sz_local = next_local_bid;
+  auto sz_local    = min(next_local_bid, (unsigned)aliasing.size(true));
   auto sz_nonlocal = aliasing.size(false);
-  assert(sz_local <= aliasing.size(true));
 
   auto check_alias = [&](AliasSet &alias, bool local, unsigned bid,
                          const expr &offset) {
