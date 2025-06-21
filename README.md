@@ -60,9 +60,6 @@ Building
 --------
 
 ```
-export ALIVE2_HOME=$PWD
-export LLVM2_HOME=$PWD/llvm-project
-export LLVM2_BUILD=$LLVM2_HOME/build
 git clone git@github.com:AliveToolkit/alive2.git
 cd alive2
 mkdir build
@@ -89,14 +86,14 @@ LLVM can be built in the following way.
 built with the option, may interfere with CMake files’ use of `USEDLIBS` and
 `LLVMLIBS`, and perhaps `dd_llvm_target`.
 * To build with Xcode rather than Ninja, replace `-GNinja` with `-GXcode` in
-the `cmake` step below, and append `-DLLVM_MAIN_SRC_DIR=$LLVM2_HOME/llvm`. 
+the `cmake` step below, and append `-DLLVM_MAIN_SRC_DIR=~/llvm/llvm`.
   * It may be necessary to disable warnings for “Implicit Conversion to 32 Bit
   Type” in the project build settings.
   * Xcode may place `tv.dylib` in a different location; a symbolic link from the
 actual location to that in the resultant error message may help.
 
 ```
-cd $LLVM2_HOME
+cd ~/llvm
 mkdir build
 cd build
 cmake -GNinja -DLLVM_ENABLE_RTTI=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="llvm;clang" ../llvm
@@ -105,37 +102,24 @@ ninja
 
 Alive2 should then be configured and built as follows:
 ```
-cd $ALIVE2_HOME/alive2/build
-cmake -GNinja -DCMAKE_PREFIX_PATH=$LLVM2_BUILD -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
+cd ~/alive2/build
+cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
 ```
 
-Translation validation of one or more LLVM passes transforming an IR file on Linux:
+Translation validation of one or more LLVM passes transforming an IR file:
 ```
-$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.so -tv -instcombine -tv -o /dev/null foo.ll
+~/alive/build/alive-tv -passes=instcombine foo.ll
 ```
-For the new pass manager:
+Or using the opt wrapper:
 ```
-$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.so -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.so -passes=tv -passes=instcombine -passes=tv -o /dev/null $LLVM2_HOME/llvm/test/Analysis/AssumptionCache/basic.ll
+~/alive2/build/opt-alive-test.sh -passes=instcombine foo.ll
 ```
-
-
-On a Mac with the old pass manager:
-```
-$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -tv -instcombine -tv -o /dev/null foo.ll
-```
-On a Mac with the new pass manager:
-```
-$LLVM2_BUILD/bin/opt -load $ALIVE2_HOME/alive2/build/tv/tv.dylib -load-pass-plugin $ALIVE2_HOME/alive2/build/tv/tv.dylib -passes=tv -passes=instcombine -passes=tv -o /dev/null $LLVM2_HOME/llvm/test/Analysis/AssumptionCache/basic.ll
-```
-You can run any pass or combination of passes, but on the command line
-they must be placed in between the two invocations of the Alive2 `-tv`
-pass.
 
 
 Translation validation of a single LLVM unit test, using lit:
 ```
-$LLVM2_BUILD/bin/llvm-lit -vv -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
+~/llvm/build/bin/llvm-lit -vv -Dopt=~/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms/InstCombine/canonicalize-constant-low-bit-mask-and-icmp-sge-to-icmp-sle.ll
 ```
 
 The output should be:
@@ -150,14 +134,14 @@ To run translation validation on all the LLVM unit tests for IR-level
 transformations:
 
 ```
-$LLVM2_BUILD/bin/llvm-lit -s -Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh $LLVM2_HOME/llvm/test/Transforms
+~/llvm/build/bin/llvm-lit -s -Dopt=~/alive2/build/opt-alive.sh ~/llvm/llvm/test/Transforms
 ```
 
 We run this command on the main LLVM branch each day, and keep track of the results
 [here](https://web.ist.utl.pt/nuno.lopes/alive2/).  To detect unsound transformations in a local run:
 
 ```
-fgrep -r "(unsound)" $ALIVE2_HOME/alive2/build/logs/
+fgrep -r "(unsound)" ~/alive2/build/logs/
 ```
 
 
@@ -168,17 +152,17 @@ This plugin tries to validate every IR-level transformation performed
 by LLVM.  Invoke the plugin like this:
 
 ```
-clang -O3 $LLVM2_HOME/clang/test/C/C99/n505.c -S -emit-llvm \
-  -fpass-plugin=$ALIVE2_HOME/alive2/build/tv/tv.so \
-  -Xclang -load -Xclang $ALIVE2_HOME/alive2/build/tv/tv.so
+clang -O3 ~/llvm/clang/test/C/C99/n505.c -S -emit-llvm \
+  -fpass-plugin=~/alive2/build/tv/tv.so \
+  -Xclang -load -Xclang ~/alive2/build/tv/tv.so
 ```
 
 Or, more conveniently:
 
 ```
-$ALIVE2_HOME/alive2/build/alivecc -O3 -c $LLVM2_HOME/clang/test/C/C99/n505.c
+~/alive2/build/alivecc -O3 -c ~/llvm/clang/test/C/C99/n505.c
 
-$ALIVE2_HOME/alive2/build/alive++ -O3 -c $LLVM2_HOME/clang/test/Analysis/aggrinit-cfg-output.cpp
+~/alive2/build/alive++ -O3 -c ~/llvm/clang/test/Analysis/aggrinit-cfg-output.cpp
 ```
 
 The Clang plugin can optionally use multiple cores. To enable parallel
@@ -235,7 +219,7 @@ called “tgt”. For example, let’s prove that removing `nsw` is correct for
 addition:
 
 ```
-$ALIVE2_HOME/alive2/build/alive-tv src.ll tgt.ll
+~/alive2/build/alive-tv src.ll tgt.ll
 
 ----------------------------------------
 define i32 @f(i32 %a, i32 %b) {
@@ -276,7 +260,7 @@ define i3 @foo(i3) {
   ret i3 %x5
 }
 
-$ALIVE2_HOME/alive2/build/alive-tv foo.ll
+~/alive2/build/alive-tv foo.ll
 
 ----------------------------------------
 define i3 @foo(i3 %0) {
@@ -355,7 +339,7 @@ files begin with “in_”.
 `--print-after-all` appended.  (You may also append other `opt`  options, such
 as other optimizations.)  E.g.:
 ```
-$LLVM2_BUILD/bin/llvm-lit -vva "-Dopt=$ALIVE2_HOME/alive2/build/opt-alive.sh --print-after-all" $LLVM2_HOME/llvm/test/Transforms/InstCombine/insert-const-shuf.ll
+~/llvm/build/bin/llvm-lit -vva "-Dopt=~/alive2/build/opt-alive.sh --print-after-all" ~/llvm/llvm/test/Transforms/InstCombine/insert-const-shuf.ll
 ```
 * Collect Lit’s LLVM IR terminal output, for comparison with Alive2’s Alive2 IR
 output in the log file indicated by “Report written to…”.  Sometimes the Lit
@@ -385,7 +369,7 @@ move the `logs` directory out of the way before each run.  After each run, copy
 the relevant logs to a separate destination directory.  (Systems with a non-GNU
 version of `cp` will need to use coreutils’ `gcp` instead.)
 ```
-fgrep --files-with-matches --recursive "(unsound)" $ALIVE2_HOME/alive2/build/logs/ |  xargs cp -p --target-directory=<Destination>
+fgrep --files-with-matches --recursive "(unsound)" ~/alive2/build/logs/ |  xargs cp -p --target-directory=<Destination>
 
 ```
 * Unique unsoundness reports can then be found with a utility such as `jdupes --print-unique`.  
