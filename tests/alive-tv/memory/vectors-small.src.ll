@@ -1,3 +1,5 @@
+; ERROR: Mismatch in memory
+
 target datalayout="e"
 
 define i8 @f(ptr %p) {

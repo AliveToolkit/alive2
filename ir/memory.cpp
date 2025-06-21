@@ -418,10 +418,14 @@ expr Byte::refined(const Byte &other) const {
   expr np2 = asm_mode ? other.nonPoison() : other.nonptrNonpoison();
 
   // int byte
-  expr int_cnstr = true;
+  expr int_cnstr = (asm_mode || !num_sub_byte_bits) ? expr(true)
+    : (np1 == 0 ||
+       (numStoredBits() == other.numStoredBits() &&
+        byteNumber() == other.byteNumber()));
+
   if (does_int_mem_access) {
     if (bits_poison_per_byte == bits_byte) {
-      int_cnstr = (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
+      int_cnstr &= (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
     }
     else if (bits_poison_per_byte > 1) {
       assert((bits_byte % bits_poison_per_byte) == 0);
@@ -436,7 +440,7 @@ expr Byte::refined(const Byte &other) const {
       }
     } else {
       assert(!np1.isValid() || np1.bits() == 1);
-      int_cnstr = np1 == 0 || ((np1.eq(np2) ? true : np2 == 1) && v1 == v2);
+      int_cnstr &= np1 == 0 || ((np1.eq(np2) ? true : np2 == 1) && v1 == v2);
     }
   }
 
