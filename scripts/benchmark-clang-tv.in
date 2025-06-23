@@ -14,13 +14,21 @@ EOM
     exit -1
 fi
 
+OS="$(uname -s)"
+
 WORK=$1
 REPORTS=$WORK/reports
 
 # TODO give alivecc a mode where it doesn't invoke alive at all, so we
 # can test scripts like this more quickly and easily
 
-CORES=`nproc`
+if [[ "$OS" == "Linux" ]]; then
+    CORES="$(nproc)"
+elif [[ "$OS" == "Darwin" ]]; then
+    CORES="$(sysctl -n hw.logicalcpu)"
+else # default
+    CORES=1
+fi
 
 ALIVECC=@PROJECT_BINARY_DIR@/alivecc
 
