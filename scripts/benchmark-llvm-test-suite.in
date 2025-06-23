@@ -12,9 +12,17 @@ EOM
     exit -1
 fi
 
+OS="$(uname -s)"
+
 WORK=$1
 
-CORES=`nproc`
+if [[ "$OS" == "Linux" ]]; then
+    CORES="$(nproc)"
+elif [[ "$OS" == "Darwin" ]]; then
+    CORES="$(sysctl -n hw.logicalcpu)"
+else # default
+    CORES=1
+fi
 
 ALIVECC=@PROJECT_BINARY_DIR@/alivecc
 JOBSERVER=@PROJECT_BINARY_DIR@/alive-jobserver
