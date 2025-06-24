@@ -1291,7 +1291,7 @@ StateValue FpUnaryOpVerticalZip::toSMT(State &s) const {
     vals.emplace_back(
       retty->getChild(0).getAsAggregateType()->aggregateVals(v1s));
     vals.emplace_back(
-        retty->getChild(v2idx).getAsAggregateType()->aggregateVals(v2s));
+      retty->getChild(v2idx).getAsAggregateType()->aggregateVals(v2s));
   } else {
     auto [v1, v2] = scalar(v, val->getType());
     vals.emplace_back(std::move(v1));
