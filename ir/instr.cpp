@@ -1304,9 +1304,10 @@ expr FpUnaryOpVerticalZip::getTypeConstraints(const Function &f) const {
            val->getType().enforceFloatOrVectorType() &&
            getType().enforceStructType();
   if (auto ty = getType().getAsStructType()) {
+    unsigned v2idx = 1 + ty->isPadding(1);
     c &= ty->numElementsExcludingPadding() == 2 &&
          ty->getChild(0) == val->getType() &&
-         ty->getChild(1).enforceIntOrVectorType(32);
+         ty->getChild(v2idx).enforceIntOrVectorType(32);
   }
   return c;
 }
