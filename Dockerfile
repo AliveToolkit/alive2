@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 RUN apt-get update -qq && apt-get dist-upgrade -qq
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
 # Setup base dependencies:
-RUN apt-get install -y python3 cmake g++ git ninja-build redis redis-server libhiredis-dev libbsd-resource-perl libredis-perl re2c libgtest-dev z3
+RUN apt-get install -y python3 cmake g++ git ninja-build redis redis-server libhiredis-dev libbsd-resource-perl libredis-perl re2c libgtest-dev z3 libz3-dev
 
 RUN git clone --depth=1 https://github.com/llvm/llvm-project $HOME/llvm
 RUN mkdir $HOME/llvm/build && cd $HOME/llvm/build && \
