@@ -753,9 +753,10 @@ void State::copyUBFromBB(
 
   for (auto *src_bb : I->second) {
     bool all_paths_ok = true;
-    for (auto &[_, src_data] : src_state->predecessor_data.at(src_bb)) {
+    for (const auto &entry : src_state->predecessor_data.at(src_bb)) {
+      const auto &src_data = entry.second;
       auto I = ranges::find_if(tgt_data, [&](const auto &p) {
-        return is_eq(p.second.path <=> src_data.path);
+      return is_eq(p.second.path <=> src_data.path);
       });
       if (I == tgt_data.end() ||
           !I->second.analysis.ranges_fn_calls.isLargerThanInclReads(
