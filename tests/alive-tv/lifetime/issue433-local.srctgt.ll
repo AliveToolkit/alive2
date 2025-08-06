@@ -15,7 +15,7 @@ define i8 @tgt() {
   store i8 1, ptr %p, align 1
   call void @llvm.lifetime.start.p0i8(i64 1, ptr %p)
   call void @llvm.lifetime.end.p0i8(i64 1, ptr %p)
-  ret i8 undef
+  ret i8 1
 }
 
 declare void @llvm.lifetime.start.p0i8(i64, ptr)

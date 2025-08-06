@@ -320,11 +320,11 @@ public:
       bool is_function = false);
 
   // Start lifetime of a local block.
-  void startLifetime(const smt::expr &ptr_local);
+  void startLifetime(const StateValue &ptr);
 
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
-  void free(const smt::expr &ptr, bool unconstrained);
+  void free(const StateValue &ptr, bool unconstrained);
 
   static unsigned getStoreByteSize(const Type &ty);
   void store(const smt::expr &ptr, const StateValue &val, const Type &type,

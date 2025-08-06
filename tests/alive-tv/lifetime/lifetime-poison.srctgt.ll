@@ -6,8 +6,8 @@ define void @src() {
 }
 
 define void @tgt() {
-  ; lifetime undef is nop
-  call void @llvm.lifetime.start.p0i8(i64 1, ptr undef)
-  call void @llvm.lifetime.end.p0i8(i64 1, ptr undef)
+  ; lifetime with a poison ptr is a nop
+  call void @llvm.lifetime.start.p0i8(i64 1, ptr poison)
+  call void @llvm.lifetime.end.p0i8(i64 1, ptr poison)
   ret void
 }

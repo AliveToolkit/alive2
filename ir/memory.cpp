@@ -2233,35 +2233,40 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   return { std::move(p).release(), std::move(allocated) };
 }
 
-void Memory::startLifetime(const expr &ptr_local) {
+void Memory::startLifetime(const StateValue &ptr) {
   assert(!memory_unused());
-  Pointer p(*this, ptr_local);
-  state->addUB(p.isLocal());
+  Pointer p(*this, ptr.value);
+  state->addUB(ptr.non_poison.implies(p.isStackAllocated()));
 
   if (observesAddresses())
-    state->addPre(p.isBlockAlive() ||
+    state->addPre(
+      !ptr.non_poison ||
+      p.isBlockAlive() ||
       disjoint_local_blocks(*this, p.getAddress(),
                             p.blockSizeAligned().zextOrTrunc(bits_ptr_address),
                             p.blockAlignment(), local_blk_addr));
 
-  store_bv(p, true, local_block_liveness, non_local_block_liveness, true);
+  store_bv(p, true, local_block_liveness, non_local_block_liveness, true,
+           ptr.non_poison);
 }
 
-void Memory::free(const expr &ptr, bool unconstrained) {
+void Memory::free(const StateValue &ptr, bool unconstrained) {
   assert(!memory_unused());
-  Pointer p(*this, ptr);
+  Pointer p(*this, ptr.value);
   expr isnnull = p.isNull();
 
   if (!unconstrained)
-    state->addUB(isnnull || (p.getOffset() == 0 &&
-                             p.isBlockAlive() &&
-                             p.getAllocType() == Pointer::MALLOC));
+    state->addUB(!ptr.non_poison ||
+                 isnnull ||
+                 (p.getOffset() == 0 &&
+                  p.isBlockAlive() &&
+                  p.getAllocType() == Pointer::MALLOC));
 
   if (!isnnull.isTrue()) {
     // A nonlocal block for encoding fn calls' side effects cannot be freed.
     ensure_non_fncallmem(p);
     store_bv(p, false, local_block_liveness, non_local_block_liveness, false,
-             !isnnull);
+             !isnnull && ptr.non_poison);
   }
 }
 

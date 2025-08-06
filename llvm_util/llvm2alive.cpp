@@ -128,8 +128,8 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   vector<pair<Phi*, llvm::PHINode*>> todo_phis;
   const Instr *insert_constexpr_before = nullptr;
   ostream *out;
-  // (LLVM alloca, (Alive2 alloc, has lifetime.start?))
-  map<const llvm::AllocaInst *, std::pair<Alloc *, bool>> allocs;
+  // (LLVM alloca, Alive2 alloc)
+  map<const llvm::AllocaInst*, Alloc*> allocs;
 
 
   using RetTy = unique_ptr<Instr>;
@@ -589,7 +589,7 @@ public:
     auto size = make_intconst(typesz, 64);
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
                       pref_alignment(i, i.getAllocatedType()));
-    allocs.emplace(&i, make_pair(alloc.get(), /*has lifetime.start?*/ false));
+    allocs.emplace(&i, alloc.get());
     return alloc;
   }
 
@@ -728,90 +728,6 @@ public:
 
   RetTy visitUnreachableInst(llvm::UnreachableInst &i) {
     return mkUnreach();
-  }
-
-  enum LifetimeKind {
-    LIFETIME_START,
-    LIFETIME_START_FILLPOISON,
-    LIFETIME_FILLPOISON,
-    LIFETIME_FREE,
-    LIFETIME_NOP,
-    LIFETIME_UNKNOWN
-  };
-  LifetimeKind getLifetimeKind(llvm::IntrinsicInst &i) {
-    llvm::Value *Ptr = i.getOperand(1);
-
-    if (isa<llvm::UndefValue>(Ptr))
-      // lifetime with undef ptr is no-op
-      return LIFETIME_NOP;
-
-    llvm::SmallVector<const llvm::Value *> Objs;
-    llvm::getUnderlyingObjects(Ptr, Objs);
-
-    if (llvm::all_of(Objs, [](const llvm::Value *V) {
-        // Stack coloring algorithm doesn't assign slots for global variables
-        // or objects passed as pointer arguments
-        return llvm::isa<llvm::Argument,
-                         llvm::GlobalVariable,
-                         llvm::CallInst>(V); }))
-      return LIFETIME_FILLPOISON;
-
-    Objs.clear();
-    // Restricted to ops without ptr offset changes only
-    Ptr = Ptr->stripPointerCasts();
-    if (auto *Sel = dyn_cast<llvm::SelectInst>(Ptr)) {
-      Objs.emplace_back(Sel->getTrueValue());
-      Objs.emplace_back(Sel->getFalseValue());
-    } else if (auto *Phi = dyn_cast<llvm::PHINode>(Ptr)) {
-      for (auto &U : Phi->incoming_values())
-        Objs.emplace_back(U.get());
-    } else
-      Objs.emplace_back(Ptr);
-
-    if (!llvm::all_of(Objs, [](const llvm::Value *V) {
-         return llvm::isa<llvm::AllocaInst>(V->stripPointerCasts()); })) {
-      // If it is gep(alloca, const) where const != 0, it is fillpoison.
-      // Since such pattern is rare, check the simplest case and just return
-      // unknown otherwise
-      if (Objs.size() == 1) {
-        const auto *GEPI = llvm::dyn_cast<llvm::GetElementPtrInst>(Objs[0]);
-        if (GEPI && llvm::isa<llvm::AllocaInst>(
-                            GEPI->getPointerOperand()->stripPointerCasts())) {
-          unsigned BitWidth = DL().getIndexTypeSizeInBits(GEPI->getType());
-          llvm::APInt Offset(BitWidth, 0);
-          if (GEPI->accumulateConstantOffset(DL(), Offset) &&
-              !Offset.isZero())
-            return LIFETIME_FILLPOISON;
-        }
-      }
-      return LIFETIME_UNKNOWN;
-    }
-
-    // Now, it is guaranteed that Ptr points to alloca with zero offset.
-
-    if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
-      // double free is okay
-      return LIFETIME_FREE;
-
-    // lifetime.start
-    bool needs_fillpoison = false;
-
-    for (const auto *V : Objs) {
-      auto *ai = cast<llvm::AllocaInst>(V);
-      auto itr = allocs.find(ai);
-      if (itr == allocs.end())
-        // AllocaInst isn't visited; it is in a loop.
-        return LIFETIME_UNKNOWN;
-
-      itr->second.first->markAsInitiallyDead();
-      if (itr->second.second) {
-        // it isn't the first lifetime.start; conservatively add fillpoison
-        // to correctly encode the precise semantics
-        needs_fillpoison = true;
-      }
-      itr->second.second = true;
-    }
-    return needs_fillpoison ? LIFETIME_START_FILLPOISON : LIFETIME_START;
   }
 
   RetTy visitIntrinsicInst(llvm::IntrinsicInst &i) {
@@ -1188,21 +1104,33 @@ public:
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_BINOP();
-      switch (getLifetimeKind(i)) {
-      case LIFETIME_START:
-        return make_unique<StartLifetime>(*b);
-      case LIFETIME_START_FILLPOISON:
-        BB->addInstr(make_unique<StartLifetime>(*b));
-        return make_unique<FillPoison>(*b);
-      case LIFETIME_FREE:
-        return make_unique<EndLifetime>(*b);
-      case LIFETIME_FILLPOISON:
-        return make_unique<FillPoison>(*b);
-      case LIFETIME_NOP:
+      if (isa<llvm::PoisonValue>(i.getOperand(1)))
         return NOP(i);
-      case LIFETIME_UNKNOWN:
-        return error(i);
-      }
+      if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
+        return make_unique<EndLifetime>(*b);
+
+      vector<llvm::Value*> todo = { i.getOperand(1) };
+      unordered_set<llvm::Value*> seen;
+      do {
+        auto Ptr = todo.back()->stripPointerCasts();
+        todo.pop_back();
+        if (!seen.emplace(Ptr).second)
+          continue;
+
+        if (auto *Sel = dyn_cast<llvm::SelectInst>(Ptr)) {
+          todo.emplace_back(Sel->getTrueValue());
+          todo.emplace_back(Sel->getFalseValue());
+        } else if (auto *Phi = dyn_cast<llvm::PHINode>(Ptr)) {
+          for (auto &U : Phi->incoming_values())
+            todo.emplace_back(U.get());
+        } else if (auto *alloca = dyn_cast<llvm::AllocaInst>(Ptr)) {
+          auto it = allocs.find(alloca);
+          if (it != allocs.end())
+            it->second->markAsInitiallyDead();
+        }
+      } while (!todo.empty());
+
+      return make_unique<StartLifetime>(*b);
     }
     case llvm::Intrinsic::ptrmask:
     {

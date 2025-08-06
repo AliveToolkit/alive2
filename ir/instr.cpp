@@ -2705,7 +2705,7 @@ StateValue FnCall::toSMT(State &s) const {
         expr freeptr = fnName == "@reallocf"
                         ? allocptr
                         : expr::mkIf(size == 0 || allocated, allocptr, nullp);
-        m.free(freeptr, false);
+        m.free({std::move(freeptr), true}, false);
       }
     }
 
@@ -2722,7 +2722,7 @@ StateValue FnCall::toSMT(State &s) const {
     auto &allocptr = s.getAndAddPoisonUB(get_alloc_ptr()).value;
 
     if (!hasAttribute(FnAttrs::NoFree)) {
-      m.free(allocptr, false);
+      m.free({expr(allocptr), true}, false);
 
       if (s.getFn().has(FnAttrs::NoFree)) {
         Pointer ptr(m, allocptr);
@@ -3836,7 +3836,7 @@ StateValue Alloc::toSMT(State &s) const {
 
   expr ptr = s.getMemory().alloc(&sz, align, Memory::STACK, true, true).first;
   if (initially_dead)
-    s.getMemory().free(ptr, true);
+    s.getMemory().free({expr(ptr), true}, true);
   return { std::move(ptr), true };
 }
 
@@ -3876,8 +3876,7 @@ void StartLifetime::print(ostream &os) const {
 }
 
 StateValue StartLifetime::toSMT(State &s) const {
-  auto &p = s.getWellDefinedPtr(*ptr);
-  s.getMemory().startLifetime(p);
+  s.getMemory().startLifetime(s[*ptr]);
   return {};
 }
 
@@ -3912,8 +3911,10 @@ void EndLifetime::print(ostream &os) const {
 }
 
 StateValue EndLifetime::toSMT(State &s) const {
-  auto &p = s.getWellDefinedPtr(*ptr);
-  s.getMemory().free(p, true);
+  auto &pv = s[*ptr];
+  Pointer p(s.getMemory(), pv.value);
+  s.addUB(pv.non_poison.implies(p.isStackAllocated()));
+  s.getMemory().free(pv, true);
   return {};
 }
 
