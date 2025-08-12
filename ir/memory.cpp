@@ -2234,7 +2234,7 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
 }
 
 void Memory::startLifetime(const StateValue &ptr) {
-  assert(!memory_unused());
+  assert(!memory_unused() || ptr.non_poison.isFalse());
   Pointer p(*this, ptr.value);
   state->addUB(ptr.non_poison.implies(p.isStackAllocated()));
 
@@ -2251,7 +2251,7 @@ void Memory::startLifetime(const StateValue &ptr) {
 }
 
 void Memory::free(const StateValue &ptr, bool unconstrained) {
-  assert(!memory_unused());
+  assert(!memory_unused() || ptr.non_poison.isFalse());
   Pointer p(*this, ptr.value);
   expr isnnull = p.isNull();
 
