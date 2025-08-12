@@ -1103,11 +1103,11 @@ public:
     case llvm::Intrinsic::lifetime_start:
     case llvm::Intrinsic::lifetime_end:
     {
-      PARSE_BINOP();
+      PARSE_UNOP();
       if (isa<llvm::PoisonValue>(i.getOperand(1)))
         return NOP(i);
       if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
-        return make_unique<EndLifetime>(*b);
+        return make_unique<EndLifetime>(*val);
 
       vector<llvm::Value*> todo = { i.getOperand(1) };
       unordered_set<llvm::Value*> seen;
@@ -1130,7 +1130,7 @@ public:
         }
       } while (!todo.empty());
 
-      return make_unique<StartLifetime>(*b);
+      return make_unique<StartLifetime>(*val);
     }
     case llvm::Intrinsic::ptrmask:
     {
