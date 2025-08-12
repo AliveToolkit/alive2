@@ -1109,7 +1109,7 @@ public:
       if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
         return make_unique<EndLifetime>(*val);
 
-      vector<llvm::Value*> todo = { i.getOperand(1) };
+      vector<llvm::Value*> todo = { i.getOperand(0) };
       unordered_set<llvm::Value*> seen;
       do {
         auto Ptr = todo.back()->stripPointerCasts();

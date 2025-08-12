@@ -4026,7 +4026,9 @@ StateValue GEP::toSMT(State &s) const {
         idx_all_zeros.add(v == 0);
 
       if (nusw) {
-        non_poison.add(val.sextOrTrunc(v.bits()) == v);
+        if (v.bits() > bits_program_pointer)
+          non_poison.add(
+            v.trunc(bits_program_pointer).sextOrTrunc(v.bits()) == v);
         non_poison.add(multiplier.mul_no_soverflow(val));
         non_poison.add(ptr.addNoUSOverflow(inc, inbounds));
         if (!inbounds) {
@@ -4038,7 +4040,8 @@ StateValue GEP::toSMT(State &s) const {
       }
 
       if (nuw) {
-        non_poison.add(val.zextOrTrunc(v.bits()) == v);
+        if (v.bits() > bits_program_pointer)
+          non_poison.add(v.extract(v.bits()-1, bits_program_pointer) == 0);
         non_poison.add(multiplier.mul_no_uoverflow(val));
         non_poison.add(ptr.addNoUOverflow(inc, inbounds));
       }
