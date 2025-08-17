@@ -177,8 +177,7 @@ class Memory {
   AliasSet escaped_local_blks;
   AliasSet observed_addrs;
 
-  void escape_helper(const smt::expr &ptr, AliasSet &set1,
-                     AliasSet *set2 = nullptr);
+  void escape_helper(const smt::expr &ptr, bool escapes);
 
   bool hasEscapedLocals() const {
     return escaped_local_blks.numMayAlias(true) > 0;
@@ -352,7 +351,7 @@ public:
 
   void fillPoison(const smt::expr &bid);
 
-  smt::expr ptr2int(const smt::expr &ptr);
+  smt::expr ptr2int(const smt::expr &ptr, bool escape = true);
   smt::expr int2ptr(const smt::expr &val);
 
   std::tuple<smt::expr, Pointer, std::set<smt::expr>>
@@ -361,7 +360,7 @@ public:
             const std::vector<PtrInput> *set_ptrs_other = nullptr) const;
 
   void escapeLocalPtr(const smt::expr &ptr, const smt::expr &is_ptr);
-  void observesAddr(const Pointer &ptr);
+  void observesAddr(const Pointer &ptr, bool escapes);
 
   smt::expr returnChecks() const;
   smt::expr checkNocapture() const;

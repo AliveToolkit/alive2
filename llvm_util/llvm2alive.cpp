@@ -279,12 +279,13 @@ public:
       ConversionOp::Op op;
       bool has_non_fp = true;
       switch (i.getOpcode()) {
-      case llvm::Instruction::SExt:     op = ConversionOp::SExt; break;
-      case llvm::Instruction::ZExt:     op = ConversionOp::ZExt; break;
-      case llvm::Instruction::Trunc:    op = ConversionOp::Trunc; break;
-      case llvm::Instruction::BitCast:  op = ConversionOp::BitCast; break;
-      case llvm::Instruction::PtrToInt: op = ConversionOp::Ptr2Int; break;
-      case llvm::Instruction::IntToPtr: op = ConversionOp::Int2Ptr; break;
+      case llvm::Instruction::SExt:      op = ConversionOp::SExt; break;
+      case llvm::Instruction::ZExt:      op = ConversionOp::ZExt; break;
+      case llvm::Instruction::Trunc:     op = ConversionOp::Trunc; break;
+      case llvm::Instruction::BitCast:   op = ConversionOp::BitCast; break;
+      case llvm::Instruction::PtrToInt:  op = ConversionOp::Ptr2Int; break;
+      case llvm::Instruction::PtrToAddr: op = ConversionOp::Ptr2Addr; break;
+      case llvm::Instruction::IntToPtr:  op = ConversionOp::Int2Ptr; break;
       default: has_non_fp = false; break;
       }
       if (has_non_fp) {

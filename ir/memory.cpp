@@ -2559,10 +2559,10 @@ void Memory::fillPoison(const expr &bid) {
          std::move(blksz), bits_byte / 8, {}, false);
 }
 
-expr Memory::ptr2int(const expr &ptr) {
+expr Memory::ptr2int(const expr &ptr, bool escapes) {
   assert(!memory_unused() && observesAddresses());
   Pointer p(*this, ptr);
-  observesAddr(p);
+  observesAddr(p, escapes);
   state->addUB(!p.isNocapture());
   return p.getAddress();
 }
@@ -2827,19 +2827,22 @@ void Memory::record_stored_pointer(uint64_t bid, const expr &offset) {
   }
 }
 
-void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
+void Memory::escape_helper(const expr &ptr, bool escapes) {
   assert(observesAddresses());
 
+  // We only record local pointers since anything global may have been
+  // observed already.
   if (next_local_bid == 0 ||
-      set1.isFullUpToAlias(true) == (int)next_local_bid-1)
+      (observed_addrs.isFullUpToAlias(true) == (int)next_local_bid-1 &&
+       (!escapes ||
+          escaped_local_blks.isFullUpToAlias(true) == (int)next_local_bid-1)))
     return;
 
-  // If we have a physical pointer, only observed addresses can escape
   if (has_int2ptr) {
     Pointer p(*this, ptr);
     if (p.isLogical().isFalse()) {
-      if (set2)
-        set1.unionWith(*set2);
+      // already escaped before
+      // TODO: revisit when we decide on the semantics of ptr2int
       return;
     }
   }
@@ -2848,24 +2851,21 @@ void Memory::escape_helper(const expr &ptr, AliasSet &set1, AliasSet *set2) {
   for (const auto &bid_expr : extract_possible_local_bids(*this, ptr)) {
     if (bid_expr.isUInt(bid)) {
       if (bid < next_local_bid) {
-        set1.setMayAlias(true, bid);
-        if (set2)
-          set2->setMayAlias(true, bid);
+        observed_addrs.setMayAlias(true, bid);
+        if (escapes)
+          escaped_local_blks.setMayAlias(true, bid);
       }
     } else if (isInitialMemBlock(bid_expr, true)) {
       // initial non local block bytes don't contain local pointers.
     } else if (isFnReturnValue(bid_expr)) {
       // Function calls have already escaped whatever they needed to.
+    } else if (isDerivedFromLoad(bid_expr)) {
+      // if this a load, it can't escape anything that hasn't escaped before
     } else {
-      if (isDerivedFromLoad(bid_expr)) {
-        // if this a load, it can't escape anything that hasn't escaped before
-        continue;
-      }
-
       // may escape a local ptr, but we don't know which one
-      set1.setMayAliasUpTo(true, next_local_bid-1);
-      if (set2)
-        set2->setMayAliasUpTo(true, next_local_bid-1);
+      observed_addrs.setMayAliasUpTo(true, next_local_bid-1);
+      if (escapes)
+        escaped_local_blks.setMayAliasUpTo(true, next_local_bid-1);
       break;
     }
   }
@@ -2875,11 +2875,11 @@ void Memory::escapeLocalPtr(const expr &ptr, const expr &is_ptr) {
   if (is_ptr.isFalse())
     return;
 
-  escape_helper(ptr, escaped_local_blks, &observed_addrs);
+  escape_helper(ptr, true);
 }
 
-void Memory::observesAddr(const Pointer &ptr) {
-  escape_helper(ptr(), observed_addrs);
+void Memory::observesAddr(const Pointer &ptr, bool escapes) {
+  escape_helper(ptr(), escapes);
 }
 
 Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {

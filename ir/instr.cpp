@@ -1704,7 +1704,8 @@ void ConversionOp::print(ostream &os) const {
   case Trunc:    str = "trunc "; break;
   case BitCast:  str = "bitcast "; break;
   case Ptr2Int:  str = "ptrtoint "; break;
-  case Int2Ptr:  str = "int2ptr "; break;
+  case Ptr2Addr: str = "ptrtoaddr "; break;
+  case Int2Ptr:  str = "inttoptr "; break;
   }
 
   os << getName() << " = " << str;
@@ -1759,6 +1760,12 @@ StateValue ConversionOp::toSMT(State &s) const {
       return {s.getMemory().ptr2int(val).zextOrTrunc(to_type.bits()), true};
     };
     break;
+  case Ptr2Addr:
+    fn = [&](auto &&val, auto &to_type) -> StateValue {
+      return
+        { s.getMemory().ptr2int(val, false).zextOrTrunc(to_type.bits()), true };
+    };
+    break;
   case Int2Ptr:
     fn = [&](auto &&val, auto &to_type) -> StateValue {
       return {s.getMemory().int2ptr(val), true};
@@ -1808,6 +1815,7 @@ expr ConversionOp::getTypeConstraints(const Function &f) const {
         getType().sizeVar() == val->getType().sizeVar();
     break;
   case Ptr2Int:
+  case Ptr2Addr:
     c = getType().enforceIntOrVectorType() &&
         val->getType().enforcePtrOrVectorType();
     break;
@@ -2873,8 +2881,8 @@ StateValue ICmp::toSMT(State &s) const {
 
       switch (pcmode) {
       case INTEGRAL:
-        m.observesAddr(lhs);
-        m.observesAddr(rhs);
+        m.observesAddr(lhs, false);
+        m.observesAddr(rhs, false);
         return fn(lhs.getAddress(), rhs.getAddress(), cond);
       case PROVENANCE:
         assert(cond == EQ || cond == NE);
@@ -2895,8 +2903,8 @@ StateValue ICmp::toSMT(State &s) const {
         auto &m = s.getMemory();
         Pointer lhs(m, a.value);
         Pointer rhs(m, b.value);
-        m.observesAddr(lhs);
-        m.observesAddr(rhs);
+        m.observesAddr(lhs, false);
+        m.observesAddr(rhs, false);
         np = lhs.getAddress().sign() == rhs.getAddress().sign();
       } else {
         np = a.value.sign() == b.value.sign();

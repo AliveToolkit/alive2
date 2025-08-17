@@ -590,10 +590,10 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     return cond;
   };
 
-  bool observes_local = m.observed_addrs.numMayAlias(true) > 0;
+  bool escapes_local = m.escaped_local_blks.numMayAlias(true) > 0;
 
   auto phy_ptr = [&](Pointer &p, bool is_phy) -> pair<expr, Pointer> {
-    DisjointExpr<expr> bids(expr::mkUInt(0, bitsShortBid() + observes_local));
+    DisjointExpr<expr> bids(expr::mkUInt(0, bitsShortBid() + escapes_local));
     DisjointExpr<expr> addrs(expr::mkUInt(0, bits_ptr_address));
     expr ub = false;
     bool all_same_size = true;
@@ -602,7 +602,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
     auto add = [&](unsigned start, unsigned limit, bool local) {
       for (unsigned i = start; i < limit; ++i) {
         // address not observed; can't alias with that
-        if (local && !m.observed_addrs.mayAlias(true, i))
+        if (local && !m.escaped_local_blks.mayAlias(true, i))
           continue;
 
         Pointer this_ptr(m, i, local, p.getAttrs());
@@ -623,7 +623,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
         all_same_size &= same_size;
 
         bids.add(
-          observes_local ? this_ptr.getBid() : this_ptr.getShortBid(), cond);
+          escapes_local ? this_ptr.getBid() : this_ptr.getShortBid(), cond);
         addrs.add(std::move(this_addr), std::move(cond));
       }
     };
@@ -633,7 +633,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
       add(num_nonlocals_src, num_nonlocals, false);
 
     expr bid = *std::move(bids)();
-    if (!observes_local)
+    if (!escapes_local)
       bid = mkLongBid(bid, false);
 
     return { std::move(ub),
@@ -950,7 +950,7 @@ pair<Pointer, expr> Pointer::findLogicalLocalPointer(const expr &addr) const {
 
   for (unsigned i = 0, e = m.numLocals(); i != e; ++i) {
     // address not observed; can't alias with that
-    if (!m.observed_addrs.mayAlias(true, i))
+    if (!m.escaped_local_blks.mayAlias(true, i))
       continue;
 
     Pointer p(m, i, true);
