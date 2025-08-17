@@ -4019,9 +4019,11 @@ StateValue GEP::toSMT(State &s) const {
     AndExpr inbounds_np;
     AndExpr idx_all_zeros;
 
-    // FIXME: not implemented for physical pointers
-    if (inbounds)
+    if (inbounds) {
+      // FIXME: not implemented for physical pointers
+      s.addUB(ptr.isLogical());
       inbounds_np.add(ptr.inbounds(false));
+    }
 
     expr offset_sum = expr::mkUInt(0, bits_for_offset);
     for (auto &[sz, idx] : offsets) {
