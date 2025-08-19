@@ -1336,8 +1336,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   return retval;
 }
 
-void State::doesApproximation(string &&name, optional<expr> e) {
-  used_approximations.emplace(std::move(name), std::move(e));
+void State::doesApproximation(string &&name, optional<expr> e,
+                              bool must_be_true) {
+  used_approximations.emplace(std::move(name), std::move(e), must_be_true);
 }
 
 void State::addQuantVar(const expr &var) {
