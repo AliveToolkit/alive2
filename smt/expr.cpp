@@ -980,11 +980,13 @@ static expr smul_fix_helper(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::smul_fix(const expr &a, const expr &b, const expr &c) {
+  C2(a);
   expr r = smul_fix_helper(a, b, c);
   return r.trunc(a.bits());
 }
 
 expr expr::smul_fix_no_soverflow(const expr &a, const expr &b, const expr &c) {
+  C2(a);
   expr r = smul_fix_helper(a, b, c);
   auto width = a.bits();
   expr result = r.trunc(width);
@@ -1008,11 +1010,13 @@ static expr umul_fix_helper(const expr &a, const expr &b, const expr &c) {
 }
 
 expr expr::umul_fix(const expr &a, const expr &b, const expr &c) {
+  C2(a);
   expr r = umul_fix_helper(a, b, c);
   return r.trunc(a.bits());
 }
 
 expr expr::umul_fix_no_uoverflow(const expr &a, const expr &b, const expr &c) {
+  C2(a);
   auto width = a.bits();
   return umul_fix_helper(a, b, c).extract(width * 2 - 1, width) == 0;
 }
